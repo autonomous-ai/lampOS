@@ -611,7 +611,8 @@ fn named_among<'a>(heard: &str, wanted: &[(String, &'a str)]) -> Option<&'a str>
     let mut found: Option<&str> = None;
     let mut at = 0;
     while at < words.len() {
-        // The longest name said from here.
+        // The longest name said from here, as it is spelled, else with one
+        // "s" on its last word ([`spelled_as`]).
         let name = (1..=NAME_WORDS.min(words.len() - at))
             .rev()
             .find_map(|length| {
@@ -619,6 +620,7 @@ fn named_among<'a>(heard: &str, wanted: &[(String, &'a str)]) -> Option<&'a str>
                 wanted
                     .iter()
                     .find(|(name, _)| *name == said)
+                    .or_else(|| wanted.iter().find(|(name, _)| spelled_as(name, &said)))
                     .map(|(_, function)| (length, *function))
             });
         if let Some((length, function)) = name {
@@ -642,6 +644,17 @@ fn named_among<'a>(heard: &str, wanted: &[(String, &'a str)]) -> Option<&'a str>
         }
     }
     found
+}
+
+/// Whether `said`, words heard in a row made [`loose`], is the name or ask
+/// `name` with one "s" put on its last word: speech to text gave "Um,
+/// daily brief." back as "Daily briefs." and "Lamp, um, daily brief." as
+/// "Lamp, daily briefs." on lamp-9adf (#7916's row, 19 Nov 14:36 and
+/// 14:44), and each was left to the model. Spelling only, as a number is
+/// matched as a word or a digit: no word is judged by what it means, and a
+/// name spelled exactly is always matched first ([`named_among`]).
+fn spelled_as(name: &str, said: &str) -> bool {
+    !name.is_empty() && said.strip_suffix('s') == Some(name)
 }
 
 /// How many words from `at` an `AROUND` phrase takes, never one of
@@ -1396,6 +1409,10 @@ mod tests {
             ("run tech news", "tech-news"),
             ("Hey Lamp, run tech news please.", "tech-news"),
             ("um, tech news now", "tech-news"),
+            // As speech to text gave them back on lamp-9adf (#7916's row,
+            // 19 Nov): the "um" dropped, an "s" put on the last word.
+            ("Daily briefs.", "daily-brief"),
+            ("Lamp, daily briefs.", "daily-brief"),
         ] {
             assert_eq!(heard(&settings, line), run(made), "{line}");
             assert_eq!(
@@ -1414,6 +1431,8 @@ mod tests {
             "news",
             "um",
             "off news",
+            "dailys brief",
+            "daily briefss",
         ] {
             assert_eq!(heard(&settings, line), None, "{line}");
         }

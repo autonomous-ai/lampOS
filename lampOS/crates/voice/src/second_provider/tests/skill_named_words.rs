@@ -1148,7 +1148,17 @@ async fn a_made_skills_words_run_it_after_a_question_that_names_it_not() {
         crate::made_skill::MAKE.to_owned(),
         json!({ crate::made_run::RUN: "daily-brief" }),
     );
-    for line in ["Hey Lamp, daily brief", "daily brief", "Daily brief."] {
+    // The row of #7916 on lamp-9adf, 19 Nov 14:36 and 14:44: "Um, daily
+    // brief." and "Lamp, um, daily brief." came back from speech to text
+    // as "Daily briefs." and "Lamp, daily briefs.", the "um" dropped and an
+    // "s" put on, and each was left to the model.
+    for line in [
+        "Hey Lamp, daily brief",
+        "daily brief",
+        "Daily brief.",
+        "Daily briefs.",
+        "Lamp, daily briefs.",
+    ] {
         for (lamp, runs) in [
             (
                 Some("Saved your day. Want me to remind you tomorrow?"),

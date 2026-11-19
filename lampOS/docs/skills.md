@@ -7943,7 +7943,11 @@ grants, its code, or the lamp's own steps (the light, the head, a say).
    a request before it such as "can you", a word that asks to run it such
    as "run") and a filler (`skill_named::FILLERS`: "um", "uh", "er",
    "erm", "hmm"). "Hey Lamp, daily brief", "Lamp, daily brief please",
-   "Daily brief." and "um, daily brief now" start daily-brief; "tell me
+   "Daily brief." and "um, daily brief now" start daily-brief, and so do
+   "Daily briefs." and "Lamp, daily briefs.": one "s" on the last word is
+   matched too, an exact spelling first (`skill_named::spelled_as`;
+   #7916's row on lamp-9adf, 19 Nov: speech to text gave "Um, daily
+   brief." back as "Daily briefs."); "tell me
    about your daily brief idea" holds other words and is the model's. A
    no, a question, a phrase two skills give, a part of the name, or a line
    while a yes is held starts nothing. After the lamp's last words asked
