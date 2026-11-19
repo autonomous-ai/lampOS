@@ -497,6 +497,9 @@ pub enum Words {
     ExactSound {
         samples: Vec<i16>,
         text: Option<String>,
+        /// A long line's pieces, played as they come (#7892): `samples`
+        /// is then empty. None for any other line.
+        pieces: Option<Arc<tts_cache::Pieces>>,
     },
     /// A paired computer's own clip (docs/control.md, "Sounds"), by its
     /// path under lamp-control's clips folder ([`CLIPS_ENVIRONMENT`]),
@@ -1515,9 +1518,18 @@ pub struct Ticket {
     line: LineMeta,
     /// An exact line's words ([`Words::ExactSound`]), none for anything else.
     said: Option<String>,
+    /// A long exact line's pieces (#7892): held while it plays, let go
+    /// with the ticket, which stops its renderer.
+    pieces: Option<Arc<tts_cache::Pieces>>,
 }
 
 impl Ticket {
+    /// A long exact line's feed, its pieces played as they come (#7892);
+    /// none for any other say.
+    pub(crate) fn pieces(&self) -> Option<Arc<crate::speaker_stream::Feed>> {
+        self.pieces.as_ref().map(|pieces| pieces.feed())
+    }
+
     /// The line this ticket plays, as `voice/line` tells it: an exact or
     /// cached line taken to play. None for a clip, a sound or a model's
     /// turn, whose words the voice does not hold.
@@ -1607,6 +1619,7 @@ impl Ticket {
                 question: false,
                 line: Default::default(),
                 said: None,
+                pieces: None,
             },
             answered,
         )
@@ -2081,6 +2094,7 @@ impl Says {
             Words::ExactSound {
                 samples,
                 text: None,
+                pieces: None,
             },
             NORMAL_PRIORITY,
         )
@@ -2101,6 +2115,7 @@ impl Says {
             Words::ExactSound {
                 samples,
                 text: None,
+                pieces: None,
             },
             NORMAL_PRIORITY,
         );
@@ -2137,6 +2152,7 @@ impl Says {
             Words::ExactSound {
                 samples,
                 text: None,
+                pieces: None,
             },
             priority,
         );
@@ -2356,6 +2372,7 @@ impl Says {
                 question: false,
                 line: Default::default(),
                 said: None,
+                pieces: None,
             },
         ))
     }
@@ -2380,6 +2397,7 @@ impl Says {
                 question: false,
                 line: waiting.request.line,
                 said: None,
+                pieces: None,
             },
         ))
     }
@@ -2435,6 +2453,7 @@ impl Says {
             question: false,
             line: Default::default(),
             said: None,
+            pieces: None,
         };
         let why = match may_play_exact(now) {
             ExactNow::Play => return Some(self.open_stream(by, ticket, at_us)),
@@ -2466,7 +2485,12 @@ impl Says {
         self.expire(now_us);
         let index = self.next_of(|request| matches!(request.words, Words::ExactSound { .. }))?;
         let waiting = self.waiting.remove(index);
-        let Words::ExactSound { samples, text } = waiting.request.words else {
+        let Words::ExactSound {
+            samples,
+            text,
+            pieces,
+        } = waiting.request.words
+        else {
             unreachable!("next_of chose an exact line");
         };
         Some((
@@ -2482,6 +2506,7 @@ impl Says {
                 question: false,
                 line: waiting.request.line,
                 said: text,
+                pieces,
             },
         ))
     }
@@ -2624,6 +2649,7 @@ impl Says {
                 question,
                 line: Default::default(),
                 said: None,
+                pieces: None,
             },
             quoted,
         ))
@@ -2660,6 +2686,7 @@ impl Says {
             question: false,
             line: Default::default(),
             said: None,
+            pieces: None,
         })
     }
 
@@ -2685,6 +2712,7 @@ impl Says {
             question: false,
             line: Default::default(),
             said: None,
+            pieces: None,
         })
     }
 
@@ -2887,6 +2915,7 @@ fn serve_client(
                     request.words = Words::ExactSound {
                         samples: read_clip(path, &folders.clips)?,
                         text: None,
+                        pieces: None,
                     };
                 }
                 Words::Recording(name) => {
@@ -2897,16 +2926,16 @@ fn serve_client(
                     request.words = Words::Sound(recordings.cached(text)?);
                 }
                 Words::Exact(text) => {
-                    let (samples, said) = match request.line.voice.as_deref() {
-                        // The app's voice preview (#7485): the words as
-                        // sent, in that voice, never the owner's fixed line.
-                        Some(voice) => (recordings.rendered_in(text, voice)?, text.as_str()),
-                        None => recordings.rendered(text)?,
+                    let (played, said) = recordings.played(text, request.line.voice.as_deref())?;
+                    let (samples, pieces) = match played {
+                        tts_cache::Played::Whole(samples) => (samples, None),
+                        tts_cache::Played::Pieces(pieces) => (Vec::new(), Some(pieces)),
                     };
                     request.line.said = Some((said.to_owned(), lamp_msgs::LineSource::Exact));
                     request.words = Words::ExactSound {
                         samples,
                         text: crate::language::is_fixed(text).then(|| said.to_owned()),
+                        pieces,
                     };
                 }
                 // A fixed line asked as text, the first stand's (#4710),
@@ -3360,6 +3389,33 @@ impl Recordings {
             }
             None => cache.render_once(text).map(|samples| (samples, text)),
         }
+    }
+
+    /// An exact `text` to play, as [`Self::rendered`] says it, or in the
+    /// lamp's voice named `voice` as [`Self::rendered_in`] does (the app's
+    /// voice preview, #7485: the words as sent, never the owner's fixed
+    /// line). A long line other than a fixed one is played as it comes,
+    /// its pieces after the first rendered while it plays
+    /// ([`tts_cache::TtsCache::render_played`], #7892).
+    pub fn played<'a>(
+        &self,
+        text: &'a str,
+        voice: Option<&str>,
+    ) -> Result<(tts_cache::Played, &'a str), String> {
+        let cache = self
+            .cache
+            .as_ref()
+            .ok_or_else(|| "the speech service is off (no speech cache)".to_owned())?;
+        if voice.is_none()
+            && (cache.owners_words(text).is_some() || crate::language::is_fixed(text))
+        {
+            return self
+                .rendered(text)
+                .map(|(samples, said)| (tts_cache::Played::Whole(samples), said));
+        }
+        cache
+            .render_played(text, voice)
+            .map(|played| (played, text))
     }
 
     /// An exact `text` rendered now in the lamp's voice named `voice`, never
@@ -4829,6 +4885,7 @@ mod tests {
         exact.request.words = Words::ExactSound {
             samples: vec![1; 8],
             text: None,
+            pieces: None,
         };
         let (mut from, _from_answered) = asked("reminders", 8, 10_000_000);
         from.request.words = Words::From(Source::Schedule);

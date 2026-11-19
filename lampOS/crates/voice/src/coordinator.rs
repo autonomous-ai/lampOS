@@ -1561,11 +1561,16 @@ impl Reply {
         // played whole, with no gap in its playback.
         // A computer's stream is `spoken` when its last chunk played out;
         // a gap in a stream's sound is its computer's, not a cut.
+        // A long exact line's pieces (#7892) are `spoken` once the last
+        // played out and none went unrendered: a gap while a piece renders
+        // is no cut.
         let sound = (matches!(
             self.notice.origin(),
             SpeechOrigin::SkillSound | SpeechOrigin::ExactLine
         ) && self.playback_gaps == 0
-            || self.notice.origin() == SpeechOrigin::ComputerStream)
+            || self.notice.origin() == SpeechOrigin::ComputerStream
+            || self.notice.origin() == SpeechOrigin::ExactLine
+                && self.notice.fed_whole() == Some(true))
             && self.settled(speaker_pending)
             && self.notice.retired();
         // A reminder that played through gaps and counts as said
@@ -15183,7 +15188,12 @@ fn play_exact_line(
     let (snapshot, _) = speaker_tone::commit_sound_turn(
         owner,
         reply,
-        NoticeDelivery::sound(SpeechOrigin::ExactLine, samples),
+        // A long line's pieces play from their feed as they are rendered
+        // (#7892); any other line from its samples, as before.
+        match ticket.pieces() {
+            Some(feed) => NoticeDelivery::fed(SpeechOrigin::ExactLine, feed),
+            None => NoticeDelivery::sound(SpeechOrigin::ExactLine, samples),
+        },
         "exact_line",
         "a computer's exact words: nothing heard, nothing sent to the provider",
         0,

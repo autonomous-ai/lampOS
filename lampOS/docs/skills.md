@@ -5967,8 +5967,10 @@ end inside (at its words when the first sentence alone is longer), then
 "There's more; ask me if you want it." (`task::MORE_LINE`). The voice
 renders a line past about 10 s of speech in pieces and plays it whole, its
 words in order, each piece within the speech cache's 20 s
-(`tts_cache::pieces`, #7892; [speaking-first.md](speaking-first.md)): before,
-a sentence past 20 s was refused whole and never said. The agent is
+(`tts_cache::pieces`, #7892; [speaking-first.md](speaking-first.md)): the
+first piece plays as soon as it is rendered, and each next one is rendered
+while the one before it plays; a line cut stops its pieces. Before, a
+sentence past 20 s was refused whole and never said. The agent is
 asked for a short spoken answer, one to three sentences, and to leave it
 empty (a lone dash, or an empty `answer.md`) when the skill already said
 it aloud, which says nothing (Heron's P3 on #7591). The skill needs no

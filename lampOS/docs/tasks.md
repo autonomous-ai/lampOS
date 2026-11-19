@@ -2970,8 +2970,10 @@ for each run, and is answered once the run ends
   characters of it (`MOST_TOLD_CHARS`, the first builder on #7591), cut at
   the last sentence end inside, then "There's more; ask me if you want
   it." A line past about 10 s of speech is rendered by the voice in pieces
-  cut at sentence, then clause, then word boundaries, and played whole, so
-  none passes the speech cache's 20 s and is dropped (#7892;
+  cut at sentence, then clause, then word boundaries, and played whole, the
+  first piece as soon as it is rendered and each next one rendered while the
+  one before it plays, so none passes the speech cache's 20 s and is dropped
+  (#7892;
   docs/speaking-first.md). Nothing tracks whether the run's own script already spoke through
   lamp-control's `say`; the agent is asked to leave its answer empty (a
   dash, or an empty `answer.md`) when it did (Heron's P3 on #7591). On

@@ -1142,6 +1142,7 @@ fn an_exact_skill_line_said_is_in_the_next_chat_requests_history() {
         crate::say::Words::ExactSound {
             samples: vec![400; 480],
             text: Some(line.to_owned()),
+            pieces: None,
         },
         crate::say::NORMAL_PRIORITY,
     );
@@ -1208,6 +1209,7 @@ fn an_exact_lines_event_carries_its_text() {
         crate::say::Words::ExactSound {
             samples: vec![400; 480],
             text: Some(line.to_owned()),
+            pieces: None,
         },
         crate::say::NORMAL_PRIORITY,
     );
@@ -1335,6 +1337,7 @@ fn the_unplug_skills_exact_line_answers_the_conversation_it_is_in() {
         crate::say::Words::ExactSound {
             samples: vec![400; 480],
             text: Some(crate::language::UNPLUG_UPDATING.to_owned()),
+            pieces: None,
         },
         8,
     );
@@ -1418,6 +1421,7 @@ fn the_unplug_skills_exact_line_waits_for_a_turn_still_on_its_way() {
         crate::say::Words::ExactSound {
             samples: vec![400; 480],
             text: Some(crate::language::UNPLUG_STAY.to_owned()),
+            pieces: None,
         },
         8,
     );
