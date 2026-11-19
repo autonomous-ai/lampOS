@@ -2390,8 +2390,11 @@ Reuse: the Store's signature check and keys (`lamp_skills::package::
 check_signature`, `store_keys`), so a model is trusted exactly as an app's
 package; `lamp_update::fetch` for HTTPS; `zune-jpeg` =0.4.21 for the JPEG,
 as the eyes; `board/heat` and `voice/privacy` as lamp-health and
-lamp-control say them. The lock gains no package. MoveNet's head follows
-its published output (17 `[y, x, score]`, normalised). Proof: unit tests
-with a fake NPU, a fake Store and the service's own clock; the VIPLite
-struct's size; the ARM64 build. Not yet proven: a run on the lamp's NPU
-through this service, and MoveNet converted and measured.
+lamp-control say them. The lock gains no package. MoveNet's head ports the
+reference decode the NPU conversion was measured with (`mn.py`: the four
+raw maps the `.nb` gives, the centre weights, the crop around the person
+from the MoveNet tutorial), checked against fixtures it made. Proof: unit
+tests with a fake NPU, a fake Store and the service's own clock; the
+VIPLite struct's size; the ARM64 build; MoveNet converted and measured on
+the lamp by its own reference. Not yet proven: a run on the lamp's NPU
+through this service.

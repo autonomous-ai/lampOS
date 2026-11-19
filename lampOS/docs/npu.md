@@ -59,15 +59,37 @@ lamp's own shell, through the same socket.
 
 A model is a network binary graph (`.nb`) converted for the NPU with its
 normalisation baked in, so it takes one RGB frame of bytes, `n, h, w, 3` or
-`n, 3, h, w`, and gives its raw outputs. The picture is fitted into the
-model's frame without changing its shape and centred on black, and the
-keypoints are mapped back (`crates/npu/src/image.rs`). A head reads the
-outputs (`crates/npu/src/head.rs`, the `PoseHead` trait):
+`n, 3, h, w`, and gives its raw outputs. A region of the picture is scaled
+into the model's frame, bilinear and black past the picture's edges, as
+OpenCV's `warpAffine` makes it, and the keypoints are mapped back
+(`crates/npu/src/image.rs`). A client's first frame is the whole picture,
+centred on black to the frame's shape (a 640x480 picture in MoveNet's square
+has black above and below). After it, the head may name the region to look
+at next for that client (`PoseHead::next`): kept 1.5 s (`TRACK_FOR`), for a
+picture of the same size, and forgotten when the lamp turns private or the
+model is let go. A head reads the outputs (`crates/npu/src/head.rs`, the
+`PoseHead` trait):
 
 - `movenet`: MoveNet SinglePose (Lightning, 192x192; Thunder, 256x256),
-  Apache-2.0. One output of 17 `[y, x, score]` normalised to the frame; the
-  person's score is the keypoints' mean. The model the lamp is expected to
-  ship (the owner, 19 Nov), once it is converted and measured on lamp-0c89.
+  Apache-2.0, the model the lamp ships (the owner, 19 Nov). Converted for the
+  NPU (`movenet_lightning_pcq.nb`, int8 per channel, 192x192 RGB bytes fed as
+  they are), it stops before MoveNet's own decode and gives four maps on a
+  48x48 grid, channels last: the person's centre (1), the keypoints' heat
+  (17), their offsets in the cell (34) and their distance from the centre
+  (34). The decode is MoveNet's own, on the CPU: the centre is the centre
+  map's highest cell weighed by its distance from the grid's middle; each
+  keypoint is the most heat near where the centre's regression puts it,
+  weighed down by distance, plus its offset; its score is its heat. The
+  person's score is the keypoints' mean. The next frame is cropped around
+  the person, as the MoveNet tutorial does: a square on the hips' middle,
+  1.9 times the torso or 1.2 times the body seen, whichever is wider; the
+  whole picture when the shoulders or hips are not seen (score 0.2 or less)
+  or the square would be wider than the picture. Checked against the
+  reference decode the conversion was measured with (`mn.py`, within 0.0002
+  of the float model): its keypoints from the NPU's int8 maps of two frames,
+  its next crops of two frames and its crops of a made picture
+  (`crates/npu/tests/fixtures/movenet/`, made by `make.py` there; no model,
+  no picture of a person).
 - `yolov8-pose`: YOLOv8-pose cut before its decode, as the reference
   conversion cuts it (box 64 / class 1 / keypoints 51 at strides 8, 16 and
   32): the most confident anchor is the person. Kept for comparison only: its
