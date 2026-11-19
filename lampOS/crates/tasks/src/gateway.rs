@@ -2182,6 +2182,7 @@ mod tests {
             not_made: Default::default(),
             net: false,
             tells: false,
+            cancel: Default::default(),
         }
     }
 

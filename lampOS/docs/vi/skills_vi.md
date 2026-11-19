@@ -3665,7 +3665,7 @@ các kỹ năng nạp và chạy y hệt từng byte như trước. `lamp_skills
     hôm nay cho tin một task đã xong (ai làm, được giao gì, mang về gì) được
     trao cho agent của đèn nguyên văn sau brief của đèn (`news_agent::BRIEF`),
     như một câu hỏi bằng giọng nói trên socket make của lamp-tasks
-    (`{"op":"voice_ask","ask","grants":[],"within_ms":10000}`). Không gì khác
+    (`{"op":"voice_ask","ask","grants":[],"within_ms":10000,"news":true}`). Không gì khác
     của tin được gửi đi, nên không có gì rời khỏi đèn nhiều hơn những gì mô
     hình nhận hôm nay. Chỉ tin một task đã xong: không bao giờ mã đăng nhập
     hay tiến độ. Tin được trao ngay khi nó đứng đầu hàng, trong lúc nó chờ
@@ -3673,11 +3673,20 @@ các kỹ năng nạp và chạy y hệt từng byte như trước. `lamp_skills
     agent đến kịp thì được nói thay ghi chú, đúng như nó là; nếu không, ghi
     chú được báo ngay, như khi tắt công tắc: quá 10 giây, không có phần
     tasks, không liên lạc được lamp-tasks hoặc nó từ chối (nó chỉ nhận câu
-    hỏi khi `LAMP_HARD_ASKS_TO_AGENT=on` trong lamp-tasks, và mỗi lần một câu,
-    nên câu hỏi của chính người dùng trong 10 giây đó bị báo bận), hoặc câu
-    trả lời là `-`, rỗng, dài hơn một câu ngắn, hay chỉ dành cho chủ đèn khi
-    ở một mình. Câu đến sau bị bỏ, và lamp-tasks kết thúc lần chạy ở cùng
-    mốc 10 giây.
+    hỏi khi `LAMP_HARD_ASKS_TO_AGENT=on` trong lamp-tasks), hoặc câu trả lời
+    là `-`, rỗng, dài hơn một câu ngắn, hay chỉ dành cho chủ đèn khi ở một
+    mình. Câu đến sau bị bỏ, và lamp-tasks kết thúc lần chạy ở cùng mốc 10
+    giây.
+  - **Câu hỏi của một người luôn thắng** (first builder, 09:57 ngày 19/11).
+    Không lần soạn nào bắt đầu khi một cuộc trò chuyện đang diễn ra: một lượt
+    đang mở, hoặc một lượt trong 15 giây qua (`news_agent::in_conversation`);
+    ghi chú được báo như trước. Câu hỏi agent của một người đến khi một lần
+    soạn đang chạy sẽ hủy nó ngay trong lamp-tasks (`"news": true` đánh dấu
+    câu hỏi của chính đèn; lần chạy của nó kết thúc như ở hạn chót, cùng cách
+    hủy lần chạy như make của một lần làm lại, #7789) và được chạy, không bao
+    giờ bị báo bận; câu hỏi tin được báo `cancelled`, và ghi chú được báo như
+    tin hôm nay, ngay hoặc sau câu trả lời của họ. Câu hỏi tin không bao giờ
+    hủy câu hỏi của một người.
   - Giữ câu có sẵn, dù cần nội dung riêng của mỗi lần kích hoạt (09:26 của
     first builder):
     - Welcome back: lời chào phải đến khi họ vừa ngồi xuống; trễ đến 10 giây
