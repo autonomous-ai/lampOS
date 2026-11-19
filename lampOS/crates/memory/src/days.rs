@@ -1412,6 +1412,21 @@ impl Days {
             params![person.as_str(), id],
         )?;
         versions(&tx)?;
+        // A kept thing or an observation with no distinctive word ("Stop.")
+        // takes no walk (#8031): it, its literal copies and the exchanges it
+        // came from go, with every version it replaced back to the first
+        // (the same kept thing at an earlier time: the first builder's HOLD
+        // on #8033), and no other kept thing. lamp-06c1, 20 Nov: forgetting
+        // a kept "Stop." by id took 28 rows, four of them kept things.
+        let wordless = selective
+            && (record.kind == "observation" || record.kind == "kept")
+            && walk_words(&doomed_texts(&tx)?).is_empty();
+        if wordless {
+            tx.execute(
+                "WITH RECURSIVE chain(rid) AS (SELECT rid FROM entries WHERE person=?1 AND id=?2 UNION SELECT r.older FROM replacements r JOIN chain c ON r.newer=c.rid) DELETE FROM doomed WHERE rid IN (SELECT rid FROM entries WHERE kind='kept') AND rid NOT IN (SELECT rid FROM chain)",
+                params![person.as_str(), id],
+            )?;
+        }
         // Forgetting an extracted fact also removes its evidence, otherwise a
         // later tidy pass could simply extract the same fact again; and a
         // kept thing goes with the conversation it came up in (#1693,
@@ -3442,15 +3457,14 @@ fn versions(db: &Connection) -> Result<()> {
 /// without the old "teal". A mixed exchange goes whole. A paraphrase with
 /// none of the words ("avoid those") stays: old links say what was shown,
 /// not used, and typed provenance is what replaces this. A fact with no
-/// distinctive word takes the whole walk ([`descendants`]), as before,
-/// and its literal copies too. Kept things never go here unless named.
+/// distinctive word ("Stop.") takes no walk, only its literal copies
+/// (#8031: the whole walk, [`descendants`], took four other kept things on
+/// lamp-06c1). Kept things never go here unless named: no walk, and no
+/// version of a row it reached ([`walk_versions`]), adds one.
 /// Only rows the search index finds are read (#3871): the rule once read
 /// every row of the person's, 9 s on a 9.6 MB store on lamp-4ace.
 fn selective_descendants(db: &Connection, person: &Person) -> Result<()> {
-    let texts: Vec<String> = db
-        .prepare("SELECT text FROM entries WHERE rid IN (SELECT rid FROM doomed)")?
-        .query_map([], |r| r.get(0))?
-        .collect::<rusqlite::Result<_>>()?;
+    let texts = doomed_texts(db)?;
     // A fact whose words the index may hold otherwise ("İstanbul": Fourteen
     // on #3902) reads every row, as before #3871: slow, never short.
     let read = if texts.iter().any(|text| search::splits_unlike_index(text)) {
@@ -3523,13 +3537,7 @@ fn selective_rows(db: &Connection, person: &Person, texts: &[String], read: Read
     // linked "Wants …" observation (C136). A fact of nothing but them keeps
     // them, so the walk is never wider than before. Copies still need every
     // word of a version, openers included.
-    let all: BTreeSet<String> = own.iter().flatten().cloned().collect();
-    let openers: BTreeSet<String> = OPENERS
-        .iter()
-        .flat_map(|word| search::content_words(word))
-        .collect();
-    let distinct: BTreeSet<String> = all.difference(&openers).cloned().collect();
-    let any = if distinct.is_empty() { all } else { distinct };
+    let any = walk_words(texts);
     let doom = |rid: i64| db.execute("INSERT OR IGNORE INTO doomed VALUES (?1)", [rid]);
     // Read when the index found it (`hit`), or its words may be held
     // otherwise; every row read, with `Read::Every`.
@@ -3539,9 +3547,9 @@ fn selective_rows(db: &Connection, person: &Person, texts: &[String], read: Read
         checked.set(checked.get() + u64::from(read));
         read
     };
-    if any.is_empty() {
-        descendants(db, None)?;
-    } else {
+    // No distinctive word ("Stop."): no walk at all, only its copies below
+    // (#8031). The whole walk ([`descendants`]) took other kept things.
+    if !any.is_empty() {
         // Every row reachable through links, those that stay included: one
         // recursive walk on `sources_parent`, each row once (#3871). Of
         // those, only the ones the search index finds with a word of the
@@ -3569,7 +3577,7 @@ fn selective_rows(db: &Connection, person: &Person, texts: &[String], read: Read
     // of one whole text, or past ASCII, are read and checked as before
     // (#3871).
     let Some(copies) = copy_words(&own, &literals) else {
-        versions(db)?;
+        walk_versions(db)?;
         return Ok(checked.get());
     };
     let rows: Vec<(bool, i64, [String; 3])> = db
@@ -3600,8 +3608,45 @@ fn selective_rows(db: &Connection, person: &Person, texts: &[String], read: Read
             doom(rid)?;
         }
     }
-    versions(db)?;
+    walk_versions(db)?;
     Ok(checked.get())
+}
+
+/// The texts of the doomed rows.
+fn doomed_texts(db: &Connection) -> Result<Vec<String>> {
+    Ok(db
+        .prepare("SELECT text FROM entries WHERE rid IN (SELECT rid FROM doomed)")?
+        .query_map([], |r| r.get(0))?
+        .collect::<rusqlite::Result<_>>()?)
+}
+
+/// The words [`selective_rows`]' linked walk follows for `texts`: their
+/// distinctive words ([`search::content_words`]) without the observation
+/// writer's opening verbs ([`OPENERS`]), or with them when there is
+/// nothing else. None: a text with no distinctive word ("Stop."), which
+/// takes no walk (#8031).
+fn walk_words(texts: &[String]) -> BTreeSet<String> {
+    let all: BTreeSet<String> = texts
+        .iter()
+        .flat_map(|text| search::content_words(text))
+        .collect();
+    let openers: BTreeSet<String> = OPENERS
+        .iter()
+        .flat_map(|word| search::content_words(word))
+        .collect();
+    let distinct: BTreeSet<String> = all.difference(&openers).cloned().collect();
+    if distinct.is_empty() { all } else { distinct }
+}
+
+/// [`versions`] for what a forget's walk reached: each doomed row's
+/// versions, but never a kept thing (#8031). The named row's own versions,
+/// of any kind, are doomed before any walk ([`Days::forget_here`]); a kept
+/// thing reached only as the version of a walked row that wasn't named (a
+/// kept thing a tidy observation corrected, finding N11) stays, hidden,
+/// never current again.
+fn walk_versions(db: &Connection) -> Result<()> {
+    db.execute("WITH RECURSIVE chain(rid) AS (SELECT rid FROM doomed UNION SELECT r.newer FROM replacements r JOIN chain c ON r.older=c.rid JOIN entries e ON e.rid=r.newer WHERE e.kind!='kept' UNION SELECT r.older FROM replacements r JOIN chain c ON r.newer=c.rid JOIN entries e ON e.rid=r.older WHERE e.kind!='kept') INSERT OR IGNORE INTO doomed SELECT rid FROM chain",[])?;
+    Ok(())
 }
 
 /// The search index's question for rows with one of `words`
@@ -3668,8 +3713,10 @@ fn descendants(db: &Connection, expiry: Option<&str>) -> Result<()> {
         // derives from a doomed row (#3113). With `LAMP_MEMORY_FORGET_ALL` a
         // kept thing's sources are its conversation's exchanges, so a named
         // exchange would take every kept thing said in its conversation. Its
-        // link to the exchange goes by the foreign key, as on expiry.
-        db.execute("WITH RECURSIVE chain(rid) AS (SELECT rid FROM doomed UNION SELECT s.child FROM sources s JOIN chain c ON s.parent=c.rid JOIN entries e ON e.rid=s.child WHERE e.kind!='kept' UNION SELECT r.newer FROM replacements r JOIN chain c ON r.older=c.rid UNION SELECT r.older FROM replacements r JOIN chain c ON r.newer=c.rid) INSERT OR IGNORE INTO doomed SELECT rid FROM chain",[])?;
+        // link to the exchange goes by the foreign key, as on expiry. Nor
+        // as a version of a row the walk reached (#8031): a named kept
+        // thing's versions are doomed before the walk ([`Days::forget_here`]).
+        db.execute("WITH RECURSIVE chain(rid) AS (SELECT rid FROM doomed UNION SELECT s.child FROM sources s JOIN chain c ON s.parent=c.rid JOIN entries e ON e.rid=s.child WHERE e.kind!='kept' UNION SELECT r.newer FROM replacements r JOIN chain c ON r.older=c.rid JOIN entries e ON e.rid=r.newer WHERE e.kind!='kept' UNION SELECT r.older FROM replacements r JOIN chain c ON r.newer=c.rid JOIN entries e ON e.rid=r.older WHERE e.kind!='kept') INSERT OR IGNORE INTO doomed SELECT rid FROM chain",[])?;
     }
     Ok(())
 }
@@ -4453,6 +4500,205 @@ mod tests {
         for id in [longer, among, unrelated] {
             assert!(store.record(&person, id).unwrap().is_some(), "{id}");
         }
+        drop(store);
+        fs::remove_dir_all(dir).unwrap();
+    }
+
+    /// #8031 (lamp-06c1, 20 Nov): forgetting a kept "Stop." by id took 28
+    /// rows, four of them other things the person kept. A forget with no
+    /// distinctive word takes it, its literal copies and the exchange it
+    /// came from (with the versions it replaced), and no other kept thing:
+    /// not one from the same exchange, one from an exchange shown it, one
+    /// an observation the walk once reached replaced, or that one's older
+    /// version. A worded forget, and forget everything, are as before.
+    #[test]
+    fn a_wordless_forget_takes_no_other_kept_thing() {
+        let (dir, mut store, person, now) = scratch("wordless-kept");
+        let said = store
+            .append(&person, now, "Lamp, stop.", "Okay", &[])
+            .unwrap();
+        let stop = store.remember_from(&person, now, "Stop.", &[said]).unwrap();
+        let same_exchange = store
+            .remember_from(&person, now, "Stop the water nudges", &[said])
+            .unwrap();
+        let shown = store
+            .append(
+                &person,
+                now + 1,
+                "Remind me to drink water",
+                "Sure",
+                &[stop],
+            )
+            .unwrap();
+        let from_shown = store
+            .remember_from(&person, now + 1, "No more water nudges today", &[shown])
+            .unwrap();
+        let older = store
+            .remember(&person, now + 2, "Nudges stop at noon")
+            .unwrap();
+        let replaced = store
+            .remember_replacing(
+                &person,
+                now + 3,
+                "Nudges stop after lunch",
+                &[],
+                older,
+                &[older],
+            )
+            .unwrap();
+        ensure_person(&store.db, &person).unwrap();
+        let observation = next_id(&store.db, &person).unwrap();
+        insert_record(
+            &store.db,
+            &Record {
+                id: observation,
+                person: person.as_str().into(),
+                kind: "observation".into(),
+                at_unix_ms: now + 4,
+                heard: String::new(),
+                said: String::new(),
+                text: "Wants quiet after lunch.".into(),
+                category: Some(tidy::Category::Thread),
+                source_ids: vec![shown],
+                supersedes: Some(replaced),
+                active: true,
+            },
+            &store.local,
+            store.now,
+        )
+        .unwrap();
+        let copy = store.append(&person, now + 5, "stop", "Okay", &[]).unwrap();
+        store.forget(&person, stop).unwrap();
+        for id in [stop, said, copy] {
+            assert!(store.record(&person, id).unwrap().is_none(), "{id}");
+        }
+        let kept = [same_exchange, from_shown, replaced, older];
+        for id in kept.into_iter().chain([shown, observation]) {
+            assert!(store.record(&person, id).unwrap().is_some(), "{id}");
+        }
+
+        // A worded forget still takes its versions, as before.
+        let teal = store
+            .remember(&person, now, "Favourite colour teal")
+            .unwrap();
+        let violet = store
+            .remember_replacing(
+                &person,
+                now + 8,
+                "Favourite colour violet",
+                &[],
+                teal,
+                &[teal],
+            )
+            .unwrap();
+        store.forget(&person, violet).unwrap();
+        assert!(store.record(&person, teal).unwrap().is_none());
+
+        // Forget everything still takes every kept thing.
+        store.forget_all(Some(&person)).unwrap();
+        for id in kept {
+            assert!(store.record(&person, id).unwrap().is_none(), "{id}");
+        }
+        drop(store);
+        fs::remove_dir_all(dir).unwrap();
+    }
+
+    /// The first builder's HOLD on #8033: a version is the same kept thing
+    /// at an earlier time, so a wordless forget of "Stop!", which replaced
+    /// "Stop", leaves neither, current or not; a kept thing outside the
+    /// chain stays.
+    #[test]
+    fn a_wordless_forget_takes_the_versions_it_replaced() {
+        let (dir, mut store, person, now) = scratch("wordless-versions");
+        let other = store
+            .remember(&person, now, "Stop the water nudges")
+            .unwrap();
+        let first = store.remember(&person, now + 1, "Stop").unwrap();
+        let again = store
+            .remember_replacing(&person, now + 2, "Stop!", &[], first, &[first])
+            .unwrap();
+        store.forget(&person, again).unwrap();
+        for id in [again, first] {
+            assert!(store.record(&person, id).unwrap().is_none(), "{id}");
+        }
+        let kept: Vec<u64> = store
+            .kept(&person, 16384)
+            .unwrap()
+            .iter()
+            .map(|kept| kept.id)
+            .collect();
+        assert_eq!(kept, [other]);
+        drop(store);
+        fs::remove_dir_all(dir).unwrap();
+    }
+
+    /// The Reviewer-lead's P2 on #8033, a kept thing a tidy observation
+    /// corrected (finding N11: kept "Locker is 440", observation "Locker is
+    /// 441"). A named row's own replaced versions go, of any kind: forgetting
+    /// the observation takes 440. A kept thing reached only as the version
+    /// of an unnamed walked row stays, hidden, never current again: a
+    /// worded forget whose walk takes the observation leaves 440 inactive.
+    #[test]
+    fn a_kept_thing_an_observation_corrected_goes_only_with_the_named_row() {
+        fn corrected(store: &mut Days, person: &Person, now: u64) -> (u64, u64, u64) {
+            let said = store.remember(person, now, "My locker is 441").unwrap();
+            let old = store.remember(person, now, "Locker is 440").unwrap();
+            let shown = store
+                .append(person, now + 1, "Which locker?", "441", &[said])
+                .unwrap();
+            ensure_person(&store.db, person).unwrap();
+            let observation = next_id(&store.db, person).unwrap();
+            insert_record(
+                &store.db,
+                &Record {
+                    id: observation,
+                    person: person.as_str().into(),
+                    kind: "observation".into(),
+                    at_unix_ms: now + 2,
+                    heard: String::new(),
+                    said: String::new(),
+                    text: "Locker is 441.".into(),
+                    category: Some(tidy::Category::Thread),
+                    source_ids: vec![shown],
+                    supersedes: Some(old),
+                    active: true,
+                },
+                &store.local,
+                store.now,
+            )
+            .unwrap();
+            store
+                .db
+                .execute(
+                    "UPDATE entries SET active=0 WHERE person=?1 AND id=?2",
+                    params![person.as_str(), old],
+                )
+                .unwrap();
+            (said, old, observation)
+        }
+        let (dir, mut store, person, now) = scratch("observation-corrected");
+        let (_, old, observation) = corrected(&mut store, &person, now);
+        store.forget(&person, observation).unwrap();
+        for id in [observation, old] {
+            assert!(store.record(&person, id).unwrap().is_none(), "{id}");
+        }
+        drop(store);
+        fs::remove_dir_all(&dir).unwrap();
+
+        let (dir, mut store, person, now) = scratch("observation-walked");
+        let (said, old, observation) = corrected(&mut store, &person, now);
+        store.forget(&person, said).unwrap();
+        for id in [said, observation] {
+            assert!(store.record(&person, id).unwrap().is_none(), "{id}");
+        }
+        assert!(!store.record(&person, old).unwrap().unwrap().active);
+        assert!(
+            store
+                .kept(&person, 16384)
+                .unwrap()
+                .iter()
+                .all(|kept| kept.id != old)
+        );
         drop(store);
         fs::remove_dir_all(dir).unwrap();
     }

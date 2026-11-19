@@ -31,9 +31,21 @@ trước; tìm kiếm và quy tắc bản sao dưới đây cũng vẫn giữ ch
 
 Mã chuẩn hóa chữ hoa/thường và `đ`, bỏ từ quá ngắn hoặc quá thông dụng, coi
 `s` số nhiều ở cuối từ tiếng Anh là tùy chọn, và ghép `allergy`, `allergies`,
-`allergic` thành một từ. Ghi chú không có từ đặc trưng dùng cách xóa rộng cũ,
-cộng các bản sao nguyên văn (khớp trọn từ; văn bản dưới ba ký tự, như «B2»,
-chỉ khi trùng nguyên một trường, nên «B22» và «Ghế B2 còn trống» được giữ). Lượt đi qua liên kết vẫn tiếp tục
+`allergic` thành một từ. Ghi chú không có từ đặc trưng («Stop.») không đi
+theo liên kết nào: chỉ nó, các lượt gốc của nó và các bản sao nguyên văn bị
+xóa (khớp trọn từ; văn bản dưới ba ký tự, như «B2», chỉ khi trùng nguyên một
+trường, nên «B22» và «Ghế B2 còn trống» được giữ), cùng mọi phiên bản cũ mà nó
+đã thay thế cho đến bản đầu tiên (vẫn là điều đó ở thời điểm trước), và không
+xóa điều đã ghi nhớ nào khác (#8031: trên lamp-06c1, 20/11, cách xóa rộng cũ đã xóa 28
+dòng cho một «Stop.», trong đó có bốn điều khác người đó đã ghi nhớ). Trong mọi
+lệnh quên, các phiên bản cũ mà dòng được nêu tên đã thay thế đều bị xóa, thuộc
+bất kỳ loại nào (vẫn là điều đó ở thời điểm trước: quên một quan sát của tidy
+đã sửa một điều đã ghi nhớ, phát hiện N11, thì xóa cả điều đó). Không điều đã
+ghi nhớ nào khác bị xóa: lượt đi không bao giờ thêm điều nào, và một điều đã ghi
+nhớ chỉ được chạm tới như phiên bản của một dòng lượt đi chạm tới mà không được
+nêu tên thì được giữ, vẫn ẩn, không bao giờ trở lại là hiện hành (một lệnh quên
+có từ đặc trưng mà lượt đi xóa quan sát ấy thì để lại điều đã ghi nhớ nó đã sửa
+ở trạng thái không hiện hành; `days::walk_versions`). Lượt đi qua liên kết vẫn tiếp tục
 qua những lượt được giữ lại, và bản sao được so với từ của từng phiên bản
 riêng, nên bản sao của «tím» mới vẫn bị xóa dù không có «xanh mòng két» cũ.
 Voice chỉ yêu cầu quy tắc này bằng `selective:true` khi không bật
