@@ -2913,6 +2913,8 @@ fn second_route_worker_environment(
         crate::action_claim::SKILL_ENVIRONMENT,
         // A keep claimed anywhere in a reply, read whole (#7878).
         crate::remember::WHOLE_ENVIRONMENT,
+        // And a wellbeing nudge said stopped, snoozed or off (#7878).
+        crate::action_claim::NUDGE_ENVIRONMENT,
         crate::second_provider::CHECKING_LINE_ENVIRONMENT,
         crate::second_provider::SPEECH_TAGS_ENVIRONMENT,
         // A light or volume turn answered with the call's own line (#2877).
@@ -3282,6 +3284,7 @@ mod tests {
             crate::action_claim::DOING_ENVIRONMENT,
             crate::action_claim::SKILL_ENVIRONMENT,
             crate::remember::WHOLE_ENVIRONMENT,
+            crate::action_claim::NUDGE_ENVIRONMENT,
             crate::second_provider::CHECKING_LINE_ENVIRONMENT,
             crate::second_provider::SPEECH_TAGS_ENVIRONMENT,
             crate::second_provider::SHORT_DONE_ENVIRONMENT,
@@ -4449,6 +4452,7 @@ mod tests {
                     || name == crate::action_claim::DOING_ENVIRONMENT
                     || name == crate::action_claim::SKILL_ENVIRONMENT
                     || name == crate::remember::WHOLE_ENVIRONMENT
+                    || name == crate::action_claim::NUDGE_ENVIRONMENT
                     || name == crate::second_provider::CHECKING_LINE_ENVIRONMENT
                     || name == crate::second_provider::SPEECH_TAGS_ENVIRONMENT
                     || name == crate::second_provider::SHORT_DONE_ENVIRONMENT

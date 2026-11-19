@@ -34,6 +34,7 @@ mod name_carries;
 mod name_near;
 mod needs_face_said;
 mod not_for_me_words;
+mod nudge_claim;
 mod opens_further;
 mod pause_join;
 mod person_scope_seen;
