@@ -949,7 +949,6 @@ pub fn after_round(
     };
     let there = present(root, shown);
     if there {
-        gateway_block(root, run, say);
         gateway_on(root, systemd, say);
     }
     // #6685: the entry recorded is added again every round with the
@@ -966,7 +965,8 @@ pub fn after_round(
         before = Some(write(records, said));
         allowlist_due = true;
     }
-    let due = allowlist_due || launcher_due(root, shown);
+    // #7868: the gateway block is read here only; the one-shot writes it.
+    let due = allowlist_due || launcher_due(root, shown) || (there && gateway_block_due(root));
     if there && !due {
         if before
             .as_ref()
@@ -1429,6 +1429,7 @@ fn steps(
         ));
         sync_launcher(root, shown, say);
         sync_socket_dir(root, run, shown, say);
+        gateway_block(root, run, say);
         let before = record(records).filter(|said| said.install == "installed");
         if let Some(said) = &before
             && said.exec_allowlist == shown.one_path
@@ -2046,13 +2047,7 @@ fn gateway_config(
     say: &mut dyn FnMut(&str),
 ) -> Result<bool, String> {
     let token_path = on(root, GATEWAY_TOKEN);
-    let kept = fs::symlink_metadata(&token_path)
-        .ok()
-        .filter(|meta| meta.is_file())
-        .and_then(|_| fs::read_to_string(&token_path).ok())
-        .map(|text| text.trim().to_owned())
-        .filter(|text| !text.is_empty());
-    let (token, made) = match kept {
+    let (token, made) = match kept_token(root) {
         Some(token) => (token, false),
         None => {
             let mut bytes = [0u8; 32];
@@ -2065,12 +2060,7 @@ fn gateway_config(
             (token, true)
         }
     };
-    let gateway = serde_json::json!({
-        "mode": "local",
-        "bind": "loopback",
-        "port": PORT,
-        "auth": {"mode": "token", "token": token},
-    });
+    let gateway = gateway_wanted(&token);
     let config_path = on(root, CONFIG);
     let mut config = match fs::read(&config_path) {
         Ok(bytes) => match serde_json::from_slice::<serde_json::Value>(&bytes) {
@@ -2146,17 +2136,58 @@ fn set_within(have: &mut serde_json::Value, wanted: serde_json::Value) -> bool {
     }
 }
 
-/// Each round with OpenClaw there (#7868, as #7879 checks the gateway's
-/// unit): OpenClaw's config is checked for the `gateway` block the install
-/// writes ([`gateway_config`]). A reset whose cut was not taken removes
-/// `openclaw.json`, and a lamp with OpenClaw installed runs no install, so
-/// nothing else writes the block again. Missing or not as the install
-/// writes it, it is written again through OpenClaw's own check, and the
-/// gateway, when it runs, restarted on it (`try-restart`; [`gateway_on`]
-/// then starts one that does not). Refused, `openclaw.json` stays byte for
-/// byte and nothing is restarted. One line, with no values of the config;
-/// still failing, the next round finds it again. No switch of its own: it
-/// only keeps what the install writes.
+/// The gateway's token kept in [`GATEWAY_TOKEN`] (a file, not empty).
+fn kept_token(root: &Path) -> Option<String> {
+    let token_path = on(root, GATEWAY_TOKEN);
+    fs::symlink_metadata(&token_path)
+        .ok()
+        .filter(|meta| meta.is_file())
+        .and_then(|_| fs::read_to_string(&token_path).ok())
+        .map(|text| text.trim().to_owned())
+        .filter(|text| !text.is_empty())
+}
+
+/// The `gateway` block the install writes, with `token`.
+fn gateway_wanted(token: &str) -> serde_json::Value {
+    serde_json::json!({
+        "mode": "local",
+        "bind": "loopback",
+        "port": PORT,
+        "auth": {"mode": "token", "token": token},
+    })
+}
+
+/// Whether [`gateway_config`] would write (#7868), read only: a round
+/// checks this, as its own sandbox can't write OpenClaw's state folder
+/// (`ProtectSystem=strict`, which no round changes), and a write due asks
+/// Harness's one-shot ([`gateway_block`]). No token yet, or no config, is
+/// due; a config not read as a JSON object is not (the write leaves it).
+fn gateway_block_due(root: &Path) -> bool {
+    let Some(token) = kept_token(root) else {
+        return true;
+    };
+    let config = match fs::read(on(root, CONFIG)) {
+        Ok(bytes) => match serde_json::from_slice::<serde_json::Value>(&bytes) {
+            Ok(serde_json::Value::Object(config)) => config,
+            _ => return false,
+        },
+        Err(error) => return error.kind() == ErrorKind::NotFound,
+    };
+    let mut block = config.get("gateway").cloned().unwrap_or_default();
+    set_within(&mut block, gateway_wanted(&token))
+}
+
+/// In Harness's one-shot over an OpenClaw there, asked by a round that
+/// found the `gateway` block due ([`gateway_block_due`], #7868, as #7879
+/// checks the gateway's unit each round): a reset whose cut was not taken
+/// removes `openclaw.json`, and a lamp with OpenClaw installed runs no
+/// install, so nothing else writes the block again. Missing or not as the
+/// install writes it, it is written again through OpenClaw's own check
+/// ([`gateway_config`]), and the gateway, when it runs, restarted on it
+/// (`try-restart`; the round's [`gateway_on`] starts one that does not).
+/// Refused, `openclaw.json` stays byte for byte and nothing is restarted.
+/// One line, with no values of the config; still due, the next round asks
+/// again. No switch of its own: it only keeps what the install writes.
 fn gateway_block(root: &Path, run: &mut Runner, say: &mut dyn FnMut(&str)) {
     match gateway_config(root, run, say) {
         Ok(false) => {}
