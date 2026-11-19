@@ -17,7 +17,7 @@
 //!   `forget_said`, and the room's lines a forget everything took): the
 //!   exchanges the memory says it removed (its answer's `exchanges`, by
 //!   scope and id, and every page `forgot_exchanges` gives when it says
-//!   `exchanges_more`), `{"ids":[…]}` by [`turn_id`]. Every removed id is
+//!   `exchanges_more`), `{"ids":[…]}` as the memory tells them. Every removed id is
 //!   told: a forget never deletes more of the account's history than the
 //!   lamp forgot. A whole-history delete is a known person's forget
 //!   everything only.
@@ -28,7 +28,11 @@
 //! The person key is lamp-memory's own scope id: a known person's `p-`
 //! id (the eyes' person id), or `""` for the room's (`everyone`), as the
 //! server's `person` is "the lamp's own person key, or empty". A saved
-//! turn's id is [`turn_id`]: the memory's exchange id in its scope.
+//! turn's id is the memory's own, `<epoch>.<scope>:<id>`
+//! ([`lamp_msgs::history_turn_id`], the store's epoch changed by a wipe, so
+//! an exchange id given again after one never names an older turn): the
+//! memory makes it in its forget answers and this sends it as told; the
+//! turn's save (#7771's other half) makes the same with the same function.
 //!
 //! Bounded: at most [`MOST_PENDING`] ids wait, far past anything real (an
 //! id is about 30 bytes). Past it, the known person with the most waiting
@@ -63,13 +67,6 @@ const ROOM: &str = "everyone";
 pub fn on() -> bool {
     static ON: OnceLock<bool> = OnceLock::new();
     *ON.get_or_init(|| std::env::var(ENVIRONMENT).is_ok_and(|value| value == "on"))
-}
-
-/// A saved turn's id on the account: the memory's exchange `id` in its
-/// `scope` (`p-…:12`, `everyone:7`). The turn's save (#7771's other half)
-/// mints the same.
-pub fn turn_id(scope: &str, id: u64) -> String {
-    format!("{scope}:{id}")
 }
 
 /// The server's person key for a memory scope: a known person's `p-` id,
@@ -244,12 +241,16 @@ impl Pending {
                 let Some(person) = person_key(scope) else {
                     continue;
                 };
+                // Each the memory's own turn id, made by
+                // `lamp_msgs::history_turn_id` with its store's epoch, and
+                // of the scope it is told under: none else is sent.
                 let ids = ids
                     .as_array()
                     .into_iter()
                     .flatten()
-                    .filter_map(Value::as_u64)
-                    .map(|id| turn_id(scope, id));
+                    .filter_map(Value::as_str)
+                    .filter(|turn| lamp_msgs::history_turn_scope(turn) == Some(scope.as_str()))
+                    .map(str::to_owned);
                 self.add_ids(person, ids);
             }
         }
@@ -431,6 +432,17 @@ mod tests {
         tokio::sync::Notify::new()
     }
 
+    /// A memory store's epoch, as its answers carry it.
+    const EPOCH: &str = "0a1b2c3d";
+
+    fn turn_id(scope: &str, id: u64) -> String {
+        lamp_msgs::history_turn_id(EPOCH, scope, id)
+    }
+
+    fn turns(scope: &str, ids: impl IntoIterator<Item = u64>) -> Vec<String> {
+        ids.into_iter().map(|id| turn_id(scope, id)).collect()
+    }
+
     /// Forget everything of a known person queues their whole history,
     /// with their person key, and never a delete of everything without one.
     #[test]
@@ -449,10 +461,10 @@ mod tests {
         let mut pending = Pending::default();
         pending.add_answered(
             &json!({"op":"forget_all","person":MINH}),
-            &json!({"ok":true,"removed":4,"exchanges":{"everyone":[3]}}),
+            &json!({"ok":true,"removed":4,"exchanges":{"everyone":turns("everyone", [3])}}),
         );
         assert!(pending.all.contains(MINH));
-        assert_eq!(pending.ids[""], BTreeSet::from(["everyone:3".to_owned()]));
+        assert_eq!(pending.ids[""], BTreeSet::from([turn_id("everyone", 3)]));
         // Refused, or a forget_all with no known person: nothing.
         for (line, answer) in [
             (
@@ -482,7 +494,10 @@ mod tests {
             &queue,
             &bell(),
             &json!({"op":"forget","person":MINH,"id":9,"selective":true}),
-            &json!({"ok":true,"removed":3,"exchanges":{MINH:[4,6],"r-0123456789abcdef":[1]}}),
+            &json!({"ok":true,"removed":3,"exchanges":{
+                MINH:turns(MINH, [4, 6]),
+                "r-0123456789abcdef":turns("r-0123456789abcdef", [1]),
+            }}),
         );
         let pending = queue.pending();
         assert!(pending.all.is_empty());
@@ -495,7 +510,7 @@ mod tests {
         );
         assert_eq!(
             pending.next().unwrap().body(),
-            json!({"ids":["p-0123456789abcdef:4","p-0123456789abcdef:6"]})
+            json!({"ids":["0a1b2c3d.p-0123456789abcdef:4","0a1b2c3d.p-0123456789abcdef:6"]})
         );
         // A forget that removed no exchange queues nothing.
         let empty = Queue::at(scratch("ids-none"));
@@ -519,7 +534,7 @@ mod tests {
             &queue,
             &bell(),
             &json!({"op":"forget_all","person":MINH}),
-            &json!({"ok":true,"removed":4,"exchanges":{"everyone":[3]}}),
+            &json!({"ok":true,"removed":4,"exchanges":{"everyone":turns("everyone", [3])}}),
         );
         assert!(queue.pending().is_empty());
         assert!(!path.exists());
@@ -563,14 +578,14 @@ mod tests {
     /// whole-history delete for the room (the first builder's P1 on #7935).
     #[test]
     fn a_forget_never_deletes_more_than_the_lamp_forgot() {
-        let ids = |range: std::ops::Range<u64>| range.collect::<Vec<u64>>();
+        let ids = |scope: &str, range: std::ops::Range<u64>| turns(scope, range);
         let mut pending = Pending::default();
         pending.add_answered(
             &json!({"op":"exchanges_forget","person":MINH}),
-            &json!({"ok":true,"removed":600,"exchanges":{MINH:ids(0..400)},"exchanges_more":true}),
+            &json!({"ok":true,"removed":600,"exchanges":{MINH:ids(MINH, 0..400)},"exchanges_more":true}),
         );
         let paged =
-            pages(|_| Some(json!({"ok":true,"exchanges":{MINH:ids(400..600)},"more":false})));
+            pages(|_| Some(json!({"ok":true,"exchanges":{MINH:ids(MINH, 400..600)},"more":false})));
         assert_eq!(paged.len(), 1);
         for (line, answer) in &paged {
             pending.add_answered(line, answer);
@@ -586,11 +601,11 @@ mod tests {
         let mut everything = Pending::default();
         everything.add_answered(
             &json!({"op":"forget_all","person":LAN}),
-            &json!({"ok":true,"removed":900,"exchanges":{"everyone":ids(0..400)},"exchanges_more":true}),
+            &json!({"ok":true,"removed":900,"exchanges":{"everyone":ids("everyone", 0..400)},"exchanges_more":true}),
         );
-        for (line, answer) in
-            pages(|_| Some(json!({"ok":true,"exchanges":{"everyone":ids(400..450)},"more":false})))
-        {
+        for (line, answer) in pages(|_| {
+            Some(json!({"ok":true,"exchanges":{"everyone":ids("everyone", 400..450)},"more":false}))
+        }) {
             everything.add_answered(&line, &answer);
         }
         assert_eq!(everything.all, BTreeSet::from([LAN.to_owned()]));
@@ -638,7 +653,7 @@ mod tests {
             let mut pending = Pending::default();
             pending.add_answered(
                 &json!({"op":op,"person":MINH}),
-                &json!({"ok":true,"exchanges":{MINH:[1,2]}}),
+                &json!({"ok":true,"exchanges":{MINH:turns(MINH, [1, 2])}}),
             );
             assert!(pending.is_empty(), "{op}");
         }
@@ -651,7 +666,7 @@ mod tests {
         let mut room = Pending::default();
         room.add_answered(
             &json!({"op":"forget_all"}),
-            &json!({"ok":true,"removed":2,"exchanges":{"everyone":[1,2]}}),
+            &json!({"ok":true,"removed":2,"exchanges":{"everyone":turns("everyone", [1, 2])}}),
         );
         assert!(room.all.is_empty());
         assert_eq!(room.ids[""].len(), 2);
@@ -663,5 +678,26 @@ mod tests {
             }
             room.done(&call);
         }
+    }
+
+    /// Only the memory's own turn ids, of the scope they are told under,
+    /// are sent: an id without the store's epoch (an older memory's bare
+    /// number or `<scope>:<id>`) or under another scope is let go, never
+    /// sent as some other turn (#7771, Backend3's (a) on #7957).
+    #[test]
+    fn only_turn_ids_with_the_stores_epoch_are_sent() {
+        let mut pending = Pending::default();
+        pending.add_answered(
+            &json!({"op":"forget","person":MINH,"id":9}),
+            &json!({"ok":true,"removed":5,"exchanges":{MINH:[
+                4,
+                "p-0123456789abcdef:5",
+                turn_id(LAN, 6),
+                "0a1b2c3d.p-0123456789abcdef:x",
+                turn_id(MINH, 7),
+            ]}}),
+        );
+        assert_eq!(pending.ids[MINH], BTreeSet::from([turn_id(MINH, 7)]));
+        assert_eq!(pending.count(), 1);
     }
 }

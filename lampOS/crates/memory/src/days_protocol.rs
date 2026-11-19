@@ -385,6 +385,9 @@ enum Extra {
     /// The next page of the exchanges the last forget removed that its
     /// answer had no room for (#7771, `"exchanges_more":true`).
     ForgotExchanges {},
+    /// The store's epoch for the account's history ids (#7771,
+    /// [`lamp_msgs::history_turn_id`]).
+    HistoryEpoch {},
     /// A forget about a thing's subjects: a known person's own exchanges
     /// that have them forgotten (`Days::exchanges_forget`).
     ExchangesForget {
@@ -1327,6 +1330,7 @@ fn extra(store: &mut Days, request: Extra, now: u64) -> Result<Value> {
             let (page, more) = store.forgot_page(MOST_PAGED_EXCHANGES);
             json!({"ok":true,"exchanges":exchanges_value(&page),"more":more})
         }
+        Extra::HistoryEpoch {} => json!({"ok":true,"epoch":store.history_epoch()}),
         Extra::ExchangesForget { person, about } => {
             json!({"ok":true,"removed":store.exchanges_forget(&one(person)?, &about)?})
         }
@@ -1348,29 +1352,36 @@ fn extra(store: &mut Days, request: Extra, now: u64) -> Result<Value> {
 }
 
 /// The most exchange ids a forget's answer names (#7771), so it stays
-/// well inside the voice's 8 KiB: the rest wait in memory, paged by
+/// inside the voice's 8 KiB at the longest turn id (about 65 bytes told,
+/// [`lamp_msgs::history_turn_id`] of a 32-character scope): the rest wait
+/// in memory, paged by
 /// `forgot_exchanges` ([`MOST_PAGED_EXCHANGES`] a page), and the answer
 /// says `"exchanges_more":true`. Every removed id is told: none is ever
 /// cut into a delete of more.
-pub const MOST_TOLD_EXCHANGES: usize = 400;
+pub const MOST_TOLD_EXCHANGES: usize = 100;
 /// The most ids a `forgot_exchanges` page names: under 64 KiB at the
-/// longest scope and id.
-pub const MOST_PAGED_EXCHANGES: usize = 1500;
+/// longest turn id.
+pub const MOST_PAGED_EXCHANGES: usize = 900;
 
-/// Removed exchanges, each by its scope and id.
-type Gone = Vec<(String, u64)>;
+/// Removed exchanges.
+type Gone = Vec<crate::days::Forgot>;
 
-/// `gone` by scope, `ids` sorted, as an answer's `exchanges`.
-pub(crate) fn exchanges_value(gone: &[(String, u64)]) -> Value {
-    let mut scopes: std::collections::BTreeMap<&str, Vec<u64>> = Default::default();
-    for (scope, id) in gone {
-        scopes.entry(scope).or_default().push(*id);
+/// `gone` by scope, each its turn id ([`lamp_msgs::history_turn_id`]) in
+/// id order, as an answer's `exchanges`.
+pub(crate) fn exchanges_value(gone: &[crate::days::Forgot]) -> Value {
+    let mut scopes: std::collections::BTreeMap<&str, Vec<(u64, &str)>> = Default::default();
+    for forgot in gone {
+        scopes
+            .entry(&forgot.scope)
+            .or_default()
+            .push((forgot.id, &forgot.turn));
     }
     let mut told = serde_json::Map::new();
-    for (scope, mut ids) in scopes {
-        ids.sort_unstable();
-        ids.dedup();
-        told.insert(scope.to_owned(), json!(ids));
+    for (scope, mut turns) in scopes {
+        turns.sort_unstable();
+        turns.dedup();
+        let turns: Vec<&str> = turns.into_iter().map(|(_, turn)| turn).collect();
+        told.insert(scope.to_owned(), json!(turns));
     }
     Value::Object(told)
 }
@@ -1380,8 +1391,8 @@ pub(crate) fn exchanges_value(gone: &[(String, u64)]) -> Value {
 /// forget everything, told whole by the voice), sorted, the first
 /// [`MOST_TOLD_EXCHANGES`] to tell now and the rest to page. Ids only,
 /// never words.
-fn exchanges_told(mut gone: Vec<(String, u64)>, except: &str) -> (Gone, Gone) {
-    gone.retain(|(scope, _)| scope != except);
+fn exchanges_told(mut gone: Gone, except: &str) -> (Gone, Gone) {
+    gone.retain(|forgot| forgot.scope != except);
     gone.sort_unstable();
     gone.dedup();
     let rest = gone.split_off(gone.len().min(MOST_TOLD_EXCHANGES));
@@ -1438,6 +1449,7 @@ pub fn answer(store: &mut Days, line: &[u8], now: u64) -> protocol::Answer {
             "service_contacts_forget",
             "exchanges_forget",
             lamp_msgs::MEMORY_FORGOT_EXCHANGES_OP,
+            lamp_msgs::MEMORY_HISTORY_EPOCH_OP,
         ];
         const OLD: &[&str] = &[
             "append",
@@ -1628,7 +1640,13 @@ mod tests {
         let third = line(&mut store, minh, "coffee again");
         // A forget by id: that exchange, and nothing else.
         let forgot = send(&mut store, json!({"op":"forget","person":minh,"id":first}));
-        assert_eq!(forgot["exchanges"], json!({ minh: [first] }), "{forgot}");
+        let turn =
+            |store: &Days, id: u64| lamp_msgs::history_turn_id(store.history_epoch(), minh, id);
+        assert_eq!(
+            forgot["exchanges"],
+            json!({ minh: [turn(&store, first)] }),
+            "{forgot}"
+        );
         assert!(!forgot.to_string().contains("scarf"), "{forgot}");
         // A forget about a thing: each exchange it took.
         let about = send(
@@ -1638,7 +1656,7 @@ mod tests {
         assert_eq!(about["removed"], 2, "{about}");
         assert_eq!(
             about["exchanges"],
-            json!({ minh: [second, third] }),
+            json!({ minh: [turn(&store, second), turn(&store, third)] }),
             "{about}"
         );
         // Nothing removed: nothing named.
@@ -1652,6 +1670,109 @@ mod tests {
         // Another request's answer never carries an earlier forget's.
         let status = send(&mut store, json!({"op":"status","person":minh}));
         assert!(status.get("exchanges").is_none(), "{status}");
+    }
+
+    /// #7771 (Backend3's (a) on #7957): the store's epoch is minted once,
+    /// kept across a reopen and a person's or the room's forget
+    /// everything, and changed by a wipe of everyone's (and so is a reset's
+    /// new store's).
+    #[test]
+    fn the_history_epoch_is_kept_until_the_store_is_wiped() {
+        let (scratch, mut store) = Scratch::new("epoch-kept");
+        let send = |store: &mut Days, request: Value| -> Value {
+            serde_json::from_str(&answer(store, request.to_string().as_bytes(), NOW).line).unwrap()
+        };
+        let epoch = |store: &mut Days| -> String {
+            let told = send(store, json!({"op":"history_epoch"}));
+            assert_eq!(told["ok"], true, "{told}");
+            told["epoch"].as_str().unwrap().to_owned()
+        };
+        let first = epoch(&mut store);
+        assert!(lamp_msgs::is_history_epoch(&first), "{first}");
+        assert_eq!(store.history_epoch(), first);
+        drop(store);
+        let mut store = scratch.open();
+        assert_eq!(epoch(&mut store), first, "kept across a reopen");
+        send(
+            &mut store,
+            json!({"op":"append","at_unix_ms":NOW,"heard":"hi"}),
+        );
+        send(
+            &mut store,
+            json!({"op":"forget_all","person":"p-0123456789abcdef"}),
+        );
+        send(&mut store, json!({"op":"forget_all"}));
+        assert_eq!(epoch(&mut store), first, "kept across a scope's forget");
+        let wiped = send(&mut store, json!({"op":"forget_all","person":null}));
+        assert_eq!(wiped["ok"], true, "{wiped}");
+        let second = epoch(&mut store);
+        assert!(lamp_msgs::is_history_epoch(&second), "{second}");
+        assert_ne!(second, first, "a wipe mints a new epoch");
+        drop(store);
+        let mut store = scratch.open();
+        assert_eq!(epoch(&mut store), second, "the new one is kept");
+        drop(store);
+        // A reset: a new store, a new epoch.
+        fs::remove_dir_all(&scratch.0).unwrap();
+        let mut store = scratch.open();
+        let third = epoch(&mut store);
+        assert!(third != first && third != second, "{third}");
+    }
+
+    /// #7771: two forgets of an exchange with the same scope and id, one
+    /// before a wipe and one after, never tell the same turn id: the
+    /// account's history never takes the second for the first's.
+    #[test]
+    fn a_forget_after_a_wipe_never_tells_an_earlier_turn_id() {
+        let (scratch, mut store) = Scratch::new("epoch-wipe");
+        let send = |store: &mut Days, request: Value| -> Value {
+            serde_json::from_str(&answer(store, request.to_string().as_bytes(), NOW).line).unwrap()
+        };
+        let forgot = |store: &mut Days| -> (u64, String) {
+            let id = send(store, json!({"op":"append","at_unix_ms":NOW,"heard":"hi"}))["id"]
+                .as_u64()
+                .unwrap();
+            let forgot = send(store, json!({"op":"forget","id":id}));
+            let told = forgot["exchanges"]["everyone"][0]
+                .as_str()
+                .unwrap()
+                .to_owned();
+            assert_eq!(
+                lamp_msgs::history_turn_scope(&told),
+                Some("everyone"),
+                "{told}"
+            );
+            assert!(told.ends_with(&format!(":{id}")), "{told}");
+            (id, told)
+        };
+        let (_, before) = forgot(&mut store);
+        send(&mut store, json!({"op":"forget_all","person":null}));
+        let (_, after) = forgot(&mut store);
+        assert_ne!(before, after);
+        // A reset gives the same id again; its turn id differs.
+        drop(store);
+        fs::remove_dir_all(&scratch.0).unwrap();
+        let mut store = scratch.open();
+        let (first, reset) = forgot(&mut store);
+        assert_eq!(first, 1, "a new store's ids start again");
+        assert!(reset != before && reset != after, "{reset}");
+    }
+
+    /// #7771: a store made before epochs mints one on its first open and
+    /// keeps it after.
+    #[test]
+    fn a_store_from_before_epochs_mints_one_on_open() {
+        let (scratch, store) = Scratch::new("epoch-old");
+        drop(store);
+        rusqlite::Connection::open(scratch.0.join(crate::days::DATABASE))
+            .unwrap()
+            .execute("DELETE FROM settings WHERE key='history_epoch'", [])
+            .unwrap();
+        let store = scratch.open();
+        let minted = store.history_epoch().to_owned();
+        assert!(lamp_msgs::is_history_epoch(&minted), "{minted}");
+        drop(store);
+        assert_eq!(scratch.open().history_epoch(), minted);
     }
 
     /// #7771 (the first builder's P1 on #7935): a forget of more
@@ -1679,11 +1800,11 @@ mod tests {
         assert_eq!(first["removed"], 600, "{first}");
         assert_eq!(first["exchanges_more"], true);
         assert!(first.get("exchanges_cut").is_none());
-        let mut ids: Vec<u64> = first["exchanges"][minh]
+        let mut ids: Vec<String> = first["exchanges"][minh]
             .as_array()
             .unwrap()
             .iter()
-            .map(|id| id.as_u64().unwrap())
+            .map(|id| id.as_str().unwrap().to_owned())
             .collect();
         assert_eq!(ids.len(), MOST_TOLD_EXCHANGES);
         // A request between leaves the rest to page.
@@ -1695,7 +1816,7 @@ mod tests {
                 .as_array()
                 .unwrap()
                 .iter()
-                .map(|id| id.as_u64().unwrap()),
+                .map(|id| id.as_str().unwrap().to_owned()),
         );
         ids.sort_unstable();
         ids.dedup();
@@ -2589,7 +2710,10 @@ mod tests {
             // A forget by id names the exchange it removed (#7771).
             assert_eq!(
                 forgot,
-                format!(r#"{{"exchanges":{{"everyone":[{id}]}},"ok":true,"removed":1}}"#)
+                format!(
+                    r#"{{"exchanges":{{"everyone":["{}"]}},"ok":true,"removed":1}}"#,
+                    lamp_msgs::history_turn_id(store.history_epoch(), "everyone", id)
+                )
             );
         }
         let ended = |store: &mut Days, request: Value| -> Value {

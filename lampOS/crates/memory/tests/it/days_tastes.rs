@@ -48,7 +48,8 @@ impl Scratch {
     }
 
     /// Every row of the store's tables but the index's, in order: what a
-    /// store holds. Called only while the Days owner has been dropped.
+    /// store holds, but for its history epoch, random to each store
+    /// (#7771). Called only while the Days owner has been dropped.
     fn dump(&self) -> Vec<String> {
         let db = Connection::open(self.0.join(DATABASE)).unwrap();
         let mut rows = Vec::new();
@@ -78,7 +79,11 @@ impl Scratch {
                 .unwrap()
                 .collect::<Result<_, _>>()
                 .unwrap();
-            rows.extend(lines);
+            rows.extend(
+                lines
+                    .into_iter()
+                    .filter(|row| !row.starts_with("settings: history_epoch,")),
+            );
         }
         let search: u64 = db
             .query_row("SELECT count(*) FROM search", [], |r| r.get(0))
