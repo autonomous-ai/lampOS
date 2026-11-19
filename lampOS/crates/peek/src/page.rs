@@ -1287,7 +1287,9 @@ fn run_name(run: &SkillRun) -> String {
 
 /// The Tasks section's skill tasks (#7873): a card for each, its run, its
 /// engine, its state (working blue, done green, failed red; an answer with
-/// no run, grey), its skill and when it began. Names and ids only.
+/// no run, grey), its skill and when it began, and what became of its
+/// answer at its gate ([`gate_line`]). Names, ids and the gate's fixed
+/// reasons only.
 fn skill_tasks(runs: &[SkillRun], now_unix_ms: u64) -> String {
     if runs.is_empty() {
         return String::new();
@@ -1300,13 +1302,14 @@ fn skill_tasks(runs: &[SkillRun], now_unix_ms: u64) -> String {
             None if run.run.is_some() => ("working", "badge-blue"),
             None => ("its answer", "badge-grey"),
         };
-        let said = [
+        let mut said = vec![
             format!("skill {}", escape(&run.skill)),
             format!(
                 "began {} ago",
                 span(now_unix_ms.saturating_sub(run.at_unix_ms) / 1000)
             ),
         ];
+        said.extend(gate_line(run));
         let _ = write!(
             html,
             "<div class=\"card task{}\"><b>{}</b> <span class=\"badge\">{}</span>\
@@ -1318,4 +1321,21 @@ fn skill_tasks(runs: &[SkillRun], now_unix_ms: u64) -> String {
         );
     }
     html
+}
+
+/// What became of a skill's answer at its gate (#7873): "held for its
+/// gate: <why>", then told or dropped; or told or dropped at once.
+fn gate_line(run: &SkillRun) -> Option<String> {
+    let answer = run.answer.map(|(stage, _)| match stage {
+        SkillTaskStage::Told => "told",
+        _ => "dropped",
+    });
+    match (&run.held, answer) {
+        (Some(why), None) => Some(format!("held for its gate: {}", escape(why))),
+        (Some(why), Some(answer)) => {
+            Some(format!("held for its gate: {}, then {answer}", escape(why)))
+        }
+        (None, Some(answer)) => Some(answer.to_owned()),
+        (None, None) => None,
+    }
 }
