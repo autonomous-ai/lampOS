@@ -3187,8 +3187,11 @@ gate are in [services.md](services.md).
 pairings.** lamp-cloud, which takes the app's commands from the broker, now
 reaches lamp-control's admin socket, which until now only a person at the lamp
 used (`lamp-control code`, `revoke`). It is gated by the owner's developer
-setting: with developer access off, lamp-control isn't running and the socket
-isn't there, so the five kinds are neither listed nor answered.
+setting: with developer access off, lamp-control's door is shut (it is restarted
+without `LAMP_CONTROL=on`, #6401, and keeps serving the owner's side), so `code`
+is answered `developer access is off on this lamp`, and `control.clients` says
+`listening: false` (the admin socket is there whenever lamp-control runs with a
+skill's tasks on, as on every product lamp; the door's state is `listening`).
 
 Off unless `lamp-cloud` is started with `--control-admin-socket PATH`
 (lamp-control's admin socket, `/run/lampos-control/admin.sock`; docs/control.md,
