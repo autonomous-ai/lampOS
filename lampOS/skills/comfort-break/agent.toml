@@ -1,0 +1,23 @@
+# Comfort break's line through the lamp's agent: read only with
+# LAMP_CORE_VIA_AGENT=on (or naming nudges) in lamp-skills and its manage
+# helper (docs/skills.md, "A core skill's line through the lamp's agent");
+# off, nothing reads it. It stands in for skill.toml's grants, [[do]] and [[present.do]]
+# alone: the trigger, the guards and the timing are skill.toml's own, never
+# copied here. Every [[do]] but a task is skill.toml's, word for word
+# (lamp-skills checks it): the say is the fallback, said at once when the
+# agent's line has not come within 10 s.
+grants = []
+
+[[do]]
+task = { task = "One short, light line, the way a friend would, that it is a good moment for a short break; name no place and no reason, and nothing about health.", run = "scripts/agent.py" }
+
+[[do]]
+body = { look_at = "face" }
+say = "They have sat at the desk for about two hours. In one short, light line, the way a friend would, say it's a good moment for a short break. Say only a short break: name no place and no reason, and nothing about health."
+
+[[present.do]]
+task = { task = "One short, light line, the way a friend would, that it is a good moment for a short break; name no place and no reason, and nothing about health.", run = "scripts/agent.py" }
+
+[[present.do]]
+body = { look_at = "face" }
+say = "They have sat at the desk for about an hour and a half. In one short, light line, the way a friend would, say it's a good moment for a short break. Say only a short break: name no place and no reason, and nothing about health."
