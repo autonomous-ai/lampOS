@@ -632,6 +632,13 @@ Environment=LAMP_SERVICE_RECORDS_TOLD=on
 # LAMP_SERVICE_RECORDS_REMINDERS: its why and rules are its row in docs/switches.md. A reminder set by voice is
 # its creator's linked record; in the private room, the line's known person, else the owner (#7960's ROW).
 Environment=LAMP_SERVICE_RECORDS_REMINDERS=on
+# The linked records (the linked-service memory plan, slices 5 and 8): a skill run's calls kept in the Days memory of
+# the person its held write is read back to, through the linked outbox, and two linked lines in the told note. Their
+# whys and rules are their rows in docs/switches.md. On in the product by the product owner's rule of 18 Nov, everything
+# on by default (#6811), beside #7960's ROW on lamp-06c1. The agent's rows need lamp-services' --run-calls
+# (lamp-services.service). Task, reminder, source and sdk rows stay off until their own ROWs (#7960).
+Environment=LAMP_SERVICE_RECORDS_AGENT=on
+Environment=LAMP_SERVICE_RECORDS_LINKED_TOLD=on
 Environment=LAMP_SERVICE_CONTACTS=on
 Environment=LAMP_SERVICE_REDO=on
 # LAMP_SERVICE_READ_IDS_KEPT: its why and rules are its row in docs/switches.md (#6546).

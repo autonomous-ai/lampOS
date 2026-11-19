@@ -159,7 +159,7 @@ dịch vụ.
 | `LAMP_SKILL_WRITES=on` (#6066; bật trong bốn unit của sản phẩm từ 11/11) | `lamp-services`, `lamp-skills` (và helper `lamp-skills-manage@` của nó) và `lamp-voice` | Kỹ năng tự tạo không ghi vào dịch vụ nào: kỹ năng có bước `write` hay quyền `"write"` không được nạp, `lamp-services` từ chối `skill_write` và `skill_write_approve`, và giọng nói không tạo kỹ năng như vậy ("I can't do that yet: sending or writing on its own") cũng không nhận lời đồng ý ("Một kỹ năng tự tạo ghi vào dịch vụ", bên dưới) |
 | `LAMP_SKILL_READS=on` (bật trong bốn unit của sản phẩm) | `lamp-services`, `lamp-skills` (và helper `lamp-skills-manage@` của nó) và `lamp-voice` | Kỹ năng tự tạo không chạm đến dịch vụ nào: `lamp-services` từ chối `lamp-skills` trên socket tools của nó, bước `read` của một kỹ năng không làm gì lúc chạy ("not made: LAMP_SKILL_READS is not on"), và mô hình tạo kỹ năng được dặn trả lời `cannot:` cho một yêu cầu tạo kỹ năng nêu một dịch vụ ("Một kỹ năng tự tạo đọc dịch vụ", bên dưới) |
 | `LAMP_SKILL_TASKS=on` (#6432; bật trong các unit của sản phẩm) | `lamp-services`, `lamp-control` (và `lamp-tasks`, nơi chạy việc) và `lamp-voice` | Một lượt chạy của kỹ năng không chạm đến dịch vụ nào: lamp-control trả lời `service.read` và `service.write` bằng `off`, `lamp-services` từ chối cgroup `lamp-control.service` trên socket tools của nó và lệnh `run_write_waiting` của giọng nói, và giọng nói không đọc lại lần ghi nào của lượt chạy ("Lượt chạy của một kỹ năng trên Hermes của đèn", bên dưới) |
-| `lamp-services --run-calls` (kế hoạch bộ nhớ dịch vụ liên kết, phần 4; không unit nào của sản phẩm truyền) | `lamp-services` | Không lệnh gọi nào của lượt chạy kỹ năng được giữ và lệnh `run_calls_since` của giọng nói bị từ chối ("Giữ 64 lệnh gọi gần nhất của mọi lượt chạy", bên dưới) |
+| `lamp-services --run-calls` (kế hoạch bộ nhớ dịch vụ liên kết, phần 4; trong `lamp-services.service` từ 19/11) | `lamp-services` | Không lệnh gọi nào của lượt chạy kỹ năng được giữ và lệnh `run_calls_since` của giọng nói bị từ chối ("Giữ 64 lệnh gọi gần nhất của mọi lượt chạy", bên dưới) |
 | `LAMP_SERVICE_READ_IDS_KEPT=on` (dòng C132 của bảng theo dõi; bật trong unit lamp-voice của sản phẩm, cùng #6410) | tuyến thứ hai của `lamp-voice`, với `LAMP_SERVICES=on` | Một lần đọc lịch không giữ gì: dời hay huỷ một sự kiện từ cuộc nói chuyện trước sẽ đọc trong mỗi yêu cầu và bị quy tắc sau khi đọc từ chối ở đó ("Sau một lần đọc", bên dưới) |
 
 Một lần ghi, và một lần đọc được nói đầy đủ, còn cần khuôn mặt của chủ đèn
@@ -2706,10 +2706,11 @@ lẫn lượt chạy đều không giữ token nào.
   tắt, không có quyền, sai loại, một máy tính đã ghép đôi, một lần đọc được
   cấp quyền) và `protocol::tests`.
 
-### Giữ 64 lệnh gọi gần nhất của mọi lượt chạy (`--run-calls`, phần 4 của kế hoạch bộ nhớ dịch vụ liên kết, tắt)
+### Giữ 64 lệnh gọi gần nhất của mọi lượt chạy (`--run-calls`, phần 4 của kế hoạch bộ nhớ dịch vụ liên kết, bật trong sản phẩm)
 
 Vòng đệm mà giọng nói dùng để ghi các bản ghi `agent` của bộ nhớ (phần 5,
-bên dưới). Không unit nào của sản phẩm truyền cờ này.
+bên dưới). Unit của sản phẩm truyền cờ này từ 19/11, theo quy tắc của chủ sản phẩm ngày
+18/11 là mọi thứ bật mặc định (https://github.com/autonomous-ai/lampOS/issues/6811#issuecomment-6977525471).
 
 - **Những gì được giữ** (`run_calls.rs`). Với `--run-calls`, mỗi
   `service_read` và `service_write` mà lượt chạy của kỹ năng gọi qua
@@ -2769,7 +2770,7 @@ bên dưới). Không unit nào của sản phẩm truyền cờ này.
   kỹ năng cũng vậy; chủ nhận được vòng đệm); trong lamp-control,
   `services::tests` và `session::tests` (id của lượt chạy trên dòng).
 
-### Các lệnh gọi của lượt chạy kỹ năng trong bộ nhớ của người đó (`LAMP_SERVICE_RECORDS_AGENT`, phần 5 của kế hoạch bộ nhớ dịch vụ liên kết, tắt)
+### Các lệnh gọi của lượt chạy kỹ năng trong bộ nhớ của người đó (`LAMP_SERVICE_RECORDS_AGENT`, phần 5 của kế hoạch bộ nhớ dịch vụ liên kết, bật trong sản phẩm)
 
 Phía giọng nói của vòng đệm ở trên: mỗi lệnh gọi của lượt chạy kỹ năng, đọc
 hay ghi, được giữ thành một bản ghi `agent` trong bộ nhớ Days của người mà
