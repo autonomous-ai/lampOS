@@ -13952,6 +13952,8 @@ mod tests {
         from_store(&folder, "desk-photo", false);
         let asks = package::task_asks(&root, None, "desk-photo").unwrap();
         assert_eq!(asks["from"], lamp_voice::make_no_cannot::FROM, "{asks}");
+        // Asked for here by the owner: its short form is read back.
+        assert_eq!(asks["made_here"], true, "{asks}");
         assert_eq!(asks["task"], words);
         assert_eq!(asks["grants"], json!(["camera", "speak"]));
         std::fs::write(
@@ -13961,6 +13963,8 @@ mod tests {
         .unwrap();
         let asks = package::task_asks(&root, None, "desk-photo").unwrap();
         assert_eq!(asks["from"], lamp_voice::upload_agent::FROM, "{asks}");
+        // An upload is read back whole (Twelve's HOLD on #7969).
+        assert_eq!(asks["made_here"], false, "{asks}");
         task::set_on_here(None);
         lamp_voice::upload_agent::set_on_here(None);
     }
@@ -13986,6 +13990,7 @@ mod tests {
         task::set_on_here(Some(true));
         let asks = package::task_asks(&root, None, "photo-booth").unwrap();
         assert_eq!(asks["from"], "the Skills Store");
+        assert_eq!(asks["made_here"], false, "{asks}");
         assert_eq!(asks["grants"], json!(["camera", "light"]));
         assert!(asks.get("approved").is_none(), "{asks}");
         assert_eq!(asks["task"], "Take a photo and send it to my phone");

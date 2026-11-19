@@ -3209,8 +3209,10 @@ fn task_folder(skills: &Path, dev: Option<&Path>, name: &str) -> Option<(PathBuf
 
 /// The skill `name`'s `do.task` as the voice says it back (#6305,
 /// `{"task_asks": NAME}`): `{"name", "sha256", "grants", "task", "summary",
-/// "from", "package"}` (`summary` null for none; the voice reads back its
-/// short form, `lamp_voice::made_skill::task_said`), its folder hashed now ([`crate::task::folder_sha256`]),
+/// "from", "made_here", "package"}` (`summary` null for none; `made_here`
+/// true only for a task made on this lamp from the owner's own ask, whose
+/// short form the voice reads back, `lamp_voice::made_skill::task_said`;
+/// any other is read back whole), its folder hashed now ([`crate::task::folder_sha256`]),
 /// where its script came from and the SHA-256 of the package it went on as
 /// ([`installed_from`], null for none). Whether the owner agreed is lamp-control's to say,
 /// never this helper's (`lamp_voice::skill_task_yes::agreed_by`).
@@ -3240,6 +3242,12 @@ pub fn task_asks(
         return Err(why);
     }
     let sha256 = crate::task::folder_sha256(&folder)?;
+    // Whether its task was made on this lamp from the owner's own ask (the
+    // lamp's own model's, or one only asked for by voice): only then is its
+    // short form read back for the yes (Twelve's HOLD on #7969). Any other
+    // (the Store, an upload, a push) is read back whole, its author's
+    // `summary` never.
+    let mut made_here = false;
     let from = if pushed {
         // "your computer NAME", or "your computer" when no name came with
         // the push: never "your computer a computer", which no read-back
@@ -3249,6 +3257,7 @@ pub fn task_asks(
             None => "your computer".to_owned(),
         }
     } else if crate::task::made_with_code(&folder, pushed) {
+        made_here = true;
         crate::task::FROM_MADE.to_owned()
     } else if crate::task::agent_from_file(&folder, pushed) {
         // One the person asked the voice for (`LAMP_MAKE_NO_CANNOT`, its
@@ -3258,6 +3267,7 @@ pub fn task_asks(
             .lines()
             .any(|line| line.trim() == lamp_voice::make_no_cannot::ASKED_MARK)
         {
+            made_here = true;
             lamp_voice::make_no_cannot::FROM.to_owned()
         } else {
             lamp_voice::upload_agent::FROM.to_owned()
@@ -3272,6 +3282,7 @@ pub fn task_asks(
         "task": step.task,
         "summary": step.summary,
         "from": from,
+        "made_here": made_here,
         "package": installed_from(&folder).map(|installed| installed.sha256),
     }))
 }
