@@ -1800,6 +1800,7 @@ fn card_turn(request: u64, start: u64, total: u64, words: bool) -> timeline::Ent
         ],
         ended_at: Some(start + total),
         agent: None,
+        skill_run: None,
     }
 }
 
@@ -1876,6 +1877,7 @@ fn a_turn_card_carries_its_status_and_latency_classes_at_the_edges() {
         steps: vec![(1_000, timeline::Step::Heard(None))],
         ended_at: None,
         agent: None,
+        skill_run: None,
     };
     let html = page::timeline(&[going], &current(Vec::new()), false);
     assert!(
@@ -1901,6 +1903,7 @@ fn a_turn_card_carries_its_status_and_latency_classes_at_the_edges() {
         ],
         ended_at: Some(1_500),
         agent: None,
+        skill_run: None,
     };
     let html = page::timeline(&[skill], &current(Vec::new()), false);
     assert!(
@@ -1919,6 +1922,7 @@ fn a_turn_card_carries_its_status_and_latency_classes_at_the_edges() {
         ],
         ended_at: Some(1_100),
         agent: None,
+        skill_run: None,
     };
     let html = page::timeline(&[held], &current(Vec::new()), false);
     assert!(
@@ -1988,6 +1992,7 @@ fn monitor_mode_hostile_words_stay_escaped_in_a_card() {
         ],
         ended_at: Some(1_900),
         agent: None,
+        skill_run: None,
     }];
     let mut record = card_record(3, 500, "<i>played</i>");
     record.basis = Some("<u>basis</u>".into());
@@ -2359,6 +2364,7 @@ fn handed_card(agent: Option<timeline::Agent>) -> timeline::Entry {
         ],
         ended_at: Some(2_000),
         agent,
+        skill_run: None,
     }
 }
 
@@ -2431,6 +2437,7 @@ fn an_active_card_with_no_event_for_five_minutes_reads_stale() {
         steps: vec![(1_000, timeline::Step::Heard(None))],
         ended_at: None,
         agent: None,
+        skill_run: None,
     };
     let active = "<span class=\"badge badge-amber pulse\">ACTIVE</span>";
     let stale = "<span class=\"badge badge-grey\">STALE</span>";

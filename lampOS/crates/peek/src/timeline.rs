@@ -18,8 +18,8 @@
 use crate::watch::plain;
 use lamp_bus::Message;
 use lamp_msgs::{
-    AgentState, Light, SkillEvent, SkillStage, SkillTask, SkillTaskStage, Speech, StepKind,
-    TaskStatus, TaskStep, TurnVerdict, VoiceDecision, VoiceTurn, cut_whole_chars,
+    AgentState, DecisionKind, Light, SkillEvent, SkillStage, SkillTask, SkillTaskStage, Speech,
+    StepKind, TaskStatus, TaskStep, TurnVerdict, VoiceDecision, VoiceTurn, cut_whole_chars,
 };
 use std::collections::{BTreeMap, VecDeque};
 
@@ -41,6 +41,9 @@ pub const TOPICS: [&str; 6] = [
     TaskStatus::TOPIC,
     SkillTask::TOPIC,
 ];
+/// The voice's tools that run a skill now, whose `do.task` the turn then
+/// began (#7873): `make_skill`'s run of a made skill, `use_skill`'s.
+pub const RUNS_A_SKILL: [&str; 2] = ["make_skill", "use_skill"];
 /// The most steps kept of one task; later ones are only counted.
 pub const MOST_STEPS: usize = 50;
 /// The most bytes kept of a tool's or a code's name.
@@ -149,6 +152,9 @@ pub struct Entry {
     /// What the agent of the task it handed over did, as
     /// [`Timeline::newest`] joins it by the task's number.
     pub agent: Option<Agent>,
+    /// The skill's `do.task` run it began (#7873), as [`Timeline::newest`]
+    /// joins it ([`RUNS_A_SKILL`]).
+    pub skill_run: Option<SkillRun>,
 }
 
 impl Entry {
@@ -244,9 +250,41 @@ impl Timeline {
                     .and_then(|decision| decision.task)
                     .and_then(|task| self.tasks.get(&task))
                     .cloned();
+                entry.skill_run = self.run_begun_by(&entry);
                 entry
             })
             .collect()
+    }
+
+    /// The skill's run `entry` began (#7873): a turn whose decision called
+    /// one of [`RUNS_A_SKILL`] begins the newest run lamp-tasks began
+    /// within its minute ([`TURN_LASTS_MS`] from its first step). No
+    /// number joins them: lamp-skills runs the skill and lamp-tasks its
+    /// task, neither knowing the turn.
+    // ponytail: joined by time, so a trigger's run begun in that minute
+    // would be taken for the turn's; carry the request in `skills/tasks`
+    // if that is ever seen.
+    fn run_begun_by(&self, entry: &Entry) -> Option<SkillRun> {
+        let called = entry.decision().is_some_and(|decision| {
+            decision.kind == DecisionKind::Answered
+                && decision
+                    .tools
+                    .iter()
+                    .any(|tool| RUNS_A_SKILL.contains(&tool.as_str()))
+        });
+        if !called {
+            return None;
+        }
+        let start = entry.start();
+        self.skill_runs
+            .iter()
+            .rev()
+            .find(|run| {
+                run.run.is_some()
+                    && run.at_unix_ms >= start
+                    && run.at_unix_ms - start < TURN_LASTS_MS
+            })
+            .cloned()
     }
 
     /// The skills' runs and answers kept, newest first (#7873).
@@ -433,6 +471,7 @@ impl Timeline {
                     steps: Vec::new(),
                     ended_at: None,
                     agent: None,
+                    skill_run: None,
                 });
                 while self.entries.len() > KEPT {
                     self.entries.pop_front();
