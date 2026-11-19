@@ -98,8 +98,12 @@ pub struct ReopenHold {
     past_wait: u64,
     /// The wait's bound was passed and said.
     overran: bool,
-    /// The recovery's reopen has been made: the next bound ends capture.
+    /// The recovery's reopen has been asked for: the next bound ends
+    /// capture.
     recovering: bool,
+    /// The recovery has closed the microphone and its reopen has not come
+    /// yet: that reopen starts step 2's clock.
+    recovery_reopen_owed: bool,
     /// The last reopen's wait, for its line: from the reopen to the clock's
     /// start, in ms.
     waited_ms: Option<u64>,
@@ -127,7 +131,7 @@ impl ReopenHold {
             return;
         }
         self.last_reopen_at = Some(at_us);
-        if !self.recovering || self.waiting_since.is_none() {
+        if !self.recovering || std::mem::take(&mut self.recovery_reopen_owed) {
             self.waiting_since = Some(at_us);
             self.overran = false;
         }
@@ -172,8 +176,13 @@ impl ReopenHold {
                 waited / 1_000
             )));
         }
+        // Still waiting through the recovery's own close and reopen: the
+        // hold, never the 100 ms prime barrier, bounds the clock until a
+        // start or step 2 (the ARM64 run on #8011: a `BarrierTimeout` right
+        // after step 1).
         self.recovering = true;
-        self.waiting_since = None;
+        self.recovery_reopen_owed = true;
+        self.waiting_since = Some(at_us);
         self.overran = false;
         Some(Recovery::Reopen(format!(
             "lamp-voice: capture: the speaker's clock has not started {} ms after a reopen, {dropped} blocks dropped; recovery step 1: the microphone is reopened under a fresh authority ({ENVIRONMENT}=on)",
@@ -193,6 +202,7 @@ impl ReopenHold {
         {
             self.waiting_since = None;
             self.recovering = false;
+            self.recovery_reopen_owed = false;
             self.waited_ms = Some(clock.saturating_sub(since) / 1_000);
             if self.last_reopen_at.is_some_and(|reopen| clock >= reopen) {
                 self.last_reopen_at = None;
@@ -392,13 +402,11 @@ mod tests {
             line.contains("800 ms after a reopen, 1 blocks dropped; recovery step 1"),
             "{line}"
         );
-        // Nothing more until the recovery's reopen is made.
-        assert_eq!(hold.due(&unstarted, 10 * RECOVER_US), None);
-        assert!(
-            hold.takes(&unstarted, 10 * RECOVER_US),
-            "closed: nothing to hold"
-        );
-        let reopened = 2 * RECOVER_US;
+        // Still waiting through the recovery's close: the hold, not the
+        // prime barrier, bounds it.
+        assert!(hold.waiting());
+        assert!(!hold.takes(&unstarted, RECOVER_US + 10_000));
+        let reopened = RECOVER_US + 50_000;
         hold.reopened(reopened);
         assert_eq!(hold.due(&unstarted, reopened + RECOVER_US - 1), None);
         let Some(Recovery::Exit(line)) = hold.due(&unstarted, reopened + RECOVER_US) else {
