@@ -2312,12 +2312,12 @@ def test_pose_checks_the_size_before_sending_and_keeps_the_lamps_refusals(tmp_pa
         from lampos.client import POSE_JPEG_MAX_BYTES, POSE_JPEG_MAX_CHARS
         from lampos.testing import FAKE_JPEG
 
-        assert POSE_JPEG_MAX_BYTES == 45 * 1024
+        assert POSE_JPEG_MAX_BYTES == 150 * 1024
         assert len(base64.b64encode(b"\xff" * POSE_JPEG_MAX_BYTES)) == POSE_JPEG_MAX_CHARS
         async with FakeLamp(grants=("camera",)) as fake:
             ring = await paired(fake, tmp_path)
             async with await Lamp.connect(keyring=ring) as lamp:
-                with pytest.raises(LampError, match="over the 46080") as too_big:
+                with pytest.raises(LampError, match="over the 153600") as too_big:
                     await lamp.pose(b"\xff\xd8" + b"\0" * POSE_JPEG_MAX_BYTES)
                 assert too_big.value.code == "bad_request"
                 with pytest.raises(LampError, match="empty"):
