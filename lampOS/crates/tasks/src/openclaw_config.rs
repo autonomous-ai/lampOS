@@ -404,6 +404,11 @@ pub fn write_checked(
     validator: &Path,
 ) -> io::Result<bool> {
     let path = state_dir.join(CONFIG_FILE);
+    // Seventh's P2 on #7872: held from the read to the rename, as every
+    // writer of this file does, so lamp-update's `gateway` block and this
+    // merge never drop each other's.
+    fs::create_dir_all(state_dir)?;
+    let _held = lamp_checked_replace::hold(state_dir, lamp_checked_replace::LOCK_WITHIN)?;
     let text = read_or_empty(&path)?;
     let merged = merge_config(&text, port, workspace, skills, v1).map_err(|refused| {
         io::Error::other(format!(
@@ -414,7 +419,6 @@ pub fn write_checked(
     if merged == text {
         return Ok(false);
     }
-    fs::create_dir_all(state_dir)?;
     if validator.exists() {
         replace_checked(&path, &merged, &mut |file| validate(validator, file))?;
     } else {

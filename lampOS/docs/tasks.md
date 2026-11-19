@@ -3040,6 +3040,26 @@ pins `NO_GATEWAY` to the wrapper's no-gateway line), and lamp-update's
 one-shot uses the same schedule: only a refusal because
 the gateway was not there to check is tried again, never a refusal of the
 text.
+All three writers of `openclaw.json` (lamp-tasks' `write_checked`,
+lamp-update's `gateway_config`, lamp-setup's reset cut) hold one lock
+from before their read until after their rename (Seventh's P2 on
+#7872): an exclusive `flock` on OpenClaw's state folder
+(`/var/lib/lampos-openclaw/state`) itself, taken through
+`lamp_checked_replace::hold` / `lock`. Without it, one writer's rename
+landing inside the other's check (seconds) dropped the other's block, and
+lamp-tasks' provider block stayed lost until its next start. The folder,
+not a lock file beside `openclaw.json`: nothing to create or own, every
+writer already opens the folder for its rename (so no unit changes), and
+the reset, which removes every name the state folder does not keep, cannot
+split it. The wait is bounded (`LOCK_WITHIN`, 90 s, over the check's
+60 s); past it the write fails with "another writer held the folder's lock
+past 90 s", as a check that could not run does (lamp-tasks: not written
+until its next start; lamp-update: the install fails `config`, a round's
+one-shot asks again next round; the reset: the file is removed). Tests:
+`the_state_folders_lock_is_held_from_the_read_through_the_check_to_the_rename`
+(lamp-tasks), `a_gateway_block_write_holds_the_state_folders_lock_through_its_check`
+(lamp-update), `a_cut_of_openclaws_config_holds_the_state_folders_lock_through_its_check`
+(lamp-setup).
 
 ## Harness's hooks inside the lamp's agent namespace (#6530)
 

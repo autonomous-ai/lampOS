@@ -1027,6 +1027,21 @@ impl Kept<'_> {
         };
         // Listed again below with what is done to it.
         steps.retain(|step| *step != AgentStep::Keep(path.clone()));
+        // Seventh's P2 on #7872: held from the read to the rename, as
+        // lamp-tasks' and lamp-update's writers of `openclaw.json` hold it.
+        // Not had in time, as a check not taken: removed.
+        if self.act
+            && let Err(error) =
+                lamp_checked_replace::lock(dir.as_fd(), lamp_checked_replace::LOCK_WITHIN)
+        {
+            steps.push(AgentStep::Remove(path));
+            remove_at(&dir, name, true)?;
+            say(&format!(
+                "lamp-setup: reset: {} removed: its cut was not taken: {error}",
+                folder.join(name).display()
+            ));
+            return Ok(true);
+        }
         let regular =
             rustix::fs::FileType::from_raw_mode(stat.st_mode) == rustix::fs::FileType::RegularFile;
         if !regular || stat.st_size as u64 > MOST_KEPT {
