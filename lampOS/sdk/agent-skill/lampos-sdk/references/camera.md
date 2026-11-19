@@ -48,7 +48,7 @@ without it, the calls are refused, or the `camera` grant can't be given.
 - **A pose (in development: unit tests only, not yet on a lamp, last
   verified 2026-11-19):** Python `await lamp.pose(jpeg)`, JS
   `await lamp.pose(jpeg)` (a Buffer), sends a JPEG of your own (a frame you
-  have, at most 45 KiB: a 640x480 frame at ordinary quality fits) to the
+  have, at most 150 KiB: a 640x480 frame at high quality fits) to the
   lamp's NPU and returns `pose` (`score` and the 17 COCO `keypoints`, each
   `x`, `y` in your picture's pixels and `score`; null with no person),
   `width`, `height`, `model` and `ms`. The same `camera` grant, the same

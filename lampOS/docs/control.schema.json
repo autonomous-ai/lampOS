@@ -3476,7 +3476,7 @@
       "additionalProperties": false
     },
     "pose": {
-      "description": "One person's pose in a JPEG of the computer's own (a camera frame it has), from the lamp's NPU: the reply's pose (score and the 17 COCO keypoints in the picture's own pixels, or null with no person), width, height, model and ms. jpeg is standard base64, 1 to 61440 characters (a JPEG of at most 45 KiB, so the frame stays under the 64 KiB WebSocket cap): a 640x480 frame at ordinary quality fits; send a smaller or more compressed one otherwise. Needs the camera grant; local network only (refused on a remote connection, as the camera's ops); refused while the lamp is private (private). Off unless the lamp's LAMP_NPU switch is on (off). On first use the lamp fetches its pose model from the Store (preparing, with retry_ms, about 2000); unavailable when no model could be fetched or checked or the lamp has no NPU (with retry_ms when it will try again). One computer asks at most 15 a second, 5 while the board is warm and 1 while hot (rate, with retry_ms); busy (with retry_ms) when the NPU's share for all computers is used; bad_request when jpeg is not a JPEG.",
+      "description": "One person's pose in a JPEG of the computer's own (a camera frame it has), from the lamp's NPU: the reply's pose (score and the 17 COCO keypoints in the picture's own pixels, or null with no person), width, height, model and ms. jpeg is standard base64, 1 to 204800 characters (a JPEG of at most 150 KiB, so the frame stays under the 256 KiB WebSocket cap): a 640x480 frame at high quality fits; send a smaller or more compressed one otherwise. Needs the camera grant; local network only (refused on a remote connection, as the camera's ops); refused while the lamp is private (private). Off unless the lamp's LAMP_NPU switch is on (off). On first use the lamp fetches its pose model from the Store (preparing, with retry_ms, about 2000); unavailable when no model could be fetched or checked or the lamp has no NPU (with retry_ms when it will try again). One computer asks at most 15 a second, 5 while the board is warm and 1 while hot (rate, with retry_ms); busy (with retry_ms) when the NPU's share for all computers is used; bad_request when jpeg is not a JPEG.",
       "type": "object",
       "properties": {
         "id": {
@@ -3489,7 +3489,7 @@
           "description": "One JPEG, standard base64.",
           "type": "string",
           "minLength": 1,
-          "maxLength": 61440,
+          "maxLength": 204800,
           "pattern": "^[A-Za-z0-9+/=]+$"
         }
       },
