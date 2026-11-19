@@ -2586,7 +2586,11 @@ mod tests {
         for id in [3, 4] {
             let line = json!({"op":"forget","id":id}).to_string();
             let forgot = answer(&mut store, line.as_bytes(), NOW).line;
-            assert_eq!(forgot, r#"{"ok":true,"removed":1}"#);
+            // A forget by id names the exchange it removed (#7771).
+            assert_eq!(
+                forgot,
+                format!(r#"{{"exchanges":{{"everyone":[{id}]}},"ok":true,"removed":1}}"#)
+            );
         }
         let ended = |store: &mut Days, request: Value| -> Value {
             serde_json::from_str(&answer(store, request.to_string().as_bytes(), NOW).line).unwrap()
@@ -2597,6 +2601,8 @@ mod tests {
         );
         assert_eq!(prepared["ok"], true, "{prepared}");
         assert_eq!(prepared["input"]["source_ids"], json!([1, 2]));
+        // A conversation's end is no forget: it names no exchanges (#7771).
+        assert!(prepared.get("exchanges").is_none(), "{prepared}");
         let submitted = ended(
             &mut store,
             json!({"op":"conversation_end","conversation":"later","source_ids":[4,2],"submit":true}),
