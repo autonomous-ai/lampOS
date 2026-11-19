@@ -156,21 +156,27 @@ console.log(bodyGrant ? `body.state subscribed on ${options.fake ? 'a simulated 
 // One lease at a time, taken at the first drag and given back 3 s after the last.
 let lease = null;
 let letGo = null;
+// The page's STOP (`stop_all`): from then on no ask goes to the lamp until a page says `resume`.
+let halted = false;
 // The lamp ended a connection and this one is new: the lamp ended the leases of the old one (docs/control.md), so none is held, and the
 // limits are asked again.
 function reconnected() {
   clearTimeout(letGo);
+  const heldBefore = lease !== null;
   lease = null;
   readLimits();
+  // A STOP's hold is the old connection's lease: with it gone the body is the lamp's again (its arm eases back to the stand), said at once.
+  if (halted && heldBefore) announce('the lamp\'s connection was made again while STOPPED: the hold ended with the old connection, the body is the lamp\'s now');
 }
 async function drag(joint, deg, final = false) {
-  if (!NAMES.includes(joint) || !Number.isFinite(deg)) return;
+  if (halted || !NAMES.includes(joint) || !Number.isFinite(deg)) return;
   try {
     if (!lease) {
       lease = lamp.lease('body');
       await lease.take();
       tell({ type: 'said', text: `holding the body (lease ${lease.id})` });
     }
+    if (halted) return; // a STOP came while the lease was being taken: nothing goes out under it
     clearTimeout(letGo);
     letGo = setTimeout(release, 3_000);
     let target = Math.max(-180, Math.min(180, deg));
@@ -185,6 +191,7 @@ async function drag(joint, deg, final = false) {
     // only asks, and the body may cut or refuse what it asks (roll is held to a count either way on a product lamp). Only the page's
     // last ask of a drag (`final`, the slider let go) waits for it, so a drag leaves no wait behind per step; a lamp that sends no `done`
     // is not waited on for more than 6 s.
+    if (halted) return;
     const mine = (asks[joint] = (asks[joint] ?? 0) + 1);
     const pending = lamp.joints(lease, 300, { [joint]: Number(target.toFixed(1)) }, { wait: final });
     sim?.aim(joint, target);
@@ -199,6 +206,45 @@ async function drag(joint, deg, final = false) {
   }
 }
 const asks = {};
+// STOP, from the page's big button: at once no more asks are sent from this page, the rainbow ends and the client's own actions end
+// (`lamp.stop()`: its light, a hand follow, a say), and the arm and head are HELD where they are now: the body lease is kept (the SDK
+// renews it; the body's own cap is 10 minutes) and one last ask names the present pose of the shoulder, the elbow and the pitch, so the
+// body holds them there instead of finishing the move it was on. Letting the lease go is a second, deliberate press (`give_back`): the
+// body then keeps torque on and eases the arm and head back to the stand (lease.rs `Lease::end`, body.rs `GESTURE_STEP` 21 counts a 20 ms
+// step = up to about 1,050 counts a second at the follower; the servo's own bound is 800 to 1,000 counts a second in the product unit,
+// so up to about 70 to 90 degrees a second, from wherever the arm is). STOP NEVER TAKES THE BODY: it holds only what this page held (the
+// lease it had, or one `lamp.stop()` ended with its own follow, taken again once); a page with no lease of its own ends its sends and
+// actions and leaves the body to the lamp, else a stopped web page would stiffen the lamp for the lease's 10 minutes. Each step is bounded and failures are said, never thrown.
+async function stopAll() {
+  halted = true;
+  clearTimeout(letGo);
+  tell({ type: 'stopped', text: 'STOP: this page sends nothing more to the lamp; holding the arm where it is now…' });
+  const bound = (what, work) => Promise.race([
+    work.then(() => null, (error) => `${what}: ${error?.message ?? error}`),
+    new Promise((resolve) => setTimeout(() => resolve(`${what}: no answer in 3 s`), 3_000).unref()),
+  ]);
+  const problems = (await Promise.all([bound('rainbow', stopRainbow()), bound('lamp.stop', lamp.stop())])).filter(Boolean);
+  let held = 'the body lease is kept but the present pose is not known, so the last ask stands';
+  const here = Object.fromEntries(['shoulder', 'elbow', 'pitch'].map((name) => [name, lastRaw?.joints?.[name]?.deg]).filter(([, deg]) => Number.isFinite(deg)));
+  if (lease && Object.keys(here).length) {
+    const asked = Object.fromEntries(Object.entries(here).map(([name, deg]) => [name, Number(deg.toFixed(1))]));
+    let error = await bound('hold', lamp.joints(lease, 300, asked));
+    // `lamp.stop()` may have ended the lease with the follow it ends: take it again once, so the hold is not lost to that.
+    if (error && /no_lease|lease/.test(error)) {
+      try { lease = lamp.lease('body'); await lease.take(); error = await bound('hold', lamp.joints(lease, 300, asked)); } catch (again) { lease = null; error = `body lease: ${again?.message ?? again}`; }
+    }
+    if (error && lease && asked.pitch !== undefined) { error = await bound('hold', lamp.joints(lease, 300, { pitch: asked.pitch })); if (!error) held = 'only the head is held (the lamp refused the arm\'s hold)'; }
+    if (!error && held.startsWith('the body')) held = `held at ${Object.entries(asked).map(([name, deg]) => `${name} ${deg}`).join(', ')}`;
+    if (error) problems.push(error);
+  } else if (!lease) held = 'this page held no body lease, so the body is left to the lamp';
+  tell({ type: 'stopped', done: true, hold: Boolean(lease), text: `STOPPED (${held}).${problems.length ? ` But: ${problems.join('; ')}.` : ''}${lease ? ' Letting go is a second press: the arm then eases back to its stand at the body\'s own pace, up to about 70 to 90 degrees a second.' : ''}` });
+}
+// The second press: the body lease is given back; the body eases the arm and head back to the stand (not held, not limp).
+async function giveBack() {
+  halted = true;
+  await release();
+  tell({ type: 'stopped', done: true, hold: false, text: 'LET GO: the body is given back; the arm and head are easing back to the stand now.' });
+}
 async function release() {
   // A following the panel started (a row that follows the hand) holds the body lease too: let it go, so every row
   // that needs the body (a look, a move) finds it free.
@@ -240,6 +286,7 @@ async function press(message, page) {
     if (message.type === 'call') {
       const control = findControl(name);
       if (!control) throw refuse(`no button ${name}`);
+      if (halted && control.id !== 'stop') throw refuse('stopped: press Resume on the red bar first');
       // A row the page draws off (not granted, or without --camera/--microphone on a real lamp) is refused here too, on a raw call;
       // and a row that moves the real lamp waits for this page's yes to "this moves the real lamp".
       const off = describe(mode, { grants: lamp.grants, flags: runFlags }).controls.find((c) => c.id === control.id)?.disabled;
@@ -438,6 +485,9 @@ wss.on('connection', (page) => {
     }
     if (message.type === 'drag' && (!real || (page.movesOk && lamp.grants.includes('body')))) drag(message.joint, Number(message.deg), message.final === true);
     if (message.type === 'let_go') release();
+    if (message.type === 'stop_all') stopAll();
+    if (message.type === 'give_back') giveBack();
+    if (message.type === 'resume' && halted) { halted = false; tell({ type: 'resumed', text: 'resumed: the sliders send again' }); }
     if (message.type === 'camera_on') cameraAskedAt = Date.now();
     if (message.type === 'hear') hearing(page, message);
     if (tryPanel && (message.type === 'call' || message.type === 'stim') && typeof message.name === 'string') press(message, page);
