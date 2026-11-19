@@ -3458,9 +3458,12 @@ cả hai người viết.
   - **Chạy tiếp** trong lamp-tasks tối đa 10 phút: dòng `skill_make` được
     đánh dấu `"may_run_on":true`, mỗi câu trả lời 300 giây
     (`long_make::WRITE_WITHIN`) trong 600 giây (`long_make::MAKE_WITHIN`),
-    và lamp-tasks chỉ nhận `within_ms` tới `skill_make::RUN_ON_MOST_WITHIN`
-    (600 giây) cho dấu đó; mọi lần tạo khác, và MAKE IT của app, vẫn 120
-    giây. Lần tạo đã giao cho agent với thời gian đó mà lượt bị cắt trước
+    và lamp-tasks nhận `within_ms` tới `skill_make::RUN_ON_MOST_WITHIN`
+    (600 giây) cho dấu đó, như nó nhận tới `skill_make::MOST_WITHIN` (600
+    giây từ #7245, lần tạo của agent gateway) cho mọi lần tạo; mọi lần tạo
+    khác, và MAKE IT của app, giữ thời gian của nó
+    (`make_skill_agent::WRITE_WITHIN`, 90 giây, hoặc khi có hướng dẫn
+    `GUIDED_WRITE_WITHIN`, 10 phút). Lần tạo đã giao cho agent với thời gian đó mà lượt bị cắt trước
     một phút vẫn được chạy tiếp (`long_make::to_agent`, `long_make::cut`),
     nên đi qua cùng cổng, không bao giờ được bật hay nói qua dịch vụ say mà
     không có cổng (P2 của El trên #7774); phản ứng nhanh của DeepSeek giữ

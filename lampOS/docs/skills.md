@@ -6703,8 +6703,11 @@ the same code for both writers.
     marked `"may_run_on":true` on its `skill_make` line, each answer given
     300 s (`long_make::WRITE_WITHIN`) within 600 s
     (`long_make::MAKE_WITHIN`), and lamp-tasks takes a `within_ms` up to
-    `skill_make::RUN_ON_MOST_WITHIN` (600 s) for that mark alone; every
-    other make, and the app's MAKE IT, keeps 120 s. A make handed to the
+    `skill_make::RUN_ON_MOST_WITHIN` (600 s) for that mark, as it takes up
+    to `skill_make::MOST_WITHIN` (600 s since #7245, a gateway agent's
+    make) for any make; every other make, and the app's MAKE IT, keeps
+    its own time (`make_skill_agent::WRITE_WITHIN`, 90 s, or with the guide
+    `GUIDED_WRITE_WITHIN`, 10 minutes). A make handed to the
     agent with that time whose turn is cut before its minute is let run on
     all the same (`long_make::to_agent`, `long_make::cut`), so it goes
     through the same gate and is never put on or said through the say
