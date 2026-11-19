@@ -4184,7 +4184,17 @@ impl HarnessRunner {
             drop(done);
             ended
         });
+        // #7906's told line: a stuck session replaced under this run, the
+        // run done again in the new one; heard once, before its answer.
+        let restarted = turn.restarted();
         drop(turn);
+        let told = |answer: String| {
+            if restarted {
+                format!("{} {answer}", crate::one_session::RESTARTED_LINE)
+            } else {
+                answer
+            }
+        };
         let took = began.elapsed().as_secs();
         let agent = "the lamp's default agent";
         Some(match ended {
@@ -4206,7 +4216,7 @@ impl HarnessRunner {
                             text.len()
                         );
                     }
-                    let _ = run.answer.set(text);
+                    let _ = run.answer.set(told(text));
                 }
                 Ok(0)
             }
@@ -4235,7 +4245,7 @@ impl HarnessRunner {
                 if ended.is_ok()
                     && let Some(answer) = answer
                 {
-                    let _ = run.answer.set(answer);
+                    let _ = run.answer.set(told(answer));
                 }
                 ended.map(|()| 0)
             }
