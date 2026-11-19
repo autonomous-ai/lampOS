@@ -26,7 +26,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .map(std::fs::read_to_string)
         .collect::<Result<Vec<_>, _>>()?;
     let counted = replay::replayed(texts.iter().map(String::as_str), day);
-    println!("{date} (UTC), from {} pulls: {}", pulls.len(), told(&counted));
+    println!(
+        "{date} (UTC), from {} pulls: {}",
+        pulls.len(),
+        told(&counted)
+    );
     println!("{}", serde_json::to_string(&counted)?);
     Ok(())
 }
