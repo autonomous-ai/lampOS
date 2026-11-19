@@ -1801,8 +1801,9 @@ fn exec_allowlist(run: &mut Runner, shown: Shown, say: &mut dyn FnMut(&str)) -> 
 pub const CONFIG_NOT_READY: &str = "Config unavailable";
 /// What the wrapper says when it joins a gateway just (re)started whose
 /// namespace does not show Node yet (c0a4, 21:22:21: `/usr/bin/env:
-/// 'node': No such file or directory`), before [`CONFIG_NOT_READY`].
-pub const NODE_NOT_READY: &str = "'node': No such file or directory";
+/// 'node': No such file or directory`), before [`CONFIG_NOT_READY`]: one
+/// constant with the checked replace's retry, so the two never drift.
+pub use lamp_checked_replace::NODE_NOT_READY;
 
 /// Whether an allow-list add was refused only because the gateway just
 /// (re)started is not ready yet ([`NODE_NOT_READY`], [`CONFIG_NOT_READY`]).
