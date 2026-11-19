@@ -10309,33 +10309,38 @@ impl Drop for ChangeAs {
 
 /// A changed skill's new entry (`new`) on: the entry it changes (its
 /// `"changes"`) taken out of `entries` and kept under its `old`, with when
-/// and whether it was off, for `crate::made_change::put_back`.
-fn changed_in_place(entries: &mut Vec<Value>, sha256: &str, now_unix_ms: u64) {
+/// and whether it was off, for `crate::made_change::put_back`. An older
+/// version that one kept is let go: given back, so its package is deleted
+/// once the index is written ([`drop_packages`], Twelve's P2 3 on #8008).
+fn changed_in_place(entries: &mut Vec<Value>, sha256: &str, now_unix_ms: u64) -> Vec<Value> {
     let Some(at) = entries.iter().position(|entry| entry["sha256"] == sha256) else {
-        return;
+        return Vec::new();
     };
     let Some(change) = entries[at]
         .as_object_mut()
         .and_then(|entry| entry.remove("changes"))
     else {
-        return;
+        return Vec::new();
     };
     let Some(old_at) = entries
         .iter()
         .position(|entry| entry["sha256"] == change["sha256"] && entry["sha256"] != sha256)
     else {
-        return;
+        return Vec::new();
     };
     let mut old = entries.remove(old_at);
     // An older version kept already goes: one undo, of the latest change.
-    if let Some(object) = old.as_object_mut() {
-        object.remove("old");
-    }
+    let gone: Vec<Value> = old
+        .as_object_mut()
+        .and_then(|object| object.remove("old"))
+        .into_iter()
+        .collect();
     old["replaced_at_ms"] = json!(now_unix_ms);
     old["was_off"] = json!(change["was_off"] == true);
     let at = if old_at < at { at - 1 } else { at };
     entries[at]["changed_from"] = change["sha256"].clone();
     entries[at]["old"] = old;
+    gone
 }
 
 /// A marked `SKILL.md` ([`card_marked`]) with its front matter's `name:`
@@ -12030,8 +12035,10 @@ pub fn put_on_within(
                 }
                 // A change (`crate::made_change`): the helper put it in its
                 // old one's folder, so that one is kept under its `old`.
-                changed_in_place(&mut entries, sha256, now_unix_ms);
-                write_index(directory, &entries)
+                let gone = changed_in_place(&mut entries, sha256, now_unix_ms);
+                write_index(directory, &entries)?;
+                drop_packages(directory, gone, &entries);
+                Ok::<(), io::Error>(())
             });
             if let Err(error) = written {
                 eprintln!("lamp-voice: a made skill is on, but not marked so: {error}");
