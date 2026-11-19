@@ -5307,12 +5307,28 @@ in and signed out, and on 0.6.60, signed in (#7507's ROW).
     end, so a refusal that took the whole bound still counts. A session
     `ensure` made new is in its first words' window for 120 s
     (`OPEN_IDLE_WITHIN`): its refusals are not counted. One refusal, then
-    a reply taken, never replaces anything. It goes through the ladder
-    below as a died session: (a) one plain resume if the Gateway still
-    holds its key. The count is kept across that resume, so if it finds
-    the same frozen process (`live` or `resumed`, refused again), the next
-    refusal is (b) `--fresh`, never another resume. The waiting task never
-    ran, so it is typed into the new session and told once.
+    a reply taken, never replaces anything. Its process is
+    frozen, not dead, so a plain resume alone finds it `live` again
+    (lamp-c0a4 J3, 19 Nov: `ensure` said `live`, `working`, and the task
+    sat refused until it expired). So `OneSession::restart_or_replace`:
+    (a) once, if the Gateway still holds its key, the session is closed
+    `--now` first, its record and OpenClaw conversation kept (no
+    `sessions.delete`), and the next plain `ensure` starts a new process
+    on the same conversation, its memory kept. A close refused goes
+    straight to (b), as does one refused because its conversation is
+    already gone (`CLOSE_CONVERSATION_GONE`: nothing to resume). This
+    mark of the close lasts 120 s (twice the bound), so a task given up
+    after the resume never leaves a later healthy busy turn counted.
+    After that resume, an `ensure` that says `live` with
+    the same agent (the frozen process outlived its close) is (b)
+    `--fresh` at once. A `resumed` after that close is a new process
+    warming up: the count starts again, so one warm-up refusal never jumps
+    to `--fresh` and loses the memory the resume kept. Until a reply is
+    taken a `NOT_IDLE` refusal counts too: nothing of ours runs in that
+    new process, so `working` there is the frozen one's, not a turn to
+    wait out. Refused over the bound again, it is (b) `--fresh`, never
+    another resume. The waiting task never ran, so it is typed into the new
+    session and told once.
     Beside #7895's bound: an `ENGINE_NOT_READY` refusal never spends one
     of a spoken task's `STARTING_RESUMES_MOST` (3) tries, which count only
     `NOT_RUNNING`, a `TIMEOUT` with nothing taken and a failed open. So a
