@@ -857,14 +857,27 @@ pub fn observer_at(base: &str, model: &str, key: &str) -> io::Result<crate::reme
 /// model's whole answer read as [`crate::remember::observe_output`]. A job
 /// given its day (`"today"`, `LAMP_MEMORY_EVENTS`) is asked for an event's
 /// day too ([`crate::remember::observe_prompt`]); any other as before.
-async fn ask_observations(
-    chat: &crate::second_provider::net::Chat,
-    input: &serde_json::Value,
-) -> Option<serde_json::Value> {
+/// The observation pass's system prompt for `input`: the day's line with
+/// `"today"`, the summary's with `"summary"`, and [`OBSERVE_KEPT`] with
+/// `"kept"` (C40).
+///
+/// [`OBSERVE_KEPT`]: crate::remember::OBSERVE_KEPT
+fn observe_system_prompt(input: &serde_json::Value) -> String {
     let mut prompt = crate::remember::observe_prompt(input.get("today").is_some()).into_owned();
     if input.get("summary").is_some() {
         prompt.push_str(crate::remember::OBSERVE_SUMMARY);
     }
+    if input.get("kept").is_some() {
+        prompt.push_str(crate::remember::OBSERVE_KEPT);
+    }
+    prompt
+}
+
+async fn ask_observations(
+    chat: &crate::second_provider::net::Chat,
+    input: &serde_json::Value,
+) -> Option<serde_json::Value> {
+    let prompt = observe_system_prompt(input);
     let mut stream = chat
         .send(&[Message::system(prompt), Message::user(input.to_string())])
         .await
@@ -15644,6 +15657,16 @@ mod tests {
                 }
             }
         }
+    }
+
+    /// C40: the pass is told `OBSERVE_KEPT` only for a job given `"kept"`.
+    #[test]
+    fn the_observation_prompt_tells_kept_only_with_kept() {
+        let plain = observe_system_prompt(&serde_json::json!({"job":"j"}));
+        assert!(!plain.contains(crate::remember::OBSERVE_KEPT));
+        let kept =
+            observe_system_prompt(&serde_json::json!({"job":"j","kept":[{"id":1,"text":"x"}]}));
+        assert!(kept.ends_with(crate::remember::OBSERVE_KEPT));
     }
 
     #[test]

@@ -932,9 +932,15 @@ fn call_kept_with(
     let mut call = call.clone();
     let on = call.args.get("on").cloned();
     let replaces = call.args.get("replaces").cloned();
+    // C81: a kept thing said again (`again`) stays so: it is sent in the
+    // words it was shown, never the heard line's or the model's.
+    let again = call.args.get("again").cloned();
     call.args = json!({"text": kept});
     if let Some(on) = on {
         call.args["on"] = on;
+    }
+    if let Some(again) = again.filter(|id| !id.is_null()) {
+        call.args["again"] = again;
     }
     if let Some(replaces) = replaces.filter(|id| keeps_replaces && !id.is_null()) {
         call.args["replaces"] = replaces;
@@ -986,6 +992,20 @@ pub fn answered(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// C81: a heard line kept in place of the model's sentence keeps its
+    /// `again`, so a kept thing said again stays itself.
+    #[test]
+    fn a_heard_line_kept_instead_keeps_again() {
+        let call = ToolCall {
+            id: String::new(),
+            name: super::super::REMEMBER.into(),
+            args: json!({"text":"Gym locker number is 441 forever.","again":1835}),
+        };
+        let (sent, _) = call_with(&call, Some("my gym locker number is 441"), || None).unwrap();
+        assert_eq!(sent.args["again"], 1835);
+        assert_ne!(sent.args["text"], call.args["text"]);
+    }
 
     /// #7739: a near spelling not kept is told whole: nothing kept, the
     /// not-caught line, and the reply ends there with nothing asked (the
