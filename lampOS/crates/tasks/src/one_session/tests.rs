@@ -4116,3 +4116,53 @@ fn an_old_engine_not_ready_never_joins_one_after_a_long_gap() {
     assert_eq!(fake.count("close-kept"), 0);
     assert_eq!(fake.count("ensure"), 1);
 }
+
+/// #7906 sign 5 beside #7895's bound, on the spoken path: `ENGINE_NOT_READY`
+/// refusals never spend a spoken task's [`STARTING_RESUMES_MOST`] tries
+/// (those count only `NOT_RUNNING`, a `TIMEOUT` with nothing taken and a
+/// failed open), so each one puts the task back `busy` and sign 5 lets the
+/// frozen session go; the session ensured again takes the task's words.
+/// It never ends [`NOT_STARTED`] first.
+#[test]
+fn a_spoken_task_refused_engine_not_ready_is_replaced_before_any_not_started() {
+    let dir = tempfile::tempdir().unwrap();
+    let one = kept_session(dir.path())
+        .with_kept_session(dir.path().join(TOKEN_FILE))
+        .with_spoken_bound(Duration::from_millis(50), Arc::new(AtomicBool::new(false)));
+    let fake = Fake::default();
+    *fake.programs.lock().unwrap() = true;
+    one.open_if_due(&fake, &place());
+    one_turn(&one, &fake, "task-0");
+    // Past its first words' window (1 s here).
+    thread::sleep(Duration::from_millis(1100));
+    let refuse = |fake: &Fake| {
+        let mut takes = fake.takes.lock().unwrap();
+        takes.clear();
+        takes.extend(std::iter::repeat_n(Took::EngineNotReady, 50));
+    };
+    // Past STARTING_RESUMES_MOST put-backs in the first refusals' window:
+    // each `busy`, none a sign yet, no try spent.
+    for round in 0..=STARTING_RESUMES_MOST {
+        refuse(&fake);
+        assert_eq!(
+            spoken_launch(&one, &fake, &spoken("lamp-1")),
+            busy(),
+            "{round}"
+        );
+    }
+    assert!(one.lock().unstarted.is_none(), "no #7895 try spent");
+    assert_eq!(fake.count("ensure"), 1);
+    thread::sleep(Duration::from_millis(1100));
+    // Refused over the bound: sign 5 lets the session go, put back `busy`.
+    refuse(&fake);
+    assert_eq!(spoken_launch(&one, &fake, &spoken("lamp-1")), busy());
+    assert_eq!(one.agent(), None, "{:?}", fake.calls());
+    fake.takes.lock().unwrap().clear();
+    one.lock().next_open = None;
+    one.open_if_due(&fake, &place());
+    assert_eq!(fake.count("ensure"), 2, "{:?}", fake.calls());
+    assert!(matches!(
+        spoken_launch(&one, &fake, &spoken("lamp-1")),
+        Some(LaunchOutcome::Joined { .. })
+    ));
+}
