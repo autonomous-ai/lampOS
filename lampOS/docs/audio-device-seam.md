@@ -126,6 +126,17 @@ capture worker's own bound (1.5 s, `REOPEN_US`) still ends the worker: the
 voice has ended by then anyway, and a speaker whose coordinator is gone must
 not keep the device.
 
+A speaker held up while the coordinator kept renewing its authority finds
+those renewals queued when it comes back (#7804: lamp-0c89 in an update's
+restart, 18 Nov). Its tick read at most 8 control messages, so the ninth
+ended the worker ("speaker control tick bound"), lamp-voice with it, and the
+update's watch rolled the update back. A tick that comes more than 50 ms
+after the last now reads up to 256, as a held-up capture worker always has
+(`control_bound`, `HELD_UP_CONTROL`: a renewal a capture block leaves at
+most 150 in 1.5 s), so the newest renewal is the fresh authority and the
+speaker goes on (`a_speaker_held_up_past_its_authority_goes_on_with_the_renewals_queued_meanwhile`).
+A tick that was not held up keeps the bound of 8.
+
 What the lamp was saying when its speaker lapsed is lost, and that costs
 the answer, never the voice (the reviewer on #1214). Queued speech is
 dropped by its own ownership check, which names its owner and the lapse

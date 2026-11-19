@@ -118,9 +118,24 @@ const REOPEN_US: u64 = 1_500_000;
 const LAPSE_MOST_US: u64 = REOPEN_US;
 /// A tick that comes this long after the last was held up.
 const HELD_UP: Duration = Duration::from_millis(50);
-/// What a held-up capture worker may read in one tick: snapshots come no
-/// faster than one a capture block, so 1.5 s leaves at most 150.
+/// What a held-up capture or speaker worker may read in one tick: snapshots
+/// come no faster than one a capture block, so 1.5 s leaves at most 150.
 const HELD_UP_CONTROL: usize = 256;
+
+/// How many control messages a worker's tick may read: a tick held up
+/// (#784) finds the snapshots sent meanwhile queued, and reads them all.
+/// The speaker kept the tight bound (#7804, lamp-0c89 in an update's
+/// restart): a hold-up's queued renewals ended it with "speaker control
+/// tick bound", and lamp-voice with it.
+fn control_bound(tick: Instant, last_tick: &mut Instant) -> usize {
+    let held_up = tick.duration_since(*last_tick) > HELD_UP;
+    *last_tick = tick;
+    if held_up {
+        HELD_UP_CONTROL
+    } else {
+        MAX_CONTROL
+    }
+}
 
 /// A discontinuity a short stall of this worker causes: the authority it
 /// held lapsed while it was held up, or its 40 ms buffer overran. Anything
@@ -637,12 +652,7 @@ fn capture_loop<D: CaptureDevice>(
         cost.begin();
         // A worker held up (#784) finds the snapshots sent meanwhile queued:
         // they are read in this tick, up to what the longest gap can leave.
-        let bound = if tick.duration_since(last_tick) > HELD_UP {
-            HELD_UP_CONTROL
-        } else {
-            MAX_CONTROL
-        };
-        last_tick = tick;
+        let bound = control_bound(tick, &mut last_tick);
         for index in 0..=bound {
             let control = match held.pop_front() {
                 Some(control) => control,
@@ -1700,15 +1710,17 @@ fn speaker_loop(
     // With LAMP_STALLS=on, a pass or an overrun wait of 50 ms or more is
     // recorded with what held it (#1178).
     let mut stalls = crate::stalls::Stalls::from_environment("speaker");
+    let mut last_tick = Instant::now();
     'tick: loop {
         let tick = Instant::now();
         output.times.begin(tick);
         let stall_pass = stalls.begin();
-        for index in 0..=MAX_CONTROL {
+        let bound = control_bound(tick, &mut last_tick);
+        for index in 0..=bound {
             let Some(control) = channels.control.receive_renewed(Control::is_renewal)? else {
                 break;
             };
-            if index == MAX_CONTROL {
+            if index == bound {
                 return Err(io::Error::other("speaker control tick bound").into());
             }
             match control {
@@ -3126,6 +3138,9 @@ mod speaker_chunk_tests {
         clock: Arc<AtomicU64>,
         /// One entry per block the queue was given: true if it holds sound.
         blocks: Arc<Mutex<Vec<bool>>>,
+        /// Held by the test, the worker's next read of the queue's clock waits for it: a speaker
+        /// held up mid-tick, as by a busy lamp.
+        hold: Arc<Mutex<()>>,
         worker: Option<std::thread::JoinHandle<std::result::Result<(), String>>>,
         privacy: u64,
         linked: bool,
@@ -3161,15 +3176,19 @@ mod speaker_chunk_tests {
                     .unwrap();
             let clock = Arc::new(AtomicU64::new(5_000_000));
             let blocks = Arc::new(Mutex::new(Vec::new()));
+            let hold = Arc::new(Mutex::new(()));
             let mut controller = Controller::new(parent_boot, at());
             controller
                 .set_microphone_permission(at(), Permission::Allowed)
                 .unwrap();
             let path = directory.path.clone();
-            let (read, seen) = (clock.clone(), blocks.clone());
+            let (read, seen, held) = (clock.clone(), blocks.clone(), hold.clone());
             let worker = std::thread::spawn(move || {
                 let pcm = SoftPcm::with_clock(
-                    move || read.load(Ordering::SeqCst),
+                    move || {
+                        drop(held.lock().unwrap_or_else(|p| p.into_inner()));
+                        read.load(Ordering::SeqCst)
+                    },
                     move |frames| {
                         seen.lock()
                             .unwrap()
@@ -3199,6 +3218,7 @@ mod speaker_chunk_tests {
                 capture,
                 clock,
                 blocks,
+                hold,
                 worker: Some(worker),
                 privacy: 0,
                 linked: false,
@@ -3414,6 +3434,46 @@ mod speaker_chunk_tests {
                 first + 1,
                 "a block of silence between two blocks of speech (pair {batch}): {blocks:?}"
             );
+        }
+        rig.parent.control.send(Control::Stop).unwrap();
+        let ended = rig.worker.take().unwrap().join().unwrap();
+        assert_eq!(ended, Ok(()));
+    }
+
+    /// #7804, lamp-0c89 in an update's restart: the speaker held up past its authority's lease
+    /// while the controller kept renewing it. Its authority lapsed ("silent until a fresh one"),
+    /// and the next tick found the renewals queued meanwhile, more than its tight bound: it ended
+    /// with "speaker control tick bound", and lamp-voice with it, so the update rolled back. Read
+    /// as the capture worker reads a hold-up's backlog (#784), the newest renewal is the fresh
+    /// authority, and the speaker goes on.
+    #[cfg_attr(
+        target_os = "macos",
+        ignore = "the Mac CI runner ends the worker early (reset, os error 54); runs on Linux"
+    )]
+    #[test]
+    fn a_speaker_held_up_past_its_authority_goes_on_with_the_renewals_queued_meanwhile() {
+        let mut rig = Rig::start();
+        rig.until("the clock starts", |rig| rig.started);
+        rig.settle();
+        // Held up past the rig's 1 s lease, a renewal every 20 ms queued behind it: about 60,
+        // far past the tight bound of 8, and within the 1.5 s a hold-up may take.
+        let hold = rig.hold.clone();
+        let guard = hold.lock().unwrap();
+        let held = Instant::now();
+        let mut renewals = 0;
+        while held.elapsed() < Duration::from_millis(1_200) {
+            rig.renew();
+            renewals += 1;
+            std::thread::sleep(Duration::from_millis(20));
+        }
+        drop(guard);
+        assert!(renewals > MAX_CONTROL, "{renewals} renewals queued");
+        // A fresh authority after the hold-up, and the speaker still up for a while after it.
+        rig.settle();
+        let from = Instant::now();
+        while from.elapsed() < Duration::from_millis(200) {
+            rig.service();
+            std::thread::sleep(Duration::from_millis(5));
         }
         rig.parent.control.send(Control::Stop).unwrap();
         let ended = rig.worker.take().unwrap().join().unwrap();
