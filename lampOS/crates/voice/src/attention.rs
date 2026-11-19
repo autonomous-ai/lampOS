@@ -7267,6 +7267,30 @@ mod tests {
         assert!(attention.weigh_the_name(None, false));
     }
 
+    /// #7891, the Reviewer-lead's P2 on #7918: a short line whose words the
+    /// rule reads as a call (`called`, `called_by_name`: the owner's
+    /// language's forms too, `calls_as_written`) keeps the name heard in the
+    /// room's sound, though no word of it is on [`written_for_the_name`]:
+    /// "Lamp's here." is "lamp's" to that list. The owner's language is read
+    /// once per process (`language::at_start`), so English stands in for it
+    /// here; the same `text_calls` passes its forms. "Okay." is still dropped.
+    #[test]
+    fn a_short_line_whose_words_call_the_lamp_keeps_a_name_heard_in_the_sound() {
+        let dropped = |heard: &str, passing: bool| {
+            let mut attention = Attention::default();
+            attention.ask_a_second_sign_of_the_name(true);
+            attention.ignore_name_in_passing(passing);
+            attention.began_at(1, 1, 10_000_000);
+            attention.name_heard_scored(10_200_000, 0.97);
+            attention.heard(heard);
+            attention.weigh_the_name(Some(true), false)
+        };
+        for passing in [false, true] {
+            assert!(!dropped("Lamp's here.", passing), "{passing}");
+            assert!(dropped("Okay.", passing), "{passing}");
+        }
+    }
+
     /// #4226, `LAMP_NAME_START_USUAL=on`: a line whose sound began 0.3 s
     /// before its usual start by the soft start's lead, the name heard 1.5 s
     /// after its sound began (1.2 s after its usual start), has the name at
