@@ -250,7 +250,8 @@ async fn run_full_with_audio(
         .announcing(false)
         .holding_forgets_through_spelling(spelling)
         .undoing_doubted_keeps(doubt_undoes)
-        .asking_near_heard_words(NEAR_ASKS.with(|on| on.replace(false)));
+        .asking_near_heard_words(NEAR_ASKS.with(|on| on.replace(false)))
+        .not_keeping_unsure(UNSURE.with(|on| on.replace(false)));
     let audio_calls = Arc::new(AtomicUsize::new(0));
     if requested_audio {
         let seen = audio_calls.clone();
@@ -386,6 +387,9 @@ thread_local! {
     /// `LAMP_MEMORY_ASK_NEAR_HEARD` ([`Engine::asking_near_heard_words`])
     /// for the next [`run_full`] on this thread, once.
     static NEAR_ASKS: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
+    /// `LAMP_MEMORY_UNSURE_NOT_KEPT` ([`Engine::not_keeping_unsure`], #7739)
+    /// for the next [`run_full`] on this thread, once.
+    static UNSURE: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
 }
 
 const FACE: &str = crate::known_faces::FORGET;
@@ -2510,4 +2514,206 @@ async fn the_audio_runner_preserves_confirmation_prints_after_failed_or_other_pe
         assert_eq!(ran.second_audio_calls, 1);
         assert_eq!(ran.second_voice_prints, 4, "case {index}");
     }
+}
+
+/// #7739, the product owner's no-asks rule (18 Nov): "An unsure line is
+/// simply not acted on, with no 'did you say…?'". With
+/// `LAMP_MEMORY_UNSURE_NOT_KEPT` a doubted keep is not kept and nothing is
+/// asked: a keep its own round doubts, a keep the round right after it
+/// doubts (taken back, never held for a yes, with or without the eyes), and
+/// a keep with a near spelling of a heard word (never "is that …?", even
+/// with `LAMP_MEMORY_ASK_NEAR_HEARD`). The model is told it was not kept
+/// and never to say it was. A clear keep is kept as before, and "forget
+/// everything" still asks "sure?" first. Off, each asks as before.
+#[tokio::test]
+async fn an_unsure_line_is_not_kept_and_nothing_is_asked() {
+    const REMEMBER: &str = crate::remember::REMEMBER;
+    const FORGET: &str = crate::remember::FORGET;
+    const NEAR_SAID: &str = "Remember that my favourite flower is a renunculus.";
+    const NEAR: &str = "Their favorite flower is a ranunculus.";
+    const CODE_SAID: &str = "Remember my code is 4417.";
+    const CODE: &str = "Their code is 4417.";
+    const A: Sight = (&["A"], true);
+    let keep = |text: &str| (REMEMBER.to_owned(), json!({ "text": text }));
+    let doubted = Lamp::Calls(
+        REMEMBER,
+        "Kept. Was that 'rhinodulus' right? I want to be sure.",
+    );
+    let undone = vec![
+        (REMEMBER.to_owned(), json!({"name": "A"})),
+        (FORGET.to_owned(), json!({"source_id": 391})),
+    ];
+    /// The turns, their eyes, (near asks, doubt undoes, unsure), the calls
+    /// run, what the model must be told (empty: nothing checked), and the
+    /// case.
+    type Case<'a> = (
+        &'a [Turn],
+        Option<&'a [Sight]>,
+        (bool, bool, bool),
+        Vec<(String, Value)>,
+        &'a str,
+        &'a str,
+    );
+    let cases: Vec<Case> = vec![
+        (
+            &[
+                ("A", NEAR_SAID, Lamp::Keeps(NEAR, "Lovely flower."), 0),
+                ("A", "Yes.", Lamp::Says("Okay."), 5),
+            ],
+            Some(&[A, A]),
+            (true, false, true),
+            vec![],
+            "Ask nothing about it",
+            "a near word: not kept, not asked, and a yes keeps nothing",
+        ),
+        (
+            &[("A", NEAR_SAID, Lamp::Keeps(NEAR, "Lovely flower."), 0)],
+            None,
+            (false, false, true),
+            vec![],
+            "Ask nothing about it",
+            "a near word without the eyes: not kept either",
+        ),
+        (
+            &[("A", NEAR_SAID, Lamp::Keeps(NEAR, "Is that ranunculus?"), 0)],
+            Some(&[A]),
+            (true, false, false),
+            vec![],
+            "Not kept yet",
+            "off: the near word is asked about, as before",
+        ),
+        (
+            &[
+                (
+                    "A",
+                    NEAR_SAID,
+                    Lamp::KeepsAsking(
+                        "Their favorite flower is a renunculus.",
+                        "I may have misheard that.",
+                    ),
+                    0,
+                ),
+                ("A", "Yes.", Lamp::Says("Okay."), 5),
+            ],
+            Some(&[A, A]),
+            (false, false, true),
+            vec![],
+            "Ask nothing about it",
+            "its own round doubts: not run, not asked",
+        ),
+        (
+            &[(
+                "A",
+                NEAR_SAID,
+                Lamp::KeepsAsking(
+                    "Their favorite flower is a renunculus.",
+                    "I may have misheard that.",
+                ),
+                0,
+            )],
+            Some(&[A]),
+            (false, false, false),
+            vec![],
+            "Ask them, in a few words, to say it again",
+            "off: its own round doubts and asks again, as before",
+        ),
+        (
+            &[
+                ("A", "My favorite flower is a rhinodulus.", doubted, 0),
+                ("A", "Yes.", Lamp::Says("Okay."), 5),
+            ],
+            Some(&[A, A]),
+            (false, true, true),
+            undone.clone(),
+            "",
+            "the round after doubts: taken back, and a yes keeps nothing",
+        ),
+        (
+            &[("A", "My favorite flower is a rhinodulus.", doubted, 0)],
+            None,
+            (false, true, true),
+            undone.clone(),
+            "",
+            "the round after doubts, without the eyes: taken back too",
+        ),
+        (
+            &[
+                (
+                    "A",
+                    CODE_SAID,
+                    Lamp::Keeps(CODE, "Kept: your code is 4417."),
+                    0,
+                ),
+                ("A", "Thanks.", Lamp::Says("Anytime."), 5),
+            ],
+            Some(&[A, A]),
+            (true, false, true),
+            vec![keep(CODE)],
+            "",
+            "a clear keep is kept as before",
+        ),
+    ];
+    for (at, (turns, sight, (near, undoes, unsure), calls, told, case)) in
+        cases.into_iter().enumerate()
+    {
+        NEAR_ASKS.with(|on| on.set(near));
+        UNSURE.with(|on| on.set(unsure));
+        let ran = run_full(
+            turns,
+            sight,
+            9801 + 10 * at as u64,
+            (false, undoes),
+            json!({"remembered": true}),
+        )
+        .await;
+        assert_eq!(ran.calls, calls, "{case}");
+        let asked = format!("{:?}", ran.asked);
+        if !told.is_empty() {
+            assert!(asked.contains(told), "{case}: {asked}");
+        }
+        if unsure {
+            // Never told to ask, and told never to say it was kept.
+            for ask in ["Not kept yet", "Ask them", "kept again only"] {
+                assert!(!asked.contains(ask), "{case}: {ask}");
+            }
+            if !told.is_empty() {
+                assert!(
+                    asked.contains("Never say it was kept")
+                        || asked.contains("Never say it is kept"),
+                    "{case}"
+                );
+            }
+            // Nothing held: no yes releases a keep.
+            assert!(ran.released.iter().all(Option::is_none), "{case}");
+        }
+    }
+    // The one carve-out: "forget everything" is still held for their yes.
+    let asks = Lamp::Calls(EVERYTHING, "Sure? Shall I forget everything about you?");
+    UNSURE.with(|on| on.set(true));
+    let ran = run_full(
+        &[("A", "Forget everything about me.", asks, 0)],
+        Some(&[A]),
+        9901,
+        (false, false),
+        json!({"ok": true}),
+    )
+    .await;
+    assert!(ran.forgets.is_empty(), "held for their yes");
+    UNSURE.with(|on| on.set(true));
+    let ran = run_full(
+        &[
+            ("A", "Forget everything about me.", asks, 0),
+            ("A", "Yes.", Lamp::Says("Done."), 5),
+        ],
+        Some(&[A, A]),
+        9911,
+        (false, false),
+        json!({"ok": true}),
+    )
+    .await;
+    assert_eq!(
+        ran.forgets,
+        [(EVERYTHING.to_owned(), json!({"name": "A"}))],
+        "their yes runs it"
+    );
 }

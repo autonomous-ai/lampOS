@@ -2064,6 +2064,32 @@ passed. Tests: the notes' exact texts in `remember::tests`.
     `remember::heard::tests::a_near_spelling_of_a_heard_word_is_asked_about`,
     `remember::heard::tests::an_inflection_or_british_spelling_is_heard_not_near`,
     `second_provider::tests::held_forget::a_keep_with_a_near_spelling_of_a_heard_word_waits_for_their_yes`.
+  - **With `LAMP_MEMORY_UNSURE_NOT_KEPT`: an unsure line is simply not
+    kept, and nothing is asked** (#7739; off unless set, the second route
+    only; on in the product). The product owner's no-asks rule of 18 Nov:
+    "An unsure line is simply not acted on, with no 'did you say…?'". The
+    doubt is the model's own, never a word list judging the person: its
+    round's words doubt what was heard, or its sentence has a near spelling
+    of a heard word. A `remember` its own round doubts is not run, and the
+    model is told nothing is kept, to ask nothing (no "did you say …?", no
+    "say it again") and never to say it was kept
+    (`doubted::NOT_KEPT_NO_ASK`). A keep the round right after it doubts is
+    forgotten by its id, with `LAMP_MEMORY_DOUBT_UNDOES`, and never held for
+    a yes, so the eyes are not needed and a later "yes" keeps nothing
+    (`doubted::UNDONE_NO_ASK_NOTE` if that round called more). A keep with a
+    near spelling of a heard word, as above, is not run and nothing is asked
+    (`heard::near_not_kept_told`), with or without
+    `LAMP_MEMORY_ASK_NEAR_HEARD`. `remember`'s description
+    (`REMEMBER_DESCRIBED_UNSURE`) and `LAMP_KEEP_QUIETLY`'s note
+    (`keep_quietly::QUIET_NOTE_UNSURE`) say a doubted word is neither kept
+    nor asked about. The model's reply stands, and no line is added; a
+    clear keep is kept as before. The "sure?" before "forget everything"
+    stays. The journal says not kept or taken back, with counts only.
+    Tests:
+    `second_provider::tests::held_forget::an_unsure_line_is_not_kept_and_nothing_is_asked`,
+    `remember::doubted::tests::an_unsure_keep_is_told_not_kept_and_to_ask_nothing`,
+    `remember::tests::an_unsure_word_is_neither_kept_nor_asked_about_in_remember_alone`,
+    `keep_quietly::tests::an_unclear_word_is_not_asked_about_with_unsure_not_kept`.
   - **The lamp's name heard as another word is no name** (#3504 finding
     N4). On lamp-06c1 the name was written "Ramon", "Edeland", "Elan" and
     "Hey, mom"; the lamp called the person by it, and "Edeland, my dog is
