@@ -31,6 +31,7 @@ mod music_scope;
 mod music_warm_name;
 mod name_carries;
 mod name_near;
+mod needs_face_said;
 mod not_for_me_words;
 mod opens_further;
 mod pause_join;
