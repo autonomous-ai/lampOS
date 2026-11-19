@@ -3868,35 +3868,84 @@ các kỹ năng nạp và chạy y hệt từng byte như trước. `lamp_skills
   giữ câu của riêng mình. Workflow của SDK chạy với mọi thay đổi trong
   `lampOS/skills/**`, nên thay đổi của một kỹ năng gặp kiểm tra mọi kỹ năng
   ngay trên pull request của nó.
-- **Mỗi lần kích hoạt**: `do.task` của nó được giao cho lamp-tasks trên luồng
-  riêng, như mọi task, và câu say của lần kích hoạt chờ câu của nó trên luồng
-  riêng của lần chạy, không bao giờ trên vòng lặp của trigger.
-- **Phương án dự phòng, không bao giờ trễ hay im lặng** (05:42 của first
-  builder): câu của agent có trong `core_agent::FALLBACK_WITHIN` (10 giây) từ
-  lần kích hoạt thì được nói thay câu say, như lời chính xác ở độ ưu tiên của
-  câu say, với cái nhìn, ánh sáng và cử động mà câu say mang theo. Nếu không,
-  câu say của chính kỹ năng được nói ngay, đúng như khi tắt công tắc: quá 10
-  giây; agent không chạy, ngoại tuyến, không liên lạc được hoặc bị từ chối;
-  hoặc câu trả lời là `-`, rỗng, hay dài hơn một câu ngắn (hai câu, 200 ký
-  tự, `core_agent::heard`). Câu đến sau đó bị bỏ, không bao giờ nói trễ, và một
-  lần chạy thất bại không tự nói gì (không câu thất bại, không lời từ chối):
-  không bao giờ nói sai.
-- **Một lần kích hoạt tốn gì.** Một lần chạy agent mất vài chục giây
-  (lamp-tasks đo 75 giây trên Hermes, `MEASURED_RUN_SECS`), nên với quy tắc 10
-  giây câu của agent chỉ được nghe khi lần chạy nhanh, và đa số lần kích hoạt
-  nói câu dự phòng; mỗi lần vẫn tốn một trong 20 lần chạy một ngày của kỹ năng,
-  và lần chạy tiếp tục trong lamp-tasks sau khi câu dự phòng đã nói. Lời nhắc
-  đến chậm nhất 10 giây sau lần kích hoạt, không bao giờ hơn.
-- **Các ca của nó** (`lamp-skills test`): một ca không có agent, nên lần chạy
-  của một lần kích hoạt là lần chạy khi agent không chạy, câu say của chính nó
-  ngay; `tests/` của mỗi kỹ năng đều qua khi bật như khi tắt, phần giao không
-  phải một lệnh gọi của ca. Kiểm thử: `core_agent::tests` (các toml đã phân tích
-  giống nhau trừ câu nói, mỗi lần kích hoạt giao task cho agent, tắt thì không
-  gì đổi, dự phòng khi chậm quá 10 giây, không chạy, `-` và rỗng) và
-  `a_core_skills_line_with_its_agent_down_says_its_own_at_once`.
-- **Nhật ký**: `its line through the lamp's agent: said its agent's line (N
-  characters)` hoặc `… said its own line at once: WHY`, không bao giờ là lời của
-  agent.
+- **Soạn trước, không bao giờ chờ** (first builder đồng ý lúc 10:45 ngày
+  19/11 trên Queue, `lamp_skills::worded_ahead`): `do.task` của một lần kích
+  hoạt không bao giờ được giao lúc kích hoạt. lamp-skills giữ vài câu agent đã
+  soạn lúc đèn rảnh, và câu say của lần kích hoạt lấy ngay câu còn mới cũ nhất,
+  nói thay câu say như lời chính xác ở độ ưu tiên của câu say, với cái nhìn,
+  ánh sáng và cử động mà câu say mang theo. Không còn câu mới nào thì câu say
+  của chính kỹ năng được nói ngay, đúng như khi tắt công tắc. Không lần kích
+  hoạt nào chờ một lần chạy agent, và không lần nào trễ hơn hôm nay. Task news
+  giữ đường 10 giây riêng (ở trên): câu của nó cần nội dung của chính lần kích
+  hoạt.
+- **Những gì được giữ** (`worded_ahead::Kept`, `worded-ahead.json` trong
+  `--state-dir` của lamp-skills, chỉ chủ tệp đọc được, nên khởi động lại vẫn
+  giữ các câu và số đếm trong ngày): tối đa 3 câu một kỹ năng (`MOST_LINES`),
+  mỗi câu kèm lúc được soạn, còn mới trong 24 giờ (`FRESH_MS`) và chỉ nói một
+  lần (`Kept::take`). Kỹ năng có hai task (Sit back, Meal check) giữ câu của
+  từng task riêng, tổng cộng 3.
+- **Khi nào nạp lại** (`Kept::next_refill`, xem mỗi 5 giây, mỗi lần một, trên
+  luồng riêng):
+  - đèn rảnh: `voice/state` đang nghỉ, và không khác đi trong 15 giây vừa qua
+    (`IDLE_AFTER`, khoảng lặng của chính task news); trạng thái không biết được
+    tính là đang có lượt nói;
+  - ngoài giờ yên lặng của chính kỹ năng (`Engine::in_quiet_hours`);
+  - bo mạch không ấm (`worded_ahead::warm`, điều kiện 1 của first builder):
+    khi `board/heat` (#7879) có trên đèn và còn mới, chỉ nó quyết định, và
+    `warm` hay `hot` tạm dừng việc nạp; cho đến lúc đó, bất kỳ nhiệt độ nào của
+    `board/state` trên 84 °C (`WARM_C`) cũng vậy. Đèn nóng không bao giờ tốn một
+    nhân để soạn lại một lời nhắc, và câu có sẵn lo giờ đó. Nhật ký ghi `worded
+    ahead: refills paused: the board is warm or hot` và `... go on: the board
+    is cool again` khi nó đổi;
+  - tối đa 3 lần nạp một kỹ năng trong 24 giờ bất kỳ (`MOST_REFILLS_A_DAY`,
+    giới hạn cứng, khoảng 30 lần một ngày trên một đèn; điều kiện 2), đếm khi
+    mỗi lần bắt đầu, dù kết quả ra sao, và chỉ trả lại khi lamp-tasks không
+    nhận nó (bận, không liên lạc được: không gì chạy; lần xem sau chờ một
+    phút);
+  - hạn mức hằng ngày của chủ đèn chưa hết (`worded_ahead::Allowance`, chỗ móc
+    cho #7664: việc nạp lấy từ đó trước và dừng khi nó hết, trước bất cứ gì
+    một người yêu cầu; đến khi có nó, `NoAllowanceYet`, chỉ giới hạn cứng);
+  - công tắc do.task bật, có `--state-dir` và socket của lamp-tasks.
+- **Lần chạy nạp**: `do.task` đã duyệt trước của chính kỹ năng với lời dặn cố
+  định (`core_agent::script`), đúng dòng mà task của một lần kích hoạt sẽ giao,
+  đánh dấu `"ahead": true` (`worded_ahead::marked`). Không gì riêng tư được
+  đưa vào: các lời nhắc này không mang nội dung nào của lần kích hoạt.
+  lamp-tasks hủy nó ngay cho một câu hỏi trực tiếp của người trên make socket
+  hay task của bất kỳ kỹ năng nào khác (`skill_task::Ahead`,
+  [tasks_vi.md](tasks_vi.md)): nó được kết thúc như lúc hết hạn và được báo
+  `cancelled`, còn cái kia chạy, không bao giờ bị báo bận. Lần giao của việc
+  nạp không phải lần mà một task chờ lượt sau nó (`LAMP_SKILL_TASK_SURE`), nên
+  không gì chờ nó.
+- **Mỗi câu được kiểm** như trước (`worded_ahead::checked`): một câu ngắn (hai
+  câu, 200 ký tự, `core_agent::heard`), không bao giờ `-` hay rỗng, và không
+  bao giờ là câu trả lời chỉ dành cho chủ đèn.
+- **Tốn gì**: một lần chạy agent cho mỗi câu, lúc rảnh; khoảng 75 giây trên
+  Hermes (`MEASURED_RUN_SECS`), tối đa 3 lần một kỹ năng một ngày. Mỗi lần nạp
+  tốn một trong 20 lần chạy một ngày của kỹ năng. CPU của một lần nạp được đọc
+  từ cgroup của lamp-tasks (`usage_usec` của `cpu.stat` trước và sau,
+  `worded_ahead::CPU_STAT`): lần chạy Hermes là con của lamp-tasks nên được
+  tính ở đó, cùng mọi việc khác lamp-tasks làm trong lúc ấy (một cận trên).
+  Lượt của một gateway agent (OpenClaw) chạy trong service riêng và không được
+  tính ở đó.
+- **Nhật ký** (không bao giờ là lời của agent; điều kiện 3, để row báo tỉ lệ
+  câu của agent theo từng kỹ năng, số lần nạp mỗi ngày và giây CPU của chúng):
+  - mỗi lần kích hoạt: `worded ahead: said its agent's line (N characters,
+    worded H h ago)` hoặc `worded ahead: said its own line: no fresh line of
+    its agent's kept`;
+  - mỗi lần nạp: `worded ahead: refill of KEY: its agent's line kept` (hoặc
+    `nothing kept: WHY`) `; run S s, cpu C s` (hoặc `cpu not read`) `, refill
+    N of 3 in 24 hours`. Lần có WHY bắt đầu bằng `lamp-tasks was busy` không
+    chạy gì và được trả lại.
+- **Các ca của nó** (`lamp-skills test`): một ca không có agent, nên mỗi lần
+  kích hoạt nói câu của chính nó; `tests/` của mỗi kỹ năng đều qua khi bật như
+  khi tắt, task của nó không phải một lệnh gọi của ca. Kiểm thử:
+  `core_agent::tests`; `worded_ahead::tests` (bộ nhớ đầy lên khi rảnh, cũ hay
+  rỗng thì không có câu, không nạp giữa cuộc trò chuyện hay trong giờ yên lặng,
+  tạm dừng vì nhiệt, giới hạn hằng ngày, giữ qua khởi động lại, dòng được đánh
+  dấu, nhật ký); `a_fire_says_a_kept_line_at_once` và
+  `a_stale_or_empty_cache_says_its_own_line_at_once`; trong lamp-tasks
+  `a_refill_yields_its_place_to_a_skills_task` và
+  `a_persons_ask_cancels_the_lamps_refill`.
 
 ### Kỹ năng tự tạo được nới lỏng (`LAMP_MADE_SKILL_LOOSE=on`, bật trong sản phẩm)
 

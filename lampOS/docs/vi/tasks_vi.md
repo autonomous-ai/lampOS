@@ -329,8 +329,16 @@ giao phần chậm hơn cho Hermes của chính đèn. lamp-skills gửi một d
 lần chạy, và được trả lời khi lần chạy kết thúc
 (`lamp_tasks::skill_task::answer`):
 
-- **Dòng gửi:** `{"op":"skill_task","skill","task","run","folder","sha256","grants"}`.
-  Cần đủ mọi trường và không nhận trường nào khác. `skill` là tên một kỹ năng
+- **Dòng gửi:** `{"op":"skill_task","skill","task","run","folder","sha256","grants"}`,
+  và `"ahead": true` cho lần nạp của chính đèn cho các câu soạn trước của một
+  kỹ năng lõi (`lamp_skills::worded_ahead`, [skills_vi.md](skills_vi.md)): nó
+  không giữ quyền nào, và khi lần chạy của nó giữ chỗ duy nhất, task của bất
+  kỳ kỹ năng nào khác, hay câu hỏi trực tiếp của một người trên make socket
+  (`voice_ask`), hủy nó ngay (`skill_task::Ahead`, một chỗ cả hai socket dùng
+  chung; lần chạy kết thúc như ở hạn chót và được báo `cancelled`) rồi chạy
+  trong 0,75 giây của lần hủy, không bao giờ bị báo bận. Lần nạp không bao giờ
+  hủy gì.
+  Cần đủ mọi trường trừ `ahead` và không nhận trường nào khác. `skill` là tên một kỹ năng
   (`a-z`, `0-9`, `-`, `_`, tối đa 64), `folder` đúng là
   `/var/lib/lampOS/skills/<skill>` (các kỹ năng Hermes thấy ở chế độ chỉ đọc)
   hoặc, với kỹ năng do máy tính của chủ đèn đẩy lên,
@@ -1262,7 +1270,9 @@ Socket tạo kỹ năng nhận thêm một loại dòng từ lamp-voice,
 `news`, mặc định false, đánh dấu câu hỏi của chính đèn cho câu của task news,
 mà câu hỏi của một người đến khi nó đang chạy sẽ hủy ngay: lần chạy kết thúc
 như ở hạn chót, được báo `cancelled`, và câu hỏi của người đó được chạy, không
-bao giờ bị báo bận; `MOST_CONNECTIONS` là 3 cho điều đó),
+bao giờ bị báo bận; `MOST_CONNECTIONS` là 3 cho điều đó; câu hỏi của một
+người cũng hủy lần nạp của chính đèn cho các câu của kỹ năng lõi, `"ahead"`
+trên socket skill-task),
 được trả lời như một lần tạo (`started`, rồi `answer` hoặc một lời từ chối),
 với một chỗ riêng bên cạnh lần tạo. Tác tử được chọn ở mỗi yêu cầu như một
 lần tạo với `"one_path":true` (`skill_make::MakeGateway`,

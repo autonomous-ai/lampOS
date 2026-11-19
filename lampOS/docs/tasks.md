@@ -2972,8 +2972,15 @@ hands its slower part to the lamp's own Hermes. lamp-skills sends one line
 for each run, and is answered once the run ends
 (`lamp_tasks::skill_task::answer`):
 
-- **The line:** `{"op":"skill_task","skill","task","run","folder","sha256","grants"}`.
-  Every field is needed and no other is taken. `skill` is a skill's name
+- **The line:** `{"op":"skill_task","skill","task","run","folder","sha256","grants"}`,
+  and `"ahead": true` for the lamp's own refill of a core skill's lines
+  worded ahead (`lamp_skills::worded_ahead`, [skills.md](skills.md)): it
+  holds no grant, and while its run holds the one place, any other skill's
+  task, or a person's live ask on the make socket (`voice_ask`), cancels it
+  at once (`skill_task::Ahead`, one slot both sockets share; the run ended
+  as at its deadline and told `cancelled`) and runs within the cancel's
+  0.75 s, never told busy. A refill never cancels anything.
+  Every field but `ahead` is needed and no other is taken. `skill` is a skill's name
   (`a-z`, `0-9`, `-`, `_`, at most 64), `folder` is exactly
   `/var/lib/lampOS/skills/<skill>` (the skills Hermes sees read-only) or,
   for a skill the owner's computer pushed, `/var/lib/lampOS/skills-dev/<skill>`
@@ -3913,7 +3920,8 @@ a second kind of line from lamp-voice, `{"op":"voice_ask","ask","grants",
 marks the lamp's own ask for task news's line, which a person's ask that
 comes while it runs cancels at once: its run ended as at its deadline, told
 `cancelled`, and the person's ask run, never told busy; `MOST_CONNECTIONS`
-is 3 for it), answered as a make is
+is 3 for it; a person's ask cancels the lamp's own refill of a core skill's
+lines too, `"ahead"` on the skill-task socket), answered as a make is
 (`started`, then `answer` or a refusal), with its own one place beside a
 make's. The agent is picked at each ask as a make with `"one_path":true`
 picks it (`skill_make::MakeGateway`, `HarnessRunner::make_agent`), with no
