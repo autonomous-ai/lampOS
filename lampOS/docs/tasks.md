@@ -5129,6 +5129,33 @@ in and signed out, and on 0.6.60, signed in (#7507's ROW).
   switch removes the token file too. One not closed is tried again at the
   next look, and no pane is opened meanwhile. A factory reset wipes the
   store folder, token included.
+- **A fresh session near the context's limit (#7906).** This revises
+  #7246's "no fresh start": on lamp-52e6 a make overflowed the kept session
+  (`context_length_exceeded`, 127014 of 128000 tokens, 175 messages), and
+  OpenClaw's own compaction then dropped the make's task (`loss=summary-tail`)
+  until the 600 s deadline. Harness shows no token count, and the pane's own
+  count (`Pane.tokens`, 4 characters a token of words typed and read) misses
+  tool output and starts at zero after a restart, so before each turn,
+  once, lamp-tasks reads the session's size in OpenClaw's own record
+  (`harness::openclaw_session_size`: the node's current session in
+  `<OPENCLAW_STATE_DIR>/agents/main/agent/openclaw-agent.sqlite`, opened
+  read-only; its rows with a role counted, their stored bytes summed and
+  taken at 4 bytes a token). A make goes into a fresh session once the old
+  one holds 76,800 tokens (`MAKE_FRESH_TOKENS`, 60% of 128k, leaving about
+  51k for the make's guide, the examples it reads, its tool output and its
+  draft) or more than 100 messages (`MAKE_FRESH_MESSAGES`; 52e6's ran about
+  725 tokens a message, so about 57%); any other task once it holds
+  108,800 tokens (`TASK_FRESH_TOKENS`, 85%) or more than 150 messages
+  (`one_session::near_context_limit`). The fresh start is the rotation's
+  own: the pane let go, `ensure --fresh`, and the old `engineSession`
+  deleted with `sessions.delete`; a spoken task's is opened by the
+  one-session thread, as at a rotation. At most one per turn, and a small
+  session is kept. The record unreadable (no file, another schema, busy past
+  200 ms), the pane's own count is weighed against the same token bound. The
+  read is one local SQLite open and three short queries over the
+  `(session_id, seq)` key: about 2 ms warm and at most 15 ms cold in a debug
+  build on a Mac, well under 50 ms. Journal: `<id> is near its context (<n>
+  messages, ~<t> tokens) before a make: a fresh session (read in <ms> ms)`.
 - **Forget, and a long idle: dropped, and a new one opened.** The owner's
   "forget everything" (`ForgetSessions`, #6274) drops the kept session as
   a sign-out does, once nothing holds it: `harness close`, then

@@ -781,6 +781,100 @@ pub fn openclaw_holds_key(db: &Path, key: &str) -> Result<bool, String> {
         .map_err(|error| format!("read: {}", error_kind(&error)))
 }
 
+/// How big a session's live conversation is in the Gateway's record
+/// ([`openclaw_session_size`], #7906): its transcript rows with a role, and
+/// their stored bytes.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct SessionSize {
+    pub messages: u64,
+    pub bytes: u64,
+}
+
+/// The size of the session of Harness's `agent_id` (its key `key`, or
+/// `agent:main:harness-<id8>...` as [`openclaw_record`] matches) in the
+/// Gateway's record at `db`: the rows of the node's current session id
+/// (`session_nodes.current_session_id`), counted, and their bytes summed
+/// (`event_utf8_bytes`, else the stored text's or blob's length, whichever
+/// columns this schema has). No node: zero, a session not written yet.
+/// Read only, one open and three short reads over the
+/// `(session_id, seq)` key; `Err` with why when it can't be read.
+pub fn openclaw_session_size(db: &Path, key: &str, agent_id: &str) -> Result<SessionSize, String> {
+    use rusqlite::{Connection, OpenFlags, OptionalExtension};
+    let id8: String = agent_id.chars().take(8).collect();
+    if id8.len() < 8 {
+        return Err("agent id too short".into());
+    }
+    let prefix = format!("agent:main:harness-{id8}");
+    let connection = Connection::open_with_flags(
+        db,
+        OpenFlags::SQLITE_OPEN_READ_ONLY | OpenFlags::SQLITE_OPEN_NO_MUTEX,
+    )
+    .map_err(|error| format!("open: {}", error_kind(&error)))?;
+    connection
+        .busy_timeout(Duration::from_millis(200))
+        .map_err(|error| format!("busy timeout: {}", error_kind(&error)))?;
+    let session: Option<String> = connection
+        .query_row(
+            "SELECT current_session_id FROM session_nodes \
+             WHERE session_key = ?1 OR substr(session_key, 1, ?3) = ?2 \
+             ORDER BY session_key = ?1 DESC LIMIT 1",
+            rusqlite::params![key, prefix, prefix.len() as i64],
+            |row| row.get(0),
+        )
+        .optional()
+        .map_err(|error| format!("read node: {}", error_kind(&error)))?
+        .flatten();
+    let Some(session) = session else {
+        return Ok(SessionSize::default());
+    };
+    let mut columns = Vec::new();
+    {
+        let mut info = connection
+            .prepare("SELECT name FROM pragma_table_info('transcript_events')")
+            .map_err(|error| format!("read columns: {}", error_kind(&error)))?;
+        let names = info
+            .query_map([], |row| row.get::<_, String>(0))
+            .and_then(|rows| rows.collect::<Result<Vec<_>, _>>())
+            .map_err(|error| format!("read columns: {}", error_kind(&error)))?;
+        columns.extend(names);
+    }
+    let has = |name: &str| columns.iter().any(|column| column == name);
+    if !has("session_id") {
+        return Err("read: no transcript_events.session_id".into());
+    }
+    let messages = if has("message_role") {
+        "COUNT(message_role)"
+    } else {
+        "COUNT(*)"
+    };
+    let lengths: Vec<&str> = [
+        ("event_utf8_bytes", "event_utf8_bytes"),
+        ("event_json", "length(CAST(event_json AS BLOB))"),
+        ("event_zstd", "length(event_zstd)"),
+    ]
+    .into_iter()
+    .filter(|(column, _)| has(column))
+    .map(|(_, expression)| expression)
+    .collect();
+    let bytes = match lengths.as_slice() {
+        [] => "0".to_owned(),
+        [one] => format!("COALESCE(SUM({one}), 0)"),
+        many => format!("COALESCE(SUM(COALESCE({}, 0)), 0)", many.join(", ")),
+    };
+    connection
+        .query_row(
+            &format!("SELECT {messages}, {bytes} FROM transcript_events WHERE session_id = ?1"),
+            rusqlite::params![session],
+            |row| {
+                Ok(SessionSize {
+                    messages: row.get::<_, i64>(0)?.max(0) as u64,
+                    bytes: row.get::<_, i64>(1)?.max(0) as u64,
+                })
+            },
+        )
+        .map_err(|error| format!("read: {}", error_kind(&error)))
+}
+
 /// A short name for a record read's error, never its message (which can
 /// quote a path or a row).
 fn error_kind(error: &rusqlite::Error) -> String {
