@@ -9498,7 +9498,7 @@ pub struct Asked<'a> {
     pub made_with: MadeWith,
     /// The name the person gave the skill as they asked for it ("called
     /// evening rate", #7911), as the voice's model read it from their
-    /// words: the made skill's name ([`given_name`]), whoever wrote it.
+    /// words: the made skill's name ([`given_name`]), DeepSeek's or the agent's answer alike.
     /// `None` when they gave none: the maker's own name stands.
     pub named: Option<&'a str>,
 }
@@ -9732,7 +9732,7 @@ impl Ending<'_> {
             limits,
             made_with,
         )?;
-        // The name the person gave it, whoever wrote it (#7911).
+        // The name the person gave it, DeepSeek's or the agent's (#7911).
         let (name, marked) = named_as_given(name, marked, named, MOST_NAME_BYTES);
         // A name a skill on the lamp has already (a factory reset keeps the
         // lamp's own, welcome-back among them): the first free one, or "you
