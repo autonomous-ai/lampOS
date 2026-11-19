@@ -1403,6 +1403,162 @@ fn the_switch_on_enables_and_starts_the_gateway_and_off_disables_and_stops_it() 
     assert_eq!(systemd.asked[..2], ["reload", "stop-gateway"]);
 }
 
+/// OpenClaw installed (the one-shot run, recorded), then the round after it.
+fn installed_openclaw() -> Lamp {
+    let lamp = Lamp::new();
+    lamp.harness_there();
+    round(&lamp, &mut Fake::default(), true, 1);
+    assert_eq!(
+        install(&lamp, &Runs::new(&lamp), 2).unwrap().install,
+        "installed"
+    );
+    round(&lamp, &mut Fake::default(), true, 3);
+    lamp
+}
+
+/// A round whose commands `runs` answers, and the lines it said.
+fn round_saying(lamp: &Lamp, systemd: &mut Fake, runs: &Runs) -> Vec<String> {
+    let mut said = Vec::new();
+    after_round(
+        lamp.root(),
+        &lamp.records(),
+        sk(true),
+        systemd,
+        &mut runs.runner(),
+        30,
+        Ok(crate::hermes_schedule::Window::Reached),
+        &mut |line: &str| said.push(line.to_owned()),
+    );
+    said
+}
+
+fn config_of(lamp: &Lamp) -> serde_json::Value {
+    serde_json::from_slice(&fs::read(lamp.at(CONFIG)).unwrap()).unwrap()
+}
+
+/// The `gateway` block the install writes, with the lamp's token.
+fn installs_block(lamp: &Lamp) -> serde_json::Value {
+    let token = fs::read_to_string(lamp.at(GATEWAY_TOKEN)).unwrap();
+    serde_json::json!({
+        "mode": "local",
+        "bind": "loopback",
+        "port": 18789,
+        "auth": {"mode": "token", "token": token.trim()},
+    })
+}
+
+/// #7868 (the first builder, 20:11): a reset whose cut was not taken
+/// removes `openclaw.json`, and a lamp with OpenClaw installed runs no
+/// install, so each round checks the `gateway` block, as #7879 checks the
+/// gateway's unit. Removed, the next round writes it again, checked by
+/// OpenClaw's own `config validate --json` before the gateway's
+/// `try-restart`, with no install and no one-shot; every other key is kept,
+/// and the round after it, finding it as written, checks nothing.
+#[test]
+fn a_gateway_block_removed_with_openclaw_installed_comes_back_at_the_next_round() {
+    let lamp = installed_openclaw();
+    let mut config = config_of(&lamp);
+    let block = config.as_object_mut().unwrap().remove("gateway").unwrap();
+    assert_eq!(block, installs_block(&lamp));
+    config["models"] = serde_json::json!({"mode": "merge"});
+    fs::write(lamp.at(CONFIG), config.to_string()).unwrap();
+
+    let runs = Runs::new(&lamp);
+    let mut systemd = Fake::default();
+    let said = round_saying(&lamp, &mut systemd, &runs);
+    let config = config_of(&lamp);
+    assert_eq!(config["gateway"], installs_block(&lamp));
+    assert_eq!(config["models"], serde_json::json!({"mode": "merge"}));
+    assert!(
+        runs.position("config validate --json")
+            < runs.position(&format!("systemctl try-restart -- {UNIT}")),
+        "{:#?}",
+        runs.lines()
+    );
+    assert_eq!(lamp.said().unwrap().install, "installed");
+    assert_eq!(lamp.asked(), None, "no install asked");
+    assert!(!systemd.asked.contains(&"start"), "no one-shot started");
+    assert!(
+        said.iter()
+            .any(|line| line.contains("gateway block") && line.contains("written again")),
+        "{said:#?}"
+    );
+
+    let again = Runs::new(&lamp);
+    round_saying(&lamp, &mut Fake::default(), &again);
+    assert!(
+        !again
+            .lines()
+            .iter()
+            .any(|line| line.contains("config validate") || line.contains("try-restart")),
+        "{:#?}",
+        again.lines()
+    );
+}
+
+/// #7868: a `gateway` block not as the install writes it (another port, a
+/// changed token) is written again at the next round, a key of OpenClaw's
+/// own in it kept, and the gateway restarted on it.
+#[test]
+fn a_gateway_block_not_as_the_install_writes_it_is_written_again() {
+    let lamp = installed_openclaw();
+    let mut config = config_of(&lamp);
+    config["gateway"]["port"] = serde_json::json!(1);
+    config["gateway"]["auth"]["token"] = serde_json::json!("changed");
+    config["gateway"]["controlUi"] = serde_json::json!({"enabled": false});
+    fs::write(lamp.at(CONFIG), config.to_string()).unwrap();
+
+    let runs = Runs::new(&lamp);
+    round_saying(&lamp, &mut Fake::default(), &runs);
+    let mut wanted = installs_block(&lamp);
+    wanted["controlUi"] = serde_json::json!({"enabled": false});
+    assert_eq!(config_of(&lamp)["gateway"], wanted);
+    assert!(
+        runs.position("config validate --json")
+            < runs.position(&format!("systemctl try-restart -- {UNIT}"))
+    );
+}
+
+/// #7868: OpenClaw's own check refusing the round's `gateway` block leaves
+/// `openclaw.json` byte for byte with nothing beside it, restarts nothing,
+/// and says so in one line with no values: OpenClaw's words naming the
+/// gateway's token never reach the journal.
+#[test]
+fn a_gateway_block_a_round_finds_refused_by_openclaws_check_restarts_nothing() {
+    let lamp = installed_openclaw();
+    let mut config = config_of(&lamp);
+    config.as_object_mut().unwrap().remove("gateway");
+    let before = config.to_string();
+    fs::write(lamp.at(CONFIG), &before).unwrap();
+    let beside = fs::read_dir(lamp.at(STATE)).unwrap().count();
+    let token = installs_block(&lamp)["auth"]["token"]
+        .as_str()
+        .unwrap()
+        .to_owned();
+
+    let refusing = Runs {
+        fail_on: Some("config validate --json"),
+        error: leak(format!("gateway.auth.token: Invalid input \"{token}\"")),
+        ..Runs::new(&lamp)
+    };
+    let mut systemd = Fake::default();
+    let said = round_saying(&lamp, &mut systemd, &refusing);
+    assert_eq!(fs::read_to_string(lamp.at(CONFIG)).unwrap(), before);
+    assert_eq!(fs::read_dir(lamp.at(STATE)).unwrap().count(), beside);
+    refusing.position("config validate --json");
+    assert!(
+        !refusing.lines().iter().any(|line| line.contains("restart")),
+        "{:#?}",
+        refusing.lines()
+    );
+    let line = said
+        .iter()
+        .find(|line| line.contains("gateway block") && line.contains("not written again"))
+        .unwrap_or_else(|| panic!("{said:#?}"));
+    assert!(!line.contains(&token), "{line}");
+    assert!(line.contains("the gateway not restarted"), "{line}");
+}
+
 /// The app's tap (#6240, V2's ask of 12 Nov) is a deliberate try again, as
 /// for Hermes: a recent failure that waits a day for a round is started at
 /// once in the window the tap opens; an install under way is still left
