@@ -3337,7 +3337,7 @@ async fn a_yes_on_a_line_theirs_by_one_face_alone_runs_no_held_forget() {
         match taken {
             Taken::Runs(..) => assert!(runs, "by one face: no yes"),
             Taken::Unseen(_) => assert!(!runs, "not by one face: runs"),
-            Taken::Nothing | Taken::AskAgain | Taken::Unknown(_) => {
+            Taken::Nothing | Taken::AskAgain | Taken::Unknown(_) | Taken::Agrees(_) => {
                 panic!("dropped for another reason")
             }
         }
@@ -3785,13 +3785,49 @@ async fn asked_once_going(
     room: bool,
     going_on: Option<bool>,
 ) -> Outcome {
+    asked_once_chats(what, lines, forget_umbrella_then(after), room, going_on).await
+}
+
+/// The model's answer to a line after the question that it takes as their
+/// yes: its `forget` call with `args` (naming nothing else, `{}`), then
+/// `said` (the first builder's ruling on leg (e) of #7960's ROW).
+fn agreed_with(args: Value, said: &'static str) -> Vec<Vec<net::Result<ChatEvent>>> {
+    vec![
+        vec![
+            Ok(ChatEvent::ToolCalls(vec![call(
+                "f2",
+                crate::remember::FORGET,
+                args,
+            )])),
+            Ok(ChatEvent::Done),
+        ],
+        vec![text(said), Ok(ChatEvent::Done)],
+    ]
+}
+
+/// [`forget_umbrella_then`] with the model taking the next line as their
+/// yes: its bare `forget` call, then "Done.".
+fn forget_umbrella_agreed() -> Vec<Vec<net::Result<ChatEvent>>> {
+    let mut chats = forget_umbrella_then(&[]);
+    chats.extend(agreed_with(json!({}), "Done."));
+    chats
+}
+
+/// [`asked_once_going`] with the chats after the forget's line given.
+async fn asked_once_chats(
+    what: &str,
+    lines: Vec<Line>,
+    chats: Vec<Vec<net::Result<ChatEvent>>>,
+    room: bool,
+    going_on: Option<bool>,
+) -> Outcome {
     ONE_FACE_READS.with(|reads| reads.set(true));
     FORGET_TARGET.with(|target| target.set(Some(UMBRELLA)));
     crate::person::set_private_room_for_test(Some(room));
     let got = lines_saving(
         what,
         lines,
-        forget_umbrella_then(after),
+        chats,
         BOOT,
         true,
         true,
@@ -3849,14 +3885,15 @@ async fn a_named_one_face_forget_the_mouth_was_not_seen_saying_asks_once() {
 #[tokio::test]
 async fn their_seen_yes_within_thirty_seconds_runs_that_forget_by_id() {
     let a = crate::remember::person_id("A");
-    let got = asked_once(
+    let got = asked_once_chats(
         "ask-once-seen-yes",
         vec![
             line(FORGET_UMBRELLA, vec![("f1", false)], 0),
             line("Yes.", vec![("f1", true)], 20),
         ],
-        &["Done."],
+        forget_umbrella_agreed(),
         false,
+        None,
     )
     .await;
     assert_eq!(
@@ -3872,14 +3909,15 @@ async fn their_seen_yes_within_thirty_seconds_runs_that_forget_by_id() {
 async fn an_unseen_yes_runs_it_only_in_the_private_room() {
     let a = crate::remember::person_id("A");
     for (room, runs) in [(true, true), (false, false)] {
-        let got = asked_once(
+        let got = asked_once_chats(
             &format!("ask-once-room-{room}"),
             vec![
                 line(FORGET_UMBRELLA, vec![("f1", false)], 0),
                 line("Yes.", vec![("f1", false)], 5),
             ],
-            &["Okay."],
+            forget_umbrella_agreed(),
             room,
+            None,
         )
         .await;
         if runs {
@@ -3929,6 +3967,79 @@ async fn a_yes_on_a_line_nobody_is_known_on_tells_the_model_it_is_kept() {
     }
 }
 
+/// Leg (e) of #7960's ROW (lamp-06c1, 19 Nov: "Lamp, yes." heard as
+/// "Loan. Yes." was no plain yes, and the forget was lost), the first
+/// builder's ruling: no yes word list. While the one-face forget is held,
+/// the model's `forget` on the next line, naming nothing else, is their
+/// yes: the held forget runs exactly, by its kept id and words, never the
+/// model's raw call.
+#[tokio::test]
+async fn the_models_forget_on_a_misheard_yes_runs_the_held_forget_exactly() {
+    let a = crate::remember::person_id("A");
+    let got = asked_once_chats(
+        "ask-once-loan-yes",
+        vec![
+            line(FORGET_UMBRELLA, vec![("f1", false)], 0),
+            line("Loan. Yes.", vec![("f1", true)], 5),
+        ],
+        forget_umbrella_agreed(),
+        false,
+        None,
+    )
+    .await;
+    assert_eq!(
+        forgets_ran(&got),
+        [json!({"source_id": UMBRELLA.0, "about": UMBRELLA.1})]
+    );
+    assert_eq!(got.calls, [Some(a)], "in A's scope only");
+}
+
+/// The same ruling: a "No." or a line on something else, which the model
+/// answers with no `forget`, runs nothing; the umbrella is kept.
+#[tokio::test]
+async fn a_no_or_an_unrelated_line_the_model_takes_as_no_yes_runs_nothing() {
+    for (what, said) in [
+        ("ask-once-plain-no", "No."),
+        ("ask-once-unrelated", "What time is it?"),
+    ] {
+        let got = asked_once(
+            what,
+            vec![
+                line(FORGET_UMBRELLA, vec![("f1", false)], 0),
+                line(said, vec![("f1", true)], 5),
+            ],
+            &["Okay."],
+            false,
+        )
+        .await;
+        assert_eq!(forgets_ran(&got), Vec::<Value>::new(), "{what}: kept");
+    }
+}
+
+/// The same ruling: a yes line that names another thing to forget is that
+/// other forget, never the held one.
+#[tokio::test]
+async fn a_yes_line_naming_another_thing_does_not_run_the_held_forget() {
+    let mut chats = forget_umbrella_then(&[]);
+    chats.extend(agreed_with(json!({"about": "coffee"}), "Okay."));
+    let got = asked_once_chats(
+        "ask-once-other-thing",
+        vec![
+            line(FORGET_UMBRELLA, vec![("f1", false)], 0),
+            line("Yes, and forget my coffee.", vec![("f1", true)], 5),
+        ],
+        chats,
+        false,
+        None,
+    )
+    .await;
+    assert!(
+        !forgets_ran(&got).contains(&json!({"source_id": UMBRELLA.0, "about": UMBRELLA.1})),
+        "the umbrella is kept: {:?}",
+        forgets_ran(&got)
+    );
+}
+
 /// #5627 (3): a no keeps it.
 #[tokio::test]
 async fn a_no_to_the_one_face_forget_keeps_it() {
@@ -3949,15 +4060,18 @@ async fn a_no_to_the_one_face_forget_keeps_it() {
 /// runs nothing either.
 #[tokio::test]
 async fn a_yes_past_thirty_seconds_keeps_it_and_a_later_yes_does_nothing() {
-    let got = asked_once(
+    let mut chats = forget_umbrella_agreed();
+    chats.extend(agreed_with(json!({}), "Okay."));
+    let got = asked_once_chats(
         "ask-once-late",
         vec![
             line(FORGET_UMBRELLA, vec![("f1", false)], 0),
             line("Yes.", vec![("f1", true)], 31),
             line("Yes.", vec![("f1", true)], 2),
         ],
-        &["Okay.", "Okay."],
+        chats,
         false,
+        None,
     )
     .await;
     assert_eq!(forgets_ran(&got), Vec::<Value>::new(), "kept");
@@ -3992,17 +4106,22 @@ async fn a_yes_from_another_person_does_not_run_the_one_face_forget() {
             true,
         ),
     ] {
-        let got = asked_once(
+        let got = asked_once_chats(
             what,
             vec![
                 line(FORGET_UMBRELLA, vec![("f1", false)], 0),
                 line("Yes.", in_view, 5),
             ],
-            &["Okay."],
+            forget_umbrella_agreed(),
             room,
+            None,
         )
         .await;
-        assert_eq!(forgets_ran(&got), Vec::<Value>::new(), "{what}: kept");
+        assert!(
+            !forgets_ran(&got).contains(&json!({"source_id": UMBRELLA.0, "about": UMBRELLA.1})),
+            "{what}: kept: {:?}",
+            forgets_ran(&got)
+        );
     }
 }
 

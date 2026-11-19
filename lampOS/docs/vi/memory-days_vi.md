@@ -1346,16 +1346,20 @@ xoá; lệnh được giữ như một lệnh quên theo id của điều ấy
 báo hỏi một lần, chỉ nêu chủ đề bằng chính lời của họ, bằng ngôn ngữ của họ
 («Mình có nên quên điều đã giữ về mã khóa xe của bạn không?»). Nội dung đã giữ
 không bao giờ được báo cho mô hình hay nói ra: người nói không được nhìn thấy
-(P2 của Reviewer-lead trên #6673). Chỉ một lời «có» rõ ràng ở câu sau trong vòng 30 giây
+(P2 của Reviewer-lead trên #6673). Chỉ lời «có» của họ ở câu sau trong vòng 30 giây
 (`remember::ONE_FACE_FORGET_YES_FOR`), của cùng người trong cùng phiên, khi
 thấy mặt họ nói, hoặc trong phòng riêng (`LAMP_PRIVATE_ROOM`) trên một câu là
 của họ vì mặt họ một mình trong khung, mới chạy đúng lệnh quên theo id ấy
 trong phạm vi của họ (`ScopeLease::mark_forget_agreed`, không bao giờ
-`forget_last`). Lời «có» cũng có thể nói luôn việc quên
-(`known_faces::plain_agreement_to_forget`, P2 của Thirteen trên #6673): «Yes,
-forget it.», «Ừ, quên đi.», «Vâng, quên đi ạ.», và cả việc quên nói lại một
-mình, «Forget it.» hay «Quên đi.», vốn chỉ được đọc như câu trả lời cho câu hỏi
-ấy, của người ấy, trong 30 giây ấy. Một lời «có» sau 30 giây ấy được ghi
+`forget_last`). **Câu ấy có phải lời «có» hay không do mô hình phán đoán, không
+có danh sách từ «có»** (quy tắc ngày 13/11 của chủ sản phẩm; phán quyết của
+first builder về bước (e) trong ROW của #7960, khi «Lamp, yes.» bị nghe thành
+«Loan. Yes.» và lệnh quên bị mất): lệnh `forget` của mô hình trên câu ấy, không
+nêu thứ gì khác, là lời «có», và lệnh quên đang giữ chạy thay nó đúng như đã
+giữ, theo id và lời đã giữ, không bao giờ theo lệnh gốc của mô hình
+(`second_provider::agree_held_forget`). Câu mà mô hình không gọi `forget` thì
+không chạy gì và điều ấy vẫn được giữ; một `forget` nêu thứ khác là lệnh quên
+khác ấy. Một lời «có» sau 30 giây ấy được ghi
 journal là "too late", dù lúc đó câu là của ai; một lời không phải của họ ghi
 lý do sau "not the same person": "no one known on the line" (không ai được
 nhận ra trên câu), "theirs, in a later session" (của họ, ở phiên sau) hoặc
