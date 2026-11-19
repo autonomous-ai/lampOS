@@ -2645,47 +2645,49 @@ khi đăng xuất, và với 0.6.60 khi đăng nhập (ROW của #7507).
     chính `--timeout 60s` của lamp-tasks, không phải của Harness, và một
     reply bị từ chối thì chưa gõ gì. Nên reply đầu tiên của một lần giao
     việc vào phiên OpenClaw giữ lại được giữ 10 s (`REPLY_KEPT_FIRST_HELD`).
-    Bị từ chối khi đó (`ENGINE_NOT_READY`, hoặc `TIMEOUT` chưa gõ gì), hai
-    dấu hiệu được xem ngay, mỗi dấu hiệu cần một engine bị đóng băng, không
-    phải chậm (nhận việc khoẻ trên lamp-c0a4: p50 4.5 s, đuôi 10-37 s; trên stable,
-    20/11, 8.4 s lần đầu, sau đó 3.0-4.0 s):
-    **(T)** tiến trình TUI OpenClaw của phiên đang dừng (`/proc/<pid>/stat`
-    trạng thái `T`, J3), tìm bằng một lần quét `/proc`. Trên lamp-c0a4
-    (20/11) TUI là một tiến trình node của chính user của lamp-tasks, tự
-    đổi tên thành `openclaw`, nằm dưới `nsenter`, dưới shell của pane
-    `/bin/sh -ic '. <launch>.sh' harness-engine <cwd>
-    /usr/local/bin/openclaw tui agent:main:harness-<agentId>`, dưới `tmux`.
-    Nên một tiến trình của user đó có cmdline đúng là `openclaw` (hoặc có
-    `openclaw` trong ba tham số đầu cùng `tui`) được nhận khi chính nó,
-    hoặc một trong 3 tổ tiên gần nhất (pid cha trong `stat`), có tham số
-    `tui` và một tham số là khoá phiên giữ lại, kết thúc bằng
-    `:harness-<agentId>` hoặc là `harness-<agentId>` (cả dạng cũ
-    `--session V`); trạng thái được đọc từ tiến trình dưới cùng đó. Không
-    tìm thấy đúng một thì dấu hiệu là chưa biết, không bao giờ là kẹt
-    (nhiều hơn một thì ghi journal một lần, `TUI pid not unique (N
-    matches); stopped check off`); **(W)**, chỉ với `ENGINE_NOT_READY` (một `TIMEOUT` là
-    engine đã sẵn sàng), `show` của Harness đọc `working` dù không có lượt
-    nào của ta trong đó, và session cùng seq cuối của bản ghi Gateway giống
-    hệt ngay trước reply (mất kết nối Gateway, TUI vẫn chạy); không bao giờ
-    khi dòng cuối là của assistant (một tool call hay exec còn chạy). Một
-    trong hai đúng: một việc nói đang chờ kết thúc `one_session_stuck` chỉ
-    sau 10 s giữ, trước mọi lần đóng, và thang của dấu hiệu 5
-    (`OneSession::restart_or_replace`) chạy trên luồng one-session
-    (`OneSession::restart_if_due`, ở bước kế tiếp, trong 2 s), vì một
-    `close --now` của TUI đang dừng có thể mất trọn 60 s; không lời nào
-    được gõ vào phiên khi việc đóng đó đang chờ: một việc nói không thấy
-    pane sẵn sàng, và một lần chạy skill vào trước sẽ tự làm việc đóng đó
-    (`ensure`) trước mọi lời, một lần, giữ hội thoại. Dấu hiệu 5 của chính
-    một lần chạy skill tự chạy thang như trước. Không cái nào
-    đúng: reply được thử lại ngay với phần còn lại, 50 s, và lần từ chối
-    ngắn đó không được đếm, nên một lần giao việc chậm mà khoẻ vẫn chờ lâu
-    như trước và luật hai lần từ chối ở trên vẫn áp dụng. Một phiên
-    `ensure` vừa tạo mới, trong cửa sổ lời đầu tiên (`OPEN_IDLE_WITHIN`),
-    được giữ đủ 60 s và không bao giờ bị xem. Đường khoẻ không tốn gì: 10 s
-    giữ chỉ tốn khi bị từ chối, rồi một `show` và một lần quét `/proc`.
+    Bị từ chối khi đó với `ENGINE_NOT_READY` (chưa gõ gì), một `show` được
+    đọc ngay và hai dấu hiệu được xem, mỗi dấu hiệu cần một engine bị đóng
+    băng, không phải chậm (nhận việc khoẻ trên lamp-c0a4: p50 4.5 s, đuôi
+    10-37 s; trên stable, 20/11, 8.4 s lần đầu, sau đó 3.0-4.0 s). Một
+    `TIMEOUT` (engine đã sẵn sàng nhưng chưa nhận lời) không là dấu hiệu
+    nào, và không hỏi `show`. **(D) rảnh mà điếc.** Thấy trực tiếp trên
+    lamp-c0a4 (20/11): một SIGSTOP vào TUI OpenClaw giữ lại bị SIGCONT gỡ
+    trong 50 ms; TUI sau đó vẫn sống (trạng thái `/proc` là `S`, không bao
+    giờ `T`) nhưng điếc: mọi `harness reply` bị từ chối `ENGINE_NOT_READY`
+    mà chưa gõ gì, trong khi `harness show` nói `state=idle`. D đúng khi
+    tất cả điều sau đều đúng: `show` đọc `idle`; lamp-tasks không giữ lượt
+    nào khác trên pane (người giữ là chính lượt này, không việc nói nào
+    đang đóng nó, không lần đóng nào đang chờ); pane đã qua cửa sổ khởi
+    động (`OPEN_IDLE_WITHIN`, 120 s kể từ khi được mở bởi bất kỳ `ensure`
+    nào, cửa sổ mà lần nhìn khi rảnh dùng); và bản ghi Gateway đọc được,
+    dù dòng cuối là gì: một phiên rảnh sau một lượt đã xong luôn kết thúc
+    bằng câu trả lời của assistant (ROW trên lamp-c0a4, 20/11, ghi journal
+    `deaf=no (the last row is the assistant's)` khi điều đó còn là một
+    điều kiện), và `show` idle đã cho biết không có tool call nào đang
+    chạy. **(W)** `show` đọc `working` dù không có lượt nào của ta trong
+    đó, và session cùng seq cuối của bản ghi Gateway giống hệt ngay trước
+    reply (mất kết nối Gateway, TUI vẫn chạy); không bao giờ khi dòng cuối
+    là của assistant. Mỗi lần kiểm tra như vậy ghi journal một dòng kèm
+    kết quả (`one session: <id8> first reply refused ENGINE_NOT_READY;
+    show <state>; deaf=<yes|no> (<reason>)`). Một trong hai đúng: một việc
+    nói đang chờ kết thúc `one_session_stuck` chỉ sau 10 s giữ, trước mọi
+    lần đóng, và thang của dấu hiệu 5 (`OneSession::restart_or_replace`)
+    chạy một lần trên luồng one-session (`OneSession::restart_if_due`, ở
+    bước kế tiếp, trong 2 s), vì một `close --now` của TUI bị đóng băng có
+    thể mất trọn 60 s; không lời nào được gõ vào phiên khi việc đóng đó
+    đang chờ: một việc nói không thấy pane sẵn sàng, và một lần chạy skill
+    vào trước sẽ tự làm việc đóng đó (`ensure`) trước mọi lời, một lần,
+    giữ hội thoại. Dấu hiệu 5 của chính một lần chạy skill tự chạy thang
+    như trước. Không cái nào đúng: reply được thử lại ngay với phần còn
+    lại, 50 s, và lần từ chối ngắn đó không được đếm, nên một lần giao
+    việc chậm mà khoẻ vẫn chờ lâu như trước và luật hai lần từ chối ở trên
+    vẫn áp dụng (trước D, chính luật này bắt TUI rảnh mà điếc, sau ~134 s).
+    Một phiên `ensure` vừa tạo mới, trong cửa sổ lời đầu tiên
+    (`OPEN_IDLE_WITHIN`), được giữ đủ 60 s và không bao giờ bị xem. Đường
+    khoẻ không tốn gì: 10 s giữ chỉ tốn khi bị từ chối, rồi một `show` và
+    một lần đọc bản ghi chỉ-đọc.
     Khi phiên đang mở và không có lượt nào được giữ, một lần nhìn khi rảnh
-    chạy mỗi 30 s (`KEEP_OPEN_WHILE_OPEN`) trên luồng one-session: T đọc
-    được ở hai lần đọc cách nhau 2 s (`STOPPED_READS_APART`), hoặc W với
+    chạy mỗi 30 s (`KEEP_OPEN_WHILE_OPEN`) trên luồng one-session: W với
     bản ghi không đổi qua ít nhất 2 lần nhìn sau lần đầu đọc nó
     (`IDLE_UNMOVED_LOOKS`) và ít nhất ~600 s (`TOOL_RESULT_STALL`, giới hạn
     của dấu hiệu 4b), dù dòng cuối là gì (của user hay kết quả tool là
@@ -2699,11 +2701,12 @@ khi đăng xuất, và với 0.6.60 khi đăng nhập (ROW của #7507).
     `working` không bao giờ tiêu lần resume thường rồi tới hội thoại.
     Không bao giờ khi đang
     giữ một lượt (lần nhìn giữ pane trong lúc đóng), và không trong cửa sổ
-    của phiên mới. Mỗi lần nhìn tốn một lần quét `/proc`, một `show` và một
-    lần đọc bản ghi chỉ-đọc. Mục tiêu: một lần hỏi vào phiên bị đóng băng
-    tới câu "hãy hỏi lại" trong 15 s (trước ~130 s); TUI dừng khi rảnh được
-    mở lại trong 35 s; mất kết nối khi rảnh trong ~630 s (600 s không đổi, cộng tối đa một lần
-    nhìn).
+    của phiên mới. Mỗi lần nhìn tốn một `show` và một lần đọc bản ghi
+    chỉ-đọc. TUI rảnh mà điếc khi không ai hỏi thì không bị tìm: nó được
+    thấy ở lần hỏi kế tiếp (D). Mục tiêu: một lần hỏi vào pane điếc tới
+    câu "hãy hỏi lại" trong khoảng 12-13 s (10 s giữ, một `show`, một lần
+    đọc bản ghi, kết thúc), mục tiêu tối đa 15 s (trước ~134 s); mất kết
+    nối khi rảnh trong ~630 s (600 s không đổi, cộng tối đa một lần nhìn).
 
   Dấu hiệu nào cũng gọi `OneSession::replace_kept`, đường duy nhất cho mọi
   dấu hiệu (dấu hiệu 3 và 4 qua `OneSession::kept_gone`). Nó `close --now`, `sessions.delete` và xoá bản ghi, rồi buông

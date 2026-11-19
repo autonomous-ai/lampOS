@@ -92,9 +92,6 @@ struct Fake {
     /// A kept close that answers but leaves the frozen process live: the
     /// next plain `ensure` says `live`, the same agent.
     close_leaves_live: Mutex<bool>,
-    /// #8001 signal T: the agent whose OpenClaw TUI reads stopped; others
-    /// unknown. A resume (a new process) clears it.
-    stopped: Mutex<Option<String>>,
 }
 
 fn agent_of(n: u32) -> String {
@@ -282,10 +279,6 @@ impl PaneHarness for Fake {
                 if frozen.as_ref() == Some(&agent) {
                     *frozen = None;
                 }
-                let mut stopped = self.stopped.lock().unwrap();
-                if stopped.as_ref() == Some(&agent) {
-                    *stopped = None;
-                }
                 ("resumed", agent)
             }
             Some(agent) if !fresh => ("live", agent),
@@ -415,10 +408,6 @@ impl PaneHarness for Fake {
             *self.kept.lock().unwrap() = None;
         }
         Ok(())
-    }
-    fn engine_stopped(&self, agent: &str, _: &str) -> Option<bool> {
-        self.call(format!("stopped {agent}"));
-        (self.stopped.lock().unwrap().as_deref() == Some(agent)).then_some(true)
     }
     fn session_held(&self, key: &str) -> Option<bool> {
         self.call(format!("held {key}"));
@@ -1272,9 +1261,6 @@ impl PaneHarness for &Fake {
     }
     fn reply_kept(&self, name: &str, token: &Path, words: &str, held: Duration) -> Took {
         (**self).reply_kept(name, token, words, held)
-    }
-    fn engine_stopped(&self, agent: &str, key: &str) -> Option<bool> {
-        (**self).engine_stopped(agent, key)
     }
     fn openclaw_turns<'a>(&'a self, key: &str) -> Option<TurnReader<'a>> {
         (**self).openclaw_turns(key)
@@ -4560,52 +4546,12 @@ fn holds(fake: &Fake) -> Vec<u64> {
 /// (1 s here); its idle look due at each call.
 fn kept_idle(dir: &std::path::Path) -> (OneSession, Fake) {
     let (one, fake) = kept_on(dir);
-    let one = one.with_idle_look(Duration::ZERO, Duration::from_millis(10));
+    let one = one.with_idle_look(Duration::ZERO);
     *fake.closed_resumes.lock().unwrap() = true;
     one.open_if_due(&fake, &place());
     one_turn(&one, &fake, "task-0");
     thread::sleep(Duration::from_millis(1100));
     (one, fake)
-}
-
-/// #8001 signal T while idle (J3: the kept OpenClaw TUI SIGSTOPped, no
-/// ask): the next idle look reads it stopped twice, closes it with its
-/// conversation kept, and the keep-open step reopens it in a new process,
-/// with no ask and nothing typed.
-#[test]
-fn an_idle_kept_session_whose_tui_is_stopped_is_reopened_on_the_next_look_with_no_ask() {
-    let dir = tempfile::tempdir().unwrap();
-    let (one, fake) = kept_idle(dir.path());
-    let mut looks = Looks::default();
-    one.idle_look(&mut looks, Instant::now(), &|| Some(&fake));
-    assert_eq!(fake.count("close-kept"), 0, "a healthy one is kept");
-    *fake.stopped.lock().unwrap() = Some(agent_of(1));
-    let replies = fake.count("reply-kept");
-    one.idle_look(&mut looks, Instant::now(), &|| Some(&fake));
-    let calls = fake.calls();
-    assert_eq!(
-        fake.count("stopped"),
-        3,
-        "read twice when stopped: {calls:?}"
-    );
-    assert_eq!(
-        calls.last().map(String::as_str),
-        Some("close-kept lamp-one-openclaw --now")
-    );
-    assert_eq!(one.agent(), None);
-    assert!(one.free());
-    keep_open_step(&one, &fake, &mut Looks::default());
-    assert_eq!(one.agent(), Some(agent_of(1)), "resumed, its conversation");
-    assert_eq!(
-        fake.stopped.lock().unwrap().as_deref(),
-        None,
-        "a new process"
-    );
-    assert_eq!(fake.count("reply-kept"), replies, "no ask typed");
-    assert_eq!(
-        one_turn(&one, &fake, "task-1"),
-        Ended::Answered("answer to New task task-1:".into())
-    );
 }
 
 /// #8001 signal W while idle (the stable-14716 lamp: its Gateway link
@@ -4652,25 +4598,44 @@ fn an_idle_kept_session_working_with_its_record_unmoved_is_reopened_after_two_lo
     assert!(one.free());
 }
 
-/// #8001 on the spoken path: the kept TUI stopped, the hand-over's first
-/// reply held short (10 s) and refused. Sign 5 runs at once: the spoken task ends
-/// [`STUCK_ENDED`] after the short hold alone (no 60 s hold, no second
-/// refusal), and the session is closed with its conversation kept.
+/// A spoken kept session past its start window (1 s here), Harness
+/// reading it `idle` and its Gateway record at seq 7, its last row `role`.
+fn spoken_idle(dir: &std::path::Path, role: &str) -> (OneSession, Fake) {
+    let (one, fake) = spoken_working(dir, role);
+    fake.states.lock().unwrap().remove(&agent_of(1));
+    (one, fake)
+}
+
+/// Whether a `show` came between the first short-held kept reply after
+/// call `from` and the reply after it (#8001's fast check).
+fn shown_after_short_hold(fake: &Fake, from: usize) -> bool {
+    let calls = fake.calls();
+    let short = format!("reply-kept lamp-one-openclaw {}s", first());
+    let Some(at) = calls.iter().skip(from).position(|c| *c == short) else {
+        return false;
+    };
+    calls
+        .iter()
+        .skip(from + at + 1)
+        .take_while(|c| !c.starts_with("reply-kept"))
+        .any(|c| c.starts_with("show "))
+}
+
+/// #8001 signal D, the exact live shape (lamp-c0a4, 20 Nov: the kept TUI
+/// SIGSTOPped, SIGCONT within 50 ms, alive but deaf): the first reply
+/// held short is refused `ENGINE_NOT_READY` with nothing typed, `show`
+/// reads it `idle`, no other turn holds the pane, it is past its start
+/// window and its Gateway record's last row is the user's. Sign 5 at
+/// once: the spoken task ends [`STUCK_ENDED`] after the short hold alone
+/// (no second reply typed), before the close; then one close `--now`, its
+/// conversation kept, no `--fresh`.
 #[test]
-fn a_short_refusal_with_a_stopped_tui_ends_the_spoken_task_stuck_at_once() {
+fn a_deaf_idle_kept_session_ends_the_spoken_task_stuck_at_the_first_refusal() {
     let dir = tempfile::tempdir().unwrap();
-    let one = kept_session(dir.path())
-        .with_kept_session(dir.path().join(TOKEN_FILE))
-        .with_spoken_bound(Duration::from_millis(50), Arc::new(AtomicBool::new(false)));
-    let fake = Fake::default();
-    *fake.programs.lock().unwrap() = true;
-    *fake.closed_resumes.lock().unwrap() = true;
-    one.open_if_due(&fake, &place());
-    one_turn(&one, &fake, "task-0");
-    thread::sleep(Duration::from_millis(1100));
+    let (one, fake) = spoken_idle(dir.path(), "user");
     let before = holds(&fake).len();
-    *fake.stopped.lock().unwrap() = Some(agent_of(1));
-    // A frozen engine refuses every hold.
+    let from = fake.calls().len();
+    // A deaf engine refuses every hold.
     fake.takes
         .lock()
         .unwrap()
@@ -4681,20 +4646,170 @@ fn a_short_refusal_with_a_stopped_tui_ends_the_spoken_task_stuck_at_once() {
         "{:?}",
         fake.calls()
     );
-    let held = holds(&fake).split_off(before);
-    let first = crate::harness::REPLY_KEPT_FIRST_HELD.as_secs();
-    assert_eq!(held, [first], "only the short hold before the end");
-    assert_eq!(held.iter().sum::<u64>(), first);
-    // The task's end comes before the close (a `close --now` of a stopped
-    // TUI can take 60 s): the close is the one-session thread's.
+    assert_eq!(
+        holds(&fake).split_off(before),
+        [first()],
+        "only the short hold, no second reply typed"
+    );
+    assert!(shown_after_short_hold(&fake, from), "{:?}", fake.calls());
+    // The task's end (its told line) comes before the close: the close is
+    // the one-session thread's.
     assert_eq!(fake.count("close-kept"), 0, "{:?}", fake.calls());
     one.restart_if_due(&fake);
+    let calls = fake.calls();
     assert_eq!(
-        fake.calls().last().map(String::as_str),
+        calls.last().map(String::as_str),
         Some("close-kept lamp-one-openclaw --now")
     );
+    assert_eq!(fake.count("close-kept"), 1, "{calls:?}");
+    assert!(!calls.iter().any(|c| c.contains("--fresh")), "{calls:?}");
     assert_eq!(one.agent(), None);
     assert!(one.free());
+}
+
+/// #8001: D's refusal not taken (`show` idle) leaves today's path: the
+/// rest of the 60 s tried at once, not stuck, never closed.
+fn not_deaf(one: &OneSession, fake: &Fake) {
+    let before = holds(fake).len();
+    let from = fake.calls().len();
+    fake.takes.lock().unwrap().push_back(Took::EngineNotReady);
+    assert_ne!(spoken_launch(one, fake, &spoken("lamp-1")), stuck());
+    assert_eq!(holds(fake).split_off(before)[..2], [first(), rest()]);
+    assert!(shown_after_short_hold(fake, from), "{:?}", fake.calls());
+    one.restart_if_due(fake);
+    assert_eq!(fake.count("close-kept"), 0, "{:?}", fake.calls());
+    assert_eq!(one.agent(), Some(agent_of(1)));
+}
+
+/// #8001: `show` idle but the pane inside its start window (opened just
+/// now, a resume warming up): never D.
+#[test]
+fn a_short_refusal_inside_the_start_window_is_not_deaf() {
+    let dir = tempfile::tempdir().unwrap();
+    let (one, fake) = spoken_idle(dir.path(), "user");
+    one.lock().pane.as_mut().unwrap().opened = Instant::now();
+    not_deaf(&one, &fake);
+}
+
+/// #8001: `show` idle with a finished turn's assistant reply last (the
+/// common live shape, ROW on lamp-c0a4, 20 Nov): D fires, stuck at once
+/// after the short hold alone.
+#[test]
+fn a_short_refusal_with_a_final_assistant_reply_last_is_deaf() {
+    let dir = tempfile::tempdir().unwrap();
+    let (one, fake) = spoken_idle(dir.path(), "assistant");
+    let before = holds(&fake).len();
+    fake.takes
+        .lock()
+        .unwrap()
+        .extend(std::iter::repeat_n(Took::EngineNotReady, 3));
+    assert_eq!(
+        spoken_launch(&one, &fake, &spoken("lamp-1")),
+        stuck(),
+        "{:?}",
+        fake.calls()
+    );
+    assert_eq!(holds(&fake).split_off(before), [first()]);
+    assert_eq!(fake.count("close-kept"), 0);
+    one.restart_if_due(&fake);
+    assert_eq!(fake.count("close-kept"), 1, "{:?}", fake.calls());
+}
+
+/// #8001: `show` idle while lamp-tasks holds another turn on the pane:
+/// never D, the rest of the 60 s tried and the words typed once.
+#[test]
+fn a_short_refusal_while_another_turn_holds_the_pane_is_not_deaf() {
+    let dir = tempfile::tempdir().unwrap();
+    let (one, fake) = spoken_idle(dir.path(), "user");
+    one.lock().holder = Some("task-other".into());
+    let turn = Turn {
+        one: &one,
+        id: "task-1".into(),
+        opens: true,
+        sent: Mutex::new(None),
+        retried: AtomicBool::new(false),
+        restarted: AtomicBool::new(false),
+        make: false,
+    };
+    let before = holds(&fake).len();
+    let from = fake.calls().len();
+    fake.takes.lock().unwrap().push_back(Took::EngineNotReady);
+    assert!(
+        matches!(
+            turn.send(&fake, &place(), "Run the skill.", far(), &|| false),
+            Sent::Typed(_)
+        ),
+        "{:?}",
+        fake.calls()
+    );
+    assert_eq!(holds(&fake).split_off(before), [first(), rest(), 60]);
+    assert!(shown_after_short_hold(&fake, from), "{:?}", fake.calls());
+    assert_eq!(fake.count("close-kept"), 0, "{:?}", fake.calls());
+    assert_eq!(one.agent(), Some(agent_of(1)));
+}
+
+/// #8001: `show` idle but the Gateway record unreadable: never D.
+#[test]
+fn a_short_refusal_with_the_record_unread_is_not_deaf() {
+    let dir = tempfile::tempdir().unwrap();
+    let (one, fake) = spoken_idle(dir.path(), "user");
+    *fake.seq.lock().unwrap() = None;
+    not_deaf(&one, &fake);
+}
+
+/// #8001: D fails closed. No pane, another agent's pane, a spoken task
+/// closing the pane or a close due: never D, though the record reads the
+/// user's row last past the start window.
+#[test]
+fn deaf_is_never_read_without_this_agents_pane_or_with_a_close_on_it() {
+    let dir = tempfile::tempdir().unwrap();
+    let (one, fake) = spoken_idle(dir.path(), "user");
+    let agent = agent_of(1);
+    assert_eq!(one.deaf_why_not(&fake, &agent, "task-1"), None, "D's shape");
+    assert!(one.deaf_why_not(&fake, &agent_of(2), "task-1").is_some());
+    one.lock().closing_for = Some("lamp-0".into());
+    assert!(one.deaf_why_not(&fake, &agent, "task-1").is_some());
+    one.lock().closing_for = None;
+    one.lock().restart_due = Some((agent.clone(), "why".into()));
+    assert!(one.deaf_why_not(&fake, &agent, "task-1").is_some());
+    one.lock().restart_due = None;
+    let pane = one.lock().pane.take();
+    assert!(one.deaf_why_not(&fake, &agent, "task-1").is_some());
+    one.lock().pane = pane;
+    assert_eq!(one.deaf_why_not(&fake, &agent, "task-1"), None);
+}
+
+/// #8001: a healthy accept within the short hold asks no `show` and
+/// nothing else: the one reply, typed once.
+#[test]
+fn a_healthy_accept_within_the_short_hold_asks_nothing_more() {
+    let dir = tempfile::tempdir().unwrap();
+    let (one, fake) = spoken_idle(dir.path(), "user");
+    let before = holds(&fake).len();
+    let from = fake.calls().len();
+    let inputs = *fake.inputs.lock().unwrap();
+    assert_ne!(spoken_launch(&one, &fake, &spoken("lamp-1")), stuck());
+    assert_eq!(holds(&fake).split_off(before), [first()]);
+    assert!(!shown_after_short_hold(&fake, from), "{:?}", fake.calls());
+    assert_eq!(*fake.inputs.lock().unwrap(), inputs + 1, "typed once");
+    assert_eq!(fake.count("close-kept"), 0);
+}
+
+/// #8001: a `TIMEOUT` of the short hold (a ready engine that did not take
+/// the words yet) is never D, even with `show` idle: no `show` asked, the
+/// rest of the 60 s tried, never closed.
+#[test]
+fn a_short_timeout_on_an_idle_session_is_never_deaf() {
+    let dir = tempfile::tempdir().unwrap();
+    let (one, fake) = spoken_idle(dir.path(), "user");
+    let before = holds(&fake).len();
+    let from = fake.calls().len();
+    fake.takes.lock().unwrap().push_back(Took::Timeout);
+    assert_ne!(spoken_launch(&one, &fake, &spoken("lamp-1")), stuck());
+    assert_eq!(holds(&fake).split_off(before)[..2], [first(), rest()]);
+    assert!(!shown_after_short_hold(&fake, from), "{:?}", fake.calls());
+    one.restart_if_due(&fake);
+    assert_eq!(fake.count("close-kept"), 0, "{:?}", fake.calls());
 }
 
 /// #8001: a 10 s refusal with neither sign (a slow but healthy hand-over)
@@ -4724,8 +4839,8 @@ fn a_short_refusal_with_no_sign_keeps_waiting_and_a_later_accept_types_once() {
 
 /// #8001: a session `ensure` made new is in its first words' window: its
 /// replies are held the whole 60 s, never the short hold, and its refusals never
-/// counted or looked at, even with its TUI read stopped; the idle look
-/// leaves it too.
+/// counted or looked at, even idle with a readable record (D's shape); the
+/// idle look leaves it too.
 #[test]
 fn a_new_kept_sessions_refusals_are_never_counted_or_probed() {
     let dir = tempfile::tempdir().unwrap();
@@ -4738,11 +4853,11 @@ fn a_new_kept_sessions_refusals_are_never_counted_or_probed() {
     .with_session_delete(Box::new(|_| Ok(())))
     .with_state_file(dir.path().join(STATE_FILE))
     .with_kept_session(dir.path().join(TOKEN_FILE))
-    .with_idle_look(Duration::ZERO, Duration::from_millis(10));
+    .with_idle_look(Duration::ZERO);
     let fake = Fake::default();
     *fake.programs.lock().unwrap() = true;
     one.open_if_due(&fake, &place());
-    *fake.stopped.lock().unwrap() = Some(agent_of(1));
+    *fake.seq.lock().unwrap() = Some(7);
     let before = holds(&fake).len();
     fake.takes
         .lock()
@@ -4755,7 +4870,6 @@ fn a_new_kept_sessions_refusals_are_never_counted_or_probed() {
     assert_eq!(holds(&fake).split_off(before), [60, 60, 60, 60]);
     one.idle_look(&mut Looks::default(), Instant::now(), &|| Some(&fake));
     assert_eq!(fake.count("close-kept"), 0, "{:?}", fake.calls());
-    assert_eq!(fake.count("stopped"), 0);
     assert_eq!(one.agent(), Some(agent_of(1)));
 }
 
@@ -4906,7 +5020,8 @@ fn a_skill_run_after_a_stuck_end_closes_first_and_never_types_into_the_frozen_ag
     one.open_if_due(&fake, &place());
     one_turn(&one, &fake, "task-0");
     thread::sleep(Duration::from_millis(1100));
-    *fake.stopped.lock().unwrap() = Some(agent_of(1));
+    // Signal D: idle, its record readable, the user's row last.
+    *fake.seq.lock().unwrap() = Some(7);
     fake.takes.lock().unwrap().push_back(Took::EngineNotReady);
     assert_eq!(spoken_launch(&one, &fake, &spoken("lamp-1")), stuck());
     assert_eq!(fake.count("close-kept"), 0);

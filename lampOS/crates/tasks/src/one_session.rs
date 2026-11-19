@@ -500,11 +500,8 @@ impl TurnWatch {
 
 /// #8001's idle look: how often [`OneSession::keep_open`] looks at the
 /// kept session while it is open and no turn is held, for a frozen engine
-/// ([`OneSession::idle_look`]): one `/proc` scan and one `show` a look.
+/// ([`OneSession::idle_look`]): one `show` a look.
 pub const KEEP_OPEN_WHILE_OPEN: Duration = Duration::from_secs(30);
-/// #8001 signal T on the idle look: the kept session's OpenClaw TUI read
-/// stopped twice this far apart before it is closed.
-pub const STOPPED_READS_APART: Duration = Duration::from_secs(2);
 /// #8001 signal W on the idle look: the Gateway record found unmoved by
 /// this many looks after the one that first read it, and for at least
 /// [`TOOL_RESULT_STALL`] (600 s) whatever its last row, so a slow model,
@@ -603,13 +600,6 @@ pub trait PaneHarness {
     fn reply_kept(&self, _name: &str, _token: &Path, _words: &str, _held: Duration) -> Took {
         Took::NotSent("unsupported".into())
     }
-    /// #8001 signal T: whether the kept session `agent`'s engine process
-    /// (OpenClaw's TUI, its session key `key`) is stopped
-    /// ([`Cli::openclaw_tui_stopped`]); `None` when unknown, which is
-    /// never taken as stopped.
-    fn engine_stopped(&self, _agent: &str, _key: &str) -> Option<bool> {
-        None
-    }
     /// `harness wait --after` an input it took ([`Cli::wait_kept`]).
     fn wait_kept(
         &self,
@@ -705,9 +695,6 @@ impl PaneHarness for Cli {
     fn reply_kept(&self, name: &str, token: &Path, words: &str, held: Duration) -> Took {
         Cli::reply_kept_held(self, name, token, words, held)
     }
-    fn engine_stopped(&self, agent: &str, key: &str) -> Option<bool> {
-        Cli::openclaw_tui_stopped(self, agent, key)
-    }
     fn wait_kept(
         &self,
         name: &str,
@@ -773,6 +760,10 @@ struct Pane {
     /// When `ensure` made it new (#7906 sign 5): its first words may be
     /// refused `ENGINE_NOT_READY` within [`OPEN_IDLE_WITHIN`] of this.
     made_new: Option<Instant>,
+    /// When it was opened (any `ensure` result, or adopted): #8001 signal
+    /// D is never read within `open_idle_within` of this, its start
+    /// window.
+    opened: Instant,
 }
 impl Pane {
     fn new(agent: &str, place: &Place, kept: bool) -> Self {
@@ -789,6 +780,7 @@ impl Pane {
             checked_at_open: false,
             handed: None,
             made_new: None,
+            opened: Instant::now(),
         }
     }
 
@@ -968,9 +960,9 @@ pub struct OneSession {
     dead_working: Duration,
     /// [`TOOL_RESULT_STALL`]; shorter in tests.
     tool_stall: Duration,
-    /// [`KEEP_OPEN_WHILE_OPEN`] and [`STOPPED_READS_APART`]; shorter in
-    /// tests ([`OneSession::with_idle_look`]).
-    idle_look: (Duration, Duration),
+    /// [`KEEP_OPEN_WHILE_OPEN`]; shorter in tests
+    /// ([`OneSession::with_idle_look`]).
+    idle_look: Duration,
 }
 
 /// What a stuck session's replacement calls with why, for the journal and
@@ -1336,14 +1328,13 @@ impl OneSession {
             turn_watch: (TURN_WATCH, TURN_START_WITHIN, TURN_STALL),
             dead_working: DEAD_WORKING,
             tool_stall: TOOL_RESULT_STALL,
-            idle_look: (KEEP_OPEN_WHILE_OPEN, STOPPED_READS_APART),
+            idle_look: KEEP_OPEN_WHILE_OPEN,
         }
     }
 
-    /// #8001's idle look every `every`, a stopped TUI read again after
-    /// `apart` ([`OneSession::idle_look`]).
-    pub fn with_idle_look(mut self, every: Duration, apart: Duration) -> Self {
-        self.idle_look = (every, apart);
+    /// #8001's idle look every `every` ([`OneSession::idle_look`]).
+    pub fn with_idle_look(mut self, every: Duration) -> Self {
+        self.idle_look = every;
         self
     }
 
@@ -2325,14 +2316,13 @@ impl OneSession {
     /// #8001's idle look, every [`KEEP_OPEN_WHILE_OPEN`] while the kept
     /// OpenClaw session is open and no turn is held: closed and reopened
     /// with its conversation kept ([`OneSession::restart_or_replace`],
-    /// sign 5's ladder) when its TUI reads stopped on two reads
-    /// [`STOPPED_READS_APART`] apart (signal T), or when Harness reads it
-    /// `working` on two looks in a row with no turn of ours held and its
-    /// Gateway record unmoved between them (signal W, a lost Gateway link).
-    /// A session `ensure` made new is not looked at within its first
-    /// words' window, as its refusals are not counted. The next
-    /// ask then goes to the reopened session. Each look: one `/proc` scan,
-    /// one `show`, one read-only record read; never while a turn is held.
+    /// sign 5's ladder) when Harness reads it `working` on two looks in a
+    /// row with no turn of ours held and its Gateway record unmoved
+    /// between them for at least [`TOOL_RESULT_STALL`] (signal W, a lost
+    /// Gateway link). A session `ensure` made new is not looked at within
+    /// its first words' window, as its refusals are not counted. The next
+    /// ask then goes to the reopened session. Each look: one `show`, one
+    /// read-only record read; never while a turn is held.
     pub fn idle_look<H: PaneHarness>(
         &self,
         looks: &mut Looks,
@@ -2342,8 +2332,7 @@ impl OneSession {
         if looks.idle_next.is_some_and(|next| now < next) {
             return;
         }
-        let (every, apart) = self.idle_look;
-        looks.idle_next = Some(now + every);
+        looks.idle_next = Some(now + self.idle_look);
         // A session `ensure` made new is in its first words' window, as
         // at a hand-over: not looked at.
         let Some((agent, machine)) = self
@@ -2357,21 +2346,12 @@ impl OneSession {
         let Some(harness) = harness() else {
             return;
         };
-        let key = self.kept_session_key(&agent);
-        let mut why = None;
-        if harness.engine_stopped(&agent, &key) == Some(true) {
-            std::thread::sleep(apart);
-            if self.idle_kept().is_some_and(|(now, _, _)| now == agent)
-                && harness.engine_stopped(&agent, &key) == Some(true)
-            {
-                why = Some(format!(
-                    "its OpenClaw TUI read stopped twice, {} s apart",
-                    apart.as_secs_f32()
-                ));
-            }
+        // One W close until a turn is taken (P3).
+        if self.lock().idle_w_spent {
+            return;
         }
-        let mut by_w = false;
-        if why.is_none() && !self.lock().idle_w_spent {
+        let mut why = None;
+        {
             let working = matches!(
                 harness.observe(&machine, &agent),
                 Ok(seen) if seen.seen.state == "working"
@@ -2391,7 +2371,6 @@ impl OneSession {
                     // so never a lost link before sign 4b's bound
                     // ([`TOOL_RESULT_STALL`], 600 s).
                     if unmoved >= IDLE_UNMOVED_LOOKS && still >= self.tool_stall {
-                        by_w = true;
                         why = Some(format!(
                             "Harness read it working with no turn of ours and its Gateway record unmoved for {} s",
                             still.as_secs()
@@ -2413,9 +2392,7 @@ impl OneSession {
                 return;
             }
             inner.holder = Some("idle-look".into());
-            if by_w {
-                inner.idle_w_spent = true;
-            }
+            inner.idle_w_spent = true;
         }
         looks.idle_working = None;
         eprintln!(
@@ -2472,40 +2449,112 @@ impl OneSession {
     }
 
     /// #8001: after the kept session `agent` refused a
-    /// [`REPLY_KEPT_FIRST_HELD`] reply, why its engine is frozen, if
-    /// either sign holds: its TUI stopped (signal T), or Harness reading
-    /// it `working` while no turn of ours is in it, its Gateway record the
-    /// same as `base` (read just before the reply, signal W).
+    /// [`REPLY_KEPT_FIRST_HELD`] reply `ENGINE_NOT_READY` (nothing typed),
+    /// why its engine is frozen, read from one `show`, if either sign
+    /// holds. Signal D, idle but deaf (lamp-c0a4, 20 Nov: a SIGSTOP of the
+    /// TUI undone by SIGCONT within 50 ms leaves it alive, `/proc` state
+    /// `S`, yet refusing every reply): `show` reads it `idle`, no other
+    /// turn of lamp-tasks holds the pane (the turn `id` alone), the pane
+    /// is past its start window (`open_idle_within` since its open, as the
+    /// idle look), and the Gateway record is readable, whatever its last
+    /// row (an idle session after a finished turn ends with the
+    /// assistant's reply; ROW on lamp-c0a4, 20 Nov). Signal W:
+    /// `show` reads it `working` while no turn of ours is in it, its
+    /// Gateway record the same as `base` (read just before the reply).
+    /// A `TIMEOUT` (a ready engine that did not take the words yet) is
+    /// neither, and no `show` is asked. Journaled once a check.
     fn frozen_at_hand_over(
         &self,
         harness: &dyn PaneHarness,
         machine: &str,
         agent: &str,
+        id: &str,
         base: Option<&(String, i64)>,
         took: &Took,
     ) -> Option<String> {
-        if harness.engine_stopped(agent, &self.kept_session_key(agent)) == Some(true) {
-            return Some("its OpenClaw TUI is stopped".into());
-        }
-        // W only on `ENGINE_NOT_READY`: a `TIMEOUT` is a ready engine that
-        // did not take the words in the short hold.
         if *took != Took::EngineNotReady {
             return None;
         }
-        let working = matches!(
-            harness.observe(machine, agent),
-            Ok(seen) if seen.seen.state == "working"
+        let state = match harness.observe(machine, agent) {
+            Ok(seen) => seen.seen.state,
+            Err(_) => "unread".to_owned(),
+        };
+        let (frozen, deaf, reason) = match state.as_str() {
+            "idle" => match self.deaf_why_not(harness, agent, id) {
+                None => (
+                    Some(
+                        "Harness reads it idle, yet it refused the words: idle but deaf".to_owned(),
+                    ),
+                    true,
+                    "idle, no other turn, past its start window, its record read".to_owned(),
+                ),
+                Some(not) => (None, false, not),
+            },
+            "working" => {
+                let now = base.and_then(|_| self.records(harness, agent).and_then(|read| read()));
+                let w = match (base, now) {
+                    // The assistant's row last: a tool call or exec still
+                    // running.
+                    (Some(_), Some(now)) if now.last_role.as_deref() == Some("assistant") => None,
+                    (Some(base), Some(now))
+                        if (now.session.as_str(), now.seq) == (base.0.as_str(), base.1) =>
+                    {
+                        Some(
+                            "Harness reads it working with no turn of ours, and its Gateway record did not move"
+                                .to_owned(),
+                        )
+                    }
+                    _ => None,
+                };
+                let reason = if w.is_some() {
+                    "working, its Gateway record unmoved: signal W"
+                } else {
+                    "working, its Gateway record moving or unread"
+                };
+                (w, false, reason.to_owned())
+            }
+            _ => (None, false, "not idle".to_owned()),
+        };
+        eprintln!(
+            "tasks: one session: {} first reply refused ENGINE_NOT_READY; show {state}; deaf={} ({reason})",
+            short(agent),
+            if deaf { "yes" } else { "no" }
         );
-        let base = base.filter(|_| working)?;
-        let now = self.records(harness, agent).and_then(|read| read())?;
-        // The assistant's row last: a tool call or exec still running.
-        if now.last_role.as_deref() == Some("assistant") {
-            return None;
+        frozen
+    }
+
+    /// #8001 signal D's conditions past `show` reading the kept session
+    /// `agent` `idle`: `None` when all hold, else the first that does not.
+    fn deaf_why_not(&self, harness: &dyn PaneHarness, agent: &str, id: &str) -> Option<String> {
+        {
+            let inner = self.lock();
+            if inner.holder.as_deref().is_some_and(|holder| holder != id)
+                || inner.closing_for.is_some()
+                || inner.restart_due.is_some()
+            {
+                return Some("lamp-tasks holds another turn on it".into());
+            }
+            // No pane, or another agent's: never D (fails closed).
+            let Some(opened) = inner
+                .pane
+                .as_ref()
+                .filter(|pane| pane.agent == agent)
+                .map(|pane| pane.opened)
+            else {
+                return Some("no pane of this agent".into());
+            };
+            if opened.elapsed() < self.open_idle_within {
+                return Some("inside its start window".into());
+            }
         }
-        ((now.session.as_str(), now.seq) == (base.0.as_str(), base.1)).then(|| {
-            "Harness reads it working with no turn of ours, and its Gateway record did not move"
-                .into()
-        })
+        // Any last row: an idle session after a finished turn always ends
+        // with the assistant's reply, and `show` idle already says no
+        // tool call is running (the record holds no cheap pending-call
+        // mark).
+        match self.records(harness, agent).and_then(|read| read()) {
+            None => Some("its Gateway record unread".into()),
+            Some(_) => None,
+        }
     }
 
     /// [`OneSession::keep_open`]'s removals for good, with nothing held: a
@@ -3892,6 +3941,7 @@ impl Turn<'_> {
                         harness,
                         &place.machine,
                         &agent,
+                        &self.id,
                         base.as_ref(),
                         &took,
                     );
