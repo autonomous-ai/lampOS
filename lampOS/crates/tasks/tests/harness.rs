@@ -284,7 +284,8 @@ fn launch_uses_exact_argv_auto_mode_null_stdin_and_stable_generic_identity() {
     );
     for call in calls {
         let environment = call["environment"].as_object().unwrap();
-        assert_eq!(environment.len(), 5);
+        // HOME, PATH, ADAPTER_DATA_DIR (#7906) and the two marks.
+        assert_eq!(environment.len(), 6);
         assert_eq!(environment["AI_AGENT"], "lampos");
         assert_eq!(environment["HARNESS_AGENT_SESSION"], "stable-session_123");
         for forbidden in [
@@ -315,7 +316,7 @@ fn as_the_person_the_call_carries_no_agent_mark_and_is_otherwise_the_same() {
     assert_eq!(calls[1]["args"][0], "new");
     for call in calls {
         let environment = call["environment"].as_object().unwrap();
-        assert_eq!(environment.len(), 3, "{environment:?}");
+        assert_eq!(environment.len(), 4, "{environment:?}");
         assert!(!environment.contains_key("AI_AGENT"));
         assert!(!environment.contains_key("HARNESS_AGENT_SESSION"));
     }
@@ -6152,6 +6153,30 @@ fn a_runtime_folder_made_after_the_start_reaches_the_next_harness_call() {
     address.push(folder.join("bus").as_os_str());
     assert_eq!(after["DBUS_SESSION_BUS_ADDRESS"], address);
     assert_eq!(after["HOME"], before["HOME"]);
+}
+
+/// #7906: every Harness call lamp-tasks makes, and so any daemon it
+/// starts, is given `ADAPTER_DATA_DIR` at Harness's own default under its
+/// `HOME`, exactly, so Harness 0.6.72's XDG move is `skipped-override` and
+/// Harness's home stays `~/.harness`; one already set is kept.
+#[test]
+fn every_harness_call_keeps_harnesss_home_in_dot_harness() {
+    let rig = Rig::new();
+    let cli = Cli::new(rig.config.clone(), "stable".into()).unwrap();
+    let given = cli.child_environment();
+    assert_eq!(
+        given["ADAPTER_DATA_DIR"],
+        OsString::from(format!("{}/.harness/cli/data", rig.root.path().display()))
+    );
+    let mut config = rig.config.clone();
+    config
+        .environment
+        .insert("ADAPTER_DATA_DIR".into(), "/set/elsewhere".into());
+    let cli = Cli::new(config, "stable".into()).unwrap();
+    assert_eq!(
+        cli.child_environment()["ADAPTER_DATA_DIR"],
+        "/set/elsewhere"
+    );
 }
 
 /// One `harness watch --json` line as openharness prints it.
