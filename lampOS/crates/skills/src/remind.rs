@@ -33,9 +33,17 @@ use std::time::Duration;
 pub const MOST_A_DAY: usize = 3;
 /// The window [`MOST_A_DAY`] counts in.
 pub const DAY_US: u64 = 86_400_000_000;
-/// The longest reminder's words, as a made skill's say
-/// (`lamp_voice::made_skill::MOST_SAY_TEXT_CHARS`).
+/// The longest reminder's words, in characters: 120, a made skill's say's
+/// bound when #6066 set it (`lamp_voice::made_skill::MOST_SAY_TEXT_CHARS`,
+/// 300 since #7245). Not raised with it: the schedule keeps a reminder's
+/// text in at most [`MOST_WORDS_BYTES`] bytes, which 120 Vietnamese
+/// letters, under 2.5 bytes each as written, stay within.
 pub const MOST_WORDS_CHARS: usize = 120;
+/// The schedule's own bound on a reminder's text, in bytes
+/// (`lamp_schedule::engine::MAX_TEXT_BYTES`): the one wire bound under the
+/// characters, checked here so words the schedule would refuse at run time
+/// refuse the skill when it loads, never later in silence.
+pub const MOST_WORDS_BYTES: usize = lamp_schedule::engine::MAX_TEXT_BYTES;
 /// The shortest `every`, as the schedule keeps one (`lamp-schedule`'s
 /// `MIN_EVERY_MINUTES`).
 pub const LEAST_EVERY_MINUTES: u32 = 15;
@@ -92,8 +100,9 @@ impl RemindFile {
     pub fn step(self) -> Result<Remind, String> {
         let words = plain_words(&self.words).ok_or_else(|| {
             format!(
-                "remind.words: its exact words, at most {MOST_WORDS_CHARS} characters in one or two \
-                 sentences, with no web address, quotes, braces, backticks or control characters"
+                "remind.words: its exact words, at most {MOST_WORDS_CHARS} characters \
+                 ({MOST_WORDS_BYTES} bytes) in one or two sentences, with no web address, quotes, \
+                 braces, backticks or control characters"
             )
         })?;
         let when = match (self.at, self.after, self.every) {
@@ -237,8 +246,8 @@ pub fn plain_words(text: &str) -> Option<String> {
     let web = ["://", "www.", "http"]
         .iter()
         .any(|mark| lower.contains(mark));
-    (plain && !web && (1..=2).contains(&sentences) && text.chars().count() <= MOST_WORDS_CHARS)
-        .then(|| text.to_owned())
+    let within = text.chars().count() <= MOST_WORDS_CHARS && text.len() <= MOST_WORDS_BYTES;
+    (plain && !web && (1..=2).contains(&sentences) && within).then(|| text.to_owned())
 }
 
 /// The same words, as a person hears them: case and spacing aside, as the
@@ -410,9 +419,12 @@ mod tests {
             "Zero\u{200B}width.",
             "{note}",
             &"a".repeat(MOST_WORDS_CHARS + 1),
+            // Within the characters, past the schedule's bytes (#7245).
+            &"ộ".repeat(MOST_WORDS_BYTES / 3 + 1),
         ] {
             assert_eq!(plain_words(bad), None, "{bad:?}");
         }
+        assert!(plain_words(&"ộ".repeat(MOST_WORDS_BYTES / 3)).is_some());
     }
 
     #[test]
