@@ -7,7 +7,7 @@ import { join } from 'node:path';
 import { test } from 'node:test';
 import { fileURLToPath } from 'node:url';
 import { WebSocket } from 'ws';
-import { clampTo, doneWords, limitsOf, pastReach, reachText } from '../examples/twin/reach.js';
+import { aboveStand, clampTo, doneWords, limitsOf, pastReach, reachOf, reachText } from '../examples/twin/reach.js';
 import { startTwin } from './twin-start.js';
 
 // `get body` as a product 75c9 says it: roll held to a count either way, pitch 13 up and about 1 down, yaw 22 either way.
@@ -81,4 +81,43 @@ test('the twin tells the page the lamp\'s limits, sends a drag past them as aske
   page.send(JSON.stringify({ type: 'drag', joint: 'yaw', deg: 10 }));
   await new Promise((r) => setTimeout(r, 300));
   assert.equal(messages.filter((m) => m.type === 'joint_done').length, before);
+});
+
+// `get body` as lamp-75c9 said it standing (10 Nov..19 Nov): the servos' spans are wide, but a holder's pose is cut to the counts between the
+// fold and the stand (body.rs, the holder's pose), so nothing above the stand is taken.
+const STANDING = { stands: true, joints: {
+  shoulder: { counts: 2620, deg: 47.8, folded_counts: 2076, stand_counts: 2639, min_deg: -36.9, max_deg: 86.4 },
+  elbow: { counts: 2535, deg: 43.1, folded_counts: 2045, stand_counts: 2570, min_deg: -36.9, max_deg: 83.1 },
+  pitch: { counts: 1789, deg: 0.2, folded_counts: null, stand_counts: null, min_deg: -1.3, max_deg: 4.5 },
+} };
+
+test('on a standing lamp an arm joint takes only the fold to the stand: above it is not yet, said and shaded', () => {
+  const limits = limitsOf(STANDING);
+  assert.ok(Math.abs(limits.shoulder.pose.max - 49.5) < 0.05 && limits.shoulder.pose.min === 0, 'the shoulder: 0 to 49.5');
+  assert.ok(Math.abs(limits.elbow.pose.max - 46.1) < 0.05, 'the elbow: 0 to 46.1');
+  assert.equal(limits.pitch.pose, undefined, 'the head has no stand pose');
+  assert.deepEqual(reachOf(limits.pitch), { min: -1.3, max: 4.5 });
+  assert.ok(Math.abs(reachOf(limits.shoulder).max - 49.5) < 0.05 && reachOf(limits.shoulder).min === 0, 'what the body takes is not the servo span');
+  assert.ok(Math.abs(clampTo(limits.shoulder, 51.8) - 49.5) < 0.05, 'an ask above the stand is cut to the stand');
+  assert.equal(clampTo(limits.shoulder, 44.8), 44.8, 'below the stand it is taken as asked');
+  assert.equal(pastReach(limits.shoulder, 51.8), true);
+  assert.equal(aboveStand(limits.shoulder, 51.8), true);
+  assert.equal(aboveStand(limits.shoulder, 44.8), false);
+  assert.equal(aboveStand(limits.pitch, 3), false);
+  assert.match(reachText(limits.shoulder, 51.8), /above the stand, it will be cut to 49\.5°/);
+  assert.match(reachText(limits.shoulder, 44.8), /takes 0\.0° to 49\.5° \(up to its stand; above it is not yet\)$/);
+  // The lamp's own word after the let-go ask names the stand when it cut the ask there.
+  assert.match(doneWords({ how: 'finished', clamped: true, shoulder: 48 }, 'shoulder', limits.shoulder), /cut by the body \(reached 48\.0°\) \(at its stand: above it is not yet\)/);
+  assert.doesNotMatch(doneWords({ how: 'finished', clamped: true, shoulder: 20 }, 'shoulder', limits.shoulder), /stand/);
+  // A lamp that does not say it stands, or a joint without its counts, has no pose range: as before.
+  assert.equal(limitsOf({ ...STANDING, stands: false }).shoulder.pose, undefined);
+  assert.equal(limitsOf({ stands: true, joints: { shoulder: { min_deg: -1, max_deg: 9 } } }).shoulder.pose, undefined);
+});
+
+test('the try-it page draws the not-yet region and reads the body\'s reach through reach.js', async () => {
+  const { readFileSync } = await import('node:fs');
+  const html = readFileSync(new URL('../examples/twin/index.html', import.meta.url), 'utf8');
+  assert.match(html, /class="notyet"/);
+  assert.match(html, /bodyReach\.reachOf\(limit\)/);
+  assert.match(html, /doneWords\(data, data\.joint, limits\[data\.joint\]\)/);
 });
