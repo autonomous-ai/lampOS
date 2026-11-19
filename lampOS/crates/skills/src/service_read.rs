@@ -53,6 +53,7 @@
 //!   NOT_LINKED`, never one that couldn't be reached) says so once, as
 //!   exact words behind the same gate, kept per skill ([`Room::link_note`])
 //!   until a read of it succeeds again. Off, a refused read says nothing.
+use lamp_msgs::{SkillTask, SkillTaskStage};
 use lamp_services::{serve::NOT_LINKED, spoken};
 use serde::Deserialize;
 use serde_json::{Map, Value, json};
@@ -601,6 +602,41 @@ pub fn run(step: &ReadStep, room: &mut impl Room) -> String {
 /// lines were said, never one.
 pub fn tell(lines: &[String], room: &mut impl Room) -> String {
     tell_within(lines, WAIT, false, room)
+}
+
+/// What `skills/tasks` says of `skill`'s answer found waiting for its gate
+/// ([`Room::waits`], #7873): the gate's own words for why
+/// ([`Closed::words`]), never the answer's.
+pub fn held_news(skill: &str, why: &str) -> SkillTask {
+    SkillTask {
+        skill: skill.to_owned(),
+        stage: SkillTaskStage::Held,
+        run: None,
+        engine: None,
+        gate: Some(why.to_owned()),
+    }
+}
+
+/// What `skills/tasks` says of `skill`'s answer once its read or telling
+/// ended with `outcome` ([`run`], [`tell`], [`tell_failed`]'s words, #7873):
+/// told when its lines were read, told or said (as news too), else dropped.
+pub fn answer_news(skill: &str, outcome: &str) -> SkillTask {
+    // A telling said as news after all ends with the news' own outcome.
+    let last = outcome.rsplit(": ").next().unwrap_or(outcome);
+    let told = ["told", "read ", "said"]
+        .iter()
+        .any(|said| last.starts_with(said));
+    SkillTask {
+        skill: skill.to_owned(),
+        stage: if told {
+            SkillTaskStage::Told
+        } else {
+            SkillTaskStage::Dropped
+        },
+        run: None,
+        engine: None,
+        gate: None,
+    }
 }
 
 /// How long news from work handed over waits for the owner: said once, the
