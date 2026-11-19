@@ -42,7 +42,7 @@ use std::{
         Mutex, OnceLock,
         atomic::{AtomicU64, Ordering},
     },
-    time::Duration,
+    time::{Duration, Instant},
 };
 
 /// The totals, beside the made skills' index.
@@ -142,11 +142,14 @@ pub fn refused(directory: &Path, maker: Maker) {
 }
 
 /// The person said no to reports: [`FILE`] deleted under [`LOCK`] (by the
-/// manage helper, root, as the voice is). Refused asks counted in a running
-/// voice's memory and not yet written (at most [`FLUSH_EVERY`]'s) begin the
-/// next file; none is ever sent without a yes, and a yes's first reading
-/// only begins the count. A folder that isn't there has nothing to forget.
-pub fn forget(directory: &Path) -> io::Result<()> {
+/// manage helper, root, as the voice is), waited for at most `wait`
+/// (the helper's [`crate::upload_skill::HELPER_LOCK_WAIT`] at most), then
+/// an error of kind `WouldBlock` with nothing deleted, never a wait without
+/// end. Refused asks counted in a running voice's memory and not yet
+/// written (at most [`FLUSH_EVERY`]'s) begin the next file; none is ever
+/// sent without a yes, and a yes's first reading only begins the count. A
+/// folder that isn't there has nothing to forget.
+pub fn forget(directory: &Path, wait: Duration) -> io::Result<()> {
     if !directory.is_dir() {
         return Ok(());
     }
@@ -155,7 +158,26 @@ pub fn forget(directory: &Path) -> io::Result<()> {
         .truncate(false)
         .write(true)
         .open(directory.join(LOCK))?;
-    rustix::fs::flock(&lock, rustix::fs::FlockOperation::LockExclusive)?;
+    let until = Instant::now() + wait;
+    loop {
+        match lock.try_lock() {
+            Ok(()) => break,
+            Err(fs::TryLockError::WouldBlock) if Instant::now() < until => {
+                std::thread::sleep(Duration::from_millis(50));
+            }
+            Err(fs::TryLockError::WouldBlock) => {
+                return Err(io::Error::new(
+                    io::ErrorKind::WouldBlock,
+                    format!(
+                        "{}: held by another run for {} ms",
+                        directory.join(LOCK).display(),
+                        wait.as_millis()
+                    ),
+                ));
+            }
+            Err(fs::TryLockError::Error(error)) => return Err(error),
+        }
+    }
     match fs::remove_file(directory.join(FILE)) {
         Err(error) if error.kind() != io::ErrorKind::NotFound => Err(error),
         _ => Ok(()),
@@ -380,9 +402,38 @@ mod tests {
             "{told}"
         );
         // A no forgets the file; the next read begins again.
-        forget(&dir).unwrap();
+        let wait = crate::upload_skill::HELPER_LOCK_WAIT;
+        forget(&dir, wait).unwrap();
         assert!(!dir.join(FILE).exists());
-        forget(&dir).unwrap();
-        forget(&dir.join("none")).unwrap();
+        forget(&dir, wait).unwrap();
+        forget(&dir.join("none"), wait).unwrap();
+    }
+
+    /// Another holder of [`LOCK`] past the wait: the no is refused,
+    /// `WouldBlock`, in time, with nothing deleted; given back, it goes on.
+    #[test]
+    fn a_no_waits_for_the_counts_lock_only_so_long() {
+        let dir = folder("held");
+        fs::write(dir.join(FILE), r#"{"kept":2}"#).unwrap();
+        let other = fs::OpenOptions::new()
+            .write(true)
+            .create(true)
+            .truncate(false)
+            .open(dir.join(LOCK))
+            .unwrap();
+        rustix::fs::flock(&other, rustix::fs::FlockOperation::LockExclusive).unwrap();
+        let (told, heard) = std::sync::mpsc::channel();
+        let place = dir.clone();
+        std::thread::spawn(move || {
+            let _ = told.send(forget(&place, Duration::from_millis(300)));
+        });
+        let forgot = heard
+            .recv_timeout(Duration::from_secs(6))
+            .expect("a no waits without end for the counts' lock");
+        assert_eq!(forgot.unwrap_err().kind(), io::ErrorKind::WouldBlock);
+        assert!(dir.join(FILE).exists());
+        drop(other);
+        forget(&dir, Duration::from_secs(1)).unwrap();
+        assert!(!dir.join(FILE).exists());
     }
 }
