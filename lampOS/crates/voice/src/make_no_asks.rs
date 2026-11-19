@@ -139,15 +139,19 @@ pub const CODE_OFF: &str = "this lamp doesn't run a made skill's own code";
 /// What a remove or an undo not the owner's is told.
 pub const NOT_OWNER: &str = "only the lamp's owner can remove a skill they made, or undo that";
 
-/// What the model is told to do when a line's first `make_skill` call is
-/// not run because the line went on, at once, from words cut short just
+/// What the model is told to do when a line's `make_skill` calls are not
+/// run because the line went on, at once, from words cut short just
 /// before it and not joined to them ([`split_told`], #7976): judge
-/// whether the two are one ask. Never a list of words.
+/// whether the two are one ask. A line that is its own ask makes its calls
+/// again as they were (Heron's P2 on #7990: "make a skill that glows blue
+/// at nine" after "what time is it"), and a whole ask keeps every part of
+/// it (his P3: "turn off the tea reminder and the daily brief"). Never a
+/// list of words.
 pub const SPLIT_NEXT: &str = "Judge whether this line goes on with those words. If it does, \
-     the two are one ask: do it once, with one call (a skill to make is one make_skill call \
-     with the whole ask of both lines as its request), and never turn off, turn on, remove, \
-     undo or run another skill for it. Only if this line asks that by itself, call it again. \
-     Never mention this note.";
+     the two are one ask: do all of it, every part, with both lines' words (a skill to make \
+     is made with the whole ask of both lines as its request), and turn off, turn on, remove, \
+     undo or run no skill for words that only describe that ask. If it is its own ask, make \
+     the call again as it was. Never mention this note.";
 
 /// Whether a `make_skill` call acts on a skill: a make, a turn off or on,
 /// a remove, an undo or a run now; never a yes, a clash's choice, a list,
@@ -169,8 +173,8 @@ pub fn acts_on_a_skill(args: &Value) -> bool {
     })
 }
 
-/// What a line's first `make_skill` call that acts on a skill is told in
-/// place of its answer, when the line began `gap` after `words`, a line
+/// What each `make_skill` call that acts on a skill, in the first round
+/// of a line that made one, is told in place of its answer, when the line began `gap` after `words`, a line
 /// cut short before any of its answer was heard and not joined to it
 /// (#7976: on lamp-9adf "Lamp, make a skill called tea reminder" and
 /// "every day at five in the afternoon, glow green and say time for tea."

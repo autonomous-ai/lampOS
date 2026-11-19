@@ -8589,18 +8589,22 @@ reset still ask. On (`crate::make_no_asks`):
   face seen speaking both, and the second line, asked alone, turned an
   older skill, time for tea, off). On the second route, a line that began
   within the join's 3 s (`JOIN_WITHIN`) of words cut short just before it,
-  none of their answer heard and not joined to it (the lamp's name alone
-  and words carried through a held line aside), has its turn's first
-  `make_skill` call that acts on a skill (a make, `turn_off`, `turn_on`,
-  `remove`, `undo` or `run`) not run: the model is told those words
-  (`make_no_asks::split_told`) and to judge whether the line goes on with
-  them; if so the two are one ask, made with one call whose request holds
-  both, and no other skill is turned off, on, removed, undone or run for
-  it (`make_no_asks::SPLIT_NEXT`). Only if the line asks that by itself
-  does the model call it again, and that call runs: one told per line,
+  none of their answer heard, not joined to it and not told apart from
+  it (the lamp's name alone and words carried through a held line aside;
+  never when the join's verdict was two voices by their prints or two
+  faces seen speaking them, `Joined::told_apart`), has every `make_skill`
+  call that acts on a skill (a make, `turn_off`, `turn_on`, `remove`,
+  `undo` or `run`) in the first chat round that makes one not run: each
+  is told those words (`make_no_asks::split_told`), so `[turn_off, make]`
+  in one round runs neither. The model judges whether the line goes on
+  with them (`make_no_asks::SPLIT_NEXT`): if so the two are one ask, all
+  of it done with both lines' words, a skill made with the whole ask as
+  its request, and no skill turned off, on, removed, undone or run for
+  words that only describe it; "If it is its own ask, make the call again
+  as it was." The calls of any later round run: one held round per line,
   never a list of words. A line with nothing cut just before it, one past
-  the 3 s, or one joined, is as before, with no extra round or wait; the
-  one told costs one model round only on such a line's first such call.
+  the 3 s, one joined, or one told apart, is as before, with no extra
+  round or wait; the hold costs one model round only on such a line.
 
 `lamp-voice` passes the exact `on` to its `provider` and `second` workers.
 Off, every make and remove is byte for byte as before.

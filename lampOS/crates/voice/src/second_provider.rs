@@ -1671,6 +1671,22 @@ pub enum Joined {
     /// as today, and the journal says why.
     Not(String),
 }
+/// Why [`Joined::Not`] when two faces were seen speaking the two lines.
+pub const TWO_FACES_SPEAKING: &str = "two faces were seen speaking them";
+/// How [`Joined::Not`]'s why opens when the two lines' voice prints are
+/// two people's, the cosine after it.
+pub const TWO_VOICES: &str = "two voices (cosine";
+
+impl Joined {
+    /// Whether the verdict told the two lines apart: two faces seen
+    /// speaking them, or two voices by their prints. Not a refusal for
+    /// want of a sign, nor a sign of someone else in the room (#7976:
+    /// only a line nothing could tell apart is held as a split one).
+    pub fn told_apart(&self) -> bool {
+        matches!(self, Joined::Not(why) if why == TWO_FACES_SPEAKING || why.starts_with(TWO_VOICES))
+    }
+}
+
 /// Asked of the line cut short and the line that cut it, by request.
 pub type SameSpeaker = Arc<dyn Fn(u64, u64) -> Joined + Send + Sync>;
 /// Where a spoken turn's verdict is said (`voice/turn`, #1155): its
@@ -2000,9 +2016,14 @@ struct Shared {
     /// The words cut short just before a spoken line, none of their answer
     /// heard and not joined to it, the line begun within [`JOIN_WITHIN`]
     /// of their end (#7976, with `LAMP_MAKE_NO_ASKS`): its first
-    /// `make_skill` call that acts on a skill is told them in place of its
-    /// answer ([`split_held`]).
+    /// `make_skill` call that acts on a skill, and every other one of that
+    /// round, is told them in place of its answer ([`split_held`]).
     split_before: Mutex<Option<SplitBefore>>,
+    /// The words cut short and the line that cut them, by request, when
+    /// the join's verdict told the two apart: two faces seen speaking them,
+    /// or two voices by their prints ([`Joined::told_apart`]). Such a line
+    /// is never held as a split one (#7976).
+    cut_told_apart: Mutex<Option<(u64, u64)>>,
     /// Whether a request was judged said by the person the lamp asked:
     /// their voice, or a face turned to the lamp
     /// ([`Engine::answering_the_asked_person`]).
@@ -5167,6 +5188,7 @@ impl Engine {
                 cut_ask_answered: false,
                 declined_in_place: Mutex::new(None),
                 split_before: Mutex::new(None),
+                cut_told_apart: Mutex::new(None),
                 asked_person: None,
                 written_wait: false,
                 begin: begin_limits(false),
@@ -13369,24 +13391,32 @@ async fn said_by_the_name(
 
 /// Words cut short just before spoken line `request`, not joined to it
 /// ([`Shared::split_before`], #7976): those words, how long after their
-/// end the line began, and whether a call of its turn was told them.
+/// end the line began, and the chat round whose calls were held for them.
 #[derive(Debug)]
 struct SplitBefore {
     request: u64,
     words: String,
     gap: Duration,
-    told: bool,
+    held_round: Option<usize>,
 }
 
 /// Keeps for spoken line `request` the words `carried` it cut short
 /// and was not joined to, when they were that line's own and the line just
 /// before it, `request` begun within [`JOIN_WITHIN`] of their end, and they
 /// were more than the lamp's name: a split line, whose first half is not
-/// in the model's words (#7976). Anything else, or the switch off, keeps
-/// none.
+/// in the model's words (#7976). Only when nothing told the two lines
+/// apart: words a voice print or two speaking faces showed another
+/// person's ([`Shared::cut_told_apart`]) are never held for. Anything
+/// else, or the switch off, keeps none.
 fn keep_split_before(shared: &Shared, request: u64, marks: &Marks, carried: Option<&Carried>) {
+    let apart = shared
+        .cut_told_apart
+        .lock()
+        .ok()
+        .and_then(|mut apart| apart.take());
     let split = carried
         .filter(|carried| carried.said_by == carried.request)
+        .filter(|carried| apart != Some((carried.request, request)))
         .filter(|_| crate::make_no_asks::on())
         .and_then(|carried| {
             let (_, gap) = marks.after_end.filter(|(of, _)| *of == carried.request)?;
@@ -13399,7 +13429,7 @@ fn keep_split_before(shared: &Shared, request: u64, marks: &Marks, carried: Opti
                 request,
                 words,
                 gap,
-                told: false,
+                held_round: None,
             })
         });
     if let Ok(mut kept) = shared.split_before.lock() {
@@ -13407,12 +13437,18 @@ fn keep_split_before(shared: &Shared, request: u64, marks: &Marks, carried: Opti
     }
 }
 
-/// What `request`'s `call` is told in place of its answer, never run: its
-/// line's first `make_skill` call that acts on a skill, when the line went
-/// on from words cut short just before it ([`keep_split_before`]). Once a
-/// line: told those words, the model judges whether the two are one ask,
-/// and a call it makes again runs (#7976).
-fn split_held(shared: &Shared, request: u64, call: &net::ToolCall) -> Option<Value> {
+/// What `request`'s `call` in chat round `round` is told in place of its
+/// answer, never run: each `make_skill` call that acts on a skill in the
+/// first round that made one, when the line went on from words cut short
+/// just before it ([`keep_split_before`]). So `[turn_off, make]` in one
+/// round runs neither, never a half ask made beside the held one (Heron's
+/// P2 on #7990). One round a line: told those words, the model judges
+/// whether the two are one ask, and the calls it makes after run (#7976).
+fn split_held(
+    shared: &Shared,
+    (request, round): (u64, usize),
+    call: &net::ToolCall,
+) -> Option<Value> {
     if call.name != crate::made_skill::MAKE
         || !crate::make_no_asks::on()
         || !crate::make_no_asks::acts_on_a_skill(&call.args)
@@ -13420,12 +13456,12 @@ fn split_held(shared: &Shared, request: u64, call: &net::ToolCall) -> Option<Val
         return None;
     }
     let mut kept = shared.split_before.lock().ok()?;
-    let split = kept
-        .as_mut()
-        .filter(|split| split.request == request && !split.told)?;
-    split.told = true;
+    let split = kept.as_mut().filter(|split| {
+        split.request == request && split.held_round.is_none_or(|held| held == round)
+    })?;
+    split.held_round = Some(round);
     eprintln!(
-        "lamp-voice second: request {request}: its make_skill call is not run: it began {} ms after words cut short just before it, not joined to it ({} words); the model is told them, to judge whether the two are one ask (#7976)",
+        "lamp-voice second: request {request} chat round {round}: its make_skill call is not run: it began {} ms after words cut short just before it, not joined to it ({} words); the model is told them, to judge whether the two are one ask (#7976)",
         split.gap.as_millis(),
         split.words.split_whitespace().count()
     );
@@ -13483,6 +13519,11 @@ async fn joined_with_cut(
         return (text, Some(carried), vec![own]);
     }
     let said = said_by_one(same, (carried.request, request), bound).await;
+    if said.told_apart()
+        && let Ok(mut apart) = shared.cut_told_apart.lock()
+    {
+        *apart = Some((carried.request, request));
+    }
     let verdict = said.clone();
     let why = match said {
         Joined::Same(why) => Ok(why.to_owned()),
@@ -21112,9 +21153,10 @@ async fn answer(
                     continue;
                 }
                 // A line that went on from words cut short just before it,
-                // not joined (#7976): its first call acting on a skill is
-                // told them, never run; the model judges.
-                if heard && let Some(told) = split_held(shared, request, call) {
+                // not joined (#7976): its calls acting on a skill in the
+                // first round with one are told them, never run; the model
+                // judges.
+                if heard && let Some(told) = split_held(shared, (request, round), call) {
                     messages.push(Message::tool(call.id.clone(), told.to_string()));
                     continue;
                 }
