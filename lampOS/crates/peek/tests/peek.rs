@@ -2455,3 +2455,68 @@ fn an_active_card_with_no_event_for_five_minutes_reads_stale() {
     let html = page::timeline_at(&[handed], &records, false, Some(10 * page::STALE_MS));
     assert!(html.contains(stale), "{html}");
 }
+
+/// What `skills/tasks` says of mail-check's run (#7873).
+fn skill_run_news(stage: lamp_msgs::SkillTaskStage) -> lamp_msgs::SkillTask {
+    lamp_msgs::SkillTask {
+        skill: "mail-check".into(),
+        stage,
+        run: Some("task-1795056147468-853891-0".into()),
+        engine: (stage == lamp_msgs::SkillTaskStage::Started).then_some("openclaw".into()),
+        gate: None,
+    }
+}
+
+/// #7873 (b), lamp-52e6 on 19 Nov: the turn that ran a made skill now
+/// (`make_skill`) showed only `LOCAL · make_skill` while its `do.task` ran
+/// on OpenClaw. The run begun within the turn's minute carries the turn's
+/// path: AGENT, the engine, the task as lamp-tasks' journal names it, and
+/// how it is going. A turn that ran no skill, or a run after its minute,
+/// is not joined.
+#[test]
+fn the_turn_that_ran_a_skill_carries_its_tasks_agent_badge() {
+    use lamp_msgs::SkillTaskStage::{Ran, Started};
+    let mut timeline = Timeline::new(false);
+    timeline.add(6, 1_000, timeline::Step::Heard(None));
+    timeline.add(
+        6,
+        1_400,
+        timeline::Step::Decided(lamp_msgs::VoiceDecision::answered(6, ["make_skill"])),
+    );
+    timeline.add(6, 2_000, timeline::Step::Said(None));
+    timeline.skill_task(skill_run_news(Started), 3_000);
+    let html = page::timeline(&timeline.newest(), &current(Vec::new()), false);
+    let started = "<span class=\"badge badge-blue\">AGENT · OpenClaw · task \
+                   1795056147468-853891-0 · started</span>";
+    assert!(html.contains(started), "{html}");
+    assert!(!html.contains("LOCAL · make_skill"), "{html}");
+    timeline.skill_task(skill_run_news(Ran), 40_000);
+    let html = page::timeline(&timeline.newest(), &current(Vec::new()), false);
+    assert!(
+        html.contains("AGENT · OpenClaw · task 1795056147468-853891-0 · ran"),
+        "{html}"
+    );
+    // A turn that called no skill's run keeps its own path.
+    let mut other = Timeline::new(false);
+    other.add(7, 1_000, timeline::Step::Heard(None));
+    other.add(
+        7,
+        1_400,
+        timeline::Step::Decided(lamp_msgs::VoiceDecision::answered(7, ["timer"])),
+    );
+    other.skill_task(skill_run_news(Started), 3_000);
+    let html = page::timeline(&other.newest(), &current(Vec::new()), false);
+    assert!(html.contains("LOCAL · timer"), "{html}");
+    assert!(!html.contains("AGENT"), "{html}");
+    // A run begun after the turn's minute is a trigger's, not the turn's.
+    let mut late = Timeline::new(false);
+    late.add(8, 1_000, timeline::Step::Heard(None));
+    late.add(
+        8,
+        1_400,
+        timeline::Step::Decided(lamp_msgs::VoiceDecision::answered(8, ["make_skill"])),
+    );
+    late.skill_task(skill_run_news(Started), 1_000 + timeline::TURN_LASTS_MS);
+    let html = page::timeline(&late.newest(), &current(Vec::new()), false);
+    assert!(html.contains("LOCAL · make_skill"), "{html}");
+}
