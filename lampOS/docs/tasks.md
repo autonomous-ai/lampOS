@@ -3022,6 +3022,11 @@ written until lamp-tasks' next start, the journal line saying the last
 refusal; a text OpenClaw refuses is never
 tried again. The write runs on a thread of its own, so lamp-tasks' start
 never waits for it.
+The checked replace and the bounded check live in `crates/checked-replace`
+(`lamp_checked_replace`, #7868), which the other two writers of
+`openclaw.json` go through too: lamp-update's install (its `gateway`
+block, docs/install.md) and lamp-setup's reset (its cut to `gateway`,
+docs/setup.md).
 
 ## Harness's hooks inside the lamp's agent namespace (#6530)
 
