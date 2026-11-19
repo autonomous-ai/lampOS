@@ -6091,10 +6091,14 @@ after a take-over, but now for every turn:
   voice in the room`), followed by `; pitch <degrees>|unread, looking
   true|false|unread, <n> looks` (#7721; `<n>` the looks that gave the pose,
   out of the window too, where it was 0 or 1 before #7891), and out of the
-  window `, seen speaking facing in <m>`. A line let through, in the window
+  window `, seen speaking facing in <m>`, and when the lamp's newest words
+  before the line asked a question, `, the lamp asked <s> s before` (the
+  seconds since that exchange began, `Thread::lamp_asked_ago`, for a
+  replay's `asked_s`, #7698). A line let through, in the window
   or out of it, has its own line, `request N: said to me: let through:
   <verdict>: <W> words, in the window|out of the window; pitch …, looking
-  …, <n> looks[, seen speaking facing in <m>] (LAMP_SAID_TO_ME)`; a short line (`said_to_me::SHORT_WORDS`
+  …, <n> looks[, seen speaking facing in <m>][, the lamp asked <s> s
+  before] (LAMP_SAID_TO_ME)`; a short line (`said_to_me::SHORT_WORDS`
   words or fewer) standing in the window adds which input let it,
   `request N: said to me: a short line stands in the window by
   named|yes awaited|lamp_asked|seen_speaking|read_silent false

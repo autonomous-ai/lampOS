@@ -11286,6 +11286,18 @@ impl Heeding {
         if !going_on {
             pose.push_str(&format!(", seen speaking facing in {}", line.facing_looks));
         }
+        // The seconds since the thread's question began, so a saved journal
+        // gives a replay its `asked_s` (#7698: request 99's were not kept).
+        if let Some(ago) = crate::thread::current(self.thread.as_deref(), |thread| {
+            thread.lamp_asked_ago(request, Instant::now())
+        })
+        .flatten()
+        {
+            pose.push_str(&format!(
+                ", the lamp asked {:.1} s before",
+                ago.as_secs_f32()
+            ));
+        }
         let words = heard.split_whitespace().count();
         // Every decision journaled with the pose, for a row to count
         // (#7721); the held line as before, the pose after it.
