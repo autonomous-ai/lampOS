@@ -1088,8 +1088,9 @@ first builder (3 Nov, 14:33). No computer and no model: `can` names
   lowercase letter, then lowercase letters, digits and `-`, at most 40
   bytes; `when` ("when I say study mode") one line of at most 200
   characters; the instructions plain text, new lines and tabs only, at
-  most 2,000 characters (both bytes before #7245); and a request id as for
-  `skills.make`. Anything else is refused in
+  most 2,000 characters (both bytes before #7245; lamp-voice alone also
+  holds the two, as its call answer, to 3,700 bytes, and its refusal is
+  passed to the app as it is); and a request id as for `skills.make`. Anything else is refused in
   the voice's plain words before the voice is asked. Then one line to the
   same socket, `{"written": {"name", "when", "instructions",
   "request_id"}}`; the voice answers at once and keeps it after, on its
