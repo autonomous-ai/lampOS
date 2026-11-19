@@ -257,6 +257,48 @@ pub const CARRY_WITHIN: Duration = Duration::from_secs(30);
 /// held each line's words back 1 to 2.5 s while Deepgram worked through it
 /// (the first builder on lamp-4ace on 19 Oct at 18:56).
 pub const KEPT_SAMPLES: usize = 16_000 * 3 / 2;
+/// With `LAMP_CARRY_UNANSWERED_SOUND=on`: the most of a line's sound kept for
+/// the next, 6 s at 16 kHz (#7939). A line is carried only when its words
+/// did not come back (the `carries` rule in [`Engine`]'s start), so a line
+/// that was heard keeps and carries nothing more than before. On lamp-9adf,
+/// "Lamp, make a skill called tech news: tell me one short tech headline"
+/// was cut in three pieces none of which came back with words; each went on
+/// with only the last 1.5 s, and "Lamp, make a skill" was lost, so no make
+/// was asked.
+pub const KEPT_SAMPLES_LONG: usize = 16_000 * 6;
+/// Where the second route reads it: `on` exactly; off unless set.
+pub const CARRY_LONG_ENVIRONMENT: &str = "LAMP_CARRY_UNANSWERED_SOUND";
+
+/// The most of a line's sound kept for the next: [`KEPT_SAMPLES`], or with
+/// [`CARRY_LONG_ENVIRONMENT`] [`KEPT_SAMPLES_LONG`]. Read once.
+fn kept_most() -> usize {
+    #[cfg(test)]
+    if let Some(long) = tests::LONG_FOR_TEST.with(std::cell::Cell::get) {
+        return most_kept(long);
+    }
+    static LONG: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
+    most_kept(
+        *LONG
+            .get_or_init(|| std::env::var(CARRY_LONG_ENVIRONMENT).is_ok_and(|value| value == "on")),
+    )
+}
+
+/// [`kept_most`] for `long` (the switch).
+fn most_kept(long: bool) -> usize {
+    if long {
+        KEPT_SAMPLES_LONG
+    } else {
+        KEPT_SAMPLES
+    }
+}
+
+/// `new` after `kept`, the oldest dropped past `most`.
+fn keep_sound(kept: &mut VecDeque<i16>, new: &[i16], most: usize) {
+    kept.extend(new.iter().copied());
+    let over = kept.len().saturating_sub(most);
+    kept.drain(..over);
+}
+
 /// A line beginning this soon after the last one ended, that one not
 /// answered, goes on from it: its sound goes first ([`KeptSound`]).
 pub const CARRY_AFTER_END: Duration = Duration::from_millis(1_500);
@@ -8034,9 +8076,7 @@ impl Engine {
                     if kept.said_from == 0 {
                         kept.said_from = read_completed_at_us;
                     }
-                    kept.samples.extend(samples.iter().copied());
-                    let over = kept.samples.len().saturating_sub(KEPT_SAMPLES);
-                    kept.samples.drain(..over);
+                    keep_sound(&mut kept.samples, &samples, kept_most());
                 }
                 match audio.try_send(LinePart::Sound(samples, true, read_completed_at_us)) {
                     Ok(()) => {}

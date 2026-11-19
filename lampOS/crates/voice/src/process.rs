@@ -2734,6 +2734,7 @@ fn second_route_worker_environment(
         crate::opens_further::ENVIRONMENT,
         crate::second_provider::TURNED_SPEAKING_ENVIRONMENT,
         crate::second_provider::JOIN_CUT_WORDS_ENVIRONMENT,
+        crate::second_provider::CARRY_LONG_ENVIRONMENT,
         // Read by the second worker, which tells the coordinator (#3026).
         crate::unfinished_words::ENVIRONMENT,
         // Read by the second route's same-voice check (#2602).
@@ -3071,6 +3072,7 @@ mod tests {
             crate::opens_further::ENVIRONMENT,
             crate::second_provider::TURNED_SPEAKING_ENVIRONMENT,
             crate::second_provider::JOIN_CUT_WORDS_ENVIRONMENT,
+            crate::second_provider::CARRY_LONG_ENVIRONMENT,
             crate::unfinished_words::ENVIRONMENT,
             crate::same_voice::CALLER_ONLY_ENVIRONMENT,
             crate::second_provider::WRITTEN_WAIT_ENVIRONMENT,
@@ -4238,6 +4240,7 @@ mod tests {
                     || name == crate::opens_further::ENVIRONMENT
                     || name == crate::second_provider::TURNED_SPEAKING_ENVIRONMENT
                     || name == crate::second_provider::JOIN_CUT_WORDS_ENVIRONMENT
+                    || name == crate::second_provider::CARRY_LONG_ENVIRONMENT
                     || name == crate::unfinished_words::ENVIRONMENT
                     || name == crate::same_voice::CALLER_ONLY_ENVIRONMENT
                     || name == crate::second_provider::WRITTEN_WAIT_ENVIRONMENT
@@ -4393,6 +4396,7 @@ mod tests {
                     "LAMP_BUSY_FOLLOW_UP_RENEWS=on",
                     "LAMP_BUSY_NO_FACE_RENEWS=on",
                     "LAMP_CARRIED_LINES_KEEP_TALK=on",
+                    "LAMP_CARRY_UNANSWERED_SOUND=on",
                     "LAMP_CHOSEN_VOICE=on",
                     "LAMP_CONVERSATION_CARRIED_MEMORY=on",
                     "LAMP_CONVERSATION_CARRIED_SAVES=on",
