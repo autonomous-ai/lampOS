@@ -460,6 +460,16 @@ Environment=LAMP_MADE_SKILL_ASKS=on
 Environment=LAMP_MADE_SKILL_SAID=on
 # #7445, docs/skills.md "Turned off and on by voice": a turn-off by voice is never a remove
 Environment=LAMP_MADE_SKILL_OFF_SAID=on
+# The make flow's five switches (the first builder's DEFAULT-ON, 19 Nov 21:42, on #7814; docs/switches.md): a make
+# the lamp can't build itself goes to its agent as a task, or is told why not (#7234); made code that only lights,
+# speaks or moves goes on at once; an ask for a skill the lamp has but is off turns that one on; "make a skill" is
+# listened for, and a thing to do on a repeat is a skill to make, never a reminder. Passed to the second route as
+# each row says. LAMP_SKILL_WRITTEN follows #7977 (the written-note size bound) in its own pull request.
+Environment=LAMP_MAKE_NO_CANNOT=on
+Environment=LAMP_MADE_CODE_ON_AT_ONCE=on
+Environment=LAMP_MAKE_CORE_OFFER=on
+Environment=LAMP_SKILL_KEYTERM=on
+Environment=LAMP_SKILL_RECURRING_TOLD=on
 # A due reminder is timed by the Reminders skill (lampOS/skills/reminders): the voice keeps its words and
 # its acknowledgement, and says it itself when no ask has come within 10 s, so none is lost (#939).
 Environment=LAMP_SCHEDULE_SPEAK=skill

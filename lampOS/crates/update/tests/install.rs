@@ -2523,7 +2523,7 @@ fn the_product_hands_a_make_deepseek_cant_keep_to_the_lamps_agent() {
 /// said on (`LAMP_MADE_NOT_ON_TOLD`, #7270) in lamp-voice alone; and a
 /// skill's task made sure of (`LAMP_SKILL_TASK_SURE`, #7239) in lamp-skills
 /// alone. A `cannot:` made a task for the lamp's agent
-/// (`LAMP_MAKE_NO_CANNOT`, #7234) stays off until its own row.
+/// (`LAMP_MAKE_NO_CANNOT`, #7234) is on with the make flow's five below.
 #[test]
 fn the_product_turns_the_skill_flows_three_switches_on_where_they_are_read() {
     let switches: [(&str, &[&str]); 3] = [
@@ -2574,6 +2574,87 @@ fn the_product_turns_the_skill_flows_three_switches_on_where_they_are_read() {
             assert!(
                 install::PRODUCT.iter().any(|(unit, _)| unit == owner),
                 "{owner} is not a product unit"
+            );
+        }
+    }
+}
+
+/// The make flow's five switches (the first builder's DEFAULT-ON, 19 Nov
+/// 21:42, on #7814), each `on` once in lamp-voice, whose part reads it, and
+/// in no other unit: a make the lamp can't build itself made a task for its
+/// agent (`LAMP_MAKE_NO_CANNOT`, #7234), made code that only lights, speaks
+/// or moves on at once (`LAMP_MADE_CODE_ON_AT_ONCE`), a skill the lamp has
+/// but is off turned on for a make asking for it (`LAMP_MAKE_CORE_OFFER`),
+/// "make a skill" listened for (`LAMP_SKILL_KEYTERM`) with a thing to do on
+/// a repeat told as a skill, never a reminder
+/// (`LAMP_SKILL_RECURRING_TOLD`). Each beside the companions its row
+/// names, on in the same unit. A skill written in the app
+/// (`LAMP_SKILL_WRITTEN`) follows #7977, the written-note size bound.
+#[test]
+fn the_product_turns_the_make_flows_five_switches_on_where_they_are_read() {
+    let voice: &[&str] = &["lamp-voice.service"];
+    let switches: [(&str, &[&str]); 5] = [
+        (lamp_voice::make_no_cannot::ENVIRONMENT, voice),
+        (lamp_voice::made_skill::CODE_AT_ONCE_ENVIRONMENT, voice),
+        (lamp_voice::make_core_offer::ENVIRONMENT, voice),
+        (
+            lamp_voice::second_provider::net::key_terms::SKILL_ENVIRONMENT,
+            voice,
+        ),
+        (lamp_voice::skill_recurring::ENVIRONMENT, voice),
+    ];
+    assert_eq!(
+        switches.map(|(name, _)| name),
+        [
+            "LAMP_MAKE_NO_CANNOT",
+            "LAMP_MADE_CODE_ON_AT_ONCE",
+            "LAMP_MAKE_CORE_OFFER",
+            "LAMP_SKILL_KEYTERM",
+            "LAMP_SKILL_RECURRING_TOLD",
+        ]
+    );
+    for (name, owners) in switches {
+        let line = format!("Environment={name}=on");
+        for (unit, text) in install::PRODUCT {
+            let on = section(text, "Service")
+                .iter()
+                .filter(|set| **set == line)
+                .count();
+            let mentioned = text
+                .lines()
+                .filter(|set| !set.starts_with('#') && set.contains(name))
+                .count();
+            assert_eq!(on, usize::from(owners.contains(unit)), "{unit}: {line}");
+            assert_eq!(mentioned, on, "{unit}: {name}");
+        }
+        for owner in owners {
+            assert!(
+                install::PRODUCT.iter().any(|(unit, _)| unit == owner),
+                "{owner} is not a product unit"
+            );
+        }
+    }
+    // The companions each row names, on in the unit that reads it.
+    let companions: [(&str, &[&str]); 1] = [(
+        "lamp-voice.service",
+        &[
+            "Environment=LAMP_MAKE_SKILL=on",
+            "Environment=LAMP_MADE_SCRIPTS=on",
+            "Environment=LAMP_SKILL_TASKS=on",
+        ],
+    )];
+    for (owner, lines) in companions {
+        let text = install::PRODUCT
+            .iter()
+            .find(|(unit, _)| *unit == owner)
+            .unwrap()
+            .1;
+        let service = section(text, "Service");
+        for line in lines {
+            assert_eq!(
+                service.iter().filter(|set| *set == line).count(),
+                1,
+                "{owner} lacks {line}"
             );
         }
     }
