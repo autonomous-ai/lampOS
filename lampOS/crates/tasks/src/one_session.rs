@@ -346,6 +346,12 @@ pub trait PaneHarness {
     fn close_kept(&self, _name: &str, _token: &Path, _now: bool) -> Result<(), String> {
         Err("unsupported".into())
     }
+    /// Whether OpenClaw's own record still holds the session of Harness's
+    /// `agent` ([`crate::harness::openclaw_record`], read only, no CLI
+    /// start); `None` when it can't be read.
+    fn session_held(&self, _agent: &str) -> Option<bool> {
+        None
+    }
 }
 
 /// Whether `show`'s state (or its error) says the pane is gone: reopened,
@@ -419,6 +425,9 @@ impl PaneHarness for Cli {
         cancel: &AtomicBool,
     ) -> Result<Option<String>, String> {
         Cli::wait_after(self, machine, agent, input, cancel)
+    }
+    fn session_held(&self, agent: &str) -> Option<bool> {
+        Cli::openclaw_holds(self, agent)
     }
 }
 
@@ -2189,7 +2198,23 @@ impl OneSession {
         // stuck sign) and deleted its OpenClaw conversation. `ensure` finds
         // a session by its name and token, not by the forgotten id, so
         // without `--fresh` it resumes that deleted conversation for ever.
-        let closed_by_us = token.exists() && !self.kept_is_program();
+        let mut closed_by_us = token.exists() && !self.kept_is_program();
+        // ...and a kept record whose OpenClaw conversation the Gateway no
+        // longer holds (deleted under it): forgotten before `ensure`, never
+        // resumed, since Harness resumes it with no Gateway check.
+        if !closed_by_us
+            && place.engine == EngineKind::Openclaw
+            && let Some((agent, _, _)) = self.kept()
+            && self.kept_is_program()
+            && harness.session_held(&agent) == Some(false)
+        {
+            eprintln!(
+                "tasks: one session: OpenClaw no longer holds the kept session {}'s conversation; forgotten, a fresh one (#7906)",
+                short(&agent)
+            );
+            self.closed_by_us(&agent, EngineKind::Openclaw, false);
+            closed_by_us = true;
+        }
         if let Some((old, machine, engine)) = self.kept()
             && !self.kept_is_program()
         {

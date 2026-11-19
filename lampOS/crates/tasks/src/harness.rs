@@ -3088,6 +3088,17 @@ impl Cli {
         }
     }
 
+    /// #7906: whether OpenClaw's own record still holds the session of
+    /// `agent_id` ([`openclaw_record`], read where `OPENCLAW_STATE_DIR` in
+    /// Harness's environment says); `None` when it can't be read.
+    pub fn openclaw_holds(&self, agent_id: &str) -> Option<bool> {
+        let state = self
+            .config
+            .environment
+            .get(crate::hold::OPENCLAW_STATE_DIR)?;
+        openclaw_record(&openclaw_record_path(Path::new(state)), agent_id).ok()
+    }
+
     /// Whether the Gateway's own record says the prompt of `agent_id`'s
     /// harness may be under way ([`openclaw_record`], read where
     /// `OPENCLAW_STATE_DIR` in Harness's environment says): `Some` with
