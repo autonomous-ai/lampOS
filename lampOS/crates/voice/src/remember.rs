@@ -494,19 +494,17 @@ pub const KEEP_CLAIMED_UNKEPT: &str = "(For you to know: you were about to say y
 /// something with no `remember` call.
 pub const NOT_KEPT_LINE: &str = "I didn't keep that. Tell me again and I'll remember it.";
 
-/// Where the second worker reads the switch for a keep claimed anywhere in
-/// a reply (#7878). `on` only, off unless set: on a spoken turn that isn't a
-/// question, while no `remember` of the turn has run, a reply whose first
-/// sentence opens with an acknowledgement ([`WHOLE_OPENINGS`]: "Got it —",
-/// "Okay,") is held for up to [`WHOLE_MOST_SENTENCES`] sentences and judged
-/// whole ([`whole_hold`], [`claims_a_change`]), not only its opening. Gated
-/// on the reply's own structure, never on words of the person's line (the
-/// Reviewer-lead's P2 on #7924). On
-/// lamp-e82d at 14432, 19 Nov 09:52, "Actually, I moved my car. It's on Level
-/// B1, spot 7 now." got no call and "Got it — your car is on Level B1, spot
-/// 7 now. That replaces wherever it was before.": its opening claims
-/// nothing, so it was said, and its second sentence claimed a keep that
-/// never happened.
+/// Where the second worker reads the switch for a keep claimed in any
+/// sentence of a reply (#7878). `on` only, off unless set: while no
+/// `remember` of the turn has run, a reply is said sentence by sentence,
+/// each held only until it is complete and judged ([`unclaimed_sentences`],
+/// [`claims_a_change`]), not only by its opening; a sentence that claims a
+/// keep or replace is held, with the rest, to the round's end. On
+/// lamp-e82d at 14432, 19 Nov 09:52, "Actually, I moved my car. It's on
+/// Level B1, spot 7 now." got no call and "Got it — your car is on Level
+/// B1, spot 7 now. That replaces wherever it was before.": its opening
+/// claims nothing, so all of it was said, and nothing was kept. No word of
+/// the person's line is read (the first builder's 13:44 ruling on #7924).
 pub const WHOLE_ENVIRONMENT: &str = "LAMP_KEEP_CLAIM_WHOLE";
 
 /// Whether [`WHOLE_ENVIRONMENT`] is on in this process's environment.
@@ -533,74 +531,21 @@ const CHANGE_CLAIMS: [&str; 12] = [
     "i've changed it",
 ];
 
-/// The acknowledgements a reply's first sentence opens with for it to be
-/// held whole ([`whole_hold`]): how a reply that claims a keep later opens
-/// ("Got it — your car is on Level B1, spot 7 now. That replaces …"). A
-/// story, an answer or a refusal opens otherwise and streams at once.
-pub const WHOLE_OPENINGS: [&str; 8] = [
-    "got it",
-    "okay",
-    "ok",
-    "sure",
-    "alright",
-    "all right",
-    "noted",
-    "understood",
-];
-
-/// The most sentences a reply is held for before it is let go with no
-/// claim found ([`whole_hold`]): a bound in code on the wait, so a long
-/// reply never waits for its end (the Reviewer-lead's P2 on #7924).
-pub const WHOLE_MOST_SENTENCES: usize = 3;
-
-/// What becomes of a reply held whole so far ([`WHOLE_ENVIRONMENT`]).
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum Whole {
-    /// Held on: no sentence ended yet, or a claim found (held to the
-    /// round's end), or fewer than [`WHOLE_MOST_SENTENCES`] ended.
-    Hold,
-    /// Let go to the opening's own judgement: its first sentence opens with
-    /// no acknowledgement, or [`WHOLE_MOST_SENTENCES`] ended with no claim.
-    Pass,
-}
-
-/// Whether `held`, a reply's text so far, is held on whole or let go.
-pub fn whole_hold(held: &str) -> Whole {
-    let text = held.replace('\u{2019}', "'");
-    let ended: Vec<&str> = text.split_inclusive(['.', '!', '?']).collect();
-    let complete = if text.trim_end().ends_with(['.', '!', '?']) {
-        ended.len()
-    } else {
-        ended.len().saturating_sub(1)
-    };
-    let opening = text.trim_start().to_lowercase();
-    let acknowledged = WHOLE_OPENINGS.iter().any(|lead| {
-        opening.strip_prefix(lead).is_some_and(|after| {
-            after.trim_end().is_empty()
-                || after.starts_with(|c: char| !c.is_alphanumeric() && c != '\'')
-        })
-    });
-    if complete == 0 {
-        // Not known yet, unless it already opens with something else.
-        let started = opening.split_whitespace().count() >= 2;
-        return if started && !acknowledged {
-            Whole::Pass
-        } else {
-            Whole::Hold
-        };
+/// How far `held`, a reply's text so far, may be said now (#7878, the
+/// first builder's 13:44 ruling): the byte length of its leading complete
+/// sentences that claim no keep or replace ([`claims_a_change`]). It stops
+/// at the first sentence that does (held, with all after it, to the
+/// round's end) and at a sentence not finished yet (held until it is). The
+/// bound is one sentence: nothing waits longer than its own sentence.
+pub fn unclaimed_sentences(held: &str) -> usize {
+    let mut said = 0;
+    for sentence in held.split_inclusive(['.', '!', '?']) {
+        if !sentence.trim_end().ends_with(['.', '!', '?']) || claims_a_change(sentence) {
+            break;
+        }
+        said += sentence.len();
     }
-    if !acknowledged {
-        return Whole::Pass;
-    }
-    let done: String = ended[..complete].concat();
-    if claims_a_change(&done) {
-        return Whole::Hold;
-    }
-    if complete >= WHOLE_MOST_SENTENCES {
-        Whole::Pass
-    } else {
-        Whole::Hold
-    }
+    said
 }
 
 /// The lead-ins a sentence's change claim may follow ([`CHANGE_CLAIMS`]).
@@ -33222,31 +33167,20 @@ mod chapter_tests {
         }
     }
 
-    /// #7924: a reply is held whole only while its first sentence opens
-    /// with an acknowledgement, and for at most [`WHOLE_MOST_SENTENCES`]
-    /// sentences unless a claim is found; a story or an answer passes.
+    /// #7924: each complete sentence that claims nothing may be said; the
+    /// first that claims a keep or replace, and an unfinished one, are held.
     #[test]
-    fn a_reply_is_held_whole_only_after_an_acknowledgement_and_for_three_sentences() {
-        assert_eq!(whole_hold("Got it"), Whole::Hold);
+    fn sentences_are_said_until_one_claims_a_keep() {
+        let e82d = "Got it \u{2014} your car is on Level B1, spot 7 now. That replaces wherever it was before.";
+        let first = "Got it \u{2014} your car is on Level B1, spot 7 now.";
+        assert_eq!(unclaimed_sentences(e82d), first.len());
+        assert_eq!(unclaimed_sentences("Got it"), 0);
         assert_eq!(
-            whole_hold("Got it \u{2014} your car is on B1."),
-            Whole::Hold
+            unclaimed_sentences("Once upon a time, a lamp. It glowed"),
+            "Once upon a time, a lamp.".len()
         );
-        assert_eq!(
-            whole_hold("Got it \u{2014} your car is on B1. That replaces wherever it was. And"),
-            Whole::Hold
-        );
-        assert_eq!(whole_hold("Once upon a time"), Whole::Pass);
-        assert_eq!(whole_hold("Once upon a time, a lamp."), Whole::Pass);
-        assert_eq!(
-            whole_hold("Okay. One. Two. Three"),
-            Whole::Pass,
-            "three sentences with no claim are let go"
-        );
-        assert_eq!(
-            whole_hold("Okay. That replaces it. Two. Three. Four."),
-            Whole::Hold,
-            "a claim found is held to the end"
-        );
+        assert_eq!(unclaimed_sentences("Kept: your car is on B1."), 0);
+        let story = "Here's one. A lamp lit a room. The end.";
+        assert_eq!(unclaimed_sentences(story), story.len());
     }
 }

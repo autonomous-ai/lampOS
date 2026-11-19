@@ -16647,13 +16647,6 @@ fn claim_released(
     held_whole: &mut bool,
 ) -> Option<String> {
     let held = claim_held.as_mut()?;
-    // Held whole while its opening is an acknowledgement, up to its bound,
-    // or to the round's end once a claim is found (`LAMP_KEEP_CLAIM_WHOLE`,
-    // #7878); otherwise judged by its opening as before.
-    if whole && crate::remember::whole_hold(held) == crate::remember::Whole::Hold {
-        *held_whole = true;
-        return None;
-    }
     if yes && let Some(end) = crate::remember::said_kept_found_to(held, found, asked, false) {
         return match crate::remember::claims_a_keep_said(&held[..end], false, faces, false) {
             Some(false) => {
@@ -16664,6 +16657,20 @@ fn claim_released(
         };
     }
     match crate::remember::claims_a_keep_said(held, false, faces, yes) {
+        // Sentence by sentence (`LAMP_KEEP_CLAIM_WHOLE`, #7878): an opening
+        // that claims no keep lets go only its complete sentences that claim
+        // none, and the hold goes on, so a keep or replace said in a later
+        // sentence is held to the round's end and judged there.
+        Some(false) if whole => {
+            let end = crate::remember::unclaimed_sentences(held);
+            if end < held.len() {
+                *held_whole = true;
+            }
+            (end > 0).then(|| {
+                let rest = held.split_off(end);
+                std::mem::replace(held, rest)
+            })
+        }
         Some(false) => claim_held.take(),
         _ => None,
     }
@@ -17162,11 +17169,11 @@ async fn answer(
         _ => Vec::new(),
     };
     let made_asked = crate::action_claim::asked_as_a_question(&said);
-    // A turn whose reply may be judged whole for a keep claimed anywhere in
-    // it (`LAMP_KEEP_CLAIM_WHOLE`, #7878): spoken, never a question. Which
-    // replies are held is the reply's own opening (`remember::whole_hold`),
-    // never words of the person's line (the Reviewer-lead's P2 on #7924).
-    let keep_whole_turn = shared.keep_whole && heard && !quoted && !made_asked;
+    // A turn whose reply is judged sentence by sentence for a keep claimed
+    // in any of them (`LAMP_KEEP_CLAIM_WHOLE`, #7878): structure only, never
+    // words of the person's line (the first builder's 13:44 ruling on
+    // #7924); held while no `remember` of the turn has run.
+    let keep_whole_turn = shared.keep_whole && !quoted;
     // Whether a light act told as under way is a claim (#7285,
     // `LAMP_ACTION_CLAIM_DOING`): read from the reply alone.
     let doing_turn = shared.doing_claims;
@@ -18189,10 +18196,9 @@ async fn answer(
             // this request was kept already, nor on a turn offered no
             // function (a quoted add-on's or a reminder's).
             let mut claim_held = (!kept_now && !quoted && !reminder).then(String::new);
-            // Whether this round's reply was held whole for a keep claimed
-            // in a later sentence (`LAMP_KEEP_CLAIM_WHOLE`, #7878): said in
-            // the journal, so a row can set its first audio beside a turn
-            // streamed.
+            // Whether a sentence of this round's reply claiming a keep or
+            // replace was held (`LAMP_KEEP_CLAIM_WHOLE`, #7878), said in the
+            // journal.
             let mut held_whole = false;
             // A reply's opening, held until it is known whether it narrates
             // a call as words ("Calling not_for_me.", lamp-06c1, 30 Oct);
@@ -19369,7 +19375,7 @@ async fn answer(
             // as the plain line that it was not kept.
             if held_whole {
                 eprintln!(
-                    "lamp-voice second: request {request} chat round {round}: its reply opened with an acknowledgement and was held whole for a keep said later in it (LAMP_KEEP_CLAIM_WHOLE)"
+                    "lamp-voice second: request {request} chat round {round}: a sentence of its reply says a keep or replace, held to the round's end (LAMP_KEEP_CLAIM_WHOLE)"
                 );
             }
             if let Some(mut held) = claim_held.take().filter(|held| !held.is_empty()) {

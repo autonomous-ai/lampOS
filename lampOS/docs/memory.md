@@ -4339,7 +4339,7 @@ then use that person's scope:
   a record counts only when it says "now" or that the old name is gone
   ("Your face is known as Sam now, and the old name is gone."). The full
   matcher is in second-voice.md.
-- **A keep claimed in a later sentence** (`LAMP_KEEP_CLAIM_WHOLE=on`, #7878, off unless set): a reply that opens with an acknowledgement is read whole for a keep or replace said done ("Got it — your car is on Level B1, spot 7 now. That replaces wherever it was before." on lamp-e82d, 19 Nov, with nothing kept), and with no call in the round it is held as the claims above are. Its rules are its row in `switches.md`.
+- **A keep claimed in a later sentence** (`LAMP_KEEP_CLAIM_WHOLE=on`, #7878, off unless set): while no `remember` has run, a reply is said sentence by sentence, and a later sentence that says a keep or replace done ("Got it — your car is on Level B1, spot 7 now. That replaces wherever it was before." on lamp-e82d, 19 Nov, with nothing kept) is held; with no call in the round it is a claim, as those above are. Its rules are its row in `switches.md`.
 
 - **Nothing personal kept while nobody is known** (the owner's question 1,
   option (b); `LAMP_MEMORY_PERSONAL_NEEDS_FACE=on`, off unless set; both
