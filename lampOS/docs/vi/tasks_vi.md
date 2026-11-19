@@ -2496,6 +2496,40 @@ khi đăng xuất, và với 0.6.60 khi đăng nhập (ROW của #7507).
   forget); a new one opens` (hoặc `(no task for 120 min)`), `dropped the
   kept session <id> (…); its conversation forgotten`, rồi `kept session new
   <id> (openclaw, …) in <ms> ms`.
+- **Phiên được giữ đã mất hoặc bị kẹt: đóng và thay, không bao giờ resume
+  mãi (#7906).** `harness ensure` tìm phiên được giữ theo tên và token,
+  không theo id trong `one-session.json`. Vì vậy khi lamp-tasks đã tự đóng
+  nó (hết hạn, huỷ, câu hỏi không ai trả lời, một dấu hiệu kẹt) và xoá hội
+  thoại OpenClaw của nó, một file token không có bản ghi giữ sẽ làm lần
+  `ensure` tiếp theo dùng `--fresh`. Token được giữ lại, vì một token mới
+  với cùng tên có thể bị từ chối `NAME_TAKEN`. Trước đây, trên lamp-52e6,
+  hạn 600 s của một lần make đã đóng và xoá phiên, rồi mọi lần `ensure` sau
+  đó lại resume nó (`kept session resumed <id> (openclaw, starting)`).
+  Engine của nó thoát ("No session found"), và mọi việc chờ cho tới khi bị
+  báo bận. Hai dấu hiệu được xử lý:
+  - **Dấu hiệu 1, vẫn `starting`.** Khi mở mà tìm thấy phiên (`live` hoặc
+    `resumed`, không bao giờ `new`), lamp-tasks gọi một lần `show`. Nếu
+    phiên vẫn `starting` (hoặc `offline`, `unknown`) sau 120 s
+    (`OPEN_IDLE_WITHIN`) tính từ lúc bắt đầu mở, nó bị coi là kẹt. Khi trao
+    việc, nếu reply bị từ chối `NOT_IDLE` hoặc `ENGINE_NOT_READY` suốt
+    120 s, lamp-tasks gọi một lần `show`, và phiên vẫn `starting` bị coi là
+    kẹt.
+  - **Dấu hiệu 2, một shell trơn.** `show` ghi agent là `Terminal` (engine
+    đã thoát, và `wait` đọc nó là idle), hoặc Harness không còn phiên đó.
+    Không bao giờ gõ vào, nhận lại hay lấy câu trả lời từ shell đó.
+
+  Dấu hiệu nào cũng gọi `OneSession::replace_kept`, đường duy nhất cho mọi
+  dấu hiệu. Nó `close --now`, `sessions.delete` và xoá bản ghi, rồi buông
+  phiên. Lần mở tiếp theo là `ensure --fresh` (pane của `harness new` thì
+  là một `new` thường), và việc đang chờ, hoặc việc tiếp theo, chạy tiếp ở
+  đó. Close lỗi được thử lại `--now` ở lần nhìn sau. Số lần thử có giới
+  hạn: quá `REPLACE_MOST` (2) lần thay liên tiếp mà không có câu trả lời
+  nào xen giữa, lần mở tiếp theo chờ backoff (5 s, nhân đôi, tối đa
+  300 s). Phiên khoẻ chỉ tốn một `show` mỗi lần mở, không tốn gì mỗi lượt.
+  Trường hợp xấu nhất từ lúc kẹt tới phiên mới là khoảng 120 s cộng một lần
+  `ensure`. `OneSession::with_on_replaced` là hook cho câu báo duy nhất tới
+  người dùng của #7895, chưa nối ở đây. Journal: `<id> is gone or stuck
+  (<why>); closed, forgotten and replaced with a fresh session (#7906)`.
 
 ### Giới hạn được chấp nhận cho thứ Hai: grant của kỹ năng đang chạy trong gateway
 
