@@ -3618,3 +3618,39 @@ fn the_reset_forgets_the_agents_before_the_plans_wipes_take_the_token() {
     let steps = reset::reset(&lamp(&Root::new()), &mut Fake::default()).unwrap();
     assert!(!steps.contains(&Step::AgentsForgotten));
 }
+
+/// #7868 (the Reviewer-lead's HOLD at fdc40d5c50): OpenClaw 2026.11.2
+/// refuses a `config validate` from namespaces other than its running
+/// gateway's (`GatewayLockNamespaceError`, #7268), and a cut not taken
+/// removes `openclaw.json`. So with the gateway's unit holding a `MainPID`
+/// the reset's check runs as `lampos` through OpenClaw's wrapper, which
+/// joins that gateway (no `LAMP_OPENCLAW_GATEWAY`, no stand-in token);
+/// with none running, in OpenClaw's namespace of its own, with the cut
+/// file's owner's ids.
+#[test]
+fn the_cuts_check_joins_a_running_gateway_and_runs_alone_with_none() {
+    let file = "/var/lib/lampos-openclaw/state/.openclaw.json.x.new";
+    let joined = reset::cut_check_argv(file, "1001", "1002", true).join(" ");
+    assert!(
+        joined.ends_with(&format!(
+            " OPENCLAW_CONFIG_PATH={file} {} config validate --json",
+            lamp_update::openclaw_install::WRAPPER
+        )),
+        "{joined}"
+    );
+    assert!(joined.starts_with("runuser -u lampos -- env "), "{joined}");
+    assert!(!joined.contains("unshare"), "{joined}");
+    assert!(!joined.contains("LAMP_OPENCLAW_GATEWAY"), "{joined}");
+    assert!(!joined.contains("LAMP_HERMES_TOKEN"), "{joined}");
+
+    let alone = reset::cut_check_argv(file, "1001", "1002", false).join(" ");
+    assert!(
+        alone.contains("LAMP_NS_UID=1001 LAMP_NS_GID=1002 ")
+            && alone.contains(" /usr/bin/unshare ")
+            && alone.ends_with(&format!(
+                "{} config validate --json",
+                lamp_update::openclaw_install::NS
+            )),
+        "{alone}"
+    );
+}
