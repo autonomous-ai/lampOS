@@ -2775,6 +2775,7 @@ dependencies = [
  "httparse",
  "lamp-actions",
  "lamp-bus",
+ "lamp-checked-replace",
  "lamp-controls",
  "lamp-gemini",
  "lamp-local-time",
