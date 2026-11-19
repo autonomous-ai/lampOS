@@ -3665,6 +3665,13 @@ as a Harness task with the agent's own tools
   takes nothing, since only root lamp-voice may call it. As it starts,
   lamp-tasks sweeps the `make-*` folders (and their homes) a lamp-tasks
   stopped mid-make left (`skill_make::sweep`).
+- **A voice gone as the outcome comes** (#7224, fault 5): when writing a
+  make's outcome fails (its route restarted, `Broken pipe`), the outcome is
+  kept in lamp-tasks' memory only, by the make's rules, at most 4 for 30 min
+  (`KeptOutcomes`), and given once to the same make asked again, at once with
+  no run of its own; the same make asked while it is still made waits for
+  that one's outcome, never refused `busy`. An outcome the voice took is
+  never kept. See skills.md, "A make survives a restart of its route".
 - **The line:** `{"op":"skill_make","rules","within_ms"}`, checked whole
   (`MakeLine::parse`): no other field but `guide` and `switches`, the
   rules (the system prompt and the brief) at most 48 KiB with no NUL,

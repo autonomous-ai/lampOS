@@ -1011,6 +1011,14 @@ agent (`lamp_tasks::skill_make`).
   lamp-voice chạy bằng root được gọi nó. Khi khởi động, lamp-tasks quét
   bỏ các thư mục `make-*` (cùng home của chúng) mà một lamp-tasks dừng
   giữa chừng để lại (`skill_make::sweep`).
+- **Voice đã mất khi kết quả đến** (#7224, lỗi 5): khi ghi kết quả của một
+  lần tạo thất bại (tuyến khởi động lại, `Broken pipe`), kết quả được giữ chỉ
+  trong bộ nhớ của lamp-tasks, theo rules của lần tạo, tối đa 4 trong 30 phút
+  (`KeptOutcomes`), và trao một lần cho cùng lần tạo được hỏi lại, ngay lập
+  tức, không chạy lại; cùng lần tạo được hỏi khi vẫn đang tạo sẽ chờ kết quả
+  của lần đó, không bao giờ bị từ chối `busy`. Kết quả voice đã nhận thì không
+  bao giờ được giữ. Xem skills_vi.md, "Một lần tạo vẫn còn sau khi tuyến khởi
+  động lại".
 - **Dòng:** `{"op":"skill_make","rules","within_ms"}`, được kiểm tra trọn
   vẹn (`MakeLine::parse`): không có trường nào khác ngoài `guide` và
   `switches`, luật (system prompt và brief) tối đa 48 KiB và không có NUL,
