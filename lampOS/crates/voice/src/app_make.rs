@@ -1995,6 +1995,84 @@ mod tests {
         let _ = fs::remove_dir_all(&root);
     }
 
+    /// The owner's ask (19 Nov): the app's MAKE IT goes to the agent chosen
+    /// on the lamp, not to Hermes alone. With `LAMP_MAKE_AGENT_ONE_PATH` on
+    /// (as the product's lamp-voice unit has it), the app's agent
+    /// ([`crate::make_skill_agent::Agent::for_app_with`]) hands a make
+    /// DeepSeek didn't keep on an OpenClaw lamp to OpenClaw on the one run
+    /// path, as a voice make is: its line carries `"one_path":true` and
+    /// `"engine":"OpenClaw"`, never DeepSeek alone. A Hermes lamp's make is
+    /// handed over as before, its line carrying `one_path` too. Off, an
+    /// OpenClaw lamp's make is DeepSeek's alone with its repairs, as before.
+    #[test]
+    fn an_app_make_goes_to_the_lamps_chosen_agent_on_the_one_run_path() {
+        use crate::make_skill_agent::{Agent, tests::stub};
+        use crate::make_skill_local::tests::{
+            chat_at, faces, good, keeping, manage_helper, service,
+        };
+        let words = "make me a skill that dims the light at 10 pm";
+        for (engine, one_path, handed, served_n) in [
+            ("openclaw", Some("on"), 1, 1),
+            ("hermes", Some("on"), 1, 1),
+            ("openclaw", None, 0, 2),
+            ("hermes", None, 1, 1),
+        ] {
+            let case = format!("{engine} {one_path:?}");
+            let (root, keeping) = keeping(&format!("app-one-path-{engine}-{}", one_path.is_some()));
+            let tasks = stub(Some(engine), std::sync::Arc::new(|_: &str| Some(good())));
+            let folder = tasks.dir.path().display().to_string();
+            let agent = Agent::for_app_with(Some("on"), None, one_path, Some(&folder)).unwrap();
+            assert_eq!(agent.one_path, one_path.is_some(), "{case}");
+            let at = now_unix_ms();
+            let brief = begin(&keeping.directory, words, "r1", at).unwrap();
+            // DeepSeek's refused answer, and its own repair when the agent
+            // doesn't take the make.
+            let replies = [(200, faces()), (200, good())][..served_n].to_vec();
+            let (url, served) = service(replies);
+            let asked = manage_helper(&keeping.manage);
+            let mut said = Vec::new();
+            make_here_with(
+                &keeping,
+                &brief,
+                "r1",
+                at,
+                chat_at(url),
+                |line| said.push(line.to_owned()),
+                || None,
+                Some(&agent),
+            );
+            assert_eq!(served.join().unwrap(), served_n, "{case}");
+            assert_eq!(tasks.hand_overs(), handed, "{case}");
+            let sent = tasks.sent.lock().unwrap().clone();
+            if let Some(make) = sent.iter().find(|line| line["op"] == "skill_make") {
+                match one_path {
+                    Some(_) => {
+                        assert_eq!(make["one_path"], serde_json::json!(true), "{case}: {make}");
+                        let named = if engine == "openclaw" {
+                            "OpenClaw"
+                        } else {
+                            "Hermes"
+                        };
+                        assert_eq!(make["engine"], serde_json::json!(named), "{case}: {make}");
+                    }
+                    None => {
+                        assert!(make.get("one_path").is_none(), "{case}: {make}");
+                        assert!(make.get("engine").is_none(), "{case}: {make}");
+                    }
+                }
+            }
+            let told = status(&keeping.directory, Some("r1"), at);
+            assert_eq!(told["state"], "on", "{case}: {told}");
+            assert_eq!(told["name"], "evening-dim", "{case}");
+            assert_eq!(asked.join().unwrap()["install_made"], told["sha256"]);
+            assert!(
+                said.len() == 1 && said[0].starts_with("I made evening dim, and it's on:"),
+                "{case}: {said:?}"
+            );
+            let _ = fs::remove_dir_all(&root);
+        }
+    }
+
     /// Heron's P2 on #6788: with `LAMP_MAKE_SKILL_AGENT` on (as the
     /// product's lamp-voice unit has it) but the make not taken by the
     /// agent (no make socket, an older lamp-tasks; `no_namespace`; or no

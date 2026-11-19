@@ -3874,7 +3874,12 @@ OpenClaw lamp could run a skill's job but not make one. With lamp-voice's
 `LAMP_MAKE_AGENT_ONE_PATH=on` (on in the product's lamp-voice;
 [switches.md](switches.md)), the make goes to the lamp's agent whenever
 lamp-tasks says it takes runs, Hermes or OpenClaw, through the one run
-path, with no second runner:
+path, with no second runner. An app's MAKE IT make takes the same path
+and sends the same line (the owner's ask, 19 Nov: the app's make goes to
+the agent chosen on the lamp, not to Hermes alone): lamp-voice's
+coordinator reads the same switch from its own environment
+(`make_skill_agent::Agent::for_app`), so on an OpenClaw lamp it is handed
+to OpenClaw, never made by DeepSeek alone:
 
 - **The line:** `{"op":"skill_make","rules","within_ms","one_path":true}`.
   `one_path` is a boolean, `false` by default; without it the make socket
@@ -7007,6 +7012,7 @@ the voice its own function, `make_skill` (`put_on_made_skill` is gone since
 app's typed skill (`LAMP_APP_MAKE_SKILL`) is made the same way, never handed
 over as a task. With `LAMP_MAKE_SKILL_AGENT=on`, a voice make or an app's
 MAKE IT make the lamp's own model didn't make goes to the lamp's own Hermes
+(with `LAMP_MAKE_AGENT_ONE_PATH`, to OpenClaw too, on the one run path)
 in a skill run's namespace ("A voice make in a skill run's namespace",
 below). The made skills' news words (`made`, `not_kept`) and their repair through
 a task are gone with it. A task whose words are a skill's brief, handed over

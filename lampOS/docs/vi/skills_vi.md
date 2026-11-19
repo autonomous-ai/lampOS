@@ -3194,8 +3194,17 @@ cả hai người viết.
   động lại, chậm, hoặc trả lời `ok:false`) là chưa biết, không bao giờ
   `AGENT_MISSING`, và DeepSeek tự tạo với các lần sửa của nó, như trước
   ("the tasks part didn't say its targets: DeepSeek makes it alone, as
-  before"). Khi tắt, chỉ Hermes được giao lần tạo, như trên, và đèn không
-  có agent thì DeepSeek tự tạo.
+  before"). MAKE IT của ứng dụng đi cùng đường chạy chung đó (yêu cầu của
+  chủ sở hữu, 19/11: lần tạo của ứng dụng đi tới agent được chọn trên đèn,
+  không chỉ Hermes): `make_skill_agent::Agent::for_app` đọc
+  `LAMP_MAKE_AGENT_ONE_PATH` từ môi trường của chính coordinator, như
+  `Agent::for_voice` đọc nó trong worker của tuyến thứ hai, và cả hai dựng
+  agent qua cùng `Agent::made_with`, nên một lần tạo của ứng dụng trên đèn
+  OpenClaw được giao cho OpenClaw với `"one_path":true` và
+  `"engine":"OpenClaw"`, không bao giờ để DeepSeek tự tạo (test
+  `an_app_make_goes_to_the_lamps_chosen_agent_on_the_one_run_path`). Không
+  nói câu chờ cho nó. Khi tắt, chỉ Hermes được giao lần tạo, bằng giọng nói
+  hay từ ứng dụng, như trên, và đèn không có agent thì DeepSeek tự tạo.
 - **Mạng của nó: `LAMP_MAKE_AGENT_NET`** (không unit nào đặt; yêu cầu của
   chủ sở hữu, 12/11, quyết định của first builder,
   12/11 19:14). Mặc định lần chạy giữ mạng, như agent của V1, và gọi mô hình qua
@@ -3416,19 +3425,22 @@ cả hai người viết.
   như lần tạo bằng giọng nói). Chữ gõ trong ứng dụng (`app_make::make_here`)
   đi qua cùng `make_skill_local::make_kept` và cùng lần giao
   (`handed_to_agent`), với agent từ `make_skill_agent::Agent::for_app`:
-  công tắc, công tắc của hướng dẫn và `LAMP_TASKS_DIR` tuyệt đối của phần
+  công tắc, công tắc của hướng dẫn, công tắc của đường chạy chung
+  (`LAMP_MAKE_AGENT_ONE_PATH`) và `LAMP_TASKS_DIR` tuyệt đối của phần
   tasks đọc từ môi trường của chính coordinator. Các lần tạo của ứng dụng
   chạy trong coordinator của lamp-voice, tiến trình của chính unit, nên
   `LAMP_MAKE_SKILL_AGENT` (khi được đặt) và `LAMP_TASKS_DIR` của unit tới được nó mà
   không cần danh sách cho phép của worker, và lamp-tasks nhận dòng của nó,
   vì chỉ nhận dòng của `lamp-voice.service` chạy bằng root. Cùng thứ tự
-  (DeepSeek một lần thử, rồi Hermes), cùng kiểm tra, cùng các lần sửa, giới
+  (DeepSeek một lần thử, rồi agent của đèn: Hermes, hoặc khi có đường
+  chạy chung thì cả OpenClaw, như trên), cùng kiểm tra, cùng các lần sửa, giới
   hạn và `"guide":true` khi có `LAMP_MAKE_AGENT_GUIDE`. Không nói câu chờ:
   ứng dụng hiện lời hỏi là `making`. Kỹ năng được giữ được bật ngay như mọi
   lần MAKE IT (kỹ năng có mã riêng như trước, `app_make::put_on_line`), và
   kỹ năng không tạo được vẫn được nói và báo cho ứng dụng như trước;
   `cannot:` riêng của agent là "I couldn't make that one.". Khi công tắc
-  tắt, không có phần tasks hoặc không có Hermes, nó vẫn do DeepSeek như
+  tắt, không có phần tasks, hoặc không có agent nào được giao lần tạo
+  (Hermes; khi có đường chạy chung thì cả OpenClaw), nó vẫn do DeepSeek như
   trước, với các lần sửa của nó. Có Hermes nhưng agent không nhận lần tạo
   (không có lần chạy tạo: không có socket tạo, `no_namespace` hay
   `not_held_off`; lamp-tasks `busy` vì một lần tạo bằng giọng nói; hoặc

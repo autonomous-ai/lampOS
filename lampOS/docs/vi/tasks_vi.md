@@ -17,7 +17,8 @@ tasks, và một kỹ năng gõ trong ứng dụng (`LAMP_APP_MAKE_SKILL`) cũng
 như vậy, không bao giờ được giao đi như một việc. Khi có
 `LAMP_MAKE_SKILL_AGENT=on`, một lần tạo bằng giọng nói hay một lần tạo bằng
 MAKE IT của ứng dụng mà mô hình của đèn không tạo được sẽ được giao cho Hermes
-của chính đèn trong namespace của lần chạy kỹ năng ("Một lần tạo bằng giọng
+của chính đèn (khi có `LAMP_MAKE_AGENT_ONE_PATH`, cho cả OpenClaw, qua đường
+chạy chung) trong namespace của lần chạy kỹ năng ("Một lần tạo bằng giọng
 nói trong namespace của lần chạy kỹ năng", bên dưới). Các câu tin của kỹ năng đã tạo (`made`,
 `not_kept`) và việc sửa nó qua một việc giao cũng bị bỏ theo. Một việc mà lời
 của nó là bản hướng dẫn của một kỹ năng, do một bản phát hành trước giao đi,
@@ -1293,7 +1294,12 @@ is OpenClaw: only Hermes has a namespace runner for a make today". Sau
 năng. Với `LAMP_MAKE_AGENT_ONE_PATH=on` của lamp-voice (bật trong unit
 lamp-voice của sản phẩm; [switches.md](../switches.md)), lần tạo được giao cho
 agent của đèn mỗi khi lamp-tasks báo agent đó nhận lần chạy, Hermes hay
-OpenClaw, qua đường chạy chung, không có runner thứ hai:
+OpenClaw, qua đường chạy chung, không có runner thứ hai. Một lần tạo bằng
+MAKE IT của ứng dụng đi cùng đường đó và gửi cùng dòng đó (yêu cầu của chủ
+sở hữu, 19/11: lần tạo của ứng dụng đi tới agent được chọn trên đèn, không
+chỉ Hermes): coordinator của lamp-voice đọc cùng công tắc từ môi trường
+của chính nó (`make_skill_agent::Agent::for_app`), nên trên đèn OpenClaw
+nó được giao cho OpenClaw, không bao giờ để DeepSeek tự tạo:
 
 - **Dòng:** `{"op":"skill_make","rules","within_ms","one_path":true}`.
   `one_path` là boolean, mặc định `false`; không có nó, socket tạo chạy

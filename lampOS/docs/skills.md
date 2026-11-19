@@ -6390,8 +6390,18 @@ the same code for both writers.
   restarting, slow, or answering `ok:false`) is not known, never
   `AGENT_MISSING`, and DeepSeek makes it alone with its repairs, as before
   ("the tasks part didn't say its targets: DeepSeek makes it alone, as
-  before"). Off, only Hermes is handed a make, as above, and a lamp with
-  no agent has DeepSeek make it alone.
+  before"). The app's MAKE IT takes the same one run path (the owner's
+  ask, 19 Nov: the app's make goes to the agent chosen on the lamp, not to
+  Hermes alone): `make_skill_agent::Agent::for_app` reads
+  `LAMP_MAKE_AGENT_ONE_PATH` from the coordinator's own environment, as
+  `Agent::for_voice` reads it in the second route's worker, and both build
+  the agent through the same `Agent::made_with`, so an app make on an
+  OpenClaw lamp is handed to OpenClaw with `"one_path":true` and
+  `"engine":"OpenClaw"`, never DeepSeek alone (test
+  `an_app_make_goes_to_the_lamps_chosen_agent_on_the_one_run_path`). No
+  waiting line is said for it. Off, only Hermes is handed a make, by voice
+  or from the app, as above, and a lamp with no agent has DeepSeek make it
+  alone.
 - **Its network: `LAMP_MAKE_AGENT_NET`** (set in no unit; the owner's ask,
   12 Nov, the first builder's ruling, 12 Nov 19:14). By default
   the run keeps the network, as V1's agent did, and reaches the model at
@@ -6606,20 +6616,22 @@ the same code for both writers.
   agent as the voice make does). The app's typed words
   (`app_make::make_here`) go through the same `make_skill_local::make_kept`
   and the same hand-over (`handed_to_agent`), with the agent from
-  `make_skill_agent::Agent::for_app`: the switch, the guide's switch and
-  the tasks part's absolute `LAMP_TASKS_DIR` read from the coordinator's
-  own environment. The app's makes run in lamp-voice's coordinator, the
+  `make_skill_agent::Agent::for_app`: the switch, the guide's switch, the
+  one run path's switch (`LAMP_MAKE_AGENT_ONE_PATH`) and the tasks part's
+  absolute `LAMP_TASKS_DIR` read from the coordinator's own environment. The app's makes run in lamp-voice's coordinator, the
   unit's own process, so the unit's `LAMP_MAKE_SKILL_AGENT` (when it is
   set) and `LAMP_TASKS_DIR` reach it with no worker allow-list, and lamp-tasks
   takes its line, as it takes only `lamp-voice.service`'s run as root.
-  The same order (DeepSeek's one try, then Hermes), the same checks, the
+  The same order (DeepSeek's one try, then the lamp's agent: Hermes, or
+  with the one run path OpenClaw too, as above), the same checks, the
   same repairs, bounds and `"guide":true` with `LAMP_MAKE_AGENT_GUIDE`.
   No waiting line is said: the app shows the ask as `making`. A kept
   skill goes on at once as every MAKE IT does (one with code of its own as
   before, `app_make::put_on_line`), and a skill not made is said and told
   to the app as before; the agent's own `cannot:` is "I couldn't make that
-  one.". With the switch off, no tasks part or no Hermes, it stays
-  DeepSeek's as before, with its repairs. With Hermes but the make not
+  one.". With the switch off, no tasks part, or no agent a make is handed
+  to (Hermes; with the one run path OpenClaw too), it stays DeepSeek's as
+  before, with its repairs. With Hermes but the make not
   taken by the agent (no make run: no make socket, `no_namespace` or
   `not_held_off`; lamp-tasks `busy` with a voice make; or no first answer
   from the agent's run), DeepSeek then gets its repairs, as without the

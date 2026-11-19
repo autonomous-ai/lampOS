@@ -688,36 +688,39 @@ impl Agent {
             return None;
         }
         let tasks = TASKS.get()?.clone();
-        Some(Self {
-            one_path: one_path_on(),
-            ..Self::made_with(
-                tasks,
-                Some(PathBuf::from(crate::say::DEFAULT_SOCKET)),
-                guide_on(),
-            )
-        })
+        Some(Self::made_with(
+            tasks,
+            Some(PathBuf::from(crate::say::DEFAULT_SOCKET)),
+            guide_on(),
+            one_path_on(),
+        ))
     }
 
     /// The agent for a make typed in the app's MAKE IT
     /// (`crate::app_make`), with the switch on and a tasks part: the
     /// coordinator's own environment, where the app's makes run, its
     /// `LAMP_TASKS_DIR` the directory the second route's worker is given
-    /// as `--tasks-dir`; none otherwise. The guide as [`Agent::for_voice`]
-    /// has it. No waiting line: the app shows the ask as making.
+    /// as `--tasks-dir`; none otherwise. The guide and the one run path
+    /// ([`ONE_PATH_ENVIRONMENT`]) as [`Agent::for_voice`] has them, so an
+    /// app make on an OpenClaw lamp goes to OpenClaw as a voice make does.
+    /// No waiting line: the app shows the ask as making.
     pub fn for_app() -> Option<Self> {
         let var = |name: &str| std::env::var(name).ok();
         Self::for_app_with(
             var(ENVIRONMENT).as_deref(),
             var(GUIDE_ENVIRONMENT).as_deref(),
+            var(ONE_PATH_ENVIRONMENT).as_deref(),
             var(agent_tasks::ENVIRONMENT).as_deref(),
         )
     }
 
     /// [`Agent::for_app`] from the switch's value `switch`, the guide's
-    /// `guide` and the tasks part's directory `tasks`, absolute only.
+    /// `guide`, the one run path's `one_path` and the tasks part's
+    /// directory `tasks`, absolute only.
     pub fn for_app_with(
         switch: Option<&str>,
         guide: Option<&str>,
+        one_path: Option<&str>,
         tasks: Option<&str>,
     ) -> Option<Self> {
         if !on_with(switch) {
@@ -731,14 +734,16 @@ impl Agent {
         // the agent doesn't take it.
         Some(Self {
             repairs_if_untaken: true,
-            ..Self::made_with(tasks, None, on_with(guide))
+            ..Self::made_with(tasks, None, on_with(guide), on_with(one_path))
         })
     }
 
     /// One make's agent through the tasks part at `tasks`, its waiting line
     /// said at `say`, each answer given [`GUIDED_WRITE_WITHIN`] with the
-    /// guide and [`WRITE_WITHIN`] without, within [`MAKE_WITHIN`].
-    fn made_with(tasks: PathBuf, say: Option<PathBuf>, guide: bool) -> Self {
+    /// guide and [`WRITE_WITHIN`] without, within [`MAKE_WITHIN`]; with
+    /// `one_path`, handed over on the one run path ([`Agent::one_path`]),
+    /// the voice's and the app's alike (#7245).
+    fn made_with(tasks: PathBuf, say: Option<PathBuf>, guide: bool, one_path: bool) -> Self {
         Self {
             tasks,
             say,
@@ -749,8 +754,6 @@ impl Agent {
             },
             make_within: MAKE_WITHIN,
             guide,
-            // The one run path is the voice's (#7245): `for_voice` sets it
-            // from its switch.
             one_path: false,
             repairs_if_untaken: false,
         }
@@ -1674,14 +1677,14 @@ pub(crate) mod tests {
     #[test]
     fn the_apps_agent_is_had_only_with_its_switch_and_a_tasks_part() {
         let tasks = Some("/run/lampos-tasks");
-        let agent = Agent::for_app_with(Some("on"), None, tasks).unwrap();
+        let agent = Agent::for_app_with(Some("on"), None, None, tasks).unwrap();
         assert_eq!(agent.tasks, PathBuf::from("/run/lampos-tasks"));
         assert_eq!(agent.say, None);
         assert!(!agent.guide);
         assert!(agent.repairs_if_untaken);
         assert_eq!(agent.within, WRITE_WITHIN);
         assert_eq!(agent.make_within, MAKE_WITHIN);
-        let guided = Agent::for_app_with(Some("on"), Some("on"), tasks).unwrap();
+        let guided = Agent::for_app_with(Some("on"), Some("on"), None, tasks).unwrap();
         assert!(guided.guide);
         assert_eq!(guided.within, GUIDED_WRITE_WITHIN);
         assert_eq!(guided.most_repairs(), GUIDED_MOST_REPAIRS);
@@ -1693,7 +1696,7 @@ pub(crate) mod tests {
             (Some("on"), Some("run/lampos-tasks")),
         ] {
             assert!(
-                Agent::for_app_with(switch, Some("on"), folder).is_none(),
+                Agent::for_app_with(switch, Some("on"), Some("on"), folder).is_none(),
                 "{switch:?} {folder:?}"
             );
         }
