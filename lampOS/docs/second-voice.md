@@ -7122,7 +7122,12 @@ plainly asks for something new (news, a score or result, a price or rate,
 opening hours, the weather: a question, or "tell me", "check", "look up")
 starts its search from the words heard, the lamp's name left off and the
 month and year after them, as its chat begins (`worker::early_query`,
-`Engine::hearing_words`). The request's first `web_search` takes that
+`Engine::hearing_words`). (#7914: "Who wrote The Signal and the Noise?" heard as "…the North" was
+refused without a search; a question of who made something has no early
+search of its own, the model's `web_search` carries it.) The spoken note also tells the model to search a
+question of fact it cannot answer surely, to say it would rather not guess
+only after a search found nothing, and to search again with the corrected
+words when the person fixes one (`worker::SPOKEN_NOTE`). The request's first `web_search` takes that
 search's answer when the model's query asks nothing the heard words did
 not: it may drop words or change their order, and small words ("the",
 "in", "for", …) don't count (`worker::early_adds`). A query with words the

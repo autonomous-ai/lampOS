@@ -1433,7 +1433,7 @@ pub(crate) fn time_elsewhere(
 /// "what is the weather like in Hanoi" heard as "Hannover" or answered with
 /// "You asking what the weather's like here?"; "Night!" at 1 pm, the
 /// character's example; a poem of two lines).
-pub(crate) const SPOKEN_NOTE: &str = "\n\nYou read what people say as words, and your ears turn some words into others, names and places most of all. When a question is plainly about the weather, a price, a time or a place, answer it for the likeliest meaning, here first, and search if you need to; ask back only when you cannot guess at all. Greet and say goodbye for the time of day it is now. A poem you are asked for has at least four lines. Call someone by a name only when you were given it: as the person you know by face, the name given at setup, or a name they tell you as their own (\"I'm Tom\"); never by a word heard at the start of what they said, which is often your own name misheard.";
+pub(crate) const SPOKEN_NOTE: &str = "\n\nYou read what people say as words, and your ears turn some words into others, names and places most of all. When a question is plainly about the weather, a price, a time or a place, answer it for the likeliest meaning, here first, and search if you need to; ask back only when you cannot guess at all. A question of fact you cannot answer surely from what you know (who wrote, made or sang something) is searched even if a word may be misheard, since the search often finds the title; say you would rather not guess only after a search found nothing, and when they correct a word, search again with the corrected words. Greet and say goodbye for the time of day it is now. A poem you are asked for has at least four lines. Call someone by a name only when you were given it: as the person you know by face, the name given at setup, or a name they tell you as their own (\"I'm Tom\"); never by a word heard at the start of what they said, which is often your own name misheard.";
 
 /// Why a line of a word or two is held ([`lone_words`]).
 pub(crate) const LONE_WORDS: &str = "a word or two in a conversation, no question and no short word said to the lamp, and nothing shows it was said to the lamp: no name, nobody turned to it";
@@ -31950,6 +31950,9 @@ mod tests {
             "the decline is the line's own note"
         );
         assert!(told.contains("ask back only when you cannot guess at all"));
+        assert!(told.contains("searched even if a word may be misheard"));
+        assert!(told.contains("say you would rather not guess only after a search found nothing"));
+        assert!(told.contains("search again with the corrected words"));
         assert!(told.contains("for the time of day it is now"));
         assert!(told.contains("at least four lines"));
     }
