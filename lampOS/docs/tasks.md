@@ -5167,7 +5167,7 @@ in and signed out, and on 0.6.60, signed in (#7507's ROW).
   a sign-out does, once nothing holds it: `harness close`, then
   `sessions.delete` of its `engineSession`, then its token file removed,
   so the next task recalls nothing (`one_session::forgotten`). A kept
-  session left with no task for 2 h (`KEPT_IDLE_MAX`, from its open or its
+  session left with no task for 7 days (`KEPT_IDLE_MAX`, from its open or its
   last turn) is dropped the same way, since OpenClaw's is never rotated by
   count. Either way the keep-open loop opens a new one (a new agent id and
   token, so a new OpenClaw session) in the same look, right after the
@@ -5175,7 +5175,7 @@ in and signed out, and on 0.6.60, signed in (#7507's ROW).
   is asked for or under way (a forget, a sign-out) waits for it in the
   queue, then goes into the new session, never the old one
   (`OneSession::enter`). Journal: `the kept session dropped (the
-  owner asked to forget); a new one opens` (or `(no task for 120 min)`),
+  owner asked to forget); a new one opens` (or `(no task for 10080 min)`),
   `dropped the kept session <id> (…); its conversation forgotten`, then
   `kept session new <id> (openclaw, …) in <ms> ms`.
 - **A kept session gone or stuck: closed and replaced, never resumed for

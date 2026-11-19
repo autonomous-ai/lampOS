@@ -2389,7 +2389,7 @@ fn a_kept_session_left_idle_is_dropped_and_a_fresh_one_opened() {
         seen.lock().unwrap().push(key.to_owned());
         Ok(())
     }));
-    assert_eq!(KEPT_IDLE_MAX, Duration::from_secs(2 * 60 * 60));
+    assert_eq!(KEPT_IDLE_MAX, Duration::from_secs(7 * 24 * 60 * 60));
     let mut looks = Looks::default();
     keep_open_step(&one, &fake, &mut looks);
     keep_open_step(&one, &fake, &mut looks);

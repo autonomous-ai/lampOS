@@ -2518,7 +2518,7 @@ khi đăng xuất, và với 0.6.60 khi đăng nhập (ROW của #7507).
   đèn (`ForgetSessions`, #6274) gỡ phiên được giữ như khi đăng xuất, khi
   không còn gì giữ nó: `harness close`, rồi `sessions.delete` với
   `engineSession` của nó, rồi xoá file token, để việc tiếp theo không nhớ
-  gì (`one_session::forgotten`). Phiên được giữ không có việc nào trong 2 h
+  gì (`one_session::forgotten`). Phiên được giữ không có việc nào trong 7 ngày
   (`KEPT_IDLE_MAX`, tính từ lúc mở hoặc lượt cuối) cũng bị gỡ cùng cách, vì
   phiên của OpenClaw không bao giờ bị xoay theo số lượt. Cả hai trường hợp,
   vòng keep-open mở một phiên mới (agent id và token mới, nên là một phiên
@@ -2526,7 +2526,7 @@ khi đăng xuất, và với 0.6.60 khi đăng nhập (ROW của #7507).
   việc tiếp theo. Việc nào cần pane trong lúc việc gỡ đã được yêu cầu
   hoặc đang chạy (quên, đăng xuất) sẽ chờ trong hàng đợi, rồi vào phiên
   mới, không bao giờ vào phiên cũ (`OneSession::enter`). Journal: `the kept session dropped (the owner asked to
-  forget); a new one opens` (hoặc `(no task for 120 min)`), `dropped the
+  forget); a new one opens` (hoặc `(no task for 10080 min)`), `dropped the
   kept session <id> (…); its conversation forgotten`, rồi `kept session new
   <id> (openclaw, …) in <ms> ms`.
 - **Phiên được giữ đã mất hoặc bị kẹt: đóng và thay, không bao giờ resume
