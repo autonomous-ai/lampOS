@@ -47,12 +47,76 @@ fn core_only(name: &str) -> tempfile::TempDir {
     root
 }
 
+/// The tasks of `pilot`, as `(on, task)`.
+fn tasks_of(pilot: &Pilot) -> Vec<(Option<String>, String)> {
+    pilot
+        .tasks
+        .iter()
+        .map(|task| (task.on.map(str::to_owned), task.task.to_owned()))
+        .collect()
+}
+
+/// The tasks a loaded skill hands over, as `(on, task)`, each running its
+/// brief.
+fn tasks_loaded(skill: &crate::Skill) -> Vec<(Option<String>, String)> {
+    skill
+        .steps
+        .iter()
+        .filter_map(|(only, step)| match step {
+            Step::Call(Call::Task(task)) => {
+                assert_eq!(task.run, RUN);
+                let on = match only {
+                    Some(crate::Only::Trigger(on)) => Some(on.clone()),
+                    None => None,
+                    Some(other) => panic!("{other:?}"),
+                };
+                Some((on, task.task.clone()))
+            }
+            _ => None,
+        })
+        .collect()
+}
+
 /// Every pilot's variant is in the repository, its script the brief byte
-/// for byte, and only the two the first builder named are pilots.
+/// for byte; the groups are the first builder's (the pilot pair, then the
+/// nudges), and a skill left out is no pilot.
 #[test]
-fn the_pilots_are_sip_of_water_and_stretch_break_their_briefs_byte_for_byte() {
-    let names: Vec<&str> = PILOTS.iter().map(|pilot| pilot.name).collect();
-    assert_eq!(names, ["sip-of-water", "stretch-break"]);
+fn the_pilots_by_group_their_briefs_byte_for_byte() {
+    let names = |group: Group| -> Vec<&str> {
+        PILOTS
+            .iter()
+            .filter(|pilot| pilot.group == group)
+            .map(|pilot| pilot.name)
+            .collect()
+    };
+    assert_eq!(names(Group::Pilot), ["sip-of-water", "stretch-break"]);
+    assert_eq!(
+        names(Group::Nudges),
+        [
+            "stand-up",
+            "rest-your-eyes",
+            "sit-back",
+            "wind-down",
+            "comfort-break",
+            "meal-check",
+            "quiet-focus",
+            "stuffy-air"
+        ]
+    );
+    // Left out: a line that names who came, the person's own words, a
+    // fixed line, a read, a conversation's tool.
+    for left in [
+        "welcome-back",
+        "reminders",
+        "head-pat",
+        "smoky-air",
+        "dusty-air",
+        "morning-agenda",
+        "dance",
+        "light-show",
+    ] {
+        assert!(pilot(left).is_none(), "{left}");
+    }
     for pilot in &PILOTS {
         let folder = skills_root().join(pilot.name);
         let written = fs::read_to_string(folder.join(RUN)).unwrap();
@@ -63,13 +127,13 @@ fn the_pilots_are_sip_of_water_and_stretch_break_their_briefs_byte_for_byte() {
             !inside.contains(['"', '\\', '`']),
             "one plain string: {inside}"
         );
-        assert!(written.contains(pilot.task.trim_end_matches('.')[1..].trim()));
+        assert!(written.contains(pilot.says), "{written}");
         assert!(written.contains("answer -."), "{written}");
-        // Its task is the skill's own intent, as its card says it.
-        let card = fs::read_to_string(folder.join("SKILL.md")).unwrap();
-        assert!(card.contains("one short"), "{}", pilot.name);
+        for task in pilot.tasks {
+            assert!(task.task.len() <= task::MOST_TASK_BYTES, "{}", pilot.name);
+            assert!(!task.task.contains(['"', '\\', '`']), "{}", pilot.name);
+        }
     }
-    assert!(pilot("rest-your-eyes").is_none());
     assert_eq!(FALLBACK_WITHIN, Duration::from_secs(10));
 }
 
@@ -112,8 +176,7 @@ fn with_the_switch_on_the_trigger_guards_and_timing_are_the_core_ones() {
             let with = load_with(&folder, present).unwrap();
             assert!(with.via_agent && !own.via_agent, "{}", pilot.name);
             assert_eq!(own.task_step(), None);
-            let step = with.task_step().expect("its task");
-            assert_eq!((step.task.as_str(), step.run.as_str()), (pilot.task, RUN));
+            assert_eq!(tasks_loaded(&with), tasks_of(pilot), "{}", pilot.name);
             assert!(with.grants.is_empty());
             let mut same = with.clone();
             same.steps
@@ -187,9 +250,29 @@ fn a_variant_not_exactly_the_pilots_leaves_the_core_skill_as_it_is() {
     }
     // A skill not a pilot never reads one, the same file beside it.
     let _on = On::new(true);
-    let (_root, other) = copy("rest-your-eyes");
-    assert_eq!(overlaid("rest-your-eyes", &other, &core), Ok(None));
+    let (_root, other) = copy("head-pat");
+    assert_eq!(overlaid("head-pat", &other, &core), Ok(None));
     assert_eq!(overlay.matches("task = {").count(), 2);
+}
+
+/// The switch's value turns on the groups it names, `on` every one, and
+/// nothing else: the pilot pair and the nudges each go on by their own.
+#[test]
+fn the_switch_turns_on_the_groups_it_names() {
+    for (value, pilot, nudges) in [
+        (None, false, false),
+        (Some("on"), true, true),
+        (Some("pilot"), true, false),
+        (Some("nudges"), false, true),
+        (Some("pilot, nudges"), true, true),
+        (Some("off"), false, false),
+        (Some("ON"), false, false),
+        (Some("pilots"), false, false),
+        (Some(""), false, false),
+    ] {
+        assert_eq!(turns_on(value, Group::Pilot), pilot, "{value:?}");
+        assert_eq!(turns_on(value, Group::Nudges), nudges, "{value:?}");
+    }
 }
 
 /// Each fire hands the lamp's agent its task: in every recorded case, each
@@ -222,7 +305,12 @@ fn each_fire_hands_the_agent_its_task() {
                 .iter()
                 .filter_map(|made| match &made.call {
                     Call::Task(step) => {
-                        assert_eq!((step.task.as_str(), step.run.as_str()), (pilot.task, RUN));
+                        assert_eq!(step.run, RUN);
+                        assert!(
+                            pilot.tasks.iter().any(|task| task.task == step.task),
+                            "{}",
+                            pilot.name
+                        );
                         Some(made.at_us)
                     }
                     _ => None,
@@ -245,7 +333,7 @@ fn each_fire_hands_the_agent_its_task() {
         .line();
         let line: serde_json::Value = serde_json::from_str(&line).unwrap();
         assert_eq!(line["op"], "skill_task");
-        assert_eq!(line["task"], pilot.task);
+        assert_eq!(line["task"], pilot.tasks[0].task);
         assert_eq!(line["run"], RUN);
         assert_eq!(line["grants"], serde_json::json!([]));
     }
