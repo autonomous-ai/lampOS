@@ -216,9 +216,9 @@ def _hex(colour) -> str:
 # lamp-control holds too (protocol.rs SAY_MAX_BYTES, lamp-voice's
 # MOST_WORDS_BYTES), checked here at the same bytes, never stricter.
 SAY_MAX_BYTES = 900
-# A `pose` request's longest JPEG: 61440 characters of base64 (protocol.rs
-# POSE_JPEG_MAX_CHARS), 45 KiB of picture, so the frame stays under 64 KiB.
-POSE_JPEG_MAX_CHARS = 61440
+# A `pose` request's longest JPEG: 204800 characters of base64 (protocol.rs
+# POSE_JPEG_MAX_CHARS), 150 KiB of picture, so the frame stays under 256 KiB.
+POSE_JPEG_MAX_CHARS = 204800
 POSE_JPEG_MAX_BYTES = POSE_JPEG_MAX_CHARS // 4 * 3
 # The 17 COCO keypoints a pose's `keypoints` come in, in this order.
 POSE_KEYPOINTS = (
@@ -1417,8 +1417,8 @@ class Lamp:
         "height", "model", "ms"}`. `pose` is `{"score", "keypoints"}`, the 17
         COCO keypoints in COCO order (`POSE_KEYPOINTS`), each `{"x", "y",
         "score"}` in the picture's own pixels, or None with no person. At most
-        45 KiB of JPEG (`POSE_JPEG_MAX_BYTES`, so the request stays under the
-        64 KiB frame): a 640x480 frame at ordinary quality fits. Needs the
+        150 KiB of JPEG (`POSE_JPEG_MAX_BYTES`, so the request stays under the
+        256 KiB frame): a 640x480 frame at high quality fits. Needs the
         camera grant and the lamp's own network; off unless the lamp's
         LAMP_NPU is on. `PreparingError` (with `retry_ms`) while the lamp
         fetches its model on first use; `UnavailableError` with no model or
@@ -1430,7 +1430,7 @@ class Lamp:
             raise LampError("jpeg: an empty picture, send one JPEG", code="bad_request")
         if size > POSE_JPEG_MAX_BYTES:
             raise LampError(
-                f"jpeg: {size} bytes, over the {POSE_JPEG_MAX_BYTES} (45 KiB) a pose takes: "
+                f"jpeg: {size} bytes, over the {POSE_JPEG_MAX_BYTES} (150 KiB) a pose takes: "
                 "send a smaller or more compressed frame (a 640x480 one at ordinary quality fits)",
                 code="bad_request",
             )

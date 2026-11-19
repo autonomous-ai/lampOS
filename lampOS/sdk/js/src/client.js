@@ -161,9 +161,9 @@ function hex(colour) {
 // MOST_WORDS_BYTES), checked here at the same bytes, never stricter.
 export const SAY_MAX_BYTES = 900;
 
-// A `pose` request's longest JPEG: 61440 characters of base64 (protocol.rs
-// POSE_JPEG_MAX_CHARS), 45 KiB of picture, so the frame stays under 64 KiB.
-export const POSE_JPEG_MAX_CHARS = 61440;
+// A `pose` request's longest JPEG: 204800 characters of base64 (protocol.rs
+// POSE_JPEG_MAX_CHARS), 150 KiB of picture, so the frame stays under 256 KiB.
+export const POSE_JPEG_MAX_CHARS = 204800;
 export const POSE_JPEG_MAX_BYTES = (POSE_JPEG_MAX_CHARS / 4) * 3;
 // The 17 COCO keypoints a pose's `keypoints` come in, in this order.
 export const POSE_KEYPOINTS = Object.freeze([
@@ -1056,9 +1056,9 @@ export class Lamp {
    * Uint8Array; a camera frame it has), from the lamp's NPU: `{ pose, width,
    * height, model, ms }`. `pose` is `{ score, keypoints }`, the 17 COCO
    * keypoints in COCO order (`POSE_KEYPOINTS`), each `{ x, y, score }` in the
-   * picture's own pixels, or null with no person. At most 45 KiB of JPEG
-   * (`POSE_JPEG_MAX_BYTES`, so the request stays under the 64 KiB frame): a
-   * 640x480 frame at ordinary quality fits. Needs the camera grant and the
+   * picture's own pixels, or null with no person. At most 150 KiB of JPEG
+   * (`POSE_JPEG_MAX_BYTES`, so the request stays under the 256 KiB frame): a
+   * 640x480 frame at high quality fits. Needs the camera grant and the
    * lamp's own network; off unless the lamp's LAMP_NPU is on. `preparing`
    * (with `retryMs`) while the lamp fetches its model on first use;
    * `unavailable` with no model or no NPU. */
@@ -1067,7 +1067,7 @@ export class Lamp {
     if (jpeg.length === 0) throw new LampError('jpeg: an empty picture, send one JPEG', { code: 'bad_request' });
     if (jpeg.length > POSE_JPEG_MAX_BYTES) {
       throw new LampError(
-        `jpeg: ${jpeg.length} bytes, over the ${POSE_JPEG_MAX_BYTES} (45 KiB) a pose takes: `
+        `jpeg: ${jpeg.length} bytes, over the ${POSE_JPEG_MAX_BYTES} (150 KiB) a pose takes: `
           + 'send a smaller or more compressed frame (a 640x480 one at ordinary quality fits)',
         { code: 'bad_request' },
       );

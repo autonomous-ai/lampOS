@@ -1435,10 +1435,10 @@ test('pose sends the JPEG in base64 and answers the 17 keypoints', () => withLam
 test('pose checks the size before sending and keeps the lamp\'s refusals', () => withLamp({ grants: ['camera'] }, async (lamp, fake) => {
   const { FAKE_JPEG } = await import('../src/testing.js');
   const { POSE_JPEG_MAX_BYTES } = await import('../src/index.js');
-  assert.equal(POSE_JPEG_MAX_BYTES, 45 * 1024);
-  assert.equal(Buffer.alloc(POSE_JPEG_MAX_BYTES).toString('base64').length, 61440);
+  assert.equal(POSE_JPEG_MAX_BYTES, 150 * 1024);
+  assert.equal(Buffer.alloc(POSE_JPEG_MAX_BYTES).toString('base64').length, 204800);
   const tooBig = Buffer.concat([Buffer.from([0xff, 0xd8]), Buffer.alloc(POSE_JPEG_MAX_BYTES)]);
-  await assert.rejects(lamp.pose(tooBig), (error) => error.code === 'bad_request' && /over the 46080/.test(error.why));
+  await assert.rejects(lamp.pose(tooBig), (error) => error.code === 'bad_request' && /over the 153600/.test(error.why));
   await assert.rejects(lamp.pose(Buffer.alloc(0)), (error) => error.code === 'bad_request' && /empty/.test(error.why));
   await assert.rejects(lamp.pose('not bytes'), (error) => error.code === 'bad_request');
   assert.deepEqual(fake.asked('pose'), []);

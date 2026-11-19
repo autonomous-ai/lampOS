@@ -39,8 +39,9 @@ use crate::protocol::{EventKind, Grant, Op};
 use crate::session::{Door, Parts, SetGrantsRefused, event_of};
 use crate::watch::{Out, Watch, phrases_in};
 
-/// The largest frame a client may send.
-pub const FRAME_MAX: usize = 64 * 1024;
+/// The largest frame a client may send: room for a `pose` JPEG
+/// (`protocol::POSE_JPEG_MAX_CHARS`, 200 KiB of base64) and its request.
+pub const FRAME_MAX: usize = 256 * 1024;
 /// What the close frame says when the app was removed.
 pub const CLOSED_REMOVED: &str = "this app was removed";
 /// What the close frame says when the owner revoked the computer.

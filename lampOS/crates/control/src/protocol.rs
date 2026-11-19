@@ -51,7 +51,7 @@ pub const LEASE_MAX_MS: u32 = 600_000;
 pub const STEP_MS: std::ops::RangeInclusive<u32> = 40..=1_000;
 /// A move's fewest frames: a start and an end. Its most are the body's own
 /// bound, held by `lamp_body::moves::check` (at most 10 s, so at most 251
-/// frames at the shortest step); the frame's 64 KiB bounds the list read.
+/// frames at the shortest step); the frame's cap bounds the list read.
 pub const FRAMES_MIN: usize = 2;
 /// The longest name a client gives itself at pairing, in characters.
 pub const CLIENT_NAME_MAX_CHARS: usize = 64;
@@ -65,9 +65,10 @@ pub const SKILL_PARTS_MAX: u32 = 32;
 /// The longest skill name, as the skill format has it.
 pub const SKILL_NAME_MAX_CHARS: usize = 64;
 
-/// The longest `pose` JPEG, in base64 characters: 45 KiB of JPEG, so the
-/// request stays under the door's 64 KiB frame (`server::FRAME_MAX`).
-pub const POSE_JPEG_MAX_CHARS: usize = 60 * 1024;
+/// The longest `pose` JPEG, in base64 characters: 150 KiB of JPEG, so a
+/// 640x480 camera frame at high quality fits and the request stays under
+/// the door's 256 KiB frame (`server::FRAME_MAX`).
+pub const POSE_JPEG_MAX_CHARS: usize = 200 * 1024;
 
 /// A part a lease holds.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
@@ -977,7 +978,7 @@ impl Op {
                         .all(|b| b.is_ascii_alphanumeric() || matches!(b, b'+' | b'/' | b'='))
                 {
                     return Err(format!(
-                        "jpeg: a JPEG in base64, 1 to {POSE_JPEG_MAX_CHARS} characters (45 KiB)"
+                        "jpeg: a JPEG in base64, 1 to {POSE_JPEG_MAX_CHARS} characters (150 KiB)"
                     ));
                 }
             }
