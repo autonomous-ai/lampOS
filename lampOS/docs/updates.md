@@ -1560,6 +1560,8 @@ are by the step that says them, with `…` for what changes (`round.rs`'s
 | `Update now: the voice gave way; switching` | an Update now round's moment for the voice ended in its 3 s of quiet: the switch goes on |
 | `Update now: no quiet in 10 s (…); switching anyway` | an Update now round's 10 s for the voice passed without 3 s of quiet: the switch goes on anyway |
 | `switching to build N` | the parts' switch begins |
+| `… is moved aside to …, the build's lamp-body taking the servo's own acceleration cap (#7946)` | a switch that changes lamp-body, after its journal is saved: the factory's acceleration drop-in (`head_touch::acceleration_only`) is copied into the records' `aside/` folder, never deleted, and taken from its place |
+| `… is put back where it was (#7946)` | a build put back, or a round cut short: that drop-in written back where it was, before the reload, for the old lamp-body |
 | `wrote …: the exit note install writes, which its unit was without` | a switch on a managed updater, before the reload: one of Cloud's fixed services, on the lamp or written by the round, had no `UNIT.d/exit-note.conf`, so `install`'s note is written (0644); one there is kept (#7135, "A part added over the air") |
 | `… is not written: …; the round goes on` | that exit note could not be written (its folder is a file, say); it is skipped, not listed as written, and the switch goes on (#7166) |
 | `the voice is stopped before the parts it reads restart` | see "The voice stopped first" |
@@ -2647,7 +2649,18 @@ With `LAMP_UPDATE_APPLY=on` in `lamp-update.service`'s environment:
   written bytes. Local wiring is still kept by the three-way rule; an
   incompatible custom file, partial pair, or nonliteral/local override of
   the mode refuses the round rather than guessing. Harmless exit-note
-  drop-ins do not block it. Controls' effective `--pins` path selects the
+  drop-ins do not block it, nor does the factory's acceleration drop-in
+  (#7946): a `lamp-body.service.d/*.conf` holding exactly an `ExecStart=`
+  reset and the installed unit's own command, word for word but for the
+  number after `--servo-acceleration` (`head_touch::acceleration_only`).
+  The bench wrote it (`zz-acceleration-50.conf`) for servos whose EEPROM caps
+  acceleration at 50. A round that changes lamp-body moves it aside after
+  its journal is saved: copied into the records' `aside/` folder (never
+  deleted), then taken from its place, one journal line each, so the
+  build's own unit runs (its lamp-body takes each servo's cap itself,
+  docs/body.md). A build put back, or a round cut short, puts it back where
+  it was (`Journal::aside`). Any other change in such a file is refused as
+  before. Controls' effective `--pins` path selects the
   file checked: build-local/custom active pins are kept byte-for-byte and
   checked against their readers, while an unused product pins file follows
   ordinary settings handling without imposing a head-reader restart.
