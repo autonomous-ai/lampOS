@@ -208,6 +208,29 @@ impl Observation {
     }
 }
 
+/// The fence's refusal of an acquisition it cannot use: stale, without its
+/// level, faulted, of another clock or ahead of now.
+const UNAVAILABLE_ACQUISITION: &str = "physical privacy acquisition unavailable";
+
+/// A slide's state read by [`SwitchFence::accept_riding`].
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum Acquired {
+    /// A fresh acquisition: the new one, or None if it is the last again.
+    Fresh(Option<PrivacySwitch>),
+    /// The state held, but its acquisition is stale or has no level: its
+    /// envelope is kept, the last acquisition is not replaced.
+    Stale,
+}
+
+/// A state read by [`SwitchFence::observe_riding`].
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum Reading {
+    /// As [`SwitchFence::observe`] gives it.
+    Observed(Option<Observation>),
+    /// [`Acquired::Stale`]: ridden as a missing reading.
+    Stale,
+}
+
 /// A restart or discontinuity ends this worker, so the supervisor must close
 /// and verify cleanup before a fresh worker can learn another producer. Its
 /// kind (a slide, or none) is set when it is made and never changes.
@@ -315,6 +338,28 @@ impl SwitchFence {
         }
     }
 
+    /// The next observation as [`SwitchFence::observe`] takes it, except
+    /// that with a slide an acquisition the state carries stale or without
+    /// its level is [`Reading::Stale`], not an error
+    /// ([`SwitchFence::accept_riding`]). Only the ridden privacy worker
+    /// reads this way (`LAMP_PRIVACY_GAP_RIDE`, #7224).
+    pub fn observe_riding(
+        &mut self,
+        message: &Message,
+        now_us: u64,
+        unix_ms: u64,
+    ) -> io::Result<Reading> {
+        if self.no_slide {
+            return self
+                .observe(message, now_us, unix_ms)
+                .map(Reading::Observed);
+        }
+        Ok(match self.accept_riding(message, now_us, unix_ms)? {
+            Acquired::Fresh(value) => Reading::Observed(value.map(Observation::Slide)),
+            Acquired::Stale => Reading::Stale,
+        })
+    }
+
     /// A slide fence's next new acquisition. A state saying no slide is
     /// wired has none, and is refused.
     pub fn accept(
@@ -323,6 +368,34 @@ impl SwitchFence {
         now_us: u64,
         unix_ms: u64,
     ) -> io::Result<Option<PrivacySwitch>> {
+        match self.acquire(message, now_us, unix_ms, false)? {
+            Acquired::Fresh(value) => Ok(value),
+            Acquired::Stale => Err(invalid(UNAVAILABLE_ACQUISITION)),
+        }
+    }
+
+    /// [`SwitchFence::accept`], except that a state whose envelope, publisher,
+    /// clock and order all hold but whose acquisition is 50 ms old or more,
+    /// or has no level or a fault, is [`Acquired::Stale`]: its envelope is
+    /// kept, so the next state continues the order, and the last acquisition
+    /// is not (#7224, Twelve's forced gap on lamp-c0a4: Controls kept
+    /// publishing while its reading lapsed, and the worker ended).
+    pub fn accept_riding(
+        &mut self,
+        message: &Message,
+        now_us: u64,
+        unix_ms: u64,
+    ) -> io::Result<Acquired> {
+        self.acquire(message, now_us, unix_ms, true)
+    }
+
+    fn acquire(
+        &mut self,
+        message: &Message,
+        now_us: u64,
+        unix_ms: u64,
+        ride: bool,
+    ) -> io::Result<Acquired> {
         if self.no_slide {
             return Err(invalid("a no-slide privacy fence reads no slide"));
         }
@@ -336,13 +409,23 @@ impl SwitchFence {
             .privacy
             .ok_or_else(|| invalid("Controls has no selected privacy source"))?;
         value.check().map_err(io::Error::other)?;
-        if value.stamp.clock_id != self.clock
-            || value.stamp.at_us > now_us
-            || now_us - value.stamp.at_us >= PRIVACY_FRESH_US
+        // Another clock, or a time ahead of now, is never ridden.
+        if value.stamp.clock_id != self.clock || value.stamp.at_us > now_us {
+            return Err(invalid(UNAVAILABLE_ACQUISITION));
+        }
+        if now_us - value.stamp.at_us >= PRIVACY_FRESH_US
             || value.muted.is_none()
             || value.fault.is_some()
         {
-            return Err(invalid("physical privacy acquisition unavailable"));
+            if !ride {
+                return Err(invalid(UNAVAILABLE_ACQUISITION));
+            }
+            self.note_clock(&message.header);
+            self.session = Some(state.session_id);
+            self.header_sequence = h;
+            self.publication = Some(state.stamp);
+            self.resync = false;
+            return Ok(Acquired::Stale);
         }
         let changed = match &self.last {
             Some(old)
@@ -366,7 +449,7 @@ impl SwitchFence {
         self.publication = Some(state.stamp);
         self.last = Some(value.clone());
         self.resync = false;
-        Ok(changed.then_some(value))
+        Ok(Acquired::Fresh(changed.then_some(value)))
     }
 
     /// A no-slide fence's next publication: it must say no slide is wired
@@ -985,6 +1068,26 @@ impl SourceGap {
         Ok(None)
     }
 
+    /// A state that held but whose acquisition is stale or has no level
+    /// ([`Reading::Stale`]), with the ride on and capture granted: ridden as
+    /// a missing reading, the bound counted from when the last fresh one,
+    /// at `last_us`, expired (#7224). Otherwise it ends the worker as the
+    /// fence's refusal did.
+    pub(crate) fn stale(
+        &mut self,
+        last_us: Option<u64>,
+        permitted: bool,
+        now_us: u64,
+    ) -> Result<Option<WorkerEvent>, Box<dyn std::error::Error + Send + Sync>> {
+        if !self.on || !permitted {
+            return Err(unreadable(UNAVAILABLE_ACQUISITION));
+        }
+        let since = last_us
+            .map_or(now_us, |last| last.saturating_add(PRIVACY_FRESH_US))
+            .min(now_us);
+        self.missing(since, permitted, now_us)
+    }
+
     pub(crate) fn recovered(&mut self) {
         self.since = None;
     }
@@ -1167,19 +1270,43 @@ fn serve(
             if resync {
                 fence.resync();
             }
+            let permitted = granted
+                && guard
+                    .state()
+                    .is_some_and(|state| state.microphone_permission() == Permission::Allowed);
+            // With the ride on and capture granted, a state whose reading is
+            // stale or has no level is ridden as a missing one (#7224):
+            // nothing heard, the last reading kept, the bound unchanged.
+            // Otherwise the fence refuses it and the worker ends, as before.
+            let reading = if ride && permitted {
+                fence.observe_riding(&message, now, wall_ms())
+            } else {
+                fence
+                    .observe(&message, now, wall_ms())
+                    .map(Reading::Observed)
+            }
+            .map_err(unreadable)?;
+            let observed = match reading {
+                Reading::Observed(observed) => observed,
+                Reading::Stale => {
+                    let event = gap.stale(
+                        last.as_ref().map(|value| value.stamp().at_us),
+                        permitted,
+                        now,
+                    )?;
+                    gate.physical.close();
+                    if let Some(event) = event {
+                        channels.control.send(event)?;
+                    }
+                    None
+                }
+            };
             // With no slide each new publication is fed as not muted, so the
             // owner's gate, generation and Denied-while-muted rules run as
             // for a slide read open: only the controller closes it.
-            if let Some(value) = fence
-                .observe(&message, now, wall_ms())
-                .map_err(unreadable)?
-            {
+            if let Some(value) = observed {
                 let muted = value.muted().map_err(unreadable)?;
                 let acquired = value.stamp();
-                let permitted = granted
-                    && guard
-                        .state()
-                        .is_some_and(|state| state.microphone_permission() == Permission::Allowed);
                 if let Some(event) = gap.before_observation(
                     last.as_ref().map(|value| value.stamp().at_us),
                     permitted,
@@ -2089,6 +2216,517 @@ pub(crate) mod tests {
         fn drop(&mut self) {
             let _ = std::fs::remove_dir_all(&self.0);
         }
+    }
+
+    /// A Controls state from session `0123456789abcdef` on clock `boot`, its
+    /// publication at `at_us` with Bus and stamp sequence `sequence`, and
+    /// its slide's acquisition as given.
+    fn slide_message(at_us: u64, sequence: u64, physical: PrivacySwitch) -> Message {
+        let state = slide_state("0123456789abcdef", "boot", at_us, sequence, physical);
+        Message {
+            header: lamp_bus::Header {
+                topic: ControlsState::TOPIC.into(),
+                kind: Kind::Latest,
+                enc: lamp_bus::JSON.into(),
+                type_name: Some(ControlsState::TYPE.into()),
+                source: "controls".into(),
+                boot: state.session_id.clone(),
+                seq: sequence,
+                at_us,
+                at_unix_ms: 1000,
+                expires_ms: Some(300),
+                clock: None,
+            },
+            payload: serde_json::to_vec(&state).unwrap(),
+            gap: 0,
+            publisher_restarted: false,
+            expired: false,
+        }
+    }
+
+    fn slide_state(
+        session: &str,
+        clock: &str,
+        at_us: u64,
+        sequence: u64,
+        physical: PrivacySwitch,
+    ) -> ControlsState {
+        ControlsState {
+            stamp: ClockStamp {
+                clock_id: clock.into(),
+                at_us,
+                sequence,
+            },
+            session_id: session.into(),
+            enabled: false,
+            ready: false,
+            fault: Some(lamp_msgs::ControlFault::Missing),
+            buttons: vec![],
+            head_active: false,
+            base_ready: false,
+            base_held_us: None,
+            base_tier: lamp_msgs::HoldTier::None,
+            latest_stop: None,
+            latest_mute: None,
+            event_sequence: 0,
+            rejected_inputs: 0,
+            privacy: Some(physical),
+            no_privacy_slide: false,
+        }
+    }
+
+    fn reading(clock: &str, at_us: u64, sequence: u64, muted: Option<bool>) -> PrivacySwitch {
+        PrivacySwitch {
+            stamp: ClockStamp {
+                clock_id: clock.into(),
+                at_us,
+                sequence,
+            },
+            reader_session_id: "slide".into(),
+            muted,
+            // As Controls says a lapsed reading (`Monitor::fault`): no
+            // level, and why.
+            fault: muted.is_none().then_some(lamp_msgs::ControlFault::Missing),
+        }
+    }
+
+    /// #7224 (Twelve's forced gap on lamp-c0a4): a fresh state whose reading
+    /// is 50 ms old by now is, read riding, `Stale`: its envelope is kept so the
+    /// next state continues the order, and the last reading is not
+    /// replaced. Read as before, it is refused, and the next state is then a
+    /// gap. Another clock or a reading ahead of now is refused either way.
+    #[test]
+    fn a_stale_acquisition_ridden_keeps_its_envelope_and_the_next_is_taken() {
+        let first = reading("boot", 100_000, 1, Some(false));
+        // The state 10 ms old, its reading 40 ms older.
+        let stale = || slide_message(140_000, 2, reading("boot", 100_000, 1, Some(false)));
+        let next = || slide_message(170_000, 3, reading("boot", 170_000, 2, Some(false)));
+        let mut fence = SwitchFence::new("boot".into());
+        assert_eq!(
+            fence
+                .accept_riding(&slide_message(100_000, 1, first.clone()), 100_001, 1000)
+                .unwrap(),
+            Acquired::Fresh(Some(first.clone()))
+        );
+        assert_eq!(
+            fence.accept_riding(&stale(), 150_001, 1000).unwrap(),
+            Acquired::Stale
+        );
+        assert_eq!(fence.header_sequence, 2);
+        assert_eq!(fence.publication.as_ref().map(|p| p.sequence), Some(2));
+        assert_eq!(fence.last, Some(first.clone()), "the last reading is kept");
+        let fresh = reading("boot", 170_000, 2, Some(false));
+        assert_eq!(
+            fence.accept_riding(&next(), 170_001, 1000).unwrap(),
+            Acquired::Fresh(Some(fresh))
+        );
+        // No level, as Controls says a lapsed reading, is ridden the same way.
+        let mut fence = SwitchFence::new("boot".into());
+        fence
+            .accept(&slide_message(100_000, 1, first.clone()), 100_001, 1000)
+            .unwrap();
+        assert_eq!(
+            fence
+                .accept_riding(
+                    &slide_message(110_000, 2, reading("boot", 110_000, 2, None)),
+                    110_001,
+                    1000
+                )
+                .unwrap(),
+            Acquired::Stale
+        );
+        // Off: refused as before, nothing kept, and the next is a gap.
+        let mut fence = SwitchFence::new("boot".into());
+        fence
+            .accept(&slide_message(100_000, 1, first.clone()), 100_001, 1000)
+            .unwrap();
+        assert_eq!(
+            fence
+                .accept(&stale(), 150_001, 1000)
+                .unwrap_err()
+                .to_string(),
+            "physical privacy acquisition unavailable"
+        );
+        assert_eq!(fence.header_sequence, 1);
+        assert!(fence.accept(&next(), 170_001, 1000).is_err());
+        // Another clock, or ahead of now, is never ridden.
+        for physical in [
+            reading("other", 150_000, 2, Some(false)),
+            reading("boot", 160_002, 2, Some(false)),
+        ] {
+            let mut fence = SwitchFence::new("boot".into());
+            fence
+                .accept(&slide_message(100_000, 1, first.clone()), 100_001, 1000)
+                .unwrap();
+            assert!(
+                fence
+                    .accept_riding(&slide_message(160_000, 2, physical), 160_001, 1000)
+                    .is_err()
+            );
+        }
+    }
+
+    /// What [`ride_run`] saw, in order: each worker event with when it came
+    /// (the monotonic clock the worker reads, µs), any error reading them,
+    /// and whether the worker was still running at the end.
+    #[derive(Default)]
+    struct Ridden {
+        events: Vec<(u64, WorkerEvent)>,
+        receive_errors: Vec<String>,
+        running_at_end: bool,
+        ended: Option<Result<(), String>>,
+        /// Each `voice/privacy` lease the worker published: its stamp's
+        /// time, whether it permitted capture, and its physical level.
+        leases: Vec<(u64, bool, Option<bool>)>,
+        /// When Controls first published a lapsed reading, and then the
+        /// first fresh one after it.
+        lapsed_us: Option<u64>,
+        back_us: Option<u64>,
+    }
+
+    impl Ridden {
+        fn fault(&self) -> Option<(u64, &str)> {
+            self.events.iter().find_map(|(at, event)| match event {
+                WorkerEvent::Fault { code } => Some((*at, code.as_str())),
+                _ => None,
+            })
+        }
+
+        /// The index of each `PrivacyUnavailable`, and its `since_us`.
+        fn unavailable(&self) -> Vec<(usize, u64)> {
+            self.events
+                .iter()
+                .enumerate()
+                .filter_map(|(index, (_, event))| match event {
+                    WorkerEvent::PrivacyUnavailable { since_us } => Some((index, *since_us)),
+                    _ => None,
+                })
+                .collect()
+        }
+
+        /// The switch readings said after the event at `index`, in order:
+        /// whether each is muted.
+        fn privacy_after(&self, index: usize) -> Vec<bool> {
+            self.events[index + 1..]
+                .iter()
+                .filter_map(|(_, event)| match event {
+                    WorkerEvent::Privacy { muted, .. } => Some(*muted),
+                    _ => None,
+                })
+                .collect()
+        }
+
+        fn granted_before_lapse(&self) -> bool {
+            self.leases.iter().any(|(_, permitted, _)| *permitted)
+        }
+
+        fn said(&self) -> String {
+            format!(
+                "ended {:?}, receive errors {:?}, events {:?}",
+                self.ended, self.receive_errors, self.events
+            )
+        }
+    }
+
+    /// The longest any one phase of [`ride_run`] waits for what it waits
+    /// for: generous, so a slow runner only takes longer.
+    const PHASE_MOST_US: u64 = 5_000_000;
+
+    /// The real privacy worker, [`run`], on a real Bus, with `ride`, the
+    /// controller granting the microphones throughout, and a Controls
+    /// publishing `controls/state` at its pace (every 5 ms). Event-driven,
+    /// each phase bounded by [`PHASE_MOST_US`]:
+    /// 1. the slide read open until a lease permits capture;
+    /// 2. the reading lapsed, as Controls says one (`Monitor::fault`: the
+    ///    last reading's stamp, no level, a fault), until `lapse_done`;
+    /// 3. read `after`, if given, until `done`.
+    ///
+    /// The run ends early if the worker ends.
+    fn ride_run(
+        ride: bool,
+        lapse_done: impl Fn(&Ridden, u64) -> bool,
+        after: Option<bool>,
+        done: impl Fn(&Ridden, u64) -> bool,
+    ) -> Ridden {
+        use crate::{
+            process::{SessionDirectory, new_boot},
+            transport::WorkerChannels,
+            wire::Control,
+        };
+        static NEXT: AtomicU64 = AtomicU64::new(0);
+        let root = Root(PathBuf::from(format!(
+            "/tmp/vpr-{}-{}",
+            std::process::id(),
+            NEXT.fetch_add(1, Ordering::Relaxed)
+        )));
+        std::fs::create_dir(&root.0).unwrap();
+        let clock = lamp_controls::runtime::clock_id(None).unwrap();
+        let bus = lamp_controls::privacy::selected_bus(Bus::new(&root.0).unwrap());
+        let mut controls = bus
+            .publisher_declared(
+                ControlsState::TOPIC,
+                &ControlsState::declaration(),
+                "controls",
+            )
+            .unwrap();
+        if bus.this_boot() == Some(clock.as_str()) {
+            controls.stamp_monotonic_clock();
+        }
+        // The lease, as Ears and the ring read it.
+        let mut lease = bus
+            .subscribe_typed(
+                MicrophonePrivacy::TOPIC,
+                "test_lease",
+                MicrophonePrivacy::TYPE,
+            )
+            .unwrap();
+        let directory = SessionDirectory::create().unwrap();
+        let (parent, worker) = (new_boot().unwrap(), new_boot().unwrap());
+        let mut voice =
+            WorkerChannels::bind(&directory.path, "privacy", parent, worker, false).unwrap();
+        let mut child =
+            WorkerChannels::bind(&directory.path, "privacy", parent, worker, true).unwrap();
+        voice.connect(&directory.path, "privacy", false).unwrap();
+        child.connect(&directory.path, "privacy", true).unwrap();
+        let started = lamp_ipc::monotonic_us();
+        let (mut controller, boot) = controller(started, Permission::Allowed, Permission::Denied);
+        let bus_root = root.0.clone();
+        let worker = thread::spawn(move || {
+            run(child, boot, &bus_root, Route::Slide, ride).map_err(|error| error.to_string())
+        });
+        let mut ridden = Ridden::default();
+        let take = |voice: &mut WorkerChannels, lease: &mut Subscriber, ridden: &mut Ridden| {
+            // A refused datagram is consumed: read on past it (a bounded
+            // number of times), so an event behind it is still seen.
+            for _ in 0..256 {
+                match voice.control.receive::<WorkerEvent>() {
+                    Ok(Some(event)) => ridden.events.push((lamp_ipc::monotonic_us(), event)),
+                    Ok(None) => break,
+                    Err(error) => ridden.receive_errors.push(error.to_string()),
+                }
+            }
+            while let Ok(Some(message)) = lease.recv(Duration::ZERO) {
+                let value: MicrophonePrivacy = message.parse().unwrap();
+                ridden
+                    .leases
+                    .push((value.stamp.at_us, value.permitted, value.physical_muted));
+            }
+        };
+        let (mut sequence, mut read) = (0, (started, 0));
+        let mut phase = (1, started);
+        loop {
+            take(&mut voice, &mut lease, &mut ridden);
+            let now = lamp_ipc::monotonic_us();
+            if worker.is_finished() || now.saturating_sub(phase.1) >= PHASE_MOST_US {
+                break;
+            }
+            let muted = match phase.0 {
+                1 if ridden.granted_before_lapse() => {
+                    phase = (2, now);
+                    ridden.lapsed_us = Some(now);
+                    None
+                }
+                1 => Some(false),
+                2 if lapse_done(&ridden, now) => match after {
+                    Some(muted) => {
+                        phase = (3, now);
+                        ridden.back_us = Some(now);
+                        Some(muted)
+                    }
+                    None => break,
+                },
+                2 => None,
+                _ if done(&ridden, now) => break,
+                _ => after,
+            };
+            sequence += 1;
+            let snapshot = controller.snapshot(MonoTime::from_micros(now)).unwrap();
+            voice.control.send(Control::Authority { snapshot }).unwrap();
+            if muted.is_some() {
+                read = (now, sequence);
+            }
+            let physical = reading(&clock, read.0, read.1, muted);
+            let state = slide_state(controls.boot(), &clock, now, sequence, physical);
+            controls.publish_json(now, &state).unwrap();
+            // Controls' own pace, not a wait for the worker.
+            thread::sleep(Duration::from_millis(5));
+        }
+        ridden.running_at_end = !worker.is_finished();
+        let _ = voice.control.send(Control::Stop);
+        ridden.ended = Some(worker.join().unwrap());
+        take(&mut voice, &mut lease, &mut ridden);
+        drop(directory);
+        ridden
+    }
+
+    /// Lapsed for 60 ms after the worker said unavailable.
+    fn sixty_ms_past_unavailable(ridden: &Ridden, now: u64) -> bool {
+        ridden
+            .unavailable()
+            .first()
+            .is_some_and(|(index, _)| now >= ridden.events[*index].0 + 60_000)
+    }
+
+    /// A reading `muted` said after the worker's unavailable.
+    fn said_after_unavailable(muted: bool) -> impl Fn(&Ridden, u64) -> bool {
+        move |ridden, _| {
+            ridden
+                .unavailable()
+                .first()
+                .is_some_and(|(index, _)| ridden.privacy_after(*index).contains(&muted))
+        }
+    }
+
+    /// #7224, Twelve's ROW FAIL on lamp-c0a4: Controls kept publishing while
+    /// the slide's reading lapsed, and the worker ended on the lapsed reading
+    /// ("privacy worker failed") 4 ms into the ride. With the ride on, 60 ms
+    /// of states saying the reading lapsed are ridden as a missing reading:
+    /// unavailable, then the fresh reading, and the worker goes on. Off, it
+    /// ends as before.
+    #[test]
+    fn the_real_worker_rides_a_reading_sixty_ms_stale_and_ends_on_it_without_the_ride() {
+        let ridden = ride_run(
+            true,
+            sixty_ms_past_unavailable,
+            Some(false),
+            said_after_unavailable(false),
+        );
+        assert!(ridden.fault().is_none(), "{}", ridden.said());
+        assert!(ridden.running_at_end, "{}", ridden.said());
+        assert_eq!(ridden.ended, Some(Ok(())));
+        let unavailable = ridden.unavailable();
+        assert_eq!(unavailable.len(), 1, "{}", ridden.said());
+        assert!(
+            ridden.privacy_after(unavailable[0].0).contains(&false),
+            "no fresh reading after the gap: {}",
+            ridden.said()
+        );
+        let ended = ride_run(
+            false,
+            |ridden, _| ridden.fault().is_some(),
+            None,
+            |_, _| true,
+        );
+        let (_, code) = ended
+            .fault()
+            .unwrap_or_else(|| panic!("off, the stale reading ends it: {}", ended.said()));
+        assert_eq!(
+            code,
+            format!("{UNREADABLE}physical privacy acquisition unavailable")
+        );
+        assert!(ended.unavailable().is_empty(), "{}", ended.said());
+        assert!(!ended.running_at_end);
+        assert_eq!(ended.ended, Some(Ok(())));
+    }
+
+    /// The ride's bound holds for stale readings: a second from the last
+    /// fresh one's expiry (`since_us`, the worker's clock), the worker ends
+    /// as it does with none.
+    #[test]
+    fn stale_readings_past_the_rides_second_still_end_the_real_worker() {
+        let ridden = ride_run(
+            true,
+            |ridden, _| ridden.fault().is_some(),
+            None,
+            |_, _| true,
+        );
+        let unavailable = ridden.unavailable();
+        assert_eq!(unavailable.len(), 1, "{}", ridden.said());
+        let (at, code) = ridden
+            .fault()
+            .unwrap_or_else(|| panic!("the bound ends it: {}", ridden.said()));
+        assert_eq!(code, format!("{UNREADABLE}physical privacy source expired"));
+        let since = unavailable[0].1;
+        assert!(
+            at >= since + RIDE_US,
+            "ended {} ms into the ride",
+            at.saturating_sub(since) / 1_000
+        );
+        assert!(!ridden.running_at_end);
+        assert_eq!(ridden.ended, Some(Ok(())));
+    }
+
+    /// Heron's P2 on #8013: the lease itself. A lapsed reading carries the
+    /// last fresh stamp, so for ~50 ms `last` is still fresh: only the
+    /// worker's close keeps capture from being granted on it. From the
+    /// first lapsed state read (15 ms for the worker to read it), no lease
+    /// permits capture; after a fresh open reading it reopens only once the
+    /// gate's steady time has passed; after a fresh mute it stays closed.
+    #[test]
+    fn the_lease_closes_on_a_stale_reading_and_reopens_only_steady_and_open() {
+        for muted_after in [false, true] {
+            let reopened = move |ridden: &Ridden, now: u64| {
+                let back = ridden.back_us.unwrap_or(u64::MAX);
+                if muted_after {
+                    // Closed for twice the steady time after the mute.
+                    now >= back.saturating_add(2 * crate::privacy::REOPEN_STABLE_US)
+                } else {
+                    ridden
+                        .leases
+                        .iter()
+                        .any(|(at, permitted, _)| *permitted && *at >= back)
+                }
+            };
+            let ridden = ride_run(true, sixty_ms_past_unavailable, Some(muted_after), reopened);
+            let (lapsed, back) = (ridden.lapsed_us.unwrap(), ridden.back_us.unwrap());
+            assert!(ridden.fault().is_none(), "{}", ridden.said());
+            assert!(
+                ridden
+                    .leases
+                    .iter()
+                    .any(|(at, permitted, _)| *permitted && *at < lapsed),
+                "never granted before the lapse: {:?}",
+                ridden.leases
+            );
+            let read_by = lapsed + 15_000;
+            let granted: Vec<u64> = ridden
+                .leases
+                .iter()
+                .filter(|(at, permitted, _)| *permitted && *at >= read_by)
+                .map(|(at, _, _)| *at)
+                .collect();
+            assert!(
+                granted
+                    .iter()
+                    .all(|at| *at >= back + crate::privacy::REOPEN_STABLE_US),
+                "muted after: {muted_after}; granted {:?} ms after the lapse",
+                granted
+                    .iter()
+                    .filter(|at| **at < back + crate::privacy::REOPEN_STABLE_US)
+                    .map(|at| (at - lapsed) / 1_000)
+                    .collect::<Vec<_>>()
+            );
+            if muted_after {
+                assert!(granted.is_empty(), "granted after a mute: {granted:?}");
+                assert!(
+                    ridden
+                        .leases
+                        .iter()
+                        .any(|(at, _, level)| *at >= back && *level == Some(true)),
+                    "{:?}",
+                    ridden.leases
+                );
+            } else {
+                assert!(!granted.is_empty(), "never reopened: {:?}", ridden.leases);
+            }
+        }
+    }
+
+    /// A fresh muted reading after a stale one is the mute, at once: the
+    /// first reading the worker says after its unavailable, in order.
+    #[test]
+    fn a_fresh_mute_after_a_stale_reading_is_said_at_once() {
+        let ridden = ride_run(
+            true,
+            sixty_ms_past_unavailable,
+            Some(true),
+            said_after_unavailable(true),
+        );
+        assert!(ridden.fault().is_none(), "{}", ridden.said());
+        let unavailable = ridden.unavailable();
+        assert_eq!(unavailable.len(), 1, "{}", ridden.said());
+        let after = ridden.privacy_after(unavailable[0].0);
+        assert_eq!(after.first(), Some(&true), "{}", ridden.said());
     }
 
     /// #1569 row 45: the order begins again only before the worker's first

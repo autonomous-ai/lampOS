@@ -131,7 +131,9 @@ it must advance, but need not be consecutive at the consumer.
 With `LAMP_PRIVACY_GAP_RIDE=on`, the conversation's worker has one bounded
 exception after it published an allowed capture lease: its own missing-acquisition
 expiry becomes `PrivacyUnavailable`, and it keeps reading while publishing
-only denied/unknown privacy leases. The deadline is one second from the last
+only denied/unknown privacy leases. A state that holds but carries a stale or
+level-less acquisition is that expiry too (`SwitchFence::accept_riding`,
+#7224), its envelope kept for the order and its acquisition not taken. The deadline is one second from the last
 accepted acquisition's 50 ms expiry, including the fresh-open gate's 60 ms
 stabilization. A late-publication notice may be ridden inside that deadline;
 publisher loss/replacement, invalid evidence and sequence discontinuity still
@@ -251,7 +253,8 @@ Denied authority that comes during that ride re-arms the worker at once, as
 Denied; with none by 1.75 s after the start the worker ends as before. The
 voice does not retry a worker that ended. The switch's own checks run
 on every look, ride or not: a stale or missing reading, or the publisher
-gone or late, ends the worker as before. A worker that ended abnormally
+gone or late, ends the worker as before, unless `LAMP_PRIVACY_GAP_RIDE`
+rides it (above). A worker that ended abnormally
 still ends the wait with an error that is not an unreadable switch, so the
 voice exits and the restart guard counts it.
 
