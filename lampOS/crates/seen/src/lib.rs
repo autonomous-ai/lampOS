@@ -50,6 +50,9 @@
 //!   and said on `humans/posture`; off unless `LAMP_SEEN_POSTURE=on`, and
 //!   no frame until an on line naming posture was said for the kept yes.
 //! - [`outlet`]: activity and posture behind one ring mark per frame.
+//! - [`heat`]: with `LAMP_HEAT_BACKOFF=on`, `board/heat` read at most once
+//!   a second, and the bursts and posture frames spaced out on a warm or
+//!   hot board (#7879).
 pub mod activity;
 pub mod backoff;
 pub mod burst;
@@ -57,6 +60,7 @@ pub mod crypto;
 pub mod endpoint;
 pub mod frames;
 pub mod gate;
+pub mod heat;
 pub mod hold;
 pub mod keep;
 pub mod link;
