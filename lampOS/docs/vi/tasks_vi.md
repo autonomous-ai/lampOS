@@ -2609,6 +2609,13 @@ khi đăng xuất, và với 0.6.60 khi đăng nhập (ROW của #7507).
     lần từ chối tiếp theo là (b) `--fresh`, không bao giờ resume lần nữa.
     Việc đang chờ chưa hề chạy, nên được gõ vào phiên mới và được báo một
     lần.
+    Bên cạnh giới hạn của #7895: một lần từ chối `ENGINE_NOT_READY` không
+    bao giờ tiêu một trong `STARTING_RESUMES_MOST` (3) lần thử của một việc
+    nói; các lần thử đó chỉ đếm `NOT_RUNNING`, một `TIMEOUT` không nhận gì
+    và một lần mở thất bại. Nên các lần từ chối của một phiên bị đóng băng
+    trả việc lại `busy` cho tới khi dấu hiệu 5 buông phiên đó, và chỉ một
+    phiên được ensure lại mà vẫn không nhận lời mới tiêu các lần thử và
+    kết thúc việc với `one_session_not_started`.
 
   Dấu hiệu nào cũng gọi `OneSession::replace_kept`, đường duy nhất cho mọi
   dấu hiệu (dấu hiệu 3 và 4 qua `OneSession::kept_gone`). Nó `close --now`, `sessions.delete` và xoá bản ghi, rồi buông
