@@ -4101,12 +4101,14 @@ one runner (a fresh home per run, the token as a file) with no new rules:
 - **What a `net` run never holds, and its bounds** (Heron's P1 and P3s on
   #7590, the first builder's 23:22 calls):
   - `net` is never granted beside a private grant: a service's read or
-    write (`*-read`, `*-write`), `camera`, `microphone`, `speech`, `notes`
-    or `look` (whether someone is there, so whether the house is empty: the
-    first builder's ruling on #7590, 18 Nov 02:01) (`skill_task::PRIVATE_GRANTS`,
+    write (`*-read`, `*-write`), `camera`, `microphone`, `speech` or `look`
+    (whether someone is there, so whether the house is empty: the first
+    builder's ruling on #7590, 18 Nov 02:01) (`skill_task::PRIVATE_GRANTS`,
     `skill_task_yes::private_grant`). `air` is not one: it may sit beside
     `net`, and the yes then says so ("…, so its air readings can go to the
-    internet", `skill_task_yes::AIR_BESIDE_NET`).
+    internet", `skill_task_yes::AIR_BESIDE_NET`). The skill's own `notes`
+    is not one either (the first builder's ruling on #7850, 19 Nov 07:20):
+    a net skill may keep today's price to compare with tomorrow's.
     The pair is refused at load (lamp-skills' `grants_of`), at an upload
     (`upload_agent::files` and its kept `skill.toml`'s check, said plainly:
     "it reaches the internet and also reads your Gmail, and one skill can't

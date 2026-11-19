@@ -801,16 +801,17 @@ mod tests {
     }
 
     /// Heron's P1 on #7590: no yes is kept for `net` beside a private
-    /// grant (the camera, the microphone, what the lamp says, its notes,
-    /// `look`, a service's read or write); each alone still is, and `net`
-    /// beside the lamp's voice, or `air`, too.
+    /// grant (the camera, the microphone, what the lamp says, `look`, a
+    /// service's read or write); each alone still is, and `net` beside the
+    /// lamp's voice, `air` or the skill's own notes, too (the first
+    /// builder's ruling on #7850, 19 Nov 07:20).
     #[test]
     fn no_yes_names_net_beside_a_private_grant() {
         lamp_voice::skill_task_yes::set_net_here(Some(true));
         let of = |grants: &[&str]| {
             grants_ok(&grants.iter().map(|g| (*g).to_owned()).collect::<Vec<_>>())
         };
-        for private in ["camera", "microphone", "speech", "notes", "look"] {
+        for private in ["camera", "microphone", "speech", "look"] {
             assert_eq!(of(&[private]), Ok(()), "{private}");
             for pair in [[private, "net"], ["net", private]] {
                 let why = of(&pair).unwrap_err();
@@ -828,6 +829,10 @@ mod tests {
         // `air` may sit beside `net` (the first builder's ruling on #7590,
         // 18 Nov 02:01); `look`, above, may not.
         assert_eq!(of(&["air", "net"]), Ok(()));
+        // The skill's own notes may too (the first builder's ruling on
+        // #7850, 19 Nov 07:20).
+        assert_eq!(of(&["notes", "net"]), Ok(()));
+        assert_eq!(of(&["net", "speak", "notes"]), Ok(()));
         lamp_voice::skill_task_yes::set_net_here(None);
     }
 

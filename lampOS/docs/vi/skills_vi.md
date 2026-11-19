@@ -3085,8 +3085,9 @@ cả hai người viết.
     `lamp-skills-manage@` (lamp-9adf, 18/11 21:37: thiếu nó, helper từ chối
     kỹ năng bitcoin-price đã lưu với "a grant the lamp doesn't have: net").
     Khi tắt, `net` chỉ đi cùng `scripts/agent.py` của chính đèn.
-    `code_held` vẫn từ chối `net` cùng một quyền riêng tư (`notes`, `camera`
-    và tương tự), với lời sửa "one skill can't do both: make it two
+    `code_held` vẫn từ chối `net` cùng một quyền riêng tư (`camera`, `look`
+    và tương tự; `notes` riêng của kỹ năng thì được đi cùng, quyết định
+    của người xây dựng đầu tiên trên #7850, 19/11 07:20), với lời sửa "one skill can't do both: make it two
     skills", như lamp-skills từ chối lúc nạp, nên code như vậy không bao giờ
     được đọc lại và nhận lời đồng ý mà rồi không bật được (P2 của Twelve
     trên #7780). Test:

@@ -16636,7 +16636,8 @@ task = { task = "take a photo and send it to the app", run = "scripts/main.py" }
     /// skill's own code granted `net` beside a private grant is refused at
     /// the check, in words its repair can act on, so it is never said back
     /// and given a yes that lamp-skills then refuses at load. `net` alone,
-    /// or beside `speak`, is still kept.
+    /// or beside `speak` or the skill's own notes (the first builder's
+    /// ruling on #7850, 19 Nov 07:20), is still kept.
     #[test]
     fn with_gateway_net_code_granted_net_beside_a_private_grant_is_refused() {
         set_scripts_here(Some(true));
@@ -16645,7 +16646,9 @@ task = { task = "take a photo and send it to the app", run = "scripts/main.py" }
         let with = |grants: &str| CODE_TOML.replace(r#"grants = ["camera", "light"]"#, grants);
         let kept = put_on_cap(&with(r#"grants = ["net", "speak"]"#));
         assert!(kept.is_ok(), "{:?}", kept.err());
-        for private in ["notes", "camera"] {
+        let notes = put_on_cap(&with(r#"grants = ["net", "speak", "notes"]"#));
+        assert!(notes.is_ok(), "{:?}", notes.err());
+        for private in ["camera", "look", "microphone"] {
             let refused = put_on_cap(&with(&format!(r#"grants = ["net", "speak", "{private}"]"#)))
                 .expect_err(private);
             assert_eq!(refused.0, SCRIPTS_NOT_HELD, "{private}");
