@@ -6711,6 +6711,79 @@ the same code for both writers.
   runs; and how long its answer takes
   there.
 
+##### A make while another is made waits its turn (`LAMP_MAKE_QUEUE=on`, off)
+
+On lamp-9adf (stock 14083, #7679) a person made one skill, then 47 s later
+asked for another ("check the gold price every evening at six"), and heard
+"The lamp's agent is busy; ask me again in a minute." The lamp handed its
+own queue to the person. With `LAMP_MAKE_QUEUE=on` (exactly `on`; read by
+the second route's worker, `crate::make_queue`), the voice makes one voice
+make at a time, in the order asked, and lamp-tasks' one-at-a-time `busy`
+stays only as the backstop:
+
+- **Idle:** a new make (`make_skill` with a `request`, heard aloud, none of
+  the function's other uses) runs at once in its own turn, as without the
+  switch, and holds the one slot.
+- **Busy:** a new make waits, at most two of them, first in first out. The
+  model is told at once `{"ok":true,"queued":true,"place":n,"id":…,"note":…}`
+  and says one line in the conversation's language ("I'll make the gold one
+  next"), never that it is made. The enqueue is one lock and a push, so
+  that line comes as fast as any answer; the journal says "make queued at
+  place P in X ms (target 10 ms)". Only when it would wait, who asked is
+  kept with it: the line's person, the owner when it was the owner's line
+  (`services::owner_of`), and the line heard for it, which the make is held
+  to when it runs (`make_skill_local::with_asker_kept`), so a busy room
+  can't push it out of the thread's twelve exchanges, and with
+  `LAMP_MAKE_NO_ASKS` the owner's queued make with code still goes on, or
+  replaces their clashing skill, as an immediate one does (a guest's never
+  does). The lamp's own "I'll make it now." opening for a bare call
+  (#7554) is not said while a make is under way or waits, so the one line
+  is "I'll make the gold one next". With `LAMP_ACTION_CLAIM_CHECKED`, that
+  line is no claim, and a queued `make_skill` never backs "I made …"
+  (`action_claim::queued_makes_in`). A third waiting gets the fixed line
+  "Two skills are already waiting for me to make them, so I can't take
+  another one yet. Ask me again once they're done."
+  (`make_queue::QUEUE_FULL_LINE`, in Vietnamese, Japanese, Chinese and
+  Korean in `language::FIXED_LINES`).
+- **In turn:** the make under way holds the slot until its line was given to
+  its turn or said, and its say-back's yes is answered, cleared or past
+  `skill_write_yes::YES_WITHIN` (120 s): that store holds one wait, and a
+  second make would overwrite it. Then the front make runs with no turn
+  (`second_provider::worker::run_queued`), says no waiting line, and its
+  line goes through the say service as a cut make's does, its say-back's yes
+  forced as usual (`skill_write_yes::said_by_the_say_service`). A queued
+  make that failed is always said, even though the person spoke since (a
+  cut make's failure is not, after a line of theirs): they were told it
+  comes next. One that failed with no line of its own (a brief refused,
+  an unclear ask with `LAMP_MAKE_NO_ASKS`, the part not running) says one
+  line from its answer's error, by its label: "I couldn't make the gold
+  one: …" (`make_queue::failed_line`). One that turned on a core skill already doing it (#7763) says
+  the line its answer gives (`make_queue::line_to_say`). The same
+  no-asks, clash and core rules apply as to an immediate make: it runs
+  through the same `make_skill` answer.
+- **Never mind:** `make_skill` takes `label` (the model's two to four words)
+  and `cancel_waiting` (a waiting make's id; not `cancel`, which a clash's
+  `choice` already uses). While any wait, each later line's note lists their
+  labels and ids; "never mind the gold one" drops only that one, and only for
+  whoever asked for it or the lamp's owner: a guest can't drop the owner's.
+  A person's marked "forget everything about me" drops the makes they asked
+  for that still wait, untold and never made from their words
+  (`make_queue::forget_with_everything`).
+- **Dropped, never made later:** a make that waited more than 6 min, was
+  still waiting when the quiet hours began, or was waiting when the voice
+  stopped is told as not made: "I didn't get to make what you asked for while
+  I was busy, so it wasn't made. Ask me again if you still want it:" and its
+  labels (`make_queue::QUEUE_DROPPED_LINE`). Across a restart only the labels
+  are kept (`/run/lampos-voice/make-queue.json`), read once at the worker's
+  start, said once the say socket answers (at most 30 s, journaled either
+  way) and removed.
+
+The two waiting are shared by everyone the make gate lets make a skill. Only
+a make behind a make is queued here: a make behind a Harness or one-session
+task is #7595's. Off, a second make is refused as before, byte for byte.
+**Not yet shown on a lamp:** two makes in a row by voice, both made in
+order, the second told as next and said back after the first's yes.
+
 ##### A made skill loosened (`LAMP_MADE_SKILL_LOOSE=on`, on in the product)
 
 A skill made here, by voice or in the app, is the person's own, so with

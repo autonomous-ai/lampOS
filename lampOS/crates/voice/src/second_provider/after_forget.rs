@@ -13,9 +13,15 @@ pub(super) fn is_memory_forget(name: &str) -> bool {
 /// Only outcome fields, never a tool's arbitrary strings, arguments or ids.
 /// Earlier actions remain accounted for without retaining what they read.
 pub(super) fn status(name: &str, result: &Value) -> Value {
+    // A make that waited its turn (`LAMP_MAKE_QUEUE`, #7679): kept by its
+    // name and `queued`, so `LAMP_ACTION_CLAIM_CHECKED` never takes it as a
+    // skill made (`action_claim::stands_on`). Only with the switch on can a
+    // result say `queued`, so off every status is as before.
+    let queued = name == crate::made_skill::MAKE && result["queued"] == true;
     // A hallucinated or user-defined function name can itself hold private
     // words. Only built-in names survive the boundary.
-    let name = if is_memory_forget(name)
+    let name = if queued
+        || is_memory_forget(name)
         || matches!(
             name,
             crate::remember::REMEMBER | crate::remember::RECALL | crate::tools::THE_TIME
@@ -42,6 +48,9 @@ pub(super) fn status(name: &str, result: &Value) -> Value {
         "other_call"
     };
     let mut outcome = serde_json::Map::new();
+    if queued {
+        outcome.insert("queued".into(), json!(true));
+    }
     for field in ["ok", "forgotten", "everything", "all", "remembered"] {
         if let Some(value) = result[field].as_bool() {
             outcome.insert(field.to_owned(), json!(value));

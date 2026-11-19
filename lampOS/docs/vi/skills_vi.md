@@ -3522,6 +3522,82 @@ cả hai người viết.
   cho thấy terminal của Hermes chuyển các công tắc `LAMP_*` của lần chạy cho
   kiểm tra nó chạy; và câu trả lời mất bao lâu ở đó.
 
+### Một lần tạo khi lần khác đang chạy sẽ chờ đến lượt (`LAMP_MAKE_QUEUE=on`, tắt)
+
+Trên lamp-9adf (stock 14083, #7679) một người tạo một kỹ năng, 47 giây sau
+nhờ thêm một cái nữa ("check the gold price every evening at six"), và nghe
+"The lamp's agent is busy; ask me again in a minute." Đèn đẩy hàng đợi của
+chính nó sang cho người dùng. Khi `LAMP_MAKE_QUEUE=on` (đúng `on`; worker
+của tuyến thứ hai đọc, `crate::make_queue`), giọng nói tạo mỗi lần một kỹ
+năng, theo thứ tự được nhờ, và `busy` một-lần-một của lamp-tasks chỉ còn là
+lớp chặn cuối:
+
+- **Rảnh:** một lần tạo mới (`make_skill` có `request`, được nói thành
+  tiếng, không phải các cách dùng khác của hàm) chạy ngay trong lượt của nó,
+  như khi tắt công tắc, và giữ chỗ duy nhất.
+- **Đang bận:** lần tạo mới chờ, tối đa hai lần, vào trước ra trước. Mô hình
+  được báo ngay `{"ok":true,"queued":true,"place":n,"id":…,"note":…}` và nói
+  một câu bằng ngôn ngữ của cuộc trò chuyện ("mình sẽ làm cái giá vàng ngay
+  sau"), không bao giờ nói là đã làm xong. Việc xếp hàng chỉ là một khóa và
+  một lần thêm, nên câu đó đến nhanh như mọi câu trả lời; nhật ký ghi "make
+  queued at place P in X ms (target 10 ms)". Chỉ khi lần tạo phải chờ, người
+  nhờ được giữ kèm: người của câu nói, chủ đèn nếu đó là câu của chủ
+  (`services::owner_of`), và câu đã nghe cho nó, mà lần tạo bám theo khi
+  chạy (`make_skill_local::with_asker_kept`), nên một phòng đông người không
+  đẩy được nó ra khỏi mười hai lượt trao đổi của luồng hội thoại, và với
+  `LAMP_MAKE_NO_ASKS` lần tạo có code của chủ khi chờ vẫn được bật, hoặc thay
+  kỹ năng xung đột của chủ, như lần tạo chạy ngay (của khách thì không bao
+  giờ). Câu mở đầu "I'll make it now." của đèn cho một lời gọi trống (#7554)
+  không được nói khi đang có lần tạo chạy hoặc chờ, nên câu duy nhất là
+  "mình sẽ làm cái giá vàng ngay sau". Với
+  `LAMP_ACTION_CLAIM_CHECKED`, câu đó không phải lời khẳng định, và một
+  `make_skill` đang xếp hàng không bao giờ chống lưng cho "I made …"
+  (`action_claim::queued_makes_in`). Lần thứ ba chờ nhận câu cố định
+  "Two skills are already waiting for me to make them, so I can't take
+  another one yet. Ask me again once they're done."
+  (`make_queue::QUEUE_FULL_LINE`, có bản tiếng Việt, Nhật, Trung và Hàn
+  trong `language::FIXED_LINES`).
+- **Theo lượt:** lần tạo đang chạy giữ chỗ cho đến khi câu của nó đã được
+  đưa cho lượt của nó hoặc đã được nói, và lời đồng ý cho phần nói lại của
+  nó đã được trả lời, bị xóa hoặc quá `skill_write_yes::YES_WITHIN` (120
+  giây): nơi lưu đó chỉ giữ một lần chờ, và lần tạo thứ hai sẽ ghi đè lên.
+  Sau đó lần tạo đầu hàng chạy mà không có lượt
+  (`second_provider::worker::run_queued`), không nói câu chờ, và câu của nó
+  đi qua dịch vụ nói như của một lần tạo bị cắt, lời đồng ý cho phần nói lại
+  được ép như thường lệ (`skill_write_yes::said_by_the_say_service`). Lần
+  tạo xếp hàng mà thất bại luôn được nói, dù người dùng đã nói thêm sau đó
+  (thất bại của lần tạo bị cắt thì không, sau một câu của họ): họ đã được
+  báo là nó đến ngay sau. Lần tạo thất bại mà không có câu riêng (brief bị
+  từ chối, câu nhờ không rõ khi bật `LAMP_MAKE_NO_ASKS`, phần đó không
+  chạy) nói một câu từ lỗi trong câu trả lời, kèm nhãn: "I couldn't make the
+  gold one: …" (`make_queue::failed_line`). Lần tạo bật một kỹ năng lõi đã làm việc đó (#7763)
+  nói câu mà câu trả lời của nó đưa ra (`make_queue::line_to_say`). Các quy
+  tắc không-hỏi, xung đột và kỹ năng lõi áp dụng như với lần tạo chạy ngay:
+  nó đi qua cùng câu trả lời `make_skill`.
+- **Thôi khỏi:** `make_skill` nhận `label` (hai đến bốn từ của mô hình) và
+  `cancel_waiting` (id của lần tạo đang chờ; không phải `cancel`, vì
+  `choice` của một xung đột đã dùng từ đó). Khi còn lần chờ, ghi chú của mỗi
+  câu sau liệt kê nhãn và id của chúng; "thôi khỏi làm cái giá vàng" chỉ bỏ
+  đúng cái đó, và chỉ cho người đã nhờ nó hoặc chủ đèn: khách không bỏ được
+  cái của chủ. Câu "quên hết mọi thứ về tôi" đã được đánh dấu của một người
+  bỏ các lần tạo họ nhờ còn đang chờ, không báo và không bao giờ làm từ lời
+  của họ (`make_queue::forget_with_everything`).
+- **Bị bỏ, không bao giờ làm sau:** lần tạo chờ quá 6 phút, vẫn còn chờ khi
+  giờ yên lặng bắt đầu, hoặc đang chờ khi giọng nói dừng, được báo là chưa
+  làm: "I didn't get to make what you asked for while I was busy, so it
+  wasn't made. Ask me again if you still want it:" kèm các nhãn
+  (`make_queue::QUEUE_DROPPED_LINE`). Qua một lần khởi động lại chỉ giữ các
+  nhãn (`/run/lampos-voice/make-queue.json`), đọc một lần khi worker khởi
+  động, nói khi socket của dịch vụ nói trả lời (tối đa 30 giây, ghi nhật ký
+  cả hai trường hợp) rồi xóa.
+
+Hai chỗ chờ dùng chung cho mọi người mà cổng tạo kỹ năng cho phép tạo. Ở đây
+chỉ xếp hàng lần tạo sau một lần tạo: lần tạo sau một task Harness hoặc
+one-session thuộc #7595. Khi tắt, lần tạo thứ hai bị từ chối như trước,
+từng byte. **Chưa thử trên đèn:** hai lần tạo liên tiếp bằng giọng nói, cả hai
+được làm theo thứ tự, lần thứ hai được báo là ngay sau và được nói lại sau
+lời đồng ý của lần đầu.
+
 ### Kỹ năng tự tạo được nới lỏng (`LAMP_MADE_SKILL_LOOSE=on`, bật trong sản phẩm)
 
 Kỹ năng tạo tại đây, bằng giọng nói hay trong ứng dụng, là của chính người

@@ -1136,6 +1136,18 @@ pub fn stands_on<'a>(
         Claim::UnplugReady => false,
         // Bound to its skill: [`stands_made_on`].
         Claim::SkillRemoved | Claim::SkillOff | Claim::SkillOn => false,
+        // A make that only waits its turn (`LAMP_MAKE_QUEUE`, #7679) made
+        // nothing yet: a skill said made stands only on a `make_skill` call
+        // more than the turn's queued ones ([`queued_makes_in`]). With none
+        // queued (always, with the switch off), as before.
+        Claim::Made if queued_makes_in(statuses) > 0 => {
+            let calls: Vec<_> = calls.into_iter().collect();
+            let makes = calls
+                .iter()
+                .filter(|(name, _)| *name == crate::made_skill::MAKE)
+                .count();
+            makes > queued_makes_in(statuses) && stands(kind, reply, read, calls)
+        }
         _ => stands(kind, reply, read, calls),
     }
 }
@@ -1156,6 +1168,20 @@ pub fn stands_made_on<'a>(
         }
         _ => stands_on(kind, reply, read, calls, statuses),
     }
+}
+
+/// How many of the turn's `make_skill` calls only waited their turn
+/// (`LAMP_MAKE_QUEUE`, #7679), by the outcomes the turn keeps of its calls
+/// (`after_forget::status`: `make_skill` with `queued`). Its own line ("I'll
+/// make the gold one next.") is no claim ([`claim`]); "I made the gold one,
+/// and it's on." after only a queued make is held as any claim with no call.
+pub fn queued_makes_in(statuses: &[serde_json::Value]) -> usize {
+    statuses
+        .iter()
+        .filter(|status| {
+            status["tool"] == crate::made_skill::MAKE && status["outcome"]["queued"] == true
+        })
+        .count()
 }
 
 /// The prepare-unplug skill's "never mind" tool, as lamp-skills names it
@@ -3291,6 +3317,58 @@ pub(crate) mod tests {
             assert!(next.contains("it's on now"), "{next}");
         }
         assert!(SKILL_ON.contains(&"is on now"));
+    }
+
+    /// #7679 (`LAMP_MAKE_QUEUE`): a queued make's own line is no claim, on
+    /// every reading (worded, doing); a skill said made after only a queued
+    /// make is held, and stands beside a make that ran.
+    #[test]
+    fn a_queued_makes_line_is_no_claim_and_a_queued_make_backs_no_made() {
+        for reply in [
+            "I'll make the gold one next.",
+            "Okay, I'll make the gold one next, as soon as this one is done.",
+            "Sure, I'll make that one next.",
+        ] {
+            assert_eq!(claim(reply, true), Some(None), "{reply}");
+            assert_eq!(
+                claim_on(reply, true, true, true, true),
+                Some(None),
+                "{reply}"
+            );
+        }
+        let args = serde_json::json!({"request": "check the gold price at six"});
+        let queued = crate::second_provider::queued_make_status_for_test();
+        let ran = serde_json::json!({"tool": "other_call", "outcome": {}});
+        let made = "I made gold price, and it's on.";
+        assert_eq!(claim(made, true), Some(Some(Claim::Made)));
+        // Only the queued make: nothing made, so the claim is held.
+        assert_eq!(queued_makes_in(std::slice::from_ref(&queued)), 1);
+        assert!(!stands_on(
+            Claim::Made,
+            made,
+            false,
+            [(crate::made_skill::MAKE, &args)],
+            std::slice::from_ref(&queued),
+        ));
+        // One make ran and one was queued in the same turn: it stands.
+        assert!(stands_on(
+            Claim::Made,
+            made,
+            false,
+            [
+                (crate::made_skill::MAKE, &args),
+                (crate::made_skill::MAKE, &args)
+            ],
+            &[ran.clone(), queued.clone()],
+        ));
+        // Off (no queued status): a make backs it, as before.
+        assert!(stands_on(
+            Claim::Made,
+            made,
+            false,
+            [(crate::made_skill::MAKE, &args)],
+            &[ran],
+        ));
     }
 
     /// C-make (Fourteen, lamp-9adf, 11 Nov 21:28): `make_skill`'s own line

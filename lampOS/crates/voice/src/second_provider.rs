@@ -62,6 +62,17 @@ use tokio::{
 };
 
 mod after_forget;
+
+/// Tests: the status a turn keeps of a `make_skill` call answered as queued
+/// (`LAMP_MAKE_QUEUE`, #7679), as `after_forget::status` keeps it.
+#[cfg(test)]
+pub(crate) fn queued_make_status_for_test() -> serde_json::Value {
+    after_forget::status(
+        crate::made_skill::MAKE,
+        &crate::make_queue::queued_told(1, "q1", "gold price"),
+    )
+}
+
 mod held_rename;
 pub mod limit_local;
 pub mod link;
@@ -11875,6 +11886,10 @@ async fn spoken(
             scope.as_ref(),
             Instant::now(),
         ))
+        // Makes waiting their turn (`LAMP_MAKE_QUEUE`, #7679): their labels
+        // and ids, so "never mind the gold one" can drop one. None waiting
+        // (always, with the switch off), nothing.
+        .chain(crate::make_queue::note())
         .chain(records)
         .chain(read_ids)
         .chain(remembered)
@@ -18534,10 +18549,15 @@ async fn answer(
                 };
                 // The round asked again for a reply that said a make line
                 // with no call is the turn's first words too: the same.
+                // Not while another make is under way or waits
+                // (`LAMP_MAKE_QUEUE`, #7679; never with it off): this one
+                // waits its turn, and its one line is "I'll make it next",
+                // never "I'll make it now" before it. One lock, no I/O.
                 if new_make
                     && (round == 1 || begun_again_at.is_some())
                     && !queue.started
                     && !text.chars().any(char::is_alphanumeric)
+                    && !crate::make_queue::busy()
                     && !std::mem::replace(&mut make_opened, true)
                 {
                     let english = crate::make_skill_agent::MAKE_OPENING;
