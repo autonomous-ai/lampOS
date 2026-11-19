@@ -893,11 +893,20 @@ pub const REQUEST: &str = "request";
 pub const GIVEN_NAME: &str = "given_name";
 
 /// Whether a `make_skill` call's whole `args` ask for a new skill: they
-/// name its [`REQUEST`], as a streamed call whose first argument is
-/// [`REQUEST`] does (`ChatEvent::Argued`). Neither weighs its words or
-/// what else it carries, since the stream decides before those come.
+/// name its [`REQUEST`] or its [`GIVEN_NAME`], as a streamed call whose
+/// first argument is one of them does ([`new_make_argument`],
+/// `ChatEvent::Argued`). Neither weighs its words or what else it
+/// carries, since the stream decides before those come.
 pub fn asks_a_new_make(args: &Value) -> bool {
-    args.get(REQUEST).is_some()
+    args.get(REQUEST).is_some() || args.get(GIVEN_NAME).is_some()
+}
+
+/// Whether a streamed `make_skill` call's first argument, `name`, is a
+/// new make's: its [`REQUEST`], or its [`GIVEN_NAME`], which the schema
+/// lists first (its keys in order), so a named make may stream it first
+/// (Twelve's HOLD on #7926: a named make lost the lamp's opening line).
+pub fn new_make_argument(name: &str) -> bool {
+    name == REQUEST || name == GIVEN_NAME
 }
 
 /// The function the model is given with the switch: the lamp makes it
@@ -1063,7 +1072,7 @@ fn parameters_with(writes: bool, tasks: bool, code: bool) -> Value {
             },
             GIVEN_NAME: {
                 "type": "string",
-                "description": "The new skill's name, if they give one (\"called evening rate\"), as said; else left out."
+                "description": "The name they give the new skill, the name alone (\"evening rate\"), as said; else left out."
             }
         },
         "required": []
@@ -3502,7 +3511,7 @@ fn made_and_journaled_by(
             &chat,
             began,
             &kept,
-            (from, keeping),
+            (from, keeping, asked.named),
         );
         let made = no_cannot(
             made,
@@ -3511,7 +3520,7 @@ fn made_and_journaled_by(
             &chat,
             began,
             &kept,
-            (from, keeping),
+            (from, keeping, asked.named),
         );
         let line = kept_line(&made, models_cannot.get(), began.elapsed().as_millis());
         (plain_unless_cannot(made, models_cannot.get()), line)
@@ -3605,7 +3614,7 @@ fn made_and_journaled_by(
                 "lamp-voice: a skill made here: {why}: to the agent ({engine}), its trigger and \
                  one task of the request; no DeepSeek draft kept"
             );
-            let made = agent_task(request, &chat, began, &agent_kept, (from, keeping));
+            let made = agent_task(request, &chat, began, &agent_kept, (from, keeping, asked.named));
             let line = kept_line(&made, false, began.elapsed().as_millis());
             return (plain_unless_cannot(made, false), line);
         }
@@ -3744,7 +3753,7 @@ fn made_and_journaled_by(
         &chat,
         began,
         &kept,
-        (from, keeping),
+        (from, keeping, asked.named),
     );
     let made = no_cannot(
         made,
@@ -3753,7 +3762,7 @@ fn made_and_journaled_by(
         &chat,
         began,
         &kept,
-        (from, keeping),
+        (from, keeping, asked.named),
     );
     let line = kept_line(&made, models_cannot.get(), began.elapsed().as_millis());
     // A repair's answer cut or never come (a product lamp, 11 Nov, from the
@@ -3817,7 +3826,7 @@ fn no_cannot(
     chat: &Arc<impl Fn() -> Result<Chat, String> + Send + Sync + 'static>,
     began: std::time::Instant,
     kept: &impl Fn(Result<String, String>) -> Result<Made, Refused>,
-    (from, keeping): (&str, &Keeping),
+    (from, keeping, named): (&str, &Keeping, Option<&str>),
 ) -> Result<Made, Refused> {
     if !crate::make_no_cannot::on() {
         return made;
@@ -3855,7 +3864,7 @@ fn no_cannot(
          ({})",
         crate::make_no_cannot::ENVIRONMENT
     );
-    let made = agent_task(request, chat, began, kept, (from, keeping));
+    let made = agent_task(request, chat, began, kept, (from, keeping, named));
     models_cannot.set(false);
     made
 }
@@ -3876,7 +3885,7 @@ fn net_made(
     chat: &Arc<impl Fn() -> Result<Chat, String> + Send + Sync + 'static>,
     began: std::time::Instant,
     kept: &impl Fn(Result<String, String>) -> Result<Made, Refused>,
-    (from, keeping): (&str, &Keeping),
+    (from, keeping, named): (&str, &Keeping, Option<&str>),
 ) -> Result<Made, Refused> {
     if !needs_net.replace(false) || made.is_ok() {
         return made;
@@ -3886,7 +3895,7 @@ fn net_made(
          lamp's agent ({})",
         crate::skill_task_yes::NET_ENVIRONMENT
     );
-    agent_task(request, chat, began, kept, (from, keeping))
+    agent_task(request, chat, began, kept, (from, keeping, named))
 }
 
 /// The make of `request` as one task for the lamp's agent
@@ -3900,7 +3909,7 @@ fn agent_task(
     chat: &Arc<impl Fn() -> Result<Chat, String> + Send + Sync + 'static>,
     began: std::time::Instant,
     kept: &impl Fn(Result<String, String>) -> Result<Made, Refused>,
-    (from, keeping): (&str, &Keeping),
+    (from, keeping, named): (&str, &Keeping, Option<&str>),
 ) -> Result<Made, Refused> {
     crate::make_no_cannot::made(
         request,
@@ -3917,6 +3926,7 @@ fn agent_task(
         // Only a hint: the model decides by naming the grant (the lead's
         // rule; the first builder on #7261).
         crate::make_skill_agent::service_hint(request),
+        named,
     )
 }
 
@@ -4463,6 +4473,22 @@ impl Drop for GivenName {
     }
 }
 
+/// [`answer`]'s `make`, run with the name the person gave it
+/// (`args`' [`GIVEN_NAME`], #7911) held for it ([`GivenName`]): the made
+/// skill's, whoever writes it. Never an undo's (`undo`), which makes the
+/// first ask again.
+fn named_make<T>(args: &Value, undo: bool, make: impl FnOnce() -> T) -> T {
+    let _given = GivenName::set(
+        args[GIVEN_NAME]
+            .as_str()
+            .filter(|_| !undo)
+            .map(str::trim)
+            .filter(|name| !name.is_empty())
+            .map(str::to_owned),
+    );
+    make()
+}
+
 thread_local! {
     /// The person's own line for the voice's make on this thread
     /// ([`OwnLine`]): `Some(None)` when it isn't known.
@@ -4891,18 +4917,9 @@ pub fn answer(
             }));
         });
     }
-    // The name the person gave it (#7911): the made skill's, whoever
-    // writes it. Never an undo's, which makes the first ask again.
-    let _given = GivenName::set(
-        undone
-            .is_none()
-            .then(|| call.args[GIVEN_NAME].as_str())
-            .flatten()
-            .map(str::trim)
-            .filter(|name| !name.is_empty())
-            .map(str::to_owned),
-    );
-    let told = make_in(request, request_words, &keeping, own_chat, now_unix_ms);
+    let told = named_make(&call.args, undone.is_some(), || {
+        make_in(request, request_words, &keeping, own_chat, now_unix_ms)
+    });
     MAKE_OWNER.with(|asked| asked.borrow_mut().take());
     // The skill made, kept as made in this conversation (#7660).
     keep_just_made(&told, request, lease);
@@ -7846,9 +7863,32 @@ printf 'tar of %s' \"$name\" > \"$3/$name-1.0.0.tar\"\n",
         let told = parameters["properties"][GIVEN_NAME]["description"]
             .as_str()
             .unwrap();
-        assert!(told.contains("called"), "{told}");
-        assert!(told.contains("else left out"), "{told}");
         assert_eq!(parameters["required"], json!([]));
+        assert!(told.contains("else left out"), "{told}");
+        // The name alone in its example, never "called …" (Twelve's P3).
+        assert!(told.contains("(\"evening rate\")"), "{told}");
+        assert!(!told.contains("\"called"), "{told}");
+    }
+
+    /// #7911 (Twelve's P3 on #7926): `answer` holds the call's
+    /// `given_name` for its make, trimmed, and none for an undo, a blank
+    /// one or none given; cleared once the make is done.
+    #[test]
+    fn answer_holds_the_calls_given_name_for_its_make_but_an_undos() {
+        let held = |args: Value, undo: bool| {
+            named_make(&args, undo, || GIVEN.with(|given| given.borrow().clone()))
+        };
+        assert_eq!(
+            held(json!({REQUEST: "hum", GIVEN_NAME: " evening rate "}), false).as_deref(),
+            Some("evening rate")
+        );
+        assert_eq!(
+            held(json!({REQUEST: "hum", GIVEN_NAME: "evening rate"}), true),
+            None
+        );
+        assert_eq!(held(json!({REQUEST: "hum", GIVEN_NAME: "  "}), false), None);
+        assert_eq!(held(json!({REQUEST: "hum"}), false), None);
+        assert_eq!(GIVEN.with(|given| given.borrow().clone()), None);
     }
 
     /// The rules of each make handed to the agent, and whether each asked

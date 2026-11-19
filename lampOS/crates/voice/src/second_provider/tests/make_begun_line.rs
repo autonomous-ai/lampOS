@@ -667,6 +667,52 @@ async fn the_stream_and_the_whole_calls_agree_on_a_new_make() {
     }
 }
 
+/// #7911 (Twelve's HOLD on #7926): the schema lists `given_name` before
+/// `request`, so a named make may stream it first. It is a new make's
+/// argument too: the opening is said once, as for a `request` first,
+/// on the stream and on the whole calls alike.
+#[tokio::test]
+async fn a_make_whose_first_argument_is_its_given_name_is_opened() {
+    let opening = format!("said:{}", crate::make_skill_agent::MAKE_OPENING);
+    let plain = || {
+        vec![Message::user(
+            "Make a skill called evening rate that hums at noon.",
+        )]
+    };
+    let next = || vec![text("Done."), Ok(ChatEvent::Done)];
+    let fast = (false, false, Duration::ZERO);
+    let named = json!({
+        crate::make_skill_local::GIVEN_NAME: "evening rate",
+        "request": "hum at noon"
+    });
+    for (at, first) in [Some(crate::make_skill_local::GIVEN_NAME), None]
+        .into_iter()
+        .enumerate()
+    {
+        let said = a_make_turn(
+            7_911_730 + at as u64,
+            plain(),
+            fast,
+            vec![a_streamed_call(first, named.clone()), next()],
+        )
+        .await;
+        assert_eq!(
+            said,
+            vec![opening.clone(), "said:Done.".into()],
+            "{first:?}"
+        );
+    }
+    assert!(crate::make_skill_local::new_make_argument(
+        crate::make_skill_local::GIVEN_NAME
+    ));
+    assert!(crate::make_skill_local::new_make_argument(
+        crate::make_skill_local::REQUEST
+    ));
+    assert!(!crate::make_skill_local::new_make_argument(
+        crate::made_remove::REMOVE
+    ));
+}
+
 /// #7554's P3: the opening is one of the lamp's fixed lines, said in the
 /// owner's language and from its clip rendered ahead as the worker
 /// starts, so its first audio never waits on the voice: here the voice
