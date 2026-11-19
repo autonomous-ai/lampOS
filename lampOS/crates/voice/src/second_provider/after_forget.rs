@@ -31,6 +31,7 @@ pub(super) fn status(name: &str, result: &Value) -> Value {
         || crate::known_faces::is_tool(name)
         || crate::rules::is_tool(name)
         || crate::action_claim::unplug_tool(name, &Value::Null).is_some()
+        || crate::action_claim::nudge_tool(name, &Value::Null).is_some()
         || name == crate::made_skill::MAKE
         || matches!(
             name,
