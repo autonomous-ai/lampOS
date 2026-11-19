@@ -2137,10 +2137,8 @@ impl Attention {
         // A short line with nothing written for the name, out of a
         // conversation, is never answered on the hearing alone, whatever
         // its second sign (#7891).
-        self.name_short_dropped = weighed
-            && !in_conversation
-            && !text_calls
-            && short_line_without_the_name(&self.heard);
+        self.name_short_dropped =
+            weighed && !in_conversation && !text_calls && short_line_without_the_name(&self.heard);
         let alone = weighed && (signs.is_empty() || self.name_short_dropped);
         self.name_signs = if weighed && !alone { signs } else { Vec::new() };
         if alone {
