@@ -1705,6 +1705,54 @@ fn a_gateway_block_openclaws_own_check_refuses_never_lands() {
     );
 }
 
+/// Whether `folder`'s lock (an exclusive `flock` on the folder) is held
+/// by another writer just now.
+fn folder_lock_held(folder: &Path) -> bool {
+    use rustix::fs::{FlockOperation, Mode, OFlags};
+    let dir = rustix::fs::open(
+        folder,
+        OFlags::RDONLY | OFlags::DIRECTORY | OFlags::CLOEXEC,
+        Mode::empty(),
+    )
+    .unwrap();
+    match rustix::fs::flock(&dir, FlockOperation::NonBlockingLockExclusive) {
+        Ok(()) => false,
+        Err(rustix::io::Errno::WOULDBLOCK) => true,
+        Err(error) => panic!("flock: {error}"),
+    }
+}
+
+/// Seventh's P2 on #7872: `openclaw.json` has two read-merge-check-rename
+/// writers (this one and lamp-tasks' provider merge), and a rename landing
+/// inside the other's check drops the other's block. So the `gateway`
+/// block's write holds the state folder's lock from before its read
+/// through OpenClaw's own check to the rename, and lets it go after.
+#[test]
+fn a_gateway_block_write_holds_the_state_folders_lock_through_its_check() {
+    let lamp = Lamp::new();
+    fs::create_dir_all(lamp.at(STATE)).unwrap();
+    fs::write(lamp.at(NS), "").unwrap();
+    let runs = Runs::new(&lamp);
+    let mut inner = runs.runner();
+    let mut held = None;
+    let mut runner = |argv: &[String]| {
+        if argv.join(" ").contains("config validate --json") {
+            held = Some(folder_lock_held(&lamp.at(STATE)));
+        }
+        inner(argv)
+    };
+    assert!(gateway_config(lamp.root(), &mut runner, &mut quiet()).unwrap());
+    assert_eq!(
+        held,
+        Some(true),
+        "the state folder was not locked through the check"
+    );
+    assert!(
+        !folder_lock_held(&lamp.at(STATE)),
+        "the lock outlived the write"
+    );
+}
+
 /// #7868 (the first builder, 02:02): OpenClaw 2026.11.2 refuses a `config
 /// validate` run in namespaces other than its running gateway's
 /// (`GatewayLockNamespaceError`, #7268). With the gateway's unit holding a
