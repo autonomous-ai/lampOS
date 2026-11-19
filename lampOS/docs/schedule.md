@@ -1154,7 +1154,8 @@ Actions only; installation and on-lamp qualification remain First's work.
 
 ### Reminder rows in the person's memory (`LAMP_SERVICE_RECORDS_REMINDERS`)
 
-The linked-service memory plan, slice 6. Off unless
+The linked-service memory plan, slice 6, on in the product (the product
+owner's rule of 18 Nov, everything on by default). Off unless
 `LAMP_SERVICE_RECORDS_REMINDERS=on` beside `LAMP_SERVICE_RECORDS=on`, on the
 second route only (`voice/src/service_records/reminder_rows.rs`). The
 Schedule itself is unchanged: the voice writes the rows, through its linked
@@ -1162,13 +1163,17 @@ outbox ([memory-days.md](memory-days.md)), and no Schedule request is added.
 
 | When | Key and action | Written for |
 |---|---|---|
-| `set_reminder` or `repeat_reminder` answered `committed` | `r-<id>-set`, `reminder_set` | The setter the voice names beside the call (`schedule_whose::caller`), a known person (`p-` id) only |
+| `set_reminder` or `repeat_reminder` answered `committed` | `r-<id>-set`, `reminder_set` | The setter the voice names beside the call (`schedule_whose::caller`), a known person (`p-` id) only; in the private room, where the Schedule is told `everyone`, the line's own person or the one-face keep, else the owner (`schedule_whose::record_caller`) |
 | The second route begins to say it (`ProviderInput::Reminder`'s `ids`) | `r-<id>-fired`, `reminder_fired` | Its creator, as kept at the set |
 | `cancel_reminder` answered `committed` with `cancelled: true` | `r-<id>-dismissed`, `reminder_dismissed` | Its creator, whoever cancelled it |
 
-- **No creator, nothing.** A reminder set as the room's (nobody sure, an
-  unknown face, the room's line, the private room's `everyone`) is never
-  written, nor its ring or cancel. A ring or cancel of an id the voice did
+- **No creator, nothing.** Outside the private room, a reminder set as the
+  room's (nobody sure, an unknown face, the room's line) is never written,
+  nor its ring or cancel. In the private room (`LAMP_PRIVATE_ROOM`, on in
+  the product) the Schedule's item stays everyone's, but its record is kept
+  for the person a keep in the line would go to, else the owner, so it is
+  never dropped while the lamp knows its owner (#7960's ROW on lamp-06c1:
+  every voice reminder there kept no row). A ring or cancel of an id the voice did
   not see set (another route, before a restart) gives nothing.
 - **Each row:** service `schedule`, status `done`, `source_kind`
   `reminder`, `source_ref` `{service:"lamp-schedule", id:"<id>"}`, the

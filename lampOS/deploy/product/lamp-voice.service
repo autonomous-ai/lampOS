@@ -625,6 +625,9 @@ Environment=LAMP_MEMORY_ROLE=on
 Environment=LAMP_SERVICE_RECORDS=on
 # LAMP_SERVICE_RECORDS_TOLD: its why and rules are its row in docs/switches.md (#6453, #6404).
 Environment=LAMP_SERVICE_RECORDS_TOLD=on
+# LAMP_SERVICE_RECORDS_REMINDERS: its why and rules are its row in docs/switches.md. A reminder set by voice is
+# its creator's linked record; in the private room, the line's known person, else the owner (#7960's ROW).
+Environment=LAMP_SERVICE_RECORDS_REMINDERS=on
 Environment=LAMP_SERVICE_CONTACTS=on
 Environment=LAMP_SERVICE_REDO=on
 # LAMP_SERVICE_READ_IDS_KEPT: its why and rules are its row in docs/switches.md (#6546).
