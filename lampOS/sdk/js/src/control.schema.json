@@ -3592,7 +3592,7 @@
       "additionalProperties": false
     },
     "app.took": {
-      "description": "The app takes the turn an app.trigger named: the voice keeps quiet. A say, gesture or light from the app within 3 s of the trigger counts as well; with neither, the voice answers itself.",
+      "description": "The app takes the turn an app.trigger named: the voice keeps quiet. A say from the app (with the speak grant) within 3 s of the trigger counts as well, not a gesture, light or sound; with neither, the voice answers itself. The reply carries taken: false when the turn was not counted (late, never offered, taken already), and the app then must not speak for that line.",
       "type": "object",
       "properties": {
         "id": {

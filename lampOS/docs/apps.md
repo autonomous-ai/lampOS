@@ -9,8 +9,8 @@ lamp. It is in English only ([the docs rule](../AGENTS.md)).
 
 **Status, honestly.** Built: the package format and its reader (piece 1,
 `lamp_skills::app_package`, with tests) and the yes ops in lamp-control (piece
-3a, `app_yes.rs`) and the app socket with `phrases.set` (pieces 3b-1 and 3b-2a, `app_socket.rs`, [control.md](control.md)). Designed and not yet built: the
-app socket's `app.trigger` and its 3 s hold (piece 3b-2b, with the voice), lamp-cloud's `apps.*` kinds
+3a, `app_yes.rs`) and the app socket with `phrases.set` (pieces 3b-1 and 3b-2a, `app_socket.rs`, [control.md](control.md)). The app socket's `app.trigger` and its 3 s hold are built too
+(piece 3b-2b, `app_triggers.rs`). Designed and not yet built: lamp-cloud's `apps.*` kinds
 (piece 4), the installer (`lamp-apps-manage`, eighth's). Everything behind
 the one switch **`LAMP_STORE_APPS`**, off unless set. A lamp that has the
 format probe refuses an app package in words ("format 2 is not one this lamp
@@ -173,7 +173,7 @@ helper takes it once, by its own cgroup. Ops on lamp-control's admin socket:
 
 ### The app socket
 
-(Built in pieces 3b-1 and 3b-2a except `app.trigger` and the 3 s hold, which are 3b-2b; the SDK's fake lamp speaks it all. The socket's side is [control.md](control.md), "An installed app's socket".) One socket,
+(Built in pieces 3b-1, 3b-2a and 3b-2b; the SDK's fake lamp speaks the first two. The socket's side is [control.md](control.md), "An installed app's socket".) One socket,
 `LAMP_APP_SOCKET`, default `/run/lampos-apps/apps.sock`, mode 0666 in the folder
 `/run/lampos-apps` that the product's `tmpfiles.d` line makes (`d /run/lampos-apps 0755 lampos lampos -`: the shared `lampos` user's, which is also lamp-cloud's and lamp-skills' user, so the folder keeps an app out, not another lampOS part, except that the three `lampos` units with no `ProtectSystem=strict` (lamp-body, lamp-eyes, lamp-tasks, where the agents' shells run) have it hidden, `InaccessiblePaths=-/run/lampos-apps`, and an install test holds every other `lampos` unit to that or to `strict`; lamp-control's unit names it `ReadWritePaths=-/run/lampos-apps` under `ProtectSystem=strict`, and it never makes the folder: its bind fails quietly without it): the guard is the peer's cgroup (`/lampos.slice/lampos-apps.slice/lampapp@<name>.service`, or `lampapp-net@<name>.service` for an app whose manifest says `net: true`, and the unit must be the manifest's: a plain unit for a `net` app, or the `net` unit for any other, is refused), and the process must still have the uid the kernel named on connect (a pid that came back as another process is no peer),
 read from `SO_PEERCRED`'s pid, never a name the app says. It speaks the door's
@@ -185,15 +185,27 @@ its grants allow, each refused `no_grant` without its grant, plus:
 | op | fields | answer |
 |---|---|---|
 | `phrases.set` | `phrases`: replace-whole, at most 16, each 1 to 64 characters with at least 8 letters (the door's `subscribe` rules, its rate on changing them), no phrase twice (`bad_request`, as the schema's `uniqueItems`), no field but `phrases`; an empty list stops listening; needs `hear` | `{"ok":true,"phrases":N}` |
-| `app.took` | `turn`: the id of an `app.trigger`, 1 to 64 characters; ten a second at most | `{"ok":true}`; over the rate `{"ok":false,"error":{"code":"rate","why":"ten a second","retry_ms":N}}` |
+| `app.took` | `turn`: the id of an `app.trigger`, 1 to 64 characters; ten a second at most | `{"ok":true,"taken":true}` when the turn was offered this app and is within 3 s; `{"ok":true,"taken":false}` when it was not counted (late, never offered, or already taken): the voice has let the model answer, so the app must not speak for that line; over the rate `{"ok":false,"error":{"code":"rate","why":"ten a second","retry_ms":N}}` |
 | `app.settings.get` | none; ten a second at most | `{"ok":true,"settings":{key: value,…}}`, every key with its current value; over the rate `{"ok":false,"error":{"code":"rate","why":"ten reads a second","retry_ms":N}}` |
 | `app.panel.set` | `title` 1 to 40, `lines` at most 6 of at most 80, no control characters; one a minute | `{"ok":true,"rev":N}`; over the rate `{"ok":false,"error":{"code":"rate","why":"one panel a minute","retry_ms":N}}`, and the minute holds across the app's reconnects |
 
 Events (`{"ev":…}`): `phrase.heard` `{phrase}` (never what was said),
 `app.trigger` `{trigger, phrase, turn}` (a manifest trigger; the words around
 it are not carried), `app.settings` `{changed:[keys], settings:{…}}`. With no
-`app.took` or say from the app within 3 s of a trigger, the voice answers the
-line itself. When the owner stops, updates or removes the app, systemd sends
+`app.took` from the app within 3 s of a trigger (`turn` is the trigger's
+turn), or a `say` from that app within the same 3 s (only a `say`, only an app
+with the `speak` grant, only the app that was offered the trigger; light, body
+and sound do not count), the voice answers the line itself. lamp-control (`app_triggers.rs`, behind `LAMP_STORE_APPS`)
+offers a trigger only to an app running now (a socket up) whose manifest has
+exactly those words, tells the voice the running apps' triggers on
+`apps/triggers` at each change and every 5 s, and an `app.took` it offered
+within the 3 s, or its `say` in them, on `apps/took` (once a turn; one not
+offered, offered twice or late is answered `taken: false` and told to nobody).
+An app that is hung with its socket open stays listed, so each line that spells
+its trigger waits the 3 s before the model answers. A trigger is the app's own
+choice and may be a broad phrase ("turn off the lights"): while the app runs it
+takes that line from the model, which is the owner's install to weigh. A trigger
+offered while 16 are already waiting is not sent. When the owner stops, updates or removes the app, systemd sends
 `SIGTERM` and the connection closes with a close frame that says why; no event
 comes first. Errors are the door's codes; with `LAMP_STORE_APPS` off every op
 is refused `off`.
