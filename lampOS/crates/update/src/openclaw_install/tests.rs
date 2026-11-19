@@ -1652,12 +1652,21 @@ fn a_gateway_block_a_round_finds_refused_by_openclaws_check_restarts_nothing() {
     let refusing = Runs {
         fail_on: Some("config validate --json"),
         error: leak(format!("gateway.auth.token: Invalid input \"{token}\"")),
+        main_pid: "4242",
         ..Runs::new(&lamp)
     };
     let said = one_shot_saying(&lamp, &refusing);
     assert_eq!(fs::read_to_string(lamp.at(CONFIG)).unwrap(), before);
     assert_eq!(fs::read_dir(lamp.at(STATE)).unwrap().count(), beside);
-    refusing.position("config validate --json");
+    assert_eq!(
+        refusing
+            .lines()
+            .iter()
+            .filter(|line| line.contains("config validate --json"))
+            .count(),
+        1,
+        "a refusal of the text is never tried again"
+    );
     assert!(
         !refusing
             .lines()
@@ -3248,4 +3257,66 @@ fn a_gateway_unit_loaded_as_written_is_left_alone() {
     assert_eq!(systemd.shown, 1, "checked once");
     assert!(systemd.asked.is_empty(), "{:?}", systemd.asked);
     assert!(not_loaded(&said).is_empty(), "{said:?}");
+}
+
+/// #7868 (the first builder, 02:02, point 3), as #7268's `write_waiting`:
+/// the one-shot's check of the `gateway` block joins the running gateway,
+/// and one just (re)started may not be there to join yet (the wrapper's
+/// "is not running in its own namespaces", or "'node': No such file or
+/// directory"). Only that refusal is tried again, a bounded number of
+/// times; then the block lands and the gateway is restarted on it. Past
+/// the last try it is not written and the next round asks again.
+#[test]
+fn a_gateway_block_the_gateway_was_not_there_to_check_is_tried_again() {
+    let no_gateway = "openclaw: its gateway (lamp-openclaw-gateway.service) is not running in its own namespaces; nothing runs without it";
+    for (refusals, lands) in [(2, true), (100, false)] {
+        let lamp = installed_openclaw();
+        let mut config = config_of(&lamp);
+        config.as_object_mut().unwrap().remove("gateway");
+        let before = config.to_string();
+        fs::write(lamp.at(CONFIG), &before).unwrap();
+        let runs = Runs {
+            main_pid: "4242",
+            ..Runs::new(&lamp)
+        };
+        let mut inner = runs.runner();
+        let mut checks = 0;
+        let mut said = Vec::new();
+        install_with(
+            lamp.root(),
+            &lamp.records(),
+            &mut |argv: &[String]| {
+                let answer = inner(argv);
+                if argv.join(" ").contains("config validate --json") {
+                    checks += 1;
+                    if checks <= refusals {
+                        return Err(no_gateway.to_owned());
+                    }
+                }
+                answer
+            },
+            &mut || 40,
+            &mut |line: &str| said.push(line.to_owned()),
+            &Kit::BUILT,
+        )
+        .unwrap();
+        drop(inner);
+        let restarted = runs
+            .lines()
+            .iter()
+            .any(|line| line.contains(&format!("try-restart -- {UNIT}")));
+        if lands {
+            assert_eq!(checks, 3, "{said:#?}");
+            assert_eq!(config_of(&lamp)["gateway"], installs_block(&lamp));
+            assert!(restarted);
+        } else {
+            assert!((2..=20).contains(&checks), "bounded: {checks}");
+            assert_eq!(fs::read_to_string(lamp.at(CONFIG)).unwrap(), before);
+            assert!(!restarted);
+            assert!(
+                said.iter().any(|line| line.contains("not written again")),
+                "{said:#?}"
+            );
+        }
+    }
 }
