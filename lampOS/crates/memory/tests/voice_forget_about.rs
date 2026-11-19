@@ -426,3 +426,68 @@ fn forget_about_takes_that_persons_talk_about_it_from_recall() {
     assert!(recall(ANA, "coffee").contains("coffee is black"));
     assert!(recall(BINH, "recheck party").contains("sounds fun"));
 }
+
+/// `LAMP_LOOK_KEPT_WITH_ASK`: a look kept as one exchange in the asker's
+/// scope (their question, "Let me look." and what the lamp saw, from the
+/// lamp's thread as it hands it on) goes with a forget about it, as any of
+/// their talk does; the room's talk about the same toy stays. Words only:
+/// nothing of the picture is in it. A made-up toy.
+#[test]
+fn a_look_kept_with_its_question_goes_with_a_forget_about_it() {
+    use lamp_voice::thread::Thread;
+    use std::time::Instant;
+    assert!(switch_forget_about(true));
+    let start = Instant::now();
+    let mut thread = Thread::new();
+    thread.person("synthetic: what movie is this toy from?", true, start);
+    thread.look_asked(1);
+    thread.lamp_for(1, "Let me look. ", start, Some(ANA));
+    assert!(thread.finished(1, start).is_empty());
+    thread.look_turn(2, 1);
+    thread.lamp_for(
+        2,
+        "A red toy motorcycle, maybe from a film. ",
+        start,
+        Some(ANA),
+    );
+    let looked = thread.finished(2, start);
+    assert_eq!(looked.len(), 1);
+    assert!(!looked[0].said.contains("data:"), "{}", looked[0].said);
+    let fixture = Fixture::new_with("look", |store, now| {
+        let ana = Person::new(ANA).unwrap();
+        store
+            .append(&ana, now - 1, &looked[0].heard, &looked[0].said, &[])
+            .unwrap();
+        store
+            .append(
+                &Person::everyone(),
+                now - 1,
+                "synthetic: whose motorcycle toy is that?",
+                "I'm not sure.",
+                &[],
+            )
+            .unwrap();
+    });
+    let client = DaysClient::new(fixture.socket.clone()).unwrap();
+    let recall = |person: Option<&str>| -> String {
+        let (told, ok) = client.run_for(
+            &call(RECALL, json!({"about":"toy motorcycle"})),
+            BUDGET,
+            person,
+        );
+        assert!(ok, "{told}");
+        told.to_string()
+    };
+    assert!(recall(Some(ANA)).contains("red toy motorcycle"));
+    let (told, ok) = client.run_for(
+        &call(FORGET, json!({"about":"the toy motorcycle"})),
+        BUDGET,
+        Some(ANA),
+    );
+    assert!(
+        ok && told["forgotten"] == true && told["exchanges"] == 1,
+        "{told}"
+    );
+    assert!(!recall(Some(ANA)).contains("red toy motorcycle"));
+    assert!(recall(None).contains("whose motorcycle toy"));
+}
