@@ -10,7 +10,8 @@ use lamp_health::{
     serve::{self, Note, Options, Times, Totals},
 };
 use lamp_msgs::{
-    BoardState, Diagnostic, Health, HealthItem, Level, Occasion, PartResult, SelfTest, Verdict,
+    BoardHeat, BoardState, Diagnostic, Health, HealthItem, HeatLevel, Level, Occasion, PartResult,
+    SelfTest, Verdict,
 };
 use serde_json::json;
 use std::{
@@ -695,6 +696,68 @@ fn shown(rig: &Rig, topic: &str) -> SystemTime {
         .find(|entry| entry.file_name().to_str().unwrap().starts_with("health."))
         .unwrap_or_else(|| panic!("no entry for health in {}", pubs.display()));
     entry.metadata().unwrap().modified().unwrap()
+}
+
+#[test]
+fn the_boards_heat_is_published_with_each_reading_and_a_change_is_said_once() {
+    let mut rig = Rig::new("heat");
+    let mut heats = rig
+        .bus
+        .subscribe_typed(BoardHeat::TOPIC, "test", BoardHeat::TYPE)
+        .unwrap();
+    let next = |heats: &mut Subscriber| {
+        let message = heats.recv(WAIT).unwrap().expect("the board's heat");
+        assert_eq!(message.header.source, "health");
+        assert_eq!(message.header.expires_ms, Some(15_000));
+        let heat: BoardHeat = message.parse().unwrap();
+        heat.check().unwrap();
+        heat
+    };
+    // A well board: ok, from its processor zone, published though no part
+    // reads it.
+    assert_eq!(
+        next(&mut heats),
+        BoardHeat {
+            level: HeatLevel::Ok,
+            zone: "cpul_thermal_zone".into(),
+            c: 63.5,
+            trip_c: 90.0,
+        }
+    );
+    assert_eq!(
+        rig.bus.declaration(BoardHeat::TOPIC).unwrap(),
+        Some(BoardHeat::declaration())
+    );
+    // Held back to cool: hot at the next reading, and said once.
+    rig.board_is(|board| {
+        board.cpufreq_cooling = true;
+        board.cpu_caps = vec![lamp_health::board::CpuCap {
+            policy: "policy0".into(),
+            max_khz: 1_608_000,
+            hardware_khz: 1_800_000,
+        }];
+    });
+    let started = Instant::now();
+    while next(&mut heats).level != HeatLevel::Hot {
+        assert!(started.elapsed() < WAIT, "the board never read hot");
+    }
+    for _ in 0..3 {
+        assert_eq!(next(&mut heats).level, HeatLevel::Hot);
+    }
+    let (totals, notes) = rig.stop();
+    let said: Vec<String> = notes
+        .iter()
+        .filter(|note| matches!(note, Note::Heat(_)))
+        .map(Note::to_string)
+        .collect();
+    assert_eq!(
+        said,
+        [
+            "the board is hot: cpul_thermal_zone 64 °C and held back to cool (it slows itself at 90); \
+          background work eases off"
+        ]
+    );
+    assert!(totals.heats >= 5, "{totals:?}");
 }
 
 #[test]

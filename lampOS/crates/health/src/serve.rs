@@ -5,7 +5,7 @@
 //! waiting, and when one came or a second has passed it works the lamp's
 //! health out again. The health is published when it says something new
 //! and every five seconds besides; the board is read and published every
-//! five seconds; the board's own report goes out once a second, like any
+//! five seconds, its numbers and its heat ([`crate::heat`]); the board's own report goes out once a second, like any
 //! part's, and is kept here as well, so that the board is in the lamp's
 //! health even if that message is lost.
 //!
@@ -15,10 +15,11 @@
 //! and the loop goes on.
 use crate::{
     board::{self, Reading},
+    heat::{self, Heat},
     parts::{self, Parts, Taken},
 };
 use lamp_bus::{Bus, Declaration, Publisher, Subscriber};
-use lamp_msgs::{BoardState, Diagnostic, Health, Level, Online, SelfTest};
+use lamp_msgs::{BoardHeat, BoardState, Diagnostic, Health, Level, Online, SelfTest};
 use serde::Serialize;
 use std::{
     fmt, io,
@@ -98,10 +99,12 @@ pub struct Totals {
     pub unreadable: u64,
     /// Reports from a part not heard before, when 64 were kept already.
     pub turned_away: u64,
-    /// Times the lamp's health and the board's numbers were published.
+    /// Times the lamp's health, the board's numbers and the board's heat
+    /// were published.
     pub healths: u64,
     pub boards: u64,
-    /// Messages of any of the three topics that could not be published.
+    pub heats: u64,
+    /// Messages of any of the topics that could not be published.
     pub unpublished: u64,
 }
 
@@ -151,6 +154,8 @@ pub enum Note {
     },
     /// A message on `lamp/selftest` was no run, or not a whole one.
     SelfTestUnreadable,
+    /// The board's heat became another level (`board/heat`, #7879).
+    Heat(heat::Change),
 }
 
 impl fmt::Display for Note {
@@ -205,6 +210,7 @@ impl fmt::Display for Note {
                 "a message on {} is not a whole run: it is passed over",
                 SelfTest::TOPIC
             ),
+            Self::Heat(change) => change.fmt(f),
         }
     }
 }
@@ -327,6 +333,7 @@ struct Serve<'a> {
     health_due: Instant,
     health_out: Out,
     board_out: Out,
+    heat_out: Out,
     reports_out: Out,
     online_out: Out,
     reach: Option<crate::reach::Reach>,
@@ -340,6 +347,8 @@ struct Serve<'a> {
     totals: Totals,
     /// The self-test's runs as they came (#812).
     selftest: parts::SelfTests,
+    /// The board's heat, from each reading (#7879).
+    heat: Heat,
 }
 
 impl Serve<'_> {
@@ -347,10 +356,11 @@ impl Serve<'_> {
         self.started.elapsed().as_micros() as u64
     }
 
-    /// Read the board: publish its numbers if they are all there, and
-    /// keep its report.
+    /// Read the board: publish its numbers if they are all there, and its
+    /// heat if it has a processor zone, and keep its report.
     fn read_board(&mut self, read: &mut dyn FnMut() -> Reading) {
         let reading = read();
+        self.publish_heat(&reading);
         let unread = reading
             .unread
             .iter()
@@ -376,6 +386,27 @@ impl Serve<'_> {
             }
         }
         self.board_report = Some(reading.report());
+    }
+
+    /// Publish the board's heat from `reading`, always: it is data, and a
+    /// part that eases off when the board is hot reads it if it will. A
+    /// change of level is said once.
+    fn publish_heat(&mut self, reading: &Reading) {
+        let Some((value, change)) = self.heat.read(reading, Instant::now()) else {
+            return;
+        };
+        if let Some(change) = change {
+            (self.say)(Note::Heat(change));
+        }
+        if value.check().is_err() {
+            return;
+        }
+        let at_us = self.at_us();
+        if self.heat_out.publish(at_us, &value, self.say) {
+            self.totals.heats += 1;
+        } else {
+            self.totals.unpublished += 1;
+        }
     }
 
     /// Publish the board's report as any part publishes its own, and keep
@@ -586,7 +617,7 @@ fn until(last: Option<Instant>, every: Duration, now: Instant) -> Duration {
 
 /// Serve the lamp's health on `bus` until `stop` is set: listen to every
 /// part's report, read the board with `read`, and publish `lamp/health`,
-/// `board/state` and the board's own report.
+/// `board/state`, `board/heat` and the board's own report.
 ///
 /// It fails only at the start, if it cannot subscribe. After that nothing
 /// ends it but `stop`. `say` is given each [`Note`] as it happens.
@@ -618,6 +649,7 @@ pub fn run(
         health_due: Instant::now(),
         health_out: Out::new(Health::TOPIC, Health::declaration()),
         board_out: Out::new(BoardState::TOPIC, BoardState::declaration()),
+        heat_out: Out::new(BoardHeat::TOPIC, BoardHeat::declaration()),
         reports_out: Out::new(Diagnostic::TOPIC, Diagnostic::declaration()),
         online_out: Out::new(Online::TOPIC, Online::declaration()),
         reach: options
@@ -639,6 +671,7 @@ pub fn run(
         full: false,
         totals: Totals::default(),
         selftest: parts::SelfTests::default(),
+        heat: Heat::default(),
     };
     let (mut board_read, mut reported): (Option<Instant>, Option<Instant>) = (None, None);
     while !stop.load(Ordering::Relaxed) {
@@ -650,6 +683,7 @@ pub fn run(
             for out in [
                 &mut serve.health_out,
                 &mut serve.board_out,
+                &mut serve.heat_out,
                 &mut serve.reports_out,
             ] {
                 out.make(bus, serve.say);
@@ -697,6 +731,7 @@ pub fn run(
         for out in [
             &mut serve.health_out,
             &mut serve.board_out,
+            &mut serve.heat_out,
             &mut serve.reports_out,
         ] {
             out.alive(serve.say);

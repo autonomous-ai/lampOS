@@ -43,7 +43,8 @@ contracts separately, and `controls_topics()` lists the optional Controls
 contracts, `keeper_topics()` the keeper's pause, `memory_topics()` the
 memory's typed rules, and `name_topics()` the first sign of a hearing of the
 lamp's name (`name/rising`), and `presence_topics()` whether anyone is at
-the lamp (`room/presence`). Touch, Schedule, Ears and privacy have separate
+the lamp (`room/presence`), and `heat_topics()` how hot the board is
+(`board/heat`). Touch, Schedule, Ears and privacy have separate
 additive catalogues. `logging_topics()` adds the optional operational log
 stream, and `output_caps_topics()` the Actions-owned output restrictions.
 `declaration_of()` recognizes the catalogues it chains without changing
@@ -90,6 +91,7 @@ publishers declare them with their own `declaration()`.
 | `Diagnostic` | `diagnostics` | event | 1 s | ROS's `DiagnosticStatus`: ok, warn, error or stale, a name, a message, a few keys and values |
 | `Health` | `lamp/health` | latest | 5 s, means nothing after 15 s | How the whole lamp is: the worst level, one sentence, every part that has reported with its level, message and age, worst first, and the parts that are expected and never reported |
 | `BoardState` | `board/state` | latest | 5 s, means nothing after 15 s | The computer's numbers: each temperature by sensor (°C), load per processor, memory in use and disk free as fractions, uptime, and the Wi-Fi signal and whether the clock is set if they could be asked |
+| `BoardHeat` | `board/heat` | latest | 5 s, means nothing after 15 s | How hot the board is for the work that can wait (#7879, [health.md](health.md#the-boards-heat)): `level` (`ok`, `warm` or `hot`, with hysteresis), `zone` (the hotter processor zone), its temperature `c` and `trip_c`, where that zone's board slows itself down (its second passive trip point, or 90). Said by lamp-health from each reading of the board, always, as data; no part reads it yet. A reader with none, one run out or one that fails `check()` takes the board for ok. `heat_topics()` lists it, apart from the first topics |
 | `NameHeard` | `name/heard` | event | none | The lamp's name was heard in what its microphone hears: how sure the listener was, from 0 to 1, and how many milliseconds before this was sent the name began. A sign, never proof ([name.md](name.md)) |
 | `NameHeard` | `name/rising` | event | none | The same hearing's first sign, as soon as the score reaches the listener's bar and while the name is still being said: the score so far, and how long ago it reached the bar. Its final word, with the highest score, is on `name/heard`; a first sign with none was a near miss (#782, [name.md](name.md)) |
 | `NameHeard` | `name/near` | event | none | A hearing that reached `lamp-name --near`'s lower bar (`LAMP_NAME_NEAR`), when it is over: its highest score, and how long before this was sent it reached that bar. Read only beside a line's first word, never as the name alone ([name.md](name.md)) |
@@ -465,7 +467,7 @@ publishes `Decision` ([policy.md](policy.md)). The body publishes
 `JointState` and its own `Diagnostic` (`crates/body/src/bus_out.rs`). The
 actions program asks for a `Light` and the voice's ring worker says the
 one it shows (`crates/voice/src/ring_light.rs`). The health program
-publishes `Health`, `BoardState` and the board's own `Diagnostic`
+publishes `Health`, `BoardState`, `BoardHeat` and the board's own `Diagnostic`
 ([health.md](health.md)). The ears publish `Audio` on `mic1/audio`
 (`crates/ears/src/pcm.rs`) and the voice on `mic2/audio`, with `VoiceLink`
 on `voice/link` (`crates/voice/src/bus_out.rs`). Nothing publishes
