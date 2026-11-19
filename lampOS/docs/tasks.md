@@ -5369,48 +5369,51 @@ in and signed out, and on 0.6.60, signed in (#7507's ROW).
     **Found in seconds, and while idle (#8001).** The ~61 s wait was
     lamp-tasks' own `--timeout 60s`, not Harness's, and a refused reply
     typed nothing. So a hand-over's first reply into a kept OpenClaw
-    session is held 10 s (`REPLY_KEPT_FIRST_HELD`). Refused then
-    (`ENGINE_NOT_READY`, or a `TIMEOUT` with nothing typed), two signs are
-    looked at once, each needing a frozen engine, never a slow one
+    session is held 10 s (`REPLY_KEPT_FIRST_HELD`). Refused then with
+    `ENGINE_NOT_READY` (nothing typed), one `show` is read at once and two
+    signs are looked at, each needing a frozen engine, never a slow one
     (healthy accepts on lamp-c0a4: p50 4.5 s, 10-37 s in the tail; on
-    stable, 20 Nov, 8.4 s at first use, then 3.0-4.0 s):
-    **(T)** the session's OpenClaw TUI process is stopped (`/proc/<pid>/stat`
-    state `T`, J3), found by one `/proc` scan. On lamp-c0a4 (20 Nov) the
-    TUI is a node process of lamp-tasks' own user retitled to just
-    `openclaw`, under `nsenter`, under the pane's shell `/bin/sh -ic '.
-    <launch>.sh' harness-engine <cwd> /usr/local/bin/openclaw tui
-    agent:main:harness-<agentId>`, under `tmux`. So a process of that user
-    whose cmdline is exactly `openclaw` (or names `openclaw` in its first
-    three arguments with `tui`) is taken when it, or one of its 3 nearest
-    ancestors (`stat`'s parent pid), has an argument `tui` and an argument
-    that is the kept session key, ends `:harness-<agentId>` or is
-    `harness-<agentId>` (the older `--session V` form too); its state is
-    read from that bottom process. Not found exactly once, the sign is
-    unknown, never stuck (more than one is journaled once, `TUI pid not
-    unique (N matches); stopped check off`); **(W)**, on `ENGINE_NOT_READY` only
-    (a `TIMEOUT` is a ready engine), Harness's `show` reads it `working`
+    stable, 20 Nov, 8.4 s at first use, then 3.0-4.0 s). A `TIMEOUT` (a
+    ready engine that did not take the words yet) is neither, and asks no
+    `show`. **(D) idle but deaf.** Live on lamp-c0a4 (20 Nov): a SIGSTOP
+    of the kept OpenClaw TUI is undone by SIGCONT within 50 ms; the TUI
+    then stays alive (`/proc` state `S`, never `T`) but deaf: every
+    `harness reply` is refused `ENGINE_NOT_READY` with nothing typed while
+    `harness show` says `state=idle`. D holds when all of these are true:
+    `show` reads it `idle`; lamp-tasks holds no other turn on the pane
+    (the holder is this turn, no spoken task closing it, no close due);
+    the pane is past its start window (`OPEN_IDLE_WITHIN`, 120 s since it
+    was opened by any `ensure`, the window the idle look uses); and the
+    Gateway record is readable, whatever its last row: an idle session
+    after a finished turn always ends with the assistant's reply (the
+    ROW on lamp-c0a4, 20 Nov, journaled `deaf=no (the last row is the
+    assistant's)` while that was a guard), and `show` idle already says
+    no tool call is running. **(W)** `show` reads it `working`
     though no turn of ours is in it, and the Gateway record's session and
     last seq are the same as just before the reply (a lost Gateway link,
-    the TUI still running); never with the assistant's row last (a tool
-    call or exec still running). Either holds: a waiting spoken task ends
+    the TUI still running); never with the assistant's row last. Every
+    such check is journaled once with its outcome (`one session: <id8>
+    first reply refused ENGINE_NOT_READY; show <state>; deaf=<yes|no>
+    (<reason>)`). Either holds: a waiting spoken task ends
     `one_session_stuck` after the 10 s hold alone, before any close, and
-    sign 5's ladder (`OneSession::restart_or_replace`) runs on the
+    sign 5's ladder (`OneSession::restart_or_replace`) runs once on the
     one-session thread (`OneSession::restart_if_due`, at its next step,
-    within 2 s), since a `close --now` of a stopped TUI can take its whole
+    within 2 s), since a `close --now` of a frozen TUI can take its whole
     60 s; no words go into the session while that close is due: a spoken
     task finds no fresh pane, and a skill run entering first does that
     close itself (`ensure`) before any words, once, its conversation kept.
     A skill run's own sign 5 runs the ladder itself, as before. Neither holds: the reply
     is tried again at once with the rest, 50 s, and that short refusal is
     not counted, so a slow but healthy hand-over waits as long as before
-    and the two-refusal rule above still applies. A session `ensure` made
+    and the two-refusal rule above still applies (it is what caught a
+    deaf idle TUI before D, in ~134 s). A session `ensure` made
     new, within its first words' window (`OPEN_IDLE_WITHIN`), is held the
     whole 60 s and never looked at. The healthy path pays nothing: the 10 s
-    hold costs only on a refusal, then one `show` and one `/proc` scan.
+    hold costs only on a refusal, then one `show` and one read-only
+    record read.
     While the session is open and no turn is held, an idle look runs every
-    30 s (`KEEP_OPEN_WHILE_OPEN`) on the one-session thread: T read on two
-    reads 2 s apart (`STOPPED_READS_APART`), or W with the record unmoved
-    over at least 2 looks after the one that first read it
+    30 s (`KEEP_OPEN_WHILE_OPEN`) on the one-session thread: W with the
+    record unmoved over at least 2 looks after the one that first read it
     (`IDLE_UNMOVED_LOOKS`) and for at least ~600 s (`TOOL_RESULT_STALL`,
     sign 4b's bound), whatever the last row (the user's or a tool's result
     is a slow model, long thinking or 429 retries; the assistant's a tool
@@ -5422,10 +5425,12 @@ in and signed out, and on 0.6.60, signed in (#7507's ROW).
     the session, so a misread `working` never spends the plain resume and
     then the conversation. Never while a turn is held (the look
     holds the pane while it closes), and not within a new session's window.
-    Each look costs one `/proc` scan, one `show` and one read-only record
-    read. Targets: an ask on a frozen session to its ask-again line
-    within 15 s (was ~130 s); an idle stopped TUI reopened within 35 s; an
-    idle lost link within ~630 s (600 s unmoved, plus up to one look).
+    Each look costs one `show` and one read-only record read. A deaf idle
+    TUI with no ask is not looked for: it is found at the next ask (D).
+    Targets: an ask on a deaf pane to its ask-again line in about 12-13 s
+    (the 10 s hold, one `show`, one record read, the end), target at most
+    15 s (was ~134 s); an idle lost link within ~630 s (600 s unmoved,
+    plus up to one look).
 
   Every sign calls `OneSession::replace_kept`, the one path for every
   sign (signs 3 and 4 through `OneSession::kept_gone`). It does a `close --now`, `sessions.delete` and the record removed,
