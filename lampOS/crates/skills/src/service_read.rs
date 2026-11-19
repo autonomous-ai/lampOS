@@ -1989,4 +1989,56 @@ mod tests {
         );
         assert!(lamp.reads.is_empty() && lamp.said.is_empty());
     }
+
+    /// #7873 (c): a skill's answer held at its gate is told on
+    /// `skills/tasks` with the gate's own reason, then told or dropped by
+    /// its outcome; never a word of the answer.
+    #[test]
+    fn an_answer_at_its_gate_is_told_held_then_told_or_dropped() {
+        use lamp_msgs::SkillTaskStage::{Dropped, Held, Told};
+        let held = held_news("mail-check", Closed::NotAlone.words());
+        held.check().unwrap();
+        assert_eq!(
+            (held.stage, held.gate.as_deref(), held.run),
+            (Held, Some("not alone"), None)
+        );
+        for why in [
+            Closed::NoOwner,
+            Closed::Private,
+            Closed::Paused,
+            Closed::Quiet,
+            Closed::NotAlone,
+            Closed::NotOwner,
+            Closed::Nobody,
+            Closed::VoiceHeard,
+            Closed::AnotherRead,
+        ] {
+            held_news("mail-check", why.words()).check().unwrap();
+        }
+        for (outcome, stage) in [
+            ("told 2", Told),
+            ("read 3", Told),
+            ("said in the asking conversation", Told),
+            (
+                "not said in the asking conversation (say: expired), so as news: told 1",
+                Told,
+            ),
+            ("skipped: not alone", Dropped),
+            ("skipped: quiet hours", Dropped),
+            ("stopped: someone came, 1 of 2 told", Dropped),
+            (
+                "stopped: a line was not said (say: expired), 0 of 1 told",
+                Dropped,
+            ),
+            (
+                "not read: the lamp's services were not reached (other)",
+                Dropped,
+            ),
+            ("nothing to tell", Dropped),
+        ] {
+            let news = answer_news("mail-check", outcome);
+            news.check().unwrap();
+            assert_eq!(news.stage, stage, "{outcome}");
+        }
+    }
 }
