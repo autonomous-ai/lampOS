@@ -1766,8 +1766,14 @@ task = { task = "Take a photo and send it to my phone", run = "scripts/main.py" 
 
 - **The step.** `task = { task, run }`, alone in its `[[do]]` table (no
   `on`, `after` or `if_choice`), one a skill, in an installable skill only.
-  `task` is 1 to 500 bytes of words (a new skill packs only with one plain
-  sentence of at most 120 characters, `Skill::made_refuses`, #7874); `run` a plain file inside the skill's
+  `task` is 1 to 500 bytes of words; a new skill takes only one plain
+  sentence of at most 120 characters, the bound the voice reads back whole
+  for the owner's yes (`Skill::made_refuses`, #7874). It is one bound for
+  every skill, however it comes: `lamp-skills pack`, an install (a Store
+  skill too) and the app's push all refuse a longer one, and the refusal its
+  author sees says "a task's words: one plain sentence of at most 120
+  characters, read back whole to the owner for their yes". A skill already on
+  a lamp still loads. `run` a plain file inside the skill's
   own `scripts/` (relative, at most four parts, no `..`, no hidden part, no
   link anywhere on it). Its `[permissions]` do not hold it: its reach is its
   `grants`.
