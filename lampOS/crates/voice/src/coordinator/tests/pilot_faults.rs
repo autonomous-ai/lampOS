@@ -3161,6 +3161,7 @@ fn held_onboarding_storage_at(near_call: bool) -> (SessionState, HeldOnboardingS
             near_call: directory.join("near-call.json"),
             room_sounds: directory.join("room-sounds.json"),
             room_sounds_group: None,
+            noticing_by_default: false,
         },
         Box::new(move |tag| {
             if tag.revision == 2 {

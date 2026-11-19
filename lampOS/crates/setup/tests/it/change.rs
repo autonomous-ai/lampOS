@@ -1088,6 +1088,68 @@ fn the_owners_desk_noticing_from_the_app_is_the_voices_yes_but_for_by() {
     assert!(!file.exists());
 }
 
+/// #7767: with `LAMP_NOTICING_BY_DEFAULT` on, where a missing file is on,
+/// the app's off keeps a no (`"by":"app"`) in place of the removal, and the
+/// mark is raised as before, so a late yes still loses to it; a later yes
+/// turns the no back to a yes. Off, the off removes the file, as before.
+#[test]
+fn with_the_switch_on_the_apps_desk_off_keeps_a_no() {
+    let root = Root::new();
+    let config = root.config();
+    let folder = &config.consent;
+    fs::create_dir_all(folder).unwrap();
+    let file = folder.join("seen-activity.json");
+    let key = lamp_msgs::consent::SEEN_ACTIVITY;
+    let desk = |allow: bool, id: u64, by_default: bool| {
+        // A yes at or below the mark is refused in `parse` already.
+        parse(
+            &json!({"desk_noticing": {"allow": allow, "request_id": id}}).to_string(),
+            &config,
+        )
+        .and_then(|change| {
+            change::apply_or(&change, &config, by_default).map_err(|error| error.to_string())
+        })
+    };
+    // On by default with no file: an off is a kept no, the app's.
+    let done = desk(false, 100, true).unwrap();
+    assert_eq!(done.data, json!({"seen_activity": false}));
+    assert_eq!(
+        done.said,
+        "the seen activity yes is off from the app's desk noticing"
+    );
+    let text = fs::read_to_string(&file).unwrap();
+    let at = serde_json::from_str::<Value>(&text).unwrap()["at_unix_s"]
+        .as_u64()
+        .unwrap();
+    assert_eq!(
+        text.into_bytes(),
+        lamp_msgs::consent::no_bytes(key, at, lamp_msgs::consent::BY_APP)
+    );
+    assert!(!lamp_msgs::consent::allowed(&file, key, true));
+    assert_eq!(
+        lamp_msgs::consent::read_mark(&lamp_msgs::consent::mark_in(folder)),
+        Some(100)
+    );
+    // A late yes, sent before the off, still loses; a later one lands.
+    assert!(desk(true, 50, true).is_err());
+    assert!(!lamp_msgs::consent::allowed(&file, key, true));
+    let done = desk(true, 200, true).unwrap();
+    assert!(!done.said.ends_with("already"));
+    assert!(lamp_msgs::consent::read(&file, key).yes);
+    // An off again: a no, never a removal.
+    desk(false, 300, true).unwrap();
+    assert!(file.exists() && !lamp_msgs::consent::allowed(&file, key, true));
+    // A yes with no file, on by default already: nothing written.
+    fs::remove_file(&file).unwrap();
+    assert!(desk(true, 400, true).unwrap().said.ends_with("already"));
+    assert!(!file.exists());
+    // Off: the off removes the file, as before.
+    desk(true, 500, false).unwrap();
+    assert!(file.exists());
+    desk(false, 600, false).unwrap();
+    assert!(!file.exists());
+}
+
 /// #6543, Heron's P2 on #7551: a desk noticing yes lands only with a
 /// `request_id` above the mark kept beside it. A resent yes after an off
 /// stays off; a yes sent before the lamp's own "no" (the voice's stop, which

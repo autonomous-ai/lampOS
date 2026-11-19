@@ -54,6 +54,7 @@ impl Store {
             near_call: path.join("near-call.json"),
             room_sounds: path.join("room-sounds.json"),
             room_sounds_group: None,
+            noticing_by_default: false,
         };
         let owner = match hook {
             Some(hook) => storage::ServiceStorage::start_with_hook(paths, hook).unwrap(),

@@ -215,9 +215,12 @@ pub(super) fn status(name: &str, result: &Value) -> Value {
                 let state = match value.as_str() {
                     Some("cleared") => "cleared",
                     Some("kept") => "kept",
+                    Some(crate::remember::CONSENT_KEPT_AS_NO) => {
+                        crate::remember::CONSENT_KEPT_AS_NO
+                    }
                     _ => "uncertain",
                 };
-                incomplete |= state != "cleared";
+                incomplete |= state != "cleared" && state != crate::remember::CONSENT_KEPT_AS_NO;
                 outcome.insert(field.into(), json!(state));
             }
         }
@@ -328,6 +331,21 @@ mod tests {
         );
         // The refusal's words never pass the reset.
         assert!(!said.contains("graduation date"), "{said}");
+    }
+
+    /// Twelve's P3 4 on #7928 (#7767): a consent the forget left as a kept
+    /// no passes as `"kept as a no"`, and is no incomplete step.
+    #[test]
+    fn a_consent_kept_as_a_no_passes_and_is_no_failed_step() {
+        let result = json!({"forgotten":true,"everything":true,
+            "sound_consent_result":"cleared",
+            "face_expression_consent_result":"kept as a no"});
+        let kept = status("forget_everything", &result);
+        assert_eq!(
+            kept["outcome"]["face_expression_consent_result"],
+            "kept as a no"
+        );
+        assert_eq!(kept["outcome"]["everything"], true);
     }
 
     #[test]
