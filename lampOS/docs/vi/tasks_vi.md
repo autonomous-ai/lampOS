@@ -3354,6 +3354,43 @@ là phần của một coder khác trong #6226; thiết kế:
   skill-start vẫn được giữ. Lần chạy kỹ năng vẫn exec nó, và `security:
   "full"` cũng cho phép exec đó, nên lần chạy không cần quyền riêng nào.
 
+**OpenClaw kiểm tra văn bản trước khi nó vào chỗ** (#7108; ngày 15/11 một
+lần merge mà OpenClaw 2026.11.2 từ chối, 78/CONFIG, đã làm gateway của
+lamp-52e6 chết): văn bản đã đổi được ghi vào một file mới 0600 cạnh
+`openclaw.json`, và `config validate --json` của chính OpenClaw chạy trên
+file đó qua wrapper `/usr/local/bin/openclaw` của lamp-update
+(`openclaw_config::validate`), trỏ tới file đó bằng `OPENCLAW_CONFIG_PATH`,
+không bao giờ file đang dùng, nhập vào namespace của gateway đang chạy như
+mọi lần gọi khác của wrapper (không bao giờ `LAMP_OPENCLAW_GATEWAY=on`:
+OpenClaw 2026.11.2 từ chối lần kiểm tra trong namespace riêng khi gateway
+của nó đang chạy, `GatewayLockNamespaceError`, ROW FAIL của #7268 trên
+lamp-52e6), trong môi trường riêng của OpenClaw, tối đa 60 s. Chỉ status 0 mới rename nó vào chỗ
+(`hermes_config::replace_checked`). Bị từ chối (hoặc quá 60 s) thì file mới
+bị xóa, `openclaw.json` giữ nguyên từng byte, và dòng nhật ký nói
+"OpenClaw's settings not written: ... OpenClaw's own config check refused
+it (status 1): <lời của OpenClaw>". Không có wrapper ở
+`/usr/local/bin/openclaw` (OpenClaw chưa cài) thì văn bản được ghi như
+trước, kèm dòng nhật ký "written unchecked". Wrapper không chạy được
+OpenClaw (không có token của forwarder, không có Node) thì từ chối, nên
+không ghi gì cho tới lần lamp-tasks khởi động sau. Không có gateway đang chạy
+thì wrapper cũng đóng an toàn, và lamp-tasks có thể khởi động trước gateway
+(lúc boot, hoặc một lần cập nhật khởi động lại cả hai: HOLD của #7268), nên
+riêng lần từ chối đó ("is not running in its own namespaces" của wrapper,
+hoặc "'node': No such file or directory" từ một gateway vừa khởi động) được
+thử lại sau 5, 10, 20, 40 s rồi 60 s bốn lần, tổng 5 phút 15 s
+(`openclaw_config::GATEWAY_WAITS`), mỗi lần chờ một dòng nhật ký
+"OpenClaw's settings wait for its gateway to check them; tried again in N
+s"; không ghi gì trước khi gateway kiểm tra nó. Lần kiểm tra bị một signal
+kết thúc trước khi OpenClaw trả lời ("status killed": trên lamp-52e6,
+lamp-tasks và gateway khởi động lại cùng lúc và lần kiểm tra đua với lúc
+gateway tự khởi động, FINDING của #7268) cũng được thử lại theo cùng các lần
+chờ đó, mỗi lần một dòng nhật ký "OpenClaw's settings were not checked,
+OpenClaw's check was killed before it answered; tried again in N s", không
+có giá trị nào của file. Quá lần chờ cuối thì không
+ghi cho tới lần lamp-tasks khởi động sau, dòng nhật ký nói lần từ chối cuối; văn bản bị OpenClaw từ chối thì
+không bao giờ thử lại. Việc ghi chạy trên một thread riêng, nên lamp-tasks
+khởi động không bao giờ phải chờ nó.
+
 ## Hook của Harness bên trong namespace agent của đèn (#6530)
 
 Hook của Harness cho một engine (`harness hook hermes session-start`,
