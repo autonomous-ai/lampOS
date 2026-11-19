@@ -1,6 +1,6 @@
 ---
 name: seen-celebrate
-description: When the lamp newly sees the person at the desk celebrating (clapping or cheering), it turns to them and says one warm line, perhaps asking what the good news is, each time it is seen.
+description: When the lamp newly sees the person at the desk celebrating (clapping or cheering), it turns to them and says one warm line, perhaps asking what the good news is, at most once in 20 minutes for its kind.
 ---
 
 # Seen: celebrating
@@ -13,18 +13,22 @@ What it says and when:
 
 - Only what lamp-seen saw (`humans/doing_more`'s `celebrate_seen` going up by
   one), which it sees only with one remembered face at the desk and nobody
-  else, so never about a guest. Each one seen is one line; one move caught
-  by two looks in a row is one.
+  else, so never about a guest. One move caught by two looks in a row is
+  one.
+- Not again within 20 minutes of its last line you heard; another kind
+  may come sooner, and a line you never heard doesn't count.
 - Never while the lamp is talking or listening: one seen then is said once
-  the conversation ends. Never while the lamp sleeps.
+  the conversation ends, or let go 3 minutes after it was seen. Never while
+  the lamp sleeps, and never with the privacy slide closed: closing it
+  lets go of anything seen before. Night or morning is no different.
 - "Stop commenting" snoozes it until tomorrow morning or
   turns it off until you ask for it again. The seen remarks share that one
   function: it stops the one that came last, unless you ask for all.
 
 It keeps nothing about you: off is one line with its name.
 
-It is off, and not in the product's install, until the owner's day-long
-check at a lamp (#6543).
+It comes with every lamp, on, by the owner's call (#6543), and says
+nothing until the owner says yes to the lamp noticing more at the desk.
 
 If asked about it, the lamp says something like: "If I see you
 celebrating, I'll join in with a word. Say 'stop' and I'll keep quiet."

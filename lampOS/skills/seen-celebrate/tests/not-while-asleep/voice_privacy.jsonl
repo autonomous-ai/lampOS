@@ -1,0 +1,2 @@
+{"topic": "voice/privacy", "declaration": {"type": "lamp_msgs/MicrophonePrivacy", "version": 1, "kind": "latest"}}
+{"header":{"topic":"voice/privacy","kind":"latest","enc":"json","type":"lamp_msgs/MicrophonePrivacy","source":"lamp_bus_cli","boot":"4d5e6f708192a3b4","seq":1,"at_us":0,"at_unix_ms":1792368000000},"payload_b64":"eyJwZXJtaXR0ZWQiOnRydWV9"}
