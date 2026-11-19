@@ -83,6 +83,16 @@ impl Drop for Scratch {
 }
 
 /// One request through the Days protocol: its answer and its log line.
+/// A forget's answer without the exchange ids it names for the account's
+/// history (#7771, checked in `days_protocol`'s and `binary`'s tests):
+/// these tests read what it removed.
+fn counts(mut answer: Value) -> Value {
+    if let Some(answer) = answer.as_object_mut() {
+        answer.remove("exchanges");
+    }
+    answer
+}
+
 fn ask(store: &mut Days, request: Value, now: u64) -> (Value, String) {
     let answer = days_protocol::answer(store, request.to_string().as_bytes(), now);
     (serde_json::from_str(&answer.line).unwrap(), answer.log)
@@ -235,7 +245,7 @@ fn forget_said_removes_exactly_that_speakers_room_lines_and_their_versions() {
         json!({"op":"remember","person":MAI,"at_unix_ms":NOW,"text":"Takes her tea green"}),
     );
     let (gone, log) = ask(&mut store, json!({"op":"forget_said","speaker":MAI}), NOW);
-    assert_eq!(gone, json!({"ok":true,"removed":3}));
+    assert_eq!(counts(gone.clone()), json!({"ok":true,"removed":3}));
     assert_eq!(log, "forget_said person=everyone ok entries=0");
     for id in [hers, violet, corrected] {
         assert!(!exists(&store, "everyone", id), "{id}");
@@ -251,7 +261,11 @@ fn forget_said_removes_exactly_that_speakers_room_lines_and_their_versions() {
             json!({"op":"forget_said","speaker":speaker}),
             NOW,
         );
-        assert_eq!(line, json!({"ok":true,"removed":0}), "{speaker}");
+        assert_eq!(
+            counts(line.clone()),
+            json!({"ok":true,"removed":0}),
+            "{speaker}"
+        );
     }
     // The room named outright is the room.
     let (line, _) = ask(
@@ -259,7 +273,7 @@ fn forget_said_removes_exactly_that_speakers_room_lines_and_their_versions() {
         json!({"op":"forget_said","person":"everyone","speaker":LAN}),
         NOW,
     );
-    assert_eq!(line, json!({"ok":true,"removed":1}));
+    assert_eq!(counts(line.clone()), json!({"ok":true,"removed":1}));
     assert!(exists(&store, "everyone", nobodys));
 }
 
@@ -308,7 +322,7 @@ fn a_thing_made_from_their_lines_goes_only_when_every_source_is_theirs() {
     );
     let (gone, _) = ask(&mut store, json!({"op":"forget_said","speaker":MAI}), NOW);
     assert_eq!(
-        gone,
+        counts(gone.clone()),
         json!({"ok":true,"removed":3}),
         "m1, m2 and the observation made only of them"
     );
@@ -381,7 +395,11 @@ fn forget_said_leaves_a_version_someone_else_said() {
         json!({"op":"forget_said","speaker":MAI}),
         NOW + 3,
     );
-    assert_eq!(gone, json!({"ok":true,"removed":2}), "her two lines only");
+    assert_eq!(
+        counts(gone.clone()),
+        json!({"ok":true,"removed":2}),
+        "her two lines only"
+    );
     for id in [hers, her_fix] {
         assert!(!exists(&store, "everyone", id), "{id} should go");
     }
@@ -431,7 +449,7 @@ fn forget_said_keeps_a_correction_adopted_into_a_persons_scope() {
         json!({"op":"forget_said","speaker":MAI}),
         NOW + 3,
     );
-    assert_eq!(gone, json!({"ok":true,"removed":1}));
+    assert_eq!(counts(gone.clone()), json!({"ok":true,"removed":1}));
     assert!(!exists(&store, "everyone", original));
     assert!(exists(&store, LAN, private));
     let (kept, _) = ask(&mut store, json!({"op":"kept","person":LAN}), NOW + 3);
@@ -460,7 +478,7 @@ fn forget_said_keeps_the_private_chain_after_an_adopted_correction() {
         json!({"op":"forget_said","speaker":MAI}),
         NOW + 5,
     );
-    assert_eq!(gone, json!({"ok":true,"removed":1}));
+    assert_eq!(counts(gone.clone()), json!({"ok":true,"removed":1}));
     assert!(!exists(&store, "everyone", original));
     for version in [private, later, latest] {
         assert!(exists(&store, LAN, version), "private version {version}");
@@ -478,7 +496,7 @@ fn ordinary_forget_still_follows_an_adopted_corrections_provenance() {
     let mut store = scratch.open(30, NOW);
     let (original, private) = adopted_room_correction(&mut store);
     let (gone, _) = ask(&mut store, json!({"op":"forget","id":original}), NOW + 3);
-    assert_eq!(gone, json!({"ok":true,"removed":2}));
+    assert_eq!(counts(gone.clone()), json!({"ok":true,"removed":2}));
     assert!(!exists(&store, "everyone", original));
     assert!(!exists(&store, LAN, private));
     assert_eq!(scratch.speakers(), (vec![], 0));
@@ -639,7 +657,7 @@ fn a_store_from_before_speakers_opens_and_gets_the_table() {
         .unwrap();
     assert_eq!(version, 1, "no version bump");
     let (line, _) = ask(&mut store, json!({"op":"forget_said","speaker":MAI}), NOW);
-    assert_eq!(line, json!({"ok":true,"removed":1}));
+    assert_eq!(counts(line.clone()), json!({"ok":true,"removed":1}));
     assert!(exists(&store, "everyone", old));
 }
 
@@ -691,7 +709,7 @@ fn the_build_before_opens_a_store_with_speakers_and_keeps_what_it_held() {
     let mut store = scratch.open(30, NOW);
     assert!(exists(&store, "everyone", kept));
     let (line, _) = ask(&mut store, json!({"op":"forget_said","speaker":MAI}), NOW);
-    assert_eq!(line, json!({"ok":true,"removed":1}));
+    assert_eq!(counts(line.clone()), json!({"ok":true,"removed":1}));
 }
 
 /// Reviewer-three's P2 on #3213: the app's removal of a person
