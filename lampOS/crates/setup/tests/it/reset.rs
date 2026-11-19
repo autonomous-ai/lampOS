@@ -3302,6 +3302,44 @@ fn a_reset_cuts_the_agents_kept_settings_to_the_lamps_keys() {
     assert_eq!(fs::read(root.path("outside")).unwrap(), b"{}");
 }
 
+/// #7868: the reset's cut of `openclaw.json` is checked by OpenClaw's own
+/// config check on a file beside it, the old file's owner and mode, before
+/// it is renamed into place. Refused, the old file stays byte for byte,
+/// nothing is left beside it, and the reset goes on (the lamp's gateway
+/// keeps a file it took, never one OpenClaw refuses); taken, the cut lands.
+#[test]
+fn a_cut_openclaws_own_check_refuses_never_lands() {
+    let root = Root::new();
+    let state = root.path("var/lib/lampos-openclaw/state");
+    fs::create_dir_all(&state).unwrap();
+    let json = state.join("openclaw.json");
+    let theirs =
+        r#"{"gateway":{"port":18789},"models":{"providers":{"other":{"apiKey":"sk-person"}}}}"#;
+    fs::write(&json, theirs).unwrap();
+    fs::set_permissions(&json, fs::Permissions::from_mode(0o640)).unwrap();
+    let cut = reset::cut_openclaw_config(theirs.as_bytes()).unwrap();
+    let checked = RefCell::new(Vec::new());
+    let mut refuse = |file: &Path| {
+        assert_eq!(file.parent(), Some(state.as_path()));
+        assert_ne!(file, json.as_path());
+        assert_eq!(
+            fs::metadata(file).unwrap().permissions().mode() & 0o7777,
+            0o640
+        );
+        checked.borrow_mut().push(fs::read(file).unwrap());
+        Err("gateway.port: Unrecognized key".to_owned())
+    };
+    reset::forget_agents_checked(&root.0, &mut refuse).unwrap();
+    assert_eq!(fs::read_to_string(&json).unwrap(), theirs);
+    assert_eq!(fs::read_dir(&state).unwrap().count(), 1);
+    assert_eq!(*checked.borrow(), [cut.clone()]);
+
+    let mut take = |_: &Path| Ok(());
+    assert!(reset::forget_agents_checked(&root.0, &mut take).unwrap() > 0);
+    assert_eq!(fs::read(&json).unwrap(), cut);
+    assert_eq!(fs::read_dir(&state).unwrap().count(), 1);
+}
+
 /// Every path under `at`, with a file's bytes or a link's target, never
 /// followed.
 fn snapshot(at: &Path, found: &mut Vec<(PathBuf, Vec<u8>)>) {
