@@ -2103,7 +2103,12 @@ fn gateway_config(root: &Path, run: &mut Runner, say: &mut dyn FnMut(&str)) -> R
         give_to_lampos(run, &file)?;
         run(&validate_argv(uid, gid, &file))
             .map(drop)
-            .map_err(|why| format!("OpenClaw's own config check refused it: {why}"))
+            .map_err(|why| {
+                format!(
+                    "OpenClaw's own config check refused it: {}",
+                    lamp_checked_replace::redact(&why)
+                )
+            })
     };
     lamp_checked_replace::replace_checked(
         &config_path,
