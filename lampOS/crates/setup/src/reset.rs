@@ -612,9 +612,9 @@ pub fn forget_agents(root: &Path) -> io::Result<usize> {
 pub fn forget_agents_checked(
     root: &Path,
     check: &mut dyn FnMut(&Path) -> Result<(), String>,
-    _say: &mut dyn FnMut(&str),
+    say: &mut dyn FnMut(&str),
 ) -> io::Result<usize> {
-    walk_agents(root, true, &mut Vec::new(), check)
+    walk_agents(root, true, &mut Vec::new(), check, say)
 }
 
 /// OpenClaw's own check of the reset's cut of `openclaw.json` in `file`
@@ -650,7 +650,7 @@ fn openclaw_check(root: &Path, file: &Path) -> Result<(), String> {
 /// the reset. Nothing is followed through a link.
 pub fn plan_agents(root: &Path) -> io::Result<Vec<AgentStep>> {
     let mut steps = Vec::new();
-    walk_agents(root, false, &mut steps, &mut |_| Ok(()))?;
+    walk_agents(root, false, &mut steps, &mut |_| Ok(()), &mut |_| {})?;
     Ok(steps)
 }
 
@@ -659,6 +659,7 @@ fn walk_agents(
     act: bool,
     steps: &mut Vec<AgentStep>,
     check: &mut dyn FnMut(&Path) -> Result<(), String>,
+    say: &mut dyn FnMut(&str),
 ) -> io::Result<usize> {
     if !root.is_absolute() {
         return Err(io::Error::new(
@@ -747,6 +748,7 @@ fn walk_agents(
         yaml_keys,
         steps,
         &mut |_| Ok(()),
+        &mut |_| {},
     )?);
     removed += usize::from(kept.cut(
         OPENCLAW_STATE,
@@ -755,6 +757,7 @@ fn walk_agents(
         json_keys,
         steps,
         check,
+        say,
     )?);
     for shell in [".bashrc", ".profile"] {
         removed += usize::from(kept.cut(
@@ -764,6 +767,7 @@ fn walk_agents(
             |_| Vec::new(),
             steps,
             &mut |_| Ok(()),
+            &mut |_| {},
         )?);
     }
     Ok(removed)
@@ -870,11 +874,11 @@ impl Kept<'_> {
     /// replace) and renamed over it, so a cut stopped half-way leaves the
     /// old file whole and the leftover, a name the folder does not keep, is
     /// removed by the next run. `check` runs on the new file first (#7868:
-    /// OpenClaw's own config check for `openclaw.json`): refused, the old
-    /// file stays byte for byte, nothing is left beside it, the refusal is
-    /// said, and the reset goes on, so the gateway keeps a file OpenClaw
-    /// took, never one it refuses. A missing folder or file is nothing to
-    /// do. `keys` names the top-level keys for the step listed, never their
+    /// OpenClaw's own config check for `openclaw.json`): not taken
+    /// (refused, past its time, not started), nothing is left beside it,
+    /// the old file is removed too, as a file `cut` can't read is, so no
+    /// person's key outlives the reset, `say` gets why (never a value),
+    /// and the reset goes on. A missing folder or file is nothing to do. `keys` names the top-level keys for the step listed, never their
     /// values.
     fn cut(
         &self,
@@ -884,6 +888,7 @@ impl Kept<'_> {
         keys: fn(&[u8]) -> Vec<String>,
         steps: &mut Vec<AgentStep>,
         check: &mut dyn FnMut(&Path) -> Result<(), String>,
+        say: &mut dyn FnMut(&str),
     ) -> io::Result<bool> {
         use std::io::Read;
         use std::os::fd::AsFd;
@@ -956,11 +961,15 @@ impl Kept<'_> {
         match (written, refused) {
             (Ok(()), _) => Ok(true),
             (Err(_), Some(why)) => {
-                eprintln!(
-                    "lamp-setup: reset: {} not cut, kept as it was: {why}",
+                // A reset fails toward wiping: the person's keys never
+                // outlive it. lamp-update's next install writes the
+                // `gateway` block again into a config that has none.
+                remove_at(&dir, name, true)?;
+                say(&format!(
+                    "lamp-setup: reset: {} removed: its cut was not taken: {why}",
                     folder.join(name).display()
-                );
-                Ok(false)
+                ));
+                Ok(true)
             }
             (Err(error), None) => Err(error),
         }
