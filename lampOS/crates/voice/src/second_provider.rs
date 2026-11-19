@@ -2290,6 +2290,9 @@ struct Shared {
     /// one marked as only the name whose words came back empty
     /// ([`Engine::holding_a_wordless_call`]).
     wordless_bar: Option<wordless_call::BestHeard>,
+    /// lamp-name's best hearing in a line, for a short sound heard in it
+    /// at its bar ([`Engine::knowing_the_name_in_a_line`], #7891).
+    name_in_line: Option<wordless_call::BestHeard>,
     /// With `name_near`, a first word said as a sentence of its own is the
     /// name by its near hearing alone ([`Engine::taking_the_name_as_a_sentence`]).
     name_as_a_sentence: bool,
@@ -5254,6 +5257,7 @@ impl Engine {
                 one_speaker: None,
                 name_near: None,
                 wordless_bar: None,
+                name_in_line: None,
                 name_as_a_sentence: false,
                 own_echo: false,
                 spare: Mutex::new(None),
@@ -6234,6 +6238,18 @@ impl Engine {
     pub fn holding_a_wordless_call(mut self, best: wordless_call::BestHeard) -> Self {
         if let Some(shared) = Arc::get_mut(&mut self.shared) {
             shared.wordless_bar = Some(best);
+        }
+        self
+    }
+
+    /// A line ended as a short sound, not heard as a short word, is no
+    /// short sound when `best` says lamp-name heard the name in it at its
+    /// own bar ([`crate::called::LEAST_SCORE`], `lamp-name --least`) or
+    /// more: the rule judges it as any line (#7891). Without it, as before.
+    /// Before any turn only.
+    pub fn knowing_the_name_in_a_line(mut self, best: wordless_call::BestHeard) -> Self {
+        if let Some(shared) = Arc::get_mut(&mut self.shared) {
+            shared.name_in_line = Some(best);
         }
         self
     }
