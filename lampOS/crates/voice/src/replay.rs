@@ -132,7 +132,15 @@ fn verdict(case: &Case) -> String {
         eyes.look(at(seconds), Some((("replay", seq as u64), &frame)));
     }
     let word = if case.yes_no { "yes" } else { "word" };
-    let heard = vec![word; case.words].join(" ") + if case.question { "?" } else { "" };
+    let mut words = vec![word; case.words];
+    // A named line's words carry the name: out of the window a hearing
+    // with none in them is no name to `said_to_me` (#7891).
+    if case.named
+        && let Some(first) = words.first_mut()
+    {
+        *first = "lamp";
+    }
+    let heard = words.join(" ") + if case.question { "?" } else { "" };
     let (line, _, _) = Line {
         heard: &heard,
         name_heard: case.named,
