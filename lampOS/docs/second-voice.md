@@ -1073,10 +1073,25 @@ order is kept. A written turn is the same from the chat on.
       monotonic clock, so they can't give a UTC day's tokens.
     - **What it gains over the live tally:** a restart loses nothing, and
       an answer just before midnight is in its own day.
+    - **From a lamp-side token TSV instead:** `--tsv PATH` in place of
+      the pulls, a tab-separated file with the header
+      `time prompt cached not_cached completion` and one row of numbers
+      per answer (`2026-11-19T08:30:05+0700 15887 14976 911 26`). Each
+      row is the `usage` it stands for (`cached` the cache's hits,
+      `not_cached` the rest) and is counted by the same rule into the UTC
+      day of its time. A row whose `prompt` is not `cached` plus
+      `not_cached`, or that is not a time and four counts, is refused and
+      named by its line number only. `--from <RFC 3339>`, the lamp-side
+      window's start, makes the first line say which part of the UTC day
+      is covered (`from 01:30:00 UTC on`, `the whole day`, `none of the
+      day`).
     - Tests: `day_tally::replay::tests` (a date as days since 1970, UTC
       midnight divides the days whatever the offset is written as,
       overlapping pulls of two days count each line once, a restart mid-day
-      loses nothing, words are never printed) and
+      loses nothing, words are never printed; TSV rows on both sides of UTC
+      midnight are in their days, a row whose prompt is not its parts is
+      refused, the `--from` window is reported, a TSV's words are never
+      printed) and
       `net::chat::tests::the_replayed_tally_reads_an_answers_line_back`,
       which fails if the line's form changes and the replay no longer
       reads it.
