@@ -5475,6 +5475,97 @@ vụ lần chạy (#6432, #6306). Chi tiết đầy đủ ở
   `lamp_control::task_yes::yes_for_token`) và kết quả qua Task news là của
   #6304 và #6306.
 
+## Một `[stop]` dùng chung gọi tên một loại (`[stop] kind`, #6543)
+
+Các kỹ năng của một nhóm `[budget]` dùng chung một hàm `[stop]` (như
+`wellbeing_nudges`). Gọi không có `all` thì dừng kỹ năng chạy hoặc được hỏi
+sau cùng, có `all` (hoặc khi chưa kỹ năng nào chạy) thì dừng tất cả, như
+trước. Từ #7473, lời của `all` và `about` của các kỹ năng wellbeing nói với
+mô hình: "the nudges" (số nhiều, hoặc nói chung) là `all`, còn "that one"
+hay "this nudge" (số ít) mới bỏ `all` để dừng cái sau cùng (trước đó, trên
+lamp-06c1, "stop the nudges" chỉ dừng cái sau cùng). Nay một kỹ năng có thể khai `kind` trong `[stop]`: một chữ thường,
+rồi chữ thường, chữ số và gạch nối đơn ở giữa, tối đa 32 byte, là từ mà hàm dùng chung gọi
+kỹ năng đó, bên cạnh tên của nó ("đừng nhắc tôi về chuyện uống nước nữa").
+Khi có ít nhất một kỹ năng dùng chung khai `kind`, hàm có thêm `kind`, một
+từ trong danh sách (`kind` của mỗi kỹ năng dùng chung đang bật, hoặc tên của nó,
+xếp theo thứ tự chữ cái); qua `use_skill`, dòng của nó nói "Its kind is one of
+…" và `kind` của lời gọi được chuyển tiếp. Khi có loại, mô tả của hàm là
+`about` rồi đến `STOP_KIND_LEAD`, "When they name a kind ('stop the water
+nudge', 'no more eye nudges'), give that kind: never all, and never the one
+that came last. 'The next one' is next. Give at most one of all, kind and
+next.", và lời của `kind` bảo đưa loại mỗi khi người dùng gọi tên
+một loại, số ít hay số nhiều (#7473: trên lamp-06c1, chỉ được nghe `about`,
+mô hình dừng cái sau cùng cho "snooze only the eyes nudges", 3 trên 3);
+không có loại thì mô tả là `about`, từng byte. Tám kỹ năng wellbeing khai loại của mình (#7473, HOLD của Heron): `water`, `eyes`, `stand-up`, `break`, `meal`, `sit-back`, `wind-down` và `focus`, nên trên sản phẩm hàm luôn có `kind`, và `about` của chúng nói `all` là cho "the nudges" khi không gọi tên loại nào, nên "no more eye nudges" chỉ dừng nhắc mắt. Gọi với một loại thì chỉ dừng
+(hoặc hoãn, hoặc bật lại) các kỹ năng của loại đó, so với các `kind` đã khai
+trước, và chỉ so với tên kỹ năng khi không `kind` khai nào khớp (một loại
+trùng tên kỹ năng khác chỉ dừng loại đó; một loại rỗng bị từ chối, "Nothing
+changed: the kind is empty. …"), không phân biệt chữ hoa
+và gạch nối, gạch dưới hay khoảng trắng, lời nói tên kỹ
+năng hoặc loại đó. Một loại không phải của kỹ năng nào thì không đổi gì, và
+mô hình được báo "Nothing changed: none of these is "naps". The kinds are
+drinks, meals, tired; or leave the kind out." Tắt theo loại được giữ trong
+cùng tệp `off`, mỗi dòng là tên một kỹ năng, như mọi lần tắt khác, nên vẫn
+tắt sau khi khởi động lại. Không kỹ năng nào khai `kind` thì hàm như trước,
+từng byte, lời gọi không có loại cũng như trước, và lời gọi có `kind` bị từ
+chối bằng "Say how: snooze, off or on." như trước; qua `use_skill`, một kỹ
+năng có lựa chọn hoặc có/không của chính nó tên `kind` vẫn nhận nó như trước, và chỉ một hàm dừng (`how` là ba cách, rồi tới cách `[stop.done]` nếu có)
+mới có loại. Số công cụ của phiên
+không đổi. Test: `a_shared_stop_named_with_a_kind_stops_only_that_kind`,
+`a_kind_turned_off_is_kept_across_a_restart`,
+`a_shared_stop_with_no_kind_declared_refuses_a_kind`,
+`a_kind_matches_declared_kinds_before_names` (`crates/skills/tests/it/skills.rs`)
+và `a_shared_stops_kind_is_passed_on_and_offered_only_when_taken`,
+`a_skills_own_parameter_named_kind_passes_through`,
+`a_stray_key_on_a_kinded_skill_names_kind`
+(`lamp_voice::use_skill`). Bản đầy đủ ở [skills.md](../skills.md), hàng
+`[stop]`.
+
+## "Cái tiếp theo" và độ dài một lần hoãn (`next`, `minutes`, #7910)
+
+"Snooze the next one five minutes" từng hoãn mọi lời nhắc wellbeing đến
+sáng: khi chưa kỹ năng nào chạy, lời gọi không có `all` là tất cả. Nay hàm
+dùng chung có thêm `next`, một có/không ("true for 'the next one': only the
+nudge due next, not the one that came last; never with all or kind"); có
+nó thì hoãn hoặc tắt chỉ kỹ năng đến hạn tiếp theo. "Đến hạn tiếp theo" theo
+lịch của chính engine, không phải lời hứa: trong các kỹ năng dùng chung chưa
+bị hoãn hay tắt, với mỗi trigger (bỏ trigger `follows`, vì đó là lời sau một
+lần chạy, không phải lời nhắc riêng), lúc lần giữ của nó đủ `for` (tính từ
+lúc bắt đầu giữ, hoặc từ bây giờ khi nó không giữ hay đã dùng cơ hội của lần
+giữ này) và không sớm hơn lúc hết cooldown (tính từ lần chạy cuối); lấy cái
+sớm nhất, bằng nhau thì cái đứng trước theo thứ tự thư mục. Giờ hoạt động,
+giờ yên lặng, cửa sổ `during`, `[[while]]`, số tối đa trong ngày và giờ của
+nhóm không được tính, nên kỹ năng được chọn có thể đến muộn hơn thế. Không
+còn kỹ năng nào (đều đã hoãn hoặc tắt): "Nothing changed: every one of them
+is snoozed or off already." `all`, một loại và `next` chỉ được một: lời gọi
+có hai cái (true hoặc có đưa) không đổi gì, "Nothing changed: give only one
+of all, kind and next: …" (một `false` bên cạnh cái khác không tính là trộn);
+`next` với `on` hoặc với một cách `[stop.done]` như `just_drank` (cách này nghỉ các kỹ năng khai nó) không đổi gì ("Nothing changed: next is for a snooze or off;
+…").
+
+Mọi hàm `[stop]` có thêm `minutes`, một số nguyên ("with snooze only: how
+many minutes, 1 to 720, only when they say a length ('five minutes': 5);
+never guess; left out, until tomorrow morning"); có nó thì lần hoãn kết thúc
+sau ngần ấy phút thay vì 06:00 sáng hôm sau, giữ trong bộ nhớ và qua một lần
+khởi động lại ngắn cạnh các hold như mọi lần hoãn, và lời đáp nói độ dài:
+"Done: no sip of water nudge for 5 minutes." (một kỹ năng của hàm dùng
+chung), "Done: none of these for 1 minute." (hàm riêng của một kỹ năng).
+`minutes` với `off`, `on` hoặc một cách `[stop.done]` (`just_drank` giữ `for` của nó), hoặc không phải số nguyên từ 1 đến 720 (5.0
+là 5), không đổi gì ("Nothing changed: minutes is for a snooze only; …",
+"Nothing changed: minutes is a whole number from 1 to 720; …"). Không có
+`next` và `minutes` thì lời gọi như trước. Qua `use_skill`, dòng của một hàm
+dừng nói "Its next is a yes-or-no: …" và "Its minutes is a number: …" (dòng
+ngắn hoặc dòng `when` nói "It takes next and minutes too."), hàm
+`use_skill` nhận `next` và `minutes` khi một hàm dừng được đưa ra nhận chúng,
+và chuyển tiếp dưới tên của chúng, `all` vẫn là có/không của hàm dừng; một
+lời gọi `use_skill` được giữ lại cũng giữ chúng (`SKILL_KEPT_FIELDS`). Test:
+`the_next_one_for_five_minutes_snoozes_only_the_nudge_due_next`,
+`a_snooze_with_no_minutes_is_until_the_morning_as_before`,
+`next_all_kind_and_minutes_mixed_wrongly_change_nothing`,
+`just_drank_takes_neither_next_nor_minutes`
+(`crates/skills/tests/it/skills.rs`) và `a_stops_next_and_minutes_are_passed_on`
+(`lamp_voice::use_skill`).
+
 ## Chủ đề người ở bàn đang làm gì (#6543, chưa có bên phát)
 
 Đã khai báo cho #6543 (nhận biết qua đám mây), chưa có phần nào phát:

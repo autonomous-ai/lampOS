@@ -384,6 +384,12 @@
               "maxLength": 160
             }
           }
+        },
+        "kind": {
+          "type": "string",
+          "pattern": "^[a-z](-?[a-z0-9])*$",
+          "maxLength": 32,
+          "description": "The word a call of a shared stop function names this skill by, beside its name (#6543)."
         }
       }
     },

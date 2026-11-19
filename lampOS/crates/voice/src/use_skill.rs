@@ -22,6 +22,26 @@ pub const NAME: &str = "use_skill";
 pub const ENVIRONMENT: &str = "LAMP_USE_SKILL";
 /// The provider worker's flag for it.
 pub const FLAG: &str = "--use-skill";
+/// A skill's kind (#6543): beside its choice, the one word of a list a
+/// shared `[stop]` function names one kind of its skills by
+/// (`lamp_skills::STOP_KIND`). Passed on under its own name. `use_skill`
+/// takes it only when a skill it offers has one, so with none it is as
+/// before, byte for byte.
+pub const KIND: &str = "kind";
+/// A shared stop's yes-or-no for "the next one" (#7910,
+/// `lamp_skills::STOP_NEXT`): beside its choice and its own yes-or-no
+/// (`all`), passed on under its own name, only to a stop that takes it.
+pub const NEXT: &str = "next";
+/// A stop's snooze length in minutes (#7910, `lamp_skills::STOP_MINUTES`):
+/// a whole number, passed on under its own name, only to a stop that takes
+/// it.
+pub const MINUTES: &str = "minutes";
+/// The choice of a `[stop]` function, and its words
+/// (`lamp_skills::STOP_CHOICE`, `lamp_skills::STOP_WAYS`): a function with
+/// them is a stop, and only a stop's [`KIND`] is its kind.
+pub const STOP_CHOICE: &str = "how";
+/// The words of [`STOP_CHOICE`].
+pub const STOP_WAYS: [&str; 3] = ["snooze", "off", "on"];
 
 /// The worker's flag for what the environment says: `on` only.
 pub fn arguments(value: Option<&str>) -> Vec<String> {
@@ -125,6 +145,36 @@ fn built(skills: &[Tool]) -> Tool {
         })),
         silent: false,
     };
+    // A skill's kind (#6543), only when one of them takes one: with none,
+    // the function is as before, byte for byte.
+    if skills.iter().any(|skill| kind(skill).is_some())
+        && let Some(parameters) = tool.parameters.as_mut()
+    {
+        parameters["properties"][KIND] = json!({
+            "type": "string",
+            "description": "The skill's kind, whenever the person names one ('stop the water nudge': water): one of the words its line lists as its kind. Leave it out only when its line names none, or the person named none."
+        });
+    }
+    // A stop's "next one" and its snooze length (#7910), only when one of
+    // them takes them: with none, the function is as before, byte for byte.
+    if skills.iter().any(|skill| stop_takes(skill, NEXT).is_some())
+        && let Some(parameters) = tool.parameters.as_mut()
+    {
+        parameters["properties"][NEXT] = json!({
+            "type": "boolean",
+            "description": "The skill's next, as its line says: true for 'the next one'. Leave it out when its line names none."
+        });
+    }
+    if skills
+        .iter()
+        .any(|skill| stop_takes(skill, MINUTES).is_some())
+        && let Some(parameters) = tool.parameters.as_mut()
+    {
+        parameters["properties"][MINUTES] = json!({
+            "type": "integer",
+            "description": "The skill's minutes, as its line says: only when the person says a length; never guess. Leave it out otherwise."
+        });
+    }
     // A question about any skill on the lamp, told from the lamp's own
     // records (`LAMP_SKILL_STATE_TOLD`, #7335, [`crate::skill_about`]):
     // `about`, given alone, so `skill` is no longer required. Only with the
@@ -331,6 +381,7 @@ fn short_line(skill: &Tool) -> String {
     if let Some((name, _)) = flag(skill) {
         line.push_str(&format!(" Its yes-or-no is {name}."));
     }
+    line.push_str(&takes_next_and_minutes(skill));
     line.replace('\n', " ")
 }
 
@@ -348,6 +399,7 @@ fn when_line(skill: &Tool, when: &str) -> String {
     if let Some((name, _)) = flag(skill) {
         line.push_str(&format!(" Its yes-or-no is {name}."));
     }
+    line.push_str(&takes_next_and_minutes(skill));
     line.replace('\n', " ")
 }
 
@@ -429,7 +481,43 @@ fn line(skill: &Tool) -> String {
                 .unwrap_or_default()
         ));
     }
+    if let Some((words, about)) = kind(skill) {
+        line.push_str(&format!(
+            " Its {KIND} is one of {}{}.",
+            words.join(", "),
+            about
+                .map(|about| format!(": {}", about.trim().trim_end_matches('.')))
+                .unwrap_or_default()
+        ));
+    }
+    for (name, what) in [(NEXT, "a yes-or-no"), (MINUTES, "a number")] {
+        if let Some(schema) = stop_takes(skill, name) {
+            line.push_str(&format!(
+                " Its {name} is {what}{}.",
+                schema
+                    .get("description")
+                    .and_then(Value::as_str)
+                    .map(|about| format!(": {}", about.trim().trim_end_matches('.')))
+                    .unwrap_or_default()
+            ));
+        }
+    }
     line.replace('\n', " ")
+}
+
+/// A short or `when` line's word of a stop's [`NEXT`] and [`MINUTES`]
+/// (#7910), by name only, as its choice is there; none when it takes
+/// neither.
+fn takes_next_and_minutes(skill: &Tool) -> String {
+    let taken: Vec<&str> = [NEXT, MINUTES]
+        .into_iter()
+        .filter(|name| stop_takes(skill, name).is_some())
+        .collect();
+    if taken.is_empty() {
+        String::new()
+    } else {
+        format!(" It takes {} too.", taken.join(" and "))
+    }
 }
 
 /// Whether `skill` takes neither a choice nor a yes-or-no: what a call
@@ -438,33 +526,86 @@ pub(crate) fn takes_nothing(skill: &Tool) -> bool {
     choice(skill).is_none() && flag(skill).is_none()
 }
 
-/// The skill's choice: its parameter's name, its words, what it says of it.
-fn choice(skill: &Tool) -> Option<(&str, Vec<&str>, Option<&str>)> {
-    properties(skill).find_map(|(name, schema)| {
-        let words: Vec<&str> = schema
-            .get("enum")?
-            .as_array()?
-            .iter()
-            .filter_map(Value::as_str)
-            .collect();
-        Some((
-            name.as_str(),
-            words,
-            schema.get("description").and_then(Value::as_str),
-        ))
-    })
+/// Whether `skill` is a `[stop]` function: its [`STOP_CHOICE`] says the
+/// [`STOP_WAYS`] first, then any `[stop.done]` ways (#7753's `just_drank`).
+fn is_stop(skill: &Tool) -> bool {
+    properties(skill)
+        .find(|(name, _)| name.as_str() == STOP_CHOICE)
+        .and_then(|(_, schema)| schema.get("enum")?.as_array())
+        .is_some_and(|words| {
+            words.len() >= STOP_WAYS.len()
+                && words
+                    .iter()
+                    .map(Value::as_str)
+                    .zip(STOP_WAYS)
+                    .all(|(word, way)| word == Some(way))
+        })
 }
 
-/// The skill's yes-or-no: its parameter's name, and what it says of it.
-fn flag(skill: &Tool) -> Option<(&str, Option<&str>)> {
-    properties(skill).find_map(|(name, schema)| {
-        (schema.get("type").and_then(Value::as_str) == Some("boolean")).then(|| {
-            (
+/// The skill's choice: its parameter's name, its words, what it says of it.
+/// A stop's [`KIND`] is its kind ([`kind`]), not its choice; any other
+/// skill's parameter named `kind` is picked as before #6543 (the voice
+/// read on #7473).
+fn choice(skill: &Tool) -> Option<(&str, Vec<&str>, Option<&str>)> {
+    let stop = is_stop(skill);
+    properties(skill)
+        .filter(|(name, _)| !stop || name.as_str() != KIND)
+        .find_map(|(name, schema)| {
+            let words: Vec<&str> = schema
+                .get("enum")?
+                .as_array()?
+                .iter()
+                .filter_map(Value::as_str)
+                .collect();
+            Some((
                 name.as_str(),
+                words,
                 schema.get("description").and_then(Value::as_str),
-            )
+            ))
         })
-    })
+}
+
+/// The skill's kind ([`KIND`], #6543): its words and what it says of it,
+/// when it takes one beside its choice.
+fn kind(skill: &Tool) -> Option<(Vec<&str>, Option<&str>)> {
+    if !is_stop(skill) {
+        return None;
+    }
+    let schema = properties(skill).find(|(name, _)| name.as_str() == KIND)?.1;
+    let words: Vec<&str> = schema
+        .get("enum")?
+        .as_array()?
+        .iter()
+        .filter_map(Value::as_str)
+        .collect();
+    Some((words, schema.get("description").and_then(Value::as_str)))
+}
+
+/// A stop's [`NEXT`] or [`MINUTES`] (#7910): its schema, when `skill` is a
+/// stop that takes it.
+fn stop_takes<'a>(skill: &'a Tool, name: &str) -> Option<&'a Value> {
+    if !is_stop(skill) {
+        return None;
+    }
+    properties(skill)
+        .find(|(own, _)| own.as_str() == name)
+        .map(|(_, schema)| schema)
+}
+
+/// The skill's yes-or-no: its parameter's name, and what it says of it. A
+/// stop's [`NEXT`] is its own ([`stop_takes`]), not its yes-or-no.
+fn flag(skill: &Tool) -> Option<(&str, Option<&str>)> {
+    let stop = is_stop(skill);
+    properties(skill)
+        .filter(|(name, _)| !stop || name.as_str() != NEXT)
+        .find_map(|(name, schema)| {
+            (schema.get("type").and_then(Value::as_str) == Some("boolean")).then(|| {
+                (
+                    name.as_str(),
+                    schema.get("description").and_then(Value::as_str),
+                )
+            })
+        })
 }
 
 fn properties(skill: &Tool) -> impl Iterator<Item = (&String, &Value)> {
@@ -528,11 +669,22 @@ pub fn translate(call: &ToolCall, skills: &[Tool]) -> Result<ToolCall, Value> {
     };
     let choice_of = choice(skill);
     let flag_of = flag(skill);
+    let kind_of = kind(skill);
+    // A skill's own choice or yes-or-no named `kind` is its own, as before
+    // #6543 (the reviewer on #7473).
+    let own_kind = choice_of.as_ref().is_some_and(|(name, _, _)| *name == KIND)
+        || flag_of.as_ref().is_some_and(|(name, _)| *name == KIND);
     // The skill's own parameters' names are taken too, as its line says
     // them ("Its choice is style"); any other key is told, never dropped
     // (the reviewer on #1696).
+    // A stop's next and minutes (#7910), where it takes them.
+    let next_of = stop_takes(skill, NEXT).is_some();
+    let minutes_of = stop_takes(skill, MINUTES).is_some();
     let known = |key: &str| {
         matches!(key, "skill" | "choice" | "flag")
+            || (kind_of.is_some() && key == KIND)
+            || (next_of && key == NEXT)
+            || (minutes_of && key == MINUTES)
             || choice_of.as_ref().is_some_and(|(name, _, _)| *name == key)
             || flag_of.as_ref().is_some_and(|(name, _)| *name == key)
     };
@@ -553,8 +705,22 @@ pub fn translate(call: &ToolCall, skills: &[Tool]) -> Result<ToolCall, Value> {
             (false, true) => format!("give {}'s yes-or-no as flag", skill.name),
             (false, false) => format!("{} takes only its name", skill.name),
         };
+        // `kind` too where it is taken (the voice read on #7473), and a
+        // stop's next and minutes (#7910).
+        let mut fields = vec!["skill", "choice", "flag"];
+        if kind_of.is_some() && !own_kind {
+            fields.push(KIND);
+        }
+        if next_of {
+            fields.push(NEXT);
+        }
+        if minutes_of {
+            fields.push(MINUTES);
+        }
+        let last = fields.pop().unwrap_or_default();
+        let fields = format!("{} and {last}", fields.join(", "));
         return Err(json!({
-            "error": format!("use_skill takes skill, choice and flag, not {stray}: {takes}.")
+            "error": format!("use_skill takes {fields}, not {stray}: {takes}.")
         }));
     }
     let given_choice = call.args.get("choice").or_else(|| {
@@ -596,6 +762,31 @@ pub fn translate(call: &ToolCall, skills: &[Tool]) -> Result<ToolCall, Value> {
     }
     if let (Some(given), Some((name, _))) = (given_flag, flag_of) {
         args.insert(name.to_owned(), json!(given));
+    }
+    // Its kind as given: the skill says when it is none of its kinds. Only
+    // a skill declaring kinds, and none of whose own parameters is named
+    // `kind`: that one's `kind` went in above as its choice or yes-or-no.
+    if kind_of.is_some() && !own_kind {
+        match call.args.get(KIND) {
+            Some(Value::String(given)) => {
+                args.insert(KIND.to_owned(), json!(given));
+            }
+            Some(Value::Null) | None => {}
+            Some(_) => {
+                return Err(json!({"error": format!("{}'s kind is a word.", skill.name)}));
+            }
+        }
+    }
+    // A stop's next and minutes as given (#7910): the stop says when one
+    // is wrong, or mixed with all or a kind.
+    for (name, taken) in [(NEXT, next_of), (MINUTES, minutes_of)] {
+        if let Some(given) = call
+            .args
+            .get(name)
+            .filter(|given| taken && !given.is_null())
+        {
+            args.insert(name.to_owned(), given.clone());
+        }
     }
     Ok(ToolCall {
         id: call.id.clone(),
@@ -1154,5 +1345,250 @@ mod tests {
         assert!(!cut(&many, &BTreeSet::new()).is_empty());
         crate::made_skill::set_said_here(None);
         crate::skill_about::set_on_here(None);
+    }
+
+    /// #6543: a shared stop that offers a kind, as `lamp_skills::tools_file`
+    /// writes it: its line names the kinds, `use_skill` takes `kind` and
+    /// passes it on, with `how` still its choice and `all` its yes-or-no.
+    /// With no skill taking one, the function has no `kind`, as before.
+    #[test]
+    fn a_shared_stops_kind_is_passed_on_and_offered_only_when_taken() {
+        let stop = skill(
+            "nudges",
+            "When someone asks to stop the nudges.",
+            Some(json!({"type":"object","properties":{
+                "all":{"type":"boolean","description":"true for every one of them"},
+                "how":{"type":"string","enum":["snooze","off","on"],"description":"snooze or off or on"},
+                "kind":{"type":"string","enum":["drinks","meals"],"description":"only the ones of the kind they named"}}})),
+        );
+        assert!(line(&stop).contains("Its choice is how, one of snooze, off, on"));
+        assert!(line(&stop).contains("Its kind is one of drinks, meals"));
+        let tool = function(std::slice::from_ref(&stop)).unwrap();
+        assert!(tool.parameters.unwrap()["properties"].get(KIND).is_some());
+        let made = translate(
+            &call(json!({"skill":"nudges","choice":"off","kind":"drinks"})),
+            std::slice::from_ref(&stop),
+        )
+        .unwrap();
+        assert_eq!(made.args, json!({"how":"off","kind":"drinks"}));
+        // An unknown word goes on, for the skill to say it is none of its kinds.
+        let made = translate(
+            &call(json!({"skill":"nudges","choice":"on","kind":"naps"})),
+            std::slice::from_ref(&stop),
+        )
+        .unwrap();
+        assert_eq!(made.args["kind"], "naps");
+        // A skill with no kind: refused as any key it does not take.
+        let without = installed();
+        assert!(
+            function(&without).unwrap().parameters.unwrap()["properties"]
+                .get(KIND)
+                .is_none()
+        );
+        assert!(
+            translate(
+                &call(json!({"skill":"dance","choice":"jazz","kind":"drinks"})),
+                &without
+            )
+            .is_err()
+        );
+        // A skill whose own choice is named kind keeps it as its choice.
+        let own = skill(
+            "sort",
+            "Sorts.",
+            Some(json!({"type":"object","properties":{
+                "kind":{"type":"string","enum":["a","b"]}}})),
+        );
+        assert_eq!(choice(&own).unwrap().0, KIND);
+        assert!(kind(&own).is_none());
+    }
+
+    /// #7753 on #7473: the wellbeing stop's `how` has `just_drank` after the
+    /// three ways, and is still a stop, so its kind is passed on.
+    #[test]
+    fn a_stop_with_a_done_way_still_passes_its_kind_on() {
+        let stop = skill(
+            "nudges",
+            "When someone asks to stop the nudges.",
+            Some(json!({"type":"object","properties":{
+                "all":{"type":"boolean","description":"true for every one of them"},
+                "how":{"type":"string","enum":["snooze","off","on","just_drank"],"description":"snooze or off or on"},
+                "kind":{"type":"string","enum":["eyes","water"],"description":"only the ones of the kind they named"}}})),
+        );
+        assert!(is_stop(&stop));
+        assert!(line(&stop).contains("Its kind is one of eyes, water"));
+        let made = translate(
+            &call(json!({"skill":"nudges","choice":"off","kind":"eyes"})),
+            std::slice::from_ref(&stop),
+        )
+        .unwrap();
+        assert_eq!(made.args, json!({"how":"off","kind":"eyes"}));
+        let made = translate(
+            &call(json!({"skill":"nudges","choice":"just_drank"})),
+            std::slice::from_ref(&stop),
+        )
+        .unwrap();
+        assert_eq!(made.args, json!({"how":"just_drank"}));
+    }
+
+    /// The reviewer on #7473: a skill whose own choice or yes-or-no is named
+    /// `kind` is called with it as before #6543, under its own name or as
+    /// choice / flag, and a word not its choice is told as its choice.
+    #[test]
+    fn a_skills_own_parameter_named_kind_passes_through() {
+        let own = skill(
+            "sort",
+            "Sorts.",
+            Some(json!({"type":"object","properties":{
+                "kind":{"type":"string","enum":["a","b"]}}})),
+        );
+        let skills = std::slice::from_ref(&own);
+        let made = translate(&call(json!({"skill":"sort","kind":"a"})), skills).unwrap();
+        assert_eq!(made.name, "sort");
+        assert_eq!(made.args, json!({"kind":"a"}));
+        let made = translate(&call(json!({"skill":"sort","choice":"b"})), skills).unwrap();
+        assert_eq!(made.args, json!({"kind":"b"}));
+        let refused = translate(&call(json!({"skill":"sort","kind":"c"})), skills).unwrap_err();
+        assert_eq!(refused["error"], "sort's choice is one of a, b.");
+        let flagged = skill(
+            "lights",
+            "Lights.",
+            Some(json!({"type":"object","properties":{
+                "kind":{"type":"boolean"}}})),
+        );
+        let made = translate(
+            &call(json!({"skill":"lights","kind":true})),
+            std::slice::from_ref(&flagged),
+        )
+        .unwrap();
+        assert_eq!(made.args, json!({"kind":true}));
+        // Two word lists, not a stop: `kind` is its choice, as before.
+        let two = skill(
+            "sort",
+            "Sorts.",
+            Some(json!({"type":"object","properties":{
+                "kind":{"type":"string","enum":["a","b"]},
+                "style":{"type":"string","enum":["x","y"]}}})),
+        );
+        assert_eq!(choice(&two).unwrap().0, KIND);
+        assert!(kind(&two).is_none());
+        let made = translate(
+            &call(json!({"skill":"sort","kind":"b"})),
+            std::slice::from_ref(&two),
+        )
+        .unwrap();
+        assert_eq!(made.args, json!({"kind":"b"}));
+    }
+
+    /// The reviewer's P3 on #7473: a stop whose own yes-or-no is named `kind`
+    /// (a stop's choice never is) keeps it as its yes-or-no, not read as the
+    /// shared stop's kind, which would refuse it as not a word.
+    #[test]
+    fn a_stops_own_yes_or_no_named_kind_is_not_its_kind() {
+        let stop = skill(
+            "nudges",
+            "When someone asks to stop the nudges.",
+            Some(json!({"type":"object","properties":{
+                "how":{"type":"string","enum":["snooze","off","on"]},
+                "kind":{"type":"boolean","enum":[true,false]}}})),
+        );
+        assert!(kind(&stop).is_some());
+        assert_eq!(flag(&stop).unwrap().0, KIND);
+        let made = translate(
+            &call(json!({"skill":"nudges","choice":"off","kind":true})),
+            std::slice::from_ref(&stop),
+        )
+        .unwrap();
+        assert_eq!(made.name, "nudges");
+        assert_eq!(made.args, json!({"how":"off","kind":true}));
+    }
+
+    /// The voice read on #7473: a stray key on a skill taking a kind is told
+    /// `kind` is taken too.
+    #[test]
+    fn a_stray_key_on_a_kinded_skill_names_kind() {
+        let stop = skill(
+            "nudges",
+            "When someone asks to stop the nudges.",
+            Some(json!({"type":"object","properties":{
+                "how":{"type":"string","enum":["snooze","off","on"]},
+                "kind":{"type":"string","enum":["drinks","meals"]}}})),
+        );
+        let refused = translate(
+            &call(json!({"skill":"nudges","choice":"off","mood":"x"})),
+            std::slice::from_ref(&stop),
+        )
+        .unwrap_err();
+        assert_eq!(
+            refused["error"],
+            "use_skill takes skill, choice, flag and kind, not mood: give nudges's choice as choice."
+        );
+    }
+
+    /// #7910: a shared stop's `next` and `minutes`, as `lamp_skills::tools_file`
+    /// writes them: its line names them, `use_skill` takes them and passes
+    /// them on under their own names, `all` still its yes-or-no. A skill not
+    /// a stop has neither, and the function none, as before.
+    #[test]
+    fn a_stops_next_and_minutes_are_passed_on() {
+        let stop = skill(
+            "nudges",
+            "When someone asks to stop the nudges.",
+            Some(json!({"type":"object","properties":{
+                "all":{"type":"boolean","description":"true for every one of them"},
+                "how":{"type":"string","enum":["snooze","off","on"]},
+                "minutes":{"type":"integer","description":"with snooze only: how many minutes; never guess"},
+                "next":{"type":"boolean","description":"true for 'the next one'"}}})),
+        );
+        assert_eq!(flag(&stop).unwrap().0, "all");
+        let said = line(&stop);
+        assert!(said.contains("Its yes-or-no is all"), "{said}");
+        assert!(
+            said.contains("Its next is a yes-or-no: true for 'the next one'"),
+            "{said}"
+        );
+        assert!(
+            said.contains("Its minutes is a number: with snooze only"),
+            "{said}"
+        );
+        let short = short_line(&stop);
+        assert!(short.contains("It takes next and minutes too."), "{short}");
+        let tool = function(std::slice::from_ref(&stop)).unwrap();
+        let properties = &tool.parameters.unwrap()["properties"];
+        assert_eq!(properties[NEXT]["type"], "boolean");
+        assert_eq!(properties[MINUTES]["type"], "integer");
+        let made = translate(
+            &call(json!({"skill":"nudges","choice":"snooze","next":true,"minutes":5})),
+            std::slice::from_ref(&stop),
+        )
+        .unwrap();
+        assert_eq!(made.args, json!({"how":"snooze","next":true,"minutes":5}));
+        // Mixed with all: passed on, for the stop to refuse.
+        let made = translate(
+            &call(json!({"skill":"nudges","choice":"snooze","flag":true,"next":true})),
+            std::slice::from_ref(&stop),
+        )
+        .unwrap();
+        assert_eq!(made.args, json!({"how":"snooze","all":true,"next":true}));
+        let refused = translate(
+            &call(json!({"skill":"nudges","choice":"off","mood":"x"})),
+            std::slice::from_ref(&stop),
+        )
+        .unwrap_err();
+        assert_eq!(
+            refused["error"],
+            "use_skill takes skill, choice, flag, next and minutes, not mood: give nudges's choice as choice and its yes-or-no as flag."
+        );
+        // Not a stop: neither is taken.
+        let without = installed();
+        let properties = function(&without).unwrap().parameters.unwrap()["properties"].clone();
+        assert!(properties.get(NEXT).is_none() && properties.get(MINUTES).is_none());
+        assert!(
+            translate(
+                &call(json!({"skill":"dance","choice":"jazz","minutes":5})),
+                &without
+            )
+            .is_err()
+        );
     }
 }
