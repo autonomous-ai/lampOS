@@ -2592,6 +2592,7 @@ version = "0.1.0"
 dependencies = [
  "axum",
  "lamp-bus",
+ "lamp-checked-replace",
  "lamp-ipc",
  "lamp-keeper",
  "lamp-local-time",
