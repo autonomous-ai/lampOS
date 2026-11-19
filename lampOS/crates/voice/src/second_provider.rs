@@ -1926,6 +1926,8 @@ struct Shared {
     made_not_on: bool,
     /// [`Engine::checking_doing_claims`] (#7285).
     doing_claims: bool,
+    /// [`Engine::checking_keep_claims_whole`] (#7878).
+    keep_whole: bool,
     /// [`Engine::reading_made_names`] (#7683).
     made_names: Option<MadeNames>,
     /// With the make's one run path ([`Engine::waiting_on_one_path`],
@@ -5088,6 +5090,7 @@ impl Engine {
                 worded_claims: false,
                 made_not_on: false,
                 doing_claims: false,
+                keep_whole: false,
                 made_names: None,
                 one_path_wait: None,
                 no_words_again: false,
@@ -6457,6 +6460,22 @@ impl Engine {
     pub fn checking_doing_claims(mut self, on: bool) -> Self {
         if let Some(shared) = Arc::get_mut(&mut self.shared) {
             shared.doing_claims = on;
+        }
+        self
+    }
+
+    /// `LAMP_KEEP_CLAIM_WHOLE=on` ([`crate::remember::WHOLE_ENVIRONMENT`],
+    /// #7878): on a turn whose spoken line is a statement about the person
+    /// (`remember::about_someone`, never a question), while no `remember`
+    /// of the turn has run, a reply is held to its round's end and judged
+    /// whole for a keep, replace or update said done
+    /// (`remember::claims_a_change`), not only by its opening. With such a
+    /// claim and no `remember`, it is asked again once, then said not kept,
+    /// as an opening's claim is. Every other turn streams as before. Before
+    /// any turn only.
+    pub fn checking_keep_claims_whole(mut self, on: bool) -> Self {
+        if let Some(shared) = Arc::get_mut(&mut self.shared) {
+            shared.keep_whole = on;
         }
         self
     }
@@ -16624,8 +16643,13 @@ fn claim_released(
     found: &[Vec<String>],
     asked: Option<&str>,
     faces: bool,
+    whole: bool,
 ) -> Option<String> {
     let held = claim_held.as_mut()?;
+    // Judged whole at the round's end (`LAMP_KEEP_CLAIM_WHOLE`, #7878).
+    if whole {
+        return None;
+    }
     if yes && let Some(end) = crate::remember::said_kept_found_to(held, found, asked, false) {
         return match crate::remember::claims_a_keep_said(&held[..end], false, faces, false) {
             Some(false) => {
@@ -17134,6 +17158,19 @@ async fn answer(
         _ => Vec::new(),
     };
     let made_asked = crate::action_claim::asked_as_a_question(&said);
+    // A turn whose reply is judged whole for a keep claimed anywhere in it
+    // (`LAMP_KEEP_CLAIM_WHOLE`, #7878): a spoken statement about the
+    // person, never a question.
+    let keep_whole_turn = shared.keep_whole
+        && heard
+        && !quoted
+        && !made_asked
+        && crate::remember::about_someone(&said);
+    if keep_whole_turn {
+        eprintln!(
+            "lamp-voice second: request {request}: a line about the person: its reply is held whole until a remember runs (LAMP_KEEP_CLAIM_WHOLE)"
+        );
+    }
     // Whether a light act told as under way is a claim (#7285,
     // `LAMP_ACTION_CLAIM_DOING`): read from the reply alone.
     let doing_turn = shared.doing_claims;
@@ -18714,6 +18751,7 @@ async fn answer(
                                     &recall_found,
                                     yes_answers.as_deref(),
                                     shared.face_claims,
+                                    keep_whole_turn && !remember_ran,
                                 ) {
                                     Some(said) => said,
                                     // Undecided, or a claim: held.
@@ -19239,6 +19277,7 @@ async fn answer(
                                 &recall_found,
                                 yes_answers.as_deref(),
                                 shared.face_claims,
+                                keep_whole_turn && !remember_ran,
                             )
                             .unwrap_or_default()
                         }
@@ -19297,6 +19336,7 @@ async fn answer(
                                     &recall_found,
                                     yes_answers.as_deref(),
                                     shared.face_claims,
+                                    keep_whole_turn && !remember_ran,
                                 )
                                 .unwrap_or_default()
                             }
@@ -19382,7 +19422,23 @@ async fn answer(
                             yes_answers.as_deref(),
                             true,
                         ),
-                );
+                )
+                .or_else(|| {
+                    // Judged whole (`LAMP_KEEP_CLAIM_WHOLE`, #7878): a keep,
+                    // replace or update said done in any sentence, as a
+                    // hard claim ("Got it — your car is on Level B1, spot 7
+                    // now. That replaces wherever it was before.").
+                    (keep_whole_turn
+                        && !remember_ran
+                        && !settings_saved
+                        && crate::remember::claims_a_change(&held))
+                    .then(|| {
+                        eprintln!(
+                            "lamp-voice second: request {request} chat round {round}: its reply, held whole on a line about the person, says in it that something was kept or replaced (LAMP_KEEP_CLAIM_WHOLE)"
+                        );
+                        crate::remember::KeepClaim::Hard
+                    })
+                });
                 // A face said saved (`LAMP_MEMORY_KEEP_ASKED`, #5141 row 8:
                 // lamp-0c4e, 3 Nov, "hold still while I take your face in"
                 // with no call) is kept by `remember_my_face`: one in this
