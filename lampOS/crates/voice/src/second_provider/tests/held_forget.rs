@@ -60,6 +60,8 @@ struct Ran {
     /// For each `remember` run, the words its scope was marked as a yes to
     /// a held keep about ([`crate::memory_scope::ScopeLease::released_keep`]).
     released: Vec<Option<String>>,
+    /// What each turn's events were, as [`turn`] labels them ("said:…").
+    events: Vec<String>,
 }
 
 async fn run(turns: &[Turn]) -> Ran {
@@ -277,6 +279,7 @@ async fn run_full_with_audio(
     // Strictly after it, beyond a coarse file clock's tick.
     std::thread::sleep(Duration::from_millis(20));
     let mut frame = 0u64;
+    let mut events: Vec<String> = Vec::new();
     for (at, (who, said, _, after)) in turns.iter().enumerate() {
         let request = at as u64 + first;
         *now.lock().unwrap() += Duration::from_secs(*after);
@@ -342,13 +345,13 @@ async fn run_full_with_audio(
                 tokio::time::sleep(Duration::from_millis(40)).await;
             }
             engine.submit(end(request));
-            turn(&mut engine).await;
+            events.extend(turn(&mut engine).await);
             done.store(true, Ordering::Release);
             frame = feeder.join().unwrap();
             engine.retire_through(request);
             continue;
         }
-        turn(&mut engine).await;
+        events.extend(turn(&mut engine).await);
         engine.retire_through(request);
     }
     let _ = std::fs::remove_file(known_face_of(&path));
@@ -380,6 +383,7 @@ async fn run_full_with_audio(
         marked,
         calls,
         released,
+        events,
     }
 }
 
@@ -2521,10 +2525,12 @@ async fn the_audio_runner_preserves_confirmation_prints_after_failed_or_other_pe
 /// `LAMP_MEMORY_UNSURE_NOT_KEPT` a doubted keep is not kept and nothing is
 /// asked: a keep its own round doubts, a keep the round right after it
 /// doubts (taken back, never held for a yes, with or without the eyes), and
-/// a keep with a near spelling of a heard word (never "is that …?", even
-/// with `LAMP_MEMORY_ASK_NEAR_HEARD`). The model is told it was not kept
-/// and never to say it was. A clear keep is kept as before, and "forget
-/// everything" still asks "sure?" first. Off, each asks as before.
+/// a keep with a near spelling of a heard word in place of
+/// `LAMP_MEMORY_ASK_NEAR_HEARD`'s "is that …?" (with that off, kept as
+/// before). The person hears it wasn't kept in one line that asks nothing,
+/// and the model is told never to say it was. A clear keep is kept as
+/// before, and "forget everything" still asks "sure?" first. Off, each asks
+/// as before.
 #[tokio::test]
 async fn an_unsure_line_is_not_kept_and_nothing_is_asked() {
     const REMEMBER: &str = crate::remember::REMEMBER;
@@ -2535,10 +2541,13 @@ async fn an_unsure_line_is_not_kept_and_nothing_is_asked() {
     const CODE: &str = "Their code is 4417.";
     const A: Sight = (&["A"], true);
     let keep = |text: &str| (REMEMBER.to_owned(), json!({ "text": text }));
-    let doubted = Lamp::Calls(
+    const DOUBTED: Lamp = Lamp::Calls(
         REMEMBER,
         "Kept. Was that 'rhinodulus' right? I want to be sure.",
     );
+    const NAME_SAID: &str = "Remember that my friend's name is Ngok.";
+    const NAME: &str = "Their friend's name is Ngoc.";
+    let taken_back = format!("said:{}", crate::remember::doubted::TAKEN_BACK_LINE);
     let undone = vec![
         (REMEMBER.to_owned(), json!({"name": "A"})),
         (FORGET.to_owned(), json!({"source_id": 391})),
@@ -2563,16 +2572,29 @@ async fn an_unsure_line_is_not_kept_and_nothing_is_asked() {
             Some(&[A, A]),
             (true, false, true),
             vec![],
-            "Ask nothing about it",
+            "with no question",
             "a near word: not kept, not asked, and a yes keeps nothing",
         ),
         (
             &[("A", NEAR_SAID, Lamp::Keeps(NEAR, "Lovely flower."), 0)],
             None,
-            (false, false, true),
+            (true, false, true),
             vec![],
-            "Ask nothing about it",
+            "with no question",
             "a near word without the eyes: not kept either",
+        ),
+        (
+            &[(
+                "A",
+                NAME_SAID,
+                Lamp::Keeps(NAME, "Kept: your friend is Ngoc."),
+                0,
+            )],
+            Some(&[A]),
+            (false, false, true),
+            vec![keep(NAME)],
+            "",
+            "near asks off: a near-spelled name is kept as before (Twelve's P2)",
         ),
         (
             &[("A", NEAR_SAID, Lamp::Keeps(NEAR, "Is that ranunculus?"), 0)],
@@ -2598,7 +2620,7 @@ async fn an_unsure_line_is_not_kept_and_nothing_is_asked() {
             Some(&[A, A]),
             (false, false, true),
             vec![],
-            "Ask nothing about it",
+            "with no question",
             "its own round doubts: not run, not asked",
         ),
         (
@@ -2619,7 +2641,7 @@ async fn an_unsure_line_is_not_kept_and_nothing_is_asked() {
         ),
         (
             &[
-                ("A", "My favorite flower is a rhinodulus.", doubted, 0),
+                ("A", "My favorite flower is a rhinodulus.", DOUBTED, 0),
                 ("A", "Yes.", Lamp::Says("Okay."), 5),
             ],
             Some(&[A, A]),
@@ -2629,7 +2651,7 @@ async fn an_unsure_line_is_not_kept_and_nothing_is_asked() {
             "the round after doubts: taken back, and a yes keeps nothing",
         ),
         (
-            &[("A", "My favorite flower is a rhinodulus.", doubted, 0)],
+            &[("A", "My favorite flower is a rhinodulus.", DOUBTED, 0)],
             None,
             (false, true, true),
             undone.clone(),
@@ -2671,6 +2693,20 @@ async fn an_unsure_line_is_not_kept_and_nothing_is_asked() {
         if !told.is_empty() {
             assert!(asked.contains(told), "{case}: {asked}");
         }
+        if unsure && told == "with no question" {
+            // The person hears it wasn't kept, in a line that asks nothing
+            // (Twelve's P1 on #7966).
+            assert!(
+                asked.contains(crate::remember::doubted::NOT_CAUGHT_LINE),
+                "{case}"
+            );
+        }
+        if case.starts_with("the round after") {
+            // Its keep was said back: the lamp says plainly it isn't kept.
+            assert!(ran.events.contains(&taken_back), "{case}: {:?}", ran.events);
+        } else {
+            assert!(!ran.events.contains(&taken_back), "{case}");
+        }
         if unsure {
             // Never told to ask, and told never to say it was kept.
             for ask in ["Not kept yet", "Ask them", "kept again only"] {
@@ -2678,8 +2714,8 @@ async fn an_unsure_line_is_not_kept_and_nothing_is_asked() {
             }
             if !told.is_empty() {
                 assert!(
-                    asked.contains("Never say it was kept")
-                        || asked.contains("Never say it is kept"),
+                    asked.contains("never say it was kept")
+                        || asked.contains("never say it is kept"),
                     "{case}"
                 );
             }

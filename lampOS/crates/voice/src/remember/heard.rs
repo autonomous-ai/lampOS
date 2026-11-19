@@ -840,8 +840,11 @@ pub fn near_held_told(near: &[(String, String)]) -> Value {
 
 /// What the model is told of a `remember` with [`near_heard`] words when
 /// an unsure line is not kept (`doubted::UNSURE_ENVIRONMENT`, #7739):
-/// nothing kept, nothing asked ("is that ...?", "did you say ...?"), and
-/// never said kept or noted. Their words alone, not the model's.
+/// nothing kept, the person told so in one line that asks nothing
+/// (`doubted::NOT_CAUGHT_LINE`), never "is that ...?" or "did you say
+/// ...?", and never said kept or noted. Their words alone, not the
+/// model's. Only in place of [`NEAR_ENVIRONMENT`]'s ask: with that switch
+/// off a near spelling is kept as before (Twelve's P2 on #7966).
 pub fn near_not_kept_told(near: &[(String, String)]) -> Value {
     let heard = near
         .iter()
@@ -851,7 +854,8 @@ pub fn near_not_kept_told(near: &[(String, String)]) -> Value {
     json!({
         "remembered": false,
         "note": format!(
-            "Not kept: they were heard saying {heard}, not your words, and the lamp may have misheard, so nothing is kept. Ask nothing about it: no \"is that ...?\" and no \"did you say ...?\". Never say it is kept or noted."
+            "Not kept: they were heard saying {heard}, not your words, and the lamp may have misheard, so nothing is kept. Tell them so in a few words, with no question, for example \"{}\" Never ask \"is that ...?\" or \"did you say ...?\", and never say it is kept or noted.",
+            super::doubted::NOT_CAUGHT_LINE
         ),
     })
 }

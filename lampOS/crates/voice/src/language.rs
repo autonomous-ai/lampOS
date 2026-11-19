@@ -490,6 +490,17 @@ const FIXED_LINES: &[(&str, [&str; 4])] = &[
             "알겠어요.",
         ],
     ),
+    // What the second route says when a keep it said back is taken back
+    // for doubt (`LAMP_MEMORY_UNSURE_NOT_KEPT`, #7739).
+    (
+        crate::remember::doubted::TAKEN_BACK_LINE,
+        [
+            "Xin lỗi, rốt cuộc mình chưa lưu điều đó.",
+            "ごめんね、やっぱりそれは覚えておかなかったよ。",
+            "抱歉，我最后还是没有记下这个。",
+            "미안해요, 결국 그건 기억해 두지 않았어요.",
+        ],
+    ),
     // What the second route says for a line that only asks to keep, every
     // keep refused for want of a known face (#7877).
     (

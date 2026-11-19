@@ -3604,8 +3604,8 @@ pub const REMEMBER_DESCRIBED: &str = "Call this when someone asks you to remembe
 pub const REMEMBER_DESCRIBED_UNSURE: &str = "Call this when someone asks you to remember something or keep it in mind for later. \
                           Give what to keep as one short sentence that will still make sense weeks from now, \
                           with their own words for names and numbers. If you are not sure you heard a key word \
-                          right (a name, a number, or the thing itself), do not call this and do not ask about \
-                          it; never keep a word you doubt. Then say back \
+                          right (a name, a number, or the thing itself), do not call this: say in a few words, \
+                          with no question, that you didn't catch it well enough to keep it. Else say back \
                           in a few words what you kept, so they can put you right if you misheard; \
                           never also ask whether to keep it.";
 
@@ -21564,8 +21564,8 @@ mod tests {
         assert!(REMEMBER_DESCRIBED_UNSURE.len() <= REMEMBER_DESCRIBED.len());
         assert!(REMEMBER_DESCRIBED.contains("ask them"));
         assert!(!REMEMBER_DESCRIBED_UNSURE.contains("ask them"));
-        assert!(REMEMBER_DESCRIBED_UNSURE.contains("do not ask about"));
-        assert!(REMEMBER_DESCRIBED_UNSURE.contains("never keep a word you doubt"));
+        assert!(REMEMBER_DESCRIBED_UNSURE.contains("didn't catch it well enough to keep it"));
+        assert!(REMEMBER_DESCRIBED_UNSURE.contains("with no question"));
         for (forget_all, forget_about) in
             [(false, false), (true, false), (false, true), (true, true)]
         {
