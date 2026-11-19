@@ -157,6 +157,18 @@ pub const QUEUE_MOST: usize = 4;
 /// How long one run waits for the pane before it is [`BUSY`]: as long as
 /// lamp-skills' own queue holds a `busy` run (#7239).
 pub const QUEUE_WAIT: Duration = Duration::from_secs(15 * 60);
+/// How many times one spoken task's words may find the kept session not
+/// running (`NOT_RUNNING`, or a `TIMEOUT` with nothing taken), each time
+/// put back while the session is ensured again, before the task ends
+/// [`NOT_STARTED`] (#7895). On lamp-52e6 a round took about 25 s, so 3
+/// resumes end it at about 100 s, inside [`OPEN_IDLE_WITHIN`], the time a
+/// new pane is given to become ready: a session not taking words by then
+/// is not starting.
+pub const STARTING_RESUMES_MOST: u32 = 3;
+/// The `not_sent` code of a spoken task whose resumes are spent
+/// ([`STARTING_RESUMES_MOST`]). Task news tells it with its plain `failed`
+/// words ("it could not be started just now", with an offer to try again).
+pub const NOT_STARTED: &str = "one_session_not_started";
 /// Between two looks at a pane `wait` read idle but whose turn is not this
 /// task's yet, or a busy pane before its words are typed again.
 pub const TURN_LOOK: Duration = Duration::from_millis(500);
