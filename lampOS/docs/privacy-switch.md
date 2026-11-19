@@ -538,7 +538,14 @@ yes, so a kept face-expressions or room-sounds no stays (told to the model
 as `"kept as a no"`) and the forget never turns either on. The voice's
 start and every progress write of setup's walk leave a kept no in place,
 and a "no" in the walk keeps one where it would remove the file
-([onboarding.md](onboarding.md), "Room sounds"). The reset still removes
+([onboarding.md](onboarding.md), "Room sounds"). A no from before
+the switch, whose file was removed (a walk's "no", or for seen activity
+the app's mark beside no yes), is kept as a no once by lamp-voice's start
+with the switch on, and until its done mark `noticing-old-nos.done` is in
+the consent folder every reader reads a missing file as no, so a person
+who declined face expressions, room sounds or seen activity never reads as
+on afterwards (the first builder's c7002724376 and c7003588081;
+[onboarding.md](onboarding.md), "Room sounds"). The reset still removes
 both files, a no too. The app's `consent.set` off still removes the file
 (slice 6 of #7767, behind `LAMP_APP_CONSENT`), so the switch goes on in no
 unit before that slice. Body sounds are not under it.

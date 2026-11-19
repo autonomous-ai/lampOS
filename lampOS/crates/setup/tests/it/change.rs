@@ -1098,6 +1098,9 @@ fn with_the_switch_on_the_apps_desk_off_keeps_a_no() {
     let config = root.config();
     let folder = &config.consent;
     fs::create_dir_all(folder).unwrap();
+    // A lamp whose earlier nos are kept (#7767, c7003588081): only then is
+    // a missing file the default.
+    fs::write(folder.join(lamp_msgs::consent::OLD_NOS_DONE), b"{}").unwrap();
     let file = folder.join("seen-activity.json");
     let key = lamp_msgs::consent::SEEN_ACTIVITY;
     let desk = |allow: bool, id: u64, by_default: bool| {

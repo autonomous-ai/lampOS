@@ -29,8 +29,9 @@ pub(crate) struct Paths {
     pub room_sounds_group: Option<u32>,
     /// `LAMP_NOTICING_BY_DEFAULT` (#7767,
     /// `lamp_msgs::consent::noticing_by_default`), where a missing yes file
-    /// is on: a kept no is then left alone, and a "no" at the lamp is kept
-    /// as one in place of the removal ([`take_back`], [`consent`]).
+    /// is on once the old nos are kept ([`keep_old_nos`], run at each start
+    /// with it on until done): a kept no is then left alone, and a "no" at
+    /// the lamp is kept as one in place of the removal ([`keeps_nos`]).
     pub noticing_by_default: bool,
 }
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -502,19 +503,13 @@ fn atomic_progress(paths: &Paths, progress: &Progress) -> io::Result<()> {
 /// after a removal, so the take-back is on disk before the progress that
 /// keeps the "no". The first error is returned, after every step is tried.
 ///
-/// With [`Paths::noticing_by_default`] on (#7767, Twelve's HOLD on #7928),
-/// where a missing file is on, a step whose progress holds the "no" keeps a
+/// With [`keeps_nos`] (#7767, Twelve's HOLD on #7928: the switch on, or the
+/// old nos done), a step whose progress holds the "no" keeps a
 /// no at its file (`lamp_msgs::consent::no_bytes`, `"by":"voice"`, at the
 /// "no"'s time) in place of the removal, and a redo leaves a kept no as it
-/// is (any other file is removed, as before: missing is on).
+/// is (any other file is removed, as before).
 fn take_back(paths: &Paths, progress: &Progress, before: Option<&Progress>) -> io::Result<()> {
-    let no = |progress: &Progress, step: &str| {
-        progress
-            .steps
-            .get(step)
-            .filter(|kept| kept.outcome == super::Outcome::Skipped)
-            .map(|kept| kept.at_unix_s)
-    };
+    let no = walk_no;
     let redone = |progress: &Progress, step: &str| progress.yes_redone_at_unix_s.get(step).copied();
     let count = |progress: &Progress, step: &str| progress.yes_taken_back.get(step).copied();
     let mut first = Ok(());
@@ -529,7 +524,7 @@ fn take_back(paths: &Paths, progress: &Progress, before: Option<&Progress>) -> i
             continue;
         }
         let path = consent_path(paths, step);
-        if paths.noticing_by_default {
+        if keeps_nos(paths) {
             let result = if let Some(at) = no(progress, step) {
                 keep_no(&path, step, at, paths.room_sounds_group)
             } else if lamp_msgs::consent::kept_no(&path, step) {
@@ -619,14 +614,14 @@ fn app_yes_stands(path: &Path, step: &str) -> bool {
 /// reader group's (0600 with no group). Never written again from the
 /// progress: a forget of everything removes it for good (`remember.rs`),
 /// whoever gave it. Only the answer and its time, never words, sound or a
-/// face. With [`Paths::noticing_by_default`] on (#7767, Twelve's HOLD on
+/// face. With [`keeps_nos`] (#7767, Twelve's HOLD on
 /// #7928) a kept no is left alone too: a stop's, the app's, or the walk's
 /// own ([`take_back`]); only a yes or a factory reset replaces it.
 fn consent(paths: &Paths, progress: &Progress, step: &str, new: bool) -> io::Result<()> {
     let path = &consent_path(paths, step);
     let Some(at) = kept_yes(progress, step) else {
         if app_yes_stands(path, step)
-            || (paths.noticing_by_default && lamp_msgs::consent::kept_no(path, step))
+            || (keeps_nos(paths) && lamp_msgs::consent::kept_no(path, step))
         {
             return Ok(());
         }
@@ -703,6 +698,119 @@ fn keep_whole(path: &Path, bytes: &[u8], group: Option<u32>) -> io::Result<()> {
     }
     result
 }
+/// The consent folder, where the yeses and the done mark are kept.
+fn consent_folder(paths: &Paths) -> Option<&Path> {
+    paths.room_sounds.parent()
+}
+
+/// Where [`keep_old_nos`] marks itself done: `lamp_msgs::consent::OLD_NOS_DONE`
+/// in the consent folder, where every reader looks for it.
+fn old_nos_mark(paths: &Paths) -> Option<PathBuf> {
+    consent_folder(paths).map(|folder| folder.join(lamp_msgs::consent::OLD_NOS_DONE))
+}
+
+/// Whether a no at the lamp is kept as one, not removed: with
+/// [`Paths::noticing_by_default`] on, or once [`keep_old_nos`] is done (a
+/// lamp switched on, then off, then on: a no said while off is still a no
+/// at the next on, Heron's P3 on #7940).
+fn keeps_nos(paths: &Paths) -> bool {
+    paths.noticing_by_default || consent_folder(paths).is_some_and(lamp_msgs::consent::old_nos_done)
+}
+
+/// The nos a person gave before `LAMP_NOTICING_BY_DEFAULT`, kept as nos
+/// (#7767, the first builder's c7002724376 and c7003588081): with
+/// [`Paths::noticing_by_default`] on, at each start until done, before the
+/// readers take any default (`lamp_msgs::consent::read_or` reads a missing
+/// file as no until the done mark is there).
+///
+/// - Each step in [`YES_STEPS`] whose walk progress holds the "no"
+///   (`skipped`), from a build that removed its file: a no at the "no"'s
+///   time, or now when it kept none (0).
+/// - Seen activity, when the app's mark stands beside no yes file: the
+///   mark is raised only by an app's yes or off, the lamp's stop or a
+///   forget, so with no yes it is a no; at the mark's time, or now.
+///
+/// Each `"by":"voice"`, written whole in the yes's mode and group
+/// ([`keep_no`]), under the mark's lock the stop and root's helper hold,
+/// and never over a file already there (an app's yes, a stop's no). A lock
+/// not taken writes nothing. The done mark is written only after every no
+/// is kept, so a no not kept is tried again at the next start, and once it
+/// is there a later yes is never turned back into a no. One journal line,
+/// the keys only.
+fn keep_old_nos(paths: &Paths, progress: &Progress) {
+    use lamp_msgs::consent::{SEEN_ACTIVITY, file_in, lock_mark, mark_in};
+    let (Some(folder), Some(mark)) = (consent_folder(paths), old_nos_mark(paths)) else {
+        return;
+    };
+    if fs::symlink_metadata(&mark).is_ok() {
+        return;
+    }
+    let lock = match lock_mark(folder) {
+        Ok(lock) => lock,
+        Err(error) => {
+            eprintln!(
+                "lamp-voice: the earlier nos were not kept, tried again at the next start: the mark could not be locked in {}: {error}",
+                folder.display()
+            );
+            return;
+        }
+    };
+    let now = || {
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map_or(0, |since| since.as_secs())
+    };
+    let mut nos: Vec<(PathBuf, &str, u64)> = YES_STEPS
+        .into_iter()
+        .filter_map(|step| walk_no(progress, step).map(|at| (consent_path(paths, step), step, at)))
+        .collect();
+    if fs::symlink_metadata(mark_in(folder)).is_ok()
+        && let Some(seen) = file_in(folder, SEEN_ACTIVITY)
+    {
+        let at = lock.read().unwrap_or(0) / 1000;
+        nos.push((seen, SEEN_ACTIVITY, at));
+    }
+    let mut kept = Vec::new();
+    let mut result = Ok(());
+    for (path, key, at) in nos {
+        if fs::symlink_metadata(&path).is_ok() {
+            continue;
+        }
+        let at = if at == 0 { now() } else { at };
+        match keep_no(&path, key, at, paths.room_sounds_group) {
+            Ok(()) => kept.push(key),
+            Err(error) if result.is_ok() => result = Err(error),
+            Err(_) => {}
+        }
+    }
+    let result = result.and_then(|()| {
+        keep_whole(
+            &mark,
+            format!("{{\"version\":1,\"at_unix_s\":{}}}", now()).as_bytes(),
+            paths.room_sounds_group,
+        )
+    });
+    drop(lock);
+    match result {
+        Ok(()) => eprintln!(
+            "lamp-voice: the earlier nos are kept as nos, once, before LAMP_NOTICING_BY_DEFAULT: [{}]",
+            kept.join(", ")
+        ),
+        Err(error) => eprintln!(
+            "lamp-voice: the earlier nos were not all kept, tried again at the next start: {error}"
+        ),
+    }
+}
+
+/// When `step`'s kept outcome is the walk's "no" (`skipped`), its time.
+fn walk_no(progress: &Progress, step: &str) -> Option<u64> {
+    progress
+        .steps
+        .get(step)
+        .filter(|kept| kept.outcome == super::Outcome::Skipped)
+        .map(|kept| kept.at_unix_s)
+}
+
 fn execute(paths: &Paths, operation: Operation) -> io::Result<Update> {
     let mut update = Update::default();
     match operation {
@@ -720,6 +828,9 @@ fn execute(paths: &Paths, operation: Operation) -> io::Result<Update> {
                 .transpose()?
                 .unwrap_or_default();
             progress.check()?;
+            if paths.noticing_by_default {
+                keep_old_nos(paths, &progress);
+            }
             consents(paths, &progress, |_| false)?;
             update.progress = Some(progress);
             update.checkpoint = Some(None);
@@ -1120,14 +1231,230 @@ mod tests {
         )
         .unwrap();
         assert!(allowed(&face, "face_expressions", false));
-        // Off: the same "no" removes the file and a start removes a kept
-        // no, as before.
+        // Off on a lamp never switched on (no done mark): the same "no"
+        // removes the file and a start removes a kept no, as before.
+        fs::remove_file(old_nos_mark(&paths).unwrap()).unwrap();
         paths.noticing_by_default = false;
         execute(&paths, Operation::Commit(no, false)).unwrap();
         assert!(!face.exists());
         fs::write(&face, &stop).unwrap();
         execute(&paths, Operation::Initialize).unwrap();
         assert!(!face.exists());
+    }
+
+    /// The first builder's ruling c7002724376 on #7767: a "no" in an old
+    /// walk, said while a "no" removed the file, is kept as a no on the
+    /// first start with the switch on, for face expressions and room sounds
+    /// alike, at the "no"'s time; once, so a later yes stays a yes; and
+    /// never over a file already there.
+    #[test]
+    fn with_the_switch_on_an_old_walk_no_is_kept_as_a_no_once() {
+        use super::super::Outcome;
+        use lamp_msgs::consent::{BY_APP, BY_VOICE, allowed, bytes, no_bytes};
+        for (step, other) in [
+            ("face_expressions", "room_sounds"),
+            ("room_sounds", "face_expressions"),
+        ] {
+            let files = Files::new();
+            let mut paths = files.paths();
+            let path = consent_path(&paths, step);
+            let other_path = consent_path(&paths, other);
+            // The old walk's "no", kept while the switch was off: no file.
+            paths.noticing_by_default = false;
+            execute(
+                &paths,
+                Operation::Commit(kept(step, Outcome::Skipped, 40), false),
+            )
+            .unwrap();
+            execute(&paths, Operation::Initialize).unwrap();
+            assert!(!path.exists());
+            assert!(
+                !old_nos_mark(&paths).unwrap().exists(),
+                "off: nothing written"
+            );
+            // The switch on: still a no, the voice's at the "no"'s time.
+            paths.noticing_by_default = true;
+            execute(&paths, Operation::Initialize).unwrap();
+            assert!(!allowed(&path, step, true), "{step} reads as on");
+            assert_eq!(fs::read(&path).unwrap(), no_bytes(step, 40, BY_VOICE));
+            assert!(
+                !other_path.exists(),
+                "a step not declined stays the default"
+            );
+            assert!(old_nos_mark(&paths).unwrap().exists());
+            // Once: the owner's later yes stays a yes through the next
+            // starts, the voice's yes gone by the first (the progress keeps
+            // no yes), so missing again and on only by the done mark.
+            keep_yes(&path, step, 60, None).unwrap();
+            for _ in 0..2 {
+                execute(&paths, Operation::Initialize).unwrap();
+                assert!(allowed(&path, step, true), "{step}'s later yes undone");
+            }
+            // Never over a file already there: an app's yes stands.
+            let files = Files::new();
+            let mut paths = files.paths();
+            let path = consent_path(&paths, step);
+            execute(
+                &paths,
+                Operation::Commit(kept(step, Outcome::Skipped, 40), false),
+            )
+            .unwrap();
+            let app = bytes(step, 70, BY_APP);
+            fs::write(&path, &app).unwrap();
+            paths.noticing_by_default = true;
+            execute(&paths, Operation::Initialize).unwrap();
+            assert_eq!(fs::read(&path).unwrap(), app);
+        }
+    }
+
+    /// The first builder's c7003588081 on #7767: the app's mark beside no
+    /// seen-activity yes (a stop, an app's off or a forget from before the
+    /// default) is a no, kept once at the mark's time; a yes there is left.
+    #[test]
+    fn with_the_switch_on_a_mark_beside_no_seen_activity_yes_keeps_a_no() {
+        use lamp_msgs::consent::{BY_APP, BY_VOICE, SEEN_ACTIVITY, allowed, bytes, mark_in};
+        let files = Files::new();
+        let mut paths = files.paths();
+        let folder = paths.room_sounds.parent().unwrap().to_path_buf();
+        let seen = lamp_msgs::consent::file_in(&folder, SEEN_ACTIVITY).unwrap();
+        fs::write(mark_in(&folder), br#"{"version":1,"after_unix_ms":9000}"#).unwrap();
+        paths.noticing_by_default = false;
+        execute(&paths, Operation::Initialize).unwrap();
+        assert!(!seen.exists(), "off: nothing written");
+        paths.noticing_by_default = true;
+        execute(&paths, Operation::Initialize).unwrap();
+        assert_eq!(
+            fs::read(&seen).unwrap(),
+            lamp_msgs::consent::no_bytes(SEEN_ACTIVITY, 9, BY_VOICE)
+        );
+        assert!(!allowed(&seen, SEEN_ACTIVITY, true));
+        // An app's yes beside its mark stands.
+        let files = Files::new();
+        let mut paths = files.paths();
+        paths.noticing_by_default = true;
+        let folder = paths.room_sounds.parent().unwrap().to_path_buf();
+        let seen = lamp_msgs::consent::file_in(&folder, SEEN_ACTIVITY).unwrap();
+        fs::write(mark_in(&folder), br#"{"version":1,"after_unix_ms":9000}"#).unwrap();
+        let yes = bytes(SEEN_ACTIVITY, 9, BY_APP);
+        fs::write(&seen, &yes).unwrap();
+        execute(&paths, Operation::Initialize).unwrap();
+        assert_eq!(fs::read(&seen).unwrap(), yes);
+        // No mark and no yes: nothing to keep, the default once done.
+        let files = Files::new();
+        let mut paths = files.paths();
+        paths.noticing_by_default = true;
+        let folder = paths.room_sounds.parent().unwrap().to_path_buf();
+        let seen = lamp_msgs::consent::file_in(&folder, SEEN_ACTIVITY).unwrap();
+        assert!(!allowed(&seen, SEEN_ACTIVITY, true), "before the migration");
+        execute(&paths, Operation::Initialize).unwrap();
+        assert!(!seen.exists());
+        assert!(allowed(&seen, SEEN_ACTIVITY, true), "after it");
+    }
+
+    /// Heron's P3s on #7940: a lock not taken writes nothing and no done
+    /// mark; a no not kept leaves no done mark and is kept at the next
+    /// start; a "no" kept with no time (0) is kept at now.
+    #[test]
+    fn a_failed_migration_writes_no_done_mark_and_is_tried_again() {
+        use super::super::Outcome;
+        use lamp_msgs::consent::{SEEN_ACTIVITY_LOCK, read};
+        let files = Files::new();
+        let mut paths = files.paths();
+        paths.noticing_by_default = true;
+        let folder = paths.room_sounds.parent().unwrap().to_path_buf();
+        let face = super::super::face_expressions_beside(&paths.room_sounds);
+        let mut progress = kept("face_expressions", Outcome::Skipped, 0);
+        progress.steps.insert(
+            "room_sounds".into(),
+            kept("room_sounds", Outcome::Skipped, 41).steps["room_sounds"].clone(),
+        );
+        paths.noticing_by_default = false;
+        execute(&paths, Operation::Commit(progress, false)).unwrap();
+        paths.noticing_by_default = true;
+        // The lock can't be taken (a folder in its place): nothing written.
+        fs::create_dir(folder.join(SEEN_ACTIVITY_LOCK)).unwrap();
+        execute(&paths, Operation::Initialize).unwrap();
+        assert!(!face.exists() && !paths.room_sounds.exists());
+        assert!(!old_nos_mark(&paths).unwrap().exists());
+        fs::remove_dir(folder.join(SEEN_ACTIVITY_LOCK)).unwrap();
+        // The face no can't be written (a folder where it is written
+        // beside): room sounds kept, no done mark.
+        let next = face.with_extension("storage-next");
+        fs::create_dir(&next).unwrap();
+        execute(&paths, Operation::Initialize).unwrap();
+        assert!(!face.exists());
+        assert!(lamp_msgs::consent::kept_no(
+            &paths.room_sounds,
+            "room_sounds"
+        ));
+        assert!(!old_nos_mark(&paths).unwrap().exists());
+        // The next start keeps it, at now for a "no" kept at 0.
+        fs::remove_dir(&next).unwrap();
+        let before = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_secs();
+        execute(&paths, Operation::Initialize).unwrap();
+        let kept_face = read(&face, "face_expressions");
+        assert!(kept_face.no);
+        assert!(kept_face.at_unix_s.is_some_and(|at| at >= before), "at now");
+        assert!(old_nos_mark(&paths).unwrap().exists());
+    }
+
+    /// Heron's P3 on #7940, on, off, on: once the old nos are done, a walk's
+    /// "no" said with the switch off is kept as a no, not a removal, and a
+    /// start off leaves it, so the next on still reads it as no.
+    #[test]
+    fn once_done_a_walk_no_said_off_is_still_a_no_at_the_next_on() {
+        use super::super::Outcome;
+        use lamp_msgs::consent::allowed;
+        let files = Files::new();
+        let mut paths = files.paths();
+        let face = super::super::face_expressions_beside(&paths.room_sounds);
+        paths.noticing_by_default = true;
+        execute(&paths, Operation::Initialize).unwrap();
+        assert!(old_nos_mark(&paths).unwrap().exists());
+        paths.noticing_by_default = false;
+        execute(
+            &paths,
+            Operation::Commit(kept("face_expressions", Outcome::Skipped, 70), false),
+        )
+        .unwrap();
+        execute(&paths, Operation::Initialize).unwrap();
+        assert!(lamp_msgs::consent::kept_no(&face, "face_expressions"));
+        paths.noticing_by_default = true;
+        execute(&paths, Operation::Initialize).unwrap();
+        assert!(!allowed(&face, "face_expressions", true));
+    }
+
+    /// With the switch off, a start with an old walk's "no" writes nothing:
+    /// no no, no done mark, byte for byte as before.
+    #[test]
+    fn with_the_switch_off_an_old_walk_no_writes_nothing() {
+        use super::super::Outcome;
+        let files = Files::new();
+        let paths = files.paths();
+        let mut progress = kept("face_expressions", Outcome::Skipped, 40);
+        progress.steps.insert(
+            "room_sounds".into(),
+            kept("room_sounds", Outcome::Skipped, 41).steps["room_sounds"].clone(),
+        );
+        execute(&paths, Operation::Commit(progress, false)).unwrap();
+        let folder = paths.progress.parent().unwrap();
+        let listing = || {
+            let mut names: Vec<_> = fs::read_dir(folder)
+                .unwrap()
+                .map(|entry| entry.unwrap().file_name())
+                .collect();
+            names.sort();
+            names
+        };
+        let before = listing();
+        execute(&paths, Operation::Initialize).unwrap();
+        assert_eq!(listing(), before);
+        assert!(!paths.room_sounds.exists());
+        assert!(!super::super::face_expressions_beside(&paths.room_sounds).exists());
+        assert!(!old_nos_mark(&paths).unwrap().exists());
     }
 
     /// A progress holding only `step`'s kept `outcome` at `at_unix_s`.

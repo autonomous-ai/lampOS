@@ -327,6 +327,11 @@ mod tests {
         let off = File::in_folder(&folder).by_default(false);
         let on = File::in_folder(&folder).by_default(true);
         assert_eq!(off.read(), Kept::default(), "missing, off");
+        // The first builder's c7003588081: with the switch on, a missing
+        // file is no until the voice's migration of earlier nos is done.
+        assert!(!latch.on(&on.read()), "missing, on, no done mark");
+        std::fs::write(folder.join(consent::OLD_NOS_DONE), b"{}").unwrap();
+        assert_eq!(off.read(), Kept::default(), "missing, off, done mark");
         let kept = on.read();
         assert!(latch.on(&kept), "missing, on");
         assert_eq!(kept.by.as_deref(), Some(consent::BY_DEFAULT));
@@ -573,6 +578,49 @@ mod tests {
         assert!(latch.on(&yes_at(None)));
     }
 
+    /// The first builder's c7003588081 on #7767: with the switch on, a lamp
+    /// whose app mark stands beside no seen-activity yes (a stop, an app's
+    /// off or a forget from before the default) never reads the default:
+    /// before the voice's migration the missing file is no, and after it
+    /// the no it keeps (`"by":"voice"`) is no, so no desk picture is asked.
+    #[test]
+    fn with_the_switch_on_a_mark_beside_no_yes_sends_no_desk_picture() {
+        use crate::gate::{Closed, Inputs, may_request};
+        let folder = folder("old-no");
+        std::fs::write(
+            consent::mark_in(&folder),
+            br#"{"version":1,"after_unix_ms":5000}"#,
+        )
+        .unwrap();
+        let on = File::in_folder(&folder).by_default(true);
+        let latch = OptIn::default();
+        let asks = |kept: &Kept| {
+            may_request(&Inputs {
+                opted_in: latch.on(kept),
+                said_on: true,
+                privacy_open: Some(true),
+                someone: Some(true),
+                faces: Some(1),
+                asleep: Some(false),
+            })
+        };
+        assert!(on.gone());
+        assert_eq!(
+            asks(&on.read()),
+            Err(Closed::NoOptIn),
+            "before the migration"
+        );
+        // The voice's migration: the no kept, then its done mark.
+        std::fs::write(&on.path, consent::no_bytes(KEY, 5, consent::BY_VOICE)).unwrap();
+        std::fs::write(folder.join(consent::OLD_NOS_DONE), b"{}").unwrap();
+        assert_eq!(
+            asks(&on.read()),
+            Err(Closed::NoOptIn),
+            "after the migration"
+        );
+        let _ = std::fs::remove_dir_all(folder);
+    }
+
     /// #7767: the latch holds only an explicit yes. With
     /// `LAMP_NOTICING_BY_DEFAULT` on, a missing file (the default's yes) is
     /// on through a forget, since a forget never turns noticing off that
@@ -581,6 +629,7 @@ mod tests {
     #[test]
     fn a_forget_holds_only_an_explicit_yes() {
         let folder = folder("forget-default");
+        std::fs::write(folder.join(consent::OLD_NOS_DONE), b"{}").unwrap();
         let on = File::in_folder(&folder).by_default(true);
         let off = File::in_folder(&folder).by_default(false);
         let mut latch = OptIn::default();
