@@ -1985,6 +1985,7 @@ impl OneSession {
                 opens: true,
                 sent: Mutex::new(None),
                 retried: AtomicBool::new(false),
+                restarted: AtomicBool::new(false),
                 make: false,
             });
         }
@@ -2027,6 +2028,7 @@ impl OneSession {
                     opens: true,
                     sent: Mutex::new(None),
                     retried: AtomicBool::new(false),
+                    restarted: AtomicBool::new(false),
                     make: false,
                 });
             }
@@ -3117,6 +3119,11 @@ impl OneSession {
     }
 }
 
+/// #7906's told line: said once to the asker of a task whose stuck session
+/// was replaced and that was done again in the new one ([`Turn::restarted`]).
+pub const RESTARTED_LINE: &str =
+    "The agent got stuck, so I restarted it and did your request again.";
+
 /// The pane held by one run's turn; let go when dropped, and the next in
 /// the queue goes.
 pub struct Turn<'a> {
@@ -3131,6 +3138,10 @@ pub struct Turn<'a> {
     sent: Mutex<Option<(Place, String, Instant)>>,
     /// That put-back used.
     retried: AtomicBool,
+    /// Its session was replaced while this task waited or was in flight,
+    /// and the task went on in the new one ([`Turn::restarted`], #7906's
+    /// told line).
+    restarted: AtomicBool,
     /// A make's turn ([`Turn::as_make`]): the pane's size bound is
     /// [`MAKE_FRESH_TOKENS`], not [`TASK_FRESH_TOKENS`] (#7906).
     make: bool,
@@ -3162,6 +3173,15 @@ pub enum Ended {
 }
 
 impl Turn<'_> {
+    /// #7906, the owner's "never stuck without the person knowing": whether
+    /// this task's session was replaced while it waited or was in flight
+    /// and the task went on in the new one. Its asker then hears
+    /// [`RESTARTED_LINE`] once, before its answer, on the path its answer
+    /// is told by; a task given up is told its own failed line instead.
+    pub fn restarted(&self) -> bool {
+        self.restarted.load(Ordering::Acquire)
+    }
+
     /// This turn is a make's when `make` (#7906): typed only into a session
     /// with room for it ([`OneSession::start_fresh_if_near_limit`]).
     pub fn as_make(mut self, make: bool) -> Self {
@@ -3242,6 +3262,7 @@ impl Turn<'_> {
                             .fallback(&format!("the kept session ensured again: {}", gone.why()));
                     }
                     replaced = true;
+                    self.restarted.store(true, Ordering::Release);
                     self.one.kept_gone(harness, &agent, &gone);
                     continue;
                 }
@@ -3276,6 +3297,7 @@ impl Turn<'_> {
                                 ));
                             }
                             replaced = true;
+                            self.restarted.store(true, Ordering::Release);
                             refused = None;
                             self.one.kept_gone(harness, &agent, &gone);
                             continue;
@@ -3336,6 +3358,7 @@ impl Turn<'_> {
                 // #7906 sign 2: `wait` reads a shell idle; never typed into.
                 Ok(seen) if seen.shell && !replaced => {
                     replaced = true;
+                    self.restarted.store(true, Ordering::Release);
                     self.one.replace_kept(
                         harness,
                         &place.machine,
@@ -3469,6 +3492,7 @@ impl Turn<'_> {
             ),
         };
         *replaced = true;
+        self.restarted.store(true, Ordering::Release);
         self.one
             .revive_or_replace(harness, &place.machine, agent, &why.0, why.1);
         true
@@ -3803,6 +3827,7 @@ impl Turn<'_> {
         if let (true, Some((place, words, until))) = (again, sent) {
             self.one
                 .revive_or_replace(harness, machine, agent, why, died);
+            self.restarted.store(true, Ordering::Release);
             eprintln!(
                 "tasks: one session: {}: its session died ({why}); its words typed again once into the reopened one (#7906)",
                 self.id
