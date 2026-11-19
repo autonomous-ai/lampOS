@@ -204,7 +204,9 @@ fn own_ids() -> (String, String) {
 /// own ids, `curl -o` by writing the stand-in Node bytes, `tar` by putting
 /// a Node of `node` there, `npm ci` by putting the package at `package`,
 /// `install -d` by making the folder; `fail_on` makes the first command
-/// holding it fail; the rest with nothing.
+/// holding it fail; `main_pid`, what `systemctl show -p MainPID` prints of
+/// the gateway's unit (`""`, none running, by default); the rest with
+/// nothing.
 struct Runs {
     root: PathBuf,
     log: Rc<RefCell<Vec<String>>>,
@@ -213,6 +215,8 @@ struct Runs {
     fail_on: Option<&'static str>,
     /// What the failing command answers.
     error: &'static str,
+    /// The gateway's `MainPID`: `""` or `"0"` when none runs.
+    main_pid: &'static str,
 }
 
 impl Runs {
@@ -224,6 +228,7 @@ impl Runs {
             package: VERSION,
             fail_on: None,
             error: "refused",
+            main_pid: "",
         }
     }
     fn runner(&self) -> impl FnMut(&[String]) -> Result<String, String> + '_ {
@@ -234,7 +239,9 @@ impl Runs {
                 return Err(self.error.to_owned());
             }
             let (uid, gid) = own_ids();
-            if line == "id -g lampos" {
+            if line == format!("systemctl show -p MainPID --value -- {UNIT}") {
+                Ok(format!("{}\n", self.main_pid))
+            } else if line == "id -g lampos" {
                 Ok(format!("{gid}\n"))
             } else if argv[0] == "id" {
                 Ok(format!("{uid}\n"))
@@ -1695,6 +1702,64 @@ fn a_gateway_block_openclaws_own_check_refuses_never_lands() {
     assert!(
         taking.position("config validate --json")
             < taking.position(&format!("chown -h lampos:lampos {CONFIG}"))
+    );
+}
+
+/// #7868 (the first builder, 02:02): OpenClaw 2026.11.2 refuses a `config
+/// validate` run in namespaces other than its running gateway's
+/// (`GatewayLockNamespaceError`, #7268). With the gateway's unit holding a
+/// `MainPID`, the check runs as `lampos` through [`WRAPPER`], which joins
+/// that gateway (never `LAMP_OPENCLAW_GATEWAY`, no stand-in token: the
+/// wrapper passes the forwarder's own); with none running (`0`, as at a
+/// first install), in namespaces of its own as before, since there is no
+/// lock to clash with.
+#[test]
+fn a_gateway_block_check_joins_the_running_gateway_and_runs_alone_with_none() {
+    let lamp = Lamp::new();
+    fs::create_dir_all(lamp.at(STATE)).unwrap();
+    fs::write(lamp.at(NS), "").unwrap();
+    let check_of = |main_pid: &'static str| {
+        let _ = fs::remove_file(lamp.at(CONFIG));
+        let runs = Runs {
+            main_pid,
+            ..Runs::new(&lamp)
+        };
+        gateway_config(lamp.root(), &mut runs.runner(), &mut quiet()).unwrap();
+        let lines = runs.lines();
+        let check = lines
+            .iter()
+            .position(|line| line.contains("config validate --json"))
+            .unwrap();
+        assert_eq!(
+            lines[..check]
+                .iter()
+                .filter(|line| line.contains("MainPID"))
+                .count(),
+            1,
+            "{lines:#?}"
+        );
+        lines[check].clone()
+    };
+    let joined = check_of("4242");
+    let (prefix, suffix) = joined
+        .split_once(".new ")
+        .unwrap_or_else(|| panic!("{joined}"));
+    assert!(
+        prefix.starts_with(&format!(
+            "{AS_LAMPOS}OPENCLAW_CONFIG_PATH={STATE}/.openclaw.json."
+        )),
+        "{joined}"
+    );
+    assert_eq!(suffix, format!("{WRAPPER} config validate --json"));
+    assert!(!joined.contains("LAMP_OPENCLAW_GATEWAY"), "{joined}");
+    assert!(!joined.contains("LAMP_HERMES_TOKEN"), "{joined}");
+
+    let alone = check_of("0");
+    assert!(
+        alone.ends_with(&format!(
+            ".new LAMP_HERMES_TOKEN=lamp-config-check /usr/bin/unshare --map-root-user --mount --pid --fork --kill-child --mount-proc --propagation private {NS} config validate --json"
+        )),
+        "{alone}"
     );
 }
 
