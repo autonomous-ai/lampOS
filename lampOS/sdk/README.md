@@ -256,6 +256,7 @@ Python names first, JavaScript where it differs.
 |---|---|---|---|---|---|---|
 | Someone arrives, leaves, stands, faces it | `person.*` | `on("person.arrived")`… | `lamp_events` | done | Nine | not yet |
 | A hand in view | `hand` | `on("hand")` | `lamp_events` | done | Nine | not yet |
+| One person's pose in a JPEG of its own, local only, off unless `LAMP_NPU=on` | `pose` | `pose` / `pose` | — (an agent has no JPEG of its own) | in review (#7415) | App Only | not yet (unit tests, 19 Nov) |
 | A camera frame, a frame stream, local only | `camera.snapshot`, `camera.stream` | `camera_snapshot`, `camera_stream` / `cameraSnapshot`, `cameraStream` | `lamp_camera_snapshot` | done; the fast frame path isn't on customer lamps | Ten | 75c9, 3 Nov 17:46, by the local leader: snapshot 0.14 s; stream at 640x480 and 1280x720, about 15 fps; 4 Nov 10:22, the fast path at 1280x720, 62 frames in 6 s. The ring's mark not seen by eye |
 
 ### Touch and controls
