@@ -24,11 +24,27 @@
 //!   watches the pane as a session the person had (`Joined`), has read its
 //!   answer ([`OneSession::release`]). A spoken task waiting is told its
 //!   place ([`OneSession::queued_place`]); there is no overflow session.
-//! - **No fresh start.** The pane is not replaced after a number of turns,
-//!   bytes or idle time: the engines compact their own context (OpenClaw's
+//! - **A fresh start only near the context's limit, or for a session gone
+//!   or stuck** (#7906, revising #7246's "no fresh start"; gone or stuck
+//!   below). The pane is not replaced after a number of
+//!   turns or idle time: the engines compact their own context (OpenClaw's
 //!   gateway its `agents.defaults.compaction`, which the lamp's
 //!   `openclaw.json` leaves at OpenClaw's own default; Hermes its own
-//!   compression), and Harness has no compact verb.
+//!   compression), and Harness has no compact verb. But OpenClaw's own
+//!   compaction came too late on lamp-52e6: a make overflowed the 128k
+//!   context at 175 messages, and the compaction dropped the make's task.
+//!   So before each turn the pane's conversation is measured in OpenClaw's
+//!   own record ([`crate::harness::openclaw_session_size`], a local SQLite
+//!   read): a make goes into a fresh session once the old one holds
+//!   [`MAKE_FRESH_TOKENS`] (60%) or more than [`MAKE_FRESH_MESSAGES`],
+//!   any other task once it holds [`TASK_FRESH_TOKENS`] (85%) or more than
+//!   [`TASK_FRESH_MESSAGES`] ([`near_context_limit`]); the record
+//!   unreadable, the pane's own token count is weighed instead. The full
+//!   session is replaced as at a rotation: the kept session `ensure
+//!   --fresh`, its token kept, as for one gone or stuck, but closed by that
+//!   `ensure` itself, never through [`OneSession::replace_kept`]: no
+//!   `--now`, not counted toward [`REPLACE_MOST`]. At most one fresh start
+//!   a turn; a small session is kept.
 //! - **Next words only once the last were taken.** Before each reply the
 //!   pane must be idle with its last words taken (`show`: no `told`, or
 //!   `told.taken`): Harness queues words typed before that behind them,
@@ -94,7 +110,8 @@ use std::path::PathBuf;
 use std::path::Path;
 
 use crate::harness::{
-    Cli, Closed, EngineKind, Ensured, Launch, LaunchOutcome, PaneSeen, Target, Took, Typed,
+    Cli, Closed, EngineKind, Ensured, Launch, LaunchOutcome, PaneSeen, SessionSize, Target, Took,
+    Typed,
 };
 
 /// The switch, in lamp-tasks' own environment: `on` exactly ([`on`]).
@@ -229,6 +246,41 @@ pub const REPLACE_MOST: u32 = 2;
 /// A `show` with no verdict on a pane refusing words ([`Seen::Unknown`]):
 /// looked at again after this, never counted as stuck.
 const UNKNOWN_LOOK_AGAIN: Duration = Duration::from_secs(10);
+/// The context of the lamp's OpenClaw model, in tokens: 128k, as the
+/// Gateway's overflow on lamp-52e6 named it (#7906: `estimated input
+/// 127014 ... 128000-token context, messages=175`).
+pub const CONTEXT_TOKENS: u64 = 128_000;
+/// A make (#7906) is given a fresh session when the one it would be typed
+/// into holds this many tokens or more (estimated at 4 stored bytes a
+/// token, [`SessionSize`]): 60% of [`CONTEXT_TOKENS`], so the make's own
+/// turn (its guide, the examples it reads, its tool output and its draft,
+/// some 30-45k tokens) has 51k left...
+pub const MAKE_FRESH_TOKENS: u64 = CONTEXT_TOKENS * 60 / 100;
+/// ...or more than this many messages: 52e6 overflowed at 175 messages and
+/// 127k tokens, about 725 tokens a message, so 100 is about 57%.
+pub const MAKE_FRESH_MESSAGES: u64 = 100;
+/// Any other task gets a fresh session only nearer the limit: 85% of
+/// [`CONTEXT_TOKENS`], 19k left for a turn with no guide...
+pub const TASK_FRESH_TOKENS: u64 = CONTEXT_TOKENS * 85 / 100;
+/// ...or more than this many messages (about 85% at 725 tokens each).
+pub const TASK_FRESH_MESSAGES: u64 = 150;
+
+/// Whether a session of `size` (OpenClaw's own record; `None`: it could
+/// not be read, so only `tokens`, the pane's own count of words typed and
+/// read, is weighed) is too big for the next turn: a make's
+/// ([`MAKE_FRESH_TOKENS`], [`MAKE_FRESH_MESSAGES`]) or another task's
+/// ([`TASK_FRESH_TOKENS`], [`TASK_FRESH_MESSAGES`]).
+pub fn near_context_limit(size: Option<SessionSize>, tokens: u64, make: bool) -> bool {
+    let (most_tokens, most_messages) = if make {
+        (MAKE_FRESH_TOKENS, MAKE_FRESH_MESSAGES)
+    } else {
+        (TASK_FRESH_TOKENS, TASK_FRESH_MESSAGES)
+    };
+    match size {
+        Some(size) => size.bytes / 4 >= most_tokens || size.messages > most_messages,
+        None => tokens >= most_tokens,
+    }
+}
 
 /// How often [`OneSession::keep_open`] looks again once the pane is open
 /// (each look asks the gateway): to see the default engine change.
@@ -457,6 +509,9 @@ struct Pane {
     session: Option<String>,
     /// Its open, or the last turn typed into it ([`KEPT_IDLE_MAX`]).
     used: Instant,
+    /// Near its model's context ([`near_context_limit`], #7906): replaced
+    /// by a fresh session at the next open, as at a rotation.
+    full: bool,
 }
 impl Pane {
     fn new(agent: &str, place: &Place, kept: bool) -> Self {
@@ -469,12 +524,16 @@ impl Pane {
             input: None,
             session: None,
             used: Instant::now(),
+            full: false,
         }
     }
 
-    /// Usable as it is at `place`: there, and no rotation due.
+    /// Usable as it is at `place`: there, no rotation due and not near its
+    /// context's limit.
     fn fresh_at(&self, place: &Place) -> bool {
-        self.place.same_spot(place) && !rotation_due(self.place.engine, self.turns, self.tokens)
+        self.place.same_spot(place)
+            && !self.full
+            && !rotation_due(self.place.engine, self.turns, self.tokens)
     }
 }
 
@@ -605,6 +664,9 @@ pub struct OneSession {
     /// Called with why each time a stuck session is replaced
     /// ([`OneSession::with_on_replaced`]).
     on_replaced: Option<Replaced>,
+    /// OpenClaw's agent database, read for the pane's size before a turn
+    /// ([`OneSession::start_fresh_if_near_limit`]); `None`: not read.
+    openclaw_db: Option<PathBuf>,
 }
 
 /// What a stuck session's replacement calls with why (#7906's C: the
@@ -940,7 +1002,11 @@ impl OneSession {
     /// The lamp's: the production bounds, its pane kept in
     /// [`STATE_FILE`] in lamp-tasks' state folder `dir`.
     pub fn lamp(dir: &std::path::Path) -> Self {
-        Self::new(QUEUE_WAIT, TURN_LOOK, OPEN_IDLE_WITHIN).with_state_file(dir.join(STATE_FILE))
+        Self::new(QUEUE_WAIT, TURN_LOOK, OPEN_IDLE_WITHIN)
+            .with_state_file(dir.join(STATE_FILE))
+            .with_openclaw_db(crate::harness::openclaw_record_path(Path::new(
+                crate::runtime::OPENCLAW_STATE_DIR,
+            )))
     }
 
     pub fn new(queue_wait: Duration, look: Duration, open_idle_within: Duration) -> Self {
@@ -957,6 +1023,7 @@ impl OneSession {
             no_reply: AtomicBool::new(false),
             kept_token: None,
             on_replaced: None,
+            openclaw_db: None,
         }
     }
 
@@ -965,6 +1032,75 @@ impl OneSession {
     pub fn with_on_replaced(mut self, replaced: Replaced) -> Self {
         self.on_replaced = Some(replaced);
         self
+    }
+
+    /// The pane's size is read from OpenClaw's agent database at `db`
+    /// ([`crate::harness::openclaw_record_path`]) before each turn (#7906).
+    pub fn with_openclaw_db(mut self, db: PathBuf) -> Self {
+        self.openclaw_db = Some(db);
+        self
+    }
+
+    /// Before a turn (#7906): the open pane's conversation measured in
+    /// OpenClaw's own record ([`crate::harness::openclaw_session_size`];
+    /// unreadable, the pane's own token count instead) and, past
+    /// [`near_context_limit`] for a make (`make`) or another task, marked
+    /// full, so the next open replaces it as at a rotation: the kept
+    /// session with `harness ensure --fresh` and its old OpenClaw session
+    /// deleted, a pane of `harness new` closed and opened anew. Whether it
+    /// was marked. One read of a local SQLite file, never under the lock.
+    pub fn start_fresh_if_near_limit(&self, place: &Place, make: bool) -> bool {
+        let (agent, tokens) = {
+            let inner = self.lock();
+            match inner.pane.as_ref() {
+                Some(pane)
+                    if pane.place.same_spot(place)
+                        && pane.place.engine == EngineKind::Openclaw
+                        && !pane.full =>
+                {
+                    (pane.agent.clone(), pane.tokens)
+                }
+                _ => return false,
+            }
+        };
+        let began = Instant::now();
+        let size = match &self.openclaw_db {
+            Some(db) => {
+                crate::harness::openclaw_session_size(db, &self.kept_session_key(&agent), &agent)
+            }
+            None => Err("no OpenClaw database".into()),
+        };
+        let read_ms = began.elapsed().as_millis();
+        let size = match size {
+            Ok(size) => Some(size),
+            Err(why) => {
+                if self.openclaw_db.is_some() {
+                    eprintln!(
+                        "tasks: one session: {}'s size not read ({why}); its own ~{tokens} tokens weighed",
+                        short(&agent)
+                    );
+                }
+                None
+            }
+        };
+        if !near_context_limit(size, tokens, make) {
+            return false;
+        }
+        let mut inner = self.lock();
+        let Some(pane) = inner.pane.as_mut().filter(|pane| pane.agent == agent) else {
+            return false;
+        };
+        pane.full = true;
+        eprintln!(
+            "tasks: one session: {} is near its context ({}) before {}: a fresh session (read in {read_ms} ms)",
+            short(&agent),
+            size.map_or_else(
+                || format!("~{tokens} tokens counted"),
+                |size| format!("{} messages, ~{} tokens", size.messages, size.bytes / 4)
+            ),
+            if make { "a make" } else { "a task" }
+        );
+        true
     }
 
     /// [`KEPT_SWITCH`] on: the pane is the lamp's kept session, its token
@@ -1643,6 +1779,7 @@ impl OneSession {
                 opens: true,
                 sent: Mutex::new(None),
                 retried: AtomicBool::new(false),
+                make: false,
             });
         }
         // Only skill runs count toward the cap: a spoken task goes ahead of
@@ -1684,6 +1821,7 @@ impl OneSession {
                     opens: true,
                     sent: Mutex::new(None),
                     retried: AtomicBool::new(false),
+                    make: false,
                 });
             }
             let now = Instant::now();
@@ -1948,21 +2086,19 @@ impl OneSession {
         let stale = {
             let mut inner = self.lock();
             match &inner.pane {
-                Some(pane)
-                    if pane.place.same_spot(place)
-                        && !rotation_due(pane.place.engine, pane.turns, pane.tokens) =>
-                {
+                Some(pane) if pane.fresh_at(place) => {
                     return Ok(pane.agent.clone());
                 }
                 Some(pane) => {
-                    if pane.place.same_spot(place) {
+                    if pane.place.same_spot(place) && !pane.full {
                         eprintln!(
                             "tasks: one session: rotated after {} turns, ~{} tokens",
                             pane.turns, pane.tokens
                         );
                     }
                     let why = if pane.place.same_spot(place) {
-                        // The rotation (Hermes' own bounds): a fresh pane.
+                        // The rotation (Hermes' own bounds), or near its
+                        // context's limit (#7906): a fresh pane.
                         "its rotation"
                     } else if pane.place.machine != place.machine {
                         "the lamp's machine changed"
@@ -2692,6 +2828,9 @@ pub struct Turn<'a> {
     sent: Mutex<Option<(Place, String, Instant)>>,
     /// That put-back used.
     retried: AtomicBool,
+    /// A make's turn ([`Turn::as_make`]): the pane's size bound is
+    /// [`MAKE_FRESH_TOKENS`], not [`TASK_FRESH_TOKENS`] (#7906).
+    make: bool,
 }
 
 /// What one `show` says of a pane for #7906's signs.
@@ -2720,6 +2859,13 @@ pub enum Ended {
 }
 
 impl Turn<'_> {
+    /// This turn is a make's when `make` (#7906): typed only into a session
+    /// with room for it ([`OneSession::start_fresh_if_near_limit`]).
+    pub fn as_make(mut self, make: bool) -> Self {
+        self.make = make;
+        self
+    }
+
     /// `words` typed into the pane after this task's header line, the
     /// pane opened first when there is none. A pane Harness says is not
     /// running is reopened once and typed again; another failure is
@@ -2741,6 +2887,7 @@ impl Turn<'_> {
         *self.sent.lock().unwrap_or_else(|e| e.into_inner()) =
             Some((place.clone(), words.to_owned(), until));
         let mut reopened = false;
+        let mut sized = false;
         // #7906 sign 1: since when the pane has refused the words (busy,
         // its engine not ready, not idle): past `open_idle_within`, one
         // `show` says whether it is stuck, and a stuck one is replaced once.
@@ -2763,6 +2910,16 @@ impl Turn<'_> {
                 }
                 Err(why) => return self.fallback(&why),
             };
+            // Near its context's limit (#7906): a fresh session first, once
+            // for this turn, also for a pane just adopted after a restart;
+            // a spoken task's is opened by the one-session thread, as at a
+            // rotation.
+            if !sized {
+                sized = true;
+                if self.one.start_fresh_if_near_limit(place, self.make) {
+                    continue;
+                }
+            }
             // The kept session (openharness#4393): an acknowledged reply,
             // counted only once the engine took it.
             if let Some((name, token)) = self.one.kept_now(&agent) {
