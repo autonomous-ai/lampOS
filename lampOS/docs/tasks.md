@@ -5211,7 +5211,7 @@ in and signed out, and on 0.6.60, signed in (#7507's ROW).
   (`openclaw_holds_key`, read only) by the record's own session key
   (`engineSession`) exactly, never by `agent:main:harness-<agent id>`; a
   record that can't be read is unknown, never gone.
-  Four signs are acted on:
+  Five signs are acted on:
   - **Sign 1, still `starting`.** At an open that found a session (`live`
     or `resumed`, never `new`), one `show` is made. If `show` itself reads
     `starting` 120 s (`OPEN_IDLE_WITHIN`) from the open's start, it is
@@ -5251,6 +5251,28 @@ in and signed out, and on 0.6.60, signed in (#7507's ROW).
     unanswered (a long exec) is never cut and is left to the run's
     deadline; `show`'s tools, `ps`'s `lastActive` and pane text are never
     read for it.
+  - **Sign 5, replies refused `ENGINE_NOT_READY` in a row.** Seen on
+    lamp-c0a4 (19 Nov): the kept session's OpenClaw process frozen,
+    `show` still `idle`, so no turn was taken and signs 1 and 4 never
+    started; each `harness reply` was refused `ENGINE_NOT_READY` after
+    Harness's own ~62 s wait, past a spoken task's 5 s bound, and the task
+    was put back until it expired. Now 2 refusals in a row
+    (`KEPT_NOT_READY_REFUSALS`) of the kept session's replies, with no
+    reply taken and no turn answered between, spanning at least 60 s from
+    the first to the last (`KEPT_NOT_READY_FOR`), make it gone or stuck.
+    A refusal more than 120 s (twice the bound) after the one before starts
+    the count again at 1, so an old refusal whose task was given up never
+    joins one hours later.
+    The count is kept across put-backs and is looked at before the run's
+    end, so a refusal that took the whole bound still counts. A session
+    `ensure` made new is in its first words' window for 120 s
+    (`OPEN_IDLE_WITHIN`): its refusals are not counted. One refusal, then
+    a reply taken, never replaces anything. It goes through the ladder
+    below as a died session: (a) one plain resume if the Gateway still
+    holds its key. The count is kept across that resume, so if it finds
+    the same frozen process (`live` or `resumed`, refused again), the next
+    refusal is (b) `--fresh`, never another resume. The waiting task never
+    ran, so it is typed into the new session and told once.
 
   Every sign calls `OneSession::replace_kept`, the one path for every
   sign (signs 3 and 4 through `OneSession::kept_gone`). It does a `close --now`, `sessions.delete` and the record removed,
@@ -5292,7 +5314,7 @@ in and signed out, and on 0.6.60, signed in (#7507's ROW).
     (or the record can't be read) is let go with no close and no delete.
     The next `ensure` is a plain resume, which keeps its memory. This is
     tried once until a turn is answered.
-  - **(b)** Died again after that resume, a conversation OpenClaw no
+  - **(b)** Died again after that resume (or, sign 5, refused again), a conversation OpenClaw no
     longer holds, our own deadline close, or still `starting`: a fresh
     conversation (`replace_kept`, then `ensure --fresh`, the same name and
     token).

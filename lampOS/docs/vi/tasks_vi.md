@@ -2544,7 +2544,7 @@ khi đăng xuất, và với 0.6.60 khi đăng nhập (ROW của #7507).
   resume một phiên đã đóng mà không kiểm tra Gateway. Bản ghi được đọc
   (`openclaw_holds_key`, chỉ đọc) đúng theo session key của chính bản ghi
   (`engineSession`), không bao giờ theo `agent:main:harness-<agent id>`;
-  bản ghi không đọc được là chưa rõ, không bao giờ là đã mất. Bốn dấu hiệu
+  bản ghi không đọc được là chưa rõ, không bao giờ là đã mất. Năm dấu hiệu
   được xử lý:
   - **Dấu hiệu 1, vẫn `starting`.** Khi mở mà tìm thấy phiên (`live` hoặc
     `resumed`, không bao giờ `new`), lamp-tasks gọi một lần `show`. Nếu
@@ -2585,6 +2585,30 @@ khi đăng xuất, và với 0.6.60 khi đăng nhập (ROW của #7507).
     (một exec dài) không bao giờ bị cắt mà để cho hạn chót của lần chạy;
     số tool của `show`, `lastActive` của `ps` hay chữ trên pane không bao
     giờ được dùng cho việc này.
+  - **Dấu hiệu 5, reply bị từ chối `ENGINE_NOT_READY` liên tiếp.** Thấy
+    trên lamp-c0a4 (19/11): tiến trình OpenClaw của phiên được giữ bị đóng
+    băng, `show` vẫn `idle`, nên không lượt nào được nhận và dấu hiệu 1 và
+    4 không bao giờ bắt đầu; mỗi `harness reply` bị từ chối
+    `ENGINE_NOT_READY` sau ~62 s chờ của chính Harness, quá giới hạn 5 s
+    của một việc nói, và việc bị trả lại hàng đợi cho tới khi hết hạn. Nay
+    2 lần từ chối liên tiếp (`KEPT_NOT_READY_REFUSALS`) với reply của phiên
+    được giữ, không reply nào được nhận và không lượt nào được trả lời xen
+    giữa, kéo dài ít nhất 60 s từ lần đầu tới lần cuối
+    (`KEPT_NOT_READY_FOR`), thì phiên bị coi là mất hoặc kẹt.
+    Một lần từ chối cách lần trước hơn 120 s (gấp đôi giới hạn) thì đếm lại
+    từ 1, nên một lần từ chối cũ mà việc của nó đã bỏ không bao giờ gộp với
+    một lần nhiều giờ sau. Bộ đếm được
+    giữ qua các lần trả lại hàng đợi và được xét trước khi xem hạn của lần
+    chạy, nên một lần từ chối chiếm hết giới hạn vẫn được tính. Phiên do
+    `ensure` tạo mới đang trong khoảng lời đầu tiên suốt 120 s
+    (`OPEN_IDLE_WITHIN`): các lần từ chối của nó không được tính. Một lần
+    từ chối rồi reply được nhận thì không thay gì cả. Nó đi qua bậc thang
+    bên dưới như một phiên đã chết: (a) một lần resume thường nếu Gateway
+    còn giữ key. Bộ đếm được giữ qua lần resume đó, nên nếu nó gặp lại
+    đúng tiến trình bị đóng băng (`live` hoặc `resumed`, lại bị từ chối),
+    lần từ chối tiếp theo là (b) `--fresh`, không bao giờ resume lần nữa.
+    Việc đang chờ chưa hề chạy, nên được gõ vào phiên mới và được báo một
+    lần.
 
   Dấu hiệu nào cũng gọi `OneSession::replace_kept`, đường duy nhất cho mọi
   dấu hiệu (dấu hiệu 3 và 4 qua `OneSession::kept_gone`). Nó `close --now`, `sessions.delete` và xoá bản ghi, rồi buông
@@ -2624,7 +2648,7 @@ khi đăng xuất, và với 0.6.60 khi đăng nhập (ROW của #7507).
     (hoặc không đọc được bản ghi) thì được buông mà không close, không
     xoá. Lần `ensure` tiếp theo là một resume thường, giữ được bộ nhớ của
     nó. Bước này chỉ thử một lần cho tới khi có một lượt được trả lời.
-  - **(b)** Chết lại sau lần resume đó, hội thoại mà OpenClaw không còn
+  - **(b)** Chết lại sau lần resume đó (hoặc, dấu hiệu 5, lại bị từ chối), hội thoại mà OpenClaw không còn
     giữ, chính lần close khi hết hạn của ta, hoặc vẫn `starting`: một hội
     thoại mới (`replace_kept`, rồi `ensure --fresh`, cùng tên và token).
   - **(c)** Từ lần thay thứ hai liên tiếp, áp dụng backoff ở trên. Resume
