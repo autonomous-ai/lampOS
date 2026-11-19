@@ -7211,6 +7211,7 @@ fn harness_on_installs_with_harnesss_own_installer_then_sets_it_at_boot() {
         [
             "id -u lampos".to_owned(),
             "install -d -o lampos -g lampos -m 0700 /var/lib/lampos-tasks".to_owned(),
+            "runuser -u lampos -- mkdir -p -m 0700 /var/lib/lampos-tasks/.harness".to_owned(),
             format!(
                 "runuser -u lampos -- env HOME=/var/lib/lampos-tasks XDG_RUNTIME_DIR=/run/user/999 ADAPTER_DATA_DIR=/var/lib/lampos-tasks/.harness/cli/data PATH=/usr/local/bin:/usr/bin:/bin SHELL=/bin/sh sh -c curl -fsSL --proto =https --tlsv1.2 {} | sh",
                 install::HARNESS_INSTALLER
