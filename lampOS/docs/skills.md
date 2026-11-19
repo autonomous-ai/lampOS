@@ -6890,9 +6890,11 @@ the same code for both writers.
 - **A long make runs on, and its person is told when it's ready
   (`LAMP_MAKE_MAY_RUN_ON=on`, off unless set, in no product unit; Fourteen's
   ask on #6811, 18 Nov 17:21, and the first builder's yes at 17:23).**
-  Before it, an agent make's part ended at 120 s (`make_skill_agent::MAKE_WITHIN`
-  and lamp-tasks' `skill_make::MOST_WITHIN`): past that the person heard
-  `AGENT_LATE_TRY` and the work was thrown away. With it
+  Without it, the voice turn waits for an agent make's part up to 10
+  minutes 30 s (`make_skill_agent::MAKE_WITHIN`: lamp-tasks'
+  `skill_make::MOST_WITHIN` of 10 minutes and 30 s more, since #7245; 120 s
+  before): past that the person hears `AGENT_LATE_TRY` and the work is
+  thrown away. With it
   (`crate::long_make`):
   - **At a minute.** A voice make handed to the agent's make run (with
     `LAMP_MAKE_REACTIONS_ONLY_DEEPSEEK` on: a linked service's, or a quick
@@ -6999,7 +7001,10 @@ the same code for both writers.
     let run on that the agent made none of is said as the agent's failure.
     A finished skill removed in the app before it was told (made, or not
     put on) has its mark
-    dropped quietly, never told "couldn't finish". A known limit: after a
+    dropped quietly, never told "couldn't finish". So does a make let run
+    on and then declined ("never mind", through its making note,
+    `long_make::dropped`): nothing of it kept, no later make told "still
+    making", nothing told of it. A known limit: after a
     worker restart the make's run in lamp-tasks isn't stopped, and may go
     on up to `long_make::WRITE_WITHIN` (300 s) for its answer, which is
     then thrown away; meanwhile lamp-tasks refuses a new make `busy`, so an
@@ -7017,6 +7022,7 @@ the same code for both writers.
   `a_make_let_run_on_stays_off_until_its_person_is_told_then_goes_on`,
   `a_long_make_told_ready_asks_its_clash_and_its_link`,
   `a_make_let_run_on_that_fails_runs_out_or_restarts_keeps_nothing_and_says_so_once`,
+  `a_make_let_run_on_then_declined_leaves_no_mark_and_is_never_told`,
   `a_second_make_ask_while_one_runs_on_is_told_its_still_making`,
   `with_the_run_on_switch_off_a_make_is_as_before`,
   `a_long_make_cut_before_its_minute_goes_through_the_gate`,
