@@ -188,3 +188,69 @@ fn a_reply_that_claims_no_stop_is_untouched() {
         assert!(went.notes.is_empty(), "{reply}: {went:?}");
     }
 }
+
+/// Twelve's P1 on #7917: the words and the stop in one round. The words ran
+/// ahead of the call, so they aren't said and no note is told; the call
+/// runs, and the next round's words are said.
+#[test]
+fn a_nudge_stopped_in_the_same_round_as_its_words_runs_with_no_note() {
+    let went = went(
+        HEARD,
+        true,
+        vec![
+            vec![
+                text(CLAIMED),
+                Ok(ChatEvent::ToolCalls(vec![call(
+                    "c1",
+                    NUDGE_TOOL,
+                    json!({"how": "off"}),
+                )])),
+                Ok(ChatEvent::Done),
+            ],
+            saying("The water nudge is off until you ask for it again."),
+        ],
+    );
+    assert!(went.notes.is_empty(), "{went:?}");
+    assert_eq!(went.called, [NUDGE_TOOL], "{went:?}");
+    assert!(
+        went.said.iter().any(|said| said.contains("until you ask")),
+        "{went:?}"
+    );
+}
+
+/// Twelve's P2 on #7917: a true state, asked as a question, is said as it
+/// is, with no call and no note.
+#[test]
+fn a_nudges_state_asked_as_a_question_is_said_as_it_is() {
+    let reply = "The water nudge is off until tomorrow morning.";
+    let went = went(
+        "Lamp, is the water nudge still off?",
+        true,
+        vec![saying(reply)],
+    );
+    assert_eq!(went.said, said(&[reply]), "{went:?}");
+    assert!(went.notes.is_empty(), "{went:?}");
+}
+
+/// Twelve's P3 on #7917: a `wellbeing_nudges` that turned them on backs no
+/// claim that they were turned off.
+#[test]
+fn a_nudge_turned_on_backs_no_claim_of_off() {
+    let went = went(
+        HEARD,
+        true,
+        vec![
+            vec![
+                Ok(ChatEvent::ToolCalls(vec![call(
+                    "c1",
+                    NUDGE_TOOL,
+                    json!({"how": "on"}),
+                )])),
+                Ok(ChatEvent::Done),
+            ],
+            saying(CLAIMED),
+            saying(CLAIMED),
+        ],
+    );
+    assert!(never_claimed(&went), "{went:?}");
+}
