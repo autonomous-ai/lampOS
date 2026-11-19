@@ -15,6 +15,7 @@
 
 pub mod agent;
 pub mod app_socket;
+pub mod app_triggers;
 pub mod app_yes;
 pub mod body_info;
 pub mod body_lease;

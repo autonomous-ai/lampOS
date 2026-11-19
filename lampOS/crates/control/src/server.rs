@@ -209,6 +209,9 @@ pub struct Shared {
     /// Where the installed apps are (`crate::app_yes::APPS_DIR` unless the
     /// app socket was served from another place).
     apps_dir: Mutex<PathBuf>,
+    /// Told when an app takes a turn the voice offered it (`apps/took`,
+    /// [`crate::app_triggers`]): none until the bus side is started.
+    took_sink: Mutex<Option<TookSink>>,
     /// Whether apps are on, as the app socket reads it.
     apps_on: Mutex<fn() -> bool>,
     /// Whether computers beyond the lamp's own network may connect
@@ -236,6 +239,10 @@ pub struct Shared {
     /// one).
     changes: Mutex<Option<std::sync::mpsc::Sender<Value>>>,
 }
+
+/// What is told when an app takes a turn the voice offered it: the app and
+/// the turn.
+pub type TookSink = Arc<dyn Fn(&str, u64) + Send + Sync>;
 
 /// Whether the camera's, the microphone's and the speaker's streams are usable on
 /// this lamp: wired to their parts, and for the microphone and the speaker the
@@ -394,6 +401,7 @@ impl Shared {
             task_yes: Mutex::new(None),
             apps: Mutex::default(),
             apps_dir: Mutex::new(PathBuf::from(crate::app_yes::APPS_DIR)),
+            took_sink: Mutex::new(None),
             apps_on: Mutex::new(crate::app_yes::on),
             changes: Mutex::new(None),
             remote: std::sync::atomic::AtomicBool::new(false),
@@ -643,6 +651,7 @@ impl Shared {
                 task_yes: Mutex::new(None),
                 apps: Mutex::default(),
                 apps_dir: Mutex::new(PathBuf::from(crate::app_yes::APPS_DIR)),
+                took_sink: Mutex::new(None),
                 apps_on: Mutex::new(crate::app_yes::on),
                 changes: Mutex::new(None),
                 remote: std::sync::atomic::AtomicBool::new(false),
@@ -924,6 +933,72 @@ impl Shared {
     /// Closes every connection of `client` at once, a listener's included:
     /// dropping its outbox ends the connection once what's queued (its
     /// leases' `lost`) is sent (harness-reviewer's P2 on #3778).
+    /// The triggers of the apps running now ([`crate::app_triggers`]): each
+    /// running app's manifest triggers, apps with none left out.
+    pub fn running_triggers(&self) -> lamp_msgs::AppTriggers {
+        let running = self.apps.lock().expect("apps").1.running();
+        let apps_dir = self.apps_dir.lock().expect("apps_dir").clone();
+        crate::app_triggers::list_of(&apps_dir, &running)
+    }
+
+    /// The voice holds a line that says `trigger` of app `app`
+    /// (`apps/trigger`): offered to the app's sockets, as `app.trigger`, only
+    /// when apps are on, the app is running and the manifest's triggers
+    /// include exactly these words. True when it was offered.
+    pub fn offer_trigger(&self, said: &lamp_msgs::AppTrigger) -> bool {
+        if !(*self.apps_on.lock().expect("apps_on"))() {
+            return false;
+        }
+        // The voice's own contract: the phrase is the manifest's trigger
+        // words, never the line around them.
+        if said.phrase != said.trigger {
+            return false;
+        }
+        // The manifest is read before the apps' lock is taken, not under it.
+        let apps_dir = self.apps_dir.lock().expect("apps_dir").clone();
+        let named = crate::app_yes::installed(&apps_dir, &said.app)
+            .is_some_and(|manifest| manifest.triggers.contains(&said.trigger));
+        if !named {
+            return false;
+        }
+        {
+            let mut apps = self.apps.lock().expect("apps");
+            if !apps.1.is_running(&said.app) {
+                return false;
+            }
+            // Not recorded: not sent, so no answer of the app goes uncounted.
+            if !apps
+                .1
+                .offer(&said.app, said.turn, std::time::Instant::now())
+            {
+                return false;
+            }
+        }
+        self.tell_client(
+            &crate::app_socket::app_client(&said.app),
+            &crate::app_socket::trigger_event(said.turn, &said.trigger, &said.phrase),
+        );
+        true
+    }
+
+    /// The turns apps took, told to the voice by the sink (after the apps'
+    /// lock is let go).
+    fn tell_took(&self, took: Vec<(String, u64)>) {
+        if took.is_empty() {
+            return;
+        }
+        if let Some(sink) = self.took_sink.lock().expect("took_sink").clone() {
+            for (app, turn) in took {
+                sink(&app, turn);
+            }
+        }
+    }
+
+    /// How a turn an app took is told to the voice (`apps/took`).
+    pub fn set_took_sink(&self, sink: TookSink) {
+        *self.took_sink.lock().expect("took_sink") = Some(sink);
+    }
+
     fn tell_client(&self, client: &str, event: &Value) {
         for each in self.open.lock().expect("open").values() {
             if each.client.as_deref() == Some(client) {
@@ -1623,7 +1698,7 @@ async fn connection<S>(
                                 state: state.as_deref(),
                             };
                             let mut apps = shared.apps.lock().expect("apps");
-                            crate::app_socket::answer(
+                            let reply = crate::app_socket::answer(
                                 &mut apps.1,
                                 &place,
                                 &name,
@@ -1639,7 +1714,13 @@ async fn connection<S>(
                                         "an op has an id and a name",
                                     ),
                                 )
-                            })
+                            });
+                            // A turn the app took is told to the voice after
+                            // the apps' lock is let go.
+                            let took = apps.1.drain_took();
+                            drop(apps);
+                            shared.tell_took(took);
+                            reply
                         };
                         if socket.send(Message::text(reply.to_string())).await.is_err() {
                             break;
@@ -1671,11 +1752,35 @@ async fn connection<S>(
                     } else {
                         (text.to_string(), None)
                     };
+                    // An app's `say` within 3 s of a trigger offered it takes
+                    // that line, as an `app.took` does (#7979, App Only), but
+                    // only once the door has accepted the `say`: a refused one
+                    // (a bad field, the rate, quiet hours, no `speak`) takes
+                    // nothing, or the person would hear neither the app nor
+                    // the model (Heron on #7979).
+                    let say_id = (session.app_may_speak() && text.contains("\"say\""))
+                        .then(|| serde_json::from_str::<Value>(text.as_str()).ok())
+                        .flatten()
+                        .filter(|frame| frame.get("op").and_then(Value::as_str) == Some("say"))
+                        .and_then(|frame| frame.get("id").and_then(Value::as_u64));
                     let mut outcome = {
                         let mut door = shared.door.lock().expect("door");
                         let mut parts = shared.parts.lock().expect("parts");
                         door.handle(&mut session, &door_text, parts.as_mut(), now, wall)
                     };
+                    if let (Some(say_id), Some(name)) = (say_id, session.app_name().map(str::to_owned))
+                        && outcome
+                            .send
+                            .iter()
+                            .any(|reply| reply["re"] == say_id && reply["ok"] == true)
+                    {
+                        let took = {
+                            let mut apps = shared.apps.lock().expect("apps");
+                            apps.1.took_by_say(&name, std::time::Instant::now());
+                            apps.1.drain_took()
+                        };
+                        shared.tell_took(took);
+                    }
                     if let Some(count) = phrases_set {
                         for reply in &mut outcome.send {
                             crate::app_socket::phrases_reply(reply, count);
@@ -2525,6 +2630,320 @@ mod tests {
             },
         );
         (shared, lines, inbox, newest)
+    }
+
+    /// #7415 piece 3b-2b: a trigger the voice holds is offered to an app only
+    /// when apps are on, the app is running and its manifest has those exact
+    /// words; the app's `app.took` within 3 s, once, is told to the voice.
+    #[test]
+    fn a_trigger_is_offered_to_a_running_app_and_its_took_is_told_once() {
+        let apps_dir =
+            std::env::temp_dir().join(format!("lampos-trigger-offer-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&apps_dir);
+        let dir = apps_dir.join("demo").join("current");
+        std::fs::create_dir_all(&dir).unwrap();
+        let manifest = json!({
+            "format": 2, "kind": "app", "name": "demo", "title": "T", "version": "1.0.0",
+            "min_build": 1, "runtime": {"name": "python", "entry": "src/main.py"},
+            "grants": ["hear"], "triggers": ["start english practice"], "settings": [], "files": []
+        });
+        std::fs::write(dir.join("lamp-skill.json"), manifest.to_string()).unwrap();
+        let (shared, _lines, _inbox, _newest) = stalled_keeping(None);
+        *shared.apps_dir.lock().unwrap() = apps_dir.clone();
+        *shared.apps_on.lock().unwrap() = || true;
+        let (outbox, mut app_inbox) = mpsc::unbounded_channel();
+        let (frames, _) = mpsc::channel(FRAMES_QUEUED);
+        let (body_state, _) = watch::channel(None);
+        shared.open.lock().unwrap().insert(
+            9,
+            Open {
+                client: Some(crate::app_socket::app_client("demo")),
+                outbox,
+                frames,
+                events: Default::default(),
+                phrases: Vec::new(),
+                grants: Default::default(),
+                body_state,
+            },
+        );
+        let said = |app: &str, trigger: &str, turn: u64| lamp_msgs::AppTrigger {
+            turn,
+            app: app.to_owned(),
+            trigger: trigger.to_owned(),
+            phrase: trigger.to_owned(),
+            at_ms: 1,
+        };
+        // Not running: never offered, and never listed.
+        assert!(!shared.offer_trigger(&said("demo", "start english practice", 7)));
+        assert!(shared.running_triggers().apps.is_empty());
+        shared.apps.lock().unwrap().1.connection("demo", true);
+        // Running: listed with its manifest's words, and offered them only.
+        let listed = shared.running_triggers();
+        assert_eq!(listed.apps.len(), 1);
+        assert_eq!(listed.apps[0].triggers, vec!["start english practice"]);
+        assert!(!shared.offer_trigger(&said("demo", "start english lesson", 7)));
+        assert!(!shared.offer_trigger(&said("other", "start english practice", 7)));
+        assert!(app_inbox.try_recv().is_err(), "nothing was offered yet");
+        assert!(shared.offer_trigger(&said("demo", "start english practice", 7)));
+        let event = app_inbox.try_recv().expect("the app is told");
+        assert_eq!(event["ev"], "app.trigger");
+        assert_eq!(event["turn"], "7");
+        assert_eq!(event["trigger"], "start english practice");
+        // The app takes it: told to the voice once, a second took is not.
+        let t0 = std::time::Instant::now();
+        let took = |turn: &str, at: u64| {
+            let apps_dir = shared.apps_dir.lock().unwrap().clone();
+            let place = crate::app_yes::Place {
+                apps: &apps_dir,
+                state: None,
+            };
+            let frame = json!({"id": 1, "op": "app.took", "turn": turn});
+            let mut apps = shared.apps.lock().unwrap();
+            let reply = crate::app_socket::answer(
+                &mut apps.1,
+                &place,
+                "demo",
+                frame.as_object().unwrap(),
+                true,
+                t0 + std::time::Duration::from_secs(at),
+            )
+            .unwrap();
+            assert_eq!(reply["ok"], true, "{reply}");
+            apps.1.drain_took()
+        };
+        assert_eq!(took("7", 1), vec![("demo".to_owned(), 7)]);
+        assert!(took("7", 2).is_empty(), "once");
+        // A turn never offered, and one taken after the hold, are no took.
+        assert!(took("8", 3).is_empty());
+        assert!(shared.offer_trigger(&said("demo", "start english practice", 9)));
+        assert!(took("9", 10).is_empty(), "late");
+        // The reply says whether the turn counted: a late or unoffered one is
+        // `taken: false`, and the app must not speak for it.
+        {
+            let apps_dir = shared.apps_dir.lock().unwrap().clone();
+            let place = crate::app_yes::Place {
+                apps: &apps_dir,
+                state: None,
+            };
+            let reply_at = |turn: &str, at: u64| {
+                let frame = json!({"id": 1, "op": "app.took", "turn": turn});
+                let mut apps = shared.apps.lock().unwrap();
+                let reply = crate::app_socket::answer(
+                    &mut apps.1,
+                    &place,
+                    "demo",
+                    frame.as_object().unwrap(),
+                    true,
+                    t0 + std::time::Duration::from_secs(at),
+                )
+                .unwrap();
+                apps.1.drain_took();
+                reply
+            };
+            assert!(shared.offer_trigger(&said("demo", "start english practice", 30)));
+            // Long past the offer's 3 s, and apart from the calls before it
+            // by the rate's tenth of a second.
+            assert_eq!(reply_at("30", 30)["taken"], false, "late");
+            assert_eq!(reply_at("31", 31)["taken"], false, "never offered");
+            // Offered at 40 s on this clock, taken at 41 s: counted.
+            shared.apps.lock().unwrap().1.offer(
+                "demo",
+                32,
+                t0 + std::time::Duration::from_secs(40),
+            );
+            assert_eq!(reply_at("32", 41)["taken"], true);
+        }
+        // A phrase that is not the trigger's own words is not offered.
+        assert!(!shared.offer_trigger(&lamp_msgs::AppTrigger {
+            phrase: "please start english practice".into(),
+            ..said("demo", "start english practice", 33)
+        }));
+        // With the offers kept full, one more is not sent (and not counted).
+        {
+            let mut apps = shared.apps.lock().unwrap();
+            let now = std::time::Instant::now();
+            for turn in 100..100 + crate::app_yes::MOST_OFFERED as u64 {
+                apps.1.offer("demo", turn, now);
+            }
+        }
+        while app_inbox.try_recv().is_ok() {}
+        assert!(!shared.offer_trigger(&said("demo", "start english practice", 34)));
+        assert!(app_inbox.try_recv().is_err(), "nothing was sent");
+        shared.apps.lock().unwrap().1.forget_run("demo");
+        // An app's `say` within the hold takes the newest turn offered it,
+        // once; one after the hold, or of an app never offered, takes none.
+        assert!(shared.offer_trigger(&said("demo", "start english practice", 21)));
+        {
+            let mut apps = shared.apps.lock().unwrap();
+            let now = std::time::Instant::now();
+            assert!(!apps.1.took_by_say("other", now));
+            assert!(apps.1.took_by_say("demo", now));
+            assert!(!apps.1.took_by_say("demo", now), "once");
+            assert_eq!(apps.1.drain_took(), vec![("demo".to_owned(), 21)]);
+        }
+        assert!(shared.offer_trigger(&said("demo", "start english practice", 22)));
+        {
+            let mut apps = shared.apps.lock().unwrap();
+            let late = std::time::Instant::now() + std::time::Duration::from_secs(30);
+            assert!(!apps.1.took_by_say("demo", late), "after the hold");
+            assert!(apps.1.drain_took().is_empty());
+        }
+        // Apps off: nothing offered.
+        *shared.apps_on.lock().unwrap() = || false;
+        assert!(!shared.offer_trigger(&said("demo", "start english practice", 10)));
+        // The app's last socket closing takes what was offered with it.
+        *shared.apps_on.lock().unwrap() = || true;
+        assert!(shared.offer_trigger(&said("demo", "start english practice", 11)));
+        shared.apps.lock().unwrap().1.connection("demo", false);
+        assert!(shared.running_triggers().apps.is_empty());
+        shared.apps.lock().unwrap().1.connection("demo", true);
+        assert!(took("11", 60).is_empty(), "the run ended");
+    }
+
+    /// #7415 piece 3b-2b, with no app running (every lamp that has none): no
+    /// trigger is listed, none is offered to anyone, and nothing is held, so
+    /// the voice's path is the one it had.
+    #[test]
+    fn with_no_running_app_nothing_is_listed_offered_or_held() {
+        let apps_dir =
+            std::env::temp_dir().join(format!("lampos-trigger-none-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&apps_dir);
+        // An app installed with a trigger, but not running.
+        let dir = apps_dir.join("demo").join("current");
+        std::fs::create_dir_all(&dir).unwrap();
+        let manifest = json!({
+            "format": 2, "kind": "app", "name": "demo", "title": "T", "version": "1.0.0",
+            "min_build": 1, "runtime": {"name": "python", "entry": "src/main.py"},
+            "grants": ["hear"], "triggers": ["start english practice"], "settings": [], "files": []
+        });
+        std::fs::write(dir.join("lamp-skill.json"), manifest.to_string()).unwrap();
+        let (shared, _lines, mut inbox, _newest) = stalled_keeping(None);
+        *shared.apps_dir.lock().unwrap() = apps_dir;
+        *shared.apps_on.lock().unwrap() = || true;
+        assert!(shared.running_triggers().apps.is_empty());
+        let said = lamp_msgs::AppTrigger {
+            turn: 1,
+            app: "demo".into(),
+            trigger: "start english practice".into(),
+            phrase: "start english practice".into(),
+            at_ms: 1,
+        };
+        assert!(!shared.offer_trigger(&said));
+        assert!(inbox.try_recv().is_err(), "no connection was told anything");
+        let mut apps = shared.apps.lock().unwrap();
+        assert!(apps.1.running().is_empty());
+        assert!(
+            !apps.1.took_turn("demo", "1", std::time::Instant::now()),
+            "nothing was offered, so nothing is taken"
+        );
+        assert!(apps.1.drain_took().is_empty());
+    }
+
+    /// #7415 piece 3b-2b on a real bus: the running app's triggers are said on
+    /// `apps/triggers`, the voice's `apps/trigger` reaches the app as
+    /// `app.trigger`, and a turn the app took is said on `apps/took`.
+    #[test]
+    fn the_bus_side_says_the_triggers_offers_one_and_tells_a_took() {
+        use lamp_msgs::{AppTook, AppTrigger, AppTriggers};
+        let base = std::env::temp_dir().join(format!("lampos-trigger-bus-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&base);
+        let apps_dir = base.join("apps");
+        let dir = apps_dir.join("demo").join("current");
+        std::fs::create_dir_all(&dir).unwrap();
+        let manifest = json!({
+            "format": 2, "kind": "app", "name": "demo", "title": "T", "version": "1.0.0",
+            "min_build": 1, "runtime": {"name": "python", "entry": "src/main.py"},
+            "grants": ["hear"], "triggers": ["start english practice"], "settings": [], "files": []
+        });
+        std::fs::write(dir.join("lamp-skill.json"), manifest.to_string()).unwrap();
+        let bus = lamp_bus::Bus::new(base.join("bus")).unwrap();
+        let (shared, _lines, _inbox, _newest) = stalled_keeping(None);
+        *shared.apps_dir.lock().unwrap() = apps_dir;
+        *shared.apps_on.lock().unwrap() = || true;
+        let (outbox, mut app_inbox) = mpsc::unbounded_channel();
+        let (frames, _) = mpsc::channel(FRAMES_QUEUED);
+        let (body_state, _) = watch::channel(None);
+        shared.open.lock().unwrap().insert(
+            9,
+            Open {
+                client: Some(crate::app_socket::app_client("demo")),
+                outbox,
+                frames,
+                events: Default::default(),
+                phrases: Vec::new(),
+                grants: Default::default(),
+                body_state,
+            },
+        );
+        shared.apps.lock().unwrap().1.connection("demo", true);
+        let mut took_reader = bus.subscribe(AppTook::TOPIC, "test").unwrap();
+        crate::app_triggers::start(&bus, shared.clone());
+        let until = |what: &str, mut ready: Box<dyn FnMut() -> bool>| {
+            let start = std::time::Instant::now();
+            while !ready() {
+                assert!(start.elapsed() < Duration::from_secs(5), "{what}");
+                std::thread::sleep(Duration::from_millis(5));
+            }
+            start.elapsed()
+        };
+        // The list is said, with the running app's words.
+        let reader = lamp_bus::Bus::new(base.join("bus")).unwrap();
+        until(
+            "apps/triggers said",
+            Box::new(move || {
+                reader
+                    .latest(AppTriggers::TOPIC)
+                    .ok()
+                    .flatten()
+                    .and_then(|m| m.parse::<AppTriggers>().ok())
+                    .is_some_and(|list| {
+                        list.apps.len() == 1
+                            && list.apps[0].triggers == vec!["start english practice"]
+                    })
+            }),
+        );
+        // The voice's word reaches the app.
+        let mut voice = bus
+            .publisher_declared(AppTrigger::TOPIC, &AppTrigger::declaration(), "voice")
+            .unwrap();
+        // The listener may bind just after the first look: said again until offered.
+        let sent = std::time::Instant::now();
+        let mut event = None;
+        while event.is_none() && sent.elapsed() < Duration::from_secs(5) {
+            voice
+                .publish_json(
+                    lamp_ipc::monotonic_us(),
+                    &AppTrigger {
+                        turn: 5,
+                        app: "demo".into(),
+                        trigger: "start english practice".into(),
+                        phrase: "start english practice".into(),
+                        at_ms: 1,
+                    },
+                )
+                .unwrap();
+            let waited = std::time::Instant::now();
+            while waited.elapsed() < Duration::from_millis(300) {
+                if let Ok(seen) = app_inbox.try_recv() {
+                    event = Some((seen, sent.elapsed()));
+                    break;
+                }
+                std::thread::sleep(Duration::from_millis(2));
+            }
+        }
+        let (event, took_us) = event.expect("the app was offered the trigger");
+        eprintln!("apps/trigger to the app's frame: {took_us:?}");
+        assert_eq!(event["ev"], "app.trigger");
+        assert_eq!(event["turn"], "5");
+        // A turn the app took is said to the voice.
+        let sink = shared.took_sink.lock().unwrap().clone().expect("the sink");
+        sink("demo", 5);
+        let said = took_reader
+            .recv(Duration::from_secs(5))
+            .unwrap()
+            .expect("apps/took said");
+        let took: AppTook = said.parse().unwrap();
+        assert_eq!((took.app.as_str(), took.turn), ("demo", 5));
     }
 
     /// The admin op `{"app_forget": NAME}`: the helper's alone, with the switch

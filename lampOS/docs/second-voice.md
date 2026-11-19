@@ -8464,7 +8464,7 @@ Not shown on the host: the real second worker behind the switch (the
 tests' second route is a peer). On a lamp: a switch mid-line and Gemini's
 return, and the latency targets, which lamp-52e6 did not meet (above).
 
-## An installed app's spoken trigger (#7415 piece 6, `LAMP_APP_TRIGGERS`, off)
+## An installed app's spoken trigger (#7415 pieces 6 and 3b-2b, `LAMP_APP_TRIGGERS`, on in the product)
 
 A final line, heard clear of the lamp's voice and not let in only as the conversation going on (`CONVERSATION_ALONE`; the caller's own `FOLLOW_UP_NOTE` follow-up counts), and not while the lamp waits on an answer (a task read back, a write or skill say-back, a held forget or rename) or another person's cut words are kept for it, that is a whole trigger of a running
 app (the manifest's `triggers`, which lamp-control keeps on `apps/triggers`) is told
@@ -8473,5 +8473,7 @@ to lamp-control on `apps/trigger` (the manifest's own trigger words, never the l
 with only a polite word before or after ("please", "lamp", "can you"); "don't start my
 english lesson" is none, and a trigger made only of the lamp's own words ("yes go ahead", "send it now") is never matched. When the app takes the line the request ends in code as a normal end does (nothing of it carried), with
 no chat round and no words from the lamp (the app speaks for itself); a line nothing
-takes goes to the model as any other. Off, with no app running or with no bus, nothing
+takes goes to the model as any other. The product's `lamp-voice.service` sets it `on`;
+with no app running (lamp-control tells no trigger until an app has a socket up, and
+apps are off unless `LAMP_STORE_APPS` is on there), with it off or with no bus, nothing
 changes. Tests: `second_provider::tests::app_triggers_in_code`, `app_triggers::tests`.

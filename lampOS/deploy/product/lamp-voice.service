@@ -655,6 +655,8 @@ Environment=LAMP_EYES_LOOK_FILE=/run/lampos-eyes/sight.jpg
 # What the lamp sees, when asked, from the eyes' full look (lamp-eyes --full-look), not the 320 working frame.
 Environment=LAMP_LOOK_FULL=on
 Environment=LAMP_EYES_FULL_LOOK_FILE=/run/lampos-eyes/look.jpg
+# LAMP_APP_TRIGGERS: #7415 piece 3b-2b; a line that spells a running app's trigger starts it with no chat round. Its rules are its row in docs/switches.md.
+Environment=LAMP_APP_TRIGGERS=on
 # Only the body opens the servo port. Defence in depth, not a mechanical stop.
 # With '-', a servo port that isn't there when the voice starts (a boot race: it comes up after the
 # unit starts; the body unplugged; a lamp without one) is passed over, and then not hidden for that run:
