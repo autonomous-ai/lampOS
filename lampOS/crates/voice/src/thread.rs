@@ -1407,8 +1407,16 @@ impl Thread {
     /// (`said_to_me`'s bare yes or no out of the window, the Reviewer-lead's
     /// HOLD on #7705).
     pub fn lamp_asked_within(&self, request: u64, now: Instant, within: Duration) -> bool {
+        self.lamp_asked_ago(request, now)
+            .is_some_and(|ago| ago <= within)
+    }
+
+    /// How long before `now` the exchange of [`Self::lamp_asked`]'s question
+    /// began, none without one: journaled with `said_to_me`'s verdict so a
+    /// saved journal gives a replay its `asked_s` (#7698, request 99).
+    pub fn lamp_asked_ago(&self, request: u64, now: Instant) -> Option<Duration> {
         self.lamp_question(request)
-            .is_some_and(|exchange| now.saturating_duration_since(exchange.at) <= within)
+            .map(|exchange| now.saturating_duration_since(exchange.at))
     }
 
     /// The lamp's newest line before `request`, when it ended in a question.
@@ -3407,10 +3415,6 @@ mod tests {
         assert_eq!(kept.recent(at(7), within, 6).len(), 1);
     }
 
-    /// `LAMP_SAID_AS_HEARD`: an answer a line cut after its first words is
-    /// kept as those words, and what it still sends adds none. Its end is
-    /// the heard end, so a question it never played isn't taken as asked. One
-    /// cut before any word is passed over, as an answer with no word is.
     #[test]
     fn the_lamps_question_waits_only_within_its_bound() {
         // The Reviewer-lead's HOLD on #7705: `lamp_asked` has no clock;
@@ -3426,11 +3430,25 @@ mod tests {
         assert!(thread.lamp_asked_within(2, at(121), within), "at the bound");
         assert!(!thread.lamp_asked_within(2, at(122), within), "stale");
         assert!(thread.lamp_asked(2), "lamp_asked alone has no clock");
+        // #7698: the journal gives the seconds since the question began.
+        assert_eq!(
+            thread.lamp_asked_ago(2, at(30)),
+            Some(Duration::from_secs(29))
+        );
         thread.person("Thanks.", true, at(5));
         thread.lamp(2, "You're welcome.", at(6));
         assert!(!thread.lamp_asked_within(3, at(7), within), "no question");
+        assert_eq!(
+            thread.lamp_asked_ago(3, at(7)),
+            None,
+            "no question, no seconds"
+        );
     }
 
+    /// `LAMP_SAID_AS_HEARD`: an answer a line cut after its first words is
+    /// kept as those words, and what it still sends adds none. Its end is
+    /// the heard end, so a question it never played isn't taken as asked. One
+    /// cut before any word is passed over, as an answer with no word is.
     #[test]
     fn an_answer_cut_is_kept_as_what_was_heard_of_it() {
         let mut thread = Thread::new();
