@@ -3946,6 +3946,147 @@ pub(crate) mod tests {
         );
     }
 
+    /// A driver's sources with nothing on the bus, whose forget is `forget`
+    /// at each second it is asked.
+    struct Forgets<F: FnMut(u64) -> bool> {
+        start: Instant,
+        now: Instant,
+        asked: Vec<u64>,
+        forget: F,
+    }
+
+    impl<F: FnMut(u64) -> bool> Sources for Forgets<F> {
+        fn seen(&mut self) -> Seen {
+            Seen::default()
+        }
+        fn voice_resting(&mut self) -> bool {
+            true
+        }
+        fn requests(&mut self) -> Vec<lamp_msgs::ReportsRequest> {
+            Vec::new()
+        }
+        fn tell(&mut self, _: &lamp_msgs::ReportsState) {}
+        fn forget_skill_counts(&mut self) -> bool {
+            let at = (self.now - self.start).as_secs();
+            self.asked.push(at);
+            (self.forget)(at)
+        }
+    }
+
+    /// `step` once a second over `seconds`, with `then` before each.
+    fn drive<F: FnMut(u64) -> bool>(
+        shared: &Shared,
+        sources: &mut Forgets<F>,
+        timing: &mut Timing,
+        seconds: std::ops::Range<u64>,
+        mut then: impl FnMut(u64, &Shared),
+    ) {
+        for second in seconds {
+            then(second, shared);
+            let now = sources.start + Duration::from_secs(second);
+            sources.now = now;
+            step(shared, sources, timing, None, now, NOW + second);
+        }
+    }
+
+    /// #7967: a forget the manage helper does not finish is asked at once,
+    /// then after 20 s, 40 s, 80 s and so on, never more than 10 minutes
+    /// apart, so `lamp-cloud` never stacks asks on the helper's socket, and
+    /// once the helper can answer the counts are forgotten within 10
+    /// minutes. Done, it is not asked again; a later no starts again from
+    /// 20 s.
+    #[test]
+    fn a_forget_not_done_is_asked_again_later_each_time() {
+        let shared = Shared::new(Reports::open(places("forget-later")));
+        shared.with(|reports| reports.kept.forget_skill_counts = true);
+        let start = Instant::now();
+        let mut timing = Timing::new(start);
+        // Busy until 3000 s, done after; busy again from 3100 s.
+        let busy_from = std::cell::Cell::new(u64::MAX);
+        let mut helper = Forgets {
+            start,
+            now: start,
+            asked: Vec::new(),
+            forget: |at| (3_000..busy_from.get()).contains(&at),
+        };
+        drive(
+            &shared,
+            &mut helper,
+            &mut timing,
+            0..3_170,
+            |second, shared| {
+                if second == 3_050 {
+                    assert!(!shared.with(|reports| reports.kept.forget_skill_counts));
+                }
+                if second == 3_100 {
+                    busy_from.set(3_100);
+                    shared.with(|reports| reports.kept.forget_skill_counts = true);
+                }
+            },
+        );
+        assert_eq!(
+            helper.asked,
+            [
+                0, 20, 60, 140, 300, 620, 1_220, 1_820, 2_420, 3_020, 3_100, 3_120, 3_160
+            ]
+        );
+        // The cap, pinned: never more than 10 minutes between two asks.
+        let gaps: Vec<u64> = helper.asked.windows(2).map(|two| two[1] - two[0]).collect();
+        assert_eq!(gaps.iter().max(), Some(&600));
+    }
+
+    /// #7967: `lamp-cloud` holds at most one of the manage socket's
+    /// connections at a time, and none between its asks, so the socket's
+    /// other three, and the voice's skill runs on them, are left free while
+    /// the forget is asked again. The helper here never answers, as one
+    /// waiting on a held lock did.
+    #[test]
+    fn the_forget_holds_one_manage_connection_at_most_and_none_between_asks() {
+        use std::io::Read;
+        use std::sync::atomic::{AtomicUsize, Ordering};
+        let root = places("forget-socket").own.parent().unwrap().to_path_buf();
+        let socket = root.join("manage.sock");
+        let listener = std::os::unix::net::UnixListener::bind(&socket).unwrap();
+        let (open, most) = (Arc::new(AtomicUsize::new(0)), Arc::new(AtomicUsize::new(0)));
+        {
+            let (open, most) = (open.clone(), most.clone());
+            std::thread::spawn(move || {
+                for mut stream in listener.incoming().flatten() {
+                    let now = open.fetch_add(1, Ordering::SeqCst) + 1;
+                    most.fetch_max(now, Ordering::SeqCst);
+                    let open = open.clone();
+                    // Read to the asker's close, never answering.
+                    std::thread::spawn(move || {
+                        let _ = stream.read_to_end(&mut Vec::new());
+                        open.fetch_sub(1, Ordering::SeqCst);
+                    });
+                }
+            });
+        }
+        let shared = Shared::new(Reports::open(places("forget-socket-reports")));
+        shared.with(|reports| reports.kept.forget_skill_counts = true);
+        let start = Instant::now();
+        let mut timing = Timing::new(start);
+        let mut helper = Forgets {
+            start,
+            now: start,
+            asked: Vec::new(),
+            forget: |_| crate::skills::forget_counts(&socket),
+        };
+        // Each unanswered ask waits its 5 s: 30 s here is two asks.
+        drive(&shared, &mut helper, &mut timing, 0..30, |_, _| {
+            // Between asks, none of the socket's connections is lamp-cloud's.
+            let until = Instant::now() + Duration::from_secs(1);
+            while open.load(Ordering::SeqCst) > 0 && Instant::now() < until {
+                std::thread::sleep(Duration::from_millis(10));
+            }
+            assert_eq!(open.load(Ordering::SeqCst), 0);
+        });
+        assert_eq!(helper.asked, [0, 20]);
+        assert_eq!(most.load(Ordering::SeqCst), 1);
+        let _ = fs::remove_dir_all(&root);
+    }
+
     /// A yes as the app would give it, over any choice kept before.
     fn yes_again(places: &Places) {
         let _ = fs::remove_file(&places.own);
