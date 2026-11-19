@@ -11679,8 +11679,8 @@ printf 'tar of %s' \"$name\" > \"$3/$name-1.0.0.tar\"\n",
     /// itself, the trigger its own model picks in one more call and one
     /// task step whose words are the person's request, done by the lamp's
     /// agent when it fires; no say, no other step, sip-of-water's guards in
-    /// `[[while]]`, `made_with` the agent's. The agent is never asked to
-    /// write it.
+    /// `[[while]]` but on the lamp's clock, `made_with` the agent's. The
+    /// agent is never asked to write it.
     #[test]
     fn with_the_switch_a_make_judged_no_reaction_is_its_trigger_and_one_task_never_drafted() {
         made_skill::set_reactions_here(Some(true));
@@ -11733,6 +11733,13 @@ printf 'tar of %s' \"$name\" > \"$3/$name-1.0.0.tar\"\n",
             assert!(!told.to_string().contains("PRIVATE-REASON-7"), "{told}");
             let table = one_task_of(&copy, request, crate::make_no_cannot::RUN);
             assert_eq!(table["trigger"]["topic"].as_str(), Some(topic));
+            // Never a guard on the lamp's clock: 9:00's run is never spent
+            // waiting (the first builder, 19 Nov 01:29 and 02:41).
+            if topic == "clock/local" {
+                assert!(table.get("while").is_none(), "{table:?}");
+                assert_eq!(made_with_of(&keeping, name).as_deref(), Some("hermes"));
+                continue;
+            }
             let guards = table["while"].as_array().unwrap();
             assert_eq!(guards.len(), 3, "sip-of-water's guards: {table:?}");
             let topics = table["permissions"]["topics"].as_array().unwrap();

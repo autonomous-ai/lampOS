@@ -6569,7 +6569,9 @@ the same code for both writers.
   `do.task` whose words are the person's request, run by
   `scripts/agent.py`, so the agent does all the work when it fires; no
   `say`, no other step and no timer or `[[while]]` a model wrote. On a
-  trigger it keeps sip-of-water's guards (`made_skill::template_guards`,
+  trigger, but never on the lamp's clock (`clock/local`: "tell me the BTC
+  price at 9" with the owner head down at 9 still runs at 9,
+  `make_no_cannot::on_the_clock`), it keeps sip-of-water's guards (`made_skill::template_guards`,
   from `made_skill::BEHAVIOUR_TEMPLATE`): `[[while]]` on `voice/state`
   `not_equals = "speaking"` for 30 s and `equals = "resting"` for 5 s, and
   on `room/activity` `state not_equals = "head_down"` with
@@ -6609,7 +6611,7 @@ the same code for both writers.
   `with_the_switch_a_make_not_a_reaction_keeps_nothing_when_tasks_are_off`,
   `with_the_switch_a_one_off_reminder_never_reaches_the_agents_make`,
   `with_the_switch_off_a_presence_draft_is_deepseeks_as_before`,
-  `with_the_reactions_switch_a_timed_task_keeps_sip_of_waters_guards_and_no_say`,
+  `with_the_reactions_switch_a_task_on_a_trigger_keeps_the_guards_but_never_on_a_clock`,
   `the_templates_guards_are_said_plainly_and_any_other_while_is_not`,
   `made_with_is_the_lamps_line_for_each_engine_and_the_models_is_dropped`,
   and lamp-skills' `a_guarded_nudge_made_by_the_agent_passes_both_caps_with_its_maker`

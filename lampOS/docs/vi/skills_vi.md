@@ -3344,7 +3344,9 @@ cả hai người viết.
   gọi nó, và một `do.task` có lời là chính yêu cầu của người dùng, chạy
   bằng `scripts/agent.py`, để agent làm toàn bộ việc khi nó chạy; không
   `say`, không bước nào khác, không hẹn giờ hay `[[while]]` do mô hình
-  viết. Trên trigger nó giữ các guard của sip-of-water
+  viết. Trên trigger, nhưng không bao giờ trên đồng hồ của đèn
+  (`clock/local`: "cho tôi biết giá BTC lúc 9 giờ" vẫn chạy lúc 9 giờ khi
+  chủ đèn đang cúi đầu, `make_no_cannot::on_the_clock`), nó giữ các guard của sip-of-water
   (`made_skill::template_guards`, lấy từ `made_skill::BEHAVIOUR_TEMPLATE`):
   `[[while]]` trên `voice/state` `not_equals = "speaking"` 30 giây và
   `equals = "resting"` 5 giây, trên `room/activity` `state not_equals =
