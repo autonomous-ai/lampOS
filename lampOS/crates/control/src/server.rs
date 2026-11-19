@@ -2079,6 +2079,13 @@ fn admin_answer(
     }
     let now = shared.now_us();
     if let Some(code) = asked.get("code") {
+        // With the door off (developer access off: `LAMP_CONTROL` not on,
+        // nothing listens on the network) no pairing code is made: no
+        // computer could use it, and the app must not show one. The owner's
+        // side stays served for the voice's yes records and skill runs.
+        if !shared.listening.load(Ordering::Relaxed) {
+            return json!({"error": "developer access is off on this lamp"});
+        }
         let say_pin = code.get("say_pin") == Some(&json!(true));
         let grants: Result<BTreeSet<Grant>, _> =
             serde_json::from_value(code.get("grants").cloned().unwrap_or(json!([])));

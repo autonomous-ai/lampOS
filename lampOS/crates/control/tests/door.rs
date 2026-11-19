@@ -58,6 +58,8 @@ async fn lamp_made(
     );
     let door = build(door, &dir);
     let shared = server::Shared::new_with(door, identity.pin.clone(), parts);
+    // These lamps have a door: it listens below.
+    shared.set_listening(true);
     let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
     let address = listener.local_addr().unwrap();
     let admin = dir.join("admin.sock");
@@ -567,6 +569,8 @@ async fn the_admin_socket_says_which_streams_are_usable() {
 #[tokio::test]
 async fn the_clients_answer_says_whether_the_door_listens() {
     let lamp = lamp("listening").await;
+    // The test lamps' door listens; this one says what it says before it is bound.
+    lamp.shared.set_listening(false);
     assert_eq!(
         admin(&lamp, json!({"clients": true})).await["listening"],
         json!(false)
