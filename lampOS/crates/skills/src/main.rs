@@ -3340,7 +3340,14 @@ fn run_now_call(
     // hand-over takes it.
     // The voice runs a made skill now only for the owner's own line
     // (`lamp_voice::made_run`'s `owner_hears`): the owner's ask (#7894).
-    mark_voice_asked(&skill, &run.calls, true, voice_asked_switched(), true, now_ms);
+    mark_voice_asked(
+        &skill,
+        &run.calls,
+        true,
+        voice_asked_switched(),
+        true,
+        now_ms,
+    );
     eprintln!("lamp-skills: skill:{skill}: run now, as its owner asked by voice");
     // Whether it speaks its own words (a made skill's exact text, the only
     // say the voice takes of one): the voice then adds no line of its own
@@ -6077,10 +6084,10 @@ fn hand_task(skill: &str, step: lamp_skills::task::TaskStep, tasks: &Tasks, mut 
 /// [`mark_voice_asked`] from the voice's run now or its model's call of the
 /// skill's tool, never a time's or a trigger's run) and ready at `ready`
 /// within five minutes of the ask, the window that lifts its quiet too
-/// (`lamp_voice::told_when_asked::lifted_until`). Who that voice is, the
-/// owner or anyone the private room lets in (`LAMP_PRIVATE_ROOM`), is
-/// the voice's, unchanged here (pending V2's ruling on #7902). Otherwise
-/// the line keeps the read's gate, quiet hours included.
+/// (`lamp_voice::told_when_asked::lifted_until`), whoever asked: a #7200
+/// refusal carries nothing the run read. What its agent found is said at
+/// once only to its owner's ask ([`asker`]). Otherwise the line keeps the
+/// read's gate, quiet hours included.
 fn asked_now(asked_at: Option<u64>, ready: u64) -> bool {
     asked_at.is_some_and(|asked| lamp_voice::told_when_asked::lifted_until(asked, ready).is_some())
 }
@@ -6181,11 +6188,9 @@ fn tell_its_run(
     }
     let told = match &failed {
         Some(line) => lamp_skills::service_read::tell_failed(line, asking, room),
-        None => lamp_skills::service_read::tell_answer(
-            &lines,
-            asker(asked_at, owners, unix_ms()),
-            room,
-        ),
+        None => {
+            lamp_skills::service_read::tell_answer(&lines, asker(asked_at, owners, unix_ms()), room)
+        }
     };
     eprintln!("lamp-skills: skill:{skill}: do.task: {what}: {told}");
     tell_gate(&lamp_skills::service_read::answer_news(skill, &told));
@@ -7175,7 +7180,14 @@ mod tests {
             assert!(!mark_voice_asked(skill, &calls, voice, switched, true, now));
             assert_eq!(lamp_skills::task::take_asked_by_voice(skill), None);
         }
-        assert!(mark_voice_asked("btc-price", &[task], true, true, true, now));
+        assert!(mark_voice_asked(
+            "btc-price",
+            &[task],
+            true,
+            true,
+            true,
+            now
+        ));
         let asked_at = lamp_skills::task::take_asked_by_voice("btc-price");
         assert_eq!(asked_at, Some(now));
         assert!(lamp_skills::task_sure::in_asking_conversation(
@@ -7252,10 +7264,23 @@ mod tests {
         }));
         let now = unix_ms();
         for owners in [true, false] {
-            assert!(mark_voice_asked("mail-check", &[task.clone()], true, true, owners, now));
-            assert_eq!(lamp_skills::task::take_asked_by_voice("mail-check"), Some(now));
+            assert!(mark_voice_asked(
+                "mail-check",
+                &[task.clone()],
+                true,
+                true,
+                owners,
+                now
+            ));
+            assert_eq!(
+                lamp_skills::task::take_asked_by_voice("mail-check"),
+                Some(now)
+            );
             assert_eq!(lamp_skills::task::take_asked_by_owner("mail-check"), owners);
-            assert!(!lamp_skills::task::take_asked_by_owner("mail-check"), "taken once");
+            assert!(
+                !lamp_skills::task::take_asked_by_owner("mail-check"),
+                "taken once"
+            );
         }
         let asked = Some(now - 2_000);
         assert_eq!(asker(asked, true, now), Asker::Owner);
