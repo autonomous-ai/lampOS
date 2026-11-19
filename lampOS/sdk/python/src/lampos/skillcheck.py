@@ -39,7 +39,28 @@ READ_ON_THE_LAMP = ("SKILL.md", "skill.toml", "moves", "sounds", "lights", "show
 # A `do.task`, as lamp-skills holds it (crates/skills task.rs: `MOST_TASK_BYTES`, `run_ok`, `grants_of`;
 # lamp_voice::skill_task_yes::GRANTS and NEVER).
 TASK_SCRIPTS = "scripts"
-TASK_MOST_BYTES = 500
+TASK_MOST_BYTES = 1500  # as the run's prompt quotes the words: each '"' and '\\' twice (made_skill MOST_TASK_BYTES, #7874)
+# Unicode's format characters (category Cf), as the lamp's own list holds
+# them (lamp_voice::made_skill::is_format): a task's words and its summary
+# carry none, nor any control character (#7874).
+_FORMAT_RANGES = (
+    (0x00AD, 0x00AD), (0x0600, 0x0605), (0x061C, 0x061C), (0x06DD, 0x06DD),
+    (0x070F, 0x070F), (0x0890, 0x0891), (0x08E2, 0x08E2), (0x180E, 0x180E),
+    (0x200B, 0x200F), (0x202A, 0x202E), (0x2060, 0x2064), (0x2066, 0x206F),
+    (0xFEFF, 0xFEFF), (0xFFF9, 0xFFFB), (0x110BD, 0x110BD), (0x110CD, 0x110CD),
+    (0x13430, 0x1343F), (0x1BCA0, 0x1BCA3), (0x1D173, 0x1D17A), (0xE0001, 0xE0001),
+    (0xE0020, 0xE007F),
+)
+
+
+def _unplain(c: str) -> bool:
+    """A control or format character, which the lamp refuses in a task's words or summary."""
+    code = ord(c)
+    return code < 32 or 127 <= code < 160 or any(low <= code <= high for low, high in _FORMAT_RANGES)
+
+
+# A task's one-line summary, read back for the owner's yes (lamp_voice::made_skill MOST_TASK_SAID_CHARS, #7874).
+TASK_SUMMARY_MOST_CHARS = 120
 TASK_GRANTS = ("body", "light", "speak", "look", "hear", "sound", "air", "device", "camera", "microphone", "notes", "speech")
 # A linked service's grants (`gmail-read`, `github-write`): a Store or made skill's task may name them with
 # `LAMP_AGENT_SERVICES=on` (lamp_voice::made_skill SERVICE_GRANT_CODES, service_grant); a push from a computer is
@@ -398,8 +419,9 @@ def _task(folder: Path, rules: dict[str, Any], report: Report) -> bool:
     """A skill's `do.task` and its `grants`, held as lamp-skills holds them
     (lib.rs, task.rs): at most one task, alone in its `[[do]]` table, in an
     installable skill; `grants` only beside one, each a grant a script may
-    hold, once; the task's words 1 to 500 bytes; its `run` a plain file in the
-    skill's own `scripts/`. True when the skill has a task step."""
+    hold, once; the task's words 1 to 1500 bytes as a run's prompt quotes them, and its `summary`, if any, 1
+    to 120 characters on one line; its `run` a plain file in the skill's own
+    `scripts/`. True when the skill has a task step."""
     steps = rules.get("do") if isinstance(rules.get("do"), list) else []
     tasks = [step for step in steps if isinstance(step, dict) and "task" in step]
     grants = rules.get("grants")
@@ -432,8 +454,13 @@ def _task(folder: Path, rules: dict[str, Any], report: Report) -> bool:
             continue
         words = task.get("task")
         text = words.strip() if isinstance(words, str) else ""
-        if not text or len(text.encode()) > TASK_MOST_BYTES or any(ord(c) < 32 or 127 <= ord(c) < 160 for c in text):
-            report.errors.append(f"skill.toml: do.task: task is 1 to {TASK_MOST_BYTES} bytes of words, with no control characters")
+        if not text or len(text.encode()) + text.count('"') + text.count("\\") > TASK_MOST_BYTES or any(_unplain(c) for c in text):
+            report.errors.append(f"skill.toml: do.task: task is 1 to {TASK_MOST_BYTES} bytes of words, with no control or format characters")
+        summary = task.get("summary")
+        if summary is not None:
+            said = summary.strip() if isinstance(summary, str) else ""
+            if not said or len(summary) > TASK_SUMMARY_MOST_CHARS or any(_unplain(c) for c in summary):
+                report.errors.append(f"skill.toml: do.task: summary is 1 to {TASK_SUMMARY_MOST_CHARS} characters on one line, read back to the owner for their yes")
         run = task.get("run")
         if isinstance(run, str):
             _task_run(folder, run, report)

@@ -4,4 +4,4 @@ version = "1.0.0"
 grants = ["google_calendar-read"]
 
 [[do]]
-task = { task = "Count the owner's calendar events left today and tell them how many, and when the next one starts", run = "scripts/main.py" }
+task = { task = "Count the owner's calendar events left today and tell them how many, and when the next one starts. Leave out events that were declined or cancelled, and say the next one's start time in the owner's local time, like 3:30 PM.", summary = "Counts your calendar events left today and says when the next starts", run = "scripts/main.py" }

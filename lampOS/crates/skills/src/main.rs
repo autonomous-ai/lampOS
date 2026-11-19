@@ -6915,6 +6915,7 @@ mod tests {
         let step = |quiet| lamp_skills::task::TaskStep {
             task: "Sum up this morning's mail".into(),
             words: "Sum up this morning's mail".into(),
+            summary: None,
             run: "scripts/main.py".into(),
             quiet,
         };
@@ -7091,6 +7092,7 @@ mod tests {
         let task = Call::Task(Box::new(lamp_skills::task::TaskStep {
             task: "Find the bitcoin price".into(),
             words: "Find the bitcoin price".into(),
+            summary: None,
             run: "scripts/main.py".into(),
             quiet: None,
         }));
@@ -8756,6 +8758,7 @@ mod tests {
             Call::Task(Box::new(lamp_skills::task::TaskStep {
                 task: "Read my unread mail.".into(),
                 words: "Read my unread mail.".into(),
+                summary: None,
                 run: "scripts/mail.sh".into(),
                 quiet: None,
             }))
@@ -8831,6 +8834,7 @@ mod tests {
             Call::Task(Box::new(lamp_skills::task::TaskStep {
                 task: "Start a study block.".into(),
                 words: "Start a study block.".into(),
+                summary: None,
                 run: "scripts/study.sh".into(),
                 quiet: None,
             }))

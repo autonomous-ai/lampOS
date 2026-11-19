@@ -649,9 +649,10 @@ fn agent_services() -> String {
          {codes}; no other grant, and no services in [permissions]: only its trigger's \
          topics, and speak = true only beside a say step; its \
          trigger the lamp's own (a time, someone coming or leaving, as above){words}; and exactly one \
-         [[do]] step, alone in its step: task = {{ task = \"...\", run = \"scripts/main.py\" }}, \
-         the task's words, one plain sentence of at most {most} characters, read back whole for \
-         the person's yes, saying plainly for the lamp's agent what \
+         [[do]] step, alone in its step: task = {{ task = \"...\", summary = \"...\", run = \
+         \"scripts/main.py\" }}, the task's words in full, plain, at most {most} characters and {bytes} bytes, and \
+         its summary one plain line of at most {said} characters a person understands, read back \
+         for the person's yes; the task's words saying plainly for the lamp's agent what \
          to read and what to tell the person, or what to send, in the request's own words, and \
          to whom (an address the request says, or the person's own for me); and one \
          ```scripts/main.py block that is exactly the example's one line, which holds no token. \
@@ -662,6 +663,8 @@ fn agent_services() -> String {
          and no blocks: {cannot} {cant_yet} deleting or changing what is in your services. \
          Never tell them to link a service. A whole such skill, for \"{AGENT_SERVICES_ASKED}\":\
          \n\n{AGENT_SERVICES_EXAMPLE}\n",
+        said = made_skill::MOST_TASK_SAID_CHARS,
+        bytes = made_skill::MOST_TASK_BYTES,
         cant_yet = made_skill::CANT_YET,
         codes = made_skill::SERVICE_GRANT_CODES.join(", "),
         words = if made_skill::asks_on() {
@@ -8688,7 +8691,8 @@ printf 'tar of %s' \"$name\" > \"$3/$name-1.0.0.tar\"\n",
         }
         made_skill::set_writes_here(Some(true));
         made_skill::set_scripts_here(Some(true));
-        let task = "task = { task = \"...\", run = \"scripts/main.py\" }";
+        // #7874: the task in full, and the summary read back for the yes.
+        let task = "task = { task = \"...\", summary = \"...\", run = \"scripts/main.py\" }";
         for reads in [true, false] {
             let on = system_for(reads, true);
             for part in [

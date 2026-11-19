@@ -8,8 +8,9 @@
 //! dropped:
 //! - **Its task is the person's request**, in their words, plain and at most
 //!   [`made_skill::MOST_TASK_CHARS`] ([`task_words`]). A request longer than
-//!   that is never cut short: its task is one plain sentence the model
-//!   writes in the same call (`task:`), kept only when every number, time,
+//!   that is never cut short: its task is the model's own plain words of at
+//!   most as many, written in the same call (`task:`), kept only when every
+//!   number, time,
 //!   threshold and named thing in the request survives in it
 //!   ([`task_kept`]), else asked again once with what it left out, then
 //!   refused as too long ([`Uncovered::TooLong`]). The lamp's agent (Hermes,
@@ -262,10 +263,10 @@ pub enum Uncovered {
     Missing(String),
     /// No time and no moment named for it to run.
     NoWhen,
-    /// A request longer than its read-back ([`task_cut`]) whose model's
+    /// A request longer than a task's words may be ([`task_cut`],
+    /// `made_skill::MOST_TASK_CHARS` and `MOST_TASK_BYTES`) whose model's
     /// own words for it ([`task_kept`]) left out what it names twice: the
-    /// agent is told only what the person heard, never the request cut
-    /// short (El's P1 on #7261).
+    /// agent is never handed the request cut short (El's P1 on #7261).
     TooLong,
 }
 
@@ -329,8 +330,8 @@ impl Uncovered {
             ),
             Self::NoWhen => no_when(),
             Self::TooLong => format!(
-                "{CANT_MAKE_YET} it's too long for me to read back to you whole, so ask for it in \
-                 fewer words."
+                "{CANT_MAKE_YET} it's too long for one skill's task, so ask for it in fewer \
+                 words."
             ),
         }
     }
@@ -454,13 +455,13 @@ pub fn brief(request: &str, hint: Option<&str>) -> String {
             )
         })
         .unwrap_or_default();
-    // A request longer than its read-back: its task's words are the
-    // model's, checked by [`task_kept`].
+    // A request longer than a task's words may be: its task's words are
+    // the model's, checked by [`task_kept`].
     let task = if task_cut(request) {
         format!(
-            "\n\nThe request is too long to read back whole: also answer a line task: and the \
-             task for the lamp's agent in one plain sentence of at most {} characters that \
-             keeps every number, time, threshold and named thing in the request.",
+            "\n\nThe request is longer than a task may be: also answer a line task: and the \
+             task for the lamp's agent in plain words of at most {} characters that keeps \
+             every number, time, threshold and named thing in the request.",
             made_skill::MOST_TASK_CHARS
         )
     } else {
@@ -734,10 +735,21 @@ fn missing(named: &str) -> Uncovered {
 pub fn task_words(request: &str) -> String {
     let plain = task_plain(request);
     let most = made_skill::MOST_TASK_CHARS;
-    let words = if plain.chars().count() <= most {
+    // Its bytes too, as the run's prompt quotes them (#7874): `task_plain`
+    // leaves no quote or backslash, so each counts once.
+    let bytes = made_skill::MOST_TASK_BYTES;
+    let words = if plain.chars().count() <= most && plain.len() <= bytes {
         plain
     } else {
-        let cut: String = plain.chars().take(most).collect();
+        let mut used = 0;
+        let cut: String = plain
+            .chars()
+            .take(most)
+            .take_while(|c| {
+                used += c.len_utf8();
+                used <= bytes
+            })
+            .collect();
         match cut.rsplit_once(' ') {
             Some((head, _)) if !head.is_empty() => head.to_owned(),
             _ => cut,
@@ -774,9 +786,9 @@ pub fn task_kept(request: &str, answer: &str, name: &str) -> Result<String, Stri
     }
     let most = made_skill::MOST_TASK_CHARS;
     let told = format!(
-        "the request is too long to read back whole, so answer a line task: and its task in one \
-         plain sentence of at most {most} characters that keeps every number, time, threshold \
-         and named thing in it"
+        "the request is longer than a task may be, so answer a line task: and its task in plain \
+         words of at most {most} characters that keeps every number, time, threshold and named \
+         thing in it"
     );
     let words = task_plain(said_task(answer).unwrap_or_default());
     let words = words
@@ -1120,8 +1132,14 @@ pub fn asked_files(
         quoted.join(", "),
         crate::upload_agent::INSTRUCTIONS,
     );
+    // Its short form (#7874): the note is cut at
+    // `upload_agent::MOST_NOTE_BYTES`, and long words whole would cut off
+    // the phrases the voice calls it by.
     let note = crate::upload_agent::note(
-        &format!("The lamp's agent does a task the person asked for: {words}."),
+        &format!(
+            "The lamp's agent does a task the person asked for: {}.",
+            made_skill::task_said(words, None).trim_end_matches(['.', '!', '?'])
+        ),
         asks,
     );
     let card = format!(
@@ -1207,9 +1225,9 @@ pub fn made(
                 if !crate::upload_agent::on() {
                     return Err(Uncovered::NoWhen.refused());
                 }
-                // Its instructions carry the words read back alone: a
-                // request longer than them is worded by the model and
-                // checked, never cut unheard.
+                // Its instructions carry the whole task: a request longer
+                // than a task may be is worded by the model and checked,
+                // never cut unheard.
                 match task_kept(request, &answer, &name) {
                     Err(lines) => {
                         task_missed = true;
@@ -1521,12 +1539,18 @@ mod tests {
         crate::skill_task_yes::set_on_here(Some(true));
         crate::upload_agent::set_on_here(Some(true));
         let tail = "and then email the whole summary to my accountant";
+        // #7874: longer than the garbage cap, not the read-back.
         let long = format!(
             "when I say desk report, look at my desk with the camera, count the cups, the \
              papers, the pens and the plants on it, tell me which of them should go, say \
-             how tidy it is from one to ten, and what to put away first, {tail}"
+             how tidy it is from one to ten, and what to put away first, {} {tail}",
+            "and check the plant ".repeat(40)
         );
-        assert!(long.chars().count() > 250, "{}", long.len());
+        assert!(
+            long.chars().count() > made_skill::MOST_TASK_CHARS,
+            "{}",
+            long.len()
+        );
         assert!(task_cut(&long));
         assert!(!task_words(&long).contains(tail));
         let answer = || Ok("name: desk-report\ngrants: camera, speak\nasks: desk report".into());
@@ -1608,6 +1632,23 @@ mod tests {
             ])
             .is_ok()
         );
+        // #7874: a long request's note still ends on the phrases it is
+        // called by, its instructions carrying the words whole.
+        let long = format!(
+            "Email me my unread mail. {}",
+            "Then list who wrote each one and what they want from me. ".repeat(14)
+        );
+        let words = task_words(&long);
+        assert!(words.len() > 800, "{}", words.len());
+        let files = asked_files(
+            "mail-sum",
+            &["sum up my mail".to_owned()],
+            &grants(&["gmail-read"]),
+            &words,
+        );
+        assert!(files.card.contains("'sum up my mail'"), "{}", files.card);
+        assert!(!files.card.contains("who wrote each one"), "{}", files.card);
+        assert!(files.scripts[0].1.contains(&words));
         made_skill::set_agent_services_here(None);
     }
 
@@ -1682,8 +1723,8 @@ mod tests {
             ),
             (
                 Uncovered::TooLong,
-                "I can't make that one yet: it's too long for me to read back to you whole, so \
-                 ask for it in fewer words.",
+                "I can't make that one yet: it's too long for one skill's task, so ask for it \
+                 in fewer words.",
             ),
         ] {
             assert_eq!(uncovered.line(), said, "{}", uncovered.class());
@@ -1804,6 +1845,21 @@ mod tests {
         );
         assert!(words.ends_with("plant") || words.ends_with("check") || words.ends_with("the"));
         assert!(!task_words("a\\b\u{200B}c").contains(['\\', '\u{200B}']));
+        // #7874: cut on its bytes too, so a long request in Korean is held
+        // plain and fits the run's prompt, never refused later for it.
+        let korean = "오늘 메일 ".repeat(200);
+        let words = task_words(&korean);
+        assert!(
+            words.len() <= made_skill::MOST_TASK_BYTES,
+            "{}",
+            words.len()
+        );
+        assert!(made_skill::task_words_plain(&words));
+        assert!(task_cut(&korean));
+        assert!(
+            words.ends_with("메일") || words.ends_with("오늘"),
+            "{words}"
+        );
     }
 
     /// lamp-9adf, 19 Nov (build ebbc6161): the evening rate's task was its
@@ -1812,6 +1868,21 @@ mod tests {
     const EVENING_RATE: &str = "Lamp, make a skill called evening rate: every night at nine, \
                                 tell me the dollar to dong rate, but only if it moved more than \
                                 half a percent since the day before.";
+
+    /// What makes a request longer than a task may be
+    /// (`made_skill::MOST_TASK_CHARS`, 1000 since #7874), naming nothing a
+    /// task must keep.
+    const SAID_CALMLY: &str = ", and say it calmly and kindly in plain words";
+
+    /// `request` made longer than a task may be ([`SAID_CALMLY`] over and
+    /// over before its end), so its task is the model's own words.
+    fn too_long(request: &str) -> String {
+        let (head, stop) = request.split_at(request.len() - 1);
+        let long = format!("{head}{}{stop}", SAID_CALMLY.repeat(24));
+        assert!(long.chars().count() > made_skill::MOST_TASK_CHARS);
+        assert!(task_cut(&long));
+        long
+    }
 
     /// The model's answer for the evening rate, its `task:` line `task`.
     fn evening_answer(task: &str) -> String {
@@ -1869,17 +1940,19 @@ mod tests {
         (result, words, briefs.into_inner())
     }
 
-    /// A request longer than its read-back: the task's words are the
-    /// making model's own sentence, at most 120 characters, kept because
-    /// every number, time, threshold and named thing in the request
-    /// survives in it; never the request cut short.
+    /// A request longer than a task may be: the task's words are the
+    /// making model's own, at most `made_skill::MOST_TASK_CHARS`, kept
+    /// because every number, time, threshold and named thing in the
+    /// request survives in it; never the request cut short (#7932).
     #[test]
     fn a_long_requests_task_keeps_every_condition_in_the_models_words() {
         all_on(Some(true));
-        assert!(task_cut(EVENING_RATE), "{}", EVENING_RATE.len());
+        // The evening rate itself now fits a task whole (#7874).
+        assert!(!task_cut(EVENING_RATE), "{}", EVENING_RATE.len());
+        let long = too_long(EVENING_RATE);
         let task = "Every night at nine, tell me the dollar to dong rate if it moved over half a \
                     percent since the day before";
-        let (result, words, briefs) = evening_made(EVENING_RATE, task);
+        let (result, words, briefs) = evening_made(&long, task);
         assert_eq!(result, Err(Refused::new("kept here")));
         let [words] = words.as_slice() else {
             panic!("{words:?}")
@@ -1894,10 +1967,16 @@ mod tests {
             "{words}"
         );
         assert!(briefs[0].contains("task:"), "{}", briefs[0]);
+        assert!(
+            briefs[0].contains("at most 1000 characters"),
+            "{}",
+            briefs[0]
+        );
         // Only asked for, the same: made with the model's words.
-        let asked = "when I say evening rate, tell me the dollar to dong rate, but only if it \
-                     moved more than half a percent since the day before, and say by how much";
-        assert!(task_cut(asked));
+        let asked = too_long(
+            "when I say evening rate, tell me the dollar to dong rate, but only if it moved more \
+             than half a percent since the day before, and say by how much.",
+        );
         let said = "Tell me the dollar to dong rate only if it moved over half a percent since the \
                     day before, and by how much";
         let made_words = std::cell::RefCell::new(Vec::new());
@@ -1910,7 +1989,7 @@ mod tests {
         let answer = format!("name: evening-rate\ngrants: speak\ntask: {said}\nasks: evening rate");
         assert_eq!(
             made(
-                asked,
+                &asked,
                 |_| Ok(answer.clone()),
                 || true,
                 &kept,
@@ -1930,7 +2009,8 @@ mod tests {
     fn a_task_that_drops_a_condition_is_asked_again_then_refused() {
         all_on(Some(true));
         let task = "Every night at nine, tell me the dollar to dong rate";
-        let (made, words, briefs) = evening_made(EVENING_RATE, task);
+        let long = too_long(EVENING_RATE);
+        let (made, words, briefs) = evening_made(&long, task);
         assert_eq!(made, Err(Uncovered::TooLong.refused()));
         assert!(words.is_empty(), "{words:?}");
         let [_, again] = briefs.as_slice() else {
@@ -1941,7 +2021,7 @@ mod tests {
             "{again}"
         );
         // No task: line at all, the same.
-        let (made, words, briefs) = evening_made(EVENING_RATE, "");
+        let (made, words, briefs) = evening_made(&long, "");
         assert_eq!(made, Err(Uncovered::TooLong.refused()));
         assert!(
             words.is_empty() && briefs.len() == 2,

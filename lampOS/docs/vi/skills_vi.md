@@ -699,7 +699,8 @@ sau:
      (`MOST_SCRIPTS`, `MOST_SCRIPT_BYTES`, `MOST_SCRIPTS_BYTES`); đúng một
      bước `[[do]]` chỉ gồm một `task`, `task = { task = "take a photo",
      run = "scripts/main.py" }` (`do.task` của #6305), lời của nó là văn
-     bản thuần và tối đa 120 ký tự, `run` là một tệp `.py` nó đã viết; và
+     bản thuần và tối đa 1.000 ký tự, một `summary` tuỳ chọn tối đa 120 ký
+     tự được đọc lại để chủ đèn đồng ý, `run` là một tệp `.py` nó đã viết; và
      một `grants = [...]` ở đầu tệp gồm các quyền của #6305
      (`made_skill::GRANTS`, đúng các tên của `skill_task_yes::GRANTS`: `body`, `light`, `speak`, `look`, `hear`,
      `sound`, `air`, `device`, `camera`, `microphone`, `notes`, `speech`;
@@ -1103,15 +1104,40 @@ sau:
    của `lamp-cloud`). Sau đó `lamp-skills pack` (#1698) kiểm tra thư mục:
    mọi kiểm tra của một lần nạp, kể cả quyền, và gói được đọc lại như khi
    cài. Một kỹ năng làm nhiều hơn những gì nó khai báo bị từ chối ở đó,
-   và một `do.task` có lời rỗng, dài hơn 120 ký tự hay không thuần (ký tự
-   điều khiển hay định dạng) cũng vậy, đúng luật của giọng nói
-   (`made_skill::task_words_plain`, #7874). Đây là một giới hạn chung cho
-   mọi kỹ năng, dù đến từ đâu: `lamp-skills pack`, một lần cài (cả kỹ năng
-   của Store) và lần đẩy từ ứng dụng đều từ chối `task` dài hơn 120 ký tự, vì
-   giọng nói đọc lại nguyên câu để chủ đèn đồng ý. Lời từ chối người viết
-   kỹ năng thấy là "a task's words: one plain sentence of at most 120
-   characters, read back whole to the owner for their yes". Một kỹ năng đã
-   có trên đèn vẫn được nạp.
+   và một `do.task` có lời rỗng, dài hơn 1.000 ký tự hay không thuần (ký tự
+   điều khiển hay định dạng), hoặc có `summary` không phải một dòng thuần
+   tối đa 120 ký tự, cũng vậy, đúng luật của giọng nói
+   (`made_skill::task_words_plain`, `task_summary_plain`, #7874). Lời của
+   `task` là việc đầy đủ, được giao cho lần chạy: có thể dài, thuần, tối đa
+   1.000 ký tự, một giới hạn chỉ chặn rác (`made_skill::MOST_TASK_CHARS`;
+   quyết định của V2 trên #7874: độ dài của task không bao giờ chặn việc
+   tạo kỹ năng), và tối đa 1.500 byte như prompt của lần chạy trích nó
+   (mỗi `"` và `\` tính hai lần, `made_skill::task_bytes`), để cùng lời
+   của lamp-tasks prompt vẫn trong 3.000 byte của Harness và một task đã
+   được đồng ý luôn chạy được: 1.000 ký tự tiếng Anh vừa cả hai; tiếng Hàn
+   vừa khoảng 500 ký tự. Câu đầu kết thúc ở `.`, `!` hay `?` có khoảng
+   trắng và không có chữ thường theo sau, không bao giờ ở một chữ viết tắt
+   ("e.g.", "a.m.", "Dr."), hoặc ở dấu chấm CJK. `summary = "..."` tuỳ chọn bên cạnh nó là một dòng mà đèn
+   đọc lại để chủ đèn đồng ý: thuần, tối đa 120 ký tự
+   (`made_skill::MOST_TASK_SAID_CHARS`). Không có nó, đèn đọc lại câu đầu
+   tiên của task, và câu đầu dài hơn 120 ký tự được cắt ở cuối một từ với
+   "…" (`made_skill::task_said`). Lời đầy đủ vẫn nằm trong kỹ năng và được
+   dùng cho lần chạy. Chỉ kỹ năng được tạo trên đèn này từ chính yêu cầu
+   của chủ đèn (`task_asks` của manage helper nói `"made_here": true`: của
+   model riêng của đèn, hoặc một việc chỉ được yêu cầu bằng giọng nói) mới
+   được đọc lại dạng ngắn. Mọi kỹ năng khác, từ Store, tải lên hay lần đẩy
+   từ ứng dụng, được đọc lại toàn bộ lời task như trước #7874, và `summary`
+   của người viết không bao giờ được đọc, để một dòng ngắn không che phần
+   còn lại của một task dài (HOLD của Twelve trên #7969). Một task dài từ
+   bên ngoài vẫn được cài; lần đồng ý chỉ nghe toàn bộ lời của nó. Câu trả
+   lời không nói `made_here` thì đọc toàn bộ lời
+   (`skill_task_yes::said_for_yes`). Đây là một giới hạn chung cho mọi kỹ năng, dù đến từ
+   đâu: `lamp-skills pack`, một lần cài (cả kỹ năng của Store) và lần đẩy
+   từ ứng dụng đều từ chối task hay summary dài hơn. Lời từ chối người
+   viết kỹ năng thấy là "a task's words: plain, at most 1000 characters
+   and 1500 bytes; its summary, if given: one plain line of at most 120
+   characters, read back to the owner for their yes". Một kỹ năng đã có trên đèn vẫn được
+   nạp.
    - **Sửa tối đa ba lần** (#2813 phần 2; ba lần từ chủ đèn, 10/11: "tự
      chạy lại cho đến khi được"). Khi bước kiểm tra từ chối một câu trả
      lời, nó được gửi lại cho mô hình trước khi nói gì: bản hướng dẫn cũ,
@@ -3046,15 +3072,18 @@ cả hai người viết.
   `make_skill_local::longest_make`) để lấy một tên, ít quyền nhất, và hoặc
   một `[trigger]` của đèn, hoặc những lời người dùng sẽ nói để gọi nó
   (`asks:`); nó không viết gì khác. Việc duy nhất của kỹ năng là yêu cầu của
-  người dùng bằng chính lời họ, chữ thường, tối đa 120 ký tự
+  người dùng bằng chính lời họ, chữ thường, tối đa 1.000 ký tự
   (`make_no_cannot::task_words`). Yêu cầu dài hơn không bao giờ bị cắt ngắn
   (lamp-9adf, 19/11: evening rate mất "more than half a percent since the
-  day before"): brief của cùng lần gọi xin một dòng `task:`, một câu thường
-  tối đa 120 ký tự, chỉ được giữ khi mọi con số (bằng chữ hay chữ số), từ
-  chỉ thời gian, tên riêng, phép so sánh và phần trăm trong yêu cầu đều còn
-  trong đó (`make_no_cannot::task_kept`); nếu không, model được hỏi lại một
-  lần, kèm điều nó bỏ sót, rồi lần tạo bị từ chối vì quá dài (bên dưới), dù
-  chạy theo trigger hay chỉ khi được gọi. Khi nói, yêu cầu là tham số công cụ của model giọng nói chứ không phải câu nghe được; phần đọc lại giới hạn rủi ro này, vì chủ đèn đồng ý đúng những lời được đọc lại. Quyền của nó
+  day before"): brief của cùng lần gọi xin một dòng `task:`, chữ thường,
+  tối đa 1.000 ký tự (`made_skill::MOST_TASK_CHARS`), chỉ được giữ khi mọi
+  con số (bằng chữ hay chữ số), từ chỉ thời gian, tên riêng, phép so sánh
+  và phần trăm trong yêu cầu đều còn trong đó (`make_no_cannot::task_kept`);
+  nếu không, model được hỏi lại một lần, kèm điều nó bỏ sót, rồi lần tạo bị
+  từ chối vì quá dài (bên dưới), dù chạy theo trigger hay chỉ khi được gọi.
+  Khi nói, yêu cầu là tham số công cụ của model giọng nói chứ không phải câu
+  nghe được; chủ đèn đồng ý với phần đọc lại của nó, là câu đầu của yêu cầu,
+  cắt ở 120 ký tự với "…" (`made_skill::task_said`). Quyền của nó
   được kiểm tra với các quyền có thật (`make_no_cannot::covered`): một quyền
   của đèn (`skill_task_yes::GRANTS`), hoặc với `LAMP_AGENT_SERVICES=on` quyền
   `-read` hay `-write` của một dịch vụ đã biết, đã liên kết hay chưa: dịch vụ
@@ -3160,13 +3189,16 @@ cả hai người viết.
       can't listen, to keep the room private."
     - Không nêu gì, hoặc một quyền không có (`other`): "I can't make that
       one yet: it needs something no skill on this lamp can be given yet."
-    - Một yêu cầu dài hơn phần đọc lại (`make_no_cannot::task_cut`) mà dòng
-      `task:` của model hai lần bỏ sót điều nó nêu (`too_long`,
-      `make_no_cannot::task_kept`): "I can't make that one yet: it's too long
-      for me to read back to you whole, so ask for it in fewer words." Một
-      việc chỉ chạy khi được gọi có `scripts/SKILL.md` chỉ mang đúng phần lời
-      được đọc lại và được đồng ý, không bao giờ thêm phần nào của yêu cầu
-      (P1 của El trên #7261).
+    - Một yêu cầu dài hơn lời của một task được phép, 1.000 ký tự và 1.500
+      byte (`make_no_cannot::task_cut`), mà dòng `task:` của model hai lần bỏ
+      sót điều nó nêu (`too_long`, `make_no_cannot::task_kept`): "I can't
+      make that one yet: it's too long for one skill's task, so ask for it in
+      fewer words." Không bao giờ cắt ngắn yêu cầu: `skill.toml` và
+      `scripts/SKILL.md` của nó mang toàn bộ task, không bao giờ thêm phần
+      nào của yêu cầu (P1 của El trên #7261), và đó là thứ được chạy. Tạo ở
+      đây từ chính yêu cầu của chủ đèn, lần đồng ý nghe dạng ngắn (câu đầu,
+      #7874); kỹ năng không tạo ở đây nghe toàn bộ lời của nó (HOLD của
+      Twelve trên #7969).
     Nhật ký chỉ ghi loại lý do, không bao giờ lời người dùng. Công tắc
     internet và dịch vụ là của đèn, không có trong cài đặt của app, nên
     không câu nào bảo người dùng vào app để bật chúng.
@@ -3337,7 +3369,8 @@ cả hai người viết.
   của `skills/skill-creator/SKILL.md` của V1, Apache-2.0, dòng đầu ghi
   nguồn gốc và giấy phép đó; bỏ phần eval, benchmark và viewer của V1;
   #7874: mục "How a made skill runs" nói cách kỹ năng chạy, luật lời
-  `task` là một câu dễ hiểu tối đa 120 ký tự, kỹ năng dịch vụ liên kết và
+  `task` viết đầy đủ kèm một `summary` một dòng tối đa 120 ký tự được đọc
+  lại để chủ đèn đồng ý, kỹ năng dịch vụ liên kết và
   kỹ năng `net`).
   Lần chạy được dặn đọc hướng dẫn trước, luật thắng khi hai bên khác nhau:
   lấy ý định chỉ từ lời người dùng (đèn làm gì, khi nào, và điều gì dạng
@@ -5153,7 +5186,12 @@ vụ lần chạy (#6432, #6306). Chi tiết đầy đủ ở
 
 - **Bước:** `[[do]] task = { task = "...", run = "scripts/main.py" }`, đứng
   riêng trong bảng `[[do]]` của nó, một bước mỗi kỹ năng, chỉ ở kỹ năng
-  installable. `run` là một tệp thường bên trong `scripts/` của kỹ năng
+  installable. `task` là việc đầy đủ, 1 đến 1.500 byte như prompt của lần
+  chạy trích nó; của một kỹ năng mới thì thuần, tối đa 1.000 ký tự. `summary = "..."` tuỳ chọn là một dòng
+  thuần tối đa 120 ký tự mà đèn đọc lại để chủ đèn đồng ý; không có nó, đèn
+  đọc câu đầu tiên của task, cắt ở 120 ký tự với "…" (#7874). Chỉ với kỹ
+  năng tạo trên đèn này từ yêu cầu của chủ đèn; kỹ năng khác được đọc lại
+  toàn bộ lời task, không bao giờ `summary` (HOLD của Twelve trên #7969). `run` là một tệp thường bên trong `scripts/` của kỹ năng
   (không `..`, không phần ẩn, không link).
 - **`grants = [...]`:** ở đầu `skill.toml`, chỉ đi cùng `do.task`: mỗi mục là
   một grant của lamp-control (`body`, `light`, `speak`, `look`, `hear`,

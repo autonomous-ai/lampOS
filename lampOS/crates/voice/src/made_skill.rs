@@ -1446,17 +1446,121 @@ const SCRIPT_ENDINGS: [&str; 4] = ["py", "json", "txt", "md"];
 const RUNNABLE_ENDING: &str = ".py";
 /// The most of a script's path past [`SCRIPTS_FOLDER`], in bytes.
 const MOST_SCRIPT_PATH_BYTES: usize = 64;
-/// The most of a `task` step's own words, said back whole.
-pub const MOST_TASK_CHARS: usize = 120;
+/// The most of a `task` step's own words: a cap that only stops garbage,
+/// never a precise task (V2's call on #7874: a task's length never blocks
+/// making a skill). The owner hears its short form ([`task_said`]).
+pub const MOST_TASK_CHARS: usize = 1_000;
+/// The most of a `task` step's words in bytes, as its run's prompt quotes
+/// them (a JSON string: each `"` and `\` counts twice, [`task_bytes`]):
+/// lamp-tasks puts the words in the run's prompt beside about 1,300 bytes
+/// of its own, and Harness takes no prompt over 3,000 bytes
+/// (`lamp_tasks::harness::MAX_PROMPT_BYTES`), so a task longer than this
+/// would be agreed to and then never run (#7874). [`MOST_TASK_CHARS`] of
+/// English fit; a task in a script of three-byte characters (Korean) fits
+/// about 500. lamp-skills' load (`lamp_skills::task::MOST_TASK_BYTES`) and
+/// lamp-tasks' hand-over (`lamp_tasks::skill_task::MOST_TASK_BYTES`) hold
+/// the same.
+pub const MOST_TASK_BYTES: usize = 1_500;
+/// The most of what the lamp reads back of a `task` step for the owner's
+/// yes ([`task_said`]): its `summary`, or its first sentence cut short.
+pub const MOST_TASK_SAID_CHARS: usize = 120;
+/// The key of a `task` step's one-line summary, the agent's own words for
+/// the read-back: `task = { task = "...", summary = "...", run = "..." }`.
+pub const TASK_SUMMARY: &str = "summary";
 
-/// Whether a `task` step's words are one plain sentence, read back whole
-/// to the owner for their yes: not empty, at most [`MOST_TASK_CHARS`]
-/// characters, and no control or format character ([`is_format`]). The
-/// same check `lamp-skills pack` holds a made skill to (#7874).
-pub fn task_words_plain(words: &str) -> bool {
+/// Whether `words` are plain: not empty, at most `most` characters, and no
+/// control or format character ([`is_format`]).
+fn plain_within(words: &str, most: usize) -> bool {
     !words.trim().is_empty()
-        && words.chars().count() <= MOST_TASK_CHARS
+        && words.chars().count() <= most
         && words.chars().all(|c| !c.is_control() && !is_format(c))
+}
+
+/// Whether a `task` step's words are plain: not empty, at most
+/// [`MOST_TASK_CHARS`] characters and [`MOST_TASK_BYTES`] as a run's
+/// prompt quotes them, and no control or format character
+/// ([`is_format`]). The same check `lamp-skills pack`, an install and the
+/// app's push hold a new skill to (#7874).
+pub fn task_words_plain(words: &str) -> bool {
+    plain_within(words, MOST_TASK_CHARS) && task_bytes(words) <= MOST_TASK_BYTES
+}
+
+/// The bytes of `words` as a run's prompt quotes them, a JSON string with
+/// no control character: each `"` and `\` escaped, so counted twice.
+pub fn task_bytes(words: &str) -> usize {
+    words.len() + words.matches(['"', '\\']).count()
+}
+
+/// Short words that end in a stop but end no sentence: "Dr. Kim", "e.g.
+/// the news", "9 a.m. tell me".
+const NOT_SENTENCE_ENDS: [&str; 12] = [
+    "mr", "mrs", "ms", "dr", "st", "prof", "jr", "sr", "vs", "etc", "approx", "no",
+];
+
+/// Whether the stop at `at` in `words` ends a sentence: a CJK full stop,
+/// or `.`, `!` or `?` with a space after it, then no lower-case letter,
+/// and for a `.`, not after an abbreviation ("e.g.", "a.m.", "Dr.").
+fn sentence_ends(words: &str, at: usize, stop: char) -> bool {
+    if matches!(stop, '。' | '！' | '？') {
+        return true;
+    }
+    if !matches!(stop, '.' | '!' | '?') {
+        return false;
+    }
+    let after = &words[at + stop.len_utf8()..];
+    if !after.starts_with(char::is_whitespace) || after.trim_start().starts_with(char::is_lowercase)
+    {
+        return false;
+    }
+    if stop != '.' {
+        return true;
+    }
+    let word = words[..at]
+        .rsplit(char::is_whitespace)
+        .next()
+        .unwrap_or_default()
+        .trim_start_matches(['(', '\'', '‘', '“']);
+    !(word.contains('.')
+        || (word.len() == 1 && word.bytes().all(|b| b.is_ascii_alphabetic()))
+        || NOT_SENTENCE_ENDS.contains(&word.to_lowercase().as_str()))
+}
+
+/// Whether a `task` step's [`TASK_SUMMARY`] is one plain line the owner
+/// hears whole: not empty, at most [`MOST_TASK_SAID_CHARS`] characters, no
+/// control or format character.
+pub fn task_summary_plain(summary: &str) -> bool {
+    plain_within(summary, MOST_TASK_SAID_CHARS)
+}
+
+/// What the lamp reads back of a `task` step for the owner's yes, at most
+/// [`MOST_TASK_SAID_CHARS`] characters (#7874): its `summary` when it is
+/// plain ([`task_summary_plain`]); otherwise the words' first sentence,
+/// and one longer than that cut at a word's end with "…". The full words
+/// stay in the skill and are what its run is handed.
+pub fn task_said(words: &str, summary: Option<&str>) -> String {
+    if let Some(summary) = summary.filter(|summary| task_summary_plain(summary)) {
+        return summary.trim().to_owned();
+    }
+    let words = words.trim();
+    // The first sentence: up to the first stop that ends one
+    // ([`sentence_ends`]), or all of it.
+    let first = words
+        .char_indices()
+        .find(|&(at, c)| sentence_ends(words, at, c))
+        .map_or(words, |(at, c)| &words[..at + c.len_utf8()]);
+    if first.chars().count() <= MOST_TASK_SAID_CHARS {
+        return first.to_owned();
+    }
+    let cut: String = first.chars().take(MOST_TASK_SAID_CHARS - 1).collect();
+    let cut = match cut.rsplit_once(char::is_whitespace) {
+        Some((head, _)) if !head.trim().is_empty() => head,
+        _ => cut.as_str(),
+    };
+    format!(
+        "{}…",
+        cut.trim_end()
+            .trim_end_matches([',', ';', ':', '.', '!', '?'])
+    )
 }
 
 /// The folder a made skill's light shows are kept in (#7245, `show =
@@ -5133,7 +5237,8 @@ fn held(table: &toml::Table, added: bool, reads: bool) -> Result<(String, Uses),
 /// [`SCRIPTS_ENVIRONMENT`] on): exactly one `[[do]]` step that is a `task`
 /// alone, `task = { task = "what it does", run = "scripts/main.py" }`
 /// (#6305's `do.task`), its words plain and at most [`MOST_TASK_CHARS`],
-/// its `run` a Python file under [`SCRIPTS_FOLDER`]; and a `grants` list of
+/// with an optional [`TASK_SUMMARY`] of one plain line read back for the
+/// yes ([`task_summary_plain`]), its `run` a Python file under [`SCRIPTS_FOLDER`]; and a `grants` list of
 /// [`GRANTS`] (none when it has no list), each once, and `net` beside them
 /// for the lamp's own task for its agent ([`agent_task`]) with
 /// `LAMP_TASK_NET` on, and for its own code with `LAMP_TASK_NET_GATEWAY`
@@ -5169,15 +5274,26 @@ fn code_held(
     let Some(task) = task.as_table() else {
         return Err(scripts_not_held("a task step that isn't a table"));
     };
-    if task.keys().any(|key| key != "task" && key != "run") {
+    if task
+        .keys()
+        .any(|key| key != "task" && key != "run" && key != TASK_SUMMARY)
+    {
         return Err(scripts_not_held(
-            "a task step with a key other than task and run",
+            "a task step with a key other than task, summary and run",
         ));
     }
     let words = task.get("task").and_then(toml::Value::as_str).unwrap_or("");
     if !task_words_plain(words) {
         return Err(scripts_not_held(
             "a task's words, empty, too long or not plain",
+        ));
+    }
+    if task
+        .get(TASK_SUMMARY)
+        .is_some_and(|summary| !summary.as_str().is_some_and(task_summary_plain))
+    {
+        return Err(scripts_not_held(
+            "a task's summary, not one plain line of at most 120 characters",
         ));
     }
     let runs = task
@@ -6441,24 +6557,28 @@ fn said_plainly(table: &toml::Table, reads: bool, general: bool) -> Result<Strin
 }
 
 /// A made skill's `task` step in plain words (#6307): "runs its own code
-/// to “take a photo”", its words as written, at most [`MOST_TASK_CHARS`];
-/// none for any other step, or one not in that form.
+/// to “take a photo”", its short form as read back for the yes
+/// ([`task_said`]: its summary, or its first sentence, at most
+/// [`MOST_TASK_SAID_CHARS`]), its words plain and at most
+/// [`MOST_TASK_CHARS`]; none for any other step, or one not in that form.
 fn task_plainly(step: &toml::Value) -> Option<String> {
     let step = step.as_table().filter(|step| step.len() == 1)?;
     let task = step.get("task")?.as_table()?;
     let words = task.get("task")?.as_str()?.trim();
     task.get("run")?.as_str()?;
-    let words = words.trim_end_matches(['.', '!', '?']);
+    if !task_words_plain(words) {
+        return None;
+    }
+    let said = task_said(words, task.get(TASK_SUMMARY).and_then(toml::Value::as_str));
+    let words = said.trim_end_matches(['.', '!', '?']);
     // A task for the lamp's agent (`LAMP_MAKE_NO_CANNOT`), as a skill's
     // `do.task` is read back.
     let agents = crate::make_no_cannot::agent_tasks_made()
         && task.get("run").and_then(toml::Value::as_str) == Some(crate::make_no_cannot::RUN);
-    task_words_plain(words).then(|| {
-        if agents {
-            format!("hands one task to the lamp's agent: “{words}”")
-        } else {
-            format!("runs its own code to “{words}”")
-        }
+    Some(if agents {
+        format!("hands one task to the lamp's agent: “{words}”")
+    } else {
+        format!("runs its own code to “{words}”")
     })
 }
 
@@ -9932,6 +10052,9 @@ pub fn keep_agent_asked(
     let (version, mut uses) = crate::upload_agent::capped(&files.toml)?;
     uses.agent_task = true;
     let grants = crate::upload_agent::grants_of_toml(&files.toml);
+    // The short form read back for the yes; the full words are its run's.
+    let words = task_said(words, None);
+    let words = words.trim_end_matches(['.', '!', '?']);
     let does = format!(
         "only when you ask for it, it hands one task to the lamp's agent: “{words}”.{} The first \
          time you ask, I'll read it back and wait for your yes.",
@@ -18595,5 +18718,122 @@ task = { task = "take a photo and send it to the app", run = "scripts/main.py" }
         assert!(put_on_scripts(SHOW_TOML, &Uses::default(), put).is_err());
         set_asks_here(None);
         let _ = fs::remove_dir_all(&dir);
+    }
+
+    /// #7874, V2's call: a task's length never blocks making a skill. A
+    /// 400-character task is held plain and its say-back is its short
+    /// form, at most 120 characters: its first sentence, or one sentence
+    /// cut at a word with "…", or its `summary` when given. Empty, not
+    /// plain or 1,001 characters is still refused; 1,000 is held.
+    #[test]
+    fn a_long_task_is_made_and_read_back_in_at_most_120_characters() {
+        set_scripts_here(Some(true));
+        let first = "Count today's calendar meetings and unread mail.";
+        let long = format!(
+            "{first} {}",
+            "Then tell me both numbers in one short sentence. ".repeat(8)
+        );
+        let long = long.trim();
+        assert!(long.chars().count() >= 400, "{}", long.chars().count());
+        let toml = |task: &str| CODE_TOML.replace("take a photo and send it to the app", task);
+        assert!(capped(&mannered(&toml(long))).is_ok());
+        let said = plainly(&mannered(&toml(long))).unwrap();
+        assert!(
+            said.contains("runs its own code to “Count today's calendar meetings and unread mail”"),
+            "{said}"
+        );
+        assert!(!said.contains("Then tell me"), "{said}");
+        // One long sentence: cut at a word, with "…".
+        let one = "check the plant on the desk and ".repeat(13);
+        let one = one.trim();
+        assert!(one.chars().count() >= 400);
+        let short = task_said(one, None);
+        assert!(short.chars().count() <= MOST_TASK_SAID_CHARS, "{short}");
+        assert!(short.ends_with("…") && !short.ends_with(" …"), "{short}");
+        assert!(one.starts_with(short.trim_end_matches('…')), "{short}");
+        assert!(capped(&mannered(&toml(one))).is_ok());
+        // A summary given is what's read back.
+        let summed = CODE_TOML.replace(
+            "task = { task = \"take a photo and send it to the app\",",
+            &format!(
+                "task = {{ task = \"{long}\", summary = \"Tells you your meetings and mail\","
+            ),
+        );
+        assert!(capped(&mannered(&summed)).is_ok());
+        let said = plainly(&mannered(&summed)).unwrap();
+        assert!(
+            said.contains("runs its own code to “Tells you your meetings and mail”"),
+            "{said}"
+        );
+        assert_eq!(
+            task_said(long, Some("Tells you your meetings and mail")),
+            "Tells you your meetings and mail"
+        );
+        let over = summed.replace(
+            "Tells you your meetings and mail",
+            &"é".repeat(MOST_TASK_SAID_CHARS + 1),
+        );
+        assert!(capped(&mannered(&over)).is_err());
+        // The cap and the plain checks stay: 1,000 characters of English
+        // are held; 1,000 of "é" (2,000 bytes) are not, since the run's
+        // prompt could not carry them past Harness's 3,000 bytes.
+        assert!(capped(&mannered(&toml(&"e".repeat(MOST_TASK_CHARS)))).is_ok());
+        assert!(capped(&mannered(&toml(&"é".repeat(MOST_TASK_BYTES / 2)))).is_ok());
+        for words in [
+            String::new(),
+            "  ".into(),
+            "take a\u{200B} photo".into(),
+            "e".repeat(MOST_TASK_CHARS + 1),
+            "é".repeat(MOST_TASK_CHARS),
+            "한".repeat(MOST_TASK_BYTES / 3 + 1),
+        ] {
+            assert!(!task_words_plain(&words), "{words}");
+            assert!(capped(&mannered(&toml(&words))).is_err(), "{words}");
+        }
+        set_scripts_here(None);
+    }
+
+    /// #7874: a task's first sentence, as read back for the yes, ends at
+    /// a sentence's end, never at an abbreviation's stop ("e.g.", "a.m.",
+    /// "Dr."), a decimal or a stop before a lower-case word, so the owner
+    /// never agrees to a fragment; a quote's escape counts twice in its
+    /// bytes, as the run's prompt quotes it.
+    #[test]
+    fn a_tasks_first_sentence_never_ends_at_an_abbreviation() {
+        for (words, first) in [
+            (
+                "Every day at 9 a.m. email my boss the sales report. Then say done.",
+                "Every day at 9 a.m. email my boss the sales report.",
+            ),
+            (
+                "Read the news, e.g. The Times, aloud. Then stop.",
+                "Read the news, e.g. The Times, aloud.",
+            ),
+            (
+                "Text Dr. Kim that I'm late. Then dim the light.",
+                "Text Dr. Kim that I'm late.",
+            ),
+            (
+                "Set the light to 3.5 and stop. Then nothing.",
+                "Set the light to 3.5 and stop.",
+            ),
+            ("Do this. then that.", "Do this. then that."),
+            ("  Count my mail! Then tell me.", "Count my mail!"),
+            (
+                "오늘 메일을 세어 줘. 그리고 알려 줘.",
+                "오늘 메일을 세어 줘.",
+            ),
+            (
+                "今日のメールを数えて。それから教えて。",
+                "今日のメールを数えて。",
+            ),
+            ("no stop at all", "no stop at all"),
+        ] {
+            assert_eq!(task_said(words, None), first, "{words}");
+        }
+        assert_eq!(task_bytes("say \"hi\" \\ now"), 17);
+        let quoted = "\"".repeat(MOST_TASK_BYTES / 2);
+        assert!(task_words_plain(&quoted));
+        assert!(!task_words_plain(&format!("{quoted}\"")));
     }
 }

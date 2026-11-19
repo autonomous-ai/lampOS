@@ -202,8 +202,13 @@ pub const TASKS_MAX: u64 = 512;
 pub const TASKS_MAX_LINE: &str = "TasksMax=512";
 /// The folder a skill's script is in (#6305, `lamp_skills::task::SCRIPTS`).
 pub const SCRIPTS: &str = "scripts";
-/// The most bytes of a task's words (#6305, `MOST_TASK_BYTES`).
-pub const MOST_TASK_BYTES: usize = 500;
+/// The most bytes of a task's words as its run's prompt quotes them, a
+/// JSON string (#6305, `MOST_TASK_BYTES`; #7874,
+/// `lamp_voice::made_skill::MOST_TASK_BYTES`, the same as lamp-skills'
+/// load; lamp-skills' tests hold the two equal): with the prompt's own
+/// words, within Harness's [`crate::harness::MAX_PROMPT_BYTES`], so a task
+/// taken here is never refused at its launch.
+pub const MOST_TASK_BYTES: usize = 1_500;
 /// lamp-control's own grants a run may hold (#6408, `protocol.rs`'s
 /// `Grant`), `skills` left out: a run never puts skills on the lamp.
 pub const CONTROL_GRANTS: &[&str] = &[
@@ -379,7 +384,7 @@ impl HandOver {
         if !name_ok(&self.skill) {
             return Err("the skill's name is not a skill's name");
         }
-        if self.task.trim().is_empty() || self.task.len() > MOST_TASK_BYTES {
+        if self.task.trim().is_empty() || quoted_bytes(self.task.trim()) > MOST_TASK_BYTES {
             return Err("the task's words are empty or too long");
         }
         // The words go into Hermes's prompt (as data, `SkillRun::prompt`):
@@ -438,6 +443,12 @@ impl HandOver {
         }
         Ok(())
     }
+}
+
+/// The bytes of `task` as [`SkillRun::prompt`] quotes it, a JSON string,
+/// its two quote marks left out.
+fn quoted_bytes(task: &str) -> usize {
+    serde_json::to_string(task).map_or(usize::MAX, |quoted| quoted.len().saturating_sub(2))
 }
 
 /// A skill's name, or a grant's: 1 to 64 lowercase letters, digits, `-`
@@ -5472,6 +5483,53 @@ mod tests {
         assert_eq!(answer["error"], "no_token");
         assert!(answer["message"].as_str().unwrap().contains("#6304"));
         assert!(runner.seen.borrow().is_empty());
+    }
+
+    /// #7874: a task's words of [`MOST_TASK_BYTES`] as its prompt quotes
+    /// them, the longest skill name, an agent skill's instructions with
+    /// four linked-service grants and the make runner's told-file line,
+    /// still make a prompt Harness takes (`harness::prompt_fits`), so a
+    /// task taken here is never refused at its launch; one byte more, or
+    /// a quote's escape past it, is refused here.
+    #[test]
+    fn the_longest_task_taken_still_fits_harness_prompt() {
+        let name = "a".repeat(64);
+        let longest = |task: &str| {
+            line(|v| {
+                v["skill"] = json!(name);
+                v["folder"] = json!(format!("/var/lib/lampOS/skills-dev/{name}"));
+                v["run"] = json!(AGENT_INSTRUCTIONS);
+                v["task"] = json!(task);
+                v["grants"] = json!([
+                    "gmail-read",
+                    "gmail-write",
+                    "google_calendar-read",
+                    "google_calendar-write"
+                ]);
+            })
+        };
+        for task in [
+            "x".repeat(MOST_TASK_BYTES),
+            "é".repeat(MOST_TASK_BYTES / 2),
+            "한".repeat(MOST_TASK_BYTES / 3),
+            "\"".repeat(MOST_TASK_BYTES / 2),
+        ] {
+            let hand = HandOver::parse(&longest(&task), skills()).unwrap();
+            let prompt = format!(
+                "{} {}",
+                SkillRun::prompt(&hand),
+                tell_file_line(Path::new(
+                    "/var/lib/lampos-tasks/make-0123456789abcdef0123456789abcdef/answer.md"
+                ))
+            );
+            assert!(crate::harness::prompt_fits(&prompt), "{}", prompt.len());
+        }
+        for task in [
+            "x".repeat(MOST_TASK_BYTES + 1),
+            "\"".repeat(MOST_TASK_BYTES / 2 + 1),
+        ] {
+            assert!(HandOver::parse(&longest(&task), skills()).is_err());
+        }
     }
 
     #[test]

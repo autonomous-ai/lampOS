@@ -344,7 +344,8 @@ lần chạy, và được trả lời khi lần chạy kết thúc
   `run` là một tệp trong `scripts/` của kỹ năng (mỗi phần chỉ gồm `A-Z a-z
   0-9 . _ -`, không bắt đầu bằng `.`, nên không `..`, không phần ẩn, không
   xuống dòng, dấu backtick hay khoảng trắng,
-  không đường dẫn tuyệt đối), `task` dài 1 đến 500 byte, `sha256` là 64 chữ
+  không đường dẫn tuyệt đối), `task` dài 1 đến 1.500 byte như prompt của lần chạy trích nó (mỗi `"` và
+  `\` tính hai lần; #7874: trong prompt 3.000 byte của Harness), `sha256` là 64 chữ
   số hex viết thường, và `grants` mỗi quyền một lần và là quyền đã biết (`grant_known`):
   một quyền của lamp-control (`CONTROL_GRANTS`: `body`, `light`, `speak`,
   `look`, `hear`, `sound`, `air`, `device`, `camera`, `microphone`, `notes`,
