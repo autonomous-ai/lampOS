@@ -127,6 +127,16 @@ const ACCELERATION_FLAG: &str = "--servo-acceleration";
 /// Such a drop-in changes nothing head touch reads, so it is no mode
 /// override; anything else in it, or any other difference, still is.
 pub fn acceleration_only(drop_in: &str, unit: &str) -> bool {
+    // Nothing but its `[Service]` section: a `[Unit]` line, or any other
+    // section, is more than an acceleration (sim-2's P3 on #7950).
+    if drop_in
+        .lines()
+        .map(str::trim)
+        .filter(|line| !line.is_empty() && !line.starts_with(['#', ';']))
+        .any(|line| line.starts_with('[') && line != "[Service]")
+    {
+        return false;
+    }
     let lines = service(drop_in);
     let lines: Vec<&str> = lines.lines().collect();
     let [reset, command] = lines.as_slice() else {
@@ -186,7 +196,7 @@ fn no_mode_overrides(inputs: &mut dyn HeadInputs, root: &Path, name: &str) -> Re
             "lamp-.service.d".to_owned(),
             format!("{name}.d"),
         ] {
-            let entries = match inputs.entries(&root.join(base).join(folder))? {
+            let entries = match inputs.entries(&root.join(base).join(&folder))? {
                 Some(entries) => entries,
                 None => continue,
             };
@@ -196,7 +206,9 @@ fn no_mode_overrides(inputs: &mut dyn HeadInputs, root: &Path, name: &str) -> Re
                     continue;
                 }
                 let text = inputs.text(&path)?.unwrap_or_default();
-                if name == BODY {
+                // Only where the round moves it aside from (sim-2's P2 on
+                // #7950): lamp-body's own folder under /etc.
+                if name == BODY && base == "etc/systemd/system" && folder == format!("{BODY}.d") {
                     if installed.is_none() {
                         installed = Some(inputs.text(&root.join("etc/systemd/system").join(name))?);
                     }

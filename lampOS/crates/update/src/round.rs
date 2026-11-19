@@ -2625,15 +2625,6 @@ impl Run<'_, '_> {
             .and_then(|()| self.switch_models())
     }
 
-    /// The exit notes a switch owes, as lamp paths: install's
-    /// `<unit>.d/exit-note.conf` for each unit of
-    /// `install::EXIT_NOTE_UNITS` whose file is on the lamp or is written
-    /// by the switch, and which has none. A unit a round added had none,
-    /// since only `install` wrote them (a lamp's lamp-tasks.service after a
-    /// round, #7135). A note already there is the lamp's and never
-    /// rewritten. Only on a managed updater, as units are only added there.
-    /// Known before the journal is saved, so a switch cut short removes
-    /// them as it removes what it added.
     /// The factory's acceleration drop-ins this switch moves aside (#7946):
     /// only in a round that changes lamp-body, each a `.conf` under
     /// `/etc/systemd/system/lamp-body.service.d/` that is the installed
@@ -2696,6 +2687,15 @@ impl Run<'_, '_> {
         Ok(())
     }
 
+    /// The exit notes a switch owes, as lamp paths: install's
+    /// `<unit>.d/exit-note.conf` for each unit of
+    /// `install::EXIT_NOTE_UNITS` whose file is on the lamp or is written
+    /// by the switch, and which has none. A unit a round added had none,
+    /// since only `install` wrote them (a lamp's lamp-tasks.service after a
+    /// round, #7135). A note already there is the lamp's and never
+    /// rewritten. Only on a managed updater, as units are only added there.
+    /// Known before the journal is saved, so a switch cut short removes
+    /// them as it removes what it added.
     fn exit_notes_owed(&self, changes: &[Change]) -> Vec<String> {
         if !self.managed_updater() {
             return Vec::new();
