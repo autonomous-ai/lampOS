@@ -3636,18 +3636,37 @@ do model viết mỗi lần kích hoạt: lamp-skills giữ nguyên trigger, cá
 `[[while]]`, `most_a_day`, `[active]`, `[quiet]`, `cooldown`, `rearm`, `wait`,
 `[budget]`, `[rest]` và `[stop]`, và chỉ câu nói của lần kích hoạt thành một
 `do.task` cho agent của đèn (Hermes hoặc OpenClaw, qua lamp-tasks). Tắt trừ khi
-`LAMP_CORE_VIA_AGENT=on`, trong lamp-skills và manage helper của nó; không unit
-nào đặt (phán quyết của first builder, 19/11 05:42: sau một công tắc mới, tắt).
-Khi tắt, không gì bên dưới được đọc: các kỹ năng nạp và chạy y hệt từng byte như
-trước. `lamp_skills::core_agent`.
+được đặt, trong lamp-skills và manage helper của nó; không unit nào đặt (phán
+quyết của first builder, 19/11 05:42: sau một công tắc mới, tắt; 06:05: phản ứng
+nhanh vẫn là của DeepSeek, và mọi câu lõi khác do model viết chuyển sang agent,
+theo từng nhóm). `LAMP_CORE_VIA_AGENT=on` bật mọi nhóm; một danh sách bật những
+nhóm nó nêu (`LAMP_CORE_VIA_AGENT=pilot,nudges`, `core_agent::turns_on`), nên mỗi
+nhóm được bật bằng lần bật riêng của nó. Khi tắt, không gì bên dưới được đọc:
+các kỹ năng nạp và chạy y hệt từng byte như trước. `lamp_skills::core_agent`.
 
-- **Những kỹ năng nào** (`core_agent::PILOTS`): Sip of water và Stretch break.
-  Một phản ứng nhanh, hay một kỹ năng mà lần kích hoạt chỉ là ánh sáng, một âm
-  thanh cố định hay một cử động, không bao giờ qua agent.
+- **Những kỹ năng nào** (`core_agent::PILOTS`), theo nhóm:
+  - `pilot`: Sip of water và Stretch break.
+  - `nudges`: Stand up, Rest your eyes, Sit back (lời nhắc và lời cảm ơn của
+    nó, mỗi trigger một task, `on = "leaned_in"` và `on = "sat_well"`), Wind
+    down, Comfort break, Meal check (trưa và tối, mỗi bữa một task), Quiet focus
+    và Stuffy air. Meal check và Quiet focus là kỹ năng cài thêm (từ Store):
+    biến thể của chúng chỉ đi theo gói của chúng.
+  - Không bao giờ: một phản ứng nhanh; một kỹ năng mà lần kích hoạt chỉ là ánh
+    sáng, một âm thanh cố định hay một cử động; một câu cố định (Head pat, Smoky
+    air, Dusty air); một `do.read` (Morning agenda, Morning mail, Tomorrow's
+    plan); một kỹ năng do cuộc trò chuyện gọi (Dance, Pose, Light scenes, Light
+    show, Prepare to unplug: câu của nó là câu trả lời của chính cuộc trò
+    chuyện). Welcome back và Reminders giữ nguyên: lời của một task cố định
+    trong tệp của nó, nên nó không mang được ai vừa quay lại (`who` của giọng
+    nói) hay lời nhắc chính người đó đặt, điều câu nói mỗi lần kích hoạt cần.
+- **Mỗi trigger một task.** Task của biến thể có thể nêu trigger của nó (`on`),
+  như câu say của nó, cho kỹ năng mà các bước nêu trigger: mỗi câu như vậy một
+  task, mỗi task một mình trong bảng của nó trừ `on` (chỉ trong biến thể; mọi kỹ
+  năng khác giữ một `do.task`). Phần đọc lại để xin gật đầu nói task đầu tiên.
 - **Biến thể** (`agent.toml` cạnh `skill.toml`, và `scripts/agent.py`): nó chỉ
   thay `grants`, `[[do]]` và `[[present.do]]` (`core_agent::overlaid`), nên
   trigger và guard không bao giờ bị chép lại. Nó chỉ được đọc khi đúng y của bản
-  thử nghiệm: `grants = []`; một `task = { task, run = "scripts/agent.py" }`, là
+  thử nghiệm: `grants = []`; các `task = { task, run = "scripts/agent.py" }` của nó, là
   ý định rõ ràng của chính kỹ năng từ `SKILL.md` ("One short, friendly line
   suggesting a sip of water; no lecture, nothing about health."), không bao giờ
   đoán lời một người; mọi bước khác là của `skill.toml`, đúng từng chữ (câu say

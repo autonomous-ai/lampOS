@@ -8936,7 +8936,7 @@ mod tests {
         };
         let note = "They have sat at the desk for about half an hour. Suggest a sip of water.";
         let task = Call::Task(Box::new(lamp_skills::task::TaskStep {
-            task: lamp_skills::core_agent::PILOTS[0].task.into(),
+            task: lamp_skills::core_agent::PILOTS[0].tasks[0].task.into(),
             run: lamp_skills::core_agent::RUN.into(),
             quiet: None,
         }));

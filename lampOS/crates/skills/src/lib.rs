@@ -5016,7 +5016,10 @@ fn manifest(
     // A task handed to the lamp's agent (#6305): one a skill, its grants
     // beside it and nowhere else, in an installable skill only.
     let tasks = file.steps.iter().filter(|step| step.task.is_some()).count();
-    if tasks > 1 {
+    // A core skill's line through the lamp's agent may hand one task for
+    // each of its triggers' lines (`on`), its variant checked as read.
+    let via_agent = file.via_agent;
+    if tasks > 1 && !via_agent {
         return Err("do.task: a skill hands over one task, so it has one do.task step".into());
     }
     // A core skill's line through the lamp's agent ([`core_agent`]) is the
@@ -5070,7 +5073,7 @@ fn manifest(
                 || step.propose.is_some()
                 || step.remind.is_some()
                 || step.write.is_some()
-                || step.on.is_some()
+                || (step.on.is_some() && !via_agent)
                 || step.after.is_some()
                 || step.if_choice.is_some()
             {
@@ -5079,8 +5082,14 @@ fn manifest(
                         .into(),
                 );
             }
+            if let Some(on) = &step.on
+                && !names.contains(&on)
+            {
+                return Err(format!("on = {on:?} names none of the skill's triggers"));
+            }
             steps.push(Step::Call(Call::Task(Box::new(task.step(dir, quiet)?))));
-            ons.resize(steps.len(), None);
+            ons.resize(steps.len() - 1, None);
+            ons.push(step.on.clone().map(Only::Trigger));
             continue;
         }
         if let Some(write) = step.write {
