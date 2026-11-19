@@ -141,6 +141,10 @@ struct Fake {
     /// `lampos`'s own manager, as [`reset::agent_manager_unit`] reads it
     /// from `/etc/passwd`; none: no such user.
     manager: Option<String>,
+    /// A file the plan wipes, lamp-cloud's forwarder token on a lamp, and
+    /// whether it was there when [`reset::forget_agents`] ran.
+    token: Option<PathBuf>,
+    token_at_forget: Option<bool>,
 }
 impl Effects for Fake {
     fn run(&mut self, argv: &[String]) -> io::Result<()> {
@@ -243,6 +247,7 @@ impl Effects for Fake {
     }
     fn forget_agents(&mut self) -> io::Result<usize> {
         self.calls.borrow_mut().push("agents".into());
+        self.token_at_forget = self.token.as_ref().map(|token| token.exists());
         Ok(self.agents)
     }
     fn agent_manager(&mut self) -> Option<String> {
@@ -314,8 +319,8 @@ fn a_reset_stops_wipes_removes_the_marker_and_reboots_in_that_order() {
             "show",
             "list-units",
             "stop",
-            "skills",
             "agents",
+            "skills",
             "sync",
             "sync",
             "reboot"
@@ -784,7 +789,7 @@ fn a_failed_stop_reboots_at_once_into_setup_which_finishes_the_wipe() {
     assert!(!steps.contains(&Step::Rebooting));
     assert_eq!(
         *start.calls.borrow(),
-        ["list-units", "skills", "agents", "sync", "sync"]
+        ["list-units", "agents", "skills", "sync", "sync"]
     );
     // Nothing left to finish.
     assert!(
@@ -3558,8 +3563,8 @@ fn a_resumed_reset_stops_the_agents_user_manager_and_starts_it_after() {
         [
             "list-units",
             "stop",
-            "skills",
             "agents",
+            "skills",
             "sync",
             "sync",
             "start"
@@ -3567,29 +3572,45 @@ fn a_resumed_reset_stops_the_agents_user_manager_and_starts_it_after() {
     );
 }
 
-/// The agents' files go after the plan's wipes and the skills, said by no
-/// name, before the marker and the journal.
+/// #7868 (the first builder, 02:02): the agents' files go after the skills
+/// and before the plan's wipes, said by no name, then the marker and the
+/// journal. OpenClaw's check of the reset's cut of `openclaw.json` joins a
+/// running gateway through OpenClaw's wrapper, which exits without
+/// lamp-cloud's forwarder token, so it runs while the token is there; the
+/// token is still gone after, so the reset forgets what it did before.
 #[test]
-fn the_reset_forgets_the_agents_after_the_plans_wipes() {
+fn the_reset_forgets_the_agents_before_the_plans_wipes_take_the_token() {
     let root = Root::new();
-    let plan = lamp(&root);
+    let mut plan = lamp(&root);
+    let token = root.path("lampos-cloud/hermes-token");
+    fs::create_dir_all(root.path("lampos-cloud")).unwrap();
+    fs::write(&token, b"synthetic forwarder token").unwrap();
+    plan.wipe.push(root.path("lampos-cloud"));
     let mut fake = Fake {
         agents: 3,
+        token: Some(token.clone()),
         ..Fake::default()
     };
     let steps = reset::reset(&plan, &mut fake).unwrap();
+    assert_eq!(fake.token_at_forget, Some(true), "checked with the token");
+    assert!(!token.exists(), "and the token wiped after");
     let at = steps
         .iter()
         .position(|step| *step == Step::AgentsForgotten)
         .expect("the agents forgotten said");
     assert_eq!(
-        steps[..at]
+        steps[at + 1..]
             .iter()
             .filter(|step| matches!(step, Step::Wiped(_)))
             .count(),
         plan.wipe.len()
     );
-    assert_eq!(steps[at + 1..].first(), Some(&Step::JournalRemoved));
+    assert!(
+        !steps[..at]
+            .iter()
+            .any(|step| matches!(step, Step::Wiped(_)))
+    );
+    assert!(steps[at + 1..].contains(&Step::JournalRemoved));
     assert_eq!(
         serde_json::to_value(&steps[at]).unwrap(),
         serde_json::json!({"step": "agents_forgotten"})
