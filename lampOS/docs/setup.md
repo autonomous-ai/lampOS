@@ -320,8 +320,12 @@ lamp-setup reset-now`). That unit, in this order:
    (#7868), as the install's and lamp-tasks' writes are: it goes to a new
    file beside `openclaw.json` with its owner and mode, and lamp-update's
    own check (`openclaw_install::validate_argv`, `config validate --json`
-   as `lampos` inside `openclaw-ns`, which needs no forwarder token, at
-   most 60 s) runs on it; only status 0 renames it into place
+   as `lampos`, at most 60 s) runs on it: joined to OpenClaw's gateway
+   through its wrapper when `lamp-openclaw-gateway.service` has a
+   `MainPID` (OpenClaw 2026.11.2 refuses a check from other namespaces
+   while its gateway runs, #7268), else inside `openclaw-ns` of its own
+   with a stand-in token. The reset stops the gateway first, so it is
+   normally the second. Only status 0 renames it into place
    (`lamp_checked_replace::replace_checked_in`). Not taken (refused, past
    60 s, or not started), the new file is removed and so is
    `openclaw.json`, since a reset fails toward wiping and no person's key

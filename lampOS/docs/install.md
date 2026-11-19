@@ -2460,11 +2460,20 @@ As root, on a lamp with the base image (`crates/update/src/install.rs`):
      lamp"). The block is checked by OpenClaw before it lands (#7868), as
      lamp-tasks' writes are (#7108): the new text goes to a new 0600 file
      beside `openclaw.json`, made `lampos`'s, and OpenClaw's own `config
-     validate --json` runs on it as `lampos` inside `openclaw-ns`, as the
-     install's `--version` does (`openclaw_install::validate_argv`),
-     pointed at that file by `OPENCLAW_CONFIG_PATH`, never the live one,
-     with a stand-in `LAMP_HERMES_TOKEN` (the check reads the file and
-     calls no provider). Only status 0 renames it into place
+     validate --json` runs on it as `lampos` (`openclaw_install::validate_argv`),
+     pointed at that file by `OPENCLAW_CONFIG_PATH`, never the live one.
+     Where it runs depends on the gateway: OpenClaw 2026.11.2 refuses a
+     check from namespaces other than its running gateway's
+     (`GatewayLockNamespaceError`, #7268's ROW FAIL on lamp-52e6). So when
+     `systemctl show -p MainPID --value -- lamp-openclaw-gateway.service`
+     prints a number other than `0`, it runs through the wrapper
+     `/usr/local/bin/openclaw`, which joins that gateway's namespaces (never
+     `LAMP_OPENCLAW_GATEWAY`; the wrapper passes the forwarder's token). With
+     no gateway running (as at a first install, before its first start)
+     there is no lock to clash with, and it runs inside `openclaw-ns` of its
+     own, as the install's `--version` does, with a stand-in
+     `LAMP_HERMES_TOKEN` (the check reads the file and calls no provider).
+     Only status 0 renames it into place
      (`lamp_checked_replace::replace_checked`). Refused, the new file is
      removed, `openclaw.json` stays byte for byte, and the install fails
      with error `config` and OpenClaw's words ("... OpenClaw's own config
