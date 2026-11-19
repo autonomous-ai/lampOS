@@ -4369,6 +4369,7 @@ mod tests {
                     crate::second_provider::net::key_terms::ENVIRONMENT,
                     crate::second_config::FLUX_ENV,
                     crate::light_told::ENVIRONMENT,
+                    crate::history_forget::ENVIRONMENT,
                     crate::services_told::ENVIRONMENT,
                     crate::attention::NEAR_CALIBRATED_ENVIRONMENT,
                     crate::memory_scope::GAP_ENVIRONMENT,
