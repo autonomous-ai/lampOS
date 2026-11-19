@@ -3395,7 +3395,7 @@ adds the key itself (`lamp_cloud::hermes_llm`).
   and attributes them to the lamp exactly as it does the voice's own
   DeepSeek turns; it can't tell the two apart.
 - **The relay's day used** (#7342, off unless `LAMP_SKILL_RUNS_VOICE_SHARE`
-  is set): the forwarder reads each answer's `X-Usage-Day-Used` and each
+  is set; the product's `lamp-cloud.service` sets it `on` since 19 Nov): the forwarder reads each answer's `X-Usage-Day-Used` and each
   chat answer's `usage` and keeps them in `day-used.json` in its state
   folder, for lamp-skills' bound on skills' runs, with one journal line a
   chat answer of its numbers. It still forwards every request as before

@@ -54,6 +54,10 @@ Environment=LAMP_SKILLS_TASKS_SOCKET=/run/lampos-tasks/skill-task.sock
 Environment=LAMP_SKILL_TASK_SURE=on
 # #7180, docs/skills.md; first builder, 16 Nov
 Environment=LAMP_TOLD_WHEN_ASKED=on
+# Skills' runs wait once the relay's day used leaves the voice only half the day (#7342, docs/tasks.md "Skills' runs
+# and the voice's share of the day"; the first builder's DEFAULT-ON, #7814): read from lamp-cloud's day-used.json.
+# The same line in lamp-cloud, whose model forwarder keeps that reading.
+Environment=LAMP_SKILL_RUNS_VOICE_SHARE=on
 # A skill made here is the person's own (#6059, docs/skills.md "A made skill loosened"): a made say's cooldown
 # as asked, at least a minute. The same line in lamp-voice and lamp-skills-manage@.
 Environment=LAMP_MADE_SKILL_LOOSE=on

@@ -2706,6 +2706,37 @@ fn the_skills_page_loads_skills_with_lamp_skills_own_switches() {
     }
 }
 
+/// Skills' runs wait late in a busy day so the voice keeps half of it (#7342,
+/// the first builder's DEFAULT-ON on #7814): `LAMP_SKILL_RUNS_VOICE_SHARE=on`
+/// once in the two units whose part reads it, alike, and named by no other
+/// product unit: `lamp-skills` (the bound, `relay_share::share`, where `on`
+/// is half the day) and `lamp-cloud` (its model forwarder keeps the reading).
+#[test]
+fn the_product_keeps_half_the_day_for_the_voice_alike_in_its_two_units() {
+    let name = lamp_skills::relay_share::SWITCH;
+    assert_eq!(name, "LAMP_SKILL_RUNS_VOICE_SHARE");
+    assert_eq!(
+        lamp_skills::relay_share::share_from(Some("on")),
+        Some(0.5),
+        "`on` keeps half the day"
+    );
+    let switch = format!("Environment={name}=on");
+    let readers = ["lamp-skills.service", "lamp-cloud.service"];
+    for (unit, text) in install::PRODUCT {
+        let service = section(text, "Service");
+        let on = service.iter().filter(|line| **line == switch).count();
+        let mentioned = service.iter().filter(|line| line.contains(name)).count();
+        assert_eq!(on, usize::from(readers.contains(unit)), "{unit}");
+        assert_eq!(mentioned, on, "{unit} names {name}");
+    }
+    for reader in readers {
+        assert!(
+            install::PRODUCT.iter().any(|(unit, _)| *unit == reader),
+            "{reader} is not a product unit"
+        );
+    }
+}
+
 /// A skill's task reaches the public web on 80 and 443 with its owner's
 /// spoken yes (#7200, the first builder's three checks): `LAMP_TASK_NET=on`
 /// once in the six units whose part reads it, and no other product unit
