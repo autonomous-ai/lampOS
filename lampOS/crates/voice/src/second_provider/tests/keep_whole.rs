@@ -161,3 +161,46 @@ fn off_the_reply_is_said_as_before() {
     assert!(!went.noted, "{went:?}");
     assert!(claimed(&went), "{went:?}");
 }
+
+/// The Reviewer-lead's and Friday's P2s on #7924: beside the round's own
+/// other call, a change said is that call's, never a keep claim: no note,
+/// and the reply said.
+#[test]
+fn a_change_said_beside_another_call_is_that_calls() {
+    let reply = "Okay, I've updated that: your dentist reminder is at 3 now.";
+    let went = went(
+        "My dentist moved my appointment to three.",
+        true,
+        vec![
+            vec![
+                Ok(ChatEvent::ToolCalls(vec![call(
+                    "c1",
+                    "set_reminder",
+                    json!({"time": "15:00", "text": "dentist"}),
+                )])),
+                text(reply),
+                Ok(ChatEvent::Done),
+            ],
+            saying(reply),
+        ],
+    );
+    assert!(!went.noted, "{went:?}");
+    assert!(
+        went.said.iter().any(|said| said.contains("dentist")),
+        "{went:?}"
+    );
+}
+
+/// A long reply that opens with an acknowledgement and claims nothing is
+/// let go after three sentences, said whole, with no note.
+#[test]
+fn a_long_acknowledged_reply_with_no_claim_is_let_go() {
+    let reply = "Okay. Here's a short one. A lamp once lit a room. Everyone smiled. The end.";
+    let went = went("I'm bored, tell me a story.", true, vec![saying(reply)]);
+    assert!(!went.noted, "{went:?}");
+    assert_eq!(went.rounds, 1, "{went:?}");
+    assert!(
+        went.said.iter().any(|said| said.contains("The end")),
+        "{went:?}"
+    );
+}

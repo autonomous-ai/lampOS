@@ -16644,10 +16644,14 @@ fn claim_released(
     asked: Option<&str>,
     faces: bool,
     whole: bool,
+    held_whole: &mut bool,
 ) -> Option<String> {
     let held = claim_held.as_mut()?;
-    // Judged whole at the round's end (`LAMP_KEEP_CLAIM_WHOLE`, #7878).
-    if whole {
+    // Held whole while its opening is an acknowledgement, up to its bound,
+    // or to the round's end once a claim is found (`LAMP_KEEP_CLAIM_WHOLE`,
+    // #7878); otherwise judged by its opening as before.
+    if whole && crate::remember::whole_hold(held) == crate::remember::Whole::Hold {
+        *held_whole = true;
         return None;
     }
     if yes && let Some(end) = crate::remember::said_kept_found_to(held, found, asked, false) {
@@ -17158,19 +17162,11 @@ async fn answer(
         _ => Vec::new(),
     };
     let made_asked = crate::action_claim::asked_as_a_question(&said);
-    // A turn whose reply is judged whole for a keep claimed anywhere in it
-    // (`LAMP_KEEP_CLAIM_WHOLE`, #7878): a spoken statement about the
-    // person, never a question.
-    let keep_whole_turn = shared.keep_whole
-        && heard
-        && !quoted
-        && !made_asked
-        && crate::remember::about_someone(&said);
-    if keep_whole_turn {
-        eprintln!(
-            "lamp-voice second: request {request}: a line about the person: its reply is held whole until a remember runs (LAMP_KEEP_CLAIM_WHOLE)"
-        );
-    }
+    // A turn whose reply may be judged whole for a keep claimed anywhere in
+    // it (`LAMP_KEEP_CLAIM_WHOLE`, #7878): spoken, never a question. Which
+    // replies are held is the reply's own opening (`remember::whole_hold`),
+    // never words of the person's line (the Reviewer-lead's P2 on #7924).
+    let keep_whole_turn = shared.keep_whole && heard && !quoted && !made_asked;
     // Whether a light act told as under way is a claim (#7285,
     // `LAMP_ACTION_CLAIM_DOING`): read from the reply alone.
     let doing_turn = shared.doing_claims;
@@ -18193,6 +18189,11 @@ async fn answer(
             // this request was kept already, nor on a turn offered no
             // function (a quoted add-on's or a reminder's).
             let mut claim_held = (!kept_now && !quoted && !reminder).then(String::new);
+            // Whether this round's reply was held whole for a keep claimed
+            // in a later sentence (`LAMP_KEEP_CLAIM_WHOLE`, #7878): said in
+            // the journal, so a row can set its first audio beside a turn
+            // streamed.
+            let mut held_whole = false;
             // A reply's opening, held until it is known whether it narrates
             // a call as words ("Calling not_for_me.", lamp-06c1, 30 Oct);
             // one that does is never said, nor kept as the lamp's words for
@@ -18752,6 +18753,7 @@ async fn answer(
                                     yes_answers.as_deref(),
                                     shared.face_claims,
                                     keep_whole_turn && !remember_ran,
+                                    &mut held_whole,
                                 ) {
                                     Some(said) => said,
                                     // Undecided, or a claim: held.
@@ -19278,6 +19280,7 @@ async fn answer(
                                 yes_answers.as_deref(),
                                 shared.face_claims,
                                 keep_whole_turn && !remember_ran,
+                                &mut held_whole,
                             )
                             .unwrap_or_default()
                         }
@@ -19337,6 +19340,7 @@ async fn answer(
                                     yes_answers.as_deref(),
                                     shared.face_claims,
                                     keep_whole_turn && !remember_ran,
+                                    &mut held_whole,
                                 )
                                 .unwrap_or_default()
                             }
@@ -19363,6 +19367,11 @@ async fn answer(
             // lead's P2 on #3628). Alone, the model is told once and asked
             // again; a second such reply, or one in the last round, is said
             // as the plain line that it was not kept.
+            if held_whole {
+                eprintln!(
+                    "lamp-voice second: request {request} chat round {round}: its reply opened with an acknowledgement and was held whole for a keep said later in it (LAMP_KEEP_CLAIM_WHOLE)"
+                );
+            }
             if let Some(mut held) = claim_held.take().filter(|held| !held.is_empty()) {
                 // Sentences whose said-back keeps name a found thing are
                 // said; what follows them is judged here on its own, never
@@ -19428,9 +19437,14 @@ async fn answer(
                     // replace or update said done in any sentence, as a
                     // hard claim ("Got it — your car is on Level B1, spot 7
                     // now. That replaces wherever it was before.").
+                    // Only with no call at all in the round: beside a light's
+                    // or another call, its words are that call's ("Done,
+                    // I've updated your light."; the Reviewer-lead's P2 on
+                    // #7924).
                     (keep_whole_turn
+                        && held_whole
                         && !remember_ran
-                        && !settings_saved
+                        && calls.is_empty()
                         && crate::remember::claims_a_change(&held))
                     .then(|| {
                         eprintln!(
