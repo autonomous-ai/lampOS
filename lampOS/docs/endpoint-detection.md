@@ -354,7 +354,8 @@ only with `LAMP_JOIN_CUT_WORDS=on` (`crate::pause_join::from_environment`):
   the grace's end. Speech after the grace is a new turn.
 - **A line begun with the name** set off at its start ("Lamp, can you
   tell me", "Hey Lamp, …") is never held as a short sound, however many
-  words follow (`second_provider::name_at_start`). The name later in a
+  words follow (`second_provider::name_at_start`). Since #7834 this holds
+  with the switch off too, on both routes ([not-speech.md](not-speech.md)). The name later in a
   line, or not set off ("Lamp is broken"), is held as before. The rule
   still judges the words: a repeat of the line before's end stays no call
   with `LAMP_NAME_REPEAT_NOT_A_CALL`. `NAME_FIRST_MORE` and the name's

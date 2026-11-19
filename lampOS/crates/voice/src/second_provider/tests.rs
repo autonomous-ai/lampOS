@@ -5698,6 +5698,25 @@ async fn a_short_sound_not_heard_as_a_short_word_is_held_when_sounds_are_checked
     }
 }
 
+/// #7834: on lamp-9adf on 19 Nov "Lamp, put it back." ended as a short
+/// sound and was held 2 times in 5, `LAMP_ENDPOINT_PAUSE_JOIN` being off
+/// there. A line begun with the lamp's name set off is never held as a
+/// short sound, with any switch; one without the name still is.
+#[tokio::test]
+async fn a_short_sound_begun_with_the_lamps_name_is_answered_when_sounds_are_checked() {
+    for named in ["Lamp, put it back.", "Lamp, stop.", "Lamp, lights off."] {
+        let (labels, asked) = sound_turn(true, true, named).await;
+        assert!(
+            labels.iter().any(|label| label.starts_with("audio:")),
+            "{named}: {labels:?}"
+        );
+        assert_eq!(asked, 1, "{named}");
+    }
+    let (held, asked) = sound_turn(true, true, "Put it back.").await;
+    assert_eq!(held, ["started:1", "heard:Put it back.", "complete"]);
+    assert_eq!(asked, 0);
+}
+
 /// #5553: on lamp-9adf on 6 Nov, with nobody in view, "Send." after a
 /// read-back was held as a short sound, and "Cancel." on 10 Nov (#5958).
 /// While a write waits, any answer is the model's to judge (the owner, 10

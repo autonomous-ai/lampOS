@@ -4836,8 +4836,8 @@ fn name_first(text: &str) -> bool {
 /// Whether a line begins with the lamp's name, set off as a call at its
 /// start ([`crate::attention::begins_with_the_name`]: "Lamp, …", "Hey Lamp
 /// …"), however many words follow: such a line is never held as a short
-/// sound (`LAMP_ENDPOINT_PAUSE_JOIN`, #4449: "Lamp, can you tell me", four
-/// words past the name, was). Never the name later in a line ("Turn the
+/// sound (#4449: "Lamp, can you tell me", four words past the name, was;
+/// since #7834 with any switch). Never the name later in a line ("Turn the
 /// lamp off", a television's "…the lamp is…"), nor "Lamp is broken", where
 /// it is not set off. Its own check: [`name_first`] and [`NAME_FIRST_MORE`],
 /// the name's carry (`LAMP_SECOND_NAME_CARRIES`), stay as they are, and the
@@ -5971,9 +5971,9 @@ impl Engine {
     /// [`crate::pause_join::GRACE`] after its speech ended, its chat and
     /// speech going on meanwhile, so a line set off in the grace cuts it
     /// short with none of it heard and is joined to it (with
-    /// [`Self::joining_cut_words`]); and a line begun with the lamp's name
-    /// (set off first, [`name_at_start`]) is never held as a short sound,
-    /// however many words follow it. Before any turn only.
+    /// [`Self::joining_cut_words`]). A line begun with the lamp's name (set
+    /// off first, [`name_at_start`]) is never held as a short sound, with
+    /// the switch or without it (#7834). Before any turn only.
     pub fn joining_pauses(mut self, on: bool) -> Self {
         if let Some(shared) = Arc::get_mut(&mut self.shared) {
             shared.pause_join = on;
@@ -10496,14 +10496,15 @@ async fn spoken(
     }
     // Only the lamp's name, or said by it (`LAMP_SECOND_NAME_CARRIES`): it
     // shows it was said to the lamp, so it is never held as a short sound.
-    // Nor, with `LAMP_ENDPOINT_PAUSE_JOIN`, a line begun with the name set
-    // off at its start, however many words follow it (#4449: "Lamp, can
-    // you tell me" was held so).
+    // Nor a line begun with the name set off at its start, however many
+    // words follow it, with or without `LAMP_ENDPOINT_PAUSE_JOIN` (#4449:
+    // "Lamp, can you tell me" was held so; #7834: on lamp-9adf, where the
+    // switch is off, "Lamp, put it back." was, 2 times in 5).
     let marked = checked.is_some_and(|sound| sound.load(Ordering::Acquire))
         && !crate::not_speech::short_word(&text)
         && !name_waits
         && name_of.is_none()
-        && !(shared.pause_join && name_at_start(&text));
+        && !name_at_start(&text);
     // A sound with a word in it, right after the lamp's own question in a
     // conversation going on, is the person's answer, as on the Live route
     // (lamp-4ace, 17 October 16:11: "Yes. Please start it." heard as

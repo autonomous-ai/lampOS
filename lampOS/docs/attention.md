@@ -1265,7 +1265,9 @@ came marked as a short sound let through is played only when what was heard
 is a short word said to the lamp, it was said close to the lamp (the room
 microphone, as for `--attention-near`), someone is turned to the lamp, the
 lamp began the turn itself, or it answers the lamp's own question (below);
-otherwise it is held. Off unless set; the rule is otherwise as above.
+otherwise it is held. A request whose words begin with the lamp's name set
+off ("Lamp, put it back.", `begins_with_the_name`) is not checked as a
+sound at all: the rule judges it as any line (#7834). Off unless set; the rule is otherwise as above.
 
 **An answer to the lamp's own question (17 October).** On lamp-4ace on
 2026-10-17 at 16:11, the lamp asked "Shall I start it?" and the person said
