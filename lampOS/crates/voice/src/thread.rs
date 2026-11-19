@@ -245,6 +245,11 @@ pub struct Thread {
     /// their exchange opened ([`Self::left_on_holding_line`]): each is let
     /// go as it opens.
     let_go: VecDeque<u64>,
+    /// A look asked by the route's own call, kept with its question
+    /// (`LAMP_LOOK_KEPT_WITH_ASK`, [`Self::look_asked`]): the asking request,
+    /// and the look's own request once its turn begins. Its exchange is
+    /// handed on with the look's words, at the look's end.
+    look: Option<(u64, Option<u64>)>,
 }
 
 /// What stands for the lamp's words in a request a connected service's
@@ -437,6 +442,7 @@ impl Thread {
             closed_at: None,
             closed_request: None,
             let_go: VecDeque::new(),
+            look: None,
         }
     }
 
@@ -1050,7 +1056,18 @@ impl Thread {
             let heard = self.heard_for(request, now);
             crate::owner_voice::lamp_answered(request, heard.as_deref(), words, now);
         }
-        let opening = self.exchanges.back().map(|last| last.request) != Some(request);
+        // A look's words go on in the exchange that asked it, as one, when
+        // it is still the newest, not handed on, and in the same scope
+        // (`LAMP_LOOK_KEPT_WITH_ASK`): what was asked, "Let me look.", and
+        // what the lamp saw.
+        let goes_on_in_ask = self.look.is_some_and(|(asking, look)| {
+            look == Some(request)
+                && self.exchanges.back().is_some_and(|last| {
+                    last.request == asking && !last.journalled && last.whose.as_deref() == scope
+                })
+        });
+        let opening =
+            !goes_on_in_ask && self.exchanges.back().map(|last| last.request) != Some(request);
         if opening && crate::not_speech::names_a_function(text) {
             self.unsaid = Some(request);
             return;
@@ -1061,6 +1078,11 @@ impl Thread {
             return;
         }
         if opening {
+            // Another exchange opens: a look waited for is over, and its
+            // asking exchange is handed on as any other.
+            if self.look.is_some_and(|(asking, _)| asking != request) {
+                self.look = None;
+            }
             let asked = self
                 .heard_at
                 .is_some_and(|at| now.saturating_duration_since(at) <= ASKED_WITHIN);
@@ -1243,6 +1265,43 @@ impl Thread {
             })
     }
 
+    /// `LAMP_LOOK_KEPT_WITH_ASK`: request `asking`'s spoken turn asked for
+    /// a look by the route's own call. Its exchange waits, while it is the
+    /// newest, for the look's words ([`Self::look_turn`]), and is handed on
+    /// with them as one exchange at the look's end ([`Self::finished`]):
+    /// said = the question, answer = "Let me look." and what the lamp saw.
+    /// Any other exchange opening, the look let go, or a forgetting ends the
+    /// wait, and it is handed on as it stands.
+    pub fn look_asked(&mut self, asking: u64) {
+        self.look = Some((asking, None));
+    }
+
+    /// The look `asking` asked for is request `look`'s turn: its words go on
+    /// in `asking`'s exchange ([`Self::look_asked`]). Nothing unless that
+    /// look is waited for.
+    pub fn look_turn(&mut self, look: u64, asking: u64) {
+        if let Some((waiting, turn)) = self.look.as_mut()
+            && *waiting == asking
+        {
+            *turn = Some(look);
+        }
+    }
+
+    /// The look `asking` asked for will not go on in its exchange: dropped,
+    /// another turn began, or its scope is not the asker's. Its exchange is
+    /// handed on as it stands.
+    pub fn look_let_go(&mut self, asking: u64) {
+        if self.look.is_some_and(|(waiting, _)| waiting == asking) {
+            self.look = None;
+        }
+    }
+
+    /// Whether `request`'s exchange waits for its look's words
+    /// ([`Self::look_asked`]): what its calls gave stays for it.
+    pub fn waits_for_look(&self, request: u64) -> bool {
+        self.look.is_some_and(|(asking, _)| asking == request)
+    }
+
     /// The exchanges that are over and were not given out before, for the
     /// lamp's memory ([`crate::remember`]): every one but the newest, and
     /// the newest too when `done` is its request. Each with its request,
@@ -1251,11 +1310,23 @@ impl Thread {
     /// the lamp said.
     pub fn finished(&mut self, done: u64, now: Instant) -> Vec<FinishedExchange> {
         let newest = self.exchanges.back().map(|last| last.request);
+        // A look's end hands on the exchange that asked it, its words in
+        // it; until then that exchange, the newest, waits (`Self::look_asked`).
+        let look = self.look;
+        let looked = look.and_then(|(asking, look)| (look == Some(done)).then_some(asking));
+        let waits = look
+            .filter(|(_, look)| *look != Some(done))
+            .map(|(asking, _)| asking);
+        if looked.is_some() {
+            self.look = None;
+        }
         self.exchanges
             .iter_mut()
             .filter(|exchange| {
                 !exchange.journalled
-                    && (Some(exchange.request) != newest || exchange.request == done)
+                    && (Some(exchange.request) != newest
+                        || (exchange.request == done && waits != Some(done))
+                        || Some(exchange.request) == looked)
             })
             .filter_map(|exchange| {
                 exchange.journalled = true;
@@ -1383,6 +1454,7 @@ impl Thread {
         self.calling.clear();
         self.kept_for.clear();
         self.let_go.clear();
+        self.look = None;
         self.note = None;
         self.heard.clear();
         self.heard_at = None;
@@ -1547,6 +1619,9 @@ impl Thread {
         // The events a calendar read kept expire with it
         // (`LAMP_SERVICE_READ_IDS_KEPT`).
         crate::service_read_ids::conversation_ended();
+        // A look's asking exchange waits no longer (`LAMP_LOOK_KEPT_WITH_ASK`,
+        // Twelve's P2 on #8019): the close drops the look.
+        self.look = None;
         self.closed_at = Some(self.closed_at.map_or(now, |closed| closed.max(now)));
     }
 
@@ -2497,11 +2572,17 @@ pub fn close_now(request: Option<u64>) {
     if !test_closes::ON.with(std::cell::Cell::get) {
         return;
     }
-    if let Ok(mut thread) = THREAD.lock() {
+    let waited = THREAD.lock().ok().and_then(|mut thread| {
+        let waited = thread.look.map(|(asking, _)| asking);
         match request {
             Some(request) => thread.close_conversation_with(request, Instant::now()),
             None => thread.close_conversation(Instant::now()),
         }
+        waited
+    });
+    // The exchange that waited for its look is kept at once.
+    if let Some(asking) = waited {
+        crate::remember::finished(asking);
     }
 }
 
@@ -3824,6 +3905,136 @@ mod tests {
         assert_eq!(rest, &flags[2..]);
         assert_eq!(take_file(&flags[2..]).unwrap(), (None, &flags[2..]));
         assert!(take_file(&flags[..1]).is_err());
+    }
+
+    /// `LAMP_LOOK_KEPT_WITH_ASK`: on lamp-06c1 (17 Nov) a look was kept as
+    /// two exchanges, the question with "Let me look." in the person's, and
+    /// what the lamp saw with nothing said in the room's. Now one exchange,
+    /// in the asker's scope: the question, "Let me look." and what it saw,
+    /// handed on at the look's end, words only.
+    #[test]
+    fn a_look_asked_is_kept_with_its_question_as_one_exchange() {
+        let start = Instant::now();
+        let at = |seconds: u64| start + Duration::from_secs(seconds);
+        for whose in [Some("p-a"), None] {
+            let mut thread = Thread::new();
+            thread.person("What movie is this toy from?", true, at(0));
+            thread.look_asked(1);
+            thread.lamp_for(1, "Let me look. ", at(1), whose);
+            assert!(thread.waits_for_look(1));
+            // The asking turn ends: its exchange waits for the look's words.
+            assert!(thread.finished(1, at(2)).is_empty());
+            thread.look_turn(2, 1);
+            thread.lamp_for(2, "A red toy motorcycle, ", at(3), whose);
+            thread.lamp_for(2, "maybe from a film. ", at(3), whose);
+            assert!(!thread.answered_between(1, 3), "no exchange of its own");
+            let done = thread.finished(2, at(4));
+            assert_eq!(
+                done,
+                [FinishedExchange {
+                    request: 1,
+                    age: Duration::from_secs(3),
+                    heard: "What movie is this toy from?".to_owned(),
+                    said: "Let me look. A red toy motorcycle, maybe from a film.".to_owned(),
+                    whose: whose.map(str::to_owned),
+                }]
+            );
+            assert!(!done[0].said.contains("data:"), "words only");
+            assert!(!thread.waits_for_look(1));
+            assert!(thread.finished(2, at(5)).is_empty(), "once");
+        }
+    }
+
+    /// A look let go (a held or carried asker, another turn first), or one
+    /// whose words come in another scope, is kept as before: the asking
+    /// exchange as it stands, the look's words in their own.
+    #[test]
+    fn a_look_let_go_or_in_another_scope_is_kept_apart_as_before() {
+        let start = Instant::now();
+        let mut thread = Thread::new();
+        thread.person("Take a look at it.", true, start);
+        thread.look_asked(1);
+        thread.lamp_for(1, "Let me look. ", start, Some("p-a"));
+        thread.look_let_go(1);
+        assert_eq!(thread.finished(1, start).len(), 1);
+        thread.lamp_for(2, "A red toy motorcycle. ", start, None);
+        let done = thread.finished(2, start);
+        assert_eq!((done[0].request, done[0].heard.as_str()), (2, ""));
+        // Its words in the room's while it was asked in A's: apart.
+        let mut thread = Thread::new();
+        thread.person("Take a look at it.", true, start);
+        thread.look_asked(1);
+        thread.lamp_for(1, "Let me look. ", start, Some("p-a"));
+        assert!(thread.finished(1, start).is_empty());
+        thread.look_turn(2, 1);
+        thread.lamp_for(2, "A red toy motorcycle. ", start, None);
+        let done = thread.finished(2, start);
+        assert_eq!(
+            done.iter()
+                .map(|exchange| (exchange.request, exchange.whose.as_deref()))
+                .collect::<Vec<_>>(),
+            [(1, Some("p-a")), (2, None)]
+        );
+        assert_eq!(done[0].said, "Let me look.");
+        // Someone speaks before the look: their turn opens its own, and the
+        // asking exchange is handed on as it stands.
+        let mut thread = Thread::new();
+        thread.person("Take a look at it.", true, start);
+        thread.look_asked(1);
+        thread.lamp_for(1, "Let me look. ", start, Some("p-a"));
+        assert!(thread.finished(1, start).is_empty());
+        thread.person("Sing.", true, start);
+        thread.lamp_for(3, "La la. ", start, Some("p-a"));
+        let given: Vec<u64> = thread
+            .finished(3, start)
+            .into_iter()
+            .map(|exchange| exchange.request)
+            .collect();
+        assert_eq!(given, [1, 3]);
+        // A close (a turn end, the person's stop) drops the look: the
+        // asking exchange is kept at once, not on the next turn (Twelve's
+        // P2 on #8019).
+        let mut thread = Thread::new();
+        thread.person("Take a look at it.", true, start);
+        thread.look_asked(1);
+        thread.lamp_for(1, "Let me look. ", start, Some("p-a"));
+        assert!(thread.finished(1, start).is_empty());
+        thread.close_conversation(start);
+        assert!(!thread.waits_for_look(1));
+        let done = thread.finished(1, start);
+        assert_eq!(
+            done.iter()
+                .map(|exchange| (exchange.request, exchange.said.as_str()))
+                .collect::<Vec<_>>(),
+            [(1, "Let me look.")]
+        );
+        // A forgetting ends the wait too.
+        thread.look_asked(4);
+        thread.forget();
+        assert!(!thread.waits_for_look(4));
+    }
+
+    /// A look the lamp began on its own (no look asked by the call) is kept
+    /// as it was: its own exchange, nothing said with it.
+    #[test]
+    fn an_unasked_look_is_kept_as_before() {
+        let start = Instant::now();
+        let mut thread = Thread::new();
+        thread.person("Hello.", true, start);
+        thread.lamp_for(1, "Hi! ", start, None);
+        thread.look_turn(2, 1);
+        thread.lamp_for(2, "A mug on the desk. ", start, None);
+        let done = thread.finished(2, start);
+        assert_eq!(
+            done.iter()
+                .map(|exchange| (
+                    exchange.request,
+                    exchange.heard.as_str(),
+                    exchange.said.as_str()
+                ))
+                .collect::<Vec<_>>(),
+            [(1, "Hello.", "Hi!"), (2, "", "A mug on the desk.")]
+        );
     }
 
     #[test]

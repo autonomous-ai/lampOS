@@ -326,6 +326,45 @@ giving the model one with everything said was switched off).
   does.
   Without the variable nothing is asked, waited for or said differently.
 
+- What the person asked and told it, beside the picture (`LAMP_LOOK_TOLD=on`,
+  #7814; on in the product). On lamp-06c1 on 17 November the person had
+  said several times that the toy on the desk was their red toy
+  motorcycle, and the lamp had kept it, yet each of three looks called it
+  a red toy camera: the look turn's only words were the fixed note, and
+  what the person said sat far up the history. With the switch the route's
+  own look function, `take_a_look`, takes two optional string arguments
+  the model writes: `question`, what they asked, and `told`, what they
+  already said about it. The look turn's words, beside the picture and
+  before the note, are "They asked: …", "They told you it is: …" and
+  "Answer from what you see. If it doesn't clearly look like what they
+  told you, say what you can make out and that it may be what they mean;
+  don't name it as something else.", each argument quoted as data. After
+  them come memory's hits (`LAMP_SECOND_MEMORY_HITS`, the same lookup and
+  bound as a spoken line's, in `HITS_NOTE`'s words) for the question, or
+  for the asking line when there is none, in the asker's scope: a known
+  person's own, the room's for the room, and none for a line held only by
+  a face's gap or a scope revoked since. With no arguments and no hits the
+  note is as before, and nothing is added without a picture. The model
+  judges what fits; there are no word lists. The journal says, as counts
+  only, "the look call wrote a question: yes|no, what they told: yes|no"
+  and "the look is told what was asked: question …, what they told …,
+  memory's hits yes|none (LAMP_LOOK_TOLD)".
+- The look kept with its question, as the asker's
+  (`LAMP_LOOK_KEPT_WITH_ASK=on`, #7814; on in the product). The look turn
+  is one the lamp writes, so it used to be the room's, and the person's
+  words had been taken by the turn that asked: each look was kept as two
+  exchanges, the question with "Let me look." in the person's, and what the
+  lamp saw, with nothing said, in the room's. With the switch the look
+  turn goes on in the asking turn's scope, read from its lease as the look
+  is asked (the person's own; the room's for a line held only by a
+  face's gap, carried as a conversation going on, revoked, or nobody's),
+  and, privacy first, only while the asker is still the one at the lamp as
+  the look begins: anyone else in view, known or not, and the look and its
+  hits are the room's, as before. It is kept as one exchange: said = the question, answer = "Let me look."
+  and what the lamp saw ([memory.md](memory.md), "A look kept with its
+  question"). Words only: never the picture, its bytes or any reference to
+  it. A look the lamp began on its own is as before.
+
 A picture leaves the lamp only on such a look: when a person has asked the
 lamp to and the lamp has said it will, or the model has called a skill's
 tool that looks (only a skill's answer asks for one). With `LAMP_VOICE_SECOND_CONFIG` set
