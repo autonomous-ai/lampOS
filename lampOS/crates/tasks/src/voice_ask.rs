@@ -43,7 +43,10 @@
 //!   (`{"mint":{"ask":[...]}}`, as the skill [`SKILL`]), held to exactly
 //!   that grant, ended with the run. The run's home has
 //!   `mcp_servers.lamp-services`, and the run is held off the network (the
-//!   runner a held make uses): a mail's words can't send anything anywhere.
+//!   runner a held make uses; with lamp-update's one run path,
+//!   [`crate::skill_make::AskRunner`]: Hermes's task entry in the run's own
+//!   `skill-<run id>` folder, its fresh home named as a make's, no way
+//!   out): a mail's words can't send anything anywhere.
 //!   The voice hands over only a read it would tell in full; it never asks
 //!   for a brief one (someone else may be in view: nothing is handed over).
 //!   OpenClaw can't take one yet: its gateway keeps the network and has no
@@ -315,7 +318,8 @@ pub fn prompt(folder: &Path) -> String {
 /// What runs an ask: the lamp's default agent as `agent` picks it; for the
 /// lamp's Hermes, as a make runs (`open`, the network as
 /// `LAMP_MAKE_AGENT_NET` says), the same held off the network for an ask
-/// with a service's grants (`held`); for a gateway agent, `agent`'s one
+/// with a service's grants (`held`, [`crate::skill_make::AskRunner`] on a
+/// lamp, the one run path's when it is on); for a gateway agent, `agent`'s one
 /// turn. lamp-control's tokens, and the one ask at a time.
 pub struct Asks {
     pub switches: Switches,
@@ -628,7 +632,9 @@ fn told(read: Option<String>) -> Value {
 /// The refusal's code for why a run can't start, as a make's.
 fn not_started(why: &str) -> &'static str {
     match why {
-        crate::skill_task::NOT_HELD_OFF => "not_held_off",
+        crate::skill_task::NOT_HELD_OFF | crate::skill_task::NOT_HELD_OFF_ONE_PATH => {
+            "not_held_off"
+        }
         crate::skill_make::NO_NAMESPACE => "no_namespace",
         _ => "run_failed",
     }
@@ -1270,6 +1276,180 @@ mod tests {
         );
         let told = answer_beside_make(line, &hermes, true, dir.path(), &mut || {});
         assert_eq!(told["ok"], true, "{told}");
+    }
+
+    /// lamp-9adf, 20 Nov: with lamp-update's one run path, a linked
+    /// service's read was refused `NOT_HELD_OFF_ONE_PATH` within 16 ms, as
+    /// the held make's runner starts Hermes outside a `skill-<run id>`
+    /// folder. By the one run path the ask now runs as a skill's run with no
+    /// Harness: by Hermes's task entry in its own `skill-<run id>` folder
+    /// (which the wrapper holds off the network), its token in its file
+    /// under that id, its fresh home the ask's own `make-<run id>/home`
+    /// named as a make's (`LAMP_NS_HOME`), no egress socket; answered from
+    /// its folder, both folders and the token file gone after. Without the
+    /// one run path it is refused as before; by it, a wrapper or namespace
+    /// with no make-home line is refused before any token is minted.
+    #[test]
+    fn a_held_ask_on_the_one_run_path_runs_in_its_own_skill_folder() {
+        use crate::skill_task::{
+            AGENT_NS_HOME_LINE, AGENT_NS_NET_LINES, AGENT_NS_TASKS_LINE, AGENT_TASK_LINE,
+            HarnessRunner, NOT_HELD_OFF_ONE_PATH, ONE_PATH_MARK, ONE_PATH_RUN_LINE,
+            TASK_ENTRY_LINES, WRAPPER_RUN_LINES,
+        };
+        use std::os::unix::fs::PermissionsExt;
+        let dir = work();
+        let top = std::fs::canonicalize(dir.path()).unwrap();
+        let (bin, runs, project, seen) = (
+            top.join("bin"),
+            top.join("runs"),
+            top.join("project"),
+            top.join("seen"),
+        );
+        std::fs::create_dir_all(&bin).unwrap();
+        let ask_work = top.join("lamp");
+        std::fs::create_dir(&ask_work).unwrap();
+        // The run as the wrapper's task entry starts it: where, its home,
+        // its token file; it answers in its fresh home's folder.
+        let body = format!(
+            "[ \"$1\" = --warm ] && exit 0\n\
+             R=$(basename \"$(pwd -P)\")\n\
+             printf '%s\\n%s\\n%s\\n%s\\n' \"$(pwd -P)\" \"${{LAMP_NS_HOME-}}\" \"${{LAMP_NS_EGRESS-none}}\" \"$(cat {runs}/${{R#skill-}})\" > {seen}\n\
+             printf 'Two meetings, at ten and at three.' > \"${{LAMP_NS_HOME%/home}}/answer.md\"",
+            runs = runs.display(),
+            seen = seen.display(),
+        );
+        let wrapper = |home_line: bool| {
+            format!(
+                "#!/bin/sh\n{ONE_PATH_MARK}E=hermes\n{body}\nexit 0\nagent_env() {{\n{}  :\n}}\n{AGENT_TASK_LINE}  :\n}}{ONE_PATH_RUN_LINE}{}{}{}{}{}{}{}",
+                if home_line {
+                    crate::skill_make::ONE_PATH_HOME_LINE
+                } else {
+                    ""
+                },
+                WRAPPER_RUN_LINES[0],
+                WRAPPER_RUN_LINES[1],
+                AGENT_NS_NET_LINES[0],
+                AGENT_NS_NET_LINES[1],
+                AGENT_NS_NET_LINES[2],
+                TASK_ENTRY_LINES[0],
+                TASK_ENTRY_LINES[1],
+            )
+        };
+        let place = bin.join("hermes");
+        let ns = top.join("agent-ns");
+        let write = |wrapper: &str, script: &str| {
+            std::fs::write(&place, wrapper).unwrap();
+            std::fs::set_permissions(&place, std::fs::Permissions::from_mode(0o755)).unwrap();
+            std::fs::write(&ns, script).unwrap();
+        };
+        let script = format!(
+            "#!/bin/sh\nE=${{LAMP_NS_ENGINE-}} X=${{LAMP_NS_ENGINE_BIN-}}{AGENT_NS_HOME_LINE}W=/w K=/k{AGENT_NS_TASKS_LINE}{}",
+            crate::skill_make::ONE_PATH_NS_MAKE_LINES
+        );
+        write(&wrapper(true), &script);
+        // macOS checks a just-written program at its first exec.
+        assert!(
+            std::process::Command::new(&place)
+                .arg("--warm")
+                .status()
+                .unwrap()
+                .success()
+        );
+        let held = |one_path: bool| {
+            let mut harness = HarnessRunner::lamp(&top, Default::default());
+            harness.project = project.clone();
+            harness.runs = runs.clone();
+            harness.wrappers = Some(bin.clone());
+            harness.agent_ns = Some(ns.clone());
+            harness.default_agent = one_path;
+            let mut make = crate::skill_make::lamp_runner(&top, true);
+            make.hermes.held_by = Some(place.clone());
+            Arc::new(crate::skill_make::AskRunner {
+                make,
+                one_path: Some(Arc::new(harness)),
+                home: top.clone(),
+            })
+        };
+        let ask = || line("what's on my calendar today?", &["google_calendar-read"]);
+        let held_asks = |held: Arc<crate::skill_make::AskRunner>, tokens: Arc<Minting>| Asks {
+            held,
+            ..asks(
+                Arc::new(Agent::default()),
+                Arc::new(Agent::default()),
+                tokens,
+                on(),
+            )
+        };
+        let tokens = Arc::new(Minting::default());
+        let asks = held_asks(held(true), tokens.clone());
+        let told = answer(&ask(), &asks, &ask_work, &mut || {});
+        assert_eq!(told["ok"], true, "{told}");
+        assert_eq!(told["answer"], "Two meetings, at ten and at three.");
+        let run = tokens.asked.lock().unwrap()[0].1.clone();
+        let seen = std::fs::read_to_string(&seen).unwrap();
+        let lines: Vec<&str> = seen.lines().collect();
+        assert_eq!(
+            lines,
+            [
+                project.join(format!("skill-{run}")).to_str().unwrap(),
+                ask_work.join(format!("make-{run}/home")).to_str().unwrap(),
+                "none",
+                "T".repeat(43).as_str(),
+            ],
+            "{seen}"
+        );
+        assert_eq!(*tokens.ended.lock().unwrap(), vec![run.clone()]);
+        assert!(!project.join(format!("skill-{run}")).exists());
+        assert!(!ask_work.join(format!("make-{run}")).exists());
+        assert!(!runs.join(&run).exists());
+        // Without the one run path: the held make's runner, refused as the
+        // one run path holds only a run in its own folder.
+        let tokens = Arc::new(Minting::default());
+        let asks = held_asks(held(false), tokens.clone());
+        let told = answer(&ask(), &asks, &ask_work, &mut || {});
+        assert_eq!(told["error"], "not_held_off", "{told}");
+        assert_eq!(told["message"], NOT_HELD_OFF_ONE_PATH, "{told}");
+        assert!(tokens.asked.lock().unwrap().is_empty());
+        // A hard ask with `LAMP_MAKE_AGENT_NET=held` runs on the held make's
+        // runner (`open`): it has no token, which the one run path's wrapper
+        // needs for a run in its own folder (lamp-control mints an ask only
+        // for a linked service's read), so it still fails closed there, told
+        // `not_held_off` as the voice says it, never `run_failed`.
+        let tokens = Arc::new(Minting::default());
+        let mut held_make = crate::skill_make::lamp_runner(&top, true);
+        held_make.hermes.held_by = Some(place.clone());
+        let hard = Asks {
+            open: Arc::new(held_make),
+            ..super::tests::asks(
+                Arc::new(Agent::default()),
+                Arc::new(Agent::default()),
+                tokens.clone(),
+                on(),
+            )
+        };
+        let told = answer(&line("plan my week", &[]), &hard, &ask_work, &mut || {});
+        assert_eq!(told["error"], "not_held_off", "{told}");
+        assert_eq!(told["message"], NOT_HELD_OFF_ONE_PATH, "{told}");
+        assert!(tokens.asked.lock().unwrap().is_empty());
+        // By the one run path, a wrapper or namespace that gives no fresh
+        // home: refused, no token minted, nothing made or started.
+        for (wrapper, script) in [
+            (wrapper(false), script.clone()),
+            (
+                wrapper(true),
+                script.replace(crate::skill_make::ONE_PATH_NS_MAKE_LINES, ""),
+            ),
+        ] {
+            write(&wrapper, &script);
+            let tokens = Arc::new(Minting::default());
+            let asks = held_asks(held(true), tokens.clone());
+            let told = answer(&ask(), &asks, &ask_work, &mut || {});
+            assert_eq!(told["error"], "no_namespace", "{told}");
+            assert_eq!(told["message"], crate::skill_make::NO_NAMESPACE);
+            assert!(tokens.asked.lock().unwrap().is_empty());
+        }
+        assert_eq!(std::fs::read_dir(&ask_work).unwrap().count(), 0);
+        assert!(std::fs::read_dir(&project).unwrap().next().is_none());
     }
 
     #[test]

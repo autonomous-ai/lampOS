@@ -1838,6 +1838,78 @@ impl Runner for NetRunner {
     }
 }
 
+/// The runner a live ask held off the network goes through
+/// (`crate::voice_ask`, an ask with a linked service's read). With
+/// lamp-update's one run path (`one_path`'s
+/// [`crate::skill_task::HarnessRunner::default_agent`]), the lamp's Hermes
+/// by its wrapper's task entry, as a skill's run with no Harness
+/// ([`crate::skill_task::HarnessRunner::run_task_entry`]): in the run's own
+/// `skill-<run id>` folder, which the wrapper holds off the network (`--net`,
+/// its one-run token read from its file), with the ask's folder
+/// `make-<run id>/home` as its fresh home, named to the wrapper as a make's
+/// is (`LAMP_NS_HOME`), and no egress socket: the one run path holds only a
+/// run started in its own folder, so `make` would be refused
+/// [`NOT_HELD_OFF_ONE_PATH`] there. Never through Harness, which passes the
+/// wrapper none of lamp-tasks' variables. Without the one run path, `make`
+/// ([`lamp_runner`] held), as before.
+pub struct AskRunner {
+    pub make: MakeHermes,
+    pub one_path: Option<Arc<crate::skill_task::HarnessRunner>>,
+    /// lamp-tasks' `HOME`, the wrapper's `HOME` as it is started.
+    pub home: PathBuf,
+}
+
+impl AskRunner {
+    /// The lamp's: [`lamp_runner`] held, and the one run path's runner
+    /// ([`crate::skill_task::HarnessRunner::lamp`]) on `harness`.
+    pub fn lamp(home: &Path, harness: crate::skill_task::SkillHarnessSlot) -> Self {
+        Self {
+            make: lamp_runner(home, true),
+            one_path: Some(Arc::new(crate::skill_task::HarnessRunner::lamp(
+                home, harness,
+            ))),
+            home: home.to_path_buf(),
+        }
+    }
+
+    fn by_one_path(&self) -> Option<&crate::skill_task::HarnessRunner> {
+        self.one_path
+            .as_deref()
+            .filter(|harness| harness.default_agent)
+    }
+}
+
+impl Runner for AskRunner {
+    /// By the one run path, the lamp's Hermes wrapper takes a run by its
+    /// task entry in a fresh home of its own
+    /// ([`crate::skill_task::HarnessRunner::takes_fresh_tasks`]); else the
+    /// held make's checks.
+    fn ready(&self) -> Result<(), String> {
+        match self.by_one_path() {
+            Some(harness) => harness.takes_fresh_tasks(crate::harness::EngineKind::Hermes),
+            None => self.make.ready(),
+        }
+    }
+
+    fn stop_on(&self, stop: Arc<AtomicBool>) {
+        if let Some(harness) = &self.one_path {
+            Runner::stop_on(harness.as_ref(), stop);
+        }
+    }
+
+    fn run(&self, run: &SkillRun, end_token: &dyn Fn()) -> Result<u64, String> {
+        match self.by_one_path() {
+            Some(harness) => harness.run_task_entry(
+                crate::harness::EngineKind::Hermes,
+                &self.home,
+                run,
+                end_token,
+            ),
+            None => self.make.run(run, end_token),
+        }
+    }
+}
+
 fn lamp_runner_with(home: &Path, held: bool, egress: Option<crate::egress::Grant>) -> MakeHermes {
     let mut hermes = crate::skill_task::HermesRunner::lamp(home);
     if !held {
@@ -1892,7 +1964,7 @@ impl MakeHandOvers {
             }
         );
         let runner: Arc<MakeHermes> = Arc::new(lamp_runner(home, held));
-        let gateway = Arc::new(MakeGateway::lamp(home, harness));
+        let gateway = Arc::new(MakeGateway::lamp(home, harness.clone()));
         let switches = crate::voice_ask::Switches::of_env();
         // A live ask on the lamp's default agent, picked as a make on the
         // one run path picks it: the lamp's Hermes on the same runner as a
@@ -1906,7 +1978,7 @@ impl MakeHandOvers {
             Arc::new(crate::voice_ask::Asks {
                 switches,
                 open: runner.clone(),
-                held: Arc::new(lamp_runner(home, true)),
+                held: Arc::new(AskRunner::lamp(home, harness.clone())),
                 agent: Some(gateway.clone()),
                 default_engine: Box::new(move || {
                     default_engine.get().and_then(|engine| engine())
@@ -1942,6 +2014,10 @@ impl MakeHandOvers {
         // lamp-tasks stops (#7245).
         if let Some(gateway) = &self.one_path {
             gateway.stop_on(stop.clone());
+        }
+        // A held ask's run on the one run path ends as lamp-tasks stops.
+        if let Some(asks) = &self.asks {
+            asks.held.stop_on(stop.clone());
         }
         let (listener, binding) = crate::runtime::bind(&self.socket)?;
         let served = std::thread::Builder::new()
