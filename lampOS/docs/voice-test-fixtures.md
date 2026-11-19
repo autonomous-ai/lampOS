@@ -734,7 +734,7 @@ A case carries no words and no names:
 |-------|---------|
 | `case`, `source` | A name, and the kit's out dir, journal and request it came from |
 | `line_s` | The line's start and end, in seconds on the eyes sample's clock |
-| `words`, `question`, `named` | Its word count, a `?` in it, the lamp's name heard in its sound and carried in its words (its first word is then "lamp": out of the window a hearing with no name in the words is no name, #7891) |
+| `words`, `question`, `named` | Its word count, a `?` in it, the lamp's name heard in its sound |
 | `going_on`, `turned`, `yes_awaited` | In a live conversation's window; a face turned to the lamp (the worker's `signs.turned`); the lamp waits for a yes or no of its own asking |
 | `lamp_asked`, `another_voice` | The lamp's own question waits for its answer (the worker's `signs.lamp_asked`); another voice in the conversation, so the lone face's pose gives none (#7726). Both default to `false` |
 | `asked_s` | Seconds from the start of the lamp's words that asked to the line, when the journal gives them: with `lamp_asked`, the question still waits for the out-of-window answer within `said_to_me::QUESTION_WAITS` (120 s). Not given, it waits no more (the Reviewer-lead's HOLD on #7705) |

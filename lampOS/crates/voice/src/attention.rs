@@ -992,18 +992,10 @@ fn name_said_to(heard: &str, alone: &[&str], recognizer_stand_ins: bool) -> bool
 /// "Hey, Lynn." and "Hey, man." carry the name in their words, and "Okay?"
 /// asks.
 pub(crate) fn short_line_without_the_name(heard: &str) -> bool {
-    let words = crate::not_speech::plain_words(heard).len();
-    (1..=2).contains(&words) && !heard.contains('?') && !names_it_in_words(heard)
-}
-
-/// Whether any word of `heard` is the lamp's name or one written for it
-/// ([`written_for_the_name`]), wherever it stands: what a short line's
-/// words need for a hearing of the name in the room's sound to count
-/// ([`short_line_without_the_name`], #7891).
-pub(crate) fn names_it_in_words(heard: &str) -> bool {
-    crate::not_speech::plain_words(heard)
-        .iter()
-        .any(|word| written_for_the_name(word))
+    let words = crate::not_speech::plain_words(heard);
+    (1..=2).contains(&words.len())
+        && !heard.contains('?')
+        && !words.iter().any(|word| written_for_the_name(word))
 }
 
 /// Whether what was heard is the lamp's name alone, or a word written for
@@ -2113,9 +2105,10 @@ impl Attention {
     /// ([`Self::start_said_to_a_person`]).
     ///
     /// Out of a conversation (`going_on`), a line of one or two words, not
-    /// a question, with nothing written for the name in its words, counts
-    /// the name for nothing whatever its second sign
-    /// ([`short_line_without_the_name`], #7891).
+    /// a question, with nothing written for the name in its words and words
+    /// the rule does not read as a call (`called`, `called_by_name`, the
+    /// owner's language's forms too), counts the name for nothing whatever
+    /// its second sign ([`short_line_without_the_name`], #7891).
     pub fn weigh_the_name(&mut self, turned: Option<bool>, going_on: bool) -> bool {
         let text_calls = if self.name_in_passing_ignored {
             called_by_name(&self.heard)
@@ -2144,8 +2137,10 @@ impl Attention {
         // A short line with nothing written for the name, out of a
         // conversation, is never answered on the hearing alone, whatever
         // its second sign (#7891).
-        self.name_short_dropped =
-            weighed && !in_conversation && short_line_without_the_name(&self.heard);
+        self.name_short_dropped = weighed
+            && !in_conversation
+            && !text_calls
+            && short_line_without_the_name(&self.heard);
         let alone = weighed && (signs.is_empty() || self.name_short_dropped);
         self.name_signs = if weighed && !alone { signs } else { Vec::new() };
         if alone {
