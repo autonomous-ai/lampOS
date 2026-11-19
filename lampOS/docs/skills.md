@@ -5633,8 +5633,10 @@ judge (the 13 Nov rule), and `crate::made_change` does the rest:
   remove takes it with the skill.
 
 To keep `make_skill`'s parameters within 4,096 bytes with every switch on,
-`choice` says "replace the others", and `answer` and `named` lose their
-last sentence (the defaults and the one-skill rule, both held in code).
+`choice` says "replace the others, keep them all, or cancel, as the person
+chose", `answer` loses its examples of a new ask (the note of a wait keeps
+them) and its last sentence, and `named` its last (the defaults and the
+one-skill rule, both held in code).
 Tests: `a_change_is_never_a_remove`, and in `made_change`'s
 `a_change_remakes_the_named_skill_in_place_never_a_second`,
 `a_change_keeps_off_and_put_it_back_restores_the_old_version`,

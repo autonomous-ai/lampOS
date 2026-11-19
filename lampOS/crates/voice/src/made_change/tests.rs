@@ -187,8 +187,8 @@ fn a_change_remakes_the_named_skill_in_place_never_a_second() {
     assert_eq!(asked, vec![json!({ "install_made": entry["sha256"] })]);
     // Its make's own "remove it" is not its undo.
     assert!(
-        !crate::make_no_asks::latest_at(&keeping.directory, crate::app_make::now_unix_ms())
-            .is_some_and(|at| at > entry["old"]["replaced_at_ms"].as_u64().unwrap())
+        crate::make_no_asks::latest_at(&keeping.directory, crate::app_make::now_unix_ms())
+            .is_none_or(|at| at <= entry["old"]["replaced_at_ms"].as_u64().unwrap())
     );
     switches(false);
     let _ = fs::remove_dir_all(&root);
@@ -405,6 +405,10 @@ fn the_tool_takes_a_change_within_the_bound() {
     assert!(remove.contains("stop or change it"), "{remove}");
     assert!(!remove.contains("no change yet"), "{remove}");
     let bytes = parameters.to_string().len();
+    eprintln!(
+        "make_skill: parameters {bytes} bytes, description {} bytes",
+        tool.description.len()
+    );
     assert!(bytes <= 4_096, "{bytes}");
     assert!(
         tool.description.len() <= 1_024,
