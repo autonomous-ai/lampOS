@@ -166,7 +166,7 @@ fn the_gateway_makes_inline_skill_toml_packs() {
 /// (`lamp_tasks::skill_make::MAKE_EXAMPLES`) packs with the real
 /// `lamp-skills pack`, as a skill made on this lamp with
 /// `LAMP_MADE_SKILL_ASKS` on: an example can never be one the check
-/// refuses. It names each of its seven skills once, in order.
+/// refuses. It names each of its ten skills once, in order.
 #[test]
 fn every_gateway_make_example_packs() {
     let dir = tempfile::tempdir().unwrap();
@@ -193,20 +193,30 @@ fn every_gateway_make_example_packs() {
             "breathing-coach",
             "exchange-rate",
             "water-breaks",
+            "agenda-count",
+            "sun-times",
         ]
     );
     // With the internet switch too, as a gateway make whose agent may
-    // write net code is checked (#7742): the exchange-rate example is
-    // granted `net`.
+    // write net code is checked (#7742): the exchange-rate and sun-times
+    // examples are granted `net`; and a linked service's read with the
+    // voice's switch for one on (agenda-count).
+    let asks = (lamp_voice::made_skill::ASKS_ENVIRONMENT, "on".to_owned());
     let on = [
-        (lamp_voice::made_skill::ASKS_ENVIRONMENT, "on".to_owned()),
+        asks.clone(),
         (lamp_tasks::skill_task::NET_SWITCH, "on".to_owned()),
+        (
+            lamp_voice::made_skill::AGENT_SERVICES_ENVIRONMENT,
+            "on".to_owned(),
+        ),
     ];
     for name in names {
         assert!(packs(&examples.join(name), &out, &on), "{name}");
     }
-    // Off, a skill its own words start is refused, as before.
+    // Off, a skill its own words start is refused, as before, and `net`
+    // is no grant where its switch is off.
     assert!(!packs(&examples.join("desk-light"), &out, &[]));
+    assert!(!packs(&examples.join("sun-times"), &out, &[asks]));
 }
 
 /// #7245: a made skill's light show, its own words alone starting it,

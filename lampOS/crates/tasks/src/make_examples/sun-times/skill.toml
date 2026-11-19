@@ -1,0 +1,7 @@
+asks = ["sunset time"]
+kind = "installable"
+version = "1.0.0"
+grants = ["net", "speak"]
+
+[[do]]
+task = { task = "look up today's sunset time here on the web and say it", run = "scripts/main.py" }
