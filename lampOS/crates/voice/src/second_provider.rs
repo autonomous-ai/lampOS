@@ -17178,6 +17178,14 @@ async fn answer(
     let own = written
         .then(|| crate::onboarding::own_words(&said).map(str::to_owned))
         .flatten()
+        // A made skill's line (#7937): its words as written, no chat asked.
+        // Asked of the model beside the conversation, "Here is your daily
+        // brief." was answered as the chat's next line (lamp-9adf, 19 Nov).
+        .or_else(|| {
+            quoted
+                .then(|| crate::say::made_words(&said).map(str::to_owned))
+                .flatten()
+        })
         // A person who talks to the lamp while the first update after setup
         // holds the walk (#6284) hears that it is updating, and no chat.
         .or_else(|| {
@@ -17269,8 +17277,13 @@ async fn answer(
             return Err(Stop::Gone);
         }
         if let Some(words) = own {
+            let whose = if quoted {
+                "a made skill's line"
+            } else {
+                "the onboarding walk's own line"
+            };
             eprintln!(
-                "lamp-voice second: request {request} is the onboarding walk's own line; its words are said, no chat asked"
+                "lamp-voice second: request {request} is {whose}; its words are said, no chat asked"
             );
             shared.emit(ProviderOutput::OwnWordsSaid { request }).await;
             queue.push(words).await?;

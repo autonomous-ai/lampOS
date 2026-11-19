@@ -18346,13 +18346,124 @@ async fn a_made_skills_words_are_asked_with_no_functions_and_run_no_call() {
         0,
         "a made skill's words run no call"
     );
-    assert_eq!(
-        *script.told_only.lock().unwrap(),
-        [&[] as &[&str]],
-        "told no function"
+    // Said as written with no chat asked (#7937): no function is offered.
+    assert!(script.asked.lock().unwrap().is_empty(), "no chat asked");
+    assert!(
+        script.told_only.lock().unwrap().is_empty(),
+        "no function told"
     );
-    let words = format!("{:?}", script.asked.lock().unwrap()[0].last());
-    assert!(words.contains("untrusted"), "{words}");
+}
+
+/// #7937, lamp-9adf on 19 Nov: `daily-brief`, a made skill, had its line
+/// "Here is your daily brief." asked of the model right after a chat about
+/// a cat, with the conversation around it, and the model answered the chat
+/// ("All right, no cat. What turned you off the idea?"). A made skill's
+/// line is said as written, its words alone: the chat is never asked for
+/// it, so nothing said before can turn it into an answer.
+#[tokio::test(start_paused = true)]
+async fn a_made_skills_line_after_a_chat_is_said_as_written_never_an_answer_to_the_chat() {
+    let script = Arc::new(Script {
+        chats: Mutex::new(VecDeque::from([
+            vec![text("A cat could be lovely company."), Ok(ChatEvent::Done)],
+            vec![
+                text("All right, no cat. What turned you off the idea?"),
+                Ok(ChatEvent::Done),
+            ],
+        ])),
+        ..Script::default()
+    });
+    let (engine, calls, _) = scripted(script.clone());
+    let mut engine = engine.announcing(false);
+    engine.submit(written(1, "Should I get a cat?"));
+    let chat = turn(&mut engine).await;
+    assert!(
+        chat.iter().any(|label| label.contains("lovely company")),
+        "{chat:?}"
+    );
+    engine.submit(ProviderInput::Written {
+        search: false,
+        request: 2,
+        session: 1,
+        privacy_generation: 1,
+        text: crate::say::made_turn("Here is your daily brief."),
+        look: false,
+        quoted: true,
+    });
+    let labels = turn_within(&mut engine, Duration::from_secs(10)).await;
+    let said: Vec<_> = labels
+        .iter()
+        .filter(|label| label.starts_with("said:"))
+        .collect();
+    assert_eq!(said, ["said:Here is your daily brief."], "{labels:?}");
+    assert!(labels.contains(&"own_words:2".to_owned()), "{labels:?}");
+    assert!(
+        labels.iter().any(|label| label.starts_with("audio:")),
+        "{labels:?}"
+    );
+    assert_eq!(
+        script.asked.lock().unwrap().len(),
+        1,
+        "the chat's turn alone is asked"
+    );
+    assert_eq!(calls.lock().unwrap().len(), 0, "{labels:?}");
+}
+
+/// #7937's second case, the first builder at 16:44 on 19 Nov (lamp-06c1,
+/// stock 14521): a skill's line asked of a reply model that had not begun
+/// within 3 s (a new chat connection took 2.3 s) was dropped as
+/// `no_audio_answer`. A made skill's line is said by the voice directly:
+/// its first audio comes as soon as the speech service's, however slow the
+/// model is to start, or if it never starts.
+#[tokio::test(start_paused = true)]
+async fn a_made_skills_line_is_said_at_once_when_the_model_is_slow_or_never_starts() {
+    for never in [false, true] {
+        let script = Arc::new(Script {
+            chats: Mutex::new(VecDeque::from([vec![
+                text("Something else entirely."),
+                Ok(ChatEvent::Done),
+            ]])),
+            hold_chat: never,
+            first_event_after: Some(Duration::from_secs(if never { 3_600 } else { 5 })),
+            speech_after: Some(Duration::from_millis(300)),
+            ..Script::default()
+        });
+        let (engine, _, _) = scripted(script.clone());
+        let mut engine = engine.announcing(false);
+        let asked = tokio::time::Instant::now();
+        engine.submit(ProviderInput::Written {
+            search: false,
+            request: 1,
+            session: 1,
+            privacy_generation: 1,
+            text: crate::say::made_turn("Time for a stretch."),
+            look: false,
+            quoted: true,
+        });
+        let first_audio = tokio::time::timeout(Duration::from_secs(3), async {
+            loop {
+                if let ProviderOutput::Audio { .. } = engine.next().await {
+                    return asked.elapsed();
+                }
+            }
+        })
+        .await
+        .unwrap_or_else(|_| panic!("never: {never}: no audio within 3 s"));
+        assert!(
+            first_audio <= Duration::from_millis(400),
+            "never: {never}: first audio after {first_audio:?}"
+        );
+        let labels = turn_within(&mut engine, Duration::from_secs(10)).await;
+        assert!(
+            labels.iter().all(|label| !label.contains("Something else")),
+            "never: {never}: {labels:?}"
+        );
+        assert_eq!(
+            *script.spoken.lock().unwrap(),
+            ["Time for a stretch."],
+            "never: {never}"
+        );
+        assert!(script.asked.lock().unwrap().is_empty(), "never: {never}");
+    }
 }
 
 /// A bounded local peer for the real second-route tool dispatcher. It is
