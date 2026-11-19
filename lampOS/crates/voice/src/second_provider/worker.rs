@@ -3424,6 +3424,8 @@ pub fn serve(
     let system: crate::second_provider::System = Arc::new(system);
     // The relay's routes, asked on the runtime below (#2882).
     let routes_task = net.routes_task();
+    // Forgets reach the account's history (`LAMP_HISTORY_FORGET`, #7771).
+    let history_forget_task = net.history_forget_task();
     crate::cut_in_told::marking_cut_answers(files.cut_in_told);
     let mut engine = Engine::new(
         Arc::new(net),
@@ -5669,6 +5671,12 @@ pub fn serve(
         .enable_all()
         .build()?;
     if let Some(task) = routes_task {
+        runtime.spawn(task);
+    }
+    if let Some(task) = history_forget_task {
+        eprintln!(
+            "lamp-voice second: what a forget removes reaches the account's history (LAMP_HISTORY_FORGET)"
+        );
         runtime.spawn(task);
     }
     if let Some((bus, told)) = air {

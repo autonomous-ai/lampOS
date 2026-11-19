@@ -7,6 +7,7 @@ use std::{fmt, sync::Arc, time::Duration};
 
 mod chat;
 mod gemini_tts;
+pub mod history;
 pub mod key_terms;
 mod public;
 pub mod routes;

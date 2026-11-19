@@ -229,6 +229,43 @@ the app (lamp-cloud's `faces.rs`) and one asked by voice
   memory doesn't make), and each protocol's
   `only_a_forget_all_that_was_done_says_whose`.
 
+## Forgets reach the account's history (`LAMP_HISTORY_FORGET`)
+
+With `LAMP_HISTORY_FORGET=on` (off unless set, in no unit; #7771), what a
+forget removes on the lamp is deleted from the conversation history the
+account keeps too (the lamp's cloud API, `POST …/history/turns/delete`).
+- **What memory says:** with `--memory-days`, the answer to `forget`,
+  `forget_last`, `forget_all`, `forget_said` and `exchanges_forget` names the
+  exchanges it removed, by scope and id: `"exchanges":{"p-…":[4,6],
+  "everyone":[3]}`. Ids only, never words. A `forget_all`'s own person is
+  left out (the voice deletes that person's whole history), so it names only
+  the room's lines it took with them. At most 400 ids an answer; a scope with
+  more is named in `"exchanges_cut"` instead. Nothing removed, no field. The
+  legacy store names none.
+- **What the voice queues** (the second route's worker, `history_forget`):
+  for a known person's forget everything, `{"all":true,"person":<their p-
+  id>}`; for every other forget, `{"ids":[…]}` of the exchanges named, each
+  turn id `<scope>:<id>` (`history_forget::turn_id`, which the turn's save
+  mints the same way). The person key is memory's own scope id: a known
+  person's `p-` id, `""` for the room's. A delete of everything is never
+  sent without a person. A cut scope is that person's whole history.
+- **Never on the reply's way:** "forgotten" follows the lamp's own delete, as
+  before. The queue is a file in the voice's state folder
+  (`/var/lib/lampOS/voice/history-forget.json`, 0600), kept across a
+  restart, at most 500 ids (past it, the person just added, then whoever has
+  most, is coalesced into their whole history), sent in the background with
+  the lamp's key in `x-api-key`, 100 ids a call.
+- **Done or kept:** a 2xx answer is done (`deleted` and `missing`, `missing`
+  meaning already gone; `deleted_count`; `{"enabled":false}`, the account
+  keeps no history). A 400 is let go. No answer, 5xx and any other status
+  keep the call, tried again after 5 s, doubling to 15 minutes. The journal
+  says counts only.
+- **Not covered yet:** the app's removal of a person (`forget_person`, asked
+  by lamp-cloud) and a forget on the Live route.
+- **Tests:** `history_forget`'s and `second_provider::net::history`'s (a
+  fake server), and `days_protocol`'s
+  `a_forget_names_the_exchanges_it_removed_by_scope_and_id`.
+
 ## Forgetting a person
 
 The app's removal of a person (lamp-cloud's `face.remove` with `entirely`,

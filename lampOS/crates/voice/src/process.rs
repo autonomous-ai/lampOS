@@ -3008,6 +3008,8 @@ fn second_route_worker_environment(
         crate::second_provider::HISTORY_AFTER_NOTE_ENVIRONMENT,
         // A recent exchange told once, as history, not again (#6218).
         crate::second_provider::HISTORY_SAID_ONCE_ENVIRONMENT,
+        // What a forget removes reaches the account's history (#7771).
+        crate::history_forget::ENVIRONMENT,
         crate::second_provider::PERSON_SCOPE_ONE_FACE_ENVIRONMENT,
         // A one-face line read as its person's, forgets refused (#5522).
         crate::second_provider::PERSON_SCOPE_ONE_FACE_READS_ENVIRONMENT,
@@ -3378,6 +3380,7 @@ mod tests {
             crate::owner_link::ENVIRONMENT,
             crate::second_provider::RENAME_SHORT_YES_ENVIRONMENT,
             crate::light_told::ENVIRONMENT,
+            crate::history_forget::ENVIRONMENT,
         ] {
             let var = |asked: &str| (asked == name).then(|| std::ffi::OsString::from("on"));
             assert_eq!(
