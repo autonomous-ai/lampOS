@@ -54,6 +54,7 @@ use super::worker::{ChatRoute, RouteFlags, relay_routable};
 
 pub mod cache;
 pub mod cut_in;
+pub mod doubt;
 pub mod handover;
 pub mod keep_quietly;
 pub mod kept_earlier;
