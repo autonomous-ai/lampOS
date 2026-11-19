@@ -3832,7 +3832,7 @@ các kỹ năng nạp và chạy y hệt từng byte như trước. `lamp_skills
   như câu say của nó, cho kỹ năng mà các bước nêu trigger: mỗi câu như vậy một
   task, mỗi task một mình trong bảng của nó trừ `on` (chỉ trong biến thể; mọi kỹ
   năng khác giữ một `do.task`).
-- **Biến thể** (`agent.toml` cạnh `skill.toml`, và `scripts/agent.py`): nó chỉ
+- **Biến thể** (`agent.toml` cạnh `skill.toml`, và, trên đèn, `scripts/agent.py`): nó chỉ
   thay `grants`, `[[do]]` và `[[present.do]]` (`core_agent::overlaid`), nên
   trigger và guard không bao giờ bị chép lại. Nó chỉ được đọc khi đúng y của bản
   thử nghiệm: `grants = []`; các `task = { task, run = "scripts/agent.py" }` của nó, là
@@ -3855,6 +3855,19 @@ các kỹ năng nạp và chạy y hệt từng byte như trước. `lamp_skills
   mục khác cần cái gật đầu của chủ đèn như trước. 20 lần chạy một ngày cho mỗi
   kỹ năng và mỗi lần một lần chạy vẫn giữ như mọi `do.task`. Chưa có trong bản
   cài của sản phẩm: trên đèn, hai tệp được chép cạnh kỹ năng.
+- **Lời dặn không bao giờ là một tệp trong thư mục kỹ năng của repo** (#7862,
+  train 1074): kiểm tra của SDK từ chối script trong một kỹ năng ("a script;
+  script skills are a later format", `lampos.skillcheck`) và giữ mọi kỹ năng
+  của Store và của nhà phát triển theo quy tắc đó, không đổi. lamp-skills giữ
+  lời dặn của mỗi kỹ năng thử nghiệm trong mã nguồn của chính nó
+  (`crates/skills/src/core_agent/briefs/`, `<name>.py`, được một test ghim
+  từng byte vào `core_agent::script`), và bản cài của sản phẩm
+  (`install::core_brief!`) cùng bundle của bản dựng (`product_skills::make`,
+  cạnh `agent.toml` của thư mục) ghi nó vào `scripts/agent.py` trên đèn. Meal
+  check và Quiet focus đến từ Store, nơi không đặt lời dặn nào, nên ở đó chúng
+  giữ câu của riêng mình. Workflow của SDK chạy với mọi thay đổi trong
+  `lampOS/skills/**`, nên thay đổi của một kỹ năng gặp kiểm tra mọi kỹ năng
+  ngay trên pull request của nó.
 - **Mỗi lần kích hoạt**: `do.task` của nó được giao cho lamp-tasks trên luồng
   riêng, như mọi task, và câu say của lần kích hoạt chờ câu của nó trên luồng
   riêng của lần chạy, không bao giờ trên vòng lặp của trigger.

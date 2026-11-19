@@ -7,6 +7,8 @@ name: lampOS SDKs
 # `copies` job fails at once if the three differ: a schema change that missed
 # a copy broke #3759 and #3805 on 27 Oct, with no job to catch it (the
 # coordinator's decision, with blue's person, on #3504).
+# `lampOS/skills/**` too, so a skill's change meets the every-skill check
+# (`test_every_skill_in_the_repo_passes`) on its own pull request (#7862).
 on:
   pull_request:
     branches: [lamp-voice]
@@ -14,6 +16,7 @@ on:
       - 'lampOS/sdk/**'
       - 'lampOS/docs/control*'
       - 'lampOS/docs/skill-format*'
+      - 'lampOS/skills/**'
       - '.github/workflows/lampos-sdk.yml'
   push:
     branches: [lamp-voice]
@@ -21,6 +24,7 @@ on:
       - 'lampOS/sdk/**'
       - 'lampOS/docs/control*'
       - 'lampOS/docs/skill-format*'
+      - 'lampOS/skills/**'
       - '.github/workflows/lampos-sdk.yml'
 
 permissions:

@@ -118,9 +118,22 @@ fn the_pilots_by_group_their_briefs_byte_for_byte() {
         assert!(pilot(left).is_none(), "{left}");
     }
     for pilot in &PILOTS {
+        // No skill folder of the repository carries a script (the SDK's
+        // check, #7862): install and the bundle write the brief.
         let folder = skills_root().join(pilot.name);
-        let written = fs::read_to_string(folder.join(RUN)).unwrap();
-        assert_eq!(written, script(pilot), "{}", pilot.name);
+        assert!(!folder.join(RUN).exists(), "{}", pilot.name);
+        assert!(folder.join(OVERLAY).is_file(), "{}", pilot.name);
+        let written = script(pilot);
+        // The lamp's own copy install and the bundle write, this crate's.
+        let kept = Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("src/core_agent/briefs")
+            .join(format!("{}.py", pilot.name));
+        assert_eq!(
+            fs::read_to_string(&kept).unwrap(),
+            written,
+            "{}",
+            pilot.name
+        );
         assert!(written.starts_with("print(\"") && written.ends_with("\")\n"));
         let inside = &written["print(\"".len()..written.len() - "\")\n".len()];
         assert!(
@@ -145,7 +158,7 @@ fn the_pilots_by_group_their_briefs_byte_for_byte() {
 fn with_the_switch_on_the_trigger_guards_and_timing_are_the_core_ones() {
     for pilot in &PILOTS {
         let _on = On::new(true);
-        let folder = skills_root().join(pilot.name);
+        let (_root, folder) = whole(pilot.name);
         let core = table_of(&fs::read_to_string(folder.join("skill.toml")).unwrap());
         let variant = overlaid(pilot.name, &folder, &core)
             .unwrap()
@@ -197,13 +210,14 @@ fn a_variant_not_exactly_the_pilots_leaves_the_core_skill_as_it_is() {
         let root = tempfile::tempdir().unwrap();
         let folder = root.path().join(name);
         fs::create_dir_all(folder.join("scripts")).unwrap();
-        for file in ["skill.toml", "SKILL.md", OVERLAY, RUN] {
+        for file in ["skill.toml", "SKILL.md", OVERLAY] {
             fs::copy(
                 skills_root().join("sip-of-water").join(file),
                 folder.join(file),
             )
             .unwrap();
         }
+        fs::write(folder.join(RUN), script(pilot("sip-of-water").unwrap())).unwrap();
         (root, folder)
     };
     let (_root, folder) = copy("sip-of-water");
@@ -282,7 +296,7 @@ fn the_switch_turns_on_the_groups_it_names() {
 fn each_fire_hands_the_agent_its_task() {
     let _on = On::new(true);
     for pilot in &PILOTS {
-        let folder = skills_root().join(pilot.name);
+        let (_root, folder) = whole(pilot.name);
         let mut fires = 0;
         for entry in fs::read_dir(folder.join("tests")).unwrap().flatten() {
             let case = entry.path();
@@ -345,7 +359,7 @@ fn each_fire_hands_the_agent_its_task() {
 #[test]
 fn each_skills_own_tests_pass_against_the_new_form() {
     for pilot in &PILOTS {
-        let folder = skills_root().join(pilot.name);
+        let (_root, folder) = whole(pilot.name);
         let off = {
             let _off = On::new(false);
             run_tests(&folder).unwrap()
@@ -499,11 +513,16 @@ fn an_empty_answer_says_the_skills_own_line_at_once() {
     assert_eq!(heard(task::told(&long)), Heard::Nothing(TOO_LONG));
 }
 
-/// A copy of `name`'s whole folder, its variant beside it.
+/// A copy of `name`'s whole folder, its variant beside it and its brief
+/// written, as install and the bundle place it on a lamp.
 fn whole(name: &str) -> (tempfile::TempDir, PathBuf) {
     let root = tempfile::tempdir().unwrap();
     let folder = root.path().join(name);
     copy_folder(&skills_root().join(name), &folder);
+    if let Some(pilot) = pilot(name) {
+        fs::create_dir_all(folder.join("scripts")).unwrap();
+        fs::write(folder.join(RUN), script(pilot)).unwrap();
+    }
     (root, folder)
 }
 

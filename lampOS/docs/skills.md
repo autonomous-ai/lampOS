@@ -2271,7 +2271,7 @@ load and run byte for byte as before. `lamp_skills::core_agent`.
   its say does, for a skill whose steps name theirs: one task for each such
   line, each alone in its table but for its `on` (only in a variant; any
   other skill keeps one `do.task`).
-- **The variant** (`agent.toml` beside `skill.toml`, and
+- **The variant** (`agent.toml` beside `skill.toml`, and, on a lamp,
   `scripts/agent.py`): it stands in for `grants`, `[[do]]` and
   `[[present.do]]` alone (`core_agent::overlaid`), so the trigger and the
   guards are never copied. It is read only while it is exactly the pilot's:
@@ -2295,6 +2295,18 @@ load and run byte for byte as before. `lamp_skills::core_agent`.
   other folder needs the owner's yes, as before. The day's 20 runs a skill
   and one run at a time hold as for every `do.task`. Not yet in the
   product's install: on a lamp the two files are copied beside the skill.
+- **The brief is never a file of the repository's skill folder** (#7862,
+  train 1074): the SDK's check refuses a script in a skill ("a script;
+  script skills are a later format", `lampos.skillcheck`) and holds every
+  Store and developer skill to it, unchanged. lamp-skills keeps each
+  pilot's brief in its own source (`crates/skills/src/core_agent/briefs/`,
+  `<name>.py`, pinned byte for byte to `core_agent::script` by a test), and
+  the product's install (`install::core_brief!`) and the build's bundle
+  (`product_skills::make`, beside a folder's `agent.toml`) write it to
+  `scripts/agent.py` on a lamp. Meal check and Quiet focus come from the
+  Store, which places no brief, so they keep their own line there. The SDK
+  workflow runs on every change to `lampOS/skills/**`, so a skill's change
+  meets the every-skill check on its own pull request.
 - **Each fire**: its `do.task` is handed to lamp-tasks on its own thread, as
   every task is, and the fire's say waits for its line on the run's own
   thread, never the trigger's loop.
