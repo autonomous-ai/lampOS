@@ -21,8 +21,12 @@
 //!    18 Nov). A pose unread lets it out ([`Said::PoseUnread`]);
 //! 3. **said to the lamp:** a face turned to it, facing (pitch inside
 //!    [`PITCH_DEG`] and not looking away, when the eyes say so), seen
-//!    speaking the line, and at least [`SHORT_WORDS`] + 1 words, or a
-//!    question (a `?` in it; no phrase list decides what a line means).
+//!    speaking the line in at least [`FACING_LOOKS`] looks while facing,
+//!    and at least [`SHORT_WORDS`] + 1 words, or a question (a `?` in it;
+//!    no phrase list decides what a line means); never after a second
+//!    voice in the room ([`Line::second_voice`]), whatever the facing: in
+//!    a meeting someone across the desk talks to the room facing the lamp
+//!    (#7891).
 //!
 //! Never held while the lamp waits for a yes or no of its own asking (a
 //! held rename, forget or setup save, a read-back's send, a skill's yes:
@@ -55,6 +59,14 @@ pub const ENVIRONMENT: &str = "LAMP_SAID_TO_ME";
 
 /// A line of this many words or fewer is a short line.
 pub const SHORT_WORDS: usize = 2;
+
+/// The fewest looks of a line, out of a conversation's window, that read
+/// the face turned to the lamp speaking while facing it for the line to be
+/// said to the lamp on its face alone (`said to the lamp, facing and seen
+/// speaking`). One frame of a moving mouth is not: on lamp-74ff on 19 Nov
+/// meeting talk with no name and no window was let through on one look
+/// (#7891, request 151, the first builder at 11:20).
+pub const FACING_LOOKS: usize = 2;
 
 /// How long, from the start of the lamp's words that asked, its question
 /// still waits for a bare yes or no out of the window: as long as the lamp
@@ -123,6 +135,12 @@ pub enum Held {
     /// A face seen speaking it, but [`SHORT_WORDS`] words or fewer, and no
     /// `?`.
     Short,
+    /// Out of the window, the turned face read speaking while facing in
+    /// fewer than [`FACING_LOOKS`] looks (#7891).
+    FewLooks,
+    /// Out of the window, a second voice in the room lately
+    /// ([`Line::second_voice`], #7891).
+    SecondVoice,
 }
 
 impl Held {
@@ -135,6 +153,8 @@ impl Held {
             Self::AwayInConversation => "held: looking away in a conversation",
             Self::NotSeenSpeaking => "held: no face seen speaking it",
             Self::Short => "held: a short line",
+            Self::FewLooks => "held: seen speaking facing in fewer than 2 looks",
+            Self::SecondVoice => "held: a second voice in the room",
         }
     }
 }
@@ -177,6 +197,14 @@ pub struct Line<'a> {
     /// (`speaking_faces::SpeakingFaces::read_silent_between`). No face, no
     /// eyes or a mouth never read is not: unknown blocks nothing.
     pub read_silent: bool,
+    /// How many looks of it read the face turned to the lamp speaking while
+    /// facing (`speaking_faces::SpeakingFaces::turned_speaking_facing_looks`).
+    pub facing_looks: usize,
+    /// A second voice in the room within `room_told::BUSY_ENDS_AFTER_US`
+    /// before it, as the worker knows one (`Heeding::second_voice_at`): a
+    /// line in another voice than the conversation's, or seen spoken by two
+    /// faces (#7891).
+    pub second_voice: bool,
 }
 
 impl Line<'_> {
@@ -213,6 +241,7 @@ impl Line<'_> {
             looking,
             seen_speaking: eyes.seen_speaking_between(from, to, self.turned && !self.going_on),
             read_silent: eyes.read_silent_between(from, to),
+            facing_looks: eyes.turned_speaking_facing_looks(from, to),
             ..self
         };
         (line, looks, skipped)
@@ -290,6 +319,10 @@ pub fn judge(line: Line<'_>) -> Said {
     if line.question_waits && bare_yes_or_no(line.heard) {
         return Said::InConversation;
     }
+    // After a second voice in the room, facing is no sign at all (#7891).
+    if line.second_voice {
+        return Said::Held(Held::SecondVoice);
+    }
     if outside_pitch(line.pitch) {
         Said::Held(Held::NotFacingPitch)
     } else if line.looking == Some(false) {
@@ -298,6 +331,8 @@ pub fn judge(line: Line<'_>) -> Said {
         Said::Held(Held::NotSeenSpeaking)
     } else if words <= SHORT_WORDS && !line.heard.contains('?') {
         Said::Held(Held::Short)
+    } else if line.facing_looks < FACING_LOOKS {
+        Said::Held(Held::FewLooks)
     } else {
         Said::ToTheLamp
     }
@@ -342,7 +377,7 @@ fn named(line: Line<'_>) -> bool {
 }
 
 /// A pitch (radians) outside [`PITCH_DEG`]; unknown is not.
-fn outside_pitch(pitch: Option<f32>) -> bool {
+pub(crate) fn outside_pitch(pitch: Option<f32>) -> bool {
     pitch.is_some_and(|pitch| !PITCH_DEG.contains(&pitch.to_degrees()))
 }
 
@@ -350,13 +385,53 @@ fn outside_pitch(pitch: Option<f32>) -> bool {
 mod tests {
     use super::*;
 
+    /// Seen speaking in [`FACING_LOOKS`] looks, or not at all.
     fn facing(heard: &str, seen_speaking: bool) -> Line<'_> {
         Line {
             heard,
             turned: true,
             seen_speaking,
+            facing_looks: if seen_speaking { FACING_LOOKS } else { 0 },
             ..Line::default()
         }
+    }
+
+    /// #7891 (lamp-74ff, 19 Nov, request 151): out of the window, meeting
+    /// talk seen speaking facing the lamp in one look is held; in two it is
+    /// said to the lamp. After a second voice in the room it is held
+    /// whatever the facing, but the name, the window and a bare yes to the
+    /// lamp's pending question stand as before.
+    #[test]
+    fn facing_alone_needs_two_looks_and_no_second_voice() {
+        let meeting = "They can do a and terminal. Hey. I terminate. Okay.";
+        let once = Line {
+            facing_looks: 1,
+            ..facing(meeting, true)
+        };
+        assert_eq!(judge(once), Said::Held(Held::FewLooks));
+        assert_eq!(judge(facing(meeting, true)), Said::ToTheLamp);
+        let second = |line: Line<'static>| Line {
+            second_voice: true,
+            ..line
+        };
+        assert_eq!(
+            judge(second(facing(meeting, true))),
+            Said::Held(Held::SecondVoice)
+        );
+        assert_eq!(
+            judge(second(facing("Hey Lamp, what is one plus one?", true))),
+            Said::Stands
+        );
+        let window = Line {
+            going_on: true,
+            ..second(facing(meeting, true))
+        };
+        assert_eq!(judge(window), Said::PoseUnread);
+        let answer = Line {
+            question_waits: true,
+            ..second(facing("Yes.", false))
+        };
+        assert_eq!(judge(answer), Said::InConversation);
     }
 
     /// #7442's rules, one by one.

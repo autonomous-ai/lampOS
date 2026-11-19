@@ -247,6 +247,10 @@ struct Look {
     /// The faces turned to the lamp whose mouth was not read (`unknown`, or
     /// not judged at all) in this look.
     turned_unread: Vec<String>,
+    /// Of those, the ones whose mouth was not judged at all (no `speaking`:
+    /// the eyes' speaking read off), for
+    /// [`SpeakingFaces::turned_never_seen_speaking`].
+    turned_unjudged: Vec<String>,
     /// Of the faces turned to the lamp, the one read speaking, when the eyes
     /// gave its head pitch or gaze: its `pitch` (radians, down positive) and
     /// `looking`, both from that face (`LAMP_EYES_PITCH_GAZE`,
@@ -454,6 +458,11 @@ impl SpeakingFaces {
             .filter(|face| !matches!(state(face), Some(SpeakingState::Yes | SpeakingState::No)))
             .map(|face| face.id.clone())
             .collect();
+        let turned_unjudged = turned_faces
+            .iter()
+            .filter(|face| state(face).is_none())
+            .map(|face| face.id.clone())
+            .collect();
         // The pose of the one turned face read speaking, pitch and gaze
         // from that face alone: a bystander turned to the lamp says nothing
         // about the speaker (Seventh's P2 on #7457). None with no such face
@@ -517,6 +526,7 @@ impl SpeakingFaces {
             turned,
             turned_silent,
             turned_unread,
+            turned_unjudged,
             turned_pose,
             speaker_pose,
             speaker_lone,
@@ -1029,6 +1039,55 @@ impl SpeakingFaces {
             && !self
                 .counted(from, to, |look| look.turned_silent.clone())
                 .is_empty()
+    }
+
+    /// Whether a face was turned to the lamp from `from` to `to` and none
+    /// turned to it was seen speaking: no turned face read `yes` in any look,
+    /// a face the eyes read still or could not read (`unknown`) both count as
+    /// not speaking (`LAMP_TURNED_FACE_SPEAKS`, #7891: on lamp-74ff on 19 Nov
+    /// "Is it after all?" was let out by a turned face read in 8 looks,
+    /// speaking in 0, unread in 8). As [`Self::turned_not_seen_speaking`],
+    /// and more. A turned face whose mouth the eyes never judged through the
+    /// line (no `speaking` at all, `LAMP_EYES_SPEAKING` off) says nothing, so
+    /// never true while one is there.
+    pub fn turned_never_seen_speaking(&self, from: Instant, to: Instant) -> bool {
+        self.looks.lock().is_ok_and(|looks| {
+            let during = || {
+                looks
+                    .kept
+                    .iter()
+                    .filter(|look| look.at >= from && look.at <= to)
+            };
+            let judged = |id: &String| {
+                during().any(|look| {
+                    look.turned_silent.contains(id)
+                        || look.turned_unread.contains(id) && !look.turned_unjudged.contains(id)
+                })
+            };
+            during().any(|look| !look.turned_silent.is_empty() || !look.turned_unread.is_empty())
+                && !during().any(|look| !look.turned.is_empty())
+                && during()
+                    .flat_map(|look| &look.turned_unjudged)
+                    .all(judged)
+        })
+    }
+
+    /// How many looks from `from` to `to` read a face turned to the lamp
+    /// speaking while it faced the lamp: the turned face read `yes`, its
+    /// pitch inside `said_to_me::PITCH_DEG` and not looking away when the
+    /// eyes give them (unknown blocks nothing) (`LAMP_SAID_TO_ME`, #7891).
+    pub fn turned_speaking_facing_looks(&self, from: Instant, to: Instant) -> usize {
+        self.looks.lock().map_or(0, |looks| {
+            looks
+                .kept
+                .iter()
+                .filter(|look| look.at >= from && look.at <= to && !look.turned.is_empty())
+                .filter(|look| {
+                    !crate::said_to_me::outside_pitch(look.turned_pose.0)
+                        && look.turned_pose.1 != Some(false)
+                })
+                .count()
+        })
     }
 
     /// Whether a face was seen speaking from `from` to `to`: read `yes` in
@@ -2678,6 +2737,29 @@ mod tests {
             "f1 with a few unread looks"
         );
         assert!(!not_seen(&[missed; 4]), "f1 never read");
+    }
+
+    /// #7891 (lamp-74ff, request 65, "speaking in 0, unread in 8"): for
+    /// `LAMP_TURNED_FACE_SPEAKS` a turned face the eyes judged and never
+    /// read is not seen speaking, alone or beside a still one; one read
+    /// speaking in any look is; a face whose speaking was never judged at
+    /// all (`LAMP_EYES_SPEAKING` off) says nothing; no turned face, nothing.
+    #[test]
+    fn a_turned_face_never_read_speaking_is_not_seen_speaking() {
+        let never = |looks: &[&[TurnedFace]]| {
+            let (eyes, from, to) = turned_seen(looks);
+            eyes.turned_never_seen_speaking(from, to)
+        };
+        let missed: &[TurnedFace] = &[("f1", Some(Unknown), true)];
+        assert!(never(&[missed; 8]), "request 65");
+        let beside: &[TurnedFace] = &[("f1", Some(No), true), ("f2", Some(Unknown), true)];
+        assert!(never(&[beside; 4]), "beside a still face");
+        let spoke: &[TurnedFace] = &[("f1", Some(Yes), true)];
+        assert!(!never(&[missed, missed, spoke, missed]), "seen speaking");
+        let unjudged: &[TurnedFace] = &[("f1", None, true)];
+        assert!(!never(&[unjudged; 4]), "no speaking read");
+        let away: &[TurnedFace] = &[("f1", Some(Unknown), false)];
+        assert!(!never(&[away; 4]), "nobody turned");
     }
 
     /// `LAMP_TURNED_SPEAKING` (lamp-4ace, 21 Oct 14:00): the faces turned to
