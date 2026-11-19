@@ -85,7 +85,7 @@ chạy đang chạy (`{"ended": false}` nếu không có): `acts` là số hành
 một lượt, đèn, một cảm xúc, một cử chỉ, một cái nhìn, một chuyển động hay
 chuyển động đã ghi, các khớp, âm lượng, luồng loa bật, một lần ghi dịch vụ,
 và một câu nói, âm thanh hay lượt bị giờ yên lặng từ chối ở cửa; không bao giờ
-là một lần đọc hay lời từ chối khác; `Runs::count_act`, giữ qua lần cấp lại
+là một lần đọc, hay một yêu cầu bị cửa từ chối vì grant, lease hay thân đèn đang bận; một câu nói, âm thanh hay lần ghi dịch vụ được tính ngay khi cửa chuyển đi, trước khi giọng nói hay lamp-services trả lời, nên nếu chúng từ chối sau đó thì vẫn được tính; `Runs::count_act`, giữ qua lần cấp lại
 token), `says` là số dòng `say` của lần chạy mà giọng nói đã nhận (đã bắt đầu
 nói, `begun`, hoặc trả lời bất kỳ cách nào trừ từ chối: đã nói, hoặc bị bỏ,
 hết hạn hay buông trước khi bắt đầu, hoặc bị cắt; không bao giờ là câu bị từ
