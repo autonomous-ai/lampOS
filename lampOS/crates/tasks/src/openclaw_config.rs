@@ -451,6 +451,23 @@ pub fn validate(validator: &Path, file: &Path) -> Result<(), String> {
     }
 }
 
+/// [`write_checked`] tried again after each of `waits` while OpenClaw's
+/// gateway is not there to check the text.
+#[allow(clippy::too_many_arguments)]
+pub fn write_waiting(
+    state_dir: &Path,
+    port: u16,
+    workspace: &Path,
+    skills: bool,
+    v1: bool,
+    validator: &Path,
+    waits: &[Duration],
+    say: &mut dyn FnMut(&str),
+) -> io::Result<bool> {
+    let _ = (waits, say);
+    write_checked(state_dir, port, workspace, skills, v1, validator)
+}
+
 /// The lamp's guidance for OpenClaw: the same words as Hermes'
 /// ([`crate::hermes_config::guidance_for`]), with OpenClaw's own name and
 /// state folder.
@@ -862,5 +879,82 @@ mod tests {
 
         assert!(write(&dir.path().join("none")).unwrap());
         assert_eq!(fs::read_to_string(&path).unwrap(), given);
+    }
+
+    /// #7268's HOLD at 950bb215dd: lamp-tasks can start before OpenClaw's
+    /// gateway (at a boot, or an update that restarts both), and the
+    /// check fails closed with no gateway. So the write is tried again
+    /// while the wrapper finds no gateway, after each of a bounded list of
+    /// waits: nothing is written before the gateway is there, then the
+    /// text lands through the check. Past the last wait it fails as
+    /// before; a text OpenClaw refuses is never tried again.
+    #[test]
+    fn a_write_waits_for_the_gateway_bounded() {
+        let dir = tempfile::tempdir().unwrap();
+        let state = dir.path().join("state");
+        fs::create_dir_all(&state).unwrap();
+        let path = state.join(CONFIG_FILE);
+        let verdict = dir.path().join("verdict");
+        let running = dir.path().join("running");
+        let wrapper = dir.path().join("openclaw");
+        fs::write(
+            &wrapper,
+            format!(
+                "#!/bin/sh\n[ -e {running} ] || {{ echo 'openclaw: its gateway (lamp-openclaw-gateway.service) is not running in its own namespaces; nothing runs without it'; exit 1; }}\necho 'models.providers.lampos: Unrecognized key'\nexit \"$(cat {verdict})\"\n",
+                running = running.display(),
+                verdict = verdict.display()
+            ),
+        )
+        .unwrap();
+        fs::set_permissions(&wrapper, fs::Permissions::from_mode(0o755)).unwrap();
+        fs::write(&verdict, "0").unwrap();
+        let waits = [Duration::from_millis(1); 3];
+        let write = |say: &mut dyn FnMut(&str)| {
+            write_waiting(
+                &state,
+                7741,
+                Path::new(WORKSPACE),
+                true,
+                true,
+                &wrapper,
+                &waits,
+                say,
+            )
+        };
+
+        // No gateway at the start: nothing written, a try pending; the
+        // gateway comes up during the second wait, and the text lands.
+        fs::write(&path, INSTALLED).unwrap();
+        let mut said = Vec::new();
+        let written = write(&mut |line| {
+            assert_eq!(fs::read_to_string(&path).unwrap(), INSTALLED);
+            assert_eq!(fs::read_dir(&state).unwrap().count(), 1);
+            said.push(line.to_owned());
+            if said.len() == 2 {
+                fs::write(&running, "").unwrap();
+            }
+        });
+        assert!(written.unwrap());
+        assert_eq!(said.len(), 2, "{said:?}");
+        assert!(said[0].contains("gateway"), "{said:?}");
+        assert_ne!(fs::read_to_string(&path).unwrap(), INSTALLED);
+
+        // Never a gateway: tried once and after each wait, then refused.
+        fs::remove_file(&running).unwrap();
+        fs::write(&path, INSTALLED).unwrap();
+        let mut tries = 0;
+        let error = write(&mut |_| tries += 1).unwrap_err().to_string();
+        assert_eq!(tries, waits.len());
+        assert!(error.contains("is not running"), "{error}");
+        assert_eq!(fs::read_to_string(&path).unwrap(), INSTALLED);
+
+        // A text refused with the gateway there is not tried again.
+        fs::write(&running, "").unwrap();
+        fs::write(&verdict, "1").unwrap();
+        let mut tries = 0;
+        let error = write(&mut |_| tries += 1).unwrap_err().to_string();
+        assert_eq!(tries, 0);
+        assert!(error.contains("Unrecognized key"), "{error}");
+        assert_eq!(fs::read_to_string(&path).unwrap(), INSTALLED);
     }
 }
