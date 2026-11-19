@@ -1412,18 +1412,25 @@ fn the_factorys_acceleration_drop_in_is_admitted_and_moved_aside() {
 /// mode override, refused before anything is written, as before.
 #[test]
 fn any_other_change_in_a_body_drop_in_is_still_refused() {
-    for change in ["extra", "speed"] {
+    for change in ["extra", "speed", "unit", "run"] {
         let mut lamp = old_product(true);
         publish_readers(&mut lamp, true, true, true);
         let mut drop_in = acceleration_drop_in(&lamp, "50");
+        let mut place = DROP_IN.to_owned();
         match change {
             "extra" => drop_in.push_str("Environment=OTHER=x\n"),
-            _ => drop_in = drop_in.replace("--speed 120", "--speed 999"),
+            "speed" => drop_in = drop_in.replace("--speed 120", "--speed 999"),
+            // Another section beside it (sim-2's P3 on #7950).
+            "unit" => drop_in = format!("[Unit]\nDescription=x\n{drop_in}"),
+            // Anywhere but lamp-body's own folder under /etc, where the
+            // round moves it from (sim-2's P2 on #7950).
+            _ => place = DROP_IN.replace("etc/systemd", "run/systemd"),
         }
-        fs::create_dir_all(lamp.root.join("etc/systemd/system/lamp-body.service.d")).unwrap();
-        fs::write(lamp.root.join(DROP_IN), &drop_in).unwrap();
+        let path = lamp.root.join(&place);
+        fs::create_dir_all(path.parent().unwrap()).unwrap();
+        fs::write(&path, &drop_in).unwrap();
         refused_without_writes(&mut lamp);
-        assert_eq!(lamp.read(&format!("/{DROP_IN}")), drop_in);
+        assert_eq!(fs::read_to_string(&path).unwrap(), drop_in, "{change}");
     }
 }
 
