@@ -237,6 +237,23 @@ fn not_run(spoken: &str, why: &str) -> Value {
     })
 }
 
+/// What the model is told of a run of the made skill said `spoken` that
+/// was kept but never put on the lamp: as [`not_run`], and never an offer
+/// to turn it on, since `make_skill`'s `turn_on` turns only one on the lamp
+/// (`made_turn`'s own "it isn't on the lamp now").
+fn not_put_on(spoken: &str) -> Value {
+    let mut told = not_run(spoken, NOT_PUT_ON);
+    told["next"] = json!(format!(
+        "{} Never offer to turn it on: it never went on the lamp, and turning it on can't \
+         put it there.",
+        told["next"].as_str().unwrap_or_default()
+    ));
+    told
+}
+
+/// Why a made skill kept but never put on the lamp didn't run now.
+pub const NOT_PUT_ON: &str = "it isn't on the lamp now";
+
 /// A run asked in `ask`, of the skills in `keeping`: only heard, and only
 /// the owner's (`owner_hears`, asked first). The person's own made skill
 /// [`made_remove::found`] by the name, on, its writes approved
@@ -343,10 +360,10 @@ pub fn asked_turning(
     let spoken = made_skill::spoken_name(&made);
     let Some(kept) = made_skill::kept_on_named(&keeping.directory, &made) else {
         eprintln!("lamp-voice: request {request}: a made skill wasn't run now: it isn't on");
-        // A yes to the lamp's offer to turn it on is its turn_on, never a
-        // new make (lamp-c0a4, 19 Nov 11:13).
-        crate::made_turn::offer_on(&made, request, std::time::Instant::now());
-        return not_run(&spoken, "it isn't on the lamp now");
+        // Made but never put on: `make_skill`'s `turn_on` answers "it isn't
+        // on the lamp now" for it as well, so no turn on is offered, nor a
+        // yes to one sent there (#7905 follow-up).
+        return not_put_on(&spoken);
     };
     // Its writes, as a read-back reads them: approved for the package on
     // the lamp, or not run (Some((false, _)): the package changed since).
@@ -835,25 +852,73 @@ mod tests {
     }
 
     /// lamp-c0a4, 19 Nov 11:13 (requests 31 and 32): a run of a made skill
-    /// that isn't on, then the person's "yes" to the lamp's offer to turn
-    /// it on, was a fresh make. The next heard line is told, once, that a
-    /// yes is `turn_on` with its name alone, never a make; a run that ran,
-    /// or one that waits for its yes, offers nothing.
+    /// that didn't run, then the person's "yes" to the lamp's offer to turn
+    /// it on, was a fresh make. Turned off and not turned on for the ask,
+    /// the next one or two heard lines within 90 s are told, once, that a
+    /// yes is `turn_on` with its name alone, never a make. Made but never
+    /// put on, `turn_on` can't put it on ("it isn't on the lamp now" there
+    /// too): nothing is offered and the model is told never to offer it
+    /// (#7905 follow-up). A run that ran, or one that waits for its yes,
+    /// offers nothing.
     #[test]
     fn a_yes_after_a_made_skill_not_on_is_its_turn_on_never_a_make() {
         let (root, keeping) = nines_lamp("run-not-on-yes");
-        let at = |request| Ask {
-            name: "evening dim",
-            request,
-            heard: true,
-        };
-        let off = asked(at(7_905_031), &keeping, owner, no_task, approved, never);
-        assert_eq!(off["error"], "it isn't on the lamp now", "{off}");
+        let off = asked(
+            Ask {
+                name: "evening dim",
+                request: 7_905_021,
+                heard: true,
+            },
+            &keeping,
+            owner,
+            no_task,
+            approved,
+            never,
+        );
+        assert_eq!(off["error"], NOT_PUT_ON, "{off}");
+        let next = off["next"].as_str().unwrap();
+        assert!(next.contains("Never offer to turn it on"), "{next}");
+        let now = std::time::Instant::now();
+        assert_eq!(
+            crate::made_turn::offered_note(7_905_022, now),
+            None,
+            "a turn on of one never put on is never offered"
+        );
+        let _ = std::fs::remove_dir_all(&root);
+
+        let (root, keeping) = space_lamp("run-off-yes");
+        let is_off = |_: &str| true;
+        let turn_on = |_: &str| Err("the lamp's skills couldn't be reached".to_owned());
+        let turn_off = |_: &str| -> Result<(), String> { panic!("nothing was turned on") };
+        let told = asked_turning(
+            Ask {
+                name: "space facts",
+                request: 7_905_031,
+                heard: true,
+            },
+            &keeping,
+            owner,
+            no_task,
+            approved,
+            never,
+            Some(TurnsOn {
+                is_off: &is_off,
+                turn_on: &turn_on,
+                turn_off: &turn_off,
+                wait: std::time::Duration::from_millis(1),
+            }),
+        );
+        assert!(told["error"].as_str().unwrap().contains("turned off"), "{told}");
         let now = std::time::Instant::now();
         assert_eq!(crate::made_turn::offered_note(7_905_031, now), None);
-        let note = crate::made_turn::offered_note(7_905_032, now).expect("the yes's turn is told");
+        assert_eq!(crate::made_turn::offered_note(7_905_034, now), None);
+        assert_eq!(
+            crate::made_turn::offered_note(7_905_033, now + crate::made_turn::OFFER_WITHIN),
+            None
+        );
+        let note = crate::made_turn::offered_note(7_905_033, now).expect("the yes's turn is told");
         assert!(
-            note.contains("make_skill now with turn_on and \"evening dim\" alone"),
+            note.contains("make_skill now with turn_on and \"space facts\" alone"),
             "{note}"
         );
         assert!(note.contains("never make it again"), "{note}");
@@ -862,6 +927,9 @@ mod tests {
             None,
             "told once"
         );
+        let _ = std::fs::remove_dir_all(&root);
+
+        let (root, keeping) = nines_lamp("run-ran-yes");
         let ran = asked(
             Ask {
                 name: "unread mail",

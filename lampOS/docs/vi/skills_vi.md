@@ -2416,6 +2416,20 @@ thay đổi: không đọc từ nào của câu nói. Sau đó, trong code
   hình cho kỹ năng đó trong lượt cũng kèm câu hoàn tác, một lần trong lượt:
   một lần chạy lại nó sau đó được báo như mọi lần chạy. Khi công tắc tắt,
   giữ như trước.
+- **Một câu "yes" để bật nó là `turn_on` của nó** (lamp-c0a4, 19/11 11:13,
+  yêu cầu 31 và 32: một lần chạy không chạy được đề nghị bật lên, và câu
+  "yes" của người dùng thành một `make_skill` với `request`, một lần tạo
+  mới). Một lần chạy không chạy vì kỹ năng đang tắt và không bật được cho
+  lời xin được ghi lại (`made_turn::offer_on`, tối đa 8, trong tiến trình
+  của giọng nói); một hoặc hai yêu cầu nghe được tiếp theo trong vòng 90 giây
+  (`made_turn::OFFER_WITHIN`) trên tuyến thứ hai được báo, một lần
+  (`made_turn::offered_note_here`, khi công tắc bật), rằng câu "yes" là
+  `turn_on` của `make_skill` với chỉ tên của nó, qua kiểm tra chủ sở hữu
+  và câu trả lời của chính nó, không bao giờ là một lần tạo mới. Một kỹ năng
+  đã tạo được giữ nhưng chưa từng được đưa lên lamp thì không bao giờ được
+  đề nghị bật: `turn_on` cũng trả lời "it isn't on the lamp now" cho nó, nên
+  câu trả lời lần chạy của nó bảo không bao giờ đề nghị bật nó
+  (`made_run::NOT_PUT_ON`, tiếp nối #7905).
 - **Qua `use_skill` cũng vậy** (dòng thử của #7562 trên lamp-9adf, 18/11:
   sau "turn it off", "Lamp, tell me a space fact with my space facts
   skill." là lời gọi `use_skill` của mô hình, vốn không nêu được kỹ năng đã

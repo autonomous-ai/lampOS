@@ -499,20 +499,20 @@ pub fn off_note_here(request: u64, heard: bool) -> Option<String> {
     Some(note)
 }
 
-/// How long after a run of a made skill that didn't run because it is off
-/// or not on (`made_run::asked_turning`) the person's next heard line is
+/// How long after a run of a made skill that didn't run because it is
+/// turned off (`made_run::asked_turning`) the person's next heard line is
 /// told how a yes to turning it on is done ([`offered_note`]).
 pub const OFFER_WITHIN: Duration = Duration::from_secs(90);
 
-/// The made skills a run now left not run because off or not on: each its
+/// The made skills a run now left not run because turned off: each its
 /// name, its request and when. At most [`OFFERS_KEPT`].
 static OFFERS: std::sync::Mutex<Vec<(String, u64, std::time::Instant)>> =
     std::sync::Mutex::new(Vec::new());
 const OFFERS_KEPT: usize = 8;
 
 /// The made skill `made` didn't run now in the request `request` at `now`
-/// because it is off or not on the lamp, so the lamp may offer to turn it
-/// on (lamp-c0a4, 19 Nov 11:13, requests 31 and 32: "Give me my daily
+/// because it is turned off and wasn't turned on, so the lamp may offer to
+/// turn it on (lamp-c0a4, 19 Nov 11:13, requests 31 and 32: "Give me my daily
 /// report" was answered that my day is off, with an offer to turn it on;
 /// the person's "yes" was then a `make_skill` with `request`, a fresh
 /// make, since nothing in that turn named the turn on or the skill: the
@@ -526,7 +526,7 @@ pub fn offer_on(made: &str, request: u64, now: std::time::Instant) {
 }
 
 /// What the heard line `request` at `now` is told, once, right after a run
-/// that left a made skill not run because off or not on ([`offer_on`],
+/// that left a made skill not run because turned off ([`offer_on`],
 /// within [`OFFER_WITHIN`] and the next two requests): a yes to turning it
 /// on is `make_skill`'s `turn_on` with its name alone, through its own
 /// path and answer, never a new make. Whether the line agrees stays the
@@ -542,10 +542,10 @@ pub fn offered_note(request: u64, now: std::time::Instant) -> Option<String> {
     let spoken = made_skill::spoken_name(&made);
     Some(format!(
         "(For you to know, not to answer: in your last turn {spoken}, a skill they made, didn't \
-         run because it is off or not on. If their line agrees to turning it on, a yes to your \
-         offer too, call make_skill now with turn_on and \"{spoken}\" alone, saying nothing \
-         first: its answer says what to say. It is made already: never call make_skill with \
-         request for it, never make it again.)"
+         run because it is turned off and wasn't turned on. If their line agrees to turning it \
+         on, a yes to your offer too, call make_skill now with turn_on and \"{spoken}\" alone, \
+         saying nothing first: its answer says what to say. It is made already: never call \
+         make_skill with request for it, never make it again.)"
     ))
 }
 

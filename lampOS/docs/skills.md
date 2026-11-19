@@ -5376,6 +5376,18 @@ model is told changes: no words of the line are read. Then, in code
   a run after the model's own `turn_on` of that skill in the turn carries
   the undo line too, once in the turn: a run of it again after is told as
   any run. Switch off, as before.
+- **A yes to turning it on is its `turn_on`** (lamp-c0a4, 19 Nov 11:13,
+  requests 31 and 32: a run that didn't run was offered a turn on, and the
+  person's "yes" was a `make_skill` with `request`, a fresh make). A run
+  left not run because the skill is turned off and wasn't turned on for the
+  ask is kept (`made_turn::offer_on`, at most 8, in the voice's process);
+  the next one or two heard requests within 90 s (`made_turn::OFFER_WITHIN`)
+  on the second route are told, once (`made_turn::offered_note_here`, with
+  the switch on), that a yes is `make_skill`'s `turn_on` with its name
+  alone, through its own owner's check and answer, never a new make. A
+  made skill kept but never put on the lamp is never offered: `turn_on`
+  answers "it isn't on the lamp now" for it too, so its run's answer says
+  never to offer turning it on (`made_run::NOT_PUT_ON`, #7905 follow-up).
 - **Through `use_skill` too** (#7562's row on lamp-9adf, 18 Nov: after
   "turn it off", "Lamp, tell me a space fact with my space facts skill."
   was the model's `use_skill`, which names no made skill, since a made
