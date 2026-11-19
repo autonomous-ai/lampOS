@@ -689,6 +689,7 @@ pub const RESET_PLAN: &str = include_str!("../../setup/fixtures/reset-plan-produ
 /// build's is written over it. Add the new one first whenever the fixture
 /// changes; never remove one.
 pub const RESET_PLAN_SHIPPED: &[&str] = &[
+    "0192f1ca63da3391fcb14e072afef96244691c35edef6388c8cd91abc05a7b55", // #6543: the app's desk noticing mark, seen-activity-mark.json
     "bc7558fcea2999b583f79dce9d28ee981db49471c186fea883baa03e2c4c51c9", // #6774 F8: setup's Wi-Fi join counts
     "73d29d8ffa197507ad12bcf41037e12a2a9e5f25c9444a82243c1a07c6ff8666", // #6893: the energy beside the character words
     "622eb88154730d0ee596b9ef048e2120ce9eb67ee33393b1503a1a4d53cdf199", // #6543: lamp-seen's state folder and its opt-in, seen-activity.json

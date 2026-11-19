@@ -689,7 +689,7 @@ picture is taken or sent and nothing from the cloud is in them.
 | Said back | the walk's or the model's words | by lamp-seen alone, on and off (its said-back record); the model is told to add nothing |
 | Taken back by voice | a "no" or a redo | anyone's "stop looking" (`stop_looking_at_my_desk`) removes the file, the safe side; never declined with its request, as reports' stop |
 | Forget | a forget of everything | any forget (`forget` and `forget_everything`, `remember.rs`), whoever asked, before the memory is asked; a journal line names the file only when one was there |
-| App | `consent.set` with `LAMP_APP_CONSENT=on`, only on a no-slide lamp | the same, only where `lamp-cloud` has `LAMP_SEEN_ACTIVITY=on` |
+| App | `consent.set` with `LAMP_APP_CONSENT=on`, only on a no-slide lamp | the same, only where `lamp-cloud` has `LAMP_SEEN_ACTIVITY=on`; and the owner's desk noticing switch, `desk_noticing.set` (`{"allow": bool, "request_id": N}`), with `LAMP_SEEN_ACTIVITY=on` alone: the same file through the same helper, `"by":"app"`, a yes kept only with `request_id` above the mark the voice's stop and a forget raise, off removing it as the voice's stop does, read back as `{"desk_noticing": {"on", "by", "posture"}}` (cloud.md, "Desk noticing from the app") |
 | Reset | the reset plan wipes it | the same |
 | Read by | lamp-ears, at its start | lamp-seen, every 2 s; it never writes the folder |
 
