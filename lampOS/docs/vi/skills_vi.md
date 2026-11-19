@@ -3498,10 +3498,11 @@ cả hai người viết.
 - **Lần tạo lâu chạy tiếp, và người dùng được báo khi xong
   (`LAMP_MAKE_MAY_RUN_ON=on`, tắt nếu không đặt, không có trong unit sản
   phẩm nào; yêu cầu của Fourteen trên #6811, 18/11 17:21, và first builder
-  đồng ý lúc 17:23).** Trước đó phần của agent dừng ở 120 giây
-  (`make_skill_agent::MAKE_WITHIN` và `skill_make::MOST_WITHIN` của
-  lamp-tasks): quá thời gian người dùng nghe `AGENT_LATE_TRY` và công việc
-  bị bỏ. Khi bật (`crate::long_make`):
+  đồng ý lúc 17:23).** Khi tắt, lượt giọng nói chờ phần của agent tối đa
+  10 phút 30 giây (`make_skill_agent::MAKE_WITHIN`: 10 phút của
+  `skill_make::MOST_WITHIN` của lamp-tasks cộng thêm 30 giây, từ #7245;
+  trước đó 120 giây): quá thời gian người dùng nghe `AGENT_LATE_TRY` và
+  công việc bị bỏ. Khi bật (`crate::long_make`):
   - **Sau một phút.** Lần tạo bằng giọng nói đã chuyển cho lượt tạo của
     agent (khi bật `LAMP_MAKE_REACTIONS_ONLY_DEEPSEEK`: lần tạo cần dịch vụ
     liên kết, hoặc bản nháp phản ứng nhanh mà DeepSeek không giữ được; lần
@@ -3606,7 +3607,10 @@ cả hai người viết.
     không tạo được được nói là lỗi của agent. Skill đã xong mà bị xóa trong
     app trước khi báo (đã xong, hoặc không bật được) thì dấu của nó được bỏ
     lặng lẽ, không bao giờ nói
-    "couldn't finish". Giới hạn đã biết: sau khi worker khởi động lại, lượt
+    "couldn't finish". Lần tạo đã chạy tiếp rồi bị từ chối ("never mind",
+    qua ghi chú đang tạo của nó, `long_make::dropped`) cũng vậy: không giữ
+    gì, không lần tạo nào sau đó bị báo "still making", không báo gì về nó.
+    Giới hạn đã biết: sau khi worker khởi động lại, lượt
     chạy của lần tạo trong lamp-tasks không bị dừng, và có thể tiếp tục tới
     `long_make::WRITE_WITHIN` (300 giây) chờ câu trả lời, rồi câu trả lời
     đó bị bỏ; trong lúc đó lamp-tasks từ chối lần tạo mới với `busy`, nên
