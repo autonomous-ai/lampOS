@@ -267,3 +267,22 @@ fn a_keep_said_beside_another_call_is_still_caught() {
         "{went:?}"
     );
 }
+
+/// Friday's P2 on #7924: the face offer that waits for a name is no keep
+/// claim: said as it is, with no note.
+#[test]
+fn a_face_offer_that_waits_for_a_name_is_said_as_it_is() {
+    let reply = "Nice to meet you. I'll remember your face once you tell me your name.";
+    let went = went(
+        "Hi lamp, it's my first day here.",
+        true,
+        vec![saying(reply)],
+    );
+    assert!(!went.noted, "{went:?}");
+    assert!(
+        went.said
+            .iter()
+            .any(|said| said.contains("once you tell me")),
+        "{went:?}"
+    );
+}
