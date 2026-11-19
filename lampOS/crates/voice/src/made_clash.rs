@@ -77,24 +77,46 @@ const CONDITION_KEYS: [&str; 7] = [
     "field", "when", "equals", "above", "below", "present", "changes",
 ];
 
+/// The keys of a trigger that say at what time of day and on which days it
+/// may fire. Not in a clash ([`CONDITION_KEYS`]), but in whether two skills
+/// do the same thing ([`same_thing`], #7938): every skill on the lamp's
+/// clock shares one topic and condition, and only its window says when.
+const WINDOW_KEYS: [&str; 2] = ["during", "days"];
+
+/// The keys of a `[[do]]` step that say when or for which call it is made,
+/// not what it does: left out of what a skill does ([`same_thing`]).
+const STEP_MODIFIERS: [&str; 3] = ["after", "on", "if_choice"];
+
 /// What a skill's `skill.toml` starts on and what it uses, as a clash is
 /// judged: each trigger's topic and condition ([`CONDITION_KEYS`]), and
-/// whether any `[[do]]` step uses the light or the body. Kept with a made
-/// skill in its index (`made_skill`'s `"clash"`), so one made here and on
-/// is judged even when its folder can't be read.
+/// whether any `[[do]]` step uses the light or the body; and, under
+/// `"same"`, what says whether it does the same thing as another
+/// ([`same_thing`]): each trigger with its window too ([`WINDOW_KEYS`]),
+/// and the kinds of its steps. Kept with a made skill in its index
+/// (`made_skill`'s `"clash"`), so one made here and on is judged even when
+/// its folder can't be read.
 pub fn signature(toml: &str) -> Value {
     let Ok(table) = toml::from_str::<toml::Table>(toml) else {
         return json!({"triggers": [], "light": false, "body": false});
     };
-    let triggers: Vec<Value> = match table.get("trigger") {
-        Some(toml::Value::Table(trigger)) => vec![trigger_key(trigger)],
-        Some(toml::Value::Array(list)) => list
-            .iter()
-            .filter_map(toml::Value::as_table)
-            .map(trigger_key)
-            .collect(),
-        _ => Vec::new(),
-    };
+    let mut timed: Vec<Value> = trigger_tables(&table)
+        .into_iter()
+        .map(|trigger| {
+            let mut key = trigger_key(trigger);
+            for name in WINDOW_KEYS {
+                if let Some(value) = trigger.get(name) {
+                    key[name] = serde_json::to_value(value).unwrap_or(Value::Null);
+                }
+            }
+            key
+        })
+        .collect();
+    timed.sort_by_key(Value::to_string);
+    timed.dedup();
+    let triggers: Vec<Value> = trigger_tables(&table)
+        .into_iter()
+        .map(trigger_key)
+        .collect();
     let steps: Vec<&toml::Table> = table
         .get("do")
         .and_then(toml::Value::as_array)
@@ -102,11 +124,49 @@ pub fn signature(toml: &str) -> Value {
         .flatten()
         .filter_map(toml::Value::as_table)
         .collect();
+    let does: std::collections::BTreeSet<&str> = steps
+        .iter()
+        .flat_map(|step| step.keys())
+        .map(String::as_str)
+        .filter(|key| !STEP_MODIFIERS.contains(key))
+        .collect();
     json!({
         "triggers": triggers,
         "light": steps.iter().any(|step| step.contains_key("light")),
         "body": steps.iter().any(|step| step.contains_key("body")),
+        "same": { "triggers": timed, "does": does },
     })
+}
+
+/// A `skill.toml`'s triggers: its one `[trigger]`, or each `[[trigger]]`.
+fn trigger_tables(table: &toml::Table) -> Vec<&toml::Table> {
+    match table.get("trigger") {
+        Some(toml::Value::Table(trigger)) => vec![trigger],
+        Some(toml::Value::Array(list)) => list.iter().filter_map(toml::Value::as_table).collect(),
+        _ => Vec::new(),
+    }
+}
+
+/// Whether two skills that clash ([`shared`]) do the same thing, by their
+/// [`signature`]s, so a make may replace the other with no question
+/// (`LAMP_MAKE_NO_ASKS`, #7938): the very same triggers, each with its
+/// condition and its window (the time of day and the days it may fire),
+/// and the same kinds of steps. A shared topic, condition, time source or
+/// output alone never makes two skills the same: on lamp-9adf a daily brief
+/// at 08:00 replaced a good morning, a good morning 3 and a water reminder,
+/// each on the lamp's clock at its own time and lighting. A structural
+/// check, no words matched; a signature kept before its `"same"` is never
+/// the same, so nothing is replaced by it.
+pub fn same_thing(one: &Value, other: &Value) -> bool {
+    let same = |signature: &Value| -> Option<(Vec<Value>, Vec<Value>)> {
+        let same = &signature["same"];
+        let triggers = same["triggers"].as_array()?.clone();
+        let does = same["does"].as_array()?.clone();
+        (!triggers.is_empty() && triggers.iter().all(|trigger| trigger["topic"].is_string()))
+            .then_some((triggers, does))
+    };
+    shared(one, other).is_some()
+        && matches!((same(one), same(other)), (Some(one), Some(other)) if one == other)
 }
 
 fn trigger_key(trigger: &toml::Table) -> Value {
@@ -159,6 +219,25 @@ pub struct Clash {
 /// signature kept with them. Empty when nothing clashes, or the made one's
 /// signature isn't kept.
 pub fn found(keeping: &Keeping, made: &Made) -> Vec<Clash> {
+    found_where(keeping, made, shared)
+}
+
+/// Of [`found`], those that do the same thing as `made` ([`same_thing`]):
+/// the only ones a make replaces with no question (`LAMP_MAKE_NO_ASKS`,
+/// #7938). The others clash and are left on beside it.
+pub fn same_found(keeping: &Keeping, made: &Made) -> Vec<Clash> {
+    found_where(keeping, made, |mine, theirs| {
+        shared(mine, theirs).filter(|_| same_thing(mine, theirs))
+    })
+}
+
+/// [`found`] by `judge`, what the made one's signature shares with
+/// another's, or none.
+fn found_where(
+    keeping: &Keeping,
+    made: &Made,
+    judge: impl Fn(&Value, &Value) -> Option<&'static str>,
+) -> Vec<Clash> {
     let entries = made_skill::entries(&keeping.directory);
     let Some(mine) = entries
         .iter()
@@ -197,7 +276,7 @@ pub fn found(keeping: &Keeping, made: &Made) -> Vec<Clash> {
             let Ok(toml) = std::fs::read_to_string(path.join("skill.toml")) else {
                 continue;
             };
-            if let Some(shares) = shared(&mine, &signature(&toml)) {
+            if let Some(shares) = judge(&mine, &signature(&toml)) {
                 clashes.push(Clash {
                     name: name.to_owned(),
                     shares,
@@ -218,7 +297,7 @@ pub fn found(keeping: &Keeping, made: &Made) -> Vec<Clash> {
         {
             continue;
         }
-        if let Some(shares) = shared(&mine, &entry["clash"]) {
+        if let Some(shares) = judge(&mine, &entry["clash"]) {
             clashes.push(Clash {
                 name: name.to_owned(),
                 shares,
@@ -1305,6 +1384,53 @@ mod tests {
             "[trigger]\n{RESTING}cooldown = \"12h\"\nfor = \"5s\"\n[[do]]\nlight = {{ dim = 1 }}\n"
         ));
         assert_eq!(shared(&light, &paced), Some("the light"));
+    }
+
+    /// #7938: two skills do the same thing only with the very same
+    /// triggers, windows too, and the same kinds of steps; a shared clock,
+    /// condition or light alone never makes them the same.
+    #[test]
+    fn the_same_thing_is_the_same_triggers_windows_and_steps() {
+        let daily = |at: &str, to: &str, steps: &str| {
+            signature(&format!(
+                "[trigger]\ntopic = \"clock/local\"\nfield = \"known\"\nequals = true\nrearm = \
+                 \"ends\"\nduring = {{ from = \"{at}\", to = \"{to}\" }}\n{steps}"
+            ))
+        };
+        let says = "[[do]]\nsay = { text = \"Hello.\" }\n[[do]]\nlight = { dim = 1 }\n";
+        let brief = daily("08:00", "08:01", says);
+        // Another time on the lamp's clock: a clash, never the same.
+        let morning = daily("07:00", "07:01", says);
+        assert_eq!(shared(&brief, &morning), Some("the light"));
+        assert!(!same_thing(&brief, &morning));
+        // Its very minute, other steps: not the same.
+        let nods = daily(
+            "08:00",
+            "08:01",
+            "[[do]]\nbody = { gesture = \"nod\" }\n[[do]]\nlight = { dim = 1 }\n",
+        );
+        assert!(!same_thing(&brief, &nods));
+        // Its very minute and steps, other words and pace: the same.
+        let again = daily(
+            "08:00",
+            "08:01",
+            "cooldown = \"12h\"\n[[do]]\nlight = { colour = \"blue\" }\nsay = { text = \"Brief.\" }\nafter = \"say\"\n",
+        );
+        assert!(same_thing(&brief, &again));
+        assert!(same_thing(&again, &brief));
+        // Another day: not the same.
+        let weekdays = signature(&format!(
+            "[trigger]\ntopic = \"clock/local\"\nfield = \"known\"\nequals = true\nrearm = \
+             \"ends\"\nduring = {{ from = \"08:00\", to = \"08:01\" }}\ndays = \"weekdays\"\n{says}"
+        ));
+        assert!(!same_thing(&brief, &weekdays));
+        // A signature kept before `"same"`: never the same.
+        let mut old = brief.clone();
+        old.as_object_mut().unwrap().remove("same");
+        assert!(!same_thing(&brief, &old));
+        // No shared output: no clash, so never the same.
+        let quiet = daily("08:00", "08:01", "[[do]]\nsay = { text = \"Hello.\" }\n");
+        assert!(!same_thing(&quiet, &quiet));
     }
 
     /// The question the lamp asked, said whole and uncut in `request`, as
