@@ -2507,16 +2507,23 @@ khi đăng xuất, và với 0.6.60 khi đăng nhập (ROW của #7507).
   đó lại resume nó (`kept session resumed <id> (openclaw, starting)`).
   Engine của nó thoát ("No session found"), và mọi việc chờ cho tới khi bị
   báo bận. Bản ghi giữ mà bản ghi riêng của OpenClaw không còn giữ hội
-  thoại của nó (`openclaw_record`, chỉ đọc) cũng bị quên trước `ensure`, và
-  lần đó là `--fresh`: Harness resume một phiên đã đóng mà không kiểm tra
-  Gateway. Hai dấu hiệu được xử lý:
+  thoại của nó cũng bị quên trước `ensure`, và lần đó là `--fresh`: Harness
+  resume một phiên đã đóng mà không kiểm tra Gateway. Bản ghi được đọc
+  (`openclaw_holds_key`, chỉ đọc) đúng theo session key của chính bản ghi
+  (`engineSession`), không bao giờ theo `agent:main:harness-<agent id>`;
+  bản ghi không đọc được là chưa rõ, không bao giờ là đã mất. Hai dấu hiệu
+  được xử lý:
   - **Dấu hiệu 1, vẫn `starting`.** Khi mở mà tìm thấy phiên (`live` hoặc
     `resumed`, không bao giờ `new`), lamp-tasks gọi một lần `show`. Nếu
-    phiên vẫn `starting` (hoặc `offline`, `unknown`) sau 120 s
-    (`OPEN_IDLE_WITHIN`) tính từ lúc bắt đầu mở, nó bị coi là kẹt. Khi trao
-    việc, nếu reply bị từ chối `NOT_IDLE` hoặc `ENGINE_NOT_READY` suốt
-    120 s, lamp-tasks gọi một lần `show`, và phiên vẫn `starting` bị coi là
-    kẹt.
+    chính `show` đọc `starting` sau 120 s (`OPEN_IDLE_WITHIN`) tính từ lúc
+    bắt đầu mở, phiên bị coi là kẹt. Khi trao việc, nếu reply bị từ chối
+    `NOT_IDLE` hoặc `ENGINE_NOT_READY` suốt 120 s, lamp-tasks gọi một lần
+    `show`, và phiên mà `show` đọc `starting` bị coi là kẹt. `installing`
+    (OTA đang cài OpenClaw), `offline`, `unknown` và một `show` không đọc
+    được (lỗi parse, daemon quá hạn) không bao giờ được tính: chúng được
+    xem lại (sau 10 s khi trao việc), và quá giới hạn của lần mở thì phiên
+    được giữ nguyên. `state` của chính `ensure` không phải dấu hiệu (hiện
+    Harness nói `starting` với mọi câu trả lời trừ `live`).
   - **Dấu hiệu 2, một shell trơn.** `show` ghi agent là `Terminal` (engine
     đã thoát, và `wait` đọc nó là idle), hoặc Harness không còn phiên đó.
     Không bao giờ gõ vào, nhận lại hay lấy câu trả lời từ shell đó.
@@ -2525,10 +2532,19 @@ khi đăng xuất, và với 0.6.60 khi đăng nhập (ROW của #7507).
   dấu hiệu. Nó `close --now`, `sessions.delete` và xoá bản ghi, rồi buông
   phiên. Lần mở tiếp theo là `ensure --fresh` (pane của `harness new` thì
   là một `new` thường), và việc đang chờ, hoặc việc tiếp theo, chạy tiếp ở
-  đó. Close lỗi được thử lại `--now` ở lần nhìn sau. Số lần thử có giới
-  hạn: quá `REPLACE_MOST` (2) lần thay liên tiếp mà không có câu trả lời
-  nào xen giữa, lần mở tiếp theo chờ backoff (5 s, nhân đôi, tối đa
-  300 s). Phiên khoẻ chỉ tốn một `show` mỗi lần mở, không tốn gì mỗi lượt.
+  đó. Close lỗi được thử lại `--now` ở lần nhìn sau và giữ token. Số lần
+  thử có giới hạn theo số lần thay liên tiếp không có câu trả lời nào xen
+  giữa: lần đầu thay ngay; từ lần thứ hai (`REPLACE_MOST`, 2) lần mở tiếp
+  theo chờ 5 s, rồi 10 s, nhân đôi mỗi lần thêm, tối đa 300 s. Một lượt có
+  câu trả lời thì đếm lại từ đầu. Close lỗi của một lượt bị huỷ cũng giữ
+  token. Các trường của openharness#4484 (đề xuất; thiếu trường nào thì như
+  hiện nay): `state: "stopped"` của `ensure` được thay ngay, không cần
+  `show`; `confirmed: false` (resume mà Harness không xác nhận được) được
+  thay khi `show` không cho kết luận trước giới hạn; `result: "new"` với
+  `whyCode: "ENGINE_SESSION_GONE"` (Harness tự thay một hội thoại đã chết)
+  được giữ và ghi đè bản ghi cũ, không close thêm hay `--fresh`, có ghi
+  journal. `ensure` được cho 120 s (`ENSURE_TIMEOUT`), dài hơn mức chờ tới
+  ~15 s của Harness sau một lần resume. Phiên khoẻ chỉ tốn một `show` mỗi lần mở, không tốn gì mỗi lượt.
   Trường hợp xấu nhất từ lúc kẹt tới phiên mới là khoảng 120 s cộng một lần
   `ensure`. `OneSession::with_on_replaced` là hook cho câu báo duy nhất tới
   người dùng của #7895, chưa nối ở đây. Journal: `<id> is gone or stuck

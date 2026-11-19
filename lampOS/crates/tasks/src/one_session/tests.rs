@@ -57,8 +57,11 @@ struct Fake {
     /// As a real Harness: a kept session closed is resumed by name and
     /// token, unless `--fresh` (#7906, lamp-52e6).
     closed_resumes: Mutex<bool>,
-    /// What `session_held` says; none: can't be read.
-    held: Mutex<Option<bool>>,
+    /// The session keys OpenClaw's record holds; none: can't be read.
+    held: Mutex<Option<Vec<String>>>,
+    /// `ensure`'s `confirmed` and `whyCode` (openharness#4484); none: absent.
+    ensure_confirmed: Mutex<Option<bool>>,
+    ensure_why_code: Mutex<Option<String>>,
     /// The state `ensure` answers; none: idle.
     ensure_state: Mutex<Option<String>>,
 }
@@ -255,6 +258,8 @@ impl PaneHarness for Fake {
                 .unwrap_or_else(|| "idle".into()),
             why: None,
             engine_session: Some(format!("agent:main:kept-{}", agent_id_now)),
+            confirmed: *self.ensure_confirmed.lock().unwrap(),
+            why_code: self.ensure_why_code.lock().unwrap().clone(),
         })
     }
     fn reply_kept(&self, name: &str, _: &Path, words: &str) -> Took {
@@ -330,9 +335,13 @@ impl PaneHarness for Fake {
         }
         Ok(())
     }
-    fn session_held(&self, agent: &str) -> Option<bool> {
-        self.call(format!("held {agent}"));
-        *self.held.lock().unwrap()
+    fn session_held(&self, key: &str) -> Option<bool> {
+        self.call(format!("held {key}"));
+        self.held
+            .lock()
+            .unwrap()
+            .as_ref()
+            .map(|keys| keys.iter().any(|held| held == key))
     }
 }
 
@@ -2652,7 +2661,7 @@ fn a_plain_shell_pane_is_closed_and_a_new_one_takes_the_task() {
 fn a_healthy_kept_session_stays_kept_with_no_fresh_start() {
     let dir = tempfile::tempdir().unwrap();
     let (one, fake) = kept_on(dir.path());
-    *fake.held.lock().unwrap() = Some(true);
+    *fake.held.lock().unwrap() = Some(vec![format!("agent:main:kept-{}", agent_of(1))]);
     one.open_if_due(&fake, &place());
     one_turn(&one, &fake, "task-1");
     drop(one);
@@ -2679,7 +2688,7 @@ fn a_kept_session_the_gateway_no_longer_holds_is_never_ensured_as_it_was() {
     let (one, fake) = kept_on(dir.path());
     one.open_if_due(&fake, &place());
     drop(one);
-    *fake.held.lock().unwrap() = Some(false);
+    *fake.held.lock().unwrap() = Some(Vec::new());
     let again = kept_session(dir.path()).with_kept_session(dir.path().join(TOKEN_FILE));
     again.open_if_due(&fake, &place());
     let ensures: Vec<String> = fake
@@ -2695,4 +2704,210 @@ fn a_kept_session_the_gateway_no_longer_holds_is_never_ensured_as_it_was() {
         ]
     );
     assert_eq!(again.agent(), Some(agent_of(2)));
+}
+
+/// #7906, the adversarial read's P1-b: OpenClaw's record is matched by the
+/// kept record's own session key (`engineSession`), never by
+/// `agent:main:harness-<agent id>`. A record whose agent id is not in its
+/// session key, still held, stays kept: no `--fresh`, no close.
+#[test]
+fn a_kept_session_held_under_its_own_session_key_stays_kept() {
+    let dir = tempfile::tempdir().unwrap();
+    let (one, fake) = kept_on(dir.path());
+    one.open_if_due(&fake, &place());
+    drop(one);
+    // Held under the record's key only, not under the agent's own id.
+    *fake.held.lock().unwrap() = Some(vec![format!("agent:main:kept-{}", agent_of(1))]);
+    let again = kept_session(dir.path()).with_kept_session(dir.path().join(TOKEN_FILE));
+    again.open_if_due(&fake, &place());
+    assert_eq!(again.agent(), Some(agent_of(1)));
+    assert!(
+        !fake.calls().iter().any(|call| call.ends_with("--fresh")),
+        "{:?}",
+        fake.calls()
+    );
+    assert_eq!(fake.count("close-kept"), 0);
+    // OpenClaw's record not readable: unknown, never gone.
+    drop(again);
+    *fake.held.lock().unwrap() = None;
+    let third = kept_session(dir.path()).with_kept_session(dir.path().join(TOKEN_FILE));
+    third.open_if_due(&fake, &place());
+    assert_eq!(third.agent(), Some(agent_of(1)));
+}
+
+/// #7906, P1-a: only `starting` read by `show` times out into stuck. A
+/// session `installing` (an OTA's OpenClaw install), `offline` or
+/// `unknown` past the open's bound is kept as it is, never replaced.
+#[test]
+fn a_kept_session_installing_or_offline_past_the_bound_is_never_replaced() {
+    for state in ["installing", "offline", "unknown"] {
+        let dir = tempfile::tempdir().unwrap();
+        let (one, fake) = kept_on(dir.path());
+        one.open_if_due(&fake, &place());
+        drop(one);
+        fake.states
+            .lock()
+            .unwrap()
+            .insert(agent_of(1), state.into());
+        let again = kept_session(dir.path()).with_kept_session(dir.path().join(TOKEN_FILE));
+        let began = Instant::now();
+        again.open_if_due(&fake, &place());
+        assert!(
+            began.elapsed() >= Duration::from_secs(1),
+            "{state}: looked at to the bound"
+        );
+        assert_eq!(again.agent(), Some(agent_of(1)), "{state}");
+        assert_eq!(fake.count("close-kept"), 0, "{state}");
+        assert!(
+            !fake.calls().iter().any(|call| call.ends_with("--fresh")),
+            "{state}"
+        );
+    }
+}
+
+/// #7906, P2-a: a stuck session's close that fails is tried again `--now`
+/// at the next look and keeps the token (a new one on the same name could
+/// be refused `NAME_TAKEN`); the next `ensure` is `--fresh`.
+#[test]
+fn a_stuck_sessions_failed_close_keeps_its_token_and_the_next_is_fresh() {
+    let dir = tempfile::tempdir().unwrap();
+    let (one, fake) = kept_on(dir.path());
+    one.open_if_due(&fake, &place());
+    drop(one);
+    fake.shells.lock().unwrap().push(agent_of(1));
+    *fake.failing_closes.lock().unwrap() = 1;
+    let again = kept_session(dir.path()).with_kept_session(dir.path().join(TOKEN_FILE));
+    again.open_if_due(&fake, &place());
+    assert_eq!(again.agent(), None, "the close failed: no new one yet");
+    assert!(again.drop_if_due(&fake));
+    assert!(dir.path().join(TOKEN_FILE).exists(), "its token kept");
+    again.open_if_due(&fake, &place());
+    assert_eq!(again.agent(), Some(agent_of(2)));
+    assert_eq!(
+        fake.calls()
+            .iter()
+            .filter(|call| call.as_str() == "close-kept lamp-one-openclaw --now")
+            .count(),
+        2
+    );
+    assert!(
+        fake.calls()
+            .contains(&"ensure lamp-one-openclaw --fresh".to_owned())
+    );
+}
+
+/// #7906, P2-b and P2-c: the backoff comes from the replacements in a row,
+/// not `failed_opens`: none at the first, 5 s from the second, doubled.
+#[test]
+fn stuck_replacements_in_a_row_back_off_from_the_second() {
+    let (one, fake) = (session(), Fake::default());
+    one.open_if_due(&fake, &place());
+    one.replace_kept(&fake, MACHINE, &agent_of(1), "a test");
+    assert!(one.lock().next_open.is_none(), "the first: at once");
+    one.open_if_due(&fake, &place());
+    let wait = |one: &OneSession| {
+        one.lock()
+            .next_open
+            .map(|next| next.saturating_duration_since(Instant::now()))
+    };
+    one.replace_kept(&fake, MACHINE, &agent_of(2), "a test");
+    assert!(
+        wait(&one).is_some_and(|wait| wait > Duration::from_secs(4) && wait <= OPEN_RETRY_FIRST)
+    );
+    one.lock().next_open = Some(Instant::now());
+    one.open_if_due(&fake, &place());
+    one.replace_kept(&fake, MACHINE, &agent_of(3), "a test");
+    assert!(wait(&one).is_some_and(|wait| wait > Duration::from_secs(9)));
+}
+
+/// #7906: OpenClaw's record is read by the exact session key.
+#[test]
+fn openclaw_holds_key_matches_the_key_exactly() {
+    let dir = tempfile::tempdir().unwrap();
+    let db = dir.path().join("openclaw-agent.sqlite");
+    let connection = rusqlite::Connection::open(&db).unwrap();
+    connection
+        .execute_batch(
+            "CREATE TABLE session_nodes (session_key TEXT NOT NULL PRIMARY KEY, current_session_id TEXT NOT NULL, status TEXT);
+             CREATE TABLE session_windows (session_id TEXT NOT NULL PRIMARY KEY, session_key TEXT NOT NULL);
+             CREATE TABLE transcript_events (session_id TEXT NOT NULL, seq INTEGER NOT NULL, message_role TEXT, PRIMARY KEY (session_id, seq));
+             INSERT INTO session_nodes VALUES ('agent:main:harness-aaaaaaaa-1', 'w1', NULL);
+             INSERT INTO transcript_events VALUES ('w1', 1, 'user');",
+        )
+        .unwrap();
+    drop(connection);
+    use crate::harness::openclaw_holds_key;
+    assert_eq!(
+        openclaw_holds_key(&db, "agent:main:harness-aaaaaaaa-1"),
+        Ok(true)
+    );
+    assert_eq!(
+        openclaw_holds_key(&db, "agent:main:harness-aaaaaaaa"),
+        Ok(false)
+    );
+    assert!(openclaw_holds_key(&dir.path().join("none.sqlite"), "agent:main:x").is_err());
+}
+
+/// openharness#4484 (proposed) `state: "stopped"`: replaced at once,
+/// before any `show`. Absent (`idle`, today's fake): kept.
+#[test]
+fn an_ensure_that_says_stopped_is_replaced_at_once() {
+    let dir = tempfile::tempdir().unwrap();
+    let (one, fake) = kept_on(dir.path());
+    one.open_if_due(&fake, &place());
+    drop(one);
+    *fake.ensure_state.lock().unwrap() = Some("stopped".into());
+    let again = kept_session(dir.path()).with_kept_session(dir.path().join(TOKEN_FILE));
+    again.open_if_due(&fake, &place());
+    assert_eq!(again.agent(), Some(agent_of(2)));
+    assert!(
+        fake.calls()
+            .contains(&"ensure lamp-one-openclaw --fresh".to_owned())
+    );
+    assert_eq!(fake.count("show"), 0, "{:?}", fake.calls());
+}
+
+/// openharness#4484 (proposed) `confirmed: false`: a resume with no verdict
+/// from `show` past the bound is replaced; the same with `confirmed`
+/// absent is kept.
+#[test]
+fn an_unconfirmed_resume_with_no_verdict_is_replaced_absent_it_is_kept() {
+    for confirmed in [Some(false), None] {
+        let dir = tempfile::tempdir().unwrap();
+        let (one, fake) = kept_on(dir.path());
+        one.open_if_due(&fake, &place());
+        drop(one);
+        *fake.ensure_confirmed.lock().unwrap() = confirmed;
+        fake.states
+            .lock()
+            .unwrap()
+            .insert(agent_of(1), "unknown".into());
+        let again = kept_session(dir.path()).with_kept_session(dir.path().join(TOKEN_FILE));
+        again.open_if_due(&fake, &place());
+        let want = if confirmed.is_some() {
+            agent_of(2)
+        } else {
+            agent_of(1)
+        };
+        assert_eq!(again.agent(), Some(want), "{confirmed:?}");
+    }
+}
+
+/// openharness#4484 (proposed) `result: "new"`, `whyCode:
+/// "ENGINE_SESSION_GONE"`: the new one is kept and recorded, the old one
+/// forgotten, no extra close and no `--fresh`.
+#[test]
+fn harness_replacing_a_dead_conversation_is_kept_with_no_extra_close() {
+    let dir = tempfile::tempdir().unwrap();
+    let (one, fake) = kept_on(dir.path());
+    one.open_if_due(&fake, &place());
+    drop(one);
+    *fake.kept.lock().unwrap() = None;
+    *fake.ensure_why_code.lock().unwrap() = Some("ENGINE_SESSION_GONE".into());
+    let again = kept_session(dir.path()).with_kept_session(dir.path().join(TOKEN_FILE));
+    again.open_if_due(&fake, &place());
+    assert_eq!(again.agent(), Some(agent_of(2)));
+    assert_eq!(fake.count("close-kept"), 0);
+    assert!(!fake.calls().iter().any(|call| call.ends_with("--fresh")));
+    assert_eq!(again.kept().map(|(agent, _, _)| agent), Some(agent_of(2)));
 }
