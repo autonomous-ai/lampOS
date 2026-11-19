@@ -3281,8 +3281,8 @@ gone ([switches.md](switches.md)). What happens:
      words and this request (`a_second_make_is_sent_only_its_own_ask`: two
      makes in one conversation, the second sent nothing of the first). The
      `request` argument the voice's model passes is "in the person's own
-     words for this ask, nothing else: never a time, step or trigger of an
-     earlier skill or turn".
+     words for this ask alone: never a time, step or trigger of an earlier
+     skill or turn".
    - It says `skill.toml` has no `name` key: the name is SKILL.md's, and
      `name =` in `skill.toml` fails the check as an unknown field. That was
      what failed #2813's rerun on lamp-0c89.
@@ -5472,9 +5472,9 @@ remove; run now: run; list: made; say nothing first."
 (`make_skill_local::TURN_OFF_TOLD`, 155 bytes to the 149 of the sentence
 it replaces, so every switch on still fits the link's 1,024, at 1,024),
 `turn_off`'s parameter says "turn off, pause or stop a skill they made or
-added (by voice, in the app or from a file), which keeps it to turn back
-on ... Never remove for this. Even one that starts only when they say its
-words. Call it at once. Ask nothing first.",
+added (even from a file), kept to turn back on ... Never remove for this,
+even one that starts only when they say its words. Call it at once. Ask
+nothing first.",
 `turn_on`'s the same of back on, and `remove`'s says "delete or
 remove a skill for good, never to turn one off, pause or stop it". A call
 that carries a turn-off is read before the remove, so a turn-off never
@@ -5839,7 +5839,7 @@ anything", since `make_skill` named no list). The skills the person made are
 told through `make_skill` itself, its `made` alone, `true`
 (`made_list::LIST`): a parameter of the function the voice has, as a remove
 is. Whether a line asks it is the model's judgment, told in the function's
-description (above) and the parameter's ("Never answer that from the
+description (above) and the parameter's ("Never answer from the
 conversation."), never a list of words. The function's description stays
 within 1,024 bytes with every switch on: its "Call it only when the person
 asks for a skill to be made." is "Make one only when the person asks for
@@ -8537,8 +8537,8 @@ reset still ask. On (`crate::make_no_asks`):
 - **A removed skill asked back by name is the undo, never a make**
   (#7828's DEFAULT-ON, fix 2: on lamp-9adf "Put the flip a coin skill
   back", just removed, was called as a make and made a new one). `undo`'s
-  description says "When the person asks to put back or restore a skill
-  they removed, call it with that skill, and never make it again."
+  description says "To put back or restore a skill they removed, call it
+  with that skill, never make it again."
   (`make_no_asks::UNDO_RESTORE_TOLD`); whether a line asks that is the
   model's judgment. A name given to `undo` is matched to every skill the
   records name as a remove's name is (`made_remove::named_alone`: near by
@@ -8573,11 +8573,14 @@ reset still ask. On (`crate::make_no_asks`):
   one they have: your line gives the undo."
   (`make_no_asks::AT_ONCE_TOLD`); its `remove` parameter adds "Call it at
   once, never asking first; ask which only when two skills they made fit
-  the words alike, never of "it"."
+  alike, never of "it"."
   (`make_no_asks::REMOVE_AT_ONCE_TOLD`); its `undo` adds
   `make_no_asks::UNDO_RESTORE_TOLD`. With every switch the product's
   unit sets on, the description stays within the link's 1,024 bytes and
-  the parameters within its 4,096.
+  the parameters within 3,750 of its 4,096
+  (`make_skill_local::PRODUCT_MOST_PARAMETERS_BYTES`, room for a later
+  parameter; #8002: 4,174 before, each description said shorter, every
+  parameter and its meaning kept).
 
 `lamp-voice` passes the exact `on` to its `provider` and `second` workers.
 Off, every make and remove is byte for byte as before.

@@ -42,15 +42,16 @@ pub(crate) fn set_on_here(on: Option<bool>) {
 /// What `make_skill`'s `request` parameter adds: the ask is a skill, by its
 /// meaning, however the words came out. On the parameter, not the
 /// function's description, which with every switch on has no room left
-/// within the link's 1,024 bytes; one example, 220 bytes (332 before
-/// #8002), so with every switch the product's unit sets on the parameters
-/// stay within the link's 4,096 (`make_skill_local`'s
+/// within the link's 1,024 bytes; one example, 195 bytes (332, then 220,
+/// before #8002), so with every switch the product's unit sets on the
+/// parameters stay within `make_skill_local::PRODUCT_MOST_PARAMETERS_BYTES`
+/// (`make_skill_local`'s
 /// `make_skill_is_within_the_link_with_the_products_switches_on`). The
 /// reminders' and the read's own words carry the rest ([`REMINDER_TOLD`],
 /// [`READ_TOLD`]).
-pub const REQUEST_TOLD: &str = " An ask for the lamp itself to do something at a time or on a \
-     repeat (\"every morning at nine, read me my new emails\") is a skill: never set a reminder \
-     or read it now for it. \"Skill\" may be misheard: judge by meaning.";
+pub const REQUEST_TOLD: &str = " An ask for the lamp itself to act at a time or on a repeat \
+     (\"every morning at nine, read me my new emails\") is a skill, never a reminder or a read \
+     now. \"Skill\" may be misheard: judge by meaning.";
 
 /// What `set_reminder`'s and `repeat_reminder`'s descriptions add.
 pub const REMINDER_TOLD: &str = " A reminder only tells the person its words at a time. When \
