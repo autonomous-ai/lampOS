@@ -1743,6 +1743,93 @@ With the switch:
   `known_only` is sent only when true: eyes from before it refuse a field
   they don't know, so voice and eyes ship in one build. Off, the line is
   as before.
+- **A question is no ask, and a known face is told so**
+  (`LAMP_FACE_QUESTION_NOT_ASK=on`, on in the product unit; lamp-74ff,
+  19 Nov: "Did you remember my face then?" and "Do you remember my face?",
+  right after the face was kept, called `remember_my_face`, and the name
+  checks answered that the lamp couldn't take the look). The function's
+  description, names checked or not, says that a question of whether the
+  lamp knows or remembers them ("Do you remember me?", "Did you remember my
+  face?", "Do you know my face?") is no ask: answer it from who you see now,
+  never with this call. The line's words are never judged in the handler:
+  whether a line asks or only wonders is the model's call. In the handler
+  (`known_faces::run_switched`), before any name check, a call with no
+  `replace` past setup's first save, whatever the line says:
+  - for the face the eyes' known file names now, under that same name
+    (case, accents and spaces folded, `known_faces::already_known`), only
+    as a fresh real match (the owner, 20 Nov 02:18): the known file within
+    3 s, the eyes marking held names (`LAMP_FACE_STICKY=on` in the voice,
+    #7933's `-held` mark) and no fresh held mark. A held name, or eyes whose
+    held names can't be told (`LAMP_FACE_KNOWN_HOLD` renews the known file
+    with no mark), goes to the eyes, whose fresh look answers `already` or
+    `not_like_them`. Otherwise it
+    answers `{"already_known": <name>}` with a note to say the lamp already
+    knows them (`ALREADY_KNOWN_NOTE`). Nothing is sent to the eyes and
+    nothing saved.
+  - on the speaker-bound route (`LAMP_REMEMBER_SPEAKER`), only when the
+    line's own speaking face (`line.enrollment`) is the known face read
+    with it (`known_faces::said_by_known_face`, as the save's own check):
+    an off-camera voice giving the in-view person's name goes on as before,
+    never told "I already know your face".
+  - any other call, a question or not, goes on as before.
+
+  A face known by another name, a rename and the setup walk's first save
+  go as before; "Remember my face." from an unknown face still saves. The
+  voice's journal names this the check here, not the eyes'
+  (`known_faces::answered_here`). Off, as before
+  (`with_face_question_a_known_face_sends_nothing_and_any_other_call_goes_as_before`).
+
+  The description is scored on the real model by `lamp-voice probe-tools
+  PROVIDER_CONFIG SECOND_CONFIG [RUNS] --face`
+  (`second_provider/probe/face_question.rs`): 32 made-up lines, 16
+  questions whether the lamp knows them and 16 asks to remember them, half
+  English and half Vietnamese, each asked as the next turn after a face was
+  kept, with the description as the switch off (`before`) and on (`now`),
+  names checked. It prints only how many requests called
+  `remember_my_face`, per arm, line, kind and language. Run it on a lamp as
+  `probe-tools` is run (docs/second-voice.md), through the relay:
+
+  ```sh
+  systemd-run --pty --wait \
+    -E LAMP_SECOND_DEEPSEEK_BASE_URL=https://campaign-api.autonomous.ai/api/v1/ai/v1/deepseek \
+    /opt/lampOS/voice/current/lamp-voice probe-tools \
+    /etc/lampOS/voice/provider.json /etc/lampOS/voice/second.json 1 --face
+  ```
+
+  With the same switch, two more (lamp-74ff, 19 Nov):
+  - **A name confirmed this session is reused** for a later save of the
+    same face, not heard again (requests 27 and 28 were refused as "name
+    not heard" right after the name was confirmed). A save whose name was
+    said back and agreed, or spelled, keeps it in memory with the one near
+    face in view then (`known_faces::note_confirmed`, before any refusal;
+    a forget clears it). A later save of that name stands as heard only
+    when all hold (`known_faces::reused_name`): the same name, folded;
+    exactly one face at least 0.10 of the frame tall in the eyes' newest
+    look within 1.2 s (`speaking_faces::SpeakingFaces::one_near_face`,
+    `NEAR_FACE_HEIGHT`, the eyes' own `NEAR_ENOUGH`); and that face is the
+    same track as at the confirmation, the same passing id or one the eyes
+    said follows it (`SpeakingFaces::same_track`). A held or carried name
+    is never one. The save then goes to the eyes' own checks as any other:
+    a name kept for another face is refused there, told as `NOT_LIKE_THEM`,
+    which never says the name is kept. The faces are the second worker's
+    own reader (`second_provider::worker`, `known_faces::sees_tracks_with`).
+    Only on the save with no speaking proof (`run_switched`), never a rename
+    and never the speaker-bound save (`LAMP_REMEMBER_SPEAKER`), which takes
+    the speaker's own words. **Dark until `LAMP_FACE_NO_ASK` is on** (#8010,
+    deferred; off in the product): without it the no-proof save has no
+    speaking proof, so the name is never reused and the save goes as today.
+    With it on, that save keeps no new face with nobody known, so the reuse
+    reaches only a save while the eyes' known file names someone. The
+    already-known answer comes first on both routes
+    (`known_faces::face_question_first`).
+  - **A face kept again is said to be known already.** The eyes answer a
+    remembering of a name already kept, the face matched as theirs as a
+    whole (`SAME_PERSON`) and no `replace`, with `"already":true` beside
+    `remembered` (`who::Remembered::already`, always; a voice that does not
+    read it ignores it). The voice then tells the model to say it already
+    knows their face ("I already know your face, Ana."), never "I'll know
+    you now", and drops the visits line said at the first save
+    (`ALREADY_KNOWN_NOTE`). Off, as a first save.
 - **A new face with nothing asked** (`LAMP_FACE_NO_ASK=on`, with names
   checked; off unless set; the first builder 18:50, 18 Nov, from the
   product owner). A face is kept unasked **only with speaking-face proof**

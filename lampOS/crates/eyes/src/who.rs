@@ -1220,21 +1220,34 @@ impl People {
             }
         }
         let mut replaced = Vec::new();
-        let name =
-            self.remember_one_into(name, prints, now_unix_s, replace, apart, &mut replaced)?;
-        Ok(Remembered { name, replaced })
+        let mut already = false;
+        let name = self.remember_one_into(
+            name,
+            prints,
+            now_unix_s,
+            (replace, apart),
+            &mut replaced,
+            &mut already,
+        )?;
+        Ok(Remembered {
+            name,
+            replaced,
+            already,
+        })
     }
 
     /// [`Self::remember_one`]'s work: the people a `replace` forgets are
-    /// put in `replaced` once their removal is written.
+    /// put in `replaced` once their removal is written, and `already` says
+    /// the name was kept before and this face matched as theirs as a whole
+    /// ([`Remembered::already`]).
     fn remember_one_into(
         &mut self,
         name: &str,
         prints: Vec<Vec<f32>>,
         now_unix_s: u64,
-        replace: bool,
-        apart: bool,
+        (replace, apart): (bool, bool),
         replaced: &mut Vec<String>,
+        already: &mut bool,
     ) -> std::result::Result<String, Refused> {
         let kept = plain_name(name).ok_or(Refused::NotAName)?;
         // Whoever else these prints are, by the same likeness that
@@ -1327,9 +1340,12 @@ impl People {
                 .filter(|(_, alike)| *alike >= SAME_PERSON)
                 .map(|(print, _)| print.clone())
                 .collect();
-            return self
+            let kept_now = self
                 .remember(&kept, own, now_unix_s)
-                .map_err(|error| Refused::Store(error.to_string()));
+                .map_err(|error| Refused::Store(error.to_string()))?;
+            // Known already, and this face theirs: never a rename.
+            *already = !replace;
+            return Ok(kept_now);
         } else if known.is_empty() && !apart {
             let near = self
                 .people
@@ -2503,6 +2519,11 @@ fn theirs_name(people: &[Person], name: &str) -> String {
 pub struct Remembered {
     pub name: String,
     pub replaced: Vec<String>,
+    /// The name was kept before this remembering and the face matched as
+    /// theirs as a whole (`SAME_PERSON`), not on a `replace`: their prints
+    /// kept in place, no new person. Said as `"already": true`; a voice that
+    /// doesn't read it ignores it (`LAMP_FACE_QUESTION_NOT_ASK`, lamp-74ff).
+    pub already: bool,
 }
 
 impl Remembered {
@@ -2511,6 +2532,7 @@ impl Remembered {
         Self {
             name,
             replaced: Vec::new(),
+            already: false,
         }
     }
 
@@ -2518,6 +2540,9 @@ impl Remembered {
     /// (`[]` when none), and, with visits counted, that they are.
     pub fn answer(&self, visits: bool) -> serde_json::Value {
         let mut answer = serde_json::json!({"remembered": self.name, "replaced": self.replaced});
+        if self.already {
+            answer["already"] = serde_json::Value::Bool(true);
+        }
         if visits {
             answer["visits"] = serde_json::Value::Bool(true);
         }
@@ -5756,6 +5781,7 @@ mod tests {
             Remembered {
                 name: "Bea".into(),
                 replaced: vec!["Original Owner".into()],
+                already: false,
             }
         );
         assert!(!people.names().contains(&"Original Owner".to_owned()));
@@ -5779,6 +5805,44 @@ mod tests {
             new.answer(true),
             serde_json::json!({"remembered": "Ines", "replaced": [], "visits": true})
         );
+    }
+
+    /// lamp-74ff, 19 Nov: a second remembering of a face already kept,
+    /// under its own name, said "I'll know you now" as a first one. It is
+    /// `already`, and said so; a first, a rename, another face under that
+    /// name and a new person are not.
+    #[test]
+    fn a_face_kept_again_under_its_own_name_is_said_to_be_known_already() {
+        let mut people = People::open(file("already")).unwrap();
+        let first = people
+            .remember_one_replacing("Ana", vec![print(0.3)], 1, false, false)
+            .unwrap();
+        assert!(!first.already, "{first:?}");
+        assert!(first.answer(false).get("already").is_none());
+        let again = people
+            .remember_one_replacing("Ana", vec![print(0.3)], 2, false, false)
+            .unwrap();
+        assert!(again.already, "{again:?}");
+        assert_eq!(
+            again.answer(true),
+            serde_json::json!({"remembered": "Ana", "replaced": [], "already": true, "visits": true})
+        );
+        assert_eq!(people.names(), vec!["Ana".to_owned()]);
+        // With `replace`, not.
+        let replaced = people
+            .remember_one_replacing("Ana", vec![print(0.3)], 3, true, false)
+            .unwrap();
+        assert!(!replaced.already, "{replaced:?}");
+        // Another face under that name is refused, and a new person is no
+        // `already`.
+        assert_eq!(
+            people.remember_one_replacing("Ana", vec![print(2.9)], 4, false, false),
+            Err(Refused::NotLikeThem)
+        );
+        let new = people
+            .remember_one_replacing("Ines", vec![print(2.9)], 5, false, false)
+            .unwrap();
+        assert!(!new.already, "{new:?}");
     }
 
     /// The reviewer on #1057: prints known by two names are refused with
