@@ -21,6 +21,39 @@ use rustix::fs::{AtFlags, Gid, Mode, OFlags, Uid};
 // is timed.
 pub const VALIDATE_WITHIN: Duration = Duration::from_secs(60);
 
+/// What lamp-update's wrapper says when it finds no running gateway to
+/// join, and fails closed.
+pub const NO_GATEWAY: &str = "is not running in its own namespaces";
+/// What it says joining a gateway just started whose namespace does not
+/// show Node yet (`lamp_update::openclaw_install::NODE_NOT_READY`, the
+/// same words).
+pub const NODE_NOT_READY: &str = "'node': No such file or directory";
+/// The waits before each new try of a write OpenClaw's gateway was not
+/// there to check (lamp-tasks' `write_waiting`, lamp-update's one-shot
+/// `gateway_block`), 5 min 15 s in all: lamp-tasks can
+/// start before the gateway, at a boot or an update that restarts both
+/// (#7268's HOLD), and a gateway takes 27-53 s to start on lamp-c0a4,
+/// about 3 min with a reinstall beside it.
+// ponytail: a fixed schedule; past it the write waits for lamp-tasks' next
+// start (lamp-update's: its next round), as a refusal does.
+pub const GATEWAY_WAITS: [Duration; 8] = [
+    Duration::from_secs(5),
+    Duration::from_secs(10),
+    Duration::from_secs(20),
+    Duration::from_secs(40),
+    Duration::from_secs(60),
+    Duration::from_secs(60),
+    Duration::from_secs(60),
+    Duration::from_secs(60),
+];
+
+/// Whether a write was refused only because OpenClaw's gateway was not
+/// there to check it ([`NO_GATEWAY`], [`NODE_NOT_READY`]), not for its
+/// text.
+pub fn gateway_not_there(error: &str) -> bool {
+    error.contains(NO_GATEWAY) || error.contains(NODE_NOT_READY)
+}
+
 /// `bytes` in place of `path`, with `mode`, through a new file beside it
 /// ([`replace_checked_in`], the file's owner the caller's).
 pub fn replace_checked(
