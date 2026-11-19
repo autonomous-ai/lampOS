@@ -401,6 +401,9 @@ lần chạy, và được trả lời khi lần chạy kết thúc
   "Dịch vụ đã liên kết thành task cho agent của đèn"), tối đa khoảng 400 ký
   tự (`MOST_TOLD_CHARS`, người xây dựng đầu tiên trên #7591), cắt ở dấu kết
   câu cuối cùng bên trong, rồi "There's more; ask me if you want it."
+  Một dòng dài quá khoảng 10 giây lời nói được giọng nói render thành nhiều
+  đoạn, cắt ở ranh giới câu, rồi mệnh đề, rồi từ, và phát trọn dòng, để không
+  đoạn nào quá 20 giây của bộ nhớ đệm giọng nói mà bị bỏ (#7892).
   Không có gì theo dõi việc script của lần chạy đã tự nói qua `say` của
   lamp-control hay chưa; agent được bảo để trống câu trả lời (một dấu gạch
   ngang, hoặc `answer.md` trống) khi đã nói (P3 của Heron trên #7591).

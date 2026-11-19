@@ -5964,7 +5964,11 @@ at most the say service's 900 bytes, all of them at most about 400
 characters (`task::MOST_TOLD_CHARS`, the first builder on #7591: a person
 answers in a sentence or two) and 10 sentences, cut at the last sentence
 end inside (at its words when the first sentence alone is longer), then
-"There's more; ask me if you want it." (`task::MORE_LINE`). The agent is
+"There's more; ask me if you want it." (`task::MORE_LINE`). The voice
+renders a line past about 10 s of speech in pieces and plays it whole, its
+words in order, each piece within the speech cache's 20 s
+(`tts_cache::pieces`, #7892; [speaking-first.md](speaking-first.md)): before,
+a sentence past 20 s was refused whole and never said. The agent is
 asked for a short spoken answer, one to three sentences, and to leave it
 empty (a lone dash, or an empty `answer.md`) when the skill already said
 it aloud, which says nothing (Heron's P3 on #7591). The skill needs no

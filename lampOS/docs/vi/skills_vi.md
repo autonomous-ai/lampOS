@@ -2837,7 +2837,11 @@ là của `task::told`: bỏ ký hiệu markdown, mỗi câu tối đa 900 byte 
 vụ nói, tất cả tối đa khoảng 400 ký tự (`task::MOST_TOLD_CHARS`, người xây
 dựng đầu tiên trên #7591: một người trả lời bằng một hai câu) và 10 câu, cắt
 ở dấu kết câu cuối cùng bên trong (ở ranh giới từ khi riêng câu đầu đã dài
-hơn), rồi "There's more; ask me if you want it." (`task::MORE_LINE`). Agent
+hơn), rồi "There's more; ask me if you want it." (`task::MORE_LINE`). Giọng
+nói render một dòng dài quá khoảng 10 giây lời nói thành nhiều đoạn và phát
+trọn dòng, giữ các từ đúng thứ tự, mỗi đoạn trong 20 giây của bộ nhớ đệm
+giọng nói (`tts_cache::pieces`, #7892): trước đây một câu dài quá 20 giây bị
+từ chối cả câu và không bao giờ được nói. Agent
 được bảo trả lời nói ngắn, một đến ba câu, và để trống (một dấu gạch ngang,
 hoặc `answer.md` trống) khi skill đã tự nói điều đó, thì không nói gì (P3
 của Heron trên #7591). Skill không cần `speak`: lời đồng ý của chủ cho quyền
