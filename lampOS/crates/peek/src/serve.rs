@@ -580,12 +580,13 @@ async fn push(served: &Arc<Served>, count: u32) -> Vec<Event> {
         read(lamp_msgs::Health::TOPIC),
         read(lamp_msgs::JointState::TOPIC),
     );
-    let (report, entries, words) = {
+    let (report, entries, words, skill_runs) = {
         let seen = peek.seen.lock().unwrap_or_else(PoisonError::into_inner);
         (
             seen.body.clone(),
             seen.timeline.newest(),
             seen.timeline.words(),
+            seen.timeline.skill_runs(),
         )
     };
     let light = read(lamp_msgs::Light::TOPICS[1]);
@@ -621,7 +622,7 @@ async fn push(served: &Arc<Served>, count: u32) -> Vec<Event> {
     );
     let tasks_html = match (&tasks_kept, &tasks) {
         (Some(_), None) => "<p class=\"warn\">The tasks' progress can't be read.</p>".to_owned(),
-        _ => page::tasks(tasks.as_ref(), now_unix_ms()),
+        _ => page::tasks_with(tasks.as_ref(), &skill_runs, now_unix_ms()),
     };
     events.push(Event::default().event("tasks").data(tasks_html));
     events.push(Event::default().event("body").data(page::body(

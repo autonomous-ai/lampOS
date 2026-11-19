@@ -18,8 +18,8 @@
 use crate::watch::plain;
 use lamp_bus::Message;
 use lamp_msgs::{
-    AgentState, Light, SkillEvent, SkillStage, Speech, StepKind, TaskStatus, TaskStep, TurnVerdict,
-    VoiceDecision, VoiceTurn, cut_whole_chars,
+    AgentState, Light, SkillEvent, SkillStage, SkillTask, SkillTaskStage, Speech, StepKind,
+    TaskStatus, TaskStep, TurnVerdict, VoiceDecision, VoiceTurn, cut_whole_chars,
 };
 use std::collections::{BTreeMap, VecDeque};
 
@@ -33,12 +33,13 @@ pub const WORD_CHARS: usize = 300;
 pub const TURN_LASTS_MS: u64 = 60_000;
 /// The topics only the timeline reads: not on `/bus`. One nobody
 /// publishes (an older lamp) only leaves its part of a card empty.
-pub const TOPICS: [&str; 5] = [
+pub const TOPICS: [&str; 6] = [
     Light::TOPICS[0],
     SkillEvent::TOPIC,
     VoiceDecision::TOPIC,
     TaskStep::TOPIC,
     TaskStatus::TOPIC,
+    SkillTask::TOPIC,
 ];
 /// The most steps kept of one task; later ones are only counted.
 pub const MOST_STEPS: usize = 50;
@@ -99,6 +100,27 @@ impl Agent {
             .chain(self.settled.map(|(_, at)| at))
             .fold(self.seen_unix_ms, u64::max)
     }
+}
+
+/// A skill's `do.task` run, or a skill's answer at its gate, as
+/// `skills/tasks` told it (#7873): lamp-tasks' run of it, which
+/// `tasks/status` never lists, and lamp-skills' gate.
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub struct SkillRun {
+    pub skill: String,
+    /// lamp-tasks' id of the run; none for an answer with no run kept (a
+    /// read's).
+    pub run: Option<String>,
+    /// The engine it began on, as `tasks/status` names engines.
+    pub engine: Option<String>,
+    /// When its first news came, by the bus.
+    pub at_unix_ms: u64,
+    /// How the run ended, `ran` or `failed`, and when.
+    pub ended: Option<(SkillTaskStage, u64)>,
+    /// Why its answer waits for its gate: the newest reason.
+    pub held: Option<String>,
+    /// Its answer told or dropped, and when.
+    pub answer: Option<(SkillTaskStage, u64)>,
 }
 
 /// One step of a turn.
@@ -192,6 +214,9 @@ pub struct Timeline {
     light: Option<Light>,
     /// The tasks' agents, by task number: the newest [`KEPT`].
     tasks: BTreeMap<u64, Agent>,
+    /// The skills' runs and answers (#7873), oldest first: the newest
+    /// [`KEPT`].
+    skill_runs: VecDeque<SkillRun>,
 }
 
 impl Timeline {
@@ -222,6 +247,54 @@ impl Timeline {
                 entry
             })
             .collect()
+    }
+
+    /// The skills' runs and answers kept, newest first (#7873).
+    pub fn skill_runs(&self) -> Vec<SkillRun> {
+        self.skill_runs.iter().rev().cloned().collect()
+    }
+
+    /// What `skills/tasks` said at `at` (#7873), when it checks: a run
+    /// begun is a new one; its end goes to the run of its id; a hold, told
+    /// or dropped to the skill's newest whose answer has not ended. One
+    /// found nowhere is a new one: a read's answer has no run.
+    pub fn skill_task(&mut self, news: SkillTask, at: u64) {
+        if news.check().is_err() {
+            return;
+        }
+        let found = match news.stage {
+            SkillTaskStage::Started => None,
+            SkillTaskStage::Ran | SkillTaskStage::Failed => self
+                .skill_runs
+                .iter()
+                .rposition(|kept| kept.run.is_some() && kept.run == news.run),
+            SkillTaskStage::Held | SkillTaskStage::Told | SkillTaskStage::Dropped => self
+                .skill_runs
+                .iter()
+                .rposition(|kept| kept.skill == news.skill && kept.answer.is_none()),
+        };
+        let index = match found {
+            Some(index) => index,
+            None => {
+                self.skill_runs.push_back(SkillRun {
+                    skill: news.skill.clone(),
+                    run: news.run.clone(),
+                    at_unix_ms: at,
+                    ..SkillRun::default()
+                });
+                while self.skill_runs.len() > KEPT {
+                    self.skill_runs.pop_front();
+                }
+                self.skill_runs.len() - 1
+            }
+        };
+        let kept = &mut self.skill_runs[index];
+        match news.stage {
+            SkillTaskStage::Started => kept.engine = news.engine,
+            SkillTaskStage::Ran | SkillTaskStage::Failed => kept.ended = Some((news.stage, at)),
+            SkillTaskStage::Held => kept.held = news.gate,
+            SkillTaskStage::Told | SkillTaskStage::Dropped => kept.answer = Some((news.stage, at)),
+        }
     }
 
     /// The task's agent, within [`KEPT`] tasks: the lowest numbers go.
@@ -324,6 +397,10 @@ impl Timeline {
             };
             self.light = Some(light);
             self.did(at, did);
+        } else if topic == SkillTask::TOPIC {
+            if let Ok(news) = message.parse::<SkillTask>() {
+                self.skill_task(news, at);
+            }
         } else if topic == SkillEvent::TOPIC
             && let Ok(event) = message.parse::<SkillEvent>()
         {
