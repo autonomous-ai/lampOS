@@ -645,10 +645,10 @@ fn openclaw_check(root: &Path, file: &Path) -> Result<(), String> {
                     &out.stdout,
                 ))
         });
-    let argv = lamp_update::openclaw_install::validate_argv(
+    let argv = cut_check_argv(
+        &file.to_string_lossy(),
         &owner.uid().to_string(),
         &owner.gid().to_string(),
-        &file.to_string_lossy(),
         joined,
     );
     lamp_checked_replace::validate(
@@ -656,6 +656,14 @@ fn openclaw_check(root: &Path, file: &Path) -> Result<(), String> {
         &[("PATH", "/usr/sbin:/usr/bin:/sbin:/bin")],
         lamp_checked_replace::VALIDATE_WITHIN,
     )
+}
+
+/// The command [`openclaw_check`] runs on the cut in `file`, owned by
+/// `uid`:`gid`: `joined` (the gateway's unit has a `MainPID`), through
+/// OpenClaw's wrapper into the running gateway; else in OpenClaw's
+/// namespace of its own (`lamp_update::openclaw_install::validate_argv`).
+pub fn cut_check_argv(file: &str, uid: &str, gid: &str, joined: bool) -> Vec<String> {
+    lamp_update::openclaw_install::validate_argv(uid, gid, file, joined)
 }
 
 /// What [`forget_agents`] would do under `root`, one step an entry, with
