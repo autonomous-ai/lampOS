@@ -884,6 +884,16 @@ switch: Harness task rows (`LAMP_SERVICE_RECORDS_TASKS`, slice 3,
 `LAMP_SERVICE_RECORDS_SDK` below. With
 `LAMP_SERVICE_RECORDS` off nothing is kept.
 
+The agent's rows (`LAMP_SERVICE_RECORDS_AGENT`, with lamp-services'
+`--run-calls`) and the told caps (`LAMP_SERVICE_RECORDS_LINKED_TOLD`) are on
+in the product since 19 Nov (`lamp-voice.service`), by the product owner's
+rule of 18 Nov that everything is on by default
+(https://github.com/autonomous-ai/lampOS/issues/6811#issuecomment-6977525471), with their
+own legs owed (#7960's ROW passed the connector legs beside them). The task, reminder and sdk rows and the source tool
+stay off until their own ROWs; `linked.sock` (`LAMP_MEMORY_LINKED_SOCKET`)
+stays off: nothing writes to it yet, and the installer doesn't make
+`lampos-linked`.
+
 - **Its own bound.** At most 16 changes wait, apart from the connector
   records' 32, so a burst of task or reminder news never pushes out a
   send's record. One a key: a newer change of the same person and key
@@ -917,7 +927,7 @@ switch: Harness task rows (`LAMP_SERVICE_RECORDS_TASKS`, slice 3,
 - **Rollback.** Only the task rows call it, behind their own switch, so an
   older voice differs in having no `linked_dropped` fact and no task rows.
 
-### Linked records told: the caps (slice 8, the voice's `LAMP_SERVICE_RECORDS_LINKED_TOLD`, off)
+### Linked records told: the caps (slice 8, the voice's `LAMP_SERVICE_RECORDS_LINKED_TOLD`, on in the product)
 
 With `LAMP_SERVICE_RECORDS_LINKED_TOLD=on` beside `LAMP_SERVICE_RECORDS_TOLD`
 and `LAMP_SERVICE_RECORDS` (the second route only,
