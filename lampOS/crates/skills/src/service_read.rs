@@ -156,6 +156,17 @@ impl Turns {
         true
     }
 
+    /// Takes the turn unless a read holds it now, with no gap waited for
+    /// after the last: a told answer's ([`tell`]).
+    fn take_unheld(&self) -> bool {
+        let mut state = self.state();
+        if state.held {
+            return false;
+        }
+        state.held = true;
+        true
+    }
+
     /// Gives the turn back, the read ended at `now_ms`.
     pub fn give_back(&self, now_ms: u64) {
         let mut state = self.state();
@@ -596,12 +607,64 @@ pub fn run(step: &ReadStep, room: &mut impl Room) -> String {
 }
 
 /// What a skill's task's agent found (`crate::task::told`'s lines, its
-/// run's runner keeping it, a `net` run's too): said to the owner as a read's
-/// lines are, behind the same gate, turn and wait, as exact words, the
-/// gate judged again before each line. The journal's words: how many
+/// run's runner keeping it, a `net` run's too): said as soon as its run
+/// ended, as exact words, in order, with no read's gate (#7894): no
+/// owner alone or steady, no voice heard, no quiet hours, no [`WAIT`].
+/// Each line is held only while the lamp can't speak ([`held`]: the
+/// privacy switch, the microphones off, asleep, or paused) and said the
+/// moment it can; and while another read says its lines, never between
+/// them. The turn taken is given back as it ends, so a scheduled read
+/// waits its [`AFTER_ANOTHER`] after it. The journal's words: how many
 /// lines were said, never one.
 pub fn tell(lines: &[String], room: &mut impl Room) -> String {
-    tell_within(lines, WAIT, false, room)
+    if lines.is_empty() {
+        return "nothing to tell".into();
+    }
+    let turns = room.turns();
+    let mut taken: Option<Taken<'static>> = None;
+    let all = lines.len();
+    let mut outcome = format!("told {all}");
+    for (at, line) in lines.iter().enumerate() {
+        let mut said_why = None;
+        loop {
+            let why = held(&room.seen()).or_else(|| match turns {
+                Some(turns) if taken.is_none() => {
+                    if !turns.take_unheld() {
+                        return Some(Closed::AnotherRead);
+                    }
+                    taken = Some(Taken { turns });
+                    None
+                }
+                _ => None,
+            });
+            let Some(why) = why else { break };
+            if said_why != Some(why) {
+                said_why = Some(why);
+                room.waits(why.words());
+            }
+            room.wait(POLL);
+        }
+        if let Err(why) = room.say(line) {
+            outcome = format!("stopped: a line was not said ({why}), {at} of {all} told");
+            break;
+        }
+    }
+    if let Some(taken) = taken {
+        taken.end(room.now_ms());
+    }
+    outcome
+}
+
+/// Why the lamp can't speak now, if it can't: the only holds of a told
+/// answer ([`tell`]), the terms of [`judge`]'s it keeps.
+fn held(seen: &Seen) -> Option<Closed> {
+    if seen.private.is_some() {
+        Some(Closed::Private)
+    } else if seen.paused {
+        Some(Closed::Paused)
+    } else {
+        None
+    }
 }
 
 /// What `skills/tasks` says of `skill`'s answer found waiting for its gate
@@ -663,15 +726,16 @@ pub fn tell_failed(line: &str, asking: bool, room: &mut impl Room) -> String {
     }
 }
 
-/// [`tell`] as news from work handed over: behind the same gate, said the
+/// A failed run's line as news from work handed over: behind a read's gate, said the
 /// next time the owner is seen within [`NEWS_WAIT`], and dropped at quiet
 /// hours, never held through them.
 pub fn tell_news(lines: &[String], room: &mut impl Room) -> String {
     tell_within(lines, NEWS_WAIT, true, room)
 }
 
-/// [`tell`], waiting at most `within`, and given up at quiet hours when
-/// `quiet_drops`.
+/// Lines said behind a read's gate, turn and wait, the gate judged again
+/// before each line: waiting at most `within`, and given up at quiet hours
+/// when `quiet_drops`.
 fn tell_within(
     lines: &[String],
     within: Duration,
