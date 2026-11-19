@@ -645,6 +645,15 @@ riêng: dòng việc Harness (`LAMP_SERVICE_RECORDS_TASKS`, lát 3,
 `LAMP_SERVICE_RECORDS_SDK` bên dưới. Khi
 `LAMP_SERVICE_RECORDS` tắt thì không giữ gì.
 
+Các dòng của agent (`LAMP_SERVICE_RECORDS_AGENT`, cùng `--run-calls` của
+lamp-services) và giới hạn kể (`LAMP_SERVICE_RECORDS_LINKED_TOLD`) bật trong
+sản phẩm từ 19/11 (`lamp-voice.service`), theo quy tắc của chủ sản phẩm ngày
+18/11 là mọi thứ bật mặc định
+(https://github.com/autonomous-ai/lampOS/issues/6811#issuecomment-6977525471), các bước riêng của chúng
+còn nợ (ROW của #7960 đạt các bước bản ghi kết nối bên cạnh). Dòng việc, dòng lời nhắc, dòng sdk và công cụ tìm nguồn
+vẫn tắt cho tới ROW riêng; `linked.sock` (`LAMP_MEMORY_LINKED_SOCKET`) vẫn
+tắt: chưa có gì ghi vào nó, và trình cài đặt chưa tạo nhóm `lampos-linked`.
+
 - **Giới hạn riêng.** Tối đa 16 thay đổi chờ, tách khỏi 32 của bản ghi
   connector, để một loạt tin việc hay lời nhắc không bao giờ đẩy mất bản ghi
   của một lần gửi. Mỗi khóa một: thay đổi mới hơn của cùng người và khóa thay
@@ -678,7 +687,7 @@ riêng: dòng việc Harness (`LAMP_SERVICE_RECORDS_TASKS`, lát 3,
   voice cũ chỉ khác ở chỗ không có dữ kiện `linked_dropped` và không có
   dòng việc.
 
-### Kể bản ghi liên kết: giới hạn (lát 8, `LAMP_SERVICE_RECORDS_LINKED_TOLD` của voice, tắt)
+### Kể bản ghi liên kết: giới hạn (lát 8, `LAMP_SERVICE_RECORDS_LINKED_TOLD` của voice, bật trong sản phẩm)
 
 Khi `LAMP_SERVICE_RECORDS_LINKED_TOLD=on` cùng `LAMP_SERVICE_RECORDS_TOLD`
 và `LAMP_SERVICE_RECORDS` (chỉ tuyến thứ hai,
