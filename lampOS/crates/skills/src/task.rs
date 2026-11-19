@@ -57,7 +57,8 @@
 //!   write's) ends with it in lamp-tasks' answer
 //!   (`lamp_tasks::skill_task::tells_answer`), which is said to the owner
 //!   sentence by sentence as exact words, never a turn for the model,
-//!   behind a read's gate and turn (`crate::service_read::tell`). Nothing
+//!   as soon as the run ended, with no read's gate, held only while the
+//!   lamp is private or paused (`crate::service_read::tell`, #7894). Nothing
 //!   else of a run is told; the journal says only how many sentences were
 //!   said.
 //! - **Off**, a `do.task` loads and hands nothing over, and the journal
