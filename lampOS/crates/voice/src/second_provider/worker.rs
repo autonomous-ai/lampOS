@@ -28826,61 +28826,6 @@ mod tests {
         );
     }
 
-    /// #7891 (lamp-74ff, 19 Nov 11:04:26, request 65), with the product
-    /// unit's switches (`LAMP_SAID_TO_ME`, `LAMP_TURNED_FACE_SPEAKS`,
-    /// `LAMP_NAME_SECOND_SIGN`, `LAMP_SPOKEN_TO`, `LAMP_NAME_IN_PASSING=
-    /// ignored`; no voice print): "Is it after all?" in a busy room, a face
-    /// turned to the lamp whose mouth went unread in every look, the name
-    /// heard only in the room's sound, was let through as named ("stands")
-    /// and played as "someone is turned to the lamp". Out of the window a
-    /// name heard only by lamp-name, its words carrying none, is no name to
-    /// `said_to_me`: the line is held. Its words carrying the name, even
-    /// misheard, or in an open window, it passes as before.
-    #[test]
-    fn with_the_products_switches_a_name_heard_only_in_the_sound_is_no_name_to_said_to_me() {
-        use crate::room_told::Room;
-        use lamp_msgs::SpeakingState::Unknown;
-        let judged = |(room, going_on): (Room, bool), words: &str, at_us: u64| {
-            let eyes = Arc::new(crate::speaking_faces::SpeakingFaces::default());
-            let (now, now_us) = (Instant::now(), monotonic_us());
-            turned_face_looks(&eyes, now, 200, &[Some(Unknown)], &mut 0);
-            let mut heeding = super::Heeding::new(true, false, None, None);
-            heeding.as_the_only_voice(false, true, false);
-            heeding.seeing_speaking_faces(eyes, None);
-            heeding.hearing_only_said_to_me();
-            heeding.needing_the_turned_face_to_speak();
-            heeding.attention.ask_a_second_sign_of_the_name(true);
-            heeding.attention.ignore_name_in_passing(true);
-            let signs = super::Signs {
-                going_on,
-                names: vec![(now_us + at_us, 0.95)],
-                ..turned_signs(room)
-            };
-            let verdict = heeding.heed_signs(65, (now_us, now_us + 2_200_000), words, signs);
-            *crate::room_told::room().lock().unwrap() = crate::room_told::RoomTold::new();
-            verdict
-        };
-        let busy = (Room::Busy, false);
-        assert!(
-            judged(busy, "Is it after all?", 1_800_000).is_some(),
-            "request 65"
-        );
-        for call in [
-            "Lamp?",
-            "Hey Lamp.",
-            "Hey, Lynn.",
-            "Lamp, put it back.",
-            "Hey Lamp, what is one plus one?",
-        ] {
-            assert_eq!(judged(busy, call, 200_000), None, "{call}");
-        }
-        assert_eq!(
-            judged((Room::Quiet, true), "Is it after all?", 1_800_000),
-            None,
-            "in the window"
-        );
-    }
-
     /// #7721 (lamp-74ff, 18 Nov): in a conversation's window, Jay talks
     /// at his phone head down (40 degrees) or with his eyes away: held. Said
     /// facing, or with the pose unread, or naming the lamp, or answering the

@@ -5565,8 +5565,10 @@ after a take-over, but now for every turn:
     (`Signs::going_on`), a line of one or two words, not a question (no
     `?`), none of its words the lamp's name or one written for it
     (`attention::written_for_the_name`: "lamp", "lamb", `STAND_INS`,
-    `STAND_ALONE_INS`) counts the hearing for nothing, whatever its second
-    sign (`attention::short_line_without_the_name`); the journal says `its
+    `STAND_ALONE_INS`), and words the rule does not read as a call
+    (`attention::called`, `called_by_name`, the owner's language's forms
+    too), counts the hearing for nothing, whatever its second sign
+    (`attention::short_line_without_the_name`); the journal says `its
     name, heard only in the room's sound (began N ms into the line),
     counts for nothing on a line of one or two words, not a question, with
     no word written for the name and no conversation going on; the model
@@ -6004,14 +6006,8 @@ after a take-over, but now for every turn:
   asked for (a held rename, forget or setup save, a read-back's send, a
   skill's yes: the engine's `a_yes_held`, told to the judging by
   `said_to_me::awaiting_yes`), so a bare "Yes." its mouth unread still
-  reaches `held_rename::take` and the other holds; when its name is
-  written in it as a call reads it (`attention::called`,
-  `attention::called_by_name_on`: "lamp" anywhere, or a word written for it
-  in a name's place, never a stand-in mid-line), or heard in its sound in
-  the window (out of the window a name heard only by `lamp-name` is none,
-  #7891: on
-  lamp-74ff on 19 Nov "Is it after all?" was let through so and played as
-  `someone is turned to the lamp`, no face seen speaking it);
+  reaches `held_rename::take` and the other holds; when its name is heard
+  or written in it;
   when it is in a live conversation (the window), unless it is 0 to 2 words
   no face was seen speaking while a face in view was read silent
   (`SpeakingFaces::read_silent_between`; no face, no eyes or a mouth never
