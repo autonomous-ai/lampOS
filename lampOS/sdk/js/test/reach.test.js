@@ -120,4 +120,16 @@ test('the try-it page draws the not-yet region and reads the body\'s reach throu
   assert.match(html, /class="notyet"/);
   assert.match(html, /bodyReach\.reachOf\(limit\)/);
   assert.match(html, /doneWords\(data, data\.joint, limits\[data\.joint\]\)/);
+  assert.match(html, /limit\.pose\.stand >= 0 \? \[limit\.pose\.stand, 180\] : \[-180, limit\.pose\.stand\]/, 'the region is drawn on the side of the stand away from the fold');
+  assert.match(html, /id="holdnote"/);
+});
+
+test('a joint that counts down from its fold has its stand below the fold: past it, away from the fold, is not yet', () => {
+  const down = limitsOf({ stands: true, joints: { shoulder: { folded_counts: 2076, stand_counts: 1537, min_deg: -90, max_deg: 40 } } }).shoulder;
+  assert.ok(Math.abs(down.pose.stand + 47.4) < 0.1 && down.pose.max === 0 && Math.abs(down.pose.min + 47.4) < 0.1);
+  assert.equal(aboveStand(down, -50), true, 'further from the fold than the stand');
+  assert.equal(aboveStand(down, -30), false);
+  assert.equal(aboveStand(down, 10), false, 'the fold side of the fold is the servo\'s business, not "above the stand"');
+  assert.ok(Math.abs(clampTo(down, -60) + 47.4) < 0.1);
+  assert.match(reachText(down, -50), /is above the stand, it will be cut to -47\.4°/);
 });
