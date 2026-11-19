@@ -3373,6 +3373,53 @@ fn a_cut_openclaws_own_check_does_not_take_is_removed() {
     assert_eq!(fs::read_dir(&state).unwrap().count(), 1);
 }
 
+/// Whether `folder`'s lock (an exclusive `flock` on the folder) is held
+/// by another writer just now.
+fn folder_lock_held(folder: &Path) -> bool {
+    use rustix::fs::{FlockOperation, Mode, OFlags};
+    let dir = rustix::fs::open(
+        folder,
+        OFlags::RDONLY | OFlags::DIRECTORY | OFlags::CLOEXEC,
+        Mode::empty(),
+    )
+    .unwrap();
+    match rustix::fs::flock(&dir, FlockOperation::NonBlockingLockExclusive) {
+        Ok(()) => false,
+        Err(rustix::io::Errno::WOULDBLOCK) => true,
+        Err(error) => panic!("flock: {error}"),
+    }
+}
+
+/// Seventh's P2 on #7872: lamp-tasks and lamp-update each read, merge,
+/// check and rename `openclaw.json`; the reset's cut is a third such
+/// writer. It holds the state folder's lock, as they do, from before its
+/// read through OpenClaw's own check to the rename, and lets it go after.
+#[test]
+fn a_cut_of_openclaws_config_holds_the_state_folders_lock_through_its_check() {
+    let root = Root::new();
+    let state = root.path("var/lib/lampos-openclaw/state");
+    fs::create_dir_all(&state).unwrap();
+    let json = state.join("openclaw.json");
+    let theirs = r#"{"gateway":{"port":18789},"models":{}}"#;
+    fs::write(&json, theirs).unwrap();
+    let mut held = None;
+    let mut take = |_: &Path| {
+        held = Some(folder_lock_held(&state));
+        Ok(())
+    };
+    assert!(reset::forget_agents_checked(&root.0, &mut take, &mut |_| {}).unwrap() > 0);
+    assert_eq!(
+        held,
+        Some(true),
+        "the state folder was not locked through the check"
+    );
+    assert!(!folder_lock_held(&state), "the lock outlived the cut");
+    assert_eq!(
+        fs::read(&json).unwrap(),
+        reset::cut_openclaw_config(theirs.as_bytes()).unwrap()
+    );
+}
+
 /// Every path under `at`, with a file's bytes or a link's target, never
 /// followed.
 fn snapshot(at: &Path, found: &mut Vec<(PathBuf, Vec<u8>)>) {
