@@ -6005,9 +6005,11 @@ after a take-over, but now for every turn:
   skill's yes: the engine's `a_yes_held`, told to the judging by
   `said_to_me::awaiting_yes`), so a bare "Yes." its mouth unread still
   reaches `held_rename::take` and the other holds; when its name is
-  written in it, or heard in its sound with a word of its words the name or
-  one written for it (`attention::names_it_in_words`) or in the window (out
-  of the window a name heard only by `lamp-name` is none, #7891: on
+  written in it as a call reads it (`attention::called`,
+  `attention::called_by_name_on`: "lamp" anywhere, or a word written for it
+  in a name's place, never a stand-in mid-line), or heard in its sound in
+  the window (out of the window a name heard only by `lamp-name` is none,
+  #7891: on
   lamp-74ff on 19 Nov "Is it after all?" was let through so and played as
   `someone is turned to the lamp`, no face seen speaking it);
   when it is in a live conversation (the window), unless it is 0 to 2 words
