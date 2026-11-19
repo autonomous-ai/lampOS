@@ -4673,6 +4673,7 @@ mod tests {
                     "LAMP_HARD_ASKS_TO_AGENT=on",
                     "LAMP_HELD_WORDS_SEEN=on",
                     "LAMP_HISTORY_AFTER_NOTE=on",
+                    "LAMP_HISTORY_FORGET=on",
                     "LAMP_HISTORY_KEEPS_CALLS=on",
                     "LAMP_HISTORY_SAID_ONCE=on",
                     "LAMP_JOIN_CUT_WORDS=on",
