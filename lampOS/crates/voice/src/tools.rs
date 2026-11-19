@@ -2642,6 +2642,14 @@ fn run_call_with_scope(
                 }
                 _ => (told, answered),
             };
+            // And the makes they asked for that still wait their turn
+            // (`LAMP_MAKE_QUEUE`, #7679), on the same mark and rule.
+            let (told, answered) = match lease {
+                Some(lease) if heard && model.name == crate::remember::FORGET_EVERYTHING => {
+                    crate::make_queue::forget_with_everything((told, answered), lease)
+                }
+                _ => (told, answered),
+            };
             // And the name typed at setup, on the same mark and rule (#4461),
             // after the place, which finds the owner by that name.
             let (told, answered) = match lease {
