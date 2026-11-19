@@ -5190,11 +5190,16 @@ in and signed out, and on 0.6.60, signed in (#7507's ROW).
   Fields of openharness#4484 (proposed; each absent is today's behaviour):
   `ensure`'s `state: "stopped"` is replaced at once, with no `show`;
   `confirmed: false` (a resume Harness could not confirm) is replaced when
-  `show` gives no verdict by the bound; `result: "new"` with `whyCode:
-  "ENGINE_SESSION_GONE"` (Harness replaced a dead conversation itself) is
-  kept and recorded over the old one, with no extra close or `--fresh`,
-  journaled. `ensure` is given 120 s (`ENSURE_TIMEOUT`), past Harness's
-  up to ~15 s wait after a resume. A healthy session costs one `show` per open and nothing
+  `show` gives no verdict by the bound; `result: "new"` with any `whyCode`
+  (`ENGINE_SESSION_GONE`, `HARNESS_GONE`, `ENGINE_EXITED`, or one not
+  known yet: Harness replaced the session itself) is kept and recorded
+  over the old one, with no extra close or `--fresh`, journaled with its
+  code. `ensure` is given 120 s (`ENSURE_TIMEOUT`), past the ~60 s one
+  `ensure` can take (the Gateway call, the resume, its settle and
+  `AGENT_BUSY` retries); a healthy one is not slowed. A fresh OpenClaw
+  session's first words refused `ENGINE_NOT_READY` (~35 s seen) are tried
+  again every 5 s within the open's 120 s, and a task's refused reply is
+  tried again within its own bound: neither is a sign. A healthy session costs one `show` per open and nothing
   per turn. The worst case from a jam to a fresh session is about 120 s
   plus one `ensure`. `OneSession::with_on_replaced` is the hook for
   #7895's one told line to the person, not wired here. Journal: `<id> is
