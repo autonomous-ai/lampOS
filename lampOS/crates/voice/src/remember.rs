@@ -26599,9 +26599,11 @@ mod tests {
     /// writes a line heard as "kept N …" with id N ("kept …": 17), answers
     /// one heard as "gone …" as a forgotten source's, and refuses any other;
     /// then a session close, and the writer ends (its conversation with it).
-    /// `requests`: the memory requests this makes.
-    pub(crate) fn write_for_history_test(lines: &[(Option<&str>, &str)], requests: usize) {
-        let (socket, served) = memory("history-send", requests, |request| {
+    /// Each call has a socket of its own, served until the writer is done,
+    /// however many requests it makes.
+    pub(crate) fn write_for_history_test(lines: &[(Option<&str>, &str)]) {
+        static CALLS: AtomicU64 = AtomicU64::new(0);
+        fn answer(request: &Value) -> Value {
             let heard = request["heard"].as_str().unwrap_or("");
             match request["op"].as_str() {
                 Some("append_linked") if heard.starts_with("kept") => {
@@ -26617,6 +26619,36 @@ mod tests {
                 }
                 Some("append_linked") => json!({"ok":false,"error":"full"}),
                 _ => json!({"ok":true}),
+            }
+        }
+        let socket = std::env::temp_dir().join(format!(
+            "lamp-remember-history-send-{}-{}.sock",
+            std::process::id(),
+            CALLS.fetch_add(1, Ordering::Relaxed)
+        ));
+        let _ = std::fs::remove_file(&socket);
+        let listener = UnixListener::bind(&socket).unwrap();
+        listener.set_nonblocking(true).unwrap();
+        let stop = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
+        let stopped = std::sync::Arc::clone(&stop);
+        let served = std::thread::spawn(move || {
+            loop {
+                match listener.accept() {
+                    Ok((stream, _)) => {
+                        stream.set_nonblocking(false).unwrap();
+                        let mut line = String::new();
+                        if BufReader::new(stream.try_clone().unwrap())
+                            .read_line(&mut line)
+                            .is_ok()
+                            && let Ok(request) = serde_json::from_str::<Value>(&line)
+                        {
+                            let _ =
+                                (&stream).write_all(format!("{}\n", answer(&request)).as_bytes());
+                        }
+                    }
+                    Err(_) if stopped.load(Ordering::Acquire) => return,
+                    Err(_) => std::thread::sleep(Duration::from_millis(2)),
+                }
             }
         });
         let (send, receive) = sync_channel(lines.len() + 2);
@@ -26649,14 +26681,15 @@ mod tests {
             &HandOns::default(),
             None,
         );
+        stop.store(true, Ordering::Release);
         served.join().unwrap();
         let _ = std::fs::remove_file(socket);
     }
 
     /// `person`'s keep then their bare "forget that", through the voice's
     /// tools with a fake memory: the forget removes the keep (id 5) and
-    /// names the exchanges it removed, `{"<person>":[17]}` (the forget
-    /// half's answer, #7935). Whether the account's history held its sends
+    /// names the exchange it removed by its turn id, `{"<person>":
+    /// ["0a1b2c3d.<person>:17"]}` (the forget half's answer, #7982). Whether the account's history held its sends
     /// while the memory answered the forget is
     /// [`crate::history_send::HELD_AT_FORGET`].
     pub(crate) fn forget_for_history_test(person: &'static str) {
@@ -26666,7 +26699,8 @@ mod tests {
                 Some("forget") => {
                     crate::history_send::probe_forget();
                     let person = request["person"].as_str().unwrap_or("everyone");
-                    json!({"ok":true,"removed":1,"exchanges":{person:[17]}})
+                    let turn = lamp_msgs::history_turn_id("0a1b2c3d", person, 17);
+                    json!({"ok":true,"removed":1,"exchanges":{person:[turn]}})
                 }
                 _ => json!({"ok":false,"error":"unexpected","message":"m"}),
             }
