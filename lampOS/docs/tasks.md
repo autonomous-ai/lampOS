@@ -5200,6 +5200,33 @@ in and signed out, and on 0.6.60, signed in (#7507's ROW).
   #7895's one told line to the person, not wired here. Journal: `<id> is
   gone or stuck (<why>); closed, forgotten and replaced with a fresh
   session (#7906)`.
+- **The lightest reopen first, and the task not lost (#7906, the
+  owner's rule).** `OneSession::revive_or_replace` is a ladder:
+  - **(a)** A kept session whose engine or pane died (a plain shell,
+    `stopped`, gone) while OpenClaw's record still holds its conversation
+    (or the record can't be read) is let go with no close and no delete.
+    The next `ensure` is a plain resume, which keeps its memory. This is
+    tried once until a turn is answered.
+  - **(b)** Died again after that resume, a conversation OpenClaw no
+    longer holds, our own deadline close, or still `starting`: a fresh
+    conversation (`replace_kept`, then `ensure --fresh`, the same name and
+    token).
+  - **(c)** From the second replacement in a row, the backoff above.
+
+  A skill run whose session dies under its turn (`wait` reads a plain
+  shell idle) while `show` counts no tool run yet is put back once: its
+  words are typed again into the reopened session. Its turn still holds
+  the queue, so the tasks behind it keep their order, and its run's token
+  is kept. A turn that had already run a tool is never replayed. It ends
+  with "...after the task had started work, so it was not run again; ask
+  again". A second death ends it with its one line. A spoken task is never
+  typed again here: it is put back by the store as before (#7919's bound),
+  so there is no double put-back. Journal: `<id> died (<why>); OpenClaw
+  still holds its conversation, so a plain resume first (#7906)`, and
+  `<task>: its session died (<why>); its words typed again once into the
+  reopened one (#7906)`. The person's line for a replacement is not wired
+  here: `with_on_replaced` stays journal-only, and the told line is
+  #7895's and #7919's path.
 
 ### The limit accepted for Monday: a running skill's grants inside the gateway
 
