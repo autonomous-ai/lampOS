@@ -1317,6 +1317,55 @@ fn the_gateway_block_is_set_in_a_config_that_lacks_it_and_other_keys_are_kept() 
     );
 }
 
+/// #7868: the install's `gateway` block is checked by OpenClaw's own
+/// `config validate --json` before it lands, as `lampos` in OpenClaw's
+/// namespace, on a file beside the config, never the live one. Refused,
+/// the install fails with OpenClaw's words, the config stays byte for
+/// byte and nothing is left beside it; taken, the block is in place.
+#[test]
+fn a_gateway_block_openclaws_own_check_refuses_never_lands() {
+    let lamp = Lamp::new();
+    fs::create_dir_all(lamp.at(STATE)).unwrap();
+    fs::write(lamp.at(NS), "").unwrap();
+    let theirs = r#"{"models": {"mode": "merge"}}"#;
+    fs::write(lamp.at(CONFIG), theirs).unwrap();
+    let refusing = Runs {
+        fail_on: Some("config validate --json"),
+        error: "models.mode: Unrecognized key",
+        ..Runs::new(&lamp)
+    };
+    let error = gateway_config(lamp.root(), &mut refusing.runner(), &mut quiet()).unwrap_err();
+    assert!(error.contains("Unrecognized key"), "{error}");
+    assert_eq!(fs::read_to_string(lamp.at(CONFIG)).unwrap(), theirs);
+    assert_eq!(fs::read_dir(lamp.at(STATE)).unwrap().count(), 1);
+    let check = refusing
+        .lines()
+        .into_iter()
+        .find(|line| line.contains("config validate --json"))
+        .unwrap();
+    let (uid, gid) = own_ids();
+    assert!(
+        check.starts_with(&format!(
+            "{AS_LAMPOS}LAMP_NS_UID={uid} LAMP_NS_GID={gid} OPENCLAW_CONFIG_PATH={STATE}/.openclaw.json."
+        )) && check.ends_with(&format!(
+            ".new LAMP_HERMES_TOKEN=lamp-config-check /usr/bin/unshare --map-root-user --mount --pid --fork --kill-child --mount-proc --propagation private {NS} config validate --json"
+        )),
+        "{check}"
+    );
+
+    let taking = Runs::new(&lamp);
+    gateway_config(lamp.root(), &mut taking.runner(), &mut quiet()).unwrap();
+    let config: serde_json::Value =
+        serde_json::from_slice(&fs::read(lamp.at(CONFIG)).unwrap()).unwrap();
+    assert_eq!(config["models"], serde_json::json!({"mode": "merge"}));
+    assert_eq!(config["gateway"]["port"], 18789);
+    assert_eq!(fs::read_dir(lamp.at(STATE)).unwrap().count(), 1);
+    assert!(
+        taking.position("config validate --json")
+            < taking.position(&format!("chown -h lampos:lampos {CONFIG}"))
+    );
+}
+
 /// (the owner on #6226: every lamp has 6 GB) The gateway is always on with
 /// the switch on: once OpenClaw is there the round enables it (the
 /// `multi-user.target.wants` link `systemctl enable` makes) and starts it,
