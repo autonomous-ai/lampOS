@@ -494,6 +494,163 @@ pub const KEEP_CLAIMED_UNKEPT: &str = "(For you to know: you were about to say y
 /// something with no `remember` call.
 pub const NOT_KEPT_LINE: &str = "I didn't keep that. Tell me again and I'll remember it.";
 
+/// Where the second worker reads the switch for a keep claimed in any
+/// sentence of a reply (#7878). `on` only, off unless set: while no
+/// `remember` of the turn has run, a reply is said sentence by sentence,
+/// each held only until it is complete and judged ([`unclaimed_sentences`],
+/// [`claims_a_change`]), not only by its opening; a sentence that claims a
+/// keep or replace is held, with the rest, to the round's end. On
+/// lamp-e82d at 14432, 19 Nov 09:52, "Actually, I moved my car. It's on
+/// Level B1, spot 7 now." got no call and "Got it — your car is on Level
+/// B1, spot 7 now. That replaces wherever it was before.": its opening
+/// claims nothing, so all of it was said, and nothing was kept. No word of
+/// the person's line is read (the first builder's 13:44 ruling on #7924).
+pub const WHOLE_ENVIRONMENT: &str = "LAMP_KEEP_CLAIM_WHOLE";
+
+/// Whether [`WHOLE_ENVIRONMENT`] is on in this process's environment.
+pub fn whole_on() -> bool {
+    std::env::var(WHOLE_ENVIRONMENT).ok().as_deref() == Some("on")
+}
+
+/// What a sentence may open with that says something was kept, replaced or
+/// updated, past a lead-in ("Okay,", "Got it —"): the replace and update
+/// claims [`keep_claim`] doesn't read ("That replaces wherever it was
+/// before.", "I've updated that.", "Updated.").
+const CHANGE_CLAIMS: [&str; 12] = [
+    "that replaces",
+    "this replaces",
+    "that'll replace",
+    "that will replace",
+    "that's replaced",
+    "that has replaced",
+    "i've updated that",
+    "i've updated it",
+    "i have updated that",
+    "i've replaced it",
+    "i've replaced that",
+    "i've changed it",
+];
+
+/// How far `held`, a reply's text so far, may be said now (#7878, the
+/// first builder's 13:44 ruling): the byte length of its leading complete
+/// sentences that claim no keep or replace ([`claims_a_change`]). It stops
+/// at the first sentence that does (held, with all after it, to the
+/// round's end) and at a sentence not finished yet (held until it is). The
+/// bound is one sentence: nothing waits longer than its own sentence.
+pub fn unclaimed_sentences(held: &str) -> usize {
+    let mut said = 0;
+    for sentence in held.split_inclusive(['.', '!', '?']) {
+        if !sentence.trim_end().ends_with(['.', '!', '?']) || claims_a_change(sentence) {
+            break;
+        }
+        said += sentence.len();
+    }
+    said
+}
+
+/// The lead-ins a sentence's change claim may follow ([`CHANGE_CLAIMS`]).
+const CHANGE_LEADS: [&str; 9] = [
+    "okay",
+    "ok",
+    "got it",
+    "sure",
+    "alright",
+    "all right",
+    "done",
+    "so",
+    "and",
+];
+
+/// Whether any sentence of the whole `reply` claims a keep: one of today's
+/// keep claims ([`keep_claim`], hard or soft) or a replace or update said
+/// done ([`CHANGE_CLAIMS`]), at the sentence's start or after a lead-in
+/// ([`CHANGE_LEADS`]), never in a sentence asked as a question (#7878).
+/// Structure only, as [`keep_claim`] reads a reply.
+pub fn claims_a_change(reply: &str) -> bool {
+    change_claim(reply).is_some()
+}
+
+/// The keeps said in the person's own words after "I'll remember", which
+/// [`keep_claim`] leaves to an object word ("that", "it"): "I'll remember
+/// you're vegetarian.", "I'll remember your car is on B1." (V2's must-fix
+/// (3) on #7924). Never "I'll remember to …", a promise to remind, nor in a
+/// sentence that names a face or waits on a condition ([`change_claim`]).
+const KEEP_SAID: [&str; 4] = [
+    "i'll remember you",
+    "i will remember you",
+    "i'll remember your",
+    "i will remember your",
+];
+
+/// What a sentence of a reply says was done to the person's things
+/// ([`change_claim`]).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Change {
+    /// A keep said in memory's own words (a hard [`keep_claim`], or
+    /// [`KEEP_SAID`]): only a `remember` makes it true, whatever else ran.
+    Keep,
+    /// A replace or update said done ([`CHANGE_CLAIMS`]) or a soft keep:
+    /// another call that ran may be what it means ("I've updated that"
+    /// beside a reminder moved), so it counts only with no call at all.
+    Replace,
+}
+
+/// The strongest change any sentence of `reply` says done, never in a
+/// sentence asked as a question: a [`Change::Keep`] over a
+/// [`Change::Replace`] (#7878, #7924).
+pub fn change_claim(reply: &str) -> Option<Change> {
+    let text = reply
+        .replace('\u{2019}', "'")
+        .replace(['\u{2014}', '\u{2013}'], ",");
+    let mut found = None;
+    for sentence in text
+        .split_inclusive(['.', '!', '?'])
+        .map(str::trim)
+        .filter(|sentence| !sentence.is_empty() && !sentence.ends_with('?'))
+    {
+        match keep_claim(sentence) {
+            Some(KeepClaim::Hard | KeepClaim::Face) => return Some(Change::Keep),
+            Some(KeepClaim::Soft) => found = Some(Change::Replace),
+            None => {}
+        }
+        let mut rest = sentence.to_lowercase();
+        for _ in 0..2 {
+            let Some(lead) = CHANGE_LEADS.iter().find(|lead| {
+                rest.strip_prefix(**lead).is_some_and(|after| {
+                    after.starts_with(|c: char| !c.is_alphanumeric() && c != '\'')
+                })
+            }) else {
+                break;
+            };
+            rest = rest[lead.len()..]
+                .trim_start_matches(|c: char| !c.is_alphanumeric())
+                .to_owned();
+        }
+        let opens = |claim: &&str| {
+            rest.strip_prefix(*claim).is_some_and(|after| {
+                after.is_empty() || after.starts_with(|c: char| !c.is_alphanumeric())
+            })
+        };
+        // Never a face's sentence (the face reading decides those) nor a
+        // promise with a condition ("I'll remember your face once you tell
+        // me your name."): Friday's P2 on #7924.
+        let words: Vec<&str> = rest
+            .split(|c: char| !(c.is_alphanumeric() || c == '\''))
+            .filter(|word| !word.is_empty())
+            .collect();
+        let offer = words
+            .iter()
+            .any(|word| matches!(*word, "face" | "once" | "when" | "if" | "after" | "soon"));
+        if !offer && KEEP_SAID.iter().any(opens) {
+            return Some(Change::Keep);
+        }
+        if CHANGE_CLAIMS.iter().any(opens) {
+            found = Some(Change::Replace);
+        }
+    }
+    found
+}
+
 /// What the model is told of a reply that said it saved, or was saving,
 /// their face with no `remember_my_face` call ([`KeepClaim::Face`], #5141
 /// row 8). Its words were not said.
@@ -33034,5 +33191,84 @@ mod chapter_tests {
                 "chapter":"A new library job.","about":CHAPTER_ABOUT,"theirs":true})
         );
         assert!(chapters_found(&json!({"ok":false,"error":"bad_person"})).is_empty());
+    }
+
+    /// #7878: a keep, replace or update said done in any sentence is a
+    /// claim; a restatement, a question or a reply about something else is
+    /// not.
+    #[test]
+    fn a_change_claimed_in_any_sentence_is_read_whole() {
+        for reply in [
+            "Got it \u{2014} your car is on Level B1, spot 7 now. That replaces wherever it was before.",
+            "Okay, your car is on B1. I've updated that.",
+            "Okay, I've updated that: B1, spot 7.",
+            "Sure. I'll remember that.",
+            "Okay. I'll remember you're vegetarian.",
+            "Spot 7 on B1. Kept.",
+        ] {
+            assert!(claims_a_change(reply), "{reply}");
+        }
+        for reply in [
+            "Your car is on Level B1, spot 7 now. Good to know where to look.",
+            "Got it \u{2014} your car is on Level B1, spot 7 now.",
+            "Should I remember that your car is on B1?",
+            "Updates come every night.",
+            "I'll remember to remind you at five.",
+            "Done, I've updated your light.",
+            "Okay, it replaces your old one.",
+            "Updated forecast: rain at noon.",
+            "That replacement part sounds expensive.",
+        ] {
+            assert!(!claims_a_change(reply), "{reply}");
+        }
+    }
+
+    /// #7924: each complete sentence that claims nothing may be said; the
+    /// first that claims a keep or replace, and an unfinished one, are held.
+    #[test]
+    fn sentences_are_said_until_one_claims_a_keep() {
+        let e82d = "Got it \u{2014} your car is on Level B1, spot 7 now. That replaces wherever it was before.";
+        let first = "Got it \u{2014} your car is on Level B1, spot 7 now.";
+        assert_eq!(unclaimed_sentences(e82d), first.len());
+        assert_eq!(unclaimed_sentences("Got it"), 0);
+        assert_eq!(
+            unclaimed_sentences("Once upon a time, a lamp. It glowed"),
+            "Once upon a time, a lamp.".len()
+        );
+        assert_eq!(unclaimed_sentences("Kept: your car is on B1."), 0);
+        let story = "Here's one. A lamp lit a room. The end.";
+        assert_eq!(unclaimed_sentences(story), story.len());
+    }
+
+    /// V2's must-fix (3) on #7924: a keep in memory's own words is a
+    /// [`Change::Keep`], which counts beside any call; a replace or update
+    /// is a [`Change::Replace`], which counts only with none.
+    #[test]
+    fn a_keep_said_is_a_keep_and_an_update_is_a_replace() {
+        assert_eq!(
+            change_claim("Okay. I'll remember you're vegetarian."),
+            Some(Change::Keep)
+        );
+        assert_eq!(
+            change_claim("Your reminder is at 3. Kept."),
+            Some(Change::Keep)
+        );
+        assert_eq!(
+            change_claim("Got it. That replaces wherever it was before."),
+            Some(Change::Replace)
+        );
+        assert_eq!(
+            change_claim("Okay, I've updated that."),
+            Some(Change::Replace)
+        );
+        assert_eq!(change_claim("I'll remember to remind you at five."), None);
+        assert_eq!(
+            change_claim("I'll remember your face once you tell me your name."),
+            None
+        );
+        assert_eq!(
+            change_claim("I'll remember your spot once you say yes."),
+            None
+        );
     }
 }

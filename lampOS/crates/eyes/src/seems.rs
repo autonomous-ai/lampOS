@@ -9,7 +9,7 @@
 //! `unsure`, with a confidence ([`judge`]). No picture, print or name is
 //! kept or said: only the kind and the confidence.
 use crate::who::SIDE as ALIGNED;
-use lamp_msgs::{HumanSeems, SeemsKind, SeemsReader};
+use lamp_msgs::{HumanSeems, SeemsKind, SeemsReader, consent};
 use sha2::{Digest, Sha256};
 use std::{fs::File, io::Read, path::Path, sync::Arc, time::Duration};
 use tract_onnx::prelude::*;
@@ -43,26 +43,21 @@ pub const READ_EVERY: Duration = Duration::from_secs(2);
 /// `{"face_expressions":"yes", ...}`, present only while the yes stands
 /// (privacy-switch.md, "Face reads stay off without a yes").
 pub const FACE_EXPRESSIONS_FILE: &str = "/var/lib/lampOS/consent/face-expressions.json";
-const FACE_EXPRESSIONS_MOST_BYTES: u64 = 4096;
 
-/// Whether `path` holds a yes: a JSON object whose `face_expressions` is
-/// exactly `"yes"`. Missing, unreadable, over 4096 bytes, not JSON, or
-/// anything else is no, as with the ears' `room_sounds_yes`.
+/// Whether faces may be read by `path` (#7767), by `lamp_msgs::consent`'s
+/// one rule ([`consent::allowed`]) with `LAMP_NOTICING_BY_DEFAULT`'s default
+/// ([`consent::noticing_by_default`]): `face_expressions` exactly `"yes"`
+/// is a yes; exactly `"no"`, unreadable, over 4096 bytes, not JSON or
+/// anything else is no; a missing file is no with the switch off, as with
+/// the ears' `room_sounds_yes`, and a yes with it on.
 pub fn face_expressions_yes(path: &Path) -> bool {
-    let Ok(file) = File::open(path) else {
-        return false;
-    };
-    let mut text = String::new();
-    if file
-        .take(FACE_EXPRESSIONS_MOST_BYTES + 1)
-        .read_to_string(&mut text)
-        .is_err()
-        || text.len() as u64 > FACE_EXPRESSIONS_MOST_BYTES
-    {
-        return false;
-    }
-    serde_json::from_str::<serde_json::Value>(&text)
-        .is_ok_and(|value| value.get("face_expressions").and_then(|v| v.as_str()) == Some("yes"))
+    face_expressions_allowed(path, consent::noticing_by_default())
+}
+
+/// [`face_expressions_yes`] with the default given: a missing file is
+/// `by_default`.
+pub fn face_expressions_allowed(path: &Path, by_default: bool) -> bool {
+    consent::allowed(path, consent::FACE_EXPRESSIONS, by_default)
 }
 
 /// Whether a reader reads the near face now.
@@ -345,6 +340,33 @@ mod tests {
             assert!(!read(no), "{no}");
             assert_eq!(due(None, &file), Due::NoYes, "{no}");
         }
+        std::fs::remove_dir_all(&folder).unwrap();
+    }
+
+    /// #7767: with `LAMP_NOTICING_BY_DEFAULT` on, a missing file is a yes;
+    /// a kept no and a file that can't be read stay no either way. Off, a
+    /// missing file is no, as [`face_expressions_yes`] reads it today.
+    #[test]
+    fn a_missing_yes_is_the_default_only_with_the_switch_and_a_no_stays_no() {
+        let folder =
+            std::env::temp_dir().join(format!("face-expressions-default-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&folder);
+        std::fs::create_dir_all(&folder).unwrap();
+        let file = folder.join("face-expressions.json");
+        assert!(!face_expressions_allowed(&file, false), "missing, off");
+        assert!(face_expressions_allowed(&file, true), "missing, on");
+        assert_eq!(face_expressions_yes(&file), consent::noticing_by_default());
+        for text in [
+            r#"{"version":1,"face_expressions":"no","at_unix_s":3,"by":"voice"}"#,
+            "not json",
+            r#"{"face_expressions":"yes""#,
+        ] {
+            std::fs::write(&file, text).unwrap();
+            assert!(!face_expressions_allowed(&file, true), "{text}");
+            assert!(!face_expressions_allowed(&file, false), "{text}");
+        }
+        std::fs::write(&file, r#"{"face_expressions":"yes"}"#).unwrap();
+        assert!(face_expressions_allowed(&file, false));
         std::fs::remove_dir_all(&folder).unwrap();
     }
 

@@ -497,6 +497,9 @@ pub enum Words {
     ExactSound {
         samples: Vec<i16>,
         text: Option<String>,
+        /// A long line's pieces, played as they come (#7892): `samples`
+        /// is then empty. None for any other line.
+        pieces: Option<Arc<tts_cache::Pieces>>,
     },
     /// A paired computer's own clip (docs/control.md, "Sounds"), by its
     /// path under lamp-control's clips folder ([`CLIPS_ENVIRONMENT`]),
@@ -1515,9 +1518,18 @@ pub struct Ticket {
     line: LineMeta,
     /// An exact line's words ([`Words::ExactSound`]), none for anything else.
     said: Option<String>,
+    /// A long exact line's pieces (#7892): held while it plays, let go
+    /// with the ticket, which stops its renderer.
+    pieces: Option<Arc<tts_cache::Pieces>>,
 }
 
 impl Ticket {
+    /// A long exact line's feed, its pieces played as they come (#7892);
+    /// none for any other say.
+    pub(crate) fn pieces(&self) -> Option<Arc<crate::speaker_stream::Feed>> {
+        self.pieces.as_ref().map(|pieces| pieces.feed())
+    }
+
     /// The line this ticket plays, as `voice/line` tells it: an exact or
     /// cached line taken to play. None for a clip, a sound or a model's
     /// turn, whose words the voice does not hold.
@@ -1607,6 +1619,7 @@ impl Ticket {
                 question: false,
                 line: Default::default(),
                 said: None,
+                pieces: None,
             },
             answered,
         )
@@ -2081,6 +2094,7 @@ impl Says {
             Words::ExactSound {
                 samples,
                 text: None,
+                pieces: None,
             },
             NORMAL_PRIORITY,
         )
@@ -2101,6 +2115,7 @@ impl Says {
             Words::ExactSound {
                 samples,
                 text: None,
+                pieces: None,
             },
             NORMAL_PRIORITY,
         );
@@ -2137,6 +2152,7 @@ impl Says {
             Words::ExactSound {
                 samples,
                 text: None,
+                pieces: None,
             },
             priority,
         );
@@ -2356,6 +2372,7 @@ impl Says {
                 question: false,
                 line: Default::default(),
                 said: None,
+                pieces: None,
             },
         ))
     }
@@ -2380,6 +2397,7 @@ impl Says {
                 question: false,
                 line: waiting.request.line,
                 said: None,
+                pieces: None,
             },
         ))
     }
@@ -2435,6 +2453,7 @@ impl Says {
             question: false,
             line: Default::default(),
             said: None,
+            pieces: None,
         };
         let why = match may_play_exact(now) {
             ExactNow::Play => return Some(self.open_stream(by, ticket, at_us)),
@@ -2466,7 +2485,12 @@ impl Says {
         self.expire(now_us);
         let index = self.next_of(|request| matches!(request.words, Words::ExactSound { .. }))?;
         let waiting = self.waiting.remove(index);
-        let Words::ExactSound { samples, text } = waiting.request.words else {
+        let Words::ExactSound {
+            samples,
+            text,
+            pieces,
+        } = waiting.request.words
+        else {
             unreachable!("next_of chose an exact line");
         };
         Some((
@@ -2482,6 +2506,7 @@ impl Says {
                 question: false,
                 line: waiting.request.line,
                 said: text,
+                pieces,
             },
         ))
     }
@@ -2624,6 +2649,7 @@ impl Says {
                 question,
                 line: Default::default(),
                 said: None,
+                pieces: None,
             },
             quoted,
         ))
@@ -2660,6 +2686,7 @@ impl Says {
             question: false,
             line: Default::default(),
             said: None,
+            pieces: None,
         })
     }
 
@@ -2685,6 +2712,7 @@ impl Says {
             question: false,
             line: Default::default(),
             said: None,
+            pieces: None,
         })
     }
 
@@ -2887,6 +2915,7 @@ fn serve_client(
                     request.words = Words::ExactSound {
                         samples: read_clip(path, &folders.clips)?,
                         text: None,
+                        pieces: None,
                     };
                 }
                 Words::Recording(name) => {
@@ -2897,16 +2926,16 @@ fn serve_client(
                     request.words = Words::Sound(recordings.cached(text)?);
                 }
                 Words::Exact(text) => {
-                    let (samples, said) = match request.line.voice.as_deref() {
-                        // The app's voice preview (#7485): the words as
-                        // sent, in that voice, never the owner's fixed line.
-                        Some(voice) => (recordings.rendered_in(text, voice)?, text.as_str()),
-                        None => recordings.rendered(text)?,
+                    let (played, said) = recordings.played(text, request.line.voice.as_deref())?;
+                    let (samples, pieces) = match played {
+                        tts_cache::Played::Whole(samples) => (samples, None),
+                        tts_cache::Played::Pieces(pieces) => (Vec::new(), Some(pieces)),
                     };
                     request.line.said = Some((said.to_owned(), lamp_msgs::LineSource::Exact));
                     request.words = Words::ExactSound {
                         samples,
                         text: crate::language::is_fixed(text).then(|| said.to_owned()),
+                        pieces,
                     };
                 }
                 // A fixed line asked as text, the first stand's (#4710),
@@ -3360,6 +3389,33 @@ impl Recordings {
             }
             None => cache.render_once(text).map(|samples| (samples, text)),
         }
+    }
+
+    /// An exact `text` to play, as [`Self::rendered`] says it, or in the
+    /// lamp's voice named `voice` as [`Self::rendered_in`] does (the app's
+    /// voice preview, #7485: the words as sent, never the owner's fixed
+    /// line). A long line other than a fixed one is played as it comes,
+    /// its pieces after the first rendered while it plays
+    /// ([`tts_cache::TtsCache::render_played`], #7892).
+    pub fn played<'a>(
+        &self,
+        text: &'a str,
+        voice: Option<&str>,
+    ) -> Result<(tts_cache::Played, &'a str), String> {
+        let cache = self
+            .cache
+            .as_ref()
+            .ok_or_else(|| "the speech service is off (no speech cache)".to_owned())?;
+        if voice.is_none()
+            && (cache.owners_words(text).is_some() || crate::language::is_fixed(text))
+        {
+            return self
+                .rendered(text)
+                .map(|(samples, said)| (tts_cache::Played::Whole(samples), said));
+        }
+        cache
+            .render_played(text, voice)
+            .map(|played| (played, text))
     }
 
     /// An exact `text` rendered now in the lamp's voice named `voice`, never
@@ -4829,6 +4885,7 @@ mod tests {
         exact.request.words = Words::ExactSound {
             samples: vec![1; 8],
             text: None,
+            pieces: None,
         };
         let (mut from, _from_answered) = asked("reminders", 8, 10_000_000);
         from.request.words = Words::From(Source::Schedule);
@@ -6444,6 +6501,116 @@ mod tests {
         ] {
             assert_eq!(parse(&line).unwrap_err(), why, "{line}");
         }
+    }
+
+    /// A long exact line of three sentences, each a piece of its own
+    /// (`tts_cache::pieces`): about 25 s together, past the 20 s a render
+    /// may give.
+    const THREE_PIECES: &str = "First, the lamp kept the room warm all evening and dimmed \
+        itself slowly while you read the long book by the window. \
+        Second, it listened for the kettle and the door, and it asked before it turned \
+        the speaker up past half. \
+        Third, it noted the weather at seven each morning and kept a short list of the \
+        day's small tasks for you.";
+
+    /// The pieces a test's speech cache was asked to render, in turn.
+    type RenderedPieces = Arc<std::sync::Mutex<Vec<String>>>;
+
+    /// A say service whose speech cache renders each piece at once, but the
+    /// second ("Second, ...") only once `release` is sent (or after 10 s),
+    /// and keeps every piece it was asked to render, in turn.
+    fn pieces_served(tag: &str) -> (PathBuf, PathBuf, Says, mpsc::Sender<()>, RenderedPieces) {
+        let dir = socket_dir(tag);
+        fs::create_dir_all(&dir).unwrap();
+        let path = dir.join("say.sock");
+        let (release, held) = mpsc::channel::<()>();
+        let held = std::sync::Mutex::new(held);
+        let asked = Arc::new(std::sync::Mutex::new(Vec::new()));
+        let seen = Arc::clone(&asked);
+        let render: tts_cache::Render = Box::new(move |text: &str| {
+            seen.lock().unwrap().push(text.to_owned());
+            if text.starts_with("Second") {
+                let _ = held.lock().unwrap().recv_timeout(Duration::from_secs(10));
+            }
+            Ok(vec![1; 24_000])
+        });
+        let cache = tts_cache::TtsCache::new(dir.join("cache"), "Rachel", "m", "en", render);
+        let recordings = Recordings::none().with_cache(Some(Arc::new(cache)));
+        let says = Says::serve(&path, None, &dir, recordings).unwrap();
+        (dir, path, says, release, asked)
+    }
+
+    /// [`THREE_PIECES`] asked as exact words on `path`, on a thread of its own.
+    fn ask_three_pieces(path: &Path) -> thread::JoinHandle<String> {
+        let path = path.to_path_buf();
+        let line = format!(
+            "{}\n",
+            serde_json::json!({"skill":"fig-facts","text":THREE_PIECES,"exact":true,"expires_in_ms":60000})
+        );
+        thread::spawn(move || exchange(&path, &line))
+    }
+
+    /// The exact line taken by the voice within 2 s, if one came.
+    fn taken_within(says: &mut Says) -> Option<(Vec<i16>, Ticket)> {
+        for _ in 0..400 {
+            says.poll(0);
+            if let Some(one) = says.take_exact(0) {
+                return Some(one);
+            }
+            thread::sleep(Duration::from_millis(5));
+        }
+        None
+    }
+
+    /// V2's 12:35 on #7897: a long exact line's first piece goes to the
+    /// voice to play as soon as it is rendered, not after every piece is:
+    /// the second still rendering, the voice has the line; and no piece
+    /// is rendered more than one ahead of what plays.
+    #[test]
+    fn a_long_exact_lines_first_piece_plays_before_the_next_is_rendered() {
+        let (dir, path, mut says, release, asked) = pieces_served("pc-first");
+        let client = ask_three_pieces(&path);
+        let taken = taken_within(&mut says);
+        let rendered = asked.lock().unwrap().clone();
+        let _ = release.send(());
+        let (_, ticket) =
+            taken.expect("the first piece reached the voice while the second rendered");
+        assert!(rendered[0].starts_with("First"), "{rendered:?}");
+        assert!(
+            !rendered.iter().any(|piece| piece.starts_with("Third")),
+            "rendered more than one piece ahead: {rendered:?}"
+        );
+        ticket.answer(Outcome::Spoken);
+        assert_eq!(
+            client.join().unwrap(),
+            format!("{}\n", Outcome::Spoken.line())
+        );
+        drop(says);
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    /// A long exact line cut after its first piece (the person spoke over
+    /// it, a stop) has no later piece played: the pieces after the one
+    /// rendering are never rendered, so none can be.
+    #[test]
+    fn a_long_exact_line_cut_after_its_first_piece_plays_no_later_piece() {
+        let (dir, path, mut says, release, asked) = pieces_served("pc-cut");
+        let client = ask_three_pieces(&path);
+        let taken = taken_within(&mut says);
+        let _ = release.send(());
+        let (_, ticket) =
+            taken.expect("the first piece reached the voice while the second rendered");
+        ticket.answer(Outcome::Dropped("user_interrupted".into()));
+        let answered = client.join().unwrap();
+        assert!(answered.contains("dropped"), "{answered}");
+        thread::sleep(Duration::from_millis(500));
+        let rendered = asked.lock().unwrap().clone();
+        assert!(
+            !rendered.iter().any(|piece| piece.starts_with("Third")),
+            "a piece after the cut was rendered: {rendered:?}"
+        );
+        drop(says);
+        let _ = fs::remove_dir_all(&dir);
     }
 
     /// #4209: an exact or cached line taken to play says what it was and

@@ -4339,6 +4339,7 @@ then use that person's scope:
   a record counts only when it says "now" or that the old name is gone
   ("Your face is known as Sam now, and the old name is gone."). The full
   matcher is in second-voice.md.
+- **A keep claimed in a later sentence** (`LAMP_KEEP_CLAIM_WHOLE=on`, #7878, off unless set): while no `remember` has run, a reply is said sentence by sentence, and a later sentence that says a keep or replace done ("Got it — your car is on Level B1, spot 7 now. That replaces wherever it was before." on lamp-e82d, 19 Nov, with nothing kept) is held; with no call in the round it is a claim, as those above are. Its rules are its row in `switches.md`.
 
 - **Nothing personal kept while nobody is known** (the owner's question 1,
   option (b); `LAMP_MEMORY_PERSONAL_NEEDS_FACE=on`, off unless set; both
@@ -4355,8 +4356,27 @@ then use that person's scope:
     wasn't kept: nobody known is speaking. If they want it kept, they can
     tell you who they are, or let the lamp see their face, and say it
     again. …"}`, which asks it to say so, short and friendly, not as a
-    refusal. Nothing is held for later, so the note promises no later keep
-    and the answer never says it was kept. "Remember the plant needs water
+    refusal, asking nothing and never "Got it" or "Noted". Nothing is held
+    for later, so the note promises no later keep and the answer never says
+    it was kept. On the second route a spoken line that only asks to keep
+    (`keep_at_once::only_keeps_refused`: `only_keeps`, or the keep with its
+    own details in clauses after it, "… level B2, spot 4T", and a short
+    address before it, the lamp's name as heard; never a question or a
+    further ask), whose round 1 called `remember` alone with
+    no words beside it and every call came back so refused
+    (`needs_face::refused`), is answered by the lamp itself with
+    `needs_face::REFUSED_LINE`, "I'm not sure who's talking, so I can't
+    keep that.", true for a face it doesn't know and for a known person not
+    seen saying it alike (in the owner's language from
+    `language::FIXED_LINES`), and
+    the turn ends with no second round (#7877: on lamp-e82d, 19 Nov, such
+    keeps were left to the model's words). A plain fix, no switch: it only
+    makes a refusal truthful. A line asking more, or a keep refused for
+    another reason, goes to round 2 as before. A keep so refused that goes
+    to round 2 anyway has one journal line naming the condition that failed
+    (`… goes to round 2: <why> (LAMP_MEMORY_PERSONAL_NEEDS_FACE)`, no
+    words). Tests:
+    `second_provider::tests::needs_face_said`. "Remember the plant needs water
     on Fridays" is kept as before; "remember I left my keys on the shelf"
     is not; a known face's own personal line, said again, is kept to them.
     A text from the app is always the room's, so its personal `remember`

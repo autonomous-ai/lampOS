@@ -52,6 +52,8 @@ struct Fake {
     takes: Mutex<VecDeque<Took>>,
     /// Inputs the kept session took.
     inputs: Mutex<u32>,
+    /// The state `ensure` answers; none: idle.
+    ensure_state: Mutex<Option<String>>,
 }
 
 fn agent_of(n: u32) -> String {
@@ -232,7 +234,12 @@ impl PaneHarness for Fake {
         Ok(Ensured {
             result: result.into(),
             agent_id: agent,
-            state: "idle".into(),
+            state: self
+                .ensure_state
+                .lock()
+                .unwrap()
+                .clone()
+                .unwrap_or_else(|| "idle".into()),
             why: None,
             engine_session: Some(format!("agent:main:kept-{}", agent_id_now)),
         })
@@ -2321,4 +2328,155 @@ fn an_engine_not_ready_ensure_is_tried_again_shortly() {
     one.open_if_due(&fake, &place());
     assert_eq!(fake.count("ensure"), 3);
     assert_eq!(one.agent(), Some(agent_of(1)));
+}
+
+/// One round of #7895's loop on lamp-52e6: a spoken task's words into the
+/// kept session answered `NOT_RUNNING`, so it is put back (`busy`) and the
+/// one-session thread ensures the session again, which comes back
+/// `resumed`. Returns the spoken launch's answer.
+fn not_running_round(one: &OneSession, fake: &Fake, id: &str) -> Option<LaunchOutcome> {
+    fake.takes.lock().unwrap().push_back(Took::NotRunning);
+    fake.gone.lock().unwrap().push(agent_of(1));
+    let outcome = spoken_launch(one, fake, &spoken(id));
+    one.open_if_due(fake, &place());
+    outcome
+}
+
+fn busy() -> Option<LaunchOutcome> {
+    Some(LaunchOutcome::NotSent {
+        code: "busy".into(),
+    })
+}
+
+/// #7895: a kept session that never takes the words through every resume.
+/// The spoken task is put back for [`STARTING_RESUMES_MOST`] resumes, then
+/// ends `not_sent` with [`NOT_STARTED`], once: the store fails it and Task
+/// news tells the asker its one failed line. No resume after that.
+fn ends_at_the_bound(one: &OneSession, fake: &Fake) {
+    one.open_if_due(fake, &place());
+    for round in 1..=STARTING_RESUMES_MOST {
+        assert_eq!(not_running_round(one, fake, "lamp-1"), busy(), "{round}");
+        assert_eq!(fake.count("ensure"), 1 + round as usize, "resumed");
+    }
+    assert_eq!(
+        not_running_round(one, fake, "lamp-1"),
+        Some(LaunchOutcome::NotSent {
+            code: NOT_STARTED.into()
+        })
+    );
+    // Ended there: the session is not let go for it, so nothing ensures it
+    // again until the next task's words find it not running.
+    let ensured = fake.count("ensure");
+    assert_eq!(ensured, 1 + STARTING_RESUMES_MOST as usize);
+    one.open_if_due(fake, &place());
+    assert_eq!(fake.count("ensure"), ensured, "{:?}", fake.calls());
+    assert!(one.free());
+    // The next ask has its own bound: put back, never ended at once.
+    fake.gone.lock().unwrap().clear();
+    assert_eq!(not_running_round(one, fake, "lamp-2"), busy());
+}
+
+/// #7895 (lamp-52e6, 19 Nov 11:15:58): the session stays `starting`
+/// through every resume.
+#[test]
+fn a_spoken_task_whose_kept_session_never_starts_ends_at_the_bound() {
+    let dir = tempfile::tempdir().unwrap();
+    let (one, fake) = kept_on(dir.path());
+    ends_at_the_bound(&one, &fake);
+}
+
+/// #7895, Fifth's read of the same jam (#7814): OpenClaw's gateway did not
+/// know the kept session, so each resume's `sessions.resolve` said `No
+/// session found: agent:main:harness-cf840d2c-…`, whatever the cause. lamp-tasks sees
+/// only Harness's side of it, as the journal shows: `harness ensure`
+/// answers `resumed` and `starting` (`harness other: … state=starting
+/// id=cf840d2c`), and the next reply `exit=4 … error=NOT_RUNNING`. Every
+/// such resume counts toward the same bound.
+#[test]
+fn a_kept_session_the_gateway_cannot_resolve_ends_at_the_same_bound() {
+    let dir = tempfile::tempdir().unwrap();
+    let (one, fake) = kept_on(dir.path());
+    *fake.ensure_state.lock().unwrap() = Some("starting".into());
+    ends_at_the_bound(&one, &fake);
+}
+
+/// #7895: a kept session that comes up within the bound (its words taken
+/// after [`STARTING_RESUMES_MOST`] resumes) runs the task as today, joined,
+/// with nothing failed or told.
+#[test]
+fn a_spoken_task_whose_kept_session_starts_within_the_bound_runs() {
+    let dir = tempfile::tempdir().unwrap();
+    let (one, fake) = kept_on(dir.path());
+    one.open_if_due(&fake, &place());
+    for _ in 0..STARTING_RESUMES_MOST {
+        assert_eq!(not_running_round(&one, &fake, "lamp-1"), busy());
+    }
+    assert_eq!(
+        spoken_launch(&one, &fake, &spoken("lamp-1")),
+        Some(LaunchOutcome::Joined {
+            agent_id: agent_of(1),
+            session: None
+        })
+    );
+    assert_eq!(one.spoken_holder().as_deref(), Some("lamp-1"));
+}
+
+/// #7895, V2's 13:02 follow-up: `harness ensure` itself refused while a
+/// spoken task waits in the store for the pane, `times` opens in a row.
+fn opens_refused(one: &OneSession, fake: &Fake, times: u32) {
+    for _ in 0..times {
+        fake.ensure_errors
+            .lock()
+            .unwrap()
+            .push_back("ensure_failed".into());
+        // Past the open's backoff at once.
+        one.lock().next_open = None;
+        one.open_if_due(fake, &place());
+    }
+}
+
+/// Each failed open counts toward the same bound; past it the waiting
+/// spoken task is handed over and ends `not_sent` [`NOT_STARTED`] at once,
+/// with no reply and no further ensure.
+#[test]
+fn a_spoken_task_whose_kept_session_is_never_ensured_ends_at_the_bound() {
+    let dir = tempfile::tempdir().unwrap();
+    let (one, fake) = kept_on(dir.path());
+    one.knows(&place());
+    one.set_spoken_queue(vec!["lamp-1".into()]);
+    opens_refused(&one, &fake, STARTING_RESUMES_MOST + 1);
+    let ensured = fake.count("ensure");
+    assert_eq!(ensured, 1 + STARTING_RESUMES_MOST as usize);
+    assert_eq!(
+        spoken_launch(&one, &fake, &spoken("lamp-1")),
+        Some(LaunchOutcome::NotSent {
+            code: NOT_STARTED.into()
+        })
+    );
+    assert_eq!(fake.count("ensure"), ensured, "{:?}", fake.calls());
+    assert_eq!(fake.count("reply-kept"), 0);
+    // Within the open's backoff, nothing ensures it again.
+    one.open_if_due(&fake, &place());
+    assert_eq!(fake.count("ensure"), ensured);
+}
+
+/// #7895: refused [`STARTING_RESUMES_MOST`] times, then ensured: the
+/// spoken task waiting for it runs as today.
+#[test]
+fn a_spoken_task_whose_kept_session_is_ensured_within_the_bound_runs() {
+    let dir = tempfile::tempdir().unwrap();
+    let (one, fake) = kept_on(dir.path());
+    one.knows(&place());
+    one.set_spoken_queue(vec!["lamp-1".into()]);
+    opens_refused(&one, &fake, STARTING_RESUMES_MOST);
+    one.lock().next_open = None;
+    one.open_if_due(&fake, &place());
+    assert_eq!(one.agent(), Some(agent_of(1)));
+    assert_eq!(
+        spoken_launch(&one, &fake, &spoken("lamp-1")),
+        Some(LaunchOutcome::Joined {
+            agent_id: agent_of(1),
+            session: None
+        })
+    );
 }

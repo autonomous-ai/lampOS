@@ -696,7 +696,8 @@ fn publish(out: &mut Publisher, mut event: SkillEvent) {
 }
 
 /// The face-expressions yes's file (`lamp_msgs::consent`), read for where a
-/// face looks before a skill sees it (#7442).
+/// face looks before a skill sees it (#7442), by `consent::allowed`'s rule
+/// with `LAMP_NOTICING_BY_DEFAULT`'s default (#7767).
 const FACE_EXPRESSIONS_YES: &str = "/var/lib/lampOS/consent/face-expressions.json";
 
 /// The light shown now, if the ring's owner has said within 3 s (as the
@@ -1026,6 +1027,18 @@ fn serve(
     }
     let mut out =
         bus.publisher_declared(SkillEvent::TOPIC, &SkillEvent::declaration(), "skills")?;
+    // A skill's answer at its gate (#7873), beside the runs lamp-tasks
+    // tells there: for lamp-peek. Not declared, nothing else changes.
+    match bus.publisher_declared(
+        lamp_msgs::SkillTask::TOPIC,
+        &lamp_msgs::SkillTask::declaration(),
+        "skills",
+    ) {
+        Ok(gate) => {
+            let _ = GATE_TOLD.set(Mutex::new(gate));
+        }
+        Err(error) => eprintln!("lamp-skills: skills/tasks not declared: {error}"),
+    }
     let audio = Arc::new(Mutex::new(Authority::new(
         requested_audio::from_environment(),
         out.boot().to_owned(),
@@ -1886,6 +1899,7 @@ fn observe(
         &message.header.topic,
         &message.payload,
         Path::new(FACE_EXPRESSIONS_YES),
+        lamp_msgs::consent::noticing_by_default(),
     );
     let made = engine.observe(
         &message.header.topic,
@@ -5785,7 +5799,9 @@ fn read_service(
         }
     }
     let mut room = lamp_room(skill, sockets, bus, known_file, local_time, read.quiet);
-    service_read::run(read, &mut room)
+    let outcome = service_read::run(read, &mut room);
+    tell_gate(&service_read::answer_news(skill, &outcome));
+    outcome
 }
 
 /// The room a skill's read is said in, and what a skill's task's agent
@@ -6101,6 +6117,7 @@ fn tell_its_run(
         None => lamp_skills::service_read::tell(&lines, room),
     };
     eprintln!("lamp-skills: skill:{skill}: do.task: {what}: {told}");
+    tell_gate(&lamp_skills::service_read::answer_news(skill, &told));
     if let Some(state) = state
         && let Err(error) = lamp_skills::task::telling_ends(state, skill, began)
     {
@@ -6129,6 +6146,27 @@ fn answer_outcome(outcome: &str, begun: bool) -> Result<(), String> {
         return Err(said.to_owned());
     }
     Ok(())
+}
+
+/// Where a skill's answer at its gate is told (`skills/tasks`, #7873): set
+/// once at the start; unset (a test), nothing is.
+static GATE_TOLD: std::sync::OnceLock<Mutex<Publisher>> = std::sync::OnceLock::new();
+
+/// Publishes `news` of a skill's answer at its gate (#7873), when it checks.
+fn tell_gate(news: &lamp_msgs::SkillTask) {
+    let Some(out) = GATE_TOLD.get() else {
+        return;
+    };
+    if news.check().is_err() {
+        return;
+    }
+    let mut out = out.lock().unwrap_or_else(|poison| poison.into_inner());
+    if let Err(error) = out.publish_json(lamp_ipc::monotonic_us(), news) {
+        eprintln!(
+            "lamp-skills: skill:{}: skills/tasks not published: {error}",
+            news.skill
+        );
+    }
 }
 
 /// lamp-skills' hand-overs to lamp-tasks under way, a task's or a fixed
@@ -6473,6 +6511,7 @@ impl lamp_skills::service_read::Room for LampRoom {
             "lamp-skills: skill:{}: waits for its gate: {why}",
             self.skill
         );
+        tell_gate(&lamp_skills::service_read::held_news(&self.skill, why));
     }
 }
 
@@ -6875,6 +6914,7 @@ mod tests {
         let window = (minute, (minute + 2) % (24 * 60));
         let step = |quiet| lamp_skills::task::TaskStep {
             task: "Sum up this morning's mail".into(),
+            words: "Sum up this morning's mail".into(),
             run: "scripts/main.py".into(),
             quiet,
         };
@@ -7050,6 +7090,7 @@ mod tests {
     fn a_skill_tools_run_the_voice_asked_answers_its_failure_in_the_conversation() {
         let task = Call::Task(Box::new(lamp_skills::task::TaskStep {
             task: "Find the bitcoin price".into(),
+            words: "Find the bitcoin price".into(),
             run: "scripts/main.py".into(),
             quiet: None,
         }));
@@ -8714,6 +8755,7 @@ mod tests {
         let task = || {
             Call::Task(Box::new(lamp_skills::task::TaskStep {
                 task: "Read my unread mail.".into(),
+                words: "Read my unread mail.".into(),
                 run: "scripts/mail.sh".into(),
                 quiet: None,
             }))
@@ -8788,6 +8830,7 @@ mod tests {
         let task = || {
             Call::Task(Box::new(lamp_skills::task::TaskStep {
                 task: "Start a study block.".into(),
+                words: "Start a study block.".into(),
                 run: "scripts/study.sh".into(),
                 quiet: None,
             }))

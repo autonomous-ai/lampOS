@@ -101,6 +101,11 @@ pub enum Op {
     PutBackForApply,
     /// The new writer proved itself: [`PREV`] removed.
     Proven,
+    /// The build's own lampos SDK written at [`crate::sdk_tree::DIR`] when it is not exactly there (#7415).
+    /// A round's sandbox cannot write `/usr/local/lib/lampos`, and before this only the Hermes one-shot wrote
+    /// the SDK, so a lamp without that one-shot kept the first SDK it got. The writer itself is left as it
+    /// is, and no [`DONE`] record is written ([`sdk_write`]).
+    Sdk,
 }
 
 /// What a refresh did, kept in the records for the round and a person.
@@ -159,6 +164,13 @@ pub fn ask(root: &Path, held: &Lock, running: &[u8], now_unix_ms: u64) -> Result
     writer_ready::ready(root, held, running)?;
     request(held, running, Op::Refresh, now_unix_ms)?;
     Ok(true)
+}
+
+/// Whether the writer under `root` is `running`, the lamp-update that runs: the case of [`ask`]'s Ok(false)
+/// in which a round asks for the build's SDK ([`Op::Sdk`], #7415). A lamp with no writer, or one put back
+/// for good, is not asked.
+pub fn holds(root: &Path, running: &[u8]) -> bool {
+    fs::read(on_root(root, BACK)).is_ok_and(|there| there == running)
 }
 
 /// Whether the build `build` of lamp-update was put back as the writer for
@@ -280,6 +292,8 @@ pub fn refresh(
         Op::PutBack => put_back(root, now_unix_ms, None),
         Op::PutBackForApply => put_back(root, now_unix_ms, Some(records)),
         Op::Proven => prove(root, records),
+        // Taken by [`sdk_write`] before a refresh is tried; never a writer's change.
+        Op::Sdk => Err("the round asked for the SDK, not the writer".to_owned()),
     });
     match fs::remove_file(records.join(REQUEST)) {
         Err(error) if error.kind() != io::ErrorKind::NotFound => {
@@ -291,6 +305,69 @@ pub fn refresh(
     let bytes = serde_json::to_vec(&done).map_err(|error| error.to_string())?;
     write_whole(&records.join(DONE), &bytes, 0o600).map_err(|error| format!("{DONE}: {error}"))?;
     Ok(done)
+}
+
+/// What the writer's unit did in one run ([`unit_run`]).
+#[derive(Debug)]
+pub enum UnitRun {
+    /// The round asked for the build's SDK alone ([`Op::Sdk`]): written, or there already.
+    Sdk { written: bool },
+    /// The writer's own op ([`refresh`]), then the build's SDK when it was not there: `None` when it was,
+    /// and otherwise whether writing it went well. Its failure is said, never the writer's end.
+    Writer {
+        done: Done,
+        sdk: Option<Result<(), String>>,
+    },
+}
+
+/// `lamp-update writer-refresh`, the unit's program: an SDK ask ([`sdk_write`]) or the writer's op
+/// ([`refresh`]), and in a writer's run the build's SDK too when it differs (#7415), so a newer build's SDK
+/// lands with its writer.
+pub fn unit_run(
+    root: &Path,
+    records: &Path,
+    running: &[u8],
+    clock: &dyn Fn() -> u64,
+    probe: &mut dyn FnMut(&Path) -> Result<String, String>,
+) -> Result<UnitRun, String> {
+    if let Some(written) = sdk_write(root, records, running, clock)? {
+        return Ok(UnitRun::Sdk { written });
+    }
+    let done = refresh(root, records, running, clock, probe)?;
+    let sdk = (!crate::sdk_tree::present(root)).then(|| crate::sdk_tree::write(root));
+    Ok(UnitRun::Writer { done, sdk })
+}
+
+/// The unit's side of [`Op::Sdk`] (#7415): with the records' lock held by another (the round that started the
+/// unit) and a fresh request naming these bytes for the SDK, the build's SDK is written under `root` when it
+/// is not exactly there ([`crate::sdk_tree::present`]), and the request removed. Ok(Some(true)) when it was
+/// written, Ok(Some(false)) when it was there already, and Ok(None) when the request is no SDK one, so the
+/// refresh goes on as before. [`DONE`] is never touched: the writer's own record stays the writer's.
+pub fn sdk_write(
+    root: &Path,
+    records: &Path,
+    running: &[u8],
+    clock: &dyn Fn() -> u64,
+) -> Result<Option<bool>, String> {
+    match Records::new(records.to_owned()).lock() {
+        Err(error) if error.kind() == io::ErrorKind::WouldBlock => {}
+        _ => return Ok(None),
+    }
+    if requested(records, running, clock()) != Ok(Op::Sdk) {
+        return Ok(None);
+    }
+    let wrote = if crate::sdk_tree::present(root) {
+        Ok(false)
+    } else {
+        crate::sdk_tree::write(root).map(|()| true)
+    };
+    match fs::remove_file(records.join(REQUEST)) {
+        Err(error) if error.kind() != io::ErrorKind::NotFound => {
+            return Err(format!("{REQUEST}: {error}"));
+        }
+        _ => {}
+    }
+    wrote.map(Some)
 }
 
 /// [`PREV`] renamed back over the writer, which failed: the copy that ran

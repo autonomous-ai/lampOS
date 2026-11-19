@@ -10,9 +10,12 @@
 //! root's helper (`lamp-setup change`) on the owner's switch in the app
 //! (`"by":"app"`, `consent.set` with `LAMP_APP_CONSENT=on`). One copy of the
 //! names and the file's shape, read by `lamp-cloud`, the helper and the
-//! voice. The readers (`lamp_eyes::seems`, `lamp_ears::classes`) read only
-//! `KEY` and keep their own copy of the rule; a file from before `by` is the
-//! voice's.
+//! voice. The readers (`lamp_eyes::seems`, `lamp_ears::classes`,
+//! `lamp_seen::opt_in`, [`crate::Faces::for_skills`]) read only `KEY`, all
+//! with one rule, [`allowed`] (#7767): a kept `"yes"` is on, a kept `"no"`
+//! is off, a missing file is on only with [`NOTICING_BY_DEFAULT`] (read in
+//! one place, [`noticing_by_default`]), and a file that can't be read is
+//! off. A file from before `by` is the voice's.
 use serde_json::Value;
 use std::io::Read;
 use std::path::{Path, PathBuf};
@@ -77,11 +80,49 @@ impl Kept {
     }
 }
 
-/// `path`'s yes for `key`. Missing, unreadable, over [`MOST_BYTES`], not
-/// JSON or not an object is no yes, with nothing else said.
-pub fn read(path: &Path, key: &str) -> Kept {
-    let Ok(file) = std::fs::File::open(path) else {
-        return Kept::default();
+/// The switch that reads a missing yes file as on (#7767): `on` exactly
+/// makes the face expressions yes, the room sounds yes, seen activity and
+/// health and crash reports default on. A kept `"no"` stays no and a file
+/// that can't be read stays off either way; off, a missing file is no, as
+/// before. Off unless set, in no unit (`docs/switches.md`).
+pub const NOTICING_BY_DEFAULT: &str = "LAMP_NOTICING_BY_DEFAULT";
+
+/// `by` for a yes nobody gave: no file is kept and
+/// [`NOTICING_BY_DEFAULT`] is on. Never written.
+pub const BY_DEFAULT: &str = "default";
+
+/// Whether `value` turns [`NOTICING_BY_DEFAULT`] on: `on` exactly.
+pub fn by_default_on(value: Option<&str>) -> bool {
+    value == Some("on")
+}
+
+/// [`NOTICING_BY_DEFAULT`] as this process's environment says it: the one
+/// place the switch is read, so every reader takes the same default.
+pub fn noticing_by_default() -> bool {
+    by_default_on(std::env::var(NOTICING_BY_DEFAULT).ok().as_deref())
+}
+
+/// `path`'s yes for `key` (#7767): one rule for a kept yes, a kept no and
+/// the default.
+///
+/// - `KEY` exactly `"yes"`: a yes, with who gave it and when.
+/// - No file at `path` (not found): `by_default`, as [`BY_DEFAULT`]'s yes
+///   with no time, or no yes.
+/// - `KEY` exactly `"no"` ([`no_bytes`]): no, whatever `by_default` says.
+/// - Unreadable (any open error but not found, or a read error), over
+///   [`MOST_BYTES`], not JSON, not an object, or an object with anything
+///   else under `KEY`: no, the safe side.
+pub fn read_or(path: &Path, key: &str, by_default: bool) -> Kept {
+    let file = match std::fs::File::open(path) {
+        Ok(file) => file,
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound && by_default => {
+            return Kept {
+                yes: true,
+                by: Some(BY_DEFAULT.to_owned()),
+                at_unix_s: None,
+            };
+        }
+        Err(_) => return Kept::default(),
     };
     let mut text = String::new();
     if file.take(MOST_BYTES + 1).read_to_string(&mut text).is_err()
@@ -99,11 +140,25 @@ pub fn read(path: &Path, key: &str) -> Kept {
     }
 }
 
-/// A yes file's bytes, whole: `{"version":1,KEY:"yes","at_unix_s":N,"by":BY}`.
-pub fn bytes(key: &str, at_unix_s: u64, by: &str) -> Vec<u8> {
+/// `path`'s yes for `key` with no default: missing, unreadable, over
+/// [`MOST_BYTES`], not JSON or not an object is no yes, with nothing else
+/// said ([`read_or`] with `by_default` false).
+pub fn read(path: &Path, key: &str) -> Kept {
+    read_or(path, key, false)
+}
+
+/// Whether `key` is allowed at `path` ([`read_or`]'s rule): a kept `"yes"`
+/// is, a kept `"no"` is not, a missing file is `by_default`, and a file
+/// that can't be read is not. Readers pass [`noticing_by_default`].
+pub fn allowed(path: &Path, key: &str, by_default: bool) -> bool {
+    read_or(path, key, by_default).yes
+}
+
+/// A kept file's bytes, whole, with `KEY` as `answer`.
+fn answer_bytes(key: &str, answer: &str, at_unix_s: u64, by: &str) -> Vec<u8> {
     let mut object = serde_json::Map::new();
     object.insert("version".into(), 1.into());
-    object.insert(key.into(), "yes".into());
+    object.insert(key.into(), answer.into());
     object.insert("at_unix_s".into(), at_unix_s.into());
     object.insert("by".into(), by.into());
     serde_json::to_vec(&Value::Object(object)).unwrap_or_default()
@@ -282,6 +337,18 @@ pub fn raise_mark(path: &Path, at_ms: u64) -> std::io::Result<u64> {
     lock_mark(folder)?.raise(at_ms)
 }
 
+/// A yes file's bytes, whole: `{"version":1,KEY:"yes","at_unix_s":N,"by":BY}`.
+pub fn bytes(key: &str, at_unix_s: u64, by: &str) -> Vec<u8> {
+    answer_bytes(key, "yes", at_unix_s, by)
+}
+
+/// A kept no's bytes, whole: `{"version":1,KEY:"no","at_unix_s":N,"by":BY}`
+/// (#7767). Kept, not removed, so that [`NOTICING_BY_DEFAULT`] never turns
+/// a person's no back on; nothing writes it yet.
+pub fn no_bytes(key: &str, at_unix_s: u64, by: &str) -> Vec<u8> {
+    answer_bytes(key, "no", at_unix_s, by)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -434,5 +501,94 @@ mod tests {
             r#"{"at_unix_s":11,"by":"voice","seen_activity":"yes","version":1}"#
         );
         assert_eq!(app, voice.replace(r#""by":"voice""#, r#""by":"app""#));
+    }
+
+    /// #7767: a kept no stays no with the switch on; a missing file is the
+    /// default only with it on; a file that can't be read is off either
+    /// way; with it off, every answer is [`read`]'s, as before.
+    #[test]
+    fn a_kept_no_stays_no_and_missing_is_the_default_only_with_the_switch() {
+        let folder =
+            std::env::temp_dir().join(format!("msgs-consent-default-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&folder);
+        std::fs::create_dir_all(&folder).unwrap();
+        let file = file_in(&folder, SEEN_ACTIVITY).unwrap();
+        // Missing: the default, only with the switch on.
+        assert!(!allowed(&file, SEEN_ACTIVITY, false), "missing, off");
+        assert!(allowed(&file, SEEN_ACTIVITY, true), "missing, on");
+        assert_eq!(
+            read_or(&file, SEEN_ACTIVITY, true),
+            Kept {
+                yes: true,
+                by: Some(BY_DEFAULT.into()),
+                at_unix_s: None
+            }
+        );
+        assert_eq!(read(&file, SEEN_ACTIVITY), Kept::default());
+        // A kept no: no either way.
+        std::fs::write(&file, no_bytes(SEEN_ACTIVITY, 9, BY_VOICE)).unwrap();
+        assert_eq!(
+            std::fs::read_to_string(&file).unwrap(),
+            r#"{"at_unix_s":9,"by":"voice","seen_activity":"no","version":1}"#
+        );
+        for by_default in [false, true] {
+            assert!(
+                !allowed(&file, SEEN_ACTIVITY, by_default),
+                "no, {by_default}"
+            );
+        }
+        // A kept yes: yes either way.
+        std::fs::write(&file, bytes(SEEN_ACTIVITY, 9, BY_APP)).unwrap();
+        for by_default in [false, true] {
+            assert!(
+                allowed(&file, SEEN_ACTIVITY, by_default),
+                "yes, {by_default}"
+            );
+        }
+        // Bad files: off either way, and as `read` says with the switch off.
+        let bad: [&[u8]; 6] = [
+            b"not json",
+            b"[1]",
+            b"\"yes\"",
+            br#"{"version":1}"#,
+            br#"{"seen_activity":true}"#,
+            br#"{"seen_activity":"YES"}"#,
+        ];
+        for text in bad {
+            std::fs::write(&file, text).unwrap();
+            for by_default in [false, true] {
+                assert!(
+                    !allowed(&file, SEEN_ACTIVITY, by_default),
+                    "{} {by_default}",
+                    String::from_utf8_lossy(text)
+                );
+            }
+            assert_eq!(
+                read_or(&file, SEEN_ACTIVITY, false),
+                read(&file, SEEN_ACTIVITY)
+            );
+        }
+        std::fs::write(&file, vec![b' '; MOST_BYTES as usize + 1]).unwrap();
+        assert!(!allowed(&file, SEEN_ACTIVITY, true), "too long");
+        // There but unreadable as a file: a folder in its place.
+        std::fs::remove_file(&file).unwrap();
+        std::fs::create_dir(&file).unwrap();
+        assert!(!allowed(&file, SEEN_ACTIVITY, true), "a folder");
+        let _ = std::fs::remove_dir_all(folder);
+    }
+
+    #[test]
+    fn the_switch_is_on_only_for_on_exactly() {
+        assert!(by_default_on(Some("on")));
+        for value in [
+            None,
+            Some(""),
+            Some("ON"),
+            Some("on "),
+            Some("yes"),
+            Some("1"),
+        ] {
+            assert!(!by_default_on(value), "{value:?}");
+        }
     }
 }

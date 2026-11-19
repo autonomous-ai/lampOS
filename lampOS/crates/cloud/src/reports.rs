@@ -894,7 +894,9 @@ fn unknown_field<'a>(
 
 /// The person's choice: `lamp-cloud`'s own record when there is one, else
 /// setup's, else no. Only a JSON `true` is a yes, and setup's only for a
-/// wording no newer than [`ASKED`]. Read at each send, never kept.
+/// wording no newer than [`ASKED`]. Read at each send, never kept. With
+/// `LAMP_NOTICING_BY_DEFAULT=on` (#7767, `lamp_msgs::consent`'s one place
+/// for it), [`read_consent_or`]'s default.
 ///
 /// One release forward (#2052), for privacy: a record this build can't
 /// read, a field it doesn't know or a `by` it doesn't know reads as **no**,
@@ -902,6 +904,15 @@ fn unknown_field<'a>(
 /// sharing on here. Such a record is left as it is (a roll forward reads it
 /// again); the line that says so comes back beside the choice.
 fn read_consent(places: &Places) -> (Consent, Option<String>) {
+    read_consent_or(places, lamp_msgs::consent::noticing_by_default())
+}
+
+/// [`read_consent`] with the default given (#7767), `lamp_msgs::consent`'s
+/// rule for a `share` boolean: neither record there (both not found) is
+/// `by_default`'s answer, a yes nobody gave (no `by`, no time); a kept
+/// `false`, a later wording, a record that can't be read and a newer
+/// build's field are still no. With `by_default` false, as before.
+fn read_consent_or(places: &Places, by_default: bool) -> (Consent, Option<String>) {
     match read_choice(&places.own) {
         Choice::Absent => {}
         Choice::Unreadable(why) => {
@@ -943,7 +954,13 @@ fn read_consent(places: &Places) -> (Consent, Option<String>) {
         }
     }
     match read_choice(&places.setup) {
-        Choice::Absent => (Consent::default(), None),
+        Choice::Absent => (
+            Consent {
+                share: by_default,
+                ..Consent::default()
+            },
+            None,
+        ),
         Choice::Unreadable(why) => (
             Consent::default(),
             Some(format!(
@@ -2887,6 +2904,45 @@ pub(crate) mod tests {
             fs::copy(places.queue.join(name), target.join("queue").join(name)).unwrap();
         }
         fs::copy(&note, target.join("exits").join(note.file_name().unwrap())).unwrap();
+        let _ = fs::remove_dir_all(places.own.parent().unwrap());
+    }
+
+    /// #7767: with `LAMP_NOTICING_BY_DEFAULT` on, no record at all is a
+    /// yes nobody gave; setup's or the lamp's own `false` stays no, and a
+    /// record that can't be read stays off, either way. Off, no record is
+    /// no, as before.
+    #[test]
+    fn no_reports_record_is_the_default_only_with_the_switch() {
+        let places = places("default");
+        let share = |by_default| read_consent_or(&places, by_default).0.share;
+        assert!(!share(false), "none, off");
+        assert!(share(true), "none, on");
+        let none = read_consent_or(&places, true).0;
+        assert_eq!((none.by, none.since, none.held), (None, None, false));
+        assert_eq!(
+            read_consent(&places).0.share,
+            lamp_msgs::consent::noticing_by_default()
+        );
+        // Setup's no, then setup's unreadable answer.
+        for text in [
+            r#"{"share":false,"asked":1,"at":"2026-11-18T00:00:00Z"}"#,
+            "not json",
+            r#"{"share":"yes"}"#,
+        ] {
+            fs::write(&places.setup, text).unwrap();
+            assert!(!share(true), "setup {text}");
+            assert!(!share(false), "setup {text}");
+        }
+        // The lamp's own no wins over setup's yes and over the default.
+        fs::remove_file(&places.setup).unwrap();
+        fs::write(
+            &places.own,
+            r#"{"share":false,"at":"2026-11-18T00:00:00Z","by":"voice","held":false}"#,
+        )
+        .unwrap();
+        assert!(!share(true), "own no");
+        fs::write(&places.own, "not json").unwrap();
+        assert!(!share(true), "own unreadable");
         let _ = fs::remove_dir_all(places.own.parent().unwrap());
     }
 

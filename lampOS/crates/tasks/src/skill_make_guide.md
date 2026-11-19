@@ -113,6 +113,33 @@ code.
 
 A skill does nothing that would surprise the person who asked for it.
 
+## How a made skill runs
+
+- At run, the lamp's agent is sent `Run <skill-start> <run id>` and the
+  skill's `task` words, as data. It runs that one command: the launcher runs
+  the step's `run` script in a fence, with the `lampos` SDK and the run's
+  grants alone. The agent sees only what the script prints.
+- The agent's last answer is said aloud to the owner, word for word (about
+  400 characters at most), and a lone dash (-) is said as nothing. So code
+  that says its result with `lamp.say` prints only `Said aloud through the
+  lamp.`, and the agent answers only a dash: the person hears it once.
+- The `task` words are read back whole for the owner's yes: one plain
+  sentence a person understands, at most 120 characters. For a
+  linked-service skill they are the work itself.
+- **A linked service** (mail, a calendar, GitHub): `grants =
+  ["<code>-read"]` to read it, or `"<code>-write"` to send with it, and no
+  other grant. scripts/main.py is exactly this one line:
+  `print("The lamp's agent does this task with its lamp-services tools.")`.
+  At run, the agent does the `task` with its lamp-services tools
+  (`services_connected`, `service_read`, `service_write`) under the run's
+  token; a send goes only on the owner's spoken yes. The script never holds
+  a token. examples/agenda-count.
+- **The public web**: the skill's own code granted `net` and `speak`, as
+  "The internet" above says: urllib reaches the public web on ports 80 and
+  443 through the run's proxy (`HTTPS_PROXY`), and the code says the result
+  with `lamp.say`. It is kept only on a lamp whose net switches are on.
+  examples/exchange-rate, sun-times.
+
 ## 2. Write a draft
 
 Make the folder draft/NAME in this folder, NAME the skill's name: lowercase

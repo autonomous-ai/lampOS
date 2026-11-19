@@ -102,6 +102,8 @@ mod chat;
 pub use chat::*;
 mod presence;
 pub use presence::*;
+mod heat;
+pub use heat::*;
 mod account;
 pub use account::*;
 mod energy;
@@ -575,8 +577,10 @@ impl Faces {
 
     /// A message on `topic` as skills may see it (#7442, the Reviewer-lead's
     /// P2 on #7450): on [`Self::TOPIC`], each face's `pitch` and `looking`
-    /// are taken out unless the face-expressions yes is kept at `yes_file`
-    /// ([`consent::read`]: missing or unreadable is no yes). Where a face
+    /// are taken out unless the face-expressions yes is allowed at
+    /// `yes_file` ([`consent::allowed`]: a kept no or a file that can't be
+    /// read is no yes; a missing file is `by_default`, which callers take
+    /// from [`consent::noticing_by_default`], #7767). Where a face
     /// looks is for the lamp's own parts (the voice's said-to-me rule); a
     /// skill can send what it reads off the lamp. Any other topic, a payload
     /// with neither field, or not JSON, is passed as it came.
@@ -584,6 +588,7 @@ impl Faces {
         topic: &str,
         payload: &'a [u8],
         yes_file: &std::path::Path,
+        by_default: bool,
     ) -> std::borrow::Cow<'a, [u8]> {
         use std::borrow::Cow;
         if topic != Self::TOPIC {
@@ -602,7 +607,7 @@ impl Faces {
         {
             had |= face.remove("pitch").is_some() | face.remove("looking").is_some();
         }
-        if !had || consent::read(yes_file, consent::FACE_EXPRESSIONS).yes {
+        if !had || consent::allowed(yes_file, consent::FACE_EXPRESSIONS, by_default) {
             return Cow::Borrowed(payload);
         }
         Cow::Owned(serde_json::to_vec(&value).unwrap_or_default())
@@ -2708,6 +2713,7 @@ pub fn declaration_of(topic: &str) -> Option<Declaration> {
         .chain(app_trigger_topics())
         .chain(chat_topics())
         .chain(presence_topics())
+        .chain(heat_topics())
         .chain(reports_topics())
         .chain(account_topics())
         .chain(energy_topics())
@@ -2952,7 +2958,7 @@ mod tests {
         let yes = consent::file_in(&folder, consent::FACE_EXPRESSIONS).unwrap();
         let gaze = br#"{"faces":[{"id":"f1","xmin":0.2,"ymin":0.2,"xmax":0.4,"ymax":0.5,"confidence":0.9,"facing":true,"pitch":0.6,"looking":false}]}"#;
         let seen = |payload: &[u8]| {
-            serde_json::from_slice::<Faces>(&Faces::for_skills(Faces::TOPIC, payload, &yes))
+            serde_json::from_slice::<Faces>(&Faces::for_skills(Faces::TOPIC, payload, &yes, false))
                 .unwrap()
                 .faces
                 .remove(0)
@@ -2972,15 +2978,49 @@ mod tests {
         )
         .unwrap();
         assert!(matches!(
-            Faces::for_skills(Faces::TOPIC, gaze, &yes),
+            Faces::for_skills(Faces::TOPIC, gaze, &yes, false),
             std::borrow::Cow::Borrowed(_)
         ));
         let face = seen(gaze);
         assert_eq!((face.pitch, face.looking), (Some(0.6), Some(false)));
         std::fs::remove_file(&yes).unwrap();
         let plain = br#"{"faces":[{"id":"f1","pitch":0.6}]}"#;
-        assert_eq!(&*Faces::for_skills("room/activity", plain, &yes), plain);
-        assert_eq!(&*Faces::for_skills(Faces::TOPIC, b"[1]", &yes), b"[1]");
+        assert_eq!(
+            &*Faces::for_skills("room/activity", plain, &yes, false),
+            plain
+        );
+        assert_eq!(
+            &*Faces::for_skills(Faces::TOPIC, b"[1]", &yes, false),
+            b"[1]"
+        );
+        std::fs::remove_dir_all(&folder).unwrap();
+    }
+
+    /// #7767: with `LAMP_NOTICING_BY_DEFAULT` on, a missing face-expressions
+    /// file lets skills see where a face looks; a kept no or a file that
+    /// can't be read still takes both out. Off, a missing file takes them
+    /// out, as before.
+    #[test]
+    fn skills_see_where_a_face_looks_by_default_only_with_the_switch() {
+        let folder = std::env::temp_dir().join(format!("msgs-gaze-default-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&folder);
+        std::fs::create_dir_all(&folder).unwrap();
+        let yes = consent::file_in(&folder, consent::FACE_EXPRESSIONS).unwrap();
+        let gaze = br#"{"faces":[{"id":"f1","pitch":0.6,"looking":false}]}"#;
+        let passes = |by_default| {
+            matches!(
+                Faces::for_skills(Faces::TOPIC, gaze, &yes, by_default),
+                std::borrow::Cow::Borrowed(_)
+            )
+        };
+        assert!(!passes(false), "missing, off");
+        assert!(passes(true), "missing, on");
+        let no = consent::no_bytes(consent::FACE_EXPRESSIONS, 1, consent::BY_VOICE);
+        for text in [no.as_slice(), b"not json"] {
+            std::fs::write(&yes, text).unwrap();
+            assert!(!passes(true), "{}", String::from_utf8_lossy(text));
+            assert!(!passes(false), "{}", String::from_utf8_lossy(text));
+        }
         std::fs::remove_dir_all(&folder).unwrap();
     }
 

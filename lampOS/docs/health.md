@@ -15,8 +15,10 @@ same defaults. Here that is three things:
    (`lamp_msgs/Health`): the worst level, one sentence, every part with its
    level, message and age, and the parts that should report and never have.
 2. The board's own numbers, read from the system and published as
-   `board/state` (`lamp_msgs/BoardState`). The board is also one more part:
-   it reports on itself as the others do, under the name `board`.
+   `board/state` (`lamp_msgs/BoardState`), and how hot it is for the work
+   that can wait, `board/heat` (`lamp_msgs/BoardHeat`, [below](#the-boards-heat)).
+   The board is also one more part: it reports on itself as the others do,
+   under the name `board`.
 3. One command, `lamp-health`, that prints how the lamp is and ends with a
    status a script can use.
 
@@ -109,12 +111,13 @@ All with the types of [lamp-msgs](msgs.md), under the name `health`.
 | `diagnostics` | `lamp_msgs/Diagnostic` | event | Publishes the board's own report, named `board` | Once a second. With a stale time under three seconds, three times within it, so that the board is never stale by its own doing |
 | `lamp/health` | `lamp_msgs/Health` | latest | Publishes how the whole lamp is | At once when it says something new, and every 5 s besides. It means nothing after 15 s |
 | `board/state` | `lamp_msgs/BoardState` | latest | Publishes the board's numbers | Every 5 s, when the board is read. It means nothing after 15 s |
+| `board/heat` | `lamp_msgs/BoardHeat` | latest | Publishes how hot the board is for the work that can wait: `ok`, `warm` or `hot` ([The board's heat](#the-boards-heat)) | Every 5 s, when the board is read and has a processor zone, always. It means nothing after 15 s |
 | `lamp/online` | `lamp_msgs/Online` | latest | Publishes whether the lamp can reach the internet, with `--online on` only (the product's unit has it) | With each `lamp/health` turn |
 | `lamp/selftest` | `lamp_msgs/SelfTest` | latest | Subscribes: the self-test's newest run, its kept value first ([The self-test's run](#the-self-tests-run)) | As runs come; the subscription is tried again each second while it cannot be made |
 
 The two kept values come five seconds apart, and the bus takes a publisher
 that has been silent for its lease of three seconds for gone. So the
-program tells the bus that it is alive (`Publisher::alive()`) on all three
+program tells the bus that it is alive (`Publisher::alive()`) on all four
 topics it publishes, and on `lamp/online` too with `--online on`, with every
 turn of its loop, ten times a second or more. The bus
 gives a publisher's entry a new time at most once a second
@@ -381,6 +384,40 @@ could act on. It now begins at the point itself. Nothing here holds a
 level for a while once it has changed, so a board that sits at its
 passive point will still go between the two.
 
+### The board's heat
+
+The lamps slow their processors down at the processor zones' second
+passive point, 90 °C: on e82d on 19 Nov, 8 of 20 samples of policy0 were
+under its 1794 MHz at 88 °C on average (#7879). So that the work nobody
+waits for can ease off before then, each reading of the board also gives a
+level, published as `board/heat` (`crates/health/src/heat.rs`): `ok`, `warm`
+or `hot`, with the zone it was read from, its temperature `c`, and `trip_c`.
+
+The zone is the hotter of the processor zones (every zone whose name begins
+`cpu`, `cpul` and `cpub` on the lamps), the one `Reading::hottest_cpu`
+names. `T` is that zone's second passive point, or 90 °C where it names
+none (`heat::TRIP_WITHOUT_SECOND_C`). The level starts at `ok`, and the lines
+are named constants at the top of `heat.rs`, each tested from both sides:
+
+| From | To | When |
+|---|---|---|
+| `ok` | `warm` | At `T`−6 (84 °C) or above for 30 s |
+| `ok` or `warm` | `hot` | At `T`−2 (88 °C) or above for 10 s, or at once while the board holds its processors back to cool (`Reading::throttled`, as for "held back" above) |
+| `hot` | `warm` | Under `T`−5 (85 °C) for 60 s, not held back |
+| `warm` or `hot` | `ok` | Under `T`−10 (80 °C) for 60 s, not held back. A hot board that cools that far goes straight to `ok` |
+
+Each line holds for its time without a break, at the readings 5 s apart:
+one reading off the line starts its time again. Between the lines the
+level stays as it was, so a zone near one does not flip it at every
+reading, and it changes at most once in 10 to 60 s. A board with no
+processor zone publishes no heat, and the level stays as it was.
+
+It is published always, with or without anything that reads it: it is
+data, not behaviour, so a thermal row can read it with every backoff off.
+No part reads it yet. A reader with no heat, one that has run out, or one
+that fails `BoardHeat::check()` takes the board for `ok`: full speed. Each
+change of level is one line in the journal ([below](#what-it-prints-while-serving)).
+
 ## What `show` prints
 
 Written for the lamp's owner (the first builder on #705, 17 Oct 15:08),
@@ -461,6 +498,14 @@ A line whenever the lamp's level becomes another, with the lamp's message:
     lamp-health: health ok
     lamp-health: health ok -> warn: board: cpul_thermal_zone is at 66 °C: the board slows itself down from 70
     lamp-health: health warn -> ok
+
+A line whenever the board's heat becomes another level ([The board's
+heat](#the-boards-heat)), naming the zone, how long the line held, `T` and
+the busiest processes since the last reading:
+
+    lamp-health: the board is warm: cpul_thermal_zone 85 °C for 30 s (it slows itself at 90); background work eases off; busiest: lamp-voice 78%, lamp-eyes 24%, lamp-skills 12%
+    lamp-health: the board is hot: cpub_thermal_zone 89 °C and held back to cool (it slows itself at 90); background work eases off; busiest: lamp-voice 80%
+    lamp-health: the board is cool again: cpul_thermal_zone 79 °C for 60 s; background work back at full pace
 
 And each trouble of the table below once when it begins and once when it
 ends. Nothing else: no line for a report, a reading or a publish.

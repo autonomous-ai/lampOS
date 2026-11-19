@@ -2885,6 +2885,13 @@ pinned Harness (docs/install.md, "Hermes on the lamp").
 
 ## A skill's task on the lamp's Hermes (#6306, #6071's PR 3, off unless `LAMP_SKILL_TASKS=on`, on in the product)
 
+A skill's run is no task in the store, so `tasks/status` never lists it:
+with `serve --progress`, each one is said on `skills/tasks` instead (#7873,
+[msgs.md](msgs.md) `SkillTask`, for lamp-peek), `started` with its run id
+and the engine it began on (`skill_task::tell_run`, where `HarnessRunner`
+picks the engine, with Harness or without), then `ran` or `failed` when its
+runner ends (`run_on_token`). A make's and a voice ask's runs are not said.
+
 A made skill's `do.task` step (#6305, docs/skills.md, "A skill's task")
 hands its slower part to the lamp's own Hermes. lamp-skills sends one line
 for each run, and is answered once the run ends
@@ -2969,7 +2976,12 @@ for each run, and is answered once the run ends
   linked service as a task for the lamp's agent"), at most about 400
   characters of it (`MOST_TOLD_CHARS`, the first builder on #7591), cut at
   the last sentence end inside, then "There's more; ask me if you want
-  it." Nothing tracks whether the run's own script already spoke through
+  it." A line past about 10 s of speech is rendered by the voice in pieces
+  cut at sentence, then clause, then word boundaries, and played whole, the
+  first piece as soon as it is rendered and each next one rendered while the
+  one before it plays, so none passes the speech cache's 20 s and is dropped
+  (#7892;
+  docs/speaking-first.md). Nothing tracks whether the run's own script already spoke through
   lamp-control's `say`; the agent is asked to leave its answer empty (a
   dash, or an empty `answer.md`) when it did (Heron's P3 on #7591). On
   lamp-9adf, 17 Nov (build 13929,
@@ -4873,7 +4885,9 @@ exactly, the default when unset), every task and run is its own
   its place (`Engine::put_back_launch`), journaled, and the pane is not
   tried again for 2 s (`PANE_RETRY`). A full queue answers at once and
   the task fails `busy` as before, and so does a task already put back
-  for 15 min in all since its first hand-over (`QUEUE_WAIT`).
+  for 15 min in all since its first hand-over (`QUEUE_WAIT`). One whose
+  words found the kept session not running after 3 resumes is not put
+  back: it fails `one_session_not_started` (#7895, the kept session below).
 - **A skill run's turn.** It ends when `harness wait`, then `show`, read
   the pane idle on that run's own header line; a pane idle on another ask
   is waited on again, so each run keeps only its own turn's answer. The
@@ -5079,7 +5093,26 @@ in and signed out, and on 0.6.60, signed in (#7507's ROW).
   waited after, never typed again. `NOT_RUNNING` (its engine died) or a
   `TIMEOUT` with nothing taken ensures the session again once, which comes
   back `resumed` with the same id and its conversation, then the task fails
-  as before. The turn's end is `harness wait lamp-one-openclaw --after
+  as before. A spoken task is put back instead (`busy`) while the
+  one-session thread ensures the session again, so a session that comes
+  back `resumed` but stays `starting` (#7895, lamp-52e6: OpenClaw's
+  gateway did not know it, `No session found` at each resume)
+  would take it back forever. So one spoken task finds the session not
+  running at most `STARTING_RESUMES_MOST` (3) times; the next ends it
+  `not_sent` with `one_session_not_started`, journaled `the lamp's session
+  did not come up after 3 tries`, and Task news tells the asker once with
+  its plain `failed` words (it could not be started just now, try again).
+  The session is not let go for it then, so nothing resumes it until the
+  next task's words find it not running, with a bound of its own. A round
+  took about 25 s on lamp-52e6, so the task ends at about 100 s, inside
+  the 120 s a new pane is given to become ready (`OPEN_IDLE_WITHIN`). Words
+  taken within the bound run the task as before. An open that fails
+  (`harness ensure` refused, or a `harness new`) while a spoken task waits
+  first in the store for the pane counts toward that task's same bound:
+  past it, the store hands the task over without waiting for the pane
+  (`pane_turn`), and it ends the same way, with no reply and no ensure of
+  its own. The opens' own backoff (5 s doubled, `OPEN_RETRY_FIRST`; 60 s
+  doubled for `ENGINE_NOT_READY`) is unchanged. The turn's end is `harness wait lamp-one-openclaw --after
   <inputId>` (0 idle, then `show` for the answer; 3 an ask; 4 gone).
 - **Signed-in replies, acknowledged.** With a Harness that acknowledges replies, every reply into a session of the person's (the one pane of `harness new`, `--reply-named`, a resumed session, a first message) counts as handed over only on `taken` with its `inputId`; a `TIMEOUT` with `cancelled: true` is typed again (a first message's is not: any answer but `taken` leaves it uncertain, `type_first_message`), one with `cancelled: false` and an `inputId` is typed and never sent again, and the one pane's turn ends with `harness wait --after <inputId>`. An older Harness's answers read as before.
 - **Rotation and removal.** OpenClaw's kept session is not rotated by

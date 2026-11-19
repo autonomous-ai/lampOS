@@ -102,6 +102,7 @@
     <p id="reachlabel"><label>masses: <select id="reachpick" aria-label="which masses the limits are judged with"></select></label></p>
     <p id="reachnote"></p>
   </div>
+  <p class="sub" id="holdnote" hidden></p>
   <p class="sub"><span id="ring"></span><span id="lampline">waiting for body.state</span><span id="speaking">speaking</span></p>
   <div id="joints"></div>
   <details>
@@ -282,8 +283,10 @@ const showServoReach = (name) => {
     row.band.style.left = at(own.min);
     row.band.style.width = `calc(${at(own.max)} - ${at(own.min)})`;
     if (limit.pose) {
-      row.notyet.style.left = at(limit.pose.max);
-      row.notyet.style.width = `calc(${at(180)} - ${at(limit.pose.max)})`;
+      // From the stand away from the fold: up to the slider's end for a joint that counts up from its fold, down to its start for one that counts down.
+      const [from, to] = limit.pose.stand >= 0 ? [limit.pose.stand, 180] : [-180, limit.pose.stand];
+      row.notyet.style.left = at(from);
+      row.notyet.style.width = `calc(${at(to)} - ${at(from)})`;
     }
   }
 };
@@ -427,6 +430,7 @@ document.getElementById('copy').addEventListener('click', async () => {
 let ws;
 // STOP: once pressed, no drag leaves this page until Resume (the server holds the same line and says what it did).
 let stopped = false;
+let holdTimer = null;
 const send = (message) => { if (stopped && message.type === 'drag') return; if (ws?.readyState === WebSocket.OPEN) ws.send(JSON.stringify(message)); };
 const stopSaid = (text, resumable, holding) => { document.getElementById('stoptext').textContent = text; document.getElementById('stopsaid').classList.add('on'); document.getElementById('resumebtn').hidden = !resumable; document.getElementById('givebtn').hidden = !holding; };
 const pressStop = () => {
@@ -537,7 +541,18 @@ function connect() {
   ws.onclose = () => { log('disconnected; retrying'); setTimeout(connect, 1000); };
   ws.onmessage = (message) => {
     const data = JSON.parse(message.data);
-    if (data.type === 'stopped') { stopped = true; stopSaid(data.text, data.done === true, data.hold === true); log(data.text); }
+    if (data.type === 'holding') {
+      // The server holds the body lease this long after the last drag, then gives it back and the arm eases to the stand: said, so it is no surprise.
+      clearInterval(holdTimer);
+      const note = document.getElementById('holdnote');
+      if (!(data.ms > 0)) { note.hidden = true; } else {
+        const until = performance.now() + data.ms;
+        const show = () => { const left = Math.ceil((until - performance.now()) / 1000); if (left <= 0) { note.hidden = true; clearInterval(holdTimer); } else { note.hidden = false; note.textContent = `holding the lamp: ${left} s, then the arm eases back to its stand`; } };
+        show();
+        holdTimer = setInterval(show, 250);
+      }
+    }
+    if (data.type === 'stopped') { clearInterval(holdTimer); document.getElementById('holdnote').hidden = true; stopped = true; stopSaid(data.text, data.done === true, data.hold === true); log(data.text); }
     if (data.type === 'resumed') { stopped = false; document.getElementById('stopsaid').classList.remove('on'); log(data.text); }
     if (data.type === 'said') {
       // A goal the reach map held is said under its slider too, for a few seconds.

@@ -714,7 +714,16 @@ impl Run<'_, '_> {
         let asked =
             crate::writer_swap::ask(&self.config.root, held, running.bytes(), records::unix_ms());
         let ran = match asked {
-            Ok(false) => return,
+            // The writer is this build already: the build's SDK, which only the Hermes one-shot wrote
+            // before, is put there by the same unit when it differs (#7415).
+            Ok(false) => {
+                if crate::writer_swap::holds(&self.config.root, running.bytes())
+                    && !crate::sdk_tree::present(&self.config.root)
+                {
+                    self.writer_op(crate::writer_swap::Op::Sdk, "it differs from this build's");
+                }
+                return;
+            }
             Ok(true) => crate::writer_unit::run(&self.config.root, self.world.systemd),
             Err(why) => Err(why),
         };
@@ -766,6 +775,23 @@ impl Run<'_, '_> {
                 format!(
                     "the settings writer refreshed has proved itself ({why}): the copy before is removed"
                 )
+            }
+            (crate::writer_swap::Op::Sdk, Ok(()))
+                if crate::sdk_tree::present(&self.config.root) =>
+            {
+                format!(
+                    "the build's lampos SDK is written at {} ({why})",
+                    crate::sdk_tree::DIR
+                )
+            }
+            (crate::writer_swap::Op::Sdk, Ok(())) => format!(
+                "{} ran, and the build's lampos SDK is still not at {}",
+                crate::writer_unit::UNIT,
+                crate::sdk_tree::DIR
+            ),
+            (crate::writer_swap::Op::Sdk, Err(error)) => {
+                crate::writer_swap::forget(&folder);
+                format!("the build's lampos SDK is not written: {error}")
             }
             (_, Ok(())) => return,
             (_, Err(error)) => {

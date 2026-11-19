@@ -394,6 +394,20 @@ struct StopFile {
     about: String,
     #[serde(default)]
     when: Option<String>,
+    #[serde(default)]
+    done: Option<StopDoneFile>,
+}
+
+/// `[stop.done]`: a way of the `[stop]` function that says the person just
+/// did what the skill nudges them to (c6972988862: "I just had water"),
+/// which rests this skill alone for a while.
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct StopDoneFile {
+    how: String,
+    #[serde(rename = "for")]
+    rest: String,
+    about: String,
 }
 
 /// `[stop]` as loaded: the function's name and when to call it, as the
@@ -405,7 +419,27 @@ pub struct Stop {
     /// When to call it and when not, in short (#6218): the tools file's
     /// `when` with [`SUMMARY_ENVIRONMENT`] on.
     pub when: Option<String>,
+    /// `[stop.done]`: its own way, beside [`STOP_WAYS`].
+    pub done: Option<StopDone>,
 }
+
+/// `[stop.done]` as loaded: a value of the function's `how` that rests only
+/// the skills declaring it, each for its `for`, from the call on.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct StopDone {
+    /// The value, a lowercase letter, then at most 31 lowercase letters,
+    /// digits and `_`, none of [`STOP_WAYS`].
+    pub how: String,
+    /// How long the skill starts nothing itself, 1 minute to 6 hours.
+    pub for_us: u64,
+    /// What the value means, told to the model with `how`'s values.
+    pub about: String,
+}
+
+/// The longest a `[stop.done]` rests its skill.
+pub const STOP_DONE_MOST_US: u64 = 6 * 3_600_000_000;
+/// The most a `[stop.done]`'s `about` may say.
+pub const STOP_DONE_ABOUT_MOST_BYTES: usize = 160;
 
 /// The one argument of a `[stop]` function, and its values: `snooze` until
 /// the next local morning, `off` until it is asked for again, `on` again.
@@ -1338,6 +1372,11 @@ const COUNT_IN_A_TABLE: &str =
 /// one already on a lamp says them as written ([`Skill::made_refuses`]).
 const NOTE_BRACES: &str = "a note's braces are one {field} that every trigger running it tests \
                            as a number with above, below or rise; any other brace is said as written";
+
+/// Why a new skill's `do.task` whose words are empty, too long or not plain
+/// is not made ([`Skill::made_refuses`], #7874).
+const TASK_WORDS_NOT_PLAIN: &str = "a task's words: one plain sentence of at most 120 characters, \
+                                    read back whole to the owner for their yes";
 
 /// The longest field name a note's `{field}` may give.
 const MOST_COUNT_FIELD_BYTES: usize = 64;
@@ -2450,7 +2489,18 @@ impl Skill {
     /// as written ([`Count`]), and a new one is told its slot is never
     /// filled.
     pub fn made_refuses(&self) -> Option<&'static str> {
-        self.read_refuses().or_else(|| self.note_refuses())
+        self.read_refuses()
+            .or_else(|| self.note_refuses())
+            .or_else(|| self.task_refuses())
+    }
+
+    /// [`Skill::made_refuses`]'s `do.task` whose words are not one plain
+    /// sentence the owner hears whole (#7874): the voice's own rule
+    /// (`lamp_voice::made_skill::task_words_plain`).
+    fn task_refuses(&self) -> Option<&'static str> {
+        self.task_step()
+            .filter(|task| !lamp_voice::made_skill::task_words_plain(&task.words))
+            .map(|_| TASK_WORDS_NOT_PLAIN)
     }
 
     /// [`Skill::made_refuses`]'s read's `query` that is an order alone.
@@ -4809,10 +4859,45 @@ fn manifest(
                     "[stop] about is 1 to {STOP_ABOUT_MOST_BYTES} bytes, with no control characters: when the model calls it"
                 ));
             }
+            let done = match stop.done {
+                None => None,
+                Some(done) => {
+                    let named = done.how.len() <= 32
+                        && done.how.starts_with(|c: char| c.is_ascii_lowercase())
+                        && done
+                            .how
+                            .chars()
+                            .all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '_');
+                    if !named || STOP_WAYS.contains(&done.how.as_str()) {
+                        return Err(format!(
+                            "[stop.done] how {:?}: a lowercase letter, then at most 31 lowercase letters, digits and _, none of snooze, off or on",
+                            done.how
+                        ));
+                    }
+                    let for_us = duration_us(&done.rest)?;
+                    if !(60_000_000..=STOP_DONE_MOST_US).contains(&for_us) {
+                        return Err("[stop.done] for is 1m to 6h".into());
+                    }
+                    if done.about.trim().is_empty()
+                        || done.about.len() > STOP_DONE_ABOUT_MOST_BYTES
+                        || done.about.chars().any(char::is_control)
+                    {
+                        return Err(format!(
+                            "[stop.done] about is 1 to {STOP_DONE_ABOUT_MOST_BYTES} bytes, with no control characters"
+                        ));
+                    }
+                    Some(StopDone {
+                        how: done.how,
+                        for_us,
+                        about: done.about,
+                    })
+                }
+            };
             Some(Stop {
                 tool: stop.tool,
                 about: stop.about,
                 when: checked_when(stop.when, "[stop]"),
+                done,
             })
         }
     };
@@ -6978,6 +7063,11 @@ pub struct Engine {
     /// memory, kept through a short restart beside the holds
     /// ([`holds::Limits`]); a reboot forgets it (#1685).
     snoozed: HashMap<String, u64>,
+    /// Each skill whose snooze is a `[stop.done]`'s rest, and until when
+    /// (the reviewer's P2 on #7753): while its snooze ends then, a chance
+    /// that comes is kept, as in the quiet hours, not spent, so the rest is
+    /// its `for` and no longer. Kept beside `snoozed`.
+    done_until: HashMap<String, u64>,
     /// The skills turned off, by name, until they are asked for again.
     off: BTreeSet<String>,
     /// Where `off` is kept across a restart ([`OFF_FILE`]), if anywhere.
@@ -7275,6 +7365,7 @@ impl Engine {
             unwritten: HashMap::new(),
             nudges: HashMap::new(),
             snoozed: HashMap::new(),
+            done_until: HashMap::new(),
             off: BTreeSet::new(),
             off_file: None,
             visits: visits::Visits::default(),
@@ -7446,6 +7537,11 @@ impl Engine {
                     .snoozed_until_us = Some(*until);
             }
         }
+        for (name, until) in &self.done_until {
+            if now_us < *until && self.snoozed.get(name) == Some(until) {
+                limits.skills.entry(name.clone()).or_default().done_until_us = Some(*until);
+            }
+        }
         for (name, nudge) in &self.nudges {
             if !nudge.judged || nudge.ignored > 0 || now_us < nudge.resting_until_us {
                 limits.skills.entry(name.clone()).or_default().rest = Some(*nudge);
@@ -7503,6 +7599,12 @@ impl Engine {
             if let Some(until) = kept.snoozed_until_us {
                 let now = self.snoozed.entry(name.clone()).or_insert(until);
                 *now = (*now).max(until);
+            }
+            // A rest is kept as one only while the snooze still ends with it.
+            if let Some(until) = kept.done_until_us
+                && self.snoozed.get(&name) == Some(&until)
+            {
+                self.done_until.insert(name.clone(), until);
             }
             if let Some(rest) = kept.rest {
                 self.nudges.entry(name).or_insert(rest);
@@ -7958,6 +8060,50 @@ impl Engine {
         let targets: Vec<String> = last.map_or_else(|| sharing.to_vec(), |one| vec![one]);
         // What the person hears it is about: "these" for a skill's own, else
         // the one by its name, or the group's.
+        // A `[stop.done]` way rests only the skills that declare it, each
+        // for its `for` from now, whichever came last and with or without
+        // `all`; a longer snooze already there is kept.
+        let done: Vec<(String, u64)> = self
+            .skills
+            .iter()
+            .filter(|skill| sharing.contains(&skill.name))
+            .filter_map(|skill| {
+                let done = skill.stop.as_ref()?.done.as_ref()?;
+                (how == Some(done.how.as_str())).then(|| (skill.name.clone(), done.for_us))
+            })
+            .collect();
+        if let Some((first, for_us)) = done.first() {
+            for (skill, for_us) in &done {
+                let until = now_us + for_us;
+                let kept = self.snoozed.entry(skill.clone()).or_insert(until);
+                *kept = (*kept).max(until);
+                if *kept == until {
+                    self.done_until.insert(skill.clone(), until);
+                } else {
+                    self.done_until.remove(skill);
+                }
+            }
+            let minutes = for_us / 60_000_000;
+            let note = format!(
+                "Done: no {} nudge for the next {minutes} minutes. Answer them as you would; no need to mention it.",
+                first.replace('-', " ")
+            );
+            return Ok(Run {
+                skill: first.clone(),
+                events: vec![event(
+                    first,
+                    SkillStage::Triggered,
+                    format!("the model called {function} with {args}, for {done:?}"),
+                    None,
+                )],
+                calls: vec![Call::Say(note)],
+                ask: None,
+                queue: false,
+                from: None,
+                generation: None,
+                held: None,
+            });
+        }
         let these = match (shared, targets.as_slice()) {
             (false, _) => "these".to_owned(),
             (true, [one]) => format!("the {} nudges", one.replace('-', " ")),
@@ -7972,6 +8118,7 @@ impl Engine {
                 let until = next_morning_us(self.clock, now_us);
                 for skill in &targets {
                     self.snoozed.insert(skill.clone(), until);
+                    self.done_until.remove(skill);
                 }
                 format!(
                     "Done: none of {these} until tomorrow morning. Tell them so in a few words."
@@ -7980,6 +8127,7 @@ impl Engine {
             Some("off") => {
                 for skill in &targets {
                     self.snoozed.remove(skill);
+                    self.done_until.remove(skill);
                     self.off.insert(skill.clone());
                 }
                 if self.keep_off() {
@@ -7996,6 +8144,7 @@ impl Engine {
                 let mut changed = false;
                 for skill in &targets {
                     self.snoozed.remove(skill);
+                    self.done_until.remove(skill);
                     changed |= self.off.remove(skill);
                 }
                 if changed {
@@ -9593,6 +9742,26 @@ impl Engine {
                     .filter(|until| now_us < **until)
                 {
                     let rest = until - now_us;
+                    // A `[stop.done]`'s rest keeps the chance, as the quiet
+                    // hours do, so it comes once the rest ends while the
+                    // trigger still holds (the reviewer's P2 on #7753: under
+                    // `rearm = "leaves"` a spent one was the whole sitting's).
+                    if self.done_until.get(&skill.name) == Some(until) {
+                        if trigger.when != When::Appears {
+                            watch.spent = false;
+                            watch.disarmed = false;
+                            watch.waiting_us = None;
+                        }
+                        dropped(
+                            &mut self.dropped,
+                            watch,
+                            &skill.name,
+                            "snooze",
+                            now_us,
+                            || format!("resting after they did it, {} left", left(rest)),
+                        );
+                        continue;
+                    }
                     dropped(
                         &mut self.dropped,
                         watch,
@@ -11192,13 +11361,28 @@ pub fn tools_file_summary(
         if let Some(stop) = &skill.stop
             && !tools.iter().any(|tool| tool["name"] == *stop.tool)
         {
+            // The ways every `[stop]` has, then each `[stop.done]` of the
+            // skills sharing it, in folder order, with what it means.
+            let mut ways: Vec<&str> = STOP_WAYS.to_vec();
+            let mut about = "snooze: none until tomorrow morning; off: none until they ask for them again; on: as before again".to_owned();
+            for done in skills
+                .iter()
+                .filter_map(|other| other.stop.as_ref())
+                .filter(|theirs| theirs.tool == stop.tool)
+                .filter_map(|theirs| theirs.done.as_ref())
+            {
+                if !ways.contains(&done.how.as_str()) {
+                    ways.push(&done.how);
+                    about.push_str(&format!("; {}: {}", done.how, done.about));
+                }
+            }
             let mut properties = serde_json::Map::new();
             properties.insert(
                 STOP_CHOICE.into(),
                 json!({
                     "type": "string",
-                    "enum": STOP_WAYS,
-                    "description": "snooze: none until tomorrow morning; off: none until they ask for them again; on: as before again"
+                    "enum": ways,
+                    "description": about
                 }),
             );
             // Shared by a group's skills: one function, and a yes-or-no for
@@ -13306,6 +13490,60 @@ mod tests {
         assert_eq!(skill.task_step().unwrap().quiet, skill.quiet);
         let folder = task_skill(dir.path(), "photo-booth", PHOTO_BOOTH);
         assert_eq!(load(&folder).unwrap().task_step().unwrap().quiet, None);
+    }
+
+    /// #7874: `lamp-skills pack` holds a made skill's `do.task` words to the
+    /// voice's rule (`lamp_voice::made_skill::task_words_plain`): 120
+    /// characters pack, 121 do not, counted in characters, not bytes, and a
+    /// format character (U+200B) is refused.
+    #[test]
+    fn pack_refuses_a_task_whose_words_are_longer_than_the_voice_reads_back() {
+        assert_eq!(lamp_voice::made_skill::MOST_TASK_CHARS, 120);
+        assert!(TASK_WORDS_NOT_PLAIN.contains(&format!(
+            "at most {} characters",
+            lamp_voice::made_skill::MOST_TASK_CHARS
+        )));
+        let dir = tempfile::tempdir().unwrap();
+        let out = dir.path().join("out");
+        let with_words = |name: &str, words: &str| {
+            task_skill(
+                &dir.path().join(name),
+                "photo-booth",
+                &PHOTO_BOOTH.replace("Take a photo and send it to my phone", words),
+            )
+        };
+        // 120 characters, each two bytes: 240 bytes, still one sentence.
+        let most = "é".repeat(lamp_voice::made_skill::MOST_TASK_CHARS);
+        let folder = with_words("most", &most);
+        assert_eq!(load(&folder).unwrap().made_refuses(), None);
+        package::pack(&folder, &out).unwrap();
+        let over = format!("{most}é");
+        let folder = with_words("over", &over);
+        assert_eq!(
+            load(&folder).unwrap().made_refuses(),
+            Some(TASK_WORDS_NOT_PLAIN)
+        );
+        assert_eq!(
+            package::pack(&folder, &out).unwrap_err(),
+            format!("not packed: {TASK_WORDS_NOT_PLAIN}")
+        );
+        // 119 characters and a space each end: 121 as the voice counts
+        // them, so refused by both, never trimmed to 119 here.
+        let spaced = format!(
+            " {} ",
+            "é".repeat(lamp_voice::made_skill::MOST_TASK_CHARS - 1)
+        );
+        assert!(!lamp_voice::made_skill::task_words_plain(&spaced));
+        let folder = with_words("spaced", &spaced);
+        assert_eq!(
+            package::pack(&folder, &out).unwrap_err(),
+            format!("not packed: {TASK_WORDS_NOT_PLAIN}")
+        );
+        let hidden = with_words("hidden", "Take a\u{200B} photo");
+        assert_eq!(
+            package::pack(&hidden, &out).unwrap_err(),
+            format!("not packed: {TASK_WORDS_NOT_PLAIN}")
+        );
     }
 
     const MORNING_MAIL: &str = "version = \"1.0.0\"\ngrants = [\"gmail-read\", \"gmail-write\"]\n\

@@ -774,6 +774,11 @@ fn pane_turn(
     let next_is_spoken = queued
         .first()
         .is_some_and(|launch| crate::one_session::for_the_pane(one, launch).is_some());
+    // One that found the pane not up past its bound (#7895) does not wait
+    // for the pane: handed over next, to end `one_session_not_started`.
+    let spent = queued
+        .first()
+        .is_some_and(|launch| one.not_up_spent(&launch.name));
     one.set_spoken_queue(
         launching
             .map(str::to_owned)
@@ -786,7 +791,10 @@ fn pane_turn(
             )
             .collect(),
     );
-    next_is_spoken && (launching.is_some() || backing_off || !one.free() || !one.has_fresh_pane())
+    next_is_spoken
+        && (launching.is_some()
+            || backing_off
+            || (!spent && (!one.free() || !one.has_fresh_pane())))
 }
 
 /// [`place_wait`]'s answer for the next launch.
@@ -5254,6 +5262,13 @@ pub fn serve_with_adapter<C: Clock, A: Adapter>(
         bus.publisher_declared(Diagnostic::TOPIC, &Diagnostic::declaration(), "tasks")?;
     // Without `--progress` the topic is not touched at all.
     let mut status_out = if config.progress {
+        // A skill's runs beside it (#7873): `tasks/status` lists only the
+        // tasks in the store, which a skill's run never enters.
+        crate::skill_task::tell_runs_on(bus.publisher_declared(
+            lamp_msgs::SkillTask::TOPIC,
+            &lamp_msgs::SkillTask::declaration(),
+            "tasks",
+        )?);
         Some(bus.publisher_declared(TaskStatus::TOPIC, &TaskStatus::declaration(), "tasks")?)
     } else {
         None
@@ -7481,6 +7496,11 @@ mod tests {
             code: "not_ready".into(),
         };
         assert!(!put_back(&not_ready, second));
+        // Its resumes spent (#7895): finished once, never put back.
+        let not_started = LaunchOutcome::NotSent {
+            code: crate::one_session::NOT_STARTED.into(),
+        };
+        assert!(!put_back(&not_started, second));
     }
 
     const PANE_MACHINE: &str = "0123456789abcdef0123456789abcdef";

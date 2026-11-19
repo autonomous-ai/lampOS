@@ -45,6 +45,7 @@
 //!   state, the run's time and whether its agent was seen to start
 //!   ([`run_line`]).
 use crate::protocol::refusal;
+use lamp_msgs::{SkillTask, SkillTaskStage};
 use serde::Deserialize;
 use serde_json::{Value, json};
 use std::collections::BTreeSet;
@@ -1489,6 +1490,58 @@ pub fn answer_for(
     }
 }
 
+/// Where a skill's runs are told (`skills/tasks`, #7873): set once by
+/// `serve` with `--progress`, beside `tasks/status`; unset, nothing is
+/// published.
+static RUNS_TOLD: std::sync::OnceLock<std::sync::Mutex<lamp_bus::Publisher>> =
+    std::sync::OnceLock::new();
+
+/// Tells each skill's run on `out` from now on (#7873): when it began, on
+/// which engine, and how it ended.
+pub fn tell_runs_on(out: lamp_bus::Publisher) {
+    let _ = RUNS_TOLD.set(std::sync::Mutex::new(out));
+}
+
+/// What `skills/tasks` says of `skill`'s run `run` at `stage` (#7873): the
+/// engine it began on with `started`. Names and the run's id only.
+pub fn run_news(
+    skill: &str,
+    run: &str,
+    stage: SkillTaskStage,
+    engine: Option<crate::harness::EngineKind>,
+) -> SkillTask {
+    SkillTask {
+        skill: skill.to_owned(),
+        stage,
+        run: Some(run.to_owned()),
+        engine: engine.map(crate::harness::EngineKind::bus_name),
+        gate: None,
+    }
+}
+
+/// Publishes [`run_news`] where [`tell_runs_on`] says, when it checks; a
+/// voice ask's run is not a skill's and is not told.
+fn tell_run(
+    skill: &str,
+    run: &str,
+    stage: SkillTaskStage,
+    engine: Option<crate::harness::EngineKind>,
+) {
+    let Some(out) = RUNS_TOLD.get() else {
+        return;
+    };
+    let news = run_news(skill, run, stage, engine);
+    if skill == crate::voice_ask::SKILL || news.check().is_err() {
+        return;
+    }
+    let mut out = out
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner);
+    if let Err(error) = out.publish_json(lamp_bus::monotonic_us(), &news) {
+        eprintln!("[lamp-tasks] skill task {run}: skills/tasks not published: {error}");
+    }
+}
+
 /// `skill`'s run asking `grants`: a token minted for a run id of its own,
 /// held to exactly those grants, the run `made` on it (with the folder it
 /// starts in, removed when it ends; or the refusal) and waited for, the
@@ -1533,6 +1586,11 @@ fn run_on_token(
     };
     run.write = write;
     let ran = runner.run(&run, &|| ending.end());
+    let ended = match ran {
+        Ok(_) => SkillTaskStage::Ran,
+        Err(_) => SkillTaskStage::Failed,
+    };
+    tell_run(skill, &run.run, ended, None);
     let began = run.started.load(Ordering::Acquire);
     let found = run
         .answer
@@ -2963,6 +3021,7 @@ impl HarnessRunner {
             eprintln!("[lamp-tasks] skill task {}: {why}", run.run);
             return Err(why);
         }
+        tell_run(&run.skill, &run.run, SkillTaskStage::Started, Some(engine));
         // A run granted `net` (#7200): its way out before anything of it is
         // written, found by the wrapper's task entry by the run's id, and
         // removed after the run's guard.
@@ -3486,6 +3545,9 @@ impl Runner for HarnessRunner {
                 (EngineKind::Hermes, "the lamp's Hermes", false)
             }
         };
+        if !self.makes {
+            tell_run(&run.skill, &run.run, SkillTaskStage::Started, Some(engine));
+        }
         // A run granted `net` (#7200): its way out made before its token
         // file and the launch, which the one run path's wrapper finds by
         // the run's id (Harness passes it no variable of lamp-tasks'), and
@@ -8374,5 +8436,44 @@ mod tests {
         assert_eq!(lines.next(), Some("test-value-123"), "{said}");
         assert!(!lines.next().unwrap_or_default().contains("test-value-123"));
         assert!(!file.exists());
+    }
+
+    /// #7873: a skill's run is told on `skills/tasks` by its id and the
+    /// engine it began on (`tasks/status` lists only the store's tasks,
+    /// which a skill's run never enters), then how it ended; a name that
+    /// isn't a skill's is never told.
+    #[test]
+    fn a_skills_run_is_told_by_its_id_and_engine() {
+        use crate::harness::EngineKind;
+        let run = "task-1795056147468-853891-0";
+        let started = run_news(
+            "mail-check",
+            run,
+            SkillTaskStage::Started,
+            Some(EngineKind::Openclaw),
+        );
+        started.check().unwrap();
+        assert_eq!(
+            serde_json::to_value(&started).unwrap(),
+            json!({"skill": "mail-check", "stage": "started", "run": run, "engine": "openclaw"})
+        );
+        let ran = run_news("mail-check", run, SkillTaskStage::Ran, None);
+        ran.check().unwrap();
+        assert_eq!(ran.engine, None);
+        assert!(
+            run_news("Mail Check", run, SkillTaskStage::Failed, None)
+                .check()
+                .is_err()
+        );
+        // Told where a run begins, on both paths a skill's run takes, and
+        // where it ends, whatever its runner.
+        let source = include_str!("skill_task.rs");
+        assert!(source.contains("tell_run(skill, &run.run, ended, None);"));
+        assert!(source.contains(
+            "if !self.makes {\n            tell_run(&run.skill, &run.run, SkillTaskStage::Started, Some(engine));"
+        ));
+        assert!(source.contains(
+            "        }\n        tell_run(&run.skill, &run.run, SkillTaskStage::Started, Some(engine));\n        // A run granted `net`"
+        ));
     }
 }

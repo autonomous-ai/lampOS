@@ -881,6 +881,27 @@ fn a_guard_of_this_boot_still_restores_its_mute() {
     assert!(marker.is_file());
 }
 
+/// #7224: a lamp asleep when the voice faults is not the guard's: no run
+/// arms the guard while it is muted, so it comes back asleep, as it was,
+/// and the guard's sign never shows for it.
+#[test]
+fn a_lamp_asleep_at_a_fault_comes_back_asleep_not_muted_by_the_guard() {
+    let directory = Directory::new();
+    let marker = directory.0.join(format!("mute.json{GUARD_MARKER_SUFFIX}"));
+    let mut asleep = MuteRecord::new(CLOCK).unwrap();
+    assert!(asleep.request_sleep(START / 2));
+    asleep.save(&directory.file()).unwrap();
+    let (mut owner, _sender) = from_record(options(false, Some(&directory.file())), asleep, START);
+    owner.mark_guard = true;
+    assert!(owner.arm_active().is_err(), "no run while asleep");
+    assert!(!marker.exists());
+    drop(owner);
+    let (restarted, _sender, released) = restart_as_restore(&directory, CLOCK, START);
+    assert!(!released);
+    assert!(restarted.muted() && restarted.asleep());
+    assert!(!restarted.restored_after_fault());
+}
+
 /// #4332: the person's own mute survives a power cut, whether they muted
 /// before the voice ran or while it listened.
 #[test]

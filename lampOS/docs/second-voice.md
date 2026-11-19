@@ -1050,6 +1050,51 @@ order is kept. A written turn is the same from the chat on.
     and an answer without usage is still counted), and the workers' census
     (`process::switch_census_tests`), which fails if the switch does not
     reach the second worker.
+  - **A day replayed off the lamp, switch or no switch** (#7664, done-when
+    1: a busy-desk day against the allowance). The `chat answer` lines
+    above are written with the switch off too, so a UTC day's chat
+    answers can be counted again on another machine from saved journal
+    pulls: `cargo run --release -p lamp-voice --example day_tally_replay
+    -- --utc-day 2026-11-18 PULL...`, each `PULL` a `journalctl -u
+    lamp-voice -o short-iso` (or `short-iso-precise`) output. Each line's
+    tokens are read back as the service's `usage` and counted by the live
+    tally's own rule (`day_tally::one_answer`), into the UTC day of the
+    line's time; a line in two overlapping pulls is counted once. It
+    prints the `thinking today (UTC)` line and the same counts as JSON in
+    `tally.json`'s form. Numbers only: nothing of a line but its time and
+    token counts is read.
+    - **What it can't count:** the model (the line has no name, so all
+      are under `journal`), the sound heard, declined turns and spoken
+      lines (no line says them as the tally counts them), and anything in
+      a gap between pulls. The lamp keeps minutes to hours of journal
+      ("How long 20M lasts" in [install.md](install.md)), so a whole day
+      needs pulls every few minutes. The session records
+      (`metadata/events-*.jsonl`) carry no tokens and only the lamp's
+      monotonic clock, so they can't give a UTC day's tokens.
+    - **What it gains over the live tally:** a restart loses nothing, and
+      an answer just before midnight is in its own day.
+    - **From a lamp-side token TSV instead:** `--tsv PATH` in place of
+      the pulls, a tab-separated file with the header
+      `time prompt cached not_cached completion` and one row of numbers
+      per answer (`2026-11-19T08:30:05+0700 15887 14976 911 26`). Each
+      row is the `usage` it stands for (`cached` the cache's hits,
+      `not_cached` the rest) and is counted by the same rule into the UTC
+      day of its time. A row whose `prompt` is not `cached` plus
+      `not_cached`, or that is not a time and four counts, is refused and
+      named by its line number only. `--from <RFC 3339>`, the lamp-side
+      window's start, makes the first line say which part of the UTC day
+      is covered (`from 01:30:00 UTC on`, `the whole day`, `none of the
+      day`).
+    - Tests: `day_tally::replay::tests` (a date as days since 1970, UTC
+      midnight divides the days whatever the offset is written as,
+      overlapping pulls of two days count each line once, a restart mid-day
+      loses nothing, words are never printed; TSV rows on both sides of UTC
+      midnight are in their days, a row whose prompt is not its parts is
+      refused, the `--from` window is reported, a TSV's words are never
+      printed) and
+      `net::chat::tests::the_replayed_tally_reads_an_answers_line_back`,
+      which fails if the line's form changes and the replay no longer
+      reads it.
 - **With `LAMP_SECOND_STEADY_FIRST=on` a spoken turn's request begins with
   what stays** (off unless set; #1712, the first builder at 18:56). The
   system message keeps only the character and the skills. The memory note,
@@ -4176,7 +4221,14 @@ after a take-over, but now for every turn:
   (`KEEP_CLAIMED_UNKEPT`); alone, the model is told once and asked again,
   and a second such reply, or one in the last round, is said as
   `NOT_KEPT_LINE` ("I didn't keep that. Tell me again and I'll remember
-  it."). Not held after any call of the same request but a `recall` ran
+  it."). With `LAMP_KEEP_CLAIM_WHOLE=on` (#7878, off unless set), while no
+  `remember` of the turn has run, a reply whose opening claims no keep is
+  said sentence by sentence (`remember::unclaimed_sentences`), and a later
+  sentence that says a keep or replace done (`remember::claims_a_change`:
+  "That replaces wherever it was before.") is held, with the rest, to the
+  round's end. With no call at all in the round it is a claim on this same
+  path; beside any call, its words are that call's. First audio waits only
+  for the first sentence to end (switches.md). Not held after any call of the same request but a `recall` ran
   unrefused, so a reminder set in round 1 may be confirmed in round 2,
   "Got it, I've saved that for five." (reviewer-three's and the
   reviewer-lead's P2 on #3628). A cut answer's finished rounds carried into
@@ -5908,11 +5960,18 @@ after a take-over, but now for every turn:
   talk past someone at the lamp reads busy, with or without
   `LAMP_NAME_OR_FOLLOW_UP`. The 22 Oct rule that a lone voice with nobody in
   view never makes the room busy stands: here a face is in view and its
-  mouth reads still while the voice talks. With no mouths read
-  (`LAMP_EYES_SPEAKING` off, or any face turned to the lamp never read
-  through the line, judged per face) the face is a sign as before: fail
-  open, so a person alone at a lamp whose eyes can't read mouths is still
-  answered, and a still face beside it does not speak for an unread one.
+  mouth reads still while the voice talks. A face turned to the lamp whose
+  mouth the eyes judged but never read speaking (`unknown` in every look of
+  the line) is not seen speaking either
+  (`speaking_faces::turned_never_seen_speaking`; #7891, lamp-74ff, 19 Nov
+  11:04, request 65: "Is it after all?" in a meeting, "speaking in 0,
+  unread in 8", was played as `someone is turned to the lamp`, the face the
+  second sign for a name heard in the room's sound). With no speaking
+  judged at all (`LAMP_EYES_SPEAKING` off, or a face turned to the lamp
+  with no `speaking` through the line, judged per face) the face is a sign
+  as before: fail open, so a person alone at a lamp whose eyes can't read
+  mouths is still answered, and a still face beside it does not speak for
+  an unjudged one.
   With `LAMP_TURNED_SPEAKING` on too, this rule decides alone. A line carried by `LAMP_SAME_SPEAKER_CARRIES`
   goes on as the conversation, before the face is read, and stays carried.
   Risk: the owner turned to the lamp and asking, whose mouth the eyes read
@@ -5960,14 +6019,32 @@ after a take-over, but now for every turn:
   went unread in 1085 of 1125 looks); or
   when a face turned to the lamp is facing it
   (head pitch from 20 degrees up to 25 degrees down, `said_to_me::PITCH_DEG`
-  as the eyes' `facing` window, and not looking away: the newest `pitch`
-  and `looking` of the one turned face read speaking, both from that face in
-  one look, with `LAMP_EYES_PITCH_GAZE` (a bystander turned to the lamp says
-  nothing; two speaking faces give none),
-  `SpeakingFaces::turned_pose_between`; unknown blocks nothing) and is seen
-  speaking it (one `yes` in a look of the line,
-  `SpeakingFaces::seen_speaking_between`; a mouth never read is not seen
-  speaking), with 3 words or more, a question or an ask; or, out of the
+  as the eyes' `facing` window, and not looking away: the median `pitch`
+  and the most-read `looking` of the one turned face read speaking over the
+  line's looks, each look's from that face, with `LAMP_EYES_PITCH_GAZE` (a
+  bystander turned to the lamp says nothing; two speaking faces give none),
+  `SpeakingFaces::turned_pose_between`; not the newest look alone, #7891:
+  head down to a phone at 40 degrees in three looks and 10 in the last was
+  read facing; the eyes' lost marks stay a pitch here, outside the window;
+  unknown blocks nothing) and is seen speaking it (one `yes` in a look of
+  the line, `SpeakingFaces::seen_speaking_between`; a mouth never read is
+  not seen speaking) while facing in at least 2 looks
+  (`said_to_me::FACING_LOOKS`, `SpeakingFaces::turned_speaking_facing_looks`;
+  #7891, lamp-74ff, 19 Nov 11:16, request 151: meeting talk across the
+  table, no name and no window, was let through on one look), with 3 words
+  or more, a question or an ask, and no second voice in the room since the
+  lamp last spoke (the end of its last words) and within 180 s
+  (`room_told::BUSY_ENDS_AFTER_US`; `said_to_me::Line::second_voice`, from
+  `Heeding::second_voice_at`): an earlier line of more than 2 words that a
+  face in view was read silent through with none read speaking (a voice
+  with no mouth: a call's far side, a video, someone off camera; a lip
+  smack heard as "Mm." is the face's own), or one two faces were seen
+  speaking (a meeting across the lamp). Faces and looks only: product
+  prints go to services (`LAMP_SAME_VOICE_FOR=services`), so no voice print
+  is read; a mouth unread is no evidence. Facing then means nothing, as in
+  a meeting or on a call with a screen (the first builder at 11:20 on
+  #7891); the name in the words, the window, a yes awaited and a bare yes
+  to the lamp's waiting question pass as before; or, out of the
   window, when the lamp still waits on its question
   (`said_to_me::Line::question_waits`: the thread's question asked no more
   than 120 s before, `said_to_me::QUESTION_WAITS`, the lamp's own wait for
@@ -5987,11 +6064,14 @@ after a take-over, but now for every turn:
   and the journal says `request N: not said to the lamp, held: <reason>`
   (`not facing (pitch)`, `looking away`, `not facing in a conversation
   (pitch)`, `looking away in a conversation`, `no face seen speaking it`,
-  `a short line`), followed by `; pitch <degrees>|unread, looking
-  true|false|unread, <n> looks` (#7721). A line let through, in the window
+  `a short line`, `seen speaking facing in fewer than 2 looks`, `a second
+  voice in the room`), followed by `; pitch <degrees>|unread, looking
+  true|false|unread, <n> looks` (#7721; `<n>` the looks that gave the pose,
+  out of the window too, where it was 0 or 1 before #7891), and out of the
+  window `, seen speaking facing in <m>`. A line let through, in the window
   or out of it, has its own line, `request N: said to me: let through:
   <verdict>: <W> words, in the window|out of the window; pitch …, looking
-  …, <n> looks (LAMP_SAID_TO_ME)`; a short line (`said_to_me::SHORT_WORDS`
+  …, <n> looks[, seen speaking facing in <m>] (LAMP_SAID_TO_ME)`; a short line (`said_to_me::SHORT_WORDS`
   words or fewer) standing in the window adds which input let it,
   `request N: said to me: a short line stands in the window by
   named|yes awaited|lamp_asked|seen_speaking|read_silent false
@@ -5999,7 +6079,12 @@ after a take-over, but now for every turn:
   addressed still lets a line out.
   `LAMP_TURNED_FACE_SPEAKS` holds a subset of it. Risk: someone at the lamp
   whose mouth the eyes cannot read, or who says one word that is no
-  question, needs its name.
+  question, needs its name; out of the window someone whose mouth is read
+  speaking in only one look, or whose mouth the eyes read still through a
+  line of their own, needs its name for the next 180 s or until the lamp
+  speaks. Open (#7891, #7721): in the window a line whose looks are all lost
+  marks or give no pitch still passes as `the speaker's pose unread`, until
+  the head-down lines of the row are counted.
 - **Who spoke a line, from the looks its mouth was read**
   (`LAMP_SPEAKING_READ_LOOKS=on`, #7442, #7419). A face is a line's speaker
   when it read `yes` in at least half of the line's looks

@@ -358,6 +358,32 @@
           "minLength": 1,
           "maxLength": 200,
           "description": "When to call the stop function and when not, in short (#6218): the tools file's when with LAMP_USE_SKILL_SUMMARY on."
+        },
+        "done": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "how",
+            "for",
+            "about"
+          ],
+          "description": "One more how of the stop function, for this skill alone (c6972988862, A sip of water's just_drank): called with it, the skill starts nothing itself for its for.",
+          "properties": {
+            "how": {
+              "type": "string",
+              "pattern": "^[a-z][a-z0-9_]{0,31}$",
+              "description": "None of snooze, off or on (the loader refuses them)."
+            },
+            "for": {
+              "type": "string",
+              "description": "A duration, 1m to 6h."
+            },
+            "about": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 160
+            }
+          }
         }
       }
     },

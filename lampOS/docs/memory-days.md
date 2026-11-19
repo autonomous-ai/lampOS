@@ -737,17 +737,22 @@ new fields yet, and a put that names none of them behaves as before.
 
   | Column | Type | Default | Bound |
   |---|---|---|---|
-  | `source_kind` | `TEXT NOT NULL`, `CHECK` in `voice`, `task`, `agent`, `reminder` | `'voice'` | one of the four |
+  | `source_kind` | `TEXT NOT NULL`, `CHECK` in `voice`, `task`, `agent`, `reminder`, `sdk` | `'voice'` | one of the five |
   | `source_ref` | `TEXT NOT NULL`, a JSON object | `'{}'` | at most 512 bytes |
   | `summary` | `TEXT NOT NULL` | `''` | at most 160 bytes |
   | `deed_unix_ms` | `INTEGER`, null on an older row | null | a time in ms |
 
   Plus the index `service_records_kind(person, source_kind, changed_unix_ms)`.
+  A table that opened on slice 1 has the `source_kind` `CHECK` without
+  `sdk`; the same transaction rebuilds it once (`allow_sdk`: a new table
+  from the stored `sql` with `sdk` added, every row copied, the old one
+  dropped, the new one renamed, its indexes and triggers made again), the
+  rows counted before and after, any difference failing the open.
 - **`service_record`** takes four more optional fields: `source_kind`,
   `source_ref`, `summary` and `deed_unix_ms`. With none of them (an older
   voice), the record is `voice`, as every record before. An unknown kind is
   refused `bad_kind`, and so is a put that would change a kept record's
-  kind. A linked kind (`task`, `agent`, `reminder`) must give `source_ref`
+  kind. A linked kind (`task`, `agent`, `reminder`, `sdk`) must give `source_ref`
   on every put; a `voice` record may. `source_ref` is
   `{service, id, session?, computer?}`: an object of those fields only,
   each a text without control characters, `service` and `id` not empty, at
@@ -875,7 +880,8 @@ queues each change as a `service_record` with `source_kind`, `source_ref`,
 switch: Harness task rows (`LAMP_SERVICE_RECORDS_TASKS`, slice 3,
 [tasks.md](tasks.md)); reminder rows (`LAMP_SERVICE_RECORDS_REMINDERS`,
 [schedule.md](schedule.md)); a skill run's calls
-(`LAMP_SERVICE_RECORDS_AGENT`, slice 5, [services.md](services.md)). With
+(`LAMP_SERVICE_RECORDS_AGENT`, slice 5, [services.md](services.md));
+`LAMP_SERVICE_RECORDS_SDK` below. With
 `LAMP_SERVICE_RECORDS` off nothing is kept.
 
 - **Its own bound.** At most 16 changes wait, apart from the connector
@@ -910,6 +916,42 @@ switch: Harness task rows (`LAMP_SERVICE_RECORDS_TASKS`, slice 3,
   is never written (slice 3).
 - **Rollback.** Only the task rows call it, behind their own switch, so an
   older voice differs in having no `linked_dropped` fact and no task rows.
+
+### Linked records told: the caps (slice 8, the voice's `LAMP_SERVICE_RECORDS_LINKED_TOLD`, off)
+
+With `LAMP_SERVICE_RECORDS_LINKED_TOLD=on` beside `LAMP_SERVICE_RECORDS_TOLD`
+and `LAMP_SERVICE_RECORDS` (the second route only,
+`process::service_records_linked_told_worker_environment`; `lamp-voice`
+`service_records::told::linked_on`), the linked records are told apart from
+the connector records, each kind bounded:
+
+- **The standing note.** The connector records as before, then at most 2
+  linked lines changed in the last 24 h, latest first, each tagged by kind
+  with its key: "[task] Book the dentist · done · today 15:40 · key
+  t-s1-7", with the rule "Lines tagged [task], [agent] or [reminder] are
+  work handed on for the owner, with its one-line summary only: never add
+  to it." and, in full with `record_source` offered, "For more of one, call
+  record_source with its key." The linked lines are never dropped for the
+  note's 1,900 bytes; the connector lines go first. They come from what the
+  linked outbox put (its last 16, RAM only) and, after a start, from the
+  memory's list of the owner's records, which never puts a linked record
+  in the connector records' ledger.
+- **Recall.** The memory is asked for 10 records about the words, not 5,
+  with `linked_most` 3: past the 3 best linked records it skips the linked
+  ones, so however many later linked records match, they never take a
+  connector record's place in the 10. Of those, every connector record
+  found is told first, up to 5, and linked ones fill
+  the room left, at most 3, so a linked record never pushes a connector one
+  out. Each in the memory's order; a linked one is told by its line, kind,
+  status, when and key.
+- **Someone else here.** Not in full (the told records' gate), a linked
+  line and a recall's linked record say only the kind, the status and when,
+  never the summary or the key, with `BRIEF`.
+- **Forgets.** A forget everything, of the person, or about a thing its
+  summary matches, takes the linked lines held, as it takes the waiting
+  changes.
+- **Off.** Nothing changes: no linked line, a recall asks 5 and tells what
+  it finds as before, and the memory's list is merged as before.
 
 ### Find the source: `record_source` (slice 7, the voice's `LAMP_SERVICE_RECORDS_SOURCE`, off)
 
@@ -970,6 +1012,54 @@ each record's `key` while it is on.
 - **Older builds.** An older lamp-memory refuses `key`
   (`deny_unknown_fields`): the call is `timed_out`. Off (either switch),
   the tool is not offered and nobody runs it.
+
+### A paired computer's daily notes count (`sdk`, `LAMP_SERVICE_RECORDS_SDK`, off)
+
+Tracker row C157 (the memory owner's call and the first builder's yes, 17
+Nov on #6811): one linked record a day for each developer computer the
+owner paired from the app, "The paired computer Dev laptop changed its
+notes 4 times on 2026-11-17". A count only: never a note's key, a key's
+name or a value.
+
+- **The memory's side.** `sdk` is a fifth source kind. An `sdk` record is
+  a count and nothing else: service `sdk`, action `notes_changed`, status
+  `done`, no `detail`, `reason`, `result_id`, `links` or `replaced_by`;
+  anything else is refused `bad_detail`, so no key or value of a
+  computer's notes can be stored under it. Unlike other final records, a
+  later put of the same key (the day's higher count) updates its summary,
+  `source_ref`, deed and changed time in place; its status stays `done`.
+  It is held to the per-kind cap (2,000) and the deed-time forget rule, and
+  forget everything, forgetting the person and a forget about a thing its
+  summary matches remove it as any row.
+- **The count.** lamp-control counts each kept `notes.set` or
+  `notes.delete` (a delete of a key not there is not one) of each computer
+  in 15-minute buckets, in memory only, the last 25 hours, a count and the
+  time of the last change (`notes::Notes::changes_since`); a revoke clears
+  them. Its owner's socket answers `{"note_changes": {"since_unix_ms": N}}`
+  to the voice alone (by its cgroup), with `{"computers": [{client, name,
+  changes, last_unix_ms}]}`, only for computers its side file marks as
+  paired from the owner's app (`paired-by.json`, control.md, "Notes").
+- **Who.** A pairing the side file marks `app`, for that pairing's
+  `paired_at`, is the owner's; a keeper's `lamp-control code`, a stale mark,
+  the local agent or no side file gives no count. The row is kept under the
+  owner's memory id (`person::owner_ids`, the first `p-` id); with no known
+  owner nothing is kept.
+- **The voice's side** (`service_records::sdk_counts`, the second route).
+  Every 5 minutes, a thread of its own asks lamp-control (1 s each way) and
+  puts, through the linked outbox, a row for each computer whose count went
+  above the one it last put: key `s-<client>-<YYYYMMDD>` (the lamp's local
+  day), `source_ref` `{service: "sdk", id: <client>, computer: <its name,
+  control characters dropped, at most 64 bytes>}`, deed the last change
+  counted. It counts from the later of the local midnight, the voice's start
+  and the owner's last forget everything, so a count never reaches back past
+  a forget; a restart of either part starts the day again (it may count low,
+  never high).
+- **Off.** Unless `LAMP_SERVICE_RECORDS_SDK=on` beside
+  `LAMP_SERVICE_RECORDS=on`, nothing is asked, kept or written.
+- **Rollback.** An older lamp-control answers the op with an `error`, and
+  nothing is kept. A memory migrated by a build with the four-kind `CHECK`
+  (slice 1 before this change, never in the product) keeps that `CHECK`, so
+  it refuses an `sdk` row and nothing is kept.
 
 ## Service contacts (`service_contact`, the voice's `LAMP_SERVICE_CONTACTS`)
 
