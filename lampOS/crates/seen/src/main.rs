@@ -550,6 +550,18 @@ fn serve(config: Config, stop: &AtomicBool) -> io::Result<()> {
             lamp_seen::JOURNAL_LABELS
         );
     }
+    // The board's heat (#7879): with LAMP_HEAT_BACKOFF=on, read at most
+    // once a second, and the bursts and posture frames spaced out on a warm
+    // or hot board. Off, nothing is read and the pace is today's.
+    let mut heat_in = lamp_seen::heat::enabled_from_environment()
+        .then(|| lamp_seen::heat::HeatIn::on(bus.clone()));
+    if heat_in.is_some() {
+        eprintln!(
+            "lamp-seen: {}=on: the bursts and posture frames ease off on a warm or hot board",
+            lamp_seen::heat::SWITCH
+        );
+    }
+    let mut paced = lamp_seen::heat::Pace::FULL;
     let mut doing_said: Option<Instant> = None;
     let started = Instant::now();
     let mut said_at: Option<Instant> = None;
@@ -705,6 +717,24 @@ fn serve(config: Config, stop: &AtomicBool) -> io::Result<()> {
         // Kept through a short closing: nothing said from it.
         let sitting_held = plan.sitting.holds();
         if let Some((taker, marked)) = frames.as_mut() {
+            // The pace for the board's heat: the next burst and posture
+            // frame only, never the frames within a burst or any gate.
+            if let Some(heat_in) = heat_in.as_mut() {
+                let level = heat_in.level();
+                let pace = lamp_seen::heat::Pace::at(level, true)
+                    .holding(holds.as_ref().is_some_and(hold::Hold::held));
+                if pace != paced {
+                    eprintln!("lamp-seen: {}", pace.line(level));
+                    paced = pace;
+                }
+                let outlet = marked.inner_mut();
+                if let Some(activity) = outlet.activity.as_mut() {
+                    activity.set_every_us(pace.burst_every_us);
+                }
+                if let Some(pose) = outlet.pose.as_mut() {
+                    pose.set_every_us(pace.posture_every_us);
+                }
+            }
             if plan.posture.holds()
                 && let Some(pose) = marked.inner_mut().pose.as_mut()
             {

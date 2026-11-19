@@ -985,3 +985,46 @@ fn the_newest_answer_is_recent_for_30_s_from_its_frame() {
     pose.forget();
     assert_eq!(pose.recent_answer(S), None);
 }
+
+/// On a hot board (#7879) posture's frame goes once a minute, not paused;
+/// back to ok, every 30 s again from the last one sent.
+#[test]
+fn a_hot_board_sends_posture_one_frame_a_minute() {
+    use crate::heat::Pace;
+    use lamp_msgs::HeatLevel;
+    let mock = Mock::start(vec![Reply::Ergo(Some(good()))]);
+    let mut pose = pose(&mock);
+    pose.set_every_us(Pace::at(HeatLevel::Hot, true).posture_every_us);
+    assert!(pose.step(0, Ok(()), false).is_none());
+    send(&mut pose, 0);
+    settle(&mut pose, S, Ok(()));
+    assert!(!pose.ready(EVERY_US), "not at 30 s on a hot board");
+    assert!(!pose.ready(60 * S - 1));
+    assert!(pose.ready(60 * S), "one a minute, not paused");
+    pose.set_every_us(Pace::at(HeatLevel::Ok, true).posture_every_us);
+    assert!(pose.ready(EVERY_US), "30 s again at ok");
+}
+
+/// A stop (a forget, the opt-in off) stops posture's request on a hot
+/// board as at ok: its socket closed, its answer dropped.
+#[test]
+fn a_gate_closed_on_a_hot_board_still_stops_the_request() {
+    use crate::heat::Pace;
+    use lamp_msgs::HeatLevel;
+    let mock = Mock::start(vec![Reply::Silent]);
+    let mut pose = pose(&mock);
+    pose.set_every_us(Pace::at(HeatLevel::Hot, true).posture_every_us);
+    pose.step(0, Ok(()), false);
+    send(&mut pose, 0);
+    mock.wait_for(|seen| seen.iter().any(|seen| matches!(seen, Seen::Frame(_))));
+    let started = Instant::now();
+    assert!(settle(&mut pose, 2 * S, Err(Closed::NoOptIn)).is_empty());
+    assert!(
+        started.elapsed() < Duration::from_secs(3),
+        "stopped at once"
+    );
+    assert_eq!(pose.counts().cancelled, 1);
+    let seen = mock.wait_for(|seen| closed_count(seen) == 1);
+    assert_eq!(closed_count(&seen), 1, "{seen:?}");
+    assert!(!pose.ready(60 * S), "the gate closed: no frame");
+}
