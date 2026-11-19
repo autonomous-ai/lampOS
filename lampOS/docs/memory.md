@@ -852,7 +852,7 @@ it is held as a forget by that thing's id (`second_provider::ask_once_forget`,
 subject in their own words, in their language ("Shall I forget what you
 kept about your bike lock code?"). The kept text is never told to the model
 or said: the speaker was not seen (the Reviewer-lead's P2 on #6673).
-Only a plain yes on a later line within 30 s
+Only their yes on a later line within 30 s
 (`remember::ONE_FACE_FORGET_YES_FOR`), from the same session's same person,
 with their face seen saying it, or in the private room
 (`LAMP_PRIVATE_ROOM`) on a line theirs by their face alone in view, runs
@@ -862,11 +862,18 @@ never `forget_last`). The held forget carries the subject's words
 about those words go too (`exchanges_forget`,
 `remember::agreed_forget_exchanges`), by the same match as a forget about
 and in their scope alone, never another's or the room's, so recall no longer
-tells the talk about it (C128; lamp-06c1, build 13523). The yes may say the forget too
-(`known_faces::plain_agreement_to_forget`, Thirteen's P2 on #6673): "Yes,
-forget it.", "Sure, go ahead and forget it.", "Ừ, quên đi.", and the forget
-said back alone, "Forget it." or "Quên đi.", which is only ever read as the
-answer to that question, by that person, within its 30 s. A yes after its
+tells the talk about it (C128; lamp-06c1, build 13523). **Whether the line
+is their yes is the model's to judge, with no yes word list** (the owner's
+13 Nov rule; the first builder's ruling on leg (e) of #7960's ROW, where
+"Lamp, yes." heard as "Loan. Yes." was refused by the old list and the
+forget was lost): the model's `forget` on that line, naming nothing else
+(no other `source_id`, and the line naming no thing of its own,
+`remember::named_subject`), is the yes, and the held forget runs in its
+place exactly as held, by its kept id and words, never the model's raw
+call (`second_provider::agree_held_forget`, `Taken::Agrees`). A line the
+model answers with no `forget` runs nothing and the thing stays kept; a
+`forget` naming another thing is that other forget, and the held one is
+kept. A yes after its
 30 s is journaled "too late", whoever the line is by then; one not theirs
 says why after "not the same person": "no one known on the line", "theirs,
 in a later session" or "another person" (`second_provider::not_theirs`, ids
@@ -877,8 +884,7 @@ dropped and kept, and, as for an unseen yes, the model is told once that it
 did not count, that nothing was forgotten and it is still kept, and that it
 may ask them once to say it facing the lamp (`remember::unknown_yes_told`,
 #7454: on lamp-06c1 the model was told nothing and could say it was
-forgotten). Any no, keep,
-wait, "đừng" or a question is no yes. If the line is no longer theirs when
+forgotten). If the line is no longer theirs when
 the forget runs (another face or voice came in), nothing is forgotten and
 the model is told it is still kept; it never runs in the room's scope
 (`remember::AGREED_FORGET_NOT_NOW`, Thirteen's P3). A no, any other line,
