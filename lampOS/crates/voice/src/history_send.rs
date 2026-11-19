@@ -22,12 +22,15 @@
 //! that for the memory, and a turn in a request a service read answered in
 //! is given that placeholder here too.
 //!
-//! **The id** is `lamp_msgs::history::turn_id`, `<store>:<scope>:<exchange
-//! id>`: the Days store's own id (made with the store, gone at a reset), the
-//! memory scope and the exchange's id in it, the same a forget names when it
-//! deletes (`LAMP_HISTORY_FORGET`). A reset lamp's new turns are neither
-//! taken as already saved nor refused by an old tombstone. The store takes a
-//! resend of an id as a no-op, so a retry is always safe.
+//! **The id** is `lamp_msgs::history_turn_id`, `<epoch>.<scope>:<exchange
+//! id>`, the one maker of it, which the memory's forget answers use too: the
+//! Days store's epoch (made with the store, made anew when it is wiped whole
+//! or reset), the memory scope and the exchange's id in it. A wiped or reset
+//! lamp's new turns are neither taken as already saved nor refused by an old
+//! tombstone. The epoch is read at start and again after every forget; when
+//! it changed, the turns not yet sent wait for the next start, and the marks
+//! start again under the new one. The store takes a resend of an id as a
+//! no-op, so a retry is always safe.
 //!
 //! **The room's lines wait for their conversation's end:** with
 //! `LAMP_MEMORY_FOLLOWS_FACE` (or `LAMP_MEMORY_EARLY_WORDS`) a room line may
@@ -50,10 +53,11 @@
 //! **Nothing lost at a restart, and no words on disk:** only a mark per
 //! scope, the last id the server took with none before it unsent, is kept,
 //! in [`MARKS_FILE`] (0600, ids only). At start the sending thread asks the
-//! memory for its store and each scope's last id, and sends what the memory
-//! kept after the marks; the memory stays the one copy of the words. A
-//! store unlike the marks' (a first start, or a reset) starts the marks at
-//! what the memory holds now: nothing before the switch went on is sent.
+//! memory for its epoch and each scope's last id (`history_issued`), and
+//! sends what the memory kept after the marks (`exchanges_after`); the
+//! memory stays the one copy of the words. An epoch unlike the marks' (a
+//! first start, or a reset) starts the marks at what the memory holds now:
+//! nothing before the switch went on is sent.
 //!
 //! **Never on the turn's path:** the memory's writer thread hands each turn
 //! over under a short lock with no I/O, into a bounded queue (at most
@@ -66,7 +70,7 @@
 //!
 //! What was said before the privacy switch closed may still be sent while
 //! it is closed: nothing new is said to the lamp then.
-use lamp_msgs::history::{ROOM_SCOPE, is_store_id, turn_id};
+use lamp_msgs::{MEMORY_HISTORY_EPOCH_OP, history_turn_id, is_history_epoch};
 use serde_json::{Value, json};
 use std::{
     collections::{BTreeMap, BTreeSet, HashSet, VecDeque},
@@ -75,6 +79,8 @@ use std::{
     time::{Duration, Instant},
 };
 
+/// The room's memory scope; its person on the server is `""`.
+pub const ROOM_SCOPE: &str = "everyone";
 /// `on`, and nothing else.
 pub const ENVIRONMENT: &str = "LAMP_HISTORY_SEND";
 /// The store's save call, below the lamp's cloud API base (`…/api/v1/ai`).
@@ -137,7 +143,7 @@ struct Pending {
 impl Pending {
     fn wire(&self, store: &str) -> Value {
         json!({
-            "id": turn_id(store, &self.scope, self.exchange),
+            "id": history_turn_id(store, &self.scope, self.exchange),
             "at": utc(self.at_unix_ms),
             "person": if self.scope == ROOM_SCOPE { "" } else { self.scope.as_str() },
             "heard": self.heard,
@@ -237,8 +243,11 @@ pub type Ask = Box<dyn FnMut(&Value) -> Option<Value> + Send>;
 struct Queue {
     ready: VecDeque<Pending>,
     held: VecDeque<Pending>,
-    /// The store's id, once the memory told it: nothing is posted before.
+    /// The memory store's epoch, once the memory told it: nothing is
+    /// posted before.
     store: Option<String>,
+    /// A forget was answered: the epoch is read again before the next post.
+    epoch_stale: bool,
     /// Sends wait for a forget's answer until then, and whose forget it is.
     paused_until: Option<Instant>,
     paused_scope: String,
@@ -447,21 +456,24 @@ fn held_by_forget(queue: &mut Queue, now: Instant) -> bool {
 }
 
 /// The next turns to send, oldest first, at most [`BATCH_MOST`], and the
-/// store's id; waits until there are some, the store is known and no
-/// forget holds.
-fn next_batch(shared: &Shared) -> (Vec<Pending>, String) {
+/// epoch; waits until there are some, the epoch is known and no forget
+/// holds. `None`: a forget was answered, and the epoch is read again first.
+fn next_batch(shared: &Shared) -> Option<(Vec<Pending>, String)> {
     let mut queue = locked(shared);
     loop {
         let now = Instant::now();
         queue.age_out(now);
         let holding = held_by_forget(&mut queue, now);
+        if !holding && queue.epoch_stale {
+            return None;
+        }
         if !holding
             && !queue.ready.is_empty()
             && let Some(store) = queue.store.clone()
         {
             let take = queue.ready.len().min(BATCH_MOST);
             let batch = queue.ready.drain(..take).collect();
-            return (batch, store);
+            return Some((batch, store));
         }
         let wait = match queue.paused_until {
             Some(until) => until
@@ -482,6 +494,8 @@ enum Ended {
     Waits,
     /// Everything in it was forgotten before it went.
     Forgotten,
+    /// Put back to go first, once the epoch is read again after a forget.
+    Requeued,
 }
 
 /// One batch, tried up to [`TRIES`] times. Before every try, the first
@@ -521,6 +535,12 @@ fn send_batch(
                     None => break,
                 }
             }
+            if queue.epoch_stale {
+                for pending in batch.drain(..).rev() {
+                    queue.ready.push_front(pending);
+                }
+                return Ended::Requeued;
+            }
             let (forgotten, rest): (Vec<_>, Vec<_>) = std::mem::take(batch)
                 .into_iter()
                 .partition(|pending| queue.is_forgotten(&pending.scope, pending.exchange));
@@ -555,11 +575,11 @@ fn send_batch(
     Ended::Waits
 }
 
-/// The marks file's contents: the store's id and each scope's mark.
+/// The marks file's contents: the epoch and each scope's mark.
 fn read_marks(path: &Path) -> Option<(String, BTreeMap<String, u64>)> {
     let bytes = crate::config::read_private(path, 65_536).ok()?;
     let value: Value = serde_json::from_slice(&bytes).ok()?;
-    let store = value.get("store")?.as_str()?.to_owned();
+    let store = value.get("epoch")?.as_str()?.to_owned();
     let marks = value
         .get("marks")?
         .as_object()?
@@ -573,7 +593,7 @@ fn read_marks(path: &Path) -> Option<(String, BTreeMap<String, u64>)> {
 fn write_marks(path: &Path, store: &str, marks: &BTreeMap<String, u64>) -> std::io::Result<()> {
     use std::io::Write;
     use std::os::unix::fs::OpenOptionsExt;
-    let text = json!({"store": store, "marks": marks}).to_string();
+    let text = json!({"epoch": store, "marks": marks}).to_string();
     let fresh = path.with_extension("json.new");
     let _ = std::fs::remove_file(&fresh);
     let mut file = std::fs::OpenOptions::new()
@@ -611,10 +631,13 @@ fn keep_marks(shared: &Shared, path: Option<&Path>, scopes: &BTreeSet<String>) {
     }
 }
 
-/// What the memory tells at start: its store's id and each scope's last id.
+/// What the memory tells at start: its epoch and each scope's last id.
 fn ask_store(ask: &mut Ask) -> Option<(String, BTreeMap<String, u64>)> {
-    let answer = ask(&json!({"op":"store"}))?;
-    let store = answer.get("store")?.as_str().filter(|s| is_store_id(s))?;
+    let answer = ask(&json!({"op":"history_issued"}))?;
+    let store = answer
+        .get("epoch")?
+        .as_str()
+        .filter(|epoch| is_history_epoch(epoch))?;
     let issued = answer
         .get("issued")?
         .as_object()?
@@ -625,8 +648,8 @@ fn ask_store(ask: &mut Ask) -> Option<(String, BTreeMap<String, u64>)> {
     Some((store.to_owned(), issued))
 }
 
-/// The start: the store's id from the memory (asked until it answers), the
-/// marks read, and what the memory kept after them sent; a new store (or
+/// The start: the epoch from the memory (asked until it answers), the
+/// marks read, and what the memory kept after them sent; a new epoch (or
 /// no marks) starts the marks at what the memory holds now.
 fn catch_up(shared: &Shared, post: &mut Post, ask: &mut Ask, marks: Option<&Path>, waits: Waits) {
     let (store, issued) = loop {
@@ -730,7 +753,56 @@ fn ended_batch(shared: &Shared, batch: &[Pending], ended: Ended) {
             Ended::Answered(_) => queue.acked(pending),
             Ended::Waits => queue.defer(pending),
             Ended::Forgotten => queue.drop_forgotten(pending),
+            Ended::Requeued => {}
         }
+    }
+}
+
+/// The epoch read again after a forget (asked until the memory answers).
+/// Unchanged, sends go on. Changed (a wipe whole, a reset): the turns not
+/// yet sent wait for the next start, what was kept by id under the old
+/// epoch goes, and the marks start again under the new one, so the next
+/// start sends what the memory kept since.
+fn reread_epoch(shared: &Shared, ask: &mut Ask, marks: Option<&Path>, waits: Waits) {
+    let epoch = loop {
+        let told = ask(&json!({"op": MEMORY_HISTORY_EPOCH_OP})).and_then(|answer| {
+            answer["epoch"]
+                .as_str()
+                .filter(|epoch| is_history_epoch(epoch))
+                .map(str::to_owned)
+        });
+        if let Some(epoch) = told {
+            break epoch;
+        }
+        let queue = locked(shared);
+        drop(wait_on(shared, queue, waits.first));
+    };
+    let mut queue = locked(shared);
+    queue.epoch_stale = false;
+    if queue.store.as_deref() == Some(epoch.as_str()) {
+        return;
+    }
+    let waiting = (queue.ready.len() + queue.held.len()) as u64;
+    queue.ready.clear();
+    queue.held.clear();
+    queue.let_go += waiting;
+    queue.forgotten.clear();
+    queue.forgotten_order.clear();
+    queue.emptied.clear();
+    queue.offered.clear();
+    queue.outstanding.clear();
+    queue.deferred.clear();
+    queue.acked.clear();
+    queue.marks.clear();
+    queue.store = Some(epoch.clone());
+    drop(queue);
+    eprintln!(
+        "lamp-voice history: the memory's epoch changed; {waiting} turns not sent go at the next start ({ENVIRONMENT})"
+    );
+    if let Some(path) = marks
+        && write_marks(path, &epoch, &BTreeMap::new()).is_err()
+    {
+        eprintln!("lamp-voice history: the marks could not be written ({ENVIRONMENT})");
     }
 }
 
@@ -741,7 +813,10 @@ fn send_all(shared: &Shared, mut post: Post, mut ask: Ask, marks: Option<PathBuf
     catch_up(shared, &mut post, &mut ask, marks.as_deref(), waits);
     let mut saving = None;
     loop {
-        let (mut batch, store) = next_batch(shared);
+        let Some((mut batch, store)) = next_batch(shared) else {
+            reread_epoch(shared, &mut ask, marks.as_deref(), waits);
+            continue;
+        };
         let ended = send_batch(shared, &mut post, &mut batch, &store, waits);
         ended_batch(shared, &batch, ended);
         let scopes = batch.iter().map(|pending| pending.scope.clone()).collect();
@@ -749,7 +824,7 @@ fn send_all(shared: &Shared, mut post: Post, mut ask: Ask, marks: Option<PathBuf
         let now_saving = match ended {
             Ended::Answered(Answer::Saved) => Some(true),
             Ended::Answered(_) | Ended::Waits => Some(false),
-            Ended::Forgotten => None,
+            Ended::Forgotten | Ended::Requeued => None,
         };
         if now_saving.is_some() && saving != now_saving {
             saving = now_saving;
@@ -912,8 +987,14 @@ impl Sender {
                             ids.as_array()
                                 .into_iter()
                                 .flatten()
-                                .filter_map(Value::as_u64)
-                                .map(|id| (scope.clone(), id))
+                                .filter_map(|id| match id {
+                                    Value::Number(id) => Some((scope.clone(), id.as_u64()?)),
+                                    Value::String(turn) => {
+                                        let (_, scope, id) = parse_turn(turn)?;
+                                        Some((scope.to_owned(), id))
+                                    }
+                                    _ => None,
+                                })
                                 .collect::<Vec<_>>()
                         })
                         .collect(),
@@ -956,21 +1037,17 @@ impl Sender {
         }
         queue.paused_until = None;
         queue.paused_scope.clear();
+        queue.epoch_stale = true;
         self.shared.1.notify_all();
     }
 
-    /// Ids queued for deletion by their full id (`turn_id`): never posted.
+    /// Ids queued for deletion by their full id (`history_turn_id`): never
+    /// posted.
     pub fn deleting(&self, ids: &[String]) {
         let mut queue = locked(&self.shared);
         let mut named = Vec::new();
         for id in ids {
-            let mut parts = id.splitn(3, ':');
-            let (Some(store), Some(scope), Some(exchange)) =
-                (parts.next(), parts.next(), parts.next())
-            else {
-                continue;
-            };
-            let Ok(exchange) = exchange.parse::<u64>() else {
+            let Some((store, scope, exchange)) = parse_turn(id) else {
                 continue;
             };
             if queue.store.as_deref().is_some_and(|ours| ours != store) {
@@ -992,6 +1069,14 @@ impl Sender {
     pub fn let_go(&self) -> u64 {
         locked(&self.shared).let_go
     }
+}
+
+/// A turn id's epoch, scope and exchange id (`history_turn_id`'s form).
+fn parse_turn(turn: &str) -> Option<(&str, &str, u64)> {
+    let (epoch, rest) = turn.split_once('.')?;
+    let (scope, id) = rest.rsplit_once(':')?;
+    (is_history_epoch(epoch) && !scope.is_empty()).then_some(())?;
+    Some((epoch, scope, id.parse().ok()?))
 }
 
 /// The voice's one sender, once started.

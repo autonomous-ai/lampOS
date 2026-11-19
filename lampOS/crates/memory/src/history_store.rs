@@ -1,69 +1,26 @@
 //! What the voice's save to the account's history needs of the Days store
-//! (#7771, the first builder's 17:09 ruling on #7957):
+//! (#7771, the first builder's 17:09 ruling on #7957), beside the store's
+//! epoch (`Days::history_epoch`, `lamp_msgs::history_turn_id`):
 //!
-//! - **The store's own id** ([`STORE_KEY`]), 8 lowercase hex digits, made
-//!   when the database is made (or first opened by a build that has it) and
-//!   kept in its `settings`, in the memory's own folder. A reset that
-//!   removes the database makes a new one, so a reset lamp's turns get new
-//!   ids (`lamp_msgs::history::turn_id`).
-//! - **`store`**: that id, and the last id given in each scope
+//! - **`history_issued`**: the epoch, and the last id given in each scope
 //!   (`next_id - 1`), never a word.
 //! - **`exchanges_after`**: a scope's exchanges after an id, oldest first,
 //!   at most [`MOST_EXCHANGES`] and about [`MOST_TEXT_BYTES`] of text, so a
 //!   voice that restarted sends what the server never took. Memory stays the
 //!   one copy of the words: the voice keeps only a mark per scope.
-use crate::days::{Days, Error, Result};
+use crate::days::{Days, Result};
 use crate::store::Person;
-use rusqlite::{Connection, OptionalExtension, params};
+use rusqlite::params;
 use serde_json::{Value, json};
-use std::io::Read;
 
-/// The `settings` key of the store's id.
-pub const STORE_KEY: &str = "history_store_id";
+/// The request that tells the epoch and each scope's last id.
+pub const ISSUED_OP: &str = "history_issued";
 /// The most exchanges one `exchanges_after` gives.
 pub const MOST_EXCHANGES: u64 = 100;
 /// About the most text one `exchanges_after` gives; one exchange always.
 pub const MOST_TEXT_BYTES: usize = 48 * 1024;
 
-/// Makes the store's id if it has none: 32 random bits, never 0.
-pub(crate) fn ensure_store_id(db: &Connection) -> Result<()> {
-    let have: Option<i64> = db
-        .query_row(
-            "SELECT value FROM settings WHERE key=?1",
-            [STORE_KEY],
-            |r| r.get(0),
-        )
-        .optional()?;
-    if have.is_some() {
-        return Ok(());
-    }
-    let id = i64::from(random_u32()?.max(1));
-    db.execute(
-        "INSERT OR IGNORE INTO settings(key,value) VALUES(?1,?2)",
-        params![STORE_KEY, id],
-    )?;
-    Ok(())
-}
-
-fn random_u32() -> Result<u32> {
-    let mut bytes = [0u8; 4];
-    std::fs::File::open("/dev/urandom")
-        .and_then(|mut random| random.read_exact(&mut bytes))
-        .map_err(|_| Error::new("storage", "no random source for the store's id"))?;
-    Ok(u32::from_le_bytes(bytes))
-}
-
 impl Days {
-    /// The store's own id, 8 lowercase hex digits.
-    pub fn store_id(&self) -> Result<String> {
-        let id: i64 = self.db.query_row(
-            "SELECT value FROM settings WHERE key=?1",
-            [STORE_KEY],
-            |r| r.get(0),
-        )?;
-        Ok(format!("{:08x}", id as u32))
-    }
-
     /// The last id given in each scope, `next_id - 1`.
     pub fn issued(&self) -> Result<Vec<(String, u64)>> {
         let mut statement = self
@@ -152,22 +109,22 @@ mod tests {
         serde_json::from_str(answer.line.trim()).unwrap()
     }
 
-    /// The store's id is made with the store, kept across a reopen, and
-    /// new after a reset (the database gone).
+    /// The epoch `history_issued` tells is kept across a reopen, and new
+    /// after a reset (the database gone).
     #[test]
-    fn the_store_id_lives_and_dies_with_the_store() {
+    fn the_issued_epoch_lives_and_dies_with_the_store() {
         let dir = dir("id");
         let first = {
             let mut store = open(&dir);
-            ask(&mut store, json!({"op":"store"}))["store"]
+            ask(&mut store, json!({"op":"history_issued"}))["epoch"]
                 .as_str()
                 .unwrap()
                 .to_owned()
         };
-        assert!(lamp_msgs::history::is_store_id(&first), "{first}");
+        assert!(lamp_msgs::is_history_epoch(&first), "{first}");
         let again = {
             let mut store = open(&dir);
-            ask(&mut store, json!({"op":"store"}))["store"]
+            ask(&mut store, json!({"op":"history_issued"}))["epoch"]
                 .as_str()
                 .unwrap()
                 .to_owned()
@@ -175,7 +132,7 @@ mod tests {
         assert_eq!(first, again);
         std::fs::remove_dir_all(&dir).unwrap();
         let mut store = open(&dir);
-        let reset = ask(&mut store, json!({"op":"store"}))["store"]
+        let reset = ask(&mut store, json!({"op":"history_issued"}))["epoch"]
             .as_str()
             .unwrap()
             .to_owned();
@@ -184,7 +141,7 @@ mod tests {
         std::fs::remove_dir_all(&dir).unwrap();
     }
 
-    /// `store` tells each scope's last id; `exchanges_after` a scope's
+    /// `history_issued` tells each scope's last id; `exchanges_after` a scope's
     /// exchanges after an id, oldest first, paged, never a kept thing.
     #[test]
     fn exchanges_after_an_id_are_given_oldest_first() {
@@ -202,7 +159,7 @@ mod tests {
             &mut store,
             json!({"op":"append","at_unix_ms":NOON,"heard":"room","said":"hi"}),
         );
-        let told = ask(&mut store, json!({"op":"store"}));
+        let told = ask(&mut store, json!({"op":"history_issued"}));
         assert_eq!(told["issued"]["p-a"], 6, "{told}");
         assert_eq!(told["issued"]["everyone"], 1, "{told}");
         let page = ask(

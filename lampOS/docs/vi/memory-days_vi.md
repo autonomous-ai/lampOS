@@ -877,17 +877,18 @@ khoản (Backend3, 19/11): `POST <base>/history/turns` với khóa của lamp tr
   giữ `(read from a linked service; not kept)` làm câu trả lời cho bộ nhớ, và
   một lượt trong yêu cầu có lần đọc dịch vụ cũng được lưu với chỗ giữ chỗ đó,
   không bao giờ là nội dung đã đọc.
-- **Id** là `<store>:<scope>:<exchange id>` (`lamp_msgs::history::turn_id`, hàm
-  dùng chung mà lệnh quên cũng dùng): `0a1b2c3d:p-0123456789abcdef:12`, hoặc
-  `0a1b2c3d:everyone:7` cho phòng. `<store>` là id riêng của kho Days, 8 chữ số
-  hex viết thường, tạo khi cơ sở dữ liệu được tạo và giữ trong `settings` của
-  nó (`history_store_id`); một lần đặt lại xóa cơ sở dữ liệu thì tạo id mới, nên
-  các lượt mới của lamp đã đặt lại không bị coi là đã lưu, cũng không bị một
-  tombstone cũ từ chối. Bộ nhớ không bao giờ cấp một id lượt hai lần trong một
-  phạm vi của cùng một kho, và kho coi việc gửi lại một id là không làm gì, nên
-  thử lại luôn an toàn.
-- **Hai lệnh của bộ nhớ cho việc này:** `{"op":"store"}` trả lời
-  `{"ok":true,"store":"<8 hex>","issued":{"<scope>":<id cuối>}}`, id cuối đã cấp
+- **Id** là `<epoch>.<scope>:<exchange id>` (`lamp_msgs::history_turn_id`, hàm
+  duy nhất tạo ra nó, mà câu trả lời quên của bộ nhớ cũng dùng):
+  `0a1b2c3d.p-0123456789abcdef:12`, hoặc `0a1b2c3d.everyone:7` cho phòng.
+  `<epoch>` là epoch của kho Days (`{"op":"history_epoch"}`), 8 chữ số hex viết
+  thường, tạo khi cơ sở dữ liệu được tạo và tạo lại khi kho bị xóa sạch hay đặt
+  lại, nên các lượt mới của lamp đã xóa sạch hay đặt lại không bị coi là đã lưu,
+  cũng không bị một tombstone cũ từ chối. Voice đọc nó khi khởi động và đọc lại
+  sau mỗi lệnh quên; khi nó đổi, các lượt chưa gửi chờ lần khởi động sau và các
+  mốc bắt đầu lại dưới epoch mới. Kho coi việc gửi lại một id là không làm gì,
+  nên thử lại luôn an toàn.
+- **Hai lệnh của bộ nhớ cho việc này:** `{"op":"history_issued"}` trả lời
+  `{"ok":true,"epoch":"<8 hex>","issued":{"<scope>":<id cuối>}}`, id cuối đã cấp
   của mỗi phạm vi (`next_id - 1`), không bao giờ có lời. `{"op":"exchanges_after",
   "person":…,"after":N,"limit":L}` trả lời các lượt của phạm vi đó sau id N, cũ
   nhất trước, dạng `{"ok":true,"exchanges":[{"id","at_unix_ms","heard","said"}],
@@ -900,7 +901,7 @@ khoản (Backend3, 19/11): `POST <base>/history/turns` với khóa của lamp tr
   thúc. Câu bị giữ 30 phút thì chờ lần khởi động sau.
 - **Một lệnh quên** nói trên lamp giữ lại mọi lần POST, kể cả lần đầu, cho đến
   khi bộ nhớ trả lời nó (tối đa 15 giây). Các lượt mà câu trả lời nêu là đã xóa
-  (`exchanges`, theo phạm vi, câu trả lời của phần quên) được bỏ và ghi nhớ là đã
+  (`exchanges`, theo phạm vi, dạng turn id: câu trả lời của phần quên) được bỏ và ghi nhớ là đã
   quên (4.096 cái gần nhất), nên một lần lưu nêu một id như vậy bị bỏ trước mọi
   POST, kể cả lần thử lại hay phần gửi bù khi khởi động: hàng rào riêng của lamp,
   bên cạnh tombstone của máy chủ. Quên hết thì quên mọi id đã đưa trong phạm vi
@@ -913,10 +914,10 @@ khoản (Backend3, 19/11): `POST <base>/history/turns` với khóa của lamp tr
 - **Không mất gì khi khởi động lại, và không có lời nào trên đĩa:** thứ duy nhất
   được giữ là một mốc cho mỗi phạm vi, id cuối máy chủ đã nhận mà không còn id
   nào trước nó chưa gửi, trong `/var/lib/lampOS/voice/history-marks.json` (0600,
-  `{"store","marks":{scope:id}}`, ghi nguyên tệp, ngoài đường của lượt nói). Khi
-  khởi động, luồng gửi hỏi bộ nhớ `store` (đến khi nó trả lời; không POST gì
+  `{"epoch","marks":{scope:id}}`, ghi nguyên tệp, ngoài đường của lượt nói). Khi
+  khởi động, luồng gửi hỏi bộ nhớ `history_issued` (đến khi nó trả lời; không POST gì
   trước đó) và gửi những gì bộ nhớ đã giữ sau mỗi mốc, bằng `exchanges_after`,
-  với cùng các id. Bộ nhớ vẫn là bản duy nhất của lời. Một kho khác với kho của
+  với cùng các id. Bộ nhớ vẫn là bản duy nhất của lời. Một epoch khác với epoch của
   các mốc (lần khởi động đầu, hoặc sau đặt lại) bắt đầu các mốc ở những gì bộ
   nhớ đang giữ: không gửi gì đã nói trước khi bật công tắc.
 - **Gửi đến đâu:** chỉ API đám mây của chính lamp, máy chủ relay mà

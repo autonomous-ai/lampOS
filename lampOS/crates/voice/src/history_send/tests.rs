@@ -8,14 +8,14 @@ const QUICK: Waits = Waits {
     first: Duration::from_millis(5),
     longest: Duration::from_millis(20),
 };
-/// The store's id the fake memory tells, and two known people.
+/// The epoch the fake memory tells, and two known people.
 const STORE: &str = "0a1b2c3d";
 const A: &str = "p-0123456789abcdef";
 const B: &str = "p-fedcba9876543210";
 
 /// The id the queue sends for `scope`'s exchange `id` in [`STORE`].
 fn id(scope: &str, exchange: u64) -> String {
-    turn_id(STORE, scope, exchange)
+    history_turn_id(STORE, scope, exchange)
 }
 
 /// A post that answers from `answers` in turn (the last one again once
@@ -34,16 +34,24 @@ fn recording(answers: Vec<Answer>) -> (Post, mpsc::Receiver<Value>) {
     (post, told)
 }
 
-/// A fake memory: `store` and `issued` for `store`, and each scope's
-/// exchanges (id, words) for `exchanges_after`, paged by its `limit`.
+/// A fake memory: epoch `store` and `issued` for `history_issued`, the
+/// epoch for `history_epoch`, and each scope's exchanges (id, words) for
+/// `exchanges_after`, paged by its `limit`.
 fn memory(store: &str, issued: Value, kept: Vec<(&str, u64, &str)>) -> Ask {
-    let store = store.to_owned();
+    memory_at(Arc::new(Mutex::new(store.to_owned())), issued, kept)
+}
+
+/// [`memory`] whose epoch can change under it.
+fn memory_at(store: Arc<Mutex<String>>, issued: Value, kept: Vec<(&str, u64, &str)>) -> Ask {
     let kept: Vec<(String, u64, String)> = kept
         .into_iter()
         .map(|(scope, id, words)| (scope.to_owned(), id, words.to_owned()))
         .collect();
     Box::new(move |line: &Value| match line["op"].as_str() {
-        Some("store") => Some(json!({"ok":true,"store":store,"issued":issued})),
+        Some("history_issued") => {
+            Some(json!({"ok":true,"epoch":*store.lock().unwrap(),"issued":issued}))
+        }
+        Some("history_epoch") => Some(json!({"ok":true,"epoch":*store.lock().unwrap()})),
         Some("exchanges_after") => {
             let scope = line["person"].as_str().unwrap_or(ROOM_SCOPE);
             let after = line["after"].as_u64().unwrap();
@@ -180,25 +188,25 @@ fn the_stores_answers_are_read() {
     assert_eq!(answer_of(200, b"not json"), Answer::Again);
 }
 
-/// Ruling 2: the id is `<store>:<scope>:<exchange id>`, the one helper a
-/// forget names (`lamp_msgs::history::turn_id`), the room's scope
-/// `everyone`, moved lines under their new person and id.
+/// Ruling 2: the id is `<epoch>.<scope>:<exchange id>`, the one helper the
+/// memory's forget answers name it by (`lamp_msgs::history_turn_id`), the
+/// room's scope `everyone`, moved lines under their new person and id.
 #[test]
 fn a_saves_id_is_the_store_the_scope_and_the_memorys_exchange_id() {
     let (post, told) = recording(vec![Answer::Saved]);
     let sender = Sender::new();
     sender.spawn(post, fresh(), None, QUICK).unwrap();
     offer(&sender, Some(A), 42);
-    assert_eq!(ids(&next(&told)), [format!("{STORE}:{A}:42")]);
+    assert_eq!(ids(&next(&told)), [format!("{STORE}.{A}:42")]);
     offer(&sender, None, 3);
     offer(&sender, None, 4);
     sender.moved(B, &[(4, 12)]);
     assert_eq!(
         ids(&next(&told)),
-        [lamp_msgs::history::turn_id(STORE, B, 12)]
+        [lamp_msgs::history_turn_id(STORE, B, 12)]
     );
     sender.settled(&[3]);
-    assert_eq!(ids(&next(&told)), [format!("{STORE}:everyone:3")]);
+    assert_eq!(ids(&next(&told)), [format!("{STORE}.everyone:3")]);
 }
 
 /// Nothing is posted before the memory told its store's id: it is asked
@@ -418,10 +426,11 @@ fn a_forget_holds_the_first_post_and_what_it_removed_never_goes() {
     offer(&sender, Some(A), 1);
     offer(&sender, Some(A), 2);
     none_within(&told, Duration::from_millis(150));
+    // The memory's forget answer names the turn ids (#7982).
     sender.forget_answered(
         Some(A),
         false,
-        Some(&json!({"ok":true,"exchanges":{A:[1]}})),
+        Some(&json!({"ok":true,"exchanges":{A:[id(A, 1)]}})),
     );
     assert_eq!(ids(&next(&told)), [id(A, 2)]);
     // An id queued for deletion by its full id is never posted, though the
@@ -461,6 +470,50 @@ fn a_forget_during_an_in_flight_save_leaves_the_turn_gone() {
     assert_eq!(ids(&next(&told)), [id(A, 2)]);
     go.send(Answer::Saved).unwrap();
     none_within(&told, Duration::from_millis(100));
+}
+
+/// After a forget the epoch is read again: a changed one (a wipe whole)
+/// lets the unsent turns wait for the next start and starts the marks
+/// again under it, and new turns go under it.
+#[test]
+fn a_changed_epoch_after_a_forget_starts_the_marks_again() {
+    let dir = scratch("epoch");
+    let marks = dir.join("history-marks.json");
+    let epoch = Arc::new(Mutex::new(STORE.to_owned()));
+    let (post, told) = recording(vec![Answer::Saved]);
+    let sender = Sender::new();
+    sender
+        .spawn(
+            post,
+            memory_at(Arc::clone(&epoch), json!({A:0}), vec![]),
+            Some(marks.clone()),
+            QUICK,
+        )
+        .unwrap();
+    marks_once(&marks, A, 0);
+    sender.forgetting(None);
+    offer(&sender, Some(B), 4);
+    *epoch.lock().unwrap() = "99999999".into();
+    sender.forget_answered(None, true, Some(&json!({"ok":true})));
+    let started = Instant::now();
+    loop {
+        let text = std::fs::read_to_string(&marks).unwrap_or_default();
+        if text.contains("99999999") {
+            assert_eq!(
+                serde_json::from_str::<Value>(&text).unwrap(),
+                json!({"epoch":"99999999","marks":{}})
+            );
+            break;
+        }
+        assert!(started.elapsed() < Duration::from_secs(5), "{text}");
+        std::thread::sleep(Duration::from_millis(5));
+    }
+    none_within(&told, Duration::from_millis(50));
+    assert_eq!(sender.let_go(), 1);
+    offer(&sender, Some(A), 1);
+    assert_eq!(ids(&next(&told)), [history_turn_id("99999999", A, 1)]);
+    // The sender may still be writing its marks: a best-effort cleanup.
+    let _ = std::fs::remove_dir_all(&dir);
 }
 
 /// A forget whose memory never answers holds sends at most [`FORGET_HOLD`];
@@ -545,7 +598,7 @@ fn a_restart_with_unsent_turns_sends_them_after() {
         none_within(&told, Duration::from_millis(100));
     }
     let written = marks_once(&marks, A, 1);
-    assert_eq!(written, json!({"store":STORE,"marks":{A:1}}));
+    assert_eq!(written, json!({"epoch":STORE,"marks":{A:1}}));
     let mode = std::fs::metadata(&marks).unwrap().permissions().mode() & 0o777;
     assert_eq!(mode, 0o600);
     // The restart: the memory still holds 2 and 3 (and its newer 4).
@@ -578,7 +631,8 @@ fn a_restart_with_unsent_turns_sends_them_after() {
     marks_once(&marks, A, 5);
     let text = std::fs::read_to_string(&marks).unwrap();
     assert!(!text.contains("words"), "{text}");
-    std::fs::remove_dir_all(&dir).unwrap();
+    // The sender may still be writing its marks: a best-effort cleanup.
+    let _ = std::fs::remove_dir_all(&dir);
 }
 
 /// A store unlike the marks' (a reset, or the first start) sends nothing
@@ -600,12 +654,13 @@ fn a_new_store_sends_nothing_from_before() {
         .unwrap();
     assert_eq!(
         marks_once(&marks, A, 9),
-        json!({"store":STORE,"marks":{A:9}})
+        json!({"epoch":STORE,"marks":{A:9}})
     );
     none_within(&told, Duration::from_millis(100));
     offer(&sender, Some(A), 10);
     assert_eq!(ids(&next(&told)), [id(A, 10)]);
-    std::fs::remove_dir_all(&dir).unwrap();
+    // The sender may still be writing its marks: a best-effort cleanup.
+    let _ = std::fs::remove_dir_all(&dir);
 }
 
 /// A forgotten id is left out of the catch-up too.
@@ -627,7 +682,8 @@ fn the_catch_up_leaves_out_what_was_forgotten() {
         .unwrap();
     assert_eq!(ids(&next(&told)), [id(A, 2)]);
     marks_once(&marks, A, 2);
-    std::fs::remove_dir_all(&dir).unwrap();
+    // The sender may still be writing its marks: a best-effort cleanup.
+    let _ = std::fs::remove_dir_all(&dir);
 }
 
 /// A plain local store that takes the connection and answers after
@@ -799,13 +855,10 @@ fn the_writer_offers_what_the_memory_wrote_under_its_id() {
     let sender = Sender::new();
     sender.spawn(post, fresh(), None, QUICK).unwrap();
     as_the_voices(&sender, || {
-        crate::remember::write_for_history_test(
-            &[
-                (Some(A), "kept by the memory"),
-                (Some(A), "refused by the memory"),
-            ],
-            3,
-        );
+        crate::remember::write_for_history_test(&[
+            (Some(A), "kept by the memory"),
+            (Some(A), "refused by the memory"),
+        ]);
     });
     let body = next(&told);
     assert_eq!(ids(&body), [id(A, 17)]);
@@ -821,10 +874,10 @@ fn a_linked_reads_turn_is_saved_as_the_placeholder() {
     let sender = Sender::new();
     crate::services::read_answered_for_test(1);
     as_the_voices(&sender, || {
-        crate::remember::write_for_history_test(
-            &[(Some(A), "kept 8 read my mail"), (Some(A), "kept 9 thanks")],
-            3,
-        );
+        crate::remember::write_for_history_test(&[
+            (Some(A), "kept 8 read my mail"),
+            (Some(A), "kept 9 thanks"),
+        ]);
     });
     let queue = locked(&sender.shared);
     let saids: Vec<(u64, &str)> = queue
@@ -845,7 +898,7 @@ fn a_linked_reads_turn_is_saved_as_the_placeholder() {
 fn the_writer_sends_a_rooms_line_when_its_conversation_ends() {
     let sender = Sender::new();
     as_the_voices(&sender, || {
-        crate::remember::write_for_history_test(&[(None, "kept 4 hello lamp")], 2);
+        crate::remember::write_for_history_test(&[(None, "kept 4 hello lamp")]);
     });
     assert_eq!(queued(&sender), (vec!["everyone:4".to_owned()], vec![]));
 }
@@ -899,7 +952,7 @@ fn a_source_forgotten_elsewhere_lets_its_scope_wait() {
     offer(&sender, Some(B), 1);
     offer(&sender, None, 4);
     as_the_voices(&sender, || {
-        crate::remember::write_for_history_test(&[(Some(A), "gone with its source")], 2);
+        crate::remember::write_for_history_test(&[(Some(A), "gone with its source")]);
     });
     assert_eq!(queued(&sender), (vec![format!("{B}:1")], vec![]));
     assert_eq!(sender.let_go(), 2);

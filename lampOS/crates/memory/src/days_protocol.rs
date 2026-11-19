@@ -431,9 +431,9 @@ enum Extra {
         to: String,
         ids: Vec<u64>,
     },
-    /// #7771: the store's own id and each scope's last id
+    /// #7771: the store's epoch and each scope's last id
     /// (`crate::history_store`), for the account's history.
-    Store {},
+    HistoryIssued {},
     /// #7771: a scope's exchanges after `after`, oldest first, paged
     /// (`Days::exchanges_after`), for a save the server never took.
     ExchangesAfter {
@@ -1360,13 +1360,13 @@ fn extra(store: &mut Days, request: Extra, now: u64) -> Result<Value> {
             let moved = store.adopt(&one(person)?, &to, &ids)?;
             json!({"ok":true,"moved":moved.len(),"ids":moved})
         }
-        Extra::Store {} => {
+        Extra::HistoryIssued {} => {
             let issued: serde_json::Map<String, Value> = store
                 .issued()?
                 .into_iter()
                 .map(|(scope, last)| (scope, json!(last)))
                 .collect();
-            json!({"ok":true,"store":store.store_id()?,"issued":issued})
+            json!({"ok":true,"epoch":store.history_epoch(),"issued":issued})
         }
         Extra::ExchangesAfter {
             person,
@@ -1479,7 +1479,7 @@ pub fn answer(store: &mut Days, line: &[u8], now: u64) -> protocol::Answer {
             "exchanges_forget",
             lamp_msgs::MEMORY_FORGOT_EXCHANGES_OP,
             lamp_msgs::MEMORY_HISTORY_EPOCH_OP,
-            "store",
+            crate::history_store::ISSUED_OP,
             "exchanges_after",
         ];
         const OLD: &[&str] = &[

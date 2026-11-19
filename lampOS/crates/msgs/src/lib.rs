@@ -145,10 +145,6 @@ pub mod local_agent;
 /// ears, given by voice or in the app (#5500, `docs/onboarding.md`).
 pub mod consent;
 
-/// A saved turn's id on the account's history, shared by the voice's save
-/// and forget (#7771).
-pub mod history;
-
 /// Whether Harness's own self-update is held: on the stable feed and any
 /// other, not on the lamp-voice feed (the canary, #6300). Decided here for
 /// lamp-tasks and lamp-update both.

@@ -1128,17 +1128,18 @@ body `{"turns":[{"id","at","person","heard","said"}]}`.
   `(read from a linked service; not kept)` as the reply for the memory, and a
   turn in a request a service read answered in is saved with that placeholder
   too, never what was read.
-- **The id** is `<store>:<scope>:<exchange id>` (`lamp_msgs::history::turn_id`,
-  the one helper a forget uses too): `0a1b2c3d:p-0123456789abcdef:12`, or
-  `0a1b2c3d:everyone:7` for the room's. `<store>` is the Days store's own id, 8
-  lowercase hex digits made when the database is made and kept in its
-  `settings` (`history_store_id`); a reset that removes the database makes a new
-  one, so a reset lamp's new turns are neither taken as already saved nor
-  refused by an old tombstone. The memory never gives an exchange id twice in a
-  scope of one store, and the store takes a resend of an id as a no-op, so a
-  retry is safe.
-- **The memory's two ops for it:** `{"op":"store"}` answers
-  `{"ok":true,"store":"<8 hex>","issued":{"<scope>":<last id>}}`, each scope's
+- **The id** is `<epoch>.<scope>:<exchange id>` (`lamp_msgs::history_turn_id`,
+  the one maker of it, which the memory's forget answers use too):
+  `0a1b2c3d.p-0123456789abcdef:12`, or `0a1b2c3d.everyone:7` for the room's.
+  `<epoch>` is the Days store's epoch (`{"op":"history_epoch"}`), 8 lowercase
+  hex digits made when the database is made and made anew when it is wiped
+  whole or reset, so a wiped or reset lamp's new turns are neither taken as
+  already saved nor refused by an old tombstone. The voice reads it at start
+  and again after every forget; when it changed, the turns not yet sent wait
+  for the next start and the marks start again under the new epoch. The store
+  takes a resend of an id as a no-op, so a retry is safe.
+- **The memory's two ops for it:** `{"op":"history_issued"}` answers
+  `{"ok":true,"epoch":"<8 hex>","issued":{"<scope>":<last id>}}`, each scope's
   last id given (`next_id - 1`), never a word. `{"op":"exchanges_after",
   "person":…,"after":N,"limit":L}` answers that scope's exchanges after id N,
   oldest first, as `{"ok":true,"exchanges":[{"id","at_unix_ms","heard","said"}],
@@ -1151,7 +1152,7 @@ body `{"turns":[{"id","at","person","heard","said"}]}`.
   minutes waits for the next start.
 - **A forget** said on the lamp holds every post, the first included, until the
   memory answers it (at most 15 s). The exchanges its answer names removed
-  (`exchanges`, by scope, the forget half's answer) are let go and kept as
+  (`exchanges`, by scope, as turn ids: the forget half's answer) are let go and kept as
   forgotten (the last 4,096), so a save naming one is dropped before any POST,
   a retry or a start's catch-up included: the lamp's own guard beside the
   server's tombstone. A forget everything forgets every id offered in that
@@ -1163,11 +1164,11 @@ body `{"turns":[{"id","at","person","heard","said"}]}`.
   of that person's.
 - **Nothing lost at a restart, and no words on disk:** the only thing kept is a
   mark per scope, the last id the server took with none before it unsent, in
-  `/var/lib/lampOS/voice/history-marks.json` (0600, `{"store","marks":{scope:id}}`,
+  `/var/lib/lampOS/voice/history-marks.json` (0600, `{"epoch","marks":{scope:id}}`,
   written whole off the turn's path). At start the sending thread asks the
-  memory `store` (until it answers; nothing is posted before) and sends what the
-  memory kept after each mark, by `exchanges_after`, under the same ids. The
-  memory stays the one copy of the words. A store unlike the marks' (the first
+  memory `history_issued` (until it answers; nothing is posted before) and sends
+  what the memory kept after each mark, by `exchanges_after`, under the same
+  ids. The memory stays the one copy of the words. An epoch unlike the marks' (the first
   start, or a reset) starts the marks at what the memory holds now: nothing said
   before the switch went on is sent.
 - **Where:** only the lamp's own cloud API, the relay host the route's
