@@ -1146,7 +1146,10 @@ fn a_made_nod_when_i_stand_up_is_tidied_and_packed() {
         lines.contains("colour is one of yellow, red, green") && lines.contains("one kind a"),
         "{lines}"
     );
-    assert!(!lines.contains("one or two short sentences"), "{lines}");
+    assert!(
+        !lines.contains("at most 300 characters, no quotes"),
+        "{lines}"
+    );
     assert_eq!(tars(&keeping.directory).len(), 1);
 }
 

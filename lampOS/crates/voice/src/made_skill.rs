@@ -40,15 +40,31 @@ use std::{
 pub const ENVIRONMENT: &str = "LAMP_MAKE_SKILL";
 /// The function the model calls for a skill to be made.
 pub const MAKE: &str = "make_skill";
-/// The most of the person's request carried in the brief, in bytes: the
-/// brief and it fit in [`MOST_BRIEF_BYTES`]. 180 at first, 480 since the
-/// owner found 180 too short in the app (6 Nov), 2,000 since a Vietnamese
-/// request, 2 or 3 bytes a letter, was still cut at 160 to 240 letters in
-/// the app's "Make a skill" box (18 Nov). The app's MAKE IT
-/// (`crate::app_make`, held to it by lamp-cloud's own
-/// `make_skill::MOST_WORDS_BYTES`, which `system.info` tells the app) and
-/// the voice's own make share it: a spoken request is far shorter.
-pub const MOST_REQUEST_BYTES: usize = 2_000;
+/// The most of the person's request carried in the brief, in characters
+/// (#7245, the owner, 19 Nov): counted as letters, so a Vietnamese request
+/// is as long as an English one. 180 bytes at first (to fit the tasks
+/// part's 1,000-byte task with the brief, no longer handed there since 3
+/// Nov), 480 bytes since the owner found 180 too short in the app (6 Nov),
+/// 2,000 bytes since a Vietnamese request, 2 or 3 bytes a letter, was still
+/// cut at 160 to 240 letters (18 Nov), and 2,000 characters since 19 Nov.
+/// Why a bound at all: the whole request goes to the making model with its
+/// system prompt, and the lamp's own model reads it all before it writes a
+/// word, so a far longer one makes the person wait longer for a skill that
+/// does one thing. The app's MAKE IT (`crate::app_make`, held to it by
+/// lamp-cloud's own `make_skill::MOST_WORDS_CHARS`, which `system.info`
+/// tells the app) and the voice's own make share it: a spoken request is
+/// far shorter.
+pub const MOST_REQUEST_CHARS: usize = 2_000;
+/// [`MOST_REQUEST_CHARS`] in bytes at most, four a letter, which UTF-8
+/// never passes: no wire or file of the request needs a smaller bound (the
+/// app-make socket's line is 64 KiB, lamp-cloud's MQTT packet over 1 MiB,
+/// and the agent's make rules 48 KiB), so it is no check of its own, only
+/// what [`MOST_BRIEF_BYTES`] is sized for.
+pub const MOST_REQUEST_BYTES: usize = 4 * MOST_REQUEST_CHARS;
+/// What the person is told of a request past [`MOST_REQUEST_CHARS`]: the
+/// bound, so they know why and by how much to shorten it.
+pub const REQUEST_TOO_LONG: &str =
+    "That is too long to ask for as one skill, past 2,000 characters: say it more shortly.";
 /// At most this many made skills are kept; the oldest not on is let go,
 /// and one on never is.
 pub const KEPT_MOST: usize = 5;
@@ -105,10 +121,11 @@ const PACK_WITHIN: Duration = Duration::from_secs(20);
 /// The most of either file taken from an answer.
 const MOST_FILE_BYTES: usize = 8 * 1024;
 /// The most of a description said: what it does, how often it starts on its
-/// own (#6066), and what was left out.
-const MOST_DESCRIPTION_CHARS: usize = 640;
+/// own (#6066), and what was left out. 640, and since #7245 a say's own
+/// words on top ([`MOST_SAY_TEXT_CHARS`]), so one said whole is never cut.
+const MOST_DESCRIPTION_CHARS: usize = 640 + MOST_SAY_TEXT_CHARS;
 const _: () = assert!(
-    MOST_PLAIN_CHARS + MOST_MANNERS_CHARS + MOST_CANNOT_CHARS + 40 <= MOST_DESCRIPTION_CHARS
+    MOST_SAY_PLAIN_CHARS + MOST_MANNERS_CHARS + MOST_CANNOT_CHARS + 40 <= MOST_DESCRIPTION_CHARS
 );
 /// How an answer begins that makes nothing: what was asked is more than a
 /// made skill can sense or do.
@@ -2082,8 +2099,8 @@ pub fn brief_for(request: &str, reads: bool, agent: bool) -> Result<String, &'st
     if request.is_empty() {
         return Err("Say what the skill should do.");
     }
-    if request.len() > MOST_REQUEST_BYTES {
-        return Err("That is too long to ask for as one skill: say it more shortly.");
+    if request.chars().count() > MOST_REQUEST_CHARS {
+        return Err(REQUEST_TOO_LONG);
     }
     // A read or a write as the system prompt says them (`make_skill_local`),
     // a write's words only the request's own (#6066).
@@ -2174,8 +2191,18 @@ pub const MOST_REPAIR_BYTES: usize = 735;
 /// read step included: its own words, at most 960 bytes, and the
 /// request's [`MOST_REQUEST_BYTES`]. 1,160 with a 480-byte request; 1,440
 /// since the brief tells the remind step, `every` with it (#7245); 2,960
-/// with a 2,000-byte request (18 Nov).
-pub const MOST_BRIEF_BYTES: usize = 2_960;
+/// with a 2,000-byte request (18 Nov); 8,960 with 2,000 characters, four
+/// bytes each at most (19 Nov).
+pub const MOST_BRIEF_BYTES: usize = 960 + MOST_REQUEST_BYTES;
+
+/// The longest request a [`brief`] takes, in bytes too, for tests:
+/// [`MOST_REQUEST_CHARS`] letters of four bytes each, [`MOST_REQUEST_BYTES`].
+#[cfg(test)]
+pub(crate) fn longest_request() -> String {
+    let longest = "𝄞".repeat(MOST_REQUEST_CHARS);
+    debug_assert_eq!(longest.len(), MOST_REQUEST_BYTES);
+    longest
+}
 /// The longest a [`repair_brief`] is: the longest [`brief`], the
 /// [`REPAIR_MARK`], the check's [`MOST_REPAIR_BYTES`] and the ask. A brief
 /// goes only to a maker, the lamp's own chat (`make_skill_local`) or the
@@ -2383,6 +2410,7 @@ pub fn plain_reason(why: &str) -> String {
         || PLAIN_REASONS.contains(&why)
         || crate::make_no_cannot::said_as_is(why)
         || why == UNRELATED
+        || why.starts_with(SAY_TOO_LONG)
         || (crate::make_no_asks::on() && words_taken(why))
     {
         return why.to_owned();
@@ -3232,9 +3260,49 @@ const CAPPED_ONLY: &str = "kind = \"installable\", version = \"1.0.0\", no [tool
                            trigger's, any other a skill may declare; a say is one \
                            say = { text = \"the exact words\" }, in the request's language";
 
-/// The most of a made skill's say text ([`say_text`]): one or two short
-/// sentences, "Welcome back!", said back whole within [`MOST_PLAIN_CHARS`].
-pub const MOST_SAY_TEXT_CHARS: usize = 120;
+/// The most of a made skill's say text ([`say_text`]), in characters: about
+/// 20 seconds of speech at the voice's ~15 a second, the longest line the
+/// speech cache keeps (`say::tts_cache::MOST_FRAMES`), and 300 of the
+/// longest Vietnamese letters, three bytes each, still within the say
+/// service's [`crate::say::MOST_WORDS_BYTES`]. 120 from #6062 (10 Nov), set
+/// as one or two short sentences said back within [`MOST_PLAIN_CHARS`]; 300
+/// since #7245 (the owner, 19 Nov: 120 came quickly in Vietnamese, and a
+/// longer say was refused with a reason that never named its length). Said
+/// back whole, its own room beside what else the skill does
+/// ([`MOST_SAY_PLAIN_CHARS`]); past it, [`say_too_long`] tells by how much.
+pub const MOST_SAY_TEXT_CHARS: usize = 300;
+const _: () = assert!(MOST_SAY_TEXT_CHARS * 3 <= crate::say::MOST_WORDS_BYTES);
+
+/// How [`say_too_long`]'s reason begins: said to the person as it is
+/// ([`plain_reason`]), with its numbers.
+const SAY_TOO_LONG: &str = "what it would say is too long, ";
+
+/// Why a say step's words are too long to say (#7245), or none: past
+/// [`MOST_SAY_TEXT_CHARS`] characters, with how many and how many over; or,
+/// within them, past the say service's [`crate::say::MOST_WORDS_BYTES`]
+/// bytes (only letters of four bytes, emoji and the like, get there), the
+/// one bound under the characters a wire needs. Never cut: the person's
+/// words are said whole or the skill isn't made.
+pub fn say_too_long(say: &toml::Value) -> Option<String> {
+    let text = say.as_table()?.get("text")?.as_str()?.trim();
+    let chars = text.chars().count();
+    if chars > MOST_SAY_TEXT_CHARS {
+        return Some(format!(
+            "{SAY_TOO_LONG}{chars} characters, {} more than the {MOST_SAY_TEXT_CHARS} a skill \
+             can say at once; try it in fewer words",
+            chars - MOST_SAY_TEXT_CHARS
+        ));
+    }
+    let bytes = text.len();
+    let most = crate::say::MOST_WORDS_BYTES;
+    (bytes > most).then(|| {
+        format!(
+            "{SAY_TOO_LONG}its {chars} characters take {bytes} bytes, {} more than the {most} \
+             the lamp can say at once; try it in fewer words or with fewer symbols",
+            bytes - most
+        )
+    })
+}
 
 /// The least cooldown of a made skill that speaks (#6062, the readers' P2a):
 /// at most once an hour. [`paced`] sets it when it is missing or shorter.
@@ -3287,8 +3355,10 @@ pub fn is_format(c: char) -> bool {
 }
 
 /// A made skill's `say` step's words (#6062), as [`plainly`] says them: a
-/// table with `text` alone, a string of at most [`MOST_SAY_TEXT_CHARS`],
-/// one or two sentences, with no double quotes, braces or guillemets (so
+/// table with `text` alone, a string of at most [`MOST_SAY_TEXT_CHARS`]
+/// characters and [`crate::say::MOST_WORDS_BYTES`] bytes, at least one
+/// sentence (as many as fit since #7245: the characters bound how long it
+/// speaks), with no double quotes, braces or guillemets (so
 /// it reads back quoted, whole), no web address, and no control or format
 /// character. The voice says them as written, framed as quoted with no
 /// functions (`say::Words::Made`), so they can't instruct anything. A bare
@@ -3312,8 +3382,9 @@ pub fn say_text(say: &toml::Value) -> Option<String> {
     let web = ["://", "www.", "http"]
         .iter()
         .any(|mark| lower.contains(mark));
-    (plain && !web && (1..=2).contains(&sentences) && text.chars().count() <= MOST_SAY_TEXT_CHARS)
-        .then(|| text.to_owned())
+    let within =
+        text.chars().count() <= MOST_SAY_TEXT_CHARS && text.len() <= crate::say::MOST_WORDS_BYTES;
+    (plain && !web && sentences >= 1 && within).then(|| text.to_owned())
 }
 
 /// The least `absent_for` of a made skill on a face coming into view
@@ -5458,6 +5529,11 @@ fn held(table: &toml::Table, added: bool, reads: bool) -> Result<(String, Uses),
                 )),
             ));
         }
+        // Words too long are told as that, with the numbers (#7245),
+        // never as words that aren't exact.
+        if let Some(why) = says.iter().find_map(|say| say_too_long(say)) {
+            return Err(Refused::new(why));
+        }
         if says.iter().any(|say| say_text(say).is_none()) {
             return Err(Refused::new(SAY_NOT_TEXT));
         }
@@ -6310,7 +6386,7 @@ pub const UNSAID: &str = "when it would run and what it would do didn't come out
 
 /// What a repair is told after a say step [`plainly`] couldn't say.
 const SAY_TEXT_PART: &str =
-    ": say = { text = \"the exact words\" }, one or two short sentences, no quotes";
+    ": say = { text = \"the exact words\" }, at most 300 characters, no quotes";
 
 /// What a repair is told after a sound step [`plainly`] couldn't say.
 const SOUND_PART: &str = ": its one sound is cue = \"hum\"";
@@ -6832,12 +6908,16 @@ fn said_plainly(table: &toml::Table, reads: bool, general: bool) -> Result<Strin
     // Code of its own (#6307): its task's words and what its code may use
     // said whole, never cut.
     let runs_code = code && has_task;
+    // A say's words quoted whole (#7245): room for them beside one breath.
+    let says = steps.iter().any(|step| step.get("say").is_some());
     // Said whole or not at all: never cut before a step or the cooldown. A
     // write's words are the request's own, so at most its length again.
     // Loosened, one too long is said in general words, every step one
     // ([`general_said`]), and is cut where a description is, never refused.
     let most = if writes || runs_code {
         MOST_WRITE_PLAIN_CHARS
+    } else if says {
+        MOST_SAY_PLAIN_CHARS
     } else {
         MOST_PLAIN_CHARS
     };
@@ -7659,6 +7739,12 @@ fn every_day_of(bits: u8) -> String {
 /// words still within [`MOST_DESCRIPTION_CHARS`], so nothing is cut. 240
 /// since #6066, room for an outbound or camera step named after the steps.
 const MOST_PLAIN_CHARS: usize = 240;
+
+/// The longest [`plainly`] says of a skill with a say step (#7245): one
+/// breath and the say's own words, quoted whole, so words as long as a
+/// skill may say ([`MOST_SAY_TEXT_CHARS`]) are never "too long for one
+/// breath".
+const MOST_SAY_PLAIN_CHARS: usize = MOST_PLAIN_CHARS + MOST_SAY_TEXT_CHARS;
 
 /// The longest [`plainly`] says of a skill that writes (#6066): its write
 /// said whole, every recipient and every word, which are the request's own
@@ -8575,10 +8661,17 @@ pub const WRITTEN_TOOL_PREFIX: &str = "written_";
 /// The most of a written skill's name: its function's name, with
 /// [`WRITTEN_TOOL_PREFIX`], is within lamp-skills' 48 bytes.
 pub const MOST_WRITTEN_NAME_BYTES: usize = 40;
-/// The most of "when to use it", one line.
-pub const MOST_WHEN_BYTES: usize = 200;
-/// The most of what to do, a few lines.
-pub const MOST_INSTRUCTIONS_BYTES: usize = 2_000;
+/// The most of "when to use it", one line, in characters (bytes until
+/// #7245, 19 Nov: a Vietnamese line was a third as long as an English
+/// one). No wire needs fewer: it goes whole only into the note the model
+/// is told at the call, and [`plainly`] says at most
+/// `MOST_SAID_WHEN_CHARS` of it.
+pub const MOST_WHEN_CHARS: usize = 200;
+/// The most of what to do, a few lines, in characters (bytes until
+/// #7245), as the request is ([`MOST_REQUEST_CHARS`]): the note the model
+/// is told at each call, a plain string with no byte bound in lamp-skills,
+/// which also never cuts it.
+pub const MOST_INSTRUCTIONS_CHARS: usize = 2_000;
 /// The front matter line that marks a written skill's `SKILL.md`, beside
 /// `made: here`: the app shows it as written there, never as the Store's.
 pub const WRITTEN_MARK: &str = "written: app";
@@ -8611,8 +8704,8 @@ impl Written {
     /// The three fields, held to their bounds, or why not in plain words.
     /// The name is a made skill's (lowercase letters, digits and hyphens),
     /// begins with a letter, and is at most [`MOST_WRITTEN_NAME_BYTES`];
-    /// `when` is one line of at most [`MOST_WHEN_BYTES`]; the instructions
-    /// at most [`MOST_INSTRUCTIONS_BYTES`] of plain text, lines and tabs
+    /// `when` is one line of at most [`MOST_WHEN_CHARS`] characters; the
+    /// instructions at most [`MOST_INSTRUCTIONS_CHARS`] of plain text, lines and tabs
     /// only. Each is trimmed at its ends and kept as it is between them.
     pub fn new(name: &str, when: &str, instructions: &str) -> Result<Self, String> {
         let name = name.trim();
@@ -8634,22 +8727,23 @@ impl Written {
         if when.is_empty() {
             return Err("say when to use it".into());
         }
-        if when.len() > MOST_WHEN_BYTES || when.chars().any(char::is_control) {
+        if when.chars().count() > MOST_WHEN_CHARS || when.chars().any(char::is_control) {
             return Err(format!(
-                "when to use it is one line of at most {MOST_WHEN_BYTES} bytes"
+                "when to use it is one line of at most {MOST_WHEN_CHARS} characters"
             ));
         }
         let instructions = instructions.trim();
         if instructions.is_empty() {
             return Err("say what the lamp should do".into());
         }
-        if instructions.len() > MOST_INSTRUCTIONS_BYTES
+        if instructions.chars().count() > MOST_INSTRUCTIONS_CHARS
             || instructions
                 .chars()
                 .any(|letter| letter.is_control() && !matches!(letter, '\n' | '\t'))
         {
             return Err(format!(
-                "what the lamp should do is plain text of at most {MOST_INSTRUCTIONS_BYTES} bytes"
+                "what the lamp should do is plain text of at most {MOST_INSTRUCTIONS_CHARS} \
+                 characters"
             ));
         }
         Ok(Self {
@@ -12321,7 +12415,7 @@ light = { dim = 1 }
     /// longer request is refused, never cut.
     #[test]
     fn the_brief_fits_the_hand_over_and_carries_only_the_request() {
-        let request = "x".repeat(MOST_REQUEST_BYTES);
+        let request = longest_request();
         let longest = brief(&request).unwrap();
         assert!(longest.len() <= MOST_BRIEF_BYTES, "{}", longest.len());
         assert!(is_brief(&longest));
@@ -12346,7 +12440,7 @@ light = { dim = 1 }
         // The name is SKILL.md's alone: a `name =` in skill.toml fails
         // lamp-skills' check as an unknown field (Mobile on lamp-0c89, #2813).
         assert!(asked.contains("no name key"), "{asked}");
-        assert!(brief(&"x".repeat(MOST_REQUEST_BYTES + 1)).is_err());
+        assert!(brief(&"x".repeat(MOST_REQUEST_CHARS + 1)).is_err());
         assert!(brief("  ").is_err());
         assert!(!is_brief("Write a poem about lamps"));
     }
@@ -12380,7 +12474,7 @@ light = { dim = 1 }
             }
         }
         set_scripts_here(Some(true));
-        let longest = brief_for(&"x".repeat(MOST_REQUEST_BYTES), true, true).unwrap();
+        let longest = brief_for(&longest_request(), true, true).unwrap();
         assert!(longest.len() <= MOST_BRIEF_BYTES, "{}", longest.len());
         set_scripts_here(None);
         set_writes_here(None);
@@ -12470,7 +12564,7 @@ light = { dim = 1 }
                 assert_eq!(brief.contains(" Or one read, as above."), reads, "{brief}");
             }
         }
-        let request = "x".repeat(MOST_REQUEST_BYTES);
+        let request = longest_request();
         for reads in [true, false] {
             let longest = brief_with(&request, reads).unwrap();
             assert!(longest.len() <= MOST_BRIEF_BYTES, "{}", longest.len());
@@ -12941,11 +13035,98 @@ say = { text = "Welcome back!" }
         );
     }
 
+    /// #7245 (the owner, 19 Nov): a made skill may say up to
+    /// [`MOST_SAY_TEXT_CHARS`] characters, as many sentences as fit: 200
+    /// Vietnamese letters in three sentences are made, said back whole, and
+    /// never cut. One past the bound isn't refused as words that aren't
+    /// exact: the person hears it is too long, by how many characters, and
+    /// the repair is told the same and the bound. Letters within the
+    /// characters but past the say service's bytes are told so too.
+    #[test]
+    fn a_long_say_is_made_and_one_past_the_bound_is_told_by_how_much() {
+        let words = "Chào mừng bạn đã trở lại bàn làm việc. Hôm nay trời đẹp lắm, nhớ uống \
+                     một cốc nước và đứng dậy vươn vai sau mỗi giờ ngồi. Chúc bạn một buổi \
+                     chiều thật nhiều niềm vui và làm việc thật hiệu quả nhé bạn!";
+        assert_eq!(words.chars().count(), 200);
+        let long = HELLO.replace("Welcome back!", words);
+        capped(&long).unwrap();
+        let said = plainly(&long).unwrap();
+        assert!(said.contains(&format!("says “{words}”")), "{said}");
+        // The most is kept, and said back whole.
+        let most = HELLO.replace("Welcome back!", &"é".repeat(MOST_SAY_TEXT_CHARS));
+        capped(&most).unwrap();
+        assert!(
+            plainly(&most)
+                .unwrap()
+                .contains(&"é".repeat(MOST_SAY_TEXT_CHARS))
+        );
+        // One more is told as too long, with the numbers.
+        let over = HELLO.replace("Welcome back!", &"é".repeat(MOST_SAY_TEXT_CHARS + 1));
+        let Err(Refused(why, Some(lines))) = capped(&over) else {
+            panic!("kept: {over}");
+        };
+        assert_eq!(
+            why,
+            "what it would say is too long, 301 characters, 1 more than the 300 a skill can say \
+             at once; try it in fewer words"
+        );
+        assert_ne!(why, SAY_NOT_TEXT);
+        assert!(lines.contains(&why), "{lines}");
+        assert_eq!(plain_reason(&why), why);
+        let line = not_made_line(&plain_reason(&why));
+        assert!(
+            line.starts_with(NOT_MADE_HEAD) && line.contains("301 characters"),
+            "{line}"
+        );
+        // The repair's hint for a say names the bound.
+        assert!(SAY_TEXT_PART.contains(&format!("at most {MOST_SAY_TEXT_CHARS} characters")));
+        // Within the characters, past the say service's bytes: told so.
+        let wide = HELLO.replace("Welcome back!", &"𝄞".repeat(MOST_SAY_TEXT_CHARS));
+        let why = capped(&wide).unwrap_err().0;
+        assert!(
+            why.starts_with(SAY_TOO_LONG) && why.contains("1200 bytes, 300 more than the 900"),
+            "{why}"
+        );
+        assert_eq!(plain_reason(&why), why);
+    }
+
+    /// #7245: the request is counted in characters, so a Vietnamese one
+    /// past the old 2,000-byte bound is briefed whole: 1,500 letters as
+    /// written, about 2,100 bytes, or 1,000 of its widest letters, 3,000
+    /// bytes; as are [`MOST_REQUEST_CHARS`] of them; one more is refused
+    /// with the bound named.
+    #[test]
+    fn a_vietnamese_request_is_counted_in_letters() {
+        let letters = |count: usize| -> String {
+            "Mỗi sáng lúc bảy giờ hãy bật đèn ấm dịu và nhắc tôi uống nước "
+                .chars()
+                .cycle()
+                .take(count - 1)
+                .chain(['a'])
+                .collect()
+        };
+        let written = letters(1_500);
+        assert!(written.len() > 2_000, "{}", written.len());
+        assert_eq!(request_of(&brief(&written).unwrap()), written);
+        let widest = "ộ".repeat(1_000);
+        assert_eq!(widest.len(), 3_000);
+        assert_eq!(request_of(&brief(&widest).unwrap()), widest);
+        let most = letters(MOST_REQUEST_CHARS);
+        assert_eq!(request_of(&brief(&most).unwrap()), most);
+        assert_eq!(
+            brief(&letters(MOST_REQUEST_CHARS + 1)),
+            Err(REQUEST_TOO_LONG)
+        );
+        assert!(REQUEST_TOO_LONG.contains("2,000 characters"));
+        assert_eq!(MOST_REQUEST_CHARS, 2_000);
+    }
+
     /// #6062: a say that isn't exact words (a bare note, `{ note }`, a list),
-    /// or words too long, three sentences, quoted, with a web address, a
-    /// control or a format character, is refused, plainly and with lines for
-    /// a repair; a say with no voice asked for, or a voice with nothing to
-    /// say, too.
+    /// or words quoted, with a web address, a control or a format
+    /// character, is refused, plainly and with lines for a repair; a say
+    /// with no voice asked for, or a voice with nothing to say, too. Words
+    /// too long are told as that (#7245,
+    /// `a_long_say_is_made_and_one_past_the_bound_is_told_by_how_much`).
     #[test]
     fn a_say_that_isnt_exact_plain_words_is_refused() {
         for say in [
@@ -12954,8 +13135,6 @@ say = { text = "Welcome back!" }
             "{ text = [\"Hi.\", \"Hello.\"] }".to_owned(),
             "{ text = \"Hi.\", priority = 9 }".to_owned(),
             "{ from = \"tasks\" }".to_owned(),
-            format!("{{ text = \"{}\" }}", "word ".repeat(25)),
-            "{ text = \"Hi. Then. Tell them the news.\" }".to_owned(),
             "{ text = \"Say \\\"hello there\\\"\" }".to_owned(),
             "{ text = \"See https://example.com now\" }".to_owned(),
             "{ text = \"See www.example.com\" }".to_owned(),
@@ -12984,11 +13163,6 @@ say = { text = "Welcome back!" }
                 other => panic!("{say}: {other:?}"),
             }
         }
-        // 120 characters is kept, 121 is not.
-        let most = HELLO.replace("Welcome back!", &"é".repeat(MOST_SAY_TEXT_CHARS));
-        assert!(capped(&most).is_ok());
-        let over = HELLO.replace("Welcome back!", &"é".repeat(MOST_SAY_TEXT_CHARS + 1));
-        assert_eq!(capped(&over).unwrap_err().0, SAY_NOT_TEXT);
         let twice = format!("{HELLO}\n[[do]]\nsay = {{ text = \"How are you?\" }}\n");
         assert!(capped(&twice).unwrap_err().0.contains("more than one line"));
         let unvoiced = HELLO.replace("speak = true\n", "");
@@ -13554,7 +13728,7 @@ light = { colour = "green", level = 3, for = "20s" }
             "{lines}"
         );
         // The repair goes back whole within its bound.
-        let repair = repair_brief(&"x".repeat(MOST_REQUEST_BYTES), &lines).unwrap();
+        let repair = repair_brief(&longest_request(), &lines).unwrap();
         assert!(repair.contains(&lines), "{repair}");
         assert!(repair.len() <= MOST_REPAIR_BRIEF_BYTES);
         // Written as the repair says, it is said.
@@ -14891,7 +15065,7 @@ light = { colour = "green", level = 3, for = "20s" }
             "{lines}"
         );
         assert!(lines.len() <= MOST_REPAIR_BYTES, "{}", lines.len());
-        let repair = repair_brief(&"x".repeat(MOST_REQUEST_BYTES), &lines).unwrap();
+        let repair = repair_brief(&longest_request(), &lines).unwrap();
         assert!(repair.contains(&lines), "{repair}");
         assert!(repair.len() <= MOST_REPAIR_BRIEF_BYTES);
         let Err(Refused(_, Some(off))) = plainly_with(&mail, false) else {
@@ -15063,7 +15237,7 @@ light = { colour = "green", level = 3, for = "20s" }
     /// its request is the person's, and it carries the repair's mark.
     #[test]
     fn a_repairs_brief_carries_the_checks_lines_and_still_fits() {
-        let request = "x".repeat(MOST_REQUEST_BYTES);
+        let request = longest_request();
         let lines = "y".repeat(5_000);
         let repair = repair_brief(&request, &lines).unwrap();
         assert!(repair.len() <= MOST_REPAIR_BRIEF_BYTES, "{}", repair.len());
@@ -15784,7 +15958,7 @@ light = { colour = "green", level = 3, for = "20s" }
         );
         for writes in [false, true] {
             set_writes_here(Some(writes));
-            let longest = brief_with(&"x".repeat(MOST_REQUEST_BYTES), true).unwrap();
+            let longest = brief_with(&longest_request(), true).unwrap();
             assert!(longest.len() <= MOST_BRIEF_BYTES, "{}", longest.len());
         }
         set_writes_here(None);
@@ -15937,8 +16111,13 @@ light = { colour = "green", level = 3, for = "20s" }
     /// in the instructions is refused in plain words.
     #[test]
     fn a_written_skill_is_held_to_its_bounds() {
-        let most = |bytes: usize| "a".repeat(bytes);
-        assert!(Written::new("a", &most(MOST_WHEN_BYTES), &most(MOST_INSTRUCTIONS_BYTES)).is_ok());
+        let most = |chars: usize| "a".repeat(chars);
+        assert!(Written::new("a", &most(MOST_WHEN_CHARS), &most(MOST_INSTRUCTIONS_CHARS)).is_ok());
+        // Counted in characters (#7245): Vietnamese, two or three bytes a
+        // letter, is as long as English.
+        let vi = |chars: usize| "ộ".repeat(chars);
+        assert!(Written::new("a", &vi(MOST_WHEN_CHARS), &vi(MOST_INSTRUCTIONS_CHARS)).is_ok());
+        assert!(Written::new("a", &vi(MOST_WHEN_CHARS + 1), "y").is_err());
         assert!(Written::new(&most(MOST_WRITTEN_NAME_BYTES), "x", "y").is_ok());
         for (name, when, instructions, why) in [
             ("", "x", "y", "name"),
@@ -15949,12 +16128,12 @@ light = { colour = "green", level = 3, for = "20s" }
             (&most(MOST_WRITTEN_NAME_BYTES + 1), "x", "y", "lowercase"),
             ("study", "", "y", "when"),
             ("study", "one\ntwo", "y", "one line"),
-            ("study", &most(MOST_WHEN_BYTES + 1), "y", "one line"),
+            ("study", &most(MOST_WHEN_CHARS + 1), "y", "one line"),
             ("study", "x", " ", "what the lamp should do"),
             (
                 "study",
                 "x",
-                &most(MOST_INSTRUCTIONS_BYTES + 1),
+                &most(MOST_INSTRUCTIONS_CHARS + 1),
                 "plain text",
             ),
             ("study", "x", "a\u{7}b", "plain text"),
@@ -17944,7 +18123,7 @@ task = { task = "take a photo and send it to the app", run = "scripts/main.py" }
         );
         crate::make_no_cannot::set_on_here(None);
         // The brief offers it, still within its bound.
-        let longest = brief(&"x".repeat(MOST_REQUEST_BYTES)).unwrap();
+        let longest = brief(&longest_request()).unwrap();
         assert!(longest.contains("Or code, as above."), "{longest}");
         assert!(longest.len() <= MOST_BRIEF_BYTES, "{}", longest.len());
         set_scripts_here(None);

@@ -190,13 +190,13 @@ fn a_queued_make_that_failed_with_no_line_says_one_through_the_real_path() {
         ..crate::tools::Settings::default()
     };
     let off = crate::tools::Settings::default();
-    let too_long = "gold ".repeat(crate::made_skill::MOST_REQUEST_BYTES);
+    let too_long = "gold ".repeat(crate::made_skill::MOST_REQUEST_CHARS);
     for (request, settings, call, line) in [
         (
             7_679_201,
             on,
             make(&too_long),
-            "I couldn't make gold price: that is too long to ask for as one skill: say it more shortly.",
+            "I couldn't make gold price: that is too long to ask for as one skill, past 2,000 characters: say it more shortly.",
         ),
         (
             7_679_203,
