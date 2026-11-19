@@ -343,6 +343,9 @@ pub fn asked_turning(
     let spoken = made_skill::spoken_name(&made);
     let Some(kept) = made_skill::kept_on_named(&keeping.directory, &made) else {
         eprintln!("lamp-voice: request {request}: a made skill wasn't run now: it isn't on");
+        // A yes to the lamp's offer to turn it on is its turn_on, never a
+        // new make (lamp-c0a4, 19 Nov 11:13).
+        crate::made_turn::offer_on(&made, request, std::time::Instant::now());
         return not_run(&spoken, "it isn't on the lamp now");
     };
     // Its writes, as a read-back reads them: approved for the package on
@@ -382,6 +385,7 @@ pub fn asked_turning(
             eprintln!(
                 "lamp-voice: request {request}: a made skill turned off wasn't run now: not turned on for the ask"
             );
+            crate::made_turn::offer_on(&made, request, std::time::Instant::now());
             return not_run(
                 &spoken,
                 &format!("it is turned off, and it wasn't turned on: {why}"),
@@ -827,6 +831,65 @@ mod tests {
             never,
         );
         assert_eq!(off["error"], "it isn't on the lamp now", "{off}");
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    /// lamp-c0a4, 19 Nov 11:13 (requests 31 and 32): a run of a made skill
+    /// that isn't on, then the person's "yes" to the lamp's offer to turn
+    /// it on, was a fresh make. The next heard line is told, once, that a
+    /// yes is `turn_on` with its name alone, never a make; a run that ran,
+    /// or one that waits for its yes, offers nothing.
+    #[test]
+    fn a_yes_after_a_made_skill_not_on_is_its_turn_on_never_a_make() {
+        let (root, keeping) = nines_lamp("run-not-on-yes");
+        let at = |request| Ask {
+            name: "evening dim",
+            request,
+            heard: true,
+        };
+        let off = asked(at(7_905_031), &keeping, owner, no_task, approved, never);
+        assert_eq!(off["error"], "it isn't on the lamp now", "{off}");
+        let now = std::time::Instant::now();
+        assert_eq!(crate::made_turn::offered_note(7_905_031, now), None);
+        let note = crate::made_turn::offered_note(7_905_032, now).expect("the yes's turn is told");
+        assert!(
+            note.contains("make_skill now with turn_on and \"evening dim\" alone"),
+            "{note}"
+        );
+        assert!(note.contains("never make it again"), "{note}");
+        assert_eq!(
+            crate::made_turn::offered_note(7_905_032, now),
+            None,
+            "told once"
+        );
+        let ran = asked(
+            Ask {
+                name: "unread mail",
+                request: 7_905_041,
+                heard: true,
+            },
+            &keeping,
+            owner,
+            no_task,
+            approved,
+            |_| Ok(false),
+        );
+        assert_eq!(ran["ran"], true, "{ran}");
+        assert_eq!(crate::made_turn::offered_note(7_905_042, now), None);
+        let waits = asked(
+            Ask {
+                name: "unread mail",
+                request: 7_905_051,
+                heard: true,
+            },
+            &keeping,
+            owner,
+            |_| Ok(Some(false)),
+            approved,
+            never,
+        );
+        assert!(waits["error"].is_string(), "{waits}");
+        assert_eq!(crate::made_turn::offered_note(7_905_052, now), None);
         let _ = std::fs::remove_dir_all(&root);
     }
 

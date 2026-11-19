@@ -499,6 +499,68 @@ pub fn off_note_here(request: u64, heard: bool) -> Option<String> {
     Some(note)
 }
 
+/// How long after a run of a made skill that didn't run because it is off
+/// or not on (`made_run::asked_turning`) the person's next heard line is
+/// told how a yes to turning it on is done ([`offered_note`]).
+pub const OFFER_WITHIN: Duration = Duration::from_secs(90);
+
+/// The made skills a run now left not run because off or not on: each its
+/// name, its request and when. At most [`OFFERS_KEPT`].
+static OFFERS: std::sync::Mutex<Vec<(String, u64, std::time::Instant)>> =
+    std::sync::Mutex::new(Vec::new());
+const OFFERS_KEPT: usize = 8;
+
+/// The made skill `made` didn't run now in the request `request` at `now`
+/// because it is off or not on the lamp, so the lamp may offer to turn it
+/// on (lamp-c0a4, 19 Nov 11:13, requests 31 and 32: "Give me my daily
+/// report" was answered that my day is off, with an offer to turn it on;
+/// the person's "yes" was then a `make_skill` with `request`, a fresh
+/// make, since nothing in that turn named the turn on or the skill: the
+/// run's answer is kept in the history as "(failed then)" alone).
+pub fn offer_on(made: &str, request: u64, now: std::time::Instant) {
+    let mut offers = OFFERS.lock().unwrap_or_else(|poison| poison.into_inner());
+    offers.retain(|(_, _, at)| now.saturating_duration_since(*at) < OFFER_WITHIN);
+    offers.push((made.to_owned(), request, now));
+    let over = offers.len().saturating_sub(OFFERS_KEPT);
+    offers.drain(..over);
+}
+
+/// What the heard line `request` at `now` is told, once, right after a run
+/// that left a made skill not run because off or not on ([`offer_on`],
+/// within [`OFFER_WITHIN`] and the next two requests): a yes to turning it
+/// on is `make_skill`'s `turn_on` with its name alone, through its own
+/// path and answer, never a new make. Whether the line agrees stays the
+/// model's to judge: no word is read.
+pub fn offered_note(request: u64, now: std::time::Instant) -> Option<String> {
+    let mut offers = OFFERS.lock().unwrap_or_else(|poison| poison.into_inner());
+    let at = offers.iter().rposition(|(_, asked, at)| {
+        *asked < request
+            && request <= asked.saturating_add(2)
+            && now.saturating_duration_since(*at) < OFFER_WITHIN
+    })?;
+    let (made, _, _) = offers.remove(at);
+    let spoken = made_skill::spoken_name(&made);
+    Some(format!(
+        "(For you to know, not to answer: in your last turn {spoken}, a skill they made, didn't \
+         run because it is off or not on. If their line agrees to turning it on, a yes to your \
+         offer too, call make_skill now with turn_on and \"{spoken}\" alone, saying nothing \
+         first: its answer says what to say. It is made already: never call make_skill with \
+         request for it, never make it again.)"
+    ))
+}
+
+/// [`offered_note`] on the lamp: with the switch on and a heard line only.
+pub fn offered_note_here(request: u64, heard: bool) -> Option<String> {
+    if !heard || !made_skill::off_said_on() {
+        return None;
+    }
+    let note = offered_note(request, std::time::Instant::now())?;
+    eprintln!(
+        "lamp-voice: request {request}: told that a yes to turning on a made skill that didn't run is its turn_on, never a make"
+    );
+    Some(note)
+}
+
 /// Whether a call's answer `told` is a turned-off skill's function that
 /// ran nothing ([`FUNCTION_OFF`]).
 pub fn ran_turned_off(told: &Value) -> bool {

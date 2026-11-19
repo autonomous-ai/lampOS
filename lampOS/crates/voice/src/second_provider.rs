@@ -17672,6 +17672,11 @@ async fn answer(
         if let Some(note) = crate::made_turn::off_note_here(request, heard) {
             messages.push(Message::system(note));
         }
+        // A yes to turning on a made skill the last turn's run left off or
+        // not on (lamp-c0a4, 19 Nov 11:13): its turn_on, never a new make.
+        if let Some(note) = crate::made_turn::offered_note_here(request, heard) {
+            messages.push(Message::system(note));
+        }
         // The owner's own spoken ask of the skill, kept so its task's first
         // yes may be asked in the lamp's quiet hours (#7180,
         // `LAMP_TOLD_WHEN_ASKED`): only the owner heard saying it, judged
