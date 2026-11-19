@@ -2011,6 +2011,34 @@ fn the_product_sends_to_the_linked_services_held_to_the_owners_voice() {
     }
 }
 
+/// A Gmail draft the lamp saved is changed or deleted in the product (the
+/// first builder's DEFAULT-ON on #7814; a tester's lamp, 11 Nov: a saved
+/// draft could only be saved again beside the old one):
+/// `LAMP_GMAIL_DRAFT_EDITS=on` once in `lamp-services`, the only unit that
+/// reads it, beside its writes, and no other product unit names it.
+#[test]
+fn the_product_changes_and_deletes_a_saved_gmail_draft() {
+    for (unit, text) in install::PRODUCT {
+        let service = section(text, "Service");
+        let on = service
+            .iter()
+            .filter(|line| **line == "Environment=LAMP_GMAIL_DRAFT_EDITS=on")
+            .count();
+        let mentioned = service
+            .iter()
+            .filter(|line| line.contains("LAMP_GMAIL_DRAFT_EDITS"))
+            .count();
+        assert_eq!(on, usize::from(*unit == "lamp-services.service"), "{unit}");
+        assert_eq!(mentioned, on, "{unit}");
+        if on == 1 {
+            assert!(
+                service.contains(&"Environment=LAMP_SERVICES_WRITE=on"),
+                "{unit} lacks LAMP_SERVICES_WRITE"
+            );
+        }
+    }
+}
+
 /// A Google Calendar event is moved or cancelled in the product (#6067; the
 /// lamp-3e83 tester's report, 10 Nov): `LAMP_CALENDAR_EDITS=on` once in
 /// `lamp-services`, the only unit that reads it, beside its writes, and no
