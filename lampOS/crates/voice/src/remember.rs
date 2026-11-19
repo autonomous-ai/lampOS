@@ -495,10 +495,13 @@ pub const KEEP_CLAIMED_UNKEPT: &str = "(For you to know: you were about to say y
 pub const NOT_KEPT_LINE: &str = "I didn't keep that. Tell me again and I'll remember it.";
 
 /// Where the second worker reads the switch for a keep claimed anywhere in
-/// a reply (#7878). `on` only, off unless set: on a turn whose spoken line
-/// is a statement about the person ([`about_someone`], never a question),
-/// while no `remember` of the turn has run, the reply is held to its round's
-/// end and judged whole ([`claims_a_change`]), not only its opening. On
+/// a reply (#7878). `on` only, off unless set: on a spoken turn that isn't a
+/// question, while no `remember` of the turn has run, a reply whose first
+/// sentence opens with an acknowledgement ([`WHOLE_OPENINGS`]: "Got it —",
+/// "Okay,") is held for up to [`WHOLE_MOST_SENTENCES`] sentences and judged
+/// whole ([`whole_hold`], [`claims_a_change`]), not only its opening. Gated
+/// on the reply's own structure, never on words of the person's line (the
+/// Reviewer-lead's P2 on #7924). On
 /// lamp-e82d at 14432, 19 Nov 09:52, "Actually, I moved my car. It's on Level
 /// B1, spot 7 now." got no call and "Got it — your car is on Level B1, spot
 /// 7 now. That replaces wherever it was before.": its opening claims
@@ -515,22 +518,90 @@ pub fn whole_on() -> bool {
 /// updated, past a lead-in ("Okay,", "Got it —"): the replace and update
 /// claims [`keep_claim`] doesn't read ("That replaces wherever it was
 /// before.", "I've updated that.", "Updated.").
-const CHANGE_CLAIMS: [&str; 14] = [
+const CHANGE_CLAIMS: [&str; 12] = [
     "that replaces",
     "this replaces",
-    "it replaces",
     "that'll replace",
     "that will replace",
     "that's replaced",
     "that has replaced",
-    "i've updated",
-    "i have updated",
-    "i updated",
-    "updated",
-    "i've replaced",
-    "i replaced",
+    "i've updated that",
+    "i've updated it",
+    "i have updated that",
+    "i've replaced it",
+    "i've replaced that",
     "i've changed it",
 ];
+
+/// The acknowledgements a reply's first sentence opens with for it to be
+/// held whole ([`whole_hold`]): how a reply that claims a keep later opens
+/// ("Got it — your car is on Level B1, spot 7 now. That replaces …"). A
+/// story, an answer or a refusal opens otherwise and streams at once.
+pub const WHOLE_OPENINGS: [&str; 8] = [
+    "got it",
+    "okay",
+    "ok",
+    "sure",
+    "alright",
+    "all right",
+    "noted",
+    "understood",
+];
+
+/// The most sentences a reply is held for before it is let go with no
+/// claim found ([`whole_hold`]): a bound in code on the wait, so a long
+/// reply never waits for its end (the Reviewer-lead's P2 on #7924).
+pub const WHOLE_MOST_SENTENCES: usize = 3;
+
+/// What becomes of a reply held whole so far ([`WHOLE_ENVIRONMENT`]).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Whole {
+    /// Held on: no sentence ended yet, or a claim found (held to the
+    /// round's end), or fewer than [`WHOLE_MOST_SENTENCES`] ended.
+    Hold,
+    /// Let go to the opening's own judgement: its first sentence opens with
+    /// no acknowledgement, or [`WHOLE_MOST_SENTENCES`] ended with no claim.
+    Pass,
+}
+
+/// Whether `held`, a reply's text so far, is held on whole or let go.
+pub fn whole_hold(held: &str) -> Whole {
+    let text = held.replace('\u{2019}', "'");
+    let ended: Vec<&str> = text.split_inclusive(['.', '!', '?']).collect();
+    let complete = if text.trim_end().ends_with(['.', '!', '?']) {
+        ended.len()
+    } else {
+        ended.len().saturating_sub(1)
+    };
+    let opening = text.trim_start().to_lowercase();
+    let acknowledged = WHOLE_OPENINGS.iter().any(|lead| {
+        opening.strip_prefix(lead).is_some_and(|after| {
+            after.trim_end().is_empty()
+                || after.starts_with(|c: char| !c.is_alphanumeric() && c != '\'')
+        })
+    });
+    if complete == 0 {
+        // Not known yet, unless it already opens with something else.
+        let started = opening.split_whitespace().count() >= 2;
+        return if started && !acknowledged {
+            Whole::Pass
+        } else {
+            Whole::Hold
+        };
+    }
+    if !acknowledged {
+        return Whole::Pass;
+    }
+    let done: String = ended[..complete].concat();
+    if claims_a_change(&done) {
+        return Whole::Hold;
+    }
+    if complete >= WHOLE_MOST_SENTENCES {
+        Whole::Pass
+    } else {
+        Whole::Hold
+    }
+}
 
 /// The lead-ins a sentence's change claim may follow ([`CHANGE_CLAIMS`]).
 const CHANGE_LEADS: [&str; 9] = [
@@ -3023,7 +3094,7 @@ const NOT_POSSESSIVE: [&str; 11] = [
 /// [`NOT_POSSESSIVE`] ("Mai's favourite colour"). Lowercased, `’` read as
 /// `'`, whole words only ("mine" in "determined" is not one). Careful on
 /// purpose: a fact about nobody, such as "the meeting is at four", passes.
-pub(crate) fn about_someone(text: &str) -> bool {
+fn about_someone(text: &str) -> bool {
     let lower = text.to_lowercase().replace('\u{2019}', "'");
     lower
         .split(|c: char| !(c.is_alphanumeric() || c == '\''))
@@ -33131,7 +33202,7 @@ mod chapter_tests {
         for reply in [
             "Got it \u{2014} your car is on Level B1, spot 7 now. That replaces wherever it was before.",
             "Okay, your car is on B1. I've updated that.",
-            "Your car is on Level B1 now. Updated.",
+            "Okay, I've updated that: B1, spot 7.",
             "Sure. I'll remember that.",
             "Spot 7 on B1. Kept.",
         ] {
@@ -33142,9 +33213,40 @@ mod chapter_tests {
             "Got it \u{2014} your car is on Level B1, spot 7 now.",
             "Should I remember that your car is on B1?",
             "Updates come every night.",
+            "Done, I've updated your light.",
+            "Okay, it replaces your old one.",
+            "Updated forecast: rain at noon.",
             "That replacement part sounds expensive.",
         ] {
             assert!(!claims_a_change(reply), "{reply}");
         }
+    }
+
+    /// #7924: a reply is held whole only while its first sentence opens
+    /// with an acknowledgement, and for at most [`WHOLE_MOST_SENTENCES`]
+    /// sentences unless a claim is found; a story or an answer passes.
+    #[test]
+    fn a_reply_is_held_whole_only_after_an_acknowledgement_and_for_three_sentences() {
+        assert_eq!(whole_hold("Got it"), Whole::Hold);
+        assert_eq!(
+            whole_hold("Got it \u{2014} your car is on B1."),
+            Whole::Hold
+        );
+        assert_eq!(
+            whole_hold("Got it \u{2014} your car is on B1. That replaces wherever it was. And"),
+            Whole::Hold
+        );
+        assert_eq!(whole_hold("Once upon a time"), Whole::Pass);
+        assert_eq!(whole_hold("Once upon a time, a lamp."), Whole::Pass);
+        assert_eq!(
+            whole_hold("Okay. One. Two. Three"),
+            Whole::Pass,
+            "three sentences with no claim are let go"
+        );
+        assert_eq!(
+            whole_hold("Okay. That replaces it. Two. Three. Four."),
+            Whole::Hold,
+            "a claim found is held to the end"
+        );
     }
 }
