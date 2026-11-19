@@ -7904,8 +7904,21 @@ reset still ask. On (`crate::make_no_asks`):
   (`LAMP_MAKE_NO_CANNOT`) goes on at once and still reads its task back
   before its first run.
 - **A clash replaces, on the owner's ask.** A plain voice make that clashes
-  with skills on the lamp (`made_clash::found`) goes on first; a put-on that
-  fails changes nothing else. Then, on the owner's own ask alone (as a code
+  with skills on the lamp doing the same thing (`made_clash::same_found`)
+  goes on first; a put-on that fails changes nothing else. The same thing
+  is structural, no words matched (`made_clash::same_thing`, #7938): the
+  very same triggers, each with its condition and its window (`during`,
+  `days`, the time of day and days it may fire), and the same kinds of
+  `[[do]]` steps (`say`, `light`, `body`, …; `after`, `on` and `if_choice`
+  aside). A shared topic, time source, word or output alone never makes
+  two skills the same: on lamp-9adf a daily brief at 08:00 replaced a good
+  morning, a good morning 3 and a water reminder, each on the lamp's clock
+  at its own time and lighting. One that clashes but does something else
+  is left on beside it, and the make is said as a plain one. Tests
+  (`make_no_asks/tests.rs`):
+  `a_make_beside_unrelated_skills_replaces_none_of_them`,
+  `a_make_that_duplicates_one_replaces_only_that_one`. Then, on the owner's
+  own ask alone (as a code
   make's, `services::owners_yes_of`; Twelve's P1 on #7783), each clashing
   skill that is on (lamp-skills' `off` file read; one already off is left
   as it is, and an unreadable file replaces nothing) is turned off through
