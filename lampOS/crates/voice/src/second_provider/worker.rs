@@ -27835,6 +27835,13 @@ mod tests {
     /// a longer line, or one in an open window, is judged as before: the
     /// first builder's "Lamp?", "Hey Lamp." and "Hey, Lynn", #7834's "Lamp,
     /// put it back.", and a named question inside a busy room.
+    ///
+    /// A face turned to the lamp is its own reason to answer, apart from
+    /// the name: out of a busy room it lets a line out with no name at all
+    /// (`Attention::face_shows`), so a short line said to a turned face is
+    /// still dropped as a name but answered on the face, and held in a busy
+    /// room by `busy_bar`. Holding meeting talk said facing the lamp is
+    /// #7891's faults 2-3 (#7908), not this rule.
     #[test]
     fn with_a_second_sign_asked_a_short_line_without_the_name_is_not_answered_on_its_sound() {
         use crate::room_told::Room;
@@ -27845,6 +27852,18 @@ mod tests {
                 heard,
                 room_name_signs(room, going_on, turned, near, vec![(at, score)]),
             )
+        };
+        // Said close to the lamp to a face turned to it: whether the name
+        // was dropped too.
+        let faced = |room, heard, (line, at, score)| {
+            let mut heeding = room_name_heeding(true);
+            let verdict = heeding.judge(
+                29,
+                line,
+                heard,
+                room_name_signs(room, false, Some(true), true, vec![(at, score)]),
+            );
+            (verdict, heeding.attention.name_dropped_as_short())
         };
         // Request 29: a 15 s line, the hearing 3253 ms into it.
         let yeah = ((10_000_000, 25_000_000), 13_253_000, 0.939);
@@ -27861,8 +27880,15 @@ mod tests {
             );
             for meeting in ["Sure.", "Thanks.", "Okay, sure."] {
                 assert!(
-                    judged(room, false, Some(true), true, meeting, start).is_some(),
+                    judged(room, false, None, true, meeting, start).is_some(),
                     "{room:?}: {meeting}"
+                );
+                let (verdict, dropped) = faced(room, meeting, start);
+                assert!(dropped, "{room:?}: {meeting}, faced");
+                assert_eq!(
+                    verdict.is_some(),
+                    room == Room::Busy,
+                    "{room:?}: {meeting}, faced"
                 );
             }
             for call in [
