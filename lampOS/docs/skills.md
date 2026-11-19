@@ -6510,12 +6510,16 @@ the same code for both writers.
   holds `format.md`, this build's whole `docs/skill-format.md`
   (`lamp_tasks::skill_make::FORMAT`), `sdk.md`, the lamp's whole Python
   SDK reference (`skill_make::SDK`, `sdk/python/README.md`, so a skill's
-  code may use any of its calls), and `examples/`, seven complete skills
+  code may use any of its calls), and `examples/`, ten complete skills
   (`MAKE_EXAMPLES`, from `crates/tasks/src/make_examples/`: a light and a
   say on its asks, a gesture and a say on a sitting, a coin flip in code,
   a say again every 30 minutes while someone stays, a break timer set with
   `remind`, a water reminder every 30 minutes with `remind every`, and a
-  breathing script that leads three breaths with the light and the voice),
+  breathing script that leads three breaths with the light and the voice;
+  #7874: `agenda-count`, a calendar read on its asks, its `main.py` the
+  one-line lamp-services stub; and, granted `net` and `speak`,
+  `exchange-rate` (#7742) and `sun-times`, each its own urllib code through
+  the run's `HTTPS_PROXY` saying one fetched value with `lamp.say`),
   each packed by the real `lamp-skills pack` in a test; its words
   name both (`GATEWAY_CAN`, about 300 bytes, now only what to read and do) and that a show is a
   ```` ```shows/NAME.toml ```` block of the answer, within Harness's
@@ -6528,7 +6532,9 @@ the same code for both writers.
   (`lamp_tasks::skill_make::GUIDE`, from `skill_make_guide.md`: a lamp
   version of V1's `skills/skill-creator/SKILL.md`, Apache-2.0, its first
   line naming that origin and license; V1's evals, benchmarks and viewer
-  left out). The run is told to read the guide first, the rules winning
+  left out; #7874: its "How a made skill runs" says the run model, the
+  `task` words' rule of one plain sentence of at most 120 characters, a
+  linked-service skill and a `net` skill). The run is told to read the guide first, the rules winning
   where they differ: take the intent from the person's words alone (what
   the lamp does, when, and what the form can't do, left out), draft the
   skill in `draft/NAME` in its folder, check it with the lamp's own check,

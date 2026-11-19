@@ -1,0 +1,7 @@
+asks = ["how full is my day"]
+kind = "installable"
+version = "1.0.0"
+grants = ["google_calendar-read"]
+
+[[do]]
+task = { task = "Count the owner's calendar events left today and tell them how many, and when the next one starts", run = "scripts/main.py" }
