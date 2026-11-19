@@ -2450,6 +2450,11 @@ pub struct Skill {
     /// are ignored as it loads ([`shed_made_manners`]), as said; empty for
     /// every other skill.
     pub manners_shed: Vec<&'static str>,
+    /// Whether it was made on this lamp ([`made_on_the_lamp`]): with
+    /// `LAMP_MADE_SKILL_ASKS` on, one with no tool is listed in the tools
+    /// file by its name (`made_asks`), its asks or none, so the voice runs
+    /// it when its name is said (`lamp_voice::skill_named`, #7233).
+    pub made_here: bool,
 }
 
 impl Skill {
@@ -4268,11 +4273,8 @@ fn manifest(
     }
     // Started by its own words (`LAMP_MADE_SKILL_ASKS`): its `asks` and no
     // tool, with or without a trigger beside them ([`started_by_words`]).
-    let by_words = started_by_words(
-        &file.asks,
-        file.tool.as_ref(),
-        made_on_the_lamp(dir, kind, description_text),
-    );
+    let made_here = made_on_the_lamp(dir, kind, description_text);
+    let by_words = started_by_words(&file.asks, file.tool.as_ref(), made_here);
     let triggers = match file.trigger {
         None => Vec::new(),
         Some(toml::Value::Array(many)) => many,
@@ -5797,6 +5799,7 @@ fn manifest(
         unplug,
         grants,
         manners_shed: Vec::new(),
+        made_here,
     };
     // A watch shows a faint mark while it is on, texts the person, and
     // tells a known face from one it does not know: each needs its key.
@@ -11331,7 +11334,19 @@ pub fn tools_file_summary(
         // (`LAMP_MADE_SKILL_ASKS`, [`started_by_words`]): its asks by its
         // name, which the voice matches a heard line against and runs it
         // now by (`lamp_voice::skill_named::MADE`). Never one that holds
-        // another skill's name, as above.
+        // another skill's name, as above. One made here with no asks (a
+        // trigger alone) is listed by its name with none, so its name said
+        // runs it all the same (the owner, 19 Nov: "a skill must be called
+        // by its exact name").
+        if skill.tool.is_none()
+            && skill.kind == SkillKind::Installable
+            && skill.pushed_by.is_none()
+            && skill.asks.is_empty()
+            && skill.made_here
+            && lamp_voice::made_skill::asks_on()
+        {
+            made_asks.insert(skill.name.clone(), json!([]));
+        }
         if skill.tool.is_none()
             && !skill.asks.is_empty()
             && skill.kind == SkillKind::Installable
@@ -12962,6 +12977,42 @@ mod tests {
         assert!(tools_file(&[]).get(lamp_voice::tools::MADE_ASKS).is_none());
         lamp_voice::made_skill::set_asks_here(None);
         service_write::set_on_here(None);
+    }
+
+    /// The owner, 19 Nov ("a skill must be called by its exact name", and
+    /// tech-news "has no phrase to call it by"): with `LAMP_MADE_SKILL_ASKS`
+    /// on, a skill made on the lamp with a trigger and no asks is listed in
+    /// the tools file's `made_asks` by its name with none, so the voice
+    /// runs it when its name is said; turned off in its file, not made
+    /// here, or with the switch off, it is not listed.
+    #[test]
+    fn a_made_skill_with_no_asks_is_listed_by_its_name() {
+        let dir = tempfile::tempdir().unwrap();
+        let toml = "version = \"1.0.0\"\n[permissions]\ntopics = [\"air/state\"]\nspeak = true\n\
+                    [ask]\npolicy = \"moment\"\n[trigger]\ntopic = \"air/state\"\n\
+                    field = \"pm2_5\"\nabove = 1\n[[do]]\nsay = { text = \"News.\" }\n";
+        let made = made_here(dir.path(), "tech-news", toml);
+        let plain = write_skill(dir.path(), "plain-news", toml);
+        let off = made_here(dir.path(), "off-news", &format!("enabled = false\n{toml}"));
+        lamp_voice::made_skill::set_asks_here(Some(true));
+        let skills = [
+            load(&made).unwrap(),
+            load(&plain).unwrap(),
+            load(&off).unwrap(),
+        ];
+        assert!(skills[0].made_here && !skills[1].made_here);
+        assert_eq!(
+            tools_file(&skills)[lamp_voice::tools::MADE_ASKS],
+            json!({"tech-news": []})
+        );
+        lamp_voice::made_skill::set_asks_here(Some(false));
+        let skills = [load(&made).unwrap()];
+        assert!(
+            tools_file(&skills)
+                .get(lamp_voice::tools::MADE_ASKS)
+                .is_none()
+        );
+        lamp_voice::made_skill::set_asks_here(None);
     }
 
     /// An uploaded `SKILL.md`'s trigger phrases (`LAMP_MADE_SKILL_ASKS`)
