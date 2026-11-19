@@ -3707,6 +3707,27 @@ nên chạy trong `openclaw-ns` riêng như trước. `GATEWAY_WAITS`,
 của wrapper), và one-shot của lamp-update cũng dùng cùng lịch chờ đó:
 chỉ lần từ chối vì gateway chưa có ở đó để kiểm tra mới được thử lại, văn
 bản bị OpenClaw từ chối thì không.
+Cả ba chỗ ghi `openclaw.json` (`write_checked` của lamp-tasks,
+`gateway_config` của lamp-update, lần cắt khi reset của lamp-setup) giữ
+một lock từ trước lúc đọc tới sau lúc rename (P2 của Seventh trên #7872):
+một `flock` độc quyền trên chính thư mục state của OpenClaw
+(`/var/lib/lampos-openclaw/state`), lấy qua `lamp_checked_replace::hold` /
+`lock`. Không có nó, lần rename của chỗ này rơi vào giữa lần kiểm tra của
+chỗ kia (vài giây) sẽ làm mất khối của chỗ kia, và khối provider của
+lamp-tasks mất cho tới lần nó khởi động sau. Lock trên thư mục, không phải
+file lock cạnh `openclaw.json`: không có gì phải tạo hay đổi chủ, chỗ ghi
+nào cũng đã mở thư mục này để rename (nên không đổi unit nào), và lần
+reset, vốn xoá mọi tên mà thư mục state không giữ, không thể tách đôi nó.
+Thời gian chờ có giới hạn (`LOCK_WITHIN`, 90 s, trên 60 s của lần kiểm
+tra); quá thời gian đó thì lần ghi thất bại với "another writer held the
+folder's lock past 90 s", như một lần kiểm tra không chạy được (lamp-tasks:
+không ghi cho tới lần khởi động sau; lamp-update: bản cài thất bại
+`config`, one-shot của vòng cập nhật hỏi lại ở vòng sau; reset: file bị
+xoá). Test:
+`the_state_folders_lock_is_held_from_the_read_through_the_check_to_the_rename`
+(lamp-tasks), `a_gateway_block_write_holds_the_state_folders_lock_through_its_check`
+(lamp-update), `a_cut_of_openclaws_config_holds_the_state_folders_lock_through_its_check`
+(lamp-setup).
 
 ## Hook của Harness bên trong namespace agent của đèn (#6530)
 
