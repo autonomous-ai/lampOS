@@ -1050,6 +1050,36 @@ order is kept. A written turn is the same from the chat on.
     and an answer without usage is still counted), and the workers' census
     (`process::switch_census_tests`), which fails if the switch does not
     reach the second worker.
+  - **A day replayed off the lamp, switch or no switch** (#7664, done-when
+    1: a busy-desk day against the allowance). The `chat answer` lines
+    above are written with the switch off too, so a UTC day's chat
+    answers can be counted again on another machine from saved journal
+    pulls: `cargo run --release -p lamp-voice --example day_tally_replay
+    -- --utc-day 2026-11-18 PULL...`, each `PULL` a `journalctl -u
+    lamp-voice -o short-iso` (or `short-iso-precise`) output. Each line's
+    tokens are read back as the service's `usage` and counted by the live
+    tally's own rule (`day_tally::one_answer`), into the UTC day of the
+    line's time; a line in two overlapping pulls is counted once. It
+    prints the `thinking today (UTC)` line and the same counts as JSON in
+    `tally.json`'s form. Numbers only: nothing of a line but its time and
+    token counts is read.
+    - **What it can't count:** the model (the line has no name, so all
+      are under `journal`), the sound heard, declined turns and spoken
+      lines (no line says them as the tally counts them), and anything in
+      a gap between pulls. The lamp keeps minutes to hours of journal
+      ("How long 20M lasts" in [install.md](install.md)), so a whole day
+      needs pulls every few minutes. The session records
+      (`metadata/events-*.jsonl`) carry no tokens and only the lamp's
+      monotonic clock, so they can't give a UTC day's tokens.
+    - **What it gains over the live tally:** a restart loses nothing, and
+      an answer just before midnight is in its own day.
+    - Tests: `day_tally::replay::tests` (a date as days since 1970, UTC
+      midnight divides the days whatever the offset is written as,
+      overlapping pulls of two days count each line once, a restart mid-day
+      loses nothing, words are never printed) and
+      `net::chat::tests::the_replayed_tally_reads_an_answers_line_back`,
+      which fails if the line's form changes and the replay no longer
+      reads it.
 - **With `LAMP_SECOND_STEADY_FIRST=on` a spoken turn's request begins with
   what stays** (off unless set; #1712, the first builder at 18:56). The
   system message keeps only the character and the skills. The memory note,
