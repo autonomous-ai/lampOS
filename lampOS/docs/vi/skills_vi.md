@@ -3755,17 +3755,25 @@ từng byte. **Chưa thử trên đèn:** hai lần tạo liên tiếp bằng gi
 được làm theo thứ tự, lần thứ hai được báo là ngay sau và được nói lại sau
 lời đồng ý của lần đầu.
 
-### Câu nói của một kỹ năng lõi qua agent của đèn (`LAMP_CORE_VIA_AGENT`, thử nghiệm, tắt)
+### Câu nói của một kỹ năng lõi qua agent của đèn (`LAMP_CORE_VIA_AGENT`, bật trong sản phẩm)
 
 Dạng ở giữa của một lần tạo bằng giọng nói, cho các kỹ năng lõi nói một câu
 do model viết mỗi lần kích hoạt: lamp-skills giữ nguyên trigger, các guard
 `[[while]]`, `most_a_day`, `[active]`, `[quiet]`, `cooldown`, `rearm`, `wait`,
 `[budget]`, `[rest]` và `[stop]`, và chỉ câu nói của lần kích hoạt thành một
 `do.task` cho agent của đèn (Hermes hoặc OpenClaw, qua lamp-tasks). Tắt trừ khi
-được đặt, trong lamp-skills, manage helper của nó và lamp-voice; không unit nào đặt (phán
-quyết của first builder, 19/11 05:42: sau một công tắc mới, tắt; 06:05: phản ứng
-nhanh vẫn là của DeepSeek, và mọi câu lõi khác do model viết chuyển sang agent,
-theo từng nhóm). `LAMP_CORE_VIA_AGENT=on` bật mọi nhóm; một danh sách bật những
+được đặt, trong lamp-skills, manage helper của nó và lamp-voice (phán quyết của
+first builder, 19/11 05:42: sau một công tắc mới; 06:05: phản ứng nhanh vẫn là
+của DeepSeek, và mọi câu lõi khác do model viết chuyển sang agent, theo từng
+nhóm). **Bật trong sản phẩm** từ lần bật của #7862 (10:45 và 10:47 của first
+builder: soạn trước, lần bật nằm trong PR của nó):
+`LAMP_CORE_VIA_AGENT=pilot,nudges,news` một lần trong `lamp-skills.service`,
+`lamp-skills-manage@.service` và `lamp-voice.service`, và `agent.toml` cùng
+`scripts/agent.py` của mỗi kỹ năng lõi thử nghiệm được cài cạnh nó
+(`install::SETTINGS`). Việc soạn câu cho task news còn cần
+`LAMP_HARD_ASKS_TO_AGENT=on` trong lamp-tasks, mà sản phẩm chưa đặt: cho đến
+khi đặt, câu hỏi của news bị từ chối `off` và ghi chú được nói ngay, như khi tắt
+công tắc. `LAMP_CORE_VIA_AGENT=on` bật mọi nhóm; một danh sách bật những
 nhóm nó nêu (`LAMP_CORE_VIA_AGENT=pilot,nudges`, `core_agent::turns_on`), nên mỗi
 nhóm được bật bằng lần bật riêng của nó. Khi tắt, không gì bên dưới được đọc:
 các kỹ năng nạp và chạy y hệt từng byte như trước. `lamp_skills::core_agent`.
@@ -3853,8 +3861,8 @@ các kỹ năng nạp và chạy y hệt từng byte như trước. `lamp_skills
   lamp-control cấp token một lần chạy cho nó mà không có quyền nào, và chỉ cho
   các kỹ năng của chính đèn, không bao giờ một thư mục được đẩy lên. Mọi thư
   mục khác cần cái gật đầu của chủ đèn như trước. 20 lần chạy một ngày cho mỗi
-  kỹ năng và mỗi lần một lần chạy vẫn giữ như mọi `do.task`. Chưa có trong bản
-  cài của sản phẩm: trên đèn, hai tệp được chép cạnh kỹ năng.
+  kỹ năng và mỗi lần một lần chạy vẫn giữ như mọi `do.task`. Bản cài của sản
+  phẩm đặt hai tệp cạnh mỗi kỹ năng lõi thử nghiệm.
 - **Lời dặn không bao giờ là một tệp trong thư mục kỹ năng của repo** (#7862,
   train 1074): kiểm tra của SDK từ chối script trong một kỹ năng ("a script;
   script skills are a later format", `lampos.skillcheck`) và giữ mọi kỹ năng

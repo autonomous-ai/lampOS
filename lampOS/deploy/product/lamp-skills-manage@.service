@@ -33,6 +33,8 @@ Environment=LAMP_SKILL_WRITES=on
 # A Store or pushed skill's `do.task` (#6305): its task and grants read for the voice's say-back (task_asks).
 # The same line in lamp-skills, lamp-voice, lamp-control, lamp-services, lamp-tasks and lamp-update.
 Environment=LAMP_SKILL_TASKS=on
+# #7862, docs/switches.md; first builder, 19 Nov 10:45 and 10:47 (the core nudges worded ahead by the lamp's agent, task news through it; the switch-on in the worded-ahead PR)
+Environment=LAMP_CORE_VIA_AGENT=pilot,nudges,news
 # A made skill's code of its own (#6307): install_made holds its scripts/ to the made cap again as it is put on
 # (made_skill::put_on_scripts), and its `do.task` reads back (task_asks). The same line in lamp-skills and lamp-voice.
 Environment=LAMP_MADE_SCRIPTS=on

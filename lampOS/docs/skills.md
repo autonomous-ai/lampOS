@@ -2196,17 +2196,25 @@ task = { task = "Take a photo and send it to my phone", run = "scripts/main.py" 
   alone, `lamp_control::task_yes::yes_for_token`) and its result as Task
   news are #6306's and #6304's. The journal keeps the outcome, never the task's words.
 
-### A core skill's line through the lamp's agent (`LAMP_CORE_VIA_AGENT`, a pilot, off)
+### A core skill's line through the lamp's agent (`LAMP_CORE_VIA_AGENT`, on in the product)
 
 The middle form of a voice make, for the core skills that say a
 model-worded line at each fire: lamp-skills keeps the trigger, the
 `[[while]]` guards, `most_a_day`, `[active]`, `[quiet]`, `cooldown`, `rearm`,
 `wait`, `[budget]`, `[rest]` and `[stop]` exactly, and only the fire's line
 becomes a `do.task` for the lamp's agent (Hermes or OpenClaw, through
-lamp-tasks). Off unless set, in lamp-skills, its manage helper and lamp-voice; set in
-no unit (the first builder's rulings, 19 Nov 05:42: behind a new switch,
-off; 06:05: quick reactions stay DeepSeek's, and every other model-worded
-core line goes to the agent, group by group). `LAMP_CORE_VIA_AGENT=on`
+lamp-tasks). Off unless set, in lamp-skills, its manage helper and lamp-voice
+(the first builder's rulings, 19 Nov 05:42: behind a new switch; 06:05:
+quick reactions stay DeepSeek's, and every other model-worded core line
+goes to the agent, group by group). **On in the product** since #7862's
+switch-on (the first builder's 10:45 and 10:47: worded ahead, the
+switch-on in its PR): `LAMP_CORE_VIA_AGENT=pilot,nudges,news` once in
+`lamp-skills.service`, `lamp-skills-manage@.service` and
+`lamp-voice.service`, and each core pilot's `agent.toml` and
+`scripts/agent.py` installed beside it (`install::SETTINGS`). Task news's
+wording also needs `LAMP_HARD_ASKS_TO_AGENT=on` in lamp-tasks, which the
+product doesn't set yet: until it does, the news ask is refused `off` and
+the note is told at once, as with the switch off. `LAMP_CORE_VIA_AGENT=on`
 turns on every group; a list turns on those it names
 (`LAMP_CORE_VIA_AGENT=pilot,nudges`, `core_agent::turns_on`), so each
 group goes on by its own switch-on. Off, nothing below is read: the skills
@@ -2294,8 +2302,8 @@ load and run byte for byte as before. `lamp_skills::core_agent`.
   whatever the switch). lamp-control mints its one-run token with no
   grant, and only for the lamp's own skills, never a pushed folder. Any
   other folder needs the owner's yes, as before. The day's 20 runs a skill
-  and one run at a time hold as for every `do.task`. Not yet in the
-  product's install: on a lamp the two files are copied beside the skill.
+  and one run at a time hold as for every `do.task`. The product's install
+  puts the two files beside each core pilot.
 - **The brief is never a file of the repository's skill folder** (#7862,
   train 1074): the SDK's check refuses a script in a skill ("a script;
   script skills are a later format", `lampos.skillcheck`) and holds every

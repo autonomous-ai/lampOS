@@ -2195,6 +2195,85 @@ fn the_product_makes_and_removes_with_nothing_asked_in_the_voice_alone() {
     assert!(install::PRODUCT.iter().any(|(unit, _)| *unit == owner));
 }
 
+/// The core nudges worded ahead by the lamp's agent, and task news through
+/// it (`LAMP_CORE_VIA_AGENT`, #7862; the first builder's 10:45 and 10:47 on
+/// 19 Nov: the switch-on in the worded-ahead PR): `pilot,nudges,news` once
+/// in the three units that read it, lamp-skills and its manage helper
+/// (`core_agent::turns_on`) and lamp-voice (task news), and in no other;
+/// each core pilot's variant installed beside it, its brief the lamp's own
+/// byte for byte, so its task is pre-approved.
+#[test]
+fn the_product_words_the_core_nudges_ahead_through_the_agent() {
+    let name = lamp_skills::core_agent::ENVIRONMENT;
+    assert_eq!(name, "LAMP_CORE_VIA_AGENT");
+    let owners = [
+        "lamp-skills.service",
+        "lamp-skills-manage@.service",
+        "lamp-voice.service",
+    ];
+    let line = format!("Environment={name}=pilot,nudges,news");
+    let value = line.split_once('=').unwrap().1.split_once('=').unwrap().1;
+    for group in [
+        lamp_skills::core_agent::Group::Pilot,
+        lamp_skills::core_agent::Group::Nudges,
+    ] {
+        assert!(lamp_skills::core_agent::turns_on(Some(value), group));
+    }
+    assert!(lamp_voice::news_agent::turns_on(
+        Some(value),
+        lamp_voice::news_agent::GROUP
+    ));
+    for (unit, text) in install::PRODUCT {
+        let on = section(text, "Service")
+            .iter()
+            .filter(|set| **set == line)
+            .count();
+        let mentioned = text
+            .lines()
+            .filter(|set| !set.starts_with('#') && set.contains(name))
+            .count();
+        assert_eq!(on, usize::from(owners.contains(unit)), "{unit}: {line}");
+        assert_eq!(mentioned, on, "{unit}: {name}");
+    }
+    for owner in owners {
+        assert!(
+            install::PRODUCT.iter().any(|(unit, _)| *unit == owner),
+            "{owner}"
+        );
+    }
+    let files = install::SETTINGS;
+    let installed = |skill: &str, file: &str| {
+        let path = format!("/var/lib/lampOS/skills/{skill}/{file}");
+        files
+            .iter()
+            .find(|(at, _)| *at == path)
+            .map(|(_, text)| *text)
+    };
+    for pilot in &lamp_skills::core_agent::PILOTS {
+        // Meal check and Quiet focus come from the Store, their variant in
+        // their package.
+        if installed(pilot.name, "skill.toml").is_none() {
+            assert!(
+                matches!(pilot.name, "meal-check" | "quiet-focus"),
+                "{}",
+                pilot.name
+            );
+            continue;
+        }
+        assert!(
+            installed(pilot.name, "agent.toml").is_some(),
+            "{}",
+            pilot.name
+        );
+        assert_eq!(
+            installed(pilot.name, lamp_skills::core_agent::RUN),
+            Some(lamp_skills::core_agent::script(pilot).as_str()),
+            "{}",
+            pilot.name
+        );
+    }
+}
+
 /// A made skill started on a request said to the lamp (#6526,
 /// `LAMP_MADE_SKILL_SAID`): `on` once in the two units that read it,
 /// `lamp-voice` (makes the skill, both routes) and `lamp-skills`' manage
