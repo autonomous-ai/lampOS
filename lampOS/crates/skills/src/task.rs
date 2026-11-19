@@ -132,8 +132,9 @@ pub const OFF: &str =
     "do.task: not handed over: a skill's tasks are off on this lamp (LAMP_SKILL_TASKS is not on)";
 /// The folder a `do.task`'s `run` is in.
 pub const SCRIPTS: &str = "scripts";
-/// The most bytes of a `do.task`'s `task` and of its `summary`: the
-/// voice's, so a task up to its character cap loads (#7874).
+/// The most bytes of a `do.task`'s `task` as its run's prompt quotes it
+/// (`lamp_voice::made_skill::task_bytes`), and of its `summary`: the
+/// voice's, what lamp-tasks' hand-over and Harness's prompt take (#7874).
 pub const MOST_TASK_BYTES: usize = lamp_voice::made_skill::MOST_TASK_BYTES;
 /// The most runs a skill hands over in any 24 hours: 3 from 11 Nov, raised
 /// on the owner's ask (15 Nov), since a presence skill fires each time
@@ -206,7 +207,12 @@ impl TaskFile {
     /// the folder's words are not one.
     pub fn step(self, dir: &Path, quiet: Option<(u16, u16)>) -> Result<TaskStep, String> {
         let task = self.task.trim();
-        if task.is_empty() || task.len() > MOST_TASK_BYTES || task.chars().any(char::is_control) {
+        // Its bytes as the run's prompt quotes them (#7874), as lamp-tasks
+        // counts them at the hand-over.
+        if task.is_empty()
+            || lamp_voice::made_skill::task_bytes(task) > MOST_TASK_BYTES
+            || task.chars().any(char::is_control)
+        {
             return Err(format!(
                 "do.task: task is 1 to {MOST_TASK_BYTES} bytes of words, with no control characters"
             ));

@@ -124,7 +124,8 @@ A skill does nothing that would surprise the person who asked for it.
   that says its result with `lamp.say` prints only `Said aloud through the
   lamp.`, and the agent answers only a dash: the person hears it once.
 - Write the `task` words in full: everything the run must do, plain, on
-  one line, at most 1000 characters. Beside them give
+  one line, at most 1000 characters and 1500 bytes (about 500 characters
+  in Korean). Beside them give
   `summary = "..."`: one plain line of at most 120 characters a person
   understands when it is read back for the owner's yes, as
   `task = { task = "...", summary = "...", run = "scripts/main.py" }`.

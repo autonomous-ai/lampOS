@@ -734,10 +734,21 @@ fn missing(named: &str) -> Uncovered {
 pub fn task_words(request: &str) -> String {
     let plain = task_plain(request);
     let most = made_skill::MOST_TASK_CHARS;
-    let words = if plain.chars().count() <= most {
+    // Its bytes too, as the run's prompt quotes them (#7874): `task_plain`
+    // leaves no quote or backslash, so each counts once.
+    let bytes = made_skill::MOST_TASK_BYTES;
+    let words = if plain.chars().count() <= most && plain.len() <= bytes {
         plain
     } else {
-        let cut: String = plain.chars().take(most).collect();
+        let mut used = 0;
+        let cut: String = plain
+            .chars()
+            .take(most)
+            .take_while(|c| {
+                used += c.len_utf8();
+                used <= bytes
+            })
+            .collect();
         match cut.rsplit_once(' ') {
             Some((head, _)) if !head.is_empty() => head.to_owned(),
             _ => cut,
@@ -1120,8 +1131,14 @@ pub fn asked_files(
         quoted.join(", "),
         crate::upload_agent::INSTRUCTIONS,
     );
+    // Its short form (#7874): the note is cut at
+    // `upload_agent::MOST_NOTE_BYTES`, and long words whole would cut off
+    // the phrases the voice calls it by.
     let note = crate::upload_agent::note(
-        &format!("The lamp's agent does a task the person asked for: {words}."),
+        &format!(
+            "The lamp's agent does a task the person asked for: {}.",
+            made_skill::task_said(words, None).trim_end_matches(['.', '!', '?'])
+        ),
         asks,
     );
     let card = format!(
@@ -1614,6 +1631,23 @@ mod tests {
             ])
             .is_ok()
         );
+        // #7874: a long request's note still ends on the phrases it is
+        // called by, its instructions carrying the words whole.
+        let long = format!(
+            "Email me my unread mail. {}",
+            "Then list who wrote each one and what they want from me. ".repeat(14)
+        );
+        let words = task_words(&long);
+        assert!(words.len() > 800, "{}", words.len());
+        let files = asked_files(
+            "mail-sum",
+            &["sum up my mail".to_owned()],
+            &grants(&["gmail-read"]),
+            &words,
+        );
+        assert!(files.card.contains("'sum up my mail'"), "{}", files.card);
+        assert!(!files.card.contains("who wrote each one"), "{}", files.card);
+        assert!(files.scripts[0].1.contains(&words));
         made_skill::set_agent_services_here(None);
     }
 
@@ -1810,6 +1844,21 @@ mod tests {
         );
         assert!(words.ends_with("plant") || words.ends_with("check") || words.ends_with("the"));
         assert!(!task_words("a\\b\u{200B}c").contains(['\\', '\u{200B}']));
+        // #7874: cut on its bytes too, so a long request in Korean is held
+        // plain and fits the run's prompt, never refused later for it.
+        let korean = "오늘 메일 ".repeat(200);
+        let words = task_words(&korean);
+        assert!(
+            words.len() <= made_skill::MOST_TASK_BYTES,
+            "{}",
+            words.len()
+        );
+        assert!(made_skill::task_words_plain(&words));
+        assert!(task_cut(&korean));
+        assert!(
+            words.ends_with("메일") || words.ends_with("오늘"),
+            "{words}"
+        );
     }
 
     /// lamp-9adf, 19 Nov (build ebbc6161): the evening rate's task was its

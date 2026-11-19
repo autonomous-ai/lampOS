@@ -1766,22 +1766,29 @@ task = { task = "Take a photo and send it to my phone", run = "scripts/main.py" 
 
 - **The step.** `task = { task, run }`, alone in its `[[do]]` table (no
   `on`, `after` or `if_choice`), one a skill, in an installable skill only.
-  `task` is the task in full, the words its run is handed: 1 to 4,000
-  bytes; a new skill's may be long, plain and at most 1,000 characters, a
+  `task` is the task in full, the words its run is handed: 1 to 1,500
+  bytes as the run's prompt quotes them (each `"` and `\` twice,
+  `made_skill::task_bytes`), so with lamp-tasks' own words the prompt
+  stays within Harness's 3,000 bytes and a task agreed to always runs;
+  a new skill's may be long, plain and at most 1,000 characters, a
   cap that only stops garbage (`made_skill::MOST_TASK_CHARS`; V2's call on
-  #7874: a task's length never blocks making a skill). An optional
+  #7874: a task's length never blocks making a skill). 1,000 characters
+  of English fit both; a task in Korean fits about 500 characters.
+  An optional
   `summary = "..."` beside it is the one line the lamp reads back for the
   owner's yes: plain, at most 120 characters
   (`made_skill::MOST_TASK_SAID_CHARS`). Without one, the lamp reads back
   the task's first sentence, and a first sentence longer than 120
   characters is cut at a word's end with "…" (`made_skill::task_said`).
-  The full words stay in the skill and are used for the run. The bounds
+  The first sentence ends at `.`, `!` or `?` with a space and no
+  lower-case word after it, never at an abbreviation ("e.g.", "a.m.",
+  "Dr."), or at a CJK full stop. The full words stay in the skill and are used for the run. The bounds
   are one for every skill, however it comes (`Skill::made_refuses`):
   `lamp-skills pack`, an install (a Store skill too) and the app's push all
   refuse a longer task or summary, and the refusal its author sees says "a
-  task's words: plain, at most 1000 characters; its summary, if given: one
-  plain line of at most 120 characters, read back to the owner for their
-  yes". A skill already on a lamp still loads. `run` a plain file inside the skill's
+  task's words: plain, at most 1000 characters and 1500 bytes; its
+  summary, if given: one plain line of at most 120 characters, read back
+  to the owner for their yes". A skill already on a lamp still loads. `run` a plain file inside the skill's
   own `scripts/` (relative, at most four parts, no `..`, no hidden part, no
   link anywhere on it). Its `[permissions]` do not hold it: its reach is its
   `grants`.

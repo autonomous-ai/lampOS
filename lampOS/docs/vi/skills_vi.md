@@ -1098,7 +1098,13 @@ sau:
    `task` là việc đầy đủ, được giao cho lần chạy: có thể dài, thuần, tối đa
    1.000 ký tự, một giới hạn chỉ chặn rác (`made_skill::MOST_TASK_CHARS`;
    quyết định của V2 trên #7874: độ dài của task không bao giờ chặn việc
-   tạo kỹ năng). `summary = "..."` tuỳ chọn bên cạnh nó là một dòng mà đèn
+   tạo kỹ năng), và tối đa 1.500 byte như prompt của lần chạy trích nó
+   (mỗi `"` và `\` tính hai lần, `made_skill::task_bytes`), để cùng lời
+   của lamp-tasks prompt vẫn trong 3.000 byte của Harness và một task đã
+   được đồng ý luôn chạy được: 1.000 ký tự tiếng Anh vừa cả hai; tiếng Hàn
+   vừa khoảng 500 ký tự. Câu đầu kết thúc ở `.`, `!` hay `?` có khoảng
+   trắng và không có chữ thường theo sau, không bao giờ ở một chữ viết tắt
+   ("e.g.", "a.m.", "Dr."), hoặc ở dấu chấm CJK. `summary = "..."` tuỳ chọn bên cạnh nó là một dòng mà đèn
    đọc lại để chủ đèn đồng ý: thuần, tối đa 120 ký tự
    (`made_skill::MOST_TASK_SAID_CHARS`). Không có nó, đèn đọc lại câu đầu
    tiên của task, và câu đầu dài hơn 120 ký tự được cắt ở cuối một từ với
@@ -1106,9 +1112,9 @@ sau:
    dùng cho lần chạy. Đây là một giới hạn chung cho mọi kỹ năng, dù đến từ
    đâu: `lamp-skills pack`, một lần cài (cả kỹ năng của Store) và lần đẩy
    từ ứng dụng đều từ chối task hay summary dài hơn. Lời từ chối người
-   viết kỹ năng thấy là "a task's words: plain, at most 1000 characters;
-   its summary, if given: one plain line of at most 120 characters, read
-   back to the owner for their yes". Một kỹ năng đã có trên đèn vẫn được
+   viết kỹ năng thấy là "a task's words: plain, at most 1000 characters
+   and 1500 bytes; its summary, if given: one plain line of at most 120
+   characters, read back to the owner for their yes". Một kỹ năng đã có trên đèn vẫn được
    nạp.
    - **Sửa tối đa ba lần** (#2813 phần 2; ba lần từ chủ đèn, 10/11: "tự
      chạy lại cho đến khi được"). Khi bước kiểm tra từ chối một câu trả
@@ -5141,8 +5147,8 @@ vụ lần chạy (#6432, #6306). Chi tiết đầy đủ ở
 
 - **Bước:** `[[do]] task = { task = "...", run = "scripts/main.py" }`, đứng
   riêng trong bảng `[[do]]` của nó, một bước mỗi kỹ năng, chỉ ở kỹ năng
-  installable. `task` là việc đầy đủ, 1 đến 4.000 byte; của một kỹ năng mới
-  thì thuần, tối đa 1.000 ký tự. `summary = "..."` tuỳ chọn là một dòng
+  installable. `task` là việc đầy đủ, 1 đến 1.500 byte như prompt của lần
+  chạy trích nó; của một kỹ năng mới thì thuần, tối đa 1.000 ký tự. `summary = "..."` tuỳ chọn là một dòng
   thuần tối đa 120 ký tự mà đèn đọc lại để chủ đèn đồng ý; không có nó, đèn
   đọc câu đầu tiên của task, cắt ở 120 ký tự với "…" (#7874). `run` là một tệp thường bên trong `scripts/` của kỹ năng
   (không `..`, không phần ẩn, không link).

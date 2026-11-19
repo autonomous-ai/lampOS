@@ -650,7 +650,7 @@ fn agent_services() -> String {
          topics, and speak = true only beside a say step; its \
          trigger the lamp's own (a time, someone coming or leaving, as above){words}; and exactly one \
          [[do]] step, alone in its step: task = {{ task = \"...\", summary = \"...\", run = \
-         \"scripts/main.py\" }}, the task's words in full, plain, at most {most} characters, and \
+         \"scripts/main.py\" }}, the task's words in full, plain, at most {most} characters and {bytes} bytes, and \
          its summary one plain line of at most {said} characters a person understands, read back \
          for the person's yes; the task's words saying plainly for the lamp's agent what \
          to read and what to tell the person, or what to send, in the request's own words, and \
@@ -664,6 +664,7 @@ fn agent_services() -> String {
          Never tell them to link a service. A whole such skill, for \"{AGENT_SERVICES_ASKED}\":\
          \n\n{AGENT_SERVICES_EXAMPLE}\n",
         said = made_skill::MOST_TASK_SAID_CHARS,
+        bytes = made_skill::MOST_TASK_BYTES,
         cant_yet = made_skill::CANT_YET,
         codes = made_skill::SERVICE_GRANT_CODES.join(", "),
         words = if made_skill::asks_on() {

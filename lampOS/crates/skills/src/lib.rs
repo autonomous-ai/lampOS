@@ -1376,14 +1376,15 @@ const NOTE_BRACES: &str = "a note's braces are one {field} that every trigger ru
 /// Why a new skill's `do.task` whose words are empty, too long or not
 /// plain, or whose `summary` is not one plain line the owner hears whole,
 /// is not made ([`Skill::made_refuses`], #7874), with the voice's own
-/// bounds (`lamp_voice::made_skill::MOST_TASK_CHARS` and
-/// `MOST_TASK_SAID_CHARS`).
+/// bounds (`lamp_voice::made_skill::MOST_TASK_CHARS`, `MOST_TASK_BYTES`
+/// and `MOST_TASK_SAID_CHARS`).
 fn task_words_not_plain() -> &'static str {
     static WHY: std::sync::LazyLock<String> = std::sync::LazyLock::new(|| {
         format!(
-            "a task's words: plain, at most {} characters; its summary, if given: one plain \
-             line of at most {} characters, read back to the owner for their yes",
+            "a task's words: plain, at most {} characters and {} bytes; its summary, if \
+             given: one plain line of at most {} characters, read back to the owner for their yes",
             lamp_voice::made_skill::MOST_TASK_CHARS,
+            lamp_voice::made_skill::MOST_TASK_BYTES,
             lamp_voice::made_skill::MOST_TASK_SAID_CHARS
         )
     });
@@ -13515,8 +13516,10 @@ mod tests {
     /// `lamp-skills pack` holds a made skill's `do.task` words to the
     /// voice's rule (`lamp_voice::made_skill::task_words_plain`): a
     /// 400-character task packs and installs, 1,000 characters pack, 1,001
-    /// do not, counted in characters, not bytes; an empty task or one with
-    /// a format character (U+200B) is refused. A `summary` packs when it is
+    /// do not; 1,000 characters of two bytes each (2,000 bytes) are not
+    /// loaded, past the 1,500 bytes a run's prompt can carry to Harness,
+    /// and 750 of them pack; an empty task or one with a format character
+    /// (U+200B) is refused. A `summary` packs when it is
     /// one plain line of at most 120 characters, and is refused otherwise.
     #[test]
     fn pack_takes_a_long_task_up_to_the_garbage_cap_and_a_short_summary() {
@@ -13569,18 +13572,27 @@ mod tests {
                 .task,
             four
         );
-        // 1,000 characters, each two bytes: 2,000 bytes, still packed.
-        let most = "é".repeat(MOST_TASK_CHARS);
+        assert_eq!(task::MOST_TASK_BYTES, 1_500);
+        // 1,000 characters: packed.
+        let most = "e".repeat(MOST_TASK_CHARS);
         let folder = with_words("most", &most);
         assert_eq!(load(&folder).unwrap().made_refuses(), None);
         package::pack(&folder, &out).unwrap();
-        let over = format!("{most}é");
+        let over = format!("{most}e");
         let folder = with_words("over", &over);
         assert_eq!(load(&folder).unwrap().made_refuses(), Some(refused));
         assert_eq!(package::pack(&folder, &out).unwrap_err(), not_packed);
+        // Two bytes each: 750 characters (1,500 bytes) packed; 1,000
+        // (2,000 bytes) not even loaded, as lamp-tasks would refuse its run.
+        let folder = with_words("bytes", &"é".repeat(task::MOST_TASK_BYTES / 2));
+        assert_eq!(load(&folder).unwrap().made_refuses(), None);
+        package::pack(&folder, &out).unwrap();
+        let folder = with_words("too-many-bytes", &"é".repeat(MOST_TASK_CHARS));
+        assert!(load(&folder).is_err());
+        assert!(package::pack(&folder, &out).is_err());
         // 999 characters and a space each end: 1,001 as the voice counts
         // them, so refused by both, never trimmed to 999 here.
-        let spaced = format!(" {} ", "é".repeat(MOST_TASK_CHARS - 1));
+        let spaced = format!(" {} ", "e".repeat(MOST_TASK_CHARS - 1));
         assert!(!lamp_voice::made_skill::task_words_plain(&spaced));
         let folder = with_words("spaced", &spaced);
         assert_eq!(package::pack(&folder, &out).unwrap_err(), not_packed);

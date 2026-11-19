@@ -2911,7 +2911,8 @@ for each run, and is answered once the run ends
   place",
   `run` is a file under the skill's `scripts/` (each part only `A-Z a-z 0-9
   . _ -`, never starting with `.`, so no `..`, no hidden part, no newline,
-  backtick or space; not absolute), `task` is 1 to 500 bytes with no
+  backtick or space; not absolute), `task` is 1 to 1,500 bytes as the run's prompt quotes it (each `"`
+  and `\` twice; #7874: within Harness's 3,000-byte prompt) with no
   control character, `sha256` is 64 lowercase hex digits,
   and `grants` are each once and each known (`grant_known`): one of
   lamp-control's own (`CONTROL_GRANTS`: `body`, `light`, `speak`, `look`,

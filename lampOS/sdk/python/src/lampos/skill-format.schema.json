@@ -1614,7 +1614,7 @@
           "properties": {
             "task": {
               "type": "string",
-              "description": "The task's words in full, what its run is handed: 1 to 4000 bytes, no control characters; a new skill's at most 1000 characters, plain."
+              "description": "The task's words in full, what its run is handed: 1 to 1500 bytes as its run's prompt quotes them (each quote mark and backslash twice), no control characters; a new skill's at most 1000 characters, plain."
             },
             "summary": {
               "type": "string",

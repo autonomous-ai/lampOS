@@ -1450,11 +1450,17 @@ const MOST_SCRIPT_PATH_BYTES: usize = 64;
 /// never a precise task (V2's call on #7874: a task's length never blocks
 /// making a skill). The owner hears its short form ([`task_said`]).
 pub const MOST_TASK_CHARS: usize = 1_000;
-/// The most of a `task` step's words in bytes: [`MOST_TASK_CHARS`] of at
-/// most four bytes each, so the characters are the only bound. lamp-skills'
-/// load (`lamp_skills::task::MOST_TASK_BYTES`) and lamp-tasks' hand-over
-/// (`lamp_tasks::skill_task::MOST_TASK_BYTES`) hold the same.
-pub const MOST_TASK_BYTES: usize = 4 * MOST_TASK_CHARS;
+/// The most of a `task` step's words in bytes, as its run's prompt quotes
+/// them (a JSON string: each `"` and `\` counts twice, [`task_bytes`]):
+/// lamp-tasks puts the words in the run's prompt beside about 1,300 bytes
+/// of its own, and Harness takes no prompt over 3,000 bytes
+/// (`lamp_tasks::harness::MAX_PROMPT_BYTES`), so a task longer than this
+/// would be agreed to and then never run (#7874). [`MOST_TASK_CHARS`] of
+/// English fit; a task in a script of three-byte characters (Korean) fits
+/// about 500. lamp-skills' load (`lamp_skills::task::MOST_TASK_BYTES`) and
+/// lamp-tasks' hand-over (`lamp_tasks::skill_task::MOST_TASK_BYTES`) hold
+/// the same.
+pub const MOST_TASK_BYTES: usize = 1_500;
 /// The most of what the lamp reads back of a `task` step for the owner's
 /// yes ([`task_said`]): its `summary`, or its first sentence cut short.
 pub const MOST_TASK_SAID_CHARS: usize = 120;
@@ -1471,11 +1477,52 @@ fn plain_within(words: &str, most: usize) -> bool {
 }
 
 /// Whether a `task` step's words are plain: not empty, at most
-/// [`MOST_TASK_CHARS`] characters, and no control or format character
+/// [`MOST_TASK_CHARS`] characters and [`MOST_TASK_BYTES`] as a run's
+/// prompt quotes them, and no control or format character
 /// ([`is_format`]). The same check `lamp-skills pack`, an install and the
 /// app's push hold a new skill to (#7874).
 pub fn task_words_plain(words: &str) -> bool {
-    plain_within(words, MOST_TASK_CHARS)
+    plain_within(words, MOST_TASK_CHARS) && task_bytes(words) <= MOST_TASK_BYTES
+}
+
+/// The bytes of `words` as a run's prompt quotes them, a JSON string with
+/// no control character: each `"` and `\` escaped, so counted twice.
+pub fn task_bytes(words: &str) -> usize {
+    words.len() + words.matches(['"', '\\']).count()
+}
+
+/// Short words that end in a stop but end no sentence: "Dr. Kim", "e.g.
+/// the news", "9 a.m. tell me".
+const NOT_SENTENCE_ENDS: [&str; 12] = [
+    "mr", "mrs", "ms", "dr", "st", "prof", "jr", "sr", "vs", "etc", "approx", "no",
+];
+
+/// Whether the stop at `at` in `words` ends a sentence: a CJK full stop,
+/// or `.`, `!` or `?` with a space after it, then no lower-case letter,
+/// and for a `.`, not after an abbreviation ("e.g.", "a.m.", "Dr.").
+fn sentence_ends(words: &str, at: usize, stop: char) -> bool {
+    if matches!(stop, '。' | '！' | '？') {
+        return true;
+    }
+    if !matches!(stop, '.' | '!' | '?') {
+        return false;
+    }
+    let after = &words[at + stop.len_utf8()..];
+    if !after.starts_with(char::is_whitespace) || after.trim_start().starts_with(char::is_lowercase)
+    {
+        return false;
+    }
+    if stop != '.' {
+        return true;
+    }
+    let word = words[..at]
+        .rsplit(char::is_whitespace)
+        .next()
+        .unwrap_or_default()
+        .trim_start_matches(['(', '\'', '‘', '“']);
+    !(word.contains('.')
+        || (word.len() == 1 && word.bytes().all(|b| b.is_ascii_alphabetic()))
+        || NOT_SENTENCE_ENDS.contains(&word.to_lowercase().as_str()))
 }
 
 /// Whether a `task` step's [`TASK_SUMMARY`] is one plain line the owner
@@ -1495,13 +1542,11 @@ pub fn task_said(words: &str, summary: Option<&str>) -> String {
         return summary.trim().to_owned();
     }
     let words = words.trim();
-    // The first sentence: up to a stop followed by a space, or all of it.
+    // The first sentence: up to the first stop that ends one
+    // ([`sentence_ends`]), or all of it.
     let first = words
         .char_indices()
-        .find(|&(at, c)| {
-            matches!(c, '.' | '!' | '?')
-                && words[at + c.len_utf8()..].starts_with(char::is_whitespace)
-        })
+        .find(|&(at, c)| sentence_ends(words, at, c))
         .map_or(words, |(at, c)| &words[..at + c.len_utf8()]);
     if first.chars().count() <= MOST_TASK_SAID_CHARS {
         return first.to_owned();
@@ -18728,17 +18773,66 @@ task = { task = "take a photo and send it to the app", run = "scripts/main.py" }
             &"é".repeat(MOST_TASK_SAID_CHARS + 1),
         );
         assert!(capped(&mannered(&over)).is_err());
-        // The cap and the plain checks stay.
-        assert!(capped(&mannered(&toml(&"é".repeat(MOST_TASK_CHARS)))).is_ok());
+        // The cap and the plain checks stay: 1,000 characters of English
+        // are held; 1,000 of "é" (2,000 bytes) are not, since the run's
+        // prompt could not carry them past Harness's 3,000 bytes.
+        assert!(capped(&mannered(&toml(&"e".repeat(MOST_TASK_CHARS)))).is_ok());
+        assert!(capped(&mannered(&toml(&"é".repeat(MOST_TASK_BYTES / 2)))).is_ok());
         for words in [
             String::new(),
             "  ".into(),
             "take a\u{200B} photo".into(),
-            "é".repeat(MOST_TASK_CHARS + 1),
+            "e".repeat(MOST_TASK_CHARS + 1),
+            "é".repeat(MOST_TASK_CHARS),
+            "한".repeat(MOST_TASK_BYTES / 3 + 1),
         ] {
             assert!(!task_words_plain(&words), "{words}");
             assert!(capped(&mannered(&toml(&words))).is_err(), "{words}");
         }
         set_scripts_here(None);
+    }
+
+    /// #7874: a task's first sentence, as read back for the yes, ends at
+    /// a sentence's end, never at an abbreviation's stop ("e.g.", "a.m.",
+    /// "Dr."), a decimal or a stop before a lower-case word, so the owner
+    /// never agrees to a fragment; a quote's escape counts twice in its
+    /// bytes, as the run's prompt quotes it.
+    #[test]
+    fn a_tasks_first_sentence_never_ends_at_an_abbreviation() {
+        for (words, first) in [
+            (
+                "Every day at 9 a.m. email my boss the sales report. Then say done.",
+                "Every day at 9 a.m. email my boss the sales report.",
+            ),
+            (
+                "Read the news, e.g. The Times, aloud. Then stop.",
+                "Read the news, e.g. The Times, aloud.",
+            ),
+            (
+                "Text Dr. Kim that I'm late. Then dim the light.",
+                "Text Dr. Kim that I'm late.",
+            ),
+            (
+                "Set the light to 3.5 and stop. Then nothing.",
+                "Set the light to 3.5 and stop.",
+            ),
+            ("Do this. then that.", "Do this. then that."),
+            ("  Count my mail! Then tell me.", "Count my mail!"),
+            (
+                "오늘 메일을 세어 줘. 그리고 알려 줘.",
+                "오늘 메일을 세어 줘.",
+            ),
+            (
+                "今日のメールを数えて。それから教えて。",
+                "今日のメールを数えて。",
+            ),
+            ("no stop at all", "no stop at all"),
+        ] {
+            assert_eq!(task_said(words, None), first, "{words}");
+        }
+        assert_eq!(task_bytes("say \"hi\" \\ now"), 17);
+        let quoted = "\"".repeat(MOST_TASK_BYTES / 2);
+        assert!(task_words_plain(&quoted));
+        assert!(!task_words_plain(&format!("{quoted}\"")));
     }
 }
