@@ -70,6 +70,18 @@ struct Fake {
     ensure_why_code: Mutex<Option<String>>,
     /// The state `ensure` answers; none: idle.
     ensure_state: Mutex<Option<String>>,
+    /// What the Gateway check says for any key when `held` is none (#7906
+    /// sign 3); none: can't be read.
+    holds: Mutex<Option<bool>>,
+    /// Reads of the Gateway check.
+    holds_read: Mutex<u32>,
+    /// The Gateway's record of the kept session (#7906 sign 4): its `seq`,
+    /// none: not read; moved by one at each read while `moving`; its
+    /// status and last row's role (none: `running`, `user`).
+    seq: Mutex<Option<i64>>,
+    moving: Mutex<bool>,
+    status: Mutex<Option<String>>,
+    last_role: Mutex<Option<String>>,
 }
 
 fn agent_of(n: u32) -> String {
@@ -305,7 +317,7 @@ impl PaneHarness for Fake {
         _: &str,
         _: &Path,
         input: &str,
-        _: &AtomicBool,
+        cancel: &AtomicBool,
     ) -> Result<Option<String>, String> {
         self.call(format!("wait-after {input}"));
         let state = self
@@ -314,6 +326,18 @@ impl PaneHarness for Fake {
             .unwrap()
             .pop_front()
             .unwrap_or_else(|| "idle".into());
+        // "hold": the turn still going, 300 ms of Harness's hold, cut by
+        // `cancel` (a watch's verdict, #7906) as Harness's wait is.
+        if state == "hold" {
+            let until = Instant::now() + Duration::from_millis(300);
+            while Instant::now() < until {
+                if cancel.load(Ordering::Acquire) {
+                    return Err("cancelled".into());
+                }
+                thread::sleep(Duration::from_millis(1));
+            }
+            return Ok(None);
+        }
         Ok((state != "none").then_some(state))
     }
     fn wait_after(
@@ -354,11 +378,42 @@ impl PaneHarness for Fake {
     }
     fn session_held(&self, key: &str) -> Option<bool> {
         self.call(format!("held {key}"));
+        *self.holds_read.lock().unwrap() += 1;
         self.held
             .lock()
             .unwrap()
             .as_ref()
             .map(|keys| keys.iter().any(|held| held == key))
+            .or(*self.holds.lock().unwrap())
+    }
+    fn openclaw_turns<'a>(&'a self, _: &str) -> Option<TurnReader<'a>> {
+        Some(Box::new(move || {
+            let mut seq = self.seq.lock().unwrap();
+            if *self.moving.lock().unwrap()
+                && let Some(seq) = seq.as_mut()
+            {
+                *seq += 1;
+            }
+            let seq = (*seq)?;
+            Some(TurnRecord {
+                session: "w1".into(),
+                seq,
+                status: Some(
+                    self.status
+                        .lock()
+                        .unwrap()
+                        .clone()
+                        .unwrap_or_else(|| "running".into()),
+                ),
+                last_role: Some(
+                    self.last_role
+                        .lock()
+                        .unwrap()
+                        .clone()
+                        .unwrap_or_else(|| "user".into()),
+                ),
+            })
+        }))
     }
 }
 
@@ -3225,4 +3280,378 @@ fn an_ordinary_task_near_the_limit_starts_fresh() {
             bytes: 140 * 3_200
         }
     );
+}
+
+/// #7906 sign 3: a kept session whose conversation OpenClaw's Gateway no
+/// longer holds (deleted under lamp-tasks) is closed `--now` and let go
+/// before any task is handed to it, and the task goes into the session
+/// ensured again; one the Gateway still holds is typed into as before.
+#[test]
+fn a_kept_session_the_gateway_no_longer_holds_is_gone_before_the_hand_over() {
+    let dir = tempfile::tempdir().unwrap();
+    let (one, fake) = kept_on(dir.path());
+    one.open_if_due(&fake, &place());
+    // Held: typed, nothing closed; the new one's first turn is not looked
+    // at (the record may not hold it yet).
+    *fake.holds.lock().unwrap() = Some(true);
+    one_turn(&one, &fake, "task-1");
+    assert_eq!(
+        *fake.holds_read.lock().unwrap(),
+        0,
+        "a new one's first turn"
+    );
+    assert_eq!(
+        one_turn(&one, &fake, "task-2"),
+        Ended::Answered("answer to New task task-2:".into())
+    );
+    assert_eq!(*fake.holds_read.lock().unwrap(), 1);
+    assert_eq!(fake.count("close-kept"), 0, "{:?}", fake.calls());
+    assert_eq!(one.agent(), Some(agent_of(1)));
+    // Gone from the Gateway: closed `--now` before the hand-over, then the
+    // task typed into the session ensured again.
+    *fake.holds.lock().unwrap() = Some(false);
+    let turn = one.enter("task-3", Kind::Skill, far(), &|| false).unwrap();
+    let replies = fake.count("reply-kept");
+    assert!(matches!(
+        turn.send(&fake, &place(), "Run.", far(), &|| false),
+        Sent::Typed(_)
+    ));
+    let calls = fake.calls();
+    assert!(
+        calls.contains(&"close-kept lamp-one-openclaw --now".to_owned()),
+        "{calls:?}"
+    );
+    assert_eq!(fake.count("ensure"), 2, "{calls:?}");
+    assert_eq!(one.agent(), Some(agent_of(2)));
+    // Its first words and this task, none into the gone one.
+    assert_eq!(fake.count("reply-kept"), replies + 2);
+}
+
+/// #7906 sign 3: a record that can't be read is never taken as gone.
+#[test]
+fn a_kept_session_whose_record_cant_be_read_is_kept() {
+    let dir = tempfile::tempdir().unwrap();
+    let (one, fake) = kept_on(dir.path());
+    one.open_if_due(&fake, &place());
+    one_turn(&one, &fake, "task-1");
+    one_turn(&one, &fake, "task-2");
+    assert!(*fake.holds_read.lock().unwrap() > 0);
+    assert_eq!(fake.count("close-kept"), 0);
+}
+
+fn record(seq: i64, status: &str, last_role: &str) -> TurnRecord {
+    TurnRecord {
+        session: "w1".into(),
+        seq,
+        status: Some(status.into()),
+        last_role: Some(last_role.into()),
+    }
+}
+
+/// #7906 sign 4a, by an injected clock: words taken but nothing past the
+/// hand-over's record 60 s after Harness's `Taken` is not moving; at 59 s
+/// it is still waited on.
+#[test]
+fn a_taken_turn_with_no_record_progress_in_60_s_is_not_moving() {
+    let t0 = Instant::now();
+    let at = |s: u64| t0 + Duration::from_secs(s);
+    let mut watch = TurnWatch::taken(t0, Some(("w1".into(), 7)), TURN_START_WITHIN, TURN_STALL);
+    for s in [5, 30, 45, 59] {
+        assert_eq!(
+            watch.look(Some(&record(7, "done", "assistant")), true, at(s)),
+            None,
+            "{s} s"
+        );
+    }
+    assert!(matches!(
+        watch.look(Some(&record(7, "done", "assistant")), true, at(60)),
+        Some(KeptGone::NotMoving(why)) if why.contains("within 60 s")
+    ));
+}
+
+/// #7906 sign 4: a turn whose record moves, however slowly, is never cut;
+/// nor one whose record can't be read.
+#[test]
+fn a_turn_with_steady_progress_is_kept() {
+    let t0 = Instant::now();
+    let at = |s: u64| t0 + Duration::from_secs(s);
+    let mut watch = TurnWatch::taken(t0, Some(("w1".into(), 7)), TURN_START_WITHIN, TURN_STALL);
+    for (n, s) in (5..=1800).step_by(5).enumerate() {
+        // One event every 2 min 50 s, waiting on the model each time.
+        let seq = 8 + (n as i64) / 34;
+        let look = watch.look(Some(&record(seq, "running", "user")), true, at(s));
+        assert_eq!(look, None, "{s} s");
+    }
+    let mut unread = TurnWatch::taken(t0, Some(("w1".into(), 7)), TURN_START_WITHIN, TURN_STALL);
+    for s in (5..=1800).step_by(5) {
+        assert_eq!(unread.look(None, true, at(s)), None, "{s} s");
+    }
+}
+
+/// #7906 sign 4b: a turn that reached OpenClaw, then `running` with its
+/// record unmoved for 3 min and the model's answer never come (a user row
+/// or a tool's result last), is stuck; at 2 min 59 s it is not yet.
+#[test]
+fn a_working_turn_unchanged_for_3_min_is_stuck() {
+    let t0 = Instant::now();
+    let at = |s: u64| t0 + Duration::from_secs(s);
+    for last in ["user", "toolResult"] {
+        let mut watch = TurnWatch::taken(t0, Some(("w1".into(), 7)), TURN_START_WITHIN, TURN_STALL);
+        assert_eq!(
+            watch.look(Some(&record(9, "running", last)), true, at(20)),
+            None
+        );
+        assert_eq!(
+            watch.look(Some(&record(9, "running", last)), true, at(199)),
+            None
+        );
+        assert!(matches!(
+            watch.look(Some(&record(9, "running", last)), true, at(200)),
+            Some(KeptGone::NotMoving(why)) if why.contains("did not move for 180 s")
+        ));
+    }
+    // A refused hand-over waiting on such a turn.
+    let mut refused = TurnWatch::refused(t0, TURN_STALL);
+    assert_eq!(
+        refused.look(Some(&record(9, "running", "user")), true, at(0)),
+        None
+    );
+    assert_eq!(
+        refused.look(Some(&record(9, "running", "user")), true, at(179)),
+        None
+    );
+    assert!(
+        refused
+            .look(Some(&record(9, "running", "user")), true, at(180))
+            .is_some()
+    );
+}
+
+/// #7906: a long exec (the assistant's tool call last, no result for
+/// 25 min, the record unmoved) is never cut, and its turn goes on once the
+/// result is written; nor a turn not open (`ENGINE_NOT_READY`).
+#[test]
+fn a_long_exec_answered_later_is_never_killed() {
+    let t0 = Instant::now();
+    let at = |s: u64| t0 + Duration::from_secs(s);
+    let mut watch = TurnWatch::taken(t0, Some(("w1".into(), 7)), TURN_START_WITHIN, TURN_STALL);
+    for s in (5..=1500).step_by(5) {
+        let look = watch.look(Some(&record(9, "running", "assistant")), true, at(s));
+        assert_eq!(look, None, "{s} s");
+    }
+    assert_eq!(
+        watch.look(Some(&record(10, "running", "toolResult")), true, at(1505)),
+        None
+    );
+    assert_eq!(
+        watch.look(Some(&record(11, "done", "assistant")), true, at(1510)),
+        None
+    );
+    let mut closed = TurnWatch::refused(t0, TURN_STALL);
+    for s in (0..=1500).step_by(5) {
+        assert_eq!(
+            closed.look(Some(&record(9, "running", "user")), false, at(s)),
+            None
+        );
+    }
+}
+
+/// #7906: a turn open while its session's status says it ended (`killed`,
+/// `failed`, `timeout`) for 15 s is dead but working; a short flip back to
+/// `running` (a chained run) is not; before the turn reached OpenClaw, the
+/// last turn's status is not judged.
+#[test]
+fn a_turn_open_on_a_session_not_running_for_15_s_is_dead() {
+    let t0 = Instant::now();
+    let at = |s: u64| t0 + Duration::from_secs(s);
+    let mut watch = TurnWatch::taken(t0, Some(("w1".into(), 7)), TURN_START_WITHIN, TURN_STALL);
+    assert_eq!(
+        watch.look(Some(&record(7, "done", "assistant")), true, at(30)),
+        None
+    );
+    assert_eq!(
+        watch.look(Some(&record(8, "killed", "user")), true, at(35)),
+        None
+    );
+    assert_eq!(
+        watch.look(Some(&record(8, "running", "user")), true, at(45)),
+        None
+    );
+    assert_eq!(
+        watch.look(Some(&record(8, "killed", "user")), true, at(50)),
+        None
+    );
+    assert_eq!(
+        watch.look(Some(&record(8, "killed", "user")), true, at(64)),
+        None
+    );
+    assert_eq!(
+        watch.look(Some(&record(8, "killed", "user")), true, at(65)),
+        Some(KeptGone::DeadButWorking("killed".into()))
+    );
+}
+
+/// #7906 sign 4 end to end, bounds shortened: a kept turn taken whose
+/// record never moves fails as not moving and its session is closed
+/// `--now`; one whose record moves runs past the stall bound to its
+/// answer, and a healthy turn gets no look at all.
+#[test]
+fn a_kept_turn_not_moving_is_closed_and_a_moving_one_answers() {
+    let dir = tempfile::tempdir().unwrap();
+    let (one, fake) = kept_on(dir.path());
+    let one = one.with_turn_watch(
+        Duration::from_millis(10),
+        Duration::from_millis(80),
+        Duration::from_millis(150),
+    );
+    one.open_if_due(&fake, &place());
+    *fake.seq.lock().unwrap() = Some(3);
+    // Healthy: answered at once, no show beside its answer's.
+    let shows = fake.count("show");
+    assert_eq!(
+        one_turn(&one, &fake, "task-1"),
+        Ended::Answered("answer to New task task-1:".into())
+    );
+    assert_eq!(fake.count("show"), shows + 1);
+    // Moving: 3 holds (~900 ms, past the stall bound), then its answer.
+    *fake.moving.lock().unwrap() = true;
+    fake.waits
+        .lock()
+        .unwrap()
+        .extend(std::iter::repeat_n("hold".to_owned(), 3));
+    assert_eq!(
+        one_turn(&one, &fake, "task-2"),
+        Ended::Answered("answer to New task task-2:".into())
+    );
+    assert_eq!(fake.count("close-kept"), 0, "{:?}", fake.calls());
+    // Not moving: never past the hand-over's record.
+    *fake.moving.lock().unwrap() = false;
+    fake.states
+        .lock()
+        .unwrap()
+        .insert(agent_of(1), "working".into());
+    fake.waits
+        .lock()
+        .unwrap()
+        .extend(std::iter::repeat_n("hold".to_owned(), 1000));
+    let began = Instant::now();
+    let ended = one_turn(&one, &fake, "task-3");
+    assert!(
+        matches!(&ended, Ended::Failed(why) if why.contains("reached OpenClaw")),
+        "{ended:?}"
+    );
+    assert!(began.elapsed() < Duration::from_secs(5));
+    assert!(
+        fake.calls()
+            .contains(&"close-kept lamp-one-openclaw --now".to_owned())
+    );
+    assert_eq!(one.agent(), None, "let go");
+}
+
+/// #7906 sign 4: a hand-over refused `NOT_IDLE` while what holds the
+/// session does not move ends at the stall bound, not at the run's end,
+/// and the session is closed; one that moves is waited on.
+#[test]
+fn a_refused_hand_over_on_a_turn_not_moving_is_bounded() {
+    let dir = tempfile::tempdir().unwrap();
+    let (one, fake) = kept_on(dir.path());
+    let one = one.with_turn_watch(
+        Duration::from_millis(10),
+        Duration::from_millis(80),
+        Duration::from_millis(150),
+    );
+    one.open_if_due(&fake, &place());
+    *fake.seq.lock().unwrap() = Some(3);
+    fake.states
+        .lock()
+        .unwrap()
+        .insert(agent_of(1), "working".into());
+    // Moving: NOT_IDLE for ~300 ms, then taken.
+    *fake.moving.lock().unwrap() = true;
+    fake.takes
+        .lock()
+        .unwrap()
+        .extend(std::iter::repeat_n(Took::NotIdle, 60));
+    let turn = one.enter("task-1", Kind::Skill, far(), &|| false).unwrap();
+    assert!(matches!(
+        turn.send(&fake, &place(), "Run.", far(), &|| false),
+        Sent::Typed(_)
+    ));
+    drop(turn);
+    assert_eq!(fake.count("close-kept"), 0, "{:?}", fake.calls());
+    // Not moving: NOT_IDLE past the stall bound; closed and ensured again
+    // (still refused here, so the run's own way), never to the run's end.
+    *fake.moving.lock().unwrap() = false;
+    fake.takes
+        .lock()
+        .unwrap()
+        .extend(std::iter::repeat_n(Took::NotIdle, 1000));
+    let turn = one.enter("task-2", Kind::Skill, far(), &|| false).unwrap();
+    let began = Instant::now();
+    let sent = turn.send(&fake, &place(), "Run.", far(), &|| false);
+    assert!(began.elapsed() < Duration::from_secs(5), "{sent:?}");
+    assert!(
+        fake.calls()
+            .contains(&"close-kept lamp-one-openclaw --now".to_owned()),
+        "{:?}",
+        fake.calls()
+    );
+}
+
+/// #7906 sign 3 before `ensure`: the kept record's session the Gateway no
+/// longer holds is gone, so the open is `--fresh`; held, or unread, or no
+/// record, it is not.
+#[test]
+fn before_ensure_a_kept_record_the_gateway_no_longer_holds_is_gone() {
+    let dir = tempfile::tempdir().unwrap();
+    let (one, fake) = kept_on(dir.path());
+    assert_eq!(one.kept_gone_before_ensure(&fake), None, "no record");
+    one.open_if_due(&fake, &place());
+    one_turn(&one, &fake, "task-1");
+    assert_eq!(one.kept_gone_before_ensure(&fake), None, "unread");
+    *fake.holds.lock().unwrap() = Some(true);
+    assert_eq!(one.kept_gone_before_ensure(&fake), None, "held");
+    *fake.holds.lock().unwrap() = Some(false);
+    assert_eq!(
+        one.kept_gone_before_ensure(&fake),
+        Some(KeptGone::GatewaySession)
+    );
+    // A lamp-tasks started again reads the same record.
+    let again = kept_session(dir.path()).with_kept_session(dir.path().join(TOKEN_FILE));
+    assert_eq!(
+        again.kept_gone_before_ensure(&fake),
+        Some(KeptGone::GatewaySession)
+    );
+}
+
+/// #7906 end to end, bounds shortened: a long exec (the record moved past
+/// the hand-over, then the assistant's tool call last and nothing more for
+/// well past the stall bound) is never cut, and the turn's answer comes.
+#[test]
+fn a_kept_turn_on_a_long_exec_is_never_closed() {
+    let dir = tempfile::tempdir().unwrap();
+    let (one, fake) = kept_on(dir.path());
+    let one = one.with_turn_watch(
+        Duration::from_millis(10),
+        Duration::from_millis(80),
+        Duration::from_millis(150),
+    );
+    one.open_if_due(&fake, &place());
+    *fake.seq.lock().unwrap() = Some(3);
+    one_turn(&one, &fake, "task-1");
+    let turn = one.enter("task-2", Kind::Skill, far(), &|| false).unwrap();
+    assert!(matches!(
+        turn.send(&fake, &place(), "Build it.", far(), &|| false),
+        Sent::Typed(_)
+    ));
+    *fake.seq.lock().unwrap() = Some(5);
+    *fake.last_role.lock().unwrap() = Some("assistant".into());
+    // Held ~900 ms, past both bounds: the exec still running.
+    fake.waits
+        .lock()
+        .unwrap()
+        .extend(std::iter::repeat_n("hold".to_owned(), 3));
+    let ended = turn.wait_end(&fake, MACHINE, &AtomicBool::new(false), &|| {});
+    assert_eq!(ended, Ended::Answered("answer to New task task-2:".into()));
+    assert_eq!(fake.count("close-kept"), 0, "{:?}", fake.calls());
 }

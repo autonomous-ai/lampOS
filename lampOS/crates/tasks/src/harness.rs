@@ -875,6 +875,72 @@ pub fn openclaw_session_size(db: &Path, key: &str, agent_id: &str) -> Result<Ses
         .map_err(|error| format!("read: {}", error_kind(&error)))
 }
 
+/// #7906 sign 4: where the Gateway's record is in one session's turn
+/// ([`openclaw_turn_at`]).
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct TurnRecord {
+    /// The node's current session id.
+    pub session: String,
+    /// That id's highest transcript `seq` (-1 with no event yet): it moves
+    /// at each message, tool call and result the Gateway writes.
+    pub seq: i64,
+    /// `session_nodes.status` (`running`, `done`, `killed`, `failed`,
+    /// `timeout`), as Harness reads it to close a turn.
+    pub status: Option<String>,
+    /// The role of the last row with one (`user`, `assistant`,
+    /// `toolResult`).
+    pub last_role: Option<String>,
+}
+
+/// #7906 sign 4: where the Gateway's record at `db` is in the session
+/// `key` (a kept session's `engineSession`, matched exactly as
+/// [`openclaw_holds_key`] does). `None` when it holds no node for it; read
+/// only, `Err` when it can't be read.
+pub fn openclaw_turn_at(db: &Path, key: &str) -> Result<Option<TurnRecord>, String> {
+    use rusqlite::{Connection, OpenFlags, OptionalExtension};
+    if key.is_empty() {
+        return Err("no key".into());
+    }
+    let connection = Connection::open_with_flags(
+        db,
+        OpenFlags::SQLITE_OPEN_READ_ONLY | OpenFlags::SQLITE_OPEN_NO_MUTEX,
+    )
+    .map_err(|error| format!("open: {}", error_kind(&error)))?;
+    connection
+        .busy_timeout(Duration::from_secs(1))
+        .map_err(|error| format!("busy timeout: {}", error_kind(&error)))?;
+    connection
+        .query_row(
+            "SELECT n.current_session_id, n.status, \
+               COALESCE((SELECT MAX(t.seq) FROM transcript_events t \
+                 WHERE t.session_id = n.current_session_id), -1), \
+               (SELECT t.message_role FROM transcript_events t WHERE t.session_id = n.current_session_id \
+                 AND t.message_role IS NOT NULL ORDER BY t.seq DESC LIMIT 1) \
+             FROM session_nodes n WHERE n.session_key = ?1 LIMIT 1",
+            rusqlite::params![key],
+            |row| {
+                Ok((
+                    row.get::<_, Option<String>>(0)?,
+                    row.get::<_, Option<String>>(1)?,
+                    row.get::<_, i64>(2)?,
+                    row.get::<_, Option<String>>(3)?,
+                ))
+            },
+        )
+        .optional()
+        .map(|row| {
+            row.and_then(|(session, status, seq, last_role)| {
+                Some(TurnRecord {
+                    session: session?,
+                    seq,
+                    status,
+                    last_role,
+                })
+            })
+        })
+        .map_err(|error| format!("read: {}", error_kind(&error)))
+}
+
 /// A short name for a record read's error, never its message (which can
 /// quote a path or a row).
 fn error_kind(error: &rusqlite::Error) -> String {
@@ -3227,6 +3293,19 @@ impl Cli {
             .environment
             .get(crate::hold::OPENCLAW_STATE_DIR)?;
         openclaw_holds_key(&openclaw_record_path(Path::new(state)), key).ok()
+    }
+
+    /// #7906 sign 4: where the Gateway's record is in the session `key`'s
+    /// turn ([`openclaw_turn_at`]); `None` when it can't be read or holds
+    /// no node for it.
+    pub fn openclaw_turn(&self, key: &str) -> Option<TurnRecord> {
+        let state = self
+            .config
+            .environment
+            .get(crate::hold::OPENCLAW_STATE_DIR)?;
+        openclaw_turn_at(&openclaw_record_path(Path::new(state)), key)
+            .ok()
+            .flatten()
     }
 
     /// Whether the Gateway's own record says the prompt of `agent_id`'s

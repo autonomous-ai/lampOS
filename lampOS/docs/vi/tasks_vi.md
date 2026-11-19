@@ -2458,7 +2458,21 @@ khi đăng xuất, và với 0.6.60 khi đăng nhập (ROW của #7507).
   nhân đôi, `OPEN_RETRY_FIRST`; 60 s nhân đôi cho `ENGINE_NOT_READY`) không
   đổi. Kết thúc của
   lượt là `harness wait lamp-one-openclaw --after <inputId>` (0 rảnh, rồi
-  `show` lấy câu trả lời; 3 có câu hỏi; 4 đã mất).
+  `show` lấy câu trả lời; 3 có câu hỏi; 4 đã mất). Phiên OpenClaw được
+  giữ bị coi là đã mất (đóng `--now`, buông, và việc được giao cho phiên
+  ensure lại, hoặc thất bại) khi bản ghi của chính OpenClaw
+  (`openclaw-agent.sqlite`, chỉ đọc, không chạy CLI) không còn giữ
+  `agent:main:harness-<id>` trước lúc giao việc (#7906 dấu hiệu 3), hoặc,
+  đọc mỗi 5 s song song với lệnh wait của lượt (`TURN_WATCH`), khi bản ghi
+  không vượt quá chỗ lúc giao sau 60 s kể từ `taken` của Harness
+  (`TURN_START_WITHIN`, dấu hiệu 4a), khi phiên đang `running` mà `seq` cao
+  nhất không đổi trong 3 phút và dòng cuối là `user` hoặc `toolResult` mà
+  model chưa trả lời (`TURN_STALL`, dấu hiệu 4b, cũng chặn một lần giao bị
+  `NOT_IDLE`), hoặc khi lượt còn mở trong khi trạng thái phiên là
+  `killed`, `failed` hay `timeout` suốt 15 s (`DEAD_WORKING`); một tool
+  call chưa có kết quả (một exec dài) không bao giờ bị cắt mà để cho hạn
+  chót của lượt chạy, và số tool của `show`, `lastActive` của `ps` hay chữ
+  trên pane không bao giờ được dùng cho việc này.
 - **Reply khi đã đăng nhập, có xác nhận.** Với Harness có xác nhận reply, mọi
   reply vào một phiên của người dùng (pane duy nhất của `harness new`,
   `--reply-named`, một phiên resumed, một tin nhắn đầu tiên) chỉ được tính là

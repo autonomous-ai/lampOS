@@ -517,6 +517,61 @@ fn openclaw_user_row(agent: &str) -> String {
     )
 }
 
+/// #7906 sign 3, on the Gateway's own record (a fixture database with
+/// OpenClaw 2026.11.2's tables): a session it holds is held, one deleted
+/// (no rows) is not, and a record that isn't there can't be read. One
+/// look is a read-only SQLite read, well under 50 ms.
+#[test]
+fn the_kept_sessions_gateway_record_says_held_or_gone() {
+    // Read by the kept session's own key, exactly (#7906).
+    let key = format!("agent:main:harness-{AGENT}");
+    let (rig, _) = openclaw_rig(Duration::from_secs(10), Some(&openclaw_user_row(AGENT)));
+    let began = std::time::Instant::now();
+    assert_eq!(rig.cli().openclaw_holds(&key), Some(true));
+    let took = began.elapsed();
+    assert!(took < Duration::from_millis(50), "{took:?}");
+    let (rig, _) = openclaw_rig(Duration::from_secs(10), Some(""));
+    assert_eq!(rig.cli().openclaw_holds(&key), Some(false));
+    let (rig, _) = openclaw_rig(Duration::from_secs(10), None);
+    assert_eq!(rig.cli().openclaw_holds(&key), None);
+}
+
+/// #7906 sign 4: where the record is in the session's turn: its current
+/// id, highest `seq` (which moves with each event), status and the last
+/// row's role; none for no node. Matched by the session key exactly.
+#[test]
+fn the_kept_sessions_gateway_record_says_where_its_turn_is() {
+    use lamp_tasks::harness::TurnRecord;
+    let key = format!("agent:main:harness-{AGENT}");
+    let (rig, _) = openclaw_rig(Duration::from_secs(10), Some(&openclaw_user_row(AGENT)));
+    assert_eq!(
+        rig.cli().openclaw_turn(&key),
+        Some(TurnRecord {
+            session: "w1".into(),
+            seq: 1,
+            status: None,
+            last_role: Some("user".into()),
+        })
+    );
+    let rows = format!(
+        "{}\nUPDATE session_nodes SET status = 'running';\n\
+         INSERT INTO transcript_events VALUES ('w1', 2, 'assistant'), ('w1', 3, NULL), ('w0', 9, 'user');",
+        openclaw_user_row(AGENT)
+    );
+    let (rig, _) = openclaw_rig(Duration::from_secs(10), Some(&rows));
+    assert_eq!(
+        rig.cli().openclaw_turn(&key),
+        Some(TurnRecord {
+            session: "w1".into(),
+            seq: 3,
+            status: Some("running".into()),
+            last_role: Some("assistant".into()),
+        })
+    );
+    let (rig, _) = openclaw_rig(Duration::from_secs(10), Some(""));
+    assert_eq!(rig.cli().openclaw_turn(&key), None);
+}
+
 /// #7277 (a): idle with no ask after `new` is no proof; a tool used within
 /// the bound is, and the launch is Created with one `new` and nothing
 /// closed, started again or replied. The #6499 case, a run that read idle
