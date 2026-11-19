@@ -3014,7 +3014,10 @@ là phần của một coder khác trong #6226; thiết kế:
   từ chối `mode` đi cùng một trong hai (exit 78, gateway chết), và lamp-tasks
   stable hôm nay, đích rollback, chèn `mode: "ask"` mà không bỏ gì khác, nên
   chỉ file có riêng `mode` mới qua được rollback (#7245, thấy trên
-  lamp-c0a4). Mục cho phép của launcher
+  lamp-c0a4). Một đèn cập nhật từ bản cũ có `security`/`ask` trong
+  `tools.exec`, dù có hay không có `mode` đi cùng (file khiến gateway exit
+  78), sẽ chỉ còn `mode` ở lần lamp-tasks khởi động kế tiếp, các khóa exec
+  riêng của người dùng (như `askFallback`) được giữ; file đã chỉ có `mode` thì không bị ghi lại (#7859). Mục cho phép của launcher
   skill-start vẫn được giữ. Lần chạy kỹ năng vẫn exec nó, và `security:
   "full"` cũng cho phép exec đó, nên lần chạy không cần quyền riêng nào.
 

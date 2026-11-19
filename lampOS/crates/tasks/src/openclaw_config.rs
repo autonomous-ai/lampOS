@@ -542,6 +542,82 @@ mod tests {
         assert_eq!(exec(false), json!({"mode": EXEC_MODE}));
     }
 
+    /// `INSTALLED` with its `tools.exec` set to `exec`.
+    fn with_exec(exec: Value) -> String {
+        let mut old: Value = serde_json::from_str(INSTALLED).unwrap();
+        old["tools"]["exec"] = exec;
+        serde_json::to_string(&old).unwrap()
+    }
+
+    fn exec_of(text: &str, v1: bool) -> Value {
+        let merged = merge_config(text, 7741, Path::new(WORKSPACE), true, v1).unwrap();
+        serde_json::from_str::<Value>(&merged).unwrap()["tools"]["exec"].clone()
+    }
+
+    /// The `tools.exec` either switch writes, with `askFallback` a key of
+    /// a person's that is kept.
+    fn ours(v1: bool) -> Value {
+        if v1 {
+            json!({"host": "gateway", "mode": EXEC_MODE_V1, "askFallback": "deny"})
+        } else {
+            json!({"mode": EXEC_MODE, "askFallback": "deny"})
+        }
+    }
+
+    /// #7859: an older build's `security` + `ask`, no `mode`: after the
+    /// update the file has `mode` alone, every other exec key kept.
+    #[test]
+    fn an_old_security_and_ask_become_mode_alone() {
+        let old = with_exec(json!({"security": "full", "ask": "off", "askFallback": "deny"}));
+        for v1 in [true, false] {
+            let exec = exec_of(&old, v1);
+            assert_eq!(exec, ours(v1), "{v1}");
+            assert!(openclaw_takes(&exec), "{v1}");
+        }
+    }
+
+    /// #7859, lamp-c0a4: `mode` already beside a stale `security` + `ask`,
+    /// the file OpenClaw refuses (exit 78), is repaired to `mode` alone.
+    #[test]
+    fn a_mode_beside_security_and_ask_is_repaired() {
+        for mode in [EXEC_MODE, EXEC_MODE_V1] {
+            let broken = with_exec(
+                json!({"security": "full", "ask": "off", "mode": mode, "askFallback": "deny"}),
+            );
+            for v1 in [true, false] {
+                let exec = exec_of(&broken, v1);
+                assert_eq!(exec, ours(v1), "{mode} {v1}");
+                assert!(openclaw_takes(&exec), "{mode} {v1}");
+            }
+        }
+    }
+
+    /// #7859: a file already migrated (`mode` alone) is given back byte for
+    /// byte, so it is never written again.
+    #[test]
+    fn an_already_migrated_file_is_unchanged() {
+        for v1 in [true, false] {
+            let once = merge_config(INSTALLED, 7741, Path::new(WORKSPACE), true, v1).unwrap();
+            assert_eq!(
+                merge_config(&once, 7741, Path::new(WORKSPACE), true, v1).unwrap(),
+                once,
+                "{v1}"
+            );
+        }
+    }
+
+    /// #7859: a fresh file, empty or `{}`, gets `mode` alone.
+    #[test]
+    fn a_fresh_file_gets_mode_alone() {
+        for text in ["", "{}"] {
+            assert_eq!(
+                exec_of(text, true),
+                json!({"host": "gateway", "mode": EXEC_MODE_V1})
+            );
+            assert_eq!(exec_of(text, false), json!({"mode": EXEC_MODE}));
+        }
+    }
+
     #[test]
     fn merging_twice_changes_nothing() {
         for v1 in [true, false] {
