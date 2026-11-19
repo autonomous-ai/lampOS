@@ -548,6 +548,24 @@ macro_rules! skill_file {
         )
     };
 }
+/// A core pilot's brief (`LAMP_CORE_VIA_AGENT`), written beside its
+/// `agent.toml` from lamp-skills' own copy in its source
+/// (`crates/skills/src/core_agent/briefs`, pinned to
+/// `lamp_skills::core_agent::script` there): no skill folder of the
+/// repository carries a script (the SDK's check, #7862), and the bundle
+/// writes the same ([`crate::product_skills::make`]).
+macro_rules! core_brief {
+    ($skill:literal) => {
+        (
+            concat!("/var/lib/lampOS/skills/", $skill, "/scripts/agent.py"),
+            include_str!(concat!(
+                "../../skills/src/core_agent/briefs/",
+                $skill,
+                ".py"
+            )),
+        )
+    };
+}
 /// A [`PRODUCT_SKILLS_OFF`] skill's `skill.toml`, with [`OFF_LINE`] above it.
 macro_rules! skill_file_off {
     ($skill:literal) => {
@@ -599,11 +617,11 @@ pub const SETTINGS: &[(&str, &str)] = &[
     skill_file!("stretch-break", "skill.toml"),
     skill_file!("stretch-break", "SKILL.md"),
     skill_file!("stretch-break", "agent.toml"),
-    skill_file!("stretch-break", "scripts/agent.py"),
+    core_brief!("stretch-break"),
     skill_file!("stuffy-air", "skill.toml"),
     skill_file!("stuffy-air", "SKILL.md"),
     skill_file!("stuffy-air", "agent.toml"),
-    skill_file!("stuffy-air", "scripts/agent.py"),
+    core_brief!("stuffy-air"),
     skill_file!("dance", "skill.toml"),
     skill_file!("dance", "SKILL.md"),
     skill_file!("bedtime-morning", "skill.toml"),
@@ -627,27 +645,27 @@ pub const SETTINGS: &[(&str, &str)] = &[
     skill_file!("sip-of-water", "skill.toml"),
     skill_file!("sip-of-water", "SKILL.md"),
     skill_file!("sip-of-water", "agent.toml"),
-    skill_file!("sip-of-water", "scripts/agent.py"),
+    core_brief!("sip-of-water"),
     skill_file!("rest-your-eyes", "skill.toml"),
     skill_file!("rest-your-eyes", "SKILL.md"),
     skill_file!("rest-your-eyes", "agent.toml"),
-    skill_file!("rest-your-eyes", "scripts/agent.py"),
+    core_brief!("rest-your-eyes"),
     skill_file!("stand-up", "skill.toml"),
     skill_file!("stand-up", "SKILL.md"),
     skill_file!("stand-up", "agent.toml"),
-    skill_file!("stand-up", "scripts/agent.py"),
+    core_brief!("stand-up"),
     skill_file!("wind-down", "skill.toml"),
     skill_file!("wind-down", "SKILL.md"),
     skill_file!("wind-down", "agent.toml"),
-    skill_file!("wind-down", "scripts/agent.py"),
+    core_brief!("wind-down"),
     skill_file!("comfort-break", "skill.toml"),
     skill_file!("comfort-break", "SKILL.md"),
     skill_file!("comfort-break", "agent.toml"),
-    skill_file!("comfort-break", "scripts/agent.py"),
+    core_brief!("comfort-break"),
     skill_file!("sit-back", "skill.toml"),
     skill_file!("sit-back", "SKILL.md"),
     skill_file!("sit-back", "agent.toml"),
-    skill_file!("sit-back", "scripts/agent.py"),
+    core_brief!("sit-back"),
     skill_file!("head-pat", "skill.toml"),
     skill_file!("head-pat", "SKILL.md"),
     skill_file!("head-pat", "README.md"),

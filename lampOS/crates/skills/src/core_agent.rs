@@ -270,7 +270,12 @@ pub fn pilot(name: &str) -> Option<&'static Pilot> {
 
 /// `pilot`'s `scripts/agent.py`: the brief the agent reads at each run,
 /// naming what fired it and what the lamp says now, asking for that one
-/// line alone and `-` when nothing fits. One plain Python string.
+/// line alone and `-` when nothing fits. One plain Python string. Kept,
+/// byte for byte, in this crate's `src/core_agent/briefs/<name>.py`,
+/// never in a skill folder of the repository (the SDK's check refuses a
+/// script there, #7862): install and the build's bundle write it beside
+/// the pilot's `agent.toml` on a lamp (`lamp_update::install`'s
+/// `core_brief!`).
 pub fn script(pilot: &Pilot) -> String {
     format!(
         "print(\"A skill that comes with the lamp, {}, has fired ({}). What the lamp says now: \

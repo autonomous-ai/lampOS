@@ -4311,6 +4311,24 @@ fn a_blank_lamp_runs_every_product_skill_as_the_skill() {
             assert_eq!(fs::read(lamp.on(&path)).unwrap(), ours, "{path}");
             installed.push(path);
         }
+        // A core pilot's brief beside its variant, lamp-skills' own words,
+        // which no folder of the repository carries (#7862).
+        if folder.join(lamp_skills::core_agent::OVERLAY).is_file() {
+            let path = format!(
+                "/var/lib/lampOS/skills/{skill}/{}",
+                lamp_skills::core_agent::RUN
+            );
+            assert!(
+                !folder.join(lamp_skills::core_agent::RUN).exists(),
+                "{skill}"
+            );
+            assert_eq!(
+                fs::read_to_string(lamp.on(&path)).unwrap(),
+                lamp_skills::core_agent::script(lamp_skills::core_agent::pilot(skill).unwrap()),
+                "{path}"
+            );
+            installed.push(path);
+        }
     }
     // Nothing else in the skills folder: no tests, no skill left out.
     let mut placed: Vec<String> = SETTINGS
