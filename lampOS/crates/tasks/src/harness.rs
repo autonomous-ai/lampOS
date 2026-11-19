@@ -478,6 +478,12 @@ pub struct Ensured {
     /// The engine's own session (`engineSession`; OpenClaw's
     /// `agent:main:harness-<id>`), when Harness names one.
     pub engine_session: Option<String>,
+    /// `confirmed` (openharness#4484, proposed): `false` for a resume
+    /// Harness could not confirm; `None` when Harness does not say.
+    pub confirmed: Option<bool>,
+    /// `whyCode` (openharness#4484, proposed), e.g. `ENGINE_SESSION_GONE`
+    /// for a `new` that replaced a dead conversation; `None` when absent.
+    pub why_code: Option<String>,
 }
 
 /// How a `harness reply` with the program's token went (openharness#4393):
@@ -740,6 +746,36 @@ pub fn openclaw_record(db: &Path, agent_id: &str) -> Result<bool, String> {
                (SELECT w.session_id FROM session_windows w WHERE substr(w.session_key, 1, ?2) = ?1 \
                 UNION SELECT n.current_session_id FROM session_nodes n WHERE substr(n.session_key, 1, ?2) = ?1))",
             rusqlite::params![prefix, prefix.len() as i64],
+            |row| row.get::<_, bool>(0),
+        )
+        .map_err(|error| format!("read: {}", error_kind(&error)))
+}
+
+/// #7906: whether the Gateway's record at `db` holds the session `key`
+/// exactly (a kept session's `engineSession`, which may not be
+/// `agent:main:harness-<its agent id>`): a run status, or a transcript row
+/// with a role. Read only; `Err` when it can't be read, which a caller
+/// takes as unknown, never as gone.
+pub fn openclaw_holds_key(db: &Path, key: &str) -> Result<bool, String> {
+    use rusqlite::{Connection, OpenFlags};
+    if key.is_empty() {
+        return Err("no key".into());
+    }
+    let connection = Connection::open_with_flags(
+        db,
+        OpenFlags::SQLITE_OPEN_READ_ONLY | OpenFlags::SQLITE_OPEN_NO_MUTEX,
+    )
+    .map_err(|error| format!("open: {}", error_kind(&error)))?;
+    connection
+        .busy_timeout(Duration::from_secs(1))
+        .map_err(|error| format!("busy timeout: {}", error_kind(&error)))?;
+    connection
+        .query_row(
+            "SELECT EXISTS(SELECT 1 FROM session_nodes n WHERE n.session_key = ?1 AND n.status IS NOT NULL) \
+             OR EXISTS(SELECT 1 FROM transcript_events t WHERE t.message_role IS NOT NULL AND t.session_id IN \
+               (SELECT w.session_id FROM session_windows w WHERE w.session_key = ?1 \
+                UNION SELECT n.current_session_id FROM session_nodes n WHERE n.session_key = ?1))",
+            rusqlite::params![key],
             |row| row.get::<_, bool>(0),
         )
         .map_err(|error| format!("read: {}", error_kind(&error)))
@@ -3088,15 +3124,15 @@ impl Cli {
         }
     }
 
-    /// #7906: whether OpenClaw's own record still holds the session of
-    /// `agent_id` ([`openclaw_record`], read where `OPENCLAW_STATE_DIR` in
+    /// #7906: whether OpenClaw's own record still holds the session `key`
+    /// exactly ([`openclaw_holds_key`], read where `OPENCLAW_STATE_DIR` in
     /// Harness's environment says); `None` when it can't be read.
-    pub fn openclaw_holds(&self, agent_id: &str) -> Option<bool> {
+    pub fn openclaw_holds(&self, key: &str) -> Option<bool> {
         let state = self
             .config
             .environment
             .get(crate::hold::OPENCLAW_STATE_DIR)?;
-        openclaw_record(&openclaw_record_path(Path::new(state)), agent_id).ok()
+        openclaw_holds_key(&openclaw_record_path(Path::new(state)), key).ok()
     }
 
     /// Whether the Gateway's own record says the prompt of `agent_id`'s
@@ -6607,7 +6643,58 @@ fn parse_ensured(bytes: &[u8], name: &str) -> Option<Ensured> {
                     })
             })
             .map(str::to_owned),
+        confirmed: reply["confirmed"].as_bool(),
+        why_code: reply["whyCode"]
+            .as_str()
+            .filter(|code| token(code, 64))
+            .map(str::to_owned),
     })
+}
+
+#[cfg(test)]
+mod ensured_tests {
+    use super::*;
+
+    const ID: &str = "00000001-1111-4111-8111-111111111111";
+
+    fn parsed(extra: Value) -> Ensured {
+        let mut reply = serde_json::json!({
+            "result": "resumed", "id": ID, "name": "lamp-one-openclaw", "state": "starting",
+        });
+        for (key, value) in extra.as_object().unwrap() {
+            reply[key] = value.clone();
+        }
+        parse_ensured(reply.to_string().as_bytes(), "lamp-one-openclaw").unwrap()
+    }
+
+    /// openharness#4484's proposed fields, each read when present and
+    /// `None` (today's behaviour) when absent.
+    #[test]
+    fn ensure_reads_4484s_fields_when_present_and_none_when_absent() {
+        let today = parsed(serde_json::json!({}));
+        assert_eq!((today.confirmed, today.why_code.as_deref()), (None, None));
+        assert_eq!(today.state, "starting");
+        assert_eq!(
+            parsed(serde_json::json!({"state": "stopped"})).state,
+            "stopped"
+        );
+        assert_eq!(
+            parsed(serde_json::json!({"confirmed": false})).confirmed,
+            Some(false)
+        );
+        assert_eq!(
+            parsed(serde_json::json!({"confirmed": true})).confirmed,
+            Some(true)
+        );
+        assert_eq!(
+            parsed(serde_json::json!({"result": "new", "whyCode": "ENGINE_SESSION_GONE"}))
+                .why_code
+                .as_deref(),
+            Some("ENGINE_SESSION_GONE")
+        );
+        // Not a plain code: dropped, never journaled as it is.
+        assert_eq!(parsed(serde_json::json!({"whyCode": "a b"})).why_code, None);
+    }
 }
 
 /// Words for the kept session that start with a plain word: OpenClaw's

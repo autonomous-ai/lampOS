@@ -10901,7 +10901,9 @@ fn the_kept_session_verbs_pass_the_token_path_never_its_text() {
             agent_id: AGENT.into(),
             state: "idle".into(),
             why: None,
-            engine_session: Some("s".into())
+            engine_session: Some("s".into()),
+            confirmed: None,
+            why_code: None,
         })
     );
     assert_eq!(
