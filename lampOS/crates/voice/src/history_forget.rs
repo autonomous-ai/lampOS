@@ -16,18 +16,26 @@
 //! - **any other forget** (`forget`, `forget_last`, `exchanges_forget`,
 //!   `forget_said`, and the room's lines a forget everything took): the
 //!   exchanges the memory says it removed (its answer's `exchanges`, by
-//!   scope and id), `{"ids":[…]}` by [`turn_id`]. A scope the memory says
-//!   it cut (`exchanges_cut`) is deleted whole for that person.
+//!   scope and id, and every page `forgot_exchanges` gives when it says
+//!   `exchanges_more`), `{"ids":[…]}` by [`turn_id`]. Every removed id is
+//!   told: a forget never deletes more of the account's history than the
+//!   lamp forgot. A whole-history delete is a known person's forget
+//!   everything only.
+//! - **not reached:** a forget of everything of every person, or a page
+//!   that could not be read, is said in the journal as not reaching the
+//!   account (the voice sends neither today).
 //!
 //! The person key is lamp-memory's own scope id: a known person's `p-`
 //! id (the eyes' person id), or `""` for the room's (`everyone`), as the
 //! server's `person` is "the lamp's own person key, or empty". A saved
 //! turn's id is [`turn_id`]: the memory's exchange id in its scope.
 //!
-//! Bounded: at most [`MOST_PENDING`] ids wait; past that the person whose
-//! ids were just added (then whoever has the most) is coalesced into a
-//! delete of their whole history. Only counts are journalled, never an id
-//! or a word.
+//! Bounded: at most [`MOST_PENDING`] ids wait, far past anything real (an
+//! id is about 30 bytes). Past it, the known person with the most waiting
+//! is coalesced into a delete of their whole history, never the room's
+//! (whose `""` would take every room line); the room's newest past it are
+//! let go. Either is journalled as a count. Only counts are journalled,
+//! never an id or a word.
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::collections::{BTreeMap, BTreeSet};
@@ -42,8 +50,10 @@ use std::sync::{Arc, Mutex, OnceLock};
 pub const ENVIRONMENT: &str = "LAMP_HISTORY_FORGET";
 /// The queue's file, in the voice's state folder.
 pub const FILE: &str = "/var/lib/lampOS/voice/history-forget.json";
-/// The most ids that wait; past it, a person's are coalesced.
-pub const MOST_PENDING: usize = 500;
+/// The most ids that wait (about 600 KB); past it, see [`Pending::add_ids`].
+pub const MOST_PENDING: usize = 20_000;
+/// The most `forgot_exchanges` pages read after one forget.
+const MOST_PAGES: usize = 64;
 /// The most ids one delete names (the server's cap).
 pub const MOST_IDS_A_CALL: usize = 100;
 /// The room's scope in lamp-memory; its person key on the server is `""`.
@@ -129,7 +139,10 @@ impl Pending {
     }
 
     /// `ids` of `person`, unless all of theirs already waits (it takes
-    /// these too); then bounded ([`MOST_PENDING`]).
+    /// these too); then bounded ([`MOST_PENDING`]): the known person with
+    /// the most waiting is coalesced into their whole history, never the
+    /// room's `""`; with only the room's left past it, its newest are let
+    /// go. Each said in the journal as a count.
     pub fn add_ids(&mut self, person: &str, ids: impl IntoIterator<Item = String>) {
         if self.all.contains(person) {
             return;
@@ -139,19 +152,32 @@ impl Pending {
             return;
         }
         self.ids.entry(person.to_owned()).or_default().extend(ids);
-        if self.count() > MOST_PENDING {
-            self.add_all(person);
-        }
         while self.count() > MOST_PENDING {
-            let Some(most) = self
+            let most = self
                 .ids
                 .iter()
+                .filter(|(person, _)| !person.is_empty())
                 .max_by_key(|(_, ids)| ids.len())
-                .map(|(person, _)| person.clone())
-            else {
-                break;
-            };
-            self.add_all(&most);
+                .map(|(person, ids)| (person.clone(), ids.len()));
+            match most {
+                Some((most, waiting)) => {
+                    eprintln!(
+                        "lamp-voice history: the forget queue is full; {waiting} turns of one person go as their whole history"
+                    );
+                    self.add_all(&most);
+                }
+                None => {
+                    let over = self.count() - MOST_PENDING;
+                    if let Some(room) = self.ids.get_mut("") {
+                        for _ in 0..over {
+                            room.pop_last();
+                        }
+                    }
+                    eprintln!(
+                        "lamp-voice history: the forget queue is full; {over} of the room's turns are not reached on the account"
+                    );
+                }
+            }
         }
     }
 
@@ -190,24 +216,27 @@ impl Pending {
     }
 
     /// What a memory request `line` and its `answer` add (nothing unless it
-    /// was answered `ok`): a `forget_all` of a known person, their whole
-    /// history; the exchanges the answer names, their turns; a scope it
-    /// says it cut, that whole person's.
+    /// is one of memory's forgets, or a page of one, answered `ok`): a
+    /// `forget_all` of a known person, their whole history; the exchanges
+    /// the answer names, their turns. A `forget_all` of every person
+    /// reaches nothing on the account, said in the journal.
     pub fn add_answered(&mut self, line: &Value, answer: &Value) {
-        if answer["ok"] != true {
+        let op = line["op"].as_str().unwrap_or_default();
+        let forget = lamp_msgs::MEMORY_FORGETS_TELLING_EXCHANGES.contains(&op);
+        if answer["ok"] != true || !(forget || op == lamp_msgs::MEMORY_FORGOT_EXCHANGES_OP) {
             return;
         }
-        if line["op"] == "forget_all"
-            && let Some(person) = line["person"].as_str()
-            && lamp_msgs::known::is_person_id(person)
-        {
-            self.add_all(person);
-        }
-        if let Some(cut) = answer["exchanges_cut"].as_array() {
-            for scope in cut.iter().filter_map(Value::as_str) {
-                if let Some(person) = person_key(scope) {
+        if op == "forget_all" {
+            match line.get("person") {
+                Some(Value::String(person)) if lamp_msgs::known::is_person_id(person) => {
                     self.add_all(person);
                 }
+                // Every person's: memory tells no ids for it.
+                Some(Value::Null) => eprintln!(
+                    "lamp-voice history: a forget of every person's memory is not reached on the account"
+                ),
+                // The room's: its lines come by id below.
+                _ => {}
             }
         }
         if let Some(scopes) = answer["exchanges"].as_object() {
@@ -308,18 +337,52 @@ pub fn queue() -> &'static (Queue, Arc<tokio::sync::Notify>) {
     QUEUE.get_or_init(|| (Queue::at(FILE), Arc::new(tokio::sync::Notify::new())))
 }
 
-/// A memory request `line` answered `answer`: with the switch on, what it
-/// removed is queued for the account's history and the sender woken. Off,
-/// nothing. Never on a turn's way for more than a small file's write.
-pub fn answered(line: &Value, answer: &Value) {
+/// A memory request `line` to `socket` answered `answer`: with the switch
+/// on, what it removed is queued for the account's history, with every
+/// page of the rest read from `socket` ([`pages`]), and the sender woken.
+/// Off, nothing. On a forget's way only for a small file's write, and for
+/// the pages' reads when it removed more ids than one answer names (400).
+pub fn answered(socket: &Path, line: &Value, answer: &Value) {
     if !on() || answer["ok"] != true {
         return;
     }
     let (queue, bell) = queue();
     answered_into(true, queue, bell, line, answer);
+    if answer["exchanges_more"] == true {
+        for page in pages(|page| crate::tools::exchange_up_to(socket, page, PAGE_WITHIN, 65_536)) {
+            answered_into(true, queue, bell, &page.0, &page.1);
+        }
+    }
 }
 
-/// [`answered`] on a given queue, `on` or not.
+/// How long one page may take.
+const PAGE_WITHIN: std::time::Duration = std::time::Duration::from_secs(2);
+
+/// The pages of `forgot_exchanges`, each its request and answer, asked by
+/// `ask` until one says no `more`, at most [`MOST_PAGES`]. A page not
+/// answered ends them, said in the journal as not reached.
+pub fn pages(ask: impl Fn(&Value) -> Option<Value>) -> Vec<(Value, Value)> {
+    let line = serde_json::json!({"op": lamp_msgs::MEMORY_FORGOT_EXCHANGES_OP});
+    let mut pages = Vec::new();
+    for _ in 0..MOST_PAGES {
+        match ask(&line) {
+            Some(answer) if answer["ok"] == true => {
+                let more = answer["more"] == true;
+                pages.push((line.clone(), answer));
+                if !more {
+                    return pages;
+                }
+            }
+            _ => break,
+        }
+    }
+    eprintln!(
+        "lamp-voice history: the rest of a forget's turns could not be read; they are not reached on the account"
+    );
+    pages
+}
+
+/// [`answered`] on a given queue, `on` or not, with no pages.
 pub fn answered_into(
     on: bool,
     queue: &Queue,
@@ -494,52 +557,111 @@ mod tests {
         assert!(!path.exists());
     }
 
-    /// Past [`MOST_PENDING`] ids, the person just added is coalesced into
-    /// their whole history; ids of a person whose whole history waits are
-    /// not kept apart; a call names at most [`MOST_IDS_A_CALL`].
+    /// A forget of 600 turns in one scope sends 600 ids and no whole
+    /// history, whatever pages they came in; a known person's forget
+    /// everything that took 450 room lines sends those ids and never a
+    /// whole-history delete for the room (the first builder's P1 on #7935).
     #[test]
-    fn the_bound_coalesces_into_a_persons_whole_history() {
+    fn a_forget_never_deletes_more_than_the_lamp_forgot() {
+        let ids = |range: std::ops::Range<u64>| range.collect::<Vec<u64>>();
         let mut pending = Pending::default();
-        pending.add_ids(LAN, (0..10).map(|id| turn_id(LAN, id)));
-        pending.add_ids(MINH, (0..MOST_PENDING as u64).map(|id| turn_id(MINH, id)));
-        assert_eq!(pending.all, BTreeSet::from([MINH.to_owned()]));
-        assert_eq!(pending.count(), 10);
-        pending.add_ids(MINH, [turn_id(MINH, 999)]);
-        assert!(!pending.ids.contains_key(MINH));
-        assert_eq!(
-            pending.next(),
-            Some(Call::All {
-                person: MINH.into()
-            })
+        pending.add_answered(
+            &json!({"op":"exchanges_forget","person":MINH}),
+            &json!({"ok":true,"removed":600,"exchanges":{MINH:ids(0..400)},"exchanges_more":true}),
         );
+        let paged =
+            pages(|_| Some(json!({"ok":true,"exchanges":{MINH:ids(400..600)},"more":false})));
+        assert_eq!(paged.len(), 1);
+        for (line, answer) in &paged {
+            pending.add_answered(line, answer);
+        }
+        assert!(pending.all.is_empty());
+        let mut sent = 0;
+        while let Some(call) = pending.next() {
+            assert!(call.body().get("all").is_none(), "{}", call.body());
+            sent += call.ids();
+            pending.done(&call);
+        }
+        assert_eq!(sent, 600);
+        let mut everything = Pending::default();
+        everything.add_answered(
+            &json!({"op":"forget_all","person":LAN}),
+            &json!({"ok":true,"removed":900,"exchanges":{"everyone":ids(0..400)},"exchanges_more":true}),
+        );
+        for (line, answer) in
+            pages(|_| Some(json!({"ok":true,"exchanges":{"everyone":ids(400..450)},"more":false})))
+        {
+            everything.add_answered(&line, &answer);
+        }
+        assert_eq!(everything.all, BTreeSet::from([LAN.to_owned()]));
+        assert_eq!(everything.ids[""].len(), 450);
+        // A page not answered ends the pages.
+        assert!(pages(|_| None).is_empty());
+    }
+
+    /// With 450 waiting, a second person's 51 stay 51; only past
+    /// [`MOST_PENDING`] is the person with the most coalesced, never the
+    /// room's; a call names at most [`MOST_IDS_A_CALL`].
+    #[test]
+    fn the_bound_coalesces_only_the_person_with_the_most_never_the_room() {
+        let mut pending = Pending::default();
+        pending.add_ids(MINH, (0..450).map(|id| turn_id(MINH, id)));
+        pending.add_ids(LAN, (0..51).map(|id| turn_id(LAN, id)));
+        assert!(pending.all.is_empty());
+        assert_eq!(pending.ids[LAN].len(), 51);
+        assert_eq!(pending.count(), 501);
+        let mut full = Pending::default();
+        full.add_ids(
+            "",
+            (0..MOST_PENDING as u64 - 10).map(|id| turn_id("everyone", id)),
+        );
+        full.add_ids(LAN, (0..5).map(|id| turn_id(LAN, id)));
+        full.add_ids(MINH, (0..20).map(|id| turn_id(MINH, id)));
+        assert_eq!(full.all, BTreeSet::from([MINH.to_owned()]));
+        assert_eq!(full.ids[LAN].len(), 5);
+        // Only the room's past it: its newest are let go, never its whole.
+        full.add_ids("", (0..100).map(|id| turn_id("everyone", 1_000_000 + id)));
+        assert!(!full.all.contains(""));
+        assert!(full.count() <= MOST_PENDING);
         let mut many = Pending::default();
         many.add_ids(LAN, (0..250).map(|id| turn_id(LAN, id)));
         assert_eq!(many.next().unwrap().ids(), MOST_IDS_A_CALL);
-        // A scope the memory cut is that person's whole history.
-        let mut cut = Pending::default();
-        cut.add_answered(
-            &json!({"op":"exchanges_forget","person":MINH}),
-            &json!({"ok":true,"removed":900,"exchanges":{},"exchanges_cut":[MINH]}),
-        );
-        assert!(cut.all.contains(MINH));
     }
 
-    /// Whatever waits, no call is ever a delete of everything without a
-    /// person.
+    /// Only memory's forgets (and their pages) are read: another answer's
+    /// `exchanges` queues nothing; a forget of every person's memory
+    /// queues nothing and never a delete without a person; the room's own
+    /// forget everything goes by its ids.
     #[test]
-    fn never_all_without_a_person() {
-        let mut pending = Pending::default();
-        pending.add_answered(
-            &json!({"op":"forget_said","speaker":MINH}),
-            &json!({"ok":true,"removed":2,"exchanges":{"everyone":[1,2]},"exchanges_cut":["everyone"]}),
+    fn only_a_forget_answer_queues_and_never_all_without_a_person() {
+        for op in ["status", "recall", "search", "kept", "adopt", "remember"] {
+            let mut pending = Pending::default();
+            pending.add_answered(
+                &json!({"op":op,"person":MINH}),
+                &json!({"ok":true,"exchanges":{MINH:[1,2]}}),
+            );
+            assert!(pending.is_empty(), "{op}");
+        }
+        let mut every = Pending::default();
+        every.add_answered(
+            &json!({"op":"forget_all","person":null}),
+            &json!({"ok":true,"removed":9}),
         );
-        pending.add_all(MINH);
-        while let Some(call) = pending.next() {
+        assert!(every.is_empty());
+        let mut room = Pending::default();
+        room.add_answered(
+            &json!({"op":"forget_all"}),
+            &json!({"ok":true,"removed":2,"exchanges":{"everyone":[1,2]}}),
+        );
+        assert!(room.all.is_empty());
+        assert_eq!(room.ids[""].len(), 2);
+        room.add_all(MINH);
+        while let Some(call) = room.next() {
             let body = call.body();
             if body.get("all").is_some() {
                 assert!(body["person"].is_string(), "{body}");
             }
-            pending.done(&call);
+            room.done(&call);
         }
     }
 }

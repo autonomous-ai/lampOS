@@ -237,24 +237,35 @@ account keeps too (the lamp's cloud API, `POST …/history/turns/delete`).
 - **What memory says:** with `--memory-days`, the answer to `forget`,
   `forget_last`, `forget_all`, `forget_said` and `exchanges_forget` names the
   exchanges it removed, by scope and id: `"exchanges":{"p-…":[4,6],
-  "everyone":[3]}`. Ids only, never words. A `forget_all`'s own person is
-  left out (the voice deletes that person's whole history), so it names only
-  the room's lines it took with them. At most 400 ids an answer; a scope with
-  more is named in `"exchanges_cut"` instead. Nothing removed, no field. The
-  legacy store names none.
+  "everyone":[3]}`. Ids only, never words. A known person's `forget_all`
+  leaves their own out (the voice deletes that person's whole history), so
+  it names only the room's lines it took with them; the room's own
+  `forget_all` names its ids. Every removed id is told: at most 400 in the
+  answer, which then says `"exchanges_more":true`, and the rest paged by
+  `{"op":"forgot_exchanges"}` (1,500 a page, `"more"` while some remain;
+  kept in RAM until the next forget). Nothing removed, no field. The legacy
+  store names none.
 - **What the voice queues** (the second route's worker, `history_forget`):
   for a known person's forget everything, `{"all":true,"person":<their p-
   id>}`; for every other forget, `{"ids":[…]}` of the exchanges named, each
   turn id `<scope>:<id>` (`history_forget::turn_id`, which the turn's save
   mints the same way). The person key is memory's own scope id: a known
-  person's `p-` id, `""` for the room's. A delete of everything is never
-  sent without a person. A cut scope is that person's whole history.
+  person's `p-` id, `""` for the room's. A forget never deletes more of the
+  account's history than the lamp forgot: a whole-history delete is a known
+  person's forget everything only, and never sent without a person. Only
+  memory's forgets and their pages are read (the list shared in
+  `lamp_msgs::MEMORY_FORGETS_TELLING_EXCHANGES`). A forget of every
+  person's memory, or a page that can't be read, is journalled as not
+  reached.
 - **Never on the reply's way:** "forgotten" follows the lamp's own delete, as
   before. The queue is a file in the voice's state folder
   (`/var/lib/lampOS/voice/history-forget.json`, 0600), kept across a
-  restart, at most 500 ids (past it, the person just added, then whoever has
-  most, is coalesced into their whole history), sent in the background with
-  the lamp's key in `x-api-key`, 100 ids a call.
+  restart, at most 20,000 ids (past it, the known person with the most
+  waiting is coalesced into their whole history, never the room's, whose
+  newest past it are let go; each journalled as a count). It is sent in the
+  background with the lamp's key in `x-api-key`, 100 ids a call, and only
+  to the lamp's own cloud API (`https://campaign-api.autonomous.ai`); with
+  any other base, nothing is sent and the forgets wait on the lamp.
 - **Done or kept:** a 2xx answer is done (`deleted` and `missing`, `missing`
   meaning already gone; `deleted_count`; `{"enabled":false}`, the account
   keeps no history). A 400 is let go. No answer, 5xx and any other status
