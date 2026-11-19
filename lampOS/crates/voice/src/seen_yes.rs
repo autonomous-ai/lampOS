@@ -404,7 +404,13 @@ pub fn run(
         }
         _ => {
             drop(offer);
-            if by_default {
+            // Once the old nos are done (#7767), a stop with the switch
+            // since turned off keeps a no as well, so the next on still
+            // reads it as no (Heron's P3 on #7940).
+            let done = path()
+                .parent()
+                .is_some_and(lamp_msgs::consent::old_nos_done);
+            if by_default || done {
                 return run_by_default(
                     &path(),
                     STOP,
@@ -680,6 +686,10 @@ mod tests {
         let folder = std::env::temp_dir().join(format!("seen-yes-{name}-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&folder);
         std::fs::create_dir_all(&folder).unwrap();
+        // A lamp whose earlier nos are kept (#7767,
+        // `lamp_msgs::consent::OLD_NOS_DONE`), where a missing file with
+        // the switch on is the default; with it off, read by nobody here.
+        std::fs::write(folder.join(lamp_msgs::consent::OLD_NOS_DONE), b"{}").unwrap();
         folder
     }
 
@@ -1211,6 +1221,7 @@ mod tests {
     #[test]
     fn a_stop_waits_for_the_helpers_lock() {
         let folder = folder("lock");
+        std::fs::remove_file(folder.join(lamp_msgs::consent::OLD_NOS_DONE)).unwrap();
         let path = file_in(&folder);
         forgotten(&path);
         assert_eq!(std::fs::read_dir(&folder).unwrap().count(), 0);

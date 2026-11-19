@@ -14,8 +14,9 @@
 //! `lamp_seen::opt_in`, [`crate::Faces::for_skills`]) read only `KEY`, all
 //! with one rule, [`allowed`] (#7767): a kept `"yes"` is on, a kept `"no"`
 //! is off, a missing file is on only with [`NOTICING_BY_DEFAULT`] (read in
-//! one place, [`noticing_by_default`]), and a file that can't be read is
-//! off. A file from before `by` is the voice's.
+//! one place, [`noticing_by_default`]) once [`OLD_NOS_DONE`] is beside it,
+//! and a file that can't be read is off. A file from before `by` is the
+//! voice's.
 use serde_json::Value;
 use std::io::Read;
 use std::path::{Path, PathBuf};
@@ -109,12 +110,27 @@ pub fn noticing_by_default() -> bool {
     by_default_on(std::env::var(NOTICING_BY_DEFAULT).ok().as_deref())
 }
 
+/// The done mark of the voice's migration of earlier nos (#7767, the first
+/// builder's c7002724376 and c7003588081), in the consent folder beside the
+/// files: written once, with [`NOTICING_BY_DEFAULT`] on, after every no a
+/// person gave before the default is kept as one (`lamp-voice`'s
+/// `onboarding/storage.rs`, `keep_old_nos`). Until it is there, a missing
+/// file is no to every reader ([`read_or`]), so a migration that never ran
+/// or failed half way leaves the lamp off, never on.
+pub const OLD_NOS_DONE: &str = "noticing-old-nos.done";
+
+/// Whether [`OLD_NOS_DONE`] is in `folder` (there at all, never followed).
+pub fn old_nos_done(folder: &Path) -> bool {
+    std::fs::symlink_metadata(folder.join(OLD_NOS_DONE)).is_ok()
+}
+
 /// `path`'s yes for `key` (#7767): one rule for a kept yes, a kept no and
 /// the default.
 ///
 /// - `KEY` exactly `"yes"`: a yes, with who gave it and when.
-/// - No file at `path` (not found): `by_default`, as [`BY_DEFAULT`]'s yes
-///   with no time, or no yes.
+/// - No file at `path` (not found): `by_default` once [`OLD_NOS_DONE`] is
+///   beside it ([`old_nos_done`]), as [`BY_DEFAULT`]'s yes with no time;
+///   with no done mark, or `by_default` false, no yes.
 /// - `KEY` exactly `"no"` ([`no_bytes`]): no, whatever `by_default` says.
 /// - Unreadable (any open error but not found, or a read error), over
 ///   [`MOST_BYTES`], not JSON, not an object, or an object with anything
@@ -122,7 +138,11 @@ pub fn noticing_by_default() -> bool {
 pub fn read_or(path: &Path, key: &str, by_default: bool) -> Kept {
     let file = match std::fs::File::open(path) {
         Ok(file) => file,
-        Err(error) if error.kind() == std::io::ErrorKind::NotFound && by_default => {
+        Err(error)
+            if error.kind() == std::io::ErrorKind::NotFound
+                && by_default
+                && path.parent().is_some_and(old_nos_done) =>
+        {
             return Kept {
                 yes: true,
                 by: Some(BY_DEFAULT.to_owned()),
@@ -532,8 +552,12 @@ mod tests {
         let _ = std::fs::remove_dir_all(&folder);
         std::fs::create_dir_all(&folder).unwrap();
         let file = file_in(&folder, SEEN_ACTIVITY).unwrap();
-        // Missing: the default, only with the switch on.
+        // Missing: the default, only with the switch on, and only once the
+        // migration's done mark is there (c7003588081).
         assert!(!allowed(&file, SEEN_ACTIVITY, false), "missing, off");
+        assert!(!allowed(&file, SEEN_ACTIVITY, true), "missing, on, no mark");
+        std::fs::write(folder.join(OLD_NOS_DONE), b"{}").unwrap();
+        assert!(!allowed(&file, SEEN_ACTIVITY, false), "missing, off, mark");
         assert!(allowed(&file, SEEN_ACTIVITY, true), "missing, on");
         assert_eq!(
             read_or(&file, SEEN_ACTIVITY, true),
@@ -608,6 +632,11 @@ mod tests {
         std::fs::create_dir_all(&folder).unwrap();
         let file = file_in(&folder, FACE_EXPRESSIONS).unwrap();
         assert!(!kept_no(&file, FACE_EXPRESSIONS), "missing");
+        assert!(
+            !read_or(&file, FACE_EXPRESSIONS, true).by_default,
+            "no mark"
+        );
+        std::fs::write(folder.join(OLD_NOS_DONE), b"{}").unwrap();
         assert!(read_or(&file, FACE_EXPRESSIONS, true).by_default);
         assert!(!read_or(&file, FACE_EXPRESSIONS, false).by_default);
         std::fs::write(&file, no_bytes(FACE_EXPRESSIONS, 9, BY_VOICE)).unwrap();
@@ -623,6 +652,33 @@ mod tests {
             for by_default in [false, true] {
                 assert!(!read_or(&file, FACE_EXPRESSIONS, by_default).by_default);
             }
+        }
+        let _ = std::fs::remove_dir_all(folder);
+    }
+
+    /// The first builder's c7003588081 on #7767: with the switch on and no
+    /// done mark, a missing face-expressions, room-sounds or seen-activity
+    /// file is no, a mark in another folder too; with the mark beside it,
+    /// the default, and a kept no still no.
+    #[test]
+    fn a_missing_file_is_the_default_only_once_the_old_nos_are_done() {
+        let folder = std::env::temp_dir().join(format!("msgs-consent-done-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&folder);
+        std::fs::create_dir_all(folder.join("other")).unwrap();
+        std::fs::write(folder.join("other").join(OLD_NOS_DONE), b"{}").unwrap();
+        for (key, _) in FILES {
+            let file = file_in(&folder, key).unwrap();
+            assert!(!allowed(&file, key, true), "{key}, no mark");
+            assert_eq!(read_or(&file, key, true), Kept::default(), "{key}");
+        }
+        std::fs::write(folder.join(OLD_NOS_DONE), b"{}").unwrap();
+        assert!(old_nos_done(&folder));
+        for (key, _) in FILES {
+            let file = file_in(&folder, key).unwrap();
+            assert!(allowed(&file, key, true), "{key}, mark");
+            assert!(!allowed(&file, key, false), "{key}, mark, off");
+            std::fs::write(&file, no_bytes(key, 9, BY_VOICE)).unwrap();
+            assert!(!allowed(&file, key, true), "{key}, a kept no");
         }
         let _ = std::fs::remove_dir_all(folder);
     }
