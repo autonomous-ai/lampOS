@@ -3206,14 +3206,17 @@ days": never a value.
 
 Lamp's voice uses your health summary to talk with you, through its voice
 services, and remembers it for you: each read is kept in the owner's own
-memory as a dated kept thing, "From Apple Health, read on YYYY-MM-DD: …."
+memory as a dated kept thing, "From Apple Health, read on YYYY-MM-DD: ….",
+one a day, the next read's replacing it, gone after 14 days
 ([services.md](services.md), "Apple Health"). The app's unlink takes those
 too: a disconnect (`null`), `connector.remove.apple_health` and a
 sign-out's wipe each make `lamp-cloud` (`services::forget_health_facts`)
 send `{"op":"forget_apple_health"}` on memory's narrow forget socket
 (`LAMP_MEMORY_FORGET_SOCKET`, `/run/lampos-memory/forget.sock`, set in
-`lamp-cloud.service`), which removes every person's kept Apple Health facts
-([memory.md](memory.md), "Forgetting a person"). If memory doesn't answer
+`lamp-cloud.service`), which removes every person's kept Apple Health facts,
+by their mark ([memory.md](memory.md), "Forgetting a person").
+Disconnecting removes what Lamp kept from Apple Health; what you talked
+about stays in your conversations until you ask Lamp to forget it. If memory doesn't answer
 or refuses, the result is `failure`, "Apple Health was unlinked, but what
 Lamp remembered from it could not be removed just now; try again"
 (`HEALTH_FACTS_KEPT`), and the app may ask again; a retry removes nothing

@@ -3243,7 +3243,12 @@ của nó, không giờ đồng hồ, không danh sách thô các ngày; không 
 cho lỗi, dữ liệu cũ hay không có gì. Khi đi cùng lời gọi khác, lượt 2 được
 báo dòng ngắn đó. Dòng được báo lại cạnh các câu tiếp theo của chủ đèn
 trong 5 phút (`services::health_note_for`, chỉ trong tiến trình, bị xoá khi
-"quên mọi thứ" và khi một lần đọc không thấy dữ liệu). Lời cho mỗi lần đọc:
+"quên mọi thứ", khi một lần đọc không thấy dữ liệu, và khi Apple Health bị gỡ
+liên kết trong ứng dụng: trong lúc dòng còn được báo, giọng nói hỏi
+`lamp-services` `services_connected` mỗi 2 giây trên một luồng riêng
+(`services::health_watch`, `HEALTH_WATCH_EVERY`, không bao giờ trên đường của
+một câu), và khi Apple Health không còn trong danh sách thì dòng thôi được
+báo; một câu trả lời không có danh sách không đổi gì). Lời cho mỗi lần đọc:
 
 - `sleep`: "Theo Apple Health lúc 7 giờ 30, đêm qua bạn ngủ 6 tiếng 52
   phút, từ 23 giờ 48 đến 6 giờ 40." ("… bạn nằm trên giường …" cho một đêm
@@ -3278,18 +3283,30 @@ các dịch vụ giọng nói của Lamp; mô hình chat (DeepSeek trong sản p
 chỉ thấy dòng ngắn ở trên.
 
 **Bộ nhớ.** Dòng ngắn đó được giữ trong bộ nhớ của chính chủ đèn như một
-điều được giữ có ngày, qua đường `remember` thường trong phạm vi người của
-chủ đèn (`remember::keep_health_fact`, chỉ với bộ nhớ Days, chỉ cho một id
-người `p-`, mỗi lần chạy một lần cho mỗi lời). Lời là "From Apple Health,
-read on YYYY-MM-DD: <dòng>." (`lamp_msgs::health_fact`). Nó được xoá khi:
+điều được giữ có ngày trong phạm vi người của chủ đèn
+(`remember::keep_health_fact`), bằng yêu cầu riêng của bộ nhớ,
+`{"op":"remember_apple_health","person","at_unix_ms","text"}`
+(`lamp_msgs::health_fact::REMEMBER_OP`, `Days::remember_apple_health`; chỉ với
+bộ nhớ Days, bộ nhớ cũ hơn từ chối và không giữ gì; chỉ cho một id người
+`p-`; cùng một lời hai lần liền chỉ gửi một lần). Lời là "From Apple Health,
+read on YYYY-MM-DD: <dòng>." (`lamp_msgs::health_fact`), nhưng bộ nhớ đánh
+dấu nó là của Apple Health (bảng `apple_health`) và không bao giờ tìm nó theo
+lời, nên một dòng chính người đó giữ với cùng lời vẫn là của họ và ở lại. Mỗi
+người mỗi ngày (theo giờ địa phương) chỉ có một: lần đọc sau trong ngày thay
+nó trong cùng một giao dịch. Nó mất sau 14 ngày (`health_fact::KEPT_DAYS`:
+đọc ngày 1 thì mất ngày 15), và không tính vào 200 điều một người được giữ
+(`KEPT_ENTRIES`). Nó không gắn với lượt trao đổi nào của cuộc trò chuyện, nên
+xoá nó không lấy đi điều gì đã nói. Nó được xoá khi:
 chủ đèn nói "quên mọi thứ" (phạm vi bộ nhớ của họ được làm rỗng, cùng
 `apple_health.json` qua `apple_health_forget`, bên dưới); ứng dụng gỡ liên
 kết (`health.summary` `null`, `connector.remove.apple_health`, lần xoá khi
 đăng xuất): `lamp-cloud` (`services::forget_health_facts`) gửi
 `{"op":"forget_apple_health"}` trên socket hẹp của bộ nhớ
-(`LAMP_MEMORY_FORGET_SOCKET`), và bộ nhớ quên mọi mục đã giữ của mọi người
-bắt đầu bằng phần đầu đó, trả `{"ok":true,"removed":N}`
-([memory-days_vi.md](memory-days_vi.md)); không có trả lời hay bị từ chối
+(`LAMP_MEMORY_FORGET_SOCKET`), và bộ nhớ quên mọi mục Apple Health đã đánh
+dấu của mọi người, trả `{"ok":true,"removed":N}`
+([memory-days_vi.md](memory-days_vi.md)). Ngắt kết nối sẽ xoá những gì Lamp
+giữ từ Apple Health; những gì bạn đã trò chuyện vẫn ở trong các cuộc trò
+chuyện của bạn cho tới khi bạn bảo Lamp quên chúng. Không có trả lời hay bị từ chối
 thì kết quả là `failure` "Apple Health was unlinked, but what Lamp
 remembered from it could not be removed just now; try again". Lần đặt lại
 xoá `/var/lib/lampos-memory` và `/var/lib/lampos-services`.
@@ -3783,11 +3800,16 @@ khi đi cùng lời gọi khác thì lượt 2 được báo dòng ngắn
 lần đọc rút gọn; không bản ghi dịch vụ; câu "quên mọi thứ" của chủ đèn hỏi
 `apple_health_forget`, của người khác thì không; và Apple Health không có
 trong danh sách quyền nào (các test catalog của `lamp-control` và
-`lamp-tasks` bỏ qua dịch vụ cục bộ). Bộ nhớ:
-`forget_apple_health_takes_every_kept_health_fact_and_nothing_else`,
+`lamp-tasks` bỏ qua dịch vụ cục bộ); dòng báo cạnh các câu thôi khi Apple
+Health không còn liên kết (`the_read_is_fixed_words_and_the_model_gets_the_short_line`).
+Bộ nhớ: `forget_apple_health_takes_the_marked_facts_and_nothing_else` (dòng
+chính người đó giữ với cùng lời và cuộc nói chuyện trước của họ ở lại),
+`an_apple_health_fact_is_replaced_by_the_same_days_next_read`,
+`an_apple_health_fact_is_gone_after_fourteen_days`,
+`apple_health_facts_are_not_counted_in_the_kept_lists_room`,
 `the_narrow_check_lets_through_one_forget_person_and_nothing_else`;
 `lamp-cloud`: `unlinking_apple_health_removes_the_kept_facts_in_memory_too`;
-`lamp-msgs`: `a_kept_fact_is_found_by_its_start_alone`.
+`lamp-msgs`: `a_kept_fact_is_worded_with_its_read_day`.
 
 `cargo test -p lamp-services`: kho chỉ root (0700/0600) và được ghi trọn, một
 code không bao giờ là một đường dẫn, gỡ và xoá; không bí mật nào trong một

@@ -272,3 +272,14 @@ CREATE TABLE IF NOT EXISTS service_contacts (
     changed_unix_ms INTEGER NOT NULL,
     PRIMARY KEY(person,name_key)
 );
+-- #7900 (Friday's P1s, the first builder's ruling 19 Nov 15:46): the kept
+-- things that are an Apple Health read's (`Days::remember_apple_health`),
+-- marked here and never found by their words, so a person's own kept line
+-- in the same words is never one. One a person a local day (`entries.day`),
+-- replaced by the next read; gone after `lamp_msgs::health_fact::KEPT_DAYS`
+-- (`Days::maintain`) and with the app's unlink (`forget_apple_health`); not
+-- counted in the kept list's room (`store::KEPT_ENTRIES`). Its row goes
+-- with the entry. Older builds pass this table over; `user_version` stays 1.
+CREATE TABLE IF NOT EXISTS apple_health (
+    rid INTEGER PRIMARY KEY REFERENCES entries(rid) ON DELETE CASCADE
+);

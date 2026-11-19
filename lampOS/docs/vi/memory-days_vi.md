@@ -1903,11 +1903,26 @@ chỉ nhận `forget_person`, và thêm đúng một dòng một khóa
 `LAMP_FACES_PAGE=on`, nên khi công tắc đó còn tắt thì không có gì thay đổi với
 người dùng; khi nó bật, xóa một người trong app cũng xóa những gì bộ nhớ giữ về họ.
 
-`{"op":"forget_apple_health"}` (Days): mọi mục đã giữ của mọi người có lời bắt
-đầu bằng «From Apple Health, read on » (`lamp_msgs::health_fact`) đều bị quên,
-từng mục, không chọn lọc; trả `{"ok":true,"removed":N}`. Không mục nào khác bị
-động tới. lamp-cloud gửi nó khi app gỡ liên kết Apple Health (`health.summary`
+`{"op":"remember_apple_health","person":ID,"at_unix_ms":N,"text":"..."}` (Days,
+`Days::remember_apple_health`): giữ điều một lần đọc Apple Health tìm thấy như
+một điều được giữ của một người đã biết (chỉ id `p-`), đánh dấu trong bảng
+`apple_health`; trả `{"ok":true,"id":N}`. Dấu đó, không bao giờ là lời, là cách
+tìm những mục này: một dòng chính người đó giữ với cùng lời là của họ (`once`
+không bao giờ tìm thấy một mục đã đánh dấu). Mỗi người mỗi ngày một mục: trong
+cùng giao dịch nó xoá mục đã đánh dấu của ngày đó, và mục nào quá hạn. Một mục
+sống 14 ngày (`health_fact::KEPT_DAYS`: đọc ngày 1 thì mất ngày 15), không tính
+vào 200 điều được giữ (`KEPT_ENTRIES`), và không gắn với lượt trao đổi nào.
+
+`{"op":"forget_apple_health"}` (Days): mọi mục Apple Health đã đánh dấu của mọi
+người đều bị quên, từng mục, không chọn lọc, cùng những gì làm từ nó; trả
+`{"ok":true,"removed":N}`. Không lượt trao đổi nào bị xoá (không lượt nào gắn
+với một mục) và đêm không bị đánh dấu: ngắt kết nối sẽ xoá những gì Lamp giữ từ
+Apple Health; những gì bạn đã trò chuyện vẫn ở trong các cuộc trò chuyện của
+bạn cho tới khi bạn bảo Lamp quên chúng. lamp-cloud gửi nó khi app gỡ liên kết Apple Health (`health.summary`
 `null`, `connector.remove.apple_health`, lần xóa khi đăng xuất), qua
 `services::forget_health_facts` (xem [services_vi.md](services_vi.md), «Apple
-Health»). Test: `forget_apple_health_takes_every_kept_health_fact_and_nothing_else`,
+Health»). Test: `forget_apple_health_takes_the_marked_facts_and_nothing_else`,
+`an_apple_health_fact_is_replaced_by_the_same_days_next_read`,
+`an_apple_health_fact_is_gone_after_fourteen_days`,
+`apple_health_facts_are_not_counted_in_the_kept_lists_room`,
 `the_narrow_check_lets_through_one_forget_person_and_nothing_else`.

@@ -384,8 +384,18 @@ enum Extra {
         person: Who,
         about: Vec<Vec<String>>,
     },
-    /// Every person's kept Apple Health facts (`lamp_msgs::health_fact`),
-    /// on the app's unlink (`Days::forget_apple_health`).
+    /// What an Apple Health read found, kept as a known person's marked
+    /// fact (`lamp_msgs::health_fact::REMEMBER_OP`), replacing theirs of the
+    /// same day (`Days::remember_apple_health`).
+    RememberAppleHealth {
+        #[serde(default)]
+        person: Who,
+        at_unix_ms: u64,
+        text: String,
+    },
+    /// Every person's kept Apple Health facts, by their mark
+    /// (`lamp_msgs::health_fact`), on the app's unlink
+    /// (`Days::forget_apple_health`).
     ForgetAppleHealth {},
     /// The voice's `LAMP_SERVICE_CONTACTS` (connector records, PR 1c): a
     /// known person's mail contact saved, new or replacing the address
@@ -1314,6 +1324,13 @@ fn extra(store: &mut Days, request: Extra, now: u64) -> Result<Value> {
                 json!({"ok":true,"removed":forgot.removed,"records":forgot.records,"addresses":forgot.addresses})
             }
         }
+        Extra::RememberAppleHealth {
+            person,
+            at_unix_ms,
+            text,
+        } => value(Response::Added {
+            id: store.remember_apple_health(&one(person)?, at_unix_ms, &text)?,
+        }),
         Extra::ForgetAppleHealth {} => {
             json!({"ok":true,"removed":store.forget_apple_health()?})
         }
@@ -1384,6 +1401,7 @@ pub fn answer(store: &mut Days, line: &[u8], now: u64) -> protocol::Answer {
             "service_contacts",
             "service_contacts_forget",
             "exchanges_forget",
+            lamp_msgs::health_fact::REMEMBER_OP,
             lamp_msgs::health_fact::FORGET_OP,
         ];
         const OLD: &[&str] = &[
@@ -1449,8 +1467,10 @@ pub fn answer(store: &mut Days, line: &[u8], now: u64) -> protocol::Answer {
             let outcome = format!("ok entries={count}");
             // Reads, maintenance and successful no-op removals must not
             // clear an earlier failure to add a record.
-            let wrote = matches!(op.as_str(), "append" | "remember" | "append_linked")
-                && response["existing"] != true;
+            let wrote = matches!(
+                op.as_str(),
+                "append" | "remember" | "append_linked" | "remember_apple_health"
+            ) && response["existing"] != true;
             (response, outcome, false, wrote)
         }
         Err(e) => (
@@ -1866,48 +1886,198 @@ mod tests {
         assert!(of(&plain["id"]).get("on").is_none(), "{note}");
     }
 
-    /// #7900: the app's unlink of Apple Health removes every person's kept
-    /// Apple Health facts and nothing else they keep.
-    #[test]
-    fn forget_apple_health_takes_every_kept_health_fact_and_nothing_else() {
-        let (_scratch, mut store) = Scratch::new("forget-apple-health");
-        let send = |store: &mut Days, request: Value| -> Value {
-            serde_json::from_str(&answer(store, request.to_string().as_bytes(), NOW).line).unwrap()
-        };
-        let (ann, bob) = ("p-0123456789abcdef", "p-fedcba9876543210");
-        let fact = lamp_msgs::health_fact::text("2026-11-19", "slept 6 h 52 m last night");
-        for (person, text) in [
-            (ann, fact.as_str()),
-            (ann, "takes her coffee black"),
-            (bob, fact.as_str()),
-        ] {
-            let kept = send(
-                &mut store,
-                json!({"op":"remember","person":person,"at_unix_ms":NOW,"text":text}),
-            );
-            assert_eq!(kept["ok"], true, "{kept}");
-        }
-        let gone = send(&mut store, json!({"op":"forget_apple_health"}));
-        assert_eq!(gone, json!({"ok":true,"removed":2}));
-        let ann_kept = send(
-            &mut store,
-            json!({"op":"kept","person":ann,"max_bytes":2000}),
-        );
-        let texts: Vec<&str> = ann_kept["entries"]
+    /// #7900 tests: a request's answer, and the texts of a person's kept list.
+    fn health_send(store: &mut Days, request: Value, now: u64) -> Value {
+        serde_json::from_str(&answer(store, request.to_string().as_bytes(), now).line).unwrap()
+    }
+
+    fn health_kept(store: &mut Days, person: &str, now: u64) -> Vec<String> {
+        health_send(
+            store,
+            json!({"op":"kept","person":person,"max_bytes":16384}),
+            now,
+        )["entries"]
             .as_array()
             .unwrap()
             .iter()
-            .map(|entry| entry["text"].as_str().unwrap())
-            .collect();
-        assert_eq!(texts, ["takes her coffee black"]);
-        let bob_kept = send(
+            .map(|entry| entry["text"].as_str().unwrap().to_owned())
+            .collect()
+    }
+
+    fn health_keep(store: &mut Days, person: &str, at: u64, line: &str) -> Value {
+        health_send(
+            store,
+            json!({"op": lamp_msgs::health_fact::REMEMBER_OP, "person": person,
+                "at_unix_ms": at, "text": lamp_msgs::health_fact::text("2026-10-13", line)}),
+            at,
+        )
+    }
+
+    const HEALTH_DAY_MS: u64 = 86_400_000;
+
+    /// #7900 (Friday's P1s, the first builder's ruling 19 Nov 15:46): the
+    /// app's unlink removes every person's kept Apple Health facts, found
+    /// by their mark, and nothing else: a person's own kept line in the
+    /// very words of one (kept plainly, and kept again with `once` after a
+    /// fact) stays, and so does their earlier talk (P2).
+    #[test]
+    fn forget_apple_health_takes_the_marked_facts_and_nothing_else() {
+        let (_scratch, mut store) = Scratch::new("forget-apple-health");
+        let (ann, bob) = ("p-0123456789abcdef", "p-fedcba9876543210");
+        let line = "slept 6 h 52 m last night";
+        let same_words = lamp_msgs::health_fact::text("2026-10-13", line);
+        let talk = health_send(
             &mut store,
-            json!({"op":"kept","person":bob,"max_bytes":2000}),
+            json!({"op":"append","person":ann,"at_unix_ms":NOW,"heard":"my sister visits on Friday","said":"Nice"}),
+            NOW,
         );
-        assert_eq!(bob_kept["entries"], json!([]));
+        assert_eq!(talk["ok"], true, "{talk}");
+        let typed = health_send(
+            &mut store,
+            json!({"op":"remember","person":ann,"at_unix_ms":NOW+1,"text":same_words}),
+            NOW + 1,
+        );
+        assert_eq!(typed["ok"], true, "{typed}");
+        for person in [ann, bob] {
+            let kept = health_keep(&mut store, person, NOW + 2, line);
+            assert_eq!(kept["ok"], true, "{kept}");
+        }
+        // Said again with `once`: their own line, never the marked fact.
+        let again = health_send(
+            &mut store,
+            json!({"op":"remember","person":ann,"at_unix_ms":NOW+3,"text":same_words,"once":true}),
+            NOW + 3,
+        );
+        assert_eq!(again["ok"], true, "{again}");
+        assert_eq!(again["id"], typed["id"], "{again}");
+        let coffee = health_send(
+            &mut store,
+            json!({"op":"remember","person":ann,"at_unix_ms":NOW+4,"text":"takes her coffee black"}),
+            NOW + 4,
+        );
+        assert_eq!(coffee["ok"], true, "{coffee}");
+        assert_eq!(health_kept(&mut store, ann, NOW + 5).len(), 3);
+        let gone = health_send(&mut store, json!({"op":"forget_apple_health"}), NOW + 5);
+        assert_eq!(gone, json!({"ok":true,"removed":2}));
         assert_eq!(
-            send(&mut store, json!({"op":"forget_apple_health"})),
+            health_kept(&mut store, ann, NOW + 5),
+            [same_words.as_str(), "takes her coffee black"]
+        );
+        assert!(health_kept(&mut store, bob, NOW + 5).is_empty());
+        let status = health_send(&mut store, json!({"op":"status","person":ann}), NOW + 5);
+        assert_eq!(status["people"][0]["exchanges"], 1, "{status}");
+        assert_eq!(
+            health_send(&mut store, json!({"op":"forget_apple_health"}), NOW + 5),
             json!({"ok":true,"removed":0})
+        );
+    }
+
+    /// #7900: one Apple Health fact a person a local day, the next read's
+    /// replacing it; another day's stays beside it, and another person's.
+    #[test]
+    fn an_apple_health_fact_is_replaced_by_the_same_days_next_read() {
+        let (_scratch, mut store) = Scratch::new("apple-health-a-day");
+        let (ann, bob) = ("p-0123456789abcdef", "p-fedcba9876543210");
+        assert_eq!(
+            health_keep(&mut store, ann, NOW, "8,421 steps so far today")["ok"],
+            true
+        );
+        assert_eq!(
+            health_keep(&mut store, bob, NOW, "4,000 steps so far today")["ok"],
+            true
+        );
+        assert_eq!(
+            health_keep(&mut store, ann, NOW + 3_600_000, "9,102 steps so far today")["ok"],
+            true
+        );
+        let kept = health_kept(&mut store, ann, NOW + 3_600_000);
+        assert_eq!(kept.len(), 1, "{kept:?}");
+        assert!(kept[0].contains("9,102 steps"), "{kept:?}");
+        assert_eq!(health_kept(&mut store, bob, NOW + 3_600_000).len(), 1);
+        let next_day = NOW + HEALTH_DAY_MS;
+        assert_eq!(
+            health_keep(&mut store, ann, next_day, "slept 7 h")["ok"],
+            true
+        );
+        let kept = health_kept(&mut store, ann, next_day);
+        assert_eq!(kept.len(), 2, "{kept:?}");
+        assert!(
+            kept[0].contains("9,102 steps") && kept[1].contains("slept 7 h"),
+            "{kept:?}"
+        );
+        // Only a known person's.
+        let room = health_send(
+            &mut store,
+            json!({"op": lamp_msgs::health_fact::REMEMBER_OP, "at_unix_ms": next_day, "text": "x"}),
+            next_day,
+        );
+        assert_eq!(room["ok"], false, "{room}");
+    }
+
+    /// #7900: a fact lasts `health_fact::KEPT_DAYS` local days, the day of
+    /// its read the first: there on the 14th day, gone on the 15th; a
+    /// person's own kept thing of that day stays.
+    #[test]
+    fn an_apple_health_fact_is_gone_after_fourteen_days() {
+        let (_scratch, mut store) = Scratch::new("apple-health-expiry");
+        let ann = "p-0123456789abcdef";
+        assert_eq!(
+            health_keep(&mut store, ann, NOW, "slept 6 h 52 m last night")["ok"],
+            true
+        );
+        let own = health_send(
+            &mut store,
+            json!({"op":"remember","person":ann,"at_unix_ms":NOW,"text":"takes her coffee black"}),
+            NOW,
+        );
+        assert_eq!(own["ok"], true, "{own}");
+        let last = NOW + u64::from(lamp_msgs::health_fact::KEPT_DAYS - 1) * HEALTH_DAY_MS;
+        assert_eq!(health_kept(&mut store, ann, last).len(), 2);
+        let gone = last + HEALTH_DAY_MS;
+        assert_eq!(
+            health_kept(&mut store, ann, gone),
+            ["takes her coffee black"]
+        );
+        // Its mark went with it: the unlink finds nothing left.
+        assert_eq!(
+            health_send(&mut store, json!({"op":"forget_apple_health"}), gone),
+            json!({"ok":true,"removed":0})
+        );
+    }
+
+    /// #7900: Apple Health facts are not counted in the kept list's room
+    /// (`store::KEPT_ENTRIES`): with them kept, a person still keeps 200 of
+    /// their own, and a read is still kept when their list is full.
+    #[test]
+    fn apple_health_facts_are_not_counted_in_the_kept_lists_room() {
+        let (_scratch, mut store) = Scratch::new("apple-health-room");
+        let ann = "p-0123456789abcdef";
+        for day in 0..3 {
+            let at = NOW + day * HEALTH_DAY_MS;
+            assert_eq!(health_keep(&mut store, ann, at, "slept 7 h")["ok"], true);
+        }
+        let now = NOW + 3 * HEALTH_DAY_MS;
+        for n in 0..crate::store::KEPT_ENTRIES as u64 {
+            let kept = health_send(
+                &mut store,
+                json!({"op":"remember","person":ann,"at_unix_ms":now+n,"text":format!("own thing {n}")}),
+                now + n,
+            );
+            assert_eq!(kept["ok"], true, "{n}: {kept}");
+        }
+        let full = health_send(
+            &mut store,
+            json!({"op":"remember","person":ann,"at_unix_ms":now+500,"text":"one too many"}),
+            now + 500,
+        );
+        assert_eq!(full["error"], "full", "{full}");
+        assert_eq!(
+            health_keep(&mut store, ann, now + 501, "8,421 steps")["ok"],
+            true
+        );
+        assert_eq!(
+            health_kept(&mut store, ann, now + 502).len(),
+            crate::store::KEPT_ENTRIES + 4
         );
     }
 

@@ -3224,17 +3224,31 @@ is none for an error, a stale summary or an answer with nothing found. The
 same line is told beside the owner's next lines for 5 minutes
 (`services::health_note_for`, `HEALTH_NOTE_FOR`), so Lamp can go on using
 it in the talk. It is kept in the voice's process alone, never on disk, and
-let go at the owner's "forget everything" and when a read finds no data.
+let go at the owner's "forget everything", when a read finds no data, and
+when Apple Health is unlinked in the app: while the line is told, the voice
+asks `lamp-services` `services_connected` every 2 seconds on a thread of its
+own (`services::health_watch`, `HEALTH_WATCH_EVERY`, never on a line's
+path), and once Apple Health is not in the list the line is no longer told
+(an answer with no list changes nothing).
 
 **What is remembered.** The same line is kept in the owner's own memory as
-a dated kept thing (`remember::keep_health_fact`), through the normal
-`remember` path into the owner's person scope, as `keep_name_with_face`
-keeps a name. Its words are `lamp_msgs::health_fact::text`: "From Apple
-Health, read on YYYY-MM-DD: <line>." (the start is
-`lamp_msgs::health_fact::PREFIX`). It is kept on the Days memory only, only
-for a `p-` person id (so the private room's "the-owner" on a lamp with no
-owner name or face keeps nothing), and once per run for the same text. It
-is removed by:
+a dated kept thing in the owner's person scope (`remember::keep_health_fact`),
+with memory's own request for it,
+`{"op":"remember_apple_health","person","at_unix_ms","text"}`
+(`lamp_msgs::health_fact::REMEMBER_OP`, `Days::remember_apple_health`).
+Its words are `lamp_msgs::health_fact::text`: "From Apple Health, read on
+YYYY-MM-DD: <line>.", but memory marks it as Apple Health's (its
+`apple_health` table) and never finds it by those words, so a person's own
+kept line in the same words is theirs and stays. Memory keeps one a person
+a local day: the next read that day replaces it in the same transaction. It
+is gone after 14 local days (`health_fact::KEPT_DAYS`: read on the 1st, gone
+on the 15th), and it does not count toward the 200 kept things a person may
+keep (`KEPT_ENTRIES`). It is linked to no exchange of the conversation, so
+removing it takes nothing that was said. It is kept on the Days memory only
+(an older memory refuses the op and nothing is kept), only for a `p-`
+person id (so the private room's "the-owner" on a lamp with no owner name or
+face keeps nothing), and the same text twice in a row is sent once. It is
+removed by:
 
 - The owner's "forget everything": memory's forget of their person scope
   (`forget_person`) takes the kept facts, and `apple_health.json` goes too,
@@ -3247,7 +3261,9 @@ is removed by:
   (`services::forget_health_facts`) sends `{"op":"forget_apple_health"}`
   on memory's narrow forget socket (`LAMP_MEMORY_FORGET_SOCKET`,
   `/run/lampos-memory/forget.sock`, set in `lamp-cloud.service`), which
-  forgets every person's kept Apple Health facts. If memory doesn't answer
+  forgets every person's kept Apple Health facts, by their mark.
+  Disconnecting removes what Lamp kept from Apple Health; what you talked
+  about stays in your conversations until you ask Lamp to forget it. If memory doesn't answer
   or refuses, the result is `failure`, "Apple Health was unlinked, but what
   Lamp remembered from it could not be removed just now; try again"
   (`HEALTH_FACTS_KEPT`). With no socket given, nothing is asked.
@@ -3756,16 +3772,22 @@ and, beside another call, round 2 told the short line
 brief read's `week` cut; no service record; the owner's "forget
 everything" asking `apple_health_forget`, anyone else's not; and Apple
 Health in no grant list (`lamp-control`'s and `lamp-tasks`' catalog tests
-skip the local service). Memory: `forget_apple_health` takes every kept
-health fact and nothing else
-(`days_protocol::tests::forget_apple_health_takes_every_kept_health_fact_and_nothing_else`),
+skip the local service); the note told beside the lines ends when Apple
+Health is no longer linked (`the_read_is_fixed_words_and_the_model_gets_the_short_line`).
+Memory: `forget_apple_health` takes the marked facts and nothing else, a
+person's own line in the same words and their earlier talk staying
+(`days_protocol::tests::forget_apple_health_takes_the_marked_facts_and_nothing_else`);
+one fact a day, the next read's replacing it
+(`an_apple_health_fact_is_replaced_by_the_same_days_next_read`); gone after
+14 days (`an_apple_health_fact_is_gone_after_fourteen_days`); not counted
+in the 200 (`apple_health_facts_are_not_counted_in_the_kept_lists_room`),
 and the narrow socket lets through one forget of a person or
 `forget_apple_health` alone and nothing else
 (`protocol::tests::the_narrow_check_lets_through_one_forget_person_and_nothing_else`).
 `lamp-cloud`: unlinking Apple Health removes the kept facts in memory too
 (`services::tests::unlinking_apple_health_removes_the_kept_facts_in_memory_too`).
-`lamp-msgs`: a kept fact is found by its start alone
-(`health_fact::tests::a_kept_fact_is_found_by_its_start_alone`).
+`lamp-msgs`: a kept fact's words
+(`health_fact::tests::a_kept_fact_is_worded_with_its_read_day`).
 
 `cargo test -p lamp-services`: the store root-only (0700/0600) and written
 whole, a code never a path, remove and wipe; no secret in a `Debug` or a

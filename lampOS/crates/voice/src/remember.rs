@@ -6495,34 +6495,42 @@ pub fn keep_name_with_face(name: &str) {
     });
 }
 
-/// The owner's Apple Health facts kept in this run, by person, so the same
-/// read said twice keeps it once.
+/// The last Apple Health fact kept in this run, one a person, so the same
+/// read said twice in a row keeps it once.
 static HEALTH_KEPT: Mutex<Vec<(String, String)>> = Mutex::new(Vec::new());
 
 /// What an Apple Health read found in the owner's own turn
 /// (`services::health_owner_turn`), kept as a dated thing of their own
 /// (`text`, `lamp_msgs::health_fact::text`) in their scope (`person`, the
-/// owner's memory id), as [`keep_name_with_face`] keeps a name: the one
-/// path a person's kept things take, so `LAMP_MEMORY_PERSONAL_NEEDS_FACE`
-/// and the person's scope hold it as theirs (never read or said for anyone
-/// else, nor with another face or none in view). Gone with them: their
-/// "forget everything" (`forget_person` empties their scope), the app's
-/// unlink of Apple Health (`lamp_msgs::health_fact::FORGET_OP`, sent by
-/// lamp-cloud) and a reset (the plan wipes memory's folder). On a thread
-/// of its own, never on a turn's path; only on the Days memory. No word of
-/// it is logged.
+/// owner's memory id) with memory's own request for it
+/// (`lamp_msgs::health_fact::REMEMBER_OP`): marked as Apple Health's, so
+/// it is never found by its words; one a local day, replaced by the next
+/// read; gone after `health_fact::KEPT_DAYS`; never counted in the kept
+/// list's room; and linked to no exchange of the conversation, so its
+/// forget takes nothing said (Friday's P1s and P2 on #7900, the first
+/// builder's ruling of 19 Nov 15:46). Only their own scope reads it, as
+/// any kept thing of theirs: never read or said for anyone else. Gone
+/// with them: their "forget everything" (`forget_person` empties their
+/// scope), the app's unlink of Apple Health
+/// (`lamp_msgs::health_fact::FORGET_OP`, sent by lamp-cloud) and a reset
+/// (the plan wipes memory's folder). On a thread of its own, never on a
+/// turn's path; only on the Days memory (an older memory refuses the op
+/// and nothing is kept). No word of it is logged.
 pub fn keep_health_fact(person: &str, text: &str) {
     let Some(client) = DAYS.get().and_then(Option::as_ref) else {
         return;
     };
-    let Some(call) = health_fact_job(person, text) else {
+    let now = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map_or(0, |since| since.as_millis() as u64);
+    let Some(line) = health_fact_job(person, text, now) else {
         return;
     };
     let socket = client.socket.clone();
     let kept = (person.to_owned(), text.to_owned());
     std::thread::spawn(move || {
-        let (told, _) = run_for(&socket, &call, WRITER_DEADLINE, Some(&kept.0));
-        let ok = told["remembered"] == true;
+        let ok = bounded_exchange(&socket, &line, WRITER_DEADLINE)
+            .is_some_and(|answer| answer["ok"] == true);
         eprintln!(
             "lamp-voice provider: an Apple Health read {} in the owner's own memory",
             if ok { "is kept" } else { "could not be kept" }
@@ -6533,25 +6541,31 @@ pub fn keep_health_fact(person: &str, text: &str) {
     });
 }
 
-/// The `remember` [`keep_health_fact`] runs for `person`'s `text`, or none:
-/// not a person the eyes know (`lamp_msgs::known::is_person_id`: the
-/// private room's "the-owner" on a lamp with no face enrolled has no scope
-/// a session reads), not a kept Apple Health fact, or kept already in this
-/// run ([`HEALTH_KEPT`]).
-pub(crate) fn health_fact_job(person: &str, text: &str) -> Option<ToolCall> {
+/// The memory request [`keep_health_fact`] sends for `person`'s `text` at
+/// `now` (`lamp_msgs::health_fact::REMEMBER_OP`), or none: not a person the
+/// eyes know (`lamp_msgs::known::is_person_id`: the private room's
+/// "the-owner" on a lamp with no face enrolled has no scope a session
+/// reads), not a kept Apple Health fact, or the last one kept for them in
+/// this run ([`HEALTH_KEPT`]).
+pub(crate) fn health_fact_job(person: &str, text: &str, now: u64) -> Option<Value> {
     if !lamp_msgs::known::is_person_id(person) || !lamp_msgs::health_fact::is_one(text) {
         return None;
     }
-    let kept = (person.to_owned(), text.to_owned());
     let mut done = HEALTH_KEPT.lock().ok()?;
-    if done.contains(&kept) {
+    if done.iter().any(|(who, kept)| who == person && kept == text) {
         return None;
     }
+    done.retain(|(who, _)| who != person);
     if done.len() >= 32 {
         done.remove(0);
     }
-    done.push(kept);
-    Some(health_fact_call(text))
+    done.push((person.to_owned(), text.to_owned()));
+    Some(json!({
+        "op": lamp_msgs::health_fact::REMEMBER_OP,
+        "person": person,
+        "at_unix_ms": now,
+        "text": text,
+    }))
 }
 
 /// [`HEALTH_KEPT`] let go: after a forget or an unlink the same read is
@@ -6559,15 +6573,6 @@ pub(crate) fn health_fact_job(person: &str, text: &str) -> Option<ToolCall> {
 pub fn health_facts_let_go() {
     if let Ok(mut done) = HEALTH_KEPT.lock() {
         done.clear();
-    }
-}
-
-/// The `remember` call [`keep_health_fact`] runs for `text`.
-pub(crate) fn health_fact_call(text: &str) -> ToolCall {
-    ToolCall {
-        id: "apple-health-read".to_owned(),
-        name: REMEMBER.to_owned(),
-        args: json!({ "text": text }),
     }
 }
 
