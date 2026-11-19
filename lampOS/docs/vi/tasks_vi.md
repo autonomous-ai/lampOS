@@ -2622,13 +2622,23 @@ khi đăng xuất, và với 0.6.60 khi đăng nhập (ROW của #7507).
     `NOT_IDLE` cũng được tính: không gì của ta chạy trong tiến trình mới
     đó, nên `working` ở đó là của tiến trình bị đóng băng, không phải một
     lượt cần chờ. Lại bị từ chối quá giới hạn thì là (b) `--fresh`, không
-    bao giờ resume lần nữa. Việc đang chờ chưa hề chạy, nên được gõ vào phiên
-    mới và được báo một lần.
+    bao giờ resume lần nữa. Việc đang chờ của một lần chạy skill chưa hề
+    chạy, nên được gõ vào phiên mới và được báo một lần. Một việc nói đang
+    chờ khi dấu hiệu 5 đóng phiên (lần đóng (a), hoặc `--fresh` (b)) kết
+    thúc ngay, `not_sent` `one_session_stuck` (`STUCK_ENDED`), không bao
+    giờ bị trả lại hàng đợi: trả lại quá giới hạn xác nhận của store
+    (`CONFIRM_MS`, 120 s từ lúc prepare việc) làm nó hết hạn mà không ai
+    nghe, nên nó nằm chờ tới giới hạn 480 s của lamp-voice (lamp-c0a4,
+    19/11 21:47-21:55). Việc đang chờ kết thúc với một câu ngắn "hãy hỏi
+    lại", được Task news báo một lần (`failed_stuck`: "I can't handle that
+    right now; please ask me again in a few minutes."); việc đóng và mở lại
+    vẫn diễn ra như trên, và việc tiếp theo đi vào phiên đã mở lại.
     Bên cạnh giới hạn của #7895: một lần từ chối `ENGINE_NOT_READY` không
     bao giờ tiêu một trong `STARTING_RESUMES_MOST` (3) lần thử của một việc
     nói; các lần thử đó chỉ đếm `NOT_RUNNING`, một `TIMEOUT` không nhận gì
     và một lần mở thất bại. Nên các lần từ chối của một phiên bị đóng băng
-    trả việc lại `busy` cho tới khi dấu hiệu 5 buông phiên đó, và chỉ một
+    trả việc lại `busy` cho tới khi dấu hiệu 5 kết thúc nó
+    (`one_session_stuck`), và chỉ một
     phiên được ensure lại mà vẫn không nhận lời mới tiêu các lần thử và
     kết thúc việc với `one_session_not_started`.
 
