@@ -1749,6 +1749,9 @@ pub type ReadBackAsked = Arc<dyn Fn(&str) -> Option<String> + Send + Sync>;
 /// The call a heard line plainly asks for by an installed skill's name, as
 /// its name and arguments, or none (`crate::skill_named::heard`, #6772).
 pub type SkillNamed = Arc<dyn Fn(&str) -> Option<(String, Value)> + Send + Sync>;
+/// Whether words (the lamp's own) name a skill made on the lamp by its
+/// name, as words in a row (`crate::skill_named::Heard::names_made`).
+pub type MadeNamed = Arc<dyn Fn(&str) -> bool + Send + Sync>;
 /// An installed skill's own ask phrases, by its function's name
 /// (`crate::tools::skill_asks`, #5749): what a called skill's recording
 /// may play for besides a line that asks to play.
@@ -2151,6 +2154,9 @@ struct Shared {
     /// The skill a heard line plainly asks for by its name: called in code
     /// as round 1 ([`Engine::calling_skills_named`]).
     skill_named: Option<SkillNamed>,
+    /// Whether words name one of the skills made on the lamp, by its name
+    /// ([`Engine::knowing_made_names`]).
+    made_named: Option<MadeNamed>,
     /// A called skill's own ask phrases: a line that holds one that asks to
     /// play is an ask for its recording ([`Engine::playing_for_skill_asks`]).
     skill_asks: Option<SkillAsks>,
@@ -5197,6 +5203,7 @@ impl Engine {
                 named_ask: None,
                 read_back_asked: None,
                 skill_named: None,
+                made_named: None,
                 skill_asks: None,
                 named_agent: None,
                 named_agent_takes_line: false,
@@ -7153,6 +7160,17 @@ impl Engine {
     pub fn calling_skills_named(mut self, named: SkillNamed) -> Self {
         if let Some(shared) = Arc::get_mut(&mut self.shared) {
             shared.skill_named = Some(named);
+        }
+        self
+    }
+
+    /// With [`Self::calling_skills_named`]: whether the lamp's last words
+    /// name a skill made on the lamp (`named`), so the lamp was talking of
+    /// its made skills and a made skill's name said next answers it
+    /// ([`lamp_awaits_answer_for`]). Before any turn only.
+    pub fn knowing_made_names(mut self, named: MadeNamed) -> Self {
+        if let Some(shared) = Arc::get_mut(&mut self.shared) {
+            shared.made_named = Some(named);
         }
         self
     }
@@ -15294,40 +15312,78 @@ fn lamp_awaits_answer(held: bool, messages: &[Message]) -> bool {
 
 /// The lamp's newest words in `messages` that hold a letter or a digit.
 fn lamp_last_words(messages: &[Message]) -> Option<&str> {
-    messages
+    lamp_last_at(messages).and_then(|at| messages[at].words())
+}
+
+/// Where in `messages` the lamp's newest words that hold a letter or a
+/// digit are ([`lamp_last_words`]).
+fn lamp_last_at(messages: &[Message]) -> Option<usize> {
+    messages.iter().rposition(|message| {
+        message.role == "assistant"
+            && message
+                .words()
+                .is_some_and(|words| words.chars().any(char::is_alphanumeric))
+    })
+}
+
+/// Whether the lamp's turn that said its newest words ([`lamp_last_at`]),
+/// back to the person's line it answered, ran a `make_skill` call kept in
+/// the history (`LAMP_HISTORY_KEEPS_CALLS`, [`kept_made`]: a remove asked
+/// or done, a turn off or on): that turn was the lamp managing its made
+/// skills, so what it asked is of them.
+fn lamp_turn_made_skills(messages: &[Message]) -> bool {
+    let Some(at) = lamp_last_at(messages) else {
+        return false;
+    };
+    messages[..at]
         .iter()
         .rev()
+        .take_while(|message| message.role != "user")
         .filter(|message| message.role == "assistant")
-        .find_map(|message| {
-            message
-                .words()
-                .filter(|words| words.chars().any(char::is_alphanumeric))
-        })
+        .flat_map(|message| &message.tool_calls)
+        .any(|call| call["function"]["name"] == crate::made_skill::MAKE)
 }
 
 /// [`lamp_awaits_answer`] for a line the heard words matched to a skill
 /// (`named`, its call): a made skill's own words or name, said plainly,
 /// still run it in code after the lamp's last words asked something, when
-/// those words name neither the skill nor the line's own words
-/// ([`crate::skill_named::asked_about`]). The lead's live test, 19 Nov
-/// 09:06: after the lamp's question, four "daily brief" lines were each
-/// left to the model, which called nothing. A held yes still waits.
+/// the lamp was not talking of its made skills. The lead's live test, 19
+/// Nov 09:06: after the lamp's question, four "daily brief" lines were
+/// each left to the model, which called nothing. A held yes still waits.
+///
+/// The line stays the answer, the model's to read with the skill told
+/// ([`crate::skill_named::awaited_note`]), when what the code knows ties
+/// the lamp's question to its made skills (Heron's and Twelve's HOLD on
+/// #7916: "Which one do you want me to delete?" then "daily brief" ran
+/// it): its last words name the skill or the line's own words
+/// ([`crate::skill_named::asked_about`]), or any made skill by a name
+/// that alone would run it (`made_named`,
+/// [`crate::skill_named::names_made`]), or its turn ran a kept
+/// `make_skill` call ([`lamp_turn_made_skills`]). Structural only, by the
+/// skills the lamp has and the calls it ran: no word of the question is
+/// matched for what it asks (the owner: the model judges meaning). So a
+/// question of them that names none and follows no kept call ("Which
+/// skill should I turn off?" alone) is not told apart here.
 fn lamp_awaits_answer_for(
     held: bool,
     messages: &[Message],
     named: Option<&(String, Value)>,
     heard: &str,
+    made_named: Option<&MadeNamed>,
 ) -> bool {
     if !lamp_awaits_answer(held, messages) {
         return false;
     }
     let made = named.filter(|(name, _)| name == crate::made_skill::MAKE);
     match (held, made, lamp_last_words(messages)) {
-        (false, Some((name, args)), Some(said)) => crate::skill_named::asked_about(
-            said,
-            heard,
-            crate::skill_named::function_of(name, args),
-        ),
+        (false, Some((name, args)), Some(said)) => {
+            crate::skill_named::asked_about(
+                said,
+                heard,
+                crate::skill_named::function_of(name, args),
+            ) || made_named.is_some_and(|named| named(said))
+                || lamp_turn_made_skills(messages)
+        }
         _ => true,
     }
 }
@@ -17838,13 +17894,15 @@ async fn answer(
                 );
             }
         }
-        // A made skill's words or name run it past a question that names
-        // it not ([`lamp_awaits_answer_for`], the lead's live test, 19 Nov).
+        // A made skill's words or name run it past a question that is not
+        // of the made skills ([`lamp_awaits_answer_for`], the lead's live
+        // test, 19 Nov; Heron's and Twelve's HOLD on #7916).
         let awaits_named = lamp_awaits_answer_for(
             held,
             &messages,
             skill_named.as_ref(),
             named_said.as_deref().unwrap_or_default(),
+            shared.made_named.as_ref(),
         );
         if awaits && !awaits_named {
             eprintln!(
