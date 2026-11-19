@@ -1000,7 +1000,13 @@ pub fn hand(
         Ok(sha256) => sha256,
         Err(why) => return format!("do.task: not handed over: its folder can't be read: {why}"),
     };
-    if let Some(why) = yes_refuses(place.control, skill, &sha256, grants) {
+    // A core variant's task is pre-approved (`crate::core_agent::pre_approved`,
+    // the first builder's 08:57): no yes is asked, aloud or of lamp-control.
+    let pre_approved = grants.is_empty() && crate::core_agent::pre_approved(folder);
+    if let Some(why) = (!pre_approved)
+        .then(|| yes_refuses(place.control, skill, &sha256, grants))
+        .flatten()
+    {
         // No yes for the folder as it is (#6071's V2): the lamp asks for
         // it itself, once a folder, never lamp-control's no answer.
         if why == WAITING || why == CHANGED {
