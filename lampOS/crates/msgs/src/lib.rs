@@ -102,6 +102,8 @@ mod chat;
 pub use chat::*;
 mod presence;
 pub use presence::*;
+mod heat;
+pub use heat::*;
 mod account;
 pub use account::*;
 mod energy;
@@ -2708,6 +2710,7 @@ pub fn declaration_of(topic: &str) -> Option<Declaration> {
         .chain(app_trigger_topics())
         .chain(chat_topics())
         .chain(presence_topics())
+        .chain(heat_topics())
         .chain(reports_topics())
         .chain(account_topics())
         .chain(energy_topics())

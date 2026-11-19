@@ -673,6 +673,7 @@ const BUS_TOPICS: &[&str] = &[
     "apps/trigger",
     "apps/triggers",
     "attention/addressed",
+    "board/heat",
     "board/state",
     "body/gesture",
     "body/hand",

@@ -9,10 +9,12 @@
 //!   `Health`. Arithmetic, and nothing else.
 //! - [`board`]: the board's own numbers, read from the system's files, and
 //!   the board's own report: when a number is too high.
+//! - [`heat`]: how hot the board is for the work that can wait, ok, warm
+//!   or hot with hysteresis, published as `board/heat` (#7879).
 //! - [`reach`]: whether the internet answers while the voice's link is
 //!   down, so a relay outage is not taken for no internet (#830).
 //! - [`serve`]: the loop that listens on the bus and publishes
-//!   `lamp/health` and `board/state`.
+//!   `lamp/health`, `board/state` and `board/heat`.
 //! - [`show`]: what `lamp-health` prints for a person, and the status it
 //!   ends with.
 
@@ -22,6 +24,7 @@
 #![deny(clippy::print_stderr, clippy::print_stdout, clippy::dbg_macro)]
 
 pub mod board;
+pub mod heat;
 pub mod parts;
 pub mod reach;
 pub mod serve;
