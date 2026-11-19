@@ -3200,7 +3200,7 @@ fn a_cut_openclaws_own_check_does_not_take_is_removed() {
             said.push(line.to_owned())
         })
         .unwrap();
-        assert_eq!(*checked.borrow(), [cut.clone()], "{why}");
+        assert_eq!(*checked.borrow(), std::slice::from_ref(&cut), "{why}");
         assert!(fs::symlink_metadata(&json).is_err(), "{why}");
         assert_eq!(fs::read_dir(&state).unwrap().count(), 0, "{why}");
         assert!(removed > 0, "{why}");
