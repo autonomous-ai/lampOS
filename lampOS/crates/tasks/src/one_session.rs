@@ -1527,7 +1527,7 @@ impl OneSession {
             && let Some(kind) = engine_named(&engine)
         {
             let now = std::mem::take(&mut self.lock().drop_now);
-            if let Err(code) = harness.close_kept(&name_for(kind), file, now) {
+            if let Err(code) = self.close_kept(harness, &name_for(kind), file, now) {
                 eprintln!(
                     "tasks: one session: the kept session {} not closed: {code}; tried again next",
                     short(&agent)
@@ -2329,7 +2329,7 @@ impl OneSession {
                     && let Some(file) = self.kept_token.clone()
                 {
                     if let Err(code) =
-                        harness.close_kept(&name_for(pane.place.engine), &file, false)
+                        self.close_kept(harness, &name_for(pane.place.engine), &file, false)
                     {
                         eprintln!(
                             "tasks: one session: the old kept session {} not closed: {code}",
@@ -2859,7 +2859,7 @@ impl OneSession {
             .filter(|pane| pane.agent == agent)
             .map_or(EngineKind::Openclaw, |pane| pane.place.engine);
         match self.kept_now(agent) {
-            Some((name, token)) => match harness.close_kept(&name, &token, true) {
+            Some((name, token)) => match self.close_kept(harness, &name, &token, true) {
                 Ok(()) => self.kept_closed(agent, engine),
                 Err(code) => {
                     eprintln!(
@@ -3014,6 +3014,32 @@ impl OneSession {
     /// ends [`NOT_STARTED`] ([`spoken_launch`]).
     pub fn not_up_spent(&self, id: &str) -> bool {
         matches!(&self.lock().unstarted, Some((was, count)) if was == id && *count > STARTING_RESUMES_MOST)
+    }
+
+    /// `harness close` of the kept session `name`, every close lamp-tasks
+    /// makes of it (#7906). A close Harness refuses because the session's
+    /// saved conversation can't be read
+    /// ([`crate::harness::CLOSE_CONVERSATION_GONE`]: its Gateway key was
+    /// already deleted, and Harness checkpoints before it closes) counts as
+    /// closed: the caller forgets the record and the next open is
+    /// `--fresh`, which replaces the session; it is never tried for ever.
+    /// Every caller closes first and deletes the conversation after.
+    fn close_kept(
+        &self,
+        harness: &dyn PaneHarness,
+        name: &str,
+        token: &Path,
+        now: bool,
+    ) -> Result<(), String> {
+        match harness.close_kept(name, token, now) {
+            Err(code) if code == crate::harness::CLOSE_CONVERSATION_GONE => {
+                eprintln!(
+                    "tasks: one session: the kept session {name}'s close refused, its conversation already gone; taken as closed, a fresh one next (#7906)"
+                );
+                Ok(())
+            }
+            closed => closed,
+        }
     }
 
     /// The pane gone with `why`: let go, so the next open makes a new one.
@@ -3771,7 +3797,7 @@ impl Turn<'_> {
                 Ok(Some(state)) if state == "needs-input" => {
                     match kept {
                         Some((name, token)) => {
-                            let _ = harness.close_kept(name, token, false);
+                            let _ = self.one.close_kept(harness, name, token, false);
                             self.one.kept_closed(agent, EngineKind::Openclaw);
                         }
                         None => {
@@ -3934,8 +3960,9 @@ impl Turn<'_> {
         // deleted, ensured anew next.
         let closed = match self.one.kept_now(agent) {
             Some((name, token)) => {
-                let closed = harness
-                    .close_kept(&name, &token, true)
+                let closed = self
+                    .one
+                    .close_kept(harness, &name, &token, true)
                     .map(|()| Closed::Closed);
                 match &closed {
                     Ok(_) => self.one.kept_closed(agent, EngineKind::Openclaw),
