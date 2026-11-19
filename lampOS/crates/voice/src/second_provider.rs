@@ -19439,22 +19439,27 @@ async fn answer(
                         ),
                 )
                 .or_else(|| {
-                    // Judged whole (`LAMP_KEEP_CLAIM_WHOLE`, #7878): a keep,
-                    // replace or update said done in any sentence, as a
+                    // Sentence by sentence (`LAMP_KEEP_CLAIM_WHOLE`, #7878):
+                    // a sentence held for a keep or replace said done, as a
                     // hard claim ("Got it — your car is on Level B1, spot 7
-                    // now. That replaces wherever it was before.").
-                    // Only with no call at all in the round: beside a light's
-                    // or another call, its words are that call's ("Done,
-                    // I've updated your light."; the Reviewer-lead's P2 on
-                    // #7924).
+                    // now. That replaces wherever it was before."). A keep
+                    // in memory's own words ("I'll remember you're
+                    // vegetarian.") counts beside any call; a replace or
+                    // update only with no call at all, since beside a
+                    // light's or a reminder's it is that call's ("Done, I've
+                    // updated your light."; the Reviewer-lead's P2 and V2's
+                    // must-fix (3) on #7924).
                     (keep_whole_turn
                         && held_whole
                         && !remember_ran
-                        && calls.is_empty()
-                        && crate::remember::claims_a_change(&held))
+                        && match crate::remember::change_claim(&held) {
+                            Some(crate::remember::Change::Keep) => true,
+                            Some(crate::remember::Change::Replace) => calls.is_empty(),
+                            None => false,
+                        })
                     .then(|| {
                         eprintln!(
-                            "lamp-voice second: request {request} chat round {round}: its reply, held whole on a line about the person, says in it that something was kept or replaced (LAMP_KEEP_CLAIM_WHOLE)"
+                            "lamp-voice second: request {request} chat round {round}: a held sentence of its reply says something was kept or replaced, with no remember (LAMP_KEEP_CLAIM_WHOLE)"
                         );
                         crate::remember::KeepClaim::Hard
                     })
