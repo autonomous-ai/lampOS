@@ -1336,7 +1336,10 @@ mod tests {
                 why,
                 "{seen:?}"
             );
-            assert!(lamp.said.is_empty(), "nothing said, no short line: {seen:?}");
+            assert!(
+                lamp.said.is_empty(),
+                "nothing said, no short line: {seen:?}"
+            );
             assert!(lamp.now - 1_000 >= WAIT.as_millis() as u64, "waited");
         }
         let mut lamp = Lamp::new(vec![alone()], json!({}));
@@ -1359,7 +1362,10 @@ mod tests {
         };
         let mut lamp = Lamp::new(vec![two.clone()], json!({}));
         assert_eq!(tell_answer(&lines, Asker::Owner, &mut lamp), "told 1");
-        assert_eq!((lamp.said.clone(), lamp.said_at.clone()), (lines.clone(), vec![1_000]));
+        assert_eq!(
+            (lamp.said.clone(), lamp.said_at.clone()),
+            (lines.clone(), vec![1_000])
+        );
         for (seen, why) in [
             (two, "not alone"),
             (
