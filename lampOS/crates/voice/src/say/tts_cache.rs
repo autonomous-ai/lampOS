@@ -847,4 +847,140 @@ mod tests {
         assert!(whole_within(short, slow(4)).await.is_ok());
         assert_eq!(render_within(&"a".repeat(10_000)), RENDER_MOST);
     }
+
+    /// A cache whose speech service speaks at the voice's pace,
+    /// [`RENDER_MORE_CHARS`] characters in 2 s, and the lines it was asked
+    /// to render, in turn.
+    fn paced(dir: &Path) -> (TtsCache, Arc<Mutex<Vec<String>>>) {
+        let asked = Arc::new(Mutex::new(Vec::new()));
+        let seen = Arc::clone(&asked);
+        let render: Render = Box::new(move |text: &str| {
+            seen.lock().unwrap().push(text.to_owned());
+            let frames =
+                text.chars().count() * 2 * crate::say::SOUND_RATE as usize / RENDER_MORE_CHARS;
+            Ok(vec![1; frames])
+        });
+        (TtsCache::new(dir, "Rachel", "m", "en", render), asked)
+    }
+
+    /// How long `text` plays at the paced voice's pace, in frames.
+    fn paced_frames(text: &str) -> usize {
+        text.chars().count() * 2 * crate::say::SOUND_RATE as usize / RENDER_MORE_CHARS
+    }
+
+    /// The words of `pieces`, in order.
+    fn words_of(pieces: &[String]) -> Vec<&str> {
+        pieces
+            .iter()
+            .flat_map(|piece| piece.split_whitespace())
+            .collect()
+    }
+
+    /// #7892: an exact line about a minute long (a task's told answer,
+    /// OpenClaw's, on lamp-52e6) rendered past 20 s and was refused whole,
+    /// so nothing was said. It is rendered whole, in pieces each within
+    /// [`MOST_FRAMES`], and played as one line: every piece, in order.
+    #[test]
+    fn a_minute_long_exact_line_is_rendered_whole_in_pieces() {
+        let dir = scratch("minute");
+        let (cache, asked) = paced(&dir);
+        let sentence = "The lamp kept the room warm at night, dimmed itself slowly \
+            while you read, and asked before it turned the speaker up past half. ";
+        let line = sentence.repeat(7);
+        let line = line.trim_end();
+        assert!(line.len() <= crate::say::MOST_WORDS_BYTES);
+        let seconds = paced_frames(line) / crate::say::SOUND_RATE as usize;
+        assert!((55..=60).contains(&seconds), "{seconds} s");
+
+        let samples = cache.render_once(line).unwrap();
+        let asked = asked.lock().unwrap().clone();
+        assert!(asked.len() > 1, "rendered in pieces: {asked:?}");
+        for piece in &asked {
+            assert!(paced_frames(piece) <= MOST_FRAMES as usize, "{piece:?}");
+        }
+        assert_eq!(
+            samples.len(),
+            asked.iter().map(|piece| paced_frames(piece)).sum::<usize>(),
+            "every piece played, none dropped"
+        );
+        assert!(samples.len() > MOST_FRAMES as usize);
+        assert_eq!(
+            words_of(&asked),
+            line.split_whitespace().collect::<Vec<_>>()
+        );
+        assert!(cache.kept(line).is_none(), "never kept");
+    }
+
+    /// A sentence alone past 20 s is cut where its clauses end; one with no
+    /// clause mark, between its words. No word is cut, lost, added or moved.
+    #[test]
+    fn an_exact_sentence_past_20_s_is_split_at_a_clause_or_a_word() {
+        let dir = scratch("sentence");
+        let (cache, asked) = paced(&dir);
+        let clauses = (1..=8)
+            .map(|at| format!("the {at} small lamp on the shelf by the window glows softly"))
+            .collect::<Vec<_>>()
+            .join(", ")
+            + ".";
+        assert!(paced_frames(&clauses) > MOST_FRAMES as usize);
+        cache.render_once(&clauses).unwrap();
+        let pieces = std::mem::take(&mut *asked.lock().unwrap());
+        assert!(pieces.len() > 1, "{pieces:?}");
+        for piece in &pieces {
+            assert!(paced_frames(piece) <= MOST_FRAMES as usize, "{piece:?}");
+            assert!(
+                piece.ends_with([',', '.']),
+                "cut inside a clause: {piece:?}"
+            );
+        }
+        assert_eq!(
+            words_of(&pieces),
+            clauses.split_whitespace().collect::<Vec<_>>()
+        );
+
+        let plain = (1..=70)
+            .map(|at| format!("word{at}"))
+            .collect::<Vec<_>>()
+            .join(" ");
+        assert!(paced_frames(&plain) > MOST_FRAMES as usize);
+        cache.render_once(&plain).unwrap();
+        let pieces = std::mem::take(&mut *asked.lock().unwrap());
+        assert!(pieces.len() > 1, "{pieces:?}");
+        let original: Vec<&str> = plain.split_whitespace().collect();
+        for piece in &pieces {
+            assert!(paced_frames(piece) <= MOST_FRAMES as usize, "{piece:?}");
+            for word in piece.split_whitespace() {
+                assert!(original.contains(&word), "a word cut: {word:?}");
+            }
+        }
+        assert_eq!(words_of(&pieces), original);
+    }
+
+    /// No word is lost, added or moved, whatever marks a long line has;
+    /// a short line is rendered once as it is; and a piece that still
+    /// renders past [`MOST_FRAMES`] refuses the line, the cap unchanged.
+    #[test]
+    fn an_exact_lines_pieces_keep_its_words_in_order_and_the_cap_stays() {
+        let dir = scratch("words");
+        let (cache, asked) = paced(&dir);
+        let line = "First: the kettle is on! Is the door shut? Yes; it is, and \
+            the window too. "
+            .repeat(6)
+            + "Then (at nine) the lamp dims - slowly - to a glow; that's all.";
+        cache.render_once(&line).unwrap();
+        let pieces = std::mem::take(&mut *asked.lock().unwrap());
+        assert!(pieces.len() > 1, "{pieces:?}");
+        assert_eq!(
+            words_of(&pieces),
+            line.split_whitespace().collect::<Vec<_>>()
+        );
+
+        cache.render_once("Build passed.").unwrap();
+        assert_eq!(*asked.lock().unwrap(), ["Build passed."]);
+
+        let render: Render = Box::new(|_: &str| Ok(vec![1; MOST_FRAMES as usize + 1]));
+        let slow = TtsCache::new(&dir, "Rachel", "m", "en", render);
+        assert!(slow.render_once("Hi.").is_err());
+        assert!(slow.render_once(&line).is_err());
+    }
 }
