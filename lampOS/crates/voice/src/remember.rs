@@ -567,34 +567,77 @@ const CHANGE_LEADS: [&str; 9] = [
 /// ([`CHANGE_LEADS`]), never in a sentence asked as a question (#7878).
 /// Structure only, as [`keep_claim`] reads a reply.
 pub fn claims_a_change(reply: &str) -> bool {
+    change_claim(reply).is_some()
+}
+
+/// The keeps said in the person's own words after "I'll remember", which
+/// [`keep_claim`] leaves to an object word ("that", "it"): "I'll remember
+/// you're vegetarian.", "I'll remember your car is on B1." (V2's must-fix
+/// (3) on #7924). Never "I'll remember to …", a promise to remind.
+const KEEP_SAID: [&str; 4] = [
+    "i'll remember you",
+    "i will remember you",
+    "i'll remember your",
+    "i will remember your",
+];
+
+/// What a sentence of a reply says was done to the person's things
+/// ([`change_claim`]).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Change {
+    /// A keep said in memory's own words (a hard [`keep_claim`], or
+    /// [`KEEP_SAID`]): only a `remember` makes it true, whatever else ran.
+    Keep,
+    /// A replace or update said done ([`CHANGE_CLAIMS`]) or a soft keep:
+    /// another call that ran may be what it means ("I've updated that"
+    /// beside a reminder moved), so it counts only with no call at all.
+    Replace,
+}
+
+/// The strongest change any sentence of `reply` says done, never in a
+/// sentence asked as a question: a [`Change::Keep`] over a
+/// [`Change::Replace`] (#7878, #7924).
+pub fn change_claim(reply: &str) -> Option<Change> {
     let text = reply
         .replace('\u{2019}', "'")
         .replace(['\u{2014}', '\u{2013}'], ",");
-    text.split_inclusive(['.', '!', '?'])
+    let mut found = None;
+    for sentence in text
+        .split_inclusive(['.', '!', '?'])
         .map(str::trim)
         .filter(|sentence| !sentence.is_empty() && !sentence.ends_with('?'))
-        .any(|sentence| {
-            keep_claim(sentence).is_some() || {
-                let mut rest = sentence.to_lowercase();
-                for _ in 0..2 {
-                    let Some(lead) = CHANGE_LEADS.iter().find(|lead| {
-                        rest.strip_prefix(**lead).is_some_and(|after| {
-                            after.starts_with(|c: char| !c.is_alphanumeric() && c != '\'')
-                        })
-                    }) else {
-                        break;
-                    };
-                    rest = rest[lead.len()..]
-                        .trim_start_matches(|c: char| !c.is_alphanumeric())
-                        .to_owned();
-                }
-                CHANGE_CLAIMS.iter().any(|claim| {
-                    rest.strip_prefix(claim).is_some_and(|after| {
-                        after.is_empty() || after.starts_with(|c: char| !c.is_alphanumeric())
-                    })
+    {
+        match keep_claim(sentence) {
+            Some(KeepClaim::Hard | KeepClaim::Face) => return Some(Change::Keep),
+            Some(KeepClaim::Soft) => found = Some(Change::Replace),
+            None => {}
+        }
+        let mut rest = sentence.to_lowercase();
+        for _ in 0..2 {
+            let Some(lead) = CHANGE_LEADS.iter().find(|lead| {
+                rest.strip_prefix(**lead).is_some_and(|after| {
+                    after.starts_with(|c: char| !c.is_alphanumeric() && c != '\'')
                 })
-            }
-        })
+            }) else {
+                break;
+            };
+            rest = rest[lead.len()..]
+                .trim_start_matches(|c: char| !c.is_alphanumeric())
+                .to_owned();
+        }
+        let opens = |claim: &&str| {
+            rest.strip_prefix(*claim).is_some_and(|after| {
+                after.is_empty() || after.starts_with(|c: char| !c.is_alphanumeric())
+            })
+        };
+        if KEEP_SAID.iter().any(opens) {
+            return Some(Change::Keep);
+        }
+        if CHANGE_CLAIMS.iter().any(opens) {
+            found = Some(Change::Replace);
+        }
+    }
+    found
 }
 
 /// What the model is told of a reply that said it saved, or was saving,
@@ -33149,6 +33192,7 @@ mod chapter_tests {
             "Okay, your car is on B1. I've updated that.",
             "Okay, I've updated that: B1, spot 7.",
             "Sure. I'll remember that.",
+            "Okay. I'll remember you're vegetarian.",
             "Spot 7 on B1. Kept.",
         ] {
             assert!(claims_a_change(reply), "{reply}");
@@ -33158,6 +33202,7 @@ mod chapter_tests {
             "Got it \u{2014} your car is on Level B1, spot 7 now.",
             "Should I remember that your car is on B1?",
             "Updates come every night.",
+            "I'll remember to remind you at five.",
             "Done, I've updated your light.",
             "Okay, it replaces your old one.",
             "Updated forecast: rain at noon.",
@@ -33182,5 +33227,29 @@ mod chapter_tests {
         assert_eq!(unclaimed_sentences("Kept: your car is on B1."), 0);
         let story = "Here's one. A lamp lit a room. The end.";
         assert_eq!(unclaimed_sentences(story), story.len());
+    }
+
+    /// V2's must-fix (3) on #7924: a keep in memory's own words is a
+    /// [`Change::Keep`], which counts beside any call; a replace or update
+    /// is a [`Change::Replace`], which counts only with none.
+    #[test]
+    fn a_keep_said_is_a_keep_and_an_update_is_a_replace() {
+        assert_eq!(
+            change_claim("Okay. I'll remember you're vegetarian."),
+            Some(Change::Keep)
+        );
+        assert_eq!(
+            change_claim("Your reminder is at 3. Kept."),
+            Some(Change::Keep)
+        );
+        assert_eq!(
+            change_claim("Got it. That replaces wherever it was before."),
+            Some(Change::Replace)
+        );
+        assert_eq!(
+            change_claim("Okay, I've updated that."),
+            Some(Change::Replace)
+        );
+        assert_eq!(change_claim("I'll remember to remind you at five."), None);
     }
 }
