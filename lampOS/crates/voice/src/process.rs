@@ -4427,6 +4427,7 @@ mod tests {
                     "LAMP_HISTORY_SAID_ONCE=on",
                     "LAMP_JOIN_CUT_WORDS=on",
                     "LAMP_KEEP_ANSWERS_AT_ONCE=on",
+                    "LAMP_KEEP_CLAIM_WHOLE=on",
                     "LAMP_KEEP_QUIETLY=on",
                     "LAMP_KEEP_QUIETLY_ONE_FACE=on",
                     "LAMP_KERNEL_CLOCK=on",
