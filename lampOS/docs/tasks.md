@@ -2868,17 +2868,20 @@ OpenClaw 2026.11.2 refused, 78/CONFIG, took lamp-52e6's gateway down): a
 changed text goes to a new 0600 file beside `openclaw.json`, and OpenClaw's
 own `config validate --json` runs on it through lamp-update's wrapper
 `/usr/local/bin/openclaw` (`openclaw_config::validate`), pointed at that
-file by `OPENCLAW_CONFIG_PATH`, never the live one, with
-`LAMP_OPENCLAW_GATEWAY=on` so it starts in namespaces of its own and runs
-with the gateway down, in OpenClaw's own environment, at most 60 s. Only
+file by `OPENCLAW_CONFIG_PATH`, never the live one, joined to the running
+gateway's namespaces as the wrapper's every other call is (never
+`LAMP_OPENCLAW_GATEWAY=on`: OpenClaw 2026.11.2 refuses a check in
+namespaces of its own while its gateway runs, `GatewayLockNamespaceError`,
+#7268's ROW FAIL on lamp-52e6), in OpenClaw's own environment, at most 60 s. Only
 status 0 renames it into place (`hermes_config::replace_checked`).
 Refused (or past 60 s), the new file is removed, `openclaw.json` stays byte
 for byte, and the journal line says "OpenClaw's settings not written: ...
 OpenClaw's own config check refused it (status 1): <OpenClaw's words>".
 With no wrapper at `/usr/local/bin/openclaw` (OpenClaw not installed) the
 text is written as before, with a journal line "written unchecked". A
-wrapper that can't run OpenClaw (no forwarder token, no Node) refuses, so
-nothing is written until lamp-tasks' next start.
+wrapper that can't run OpenClaw (no forwarder token, no Node, or no gateway
+running: it fails closed) refuses, so nothing is written until lamp-tasks'
+next start.
 
 ## Harness's hooks inside the lamp's agent namespace (#6530)
 

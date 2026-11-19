@@ -376,9 +376,12 @@ pub fn write_checked(
 
 /// OpenClaw's own check of the config text in `file`: `config validate
 /// --json` run through its wrapper `validator`, pointed at `file` by
-/// `OPENCLAW_CONFIG_PATH` (never the live `openclaw.json`), in namespaces
-/// of its own (`LAMP_OPENCLAW_GATEWAY=on`, never the running gateway's,
-/// so it runs with the gateway down), with OpenClaw's own environment
+/// `OPENCLAW_CONFIG_PATH` (never the live `openclaw.json`), joined to the
+/// running gateway's namespaces as the wrapper's every other call is
+/// (never `LAMP_OPENCLAW_GATEWAY`: namespaces of its own are refused by
+/// OpenClaw 2026.11.2 while its gateway runs, `GatewayLockNamespaceError`,
+/// #7268's ROW FAIL on lamp-52e6), so with no gateway running the wrapper
+/// fails closed and nothing is written; with OpenClaw's own environment
 /// (`crate::gateway::APPROVALS_ENV`) and nothing else, killed with its
 /// process group past [`VALIDATE_WITHIN`]. `Ok` only on status 0; else
 /// what OpenClaw said, on one line and short.
@@ -390,7 +393,6 @@ pub fn validate(validator: &Path, file: &Path) -> Result<(), String> {
         .args(["config", "validate", "--json"])
         .env_clear()
         .envs(crate::gateway::APPROVALS_ENV)
-        .env("LAMP_OPENCLAW_GATEWAY", "on")
         .env("OPENCLAW_CONFIG_PATH", file)
         .current_dir("/")
         .stdin(Stdio::null())

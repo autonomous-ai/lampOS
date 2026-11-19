@@ -2992,16 +2992,19 @@ lamp-52e6 chết): văn bản đã đổi được ghi vào một file mới 060
 `openclaw.json`, và `config validate --json` của chính OpenClaw chạy trên
 file đó qua wrapper `/usr/local/bin/openclaw` của lamp-update
 (`openclaw_config::validate`), trỏ tới file đó bằng `OPENCLAW_CONFIG_PATH`,
-không bao giờ file đang dùng, với `LAMP_OPENCLAW_GATEWAY=on` nên nó chạy
-trong namespace riêng và chạy được khi gateway chết, trong môi trường riêng
-của OpenClaw, tối đa 60 s. Chỉ status 0 mới rename nó vào chỗ
+không bao giờ file đang dùng, nhập vào namespace của gateway đang chạy như
+mọi lần gọi khác của wrapper (không bao giờ `LAMP_OPENCLAW_GATEWAY=on`:
+OpenClaw 2026.11.2 từ chối lần kiểm tra trong namespace riêng khi gateway
+của nó đang chạy, `GatewayLockNamespaceError`, ROW FAIL của #7268 trên
+lamp-52e6), trong môi trường riêng của OpenClaw, tối đa 60 s. Chỉ status 0 mới rename nó vào chỗ
 (`hermes_config::replace_checked`). Bị từ chối (hoặc quá 60 s) thì file mới
 bị xóa, `openclaw.json` giữ nguyên từng byte, và dòng nhật ký nói
 "OpenClaw's settings not written: ... OpenClaw's own config check refused
 it (status 1): <lời của OpenClaw>". Không có wrapper ở
 `/usr/local/bin/openclaw` (OpenClaw chưa cài) thì văn bản được ghi như
 trước, kèm dòng nhật ký "written unchecked". Wrapper không chạy được
-OpenClaw (không có token của forwarder, không có Node) thì từ chối, nên
+OpenClaw (không có token của forwarder, không có Node, hoặc không có gateway
+đang chạy: nó đóng an toàn) thì từ chối, nên
 không ghi gì cho tới lần lamp-tasks khởi động sau.
 
 ## Hook của Harness bên trong namespace agent của đèn (#6530)
