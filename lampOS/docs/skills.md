@@ -6884,8 +6884,18 @@ the same code for both writers.
   `make_skill`'s `request`, which is taken only when no line of theirs was
   heard (a make from the app or a typed line); the judgement and the one
   more call are asked of the same words. A line longer than a task holds
-  (`made_skill::MOST_TASK_CHARS`, `make_no_cannot::task_cut`) is refused,
-  said plainly, never cut. It is run by `scripts/agent.py`, whose brief
+  (`made_skill::MOST_TASK_CHARS`, `make_no_cannot::task_cut`) is never
+  refused for its length nor cut: its task is the model's own sentence in
+  the one more call (`task:`), kept only when every number, time and name
+  of the line survives (`make_no_cannot::task_kept`, #7904; the first
+  builder's call on #7819), and that sentence is what the brief quotes. So
+  is the task of the internet's route
+  (`make_skill_local::net_made`, `LAMP_TASK_NET`) and of the model's
+  `cannot:` (`make_skill_local::no_cannot`, `LAMP_MAKE_NO_CANNOT`): the
+  same own line, the same checked words for one too long, on a trigger as
+  when only asked for (Twelve's follow-up on #7819, 02:41;
+  `make_in_gives_the_internets_task_the_own_make_line_and_words_one_too_long`
+  drives `make_in` itself). It is run by `scripts/agent.py`, whose brief
   names what fired it and quotes the line whole ("A skill the person made
   has fired (when someone comes back to the desk after it was empty for 5
   minutes). When they made it, they said: «Lamp, make a skill that tells

@@ -923,12 +923,6 @@ pub fn task_words(request: &str) -> String {
         .to_owned()
 }
 
-/// What a make whose line [`task_cut`] would cut is refused as
-/// ([`Uncovered::TooLong`]), said plainly.
-pub fn too_long() -> Refused {
-    Uncovered::TooLong.refused()
-}
-
 /// Whether [`task_words`] cut `request` short: more of it than the
 /// trailing punctuation it trims was left out, so its task's words are the
 /// model's own, checked ([`task_kept`]), never the request cut short (El's
