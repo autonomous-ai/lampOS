@@ -9,8 +9,12 @@ use zune_jpeg::{
     zune_core::{colorspace::ColorSpace, options::DecoderOptions},
 };
 
-/// The longest side of a picture decoded.
-pub const MOST_SIDE: usize = 4096;
+/// The longest side of a picture decoded: the camera's largest size is
+/// 1280x720 (lamp-control's `camera::SIZES`), so a picture past 1280 on
+/// either side is refused from its header, before it is decoded (Heron's
+/// P2 5 on #7972: a flat 4096x4096 JPEG fits in 150 KiB and is 48 MiB of
+/// RGB).
+pub const MOST_SIDE: usize = 1280;
 
 /// A decoded picture: red, green and blue bytes, row by row.
 pub struct Picture {
@@ -19,17 +23,22 @@ pub struct Picture {
     pub height: usize,
 }
 
-/// Decodes `jpeg`.
+/// Decodes `jpeg`, at most [`MOST_SIDE`] on each side.
 pub fn decode(jpeg: &[u8]) -> Result<Picture, String> {
-    let options = DecoderOptions::default()
-        .set_max_width(MOST_SIDE)
-        .set_max_height(MOST_SIDE)
-        .jpeg_set_out_colorspace(ColorSpace::RGB);
+    let options = DecoderOptions::default().jpeg_set_out_colorspace(ColorSpace::RGB);
     let mut decoder = JpegDecoder::new_with_options(jpeg, options);
+    decoder
+        .decode_headers()
+        .map_err(|error| format!("not a JPEG this lamp reads: {error:?}"))?;
+    let (width, height) = decoder.dimensions().ok_or("a JPEG without a size")?;
+    if width > MOST_SIDE || height > MOST_SIDE {
+        return Err(format!(
+            "jpeg: {width}x{height} is too big: at most {MOST_SIDE} pixels on each side (the camera's 1280x720 or smaller)"
+        ));
+    }
     let rgb = decoder
         .decode()
         .map_err(|error| format!("not a JPEG this lamp reads: {error:?}"))?;
-    let (width, height) = decoder.dimensions().ok_or("a JPEG without a size")?;
     if width == 0 || height == 0 || rgb.len() != width * height * 3 {
         return Err("a JPEG of no picture".to_owned());
     }
@@ -267,5 +276,23 @@ mod tests {
         let p = decode(&jpeg).unwrap();
         assert_eq!((p.width, p.height), (32, 24));
         assert!(decode(b"not a jpeg").is_err());
+    }
+
+    #[test]
+    fn a_picture_past_the_cameras_size_is_refused_from_its_header() {
+        let jpeg_of = |width: u16, height: u16| {
+            let mut jpeg = Vec::new();
+            let rgb = vec![90u8; usize::from(width) * usize::from(height) * 3];
+            jpeg_encoder::Encoder::new(&mut jpeg, 50)
+                .encode(&rgb, width, height, jpeg_encoder::ColorType::Rgb)
+                .unwrap();
+            jpeg
+        };
+        let camera = decode(&jpeg_of(1280, 720)).unwrap();
+        assert_eq!((camera.width, camera.height), (1280, 720));
+        for (width, height) in [(1281, 8), (8, 1281)] {
+            let why = decode(&jpeg_of(width, height)).err().unwrap();
+            assert!(why.contains("at most 1280"), "{why}");
+        }
     }
 }

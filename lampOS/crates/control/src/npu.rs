@@ -54,12 +54,20 @@ impl Npu {
         let mut stream = UnixStream::connect(&self.socket).map_err(gone)?;
         stream.set_read_timeout(Some(WAIT)).map_err(gone)?;
         stream.set_write_timeout(Some(WAIT)).map_err(gone)?;
-        writeln!(stream, "{line}").map_err(gone)?;
+        // A service past its askers says `busy` before it reads, and may
+        // close before the whole line is taken: its answer is read even
+        // when the write is cut short (Heron's P3 on #7972).
+        let wrote = writeln!(stream, "{line}");
         let mut answer = String::new();
-        BufReader::new(stream.take(ANSWER_MOST))
-            .read_line(&mut answer)
-            .map_err(|_| Error::new(ErrorCode::Refused, "the lamp's NPU did not answer in time"))?;
-        reply(&answer)
+        let read = BufReader::new(stream.take(ANSWER_MOST)).read_line(&mut answer);
+        match (wrote, read) {
+            (_, Ok(_)) if !answer.trim().is_empty() => reply(&answer),
+            (Err(error), _) => Err(gone(error)),
+            _ => Err(Error::new(
+                ErrorCode::Refused,
+                "the lamp's NPU did not answer in time",
+            )),
+        }
     }
 }
 
@@ -138,6 +146,31 @@ mod tests {
             assert_eq!(reply(&line).unwrap_err().code, expected, "{code}");
         }
         assert_eq!(reply("not json").unwrap_err().code, ErrorCode::Refused);
+    }
+
+    /// A service past its askers answers `busy` before it reads the line
+    /// and closes: that answer is what the client is told.
+    #[test]
+    fn a_busy_service_is_told_as_busy_not_unreachable() {
+        let dir =
+            std::env::temp_dir().join(format!("lamp-control-npu-busy-{}", std::process::id()));
+        let _ = std::fs::create_dir_all(&dir);
+        let socket = dir.join("npu.sock");
+        let _ = std::fs::remove_file(&socket);
+        let listener = UnixListener::bind(&socket).unwrap();
+        let served = std::thread::spawn(move || {
+            let (mut stream, _) = listener.accept().unwrap();
+            writeln!(
+                stream,
+                r#"{{"ok":false,"code":"busy","why":"full","retry_ms":100}}"#
+            )
+            .unwrap();
+        });
+        let npu = Npu::new(socket.clone());
+        let busy = npu.pose("c_1", &"A".repeat(200 * 1024)).unwrap_err();
+        assert_eq!((busy.code, busy.retry_ms), (ErrorCode::Busy, Some(100)));
+        served.join().unwrap();
+        let _ = std::fs::remove_dir_all(&dir);
     }
 
     #[test]

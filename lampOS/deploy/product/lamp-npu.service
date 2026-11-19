@@ -22,6 +22,9 @@ Type=simple
 # lamp-control's grant check.
 User=lampos
 Group=lampos
+# /dev/vipcore is the `video` group's (0660, the image's 99-lamp-device.rules, #7972); only that device is
+# allowed below, so the group opens no camera here.
+SupplementaryGroups=video
 Slice=lampos-parts.slice
 # Poses are never worth a late word.
 Nice=10
