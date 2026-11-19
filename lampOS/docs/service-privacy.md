@@ -107,7 +107,12 @@ allowed no longer ends the conversation at once (`privacy_gap.rs`):
   worker has published an allowed capture lease, a missing fresh acquisition
   sends `PrivacyUnavailable { since_us }`, closes the worker's `voice/privacy`
   lease, and keeps reading in the same worker. `since_us` is the last accepted
-  acquisition plus the unchanged 50 ms freshness. The coordinator treats it
+  acquisition plus the unchanged 50 ms freshness. A state Controls still
+  publishes whose acquisition is 50 ms old or more, or has no level or a
+  fault, is ridden the same way (#7224): the fence keeps its envelope, so the
+  next state continues the order, but not its acquisition, and the worker
+  keeps its last fresh reading. Another clock or a reading ahead of now
+  still ends it. The coordinator treats it
   as unavailable even if recovery is queued in the same batch, so the cut and
   hold below still happen. The muted wait and direct GPIO route are unchanged.
 - **From the lapse:** no capture frame is taken, including those capture still
