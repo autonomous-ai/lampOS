@@ -8435,13 +8435,17 @@ Reported by the builders:
   count as it does on the Live route. A hearing of the name does: a short
   sound in whose window (from 1.5 s before its first sound to its end)
   lamp-name heard the name at its own bar, 0.9 (`called::LEAST_SCORE`,
-  `lamp-name --least`), or more, is no short sound, its words come back as
+  `lamp-name --least`), or more, and begun clear of the lamp's voice and
+  its echo tail (not over its voice, nor within 1.5 s,
+  `own_echo::TAIL_US`, after its words played to their end), is no short sound, its words come back as
   another word, and the rule judges it as any line, where a line of one or
   two words, not a question, with nothing written for the name, is still
   not answered on the hearing alone (#7918). The journal says "a short
   sound, but lamp-name heard the name in it at 0.917: judged as a line
   (#7891)" (lamp-52e6, 19 Nov: "Lamp?", its word back not the name, was
-  held so). The hearings are read as `LAMP_NAME_WORDLESS_BAR`'s are
+  held so). One begun over the lamp's voice or in its tail stays held:
+  in the product lamp-name runs without `--not-while-speaking`, and on
+  lamp-4ace it heard the lamp's own reply at 0.990 (#7994). The hearings are read as `LAMP_NAME_WORDLESS_BAR`'s are
   (`second_provider::wordless_call`), on, switch or not, whenever the
   worker has a bus. Tests in `second_provider/tests/short_sound_name.rs`.
 - **The rule for whom it answers, without one sign:** a tap on the head is
