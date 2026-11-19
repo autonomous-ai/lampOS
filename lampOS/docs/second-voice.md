@@ -7223,8 +7223,9 @@ failed, never the name. With no address more the request ends at its bound
 as before, and the call says the weather couldn't be reached within its
 6 s.
 **The backup forecast** (`LAMP_WEATHER_BACKUP`, off unless exactly `on`,
-in no unit: El's ruling on #7700, 18 Nov, keeps a new weather lookup off
-in the product; the migrate on #7665, #7593). With it on, when
+on in the product unit since the FB's order on #7814, 19 Nov 09:44, which
+replaces El's ruling on #7700, 18 Nov, that kept a new weather lookup off;
+the migrate on #7665, #7593). With it on, when
 Open-Meteo's forecast can't be reached (no connection opened, after the
 DNS-over-HTTPS lookup too while `LAMP_WEATHER_DOH=on`, its name not
 found, or a step timed out) or answers only with a server error (HTTP 500

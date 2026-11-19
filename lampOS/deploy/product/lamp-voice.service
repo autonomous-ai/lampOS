@@ -231,6 +231,8 @@ Environment=LAMP_CHOSEN_VOICE=on
 # Speed: the relay's near routes, the chat's connection kept, the link said for lamp/online.
 Environment=LAMP_RELAY_ROUTES=on
 Environment=LAMP_SECOND_CHAT_KEPT=on
+# LAMP_WEATHER_BACKUP: #7593, #7732; MET Norway's forecast when Open-Meteo's is down or 5xx. Its rules are its row in docs/switches.md.
+Environment=LAMP_WEATHER_BACKUP=on
 # The model service refusing every turn (#4265; lamp-52e6 30 Oct, the lead's call on #1711): said once and held,
 # a line sent each minute to find it back; a skill's fixed words are said meanwhile, a note the model words waits.
 Environment=LAMP_SECOND_REFUSED_HOLD=on
