@@ -40,6 +40,9 @@ struct Fake {
     closed_on: Mutex<Vec<String>>,
     /// Closes that fail, in a row, first.
     failing_closes: Mutex<u32>,
+    /// Kept closes refused as Harness refuses one whose Gateway
+    /// conversation is already deleted (#7906, lamp-c0a4).
+    conversation_gone_closes: Mutex<bool>,
     /// The code a failing close answers; none: `timed_out`.
     close_error: Mutex<Option<String>>,
     /// `harness capabilities` says program sessions (openharness#4393).
@@ -361,6 +364,9 @@ impl PaneHarness for Fake {
             "close-kept {name}{}",
             if now { " --now" } else { "" }
         ));
+        if *self.conversation_gone_closes.lock().unwrap() {
+            return Err(crate::harness::CLOSE_CONVERSATION_GONE.into());
+        }
         let mut failing = self.failing_closes.lock().unwrap();
         if *failing > 0 {
             *failing -= 1;
@@ -3726,4 +3732,44 @@ fn a_replacement_with_no_task_waiting_has_no_told_line() {
     ));
     turn.wait_end(&fake, MACHINE, &AtomicBool::new(false), &|| {});
     assert!(!turn.restarted(), "the replacement was before this task");
+}
+
+/// #7906, lamp-c0a4: Harness refuses `close --now` once the session's
+/// Gateway conversation is already deleted ("Could not read the saved
+/// conversation"). That close counts as closed: the record is forgotten,
+/// the token kept, and the next open is `--fresh` at once, with no close
+/// tried again for ever.
+#[test]
+fn a_close_refused_for_a_missing_conversation_still_leads_to_a_fresh_session() {
+    let dir = tempfile::tempdir().unwrap();
+    let (one, fake) = kept_on(dir.path());
+    one.open_if_due(&fake, &place());
+    assert_eq!(one.agent(), Some(agent_of(1)));
+    *fake.conversation_gone_closes.lock().unwrap() = true;
+    // A stuck session whose `close --now` is refused so.
+    one.replace_kept(&fake, MACHINE, &agent_of(1), "a test");
+    assert_eq!(one.kept(), None, "its record forgotten");
+    assert!(dir.path().join(TOKEN_FILE).exists(), "its token kept");
+    assert!(!one.drop_if_due(&fake), "no close tried again");
+    one.open_if_due(&fake, &place());
+    assert_eq!(one.agent(), Some(agent_of(2)), "{:?}", fake.calls());
+    assert!(
+        fake.calls()
+            .contains(&"ensure lamp-one-openclaw --fresh".to_owned())
+    );
+    assert_eq!(fake.count("close-kept"), 1, "{:?}", fake.calls());
+    // A cancelled turn's close refused so: the same, fresh next.
+    let turn = one.enter("task-1", Kind::Skill, far(), &|| false).unwrap();
+    assert!(matches!(
+        turn.send(&fake, &place(), "Run.", far(), &|| false),
+        Sent::Typed(_)
+    ));
+    assert_eq!(
+        turn.wait_end(&fake, MACHINE, &AtomicBool::new(true), &|| {}),
+        Ended::Cancelled
+    );
+    drop(turn);
+    assert!(!one.drop_if_due(&fake), "no close tried again");
+    one.open_if_due(&fake, &place());
+    assert_eq!(one.agent(), Some(agent_of(3)), "{:?}", fake.calls());
 }

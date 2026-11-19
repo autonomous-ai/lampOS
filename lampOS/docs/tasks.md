@@ -5227,7 +5227,13 @@ in and signed out, and on 0.6.60, signed in (#7507's ROW).
   then lets the session go. The next open is `ensure --fresh` (a pane of
   `harness new` gets a plain `new`), and the waiting task, or the next
   one, goes on there. A failed close is tried `--now` again at the next
-  look and keeps the token. Retries are bounded by the replacements in a
+  look and keeps the token. A close Harness refuses because the session's
+  saved conversation can't be read ("Could not read the saved
+  conversation", its Gateway key already deleted: Harness checkpoints
+  before it closes) counts as closed (`CLOSE_CONVERSATION_GONE`): the
+  record is forgotten and the next open is `--fresh`, never a close tried
+  for ever. Every path closes first and deletes the conversation after.
+  Retries are bounded by the replacements in a
   row with no answer between: the first is at once; from the second
   (`REPLACE_MOST`, 2) the next open waits 5 s, then 10 s, doubled at each
   more, at most 300 s. A turn answered starts the count again. A cancelled
