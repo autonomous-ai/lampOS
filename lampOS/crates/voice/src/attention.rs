@@ -2929,7 +2929,13 @@ impl Attention {
         // when what was heard is a short word said to the lamp, or it was
         // said close to the lamp, or someone is turned to it, or it has a
         // word in it and answers the lamp's own question in a conversation.
-        if self.sound_in_hand() && !own {
+        // A line begun with the lamp's name set off is never held as one
+        // (#7834: on lamp-9adf "Lamp, put it back." was, 2 times in 5): the
+        // rule below judges it as any line. A short word ("Hey Lamp")
+        // keeps its own reason here.
+        let named_line =
+            begins_with_the_name(&self.heard) && !crate::not_speech::short_word(&self.heard);
+        if self.sound_in_hand() && !own && !named_line {
             // A reply to someone the room had just called by name is not
             // the lamp's, short or not (the reviewer on #918 at 06:06): only
             // the lamp's name lets it out.
@@ -3690,6 +3696,48 @@ mod tests {
         assert!(attention.sound_in_hand());
         attention.began_at(8, 1, 80_000_000);
         assert!(!attention.sound_in_hand());
+    }
+
+    /// #7834: on lamp-9adf on 19 Nov "Lamp, put it back.", played from a
+    /// speaker, ended as a short sound and was held 2 times in 5: not a
+    /// short word, not close, nobody turned to it. A line begun with the
+    /// lamp's name set off is never held as a short sound, however its
+    /// name is written ("Lamp,", "lamp", "Hey Lamp", or only its first
+    /// piece heard yet); the rule judges it as any line. One without the
+    /// name, or with it later or not set off, is held as before.
+    #[test]
+    fn a_short_sound_begun_with_the_lamps_name_is_never_held_as_one() {
+        let decide = |heard: &str| {
+            let mut attention = Attention::default();
+            attention.check_sounds(true);
+            attention.began_at(7, 1, 70_000_000);
+            attention.heard(heard);
+            attention.ended_as_sound(7);
+            attention
+                .first_output_busy(7, Room::Quiet, false, false, None)
+                .unwrap()
+        };
+        for named in [
+            "Lamp, put it back.",
+            "Lamp, stop.",
+            "Lamp, lights off.",
+            "lamp, put it back",
+            "LAMP. Lights off.",
+            "Hey Lamp, put it back.",
+            "Lamp,",
+        ] {
+            let verdict = decide(named);
+            assert!(matches!(verdict, Verdict::Play(_)), "{named}: {verdict:?}");
+        }
+        for unnamed in [
+            "Put it back.",
+            "¿Qué?",
+            "",
+            "and the lamp is on sale now",
+            "Lamp is broken again today",
+        ] {
+            assert_eq!(decide(unnamed), Verdict::Hold(SOUND_HELD), "{unnamed}");
+        }
     }
 
     /// On lamp-4ace on 2026-10-17 at 16:11 "Yes. Please start it.", said
