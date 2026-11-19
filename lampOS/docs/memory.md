@@ -2641,7 +2641,10 @@ passed. Tests: the notes' exact texts in `remember::tests`.
     `room_sounds` and `face_expression_consent_result` for the neighbouring
     face-expression consent file. Each is `cleared` when `remove_file`
     succeeds or returns `NotFound` (already absent), and `uncertain` for
-    any other error. These fields carry fixed states only, never paths,
+    any other error. With `LAMP_NOTICING_BY_DEFAULT=on` (#7767) the forget
+    removes only a kept yes: a kept no stays and is `kept as a no`, which
+    is no failed step and leaves `everything` as it is; any other file it
+    leaves holds no yes and is `cleared`. These fields carry fixed states only, never paths,
     error text, person ids or remembered words.
   - A room or consent cleanup result other than `cleared` sets
     `everything: false`; a later successful cleanup does not restore it
@@ -4174,7 +4177,8 @@ then use that person's scope:
   `everything: false` and the fixed `room_memory_result`,
   `sound_consent_result` and `face_expression_consent_result` outcomes when
   the internal forget reports them. Only `cleared`, `kept` and `uncertain`
-  survive; unknown values become `uncertain`, never copied private text.
+  survive (and `kept as a no` for the two consents, #7767, which is no
+  partial cleanup); unknown values become `uncertain`, never copied private text.
   A non-cleared or malformed outcome prevents a complete-deletion claim,
   even when primary memory was already empty. A successful memory receipt
   cannot upgrade a partial face result or a note about old face records

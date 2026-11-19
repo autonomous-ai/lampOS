@@ -667,7 +667,14 @@ The record, for lamp-ears (`onboarding/storage.rs`, `room_sounds`):
   any progress write or start whose `room_sounds` outcome is not `done`,
   unless it is the owner's yes from the app that still stands (below).
   It is never written back from the progress, so once removed it stays
-  gone until a new yes.
+  gone until a new yes. With `LAMP_NOTICING_BY_DEFAULT=on` (#7767,
+  [switches.md](switches.md)), where a missing file is on, a kept no
+  (`{"room_sounds":"no",...}`, `lamp_msgs::consent::no_bytes`: the voice's
+  stop, the app's off or the walk's own) is left in place by every start
+  and progress write, a redo too, and a "no" (`skipped`) at the lamp keeps
+  one (`"by":"voice"`, at the "no"'s time) where the write would remove
+  the file; only a yes or the factory reset replaces it. Off, all of it is
+  as above, byte for byte.
 - Shape: `{"version":1,"room_sounds":"yes","at_unix_s":<when the yes was kept>,"by":"voice"}`
   (keys in that file sorted, as `lamp_msgs::consent::bytes` writes them;
   files from before `by` have none and are the voice's).

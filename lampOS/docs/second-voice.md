@@ -5385,7 +5385,10 @@ after a take-over, but now for every turn:
       and reminder deletion results retain only fixed success, kept or
       uncertain states. The same sanitizer carries `room_memory_result`,
       `sound_consent_result` and `face_expression_consent_result` only as
-      `cleared`, `kept` or `uncertain`; any other value becomes `uncertain`,
+      `cleared`, `kept` or `uncertain` (the two consents also as
+      `kept as a no`, a kept no a forget leaves with
+      `LAMP_NOTICING_BY_DEFAULT` on, #7767, which is no incomplete step);
+      any other value becomes `uncertain`,
       with no raw payload copied. An absent field stays unreported and is
       never assumed successful.
       For room cleanup, the producer reports `cleared` only for a
