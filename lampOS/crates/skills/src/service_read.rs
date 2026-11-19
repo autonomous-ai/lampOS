@@ -607,18 +607,28 @@ pub fn run(step: &ReadStep, room: &mut impl Room) -> String {
 }
 
 /// What a skill's task's agent found (`crate::task::told`'s lines, its
-/// run's runner keeping it, a `net` run's too): said as soon as its run
-/// ended, as exact words, in order, with no read's gate (#7894): no
-/// owner alone or steady, no voice heard, no quiet hours, no [`WAIT`].
-/// Each line is held only while the lamp can't speak ([`held`]: the
-/// privacy switch, the microphones off, asleep, or paused) and said the
-/// moment it can; and while another read says its lines, never between
-/// them. The turn taken is given back as it ends, so a scheduled read
-/// waits its [`AFTER_ANOTHER`] after it. The journal's words: how many
-/// lines were said, never one.
-pub fn tell(lines: &[String], room: &mut impl Room) -> String {
+/// run's runner keeping it, a `net` run's too), or its run's #7200
+/// refusal. `asked`: said to the person who asked by voice now, ready
+/// within five minutes of the ask (`lamp-skills`' `asked_now`): for what
+/// the agent found only its owner's ask ([`tell_answer`]); for a refusal,
+/// which carries nothing the run read, whoever asked. Asked, it is said as
+/// soon as its run ended, as exact words, in order, with no read's gate
+/// (#7894): no owner alone or steady, no voice heard, no quiet hours, no
+/// [`WAIT`]. Each line is held only while the lamp can't speak
+/// ([`held`]: the privacy switch, the microphones off, asleep, or paused)
+/// and said the moment it can; and while another read says its lines,
+/// never between them. The turn taken is given back as it ends, so a
+/// scheduled read waits its [`AFTER_ANOTHER`] after it. Unasked (a time's
+/// or a trigger's run, or one ready past the five minutes), it keeps the
+/// read's gate as before, quiet hours included, waiting up to [`WAIT`]
+/// (#7894's HOLD: a guest at the desk never hears an unasked run's mail).
+/// The journal's words: how many lines were said, never one.
+pub fn tell(lines: &[String], asked: bool, room: &mut impl Room) -> String {
     if lines.is_empty() {
         return "nothing to tell".into();
+    }
+    if !asked {
+        return tell_within(lines, WAIT, false, room);
     }
     let turns = room.turns();
     let mut taken: Option<Taken<'static>> = None;
@@ -653,6 +663,43 @@ pub fn tell(lines: &[String], room: &mut impl Room) -> String {
         taken.end(room.now_ms());
     }
     outcome
+}
+
+/// What a run asked by voice now, but not by its owner (a guest, or nobody
+/// named), hears at once instead of silence while what its agent found
+/// waits for the read's gate (the first builder's 10:02 on #7874).
+pub const NOT_JUST_YOU: &str = "I'll tell you when it's just you.";
+
+/// Whose ask what a run's agent found answers ([`tell_answer`], #7894,
+/// V2's 12:47 on #7902).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Asker {
+    /// Its owner, asked by voice now: in the private room
+    /// (`LAMP_PRIVATE_ROOM`) whoever asked; outside it the owner the voice
+    /// heard (the person scope naming them, `lamp_voice::made_run`).
+    Owner,
+    /// Asked by voice now by anyone else: a guest, or nobody named.
+    Another,
+    /// Nobody asked: a time's or a trigger's run, or ready too late.
+    Nobody,
+}
+
+/// What a skill's task's agent found, told as `asker` asked it: to its
+/// owner, at once with no read's gate ([`tell`]); to another, the short
+/// [`NOT_JUST_YOU`] at once, then the lines behind the read's gate; to
+/// nobody, behind the read's gate as before, quiet hours included. The
+/// journal's words: the lines' outcome last (`short line <outcome>, then:
+/// <outcome>` for another's), never a line.
+pub fn tell_answer(lines: &[String], asker: Asker, room: &mut impl Room) -> String {
+    match asker {
+        Asker::Owner => tell(lines, true, room),
+        Asker::Nobody => tell(lines, false, room),
+        Asker::Another if lines.is_empty() => tell(lines, false, room),
+        Asker::Another => {
+            let short = tell(&[NOT_JUST_YOU.to_owned()], true, room);
+            format!("short line {short}, then: {}", tell(lines, false, room))
+        }
+    }
 }
 
 /// Why the lamp can't speak now, if it can't: the only holds of a told
@@ -1204,7 +1251,7 @@ mod tests {
 
     /// #7894 (lamp-52e6, 19 Nov 09:52: a mail check's answer held "not
     /// alone" and "a voice heard" while its asker was at the lamp): what a
-    /// skill's task's agent found is said at once, as exact words, in
+    /// run asked by voice now found is said at once, as exact words, in
     /// order, with no read's gate: two faces in view, a voice heard just
     /// before, no owner's face enrolled or a read that ended a moment ago
     /// hold nothing. The turn is taken and given back, so a scheduled read
@@ -1238,7 +1285,7 @@ mod tests {
             turns.give_back(1_000);
             let mut lamp = Lamp::new(vec![seen.clone()], json!({}));
             lamp.turns = Some(turns);
-            assert_eq!(tell(&lines, &mut lamp), "told 2", "{seen:?}");
+            assert_eq!(tell(&lines, true, &mut lamp), "told 2", "{seen:?}");
             assert_eq!(lamp.said, lines);
             assert_eq!(lamp.said_at, [1_000, 1_000], "at once: {seen:?}");
             assert!(lamp.waits.is_empty(), "no gate waited for: {seen:?}");
@@ -1246,17 +1293,123 @@ mod tests {
             assert!(!turns.free(lamp.now), "the turn is given back as it ended");
         }
         assert_eq!(
-            tell(&[], &mut Lamp::new(vec![alone()], json!({}))),
+            tell(&[], true, &mut Lamp::new(vec![alone()], json!({}))),
             "nothing to tell"
         );
     }
 
+    /// #7894's HOLD (Fourteen, Heron, the Reviewer-lead, 12:37): a run
+    /// nobody asked by voice now (a time's or a trigger's: a morning mail
+    /// check at 8:00) keeps the read's gate for what its agent found, as
+    /// before #7894: two faces in view, a voice heard, or quiet hours, and
+    /// it waits its [`WAIT`] and is skipped, nothing said; alone, it is
+    /// said once steady.
+    #[test]
+    fn an_unasked_runs_answer_keeps_the_reads_gate_and_quiet_hours() {
+        let lines = vec!["You have 12 unread messages.".to_owned()];
+        for (seen, why) in [
+            (
+                Seen {
+                    faces: Some(2),
+                    ..alone()
+                },
+                "skipped: not alone",
+            ),
+            (
+                Seen {
+                    heard_ago: Some(Duration::from_secs(1)),
+                    ..alone()
+                },
+                "skipped: a voice heard",
+            ),
+            (
+                Seen {
+                    quiet: true,
+                    ..alone()
+                },
+                "skipped: quiet hours",
+            ),
+        ] {
+            let mut lamp = Lamp::new(vec![seen.clone()], json!({}));
+            assert_eq!(
+                tell_answer(&lines, Asker::Nobody, &mut lamp),
+                why,
+                "{seen:?}"
+            );
+            assert!(lamp.said.is_empty(), "nothing said, no short line: {seen:?}");
+            assert!(lamp.now - 1_000 >= WAIT.as_millis() as u64, "waited");
+        }
+        let mut lamp = Lamp::new(vec![alone()], json!({}));
+        assert_eq!(tell_answer(&lines, Asker::Nobody, &mut lamp), "told 1");
+        assert!(lamp.said_at[0] >= 1_000 + STEADY.as_millis() as u64);
+    }
+
+    /// #7894, V2's 12:47 on #7902 and the first builder's 10:02 on #7874:
+    /// a run its owner asked by voice now (in the private room, whoever
+    /// asked) is said at once with two faces in view; asked by anyone else
+    /// outside it (a guest, or nobody named, no owner's face enrolled too)
+    /// nothing of the answer is said at once: one short line is, and the
+    /// answer keeps the read's gate, said once the owner is alone.
+    #[test]
+    fn a_guests_ask_hears_one_short_line_and_the_answer_keeps_the_gate() {
+        let lines = vec!["Mail from Bea: the rent is due.".to_owned()];
+        let two = Seen {
+            faces: Some(2),
+            ..alone()
+        };
+        let mut lamp = Lamp::new(vec![two.clone()], json!({}));
+        assert_eq!(tell_answer(&lines, Asker::Owner, &mut lamp), "told 1");
+        assert_eq!((lamp.said.clone(), lamp.said_at.clone()), (lines.clone(), vec![1_000]));
+        for (seen, why) in [
+            (two, "not alone"),
+            (
+                Seen {
+                    owner_known: false,
+                    faces: None,
+                    owner_in_view: false,
+                    ..alone()
+                },
+                "no owner's face enrolled",
+            ),
+        ] {
+            let mut lamp = Lamp::new(vec![seen.clone()], json!({}));
+            let told = tell_answer(&lines, Asker::Another, &mut lamp);
+            assert_eq!(told, format!("short line told 1, then: skipped: {why}"));
+            assert_eq!(lamp.said, [NOT_JUST_YOU], "only the short line: {seen:?}");
+            assert_eq!(lamp.said_at, [1_000], "at once: {seen:?}");
+            assert_eq!(answer_news("mail", &told).stage, SkillTaskStage::Dropped);
+        }
+        // The owner alone after ten seconds: the answer, after its line.
+        let mut seen = vec![
+            Seen {
+                faces: Some(2),
+                ..alone()
+            };
+            40
+        ];
+        seen.push(alone());
+        let mut lamp = Lamp::new(seen, json!({}));
+        let told = tell_answer(&lines, Asker::Another, &mut lamp);
+        assert_eq!(told, "short line told 1, then: told 1");
+        assert_eq!(answer_news("mail", &told).stage, SkillTaskStage::Told);
+        assert_eq!(lamp.said, [NOT_JUST_YOU, lines[0].as_str()]);
+        assert!(lamp.said_at[1] >= 10_000 + STEADY.as_millis() as u64);
+    }
+
     /// #7894: a scheduled read in the room a told answer is said in keeps
-    /// its gate: two faces in view, or a voice heard, and it waits its
-    /// [`WAIT`] and is skipped with nothing read or said.
+    /// its gate exactly as before: two faces in view, a voice heard, or
+    /// quiet hours, and it waits its [`WAIT`] and is skipped with nothing
+    /// read or said.
     #[test]
     fn a_scheduled_read_in_the_same_room_still_waits_for_its_gate() {
         for (seen, why) in [
+            (
+                Seen {
+                    quiet: true,
+                    ..alone()
+                },
+                "skipped: quiet hours",
+            ),
             (
                 Seen {
                     faces: Some(2),
@@ -1308,7 +1461,7 @@ mod tests {
         seen.extend(vec![paused; 8]);
         seen.push(talking());
         let mut lamp = Lamp::new(seen, json!({}));
-        assert_eq!(tell(&lines, &mut lamp), "told 2");
+        assert_eq!(tell(&lines, true, &mut lamp), "told 2");
         assert_eq!(lamp.said, lines);
         assert_eq!(lamp.said_at, [11_000, 15_000]);
         assert_eq!(lamp.waits, ["private", "private", "paused"]);
@@ -1330,7 +1483,7 @@ mod tests {
             ]
         );
         let mut lamp = Lamp::new(vec![alone()], json!({}));
-        assert_eq!(tell(&lines, &mut lamp), "told 2");
+        assert_eq!(tell(&lines, true, &mut lamp), "told 2");
         assert_eq!(lamp.said, lines);
         assert!(lamp.reads.is_empty());
     }
