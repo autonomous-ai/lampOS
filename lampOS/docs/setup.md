@@ -157,7 +157,8 @@ The room sounds yes (#1722 item 1) is `/var/lib/lampOS/consent/room-sounds.json`
 0640 root:lampos so lamp-ears can read it, and the face expressions yes
 (`LAMP_FACE_EXPRESSIONS_ASK`) is `/var/lib/lampOS/consent/face-expressions.json`
 beside it, and lamp-seen's opt-in (#6543, seen.md) is `seen-activity.json` there
-too; both reset plans wipe all three files.
+too, with the app's desk noticing mark beside it, `seen-activity-mark.json`
+(cloud.md, "Desk noticing from the app"); both reset plans wipe all four files.
 The product unit names that canonical file and turns `LAMP_ONBOARDING` on.
 Both reset plans wipe the entire directory's contents, including pending writes,
 temporary files and mailbox descendants, retaining the empty private container.

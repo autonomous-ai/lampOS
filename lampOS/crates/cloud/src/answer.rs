@@ -270,6 +270,13 @@ pub trait Lamp {
         None
     }
 
+    /// The owner's desk noticing switch in the app (#6543,
+    /// `crate::consent::DESK_KINDS`): there only with `LAMP_SEEN_ACTIVITY=on`
+    /// in `lamp-cloud`'s own unit.
+    fn desk_noticing(&self) -> Option<crate::consent::Place> {
+        None
+    }
+
     /// The person's own services linked from the app (`LAMP_SERVICES=on`,
     /// Queue #4710, `crate::services`): there only with the switch.
     fn services(&self) -> Option<std::sync::Arc<crate::services::Services>> {
@@ -414,7 +421,7 @@ const ALWAYS: Switch = |_| true;
 
 /// Every kind the app may ask that this lamp can answer, with its switch,
 /// in the order `system.info`'s `can` lists them (#2864).
-pub const KINDS: [(&str, Switch); 87] = [
+pub const KINDS: [(&str, Switch); 89] = [
     ("system.info", ALWAYS),
     ("system.version", ALWAYS),
     ("system.network", ALWAYS),
@@ -432,6 +439,10 @@ pub const KINDS: [(&str, Switch); 87] = [
     // reports' choice: both kinds with the switch.
     (crate::consent::KINDS[0], CONSENT),
     (crate::consent::KINDS[1], CONSENT),
+    // The owner's desk noticing switch (#6543), as mute's row: named only
+    // while lamp-seen is switched on (`LAMP_SEEN_ACTIVITY=on`).
+    (crate::consent::DESK_KINDS[0], DESK),
+    (crate::consent::DESK_KINDS[1], DESK),
     ("skills.list", |lamp| lamp.skills().is_some()),
     ("skills.remove", |lamp| lamp.skills().is_some()),
     // Off, on and the camera's yes with the page (#4099), so `can` tells an
@@ -532,6 +543,7 @@ pub const KINDS: [(&str, Switch); 87] = [
 ];
 
 const CONSENT: Switch = |lamp| lamp.consent().is_some();
+const DESK: Switch = |lamp| lamp.desk_noticing().is_some();
 const HARNESS_SIGN_IN: Switch = |lamp| lamp.harness_sign_in().is_some();
 
 const WIFI: Switch = |lamp| lamp.changes().is_some_and(|c| c.wifi_on());
@@ -741,6 +753,19 @@ pub fn answer(lamp: &mut impl Lamp, kind: &str, data: &Value) -> Result<Option<V
                 some(crate::consent::get(&place))
             } else {
                 crate::consent::set(&place, data).map(Some)
+            }
+        }
+        // The owner's desk noticing switch (#6543): read where the yes is
+        // kept, and set through root's helper as seen activity's yes, with
+        // `"by":"app"` and the app's `request_id` (a yes not above the mark
+        // is refused); off removes it, as the voice's stop does. The reply
+        // is what the file says after it.
+        kind if crate::consent::DESK_KINDS.contains(&kind) && on(lamp, kind) => {
+            let place = lamp.desk_noticing().ok_or_else(|| not_here(kind))?;
+            if kind == crate::consent::DESK_KINDS[0] {
+                some(crate::consent::desk_now(&place))
+            } else {
+                crate::consent::desk_set(&place, data).map(Some)
             }
         }
         // The app's skills page (#1722): every skill on the lamp, its group,
@@ -1164,6 +1189,8 @@ pub mod tests {
         pub control: Option<crate::control::Door>,
         /// The owner's two yeses from the app (#5500), with their switch.
         pub consent: Option<crate::consent::Place>,
+        /// The owner's desk noticing switch (#6543), with lamp-seen's.
+        pub desk_noticing: Option<crate::consent::Place>,
         /// What `onboarding` says, and the switch's file (#5812).
         pub onboarding: Option<u64>,
         pub onboarding_done: Option<std::path::PathBuf>,
@@ -1307,6 +1334,9 @@ pub mod tests {
         fn consent(&self) -> Option<crate::consent::Place> {
             self.consent.clone()
         }
+        fn desk_noticing(&self) -> Option<crate::consent::Place> {
+            self.desk_noticing.clone()
+        }
         fn update_events(&self) -> Option<std::path::PathBuf> {
             self.update_events.clone()
         }
@@ -1408,7 +1438,11 @@ pub mod tests {
                 let mut line = String::new();
                 let _ = std::io::BufReader::new(&stream).read_line(&mut line);
                 kept.lock().unwrap().push(line.trim().to_owned());
-                let asked: Value = serde_json::from_str(&line).unwrap_or_default();
+                let mut asked: Value = serde_json::from_str(&line).unwrap_or_default();
+                // The desk noticing switch's line is seen activity's yes.
+                if let Some(allow) = asked["desk_noticing"].get("allow").cloned() {
+                    asked = json!({"consent": {"seen_activity": allow}});
+                }
                 let reply = match asked["consent"].as_object().and_then(|c| c.iter().next()) {
                     Some((key, yes)) => {
                         let file = lamp_msgs::consent::file_in(&folder, key).unwrap();
@@ -1521,6 +1555,134 @@ pub mod tests {
         };
         assert_eq!(
             set(&mut gone, json!({"room_sounds": false})),
+            Err("the lamp's settings are not running".to_owned())
+        );
+        let _ = std::fs::remove_dir_all(&folder);
+    }
+
+    /// #6543: the owner's desk noticing switch in the app. Off (no
+    /// `LAMP_SEEN_ACTIVITY=on`): neither kind in `can`, `can` and
+    /// `system.info` byte for byte as before, each "not on this lamp". On:
+    /// a yes kept through the helper as seen activity's with `"by":"app"`,
+    /// the app's `request_id` handed on, read back with who gave it and
+    /// whether posture is on; off removes the file, as the voice's stop
+    /// does; a voice's yes reads as the voice's; no `request_id`, refused
+    /// before the helper.
+    #[test]
+    fn the_owners_desk_noticing_is_set_and_read_from_the_app_with_lamp_seens_switch() {
+        let folder = std::path::PathBuf::from(format!("/tmp/lcd-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&folder);
+        std::fs::create_dir_all(&folder).unwrap();
+        let socket = folder.join("change.sock");
+        let lines = consent_helper(&socket, &folder);
+        let kinds = crate::consent::DESK_KINDS;
+        let file = folder.join("seen-activity.json");
+
+        let mut off = lamp();
+        let before = answer(&mut off, "system.info", &json!({}))
+            .unwrap()
+            .unwrap();
+        let before = serde_json::to_vec(&before).unwrap();
+        assert!(kinds.iter().all(|kind| !can(&off).contains(kind)));
+        for kind in kinds {
+            assert_eq!(
+                answer(&mut off, kind, &json!({"allow": true})),
+                Err(format!("not on this lamp: {kind}"))
+            );
+        }
+        assert!(lines.lock().unwrap().is_empty() && !file.exists());
+
+        let mut on = Fake {
+            desk_noticing: Some(crate::consent::desk_in(&folder, &socket)),
+            ..lamp()
+        };
+        // With the switch on, `can` gains exactly the two kinds; the rest of
+        // system.info is unchanged.
+        let with = can(&on);
+        assert!(kinds.iter().all(|kind| with.contains(kind)));
+        let without: Vec<&str> = with
+            .into_iter()
+            .filter(|kind| !kinds.contains(kind))
+            .collect();
+        assert_eq!(without, can(&off));
+        let mut info = answer(&mut on, "system.info", &json!({})).unwrap().unwrap();
+        info["can"] = json!(can(&off));
+        assert_eq!(serde_json::to_vec(&info).unwrap(), before);
+
+        let get = |lamp: &mut Fake| answer(lamp, kinds[0], &json!({})).unwrap().unwrap();
+        let set = |lamp: &mut Fake, data: Value| answer(lamp, kinds[1], &data);
+        let state =
+            |on: bool, by: Value| json!({"desk_noticing": {"on": on, "by": by, "posture": false}});
+        assert_eq!(get(&mut on), state(false, Value::Null));
+        assert_eq!(
+            set(&mut on, json!({"allow": true})),
+            Err(crate::consent::DESK_REQUEST_ID.to_owned())
+        );
+        assert_eq!(
+            set(&mut on, json!({"allow": true, "request_id": 10})),
+            Ok(Some(state(true, json!("app"))))
+        );
+        assert_eq!(get(&mut on), state(true, json!("app")));
+        // The file is the voice's but for `by`.
+        let kept: Value = serde_json::from_slice(&std::fs::read(&file).unwrap()).unwrap();
+        assert_eq!(
+            kept,
+            json!({"version": 1, "seen_activity": "yes", "at_unix_s": 9, "by": "app"})
+        );
+        assert_eq!(
+            set(&mut on, json!({"allow": false, "request_id": 11})),
+            Ok(Some(state(false, Value::Null)))
+        );
+        assert!(!file.exists());
+        // A spoken yes reads as the voice's, and the app's off takes it back
+        // as the voice's stop does: the file gone.
+        std::fs::write(
+            &file,
+            lamp_msgs::consent::bytes("seen_activity", 5, lamp_msgs::consent::BY_VOICE),
+        )
+        .unwrap();
+        assert_eq!(get(&mut on), state(true, json!("voice")));
+        assert_eq!(
+            set(&mut on, json!({"allow": false, "request_id": 11})),
+            Ok(Some(state(false, Value::Null)))
+        );
+        assert!(!file.exists());
+        for data in [
+            json!({"request_id": 12}),
+            json!({"allow": "yes", "request_id": 12}),
+            json!({"allow": 1, "request_id": 12}),
+            json!(null),
+        ] {
+            assert_eq!(
+                set(&mut on, data.clone()),
+                Err("allow must be true or false".to_owned()),
+                "{data}"
+            );
+        }
+        // Only what passed the check reached the helper, as consent.set's line.
+        assert_eq!(
+            *lines.lock().unwrap(),
+            [
+                r#"{"desk_noticing":{"allow":true,"request_id":10}}"#,
+                r#"{"desk_noticing":{"allow":false,"request_id":11}}"#,
+                r#"{"desk_noticing":{"allow":false,"request_id":11}}"#,
+            ]
+        );
+        // Posture said as its switch is (`LAMP_SEEN_POSTURE`).
+        let mut posture = Fake {
+            desk_noticing: Some(crate::consent::Place {
+                posture: true,
+                ..crate::consent::desk_in(&folder, &socket)
+            }),
+            ..lamp()
+        };
+        assert_eq!(get(&mut posture)["desk_noticing"]["posture"], json!(true));
+        let mut gone = Fake {
+            desk_noticing: Some(crate::consent::desk_in(&folder, &folder.join("none.sock"))),
+            ..lamp()
+        };
+        assert_eq!(
+            set(&mut gone, json!({"allow": true, "request_id": 13})),
             Err("the lamp's settings are not running".to_owned())
         );
         let _ = std::fs::remove_dir_all(&folder);
