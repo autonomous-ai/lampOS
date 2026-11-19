@@ -5338,13 +5338,22 @@ in and signed out, and on 0.6.60, signed in (#7507's ROW).
     taken a `NOT_IDLE` refusal counts too: nothing of ours runs in that
     new process, so `working` there is the frozen one's, not a turn to
     wait out. Refused over the bound again, it is (b) `--fresh`, never
-    another resume. The waiting task never ran, so it is typed into the new
-    session and told once.
+    another resume. A skill run's waiting task never ran, so it is typed
+    into the new session and told once. A spoken task waiting when sign 5
+    closes the session (its (a) close, or its (b) `--fresh`) ends at once,
+    `not_sent` `one_session_stuck` (`STUCK_ENDED`), never put back: a
+    put-back past the store's confirm bound (`CONFIRM_MS`, 120 s from the
+    task's prepare) expired it unheard, so it sat until lamp-voice's 480 s
+    bound (lamp-c0a4, 19 Nov 21:47-21:55). The waiting task ends with a
+    short "ask me again" line, told once by Task news (`failed_stuck`:
+    "I can't handle that right now; please ask me again in a few
+    minutes."); the close and the reopen go on as above, and the next one
+    goes to the reopened session.
     Beside #7895's bound: an `ENGINE_NOT_READY` refusal never spends one
     of a spoken task's `STARTING_RESUMES_MOST` (3) tries, which count only
     `NOT_RUNNING`, a `TIMEOUT` with nothing taken and a failed open. So a
-    frozen session's refusals put the task back `busy` until sign 5 lets
-    it go, and only a session ensured again that still never takes the
+    frozen session's refusals put the task back `busy` until sign 5 ends
+    it (`one_session_stuck`), and only a session ensured again that still never takes the
     words spends the tries and ends it `one_session_not_started`.
 
   Every sign calls `OneSession::replace_kept`, the one path for every
