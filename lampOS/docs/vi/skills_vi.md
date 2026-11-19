@@ -3636,7 +3636,7 @@ do model viết mỗi lần kích hoạt: lamp-skills giữ nguyên trigger, cá
 `[[while]]`, `most_a_day`, `[active]`, `[quiet]`, `cooldown`, `rearm`, `wait`,
 `[budget]`, `[rest]` và `[stop]`, và chỉ câu nói của lần kích hoạt thành một
 `do.task` cho agent của đèn (Hermes hoặc OpenClaw, qua lamp-tasks). Tắt trừ khi
-được đặt, trong lamp-skills và manage helper của nó; không unit nào đặt (phán
+được đặt, trong lamp-skills, manage helper của nó và lamp-voice; không unit nào đặt (phán
 quyết của first builder, 19/11 05:42: sau một công tắc mới, tắt; 06:05: phản ứng
 nhanh vẫn là của DeepSeek, và mọi câu lõi khác do model viết chuyển sang agent,
 theo từng nhóm). `LAMP_CORE_VIA_AGENT=on` bật mọi nhóm; một danh sách bật những
@@ -3659,19 +3659,35 @@ các kỹ năng nạp và chạy y hệt từng byte như trước. `lamp_skills
     chuyện). Cũng không bao giờ Onboarding hay Guard mode (first builder,
     08:57 ngày 19/11): chúng giữ câu nói có sẵn của mình, với mọi giá trị của
     công tắc.
-  - `complex`, được phép nhưng chưa xây (08:57 của first builder: nội dung
-    riêng của mỗi lần kích hoạt, chỉ những gì ghi chú của DeepSeek có hôm
-    nay, nên những gì rời khỏi đèn không đổi): Welcome back (ai vừa quay lại),
-    Reminders (lời nhắc nguyên văn), FAQ (phần `knowledge.md` và câu hỏi), Who
-    was here (bản ghi 12 giờ) và Task news (kết quả của agent). Mỗi kỹ năng bị
-    chặn bởi một thứ lamp-skills không giữ. Với Welcome back, Reminders và Task
-    news, lamp-voice dựng nội dung khi nói câu (`who`, `from = "schedule"`,
-    `from = "tasks"`), và một lời nhắc chỉ tính là đã báo khi đã được nói. FAQ
-    và Who was here trả lời lệnh gọi công cụ của một cuộc trò chuyện, mà giọng
-    nói chờ tối đa 1,5 giây (`lamp_voice::tools::ASK_DEADLINE`), không bao giờ
-    10 giây, và một lần chạy agent mất khoảng 75 giây. Nên nhóm này còn trống
-    và năm kỹ năng giữ câu nói của mình cho đến khi giọng nói trao nội dung của
-    nó. Các kỹ năng nhìn (Desk tutor, các
+  - `news`: chỉ Task news trong số các câu cần nội dung riêng của mỗi lần
+    kích hoạt (first builder, 08:57 và 09:26 ngày 19/11). lamp-voice soạn câu,
+    không phải lamp-skills (`lamp_voice::news_agent`): ghi chú mà mô hình nhận
+    hôm nay cho tin một task đã xong (ai làm, được giao gì, mang về gì) được
+    trao cho agent của đèn nguyên văn sau brief của đèn (`news_agent::BRIEF`),
+    như một câu hỏi bằng giọng nói trên socket make của lamp-tasks
+    (`{"op":"voice_ask","ask","grants":[],"within_ms":10000}`). Không gì khác
+    của tin được gửi đi, nên không có gì rời khỏi đèn nhiều hơn những gì mô
+    hình nhận hôm nay. Chỉ tin một task đã xong: không bao giờ mã đăng nhập
+    hay tiến độ. Tin được trao ngay khi nó đứng đầu hàng, trong lúc nó chờ
+    thời điểm của mình như trước, và được giữ tối đa 10 giây từ đó. Câu của
+    agent đến kịp thì được nói thay ghi chú, đúng như nó là; nếu không, ghi
+    chú được báo ngay, như khi tắt công tắc: quá 10 giây, không có phần
+    tasks, không liên lạc được lamp-tasks hoặc nó từ chối (nó chỉ nhận câu
+    hỏi khi `LAMP_HARD_ASKS_TO_AGENT=on` trong lamp-tasks, và mỗi lần một câu,
+    nên câu hỏi của chính người dùng trong 10 giây đó bị báo bận), hoặc câu
+    trả lời là `-`, rỗng, dài hơn một câu ngắn, hay chỉ dành cho chủ đèn khi
+    ở một mình. Câu đến sau bị bỏ, và lamp-tasks kết thúc lần chạy ở cùng
+    mốc 10 giây.
+  - Giữ câu có sẵn, dù cần nội dung riêng của mỗi lần kích hoạt (09:26 của
+    first builder):
+    - Welcome back: lời chào phải đến khi họ vừa ngồi xuống; trễ đến 10 giây
+      thì nghe như một cái máy. Một phần sau có thể soạn trước, khi họ rời đi.
+    - Reminders: câu phải nói đúng điều họ đã đặt, và một lời nhắc chỉ tính
+      là đã báo khi đã được nói.
+    - FAQ và Who was here: chúng trả lời lệnh gọi công cụ của một cuộc trò
+      chuyện, mà giọng nói chờ tối đa 1,5 giây
+      (`lamp_voice::tools::ASK_DEADLINE`).
+    Các kỹ năng nhìn (Desk tutor, các
     dấu của nó, Look for things, Point the light) cũng giữ nguyên: lamp-tasks
     không đưa ảnh nào cho agent; một lần chạy có quyền `camera` có thể lấy khung
     hình rộng 320 của mắt từ lamp-control (`camera.snapshot`), sau cái gật đầu
