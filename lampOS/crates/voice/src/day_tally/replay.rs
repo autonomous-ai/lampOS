@@ -253,7 +253,11 @@ mod tests {
         let counted = replayed([pull.as_str()], day);
         assert_eq!(counted.all().answers, 1);
         assert_eq!(counted.all().uncounted, 1);
-        let printed = format!("{}\n{}", told(&counted), serde_json::to_string(&counted).unwrap());
+        let printed = format!(
+            "{}\n{}",
+            told(&counted),
+            serde_json::to_string(&counted).unwrap()
+        );
         for word in ["oat", "milk", "Jay", "buy"] {
             assert!(!printed.contains(word), "{printed}");
         }
