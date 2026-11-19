@@ -2779,3 +2779,325 @@ async fn an_unsure_line_is_not_kept_and_nothing_is_asked() {
         "their yes runs it"
     );
 }
+
+/// #7478: `take_held_forget` on "Yes.", with a held `name` forget asked of
+/// A in session 3, one-face or spelling as given, and the line `line`'s
+/// (both the session's asker and the line's person) `after` the hold.
+fn taken_on(name: &str, flags: (bool, bool), line: Option<HeldAsker>, after: Duration) -> Taken {
+    taken_said(name, flags, "Yes.", line, after)
+}
+
+/// [`taken_on`] on the line `said`.
+fn taken_said(
+    name: &str,
+    (one_face, spelling): (bool, bool),
+    said: &str,
+    line: Option<HeldAsker>,
+    after: Duration,
+) -> Taken {
+    let (engine, _, _) = scripted(Arc::new(Script::default()));
+    let at = Instant::now();
+    let held: HeldAsker = (3, crate::remember::person_id("A"));
+    if let Ok(mut hold) = engine.shared.held_forget.lock() {
+        hold.held = Some(HeldForget {
+            call: call("f1", name, json!({"about": "the blue umbrella"})),
+            request: 1,
+            asker: held,
+            at,
+            asked: true,
+            spelling,
+            carried: false,
+            line: None,
+            asked_again: false,
+            one_face,
+            near: None,
+        });
+    }
+    take_held_forget(
+        &engine.shared,
+        2,
+        true,
+        said,
+        (line.as_ref(), line.as_ref()),
+        false,
+        at + after,
+    )
+}
+
+/// #7478's lines: the same person, theirs in a later session, no one
+/// known, and another person.
+fn same_later_none_other() -> [(Option<HeldAsker>, bool); 4] {
+    let a = crate::remember::person_id("A");
+    [
+        (Some((3, a.clone())), false),
+        (Some((4, a)), false),
+        (None, false),
+        (Some((3, crate::remember::person_id("B"))), true),
+    ]
+}
+
+/// What `taken` tells the model, or none, as [`answer`] tells it: a
+/// one-face or spelling drop's note on the model's call to that forget
+/// ([`Taken::OnForget`]).
+fn told(taken: &Taken) -> Option<String> {
+    match taken {
+        Taken::OnForget(_, note) => Some(note.clone()),
+        taken => taken.told(),
+    }
+}
+
+/// #7478 (1): a one-face forget's yes too late tells the model it is kept,
+/// the same person's (no one known's naming nothing held, the P3 on
+/// #7490), and another person's yes is told it was not theirs to give;
+/// none runs it, and each is told only on the model's forget call.
+#[test]
+fn a_late_one_face_yes_tells_the_model_nothing_was_forgotten() {
+    let late = crate::remember::ONE_FACE_FORGET_YES_FOR + Duration::from_secs(1);
+    for (line, other) in same_later_none_other() {
+        let taken = taken_on(crate::remember::FORGET, (true, false), line.clone(), late);
+        let want = if other {
+            crate::remember::not_theirs_told(crate::remember::THAT_YES)
+        } else if line.is_none() {
+            crate::remember::unknown_late_told(crate::remember::THAT_YES)
+        } else {
+            crate::remember::unknown_yes_told(crate::remember::FORGET)
+        };
+        assert!(
+            matches!(taken, Taken::OnForget(..)),
+            "{line:?}: told at once"
+        );
+        assert_eq!(told(&taken), Some(want), "{line:?}");
+    }
+}
+
+/// The first builder on #7490: a hold past its window and
+/// `remember::HELD_FORGET_GRACE` is let go silently, whatever the line and
+/// whoever says it: nothing runs and nothing is told, so the line is a
+/// plain line ("forget my bike lock code" an hour later is a new ask). Up
+/// to the grace, a late line still takes the hold.
+#[test]
+fn a_hold_past_its_window_and_grace_is_let_go_silently() {
+    let grace = crate::remember::HELD_FORGET_GRACE;
+    for (name, flags, window) in [
+        (
+            crate::remember::FORGET,
+            (true, false),
+            crate::remember::ONE_FACE_FORGET_YES_FOR,
+        ),
+        (
+            crate::remember::FORGET,
+            (false, false),
+            crate::remember::HELD_FORGET_FOR,
+        ),
+        (
+            crate::known_faces::FORGET,
+            (false, true),
+            crate::remember::HELD_FORGET_FOR,
+        ),
+    ] {
+        for (line, _) in same_later_none_other() {
+            for said in ["Yes.", "Forget my bike lock code."] {
+                for after in [
+                    window + grace + Duration::from_secs(1),
+                    Duration::from_secs(3600),
+                ] {
+                    let taken = taken_said(name, flags, said, line.clone(), after);
+                    assert!(
+                        matches!(taken, Taken::Nothing),
+                        "{name} {flags:?} {said:?} {line:?} {after:?}: not let go"
+                    );
+                }
+            }
+        }
+        // Within the grace a late yes is still taken, and told.
+        let taken = taken_on(name, flags, None, window + grace);
+        assert!(told(&taken).is_some(), "{name} {flags:?}: within the grace");
+    }
+}
+
+/// The P3 on #7490: a late line from no one known, within its kind's
+/// window plus `remember::HELD_FORGET_GRACE` (past it nothing is told),
+/// names neither the kind of thing held nor its call.
+#[test]
+fn a_late_line_from_no_one_known_names_nothing_held() {
+    for (name, flags, window) in [
+        (
+            crate::remember::FORGET,
+            (true, false),
+            crate::remember::ONE_FACE_FORGET_YES_FOR,
+        ),
+        (
+            crate::known_faces::FORGET,
+            (false, true),
+            crate::remember::HELD_FORGET_FOR,
+        ),
+    ] {
+        let late = window + Duration::from_secs(1);
+        let note = told(&taken_on(name, flags, None, late))
+            .unwrap_or_default()
+            .to_lowercase();
+        assert!(note.contains("nothing was forgotten"), "{name}: {note}");
+        for word in ["blue", "umbrella", "face", "everything", "_", "call"] {
+            assert!(!note.contains(word), "{name}: {word:?} in {note}");
+        }
+    }
+}
+
+/// The Reviewer-lead's P2 on #7490: a held one-face forget's line dropped
+/// (late, from no one known, another person's) is told only when the
+/// model's round on that line calls the forget, naming nothing else
+/// ([`told_on_forget`], #7971's door), as that call's answer. A line it
+/// answers with no forget ("Good morning." past the 30 s, a question from
+/// someone unknown in time) is told nothing.
+#[test]
+fn a_dropped_one_face_line_is_told_only_on_the_models_forget_call() {
+    let late = crate::remember::ONE_FACE_FORGET_YES_FOR + Duration::from_secs(1);
+    let a = crate::remember::person_id("A");
+    let b = crate::remember::person_id("B");
+    for (what, said, line, after, want) in [
+        (
+            "past the 30 s, no yes",
+            "Good morning.",
+            Some((3, a.clone())),
+            late,
+            crate::remember::unknown_yes_told(crate::remember::FORGET),
+        ),
+        (
+            "in time, no one known, no yes",
+            "What time is it?",
+            None,
+            Duration::from_secs(5),
+            crate::remember::unknown_yes_told(crate::remember::FORGET),
+        ),
+        (
+            "their yes, late",
+            "Yes.",
+            Some((3, a)),
+            late,
+            crate::remember::unknown_yes_told(crate::remember::FORGET),
+        ),
+        (
+            "another person's yes",
+            "Yes.",
+            Some((3, b)),
+            Duration::from_secs(5),
+            crate::remember::not_theirs_told(crate::remember::THAT_YES),
+        ),
+    ] {
+        let taken = taken_said(crate::remember::FORGET, (true, false), said, line, after);
+        let Taken::OnForget(held, note) = taken else {
+            panic!("{what}: not held for the model's forget");
+        };
+        assert_eq!(note, want, "{what}");
+        let other = call("c1", "get_time", json!({}));
+        for calls in [vec![], vec![other.clone()]] {
+            assert_eq!(
+                told_on_forget(2, 1, said, &held, &calls),
+                None,
+                "{what}: told with no forget call"
+            );
+        }
+        let forget = call("f2", crate::remember::FORGET, json!({}));
+        assert_eq!(
+            told_on_forget(2, 1, said, &held, &[other, forget]),
+            Some("f2".to_owned()),
+            "{what}: the forget call is told"
+        );
+    }
+}
+
+/// #7478 (2): a held forget that is not one-face, its plain yes dropped as
+/// too late, from no one known, theirs in a later session or another
+/// person's, tells the model one of the two notes; none runs it.
+#[test]
+fn a_held_forgets_dropped_yes_tells_the_model_nothing_was_forgotten() {
+    let late = crate::remember::HELD_FORGET_FOR + Duration::from_secs(1);
+    for name in [
+        crate::remember::FORGET,
+        crate::remember::FORGET_EVERYTHING,
+        crate::known_faces::FORGET,
+    ] {
+        for after in [Duration::from_secs(5), late] {
+            for (line, other) in same_later_none_other() {
+                let in_time_theirs =
+                    !other && after != late && line.as_ref().is_some_and(|l| l.0 == 3);
+                if in_time_theirs {
+                    continue;
+                }
+                let taken = taken_on(name, (false, false), line.clone(), after);
+                let want = if other {
+                    crate::remember::not_theirs_told(crate::remember::THAT_YES)
+                } else {
+                    crate::remember::unknown_yes_told(name)
+                };
+                assert!(
+                    !matches!(taken, Taken::Runs(..)),
+                    "{name} {after:?} {line:?}: runs"
+                );
+                assert_eq!(told(&taken), Some(want), "{name} {after:?} {line:?}");
+            }
+        }
+    }
+}
+
+/// #7478 (3): a face forget held through the spelling question, its
+/// spelling dropped as too late or not theirs, tells the model one of the
+/// two notes, as a spelling, never as a yes (the P3 on #7490), and a late
+/// one from no one known naming nothing held; nothing runs.
+#[test]
+fn a_spellings_dropped_forget_tells_the_model_nothing_was_forgotten() {
+    let late = crate::remember::HELD_FORGET_FOR + Duration::from_secs(1);
+    let name = crate::known_faces::FORGET;
+    for after in [Duration::from_secs(5), late] {
+        for (line, other) in same_later_none_other() {
+            if !other && after != late && line.as_ref().is_some_and(|l| l.0 == 3) {
+                continue;
+            }
+            let taken = taken_on(name, (false, true), line.clone(), after);
+            let spelling = crate::remember::THAT_SPELLING;
+            let want = if other {
+                crate::remember::not_theirs_told(spelling)
+            } else if line.is_none() && after == late {
+                crate::remember::unknown_late_told(spelling)
+            } else {
+                crate::remember::unknown_told(name, spelling)
+            };
+            assert!(matches!(taken, Taken::OnForget(..)), "{after:?} {line:?}");
+            assert!(
+                !matches!(taken, Taken::Runs(..)),
+                "{after:?} {line:?}: runs"
+            );
+            assert_eq!(told(&taken), Some(want), "{after:?} {line:?}");
+        }
+    }
+}
+
+/// #7478: another known person's dropped yes is told it was not theirs,
+/// and the note never names the held thing: not its words, its kind or its
+/// call.
+#[test]
+fn another_persons_yes_note_never_names_the_held_thing() {
+    let b = Some((3, crate::remember::person_id("B")));
+    for (name, one_face, spelling) in [
+        (crate::remember::FORGET, true, false),
+        (crate::remember::FORGET, false, false),
+        (crate::remember::FORGET_EVERYTHING, false, false),
+        (crate::known_faces::FORGET, false, true),
+    ] {
+        let taken = taken_on(
+            name,
+            (one_face, spelling),
+            b.clone(),
+            Duration::from_secs(5),
+        );
+        let note = told(&taken).unwrap_or_default().to_lowercase();
+        assert!(note.contains("nothing was forgotten"), "{name}: {note}");
+        for word in ["blue", "umbrella", "face", "everything", "name", "_"] {
+            assert!(!note.contains(word), "{name}: {word:?} in {note}");
+        }
+        assert!(
+            !note.contains("call forget"),
+            "{name}: names the call: {note}"
+        );
+    }
+}
