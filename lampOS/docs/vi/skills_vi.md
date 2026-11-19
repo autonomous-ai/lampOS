@@ -1729,8 +1729,13 @@ sau:
     won't make it." và không gì được tạo). Cả hai note (của lần tạo đang
     chạy, và của code một lần tạo bằng giọng nói đang chờ lời "có") bảo mô
     hình rằng một câu đổi hay thêm vào kỹ năng (một con số, tên của nó, một
-    bước nữa) là `answer: "change"` với `change`, điều họ đã đổi, nói trọn,
-    và rằng một thay đổi không bao giờ là lời "không": chỉ một câu có nghĩa
+    bước nữa) là `answer: "change"` với `request`, toàn bộ lời nhờ như bây
+    giờ với thay đổi của họ ở trong, do mô hình gộp lại (ROW của #7936 trên
+    lamp-9adf, 20/11 01:15: "every thirty minutes…", rồi "make it forty five
+    minutes", được tạo lại từ lời nhờ đầu với lời của mô hình về thay đổi
+    theo sau, và cả DeepSeek lẫn agent đều giữ `cooldown = "30m"`; thay đổi
+    không có tham số riêng, vì JSON của tool bị giới hạn bởi
+    `lamp_gemini::MAX_TOOL_JSON_BYTES`), và rằng một thay đổi không bao giờ là lời "không": chỉ một câu có nghĩa
     là dừng mới từ chối nó. Một câu là thay đổi, lời "không" hay chuyện
     khác là việc mô hình phán đoán, không bao giờ là danh sách từ; code áp
     dụng nó (`make_skill_local::making_changed`). Một thay đổi chỉ được
@@ -1753,8 +1758,11 @@ sau:
     dài". Khi đang chạy, thay đổi được giữ cho lần tạo: ở lần nhìn cuối
     (`OneAsk::settled`) kỹ năng viết trước được thả như một kỹ năng bị từ
     chối (`forget_unput`, không bao giờ được nói) và lời nhờ được tạo lại,
-    trong cùng lần tạo, với request đầu nguyên vẹn và thay đổi theo sau,
-    được nói là thắng ở chỗ hai cái khác nhau, và câu nghe được của thay
+    trong cùng lần tạo, từ `request` của mô hình (không bao giờ là lời lẽ
+    đầu; khi không có, từ request đầu nguyên vẹn), câu nghe được của thay
+    đổi theo sau như lời mới nhất của người đó, thắng mọi lời lẽ trước ở bất cứ chỗ nào
+    khác nhau (`make_skill_local::LATEST_WORD_WINS`; khác nhau thế nào là
+    việc của bên tạo đọc, không bao giờ của code), và câu nghe được của thay
     đổi sau câu đầu (một ghi được giữ theo cả hai); một lời "không" hay
     thay đổi sau đó vẫn thấy nó đang chạy. Lượt của thay đổi được báo là nó
     đã được nhận (`"changed": true`, `CHANGED_NEXT`), không bao giờ là nó sẽ
@@ -1788,6 +1796,8 @@ sau:
     lần tạo bằng giọng nói (tác vụ của một kỹ năng, một lần gỡ, một bản ghi
     đã thả) được đọc là chưa rõ, không bao giờ là lời "không". Kiểm thử:
     `a_change_said_while_made_makes_it_with_the_change`,
+    `a_change_while_made_is_remade_from_the_whole_ask_the_latest_word_winning`,
+    `a_remake_is_made_from_the_merged_ask_the_latest_word_said_to_win`,
     `a_change_to_a_make_waiting_for_its_yes_makes_it_again`,
     `a_change_counts_only_from_its_asker_or_the_owner`,
     `a_face_only_line_never_changes_the_askers_make`,

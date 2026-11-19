@@ -398,7 +398,8 @@ fn waiting_now(request: u64, now: Instant) -> Option<String> {
             " If they decline or put it off, call make_skill with that approve_id and answer \
              \"no\": it is dropped. If they change this skill or add to it (a number, its name, \
              another step), call make_skill with that approve_id, answer \"change\" and \
-             change: what they changed, said whole; it is made again with the change. A change \
+             request: the whole ask as it is now, their change in it; it is made again from \
+             that, their latest word winning. A change \
              is never a no: only a line that means stop declines it. Until their yes, never say \
              it is on or how to start it."
         } else {

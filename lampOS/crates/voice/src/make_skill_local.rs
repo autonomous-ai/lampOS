@@ -1271,7 +1271,9 @@ fn parameters_with(writes: bool, tasks: bool, code: bool) -> Value {
         // What the person answered (#6835 gap 2): a call made in code's
         // turn may be a no or unclear, never only a yes; a change of a
         // voice make under way or waiting for its yes (#7912) is its own
-        // answer, never a no.
+        // answer, never a no, given with `request`, the whole ask as it is
+        // now (the notes say so; no argument of its own, as the tool's JSON
+        // is held to `lamp_gemini::MAX_TOOL_JSON_BYTES`).
         let answers: Vec<&str> = crate::skill_write_yes::ANSWERS
             .into_iter()
             .chain([CHANGE])
@@ -1279,11 +1281,7 @@ fn parameters_with(writes: bool, tasks: bool, code: bool) -> Value {
         parameters["properties"][crate::skill_write_yes::ANSWER] = json!({
             "type": "string",
             "enum": answers,
-            "description": "With approve_id only: their answer to the say-back: yes if they agree, no if they decline or wait, unclear if you can't tell, new_ask if they ask something new instead (another skill or thing), which you then answer; one naming the skill asked about is never new_ask. change when a note says so. Left out: yes for a made skill's writes or code, unclear for a skill's task."
-        });
-        parameters["properties"][CHANGE_ARG] = json!({
-            "type": "string",
-            "description": "With answer change: what they changed, said whole."
+            "description": "With approve_id only: their answer to the say-back: yes if they agree, no if they decline or wait, unclear if you can't tell, new_ask if they ask something new instead (another skill or thing), which you then answer; one naming the skill asked about is never new_ask. Left out: yes for a made skill's writes or code, unclear for a skill's task."
         });
         // The skill the person's line names (#7545): a yes is taken only
         // for the skill waiting, matched in code.
@@ -1692,9 +1690,7 @@ fn make_with_by(
                 // settles as a make that made nothing, told by its long
                 // make when let run on; else, its person told they'll hear,
                 // its line is said after a cut too.
-                let let_go = begun
-                    .then(|| crate::long_make::settle(made_in))
-                    .flatten();
+                let let_go = begun.then(|| crate::long_make::settle(made_in)).flatten();
                 if let Some(directory) = let_go {
                     crate::long_make::settled(
                         &directory,
@@ -1744,7 +1740,10 @@ fn make_with_by(
                 // its `making` mark goes untold, so no later make hears "still
                 // making" and nothing is told of it when its time would run out.
                 if run_on && let Some(directory) = crate::long_make::settle(made_in) {
-                    crate::long_make::dropped(&directory, crate::app_make::now_unix_ms().max(now_unix_ms));
+                    crate::long_make::dropped(
+                        &directory,
+                        crate::app_make::now_unix_ms().max(now_unix_ms),
+                    );
                 }
                 eprintln!(
                     "lamp-voice: a skill made here was declined while it was made: not put on, not kept, nothing said"
@@ -2109,9 +2108,10 @@ struct HeldAsk {
     whole: String,
     heard_line: String,
     /// Changes the person said while it was made ([`making_changed`]):
-    /// each its words as the model gave them and the line heard, taken by
-    /// the make, which is made again with them ([`OneAsk::settled`]).
-    changes: Vec<(String, String)>,
+    /// each its words and the whole ask with it as the model gave them,
+    /// and the line heard, taken by the make, which is made again with
+    /// them ([`OneAsk::settled`]).
+    changes: Vec<Change>,
     /// Who asked for it ([`with_asked_by`]): a change counts only from
     /// them or the owner ([`AskedBy::may_change`]).
     asked_by: AskedBy,
@@ -2365,9 +2365,8 @@ impl OneAsk {
         match asks.iter_mut().find(|ask| ask.id == self.0) {
             Some(ask) if ask.dropped => Settled::Dropped,
             Some(ask) if !ask.changes.is_empty() => {
-                for (change, heard) in std::mem::take(&mut ask.changes) {
-                    (ask.whole, ask.heard_line) =
-                        changed_ask(&ask.whole, &ask.heard_line, &change, &heard);
+                for change in std::mem::take(&mut ask.changes) {
+                    (ask.whole, ask.heard_line) = changed_ask(&ask.whole, &ask.heard_line, &change);
                 }
                 ask.request = ask_words(&ask.whole);
                 ask.heard = ask_words(&ask.heard_line);
@@ -2409,26 +2408,40 @@ pub struct Again {
     pub asked_by: AskedBy,
 }
 
-/// The ask `whole`, heard as `heard_line`, with the person's `change`
-/// (the model's words of it), heard as `change_heard`: the first ask kept
-/// whole, the change after it and said to win where they differ, so the
-/// maker reads both; the heard lines one after the other, so a write the
+/// A change the person said to a voice make (#7912), as held for it
+/// ([`making_changed`]).
+#[derive(Clone, Debug, PartialEq)]
+struct Change {
+    /// The whole ask as it is now, the change in it, as the model merged
+    /// it (the call's `request`, #7936's ROW); none when it gave none.
+    whole: Option<String>,
+    /// The line heard for the change: the person's latest word.
+    heard: String,
+}
+
+/// What a remake's request says before the person's change (#7936's ROW
+/// on lamp-9adf: "every thirty minutes", then "make it forty five", kept
+/// `cooldown = "30m"`): their latest word wins over any earlier wording.
+pub const LATEST_WORD_WINS: &str = "Changed while it was made. The person's latest word, \
+     which wins over any earlier wording of this ask wherever they differ: ";
+
+/// The ask `whole`, heard as `heard_line`, with the person's `change`:
+/// made from the whole ask as the model merged it with the change, never
+/// the first wording, else from the first ask; either way the change's
+/// line after it, said as their latest word, which wins over any earlier
+/// wording ([`LATEST_WORD_WINS`]), so the maker never keeps the first
+/// wording over it. Whether the two differ, and how, is the maker's to
+/// read, never code's. The heard lines one after the other, so a write the
 /// change asks for is held to words the person said.
-fn changed_ask(
-    whole: &str,
-    heard_line: &str,
-    change: &str,
-    change_heard: &str,
-) -> (String, String) {
+fn changed_ask(whole: &str, heard_line: &str, change: &Change) -> (String, String) {
+    let asked = change.whole.as_deref().unwrap_or(whole).trim();
+    let latest = change.heard.trim();
     (
-        format!(
-            "{} Changed since, in their later words, which win where the two differ: {}",
-            whole.trim(),
-            change.trim()
-        ),
-        format!("{} {}", heard_line.trim(), change_heard.trim())
-            .trim()
-            .to_owned(),
+        match latest.is_empty() {
+            true => asked.to_owned(),
+            false => format!("{asked} {LATEST_WORD_WINS}{latest}"),
+        },
+        format!("{} {latest}", heard_line.trim()).trim().to_owned(),
     )
 }
 
@@ -2438,9 +2451,6 @@ fn changed_ask(
 /// made again with the change. Whether a line is one is the model's
 /// judgment, never a list of words.
 pub const CHANGE: &str = "change";
-/// The `make_skill` argument beside [`CHANGE`]: what the person changed,
-/// in the model's words, said whole.
-pub const CHANGE_ARG: &str = "change";
 
 /// The most of the model's request told to a later line while it is made
 /// ([`making_note`]).
@@ -2532,7 +2542,8 @@ fn making_note_where(request: u64, of: impl Fn(&std::path::Path) -> bool) -> Opt
          approve_id \"{MAKING_ID}{}\". It isn't made or on yet, and they'll hear when it is: \
          never say it is on, or how to start it. If this line changes it or adds to it (a \
          number, its name, another step), call make_skill with that approve_id, answer \
-         \"change\" and change: what they changed, said whole; it is made with the change. \
+         \"change\" and request: the whole ask as it is now, their change in it; it is made \
+         from that, their latest word winning. \
          A change is never a no: only a line that means stop declines it. If this line \
          declines it or puts it off, call make_skill with only that approve_id and answer \
          \"no\": it is dropped. Otherwise don't call it with that approve_id. \
@@ -2711,8 +2722,10 @@ const CHANGE_BUSY_NEXT: &str = "Nothing was changed: another skill is being made
 
 /// The person's change to the voice make `id` names, in a later `request`
 /// (#7912: "make it fifty" while a make was under way was read as a no,
-/// and nothing was made): `change`, the model's words of it and the line
-/// heard, which stands for the words when the model gave none. The model
+/// and nothing was made): `change`, the whole ask as it is now with the
+/// change in it as the model merged it (the call's `request`, #7936's ROW
+/// on lamp-9adf: made from it, never the first wording), and the line
+/// heard, the person's latest word. The model
 /// judged the line a change, never a no; code applies it, and only for
 /// `changer` the make's asker or the owner ([`AskedBy::may_change`]):
 /// anyone else's changes nothing and never enters its heard line. A change
@@ -2734,16 +2747,16 @@ pub fn making_changed(
     changer: &AskedBy,
     retake: impl FnOnce(u64) -> bool,
 ) -> Making {
-    let (change, heard) = change;
+    let (merged, heard) = change;
     let held = id
         .strip_prefix(MAKING_ID)
         .and_then(|held| held.parse::<u64>().ok());
-    let Some(change) = change
-        .map(str::trim)
-        .filter(|change| !change.is_empty())
-        .or(Some(heard.trim()).filter(|heard| !heard.is_empty()))
-    else {
-        return Making::Told(json!({ "approved": false, "next": CHANGE_UNSAID_NEXT }));
+    let change = Change {
+        whole: merged
+            .map(str::trim)
+            .filter(|merged| !merged.is_empty())
+            .map(str::to_owned),
+        heard: heard.trim().to_owned(),
     };
     let mut asks = ASKS.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
     let at = asks.iter().position(|ask| match held {
@@ -2761,6 +2774,10 @@ pub fn making_changed(
         eprintln!("lamp-voice: request {request}: a change to a make found none under way");
         return Making::Told(json!({ "approved": false, "next": NOT_MAKING_NEXT }));
     };
+    // No words of the change at all, neither the whole ask nor its line.
+    if change.whole.is_none() && change.heard.is_empty() {
+        return Making::Told(json!({ "approved": false, "next": CHANGE_UNSAID_NEXT }));
+    }
     if !ask.asked_by.may_change(changer) {
         eprintln!(
             "lamp-voice: request {request}: a change to a make wasn't taken: the line isn't its asker's or the owner's (#7912)"
@@ -2780,9 +2797,9 @@ pub fn making_changed(
     // The ask as it would be made: every change held, then this one.
     let (whole, line) = ask.changes.iter().fold(
         (ask.whole.clone(), ask.heard_line.clone()),
-        |(whole, line), (change, heard)| changed_ask(&whole, &line, change, heard),
+        |(whole, line), change| changed_ask(&whole, &line, change),
     );
-    let (request_words, heard_line) = changed_ask(&whole, &line, change, heard);
+    let (request_words, heard_line) = changed_ask(&whole, &line, &change);
     if made_skill::brief(&request_words).is_err() {
         eprintln!(
             "lamp-voice: request {request}: a change to a make wasn't taken: the ask would be too long (#7912)"
@@ -2806,8 +2823,7 @@ pub fn making_changed(
         }
         // A change after their no takes the make back: made, with it.
         ask.dropped = false;
-        ask.changes
-            .push((change.to_owned(), heard.trim().to_owned()));
+        ask.changes.push(change);
         eprintln!(
             "lamp-voice: request {request}: the person changed a make under way: it is made again with the change, never dropped (#7912)"
         );
@@ -5496,7 +5512,7 @@ pub fn answer(
             making_changed(
                 id,
                 request,
-                (call.args[CHANGE_ARG].as_str(), &heard_line),
+                (call.args[REQUEST].as_str(), &heard_line),
                 &AskedBy::of(lease),
                 |held| {
                     !crate::make_queue::on()
@@ -7649,7 +7665,7 @@ light = { dim = 1 }
                         &making_id_in(&directory),
                         71,
                         (
-                            Some("dim it at ten fifty pm, not at ten"),
+                            Some("make me a skill that dims the light at 10:50 pm"),
                             "make it ten fifty",
                         ),
                         &by("ann", true),
@@ -7673,20 +7689,21 @@ light = { dim = 1 }
         let note = note.get().unwrap().clone().unwrap();
         assert!(note.contains("answer \"change\""), "{note}");
         assert!(note.contains("A change is never a no"), "{note}");
+        assert!(note.contains("request: the whole ask"), "{note}");
         // Made again with the change: the second answer is the one kept.
         let bodies = served.join().unwrap();
         assert_eq!(bodies.len(), 2, "made again with the change");
         assert!(!bodies[0].contains("fifty"), "{}", bodies[0]);
+        // Made from the whole ask as it is now, the change's line said as
+        // the person's latest word (#7936's ROW), never the first wording.
         assert!(
-            bodies[1].contains("dim it at ten fifty pm, not at ten"),
+            bodies[1].contains(&format!(
+                "make me a skill that dims the light at 10:50 pm {LATEST_WORD_WINS}make it ten fifty"
+            )),
             "{}",
             bodies[1]
         );
-        assert!(
-            bodies[1].contains("dims the light at 10 pm"),
-            "{}",
-            bodies[1]
-        );
+        assert!(!bodies[1].contains("at 10 pm"), "{}", bodies[1]);
         assert!(told.get("dropped").is_none(), "{told}");
         assert_eq!(told["made"], "evening-dim", "{told}");
         assert_eq!(told["on"], true, "{told}");
@@ -7710,10 +7727,113 @@ light = { dim = 1 }
         let _ = std::fs::remove_dir_all(&root);
     }
 
+    /// #7936's ROW on lamp-9adf (20 Nov 01:15): "every thirty minutes while
+    /// I sit at the desk, remind me to roll my shoulders", then "Actually,
+    /// make it forty five minutes" while it was made: the remake was told
+    /// the first ask whole with the change after it, and both DeepSeek and
+    /// the agent kept `cooldown = "30m"`. The model's call gives the whole
+    /// ask as it is now as its `request`, which the note asks for: the
+    /// remake's request to the maker is that whole ask, never the first
+    /// wording, and says the person's latest word, their line, wins.
+    #[test]
+    fn a_change_while_made_is_remade_from_the_whole_ask_the_latest_word_winning() {
+        const FIRST: &str =
+            "every thirty minutes while I sit at the desk, remind me to roll my shoulders";
+        const NOW_ASKED: &str =
+            "every forty five minutes while I sit at the desk, remind me to roll my shoulders";
+        // The change's line: a request no other test's.
+        const LINE: u64 = 7_936_077;
+        let (root, keeping) = keeping("changed-whole-while-made");
+        let (url, served) = service_sent(vec![(200, good()), (200, good())]);
+        let helper = manage_helper(&keeping.manage);
+        let directory = keeping.directory.clone();
+        let chat = chat_at(url);
+        let changed = Arc::new(std::sync::OnceLock::new());
+        let seen = changed.clone();
+        let told = make_with(
+            76,
+            Some(
+                "Lamp, make a skill: every thirty minutes while I sit at the desk, remind me to roll my shoulders.",
+            ),
+            FIRST,
+            &keeping,
+            move || {
+                if seen.get().is_none() {
+                    // Its note asks for the whole ask as it is now.
+                    let note = making_note_where(LINE, |at| at == directory).unwrap();
+                    assert!(note.contains("request: the whole ask"), "{note}");
+                    crate::thread::THREAD
+                        .lock()
+                        .unwrap()
+                        .line_of(LINE, "Actually, make it forty five minutes.");
+                    // The owner's line: every line is, in the private room.
+                    crate::person::set_private_room_for_test(Some(true));
+                    let _ = seen.set(answered_while_made(
+                        &directory,
+                        LINE,
+                        json!({ "answer": "change", "request": NOW_ASKED }),
+                    ));
+                    crate::person::set_private_room_for_test(None);
+                }
+                chat()
+            },
+            NOW,
+            || None,
+        );
+        let changed = changed.get().unwrap();
+        assert_eq!(changed["changed"], true, "{changed}");
+        let bodies = served.join().unwrap();
+        assert_eq!(bodies.len(), 2, "made again with the change");
+        assert!(bodies[0].contains(FIRST), "{}", bodies[0]);
+        // The remake: the whole ask as it is now, the change said as the
+        // person's latest word, and never the first wording.
+        assert!(bodies[1].contains(NOW_ASKED), "{}", bodies[1]);
+        assert!(!bodies[1].contains(FIRST), "{}", bodies[1]);
+        assert!(
+            bodies[1].contains("Actually, make it forty five minutes."),
+            "{}",
+            bodies[1]
+        );
+        assert!(bodies[1].contains("latest word"), "{}", bodies[1]);
+        assert!(bodies[1].contains("wins over"), "{}", bodies[1]);
+        assert_eq!(told["made"], "evening-dim", "{told}");
+        assert!(helper.join().unwrap()["install_made"].is_string());
+        ASKS.lock()
+            .unwrap()
+            .retain(|ask| ask.directory != keeping.directory);
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    /// #7936's ROW: a remake is made from the whole ask the model merged,
+    /// the change after it as the person's latest word, which wins; with
+    /// no merge given, from the first ask, the change said to win all the
+    /// same. The heard lines go one after the other either way.
+    #[test]
+    fn a_remake_is_made_from_the_merged_ask_the_latest_word_said_to_win() {
+        let first = "every thirty minutes at the desk, remind me to roll my shoulders";
+        let merged = "every forty five minutes at the desk, remind me to roll my shoulders";
+        let line = "Actually, make it forty five minutes.";
+        let change = |whole: Option<&str>| Change {
+            whole: whole.map(str::to_owned),
+            heard: line.to_owned(),
+        };
+        let (request, heard) = changed_ask(first, "make a skill", &change(Some(merged)));
+        assert_eq!(request, format!("{merged} {LATEST_WORD_WINS}{line}"));
+        assert!(!request.contains("thirty"), "{request}");
+        assert_eq!(heard, "make a skill Actually, make it forty five minutes.");
+        let (request, _) = changed_ask(first, "make a skill", &change(None));
+        assert!(request.starts_with(first), "{request}");
+        assert!(
+            request.ends_with(&format!("{LATEST_WORD_WINS}{line}")),
+            "{request}"
+        );
+        assert!(LATEST_WORD_WINS.contains("wins over any earlier wording"));
+    }
+
     /// #7912: a voice make's code waiting for its yes, changed by the
     /// wait's own id: the wait is dropped, and the ask is given back to be
-    /// made again now, the first request whole with the change after it,
-    /// and both lines heard; the held ask let go, so it is no "you already
+    /// made again now, from the whole ask as it is now with the change's
+    /// line after it as the latest word, and both lines heard; the held ask let go, so it is no "you already
     /// have that skill". Without words of the change, nothing is changed.
     #[test]
     fn a_change_to_a_make_waiting_for_its_yes_makes_it_again() {
@@ -7750,7 +7870,7 @@ light = { dim = 1 }
         );
         assert!(crate::skill_write_yes::waits(&id), "nothing changed yet");
         let change = (
-            Some("the break after fifty minutes, not forty five"),
+            Some("when I say start studying, remind me to take a break after fifty minutes"),
             "make it fifty",
         );
         // Heron's HOLD 2 on #7936: with `LAMP_MAKE_QUEUE`, the remake must
@@ -7770,16 +7890,14 @@ light = { dim = 1 }
             panic!("made again");
         };
         assert_eq!(slot_of, Some(80), "the slot taken from the make that waits");
-        assert!(
-            again.request.starts_with(
-                "when I say start studying, remind me to take a break after forty five minutes"
+        // Made from the whole ask as it is now (#7936's ROW), the change's
+        // line its latest word, never the first wording.
+        assert_eq!(
+            again.request,
+            format!(
+                "when I say start studying, remind me to take a break after fifty minutes \
+                 {LATEST_WORD_WINS}make it fifty"
             ),
-            "{again:?}"
-        );
-        assert!(
-            again
-                .request
-                .contains("the break after fifty minutes, not forty five"),
             "{again:?}"
         );
         assert!(again.heard.ends_with("make it fifty"), "{again:?}");
@@ -8028,7 +8146,7 @@ light = { dim = 1 }
         let call = lamp_gemini::ToolCall {
             id: "c1".to_owned(),
             name: crate::made_skill::MAKE.to_owned(),
-            args: json!({"approve_id": id, "answer": "change", "change": "at nine", "named": "none"}),
+            args: json!({"approve_id": id, "answer": "change", "request": "at nine", "named": "none"}),
         };
         let told = answer(&call, 98, true, None, None);
         assert_eq!(told["next"], crate::skill_write_yes::UNCLEAR_NEXT, "{told}");
