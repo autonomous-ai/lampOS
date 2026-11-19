@@ -44,8 +44,9 @@ Environment=LAMP_SKILL_READS=on
 # mid-read still stops it.
 Environment=LAMP_PRIVATE_ROOM=on
 # Every face but a far one counts (V2, 19 Nov 09:53; the first builder, 12:20 on #7814): a made skill's read or told
-# answer drops a face under 0.6 of the owner's face's height, never one only for being unsure, so a far face beside
-# the owner alone no longer holds it "not alone" and a guest at the desk turned sideways still does.
+# answer drops a face only under both 0.6 of the owner's face's height and 0.10 of the picture, never one only for
+# being unsure, so a far face beside the owner alone no longer holds it "not alone" and a guest at the desk turned
+# sideways, or leaning in nearer than the owner, still does.
 Environment=LAMP_FACES_AT_DESK_ONLY=on
 # A Store or pushed skill's `do.task` (#6305, #6071 PR 2, docs/skills.md "A skill's task"): handed to lamp-tasks
 # only with lamp-control's kept yes to its grants and folder's SHA-256; at most 3 a skill and 10 in all a day.

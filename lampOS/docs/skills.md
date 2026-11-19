@@ -5995,12 +5995,14 @@ of the last 3 s, each look counted once, as lamp-voice's
 height, never for the eyes being unsure of it alone (the first builder's
 ruling, 19 Nov 12:20 on #7814: a read is said unasked, so a person at the
 desk must hold it). A face is far when it is under 0.6 of the owner's face's
-height (`known_faces::AT_DESK_HEIGHT`). The owner's face is the eyes' known
-face at the lamp: the tallest face they are at least 0.70 sure of and at
-most 0.6 of the picture tall. With no owner's face to measure from (a lamp
+height (`known_faces::AT_DESK_HEIGHT`) and under 0.10 of the picture tall,
+the eyes' own near bar (`NEAR_ENOUGH`): a face near by that bar is never
+far, so a guest leaning in nearer the lamp than the owner never makes the
+owner the far face (Heron's HOLD on #7883). The owner's face is the eyes'
+known face at the lamp, taken as the tallest face they are at least 0.70
+sure of and at most 0.6 of the picture tall. With no owner's face to measure from (a lamp
 that knows nobody, as lamp-e82d, #7876, or the owner not known in view), a
-face is far when it is under 0.10 of the picture tall, the eyes' own near
-bar (`NEAR_ENOUGH`). So a small face far behind the owner (mostly a TV, a
+face is far when it is under the near bar alone. So a small face far behind the owner (mostly a TV, a
 photo or someone passing), or one look's face never seen again, is not
 someone with them. A silent guest at the desk turned sideways (the eyes
 about 0.65 sure) still counts, and a second face at the desk in two looks
@@ -6017,6 +6019,7 @@ at the desk and "2 faces not at the desk". Tests (`service_read::tests`):
 `a_stale_or_lost_track_is_not_counted`, `two_faces_at_the_desk_are_not_alone`,
 `an_unsure_face_at_the_desk_holds_the_read`,
 `a_far_face_under_six_tenths_of_the_owners_lets_the_read_through`,
+`a_guest_nearer_than_the_owner_never_makes_the_owner_far`,
 `a_far_face_with_a_voice_heard_holds_the_read`,
 `with_no_owners_face_known_the_eyes_near_bar_measures`,
 `the_camera_off_holds_the_read`.

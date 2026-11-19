@@ -2869,12 +2869,14 @@ lamp-voice đếm. Một khuôn mặt chỉ bị bỏ vì chiều cao của nó,
 chỉ vì mắt không chắc về nó (quyết định của first builder, 19/11 12:20 trên
 #7814: một lần đọc được nói khi không ai hỏi, nên một người ở bàn phải giữ
 được nó). Một khuôn mặt là ở xa khi nó thấp hơn 0,6 chiều cao khuôn mặt của
-chủ (`known_faces::AT_DESK_HEIGHT`). Khuôn mặt của chủ là khuôn mặt mà mắt
-nhận ra ở đèn: khuôn mặt cao nhất mà mắt chắc ít nhất 0,70 và cao không quá
-0,6 khung hình. Khi không có khuôn mặt của chủ để đo (một đèn không biết ai,
+chủ (`known_faces::AT_DESK_HEIGHT`) và thấp hơn 0,10 khung hình, ngưỡng gần
+của chính mắt (`NEAR_ENOUGH`): một khuôn mặt gần theo ngưỡng đó không bao giờ
+là ở xa, nên một vị khách nghiêng người lại gần đèn hơn chủ không bao giờ
+làm khuôn mặt của chủ thành khuôn mặt ở xa (HOLD của Heron trên #7883).
+Khuôn mặt của chủ là khuôn mặt mà mắt nhận ra ở đèn, được lấy là khuôn mặt
+cao nhất mà mắt chắc ít nhất 0,70 và cao không quá 0,6 khung hình. Khi không có khuôn mặt của chủ để đo (một đèn không biết ai,
 như lamp-e82d, #7876, hoặc chủ không được nhận ra trong tầm nhìn), một khuôn
-mặt là ở xa khi nó thấp hơn 0,10 khung hình, ngưỡng gần của chính mắt
-(`NEAR_ENOUGH`). Vì vậy một khuôn mặt nhỏ ở xa phía sau chủ (phần lớn là TV,
+mặt là ở xa khi nó chỉ thấp hơn ngưỡng gần đó. Vì vậy một khuôn mặt nhỏ ở xa phía sau chủ (phần lớn là TV,
 ảnh hoặc người đi ngang), hay khuôn mặt của một lần nhìn không bao giờ thấy
 lại, không phải là người đang ở cùng chủ. Một vị khách im lặng ở bàn quay
 nghiêng (mắt chắc khoảng 0,65) vẫn được đếm, và một khuôn mặt thứ hai ở bàn
@@ -2892,6 +2894,7 @@ lamp-voice đọc thấy một khuôn mặt ở bàn và "2 faces not at the des
 `a_stale_or_lost_track_is_not_counted`, `two_faces_at_the_desk_are_not_alone`,
 `an_unsure_face_at_the_desk_holds_the_read`,
 `a_far_face_under_six_tenths_of_the_owners_lets_the_read_through`,
+`a_guest_nearer_than_the_owner_never_makes_the_owner_far`,
 `a_far_face_with_a_voice_heard_holds_the_read`,
 `with_no_owners_face_known_the_eyes_near_bar_measures`,
 `the_camera_off_holds_the_read`.

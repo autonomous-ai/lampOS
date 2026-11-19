@@ -597,16 +597,18 @@ impl FacesSeen {
 /// How many faces of one look the gate counts: without `desk_only`, every
 /// face; with it, every face but a far one, by height alone, never by how
 /// sure the eyes are of it. A face is far when it is under
-/// `known_faces::AT_DESK_HEIGHT` (0.6) of the owner's face's height. The
-/// owner's face is the eyes' known face at the lamp (`owner_in_view`): the
-/// near face they recognise, the tallest they are at least
-/// `known_faces::AT_DESK_CONFIDENCE` sure of and at most
+/// `known_faces::AT_DESK_HEIGHT` (0.6) of the owner's face's height and
+/// under the eyes' own near bar, [`crate::watch::NEAR`] (0.10) of the
+/// picture tall: a face near by that bar is never far, so a guest leaning
+/// in nearer the lamp than the owner never makes the owner the far face
+/// (Heron's HOLD on #7883, 19 Nov 13:26). The owner's face is the eyes'
+/// known face at the lamp (`owner_in_view`), taken as the tallest face they
+/// are at least `known_faces::AT_DESK_CONFIDENCE` sure of and at most
 /// `known_faces::AT_DESK_TALLEST` of the picture tall, so a giant false box
 /// is never the measure (lamp-voice's own reference, `known_faces::at_desk`).
 /// With no owner's face to measure from (none known, as on lamp-e82d,
 /// #7876, or the owner not known in view now), a face is far when it is
-/// under the eyes' own near bar, [`crate::watch::NEAR`] (0.10) of the
-/// picture tall. A look whose faces are all far counts nobody.
+/// under the near bar alone. A look whose faces are all far counts nobody.
 pub fn near_faces(faces: &[lamp_msgs::Face], desk_only: bool, owner_in_view: bool) -> usize {
     use lamp_voice::known_faces::{AT_DESK_CONFIDENCE, AT_DESK_HEIGHT, AT_DESK_TALLEST};
     if !desk_only {
@@ -619,7 +621,7 @@ pub fn near_faces(faces: &[lamp_msgs::Face], desk_only: bool, owner_in_view: boo
         .map(height)
         .fold(0.0_f32, f32::max);
     let bar = if owner_in_view && owner > 0.0 {
-        AT_DESK_HEIGHT * owner
+        (AT_DESK_HEIGHT * owner).min(crate::watch::NEAR)
     } else {
         crate::watch::NEAR
     };
@@ -2378,24 +2380,46 @@ mod tests {
         assert_eq!(counts.last().copied().flatten(), Some(1), "{counts:?}");
     }
 
-    /// A face under 0.6 of the owner's face's height is far from the desk
-    /// and lets the read through, however sure the eyes are of it; at 0.6 or
-    /// over it is at the desk and holds it.
+    /// A face `height` of the picture tall at `confidence`, as [`face`]
+    /// takes it (its width three quarters of that, square in a 4:3 frame).
+    fn tall(height: f32, confidence: f32) -> (f32, f32) {
+        (height * 3.0 / 4.0, confidence)
+    }
+
+    /// A face under 0.6 of the owner's face's height, and under the eyes'
+    /// near bar, is far from the desk and lets the read through, however
+    /// sure the eyes are of it; at 0.6 or over it is at the desk and holds it.
     #[test]
     fn a_far_face_under_six_tenths_of_the_owners_lets_the_read_through() {
-        // The owner 0.2 of the picture tall; a sure face 0.113 tall (0.57).
-        let behind = (0.085, 0.95);
-        let counts = counted_by(&steady(&[OWNER, behind]), true);
+        // The owner 0.15 of the picture tall; a sure face 0.085 tall (0.57).
+        let owner = tall(0.15, 0.88);
+        let behind = tall(0.085, 0.95);
+        let counts = counted_by(&steady(&[owner, behind]), true);
         assert_eq!(counts.last().copied().flatten(), Some(1), "{counts:?}");
         let seen = Seen {
             faces: counts.last().copied().flatten(),
             ..private_one()
         };
         assert_eq!(judge(&seen), Ok(()));
-        // 0.127 tall (0.63 of the owner's), unsure: at the desk.
-        let beside = (0.095, 0.62);
-        let counts = counted_by(&steady(&[OWNER, beside]), true);
+        // 0.095 tall (0.63 of the owner's), unsure: at the desk.
+        let beside = tall(0.095, 0.62);
+        let counts = counted_by(&steady(&[owner, beside]), true);
         assert_eq!(counts.last().copied().flatten(), Some(2), "{counts:?}");
+    }
+
+    /// Heron's HOLD on #7883 (19 Nov 13:26): a guest leaning in nearer the
+    /// lamp than the owner never makes the owner the far face. The owner
+    /// 0.15 tall is under 0.6 of the guest's 0.27, but near by the eyes' own
+    /// bar (0.10), so both count and the read holds.
+    #[test]
+    fn a_guest_nearer_than_the_owner_never_makes_the_owner_far() {
+        let counts = counted_by(&steady(&[tall(0.15, 0.88), tall(0.27, 0.90)]), true);
+        assert_eq!(counts.last().copied().flatten(), Some(2), "{counts:?}");
+        let seen = Seen {
+            faces: counts.last().copied().flatten(),
+            ..private_one()
+        };
+        assert_eq!(judge(&seen), Err(Closed::NotAlone));
     }
 
     /// The first builder's note 1: a far face that speaks still holds the
