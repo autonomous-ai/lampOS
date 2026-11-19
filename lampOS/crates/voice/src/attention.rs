@@ -997,10 +997,9 @@ pub(crate) fn short_line_without_the_name(heard: &str) -> bool {
 }
 
 /// Whether any word of `heard` is the lamp's name or one written for it
-/// ([`written_for_the_name`]), wherever it stands: what a hearing of the
-/// name in the room's sound needs from the words to count as naming the
-/// line ([`short_line_without_the_name`]; `said_to_me`'s named line,
-/// #7891).
+/// ([`written_for_the_name`]), wherever it stands: what a short line's
+/// words need for a hearing of the name in the room's sound to count
+/// ([`short_line_without_the_name`], #7891).
 pub(crate) fn names_it_in_words(heard: &str) -> bool {
     crate::not_speech::plain_words(heard)
         .iter()
