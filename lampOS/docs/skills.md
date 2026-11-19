@@ -6248,7 +6248,14 @@ the same code for both writers.
   either one `[trigger]` of the lamp's own or the words the person will
   say to ask for it (`asks:`); it writes nothing else. The skill's one
   task is the person's request in their own words, plain, at most 120
-  characters (`make_no_cannot::task_words`), never a model's words. By
+  characters (`make_no_cannot::task_words`). A longer request is never cut
+  short (lamp-9adf, 19 Nov: the evening rate lost "more than half a
+  percent since the day before"): the same call's brief asks for a `task:`
+  line, one plain sentence of at most 120 characters, kept only when every
+  number (in words or digits), time word, name, comparison and percent in
+  the request survives in it (`make_no_cannot::task_kept`); else the model
+  is asked again once, told what it left out, then the make is refused as
+  too long (below), on a trigger or only asked for alike. By
   voice, the request is the voice model's tool argument rather than the
   line heard; the read-back bounds this, because the owner agrees to
   exactly the words said back. Its
@@ -6347,11 +6354,13 @@ the same code for both writers.
       microphone, and a skill can't listen, to keep the room private."
     - Nothing named, or a grant there isn't (`other`): "I can't make that
       one yet: it needs something no skill on this lamp can be given yet."
-    - A task only asked for whose request is longer than the words read
-      back (`too_long`, `make_no_cannot::task_cut`): "I can't make that one
-      yet: it's too long for me to read back to you whole, so ask for it in
-      fewer words." Its `scripts/SKILL.md` carries exactly the words read
-      back and agreed to, never more of the request (El's P1 on #7261).
+    - A request longer than the words read back (`make_no_cannot::task_cut`)
+      whose model's `task:` line left out what it names twice (`too_long`,
+      `make_no_cannot::task_kept`): "I can't make that one yet: it's too
+      long for me to read back to you whole, so ask for it in fewer words."
+      A task only asked for has its `scripts/SKILL.md` carry exactly the
+      words read back and agreed to, never more of the request (El's P1 on
+      #7261).
     The journal names only the reason's class, never the person's words.
     The internet and services switches are the lamp's own, in no app
     setting, so no line sends the person to the app for them.
