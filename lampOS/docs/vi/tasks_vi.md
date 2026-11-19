@@ -401,9 +401,74 @@ lần chạy, và được trả lời khi lần chạy kết thúc
   "Dịch vụ đã liên kết thành task cho agent của đèn"), tối đa khoảng 400 ký
   tự (`MOST_TOLD_CHARS`, người xây dựng đầu tiên trên #7591), cắt ở dấu kết
   câu cuối cùng bên trong, rồi "There's more; ask me if you want it."
-  Không có gì theo dõi việc script của lần chạy đã tự nói qua `say` của
-  lamp-control hay chưa; agent được bảo để trống câu trả lời (một dấu gạch
-  ngang, hoặc `answer.md` trống) khi đã nói (P3 của Heron trên #7591).
+  Agent được bảo để trống câu trả lời (một dấu gạch ngang, hoặc
+  `answer.md` trống) khi script của lần chạy đã tự nói qua `say` của
+  lamp-control (P3 của Heron trên #7591). Dấu gạch ngang không được tin
+  suông (#6071). lamp-control đếm các dòng `say` của mỗi token lần chạy
+  (không tính tiếng hum hay clip): `says`, những câu giọng nói đã nhận
+  (đã bắt đầu nói, `begun`, hoặc trả lời bất kỳ cách nào trừ từ chối: đã
+  nói, hoặc bị bỏ, hết hạn hay buông trước khi bắt đầu, hoặc bị cắt; không
+  bao giờ là câu bị từ chối, không tới được giọng nói, hay bị dừng trước
+  khi gửi), và `said`, trong số đó, đã nói trọn (kết quả `spoken`); kết
+  quả đến sau khi lần chạy đã đọc số đếm thì không được tính. Nó cũng đếm
+  `acts` của lần chạy, mọi hành động đèn đã nhận cho token đó
+  (`Op::is_act`: một câu nói, một âm thanh hay clip, một lượt, đèn, một
+  cảm xúc, một cử chỉ, một cái nhìn, một chuyển động hay chuyển động đã
+  ghi, các khớp, âm lượng, luồng loa bật, một lần ghi dịch vụ; và một câu
+  nói, âm thanh hay lượt bị giờ yên lặng từ chối ở cửa), không bao giờ là
+  một lần đọc hay một lời từ chối (`Runs::count_act`, giữ qua lần cấp lại
+  token). Script của lần chạy nói rồi
+  thoát vẫn được nghe: kết nối cuối của nó đóng thì các câu nói nó đã yêu
+  cầu vẫn được nói hết (`Parts::run_gone`), còn của một máy tính thì vẫn bị
+  dừng như trước. lamp-tasks kết thúc một lần chạy kết thúc tốt (lần chạy có nói, câu
+  trả lời của agent được giữ, điều runner chỉ làm khi kết thúc tốt), trước
+  hạn chót và trước khi lamp-tasks dừng (`Runner::stopping`, runner net và
+  held cũng được báo), bằng `{"end": {"run", "settle": true}}`: token chấm
+  dứt và các kết nối đóng ngay, các câu nói đã yêu cầu, kể cả của script
+  còn đang kết nối, được nói hết, tối đa 15 giây (`SETTLE_SAYS`; lamp-tasks
+  chờ tối đa 20 giây, `SETTLE_WAIT`), rồi được đếm và phần còn lại bị hủy.
+  Kết thúc của lần chạy thất bại, ở hạn chót, khi dừng hay khi bị bỏ là
+  `end` thường, và chúng dừng ngay. Cái giá đã biết: chỗ chạy duy nhất vẫn
+  bị giữ trong lúc chờ, nên một lần chạy được yêu cầu trong mấy giây đó
+  (tối đa 15) bị từ chối `busy`, như mọi lần chạy thứ hai (docs/control.md, "It ends
+  with the run"). Câu trả lời của lần chạy đã kết thúc mang các số đếm bên
+  cạnh câu trả lời của agent
+  (`{"ok":true,"id":N,"answer":"-","says":N,"said":N,"acts":N}`, `acts`
+  bỏ đi với lamp-control chưa đếm chúng,
+  `Tokens::end_said`; bỏ đi khi `end` không được trả lời, lamp-control
+  không tới được). Lần chạy qua runner của việc làm skill mà `answer.md`
+  để trống hoặc không viết được mang `"answer": ""`
+  (`skill_make::keep_told_answer`), coi như dấu gạch; lần chạy mà runner
+  không giữ câu trả lời nào vẫn không mang gì. lamp-skills
+  (`task::told_of_run`): dấu gạch sau một câu đã nói trọn thì không nói gì
+  (`skill:<name>: a dash after N says: nothing told`); sau các câu đã nhận
+  mà không câu nào nói trọn (bị bỏ trước khi bắt đầu, hoặc bị cắt ở hạn
+  chót, khi dừng hay hết lúc chờ) cũng không nói thêm (`skill:<name>: a
+  dash with a cut say`); không câu nói nào nhưng có hành động (skill chỉ
+  phát tiếng mưa, bật đèn hay chuyển động, hoặc một câu nói bị giờ yên
+  lặng giữ lại) cũng không nói gì (`skill:<name>: a dash after N acts:
+  nothing told`): chiếc đèn xin lỗi sau khi đã làm xong việc thì giống
+  một cái máy (P2 của Heron trên #7841). Không hành động và không câu nói
+  nào, hoặc không biết, thì nói "<Tên skill> ran, but had nothing to
+  say." (`task::no_say_line`) qua cùng cổng đó (`skill:<name>: a dash with
+  no say: told a fallback`). Trên lamp-9adf, 19/11 02:44, lần chạy
+  `flip-a-coin` trên Hermes trả lời một dấu gạch ngang và người dùng không
+  nghe gì: `lamp.say` của script trả về ngay khi được nhận (`wait=False`),
+  và việc script thoát đóng kết nối, làm hủy câu nói. Không có công tắc:
+  đây là sửa lỗi. Test:
+  `skill_task::tests::an_ended_runs_answer_carries_how_many_of_its_says_were_spoken`,
+  `an_empty_answer_md_is_carried_empty_with_its_says`; của lamp-control
+  `parts::tests::a_says_spoken_whole_are_counted_for_its_runs_end_and_read_once`,
+  `a_runs_say_outlives_its_scripts_exit_and_a_computers_does_not`,
+  `a_say_the_voice_never_took_is_not_counted`,
+  `session::tests::a_runs_acts_the_lamp_took_are_counted_for_its_end`, và
+  của cửa
+  `a_settled_end_lets_a_still_connected_runs_say_finish_and_counts_it`,
+  `a_runs_say_outlives_its_scripts_last_connection_mid_run`; của
+  lamp-skills `task::tests::a_dash_after_a_say_tells_nothing`,
+  `a_dash_after_an_act_with_no_say_tells_nothing`,
+  `a_dash_after_a_cut_say_tells_nothing_more`,
+  `a_dash_with_no_say_tells_a_fallback`, `a_normal_answer_is_told_as_before`.
   Trên lamp-9adf, 17/11
   (build 13929, `LAMP_TASK_NET=on`), một `btc-price` tải lên được cấp
   `speak` và `net` đã tới api.coinbase.com, giữ câu trả lời 220 byte của

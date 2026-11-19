@@ -1150,7 +1150,7 @@ pub const MORE_LINE: &str = "There's more; ask me if you want it.";
 /// words, when its first sentence alone is longer) and fewer than
 /// [`MOST_TOLD_LINES`] sentences, and [`MORE_LINE`] said after it. None for
 /// any other answer, or one with no words (a lone dash: one the skill
-/// already said aloud).
+/// already said aloud, held to a say spoken by [`told_of_run`]).
 pub fn told(answer: &str) -> Option<Vec<String>> {
     let answer: serde_json::Value = serde_json::from_str(answer.trim()).ok()?;
     if answer.get("ok").and_then(serde_json::Value::as_bool) != Some(true) {
@@ -1201,6 +1201,70 @@ pub fn told(answer: &str) -> Option<Vec<String>> {
         return None;
     }
     Some(told_bounded(lines))
+}
+
+/// What a run's answer to a hand-over (`answer`) tells `skill`'s owner,
+/// and the journal's words of a dash-only one, never the answer's own
+/// (#7180). [`told`]'s sentences for an answer with words, as before. An
+/// answer whose agent's answer has no words (a lone dash, or an empty
+/// `answer.md`: the skill already said it aloud) is held to what the run
+/// did, as lamp-tasks' answer gives lamp-control's counts (`says`, its
+/// token's `say` lines the voice took; `said`, spoken whole; `acts`, every
+/// act the lamp took for it: a say, a sound or clip, a light, a move, a
+/// say the quiet hours kept quiet): one spoken, it tells nothing; some
+/// taken but none spoken whole (dropped before it began, or cut at the
+/// run's deadline, a stop or its end), nothing more either, journaled as
+/// a cut say; no say but an act (a skill that plays rain or sets a light),
+/// nothing either: the skill did its thing, and a lamp that apologises
+/// after it reads as a machine (Heron's P2 on #7841). No act and no say,
+/// or none known, the person would see and hear nothing at all, so it
+/// tells [`no_say_line`] (#6071: on lamp-9adf, 19 Nov 02:44,
+/// `flip-a-coin`'s run on Hermes answered a lone dash and nothing was
+/// said).
+pub fn told_of_run(skill: &str, answer: &str) -> (Option<Vec<String>>, Option<String>) {
+    if let Some(lines) = told(answer) {
+        return (Some(lines), None);
+    }
+    let Ok(answer) = serde_json::from_str::<serde_json::Value>(answer.trim()) else {
+        return (None, None);
+    };
+    if answer.get("ok").and_then(serde_json::Value::as_bool) != Some(true)
+        || answer
+            .get("answer")
+            .and_then(serde_json::Value::as_str)
+            .is_none()
+    {
+        return (None, None);
+    }
+    let count = |field: &str| answer.get(field).and_then(serde_json::Value::as_u64);
+    match (count("says"), count("said")) {
+        (_, Some(said)) if said > 0 => (
+            None,
+            Some(format!("a dash after {said} says: nothing told")),
+        ),
+        (Some(says), _) if says > 0 => (None, Some("a dash with a cut say".to_owned())),
+        _ if count("acts").is_some_and(|acts| acts > 0) => (
+            None,
+            Some(format!(
+                "a dash after {} acts: nothing told",
+                count("acts").unwrap_or_default()
+            )),
+        ),
+        _ => (
+            Some(vec![no_say_line(skill)]),
+            Some("a dash with no say: told a fallback".to_owned()),
+        ),
+    }
+}
+
+/// What is told of `skill`'s run whose agent answered a lone dash though
+/// it did nothing the lamp took ([`told_of_run`]), in the plain words of a
+/// failed run's line (`crate::task_sure::failed_line`).
+pub fn no_say_line(skill: &str) -> String {
+    format!(
+        "{} ran, but had nothing to say.",
+        crate::task_sure::spoken_name(skill)
+    )
 }
 
 /// `lines` as [`told`] says them: whole while within [`MOST_TOLD_CHARS`]
@@ -1443,6 +1507,130 @@ mod tests {
             r#"{"ok":true,"id":3}"#,
         ] {
             assert_eq!(told(nothing), None, "{nothing}");
+        }
+    }
+
+    /// #6071: a lone dash is trusted only when the run's says were spoken:
+    /// with one, nothing is told and the journal says so.
+    #[test]
+    fn a_dash_after_a_say_tells_nothing() {
+        assert_eq!(
+            told_of_run(
+                "flip-a-coin",
+                r#"{"ok":true,"id":3,"answer":"-","says":1,"said":1}"#
+            ),
+            (None, Some("a dash after 1 says: nothing told".to_owned()))
+        );
+        // An empty `answer.md` is held as a dash is.
+        assert_eq!(
+            told_of_run(
+                "flip-a-coin",
+                r#"{"ok":true,"id":3,"answer":"","says":2,"said":2}"#
+            ),
+            (None, Some("a dash after 2 says: nothing told".to_owned()))
+        );
+    }
+
+    /// #6071: a lone dash after a say taken but cut before its end (the
+    /// run's deadline, a stop) tells nothing more: "had nothing to say"
+    /// would be false.
+    #[test]
+    fn a_dash_after_a_cut_say_tells_nothing_more() {
+        assert_eq!(
+            told_of_run(
+                "flip-a-coin",
+                r#"{"ok":true,"id":3,"answer":"-","says":1,"said":0}"#
+            ),
+            (None, Some("a dash with a cut say".to_owned()))
+        );
+    }
+
+    /// Heron's P2 on #7841: a lone dash from a run that did its thing with
+    /// no say, a sound only or a light only, tells nothing: the lamp never
+    /// apologises after playing the rain. A say the quiet hours kept quiet
+    /// (an act, refused at the door) or one the voice took and dropped
+    /// before it began (a cut say) tells nothing either.
+    #[test]
+    fn a_dash_after_an_act_with_no_say_tells_nothing() {
+        // A sound-only run, then a light-only one: one act, no say.
+        for acted in [
+            r#"{"ok":true,"id":3,"answer":"-","says":0,"said":0,"acts":1}"#,
+            r#"{"ok":true,"id":4,"answer":"","says":0,"said":0,"acts":2}"#,
+        ] {
+            assert_eq!(told_of_run("rain-sounds", acted).0, None, "{acted}");
+        }
+        assert_eq!(
+            told_of_run(
+                "desk-light",
+                r#"{"ok":true,"id":3,"answer":"-","says":0,"said":0,"acts":1}"#
+            ),
+            (None, Some("a dash after 1 acts: nothing told".to_owned()))
+        );
+        // A say the quiet hours kept quiet: refused at the door, an act.
+        assert_eq!(
+            told_of_run(
+                "flip-a-coin",
+                r#"{"ok":true,"id":3,"answer":"-","says":0,"said":0,"acts":1}"#
+            )
+            .0,
+            None
+        );
+        // A say the voice took and let expire before it began: a cut say.
+        assert_eq!(
+            told_of_run(
+                "flip-a-coin",
+                r#"{"ok":true,"id":3,"answer":"-","says":1,"said":0,"acts":1}"#
+            ),
+            (None, Some("a dash with a cut say".to_owned()))
+        );
+    }
+
+    /// #6071 (lamp-9adf, 19 Nov 02:44): a lone dash (or an empty
+    /// `answer.md`) with no act and no say, or none known, tells a fallback
+    /// in plain words, and the journal says so in its words alone, never
+    /// the answer's.
+    #[test]
+    fn a_dash_with_no_say_tells_a_fallback() {
+        for dash in [
+            r#"{"ok":true,"id":3,"answer":"-","says":0,"said":0,"acts":0}"#,
+            r#"{"ok":true,"id":3,"answer":"-","says":0,"said":0}"#,
+            r#"{"ok":true,"id":3,"answer":"-"}"#,
+            r#"{"ok":true,"id":3,"answer":" ** - ","says":0,"said":0}"#,
+            r#"{"ok":true,"id":3,"answer":"","says":0,"said":0}"#,
+        ] {
+            assert_eq!(
+                told_of_run("flip-a-coin", dash),
+                (
+                    Some(vec!["Flip a coin ran, but had nothing to say.".to_owned()]),
+                    Some("a dash with no say: told a fallback".to_owned())
+                ),
+                "{dash}"
+            );
+        }
+    }
+
+    /// #6071: an answer with words is told as [`told`] tells it, a say
+    /// spoken or not; one with no agent's answer, a refusal or no JSON
+    /// tells nothing, as before, and the journal adds nothing.
+    #[test]
+    fn a_normal_answer_is_told_as_before() {
+        for said in ["", r#","says":0,"said":0"#, r#","says":2,"said":2"#] {
+            let answer =
+                format!(r#"{{"ok":true,"id":3,"answer":"Heads. It landed heads up."{said}}}"#);
+            assert_eq!(
+                told_of_run("flip-a-coin", &answer),
+                (told(&answer), None),
+                "{answer}"
+            );
+            assert_eq!(told(&answer).unwrap(), ["Heads.", "It landed heads up."]);
+        }
+        for none in [
+            r#"{"ok":true,"id":3}"#,
+            r#"{"ok":true,"id":3,"said":0}"#,
+            r#"{"ok":false,"error":"run_failed","message":"x","answer":"-"}"#,
+            "not json",
+        ] {
+            assert_eq!(told_of_run("flip-a-coin", none), (None, None), "{none}");
         }
     }
 

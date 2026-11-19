@@ -2935,9 +2935,71 @@ for each run, and is answered once the run ends
   linked service as a task for the lamp's agent"), at most about 400
   characters of it (`MOST_TOLD_CHARS`, the first builder on #7591), cut at
   the last sentence end inside, then "There's more; ask me if you want
-  it." Nothing tracks whether the run's own script already spoke through
-  lamp-control's `say`; the agent is asked to leave its answer empty (a
-  dash, or an empty `answer.md`) when it did (Heron's P3 on #7591). On
+  it." The agent is asked to leave its answer empty (a dash, or an empty
+  `answer.md`) when the run's own script already spoke through
+  lamp-control's `say` (Heron's P3 on #7591). A dash is not taken on
+  trust (#6071). lamp-control counts each run token's `say` lines (never
+  a sound's cue or clip): `says`, those the voice took (it began saying
+  it, its `begun`, or answered it any way but a refusal: spoken, or
+  dropped, expired or let go before it began, or cut; never one it
+  refused, couldn't be reached for, or one stopped before it was sent),
+  and `said`, of those, spoken whole (outcome `spoken`); an outcome after
+  the run's end read the counts counts nowhere. It also counts the run's
+  `acts`, every act the lamp took for its token (`Op::is_act`: a say, a
+  sound or clip, a turn, a light, a feeling, a gesture, a look, a move or
+  recorded move, joints, the volume, the speaker's stream on, a service
+  write; and a say, sound or turn the quiet hours refused at the door),
+  never a read or a refusal (`Runs::count_act`, kept across a token
+  minted again). A run's script that says and
+  exits is still heard: its last connection closing leaves the says it
+  asked to finish (`Parts::run_gone`), where a computer's are stopped as
+  before. lamp-tasks ends a run that ended well (a run that tells, its
+  agent's answer kept, which a runner keeps only for a good end), before
+  its deadline and lamp-tasks' stop (`Runner::stopping`, which the net and
+  held runners are told too), with `{"end": {"run", "settle": true}}`: the
+  token ends and its connections close at once, the says already asked,
+  a still-connected script's included, are let finish, up to 15 s
+  (`SETTLE_SAYS`; lamp-tasks waits up to 20 s, `SETTLE_WAIT`), then counted
+  and what is left cancelled. A failed run's end, a deadline's, a stop's
+  or a drop's is plain, and they stop at once. A known cost: the one-run
+  slot stays taken while a settled end waits, so a run asked in those
+  seconds (15 at most) is refused `busy`, as any second run is (docs/control.md, "It
+  ends with the run"). The ended run's answer carries the counts beside
+  the agent's (`{"ok":true,"id":N,"answer":"-","says":N,"said":N,"acts":N}`,
+  `acts` left out from a lamp-control that doesn't count them,
+  `Tokens::end_said`; left out when the end didn't answer, lamp-control
+  unreachable). A make's runner's run whose `answer.md` was left empty or
+  not written is carried with `"answer": ""` (`skill_make::keep_told_answer`),
+  held as a dash; a run whose runner kept no answer still carries none.
+  lamp-skills (`task::told_of_run`): a dash after a say spoken tells
+  nothing (`skill:<name>: a dash after N says: nothing told`); after says
+  taken but none spoken whole (dropped before it began, or cut at the
+  deadline, a stop or the settle's end) nothing more either
+  (`skill:<name>: a dash with a cut say`); after no say but an act (a
+  skill that only plays rain, sets a light or moves, or a say the quiet
+  hours kept quiet) nothing either (`skill:<name>: a dash after N acts:
+  nothing told`): a lamp that apologises after doing the thing reads as a
+  machine (Heron's P2 on #7841). With no act and no say, or none known, it
+  tells "<Skill name> ran, but had nothing to say."
+  (`task::no_say_line`) through the same gate (`skill:<name>: a dash with
+  no say: told a fallback`). On lamp-9adf, 19 Nov 02:44, `flip-a-coin`'s
+  run on Hermes answered a lone dash and the person heard nothing: its
+  script's `lamp.say` returns once taken (`wait=False`), and its exit
+  closed its connection, which cancelled the say. No switch: a bug fix.
+  Tests:
+  `skill_task::tests::an_ended_runs_answer_carries_how_many_of_its_says_were_spoken`,
+  `an_empty_answer_md_is_carried_empty_with_its_says`; lamp-control's
+  `parts::tests::a_says_spoken_whole_are_counted_for_its_runs_end_and_read_once`,
+  `a_runs_say_outlives_its_scripts_exit_and_a_computers_does_not`,
+  `a_say_the_voice_never_took_is_not_counted`,
+  `session::tests::a_runs_acts_the_lamp_took_are_counted_for_its_end`, and
+  the door's
+  `a_settled_end_lets_a_still_connected_runs_say_finish_and_counts_it`,
+  `a_runs_say_outlives_its_scripts_last_connection_mid_run`; lamp-skills'
+  `task::tests::a_dash_after_a_say_tells_nothing`,
+  `a_dash_after_an_act_with_no_say_tells_nothing`,
+  `a_dash_after_a_cut_say_tells_nothing_more`,
+  `a_dash_with_no_say_tells_a_fallback`, `a_normal_answer_is_told_as_before`. On
   lamp-9adf, 17 Nov (build 13929,
   `LAMP_TASK_NET=on`), an uploaded `btc-price` granted `speak` and `net`
   reached api.coinbase.com, kept its agent's 220-byte answer, and said

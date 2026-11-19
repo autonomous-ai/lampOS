@@ -619,12 +619,39 @@ pub struct Minted {
     pub grants: Vec<String>,
 }
 
+/// A run's `say` lines as lamp-control counted them at its end
+/// ([`Tokens::end_said`], #6071): `asked`, taken by the voice; `spoken`,
+/// of those, spoken whole; `acts`, every act the lamp took for the run (a
+/// say, a sound, a light, a move, ...), none when lamp-control is from
+/// before it counted them. Counts only, never words.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct RunSays {
+    pub asked: u64,
+    pub spoken: u64,
+    pub acts: Option<u64>,
+}
+
+/// The longest lamp-tasks waits for an end that lets the run's says finish
+/// ([`Tokens::end_said`]): lamp-control's 15 s for the says, and
+/// [`ADMIN_WAIT`] for its answer.
+pub const SETTLE_WAIT: Duration = Duration::from_secs(20);
+
 /// lamp-control's one-run tokens (#6304): minted from the owner's yes for
 /// `skill`, one for run id `run`, ended with the run.
 pub trait Tokens {
     fn mint(&self, skill: &str, run: &str) -> Result<Minted, String>;
     /// The run ended: its token is refused from now on.
     fn end(&self, run: &str);
+    /// [`Self::end`], and the run's `say` lines as lamp-control counted
+    /// them (its admin `end`'s `says`, `said` and `acts`, #6071): what a run's
+    /// dash-only answer is held to in lamp-skills. `settle`: a run that
+    /// ended well, whose says already asked are let finish first, a
+    /// bounded wait (lamp-control's `SETTLE_SAYS`); never at its deadline
+    /// or lamp-tasks' stop. None when not known.
+    fn end_said(&self, run: &str, _settle: bool) -> Option<RunSays> {
+        self.end(run);
+        None
+    }
     /// Whether lamp-control's recorded yes for `skill` is for exactly the
     /// folder hashed `sha256` and `grants`, [`NET_GRANT`] among them: what
     /// a run granted `net` must have before it gets its way out, since
@@ -672,11 +699,14 @@ impl Default for ControlTokens {
 
 impl ControlTokens {
     fn ask(&self, asked: &Value) -> Result<Value, String> {
+        self.ask_within(asked, self.wait)
+    }
+
+    /// [`Self::ask`], its answer read within `wait`.
+    fn ask_within(&self, asked: &Value, wait: Duration) -> Result<Value, String> {
         let unreachable = |error: std::io::Error| format!("lamp-control is not reachable: {error}");
         let mut stream = UnixStream::connect(&self.socket).map_err(unreachable)?;
-        stream
-            .set_read_timeout(Some(self.wait))
-            .map_err(unreachable)?;
+        stream.set_read_timeout(Some(wait)).map_err(unreachable)?;
         stream
             .set_write_timeout(Some(self.wait))
             .map_err(unreachable)?;
@@ -722,7 +752,11 @@ impl Tokens for ControlTokens {
     }
 
     fn end(&self, run: &str) {
-        self.end_asked(run);
+        self.end_asked(run, false);
+    }
+
+    fn end_said(&self, run: &str, settle: bool) -> Option<RunSays> {
+        self.end_asked(run, settle)
     }
 }
 
@@ -734,7 +768,7 @@ impl ControlTokens {
         let answer = match self.ask(asked) {
             Ok(answer) => answer,
             Err(why) => {
-                self.end_asked(run);
+                self.end_asked(run, false);
                 return Err(why);
             }
         };
@@ -757,7 +791,7 @@ impl ControlTokens {
                 grants,
             }),
             _ => {
-                self.end_asked(run);
+                self.end_asked(run, false);
                 Err("lamp-control's token answer is not one this lamp-tasks reads".into())
             }
         }
@@ -778,10 +812,27 @@ impl ControlTokens {
                 .is_ok_and(|answer| answer["agreed"] == true)
     }
 
-    fn end_asked(&self, run: &str) {
-        if let Err(why) = self.ask(&json!({"end": {"run": run}})) {
-            // The token still ends at its own time (RUN_LIFETIME, 14 minutes at most).
-            eprintln!("[lamp-tasks] skill task: ending run {run}: {why}");
+    /// `{"end": {"run", "settle"?}}`: the run's says (`says` taken,
+    /// `said` spoken whole) and `acts`, when lamp-control answered it for a run
+    /// going. With `settle`, lamp-control first lets the says already
+    /// asked finish, so its answer is waited for up to [`SETTLE_WAIT`].
+    fn end_asked(&self, run: &str, settle: bool) -> Option<RunSays> {
+        let (asked, wait) = if settle {
+            (json!({"end": {"run": run, "settle": true}}), SETTLE_WAIT)
+        } else {
+            (json!({"end": {"run": run}}), self.wait)
+        };
+        match self.ask_within(&asked, wait) {
+            Ok(answer) => Some(RunSays {
+                asked: answer["says"].as_u64()?,
+                spoken: answer["said"].as_u64()?,
+                acts: answer["acts"].as_u64(),
+            }),
+            Err(why) => {
+                // The token still ends at its own time (RUN_LIFETIME, 14 minutes at most).
+                eprintln!("[lamp-tasks] skill task: ending run {run}: {why}");
+                None
+            }
         }
     }
 }
@@ -1107,6 +1158,11 @@ pub trait Runner {
     fn answers(&self) -> bool {
         false
     }
+    /// Whether lamp-tasks is stopping ([`Self::stop_on`]'s flag set): a
+    /// run's end then stops its says at once (#6071). Never by default.
+    fn stopping(&self) -> bool {
+        false
+    }
     /// What a run that tells its answer is asked, last in its words, for
     /// one fit to say, its own folder `start_in` given: [`TELL_LINE`] by
     /// default (a chat answer kept, as Harness's runner keeps it).
@@ -1117,17 +1173,25 @@ pub trait Runner {
 
 /// Ends the token however the run ends, a panic too, and once only: the
 /// runner may end it first ([`Runner::run`]'s `end_token`).
+/// `said`: its says, as its end read them ([`Tokens::end_said`]).
 struct Ending<'a> {
     tokens: &'a dyn Tokens,
     run: String,
     ended: std::cell::Cell<bool>,
+    said: std::cell::Cell<Option<RunSays>>,
 }
 
 impl Ending<'_> {
-    fn end(&self) {
+    /// `settle`: its says already asked let finish first (a run that ended
+    /// well, [`Tokens::end_said`]).
+    fn end_settled(&self, settle: bool) {
         if !self.ended.replace(true) {
-            self.tokens.end(&self.run);
+            self.said.set(self.tokens.end_said(&self.run, settle));
         }
+    }
+
+    fn end(&self) {
+        self.end_settled(false);
     }
 }
 
@@ -1253,8 +1317,10 @@ pub fn is_service_grant(grant: &str) -> bool {
 /// as a read's lines are said (`lamp_skills::service_read::tell`), never a
 /// turn for the model. A fixed write's run never tells, nor a run through
 /// a runner that keeps no answer (Hermes's, a make's): their answer is
-/// `{"ok":true,"id":N}` alone, as before. Nothing here knows whether the
-/// run's own script already said something through lamp-control's `say`.
+/// `{"ok":true,"id":N}` alone, as before. Whether the run's own script
+/// already said something through lamp-control's `say` is lamp-control's
+/// to count: an answer that carries the agent's carries, beside it, how
+/// many of its says were spoken whole (`said`, [`Tokens::end_said`], #6071).
 pub fn tells_answer(runner: &dyn Runner) -> bool {
     runner.answers()
 }
@@ -1509,6 +1575,7 @@ fn run_on_token(
         tokens,
         run: run_id.clone(),
         ended: std::cell::Cell::new(false),
+        said: std::cell::Cell::new(None),
     };
     let asked: BTreeSet<&String> = grants.iter().collect();
     if minted.grants.iter().collect::<BTreeSet<_>>() != asked {
@@ -1524,14 +1591,30 @@ fn run_on_token(
         Err(refused) => return refused,
     };
     run.write = write;
-    let ran = runner.run(&run, &|| ending.end());
+    // The end of a run that ended well (a run that tells, its agent's
+    // answer kept, which a runner keeps only then), before its deadline and
+    // lamp-tasks' stop, lets the says its script already asked finish, so
+    // they count (#6071). Any other end, a failure's, a deadline's, a
+    // stop's, or a drop's, stops them at once, as before.
+    let until = std::time::Instant::now() + run.deadline;
+    let settle = |run: &SkillRun| {
+        tells
+            && run.answer.get().is_some()
+            && !runner.stopping()
+            && std::time::Instant::now() < until
+    };
+    let ran = runner.run(&run, &|| ending.end_settled(settle(&run)));
+    let settle_at_end = ran.is_ok() && settle(&run);
     let began = run.started.load(Ordering::Acquire);
-    let found = run
+    // Kept empty (a make's runner's `answer.md` left empty, as a lone
+    // dash): carried empty, so lamp-skills holds it to the run's says
+    // (#6071). None kept: nothing carried, as before.
+    let kept = run
         .answer
         .get()
         .filter(|_| tells)
-        .map(|answer| told_answer(answer))
-        .filter(|answer| !answer.is_empty());
+        .map(|answer| told_answer(answer));
+    let found = kept.clone().filter(|answer| !answer.is_empty());
     // What its answer to lamp-skills tells: its length only (#7180).
     if tells || run.answer.get().is_some() {
         eprintln!(
@@ -1552,11 +1635,25 @@ fn run_on_token(
     drop(fresh);
     drop(run);
     drop(minted);
+    ending.end_settled(settle_at_end);
+    let said = ending.said.get();
     drop(ending);
     match ran {
-        Ok(id) => match found {
-            Some(answer) => json!({"ok": true, "id": id, "answer": answer}),
-            None => json!({"ok": true, "id": id}),
+        // With the run's acts and says, when known: a dash-only (or empty)
+        // answer is told a fallback only after none (#6071).
+        Ok(id) => match (kept, said) {
+            (Some(answer), Some(said)) => {
+                let mut told = json!({
+                    "ok": true, "id": id, "answer": answer,
+                    "says": said.asked, "said": said.spoken,
+                });
+                if let Some(acts) = said.acts {
+                    told["acts"] = json!(acts);
+                }
+                told
+            }
+            (Some(answer), None) => json!({"ok": true, "id": id, "answer": answer}),
+            (None, _) => json!({"ok": true, "id": id}),
         },
         // The one session's queue full (#7246): `busy`, as a second run
         // is, so lamp-skills' retry (#7239) still applies.
@@ -3294,6 +3391,12 @@ impl Runner for HarnessRunner {
         let _ = self.stopping.set(stop);
     }
 
+    fn stopping(&self) -> bool {
+        self.stopping
+            .get()
+            .is_some_and(|stop| stop.load(Ordering::Acquire))
+    }
+
     /// Kept from `harness show` once a run ends well; never a make's (its
     /// answer is its file's alone). Not read from the path a run takes
     /// ([`Self::without_harness`]): that is read again at the run's start,
@@ -4257,6 +4360,11 @@ impl HandOvers {
         }
         let (listener, binding) = crate::runtime::bind(&self.socket)?;
         self.runner.stop_on(stop.clone());
+        // A net or held run's runner knows the stop too, so its run's end
+        // never waits on its says while lamp-tasks stops (#6071).
+        for runner in [&self.net, &self.held].into_iter().flatten() {
+            runner.stop_on(stop.clone());
+        }
         self.runner.prepare();
         let served = std::thread::Builder::new()
             .name("tasks-skill-task".into())
@@ -4656,6 +4764,10 @@ mod tests {
         ended: RefCell<Vec<String>>,
         /// Whether lamp-control's yes names `net` for the folder.
         net_yes: bool,
+        /// What its end says of the run's says (#6071).
+        said: Option<RunSays>,
+        /// Whether each end asked its says let finish.
+        settled: RefCell<Vec<bool>>,
     }
 
     impl Tokens for FakeTokens {
@@ -4684,6 +4796,12 @@ mod tests {
             self.live.borrow_mut().retain(|(live, _)| live != run);
             self.ended.borrow_mut().push(run.into());
         }
+
+        fn end_said(&self, run: &str, settle: bool) -> Option<RunSays> {
+            self.end(run);
+            self.settled.borrow_mut().push(settle);
+            self.said
+        }
     }
 
     /// A run as the runner saw it: its words, its environment, and whether
@@ -4703,7 +4821,8 @@ mod tests {
     }
 
     impl Runner for FakeRunner<'_> {
-        fn run(&self, run: &SkillRun, _: &dyn Fn()) -> Result<u64, String> {
+        /// Ends the token itself as it ends, as the lamp's runners do.
+        fn run(&self, run: &SkillRun, end_token: &dyn Fn()) -> Result<u64, String> {
             if self.starts {
                 run.started.store(true, Ordering::Release);
             }
@@ -4725,19 +4844,22 @@ mod tests {
             self.seen
                 .borrow_mut()
                 .push((run.prompt.clone(), run.env.clone(), live));
+            end_token();
             self.result.clone()
         }
     }
 
     /// A run whose agent ended well with its answer, as the Harness runner
-    /// keeps it, and the words each run was given.
+    /// keeps it (then ends the token, as its session's close does), and
+    /// the words each run was given.
     struct Answering(&'static str, RefCell<Vec<String>>);
 
     impl Runner for Answering {
-        fn run(&self, run: &SkillRun, _: &dyn Fn()) -> Result<u64, String> {
+        fn run(&self, run: &SkillRun, end_token: &dyn Fn()) -> Result<u64, String> {
             run.started.store(true, Ordering::Release);
             self.1.borrow_mut().push(run.prompt.clone());
             let _ = run.answer.set(self.0.into());
+            end_token();
             Ok(0)
         }
 
@@ -4798,6 +4920,121 @@ mod tests {
         let hand = HandOver::parse(&line(gmail), skills()).unwrap();
         assert!(!SkillRun::prompt(&hand).contains(TELL_LINE));
         assert_eq!(told_answer(&"a ".repeat(4_000)).len(), MOST_TOLD_BYTES - 1);
+    }
+
+    /// #6071: an ended run's answer that carries its agent's answer
+    /// carries, beside it, the run's says as the token's end counted them
+    /// (`says` taken, `said` spoken whole, and `acts` when counted); once each run, its end asking
+    /// the says let finish for a run that ended well, and nothing when
+    /// the end doesn't know.
+    #[test]
+    fn an_ended_runs_answer_carries_how_many_of_its_says_were_spoken() {
+        let told = |said: Option<RunSays>| {
+            let tokens = FakeTokens {
+                said,
+                ..Default::default()
+            };
+            let ran = Answering("-", RefCell::default());
+            let told = answer_agent(
+                &line(|_| {}),
+                true,
+                skills(),
+                &tokens,
+                &ran,
+                &Agent::default(),
+            );
+            assert_eq!(*tokens.settled.borrow(), [true], "ended once, settled");
+            told
+        };
+        let says = |asked, spoken| {
+            Some(RunSays {
+                asked,
+                spoken,
+                acts: None,
+            })
+        };
+        assert_eq!(
+            told(says(1, 1)),
+            json!({"ok": true, "id": 0, "answer": "-", "says": 1, "said": 1})
+        );
+        // Its acts too, when lamp-control counted them: a sound-only run
+        // (Heron's P2 on #7841).
+        assert_eq!(
+            told(Some(RunSays {
+                asked: 0,
+                spoken: 0,
+                acts: Some(1),
+            })),
+            json!({"ok": true, "id": 0, "answer": "-", "says": 0, "said": 0, "acts": 1})
+        );
+        assert_eq!(
+            told(says(1, 0)),
+            json!({"ok": true, "id": 0, "answer": "-", "says": 1, "said": 0})
+        );
+        assert_eq!(told(None), json!({"ok": true, "id": 0, "answer": "-"}));
+        // A run that failed, its runner ending the token as it ends: its
+        // end stops its says at once.
+        let tokens = FakeTokens::default();
+        let failed = runner(&tokens, Err("x".into()));
+        let _ = answer(&line(|_| {}), true, skills(), &tokens, &failed);
+        assert_eq!(*tokens.settled.borrow(), [false]);
+        // lamp-tasks stopping: a run that ended well ends plain too.
+        struct Stopping(Answering);
+        impl Runner for Stopping {
+            fn run(&self, run: &SkillRun, end_token: &dyn Fn()) -> Result<u64, String> {
+                self.0.run(run, end_token)
+            }
+
+            fn answers(&self) -> bool {
+                true
+            }
+
+            fn stopping(&self) -> bool {
+                true
+            }
+        }
+        let tokens = FakeTokens::default();
+        let ran = Stopping(Answering("Heads.", RefCell::default()));
+        let _ = answer_agent(
+            &line(|_| {}),
+            true,
+            skills(),
+            &tokens,
+            &ran,
+            &Agent::default(),
+        );
+        assert_eq!(*tokens.settled.borrow(), [false]);
+    }
+
+    /// #6071: a make's runner's run whose agent left its `answer.md` empty
+    /// (the skill already said it aloud, as its words ask) carries an
+    /// empty answer with its says, as a lone dash does, so lamp-skills
+    /// holds it to a say spoken; before, it carried nothing and the
+    /// person heard nothing whatever was said.
+    #[test]
+    fn an_empty_answer_md_is_carried_empty_with_its_says() {
+        let work = tempfile::tempdir().unwrap();
+        let make = MakeLike("", RefCell::default());
+        let tokens = FakeTokens {
+            said: Some(RunSays {
+                asked: 0,
+                spoken: 0,
+                acts: Some(0),
+            }),
+            ..Default::default()
+        };
+        let plain = runner(&tokens, Ok(0));
+        let agent = Agent {
+            held: Some(&make),
+            work: Some(work.path()),
+            ..Default::default()
+        };
+        let skill_md = line(|value| value["run"] = json!(AGENT_INSTRUCTIONS));
+        let told = answer_agent(&skill_md, true, skills(), &tokens, &plain, &agent);
+        assert_eq!(
+            told,
+            json!({"ok": true, "id": 0, "answer": "", "says": 0, "said": 0, "acts": 0})
+        );
     }
 
     /// A run granted `net` with the net grant on is a read of the web: it

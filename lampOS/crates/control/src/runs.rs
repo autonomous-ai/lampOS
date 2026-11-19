@@ -141,6 +141,11 @@ pub struct Run {
     /// names none of its own content is given this write
     /// ([`FixedWrite::covers`]), so the run's words never carry it.
     pub fixed_write: Option<FixedWrite>,
+    /// The acts the lamp took for it ([`crate::protocol::Op::is_act`]): a
+    /// say, a sound, a light, a move, ..., and a say or sound the quiet
+    /// hours kept quiet. Counts only, kept across a token minted again
+    /// (#6071).
+    pub acts: u64,
 }
 
 /// A skill's fixed write as lamp-control read it from the skill's own file
@@ -215,6 +220,12 @@ impl Runs {
         if !self.by_token.values().any(|live| live.run == run) && self.by_token.len() >= MOST_RUNS {
             return Err(format!("{MOST_RUNS} runs are going: one must end first"));
         }
+        let acts = self
+            .by_token
+            .values()
+            .filter(|live| live.run == run)
+            .map(|live| live.acts)
+            .sum();
         self.by_token.retain(|_, live| live.run != run);
         self.serial += 1;
         let for_ms = for_ms.unwrap_or(DEFAULT_MS).clamp(1, LONGEST_MS);
@@ -226,6 +237,7 @@ impl Runs {
             until_us: now_us.saturating_add(for_ms.saturating_mul(1000)),
             serial: self.serial,
             fixed_write: None,
+            acts,
         };
         self.by_token.insert(token_key(token), live.clone());
         Ok(live)
@@ -246,6 +258,18 @@ impl Runs {
         self.by_token
             .get(&token_key(token))
             .filter(|live| now_us < live.until_us)
+    }
+
+    /// One more act for the live run whose client is `client`, if there is
+    /// one ([`Run::acts`]); a paired computer's are never counted.
+    pub fn count_act(&mut self, client: &str, now_us: u64) {
+        if let Some(live) = self
+            .by_token
+            .values_mut()
+            .find(|live| live.client == client && now_us < live.until_us)
+        {
+            live.acts += 1;
+        }
     }
 
     /// The run whose client is `client`, if it is live at `now_us`.

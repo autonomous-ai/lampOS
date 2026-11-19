@@ -102,6 +102,19 @@ const SAY_CANCEL_WITHIN: Duration = Duration::from_millis(100);
 /// longer listed was stopped.
 type Says = Arc<std::sync::Mutex<HashMap<String, HashMap<u64, Option<UnixStream>>>>>;
 
+/// Each client's `say` lines the voice took (it began saying it, its
+/// `begun`, or gave any outcome but `refused`: spoken, or dropped, expired
+/// or let go, a cut included), and how many of them it spoke whole (its
+/// outcome `spoken`, a `done` `finished`), read once and let go when a
+/// skill run ends ([`Parts::said`]): a run's dash-only answer after a say
+/// taken is a cut say, never "nothing to say" (#6071). A say the voice
+/// refused, one it was never reached for, or one stopped before it was
+/// sent, is never taken. A client's
+/// entry is made as it asks a say, and a count comes only into an entry
+/// still there: a say whose run's end already read it counts nowhere.
+/// Counts only, never words.
+type SaidCounts = Arc<std::sync::Mutex<HashMap<String, crate::session::Said>>>;
+
 /// How long the voice's first answer to a `turn.end` or a `listen` may
 /// take: it waits at most 10 s on an end (`say::TURN_END_EXPIRY_MS`) and
 /// 5 s to take a mute (`control_mute::TAKE_WITHIN`).
@@ -220,6 +233,9 @@ pub struct Lamp {
     voice: Arc<Mutex<Voice>>,
     /// Each client's says still waiting on the voice, for its `stop`.
     says: Says,
+    /// Each client's says taken and spoken whole, for its run's end
+    /// ([`SaidCounts`]).
+    said: SaidCounts,
     /// The number the next say is kept under.
     next_say: u64,
     /// The microphone, the ears' blocks on the bus; none without the bus.
@@ -330,6 +346,7 @@ impl Lamp {
             voice: Arc::default(),
             actions: None,
             says: Says::default(),
+            said: SaidCounts::default(),
             next_say: 0,
             microphone: None,
             speaker: None,
@@ -1143,16 +1160,43 @@ impl Lamp {
             .entry(client.clone())
             .or_default()
             .insert(number, None);
+        // A `say` (words, never a sound's cue or clip) counts for its run's
+        // end once the voice takes it ([`SaidCounts`]): its entry made now.
+        let said = line.get("text").is_some().then(|| Arc::clone(&self.said));
+        if let Some(said) = &said {
+            said.lock()
+                .expect("said")
+                .entry(client.clone())
+                .or_default();
+        }
         // Off the door's lock, connecting included (the Reviewer-lead's P3
         // on #3805: a voice whose backlog is full must not hold every
         // connection). The outcome comes when the turn ends, as `done`; a
         // voice that can't be reached is a `done` dropped, with why.
         std::thread::spawn(move || {
+            // Taken once: when the voice began it, or answered it any way
+            // but a refusal.
+            let taken = std::sync::atomic::AtomicBool::new(false);
+            let take = || {
+                if let Some(said) = &said
+                    && !taken.swap(true, std::sync::atomic::Ordering::AcqRel)
+                {
+                    count_said(said, &client, |counts| counts.asked += 1);
+                }
+            };
             let attempt =
                 |line: &Value| match ask_voice_for_say(&path, line, &says, &client, number) {
                     Ok(Some(stream)) => {
                         let _ = stream.set_read_timeout(Some(SAY_ANSWER_WITHIN));
-                        outcome(BufReader::new(stream))
+                        let answered = outcome_with(BufReader::new(stream), |event| {
+                            if event["event"] == "begun" {
+                                take();
+                            }
+                        });
+                        if was_taken(answered.1.as_deref()) {
+                            take();
+                        }
+                        answered
                     }
                     Ok(None) => ("dropped", Some(format!("dropped: {STOPPED_BY_ASKER}"))),
                     Err(error) => (
@@ -1172,7 +1216,14 @@ impl Lamp {
                 result = attempt(&plain);
             }
             let (how, why) = result;
-            forget_say(&says, &client, number);
+            end_say(
+                &says,
+                said.as_ref(),
+                &client,
+                number,
+                how == "finished",
+                take,
+            );
             let mut done = json!({"ev": "done", "re": re, "how": how});
             if let Some(why) = why {
                 done["why"] = json!(why);
@@ -1180,6 +1231,43 @@ impl Lamp {
             events(&client, done);
         });
         Ok(json!({"to": "voice"}))
+    }
+}
+
+/// Say `number` of `client` is answered: spoken whole (`finished`), it is
+/// counted taken (`take`) and spoken first, and only then leaves the says
+/// still waiting ([`forget_say`]), so a run's settled end, which reads the
+/// counts once none of its says waits (`Shared::end_run_settled`), never
+/// reads them before a say spoken whole is counted (#6071).
+fn end_say(
+    says: &Says,
+    said: Option<&SaidCounts>,
+    client: &str,
+    number: u64,
+    finished: bool,
+    take: impl Fn(),
+) {
+    if finished {
+        take();
+        if let Some(said) = said {
+            count_said(said, client, |counts| counts.spoken += 1);
+        }
+    }
+    forget_say(says, client, number);
+}
+
+/// Whether the voice took a say it answered with `why` ([`outcome_with`]):
+/// spoken (no why), or dropped, expired, let go or cut, yes; refused, or
+/// no outcome at all, no.
+fn was_taken(why: Option<&str>) -> bool {
+    why.is_none_or(|why| !why.starts_with("refused") && why != NO_OUTCOME)
+}
+
+/// Counts a say of `client` into its entry, only while it is there
+/// ([`SaidCounts`]).
+fn count_said(said: &SaidCounts, client: &str, count: impl FnOnce(&mut crate::session::Said)) {
+    if let Some(counts) = said.lock().expect("said").get_mut(client) {
+        count(counts);
     }
 }
 
@@ -1243,7 +1331,9 @@ fn forget_say(says: &Says, client: &str, number: u64) {
 /// words (`done.how`: `finished`, `cut_short`, `dropped`; the Reviewer-lead's
 /// and harness-reviewer's P2 on #3805): `spoken` is `finished`; `dropped`,
 /// `expired`, `refused` and no outcome at all are `dropped`, the voice's
-/// own word and why in `why`.
+/// own word and why in `why`. The say's own reads it with its `begun`
+/// ([`outcome_with`]); this, the tests'.
+#[cfg(test)]
 fn outcome(reader: impl std::io::BufRead) -> (&'static str, Option<String>) {
     outcome_with(reader, |_| {})
 }
@@ -1283,8 +1373,11 @@ fn outcome_with(
         };
         return ("dropped", Some(why));
     }
-    ("dropped", Some("the voice gave no outcome".to_owned()))
+    ("dropped", Some(NO_OUTCOME.to_owned()))
 }
+
+/// The why of a say the voice gave no outcome for ([`outcome_with`]).
+const NO_OUTCOME: &str = "the voice gave no outcome";
 
 /// `line` on a new say socket connection, and the voice's first outcome on
 /// it (past any event): the connection kept, to read on or hold.
@@ -1589,26 +1682,19 @@ impl Parts for Lamp {
     /// person, as before. Shut off the lock: a shutdown never waits.
     fn gone(&mut self, client: &str, now_us: u64) {
         self.stop(client, now_us);
-        if let Some(motions) = &self.motions {
-            motions.lock().expect("motions").gone(client);
-        }
-        let (held, turns) = {
-            let mut voice = self.voice.lock().expect("voice");
-            (voice.mutes.remove(client), voice.turns.remove(client))
-        };
-        for waiting in turns.into_iter().flatten().filter_map(|turn| turn.waiting) {
-            let _ = waiting.shutdown(Shutdown::Both);
-        }
-        if let Some(Mute {
-            held: Some(held), ..
-        }) = held
-        {
-            let _ = held.shutdown(Shutdown::Both);
-        }
+        self.let_go(client);
     }
 
     fn motion_done(&self) -> bool {
         self.motions.is_some()
+    }
+
+    fn said(&mut self, client: &str) -> crate::session::Said {
+        self.said
+            .lock()
+            .expect("said")
+            .remove(client)
+            .unwrap_or_default()
     }
 
     fn asking(&mut self, connection: Option<u64>) {
@@ -1714,6 +1800,31 @@ impl Parts for Lamp {
     }
 
     fn stop(&mut self, client: &str, _: u64) {
+        self.stop_but_says(client);
+        self.cancel_says(client);
+    }
+
+    /// As [`Parts::gone`], its says left to finish (#6071): a skill run's
+    /// script that said a line and exited is still heard; its run's end
+    /// cancels what is left ([`Parts::gone`]).
+    fn run_gone(&mut self, client: &str, _: u64) {
+        self.stop_but_says(client);
+        self.let_go(client);
+    }
+
+    fn says_pending(&self, client: &str) -> usize {
+        self.says
+            .lock()
+            .expect("says")
+            .get(client)
+            .map_or(0, HashMap::len)
+    }
+}
+
+impl Lamp {
+    /// Everything `client` asked for that still goes stopped, as its
+    /// `stop`, but its says.
+    fn stop_but_says(&mut self, client: &str) {
         if let Some(speaker) = &self.speaker {
             speaker.end_client(client);
         }
@@ -1736,12 +1847,35 @@ impl Parts for Lamp {
         {
             let _ = self.ask_ring(client, light, None, now_us);
         }
-        // Its own says cancelled, each on the connection that asked it, and
-        // no other client's: one still connecting cancels itself when it
-        // finds it is no longer kept (`ask_voice_for_say`).
+    }
+
+    /// `client`'s own says cancelled, each on the connection that asked it,
+    /// and no other client's: one still connecting cancels itself when it
+    /// finds it is no longer kept (`ask_voice_for_say`).
+    fn cancel_says(&self, client: &str) {
         let stopped = self.says.lock().expect("says").remove(client);
         for stream in stopped.into_iter().flat_map(HashMap::into_values).flatten() {
             let _ = writeln!(&stream, "{SAY_CANCEL}");
+        }
+    }
+
+    /// What a client gone holds let go, beyond its `stop` ([`Parts::gone`]).
+    fn let_go(&mut self, client: &str) {
+        if let Some(motions) = &self.motions {
+            motions.lock().expect("motions").gone(client);
+        }
+        let (held, turns) = {
+            let mut voice = self.voice.lock().expect("voice");
+            (voice.mutes.remove(client), voice.turns.remove(client))
+        };
+        for waiting in turns.into_iter().flatten().filter_map(|turn| turn.waiting) {
+            let _ = waiting.shutdown(Shutdown::Both);
+        }
+        if let Some(Mute {
+            held: Some(held), ..
+        }) = held
+        {
+            let _ = held.shutdown(Shutdown::Both);
         }
     }
 }
@@ -2385,6 +2519,231 @@ mod tests {
                 json!({"ev": "done", "re": 14, "how": "finished"})
             )
         );
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    /// #6071: a run's says are counted for its end and read once
+    /// (`Parts::said`): a say spoken whole is taken and spoken; one begun
+    /// and then cut is taken alone; one the voice refused or dropped before
+    /// it began, and a sound's hum, count nothing; another client's count
+    /// is its own, and a count read is let go, a late outcome counting
+    /// nowhere.
+    #[test]
+    fn a_says_spoken_whole_are_counted_for_its_runs_end_and_read_once() {
+        let dir = dir("say-said");
+        let path = dir.join("say.sock");
+        let listener = std::os::unix::net::UnixListener::bind(&path).unwrap();
+        let told: Arc<Mutex<Vec<(String, Value)>>> = Arc::default();
+        let sink = told.clone();
+        let events: Events =
+            Arc::new(move |client, event| sink.lock().unwrap().push((client.to_owned(), event)));
+        let voice = std::thread::spawn(move || {
+            for answer in [
+                "{\"event\":\"begun\",\"at_us\":5}\n{\"outcome\":\"spoken\"}",
+                r#"{"outcome":"refused","why":"quiet hours"}"#,
+                r#"{"outcome":"expired"}"#,
+                "{\"event\":\"begun\",\"at_us\":5}\n{\"outcome\":\"dropped\",\"why\":\"stopped by its asker\"}",
+                r#"{"outcome":"spoken"}"#,
+                r#"{"outcome":"spoken"}"#,
+            ] {
+                let (stream, _) = listener.accept().unwrap();
+                let mut line = String::new();
+                BufReader::new(&stream).read_line(&mut line).unwrap();
+                let mut out = &stream;
+                writeln!(out, "{answer}").unwrap();
+            }
+        });
+        let mut lamp = Lamp::new(None, None, Some(path), "boot".into(), events);
+        let wait_for = |count: usize| {
+            for _ in 0..200 {
+                if told.lock().unwrap().len() >= count {
+                    break;
+                }
+                std::thread::sleep(Duration::from_millis(10));
+            }
+            assert_eq!(told.lock().unwrap().len(), count);
+        };
+        // One at a time, so each meets its own answer.
+        for (n, (client, asked)) in [
+            ("c_run", r#"{"id":1,"op":"say","text":"Heads."}"#),
+            ("c_run", r#"{"id":2,"op":"say","text":"Tails."}"#),
+            ("c_run", r#"{"id":3,"op":"say","text":"Late."}"#),
+            ("c_run", r#"{"id":4,"op":"say","text":"Again."}"#),
+            ("c_run", r#"{"id":5,"op":"sound","name":"hum"}"#),
+            ("c_other", r#"{"id":6,"op":"say","text":"Hi."}"#),
+        ]
+        .into_iter()
+        .enumerate()
+        {
+            lamp.act(client, 0, &op(asked), 0).unwrap();
+            wait_for(n + 1);
+        }
+        voice.join().unwrap();
+        let said = |asked, spoken| crate::session::Said {
+            asked,
+            spoken,
+            acts: 0,
+        };
+        // Taken: spoken, expired before it began, begun and cut; the one
+        // refused, never; the sound is no say.
+        assert_eq!(lamp.said("c_run"), said(3, 1));
+        assert_eq!(lamp.said("c_run"), said(0, 0), "read once");
+        assert_eq!(lamp.said("c_other"), said(1, 1));
+        assert_eq!(lamp.said("c_nobody"), said(0, 0));
+        // An outcome after its count was read counts nowhere, and makes no
+        // entry again.
+        count_said(&lamp.said, "c_run", |counts| counts.spoken += 1);
+        assert!(!lamp.said.lock().unwrap().contains_key("c_run"));
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    /// #6071: a say spoken whole is counted while it still waits, never
+    /// after it leaves the says waiting: a settled end that finds none
+    /// waiting reads a count already made. Seen at the count itself.
+    #[test]
+    fn a_say_spoken_whole_is_counted_before_it_stops_waiting() {
+        let says = Says::default();
+        says.lock()
+            .unwrap()
+            .entry("c_run".to_owned())
+            .or_default()
+            .insert(7, None);
+        let said = SaidCounts::default();
+        said.lock()
+            .unwrap()
+            .insert("c_run".to_owned(), crate::session::Said::default());
+        let waiting = |says: &Says| {
+            says.lock()
+                .unwrap()
+                .get("c_run")
+                .is_some_and(|asked| asked.contains_key(&7))
+        };
+        let seen = std::cell::Cell::new(None);
+        end_say(&says, Some(&said), "c_run", 7, true, || {
+            seen.set(Some(waiting(&says)));
+            count_said(&said, "c_run", |counts| counts.asked += 1);
+        });
+        assert_eq!(seen.get(), Some(true), "counted while it still waited");
+        assert!(!waiting(&says), "then it stopped waiting");
+        assert_eq!(
+            said.lock().unwrap()["c_run"],
+            crate::session::Said {
+                asked: 1,
+                spoken: 1,
+                acts: 0
+            }
+        );
+    }
+
+    /// #6071: a say the voice can't be reached for, or refuses, is never
+    /// taken: its run's end reads no say, so a lone dash is told its
+    /// fallback.
+    #[test]
+    fn a_say_the_voice_never_took_is_not_counted() {
+        let dir = dir("say-untaken");
+        let told: Arc<Mutex<Vec<(String, Value)>>> = Arc::default();
+        let sink = told.clone();
+        let events: Events =
+            Arc::new(move |client, event| sink.lock().unwrap().push((client.to_owned(), event)));
+        // No voice listening at all.
+        let mut lamp = Lamp::new(
+            None,
+            None,
+            Some(dir.join("none.sock")),
+            "boot".into(),
+            events,
+        );
+        lamp.act("c_run", 1, &op(r#"{"id":1,"op":"say","text":"Heads."}"#), 0)
+            .unwrap();
+        for _ in 0..200 {
+            if !told.lock().unwrap().is_empty() {
+                break;
+            }
+            std::thread::sleep(Duration::from_millis(10));
+        }
+        assert_eq!(told.lock().unwrap()[0].1["how"], "dropped");
+        assert_eq!(lamp.said("c_run"), crate::session::Said::default());
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    /// #6071: a skill run's script that said a line and exited is heard:
+    /// its client gone while its run goes on (`run_gone`), the say already
+    /// with the voice is never cancelled, finishes and is counted spoken.
+    /// A computer's client gone (`gone`) still cancels its say, as before.
+    #[test]
+    fn a_runs_say_outlives_its_scripts_exit_and_a_computers_does_not() {
+        let dir = dir("say-run-gone");
+        let path = dir.join("say.sock");
+        let listener = std::os::unix::net::UnixListener::bind(&path).unwrap();
+        let told: Arc<Mutex<Vec<(String, Value)>>> = Arc::default();
+        let sink = told.clone();
+        let events: Events =
+            Arc::new(move |client, event| sink.lock().unwrap().push((client.to_owned(), event)));
+        let (heard, asked) = std::sync::mpsc::channel::<()>();
+        let (go, gone) = std::sync::mpsc::channel::<()>();
+        let voice = std::thread::spawn(move || {
+            let mut cancels = Vec::new();
+            for _ in 0..2 {
+                let (stream, _) = listener.accept().unwrap();
+                let mut reader = BufReader::new(stream.try_clone().unwrap());
+                let mut line = String::new();
+                reader.read_line(&mut line).unwrap();
+                heard.send(()).unwrap();
+                gone.recv().unwrap();
+                // A cancel, if one comes, within 300 ms.
+                stream
+                    .set_read_timeout(Some(Duration::from_millis(300)))
+                    .unwrap();
+                let mut next = String::new();
+                let cancelled =
+                    reader.read_line(&mut next).is_ok_and(|n| n > 0) && next.trim() == SAY_CANCEL;
+                cancels.push(cancelled);
+                let mut out = &stream;
+                if cancelled {
+                    writeln!(
+                        out,
+                        r#"{{"outcome":"dropped","why":"stopped by its asker"}}"#
+                    )
+                    .unwrap();
+                } else {
+                    writeln!(out, r#"{{"outcome":"spoken"}}"#).unwrap();
+                }
+            }
+            cancels
+        });
+        let mut lamp = Lamp::new(None, None, Some(path), "boot".into(), events);
+        let wait_for = |count: usize| {
+            for _ in 0..200 {
+                if told.lock().unwrap().len() >= count {
+                    break;
+                }
+                std::thread::sleep(Duration::from_millis(10));
+            }
+            assert_eq!(told.lock().unwrap().len(), count);
+        };
+        lamp.act("c_run", 1, &op(r#"{"id":1,"op":"say","text":"Heads."}"#), 0)
+            .unwrap();
+        asked.recv().unwrap();
+        lamp.run_gone("c_run", 0);
+        go.send(()).unwrap();
+        wait_for(1);
+        assert_eq!(told.lock().unwrap()[0].1["how"], "finished");
+        lamp.act("c_app", 2, &op(r#"{"id":2,"op":"say","text":"Hi."}"#), 0)
+            .unwrap();
+        asked.recv().unwrap();
+        lamp.gone("c_app", 0);
+        go.send(()).unwrap();
+        wait_for(2);
+        assert_eq!(told.lock().unwrap()[1].1["how"], "dropped");
+        assert_eq!(voice.join().unwrap(), [false, true]);
+        let said = |asked, spoken| crate::session::Said {
+            asked,
+            spoken,
+            acts: 0,
+        };
+        assert_eq!(lamp.said("c_run"), said(1, 1));
+        // Cut once the voice had it: taken, never spoken.
+        assert_eq!(lamp.said("c_app"), said(1, 0));
         let _ = std::fs::remove_dir_all(&dir);
     }
 

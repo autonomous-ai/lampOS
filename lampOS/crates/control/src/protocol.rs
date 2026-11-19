@@ -861,6 +861,31 @@ impl Op {
         }
     }
 
+    /// Whether it is an act the owner can see or hear, or one done for
+    /// them: a say, a sound or clip, a turn, a light, a move, a look, a
+    /// feeling, the volume, the speaker's stream on, a service write. A
+    /// skill run's such ops, once the lamp takes them, are its run's
+    /// `acts` (`crate::runs::Run::acts`, #6071): a run that did one and
+    /// answered a lone dash is not told it had nothing to say.
+    pub fn is_act(&self) -> bool {
+        match self {
+            Self::Say { .. }
+            | Self::Sound { .. }
+            | Self::TurnStart { .. }
+            | Self::Light { .. }
+            | Self::Express { .. }
+            | Self::Gesture { .. }
+            | Self::Look { .. }
+            | Self::Move { .. }
+            | Self::Play { .. }
+            | Self::Joints { .. }
+            | Self::Volume { .. }
+            | Self::ServiceWrite { .. } => true,
+            Self::SpeakerStream { on, .. } => *on,
+            _ => false,
+        }
+    }
+
     /// Whether the client must have said `hello` (or be pairing) first:
     /// every op but `pair` and `hello`.
     pub fn needs_hello(&self) -> bool {
