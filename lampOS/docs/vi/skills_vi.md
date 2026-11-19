@@ -1342,7 +1342,10 @@ sau:
      đa 120 ký tự), nên người dùng nghe cả phần bị bỏ (#5041). Hai
      dấu hiệu `cannot:` và `left out:` được đọc không phân biệt hoa thường.
 6. **Giữ lại, không cài.** Gói nằm trong thư mục riêng của giọng nói,
-   `/var/lib/lampOS/voice/made-skills` (0700, người dùng của giọng nói),
+   `/var/lib/lampOS/voice/made-skills` (0700, người dùng của giọng nói;
+   helper quản lý được ghi vào đây, có trong `ReadWritePaths` của nó, để
+   lời "không" với báo cáo lấy được `.counts.lock` và xoá `counts.json`,
+   #7907),
    được ghi là tạo từ `local:<ms>`:
    - mỗi kỹ năng một mục: cùng SHA-256, hoặc cùng tên mà chưa bật, khi
      giữ lại sẽ thay mục cũ, ghi theo lần yêu cầu mới nhất, và mục đang bật
