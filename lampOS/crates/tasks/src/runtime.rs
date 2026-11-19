@@ -4854,6 +4854,8 @@ pub fn serve<C: Clock>(
             // cancelled at once for a person's live ask or any other
             // skill's task: one slot, shared by both sockets.
             let ahead = crate::skill_task::Ahead::default();
+            // A person's make's place: a refill is refused while it is held.
+            let making = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
             match crate::skill_task::HandOvers::lamp(
                 &home,
                 skill_harness.clone(),
@@ -4862,6 +4864,7 @@ pub fn serve<C: Clock>(
                 one_session.clone(),
             )
             .with_ahead(ahead.clone())
+            .with_making(making.clone())
             .start(true, stop.clone())
             {
                 Ok(served) => {
@@ -4882,6 +4885,7 @@ pub fn serve<C: Clock>(
                 ask_default.clone(),
             )
             .with_ahead(ahead)
+            .with_making(making)
             .start(true, stop.clone())
             {
                 Ok(_) => eprintln!(

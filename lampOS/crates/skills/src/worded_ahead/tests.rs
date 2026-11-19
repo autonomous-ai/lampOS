@@ -313,20 +313,23 @@ fn the_count_outlives_a_crash_mid_refill() {
         // A new process each time: what the file keeps, and nothing else.
         let store = Store::at(Some(file.clone()));
         let now = idle(NOON_MS + at * HOUR_MS, &never, &NoAllowanceYet);
-        let (kind, today) = store.begin_refill(&only_sip, &now).unwrap().unwrap();
+        let (kind, today) = store.begin_refill(&only_sip, &now).unwrap();
         assert_eq!(kind.key(), "sip-of-water");
         assert_eq!(today, at as usize + 1);
+        // Written before the hand-over, on the refill's own thread.
+        store.write_count(kind.pilot.name, now.now_ms).unwrap();
         // The crash: dropped with the run under way, no end, no save.
         drop(store);
     }
     let store = Store::at(Some(file.clone()));
     let later = idle(NOON_MS + 5 * HOUR_MS, &never, &NoAllowanceYet);
-    assert_eq!(store.begin_refill(&only_sip, &later), Ok(None));
+    assert!(store.begin_refill(&only_sip, &later).is_none());
     assert_eq!(store.kept().next_refill(&only_sip, &later), Err(CAPPED));
     // A count that can't be written begins nothing and is given back.
     let unwritable = Store::at(Some(dir.join("no-such-folder").join(FILE)));
     let now = idle(NOON_MS, &never, &NoAllowanceYet);
-    assert!(unwritable.begin_refill(&only_sip, &now).is_err());
+    let (kind, _) = unwritable.begin_refill(&only_sip, &now).unwrap();
+    assert!(unwritable.write_count(kind.pilot.name, NOON_MS).is_err());
     assert_eq!(unwritable.kept().refills_today("sip-of-water", NOON_MS), 0);
     std::fs::remove_dir_all(&dir).unwrap();
 }
@@ -341,18 +344,30 @@ fn forget_and_a_language_change_let_the_kept_lines_go() {
     let store = Store::at(Some(file.clone()));
     let sip = kind("sip-of-water");
     assert!(
-        !store.in_language(Some("en\n")),
-        "the first read: nothing to let go"
+        store.in_language(Some("en\n")),
+        "the first read, to be written"
     );
     assert!(!store.in_language(Some("en")), "the same language");
     store.kept().keep(&sip, "A sip?".into(), NOON_MS);
     store.kept().count_refill("sip-of-water", NOON_MS);
+    let before = store.cleared();
     assert!(store.clear());
+    assert_eq!(
+        store.cleared(),
+        before + 1,
+        "a refill under way keeps nothing"
+    );
+    store.save().unwrap();
     assert!(Kept::load(&file).lines.is_empty(), "written so");
     assert_eq!(Kept::load(&file).refills_today("sip-of-water", NOON_MS), 1);
     store.kept().keep(&sip, "A sip?".into(), NOON_MS);
+    // Said only in the language it was worded in, even before a look.
+    assert!(store.kept().take_in(&sip, NOON_MS, Some("vi")).is_none());
     assert!(store.in_language(Some("vi")));
     assert!(store.kept().take(&sip, NOON_MS).is_none());
+    store.save().unwrap();
     assert_eq!(Kept::load(&file).language.as_deref(), Some("vi"));
+    store.kept().keep(&sip, "Một ngụm?".into(), NOON_MS);
+    assert!(store.kept().take_in(&sip, NOON_MS, Some("vi\n")).is_some());
     std::fs::remove_dir_all(&dir).unwrap();
 }

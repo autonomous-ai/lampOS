@@ -180,12 +180,18 @@ pub struct Kept {
 /// What is kept, behind its lock, and its file (Heron's HOLD and P3 on
 /// #7903): each write is of a copy taken under a lock of its own, so a
 /// fire's take never waits on a write (the copy is taken in a moment), and
-/// the newest copy is always the one written last.
+/// the newest copy is always the one written last. Nothing here writes on
+/// its own: [`Self::save`] is called off the loop that fires skills
+/// (Twelve's P3 3 on #7903), and [`Self::write_count`] on the refill's
+/// own thread before its hand-over.
 #[derive(Debug, Default)]
 pub struct Store {
     kept: std::sync::Mutex<Kept>,
     writing: std::sync::Mutex<()>,
     file: Option<std::path::PathBuf>,
+    /// How many times the kept lines were let go ([`Self::clear`]): a
+    /// refill begun before one keeps nothing (Twelve's P3 1 on #7903).
+    cleared: std::sync::atomic::AtomicU64,
 }
 
 /// Why no refill began: its count couldn't be written.
@@ -193,6 +199,9 @@ pub const NOT_WRITTEN: &str = "worded ahead: no refill begins: its count couldn'
 /// Why the kept lines were let go.
 pub const FORGOTTEN: &str = "memory forgot everything";
 pub const LANGUAGE_CHANGED: &str = "the owner's language changed";
+/// Why a refill's line was not kept: the kept lines were let go during its
+/// run.
+pub const LET_GO: &str = "the kept lines were let go while it ran";
 
 impl Store {
     /// What `file` keeps, if there is one; in this process alone otherwise.
@@ -202,6 +211,7 @@ impl Store {
             kept: std::sync::Mutex::new(kept),
             writing: std::sync::Mutex::new(()),
             file,
+            cleared: std::sync::atomic::AtomicU64::new(0),
         }
     }
 
@@ -226,48 +236,47 @@ impl Store {
     }
 
     /// The refill to begin now ([`Kept::next_refill`]) and `today`, its
-    /// count of the day's cap: counted and written to the file before it
-    /// is handed over (Heron's HOLD on #7903), so a crash or a restart
-    /// during its run keeps the count. None when none may begin; the count
-    /// not written, it is given back and none begins.
-    pub fn begin_refill(
-        &self,
-        kinds: &[Kind],
-        now: &Now<'_>,
-    ) -> Result<Option<(Kind, usize)>, String> {
-        let (kind, today) = {
-            let mut kept = self.kept();
-            let Ok(kind) = kept.next_refill(kinds, now) else {
-                return Ok(None);
-            };
-            kept.count_refill(kind.pilot.name, now.now_ms);
-            (kind, kept.refills_today(kind.pilot.name, now.now_ms))
-        };
-        if let Err(why) = self.save() {
-            self.kept().uncount_refill(kind.pilot.name, now.now_ms);
-            return Err(format!("{NOT_WRITTEN}: {why}"));
-        }
-        Ok(Some((kind, today)))
+    /// count of the day's cap, counted; none when none may begin. Its
+    /// count is written by [`Self::write_count`] before it is handed over.
+    pub fn begin_refill(&self, kinds: &[Kind], now: &Now<'_>) -> Option<(Kind, usize)> {
+        let mut kept = self.kept();
+        let kind = kept.next_refill(kinds, now).ok()?;
+        kept.count_refill(kind.pilot.name, now.now_ms);
+        let today = kept.refills_today(kind.pilot.name, now.now_ms);
+        Some((kind, today))
     }
 
-    /// Every kept line let go, and written so; the day's count stays, so
-    /// the cap holds. Whether any was kept.
+    /// A refill of `skill` counted at `at_ms` written to the file before
+    /// it is handed over (Heron's HOLD on #7903), so a crash or a restart
+    /// during its run keeps the count; not written, the count is given
+    /// back and the refill must not begin.
+    pub fn write_count(&self, skill: &str, at_ms: u64) -> Result<(), String> {
+        self.save().map_err(|why| {
+            self.kept().uncount_refill(skill, at_ms);
+            format!("{NOT_WRITTEN}: {why}")
+        })
+    }
+
+    /// How many times the kept lines were let go so far.
+    pub fn cleared(&self) -> u64 {
+        self.cleared.load(std::sync::atomic::Ordering::Acquire)
+    }
+
+    /// Every kept line let go (to be written by [`Self::save`]); the day's
+    /// count stays, so the cap holds. A refill under way keeps nothing
+    /// ([`Self::cleared`]). Whether any was kept.
     pub fn clear(&self) -> bool {
-        let had = {
-            let mut kept = self.kept();
-            let had = !kept.lines.is_empty();
-            kept.lines.clear();
-            had
-        };
-        if let Err(why) = self.save() {
-            eprintln!("lamp-skills: {why}");
-        }
+        let mut kept = self.kept();
+        self.cleared
+            .fetch_add(1, std::sync::atomic::Ordering::AcqRel);
+        let had = !kept.lines.is_empty();
+        kept.lines.clear();
         had
     }
 
     /// The lines kept in the owner's `language` now (the language file's
     /// text): worded under another, they are let go and the new one kept.
-    /// Whether any were let go.
+    /// Whether anything changed, to be written.
     pub fn in_language(&self, language: Option<&str>) -> bool {
         let language = language.map(str::trim).map(str::to_owned);
         {
@@ -277,7 +286,8 @@ impl Store {
             }
             kept.language = language;
         }
-        self.clear()
+        self.clear();
+        true
     }
 }
 
@@ -330,6 +340,16 @@ impl Kept {
 
     /// The oldest fresh line of `kind`, taken so it is said once; the stale
     /// ones let go with it.
+    /// [`Self::take`], only while the lines were worded in the owner's
+    /// `language` now (the language file's text): another, and none is
+    /// said, before the next look lets them go (Twelve's P3 2 on #7903).
+    pub fn take_in(&mut self, kind: &Kind, now_ms: u64, language: Option<&str>) -> Option<Line> {
+        if self.language.as_deref() != language.map(str::trim) {
+            return None;
+        }
+        self.take(kind, now_ms)
+    }
+
     pub fn take(&mut self, kind: &Kind, now_ms: u64) -> Option<Line> {
         let key = kind.key();
         let lines = self.lines.get_mut(&key)?;

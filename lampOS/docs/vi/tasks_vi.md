@@ -337,12 +337,17 @@ lần chạy, và được trả lời khi lần chạy kết thúc
   (`voice_ask`) hay một lần tạo kỹ năng của một người, hủy nó ngay
   (`skill_task::Ahead`, một chỗ cả hai socket dùng chung; lần chạy kết thúc
   như ở hạn chót và được báo `cancelled`). Lệnh hủy của nó được giữ trước khi
-  nó lấy chỗ, nên không ai thấy chỗ bị giữ mà không có gì để hủy. Task hay câu
-  hỏi lấy chỗ trong 0,75 giây của lần hủy khi lần chạy nạp đã nhả chỗ: ngay
-  với lần chạy dừng ở lệnh hủy; lần chạy qua Harness trước hết đóng phiên và
-  kết thúc token, và một `harness new` đang chạy không bị cắt, nên ở đó vẫn có
-  thể bị báo bận (chưa đo trên đèn). Một lần tạo kỹ năng lấy chỗ riêng của nó
-  và hủy lần nạp. Lần nạp không bao giờ hủy gì, và không bao giờ chạy trong
+  nó lấy chỗ, nên không ai thấy chỗ bị giữ mà không có gì để hủy. Task lấy chỗ
+  trong 0,75 giây của lần hủy khi lần chạy nạp đã nhả chỗ: ngay với lần chạy
+  dừng ở lệnh hủy; lần chạy qua Harness trước hết đóng phiên và kết thúc
+  token, và một `harness new` đang chạy không bị cắt, nên ở đó vẫn có thể bị
+  báo bận (chưa đo trên đèn). Lần nạp đã giữ lệnh hủy nhưng không lấy được
+  chỗ (task khác đang giữ) bỏ lệnh hủy ngay, và task được báo bận lúc đó, nhật
+  ký không ghi lần hủy nào. Câu hỏi bằng giọng nói và lần tạo kỹ năng mỗi cái
+  có chỗ riêng, không bao giờ phải chờ: lần tạo lấy chỗ của nó và hủy lần nạp,
+  và khi một lần tạo giữ chỗ (`HandOvers::making`, cờ riêng của make socket,
+  được xem dưới khóa của chỗ nạp) thì lần nạp bị báo bận, không bao giờ bắt
+  đầu bên cạnh nó (HOLD của Twelve trên #7903 ở 7b6a94f93f). Lần nạp không bao giờ hủy gì, và không bao giờ chạy trong
   pane được giữ của `LAMP_TASKS_ONE_SESSION` (`SkillRun::refill`): nó chạy
   trong một phiên ngắn của riêng nó, theo cách mỗi lần chạy một phiên, nên
   lệnh hủy chỉ đóng phiên đó, không bao giờ đóng phiên OpenClaw được giữ của

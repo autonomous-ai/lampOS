@@ -1857,6 +1857,10 @@ pub struct MakeHandOvers {
     /// The lamp's own refill of a core skill's lines, which a person's make
     /// cancels as it takes its place ([`take_make_place`]).
     pub ahead: crate::skill_task::Ahead,
+    /// The one make's place: held while a make runs, and shared with the
+    /// skill tasks' hand-over ([`crate::skill_task::HandOvers::making`]),
+    /// which refuses a refill meanwhile.
+    pub making: Arc<AtomicBool>,
 }
 
 impl MakeHandOvers {
@@ -1867,6 +1871,13 @@ impl MakeHandOvers {
             asks.ahead = ahead.clone();
         }
         self.ahead = ahead;
+        self
+    }
+
+    /// These makes holding `making` as their place, so the skill tasks'
+    /// hand-over refuses the lamp's own refill while one runs.
+    pub fn with_making(mut self, making: Arc<AtomicBool>) -> Self {
+        self.making = making;
         self
     }
 
@@ -1921,6 +1932,7 @@ impl MakeHandOvers {
             caller: caller_may,
             asks,
             ahead: Default::default(),
+            making: Default::default(),
         }
     }
 
@@ -1952,8 +1964,8 @@ impl MakeHandOvers {
     }
 
     fn accept(self, listener: &std::os::unix::net::UnixListener, stop: &AtomicBool) {
+        let running = self.making.clone();
         let this = Arc::new(self);
-        let running = Arc::new(AtomicBool::new(false));
         let open = Arc::new(AtomicUsize::new(0));
         while !stop.load(Ordering::Acquire) {
             let stream = match listener.accept() {
@@ -2055,7 +2067,10 @@ impl MakeHandOvers {
 
 /// The one make's place: taken, a person's make cancels the lamp's own
 /// refill of a core skill's lines (Heron's P3 on #7903), so the agent's
-/// CPU is the make's; refused busy, it cancels nothing.
+/// CPU is the make's; refused busy, it cancels nothing. Taken before the
+/// slot is looked at, so a refill holding it after is refused instead
+/// (`skill_task::take_ahead_place` looks at `running` under the slot's
+/// lock).
 fn take_make_place(running: &AtomicBool, ahead: &crate::skill_task::Ahead) -> bool {
     if running
         .compare_exchange(false, true, Ordering::AcqRel, Ordering::Acquire)
@@ -3357,6 +3372,7 @@ mod tests {
             caller: |_| true,
             asks: None,
             ahead: Default::default(),
+            making: Default::default(),
         }
         .start(true, stop.clone())
         .unwrap()
@@ -3401,6 +3417,7 @@ mod tests {
             caller: |_| true,
             asks: None,
             ahead: Default::default(),
+            making: Default::default(),
         }
         .start(true, stop.clone())
         .unwrap()
@@ -3427,6 +3444,7 @@ mod tests {
             caller: |_| true,
             asks: None,
             ahead: Default::default(),
+            making: Default::default(),
         }
         .start(false, Arc::default())
         .unwrap();

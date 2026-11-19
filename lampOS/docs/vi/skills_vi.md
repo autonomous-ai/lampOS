@@ -3884,11 +3884,17 @@ các kỹ năng nạp và chạy y hệt từng byte như trước. `lamp_skills
   mỗi câu kèm lúc được soạn, còn mới trong 24 giờ (`FRESH_MS`) và chỉ nói một
   lần (`Kept::take`). Kỹ năng có hai task (Sit back, Meal check) giữ câu của
   từng task riêng, tổng cộng 3. Sau `worded_ahead::Store`: mỗi lần ghi là ghi
-  một bản sao lấy dưới khóa riêng, nên lần kích hoạt không bao giờ chờ đĩa.
-  Mọi câu được giữ bị bỏ, và tệp được ghi lại, khi bộ nhớ "quên hết" (sự kiện
+  một bản sao lấy dưới khóa riêng, và không lần ghi nào nằm trên vòng lặp
+  kích hoạt kỹ năng (P3 3 của Twelve trên #7903): lần ghi của một lần lấy câu,
+  một lần quên hay một lần đổi ngôn ngữ chạy trên luồng riêng, số đếm của lần
+  nạp được ghi trên luồng riêng của lần nạp trước khi giao đi. Mọi câu được
+  giữ bị bỏ, và tệp được ghi lại, khi bộ nhớ "quên hết" (sự kiện
   `memory/forgot` của nó, của bất kỳ ai) và khi ngôn ngữ của chủ đèn đổi
-  (nội dung `LAMP_LANGUAGE_FILE`, đọc mỗi lần xem; câu soạn theo ngôn ngữ cũ
-  không được giữ). Số đếm trong ngày vẫn còn.
+  (nội dung `LAMP_LANGUAGE_FILE`, đọc mỗi giây, dù có lần nạp đang chạy hay
+  không). Lần nạp đang chạy không giữ gì soạn trước một trong hai việc đó
+  (`Store::cleared`), và lần kích hoạt chỉ nói câu được giữ bằng đúng ngôn ngữ
+  nó được soạn (`Kept::take_in`), kể cả trước lần xem kế tiếp. Số đếm trong
+  ngày vẫn còn.
 - **Khi nào nạp lại** (`Kept::next_refill`, xem mỗi 5 giây, mỗi lần một, trên
   luồng riêng):
   - đèn rảnh: `voice/state` đang nghỉ, và không khác đi trong 15 giây vừa qua
@@ -3905,7 +3911,8 @@ các kỹ năng nạp và chạy y hệt từng byte như trước. `lamp_skills
   - tối đa 3 lần nạp một kỹ năng trong 24 giờ bất kỳ (`MOST_REFILLS_A_DAY`,
     giới hạn cứng, khoảng 30 lần một ngày trên một đèn; điều kiện 2), đếm và
     ghi vào tệp khi mỗi lần bắt đầu, trước khi giao đi
-    (`Store::begin_refill`, HOLD của Heron trên #7903: sập hay khởi động lại
+    (`Store::begin_refill` và `Store::write_count`, HOLD của Heron trên
+    #7903: sập hay khởi động lại
     giữa chừng vẫn giữ số đếm; số đếm không ghi được thì không bắt đầu gì),
     dù kết quả ra sao, và chỉ trả lại khi lamp-tasks không nhận nó (bận,
     không liên lạc được: không gì chạy; lần xem sau chờ một phút). Lần nạp bị
@@ -3923,7 +3930,9 @@ các kỹ năng nạp và chạy y hệt từng byte như trước. `lamp_skills
   một lần tạo kỹ năng của người hay task của bất kỳ kỹ năng nào khác
   (`skill_task::Ahead`, [tasks_vi.md](tasks_vi.md)): nó được kết thúc như lúc
   hết hạn và được báo `cancelled`, còn cái kia chạy khi chỗ được nhả (lần
-  chạy qua Harness vẫn có thể bị báo bận, xem tasks_vi.md). Nó không bao giờ
+  chạy qua Harness vẫn có thể bị báo bận, xem tasks_vi.md). Khi một lần tạo
+  kỹ năng của người đang chạy, lần nạp bị báo bận (được trả lại số đếm, lần
+  xem sau chờ một phút), không bao giờ bắt đầu bên cạnh nó. Nó không bao giờ
   chạy trong pane OpenClaw được giữ (`LAMP_TASKS_ONE_SESSION`), chỉ trong một
   phiên ngắn của riêng nó, nên lệnh hủy không bao giờ khiến người dùng phải
   chờ một phiên lạnh. Lần giao của việc nạp không phải lần mà một task chờ

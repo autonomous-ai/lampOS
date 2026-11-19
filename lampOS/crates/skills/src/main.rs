@@ -2209,7 +2209,15 @@ fn said_ahead(skill: &str, tasks: &[Call], calls: Vec<Call>, ahead: &WordedAhead
         Call::Task(step) => Kind::of(skill, &step.task),
         _ => None,
     });
-    let line = kind.and_then(|kind| ahead.store.kept().take(&kind, now_ms));
+    // Only a line worded in the owner's language now (Twelve's P3 2 on
+    // #7903): the file is read, never written, on the fire's path.
+    let language = kind.as_ref().and_then(|_| language_now());
+    let line = kind.and_then(|kind| {
+        ahead
+            .store
+            .kept()
+            .take_in(&kind, now_ms, language.as_deref())
+    });
     match line {
         Some(line) => {
             ahead.save_soon();
@@ -2259,12 +2267,24 @@ fn look_ahead(runner: &Runner, quiet: &dyn Fn(&str) -> bool) {
         while receive(forgot, Duration::ZERO).is_some() {
             heard = true;
         }
-        if heard && ahead.store.clear() {
-            eprintln!(
-                "lamp-skills: worded ahead: the kept lines let go: {}",
-                worded::FORGOTTEN
-            );
+        if heard {
+            if ahead.store.clear() {
+                eprintln!(
+                    "lamp-skills: worded ahead: the kept lines let go: {}",
+                    worded::FORGOTTEN
+                );
+            }
+            ahead.save_soon();
         }
+    }
+    // Worded in another language than the owner's now: let go, even while
+    // a refill runs (Twelve's P3 2 on #7903), written off this loop.
+    if ahead.store.in_language(language_now().as_deref()) {
+        eprintln!(
+            "lamp-skills: worded ahead: the kept lines let go: {}",
+            worded::LANGUAGE_CHANGED
+        );
+        ahead.save_soon();
     }
     // Not resting, or not known: a turn is open.
     if said_lately::<VoiceState>(&runner.bus, VoiceState::TOPIC).map(|now| now.state)
@@ -2278,13 +2298,6 @@ fn look_ahead(runner: &Runner, quiet: &dyn Fn(&str) -> bool) {
         return;
     }
     ahead.looked.set(Some(now));
-    // Worded in another language than the owner's now: let go.
-    if ahead.store.in_language(language_now().as_deref()) {
-        eprintln!(
-            "lamp-skills: worded ahead: the kept lines let go: {}",
-            worded::LANGUAGE_CHANGED
-        );
-    }
     let heat = reading(&runner.bus, worded::BOARD_HEAT);
     let state = reading(&runner.bus, lamp_msgs::BoardState::TOPIC);
     let warm = worded::warm(
@@ -2311,7 +2324,8 @@ fn look_ahead(runner: &Runner, quiet: &dyn Fn(&str) -> bool) {
     let kinds = Kind::all_of(|name| tasks.via_agent.contains(name) && tasks.of.contains_key(name));
     let now_ms = unix_ms();
     let talking = since(&ahead.talked).is_some_and(|since| since < worded::IDLE_AFTER);
-    // Counted and written before it is handed over (Heron's HOLD on #7903).
+    // Counted here, and written on the refill's own thread before it is
+    // handed over (Heron's HOLD and Twelve's P3 3 on #7903).
     let begun = ahead.store.begin_refill(
         &kinds,
         &Now {
@@ -2322,13 +2336,8 @@ fn look_ahead(runner: &Runner, quiet: &dyn Fn(&str) -> bool) {
             allowance: worded::allowance(),
         },
     );
-    let (kind, today) = match begun {
-        Ok(Some(begun)) => begun,
-        Ok(None) => return,
-        Err(why) => {
-            eprintln!("lamp-skills: {why}");
-            return;
-        }
+    let Some((kind, today)) = begun else {
+        return;
     };
     let Some((folder, _)) = tasks.of.get(kind.pilot.name).cloned() else {
         return;
@@ -2338,7 +2347,10 @@ fn look_ahead(runner: &Runner, quiet: &dyn Fn(&str) -> bool) {
         .store(true, std::sync::atomic::Ordering::Release);
     let (store, refilling) = (ahead.store.clone(), ahead.refilling.clone());
     std::thread::spawn(move || {
-        refill(kind, &folder, &state_dir, &socket, &store, now_ms, today);
+        match store.write_count(kind.pilot.name, now_ms) {
+            Ok(()) => refill(kind, &folder, &state_dir, &socket, &store, now_ms, today),
+            Err(why) => eprintln!("lamp-skills: {why}"),
+        }
         refilling.store(false, std::sync::atomic::Ordering::Release);
     });
 }
@@ -2395,6 +2407,7 @@ fn refill(
     let cpu = Path::new(worded::CPU_STAT);
     let before = worded::cpu_usec(cpu);
     let language = language_now();
+    let cleared = store.cleared();
     let began = Instant::now();
     let answer = std::cell::RefCell::new(None);
     let said = lamp_skills::task::hand(
@@ -2422,6 +2435,9 @@ fn refill(
     let outcome = match answer.into_inner() {
         // Worded under another language than the owner's now: not kept.
         Some(_) if language_now() != language => Err(worded::LANGUAGE_CHANGED.to_owned()),
+        // Let go meanwhile ("forget everything", a language change):
+        // nothing worded before it is kept (Twelve's P3 1 on #7903).
+        Some(_) if store.cleared() != cleared => Err(worded::LET_GO.to_owned()),
         Some(answer) => kept
             .refilled(&kind, &answer, at_ms, unix_ms())
             .map_err(str::to_owned),

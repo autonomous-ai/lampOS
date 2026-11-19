@@ -2980,12 +2980,18 @@ for each run, and is answered once the run ends
   make, cancels it at once (`skill_task::Ahead`, one slot both sockets
   share; the run ended as at its deadline and told `cancelled`). Its cancel
   is kept before it takes the place, so none finds the place held with
-  nothing to cancel. A task or an ask then takes the place within the
-  cancel's 0.75 s once the refill's run has let it go: at once with a run
-  that stops at its cancel; a Harness run first closes its session and
-  ends its token, and a `harness new` under way isn't cut, so there it can
-  still be told busy (not measured on a lamp). A make takes its own place
-  and cancels it. A refill never cancels anything, and never runs in the
+  nothing to cancel. A task then takes the place within the cancel's
+  0.75 s once the refill's run has let it go: at once with a run that
+  stops at its cancel; a Harness run first closes its session and ends its
+  token, and a `harness new` under way isn't cut, so there it can still be
+  told busy (not measured on a lamp). A refill whose cancel was kept but
+  that never got the place (another task had it) lets its cancel go at
+  once, and the task is told busy then, with no cancel journaled. A voice
+  ask and a make each have a place of their own, never waited for: a make
+  takes its place and cancels the refill, and while a make holds its place
+  (`HandOvers::making`, the make socket's own flag, looked at under the
+  refill slot's lock) a refill is refused busy, never begun beside it
+  (Twelve's HOLD on #7903 at 7b6a94f93f). A refill never cancels anything, and never runs in the
   kept pane of `LAMP_TASKS_ONE_SESSION` (`SkillRun::refill`): it runs in a
   short session of its own, the per-run way, so its cancel closes only
   that and never the person's kept OpenClaw session (Twelve's HOLD on
