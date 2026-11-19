@@ -140,8 +140,10 @@ whole, which is Harness itself, its CLI and its own Node, and not the
 Harness service `install` set up, #934; Nine on #1016), the work folder
 Hermes and OpenClaw share on the lamp (`/var/lib/lampos-tasks/harnesses/lamp-tasks`,
 emptied; lamp-tasks writes the lamp's `AGENTS.md` again at its start), and
-Hermes's and OpenClaw's own per-person files, in a step of their own after
-the plan's paths (`reset::forget_agents`, #6343, below), the user's key
+Hermes's and OpenClaw's own per-person files, in a step of their own before
+the plan's paths (`reset::forget_agents`, #6343, below; before them since
+#7868, so OpenClaw's check of its cut runs while lamp-cloud's forwarder
+token, which OpenClaw's wrapper needs, is still there), the user's key
 (`/etc/lampOS/voice/credential` and `/etc/lampOS/policy/jev.key`, #806,
 16:13), the person's own keys (`/etc/lampOS/voice/own`, `LAMP_OWN_KEYS`), the
 name (`/etc/lampOS/person/name`), the owner's place from the app
@@ -325,7 +327,9 @@ lamp-setup reset-now`). That unit, in this order:
    `MainPID` (OpenClaw 2026.11.2 refuses a check from other namespaces
    while its gateway runs, #7268), else inside `openclaw-ns` of its own
    with a stand-in token. The reset stops the gateway first, so it is
-   normally the second. Only status 0 renames it into place
+   normally the second; either way the check runs before the plan's wipes
+   take `/var/lib/lampos-cloud` (the forwarder token the wrapper needs),
+   and the token is still wiped after it. Only status 0 renames it into place
    (`lamp_checked_replace::replace_checked_in`). Not taken (refused, past
    60 s, or not started), the new file is removed and so is
    `openclaw.json`, since a reset fails toward wiping and no person's key
