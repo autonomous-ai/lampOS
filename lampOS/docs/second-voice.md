@@ -2371,9 +2371,10 @@ order is kept. A written turn is the same from the chat on.
   forget drops them. They are not written to the thread file (an older
   build would set the file aside, #1505): after a restart, earlier
   exchanges are words only. A skill's call through `use_skill` is kept
-  with its `skill`, `choice`, `flag` and `kind` only (`SKILL_KEPT_FIELDS`:
-  a skill's name, a word from its own list, a yes-or-no, a word from its
-  kinds, #6543), and only when it
+  with its `skill`, `choice`, `flag`, `kind`, `next` and `minutes` only
+  (`SKILL_KEPT_FIELDS`: a skill's name, a word from its own list, a
+  yes-or-no, a word from its kinds, #6543, a stop's "next one" and a
+  snooze's whole minutes, #7910), and only when it
   has no other field, its result told "(done earlier: the skill ran then.
   The rest of its result was not kept. A new ask for it needs its own
   call.)" (`SKILL_RAN_EARLIER`; #7076: on lamp-52e6 on 14 Nov a second

@@ -472,9 +472,10 @@ pub(crate) fn without_kept_calls(history: &[Message]) -> Option<(Vec<Message>, u
 /// back by the model itself, no call, three rows of three).
 ///
 /// A skill's call through [`crate::use_skill::NAME`] is kept with its
-/// `skill`, `choice`, `flag` and `kind` only, [`SKILL_KEPT_FIELDS`] (a
-/// skill's name, a word from its own list, a yes-or-no, a word from its
-/// kinds; never the person's words),
+/// `skill`, `choice`, `flag`, `kind`, `next` and `minutes` only,
+/// [`SKILL_KEPT_FIELDS`] (a skill's name, a word from its own list, a
+/// yes-or-no, a word from its kinds, a stop's "next one" and snooze length,
+/// #7910; never the person's words),
 /// and only when every field it has is one of those (#7076: on lamp-52e6 on
 /// 14 Nov a second "Lamp, I'm unplugging you now." 8 s after a
 /// prepare-unplug run was answered in words, `calls=none`: the earlier
@@ -499,7 +500,10 @@ pub(crate) fn kept_args(name: &str, args: &serde_json::Value) -> Option<serde_js
     if name == crate::use_skill::NAME {
         let fields = args.as_object()?;
         let kept = fields.iter().all(|(field, value)| {
-            SKILL_KEPT_FIELDS.contains(&field.as_str()) && (value.is_string() || value.is_boolean())
+            SKILL_KEPT_FIELDS.contains(&field.as_str())
+                && (value.is_string()
+                    || value.is_boolean()
+                    || (field == "minutes" && value.is_u64()))
         }) && fields
             .get("skill")
             .is_some_and(serde_json::Value::is_string);
@@ -523,7 +527,8 @@ pub(crate) fn kept_args(name: &str, args: &serde_json::Value) -> Option<serde_js
 pub(crate) const WRITE_KEPT_FIELDS: [&str; 3] = ["service", "action", "send_id"];
 
 /// The only fields a kept `use_skill` call may have ([`kept_args`]).
-pub(crate) const SKILL_KEPT_FIELDS: [&str; 4] = ["skill", "choice", "flag", "kind"];
+pub(crate) const SKILL_KEPT_FIELDS: [&str; 6] =
+    ["skill", "choice", "flag", "kind", "next", "minutes"];
 
 /// A kept skill's call, as told in a later turn's history ([`kept_result`]):
 /// it ran then, and a new ask for it is a call of its own (#7076).

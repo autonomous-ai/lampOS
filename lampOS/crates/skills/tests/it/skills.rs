@@ -17438,3 +17438,298 @@ fn music_sway_follows_the_energy_level_and_level_one_is_as_written() {
         "{why}"
     );
 }
+
+/// #7910: three skills sharing `nudges`, due 30, 10 and 20 minutes into a
+/// stuffy room, an hour's cooldown each.
+fn timed_stops(dir: &Path) -> Vec<lamp_skills::Skill> {
+    for (name, minutes) in [("a", 30), ("b", 10), ("c", 20)] {
+        skill_with(
+            dir,
+            name,
+            &format!(
+                "[budget]\ngroup = \"g\"\nper_hour = 6\n[trigger]\ntopic = \"air/indoor\"\nfield = \"co2\"\nabove = 1000\nfor = \"{minutes}m\"\ngap = \"5m\"\ncooldown = \"60m\"\n[ask]\npolicy = \"nudge\"\n[stop]\ntool = \"nudges\"\nabout = \"When.\"\n[[do]]\nlight = {{ colour = \"warm\" }}\n"
+            ),
+        );
+    }
+    let (loaded, errors) = load_all(dir);
+    assert!(errors.is_empty(), "{errors:?}");
+    loaded
+}
+
+/// The skills a stuffy-room reading at `minute` starts.
+fn next_runs(engine: &mut Engine, minute: u64) -> Vec<String> {
+    engine
+        .observe("air/indoor", minute * 60_000_000, br#"{"co2":1200}"#, None)
+        .into_iter()
+        .filter(|run| !run.calls.is_empty())
+        .map(|run| run.skill)
+        .collect()
+}
+
+/// #7910: "snooze the next one five minutes" snoozed every wellbeing nudge
+/// until the morning. `next` snoozes only the one due next by the engine's
+/// schedule, and `minutes` is the snooze's length, said back; after it the
+/// nudge runs again, and the others were never stopped.
+#[test]
+fn the_next_one_for_five_minutes_snoozes_only_the_nudge_due_next() {
+    let dir = tempfile::tempdir().unwrap();
+    let loaded = timed_stops(dir.path());
+    let tools = tools_file(&loaded);
+    let properties = &tools["tools"][0]["parameters"]["properties"];
+    assert_eq!(properties["next"]["type"], "boolean", "{tools}");
+    assert!(
+        properties["next"]["description"]
+            .as_str()
+            .unwrap()
+            .contains("'the next one'")
+    );
+    assert_eq!(properties["minutes"]["type"], "integer", "{tools}");
+    assert!(
+        properties["minutes"]["description"]
+            .as_str()
+            .unwrap()
+            .contains("never guess")
+    );
+    let mut engine = Engine::new(loaded, true);
+    for minute in 0..9 {
+        assert!(next_runs(&mut engine, minute).is_empty(), "{minute}");
+    }
+    // None has run: without `next` that is every one; with it, `b`, due at
+    // 10 minutes, before `c` at 20 and `a` at 30.
+    let run = engine
+        .tool(
+            "nudges",
+            &serde_json::json!({"how": "snooze", "next": true, "minutes": 5}),
+            9 * 60_000_000,
+        )
+        .unwrap();
+    let told = lamp_skills::told(&run.calls)["next"]
+        .as_str()
+        .unwrap()
+        .to_owned();
+    assert!(told.contains("Done: no b nudge for 5 minutes."), "{told}");
+    assert!(engine.stopped("b", 9 * 60_000_000));
+    assert!(!engine.stopped("a", 9 * 60_000_000) && !engine.stopped("c", 9 * 60_000_000));
+    for minute in 9..14 {
+        assert!(next_runs(&mut engine, minute).is_empty(), "{minute}");
+    }
+    // Five minutes on, it runs again; the others as ever.
+    assert_eq!(next_runs(&mut engine, 14), ["b"]);
+    for minute in 15..20 {
+        assert!(next_runs(&mut engine, minute).is_empty(), "{minute}");
+    }
+    assert_eq!(next_runs(&mut engine, 20), ["c"]);
+    // `b` ran at 14: in its cooldown, so `a`, due at 30, is next now.
+    let at = 21 * 60_000_000;
+    engine
+        .tool(
+            "nudges",
+            &serde_json::json!({"how": "off", "next": true}),
+            at,
+        )
+        .unwrap();
+    assert!(engine.stopped("a", at) && !engine.stopped("b", at) && !engine.stopped("c", at));
+}
+
+/// #7910: without `minutes` a snooze is as before, until tomorrow morning,
+/// and without `next` it is the one that came last, or every one before
+/// any ran.
+#[test]
+fn a_snooze_with_no_minutes_is_until_the_morning_as_before() {
+    let dir = tempfile::tempdir().unwrap();
+    let loaded = timed_stops(dir.path());
+    let mut engine = Engine::new(loaded.clone(), true);
+    let run = engine
+        .tool("nudges", &serde_json::json!({"how": "snooze"}), 0)
+        .unwrap();
+    let told = lamp_skills::told(&run.calls)["next"]
+        .as_str()
+        .unwrap()
+        .to_owned();
+    assert!(told.contains("until tomorrow morning"), "{told}");
+    // 12 h with the local time not known.
+    for skill in ["a", "b", "c"] {
+        assert!(engine.stopped(skill, 12 * 3_600_000_000 - 1), "{skill}");
+        assert!(!engine.stopped(skill, 12 * 3_600_000_000), "{skill}");
+    }
+    // `next` without minutes: only the one due next, until the morning.
+    let mut engine = Engine::new(loaded, true);
+    engine
+        .tool(
+            "nudges",
+            &serde_json::json!({"how": "snooze", "next": true}),
+            0,
+        )
+        .unwrap();
+    assert!(engine.stopped("b", 12 * 3_600_000_000 - 1));
+    assert!(!engine.stopped("a", 0) && !engine.stopped("c", 0));
+    // A one-skill stop takes minutes, not next.
+    let one = tempfile::tempdir().unwrap();
+    let skill = load(&stoppable(one.path())).unwrap();
+    let mut engine = Engine::new(vec![skill], true);
+    let run = engine
+        .tool(
+            "stuffy_nudges",
+            &serde_json::json!({"how": "snooze", "minutes": 1}),
+            0,
+        )
+        .unwrap();
+    let told = lamp_skills::told(&run.calls)["next"]
+        .as_str()
+        .unwrap()
+        .to_owned();
+    assert!(told.contains("none of these for 1 minute."), "{told}");
+    assert!(engine.stopped("sip", 59_999_999) && !engine.stopped("sip", 60_000_000));
+    assert!(
+        engine
+            .tool(
+                "stuffy_nudges",
+                &serde_json::json!({"how": "snooze", "next": true}),
+                0,
+            )
+            .is_err()
+    );
+}
+
+/// #7910: `all`, a kind and `next` are one each; mixed, nothing changes.
+/// `minutes` is a snooze's only, a whole number from 1 to 720; `next` does
+/// not put one on again.
+#[test]
+fn next_all_kind_and_minutes_mixed_wrongly_change_nothing() {
+    let dir = tempfile::tempdir().unwrap();
+    let loaded = kinded_stops(dir.path());
+    let mut engine = Engine::new(loaded, true);
+    for (args, said) in [
+        (
+            serde_json::json!({"how": "snooze", "next": true, "all": true}),
+            "only one of all, kind and next",
+        ),
+        (
+            serde_json::json!({"how": "snooze", "next": true, "kind": "drinks"}),
+            "only one of all, kind and next",
+        ),
+        (
+            serde_json::json!({"how": "off", "all": true, "kind": "drinks"}),
+            "only one of all, kind and next",
+        ),
+        (
+            serde_json::json!({"how": "off", "minutes": 5}),
+            "minutes is for a snooze only",
+        ),
+        (
+            serde_json::json!({"how": "on", "minutes": 5}),
+            "minutes is for a snooze only",
+        ),
+        (
+            serde_json::json!({"how": "snooze", "minutes": 0}),
+            "1 to 720",
+        ),
+        (
+            serde_json::json!({"how": "snooze", "minutes": 721}),
+            "1 to 720",
+        ),
+        (
+            serde_json::json!({"how": "snooze", "minutes": 2.5}),
+            "1 to 720",
+        ),
+        (
+            serde_json::json!({"how": "snooze", "minutes": "five"}),
+            "1 to 720",
+        ),
+        (
+            serde_json::json!({"how": "on", "next": true}),
+            "next is for a snooze or off",
+        ),
+    ] {
+        let refused = engine.tool("nudges", &args, 0).unwrap_err();
+        assert!(refused.contains("Nothing changed"), "{args}: {refused}");
+        assert!(refused.contains(said), "{args}: {refused}");
+        assert!(
+            ["drink", "eat", "tired"]
+                .iter()
+                .all(|skill| !engine.stopped(skill, 0)),
+            "{args}"
+        );
+    }
+    // A `false` beside another is not a mix; 5.0 is five minutes.
+    engine
+        .tool(
+            "nudges",
+            &serde_json::json!({"how": "snooze", "kind": "meals", "all": false, "next": false, "minutes": 5.0}),
+            0,
+        )
+        .unwrap();
+    assert!(engine.stopped("eat", 0) && !engine.stopped("eat", 300_000_000));
+    assert!(!engine.stopped("drink", 0));
+}
+
+/// #7910 beside #7753: on the product's eight wellbeing skills, `next` and
+/// `minutes` snooze one for the length said, and a `[stop.done]` way,
+/// `just_drank`, takes neither: mixed, nothing changes.
+#[test]
+fn just_drank_takes_neither_next_nor_minutes() {
+    let names = [
+        "comfort-break",
+        "meal-check",
+        "quiet-focus",
+        "rest-your-eyes",
+        "sip-of-water",
+        "sit-back",
+        "stand-up",
+        "wind-down",
+    ];
+    let skills: Vec<lamp_skills::Skill> = names
+        .iter()
+        .map(|name| load(&skills_root().join(name)).unwrap())
+        .collect();
+    let tools = tools_file(&skills);
+    let properties = &tools["tools"][0]["parameters"]["properties"];
+    assert_eq!(properties["next"]["type"], "boolean", "{tools}");
+    assert_eq!(properties["minutes"]["type"], "integer", "{tools}");
+    let mut engine = Engine::new(skills, true);
+    for (args, said) in [
+        (
+            serde_json::json!({"how": "just_drank", "next": true}),
+            "next is for a snooze or off",
+        ),
+        (
+            serde_json::json!({"how": "just_drank", "minutes": 5}),
+            "minutes is for a snooze only",
+        ),
+    ] {
+        let refused = engine.tool("wellbeing_nudges", &args, 0).unwrap_err();
+        assert!(refused.contains(said), "{args}: {refused}");
+        assert!(
+            names.iter().all(|skill| !engine.stopped(skill, 0)),
+            "{args}"
+        );
+    }
+    let run = engine
+        .tool(
+            "wellbeing_nudges",
+            &serde_json::json!({"how": "snooze", "next": true, "minutes": 5}),
+            0,
+        )
+        .unwrap();
+    let told = lamp_skills::told(&run.calls)["next"]
+        .as_str()
+        .unwrap()
+        .to_owned();
+    assert!(told.contains("nudge for 5 minutes."), "{told}");
+    let stopped: Vec<&str> = names
+        .iter()
+        .copied()
+        .filter(|skill| engine.stopped(skill, 0))
+        .collect();
+    assert_eq!(stopped.len(), 1, "{stopped:?}");
+    assert!(!engine.stopped(stopped[0], 300_000_000));
+    // `just_drank` alone, as before.
+    engine
+        .tool(
+            "wellbeing_nudges",
+            &serde_json::json!({"how": "just_drank"}),
+            0,
+        )
+        .unwrap();
+    assert!(engine.stopped("sip-of-water", 0));
+}

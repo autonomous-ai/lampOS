@@ -28,6 +28,14 @@ pub const FLAG: &str = "--use-skill";
 /// takes it only when a skill it offers has one, so with none it is as
 /// before, byte for byte.
 pub const KIND: &str = "kind";
+/// A shared stop's yes-or-no for "the next one" (#7910,
+/// `lamp_skills::STOP_NEXT`): beside its choice and its own yes-or-no
+/// (`all`), passed on under its own name, only to a stop that takes it.
+pub const NEXT: &str = "next";
+/// A stop's snooze length in minutes (#7910, `lamp_skills::STOP_MINUTES`):
+/// a whole number, passed on under its own name, only to a stop that takes
+/// it.
+pub const MINUTES: &str = "minutes";
 /// The choice of a `[stop]` function, and its words
 /// (`lamp_skills::STOP_CHOICE`, `lamp_skills::STOP_WAYS`): a function with
 /// them is a stop, and only a stop's [`KIND`] is its kind.
@@ -145,6 +153,26 @@ fn built(skills: &[Tool]) -> Tool {
         parameters["properties"][KIND] = json!({
             "type": "string",
             "description": "The skill's kind, whenever the person names one ('stop the water nudge': water): one of the words its line lists as its kind. Leave it out only when its line names none, or the person named none."
+        });
+    }
+    // A stop's "next one" and its snooze length (#7910), only when one of
+    // them takes them: with none, the function is as before, byte for byte.
+    if skills.iter().any(|skill| stop_takes(skill, NEXT).is_some())
+        && let Some(parameters) = tool.parameters.as_mut()
+    {
+        parameters["properties"][NEXT] = json!({
+            "type": "boolean",
+            "description": "The skill's next, as its line says: true for 'the next one'. Leave it out when its line names none."
+        });
+    }
+    if skills
+        .iter()
+        .any(|skill| stop_takes(skill, MINUTES).is_some())
+        && let Some(parameters) = tool.parameters.as_mut()
+    {
+        parameters["properties"][MINUTES] = json!({
+            "type": "integer",
+            "description": "The skill's minutes, as its line says: only when the person says a length; never guess. Leave it out otherwise."
         });
     }
     // A question about any skill on the lamp, told from the lamp's own
@@ -353,6 +381,7 @@ fn short_line(skill: &Tool) -> String {
     if let Some((name, _)) = flag(skill) {
         line.push_str(&format!(" Its yes-or-no is {name}."));
     }
+    line.push_str(&takes_next_and_minutes(skill));
     line.replace('\n', " ")
 }
 
@@ -370,6 +399,7 @@ fn when_line(skill: &Tool, when: &str) -> String {
     if let Some((name, _)) = flag(skill) {
         line.push_str(&format!(" Its yes-or-no is {name}."));
     }
+    line.push_str(&takes_next_and_minutes(skill));
     line.replace('\n', " ")
 }
 
@@ -460,7 +490,34 @@ fn line(skill: &Tool) -> String {
                 .unwrap_or_default()
         ));
     }
+    for (name, what) in [(NEXT, "a yes-or-no"), (MINUTES, "a number")] {
+        if let Some(schema) = stop_takes(skill, name) {
+            line.push_str(&format!(
+                " Its {name} is {what}{}.",
+                schema
+                    .get("description")
+                    .and_then(Value::as_str)
+                    .map(|about| format!(": {}", about.trim().trim_end_matches('.')))
+                    .unwrap_or_default()
+            ));
+        }
+    }
     line.replace('\n', " ")
+}
+
+/// A short or `when` line's word of a stop's [`NEXT`] and [`MINUTES`]
+/// (#7910), by name only, as its choice is there; none when it takes
+/// neither.
+fn takes_next_and_minutes(skill: &Tool) -> String {
+    let taken: Vec<&str> = [NEXT, MINUTES]
+        .into_iter()
+        .filter(|name| stop_takes(skill, name).is_some())
+        .collect();
+    if taken.is_empty() {
+        String::new()
+    } else {
+        format!(" It takes {} too.", taken.join(" and "))
+    }
 }
 
 /// Whether `skill` takes neither a choice nor a yes-or-no: what a call
@@ -524,16 +581,31 @@ fn kind(skill: &Tool) -> Option<(Vec<&str>, Option<&str>)> {
     Some((words, schema.get("description").and_then(Value::as_str)))
 }
 
-/// The skill's yes-or-no: its parameter's name, and what it says of it.
+/// A stop's [`NEXT`] or [`MINUTES`] (#7910): its schema, when `skill` is a
+/// stop that takes it.
+fn stop_takes<'a>(skill: &'a Tool, name: &str) -> Option<&'a Value> {
+    if !is_stop(skill) {
+        return None;
+    }
+    properties(skill)
+        .find(|(own, _)| own.as_str() == name)
+        .map(|(_, schema)| schema)
+}
+
+/// The skill's yes-or-no: its parameter's name, and what it says of it. A
+/// stop's [`NEXT`] is its own ([`stop_takes`]), not its yes-or-no.
 fn flag(skill: &Tool) -> Option<(&str, Option<&str>)> {
-    properties(skill).find_map(|(name, schema)| {
-        (schema.get("type").and_then(Value::as_str) == Some("boolean")).then(|| {
-            (
-                name.as_str(),
-                schema.get("description").and_then(Value::as_str),
-            )
+    let stop = is_stop(skill);
+    properties(skill)
+        .filter(|(name, _)| !stop || name.as_str() != NEXT)
+        .find_map(|(name, schema)| {
+            (schema.get("type").and_then(Value::as_str) == Some("boolean")).then(|| {
+                (
+                    name.as_str(),
+                    schema.get("description").and_then(Value::as_str),
+                )
+            })
         })
-    })
 }
 
 fn properties(skill: &Tool) -> impl Iterator<Item = (&String, &Value)> {
@@ -605,9 +677,14 @@ pub fn translate(call: &ToolCall, skills: &[Tool]) -> Result<ToolCall, Value> {
     // The skill's own parameters' names are taken too, as its line says
     // them ("Its choice is style"); any other key is told, never dropped
     // (the reviewer on #1696).
+    // A stop's next and minutes (#7910), where it takes them.
+    let next_of = stop_takes(skill, NEXT).is_some();
+    let minutes_of = stop_takes(skill, MINUTES).is_some();
     let known = |key: &str| {
         matches!(key, "skill" | "choice" | "flag")
             || (kind_of.is_some() && key == KIND)
+            || (next_of && key == NEXT)
+            || (minutes_of && key == MINUTES)
             || choice_of.as_ref().is_some_and(|(name, _, _)| *name == key)
             || flag_of.as_ref().is_some_and(|(name, _)| *name == key)
     };
@@ -628,12 +705,20 @@ pub fn translate(call: &ToolCall, skills: &[Tool]) -> Result<ToolCall, Value> {
             (false, true) => format!("give {}'s yes-or-no as flag", skill.name),
             (false, false) => format!("{} takes only its name", skill.name),
         };
-        // `kind` too where it is taken (the voice read on #7473).
-        let fields = if kind_of.is_some() && !own_kind {
-            "skill, choice, flag and kind"
-        } else {
-            "skill, choice and flag"
-        };
+        // `kind` too where it is taken (the voice read on #7473), and a
+        // stop's next and minutes (#7910).
+        let mut fields = vec!["skill", "choice", "flag"];
+        if kind_of.is_some() && !own_kind {
+            fields.push(KIND);
+        }
+        if next_of {
+            fields.push(NEXT);
+        }
+        if minutes_of {
+            fields.push(MINUTES);
+        }
+        let last = fields.pop().unwrap_or_default();
+        let fields = format!("{} and {last}", fields.join(", "));
         return Err(json!({
             "error": format!("use_skill takes {fields}, not {stray}: {takes}.")
         }));
@@ -690,6 +775,17 @@ pub fn translate(call: &ToolCall, skills: &[Tool]) -> Result<ToolCall, Value> {
             Some(_) => {
                 return Err(json!({"error": format!("{}'s kind is a word.", skill.name)}));
             }
+        }
+    }
+    // A stop's next and minutes as given (#7910): the stop says when one
+    // is wrong, or mixed with all or a kind.
+    for (name, taken) in [(NEXT, next_of), (MINUTES, minutes_of)] {
+        if let Some(given) = call
+            .args
+            .get(name)
+            .filter(|given| taken && !given.is_null())
+        {
+            args.insert(name.to_owned(), given.clone());
         }
     }
     Ok(ToolCall {
@@ -1426,6 +1522,73 @@ mod tests {
         assert_eq!(
             refused["error"],
             "use_skill takes skill, choice, flag and kind, not mood: give nudges's choice as choice."
+        );
+    }
+
+    /// #7910: a shared stop's `next` and `minutes`, as `lamp_skills::tools_file`
+    /// writes them: its line names them, `use_skill` takes them and passes
+    /// them on under their own names, `all` still its yes-or-no. A skill not
+    /// a stop has neither, and the function none, as before.
+    #[test]
+    fn a_stops_next_and_minutes_are_passed_on() {
+        let stop = skill(
+            "nudges",
+            "When someone asks to stop the nudges.",
+            Some(json!({"type":"object","properties":{
+                "all":{"type":"boolean","description":"true for every one of them"},
+                "how":{"type":"string","enum":["snooze","off","on"]},
+                "minutes":{"type":"integer","description":"with snooze only: how many minutes; never guess"},
+                "next":{"type":"boolean","description":"true for 'the next one'"}}})),
+        );
+        assert_eq!(flag(&stop).unwrap().0, "all");
+        let said = line(&stop);
+        assert!(said.contains("Its yes-or-no is all"), "{said}");
+        assert!(
+            said.contains("Its next is a yes-or-no: true for 'the next one'"),
+            "{said}"
+        );
+        assert!(
+            said.contains("Its minutes is a number: with snooze only"),
+            "{said}"
+        );
+        let short = short_line(&stop);
+        assert!(short.contains("It takes next and minutes too."), "{short}");
+        let tool = function(std::slice::from_ref(&stop)).unwrap();
+        let properties = &tool.parameters.unwrap()["properties"];
+        assert_eq!(properties[NEXT]["type"], "boolean");
+        assert_eq!(properties[MINUTES]["type"], "integer");
+        let made = translate(
+            &call(json!({"skill":"nudges","choice":"snooze","next":true,"minutes":5})),
+            std::slice::from_ref(&stop),
+        )
+        .unwrap();
+        assert_eq!(made.args, json!({"how":"snooze","next":true,"minutes":5}));
+        // Mixed with all: passed on, for the stop to refuse.
+        let made = translate(
+            &call(json!({"skill":"nudges","choice":"snooze","flag":true,"next":true})),
+            std::slice::from_ref(&stop),
+        )
+        .unwrap();
+        assert_eq!(made.args, json!({"how":"snooze","all":true,"next":true}));
+        let refused = translate(
+            &call(json!({"skill":"nudges","choice":"off","mood":"x"})),
+            std::slice::from_ref(&stop),
+        )
+        .unwrap_err();
+        assert_eq!(
+            refused["error"],
+            "use_skill takes skill, choice, flag, next and minutes, not mood: give nudges's choice as choice and its yes-or-no as flag."
+        );
+        // Not a stop: neither is taken.
+        let without = installed();
+        let properties = function(&without).unwrap().parameters.unwrap()["properties"].clone();
+        assert!(properties.get(NEXT).is_none() && properties.get(MINUTES).is_none());
+        assert!(
+            translate(
+                &call(json!({"skill":"dance","choice":"jazz","minutes":5})),
+                &without
+            )
+            .is_err()
         );
     }
 }
