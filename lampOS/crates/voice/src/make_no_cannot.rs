@@ -1521,12 +1521,18 @@ mod tests {
         crate::skill_task_yes::set_on_here(Some(true));
         crate::upload_agent::set_on_here(Some(true));
         let tail = "and then email the whole summary to my accountant";
+        // #7874: longer than the garbage cap, not the read-back.
         let long = format!(
             "when I say desk report, look at my desk with the camera, count the cups, the \
              papers, the pens and the plants on it, tell me which of them should go, say \
-             how tidy it is from one to ten, and what to put away first, {tail}"
+             how tidy it is from one to ten, and what to put away first, {} {tail}",
+            "and check the plant ".repeat(40)
         );
-        assert!(long.chars().count() > 250, "{}", long.len());
+        assert!(
+            long.chars().count() > made_skill::MOST_TASK_CHARS,
+            "{}",
+            long.len()
+        );
         assert!(task_cut(&long));
         assert!(!task_words(&long).contains(tail));
         let answer = || Ok("name: desk-report\ngrants: camera, speak\nasks: desk report".into());

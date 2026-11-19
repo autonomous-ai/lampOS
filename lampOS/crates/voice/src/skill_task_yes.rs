@@ -298,7 +298,10 @@ pub struct TaskAsks {
     /// The SHA-256 of its folder as read, `lamp_skills::task::folder_sha256`.
     pub sha256: String,
     pub grants: Vec<String>,
-    /// The step's `task`, the skill file's own words.
+    /// The step's `task` as read back for the yes: its short form, at most
+    /// `made_skill::MOST_TASK_SAID_CHARS` ([`crate::made_skill::task_said`]:
+    /// its `summary`, or its first sentence). The full words stay in the
+    /// skill and are its run's (#7874).
     pub task: String,
     /// The SHA-256 of the package it went on as (its `.package.json`), none
     /// for one put on from a folder or pushed.
@@ -328,7 +331,10 @@ impl TaskAsks {
             name: text("name")?,
             sha256,
             grants,
-            task: text("task")?,
+            task: crate::made_skill::task_said(
+                &text("task")?,
+                done.get("summary").and_then(Value::as_str),
+            ),
             package: text("package"),
             from: text("from")?,
             approved: false,
@@ -2037,5 +2043,32 @@ mod tests {
         let mut wrong = done;
         wrong["grants"] = json!([1]);
         assert!(TaskAsks::of_json(&wrong).is_none());
+    }
+
+    /// #7874, V2's call: a long task is read back short for the owner's
+    /// yes, at most 120 characters: its `summary` when the helper gives a
+    /// plain one, else its first sentence; never the whole long words.
+    #[test]
+    fn a_long_task_is_read_back_short_and_its_summary_when_given() {
+        let first = "Count today's meetings and unread mail.";
+        let long = format!(
+            "{first} {}",
+            "Then tell me both numbers, the next meeting and who wrote last. ".repeat(6)
+        );
+        assert!(long.chars().count() >= 400);
+        let done = |summary: Value| {
+            json!({"name": "daily-brief", "sha256": "a".repeat(64), "grants": ["gmail-read"],
+                "task": long, "summary": summary, "from": "the Skills Store"})
+        };
+        let asks = TaskAsks::of_json(&done(Value::Null)).unwrap();
+        assert_eq!(asks.task, first);
+        let said = line(&asks);
+        assert!(said.contains(&format!("“{first}”")), "{said}");
+        assert!(!said.contains("who wrote last"), "{said}");
+        let asks = TaskAsks::of_json(&done(json!("Tells you your meetings and mail"))).unwrap();
+        assert_eq!(asks.task, "Tells you your meetings and mail");
+        // A summary that isn't one plain line of 120 is not read back.
+        let asks = TaskAsks::of_json(&done(json!("x".repeat(121)))).unwrap();
+        assert_eq!(asks.task, first);
     }
 }

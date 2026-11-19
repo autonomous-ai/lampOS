@@ -202,8 +202,11 @@ pub const TASKS_MAX: u64 = 512;
 pub const TASKS_MAX_LINE: &str = "TasksMax=512";
 /// The folder a skill's script is in (#6305, `lamp_skills::task::SCRIPTS`).
 pub const SCRIPTS: &str = "scripts";
-/// The most bytes of a task's words (#6305, `MOST_TASK_BYTES`).
-pub const MOST_TASK_BYTES: usize = 500;
+/// The most bytes of a task's words (#6305, `MOST_TASK_BYTES`): 1,000
+/// characters of at most four bytes (#7874,
+/// `lamp_voice::made_skill::MOST_TASK_BYTES`, the same as lamp-skills'
+/// load; lamp-skills' tests hold the two equal).
+pub const MOST_TASK_BYTES: usize = 4_000;
 /// lamp-control's own grants a run may hold (#6408, `protocol.rs`'s
 /// `Grant`), `skills` left out: a run never puts skills on the lamp.
 pub const CONTROL_GRANTS: &[&str] = &[

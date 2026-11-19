@@ -1614,7 +1614,13 @@
           "properties": {
             "task": {
               "type": "string",
-              "description": "The task's words, 1 to 500 bytes, no control characters."
+              "description": "The task's words in full, what its run is handed: 1 to 4000 bytes, no control characters; a new skill's at most 1000 characters, plain."
+            },
+            "summary": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 120,
+              "description": "The one-line summary read back to the owner for their yes, at most 120 characters, plain; without one the lamp reads back the task's first sentence (#7874)."
             },
             "run": {
               "type": "string",

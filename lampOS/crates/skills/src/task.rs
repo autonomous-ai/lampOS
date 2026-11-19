@@ -132,8 +132,9 @@ pub const OFF: &str =
     "do.task: not handed over: a skill's tasks are off on this lamp (LAMP_SKILL_TASKS is not on)";
 /// The folder a `do.task`'s `run` is in.
 pub const SCRIPTS: &str = "scripts";
-/// The most bytes of a `do.task`'s `task`.
-pub const MOST_TASK_BYTES: usize = 500;
+/// The most bytes of a `do.task`'s `task` and of its `summary`: the
+/// voice's, so a task up to its character cap loads (#7874).
+pub const MOST_TASK_BYTES: usize = lamp_voice::made_skill::MOST_TASK_BYTES;
 /// The most runs a skill hands over in any 24 hours: 3 from 11 Nov, raised
 /// on the owner's ask (15 Nov), since a presence skill fires each time
 /// someone comes back to the desk and 3 ran out before lunch on lamp-9adf.
@@ -171,6 +172,11 @@ pub const NO_CONTROL: &str =
 #[serde(deny_unknown_fields)]
 pub struct TaskFile {
     task: String,
+    /// The one-line summary the lamp reads back for the owner's yes
+    /// (`lamp_voice::made_skill::task_said`, #7874); none: its first
+    /// sentence.
+    #[serde(default)]
+    summary: Option<String>,
     run: String,
 }
 
@@ -184,6 +190,10 @@ pub struct TaskStep {
     /// (`lamp_voice::made_skill::task_words_plain`, #7874), measured as the
     /// voice measures them.
     pub words: String,
+    /// Its `summary` as the folder writes it: what the owner hears for
+    /// their yes, held by a new skill's pack to one plain line of at most
+    /// `lamp_voice::made_skill::MOST_TASK_SAID_CHARS` (#7874).
+    pub summary: Option<String>,
     pub run: String,
     /// The skill's own `[quiet]`, local minutes: what its agent found
     /// ([`told`]) is held to it beside the lamp's quiet hours, as a
@@ -201,10 +211,18 @@ impl TaskFile {
                 "do.task: task is 1 to {MOST_TASK_BYTES} bytes of words, with no control characters"
             ));
         }
+        if self.summary.as_ref().is_some_and(|summary| {
+            summary.len() > MOST_TASK_BYTES || summary.chars().any(char::is_control)
+        }) {
+            return Err(format!(
+                "do.task: summary is at most {MOST_TASK_BYTES} bytes of words, with no control characters"
+            ));
+        }
         run_ok(dir, &self.run)?;
         Ok(TaskStep {
             task: task.to_owned(),
             words: self.task.clone(),
+            summary: self.summary,
             run: self.run,
             quiet,
         })

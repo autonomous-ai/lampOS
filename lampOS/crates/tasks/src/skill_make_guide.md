@@ -123,8 +123,13 @@ A skill does nothing that would surprise the person who asked for it.
   400 characters at most), and a lone dash (-) is said as nothing. So code
   that says its result with `lamp.say` prints only `Said aloud through the
   lamp.`, and the agent answers only a dash: the person hears it once.
-- The `task` words are read back whole for the owner's yes: one plain
-  sentence a person understands, at most 120 characters. For a
+- Write the `task` words in full: everything the run must do, plain, on
+  one line, at most 1000 characters. Beside them give
+  `summary = "..."`: one plain line of at most 120 characters a person
+  understands when it is read back for the owner's yes, as
+  `task = { task = "...", summary = "...", run = "scripts/main.py" }`.
+  Without a summary the lamp reads back the task's first sentence. The
+  full words stay in the skill and are what the run is given. For a
   linked-service skill they are the work itself.
 - **A linked service** (mail, a calendar, GitHub): `grants =
   ["<code>-read"]` to read it, or `"<code>-write"` to send with it, and no

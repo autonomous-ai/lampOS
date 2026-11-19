@@ -3208,8 +3208,9 @@ fn task_folder(skills: &Path, dev: Option<&Path>, name: &str) -> Option<(PathBuf
 }
 
 /// The skill `name`'s `do.task` as the voice says it back (#6305,
-/// `{"task_asks": NAME}`): `{"name", "sha256", "grants", "task", "from",
-/// "package"}`, its folder hashed now ([`crate::task::folder_sha256`]),
+/// `{"task_asks": NAME}`): `{"name", "sha256", "grants", "task", "summary",
+/// "from", "package"}` (`summary` null for none; the voice reads back its
+/// short form, `lamp_voice::made_skill::task_said`), its folder hashed now ([`crate::task::folder_sha256`]),
 /// where its script came from and the SHA-256 of the package it went on as
 /// ([`installed_from`], null for none). Whether the owner agreed is lamp-control's to say,
 /// never this helper's (`lamp_voice::skill_task_yes::agreed_by`).
@@ -3269,6 +3270,7 @@ pub fn task_asks(
         "sha256": sha256,
         "grants": skill.grants,
         "task": step.task,
+        "summary": step.summary,
         "from": from,
         "package": installed_from(&folder).map(|installed| installed.sha256),
     }))

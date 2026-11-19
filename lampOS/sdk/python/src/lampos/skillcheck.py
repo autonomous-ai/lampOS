@@ -39,7 +39,9 @@ READ_ON_THE_LAMP = ("SKILL.md", "skill.toml", "moves", "sounds", "lights", "show
 # A `do.task`, as lamp-skills holds it (crates/skills task.rs: `MOST_TASK_BYTES`, `run_ok`, `grants_of`;
 # lamp_voice::skill_task_yes::GRANTS and NEVER).
 TASK_SCRIPTS = "scripts"
-TASK_MOST_BYTES = 500
+TASK_MOST_BYTES = 4000
+# A task's one-line summary, read back for the owner's yes (lamp_voice::made_skill MOST_TASK_SAID_CHARS, #7874).
+TASK_SUMMARY_MOST_CHARS = 120
 TASK_GRANTS = ("body", "light", "speak", "look", "hear", "sound", "air", "device", "camera", "microphone", "notes", "speech")
 # A linked service's grants (`gmail-read`, `github-write`): a Store or made skill's task may name them with
 # `LAMP_AGENT_SERVICES=on` (lamp_voice::made_skill SERVICE_GRANT_CODES, service_grant); a push from a computer is
@@ -398,8 +400,9 @@ def _task(folder: Path, rules: dict[str, Any], report: Report) -> bool:
     """A skill's `do.task` and its `grants`, held as lamp-skills holds them
     (lib.rs, task.rs): at most one task, alone in its `[[do]]` table, in an
     installable skill; `grants` only beside one, each a grant a script may
-    hold, once; the task's words 1 to 500 bytes; its `run` a plain file in the
-    skill's own `scripts/`. True when the skill has a task step."""
+    hold, once; the task's words 1 to 4000 bytes, and its `summary`, if any, 1
+    to 120 characters on one line; its `run` a plain file in the skill's own
+    `scripts/`. True when the skill has a task step."""
     steps = rules.get("do") if isinstance(rules.get("do"), list) else []
     tasks = [step for step in steps if isinstance(step, dict) and "task" in step]
     grants = rules.get("grants")
@@ -434,6 +437,11 @@ def _task(folder: Path, rules: dict[str, Any], report: Report) -> bool:
         text = words.strip() if isinstance(words, str) else ""
         if not text or len(text.encode()) > TASK_MOST_BYTES or any(ord(c) < 32 or 127 <= ord(c) < 160 for c in text):
             report.errors.append(f"skill.toml: do.task: task is 1 to {TASK_MOST_BYTES} bytes of words, with no control characters")
+        summary = task.get("summary")
+        if summary is not None:
+            said = summary.strip() if isinstance(summary, str) else ""
+            if not said or len(summary) > TASK_SUMMARY_MOST_CHARS or any(ord(c) < 32 or 127 <= ord(c) < 160 for c in summary):
+                report.errors.append(f"skill.toml: do.task: summary is 1 to {TASK_SUMMARY_MOST_CHARS} characters on one line, read back to the owner for their yes")
         run = task.get("run")
         if isinstance(run, str):
             _task_run(folder, run, report)
