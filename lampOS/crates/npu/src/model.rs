@@ -211,6 +211,15 @@ pub struct Store {
     pub root: PathBuf,
 }
 
+/// A model the Store offers: its manifest's exact bytes, their signature
+/// (checked) and the manifest read from them.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Offered {
+    pub bytes: Vec<u8>,
+    pub signature: Vec<u8>,
+    pub manifest: ModelManifest,
+}
+
 /// A model ready to load: its manifest and its checked file.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Kept {
@@ -238,7 +247,24 @@ impl Store {
         op: &str,
         board: &str,
     ) -> Result<Kept, String> {
-        let manifest_bytes = fetched(
+        let offered = self.offered(channel, source, keys, op, board)?;
+        let file = self.fetch_file(channel, source, op, board, &offered)?;
+        self.keep(op, &offered, &file)
+    }
+
+    /// What the Store offers for `op` on `board` now: its manifest and
+    /// signature fetched into memory, the signature checked before the
+    /// manifest is read. A few KiB, and nothing written: what an update
+    /// check and a model the NPU refused look at before the file.
+    pub fn offered(
+        &self,
+        channel: &mut dyn Channel,
+        source: &Source,
+        keys: &[[u8; 32]],
+        op: &str,
+        board: &str,
+    ) -> Result<Offered, String> {
+        let bytes = fetched(
             channel,
             &source.url(op, board, MANIFEST),
             MOST_MANIFEST_BYTES,
@@ -248,7 +274,25 @@ impl Store {
             &source.url(op, board, SIGNATURE),
             MOST_SIGNATURE_BYTES,
         )?;
-        let manifest = verified(&manifest_bytes, &signature, keys, op, board)?;
+        let manifest = verified(&bytes, &signature, keys, op, board)?;
+        Ok(Offered {
+            bytes,
+            signature,
+            manifest,
+        })
+    }
+
+    /// The offered model's file, fetched into memory, at most its
+    /// manifest's size, its size and SHA-256 checked.
+    pub fn fetch_file(
+        &self,
+        channel: &mut dyn Channel,
+        source: &Source,
+        op: &str,
+        board: &str,
+        offered: &Offered,
+    ) -> Result<Vec<u8>, String> {
+        let manifest = &offered.manifest;
         let file = fetched(
             channel,
             &source.url(op, board, &manifest.file),
@@ -260,12 +304,47 @@ impl Store {
                 manifest.file
             ));
         }
-        self.put(op, &manifest_bytes, &signature, &manifest, &file)
-            .map_err(|error| format!("the model can't be kept: {error}"))?;
+        Ok(file)
+    }
+
+    /// The offered model and its checked file kept for `op`, in place of
+    /// any kept before.
+    pub fn keep(&self, op: &str, offered: &Offered, file: &[u8]) -> Result<Kept, String> {
+        self.put(
+            op,
+            &offered.bytes,
+            &offered.signature,
+            &offered.manifest,
+            file,
+        )
+        .map_err(|error| format!("the model can't be kept: {error}"))?;
         Ok(Kept {
-            path: self.folder(op).join(&manifest.file),
-            manifest,
+            path: self.folder(op).join(&offered.manifest.file),
+            manifest: offered.manifest.clone(),
         })
+    }
+
+    fn refused_mark(&self, op: &str) -> PathBuf {
+        self.root.join(format!("{op}.refused"))
+    }
+
+    /// Marks the model of this SHA-256 as refused by the NPU
+    /// (`vip_create_network`, or a buffer this build can't read), so it is
+    /// never fetched again: only a model of another SHA-256 is (Heron's
+    /// P2 4 on #7972). Kept across restarts, beside the kept models.
+    pub fn mark_refused(&self, op: &str, sha256: &str) {
+        let written = fs::create_dir_all(&self.root)
+            .and_then(|()| fs::write(self.refused_mark(op), sha256.as_bytes()));
+        if let Err(error) = written {
+            eprintln!("[lamp-npu] the refused model's mark can't be kept: {error}");
+        }
+    }
+
+    /// The SHA-256 of `op`'s model the NPU last refused, if any.
+    pub fn refused(&self, op: &str) -> Option<String> {
+        let bytes = read_most(&self.refused_mark(op), 64).ok()?;
+        let sha256 = String::from_utf8(bytes).ok()?;
+        lamp_skills::package::sha256_ok(&sha256).then_some(sha256)
     }
 
     /// Writes the three checked files into a staging folder, syncs them,

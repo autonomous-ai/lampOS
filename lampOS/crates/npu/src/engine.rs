@@ -191,6 +191,8 @@ pub struct Fake {
     pub runs: std::sync::Arc<std::sync::atomic::AtomicUsize>,
     /// `Some`: every load fails so.
     pub refuse: Option<LoadError>,
+    /// How long each run takes: a slow or hung NPU.
+    pub delay: std::time::Duration,
 }
 
 impl Fake {
@@ -201,6 +203,7 @@ impl Fake {
             loads: Default::default(),
             runs: Default::default(),
             refuse: None,
+            delay: std::time::Duration::ZERO,
         }
     }
 }
@@ -209,6 +212,7 @@ struct FakeNet {
     input: Input,
     outputs: Vec<Tensor>,
     runs: std::sync::Arc<std::sync::atomic::AtomicUsize>,
+    delay: std::time::Duration,
 }
 
 impl Net for FakeNet {
@@ -225,6 +229,7 @@ impl Net for FakeNet {
             ));
         }
         self.runs.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+        std::thread::sleep(self.delay);
         Ok((self.outputs.clone(), RunMs::default()))
     }
 }
@@ -239,6 +244,7 @@ impl Backend for Fake {
             input: self.input,
             outputs: self.outputs.clone(),
             runs: self.runs.clone(),
+            delay: self.delay,
         }))
     }
 }
@@ -270,6 +276,26 @@ mod tests {
             data: vec![(-8i8) as u8],
         };
         assert_eq!(dfp.at(0), -2.0);
+        // int16 dynamic fixed point, as the int16 MoveNet's outputs are
+        // (fl 15 for its sigmoids, 10 and 8 for its offsets and regression).
+        let i16_dfp = |pos: i32, values: &[i16]| Tensor {
+            dims: vec![values.len()],
+            format: Format::I16,
+            quant: Quant::Dfp { pos },
+            data: values.iter().flat_map(|v| v.to_le_bytes()).collect(),
+        };
+        let sigmoid = i16_dfp(15, &[0, 16384, 32767]);
+        assert_eq!((sigmoid.at(0), sigmoid.at(1)), (0.0, 0.5));
+        assert!((sigmoid.at(2) - 32767.0 / 32768.0).abs() < 1e-7);
+        let regress = i16_dfp(8, &[-256, 24_576]);
+        assert_eq!((regress.at(0), regress.at(1)), (-1.0, 96.0));
+        let dfp8 = Tensor {
+            dims: vec![1],
+            format: Format::I8,
+            quant: Quant::Dfp { pos: 7 },
+            data: vec![64],
+        };
+        assert_eq!(dfp8.at(0), 0.5);
         let float = Tensor::from_f32(vec![2], &[1.5, -3.0]);
         assert_eq!((float.len(), float.at(1)), (2, -3.0));
         // 1.0 and -2.0 as halves.

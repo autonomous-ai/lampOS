@@ -65,10 +65,13 @@ pub const SKILL_PARTS_MAX: u32 = 32;
 /// The longest skill name, as the skill format has it.
 pub const SKILL_NAME_MAX_CHARS: usize = 64;
 
-/// The longest `pose` JPEG, in base64 characters: 150 KiB of JPEG, so a
-/// 640x480 camera frame at high quality fits and the request stays under
-/// the door's 256 KiB frame (`server::FRAME_MAX`).
-pub const POSE_JPEG_MAX_CHARS: usize = 200 * 1024;
+/// The longest `pose` JPEG, in bytes: 150 KiB, the same bound as lamp-npu's
+/// `service::MOST_JPEG_BYTES`, so a 640x480 camera frame at high quality fits.
+pub const POSE_JPEG_MAX_BYTES: usize = 150 * 1024;
+/// The longest `pose` JPEG, in base64 characters ([`POSE_JPEG_MAX_BYTES`]
+/// as base64, 200 KiB), so the request stays under the door's 256 KiB pose
+/// frame (`server::POSE_FRAME_MAX`).
+pub const POSE_JPEG_MAX_CHARS: usize = POSE_JPEG_MAX_BYTES / 3 * 4;
 
 /// A part a lease holds.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
@@ -2152,7 +2155,8 @@ mod tests {
         );
         let most = json!({"id": 1, "op": "pose", "jpeg": "A".repeat(POSE_JPEG_MAX_CHARS)});
         assert!(checked(most.to_string()).is_ok());
-        assert!(most.to_string().len() < crate::server::FRAME_MAX);
+        assert!(most.to_string().len() < crate::server::POSE_FRAME_MAX);
+        assert_eq!(POSE_JPEG_MAX_CHARS, 200 * 1024);
     }
 
     #[test]
