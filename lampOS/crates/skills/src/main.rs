@@ -6043,7 +6043,9 @@ fn lift_quiet(room: &mut LampRoom, asked: u64, ready: u64) -> Option<u64> {
 }
 
 /// What [`hand_task`] tells of its run, once it ended, on its thread: what
-/// its agent found, behind a read's gate; or, with `LAMP_SKILL_TASK_SURE`
+/// its agent found, behind a read's gate, or at once as the answer in the
+/// conversation that asked for it while it goes on
+/// (`lamp_skills::service_read::tell_answer`, #7874); or, with `LAMP_SKILL_TASK_SURE`
 /// on (`sure`), why it didn't run (`failed`), unless a refusal was said
 /// (`refused`). The failure is said in the conversation that asked for the
 /// run while it goes on, a run now its owner asked by voice at `asked_at`
@@ -6098,7 +6100,7 @@ fn tell_its_run(
     }
     let told = match &failed {
         Some(line) => lamp_skills::service_read::tell_failed(line, asking, room),
-        None => lamp_skills::service_read::tell(&lines, room),
+        None => lamp_skills::service_read::tell_answer(&lines, asking, room),
     };
     eprintln!("lamp-skills: skill:{skill}: do.task: {what}: {told}");
     if let Some(state) = state

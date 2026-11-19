@@ -2832,7 +2832,18 @@ lặng của đèn hay `[quiet]` riêng của skill, như một `do.read`
 lượt đọc duy nhất của
 đèn, mỗi câu một dòng bằng lời chính xác (không bao giờ là một lượt cho mô
 hình, nên nội dung thư không bao giờ là chỉ dẫn), cổng được xét lại trước
-mỗi dòng, có người đến thì dừng với "I'll tell you the rest later." Các câu
+mỗi dòng, có người đến thì dừng với "I'll tell you the rest later." Đèn là
+của một người dùng (chủ, 19/11, #7874): một lần chạy chủ đã hỏi bằng giọng
+nói, trong cuộc trò chuyện vẫn đang diễn ra
+(`task_sure::in_asking_conversation`, khi bật `LAMP_SKILL_TASK_SURE`), có
+điều agent tìm thấy được nói ngay làm câu trả lời của cuộc trò chuyện đó
+(`service_read::tell_answer`, `Room::answer`), các câu ghép thành một câu
+trả lời nên không bao giờ nói hai lần, không có cổng: hai khuôn mặt trong tầm
+nhìn hay một giọng nói vừa nghe không giữ nó lại (`do.task: what its agent
+found: said in the asking conversation: N told`). Nếu giọng nói không nhận nó
+làm câu trả lời, nó đi sau cổng như trên (`not said in the asking
+conversation (<why>), so behind the gate: told N`). Lần chạy không ai hỏi
+bằng giọng nói (theo giờ hay theo trigger) vẫn giữ cổng. Các câu
 là của `task::told`: bỏ ký hiệu markdown, mỗi câu tối đa 900 byte của dịch
 vụ nói, tất cả tối đa khoảng 400 ký tự (`task::MOST_TOLD_CHARS`, người xây
 dựng đầu tiên trên #7591: một người trả lời bằng một hai câu) và 10 câu, cắt
@@ -5122,8 +5133,10 @@ vụ lần chạy (#6432, #6306). Chi tiết đầy đủ ở
   `LAMP_TOLD_WHEN_ASKED`: trên lamp-9adf (18/11, 00:11) "Lamp, use my
   bitcoin price skill." có câu trả lời của agent được giữ rồi bị giờ yên
   lặng giữ lại không nói. Câu trả lời trong cuộc trò chuyện đã yêu cầu
-  (`answers`) chỉ dành cho câu thất bại; điều agent tìm thấy vẫn đi sau
-  cổng của lần đọc, với giờ yên lặng được bỏ. Trước đây câu chờ tới một giờ để có đúng
+  (`answers`) dành cho câu thất bại, và cả điều agent tìm thấy (#7874):
+  câu trả lời chủ đã hỏi bằng giọng nói được nói ngay trong cuộc trò chuyện
+  đó (`service_read::tell_answer`); chỉ khi giọng nói không nhận nó thì nó
+  mới đi sau cổng của lần đọc, với giờ yên lặng được bỏ. Trước đây câu chờ tới một giờ để có đúng
   một khuôn mặt và không có giọng nói, và trên lamp-9adf (17/11, 21:11) sau
   "Fig facts is running now." không có gì nữa. Các câu: `missing_secret` "<Skill> couldn't run: it needs a key added in the app, on its page.";
   mọi lời từ chối khác trước khi agent bắt đầu, hoặc không tới được

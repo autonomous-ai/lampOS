@@ -2088,8 +2088,11 @@ task = { task = "Take a photo and send it to my phone", run = "scripts/main.py" 
   The product sets this switch and not `LAMP_TOLD_WHEN_ASKED`: on
   lamp-9adf (18 Nov, 00:11) "Lamp, use my bitcoin price skill." had its
   agent's answer kept and then held unsaid by quiet hours. The answer in
-  the asking conversation (`answers`) is the failure line's alone; what
-  the agent found still goes behind a read's gate, with the quiet lifted.
+  the asking conversation (`answers`) is the failure line's, and what
+  the agent found too (#7874): an answer the owner asked for by voice is
+  said at once in that conversation (`service_read::tell_answer`); only
+  when the voice doesn't take it does it go behind a read's gate, with the
+  quiet lifted.
   Before, the line waited up to
   an hour for one face alone and no voice, and on lamp-9adf (17 Nov, 21:11)
   "Fig facts is running now." was followed by nothing. Lines:
@@ -5959,7 +5962,17 @@ unsaid), in the
 lamp's one read turn, one sentence a line as exact words (never a turn for
 the model, so what a mail says is never an instruction), the gate judged
 again before each, someone coming stopping it with "I'll tell you the rest
-later." The sentences are `task::told`'s: markdown's marks left out, each
+later." The lamp is one user's (the owner, 19 Nov, #7874): a run the
+owner asked for by voice, in a conversation still going on
+(`task_sure::in_asking_conversation`, with `LAMP_SKILL_TASK_SURE` on), has
+what its agent found said at once as that conversation's answer
+(`service_read::tell_answer`, `Room::answer`), its sentences joined as one
+answer so it is never said twice, with no gate: two faces in view or a voice
+just heard don't hold it (`do.task: what its agent found: said in the asking
+conversation: N told`). If the voice doesn't take it as the answer, it goes
+behind the gate as above (`not said in the asking conversation (<why>), so
+behind the gate: told N`). A run nobody asked for by voice (a time or a
+trigger) keeps the gate. The sentences are `task::told`'s: markdown's marks left out, each
 at most the say service's 900 bytes, all of them at most about 400
 characters (`task::MOST_TOLD_CHARS`, the first builder on #7591: a person
 answers in a sentence or two) and 10 sentences, cut at the last sentence

@@ -603,6 +603,28 @@ pub fn tell(lines: &[String], room: &mut impl Room) -> String {
     tell_within(lines, WAIT, false, room)
 }
 
+/// What a skill's task's agent found, as [`tell`], but said at once as the
+/// answer when `asking`: its run was asked by the owner's voice in a
+/// conversation still going on (`crate::task_sure::in_asking_conversation`).
+/// The lamp is one user's (the owner, 19 Nov, #7874): what they just asked
+/// for is said then, with no read's gate ([`Room::answer`]), its lines
+/// joined as one answer so it is said once or not at all. Not said that
+/// way, or not asked, it waits for the gate as before ([`tell`]). The
+/// journal's words: counts only, never a line.
+pub fn tell_answer(lines: &[String], asking: bool, room: &mut impl Room) -> String {
+    if !asking || lines.is_empty() {
+        return tell(lines, room);
+    }
+    let all = lines.len();
+    match room.answer(&lines.join(" ")) {
+        Ok(()) => format!("said in the asking conversation: {all} told"),
+        Err(why) => format!(
+            "not said in the asking conversation ({why}), so behind the gate: {}",
+            tell(lines, room)
+        ),
+    }
+}
+
 /// How long news from work handed over waits for the owner: said once, the
 /// next time they are seen within it, then dropped (the first builder's
 /// 21:25 on #7363, as for #6577's fix 2).
@@ -1056,6 +1078,66 @@ mod tests {
             "not said in the asking conversation (expired), so as news: told 1"
         );
         assert_eq!(lamp.said, ["Fig facts couldn't run this time."]);
+    }
+
+    /// #7874 (the owner, 19 Nov): what the owner asked for by voice, in a
+    /// conversation still going on, is said at once as its answer, even
+    /// with two faces in view and a voice just heard. Before, it waited for
+    /// the read's gate: the owner alone for 5 s and no voice for a minute.
+    #[test]
+    fn a_voice_asked_runs_answer_is_said_at_once_with_no_gate() {
+        let crowded = Seen {
+            faces: Some(2),
+            ..talking()
+        };
+        let lines = vec![
+            "You have 3 meetings.".to_owned(),
+            "And 5 unread emails.".to_owned(),
+        ];
+        let mut lamp = Lamp::new(vec![crowded], json!({}));
+        lamp.answers = Some(Ok(()));
+        assert_eq!(
+            tell_answer(&lines, true, &mut lamp),
+            "said in the asking conversation: 2 told"
+        );
+        assert_eq!(
+            lamp.said,
+            ["answer: You have 3 meetings. And 5 unread emails."]
+        );
+        assert_eq!(lamp.said_at, [1_000], "said then, with no wait");
+        assert!(lamp.waits.is_empty(), "no gate waited for");
+    }
+
+    /// #7874: a run not asked by voice (a time, a trigger) keeps the gate:
+    /// never said as an answer, and only once the owner is alone and quiet.
+    #[test]
+    fn an_unasked_runs_answer_still_waits_for_the_gate() {
+        let crowded = Seen {
+            faces: Some(2),
+            ..talking()
+        };
+        let lines = vec!["You have 3 meetings.".to_owned()];
+        let mut lamp = Lamp::new(vec![crowded, alone()], json!({}));
+        lamp.answers = Some(Ok(()));
+        assert_eq!(tell_answer(&lines, false, &mut lamp), "told 1");
+        assert_eq!(lamp.said, ["You have 3 meetings."], "never as an answer");
+        assert!(!lamp.waits.is_empty(), "the gate waited for");
+        assert!(lamp.said_at[0] > 1_000, "{:?}", lamp.said_at);
+    }
+
+    /// #7874: the voice didn't take it as the answer (the conversation over):
+    /// it falls back to the gate, said once, never lost.
+    #[test]
+    fn an_asked_answer_the_voice_refused_falls_back_to_the_gate() {
+        let lines = vec!["You have 3 meetings.".to_owned()];
+        let mut lamp = Lamp::new(vec![talking(), alone()], json!({}));
+        lamp.answers = Some(Err("expired".into()));
+        assert_eq!(
+            tell_answer(&lines, true, &mut lamp),
+            "not said in the asking conversation (expired), so behind the gate: told 1"
+        );
+        assert_eq!(lamp.said, ["You have 3 meetings."]);
+        assert!(!lamp.waits.is_empty(), "the gate waited for");
     }
 
     /// #7363: past the asking conversation, a failed run is news. It waits
