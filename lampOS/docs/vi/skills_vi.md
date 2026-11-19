@@ -1777,7 +1777,12 @@ sau:
     xét với `LAMP_MAKE_NO_ASKS`) nói lý do, "I couldn't make it with your
     change: …", bất kể người đó đã nói gì sau đó, như thất bại của một lần
     tạo đã xếp hàng; một lần bị bỏ bởi lời "không" sau đó của họ không nói
-    gì (`run_remade_with`). Một lần tạo đã xong và đã bật được báo rằng thay
+    gì (`run_remade_with`). Một lần tạo bị thay đổi khi đang làm mà lượt của
+    nó sau đó bị cắt cũng nói câu của nó qua dịch vụ nói, kể cả khi thất bại,
+    bất kể người đó đã nói gì sau đó: chính câu thay đổi không phải là đi
+    tiếp khỏi nó (`make_skill_local::take_changed_here`; ROW của #7936 trên
+    lamp-9adf ở 09ede55c76, "make it seven thirty instead", thất bại của lần
+    tạo lại không bao giờ được nói). Một lần tạo đã xong và đã bật được báo rằng thay
     đổi của nó là một lần tạo mới, cả lời nhờ cùng thay đổi. Một câu về
     chuyện khác để yên lần tạo. "change" cho một lần chờ không phải của một
     lần tạo bằng giọng nói (tác vụ của một kỹ năng, một lần gỡ, một bản ghi
@@ -1788,6 +1793,7 @@ sau:
     `a_face_only_line_never_changes_the_askers_make`,
     `a_change_after_a_waiting_yes_is_told_before_it_is_made_again`,
     `make_queue_runs::a_remake_that_fails_says_its_line`,
+    `made_line::a_change_mid_make_whose_remake_fails_is_said_after_the_cut`,
     `a_change_to_a_wait_of_no_make_reads_as_unclear`,
     `a_change_past_the_longest_ask_is_told_at_once`,
     `make_queue::tests::a_remake_after_a_waiting_yes_keeps_the_slot`,

@@ -1681,19 +1681,28 @@ fn make_with_by(
     // Whether its long make's time was begun: once, at its first brief, so
     // a remake (#7912) keeps a make let run on as it was.
     let mut begun = false;
+    // Nothing an earlier make left on this thread is taken as this one's.
+    CHANGED_HERE.set(false);
     let made = loop {
         let brief = match made_skill::brief(&request) {
             Ok(brief) => brief,
             Err(why) => {
                 crate::made_counts::refused(&keeping.directory, made_skill::Maker::Voice);
                 // A remake's brief refused after its make was begun: it
-                // settles as a make that made nothing.
-                if begun && let Some(directory) = crate::long_make::settle(made_in) {
+                // settles as a make that made nothing, told by its long
+                // make when let run on; else, its person told they'll hear,
+                // its line is said after a cut too.
+                let let_go = begun
+                    .then(|| crate::long_make::settle(made_in))
+                    .flatten();
+                if let Some(directory) = let_go {
                     crate::long_make::settled(
                         &directory,
                         Err(false),
                         crate::app_make::now_unix_ms().max(now_unix_ms),
                     );
+                } else if CHANGED_HERE.get() {
+                    failed_unless_said(|| Some(made_skill::not_made_line(why)));
                 }
                 return json!({
                     "error": why,
@@ -1749,6 +1758,7 @@ fn make_with_by(
                 eprintln!(
                     "lamp-voice: a skill made here was changed while it was made: not put on, made again with the change (#7912)"
                 );
+                CHANGED_HERE.set(true);
                 // The judge of a made skill with no word of the ask
                 // (#7621) reads the change's line too.
                 OWN_LINE.with(|own| {
@@ -3803,6 +3813,21 @@ impl Outcome {
 /// here since the last take (not asked aloud, the brief refused).
 pub fn take_said_line() -> Option<String> {
     take_said_outcome().map(|(line, _)| line)
+}
+
+std::thread_local! {
+    /// Whether the make [`make_with`] last ran on this thread was changed
+    /// while it was made (#7912), until [`take_changed_here`] takes it.
+    static CHANGED_HERE: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
+}
+
+/// Whether the make last run on this thread was changed while it was made
+/// and made again (#7912): its person was told "you'll hear when it's
+/// ready", so a failure of it is said after a cut whatever they said
+/// since (#7936's ROW on lamp-9adf at 09ede55c76, 19 Nov 20:43). Taken
+/// once.
+pub fn take_changed_here() -> bool {
+    CHANGED_HERE.take()
 }
 
 /// [`take_said_line`], with what the make came to ([`Outcome`]).
@@ -7564,6 +7589,18 @@ light = { dim = 1 }
             .map(|ask| ask.id)
             .unwrap();
         format!("{MAKING_ID}{id}")
+    }
+
+    /// The owner's change `change` of the make under way in `directory`,
+    /// said in `request` (a later line's `make_skill` call, the queue off).
+    pub(crate) fn owner_changes(directory: &Path, request: u64, change: &str) -> Making {
+        making_changed(
+            &making_id_in(directory),
+            request,
+            (Some(change), change),
+            &by("ann", true),
+            free,
+        )
     }
 
     /// Whoever's line `speaker` is, the lamp's owner (`owner`) or not.
