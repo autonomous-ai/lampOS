@@ -79,6 +79,9 @@ ProtectSystem=strict
 ReadWritePaths=/run/lampos-bus
 # The apps' socket folder, made by the tmpfiles (lampos.conf); `-` so a lamp without it still starts.
 ReadWritePaths=-/run/lampos-apps
+# `pose` (#7415, docs/npu.md): forwarded to lamp-npu's /run/lampos-npu/npu.sock (lampos's, 0700) only with
+# LAMP_NPU=on in this unit's own environment; unset here, so off. A drop-in `Environment=LAMP_NPU=on`, with the same
+# line in lamp-npu.service, turns it on. Connecting needs no ReadWritePaths= (as the body's and the voice's sockets).
 ProtectHome=yes
 PrivateTmp=yes
 CapabilityBoundingSet=
