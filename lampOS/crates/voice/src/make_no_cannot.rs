@@ -1090,10 +1090,14 @@ fn task_plain(request: &str) -> String {
 /// `LAMP_MAKE_REACTIONS_ONLY_DEEPSEEK` on (`made_skill::reactions_on`, the
 /// first builder's 19:50 ruling on #6811), sip-of-water's guards
 /// (`made_skill::template_guards`) after the trigger: never in the middle
-/// of a conversation or with the head down. Off, as before.
+/// of a conversation or with the head down. Off, as before. Never on a
+/// clock (`made_skill::CLOCK_TOPIC`): its one minute's run is never spent
+/// waiting on a guard ("tell me the BTC price at 9" with the owner head
+/// down at 9 still runs; Twelve's P1 on #7764, the first builder's 01:29
+/// and 02:41).
 pub fn skill_text(name: &str, grants: &[String], block: &str, words: &str) -> String {
     let grants: Vec<String> = grants.iter().map(|grant| format!("\"{grant}\"")).collect();
-    let guards = if made_skill::reactions_on() {
+    let guards = if made_skill::reactions_on() && !on_the_clock(block) {
         format!("{}\n\n", made_skill::template_guards())
     } else {
         String::new()
@@ -1106,6 +1110,18 @@ pub fn skill_text(name: &str, grants: &[String], block: &str, words: &str) -> St
          {words}\n```\n\n```{RUN}\n{SCRIPT}```\n",
         grants = grants.join(", "),
     )
+}
+
+/// Whether `block`'s `[trigger]` is the lamp's own clock
+/// (`made_skill::CLOCK_TOPIC`).
+pub fn on_the_clock(block: &str) -> bool {
+    toml::from_str::<toml::Table>(block).is_ok_and(|table| {
+        table
+            .get("trigger")
+            .and_then(|trigger| trigger.get("topic"))
+            .and_then(toml::Value::as_str)
+            == Some(made_skill::CLOCK_TOPIC)
+    })
 }
 
 /// A task skill only asked for, in the form of an agent skill added from a
@@ -2055,23 +2071,35 @@ mod tests {
     /// The first builder's 19:50 ruling on #6811 (the middle form): with
     /// `LAMP_MAKE_REACTIONS_ONLY_DEEPSEEK` on, a task the lamp writes on a
     /// trigger carries sip-of-water's three guards and still only its one
-    /// task step, no say; its cap takes it. Off, as before, byte for byte.
+    /// task step, no say; its cap takes it. Never on the lamp's clock
+    /// (Twelve's P1 on #7764, the first builder's 19 Nov 01:29 and 02:41):
+    /// "tell me the BTC price at 9" runs at 9 whatever the room does. Off,
+    /// as before, byte for byte.
     #[test]
-    fn with_the_reactions_switch_a_timed_task_keeps_sip_of_waters_guards_and_no_say() {
+    fn with_the_reactions_switch_a_task_on_a_trigger_keeps_the_guards_but_never_on_a_clock() {
         crate::skill_task_yes::set_net_here(Some(true));
         made_skill::set_scripts_here(Some(true));
         crate::skill_task_yes::set_on_here(Some(true));
         crate::upload_agent::set_on_here(Some(true));
         set_on_here(Some(false));
-        let block = EXAMPLE.split_once("```skill.toml\n").unwrap().1;
-        let block = block_kept(block.trim_end_matches("```")).unwrap();
+        let clock = EXAMPLE.split_once("```skill.toml\n").unwrap().1;
+        let clock = block_kept(clock.trim_end_matches("```")).unwrap();
+        assert!(on_the_clock(&clock), "{clock}");
         let words = task_words("tell me the BTC price at 9");
         let kept = covered(&grants(&["net", "speak"]), false).unwrap();
+        made_skill::set_reactions_here(Some(true));
+        let timed = skill_text("btc-price", &kept, &clock, &words);
+        assert!(!timed.contains("[[while]]"), "{timed}");
         made_skill::set_reactions_here(Some(false));
-        let before = skill_text("btc-price", &kept, &block, &words);
+        assert_eq!(skill_text("btc-price", &kept, &clock, &words), timed);
+        let block = "[permissions]\ntopics = [\"room/presence\"]\n\n[trigger]\n\
+                     topic = \"room/presence\"\nfield = \"someone\"\nequals = true\n\
+                     for = \"30m\"\nrearm = \"leaves\"";
+        assert!(!on_the_clock(block));
+        let before = skill_text("btc-price", &kept, block, &words);
         assert!(!before.contains("[[while]]"), "{before}");
         made_skill::set_reactions_here(Some(true));
-        let text = skill_text("btc-price", &kept, &block, &words);
+        let text = skill_text("btc-price", &kept, block, &words);
         let files = made_skill::files(&text).unwrap();
         let table: toml::Table = toml::from_str(&files.toml).unwrap();
         assert_eq!(table["while"].as_array().map(Vec::len), Some(3), "{text}");
