@@ -121,8 +121,8 @@ pub const AT_ONCE_TOLD: &str =
 /// called at once, never a "did you mean" or a yes; which one is asked
 /// only when two skills they made fit the words alike, never of "it",
 /// which the conversation's note of what was just made names.
-pub const REMOVE_AT_ONCE_TOLD: &str = " Call it at once, never asking first or for a yes; ask \
-     which only when two skills they made fit the words alike, never of \"it\".";
+pub const REMOVE_AT_ONCE_TOLD: &str = " Call it at once, never asking first; ask which only \
+     when two skills they made fit the words alike, never of \"it\".";
 
 /// What `make_skill`'s `undo` adds (#7828's fix 2, the first builder's
 /// call on #7836): a removed skill asked back, by any words, is the undo

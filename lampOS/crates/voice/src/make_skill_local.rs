@@ -1077,7 +1077,10 @@ fn parameters(writes: bool, code: bool) -> Value {
 }
 
 /// [`parameters`], and with a skill's tasks on (#6305) the same
-/// `approve_id` and `read_back` for a skill's task.
+/// `approve_id` and `read_back` for a skill's task. A parameter given
+/// "alone" is the call's one argument, with no request: said in that one
+/// word (#8002), so with every switch the product's unit sets on these
+/// stay within the link's 4,096 bytes.
 fn parameters_with(writes: bool, tasks: bool, code: bool) -> Value {
     let mut parameters = json!({
         "type": "object",
@@ -1097,7 +1100,7 @@ fn parameters_with(writes: bool, tasks: bool, code: bool) -> Value {
     // lamp (#6593, [`crate::made_clash`]): its id and the choice, alone.
     parameters["properties"][crate::made_clash::CLASH_ID] = json!({
         "type": "string",
-        "description": "Only when a skill you just made clashes with one or more on the lamp and the person then chooses: its clash_id, given with choice alone, with no request."
+        "description": "Only when a skill you just made clashes with one or more on the lamp and the person then chooses: its clash_id, with choice alone."
     });
     // A made skill removed by voice (#6960, [`crate::made_remove`]): the
     // name as heard, matched in code to the person's own made skills.
@@ -1110,22 +1113,22 @@ fn parameters_with(writes: bool, tasks: bool, code: bool) -> Value {
     // never a remove, which is then told as for good alone.
     if made_skill::off_said_on() {
         parameters["properties"][crate::made_remove::REMOVE]["description"] = json!(
-            "Only when the person asks to delete or remove a skill for good, never to turn one off, pause or stop it: its name as they said it, given alone with no request."
+            "Only when the person asks to delete or remove a skill for good, never to turn one off, pause or stop it: its name as they said it, alone."
         );
         parameters["properties"][crate::made_turn::TURN_OFF] = json!({
             "type": "string",
-            "description": "Only when the person asks to turn off, pause or stop a skill they made or added (by voice, in the app or from a file), which keeps it to turn back on: its name as they said it, given alone with no request. Never remove for this. Even one that starts only when they say its words is turned off this way. Call it at once. Ask nothing first."
+            "description": "Only when the person asks to turn off, pause or stop a skill they made or added (by voice, in the app or from a file), which keeps it to turn back on: its name as they said it, alone. Never remove for this. Even one that starts only when they say its words. Call it at once. Ask nothing first."
         });
         parameters["properties"][crate::made_turn::TURN_ON] = json!({
             "type": "string",
-            "description": "Only when the person asks to turn a skill they made or added (by voice, in the app or from a file) back on, or to resume it: its name as they said it, given alone with no request. To use or run one that is off, call run instead: it turns it on itself."
+            "description": "Only when the person asks to turn a skill they made or added (by voice, in the app or from a file) back on, or to resume it: its name as they said it, alone. To use or run one that is off, call run instead: it turns it on itself."
         });
     }
     // The skills the person made, listed by voice ([`crate::made_list`]):
     // how many, and the newest by name to the owner.
     parameters["properties"][crate::made_list::LIST] = json!({
         "type": "boolean",
-        "description": "Only when the person asks which skills they made, or you made for them, or how many: true, given alone with no request. Never answer that from the conversation."
+        "description": "Only when the person asks which skills they made, or you made for them, or how many: true, alone. Never answer that from the conversation."
     });
     // And whether a skill still being made is ready (#6811,
     // `LAMP_MAKE_MAY_RUN_ON`): the long make's state told with the list.
@@ -1138,7 +1141,7 @@ fn parameters_with(writes: bool, tasks: bool, code: bool) -> Value {
     // heard, matched in code to the person's own made skills, as a remove's.
     parameters["properties"][crate::made_run::RUN] = json!({
         "type": "string",
-        "description": "Only when the person asks to run, start or do a skill they made, now: its name as they said it, given alone with no request. Never to hear what it sends or uses."
+        "description": "Only when the person asks to run, start or do a skill they made, now: its name as they said it, alone. Never to hear what it sends or uses."
     });
     // What was just done to a skill they made, undone (`LAMP_MAKE_NO_ASKS`,
     // [`crate::make_no_asks::undo`]): the model judges the words.
@@ -1149,7 +1152,7 @@ fn parameters_with(writes: bool, tasks: bool, code: bool) -> Value {
         parameters["properties"][crate::make_no_asks::UNDO] = json!({
             "type": "string",
             "description": format!(
-                "Only when the person asks to undo what you just did to a skill they made (\"remove it\" right after you made one, \"keep the old one\" after one replaced theirs, \"put it back\" after one was removed): \"last\", or the skill's name as they said it, given alone with no request.{}",
+                "Only when the person asks to undo what you just did to a skill they made (\"remove it\" right after you made one, \"keep the old one\" after one replaced theirs): \"last\", or the skill's name as they said it, alone.{}",
                 crate::make_no_asks::UNDO_RESTORE_TOLD
             )
         });
@@ -1181,7 +1184,7 @@ fn parameters_with(writes: bool, tasks: bool, code: bool) -> Value {
     if writes || tasks || code {
         parameters["properties"][crate::skill_write_yes::APPROVE_ID] = json!({
             "type": "string",
-            "description": "Only when a skill you just made or read back waits for the person's yes and they then agree, in any words, or a note asks their answer by it: its approve_id, given alone with no request."
+            "description": "Only when a skill you just made or read back waits for the person's yes and they then agree, in any words, or a note asks their answer by it: its approve_id, alone."
         });
         // What the person answered (#6835 gap 2): a call made in code's
         // turn may be a no or unclear, never only a yes.
@@ -1208,7 +1211,7 @@ fn parameters_with(writes: bool, tasks: bool, code: bool) -> Value {
         };
         parameters["properties"][READ_BACK] = json!({
             "type": "string",
-            "description": format!("Only when the person asks {asked}: its name, given alone with no request.")
+            "description": format!("Only when the person asks {asked}: its name, alone.")
         });
         parameters["required"] = json!([]);
     }
@@ -10092,6 +10095,57 @@ printf 'tar of %s' \"$name\" > \"$3/$name-1.0.0.tar\"\n",
         crate::skill_task_yes::set_on_here(None);
         made_skill::set_writes_here(None);
         made_skill::set_scripts_here(None);
+    }
+
+    /// #8002's ARM64 row: with every switch the product's `lamp-voice`
+    /// unit sets on that shapes `make_skill` (writes, tasks, code, the
+    /// turn-off, the make at once, the core offer's undo and the repeat
+    /// told on the request), the link takes it whole: its description
+    /// within 1,024 bytes and its parameters within
+    /// [`lamp_gemini::MAX_TOOL_JSON_BYTES`]. Before, they came to 4,490
+    /// bytes (3,942 on lamp-voice, the core offer's undo and the repeat's
+    /// words adding 548) and the product lamp's chat requests left
+    /// `make_skill` out; now 4,059.
+    #[test]
+    fn make_skill_is_within_the_link_with_the_products_switches_on() {
+        made_skill::set_writes_here(Some(true));
+        made_skill::set_scripts_here(Some(true));
+        made_skill::set_off_said_here(Some(true));
+        crate::skill_task_yes::set_on_here(Some(true));
+        crate::make_no_asks::set_here(Some(true));
+        crate::make_core_offer::set_on_here(Some(true));
+        crate::skill_recurring::set_on_here(Some(true));
+        let all = tool();
+        let parameters = all.parameters.as_ref().unwrap();
+        for part in [
+            crate::made_turn::TURN_OFF,
+            crate::make_no_asks::UNDO,
+            crate::make_core_offer::UNDO,
+            crate::skill_write_yes::APPROVE_ID,
+            READ_BACK,
+        ] {
+            assert!(parameters["properties"][part].is_object(), "{part}");
+        }
+        let request = parameters["properties"]["request"]["description"]
+            .as_str()
+            .unwrap();
+        assert!(
+            request.ends_with(crate::skill_recurring::REQUEST_TOLD),
+            "{request}"
+        );
+        assert!(all.description.len() <= 1_024, "{}", all.description.len());
+        let bytes = parameters.to_string().len();
+        assert!(bytes <= lamp_gemini::MAX_TOOL_JSON_BYTES, "{bytes}");
+        assert!(all.validate().is_ok());
+        let (kept, left_out) = crate::tools::admitted(vec![all]);
+        assert_eq!((kept.len(), left_out), (1, Vec::<String>::new()));
+        crate::skill_recurring::set_on_here(None);
+        crate::make_core_offer::set_on_here(None);
+        crate::make_no_asks::set_here(None);
+        crate::skill_task_yes::set_on_here(None);
+        made_skill::set_off_said_here(None);
+        made_skill::set_scripts_here(None);
+        made_skill::set_writes_here(None);
     }
 
     /// #6749 E: the making model is told the lamp's real calls for its

@@ -39,14 +39,18 @@ pub(crate) fn set_on_here(on: Option<bool>) {
     HERE.with(|here| here.set(on));
 }
 
-/// What `make_skill`'s `request` parameter adds: the ask whole, by its
+/// What `make_skill`'s `request` parameter adds: the ask is a skill, by its
 /// meaning, however the words came out. On the parameter, not the
 /// function's description, which with every switch on has no room left
-/// within the link's 1,024 bytes.
-pub const REQUEST_TOLD: &str = " When the person wants the lamp itself to do something at a \
-     time or on a repeat (\"every morning at nine, read me my new emails\", \"every day at 3 PM \
-     read my calendar\"), that is a skill: pass the ask here whole, and never set a reminder or \
-     read it now instead. Speech to text may mishear \"skill\": judge the ask by what it means.";
+/// within the link's 1,024 bytes; one example, 220 bytes (332 before
+/// #8002), so with every switch the product's unit sets on the parameters
+/// stay within the link's 4,096 (`make_skill_local`'s
+/// `make_skill_is_within_the_link_with_the_products_switches_on`). The
+/// reminders' and the read's own words carry the rest ([`REMINDER_TOLD`],
+/// [`READ_TOLD`]).
+pub const REQUEST_TOLD: &str = " An ask for the lamp itself to do something at a time or on a \
+     repeat (\"every morning at nine, read me my new emails\") is a skill: never set a reminder \
+     or read it now for it. \"Skill\" may be misheard: judge by meaning.";
 
 /// What `set_reminder`'s and `repeat_reminder`'s descriptions add.
 pub const REMINDER_TOLD: &str = " A reminder only tells the person its words at a time. When \
