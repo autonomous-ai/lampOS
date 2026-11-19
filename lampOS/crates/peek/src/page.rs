@@ -625,6 +625,23 @@ fn path(decision: Option<&VoiceDecision>) -> String {
     }
 }
 
+/// The path of a turn that began a skill's run (#7873): AGENT, the engine
+/// it began on, the task as lamp-tasks' journal names it ([`run_name`]),
+/// and how it is going: started, ran or failed.
+fn skill_path(run: &SkillRun) -> String {
+    let stage = match run.ended {
+        None => "started",
+        Some((SkillTaskStage::Failed, _)) => "failed",
+        Some(_) => "ran",
+    };
+    // `engine_name` and `run_name` escape what they carry.
+    format!(
+        "<span class=\"badge badge-blue\">AGENT · {} · {} · {stage}</span>",
+        engine_name(run.engine.as_deref().unwrap_or("?")),
+        run_name(run)
+    )
+}
+
 /// One step of a task's agent: its kind, number and tool always (✗ on a
 /// call that failed); its arguments and result, the reply's or the error's
 /// text, only with `words`.
@@ -727,7 +744,10 @@ fn card(
              <b>{}</b>{}{}{}{}<span class=\"small\">request {} · {}</span></div>",
             type_icon(heard.is_some()),
             escape(kind),
-            path(decision),
+            entry
+                .skill_run
+                .as_ref()
+                .map_or_else(|| path(decision), skill_path),
             turn_status(entry, record, index == 0, now),
             turn_total(entry).map(total).unwrap_or_default(),
             lightning,
