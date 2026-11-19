@@ -888,25 +888,32 @@ pub const REQUEST: &str = "request";
 /// The `make_skill` argument for the name the person gave a new skill
 /// as they asked for it (#7911): read from their words by the voice's
 /// model, which judges what they said, and made the skill's name in code
-/// whoever writes it, DeepSeek or the lamp's agent
-/// ([`made_skill::given_name`]).
+/// on every make path ([`made_skill::given_name`]): DeepSeek's answer,
+/// the lamp's agent's, and a task for the agent only asked for
+/// (`make_no_cannot::made`).
 pub const GIVEN_NAME: &str = "given_name";
 
 /// Whether a `make_skill` call's whole `args` ask for a new skill: they
-/// name its [`REQUEST`] or its [`GIVEN_NAME`], as a streamed call whose
-/// first argument is one of them does ([`new_make_argument`],
-/// `ChatEvent::Argued`). Neither weighs its words or what else it
-/// carries, since the stream decides before those come.
+/// name its [`REQUEST`], as a streamed call whose first argument is
+/// [`REQUEST`] does ([`new_make_argument`], `ChatEvent::Argued`). Neither
+/// weighs its words or what else it carries, since the stream decides
+/// before those come. A [`GIVEN_NAME`] alone, or beside a remove, is none.
 pub fn asks_a_new_make(args: &Value) -> bool {
-    args.get(REQUEST).is_some() || args.get(GIVEN_NAME).is_some()
+    args.get(REQUEST).is_some()
 }
 
-/// Whether a streamed `make_skill` call's first argument, `name`, is a
-/// new make's: its [`REQUEST`], or its [`GIVEN_NAME`], which the schema
-/// lists first (its keys in order), so a named make may stream it first
-/// (Twelve's HOLD on #7926: a named make lost the lamp's opening line).
-pub fn new_make_argument(name: &str) -> bool {
-    name == REQUEST || name == GIVEN_NAME
+/// What a streamed `make_skill` call's first argument, `name`, decides:
+/// a new make for its [`REQUEST`], none for any other, and nothing yet
+/// (`None`) for its [`GIVEN_NAME`]. The schema's keys sort, so that one
+/// streams first in any call that carries it, a remove's too (Heron's
+/// HOLD on #7926): the whole calls decide then, by their `request`
+/// ([`asks_a_new_make`]), so a named make still has its opening (Twelve's
+/// HOLD on #7926).
+pub fn new_make_argument(name: &str) -> Option<bool> {
+    if name == GIVEN_NAME {
+        return None;
+    }
+    Some(name == REQUEST)
 }
 
 /// The function the model is given with the switch: the lamp makes it
@@ -4473,19 +4480,26 @@ impl Drop for GivenName {
     }
 }
 
-/// [`answer`]'s `make`, run with the name the person gave it
-/// (`args`' [`GIVEN_NAME`], #7911) held for it ([`GivenName`]): the made
-/// skill's, whoever writes it. Never an undo's (`undo`), which makes the
-/// first ask again.
-fn named_make<T>(args: &Value, undo: bool, make: impl FnOnce() -> T) -> T {
-    let _given = GivenName::set(
-        args[GIVEN_NAME]
-            .as_str()
-            .filter(|_| !undo)
-            .map(str::trim)
-            .filter(|name| !name.is_empty())
-            .map(str::to_owned),
-    );
+/// The name the person gave a make [`answer`] makes (#7911): the call's
+/// `args`' [`GIVEN_NAME`]; for an undo's (`undone`), which makes the
+/// first ask again, the one given in that ask
+/// ([`crate::make_core_offer::Turned::given`]), never the undo call's.
+/// Trimmed; none when blank.
+fn given_of(args: &Value, undone: Option<&crate::make_core_offer::Turned>) -> Option<String> {
+    let given = match undone {
+        Some(done) => done.given.as_deref(),
+        None => args[GIVEN_NAME].as_str(),
+    };
+    given
+        .map(str::trim)
+        .filter(|name| !name.is_empty())
+        .map(str::to_owned)
+}
+
+/// [`answer`]'s `make`, run with the name the person gave it held for it
+/// ([`GivenName`], [`given_of`]): the made skill's on every make path.
+fn named_make<T>(given: Option<String>, make: impl FnOnce() -> T) -> T {
+    let _given = GivenName::set(given);
     make()
 }
 
@@ -4863,7 +4877,7 @@ pub fn answer(
     let undone = if crate::make_core_offer::on() && call.args[crate::make_core_offer::UNDO] == true
     {
         match crate::make_core_offer::undone_here(request) {
-            Ok(first_ask) => Some(first_ask),
+            Ok(done) => Some(done),
             Err(told) => return told,
         }
     } else {
@@ -4903,9 +4917,10 @@ pub fn answer(
     {
         return turned;
     }
-    let request_words = undone
-        .as_deref()
-        .unwrap_or_else(|| call.args["request"].as_str().unwrap_or_default());
+    let request_words = undone.as_ref().map_or_else(
+        || call.args["request"].as_str().unwrap_or_default(),
+        |done| done.request.as_str(),
+    );
     // Whose ask it was, asked only for a make with code of its own
     // (`LAMP_MAKE_NO_ASKS`): the line's owner read now, the lease's, or
     // the one kept at the ask of a make that waited its turn (#7679).
@@ -4917,7 +4932,7 @@ pub fn answer(
             }));
         });
     }
-    let told = named_make(&call.args, undone.is_some(), || {
+    let told = named_make(given_of(&call.args, undone.as_ref()), || {
         make_in(request, request_words, &keeping, own_chat, now_unix_ms)
     });
     MAKE_OWNER.with(|asked| asked.borrow_mut().take());
@@ -7870,24 +7885,36 @@ printf 'tar of %s' \"$name\" > \"$3/$name-1.0.0.tar\"\n",
         assert!(!told.contains("\"called"), "{told}");
     }
 
-    /// #7911 (Twelve's P3 on #7926): `answer` holds the call's
-    /// `given_name` for its make, trimmed, and none for an undo, a blank
-    /// one or none given; cleared once the make is done.
+    /// #7911 (Twelve's and Heron's P3s on #7926): `answer` holds the
+    /// call's `given_name` for its make, trimmed, none for a blank one or
+    /// none given; an undo's make ("make my own instead") the name given
+    /// in its first ask, never the undo call's; cleared once it is done.
     #[test]
-    fn answer_holds_the_calls_given_name_for_its_make_but_an_undos() {
-        let held = |args: Value, undo: bool| {
-            named_make(&args, undo, || GIVEN.with(|given| given.borrow().clone()))
+    fn answer_holds_the_calls_given_name_for_its_make_and_an_undos_first() {
+        let held = |args: Value, undone: Option<&crate::make_core_offer::Turned>| {
+            named_make(given_of(&args, undone), || {
+                GIVEN.with(|given| given.borrow().clone())
+            })
+        };
+        let undone = |given: Option<&str>| crate::make_core_offer::Turned {
+            name: "sip-of-water".into(),
+            request: "remind me to drink water".into(),
+            given: given.map(str::to_owned),
+            at: std::time::Instant::now(),
         };
         assert_eq!(
-            held(json!({REQUEST: "hum", GIVEN_NAME: " evening rate "}), false).as_deref(),
+            held(json!({REQUEST: "hum", GIVEN_NAME: " evening rate "}), None).as_deref(),
             Some("evening rate")
         );
+        assert_eq!(held(json!({REQUEST: "hum", GIVEN_NAME: "  "}), None), None);
+        assert_eq!(held(json!({REQUEST: "hum"}), None), None);
+        let first = undone(Some("water time"));
+        let undo = json!({crate::make_core_offer::UNDO: true, GIVEN_NAME: "other"});
         assert_eq!(
-            held(json!({REQUEST: "hum", GIVEN_NAME: "evening rate"}), true),
-            None
+            held(undo.clone(), Some(&first)).as_deref(),
+            Some("water time")
         );
-        assert_eq!(held(json!({REQUEST: "hum", GIVEN_NAME: "  "}), false), None);
-        assert_eq!(held(json!({REQUEST: "hum"}), false), None);
+        assert_eq!(held(undo, Some(&undone(None))), None);
         assert_eq!(GIVEN.with(|given| given.borrow().clone()), None);
     }
 

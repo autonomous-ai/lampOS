@@ -2031,6 +2031,7 @@ mod tests {
             &kept,
             kept_asked,
             None,
+            None,
         );
         let words = texts
             .into_inner()
@@ -2089,6 +2090,7 @@ mod tests {
                 || true,
                 &kept,
                 kept_asked,
+                None,
                 None
             ),
             Err(Refused::new("kept here"))

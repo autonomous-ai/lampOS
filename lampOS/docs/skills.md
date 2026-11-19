@@ -4446,8 +4446,10 @@ gone ([switches.md](switches.md)). What happens:
      it evening rate"), the name alone (`evening rate`), left out when
      they give none. The voice's model judges their words; no word list
      reads them. `answer` holds it for that make
-     (`make_skill_local::named_make`), never for an undo, which makes the
-     first ask again. Code then makes it the skill's name on every make
+     (`make_skill_local::given_of`, `named_make`); an undo of a skill
+     turned on in place of a make ("make my own instead") makes the first
+     ask under the name given in it, kept with the turn-on
+     (`make_core_offer::Turned::given`), never the undo call's. Code then makes it the skill's name on every make
      path: DeepSeek's answer and the lamp's agent's (both through
      `made_skill::keep_asked`, its card renamed by `named_as_given`), and
      a cannot made one task for the agent only asked for
@@ -4457,16 +4459,21 @@ gone ([switches.md](switches.md)). What happens:
      cut to the name's bound, before a taken name gets a free one, below.
      With none given, or one that gives no skill's name (no letter first,
      or letters a skill's name can't have, "tỷ giá"), the maker's own name
-     stands, as before. The schema lists `given_name` before `request`
-     (its keys in order), so a named make may stream it first: either is
-     a new make's first argument (`make_skill_local::new_make_argument`,
-     `asks_a_new_make`), and the lamp's opening line is said for it as
-     for any new make (Twelve's HOLD on #7926). Tests:
+     stands, as before. The schema's keys sort, so `given_name` streams
+     first in any call that carries it, a remove's too: a first
+     `given_name` decides nothing (`make_skill_local::new_make_argument`
+     gives `None`), and the whole calls decide by their `request`
+     (`asks_a_new_make`). A named make has the lamp's opening line as any
+     new make does (Twelve's HOLD on #7926); a remove with a
+     `given_name`, or a `given_name` alone, has none (Heron's HOLD on
+     #7926). Tests:
      `a_name_the_person_gave_is_the_made_skills_and_none_keeps_the_models`,
      `a_name_the_person_gave_is_the_made_skills_by_deepseek_and_by_the_agent`,
-     `answer_holds_the_calls_given_name_for_its_make_but_an_undos`,
+     `answer_holds_the_calls_given_name_for_its_make_and_an_undos_first`,
+     `the_undo_makes_the_first_ask_under_the_name_given_in_it`,
      `a_task_only_asked_for_takes_the_name_the_person_gave`,
-     `a_make_whose_first_argument_is_its_given_name_is_opened`.
+     `a_make_whose_first_argument_is_its_given_name_is_opened`,
+     `a_given_name_without_a_request_opens_no_make`.
    - **A name taken gets a free one** (the owner, 11 Nov: a factory reset
      keeps the lamp's own skills, welcome-back, bedtime-morning,
      light-out, sip-of-water among them, so a skill the model named
