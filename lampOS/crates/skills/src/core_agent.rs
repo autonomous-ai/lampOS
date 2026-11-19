@@ -3,8 +3,9 @@
 //! set, in no unit; the first builder's ruling of 19 Nov 05:42 on the
 //! pilot's scope and fallback, and 06:05: quick reactions stay DeepSeek's,
 //! and every other model-worded core line goes to the agent, group by
-//! group). Only [`PILOTS`]. Off, nothing here is read and they load and run
-//! byte for byte as before.
+//! group). Only [`PILOTS`]; Task news, the `news` group, is lamp-voice's
+//! (`lamp_voice::news_agent`). Off, nothing here is read and they load and
+//! run byte for byte as before.
 //!
 //! - **The middle form, for a core skill.** lamp-skills keeps the skill's
 //!   trigger, `[[while]]` guards, `most_a_day`, `[active]`, `[quiet]`,
@@ -39,7 +40,7 @@ use std::{fs, path::Path, sync::mpsc, time::Duration};
 
 /// The switch, in lamp-skills and its manage helper: `on` for every
 /// [`Group`], or the groups' names with commas between (`pilot,nudges`).
-pub const ENVIRONMENT: &str = "LAMP_CORE_VIA_AGENT";
+pub const ENVIRONMENT: &str = lamp_voice::news_agent::ENVIRONMENT;
 
 /// The groups the skills go on by, each by its own switch-on.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -64,11 +65,8 @@ impl Group {
 /// naming it. Anything else, a typo or an unknown name, turns on nothing
 /// more.
 pub fn turns_on(value: Option<&str>, group: Group) -> bool {
-    match value {
-        Some("on") => true,
-        Some(list) => list.split(',').any(|name| name.trim() == group.name()),
-        None => false,
-    }
+    // One rule with lamp-voice's `news` group.
+    lamp_voice::news_agent::turns_on(value, group.name())
 }
 
 /// One `do.task` of a pilot: for the line of its trigger `on` (a skill whose
