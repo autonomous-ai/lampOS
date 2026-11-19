@@ -3013,7 +3013,14 @@ cả hai người viết.
   một `[trigger]` của đèn, hoặc những lời người dùng sẽ nói để gọi nó
   (`asks:`); nó không viết gì khác. Việc duy nhất của kỹ năng là yêu cầu của
   người dùng bằng chính lời họ, chữ thường, tối đa 120 ký tự
-  (`make_no_cannot::task_words`), không bao giờ là lời của model. Khi nói, yêu cầu là tham số công cụ của model giọng nói chứ không phải câu nghe được; phần đọc lại giới hạn rủi ro này, vì chủ đèn đồng ý đúng những lời được đọc lại. Quyền của nó
+  (`make_no_cannot::task_words`). Yêu cầu dài hơn không bao giờ bị cắt ngắn
+  (lamp-9adf, 19/11: evening rate mất "more than half a percent since the
+  day before"): brief của cùng lần gọi xin một dòng `task:`, một câu thường
+  tối đa 120 ký tự, chỉ được giữ khi mọi con số (bằng chữ hay chữ số), từ
+  chỉ thời gian, tên riêng, phép so sánh và phần trăm trong yêu cầu đều còn
+  trong đó (`make_no_cannot::task_kept`); nếu không, model được hỏi lại một
+  lần, kèm điều nó bỏ sót, rồi lần tạo bị từ chối vì quá dài (bên dưới), dù
+  chạy theo trigger hay chỉ khi được gọi. Khi nói, yêu cầu là tham số công cụ của model giọng nói chứ không phải câu nghe được; phần đọc lại giới hạn rủi ro này, vì chủ đèn đồng ý đúng những lời được đọc lại. Quyền của nó
   được kiểm tra với các quyền có thật (`make_no_cannot::covered`): một quyền
   của đèn (`skill_task_yes::GRANTS`), hoặc với `LAMP_AGENT_SERVICES=on` quyền
   `-read` hay `-write` của một dịch vụ đã biết, đã liên kết hay chưa: dịch vụ
@@ -3119,12 +3126,13 @@ cả hai người viết.
       can't listen, to keep the room private."
     - Không nêu gì, hoặc một quyền không có (`other`): "I can't make that
       one yet: it needs something no skill on this lamp can be given yet."
-    - Một việc chỉ chạy khi được gọi mà yêu cầu dài hơn phần đọc lại
-      (`too_long`, `make_no_cannot::task_cut`): "I can't make that one yet:
-      it's too long for me to read back to you whole, so ask for it in fewer
-      words." `scripts/SKILL.md` của nó chỉ mang đúng phần lời được đọc lại
-      và được đồng ý, không bao giờ thêm phần nào của yêu cầu (P1 của El
-      trên #7261).
+    - Một yêu cầu dài hơn phần đọc lại (`make_no_cannot::task_cut`) mà dòng
+      `task:` của model hai lần bỏ sót điều nó nêu (`too_long`,
+      `make_no_cannot::task_kept`): "I can't make that one yet: it's too long
+      for me to read back to you whole, so ask for it in fewer words." Một
+      việc chỉ chạy khi được gọi có `scripts/SKILL.md` chỉ mang đúng phần lời
+      được đọc lại và được đồng ý, không bao giờ thêm phần nào của yêu cầu
+      (P1 của El trên #7261).
     Nhật ký chỉ ghi loại lý do, không bao giờ lời người dùng. Công tắc
     internet và dịch vụ là của đèn, không có trong cài đặt của app, nên
     không câu nào bảo người dùng vào app để bật chúng.
