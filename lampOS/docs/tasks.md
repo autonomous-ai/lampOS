@@ -5156,16 +5156,23 @@ in and signed out, and on 0.6.60, signed in (#7507's ROW).
   `ensure` resumed it (`kept session resumed <id> (openclaw, starting)`).
   Its engine exited ("No session found"), and every task waited until busy.
   A kept record whose conversation OpenClaw's own record no longer holds
-  (`openclaw_record`, read only) is also forgotten before `ensure`, which
-  is then `--fresh`: Harness resumes a closed session with no Gateway
-  check.
+  is also forgotten before `ensure`, which is then `--fresh`: Harness
+  resumes a closed session with no Gateway check. The record is read
+  (`openclaw_holds_key`, read only) by the record's own session key
+  (`engineSession`) exactly, never by `agent:main:harness-<agent id>`; a
+  record that can't be read is unknown, never gone.
   Two signs are acted on:
   - **Sign 1, still `starting`.** At an open that found a session (`live`
-    or `resumed`, never `new`), one `show` is made. If the session stays
-    `starting` (or `offline`, `unknown`) 120 s (`OPEN_IDLE_WITHIN`) from
-    the open's start, it is stuck. During a task's hand-over, replies
-    refused `NOT_IDLE` or `ENGINE_NOT_READY` for 120 s lead to one `show`,
-    and a session still `starting` is stuck.
+    or `resumed`, never `new`), one `show` is made. If `show` itself reads
+    `starting` 120 s (`OPEN_IDLE_WITHIN`) from the open's start, it is
+    stuck. During a task's hand-over, replies refused `NOT_IDLE` or
+    `ENGINE_NOT_READY` for 120 s lead to one `show`, and a session `show`
+    reads `starting` is stuck. `installing` (an OTA's OpenClaw install),
+    `offline`, `unknown` and a `show` not read (a parse error, a daemon
+    timeout) never count: they are looked at again (10 s later at a
+    hand-over), and past the open's bound the session is kept as it is.
+    `ensure`'s own `state` is not a sign (today Harness says `starting` of
+    every answer but `live`).
   - **Sign 2, a plain shell.** `show` names the agent `Terminal` (its
     engine exited, and `wait` reads it idle), or Harness no longer has the
     session. The shell is never typed into, adopted or answered from.
@@ -5175,9 +5182,19 @@ in and signed out, and on 0.6.60, signed in (#7507's ROW).
   then lets the session go. The next open is `ensure --fresh` (a pane of
   `harness new` gets a plain `new`), and the waiting task, or the next
   one, goes on there. A failed close is tried `--now` again at the next
-  look. Retries are bounded: past `REPLACE_MOST` (2) replacements in a row
-  with no answer between, the next open waits its backoff (5 s, doubled,
-  at most 300 s). A healthy session costs one `show` per open and nothing
+  look and keeps the token. Retries are bounded by the replacements in a
+  row with no answer between: the first is at once; from the second
+  (`REPLACE_MOST`, 2) the next open waits 5 s, then 10 s, doubled at each
+  more, at most 300 s. A turn answered starts the count again. A cancelled
+  turn's close that failed keeps the token too.
+  Fields of openharness#4484 (proposed; each absent is today's behaviour):
+  `ensure`'s `state: "stopped"` is replaced at once, with no `show`;
+  `confirmed: false` (a resume Harness could not confirm) is replaced when
+  `show` gives no verdict by the bound; `result: "new"` with `whyCode:
+  "ENGINE_SESSION_GONE"` (Harness replaced a dead conversation itself) is
+  kept and recorded over the old one, with no extra close or `--fresh`,
+  journaled. `ensure` is given 120 s (`ENSURE_TIMEOUT`), past Harness's
+  up to ~15 s wait after a resume. A healthy session costs one `show` per open and nothing
   per turn. The worst case from a jam to a fresh session is about 120 s
   plus one `ensure`. `OneSession::with_on_replaced` is the hook for
   #7895's one told line to the person, not wired here. Journal: `<id> is
