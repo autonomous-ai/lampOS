@@ -2576,7 +2576,7 @@ fn a_skill_sees_where_a_face_looks_only_with_the_expressions_yes() {
     // not news.
     let seen = |yes: &Path| {
         let [first, then] = [toward.as_bytes(), away.as_bytes()]
-            .map(|payload| Faces::for_skills(Faces::TOPIC, payload, yes).into_owned());
+            .map(|payload| Faces::for_skills(Faces::TOPIC, payload, yes, false).into_owned());
         let text = |payload: &[u8]| String::from_utf8(payload.to_vec()).unwrap();
         runs_at(
             &skill,

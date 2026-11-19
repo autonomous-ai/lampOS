@@ -520,6 +520,20 @@ root:
 `printf '{"face_expressions":"yes"}' > /var/lib/lampOS/consent/face-expressions.json`,
 `chown root:lampos` and `chmod 0640` it, and remove it after.
 
+**One rule for the yeses, and the default (#7767).** The face-expressions
+and room-sounds files above, seen activity's (seen.md) and health and crash
+reports' `share` (cloud.md) are all read by one rule,
+`lamp_msgs::consent::allowed`: exactly `"yes"` is on, exactly `"no"` is
+off, a file that can't be read, over 4096 bytes or not JSON is off, and a
+missing file is off unless `LAMP_NOTICING_BY_DEFAULT=on` (switches.md, off
+unless set, in no unit). With the switch on, a missing face-expressions or
+room-sounds file reads as a yes, so faces are read and room sounds
+classified by default, while a kept `{"face_expressions":"no",...}` or
+`{"room_sounds":"no",...}` (`consent::no_bytes`) stays no. Off, each reader
+answers exactly as described above. Nothing writes a kept no yet: the
+voice's and the app's kept no come in a later slice of #7767, before the
+switch is set in any unit. Body sounds are not under it.
+
 **Only for a board with no slide.** Controls refuses `no-slide` only when the
 pins file has a `privacy` section, and no pins file has one today. A slide
 that is fitted but not declared (the product's hardware contract gives it

@@ -682,6 +682,33 @@ fn only_a_stored_room_sounds_yes_is_a_yes() {
     std::fs::remove_dir_all(&folder).unwrap();
 }
 
+/// #7767: with `LAMP_NOTICING_BY_DEFAULT` on, a missing room sounds file
+/// is a yes; a kept no and a file that can't be read stay no either way.
+/// Off, a missing file is no, as before.
+#[test]
+fn a_missing_room_sounds_yes_is_the_default_only_with_the_switch() {
+    let folder = std::env::temp_dir().join(format!("room-sounds-default-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&folder);
+    std::fs::create_dir_all(&folder).unwrap();
+    let file = folder.join("room-sounds.json");
+    assert!(!room_sounds_allowed(&file, false), "missing, off");
+    assert!(room_sounds_allowed(&file, true), "missing, on");
+    assert_eq!(
+        room_sounds_yes(&file),
+        lamp_msgs::consent::noticing_by_default()
+    );
+    for text in [
+        r#"{"version":1,"room_sounds":"no","at_unix_s":3,"by":"voice"}"#,
+        "not json",
+        "",
+    ] {
+        std::fs::write(&file, text).unwrap();
+        assert!(!room_sounds_allowed(&file, true), "{text}");
+        assert!(!room_sounds_allowed(&file, false), "{text}");
+    }
+    std::fs::remove_dir_all(&folder).unwrap();
+}
+
 /// Third's P2 on #2109: a yes taken back while the classifier runs (a forget
 /// or a redo of setup removes the file) stops it within `YES_EVERY_US`, with
 /// no restart: it says `privacy` once and its thread ends.
