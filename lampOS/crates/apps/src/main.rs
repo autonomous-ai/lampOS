@@ -1,11 +1,12 @@
-//! `lamp-apps asked`: one request line on standard input (the connection
+//! `lamp-apps-manage asked`: one request line on standard input (the connection
 //! systemd hands over), one answer line on standard output.
-//! `lamp-apps start-all`: the boot start. Both run only with `LAMP_STORE_APPS=on`
+//! `lamp-apps-manage start-all`: the boot start. Both run only with `LAMP_STORE_APPS=on`
 //! in their own environment (a list excepted).
 use lamp_apps::{
     ask::{MOST_LINE, Parts, answer, build_sequence},
     client::AdminYes,
     effects::RealEffects,
+    launcher,
     layout::Layout,
     lock::Running,
     manage::start_all,
@@ -87,15 +88,78 @@ fn main() -> ExitCode {
                 staged_owner: owner,
                 build,
             };
+            if on()
+                && let Err(why) = launcher::ensure(&layout)
+            {
+                println!("{}", json!({"refused": format!("the launcher: {why}")}));
+                return ExitCode::FAILURE;
+            }
             println!("{}", answer(on(), &line, &mut parts));
             ExitCode::SUCCESS
         }
+        Some("folders") => {
+            // The apps' three folders, empty (lamp-apps-folders.service): no argument, no file, no environment, no
+            // socket and no switch. Anything after the name is refused before a thing is made.
+            if args.len() != 1 {
+                eprintln!("lamp-apps-manage: folders takes no argument");
+                return ExitCode::from(2);
+            }
+            match lamp_apps::folders::make(&layout, lamp_apps::folders::give_to_lampos) {
+                Ok(said) => {
+                    for line in said {
+                        eprintln!("lamp-apps-manage: folders: {line}");
+                    }
+                    ExitCode::SUCCESS
+                }
+                Err(why) => {
+                    eprintln!("lamp-apps-manage: folders: {why}");
+                    ExitCode::FAILURE
+                }
+            }
+        }
+        Some("run") => {
+            // What an app's unit starts: the name checked, then the fixed launcher (exec: this program is gone).
+            use std::os::unix::process::CommandExt as _;
+            let [_, name] = args.as_slice() else {
+                eprintln!("lamp-apps-manage: run takes exactly an app's name");
+                return ExitCode::from(78);
+            };
+            let argv = match lamp_apps::run::argv(&layout, name) {
+                Ok(argv) => argv,
+                Err(why) => {
+                    eprintln!("lamp-apps-manage: run: {why}");
+                    return ExitCode::from(78);
+                }
+            };
+            let error = std::process::Command::new(&argv[0]).args(&argv[1..]).exec();
+            eprintln!("lamp-apps-manage: run: {}: {error}", argv[0]);
+            ExitCode::from(78)
+        }
         Some("start-all") => {
             if !on() {
-                eprintln!("lamp-apps: start-all: {SWITCH} is off");
+                eprintln!("lamp-apps-manage: start-all: {SWITCH} is off");
                 return ExitCode::SUCCESS;
             }
+            if let Err(why) = launcher::ensure(&layout) {
+                eprintln!("lamp-apps-manage: the launcher: {why}");
+                return ExitCode::FAILURE;
+            }
             let mut fx = RealEffects;
+            // A cut remove ends with a word to lamp-control, which `Type=simple` may not have
+            // bound yet at boot: wait for its socket (30 s at most) only when one is waiting.
+            if lamp_apps::state::marked(&layout.state)
+                .iter()
+                .any(|(_, marks)| marks.contains(&lamp_apps::state::Mark::Removing))
+                && !lamp_apps::client::wait_for_path(
+                    std::path::Path::new(lamp_apps::client::ADMIN),
+                    30,
+                    || std::thread::sleep(std::time::Duration::from_secs(1)),
+                )
+            {
+                eprintln!(
+                    "lamp-apps-manage: start-all: lamp-control's admin socket did not appear in 30 s; a cut remove stays cut"
+                );
+            }
             // The sweep only with no other instance alive, and the lock is let go before the
             // boot start: it is held for the sweep alone.
             match Running::alone(&layout.state) {
@@ -103,7 +167,9 @@ fn main() -> ExitCode {
                     let report = sweep(&layout, &mut fx, &mut skills);
                     drop(alone);
                     for error in &report.errors {
-                        eprintln!("lamp-apps-manage: sweep: {error}");
+                        eprintln!(
+                            "lamp-apps-manage: sweep: {error} (a cut remove not finished here is resumed at the next boot, or when the owner asks for it again)"
+                        );
                     }
                 }
                 Ok(None) => eprintln!(
@@ -112,18 +178,17 @@ fn main() -> ExitCode {
                 Err(why) => eprintln!("lamp-apps-manage: the sweep is skipped: {why}"),
             }
             let (started, errors) = start_all(&layout, &mut fx);
-            eprintln!("lamp-apps: started {started:?}");
+            eprintln!("lamp-apps-manage: started {started:?}");
             for error in &errors {
-                eprintln!("lamp-apps: start-all: {error}");
+                eprintln!("lamp-apps-manage: start-all: {error}");
             }
-            if errors.is_empty() {
-                ExitCode::SUCCESS
-            } else {
-                ExitCode::FAILURE
-            }
+            // An app that will not start is logged and never fails this unit: a round that restarts it judges the
+            // OS's own units, and one app (a template not yet placed, a crashing app) must not put an update back
+            // (0c89, 20 Nov 16:04, #8115). The next boot, or the owner's Start, tries it again.
+            ExitCode::SUCCESS
         }
         _ => {
-            eprintln!("usage: lamp-apps asked | start-all");
+            eprintln!("usage: lamp-apps-manage asked | start-all | folders | run NAME");
             ExitCode::from(2)
         }
     }

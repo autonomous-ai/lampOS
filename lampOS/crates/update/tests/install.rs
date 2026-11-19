@@ -831,6 +831,9 @@ fn the_exit_note_allowlist_is_exactly_clouds_product_services() {
         .unwrap()
         .map(|entry| entry.unwrap().file_name().into_string().unwrap())
         .filter(|name| name.starts_with("lamp-") && name.ends_with(".service"))
+        // The Store apps' templates are a third party's program, never reported by Cloud (and no app's name is
+        // sent): the same two names are left out in lamp-cloud's own check.
+        .filter(|name| !["lamp-app@.service", "lamp-app-net@.service"].contains(&name.as_str()))
         .collect();
     services.sort();
     assert_eq!(services, names, "no duplicate, omitted or extra unit");
@@ -1535,7 +1538,7 @@ fn every_part_of_the_lamp_waits_for_setups_marker_itself() {
             );
         }
     }
-    assert_eq!(gated.len(), 28, "{gated:?}");
+    assert_eq!(gated.len(), 29, "{gated:?}");
     for outside in ["lamp-update.service", "lamp-records.timer"] {
         assert!(!gated.contains(&outside), "{outside}");
     }
@@ -9589,4 +9592,20 @@ fn the_product_sees_with_cloud_perception() {
             "{name} sets the voice's offer"
         );
     }
+}
+
+/// A round carries a product unit only if its first `ExecStart=` is a lamp program (#7956's row on lamp-75c9: the
+/// folders unit that ran `/usr/bin/install` was never in the manifest, so no round could add it).
+#[test]
+fn the_apps_folders_unit_is_binary_backed_so_a_round_can_carry_and_add_it() {
+    let (_, text) = PRODUCT
+        .iter()
+        .find(|(name, _)| *name == "lamp-apps-folders.service")
+        .expect("in the product's list");
+    assert!(
+        lamp_update::unit::linked(text)
+            .is_some_and(|(folder, binary)| folder == "/opt/lampOS/apps-manage/"
+                && binary == "lamp-apps-manage"),
+        "{text}"
+    );
 }

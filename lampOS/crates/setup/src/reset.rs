@@ -312,6 +312,9 @@ pub trait Effects {
     /// The skills a person put on from a package removed,
     /// [`remove_installed_skills`] in [`SKILLS`]; how many.
     fn remove_installed_skills(&mut self) -> io::Result<usize>;
+    /// The Store apps a person installed removed, [`remove_installed_apps`]
+    /// under [`APPS_FOLDERS`]; how many entries (#7415 piece 8, #7956).
+    fn remove_installed_apps(&mut self) -> io::Result<usize>;
     /// Hermes's and OpenClaw's per-person files removed and both programs
     /// kept, [`forget_agents`] in [`AGENT_FOLDERS`] (#6343); how many.
     fn forget_agents(&mut self) -> io::Result<usize>;
@@ -593,6 +596,90 @@ impl std::fmt::Display for AgentStep {
             ),
         }
     }
+}
+
+/// The Store apps' folders under a root, each emptied and kept (the units name them, and `lamp-apps-folders`
+/// makes them again at every boot anyway): the apps' code (`/opt/lampOS/apps`, which a plan may not wipe: it is
+/// [`PROTECTED`]), the helper's marks, and the staged packages.
+pub const APPS_FOLDERS: [&str; 3] = [
+    "opt/lampOS/apps",
+    "var/lib/lampos-apps-state",
+    "var/lib/lampos-apps-staging",
+];
+
+/// Where an app's own data is: systemd's dynamic user makes `/var/lib/private/lampapp-<name>` and a link to it,
+/// `/var/lib/lampapp-<name>`; both are the previous owner's.
+pub const APP_DATA_PARENTS: [&str; 2] = ["var/lib", "var/lib/private"];
+pub const APP_DATA_PREFIX: &str = "lampapp-";
+
+/// What a person's Store apps left, removed at a factory reset (#7415 piece 8, #7956): after "forget everything" no
+/// app, its data, its marks or a staged package of the previous owner may remain to start for the next. The
+/// units of the apps are stopped before this (the reset's barrier, [`WRITERS`]). Emptied and kept: the three
+/// [`APPS_FOLDERS`]; removed with their contents: every `lampapp-*` entry of [`APP_DATA_PARENTS`]. A link is
+/// removed, never followed. A missing folder removes nothing. Returns the entries removed, in order.
+pub fn remove_installed_apps(root: &Path) -> io::Result<Vec<PathBuf>> {
+    if !root.is_absolute() {
+        return Err(io::Error::new(
+            io::ErrorKind::InvalidInput,
+            "the reset's root must be absolute",
+        ));
+    }
+    let mut removed = Vec::new();
+    let mut take = |entry: PathBuf| -> io::Result<()> {
+        match fs::symlink_metadata(&entry) {
+            Ok(meta) if meta.is_dir() => fs::remove_dir_all(&entry)?,
+            Ok(_) => fs::remove_file(&entry)?,
+            Err(error) if error.kind() == io::ErrorKind::NotFound => return Ok(()),
+            Err(error) => return Err(error),
+        }
+        removed.push(entry);
+        Ok(())
+    };
+    for folder in APPS_FOLDERS {
+        let folder = root.join(folder);
+        let entries = match fs::read_dir(&folder) {
+            Ok(entries) => entries,
+            Err(error) if error.kind() == io::ErrorKind::NotFound => continue,
+            Err(error) => return Err(error),
+        };
+        let mut names: Vec<PathBuf> = entries
+            .map(|entry| entry.map(|entry| entry.path()))
+            .collect::<io::Result<_>>()?;
+        names.sort();
+        for entry in names {
+            take(entry)?;
+        }
+    }
+    for parent in APP_DATA_PARENTS {
+        let parent = root.join(parent);
+        let entries = match fs::read_dir(&parent) {
+            Ok(entries) => entries,
+            Err(error) if error.kind() == io::ErrorKind::NotFound => continue,
+            // `/var/lib/private` is root's (0700): the reset runs as root on a lamp, where this never happens; a
+            // test that runs the binary as a user has no apps there to remove and must not fail on it.
+            Err(error)
+                if error.kind() == io::ErrorKind::PermissionDenied
+                    && !rustix::process::geteuid().is_root() =>
+            {
+                continue;
+            }
+            Err(error) => return Err(error),
+        };
+        let mut names: Vec<PathBuf> = entries
+            .map(|entry| entry.map(|entry| entry.path()))
+            .collect::<io::Result<_>>()?;
+        names.sort();
+        for entry in names {
+            if entry
+                .file_name()
+                .and_then(|name| name.to_str())
+                .is_some_and(|name| name.starts_with(APP_DATA_PREFIX))
+            {
+                take(entry)?;
+            }
+        }
+    }
+    Ok(removed)
 }
 
 /// The person's files in each of [`AGENT_FOLDERS`] under `root` (`/` on a
@@ -1198,6 +1285,9 @@ impl Effects for System {
     fn remove_installed_skills(&mut self) -> io::Result<usize> {
         remove_installed_skills(Path::new(SKILLS)).map(|removed| removed.len())
     }
+    fn remove_installed_apps(&mut self) -> io::Result<usize> {
+        remove_installed_apps(Path::new("/")).map(|removed| removed.len())
+    }
     fn forget_agents(&mut self) -> io::Result<usize> {
         forget_agents(Path::new("/"))
     }
@@ -1229,6 +1319,7 @@ pub enum Step {
     /// count, never by name, since a made skill's name is the person's words
     /// and the journal outlives the reset (Reviewer-two's P3 on the branch).
     InstalledSkillsRemoved,
+    InstalledAppsRemoved,
     /// Hermes's and OpenClaw's per-person files removed, [`forget_agents`]
     /// (#6343): by count, never by name.
     AgentsForgotten,
@@ -1501,8 +1592,9 @@ pub fn stop_and_wait_keeping(
 /// pending self-switch (Reviewer-two's P2 on #3579), and the keeper's
 /// restart socket restarts parts: each is stopped here, before the barrier,
 /// so nothing restarts a writer after it.
-pub const STARTERS: [&str; 8] = [
+pub const STARTERS: [&str; 9] = [
     "lamp-skills-manage.socket",
+    "lamp-apps-manage.socket",
     "lamp-setup-change.socket",
     "lamp-setup-keys.socket",
     "lamp-setup-wifi.socket",
@@ -1533,13 +1625,16 @@ pub const STARTERS: [&str; 8] = [
 /// manager ([`agent_manager_unit`], [`Effects::agent_manager`]). Patterns
 /// name only loaded units, and none matches `lamp-setup-wipe.service`, the
 /// reset's own unit.
-pub const WRITERS: [&str; 12] = [
+pub const WRITERS: [&str; 15] = [
     "lamp-setup.service",
     "lamp-setup-recover.service",
     "lamp-setup-change@*.service",
     "lamp-setup-keys@*.service",
     "lamp-setup-wifi@*.service",
     "lamp-skills-manage@*.service",
+    "lamp-apps-manage@*.service",
+    "lamp-app@*.service",
+    "lamp-app-net@*.service",
     "lamp-records.service",
     "lamp-update.service",
     "lamp-update-apply.service",
@@ -1918,6 +2013,13 @@ fn finish(plan: &Plan, effects: &mut impl Effects, steps: &mut Vec<Step>) -> io:
     if removed > 0 {
         eprintln!("lamp-setup: reset: removed {removed} skills put on from a package");
         steps.push(Step::InstalledSkillsRemoved);
+    }
+    let apps = effects.remove_installed_apps()?;
+    if apps > 0 {
+        eprintln!(
+            "lamp-setup: reset: removed {apps} Store app entries (code, data, marks, staged packages)"
+        );
+        steps.push(Step::InstalledAppsRemoved);
     }
     let forgotten = effects.forget_agents()?;
     if forgotten > 0 {

@@ -119,6 +119,9 @@ impl Effects for Removal<'_> {
         })
         .map(|removed| removed.len())
     }
+    fn remove_installed_apps(&mut self) -> io::Result<usize> {
+        Ok(0)
+    }
     fn forget_agents(&mut self) -> io::Result<usize> {
         Ok(0)
     }
