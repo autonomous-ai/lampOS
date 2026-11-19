@@ -94,6 +94,12 @@ fn is_skill_path(path: &str) -> bool {
         })
 }
 
+/// A core pilot's variant beside its `skill.toml`
+/// (`lamp_skills::core_agent::OVERLAY`), and its brief
+/// (`lamp_skills::core_agent::RUN`), which install's settings carry.
+const CORE_VARIANT: &str = "agent.toml";
+const CORE_BRIEF: &str = "scripts/agent.py";
+
 /// The bundle of these skills of `skills` (`lampOS/skills`): every file of
 /// each folder but its `tests/` and hidden files, sorted. Each must be text.
 /// A skill of `install::PRODUCT_SKILLS_OFF` gets `install::OFF_LINE` above
@@ -136,6 +142,20 @@ pub fn make(skills: &Path, names: &[&str]) -> io::Result<Bundle> {
             return Err(invalid(format!("{} has no skill.toml", folder.display())));
         }
         walk(&folder, name, &mut files)?;
+        // A core pilot's brief beside its variant, as install writes it
+        // (`install::core_brief!`, lamp-skills' own copy): never a file of
+        // the repository's skill folder (the SDK's check, #7862).
+        let brief = format!("{FOLDER}/{name}/{CORE_BRIEF}");
+        if folder.join(CORE_VARIANT).is_file()
+            && let Some((_, text)) = crate::install::SETTINGS
+                .iter()
+                .find(|(path, _)| *path == brief)
+        {
+            files.push(SkillFile {
+                path: format!("{name}/{CORE_BRIEF}"),
+                text: (*text).to_owned(),
+            });
+        }
         // Installed disabled, as install writes it (install::OFF_LINE).
         if crate::install::PRODUCT_SKILLS_OFF
             .iter()
@@ -853,6 +873,21 @@ mod tests {
             .map(|(path, text)| ((*path).to_owned(), (*text).to_owned()))
             .collect();
         assert_eq!(from_bundle, from_install);
+        // The core pilots' briefs (#7862): in the bundle as install writes
+        // them, lamp-skills' own words, and in no folder of the repository.
+        assert_eq!(CORE_VARIANT, lamp_skills::core_agent::OVERLAY);
+        assert_eq!(CORE_BRIEF, lamp_skills::core_agent::RUN);
+        let briefs: Vec<&String> = from_bundle
+            .keys()
+            .filter(|path| path.ends_with(&format!("/{CORE_BRIEF}")))
+            .collect();
+        assert_eq!(briefs.len(), 8, "{briefs:?}");
+        for path in briefs {
+            let name = path.split('/').nth_back(2).unwrap();
+            let pilot = lamp_skills::core_agent::pilot(name).unwrap();
+            assert_eq!(from_bundle[path], lamp_skills::core_agent::script(pilot));
+            assert!(!skills.join(name).join(CORE_BRIEF).exists(), "{name}");
+        }
         assert!(bytes(&made).unwrap().len() < MOST_BYTES as usize);
         let carried: Vec<String> = crate::install::product_settings()
             .into_iter()
