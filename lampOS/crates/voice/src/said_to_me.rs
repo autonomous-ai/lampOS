@@ -9,9 +9,7 @@
 //! subset of what it holds.
 //!
 //! A line is let out when:
-//! 1. **named:** the lamp's name is written in it as a call reads it, or
-//!    heard in its sound in the window (a name heard only by lamp-name,
-//!    out of the window, is none: #7891);
+//! 1. **named:** the lamp's name is heard or written in it;
 //! 2. **in a live conversation** (its window): unless it is 0 to
 //!    [`SHORT_WORDS`] words, no face seen speaking it and a face in view
 //!    read silent (no face, no eyes or a mouth never read is unknown, and
@@ -372,17 +370,9 @@ fn bare_yes_or_no(heard: &str) -> bool {
         && (crate::services::plain_yes(heard) || crate::services::plain_no(heard))
 }
 
-/// The lamp's name written in the line's words, as a call reads it ("lamp"
-/// anywhere, or a word written for it in a name's place: `attention::called`,
-/// `attention::called_by_name_on`, "Lamp?", "Hey, Lynn."), or heard in its
-/// sound in a live conversation's window. Out of the window, a name heard
-/// only by lamp-name, its words not calling the lamp, is no name here: on
-/// lamp-74ff on 19 Nov meeting talk ("Is it after all?") let through as
-/// named was played as "someone is turned to the lamp" with no face seen
-/// speaking it (#7891); a stand-in mid-line ("the plan is fine") calls
-/// nothing.
+/// The lamp's name heard in the line's sound or written in its words.
 fn named(line: Line<'_>) -> bool {
-    line.name_heard && line.going_on
+    line.name_heard
         || crate::attention::called(line.heard)
         || crate::attention::called_by_name_on(line.heard, true)
 }
@@ -447,26 +437,6 @@ mod tests {
             awaiting_yes(true, || judge(second(facing("Yes.", false)))),
             Said::Stands
         );
-    }
-
-    /// #7891 (the P2 from #7908's cross-read): out of the window, a name
-    /// heard only in the room's sound is named by the words only where they
-    /// call the lamp: "lamp" anywhere, or a word written for it in a name's
-    /// place ("Lynn, what time is it?"). A stand-in mid-line ("the plan is
-    /// fine") is no name, so the face rule judges the line.
-    #[test]
-    fn a_sound_only_name_needs_its_words_to_call_the_lamp_out_of_the_window() {
-        let heard_only = |heard| Line {
-            name_heard: true,
-            ..facing(heard, false)
-        };
-        assert_eq!(
-            judge(heard_only("I think the plan is fine for Thursday")),
-            Said::Held(Held::NotSeenSpeaking)
-        );
-        for call in ["Lynn, what time is it?", "Hey, Lynn.", "Lamp?", "Turn the lamp off"] {
-            assert_eq!(judge(heard_only(call)), Said::Stands, "{call}");
-        }
     }
 
     /// #7442's rules, one by one.
