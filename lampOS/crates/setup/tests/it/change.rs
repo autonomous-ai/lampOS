@@ -1025,6 +1025,245 @@ fn the_products_reset_wipes_the_lamps_name_and_the_unit_runs_the_helper() {
     assert!(socket.contains("Accept=yes\n"));
 }
 
+/// #6543: the owner's desk noticing from the app (`desk_noticing.set`, sent
+/// as `{"desk_noticing": {"allow", "request_id"}}`): the voice's file but for
+/// `by`, in its mode; a spoken yes already there is left as it is; off
+/// removes the file whoever gave it, as the voice's `stop_looking_at_my_desk`
+/// does, and nothing restarts (lamp-seen reads it every 2 s).
+#[test]
+fn the_owners_desk_noticing_from_the_app_is_the_voices_yes_but_for_by() {
+    let root = Root::new();
+    let config = root.config();
+    let folder = &config.consent;
+    fs::create_dir_all(folder).unwrap();
+    let file = folder.join("seen-activity.json");
+    let desk = |allow: bool, id: u64| {
+        answer(
+            &json!({"desk_noticing": {"allow": allow, "request_id": id}}).to_string(),
+            &config,
+            true,
+        )
+    };
+    let (reply, done) = desk(true, 10);
+    assert_eq!(reply, json!({"done": {"seen_activity": true}}));
+    let done = done.unwrap();
+    assert!(!done.restart_ears && !done.restart_voice && !done.restart_control);
+    assert_eq!(
+        done.said,
+        "the seen activity yes is on from the app's desk noticing"
+    );
+    let text = fs::read_to_string(&file).unwrap();
+    let at = serde_json::from_str::<Value>(&text).unwrap()["at_unix_s"]
+        .as_u64()
+        .unwrap();
+    assert!(at > 1_700_000_000);
+    let voice = lamp_msgs::consent::bytes("seen_activity", at, lamp_msgs::consent::BY_VOICE);
+    assert_eq!(
+        text,
+        String::from_utf8(voice)
+            .unwrap()
+            .replace(r#""by":"voice""#, r#""by":"app""#)
+    );
+    let group = std::os::unix::fs::MetadataExt::gid(&fs::metadata(folder).unwrap());
+    assert_eq!(mode(&file), if group == 0 { 0o600 } else { 0o640 });
+    let mark = lamp_msgs::consent::mark_in(folder);
+    assert_eq!(mode(&mark), mode(&file));
+    let (_, done) = desk(false, 20);
+    assert!(!done.unwrap().restart_ears && !file.exists());
+    // The voice's yes: kept by an app yes, removed by an app off.
+    fs::write(
+        &file,
+        lamp_msgs::consent::bytes("seen_activity", 5, lamp_msgs::consent::BY_VOICE),
+    )
+    .unwrap();
+    let (_, done) = desk(true, 30);
+    assert!(done.unwrap().said.ends_with("already"));
+    assert!(
+        fs::read_to_string(&file)
+            .unwrap()
+            .contains(r#""by":"voice""#)
+    );
+    let (reply, _) = desk(false, 40);
+    assert_eq!(reply, json!({"done": {"seen_activity": false}}));
+    assert!(!file.exists());
+}
+
+/// #6543, Heron's P2 on #7551: a desk noticing yes lands only with a
+/// `request_id` above the mark kept beside it. A resent yes after an off
+/// stays off; a yes sent before the lamp's own "no" (the voice's stop, which
+/// raises the mark to the lamp's now) is refused; an off is never refused;
+/// no `request_id`, or one that is no positive integer, is refused; an
+/// unreadable mark refuses a yes until an off rewrites it.
+#[test]
+fn a_desk_noticing_yes_older_than_the_last_no_is_refused() {
+    let root = Root::new();
+    let config = root.config();
+    let folder = &config.consent;
+    fs::create_dir_all(folder).unwrap();
+    let file = folder.join("seen-activity.json");
+    let mark = lamp_msgs::consent::mark_in(folder);
+    let desk = |allow: bool, id: u64| {
+        answer(
+            &json!({"desk_noticing": {"allow": allow, "request_id": id}}).to_string(),
+            &config,
+            true,
+        )
+        .0
+    };
+    let refused = json!({"refused": lamp_setup::change::DESK_OLDER});
+    // A yes, then an off: the yes resent (a QoS 1 resend) stays off.
+    assert_eq!(desk(true, 100), json!({"done": {"seen_activity": true}}));
+    assert_eq!(desk(false, 200), json!({"done": {"seen_activity": false}}));
+    assert_eq!(desk(true, 100), refused);
+    assert_eq!(desk(true, 200), refused);
+    assert!(!file.exists());
+    // An off older than the mark still turns it off, and never lowers it.
+    assert_eq!(desk(true, 300), json!({"done": {"seen_activity": true}}));
+    assert_eq!(desk(false, 150), json!({"done": {"seen_activity": false}}));
+    assert_eq!(lamp_msgs::consent::read_mark(&mark), Some(300));
+    assert_eq!(desk(true, 250), refused);
+    // The lamp's own "no" (the voice's stop raises the mark to its now): a
+    // yes the app sent before it is refused; one sent after it lands.
+    let stop = lamp_msgs::consent::now_unix_ms();
+    lamp_msgs::consent::raise_mark(&mark, stop).unwrap();
+    assert_eq!(desk(true, stop - 1_000), refused);
+    assert_eq!(desk(true, stop), refused);
+    assert!(!file.exists());
+    assert_eq!(
+        desk(true, stop + 1),
+        json!({"done": {"seen_activity": true}})
+    );
+    // No request_id, or none a positive integer: refused, nothing changed.
+    let why = "desk_noticing holds allow, true or false, and request_id, a positive integer";
+    for line in [
+        r#"{"desk_noticing":{"allow":false}}"#,
+        r#"{"desk_noticing":{"allow":true,"request_id":0}}"#,
+        r#"{"desk_noticing":{"allow":true,"request_id":"9"}}"#,
+        r#"{"desk_noticing":{"allow":true,"request_id":-1}}"#,
+        r#"{"desk_noticing":{"allow":"yes","request_id":9}}"#,
+        r#"{"desk_noticing":{"allow":true,"request_id":9,"by":"voice"}}"#,
+    ] {
+        assert_eq!(
+            answer(line, &config, true).0,
+            json!({"refused": why}),
+            "{line}"
+        );
+    }
+    assert!(file.exists());
+    // A mark unreadable: no yes, until an off rewrites it.
+    fs::write(&mark, "garbled").unwrap();
+    assert_eq!(
+        desk(false, stop + 2),
+        json!({"done": {"seen_activity": false}})
+    );
+    assert_eq!(lamp_msgs::consent::read_mark(&mark), Some(stop + 2));
+    fs::write(&mark, "garbled").unwrap();
+    assert_eq!(
+        desk(true, stop + 9),
+        json!({"refused": lamp_setup::change::DESK_MARK_UNREAD})
+    );
+    assert!(!file.exists());
+}
+
+/// Twelve's P2 on #7551: a yes checked by `parse`, then the voice's stop
+/// (the mark raised and the yes removed under the mark's lock), then
+/// `apply`: refused under the lock, nothing kept. And a yes that comes while
+/// a stop holds the lock waits for it, then is refused.
+#[test]
+fn a_desk_noticing_yes_checked_before_a_stop_never_lands_after_it() {
+    let root = Root::new();
+    let config = root.config();
+    let folder = &config.consent;
+    fs::create_dir_all(folder).unwrap();
+    let file = folder.join("seen-activity.json");
+    let id = lamp_msgs::consent::now_unix_ms();
+    let line = json!({"desk_noticing": {"allow": true, "request_id": id}}).to_string();
+    let change = parse(&line, &config).unwrap();
+    assert!(matches!(change, Change::DeskNoticing(true, checked) if checked == id));
+    // The stop by voice, as `seen_yes` makes it.
+    let stop = lamp_msgs::consent::lock_mark(folder).unwrap();
+    stop.raise(id + 5).unwrap();
+    let _ = fs::remove_file(&file);
+    drop(stop);
+    let error = change::apply(&change, &config).unwrap_err();
+    assert_eq!(error.to_string(), change::DESK_OLDER);
+    assert!(!file.exists());
+    // A yes while the stop holds the lock waits, then is refused.
+    let held = lamp_msgs::consent::lock_mark(folder).unwrap();
+    let line = json!({"desk_noticing": {"allow": true, "request_id": id + 10}}).to_string();
+    std::thread::scope(|scope| {
+        let yes = scope.spawn(|| answer(&line, &config, true).0);
+        std::thread::sleep(Duration::from_millis(200));
+        assert!(!yes.is_finished() && !file.exists());
+        held.raise(id + 20).unwrap();
+        drop(held);
+        assert_eq!(yes.join().unwrap(), json!({"refused": change::DESK_OLDER}));
+    });
+    assert!(!file.exists());
+    assert_eq!(
+        answer(
+            &json!({"desk_noticing": {"allow": true, "request_id": id + 21}}).to_string(),
+            &config,
+            true
+        )
+        .0,
+        json!({"done": {"seen_activity": true}})
+    );
+}
+
+/// Twelve's P2 on #7551: a `request_id` more than a day past the lamp's now
+/// is no send time. A yes with one is refused with nothing written; an off
+/// with one still turns it off, and raises the mark only to the lamp's now,
+/// so a yes sent after it lands.
+#[test]
+fn a_desk_noticing_request_id_a_day_ahead_is_refused() {
+    let root = Root::new();
+    let config = root.config();
+    let folder = &config.consent;
+    fs::create_dir_all(folder).unwrap();
+    let file = folder.join("seen-activity.json");
+    let mark = lamp_msgs::consent::mark_in(folder);
+    let desk = |allow: bool, id: u64| {
+        answer(
+            &json!({"desk_noticing": {"allow": allow, "request_id": id}}).to_string(),
+            &config,
+            true,
+        )
+        .0
+    };
+    let now = lamp_msgs::consent::now_unix_ms();
+    let day = lamp_msgs::consent::REQUEST_AHEAD_MOST_MS;
+    assert_eq!(day, 86_400_000);
+    // Microseconds, not milliseconds; a phone two days ahead.
+    for ahead in [now * 1000, now + 2 * day] {
+        assert_eq!(desk(true, ahead), json!({"refused": change::DESK_AHEAD}));
+        assert!(!file.exists() && !mark.exists());
+    }
+    // An off a day ahead still turns it off, the mark only to the lamp's now.
+    fs::write(
+        &file,
+        lamp_msgs::consent::bytes("seen_activity", 5, lamp_msgs::consent::BY_VOICE),
+    )
+    .unwrap();
+    let before = lamp_msgs::consent::now_unix_ms();
+    assert_eq!(
+        desk(false, now * 1000),
+        json!({"done": {"seen_activity": false}})
+    );
+    assert!(!file.exists());
+    let raised = lamp_msgs::consent::read_mark(&mark).unwrap();
+    assert!(raised >= before && raised <= lamp_msgs::consent::now_unix_ms());
+    // So a yes sent after it lands, and one within the day ahead too.
+    assert_eq!(
+        desk(true, raised + 1),
+        json!({"done": {"seen_activity": true}})
+    );
+    assert_eq!(
+        desk(true, lamp_msgs::consent::now_unix_ms() + day - 60_000),
+        json!({"done": {"seen_activity": true}})
+    );
+}
+
 /// #5500: the owner's yeses from the app, kept as the voice's onboarding
 /// keeps them with `"by":"app"`, 0640 and the folder's group (0600 where it
 /// is root's); off removes the file; only a new room sounds yes asks for
@@ -1128,7 +1367,13 @@ fn the_owners_yeses_from_the_app_are_kept_as_the_voice_keeps_them() {
     );
     let plan: Value =
         serde_json::from_str(include_str!("../../fixtures/reset-plan-product.json")).unwrap();
-    for (_, name) in lamp_msgs::consent::FILES {
+    // The app's desk noticing mark too (Twelve's P2 on #7551): kept, a
+    // mark from a clock far ahead would refuse every yes after a reset.
+    let names = lamp_msgs::consent::FILES
+        .map(|(_, name)| name)
+        .into_iter()
+        .chain([lamp_msgs::consent::SEEN_ACTIVITY_MARK]);
+    for name in names {
         let path = format!("{}/{name}", lamp_msgs::consent::FOLDER);
         assert!(
             plan["wipe"].as_array().unwrap().iter().any(|w| *w == path),

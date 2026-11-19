@@ -191,6 +191,7 @@ fn the_apps_switch_reads_the_agreed_reply_and_its_refusal() {
         services: None,
         control: None,
         consent: None,
+        desk_noticing: None,
         monitor: None,
         devices: None,
         apps: None,
