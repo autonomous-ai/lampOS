@@ -365,6 +365,10 @@ def test_a_script_with_no_task_is_still_refused(tmp_path):
         (TASK_RULES.replace("Breathe the light blue for a few seconds", "a\\u0007b"), "task is 1 to 1500 bytes"),
         (TASK_RULES.replace('run = "scripts/main.py"', 'summary = "Breathes blue", run = "scripts/main.py"'), None),
         (TASK_RULES.replace('run = "scripts/main.py"', f'summary = "{"x" * 121}", run = "scripts/main.py"'), "summary is 1 to 120 characters"),
+        # A format character (U+200B, U+202E) is refused as the lamp refuses it (made_skill::is_format).
+        (TASK_RULES.replace('run = "scripts/main.py"', 'summary = "Breathes\\u200bblue", run = "scripts/main.py"'), "summary is 1 to 120 characters"),
+        (TASK_RULES.replace("Breathe the light blue for a few seconds", "Breathe \\u202eblue"), "task is 1 to 1500 bytes"),
+        (TASK_RULES.replace('run = "scripts/main.py"', 'summary = "Breathes blu\\u00e9", run = "scripts/main.py"'), None),
         (TASK_RULES.replace('task = {', 'light = { colour = "blue" }\ntask = {'), "alone in its [[do]] table"),
         (TASK_RULES.replace('version = "1.0.0"', 'version = "1.0.0"\nkind = "addon"'), "only an installable skill"),
     ],
