@@ -22,14 +22,14 @@ fn rig() -> (tempfile::TempDir, Layout) {
 fn an_interrupted_remove_is_finished() {
     let (_root, layout) = rig();
     write(&layout.code.join("x/1.0.0/src/app.py"), "x");
-    write(&layout.data_real("x/f"), "f");
+    write(&layout.private.join("x/f"), "f");
     set(&layout.state, "x", Mark::Removing).unwrap();
-    let (mut fx, mut skills) = (FakeEffects::cleaning(&layout), FakeCompanions::default());
+    let (mut fx, mut skills) = (FakeEffects::default(), FakeCompanions::default());
     let report = sweep(&layout, &mut fx, &mut skills);
     assert_eq!(report.resumed_removes, ["x"]);
     assert!(report.errors.is_empty(), "{:?}", report.errors);
     assert!(!layout.code.join("x").exists());
-    assert!(!layout.data_real("x").exists());
+    assert!(!layout.private.join("x").exists());
     assert!(!has(&layout.state, "x", Mark::Removing));
 }
 
@@ -39,7 +39,7 @@ fn an_install_cut_before_the_link_leaves_nothing() {
     write(&layout.code.join("x/.tmp-1/src/app.py"), "x");
     write(&layout.code.join("x/1.0.0/src/app.py"), "x");
     set(&layout.state, "x", Mark::Installing).unwrap();
-    let (mut fx, mut skills) = (FakeEffects::cleaning(&layout), FakeCompanions::default());
+    let (mut fx, mut skills) = (FakeEffects::default(), FakeCompanions::default());
     let report = sweep(&layout, &mut fx, &mut skills);
     assert_eq!(report.cleaned_installs, ["x"]);
     assert!(!layout.code.join("x").exists());
@@ -55,7 +55,7 @@ fn an_update_cut_after_the_link_keeps_the_current_version_only() {
     write(&layout.code.join("x/1.1.0/src/app.py"), "new");
     symlink("1.1.0", layout.code.join("x/current")).unwrap();
     set(&layout.state, "x", Mark::Installing).unwrap();
-    let (mut fx, mut skills) = (FakeEffects::cleaning(&layout), FakeCompanions::default());
+    let (mut fx, mut skills) = (FakeEffects::default(), FakeCompanions::default());
     sweep(&layout, &mut fx, &mut skills);
     assert!(layout.code.join("x/1.1.0/src/app.py").exists());
     assert!(!layout.code.join("x/1.0.0").exists());
@@ -73,7 +73,7 @@ fn a_stale_stopped_mark_goes_and_a_live_one_stays() {
     set(&layout.state, "gone", Mark::Stopped).unwrap();
     write(&layout.code.join("here/1.0.0/f"), "x");
     set(&layout.state, "here", Mark::Stopped).unwrap();
-    let (mut fx, mut skills) = (FakeEffects::cleaning(&layout), FakeCompanions::default());
+    let (mut fx, mut skills) = (FakeEffects::default(), FakeCompanions::default());
     sweep(&layout, &mut fx, &mut skills);
     assert!(!has(&layout.state, "gone", Mark::Stopped));
     assert!(has(&layout.state, "here", Mark::Stopped));
@@ -88,7 +88,7 @@ fn one_failed_resume_does_not_stop_the_rest() {
     }
     let mut fx = FakeEffects {
         fail_at: Some(0),
-        ..FakeEffects::cleaning(&layout)
+        ..Default::default()
     };
     let mut skills = FakeCompanions::default();
     let report = sweep(&layout, &mut fx, &mut skills);

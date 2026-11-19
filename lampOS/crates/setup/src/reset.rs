@@ -1501,9 +1501,8 @@ pub fn stop_and_wait_keeping(
 /// pending self-switch (Reviewer-two's P2 on #3579), and the keeper's
 /// restart socket restarts parts: each is stopped here, before the barrier,
 /// so nothing restarts a writer after it.
-pub const STARTERS: [&str; 9] = [
+pub const STARTERS: [&str; 8] = [
     "lamp-skills-manage.socket",
-    "lamp-apps-manage.socket",
     "lamp-setup-change.socket",
     "lamp-setup-keys.socket",
     "lamp-setup-wifi.socket",
@@ -1534,14 +1533,13 @@ pub const STARTERS: [&str; 9] = [
 /// manager ([`agent_manager_unit`], [`Effects::agent_manager`]). Patterns
 /// name only loaded units, and none matches `lamp-setup-wipe.service`, the
 /// reset's own unit.
-pub const WRITERS: [&str; 13] = [
+pub const WRITERS: [&str; 12] = [
     "lamp-setup.service",
     "lamp-setup-recover.service",
     "lamp-setup-change@*.service",
     "lamp-setup-keys@*.service",
     "lamp-setup-wifi@*.service",
     "lamp-skills-manage@*.service",
-    "lamp-apps-manage@*.service",
     "lamp-records.service",
     "lamp-update.service",
     "lamp-update-apply.service",
