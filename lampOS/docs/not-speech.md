@@ -387,7 +387,13 @@ either, with or without `LAMP_ENDPOINT_PAUSE_JOIN` (#7834: lamp-9adf runs
 the product's unit, where that switch is off, and held "Lamp, put it back."
 so 2 times in 5; test
 `a_short_sound_begun_with_the_lamps_name_is_answered_when_sounds_are_checked`
-in `second_provider/tests.rs`). One with a word in it, right after the
+in `second_provider/tests.rs`). Nor is one in which lamp-name heard the
+name at its own bar, 0.9, or more, whatever its words came back as: the
+rule judges it as any line, and a line of one or two words, not a
+question, with nothing written for the name, is still not answered on the
+hearing alone (#7891: on lamp-52e6 on 19 Nov "Lamp?", heard at 0.917, its
+word back not the name, was held; #7918; tests in
+`second_provider/tests/short_sound_name.rs`). One with a word in it, right after the
 lamp's own question in a conversation going on, is judged as a line there
 too: the worker reads the same thread (`worker::lamp_just_asked`). So is
 one with a word in it said while the lamp waits for a yes or no of its own

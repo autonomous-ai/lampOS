@@ -21,6 +21,9 @@
 //! [`crate::attention::NAME_BEFORE_US`] before its first sound to its end.
 //! A line with none read is under the bar: its call came from the name's
 //! first sign alone (`name/rising`), which lamp-name never said in full.
+//!
+//! The same reader, switch or not, tells the route a short sound heard as
+//! the name at lamp-name's own bar, which is then judged as a line (#7891).
 
 use std::{
     collections::VecDeque,
