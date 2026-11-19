@@ -17174,6 +17174,17 @@ async fn answer(
     // words of the person's line (the first builder's 13:44 ruling on
     // #7924); held while no `remember` of the turn has run.
     let keep_whole_turn = shared.keep_whole && !quoted;
+    // With it, whether nobody known speaks (no person in the turn's admitted
+    // scope): then a keep claimed with none made is answered with the
+    // refusal's own true line, never "Tell me again and I'll remember it"
+    // (#7885's `REFUSED_LINE`, V2's must-fix (4) on #7924).
+    let keep_nobody_known = keep_whole_turn
+        && crate::remember::needs_face::on()
+        && scope
+            .as_ref()
+            .and_then(|lease| lease.scope())
+            .and_then(|scope| scope.person())
+            .is_none();
     // Whether a light act told as under way is a claim (#7285,
     // `LAMP_ACTION_CLAIM_DOING`): read from the reply alone.
     let doing_turn = shared.doing_claims;
@@ -18010,6 +18021,10 @@ async fn answer(
         // #3504), and whether a `remember` of this request ran.
         let mut offer_hold = crate::remember::OfferHold::default();
         let mut remember_ran = carried.remembered;
+        // Whether a `remember` of this turn came back refused with nobody
+        // known (`needs_face::refused`): a later claim is then answered with
+        // the refusal's own line at once (Friday's P2-2 on #7924).
+        let mut keep_refused = false;
         // Whether a don't-know was recalled once already in this turn
         // (`LAMP_MEMORY_DONT_KNOW_RECALLS`).
         let mut dont_know_recalled = false;
@@ -19509,6 +19524,27 @@ async fn answer(
                     {
                         queue.push(rest).await?;
                     }
+                    // Nobody known, with the check on: nothing could be kept,
+                    // so the refusal's own line is said now, with no round
+                    // asked to call a `remember` that would be refused
+                    // (`LAMP_KEEP_CLAIM_WHOLE`, V2's must-fix (4) and
+                    // Friday's P2-2 on #7924).
+                    if !face && keep_whole_turn && (keep_refused || keep_nobody_known) {
+                        eprintln!(
+                            "lamp-voice second: request {request} chat round {round}: its reply says it kept something, nobody known: the refusal's line said (LAMP_KEEP_CLAIM_WHOLE)"
+                        );
+                        for sentence in offered(&mut offer_hold, false, request, round) {
+                            queue.push(sentence).await?;
+                        }
+                        queue
+                            .push(
+                                shared
+                                    .fixed(crate::remember::needs_face::REFUSED_LINE)
+                                    .to_owned(),
+                            )
+                            .await?;
+                        return Ok(());
+                    }
                     if !calls.is_empty() {
                         eprintln!(
                             "lamp-voice second: request {request} chat round {round}: its reply says it kept something, with no {keeper} call: not said, its other calls run"
@@ -20923,6 +20959,11 @@ async fn answer(
                         &answer.told,
                         scope.as_ref(),
                     );
+                }
+                if call.name == crate::remember::REMEMBER
+                    && crate::remember::needs_face::refused(&answer.told)
+                {
+                    keep_refused = true;
                 }
                 // A `use_skill` that ran an unplug tool is kept under that
                 // tool's name, for the unplug claim's outcome (#6457).
