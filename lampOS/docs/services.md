@@ -2807,7 +2807,7 @@ never through an open socket.
   `the_settings_written_follow_the_switch`, and lamp-setup's
   `a_reset_cuts_the_agents_kept_settings_to_the_lamps_keys`.
 
-### Reads through the lamp's agent (`LAMP_SERVICES_TO_AGENT`, off unless set)
+### Reads through the lamp's agent (`LAMP_SERVICES_TO_AGENT`, on in the product)
 
 The owner's ruling of 17 Nov: connector work goes to the lamp's agent,
 never the second route's own model; and (~17:55) that agent is the lamp's
@@ -2815,7 +2815,8 @@ default, Hermes or OpenClaw, never pinned to Hermes. On lamp-a63e that day the
 second route's model sent Gmail an invalid `what` four times, and the owner
 heard "gmail read keeps erroring out". With the switch `on` in lamp-voice,
 lamp-tasks and lamp-control (and `LAMP_SERVICES`, `LAMP_AGENT_SERVICES` and
-`LAMP_SKILL_TASKS` on):
+`LAMP_SKILL_TASKS` on; all on in the product's units since 19 Nov, the first
+builder's DEFAULT-ON on #7814):
 
 - **The voice's gates hold first.** A `service_read` on the second route is
   gated exactly as before (`services::gate`): heard live, the owner's own

@@ -3947,7 +3947,7 @@ lamp's local ports included until the net runner lands; lamp-voice sends it
 only for the owner's own line); with one service's `<code>-read` grant (a
 read only: a `-write` or a second grant is refused `bad_request`, and
 lamp-control never mints one for an ask) only with `LAMP_SERVICES_TO_AGENT=on` and
-`LAMP_AGENT_SERVICES=on`, held off the network, on a token lamp-control
+`LAMP_AGENT_SERVICES=on` (both on in the product since 19 Nov), held off the network, on a token lamp-control
 mints for exactly that grant (`{"mint":{"ask":[...]}}`), its fresh home's
 config with `mcp_servers.lamp-services`. On Hermes, either way a fresh folder and home
 of its own, the person's words in its rules file (never its arguments), its

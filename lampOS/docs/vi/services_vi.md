@@ -2927,13 +2927,15 @@ qua một socket mở.
   `the_settings_written_follow_the_switch` của lamp-tasks, và
   `a_reset_cuts_the_agents_kept_settings_to_the_lamps_keys` của lamp-setup.
 
-### Đọc qua tác tử của đèn (`LAMP_SERVICES_TO_AGENT`, tắt trừ khi bật)
+### Đọc qua tác tử của đèn (`LAMP_SERVICES_TO_AGENT`, bật trong sản phẩm)
 
 Quyết định của chủ đèn ngày 17/11: việc với các kết nối do tác tử của đèn
 làm, không bao giờ do mô hình riêng của tuyến thứ hai; và (~17:55) tác tử đó
 là tác tử mặc định của đèn, Hermes hoặc OpenClaw, không bao giờ cố định là
 Hermes. Với công tắc `on` trong lamp-voice, lamp-tasks và lamp-control (cùng
-`LAMP_SERVICES`, `LAMP_AGENT_SERVICES` và `LAMP_SKILL_TASKS` bật):
+`LAMP_SERVICES`, `LAMP_AGENT_SERVICES` và `LAMP_SKILL_TASKS` bật; tất cả bật
+trong các unit của sản phẩm từ 19/11, theo DEFAULT-ON của người xây dựng đầu
+tiên trên #7814):
 
 - **Các cổng của giọng nói giữ trước.** Một `service_read` trên tuyến thứ hai
   được gác đúng như trước (`services::gate`): nghe trực tiếp, dòng của chính

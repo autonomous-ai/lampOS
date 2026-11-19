@@ -2294,6 +2294,47 @@ fn the_product_lets_a_made_skill_write_after_its_owners_yes() {
     );
 }
 
+/// A linked service's live read goes to the lamp's agent, never the second
+/// route's own model (the owner's ruling, 17 Nov; the first builder's
+/// DEFAULT-ON on #7814): `LAMP_SERVICES_TO_AGENT=on` once in the three units
+/// whose part reads it, alike, each beside `LAMP_AGENT_SERVICES` and
+/// `LAMP_SKILL_TASKS` (and `LAMP_SERVICES` in the voice), and named by no
+/// other product unit: `lamp-voice` (the second route's worker hands the
+/// read over), `lamp-tasks` (`voice_ask` runs it) and `lamp-control` (it
+/// mints the read's token).
+#[test]
+fn the_product_reads_a_linked_service_through_the_lamps_agent_in_its_three_units() {
+    let name = lamp_voice::agent_asks::SERVICES_ENVIRONMENT;
+    assert_eq!(name, "LAMP_SERVICES_TO_AGENT");
+    let switch = format!("Environment={name}=on");
+    let readers = [
+        "lamp-voice.service",
+        "lamp-tasks.service",
+        "lamp-control.service",
+    ];
+    for (unit, text) in install::PRODUCT {
+        let service = section(text, "Service");
+        let on = service.iter().filter(|line| **line == switch).count();
+        let mentioned = service.iter().filter(|line| line.contains(name)).count();
+        assert_eq!(on, usize::from(readers.contains(unit)), "{unit}");
+        assert_eq!(mentioned, on, "{unit} names {name}");
+        if on == 1 {
+            for companion in [
+                "Environment=LAMP_AGENT_SERVICES=on",
+                "Environment=LAMP_SKILL_TASKS=on",
+            ] {
+                assert!(service.contains(&companion), "{unit} lacks {companion}");
+            }
+        }
+        if *unit == "lamp-voice.service" {
+            assert!(
+                service.contains(&"Environment=LAMP_SERVICES=on"),
+                "{unit} lacks LAMP_SERVICES"
+            );
+        }
+    }
+}
+
 /// The lamp's agent gets the owner's linked services in the product
 /// (#6648, #6664): the owner's ask on 13 Nov. `LAMP_AGENT_SERVICES=on` in
 /// the five units that read it, `lamp-tasks` (Hermes's `lamp-services`
