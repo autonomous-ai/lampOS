@@ -490,6 +490,17 @@ const FIXED_LINES: &[(&str, [&str; 4])] = &[
             "알겠어요.",
         ],
     ),
+    // What the second route says for a line that only asks to keep, every
+    // keep refused for want of a known face (#7877).
+    (
+        crate::remember::needs_face::REFUSED_LINE,
+        [
+            "Mình chưa chắc ai đang nói, nên mình chưa lưu được điều đó.",
+            "誰が話しているのかわからないから、それは覚えておけないの。",
+            "我不确定是谁在说话，所以没法记住这个。",
+            "누가 말하는지 확실하지 않아서, 그건 기억해 둘 수 없어요.",
+        ],
+    ),
     // What the second route says at once for a plain keep
     // (`LAMP_KEEP_ANSWERS_AT_ONCE`, C59), from its clip rendered ahead.
     (

@@ -82,6 +82,34 @@ pub use services::{
     SPEECH_SOCKET_ENVIRONMENT, SPEECH_SOCKET_MODEL_ENVIRONMENT, SPEECH_WARM_ENVIRONMENT, Services,
 };
 
+/// What a refused keep's line said at once needs (#7877), each kept apart
+/// so the journal can name the one that failed.
+#[derive(Clone, Copy, Debug)]
+struct RefusedGate {
+    heard: bool,
+    first_calls: bool,
+    held_forget_ran: bool,
+    worded: bool,
+    only_keeps: bool,
+}
+
+impl RefusedGate {
+    /// The first condition that keeps the line from being said, or none;
+    /// `refused_all`: every call came back refused with nobody known.
+    fn failed(self, refused_all: bool) -> Option<&'static str> {
+        [
+            (!self.heard, "not a spoken line"),
+            (!self.first_calls, "not round 1's first calls"),
+            (self.held_forget_ran, "a held forget ran"),
+            (self.worded, "the model's words came beside the call"),
+            (!self.only_keeps, "the line asks more than a keep"),
+            (!refused_all, "not every call was so refused"),
+        ]
+        .into_iter()
+        .find_map(|(fails, why)| fails.then_some(why))
+    }
+}
+
 #[cfg(test)]
 mod tests;
 
@@ -19923,6 +19951,24 @@ async fn answer(
                 && !crate::not_speech::names_a_function(&text);
             // What each call was told, while every one may be answered short.
             let mut short_told: Vec<Value> = Vec::new();
+            // A line that only asks to keep, round 1's first calls all
+            // `remember`, no words beside them: one whose every keep was
+            // refused with nobody known speaking is said plainly by the lamp
+            // (#7877), with or without `LAMP_KEEP_ANSWERS_AT_ONCE`. Each
+            // condition kept apart, for the journal when one fails.
+            let only_remember = !calls.is_empty()
+                && calls
+                    .iter()
+                    .all(|call| call.name == crate::remember::REMEMBER);
+            let refused_gate = RefusedGate {
+                heard,
+                first_calls,
+                held_forget_ran,
+                worded: text.chars().any(char::is_alphanumeric),
+                only_keeps: crate::keep_at_once::only_keeps_refused(&heard_words),
+            };
+            // What each `remember` was told, when every call is one.
+            let mut refused_told: Vec<Value> = Vec::new();
             // A plain keep answered at once (`LAMP_KEEP_ANSWERS_AT_ONCE`,
             // C59): a spoken line that only asks to keep, round 1's first
             // calls all `remember`, no words beside them. What each was told.
@@ -20756,6 +20802,9 @@ async fn answer(
                 if may_keep_at_once {
                     kept_told.push(answer.told.clone());
                 }
+                if only_remember {
+                    refused_told.push(answer.told.clone());
+                }
                 // Any call of this request that ran and was not refused (a
                 // remember, a reminder set, a skill's add): its confirmation
                 // in a later round, "I've saved that for five", is no false
@@ -20940,6 +20989,35 @@ async fn answer(
                 eprintln!(
                     "lamp-voice second: request {request} chat round {round}: a keep was not kept plainly; round 2 says what happened (LAMP_KEEP_ANSWERS_AT_ONCE)"
                 );
+            }
+            // Every keep of a line that only asks to keep refused for want
+            // of a known face (`LAMP_MEMORY_PERSONAL_NEEDS_FACE`, #7877):
+            // the lamp says so itself, one true line that asks nothing, and
+            // the turn ends with no second round, so no "Got it" is said
+            // for what was not kept.
+            let refused_all = only_remember
+                && refused_told.len() == calls.len()
+                && refused_told
+                    .iter()
+                    .all(crate::remember::needs_face::refused);
+            if only_remember
+                && refused_told
+                    .iter()
+                    .any(crate::remember::needs_face::refused)
+                && let Some(why) = refused_gate.failed(refused_all)
+            {
+                eprintln!(
+                    "lamp-voice second: request {request} chat round {round}: a keep refused with nobody known goes to round 2: {why} (LAMP_MEMORY_PERSONAL_NEEDS_FACE)"
+                );
+            }
+            if refused_all && refused_gate.failed(true).is_none() {
+                let line = shared.fixed(crate::remember::needs_face::REFUSED_LINE);
+                eprintln!(
+                    "lamp-voice second: request {request} chat round {round}: {} keep(s) refused, nobody known; the refusal said at once, and no round 2 is asked (LAMP_MEMORY_PERSONAL_NEEDS_FACE)",
+                    calls.len()
+                );
+                queue.push(line.to_owned()).await?;
+                return Ok(());
             }
             // A skill asked for a look (#941): as a look by its own call, the
             // coordinator takes the turn's full look once the lamp's words
