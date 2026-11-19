@@ -4895,6 +4895,28 @@ và khôi phục cài đặt gốc là còn hỏi. Khi bật (`crate::make_no_as
   (`make_skill_local::PRODUCT_MOST_PARAMETERS_BYTES`, chừa chỗ cho một
   tham số sau này; #8002: trước đó là 4.174, mỗi mô tả được nói ngắn hơn,
   giữ mọi tham số và ý nghĩa của nó).
+- **Một lần tạo bị tách đôi vẫn là một lần tạo** (#7976: trên lamp-9adf,
+  19/11, "Lamp, make a skill called tea reminder: every day at five in the
+  afternoon, glow green and say time for tea." đến thành hai câu, cắt ở
+  dấu hai chấm; câu thứ hai bắt đầu 0,76 s sau khi câu đầu kết thúc và cắt
+  ngang nó trước khi nghe được câu trả lời nào, phần nối từ chối ghép vì
+  không có kiểm tra giọng hay khuôn mặt nào được thấy nói cả hai, và câu
+  thứ hai, được hỏi riêng, đã tắt một kỹ năng cũ, time for tea). Trên
+  route thứ hai, một câu bắt đầu trong vòng 3 s của phần nối
+  (`JOIN_WITHIN`) sau những lời bị cắt ngang ngay trước nó, chưa nghe được
+  câu trả lời nào và không được ghép vào nó (trừ riêng tên của đèn và lời
+  mang qua một câu bị giữ), thì lời gọi `make_skill` đầu tiên trong lượt
+  của nó mà tác động lên một kỹ năng (tạo, `turn_off`, `turn_on`, `remove`,
+  `undo` hoặc `run`) không được chạy: mô hình được cho biết những lời đó
+  (`make_no_asks::split_told`) và tự phán đoán câu này có nói tiếp những
+  lời đó không; nếu có thì hai câu là một yêu cầu, được tạo bằng một lời
+  gọi có request chứa cả hai, và không kỹ năng nào khác bị tắt, bật, xóa,
+  hoàn tác hay chạy vì nó (`make_no_asks::SPLIT_NEXT`). Chỉ khi chính câu
+  này yêu cầu việc đó thì mô hình mới gọi lại, và lời gọi đó được chạy:
+  mỗi câu chỉ được báo một lần, không bao giờ dùng danh sách từ. Câu không
+  có lời nào bị cắt ngay trước, câu sau quá 3 s, hoặc câu đã được ghép, vẫn
+  như trước, không thêm lượt hay thời gian chờ nào; lần báo chỉ tốn một
+  lượt mô hình, ở lời gọi như thế đầu tiên của một câu như vậy.
 
 `lamp-voice` truyền đúng `on` cho worker `provider` và `second`. Khi tắt,
 mọi lần tạo và xóa giống hệt từng byte như trước.

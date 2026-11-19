@@ -5094,7 +5094,11 @@ after a take-over, but now for every turn:
     joins too: the cut words are answered in its place, as before, with its
     own words after them. Otherwise the journal says why: `request M: not joined with
     request N's words, cut short by it: WHY (LAMP_JOIN_CUT_WORDS)`, with
-    the gap, the cosine, which line has no print, or no one face seen. One person
+    the gap, the cosine, which line has no print, or no one face seen.
+    Not joined, with `LAMP_MAKE_NO_ASKS=on`, the new line's first
+    `make_skill` call that acts on a skill is not run and the model is
+    told the cut words, to judge whether the two are one ask (#7976; the
+    skills doc's "A split make is still one make"). One person
     is the two lines' prints at 0.70 or over (`same_voice::SAME_FROM`, over
     every pair of two voices on 18 Oct's labelled set), when the same-voice
     check runs for another rule; or else one face, the same passing id,

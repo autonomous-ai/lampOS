@@ -47,6 +47,7 @@ mod short_sound_name;
 mod skill_claim;
 mod skill_named_words;
 mod skill_yes_carry;
+mod split_make;
 mod task_yes_in_code;
 mod task_yes_words;
 mod unplayed_join;
