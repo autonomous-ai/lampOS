@@ -655,7 +655,9 @@ fn a_path_longer_than_the_most_is_refused_without_echoing_it() {
 #[test]
 fn an_apps_npu_ops_are_the_lamps_and_ride_their_grant() {
     let package = changed(|manifest, _| {
-        manifest["grants"] = json!(["speak", "hear", "light", "body", "sound", "skills", "camera"]);
+        manifest["grants"] = json!([
+            "speak", "hear", "light", "body", "sound", "skills", "camera"
+        ]);
         manifest["npu"] = json!(["pose"]);
     })
     .unwrap();
