@@ -2108,7 +2108,8 @@ impl Attention {
     /// a question, with nothing written for the name in its words and words
     /// the rule does not read as a call (`called`, `called_by_name`, the
     /// owner's language's forms too), counts the name for nothing whatever
-    /// its second sign ([`short_line_without_the_name`], #7891).
+    /// its second sign, unless the lamp's own question is open
+    /// ([`Self::lamp_asked`]) ([`short_line_without_the_name`], #7891).
     pub fn weigh_the_name(&mut self, turned: Option<bool>, going_on: bool) -> bool {
         let text_calls = if self.name_in_passing_ignored {
             called_by_name(&self.heard)
@@ -2137,8 +2138,13 @@ impl Attention {
         // A short line with nothing written for the name, out of a
         // conversation, is never answered on the hearing alone, whatever
         // its second sign (#7891).
-        self.name_short_dropped =
-            weighed && !in_conversation && !text_calls && short_line_without_the_name(&self.heard);
+        // Never while the lamp's own question is open: "Yes." then answers
+        // the lamp (V2 on #7918).
+        self.name_short_dropped = weighed
+            && !in_conversation
+            && !self.lamp_asked
+            && !text_calls
+            && short_line_without_the_name(&self.heard);
         let alone = weighed && (signs.is_empty() || self.name_short_dropped);
         self.name_signs = if weighed && !alone { signs } else { Vec::new() };
         if alone {
