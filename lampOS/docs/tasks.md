@@ -5113,7 +5113,21 @@ in and signed out, and on 0.6.60, signed in (#7507's ROW).
   (`pane_turn`), and it ends the same way, with no reply and no ensure of
   its own. The opens' own backoff (5 s doubled, `OPEN_RETRY_FIRST`; 60 s
   doubled for `ENGINE_NOT_READY`) is unchanged. The turn's end is `harness wait lamp-one-openclaw --after
-  <inputId>` (0 idle, then `show` for the answer; 3 an ask; 4 gone).
+  <inputId>` (0 idle, then `show` for the answer; 3 an ask; 4 gone). A
+  kept OpenClaw session is seen as gone (closed `--now`, let go, and the
+  task handed to the session ensured again, or failed) when OpenClaw's own
+  record (`openclaw-agent.sqlite`, read only, no CLI start) no longer holds
+  `agent:main:harness-<id>` before a task is handed to it (#7906 sign 3),
+  or, read every 5 s beside the turn's wait (`TURN_WATCH`), when the
+  record is not past the hand-over 60 s after Harness's `taken`
+  (`TURN_START_WITHIN`, sign 4a), when the session is `running` with its
+  highest `seq` unmoved for 3 min and its last row a `user` or
+  `toolResult` the model never answered (`TURN_STALL`, sign 4b, which also
+  bounds a `NOT_IDLE` hand-over), or when the turn is open while the
+  session's status is `killed`, `failed` or `timeout` for 15 s
+  (`DEAD_WORKING`); a tool call still unanswered (a long exec) is never
+  cut and is left to the run's deadline, and `show`'s tools, `ps`'s
+  `lastActive` and pane text are never read for it.
 - **Signed-in replies, acknowledged.** With a Harness that acknowledges replies, every reply into a session of the person's (the one pane of `harness new`, `--reply-named`, a resumed session, a first message) counts as handed over only on `taken` with its `inputId`; a `TIMEOUT` with `cancelled: true` is typed again (a first message's is not: any answer but `taken` leaves it uncertain, `type_first_message`), one with `cancelled: false` and an `inputId` is typed and never sent again, and the one pane's turn ends with `harness wait --after <inputId>`. An older Harness's answers read as before.
 - **Rotation and removal.** OpenClaw's kept session is not rotated by
   count (its gateway compacts the session itself, `agents.defaults.compaction`);
