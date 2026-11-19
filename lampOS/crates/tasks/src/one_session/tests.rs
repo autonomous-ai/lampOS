@@ -3035,3 +3035,51 @@ fn a_task_that_had_run_a_tool_is_not_replayed() {
     );
     assert_eq!(fake.count("reply-kept"), typed, "never typed again");
 }
+
+/// #7906 (Harness's timing on OpenClaw 2026.11.2): a fresh session refuses
+/// its first replies ENGINE_NOT_READY for a while, then takes them. Within
+/// the bound that is waited on, never a sign: no replace, no `--fresh`,
+/// and the task is answered in the same session.
+#[test]
+fn a_fresh_session_refusing_engine_not_ready_for_a_while_is_not_replaced() {
+    let dir = tempfile::tempdir().unwrap();
+    let (one, fake) = kept_on(dir.path());
+    // Its first words: refused twice, 250 ms apart, within the 1 s bound.
+    fake.takes
+        .lock()
+        .unwrap()
+        .extend(std::iter::repeat_n(Took::EngineNotReady, 2));
+    one.open_if_due(&fake, &place());
+    assert_eq!(one.agent(), Some(agent_of(1)));
+    assert_eq!(
+        fake.asked
+            .lock()
+            .unwrap()
+            .get(&agent_of(1))
+            .map(String::as_str),
+        Some(OPEN_PROMPT),
+        "its first words taken after the refusals"
+    );
+    // The task's: refused 40 times, 5 ms apart, also within the bound.
+    fake.takes
+        .lock()
+        .unwrap()
+        .extend(std::iter::repeat_n(Took::EngineNotReady, 40));
+    let turn = one.enter("task-1", Kind::Skill, far(), &|| false).unwrap();
+    assert!(matches!(
+        turn.send(&fake, &place(), "Run the skill.", far(), &|| false),
+        Sent::Typed(_)
+    ));
+    assert_eq!(
+        turn.wait_end(&fake, MACHINE, &AtomicBool::new(false), &|| {}),
+        Ended::Answered("answer to New task task-1:".into())
+    );
+    assert_eq!(one.agent(), Some(agent_of(1)));
+    assert_eq!(fake.count("close-kept"), 0);
+    assert!(!fake.calls().iter().any(|call| call.ends_with("--fresh")));
+    assert!(
+        fake.calls().contains(&"wait-after in-1".to_owned()),
+        "its first words were taken after the refusals: {:?}",
+        fake.calls()
+    );
+}
