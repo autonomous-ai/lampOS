@@ -619,9 +619,10 @@ pub fn forget_agents_checked(
 
 /// OpenClaw's own check of the reset's cut of `openclaw.json` in `file`
 /// (#7868): lamp-update's ([`lamp_update::openclaw_install::validate_argv`],
-/// `config validate --json` as `lampos` in OpenClaw's namespace, with the
-/// file's own ids), bounded by [`lamp_checked_replace::VALIDATE_WITHIN`].
-/// It needs no forwarder token, which the reset has wiped by then. With no
+/// `config validate --json` as `lampos`, with the file's own ids), joined
+/// to OpenClaw's gateway through its wrapper when the gateway's unit has a
+/// `MainPID`, else in OpenClaw's namespace of its own, bounded by
+/// [`lamp_checked_replace::VALIDATE_WITHIN`]. With no
 /// OpenClaw namespace script under `root`, OpenClaw can't run and the cut
 /// is written unchecked, said.
 fn openclaw_check(root: &Path, file: &Path) -> Result<(), String> {
@@ -632,10 +633,23 @@ fn openclaw_check(root: &Path, file: &Path) -> Result<(), String> {
         return Ok(());
     }
     let owner = fs::metadata(file).map_err(|error| format!("{}: {error}", file.display()))?;
+    let main_pid = &lamp_update::openclaw_install::MAIN_PID;
+    let joined = std::process::Command::new("/usr/bin/systemctl")
+        .args(&main_pid[1..])
+        .stdin(std::process::Stdio::null())
+        .stderr(std::process::Stdio::null())
+        .output()
+        .is_ok_and(|out| {
+            out.status.success()
+                && lamp_update::openclaw_install::has_main_pid(&String::from_utf8_lossy(
+                    &out.stdout,
+                ))
+        });
     let argv = lamp_update::openclaw_install::validate_argv(
         &owner.uid().to_string(),
         &owner.gid().to_string(),
         &file.to_string_lossy(),
+        joined,
     );
     lamp_checked_replace::validate(
         &argv,

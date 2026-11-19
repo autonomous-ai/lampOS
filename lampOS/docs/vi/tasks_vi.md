@@ -3396,7 +3396,12 @@ Phần thay file có kiểm tra và lần kiểm tra có giới hạn thời gia
 `gateway`, docs/install.md; vòng cập nhật nào thấy khối này thiếu hoặc
 khác thì nhờ one-shot của Harness ghi lại, #7868) và lần reset của
 lamp-setup (cắt còn
-`gateway`, docs/setup.md).
+`gateway`, docs/setup.md). Hai chỗ đó kiểm tra bằng
+`openclaw_install::validate_argv`: khi unit
+`lamp-openclaw-gateway.service` có `MainPID` (gateway đang chạy) thì chạy
+qua wrapper, nhập vào namespace của gateway như lamp-tasks; không có
+gateway nào chạy (như lúc cài lần đầu) thì không có lock nào để va chạm,
+nên chạy trong `openclaw-ns` riêng như trước.
 
 ## Hook của Harness bên trong namespace agent của đèn (#6530)
 
