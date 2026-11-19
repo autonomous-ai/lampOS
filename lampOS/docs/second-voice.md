@@ -5567,8 +5567,9 @@ after a take-over, but now for every turn:
     (`attention::written_for_the_name`: "lamp", "lamb", `STAND_INS`,
     `STAND_ALONE_INS`), and words the rule does not read as a call
     (`attention::called`, `called_by_name`, the owner's language's forms
-    too), counts the hearing for nothing, whatever its second sign
-    (`attention::short_line_without_the_name`); the journal says `its
+    too), while the lamp's own question is not open (a bare "Yes." to it
+    answers the lamp), counts the hearing for nothing, whatever its second
+    sign (`attention::short_line_without_the_name`); the journal says `its
     name, heard only in the room's sound (began N ms into the line),
     counts for nothing on a line of one or two words, not a question, with
     no word written for the name and no conversation going on; the model
