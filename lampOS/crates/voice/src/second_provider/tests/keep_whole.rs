@@ -27,15 +27,16 @@ struct Went {
 }
 
 fn went(heard: &str, whole: bool, rounds: Vec<Vec<net::Result<ChatEvent>>>) -> Went {
-    went_with(heard, whole, rounds, false)
+    went_with(heard, whole, rounds, None)
 }
 
-/// [`went`], with every `remember` refused as nobody known (`refused`).
+/// [`went`], with every `remember` answered `remembered` instead, when given
+/// (refused as nobody known, or held for their yes).
 fn went_with(
     heard: &str,
     whole: bool,
     rounds: Vec<Vec<net::Result<ChatEvent>>>,
-    refused: bool,
+    remembered: Option<Value>,
 ) -> Went {
     let script = Arc::new(Script {
         heard: Mutex::new([Ok(heard.to_owned())].into()),
@@ -46,10 +47,9 @@ fn went_with(
     let seen = called.clone();
     let tools: ToolRunner = Arc::new(move |_, _, name, _| {
         seen.lock().unwrap().push(name.to_owned());
-        let answer = if refused && name == REMEMBER {
-            json!({"remembered": false, "note": crate::remember::needs_face::NOT_KEPT})
-        } else {
-            json!({"ok": true, "remembered": true})
+        let answer = match &remembered {
+            Some(told) if name == REMEMBER => told.clone(),
+            _ => json!({"ok": true, "remembered": true}),
         };
         Box::pin(async move { answer })
     });
@@ -323,7 +323,7 @@ fn a_claim_after_a_refused_keep_says_the_refusals_line() {
             ],
             saying(E82D),
         ],
-        true,
+        Some(json!({"remembered": false, "note": crate::remember::needs_face::NOT_KEPT})),
     );
     assert!(!claimed(&went), "{went:?}");
     assert!(!went.noted, "{went:?}");
@@ -335,6 +335,36 @@ fn a_claim_after_a_refused_keep_says_the_refusals_line() {
     );
     assert!(
         !went.said.iter().any(|said| said.contains(NOT_KEPT_LINE)),
+        "{went:?}"
+    );
+}
+
+/// Friday's P2 at 3410d5b787: a keep held for their yes (`held_keep_told`)
+/// keeps its own ask; a later claim gets no refusal said over it.
+#[test]
+fn a_claim_after_a_held_keep_says_no_refusal() {
+    let went = went_with(
+        HEARD,
+        true,
+        vec![
+            vec![
+                Ok(ChatEvent::ToolCalls(vec![call(
+                    "c1",
+                    REMEMBER,
+                    json!({"text": "Their car is on Level B1, spot 7."}),
+                )])),
+                Ok(ChatEvent::Done),
+            ],
+            saying(E82D),
+            saying(E82D),
+        ],
+        Some(crate::remember::held_keep_told()),
+    );
+    assert!(
+        !went
+            .said
+            .iter()
+            .any(|said| said.contains(crate::remember::needs_face::REFUSED_LINE)),
         "{went:?}"
     );
 }
