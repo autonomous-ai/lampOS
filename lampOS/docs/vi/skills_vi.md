@@ -2370,8 +2370,10 @@ người dùng; một câu có phải là xin đổi hay không là do mô hình
   cùng phần giữ của `make_no_asks`, và lệnh gỡ mang nó đi cùng kỹ năng.
 
 Để tham số của `make_skill` nằm trong 4.096 byte khi bật mọi công tắc,
-`choice` nói "replace the others", còn `answer` và `named` bỏ câu cuối (giá
-trị mặc định và quy tắc một kỹ năng, cả hai đều do mã giữ). Test:
+`choice` nói "replace the others, keep them all, or cancel, as the person
+chose", `answer` bỏ các ví dụ về một yêu cầu mới (ghi chú lúc chờ vẫn giữ
+chúng) và câu cuối, còn `named` bỏ câu cuối (giá trị mặc định và quy tắc
+một kỹ năng, cả hai đều do mã giữ). Test:
 `a_change_is_never_a_remove`, và trong `made_change`:
 `a_change_remakes_the_named_skill_in_place_never_a_second`,
 `a_change_keeps_off_and_put_it_back_restores_the_old_version`,
