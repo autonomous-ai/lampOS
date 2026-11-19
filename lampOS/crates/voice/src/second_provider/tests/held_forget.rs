@@ -2547,7 +2547,16 @@ async fn an_unsure_line_is_not_kept_and_nothing_is_asked() {
     );
     const NAME_SAID: &str = "Remember that my friend's name is Ngok.";
     const NAME: &str = "Their friend's name is Ngoc.";
-    let taken_back = format!("said:{}", crate::remember::doubted::TAKEN_BACK_LINE);
+    // What the lamp said, piece by piece, as [`turn`] labels it ("said:…",
+    // a piece after the first led by a space).
+    let said = |events: &[String]| -> Vec<String> {
+        events
+            .iter()
+            .filter_map(|event| event.strip_prefix("said:"))
+            .map(|piece| piece.trim().to_owned())
+            .collect()
+    };
+    let taken_back = crate::remember::doubted::TAKEN_BACK_LINE;
     let undone = vec![
         (REMEMBER.to_owned(), json!({"name": "A"})),
         (FORGET.to_owned(), json!({"source_id": 391})),
@@ -2701,11 +2710,28 @@ async fn an_unsure_line_is_not_kept_and_nothing_is_asked() {
                 "{case}"
             );
         }
+        let pieces = said(&ran.events);
         if case.starts_with("the round after") {
-            // Its keep was said back: the lamp says plainly it isn't kept.
-            assert!(ran.events.contains(&taken_back), "{case}: {:?}", ran.events);
+            // Its keep was said back: the lamp says plainly it isn't kept,
+            // as the first turn's last line, after the round's own words.
+            let first: Vec<&String> = ran
+                .events
+                .iter()
+                .take_while(|event| *event != "complete")
+                .collect();
+            let last = first
+                .iter()
+                .rev()
+                .find_map(|event| event.strip_prefix("said:"))
+                .map(str::trim);
+            assert_eq!(last, Some(taken_back), "{case}: {:?}", ran.events);
+            assert_eq!(
+                pieces.iter().filter(|piece| *piece == taken_back).count(),
+                1,
+                "{case}"
+            );
         } else {
-            assert!(!ran.events.contains(&taken_back), "{case}");
+            assert!(!pieces.iter().any(|piece| piece == taken_back), "{case}");
         }
         if unsure {
             // Never told to ask, and told never to say it was kept.
