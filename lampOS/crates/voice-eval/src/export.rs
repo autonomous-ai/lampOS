@@ -755,6 +755,7 @@ const BUS_TOPICS: &[&str] = &[
     "selftest/speaker/request",
     "skills/ask",
     "skills/events",
+    "skills/tasks",
     "speaker/audio",
     "speaker/state",
     "speaker/volume",
