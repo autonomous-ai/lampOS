@@ -267,7 +267,7 @@ fn span(ms: u64) -> String {
 /// goes; once its day is over, asks root's helper at `helper` to turn it
 /// off, as the app's off does, and keeps when in [`OFF_FILE`].
 pub fn keep(place: Place, bus: Option<lamp_bus::Bus>, helper: PathBuf) {
-    use lamp_msgs::{Diagnostic, Level};
+    use lamp_msgs::Diagnostic;
     std::thread::spawn(move || {
         let mut health = bus.and_then(|bus| {
             bus.publisher_declared(
@@ -277,36 +277,69 @@ pub fn keep(place: Place, bus: Option<lamp_bus::Bus>, helper: PathBuf) {
             )
             .ok()
         });
-        let mut was_on = false;
-        let mut tried: Option<Instant> = None;
+        let mut keeping = Keeping::default();
         loop {
-            let report = match look(place.since_ms(), place.day, crate::chat::now_ms()) {
-                Look::On { said, due } => {
-                    // On again since it turned itself off: that is no
-                    // longer the news.
-                    if !was_on && let Some(file) = &place.went_off {
-                        let _ = std::fs::remove_file(file);
-                    }
-                    was_on = true;
-                    if due && tried.is_none_or(|at| at.elapsed() >= TRY_AGAIN) {
-                        tried = Some(Instant::now());
-                        turn_off(&place, &helper, crate::chat::now_ms(), &mut |line| {
-                            eprintln!("lamp-cloud: {line}")
-                        });
-                    }
-                    Some(Diagnostic::new(Level::Ok, HEALTH_NAME, &said))
-                }
-                Look::Off => {
-                    tried = None;
-                    std::mem::take(&mut was_on).then(|| Diagnostic::stopping(HEALTH_NAME))
-                }
-            };
+            let report = keeping.step(
+                &place,
+                &helper,
+                crate::chat::now_ms(),
+                Instant::now(),
+                &mut |line| eprintln!("lamp-cloud: {line}"),
+            );
             if let (Some(publisher), Some(report)) = (health.as_mut(), report) {
                 let _ = publisher.publish_json(lamp_ipc::monotonic_us(), &report);
             }
             std::thread::sleep(LOOK_EVERY);
         }
     });
+}
+
+/// What [`keep`] carries from one look to the next.
+#[derive(Debug, Default)]
+struct Keeping {
+    was_on: bool,
+    /// When the helper was last asked to turn it off, while its day is over.
+    tried: Option<Instant>,
+}
+
+impl Keeping {
+    /// One look at `now_ms` (`now` for the re-ask): what the lamp's health
+    /// is told, if anything; the day over, the off asked of root's helper.
+    fn step(
+        &mut self,
+        place: &Place,
+        helper: &Path,
+        now_ms: u64,
+        now: Instant,
+        say: &mut dyn FnMut(&str),
+    ) -> Option<lamp_msgs::Diagnostic> {
+        use lamp_msgs::{Diagnostic, Level};
+        match look(place.since_ms(), place.day, now_ms) {
+            Look::On { said, due } => {
+                // On again since it turned itself off: that is no longer
+                // the news.
+                if !self.was_on
+                    && let Some(file) = &place.went_off
+                {
+                    let _ = std::fs::remove_file(file);
+                }
+                self.was_on = true;
+                if due
+                    && self
+                        .tried
+                        .is_none_or(|at| now.duration_since(at) >= TRY_AGAIN)
+                {
+                    self.tried = Some(now);
+                    turn_off(place, helper, now_ms, say);
+                }
+                Some(Diagnostic::new(Level::Ok, HEALTH_NAME, &said))
+            }
+            Look::Off => {
+                self.tried = None;
+                std::mem::take(&mut self.was_on).then(|| Diagnostic::stopping(HEALTH_NAME))
+            }
+        }
+    }
 }
 
 /// Its day over: off through root's helper at `helper`, as the app's
@@ -619,6 +652,54 @@ mod tests {
                 r#"the dev monitor was on for its day: turned off ({"closed":true,"on":false})"#,
             ]
         );
+        let _ = std::fs::remove_dir_all(dir);
+    }
+
+    /// `keep`'s looks, one at a time: on again, `monitor-off` goes; the day
+    /// over, the off is asked of the helper, and again only a minute
+    /// later; off, the item goes, also for a lamp-cloud that starts with
+    /// the dev monitor already off.
+    #[test]
+    fn keep_asks_the_off_again_a_minute_later_and_lets_the_item_go() {
+        let dir = folder("keep");
+        let (place, _) = place(&dir, CODE);
+        let helper = dir.join("change.sock");
+        let listener = UnixListener::bind(&helper).unwrap();
+        let (heard, lines_in) = std::sync::mpsc::channel();
+        std::thread::spawn(move || {
+            for stream in listener.incoming().flatten() {
+                let mut line = String::new();
+                BufReader::new(&stream).read_line(&mut line).unwrap();
+                let _ = heard.send(line);
+                let _ = writeln!(&stream, r#"{{"refused":"busy"}}"#);
+            }
+        });
+        std::fs::write(place.went_off.as_ref().unwrap(), "7").unwrap();
+        std::fs::write(&place.dropin, DROPIN_TEXT).unwrap();
+        let since = place.since_ms().unwrap();
+        let over = since + DAY.as_millis() as u64;
+        let at = Instant::now();
+        let step = |keeping: &mut Keeping, now_ms: u64, now: Instant| {
+            keeping.step(&place, &helper, now_ms, now, &mut |_| {})
+        };
+        let mut keeping = Keeping::default();
+        assert!(!step(&mut keeping, since + 1_000, at).unwrap().is_stopping());
+        assert_eq!(place.went_off_ms(), None);
+        assert!(lines_in.try_recv().is_err());
+        assert!(step(&mut keeping, over, at).is_some());
+        assert_eq!(lines_in.try_recv().unwrap(), "{\"monitor\":false}\n");
+        step(&mut keeping, over, at + TRY_AGAIN - Duration::from_secs(1));
+        assert!(lines_in.try_recv().is_err());
+        step(&mut keeping, over, at + TRY_AGAIN);
+        assert_eq!(lines_in.try_recv().unwrap(), "{\"monitor\":false}\n");
+        std::fs::remove_file(&place.dropin).unwrap();
+        assert!(step(&mut keeping, over, at).unwrap().is_stopping());
+        assert!(step(&mut keeping, over, at).is_none());
+        // A new lamp-cloud, the dev monitor turned off while it was down:
+        // the item it left is let go once, not left stale.
+        let mut keeping = Keeping::default();
+        assert!(step(&mut keeping, over, at).unwrap().is_stopping());
+        assert!(step(&mut keeping, over, at).is_none());
         let _ = std::fs::remove_dir_all(dir);
     }
 
