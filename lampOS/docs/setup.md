@@ -330,8 +330,11 @@ lamp-setup reset-now`). That unit, in this order:
    normally the second; either way the check runs before the plan's wipes
    take `/var/lib/lampos-cloud` (the forwarder token the wrapper needs),
    and the token is still wiped after it. Only status 0 renames it into place
-   (`lamp_checked_replace::replace_checked_in`). Not taken (refused, past
-   60 s, or not started), the new file is removed and so is
+   (`lamp_checked_replace::replace_checked_in`), the folder's lock
+   (`lamp_checked_replace::lock`, a `flock` on the folder, shared with
+   lamp-tasks' and lamp-update's writes, docs/tasks.md) held from the read
+   to the rename. Not taken (refused, past 60 s, not started, or the lock
+   not had within 90 s), the new file is removed and so is
    `openclaw.json`, since a reset fails toward wiping and no person's key
    outlives it. The journal says "lamp-setup: reset: ... removed: its cut
    was not taken: <why>" (the check's words, never a value). The reset

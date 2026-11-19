@@ -2072,6 +2072,11 @@ fn gateway_config(
     };
     let gateway = gateway_wanted(&token);
     let config_path = on(root, CONFIG);
+    // Seventh's P2 on #7872: held from the read to the rename, as every
+    // writer of the config does, so lamp-tasks' merge and this block never
+    // drop each other's.
+    let _held = lamp_checked_replace::hold(&on(root, STATE), lamp_checked_replace::LOCK_WITHIN)
+        .map_err(|error| format!("{STATE}: {error}"))?;
     let mut config = match fs::read(&config_path) {
         Ok(bytes) => match serde_json::from_slice::<serde_json::Value>(&bytes) {
             Ok(serde_json::Value::Object(config)) => config,
