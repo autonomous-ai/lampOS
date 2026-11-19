@@ -2561,6 +2561,14 @@ impl Cli {
         if reply.success || gone(&reply.stdout) {
             return Ok(());
         }
+        // #7906, seen on lamp-c0a4: Harness checkpoints a close first and
+        // refuses it once the Gateway's conversation is already deleted
+        // ("Could not read the saved conversation. The session has not been
+        // closed."): named, so the caller forgets the record and goes
+        // `--fresh` instead of trying the close for ever.
+        if conversation_unreadable(&reply.stdout) || conversation_unreadable(&reply.stderr) {
+            return Err(CLOSE_CONVERSATION_GONE.into());
+        }
         Err(program_refusal(&reply.stdout, reply.code, "close_failed"))
     }
 
@@ -6265,6 +6273,17 @@ pub fn shown_agent(bytes: &[u8], id: &str) -> Option<String> {
 /// Whether a refused `harness show` says the session is no longer there:
 /// `UNKNOWN_HARNESS` (no harness of that name or id) or `GONE` (no longer
 /// on its machine), Harness 0.6.12's `target`.
+/// What [`Cli::close_kept`] answers when Harness refused the close as the
+/// session's saved conversation can't be read (its Gateway key deleted).
+pub const CLOSE_CONVERSATION_GONE: &str = "conversation_gone";
+
+/// Whether Harness's answer says the saved conversation can't be read.
+fn conversation_unreadable(bytes: &[u8]) -> bool {
+    String::from_utf8_lossy(bytes)
+        .to_ascii_lowercase()
+        .contains("could not read the saved conversation")
+}
+
 fn gone(bytes: &[u8]) -> bool {
     let reply = serde_json::from_slice::<Value>(bytes).unwrap_or_default();
     matches!(

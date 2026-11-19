@@ -2577,7 +2577,13 @@ khi đăng xuất, và với 0.6.60 khi đăng nhập (ROW của #7507).
   dấu hiệu (dấu hiệu 3 và 4 qua `OneSession::kept_gone`). Nó `close --now`, `sessions.delete` và xoá bản ghi, rồi buông
   phiên. Lần mở tiếp theo là `ensure --fresh` (pane của `harness new` thì
   là một `new` thường), và việc đang chờ, hoặc việc tiếp theo, chạy tiếp ở
-  đó. Close lỗi được thử lại `--now` ở lần nhìn sau và giữ token. Số lần
+  đó. Close lỗi được thử lại `--now` ở lần nhìn sau và giữ token. Close mà
+  Harness từ chối vì không đọc được hội thoại đã lưu của phiên ("Could not
+  read the saved conversation", key trên Gateway đã bị xoá: Harness lưu
+  checkpoint trước khi đóng) được tính là đã đóng
+  (`CLOSE_CONVERSATION_GONE`): bản ghi được quên và lần mở tiếp theo là
+  `--fresh`, không bao giờ thử close mãi. Mọi đường đều close trước rồi mới
+  xoá hội thoại. Số lần
   thử có giới hạn theo số lần thay liên tiếp không có câu trả lời nào xen
   giữa: lần đầu thay ngay; từ lần thứ hai (`REPLACE_MOST`, 2) lần mở tiếp
   theo chờ 5 s, rồi 10 s, nhân đôi mỗi lần thêm, tối đa 300 s. Một lượt có
