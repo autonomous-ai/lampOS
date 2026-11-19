@@ -3655,3 +3655,73 @@ fn a_kept_turn_on_a_long_exec_is_never_closed() {
     assert_eq!(ended, Ended::Answered("answer to New task task-2:".into()));
     assert_eq!(fake.count("close-kept"), 0, "{:?}", fake.calls());
 }
+
+/// #7906's told line: a task whose session died under it and was done
+/// again in the replaced one says so once ([`Turn::restarted`]); a healthy
+/// turn, and a turn that had run a tool (given up, its own failed line),
+/// do not; a replacement with no task waiting (the one-session thread's
+/// open) has no turn, so no line.
+#[test]
+fn the_told_line_comes_once_with_a_waiting_task_and_never_without() {
+    let dir = tempfile::tempdir().unwrap();
+    let replaced = Arc::new(Mutex::new(0));
+    let seen = replaced.clone();
+    let (one, fake) = kept_on(dir.path());
+    let one = one.with_on_replaced(Box::new(move |_| *seen.lock().unwrap() += 1));
+    one.open_if_due(&fake, &place());
+    // Healthy: no line.
+    let turn = one.enter("task-0", Kind::Skill, far(), &|| false).unwrap();
+    assert!(matches!(
+        turn.send(&fake, &place(), "Run.", far(), &|| false),
+        Sent::Typed(_)
+    ));
+    turn.wait_end(&fake, MACHINE, &AtomicBool::new(false), &|| {});
+    assert!(!turn.restarted());
+    drop(turn);
+    // Died under it, no tool run: replaced, done again, one line.
+    let turn = one.enter("task-1", Kind::Skill, far(), &|| false).unwrap();
+    assert!(matches!(
+        turn.send(&fake, &place(), "Run the skill.", far(), &|| false),
+        Sent::Typed(_)
+    ));
+    fake.shells.lock().unwrap().push(agent_of(1));
+    *fake.tools.lock().unwrap() = Some(0);
+    let ended = turn.wait_end(&fake, MACHINE, &AtomicBool::new(false), &|| {});
+    assert_eq!(ended, Ended::Answered("answer to New task task-1:".into()));
+    assert!(turn.restarted(), "one line for the waiting task");
+    assert_eq!(*replaced.lock().unwrap(), 1);
+    drop(turn);
+    // A tool had run: given up, its own failed line, not this one.
+    let turn = one.enter("task-2", Kind::Skill, far(), &|| false).unwrap();
+    assert!(matches!(
+        turn.send(&fake, &place(), "Run the skill.", far(), &|| false),
+        Sent::Typed(_)
+    ));
+    fake.shells.lock().unwrap().push(agent_of(2));
+    *fake.tools.lock().unwrap() = Some(2);
+    let ended = turn.wait_end(&fake, MACHINE, &AtomicBool::new(false), &|| {});
+    assert!(matches!(ended, Ended::Failed(_)), "{ended:?}");
+    assert!(!turn.restarted());
+    drop(turn);
+}
+
+/// #7906's told line with no task: a kept session found a plain shell at
+/// the one-session thread's open is replaced, and no turn exists to tell.
+#[test]
+fn a_replacement_with_no_task_waiting_has_no_told_line() {
+    let dir = tempfile::tempdir().unwrap();
+    let (one, fake) = kept_on(dir.path());
+    one.open_if_due(&fake, &place());
+    drop(one);
+    fake.shells.lock().unwrap().push(agent_of(1));
+    let again = kept_session(dir.path()).with_kept_session(dir.path().join(TOKEN_FILE));
+    again.open_if_due(&fake, &place());
+    assert_eq!(again.agent(), Some(agent_of(2)));
+    let turn = again.enter("task-1", Kind::Skill, far(), &|| false).unwrap();
+    assert!(matches!(
+        turn.send(&fake, &place(), "Run.", far(), &|| false),
+        Sent::Typed(_)
+    ));
+    turn.wait_end(&fake, MACHINE, &AtomicBool::new(false), &|| {});
+    assert!(!turn.restarted(), "the replacement was before this task");
+}
