@@ -77,13 +77,23 @@ pub fn unsure_not_kept_on() -> bool {
     std::env::var(UNSURE_ENVIRONMENT).ok().as_deref() == Some("on")
 }
 
-/// [`NOT_KEPT`] with [`UNSURE_ENVIRONMENT`]: nothing kept, nothing asked,
-/// never said kept.
-pub const NOT_KEPT_NO_ASK: &str = "Not kept: in this same reply you doubted what you heard, so nothing is kept. Ask nothing about it: no \"did you say ...?\" and no asking them to say it again. Never say it was kept.";
+/// The one true line the person hears of a keep not kept for doubt, with
+/// [`UNSURE_ENVIRONMENT`]: it asks nothing (Twelve's P1 on #7966, as
+/// #7885's refused line), so they know to say it again.
+pub const NOT_CAUGHT_LINE: &str = "I didn't catch that well enough to keep it.";
 
-/// [`UNDONE_NOTE`] with [`UNSURE_ENVIRONMENT`]: taken back for good, and
-/// nothing more asked.
-pub const UNDONE_NO_ASK_NOTE: &str = "(For you to know: what you kept just before is taken back, since your words doubt what you heard, and it stays not kept. Ask nothing more about it, and never say it is kept.)";
+/// What the lamp says itself when a keep it already said back is taken
+/// back for doubt and its round has no more calls ([`UNSURE_ENVIRONMENT`]):
+/// one true line, no question.
+pub const TAKEN_BACK_LINE: &str = "Sorry, I didn't keep that after all.";
+
+/// [`NOT_KEPT`] with [`UNSURE_ENVIRONMENT`]: nothing kept, the person told
+/// so in [`NOT_CAUGHT_LINE`]'s few words, nothing asked, never said kept.
+pub const NOT_KEPT_NO_ASK: &str = "Not kept: in this same reply you doubted what you heard, so nothing is kept. Tell them so in a few words, with no question, for example \"I didn't catch that well enough to keep it.\" Never ask \"did you say ...?\" or ask them to say it again, and never say it was kept.";
+
+/// [`UNDONE_NOTE`] with [`UNSURE_ENVIRONMENT`]: taken back for good, the
+/// person told so plainly ([`TAKEN_BACK_LINE`]), nothing more asked.
+pub const UNDONE_NO_ASK_NOTE: &str = "(For you to know: what you kept just before is taken back, since your words doubt what you heard, and it stays not kept. Tell them so plainly in a few words, with no question, for example \"Sorry, I didn't keep that after all.\" Ask nothing more about it, and never say it is kept.)";
 
 /// What the model is told of a keep not run on a line: with
 /// [`UNSURE_ENVIRONMENT`] [`NOT_KEPT_NO_ASK`], else [`NOT_KEPT`].
@@ -532,19 +542,25 @@ mod tests {
     use super::*;
 
     /// #7739: with an unsure line not kept the model is told nothing is
-    /// kept, to ask nothing and never to say it was kept; off, as before.
+    /// kept, to tell them so in one line that asks nothing (Twelve's P1 on
+    /// #7966), and never to say it was kept; off, as before.
     #[test]
     fn an_unsure_keep_is_told_not_kept_and_to_ask_nothing() {
         assert_eq!(not_kept_note(false), NOT_KEPT);
         assert!(NOT_KEPT.contains("Ask them"));
-        for note in [not_kept_note(true), UNDONE_NO_ASK_NOTE] {
-            assert!(note.contains("Ask nothing"), "{note}");
+        for line in [NOT_CAUGHT_LINE, TAKEN_BACK_LINE] {
+            assert!(!line.contains('?'), "{line}");
+            assert!(line.contains("didn't"), "{line}");
+        }
+        for (note, line) in [
+            (not_kept_note(true), NOT_CAUGHT_LINE),
+            (UNDONE_NO_ASK_NOTE, TAKEN_BACK_LINE),
+        ] {
+            assert!(note.contains(line), "{note}");
+            assert!(note.contains("with no question"), "{note}");
             assert!(!note.contains("Ask them"), "{note}");
             assert!(!note.contains("yes"), "{note}");
-            assert!(
-                note.contains("never say it") || note.contains("Never say it"),
-                "{note}"
-            );
+            assert!(note.contains("never say it"), "{note}");
         }
     }
 

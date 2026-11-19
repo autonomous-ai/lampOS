@@ -5902,8 +5902,10 @@ impl Engine {
     /// [`Self::undoing_doubted_keeps`], which forgets by id, and without
     /// the eyes, since no yes is waited for); a spoken keep with a near
     /// spelling of a heard word is not kept and nothing is asked, in place
-    /// of [`Self::asking_near_heard_words`]'s ask. A clear keep is kept as
-    /// before. Off, as before.
+    /// of [`Self::asking_near_heard_words`]'s ask (with that off, it is kept
+    /// as before). Each time the person is told, in one line that asks
+    /// nothing, that it wasn't kept. A clear keep is kept as before. Off, as
+    /// before.
     pub fn not_keeping_unsure(mut self, on: bool) -> Self {
         let shared = Arc::get_mut(&mut self.shared).expect("configured before admission");
         shared.unsure_not_kept = on;
@@ -15043,7 +15045,7 @@ fn hold_near_heard_keep(
     // on to `keep_quietly::unheard`, which keeps nothing with a word not
     // heard, so a yes about a spelling never becomes consent to keep
     // (Reviewer-lead on #6850).
-    if !(shared.near_heard_asks || shared.unsure_not_kept)
+    if !shared.near_heard_asks
         || !heard
         || call.name != crate::remember::REMEMBER
         || call.args.get("replaces").is_some_and(|id| !id.is_null())
@@ -15055,8 +15057,10 @@ fn hold_near_heard_keep(
     if near.is_empty() {
         return None;
     }
-    // An unsure line is simply not kept, and nothing is asked (#7739): no
-    // hold, so no eyes or known person are needed.
+    // An unsure line is simply not kept, and nothing is asked (#7739): in
+    // place of this switch's ask, with no hold, so no eyes or known person
+    // are needed. With the switch off a near spelling is kept as before
+    // (Twelve's P2 on #7966).
     if shared.unsure_not_kept {
         eprintln!(
             "lamp-voice second: request {request}: a keep with {} near word(s) not heard is not kept, and nothing is asked ({})",
@@ -19916,13 +19920,29 @@ async fn answer(
                     scope.as_ref(),
                 )
                 .await?
-                && !calls.is_empty()
             {
-                doubt_note = Some(if shared.unsure_not_kept {
-                    crate::remember::doubted::UNDONE_NO_ASK_NOTE
-                } else {
-                    crate::remember::doubted::UNDONE_NOTE
-                });
+                if !calls.is_empty() {
+                    doubt_note = Some(if shared.unsure_not_kept {
+                        crate::remember::doubted::UNDONE_NO_ASK_NOTE
+                    } else {
+                        crate::remember::doubted::UNDONE_NOTE
+                    });
+                } else if shared.unsure_not_kept {
+                    // Its keep was said back and no round follows: the lamp
+                    // says itself, plainly and asking nothing, that it is
+                    // not kept after all (Twelve's P1 on #7966).
+                    eprintln!(
+                        "lamp-voice second: request {request} chat round {round}: the take-back is said at once ({})",
+                        crate::remember::doubted::UNSURE_ENVIRONMENT
+                    );
+                    queue
+                        .push(
+                            shared
+                                .fixed(crate::remember::doubted::TAKEN_BACK_LINE)
+                                .to_owned(),
+                        )
+                        .await?;
+                }
             }
             let first_calls = !called_earlier;
             called_earlier |= !calls.is_empty();
