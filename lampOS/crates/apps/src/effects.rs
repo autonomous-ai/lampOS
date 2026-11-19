@@ -12,10 +12,6 @@ pub enum Verb {
     Restart,
     Stop,
     ResetFailed,
-    /// `systemctl clean --what=state`: systemd removes the unit's own state
-    /// (a dynamic user's private folder and its link); the helper writes
-    /// nothing there. First real on a lamp.
-    Clean,
 }
 
 impl Verb {
@@ -25,7 +21,6 @@ impl Verb {
             Verb::Restart => "restart",
             Verb::Stop => "stop",
             Verb::ResetFailed => "reset-failed",
-            Verb::Clean => "clean",
         }
     }
 }
@@ -33,23 +28,22 @@ impl Verb {
 /// The command line, whole: the program by its absolute path, and `--`
 /// before the unit so a name can never be read as an option.
 pub fn argv(verb: Verb, unit: &str) -> Vec<String> {
-    let mut line = vec![SYSTEMCTL.into(), verb.word().into()];
-    if verb == Verb::Clean {
-        line.push("--what=state".into());
-    }
-    line.push("--".into());
-    line.push(unit.into());
-    line
+    vec![
+        SYSTEMCTL.into(),
+        verb.word().into(),
+        "--".into(),
+        unit.into(),
+    ]
 }
 
 /// What `systemctl`'s exit status means for a verb. `systemctl` says 5 when
-/// the unit is not loaded: for a stop, a reset of the failed state or a clean of
-/// its state, a unit that is already gone IS the wanted end, not an
+/// the unit is not loaded: for a stop or a reset of the failed state, a
+/// unit that is already gone IS the wanted end, not an
 /// error (a remove cut at `reset-failed` because the unit had unloaded left
 /// the app half removed, 18 Nov, on 0c89). A start or a restart of a unit that
 /// is not loaded is an error, as is every other exit.
 pub fn judge_status(verb: Verb, unit: &str, code: Option<i32>) -> Result<(), String> {
-    let gone_is_done = matches!(verb, Verb::Stop | Verb::ResetFailed | Verb::Clean);
+    let gone_is_done = matches!(verb, Verb::Stop | Verb::ResetFailed);
     match code {
         Some(0) => Ok(()),
         Some(5) if gone_is_done => Ok(()),
@@ -65,10 +59,6 @@ pub trait Effects {
     fn systemctl(&mut self, verb: Verb, unit: &str) -> Result<(), String>;
     /// Whether the unit's cgroup has no process left (or has none at all).
     fn unit_empty(&mut self, unit: &str) -> Result<bool, String>;
-    /// Tells lamp-control the app is gone (`{"app_forget": NAME}`), so what it
-    /// kept of the app goes too. Called only after both unit variants have
-    /// stopped; an error leaves the remove cut, to be resumed.
-    fn forget(&mut self, name: &str) -> Result<(), String>;
     /// A short wait between two `unit_empty` asks.
     fn pause(&mut self) {}
 }
@@ -114,10 +104,6 @@ pub fn judge_unit_empty(
 pub struct RealEffects;
 
 impl Effects for RealEffects {
-    fn forget(&mut self, name: &str) -> Result<(), String> {
-        crate::client::AdminYes::product().forget(name)
-    }
-
     fn systemctl(&mut self, verb: Verb, unit: &str) -> Result<(), String> {
         let line = argv(verb, unit);
         let status = Command::new(&line[0])

@@ -9,16 +9,13 @@
 //! (`entry.env`), the order a remove runs in, the sweep after an interrupted
 //! install or remove, the rule for a staged package, and the launcher.
 //!
-//! Nothing here stores a uid: a dynamic user's is not stable. (The caller and
-//! the staged file's owner are checked by uid, root's or lampos's, and never
-//! kept.)
+//! Nothing here stores or compares a uid: a dynamic user's is not stable.
 pub mod ask;
 pub mod client;
 pub mod effects;
 pub mod entry;
 pub mod facts;
 pub mod install;
-pub mod launcher;
 pub mod layout;
 pub mod lock;
 pub mod manage;
@@ -39,5 +36,3 @@ pub mod yes;
 /// package): `python3 -I` drops the app's `src/` from `sys.path`, so this
 /// puts it back and runs the entry named in `entry.env`.
 pub const LAUNCHER: &str = include_str!("../launcher/run.py");
-/// The resolver a net app sees (`/etc/resolv.conf` in its unit): public addresses only.
-pub const RESOLV: &str = include_str!("../launcher/resolv.conf");
