@@ -16,7 +16,7 @@ fn lamp() -> Lamp {
     lamp.config.writer_from = Some(writer_swap::Running::new(b"lamp-update 1".to_vec()));
     let (root, records) = (lamp.root.clone(), lamp.records());
     lamp.systemd.writer = Some(Box::new(move || {
-        writer_swap::refresh(
+        writer_swap::unit_run(
             &root,
             &records,
             b"lamp-update 1",
@@ -244,7 +244,7 @@ fn a_new_writer_whose_first_apply_fails_is_put_back_after_that_apply() {
     lamp.config.writer_from = Some(writer_swap::Running::new(b"lamp-update 1".to_vec()));
     let (root, records) = (lamp.root.clone(), lamp.records());
     lamp.systemd.writer = Some(Box::new(move || {
-        writer_swap::refresh(
+        writer_swap::unit_run(
             &root,
             &records,
             b"lamp-update 1",
@@ -390,7 +390,7 @@ fn far_jump_from(updater: u64) {
     lamp.config.writer_from = Some(writer_swap::Running::new(b"lamp-update 10".to_vec()));
     let (root, records) = (lamp.root.clone(), lamp.records());
     lamp.systemd.writer = Some(Box::new(move || {
-        writer_swap::refresh(
+        writer_swap::unit_run(
             &root,
             &records,
             b"lamp-update 10",
@@ -416,4 +416,100 @@ fn far_jump_from(updater: u64) {
     assert_eq!(lamp.read(BACK), "lamp-update 10");
     assert_eq!(lamp.read(manifest::STORE_ENV), on);
     assert_eq!(lamp.own_build(), ten);
+}
+
+/// The build's lampos SDK, as the lamp names it (#7415).
+const SDK_CLIENT: &str = "/usr/local/lib/lampos/sdk-python/lampos/client.py";
+
+/// A lamp whose writer is this lamp-update already and whose SDK is an older build's: every file there,
+/// `client.py` with older bytes (lamp-0c89 on 14420, 19 Nov: its SDK of 18 Nov 07:13, no `connect_app`).
+fn older_sdk() -> Lamp {
+    let mut lamp = refreshed();
+    // Its `back` ended well since: the next round proves it, and the writer is this build's for good.
+    let done = writer_swap::done(&lamp.records()).unwrap();
+    writer_swap::note_back(&lamp.records(), b"lamp-update 1", done.at_unix_ms + 1).unwrap();
+    lamp.round();
+    assert!(!writer_swap::unproven(&lamp.root, &lamp.records()));
+    assert!(lamp_update::sdk_tree::present(&lamp.root));
+    fs::write(
+        lamp.root.join(SDK_CLIENT.trim_start_matches('/')),
+        "class Lamp: pass\n",
+    )
+    .unwrap();
+    assert!(!lamp_update::sdk_tree::present(&lamp.root));
+    lamp.systemd.calls.borrow_mut().clear();
+    lamp.said.clear();
+    lamp
+}
+
+/// #7415: the SDK followed a build only when the Hermes one-shot ran, so a lamp without it (OpenClaw by
+/// default) kept its first SDK. Now a round whose writer is this build already has the writer's unit put
+/// the build's SDK in place, exactly its files, and a second round asks nothing more.
+#[test]
+fn a_round_puts_this_builds_sdk_over_an_older_one_and_a_second_round_changes_nothing() {
+    let mut lamp = older_sdk();
+    let done_before = lamp.read("/var/lib/lampos-update/writer-refresh.done");
+    lamp.round();
+    assert!(started_writer(&lamp), "{:?}", lamp.calls());
+    assert!(lamp_update::sdk_tree::present(&lamp.root));
+    assert!(lamp.read(SDK_CLIENT).contains("def connect_app"));
+    assert!(
+        lamp.said.iter().any(|line| line
+            .starts_with("the build's lampos SDK is written at /usr/local/lib/lampos/sdk-python")),
+        "{:?}",
+        lamp.said
+    );
+    // The writer is left as it is, and its own record too.
+    assert_eq!(lamp.read(BACK), "lamp-update 1");
+    assert!(!lamp.exists(PREV));
+    assert_eq!(
+        lamp.read("/var/lib/lampos-update/writer-refresh.done"),
+        done_before
+    );
+    assert!(!lamp.exists("/var/lib/lampos-update/writer-refresh.request"));
+    // A second round: the SDK is this build's, so nothing is asked.
+    lamp.systemd.calls.borrow_mut().clear();
+    lamp.round();
+    assert!(!started_writer(&lamp), "{:?}", lamp.calls());
+}
+
+/// No Hermes on this lamp, and no agent at all: the SDK still follows the build (an OpenClaw-default layout,
+/// whose Hermes one-shot never runs).
+#[test]
+fn a_lamp_with_no_hermes_gets_the_builds_sdk_too() {
+    let mut lamp = older_sdk();
+    assert!(!lamp.exists("/usr/local/bin/hermes"));
+    fs::remove_dir_all(lamp.root.join("usr/local/lib/lampos/sdk-python")).unwrap();
+    lamp.round();
+    assert!(started_writer(&lamp), "{:?}", lamp.calls());
+    assert!(lamp_update::sdk_tree::present(&lamp.root));
+}
+
+/// A writer's refresh lands the build's SDK in the same run, so a newer build's SDK comes with its writer.
+#[test]
+fn a_writer_refreshed_brings_the_builds_sdk_with_it() {
+    let mut lamp = lamp();
+    assert!(!lamp_update::sdk_tree::present(&lamp.root));
+    lamp.round();
+    assert_eq!(lamp.read(BACK), "lamp-update 1");
+    assert!(lamp_update::sdk_tree::present(&lamp.root));
+}
+
+/// A unit that cannot run leaves the older SDK and the writer as they are, says so, and takes its request
+/// back.
+#[test]
+fn an_sdk_the_unit_cannot_write_is_said_and_its_request_taken_back() {
+    let mut lamp = older_sdk();
+    lamp.systemd.writer = None;
+    lamp.round();
+    assert!(!lamp_update::sdk_tree::present(&lamp.root));
+    assert!(!lamp.exists("/var/lib/lampos-update/writer-refresh.request"));
+    assert!(
+        lamp.said
+            .iter()
+            .any(|line| line.starts_with("the build's lampos SDK is not written")),
+        "{:?}",
+        lamp.said
+    );
+    assert_eq!(lamp.read(BACK), "lamp-update 1");
 }

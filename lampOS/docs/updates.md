@@ -3743,7 +3743,28 @@ that runs past its bound ends only the waiting: systemd's job goes on, so
 its result is read from what the command leaves, not from the start.
 
 A round runs it to refresh the settings writer ("The settings writer
-refreshed", below). The unit has been checked by its tests' reading of the
+refreshed", below), and for the build's own lampos SDK (#7415). Before #7415
+only the Hermes one-shot wrote `/usr/local/lib/lampos/sdk-python`, so a lamp
+where that one-shot doesn't run (OpenClaw by default, or no Hermes round)
+kept the first SDK it got: lamp-0c89 on 14420 still had 18 Nov's, with no
+`Lamp.connect_app`. Now:
+
+- **Every run of the unit** that changes the writer, or finds it this build
+  already, also writes the build's SDK when the folder isn't exactly the
+  build's files (`sdk_tree::present`, then `sdk_tree::write`). So a newer
+  build's SDK lands with its writer. A failed write is said, never the end of
+  the writer's run.
+- **A round whose writer is this lamp-update already** (`writer_swap::holds`)
+  and whose SDK isn't the build's asks the same unit for the SDK alone
+  (`writer_swap::Op::Sdk`). The unit's program writes the SDK and nothing
+  else: the writer and its record (`writer-refresh.done`) stay as they are.
+  The round says `the build's lampos SDK is written at
+  /usr/local/lib/lampos/sdk-python (it differs from this build's)`. A second
+  round finds the SDK in place and asks nothing.
+- A lamp with no writer at all, or a writer refreshed and not proved yet, is
+  not asked: the SDK comes once the writer is this build's.
+
+The unit has been checked by its tests' reading of the
 text and a fake systemd, not by a real systemd: neither `systemd-analyze
 verify` nor a start on Bookworm has run.
 
