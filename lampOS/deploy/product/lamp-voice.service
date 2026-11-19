@@ -638,9 +638,12 @@ Environment=LAMP_SERVICE_RECORDS_REMINDERS=on
 # the person its held write is read back to, through the linked outbox, and two linked lines in the told note. Their
 # whys and rules are their rows in docs/switches.md. On in the product by the product owner's rule of 18 Nov, everything
 # on by default (#6811), beside #7960's ROW on lamp-06c1. The agent's rows need lamp-services' --run-calls
-# (lamp-services.service). Task, reminder, source and sdk rows stay off until their own ROWs (#7960).
+# (lamp-services.service). Task and sdk rows stay off until their own ROWs (#7960).
 Environment=LAMP_SERVICE_RECORDS_AGENT=on
 Environment=LAMP_SERVICE_RECORDS_LINKED_TOLD=on
+# LAMP_SERVICE_RECORDS_SOURCE: its why and rules are its row in docs/switches.md (slice 7). A linked record's source
+# fetched for its owner only (another's key is not_yours), reads only. On by the same rule of 18 Nov (#6811).
+Environment=LAMP_SERVICE_RECORDS_SOURCE=on
 Environment=LAMP_SERVICE_CONTACTS=on
 Environment=LAMP_SERVICE_REDO=on
 # LAMP_SERVICE_READ_IDS_KEPT: its why and rules are its row in docs/switches.md (#6546).

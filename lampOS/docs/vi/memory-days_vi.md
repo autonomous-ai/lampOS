@@ -650,7 +650,9 @@ lamp-services) và giới hạn kể (`LAMP_SERVICE_RECORDS_LINKED_TOLD`) bật 
 sản phẩm từ 19/11 (`lamp-voice.service`), theo quy tắc của chủ sản phẩm ngày
 18/11 là mọi thứ bật mặc định
 (https://github.com/autonomous-ai/lampOS/issues/6811#issuecomment-6977525471), các bước riêng của chúng
-còn nợ (ROW của #7960 đạt các bước bản ghi kết nối bên cạnh). Dòng việc, dòng lời nhắc, dòng sdk và công cụ tìm nguồn
+còn nợ (ROW của #7960 đạt các bước bản ghi kết nối bên cạnh). Dòng lời nhắc bật
+từ #7970, và công cụ tìm nguồn (`LAMP_SERVICE_RECORDS_SOURCE`) từ 20/11 theo cùng
+quy tắc, ROW của nó trên lamp-06c1 trong pull request bật nó. Dòng việc và dòng sdk
 vẫn tắt cho tới ROW riêng; `linked.sock` (`LAMP_MEMORY_LINKED_SOCKET`) vẫn
 tắt: chưa có gì ghi vào nó, và trình cài đặt chưa tạo nhóm `lampos-linked`.
 
@@ -722,7 +724,7 @@ ghi connector, mỗi loại có giới hạn riêng:
 - **Tắt.** Không đổi gì: không có dòng liên kết, recall hỏi 5 và kể những gì
   tìm thấy như trước, danh sách của memory được gộp như trước.
 
-### Tìm nguồn: `record_source` (lát 7, `LAMP_SERVICE_RECORDS_SOURCE` của voice, tắt)
+### Tìm nguồn: `record_source` (lát 7, `LAMP_SERVICE_RECORDS_SOURCE` của voice, bật trong sản phẩm)
 
 Khi `LAMP_SERVICE_RECORDS_SOURCE=on` cùng `LAMP_SERVICE_RECORDS=on` (chỉ
 tuyến thứ hai, `process::service_records_source_worker_environment`;

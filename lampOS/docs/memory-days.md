@@ -889,8 +889,10 @@ The agent's rows (`LAMP_SERVICE_RECORDS_AGENT`, with lamp-services'
 in the product since 19 Nov (`lamp-voice.service`), by the product owner's
 rule of 18 Nov that everything is on by default
 (https://github.com/autonomous-ai/lampOS/issues/6811#issuecomment-6977525471), with their
-own legs owed (#7960's ROW passed the connector legs beside them). The task, reminder and sdk rows and the source tool
-stay off until their own ROWs; `linked.sock` (`LAMP_MEMORY_LINKED_SOCKET`)
+own legs owed (#7960's ROW passed the connector legs beside them). The reminder rows are on
+since #7970, and the source tool (`LAMP_SERVICE_RECORDS_SOURCE`) since 20 Nov by the same
+rule, its ROW on lamp-06c1 in its switch-on pull request. The task and sdk rows stay off
+until their own ROWs; `linked.sock` (`LAMP_MEMORY_LINKED_SOCKET`)
 stays off: nothing writes to it yet, and the installer doesn't make
 `lampos-linked`.
 
@@ -963,7 +965,7 @@ the connector records, each kind bounded:
 - **Off.** Nothing changes: no linked line, a recall asks 5 and tells what
   it finds as before, and the memory's list is merged as before.
 
-### Find the source: `record_source` (slice 7, the voice's `LAMP_SERVICE_RECORDS_SOURCE`, off)
+### Find the source: `record_source` (slice 7, the voice's `LAMP_SERVICE_RECORDS_SOURCE`, on in the product)
 
 With `LAMP_SERVICE_RECORDS_SOURCE=on` beside `LAMP_SERVICE_RECORDS=on` (the
 second route only, `process::service_records_source_worker_environment`;

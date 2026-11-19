@@ -46,7 +46,9 @@ const SERVICES: &str = "services";
 
 /// The lamp's own functions a product lamp's chat request offers now, on the
 /// product's route (`LAMP_VOICE_ROUTE=second`, bound
-/// `lamp_voice::second_provider::MAX_TOOLS`): the voice's own 32 (seen
+/// `lamp_voice::second_provider::MAX_TOOLS`): the voice's own 33 (a linked
+/// record's `record_source` since `LAMP_SERVICE_RECORDS_SOURCE` is on in the
+/// product since 20 Nov, and before it 32: seen
 /// activity's `look_at_my_desk` and `stop_looking_at_my_desk` since
 /// `LAMP_SEEN_ACTIVITY` is on in the product, #6543, its
 /// `offer_desk_noticing` not, `LAMP_SEEN_VOICE_OFFER` being off in the
@@ -71,18 +73,18 @@ const SERVICES: &str = "services";
 /// Pose's `set_pose` and the wellbeing skills' `[stop]`, `wellbeing_nudges`,
 /// were 3 before it; the FAQ's `lamp_help` since #5790, Light show's
 /// `light_show` since #5745, Light scenes' `light_scene` and Point the
-/// light's `point_light` since #5744): 50, and 54 with the route's 4 (the
+/// light's `point_light` since #5744): 51, and 55 with the route's 4 (the
 /// search, its fetch, the weather and the look), within the bound of 64;
 /// 52 was past the bound of 48 it had until #7433, which left out the
 /// fetch, the time elsewhere, `reports_state` and the weather on every lamp. However many skills
 /// are installed, the skills' stay 1. The test prints this split. A change
 /// to it is a change to what every session is told: say in its pull
 /// request what is left out past the bound, if anything.
-const PRODUCT_FUNCTIONS: usize = 50;
+const PRODUCT_FUNCTIONS: usize = 51;
 
 /// The lamp's own with `LAMP_HARD_ASKS_TO_AGENT` on (off in the product, a
 /// lamp's drop-in): [`PRODUCT_FUNCTIONS`] and the lamp's agent's
-/// `ask_agent` (Heron's P2 7 on #7509). With the route's 4 that is 53,
+/// `ask_agent` (Heron's P2 7 on #7509). With the route's 4 that is 54,
 /// within the bound of 64 (#7433), so nothing is cut.
 const HARD_ASKS_FUNCTIONS: usize = PRODUCT_FUNCTIONS + 1;
 
