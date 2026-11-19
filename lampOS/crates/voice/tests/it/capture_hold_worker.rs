@@ -175,6 +175,9 @@ struct Rig {
     accepted_at: Option<Instant>,
     /// Blocks the speaker has accepted, in the stream and in a hold-up.
     references: u64,
+    /// The speaker's playback epoch, and `references` when it began.
+    playback_epoch: u64,
+    epoch_base: u64,
     frames: Vec<Heard>,
     ready: bool,
     prepared: bool,
@@ -402,6 +405,8 @@ impl Rig {
             pushed_at: Vec::new(),
             accepted_at: None,
             references: 0,
+            playback_epoch: 1,
+            epoch_base: 0,
             frames: Vec::new(),
             ready: false,
             prepared: false,
@@ -652,13 +657,14 @@ impl Rig {
         // send held up only makes the early side's time longer (#7295).
         let sent = Instant::now();
         let at = monotonic_us();
+        let in_epoch = self.references - self.epoch_base;
         self.speaker.data.send(RenderReference {
-            playback_epoch: 1,
+            playback_epoch: self.playback_epoch,
             privacy_generation: self.privacy,
-            sequence: self.references + 1,
+            sequence: in_epoch + 1,
             accepted_at_us: at,
             queue_observed_at_us: at,
-            first_sample: PRIME_FRAMES as u64 + self.references * RENDER_SAMPLES as u64,
+            first_sample: PRIME_FRAMES as u64 + in_epoch * RENDER_SAMPLES as u64,
             queued_frames: 960,
             payload: RenderPayload::Speech {
                 owner: self.owner,
@@ -700,6 +706,98 @@ impl Rig {
             self.device.push(&signal.microphone(tick));
             self.pushed_at.push(at);
             self.service();
+        }
+    }
+
+    /// The speaker re-primes a new playback epoch, its old one discarded,
+    /// as it does on a fresh authority after its own lapsed (#7224), and
+    /// waits for the worker's `ReferencePrimed`; its clock is not started.
+    fn reprime(&mut self) {
+        let old = self.playback_epoch;
+        let accepted_through =
+            PRIME_FRAMES as u64 + (self.references - self.epoch_base) * RENDER_SAMPLES as u64;
+        self.playback_epoch += 1;
+        self.epoch_base = self.references;
+        let at = monotonic_us();
+        let prime = ClockPrimed {
+            playback_epoch: self.playback_epoch,
+            privacy_generation: self.privacy,
+            accepted_zero_frames: PRIME_FRAMES,
+            accepted_at_us: at,
+            queue_observed_at_us: at,
+            queued_frames: PRIME_FRAMES,
+            discarded: Some(lamp_audio::ownership::QueuedRange {
+                epoch: old,
+                retired_through: 0,
+                accepted_through,
+            }),
+        };
+        self.speaker
+            .control
+            .send(ReferenceControl::ClockPrimed { prime })
+            .unwrap();
+        let deadline = Instant::now() + Duration::from_secs(2);
+        loop {
+            assert!(Instant::now() < deadline, "no ReferencePrimed");
+            self.service();
+            if let Some(control) = self.speaker.control.receive().unwrap() {
+                match control {
+                    ReferenceControl::ReferencePrimed { prepared } => {
+                        assert_eq!(prepared.playback_epoch, self.playback_epoch);
+                        return;
+                    }
+                    _ => panic!("the capture worker sent the speaker something else"),
+                }
+            }
+            sleep(Duration::from_micros(500));
+        }
+    }
+
+    /// The speaker's clock of the current epoch starts now.
+    fn start_clock(&mut self) {
+        let at = monotonic_us();
+        self.speaker
+            .control
+            .send(ReferenceControl::ClockStarted {
+                playback_epoch: self.playback_epoch,
+                start_requested_at_us: at,
+                started_at_us: at,
+            })
+            .unwrap();
+        self.origin = Instant::now() - TICK * self.pushed_at.len() as u32;
+    }
+
+    /// Wait until the worker has reported its `epochs`th start.
+    fn wait_for_start(&mut self, epochs: usize) {
+        let deadline = Instant::now() + Duration::from_secs(2);
+        while self.epochs.len() < epochs {
+            assert!(
+                Instant::now() < deadline,
+                "starts {:?}, gaps {}, fault {:?} {:?}",
+                self.epochs,
+                self.gaps,
+                self.fault,
+                self.worker_fault
+            );
+            self.service();
+            sleep(Duration::from_micros(500));
+        }
+    }
+
+    /// The microphone holds a block every 10 ms for `ms`, the speaker
+    /// silent, its clock not started, the worker given authority all along.
+    fn microphone_only(&mut self, signal: &Signal, ms: u64) {
+        let until = Instant::now() + Duration::from_millis(ms);
+        let mut tick = self.pushed_at.len();
+        while Instant::now() < until {
+            self.device.push(&signal.microphone(tick));
+            self.pushed_at.push(monotonic_us());
+            tick += 1;
+            let next = Instant::now() + TICK;
+            while Instant::now() < next {
+                self.service();
+                sleep(Duration::from_micros(300));
+            }
         }
     }
 
@@ -1693,4 +1791,99 @@ fn capture_wait_cost() {
         rig.end_with(Control::Stop);
         rig.finish();
     }
+}
+
+/// Turns the reopen hold on for the capture workers of one test, and off
+/// again however it ends.
+struct ReopenHoldOn;
+
+impl ReopenHoldOn {
+    fn on() -> Self {
+        lamp_voice::unstarted_frames::ON_FOR_TESTS
+            .store(true, std::sync::atomic::Ordering::Relaxed);
+        Self
+    }
+}
+
+impl Drop for ReopenHoldOn {
+    fn drop(&mut self) {
+        lamp_voice::unstarted_frames::ON_FOR_TESTS
+            .store(false, std::sync::atomic::Ordering::Relaxed);
+    }
+}
+
+/// #7224, Twelve's P1 and P3a on #8011, through the worker's own loop: a
+/// stall closes the microphone, it reopens, and the speaker re-primes with
+/// its clock started only 300 ms later, the microphone holding a block
+/// every 10 ms meanwhile. With `LAMP_VOICE_UNSTARTED_FRAME_DROP=on` the
+/// worker drops those blocks before the reference sees them (without, the
+/// third block before the start notice is `ReferenceLate`, and the 100 ms
+/// barrier would end it before), hands none on, and goes on once the clock
+/// has started.
+#[test]
+fn with_the_switch_a_reopen_holds_its_blocks_until_a_late_clock_and_goes_on() {
+    warm_up();
+    let signal = Signal::new(600);
+    let mut rig = Rig::start("scripted reopen hold");
+    let _on = ReopenHoldOn::on();
+    rig.stream(&signal, 30);
+    rig.hold_up(400);
+    rig.wait_for_start(2);
+    let before = rig.frames.len();
+    rig.reprime();
+    rig.microphone_only(&signal, 300);
+    assert!(rig.worker_running(), "the worker ended in the wait");
+    assert_eq!(rig.frames.len(), before, "a held block was handed on");
+    assert!(rig.gaps == 1, "gaps {}", rig.gaps);
+    rig.start_clock();
+    rig.stream(&signal, 50);
+    let deadline = Instant::now() + Duration::from_secs(2);
+    while rig.frames.len() < before + 30 {
+        assert!(
+            Instant::now() < deadline,
+            "{} frames after the clock",
+            rig.frames.len() - before
+        );
+        rig.service();
+        sleep(Duration::from_micros(500));
+    }
+    assert!(rig.worker_running());
+    assert_eq!(rig.epochs, [1, 2]);
+    rig.end_with(Control::Stop);
+    rig.finish();
+}
+
+/// The same with a clock that never starts: at 800 ms the worker closes
+/// the microphone as `ClockNotStarted` and reopens it (step 1), and 800 ms
+/// after that it ends with the old error (step 2). Never silent for good.
+#[test]
+fn with_the_switch_a_clock_that_never_starts_is_recovered_then_ends_capture() {
+    warm_up();
+    let signal = Signal::new(600);
+    let mut rig = Rig::start("scripted reopen never");
+    let _on = ReopenHoldOn::on();
+    rig.tolerate_fault = true;
+    rig.stream(&signal, 30);
+    rig.hold_up(400);
+    rig.wait_for_start(2);
+    rig.reprime();
+    let primed = Instant::now();
+    rig.microphone_only(&signal, 1_000);
+    assert_eq!(rig.gaps, 2, "step 1's ClockNotStarted gap");
+    rig.wait_for_start(3);
+    let deadline = primed + Duration::from_secs(4);
+    while rig.worker_running() {
+        assert!(Instant::now() < deadline, "step 2 never ended capture");
+        rig.microphone_only(&signal, 50);
+    }
+    let error = rig.worker.take().unwrap().join().unwrap().unwrap_err();
+    assert!(
+        error.contains("capture frame preceded certified running reference clock"),
+        "{error}"
+    );
+    assert!(
+        primed.elapsed() >= Duration::from_millis(1_500),
+        "ended {} ms after the re-prime",
+        primed.elapsed().as_millis()
+    );
 }

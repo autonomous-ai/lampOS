@@ -817,14 +817,19 @@ Two of the voice's start-up failures, found on lamp-52e6 and lamp-4ace on
   clock has started, up to 500 ms and then dropped and counted until it
   comes; a clock still not started 800 ms after the reopen is recovered
   by one fresh reopen, and 800 ms more without it ends capture with the
-  old error (exit, systemd restart), never silence for good; and the
+  old error (exit, systemd restart), never silence for good, the
+  recovery's `ClockNotStarted` gap moving the coordinator's 1.5 s
+  retention heartbeat so both steps come first; and the
   coordinator ends the voice on that check only at the boot
   barrier; mid-run the frame is a gap's dropped frame, said once per
   reopen. Unit tests: in the harness the held turn's cut then a reopen
   whose first frame has no clock start goes on with the switch, the reply
   cut once as `capture_gap` and the frame counted in the gap, and ends
   with the exit off; a boot's first frame before the clock still ends the
-  voice with it on; the worker's hold, its 500 ms bound, the recovery
+  voice with it on; a clock starting 1.2 s after a reopen goes on with
+  it (off, the heartbeat ends it as before), and one that never starts
+  ends in capture's fault, not the heartbeat; the worker's hold, its 500
+  ms bound, the recovery
   then the exit for a clock that never starts, and the coordinator's
   once-per-reopen line each on their own. Not yet tried on a
   lamp.

@@ -852,6 +852,9 @@ fn capture_loop<D: CaptureDevice>(
                             );
                             // No microphone sequence or retained upstream prefix is reset.
                             primed_at = Some(monotonic_us());
+                            // A re-prime soon after a reopen is held as the
+                            // reopen is (#7224).
+                            reopen_hold.primed(monotonic_us());
                             link.control
                                 .send(ReferenceControl::ReferencePrimed { prepared })?;
                         }
@@ -913,7 +916,11 @@ fn capture_loop<D: CaptureDevice>(
                 cost.stage(Stage::Reference, from);
             }
         }
-        if primed_at.is_some_and(|at| monotonic_us().saturating_sub(at) >= BARRIER_US) {
+        // While a reopen holds its blocks back (#7224), its own two steps
+        // bound the clock's start, not the barrier.
+        if !reopen_hold.waiting()
+            && primed_at.is_some_and(|at| monotonic_us().saturating_sub(at) >= BARRIER_US)
+        {
             return Err(reference
                 .fault(ReferenceFaultKind::BarrierTimeout, monotonic_us())
                 .into());
@@ -930,7 +937,7 @@ fn capture_loop<D: CaptureDevice>(
                     let closed_at_us = monotonic_us();
                     channels.control.send(WorkerEvent::CaptureGap {
                         epoch: microphone.epoch(),
-                        reason: "ClockNotStarted".to_owned(),
+                        reason: crate::unstarted_frames::CLOCK_NOT_STARTED.to_owned(),
                         closed_at_us,
                     })?;
                     hold = CaptureHold::new(hold.blocks())
@@ -959,6 +966,32 @@ fn capture_loop<D: CaptureDevice>(
             None
         };
         let available = read.as_ref().map(|frame| frame.timing.available_frames);
+        // After a reopen, nothing before the clock has started again
+        // (#7224): the block, read under the authority `try_read` checked,
+        // is dropped before the reference sees it, so the strict count
+        // before a start notice is never spent on it, as at the first
+        // start no block is read before the start.
+        if read.is_some() && !reopen_hold.takes(&reference.timing(), monotonic_us()) {
+            if let Some(line) = reopen_hold.line() {
+                eprintln!("{line}");
+            }
+            said(cost.done());
+            stall_pass.done();
+            pace(
+                wait,
+                microphone,
+                channels,
+                link.as_ref(),
+                gap,
+                primed_at,
+                available,
+                tick,
+            );
+            continue;
+        }
+        if let Some(line) = reopen_hold.line() {
+            eprintln!("{line}");
+        }
         if let Some(frame) = read {
             let from = cost.now();
             let step = reference.capture_step(
@@ -1072,28 +1105,6 @@ fn capture_loop<D: CaptureDevice>(
                 Err(error) => return Err(error.into()),
             }
             let timing = reference.timing();
-            // After a reopen, nothing before the clock has started again
-            // (#7224): the coordinator takes such a first frame for one that
-            // preceded the boot's certified start.
-            let taken = reopen_hold.takes(&timing, monotonic_us());
-            if let Some(line) = reopen_hold.line() {
-                eprintln!("{line}");
-            }
-            if !taken {
-                said(cost.done());
-                stall_pass.done();
-                pace(
-                    wait,
-                    microphone,
-                    channels,
-                    link.as_ref(),
-                    gap,
-                    primed_at,
-                    available,
-                    tick,
-                );
-                continue;
-            }
             let processing_completed_at_us = monotonic_us();
             if let Some(recording) = recording {
                 let _ = recording.recorder.try_capture(

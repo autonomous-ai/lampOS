@@ -46,6 +46,10 @@ pub const RECOVER_US: u64 = 800_000;
 /// exit that a failed recovery ends in.
 pub const UNSTARTED_ERROR: &str = "capture frame preceded certified running reference clock";
 
+/// The reason of the `CaptureGap` capture sends when its reopen hold
+/// closes the microphone for a clock that has not come.
+pub const CLOCK_NOT_STARTED: &str = "ClockNotStarted";
+
 /// What the capture worker does about a clock that has not come.
 #[derive(Debug, PartialEq, Eq)]
 pub enum Recovery {
@@ -61,9 +65,17 @@ pub fn switched_on(value: Option<&str>) -> bool {
     value == Some("on")
 }
 
+/// The switch on for every capture worker started in this process, in
+/// place of the environment: the capture worker's own tests over a scripted
+/// microphone (`tests/it/capture_hold_worker.rs`), which run it on a thread
+/// and may not set the environment. Never set outside them.
+#[doc(hidden)]
+pub static ON_FOR_TESTS: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+
 /// The switch as this process's environment sets it.
 pub fn from_environment() -> bool {
-    switched_on(std::env::var(ENVIRONMENT).ok().as_deref())
+    ON_FOR_TESTS.load(std::sync::atomic::Ordering::Relaxed)
+        || switched_on(std::env::var(ENVIRONMENT).ok().as_deref())
 }
 
 /// Whether a frame's reference timing says the clock it was cancelled
@@ -88,6 +100,12 @@ pub struct ReopenHold {
     overran: bool,
     /// The recovery's reopen has been made: the next bound ends capture.
     recovering: bool,
+    /// The last reopen's wait, for its line: from the reopen to the clock's
+    /// start, in ms.
+    waited_ms: Option<u64>,
+    /// The last reopen, until a clock started after it: a re-prime soon
+    /// after it is held as the reopen is.
+    last_reopen_at: Option<u64>,
 }
 
 impl ReopenHold {
@@ -98,12 +116,41 @@ impl ReopenHold {
         }
     }
 
-    /// The microphone reopened after a gap, at `at_us`.
+    /// The microphone reopened after a gap, at `at_us`. A reopen during a
+    /// wait starts step 1's clock again; once the recovery's reopen has
+    /// been made, a further reopen leaves step 2's clock where it is, so
+    /// the hold ends within [`RECOVER_US`] of the recovery's reopen
+    /// however many stalls come in it. `recovering` is cleared only by a
+    /// started clock.
     pub fn reopened(&mut self, at_us: u64) {
-        if self.on && self.waiting_since.is_none() {
+        if !self.on {
+            return;
+        }
+        self.last_reopen_at = Some(at_us);
+        if !self.recovering || self.waiting_since.is_none() {
             self.waiting_since = Some(at_us);
             self.overran = false;
         }
+    }
+
+    /// The speaker re-primed at `at_us`. Within [`RECOVER_US`] of a reopen
+    /// whose clock has not yet started after it, the re-prime is the
+    /// reopen's, and its blocks are held as the reopen's are, its bounds
+    /// counted from the reopen. Otherwise nothing: a re-prime at a
+    /// cancelled answer keeps the two blocks before the start notice.
+    pub fn primed(&mut self, at_us: u64) {
+        if self.waiting_since.is_none()
+            && let Some(reopen) = self.last_reopen_at
+            && at_us.saturating_sub(reopen) < RECOVER_US
+        {
+            self.waiting_since = Some(reopen);
+            self.overran = false;
+        }
+    }
+
+    /// Whether blocks are being held back for the clock.
+    pub fn waiting(&self) -> bool {
+        self.waiting_since.is_some()
     }
 
     /// Each pass, whether the clock that a reopen waits for has come, and
@@ -141,9 +188,15 @@ impl ReopenHold {
         let Some(since) = self.waiting_since else {
             return true;
         };
-        if reference.playback_epoch != 0 && reference.clock_started_at_us.is_some() {
+        if reference.playback_epoch != 0
+            && let Some(clock) = reference.clock_started_at_us
+        {
             self.waiting_since = None;
             self.recovering = false;
+            self.waited_ms = Some(clock.saturating_sub(since) / 1_000);
+            if self.last_reopen_at.is_some_and(|reopen| clock >= reopen) {
+                self.last_reopen_at = None;
+            }
             return true;
         }
         if at_us.saturating_sub(since) < WAIT_US {
@@ -168,15 +221,13 @@ impl ReopenHold {
             }
             return None;
         }
-        if self.held == 0 && self.past_wait == 0 {
-            return None;
-        }
+        let waited_ms = self.waited_ms.take()?;
         let (held, past) = (
             std::mem::take(&mut self.held),
             std::mem::take(&mut self.past_wait),
         );
         Some(format!(
-            "lamp-voice: capture: {} blocks read after a reopen before the speaker's clock started again were dropped, {past} of them past the {} ms wait ({ENVIRONMENT}=on)",
+            "lamp-voice: capture: the speaker's clock started {waited_ms} ms after the reopen; {} blocks read before it were dropped, {past} of them past the {} ms wait ({ENVIRONMENT}=on)",
             held + past,
             WAIT_US / 1_000
         ))
@@ -284,7 +335,10 @@ mod tests {
         }
         assert!(hold.takes(&started(2, Some(1_025_000)), 1_030_000));
         let line = hold.line().unwrap();
-        assert!(line.contains(": 3 blocks "), "{line}");
+        assert!(
+            line.contains("started 25 ms after the reopen; 3 blocks "),
+            "{line}"
+        );
         assert!(line.contains("0 of them past"), "{line}");
         assert!(
             line.contains("LAMP_VOICE_UNSTARTED_FRAME_DROP=on"),
@@ -313,7 +367,10 @@ mod tests {
         assert_eq!(hold.line(), None, "the bound is said once");
         assert!(hold.takes(&started(2, Some(WAIT_US)), WAIT_US + 20_000));
         let end = hold.line().unwrap();
-        assert!(end.contains(": 3 blocks "), "{end}");
+        assert!(
+            end.contains("started 500 ms after the reopen; 3 blocks "),
+            "{end}"
+        );
         assert!(end.contains("2 of them past the 500 ms wait"), "{end}");
     }
 
@@ -379,16 +436,86 @@ mod tests {
     fn off_nothing_is_recovered() {
         let mut hold = ReopenHold::new(false);
         hold.reopened(0);
+        hold.primed(1);
+        assert!(!hold.waiting());
         assert_eq!(hold.due(&started(2, None), 100 * RECOVER_US), None);
     }
 
-    /// A reopen with the clock running sends at once.
+    /// A reopen with the clock running sends at once; its line says the
+    /// clock waited for nothing, so every reopen's wait is journalled.
     #[test]
     fn a_reopen_with_the_clock_running_waits_for_nothing() {
         let mut hold = ReopenHold::new(true);
-        hold.reopened(0);
-        assert!(hold.takes(&started(1, Some(1)), 0));
+        hold.reopened(5_000);
+        assert!(hold.takes(&started(1, Some(1)), 5_000));
+        let line = hold.line().unwrap();
+        assert!(
+            line.contains("started 0 ms after the reopen; 0 blocks"),
+            "{line}"
+        );
         assert_eq!(hold.line(), None);
+    }
+
+    /// Twelve's P3b on #8011: a reopen during the wait starts step 1 again;
+    /// after the recovery's reopen a further one leaves step 2's clock, so
+    /// the total stays bounded; only a started clock clears it.
+    #[test]
+    fn a_reopen_in_the_wait_restarts_step_1_but_not_step_2() {
+        let mut hold = ReopenHold::new(true);
+        let unstarted = started(2, None);
+        hold.reopened(0);
+        hold.reopened(500_000);
+        assert_eq!(
+            hold.due(&unstarted, RECOVER_US),
+            None,
+            "step 1 from the new reopen"
+        );
+        assert!(matches!(
+            hold.due(&unstarted, 500_000 + RECOVER_US),
+            Some(Recovery::Reopen(_))
+        ));
+        let recovery = 2 * RECOVER_US;
+        hold.reopened(recovery);
+        hold.reopened(recovery + 400_000);
+        assert!(
+            matches!(
+                hold.due(&unstarted, recovery + RECOVER_US),
+                Some(Recovery::Exit(_))
+            ),
+            "step 2 counts from the recovery's reopen"
+        );
+    }
+
+    /// A re-prime right after a reopen whose first block went with the old
+    /// clock is held as the reopen is; one long after it, or with no
+    /// reopen, holds nothing.
+    #[test]
+    fn a_reprime_soon_after_a_reopen_is_held() {
+        let mut hold = ReopenHold::new(true);
+        hold.primed(10);
+        assert!(!hold.waiting(), "no reopen");
+        hold.reopened(1_000);
+        assert!(
+            hold.takes(&started(1, Some(1)), 1_000),
+            "the old clock runs"
+        );
+        hold.primed(30_000);
+        assert!(hold.waiting());
+        assert!(!hold.takes(&started(2, None), 40_000));
+        assert!(hold.takes(&started(2, Some(300_000)), 300_000));
+        assert!(
+            hold.line()
+                .unwrap()
+                .contains("started 299 ms after the reopen; 1 blocks")
+        );
+        // That clock started after the reopen: a later re-prime is not it.
+        hold.primed(320_000);
+        assert!(!hold.waiting());
+        let mut late = ReopenHold::new(true);
+        late.reopened(0);
+        assert!(late.takes(&started(1, Some(1)), 0));
+        late.primed(RECOVER_US);
+        assert!(!late.waiting());
     }
 
     /// Off, a reopen holds nothing back: today's behaviour.

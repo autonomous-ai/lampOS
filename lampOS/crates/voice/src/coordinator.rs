@@ -11906,6 +11906,16 @@ fn conversation_with_gate_inner(
         lease_end_drained = last_capture.is_some()
             && !gap_cancelled
             && held_turn_lease_ending(owner.snapshot(now())?);
+        // Capture's reopen hold closed the microphone for a clock that had
+        // not started (#7224): with the switch, the heartbeat counts from
+        // that recovery, as from a ridden privacy gap's reopen, so the
+        // hold's two steps have their bound; its second ends capture
+        // within 0.8 s of the recovery's reopen, so this moves once a hold.
+        if let Some(at) = trace.clock_recovery_at_us.take()
+            && unstarted_on
+        {
+            frames_from_us = frames_from_us.max(at);
+        }
         if retention_expired(last_capture, frames_from_us, monotonic_us()) {
             return Err(io::Error::other("microphone retention heartbeat expired").into());
         }
@@ -17521,6 +17531,11 @@ fn drain_capture_control(
                 json!({"kind":"echo_reference_reset","at_us":monotonic_us(),"details":event}),
             )?,
             WorkerEvent::CaptureGap { epoch: gone, .. } if *epoch == Some(gone) => {
+                if matches!(&event, WorkerEvent::CaptureGap { reason, .. }
+                    if reason == crate::unstarted_frames::CLOCK_NOT_STARTED)
+                {
+                    trace.clock_recovery_at_us = Some(monotonic_us());
+                }
                 record(
                     trace,
                     json!({"kind":"capture_gap_closed","at_us":monotonic_us(),"details":event}),
