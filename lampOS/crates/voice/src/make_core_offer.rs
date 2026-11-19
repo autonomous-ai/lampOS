@@ -82,8 +82,10 @@ pub const LISTED_MOST: usize = 40;
 /// The most bytes of a skill's description shown.
 pub const DOES_MOST: usize = 200;
 
-/// What [`UNDO`]'s parameter says.
-pub const UNDO_TOLD: &str = "Only when the lamp just turned on a skill in place of making one and the person asks, in any words, to make their own instead: true, given alone with no request.";
+/// What [`UNDO`]'s parameter says: short, so with every switch the
+/// product's unit sets on `make_skill`'s parameters stay within the link's
+/// 4,096 bytes (#8002).
+pub const UNDO_TOLD: &str = "Only when the lamp just turned on a skill in place of a make and the person asks for their own instead: true, alone.";
 
 /// What the model is told of an undo with nothing to undo.
 pub const NOTHING_TO_UNDO: &str =

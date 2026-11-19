@@ -5474,7 +5474,7 @@ it replaces, so every switch on still fits the link's 1,024, at 1,024),
 `turn_off`'s parameter says "turn off, pause or stop a skill they made or
 added (by voice, in the app or from a file), which keeps it to turn back
 on ... Never remove for this. Even one that starts only when they say its
-words is turned off this way. Call it at once. Ask nothing first.",
+words. Call it at once. Ask nothing first.",
 `turn_on`'s the same of back on, and `remove`'s says "delete or
 remove a skill for good, never to turn one off, pause or stop it". A call
 that carries a turn-off is read before the remove, so a turn-off never
@@ -8572,8 +8572,8 @@ reset still ask. On (`crate::make_no_asks`):
   description ends "Make or remove at once, never asking first, even of
   one they have: your line gives the undo."
   (`make_no_asks::AT_ONCE_TOLD`); its `remove` parameter adds "Call it at
-  once, never asking first or for a yes; ask which only when two skills
-  they made fit the words alike, never of "it"."
+  once, never asking first; ask which only when two skills they made fit
+  the words alike, never of "it"."
   (`make_no_asks::REMOVE_AT_ONCE_TOLD`); its `undo` adds
   `make_no_asks::UNDO_RESTORE_TOLD`. With every switch the product's
   unit sets on, the description stays within the link's 1,024 bytes and
