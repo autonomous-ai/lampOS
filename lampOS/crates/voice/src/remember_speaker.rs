@@ -500,7 +500,11 @@ mod tests {
             assert_eq!(answer, json!({"ok": true, "remembered": "Kesh"}), "{words}");
             assert_eq!(requests.len(), 1, "{words}");
         }
-        // Past setup a name alone keeps its face as before.
+        // Past setup, with `LAMP_NAME_LEARN_FIX` off, a name alone keeps its
+        // face as before; with it on, see
+        // `remember_speaker_past_setup_with_name_learn_fix_a_name_alone_keeps_no_face`
+        // and, with `LAMP_FACE_NO_ASK` too,
+        // `remember_speaker_with_no_ask_and_name_learn_fix_keeps_the_speaker_unasked`.
         let (answer, requests) = own_name_exchange(
             "I'm Kesh.",
             "Kesh",
@@ -510,6 +514,225 @@ mod tests {
         );
         assert_eq!(answer, json!({"ok": true, "remembered": "Kesh"}));
         assert_eq!(requests.len(), 1);
+    }
+
+    /// Heron's P1 on #7622: with `LAMP_NAME_LEARN_FIX` on (the product,
+    /// #7331) and `LAMP_FACE_NO_ASK` off, past setup a new face needs the
+    /// speaker's leave: a bare name keeps no face and the lamp asks first;
+    /// their own ask for the face, or a yes to the lamp's face question,
+    /// keeps it.
+    #[test]
+    fn remember_speaker_past_setup_with_name_learn_fix_a_name_alone_keeps_no_face() {
+        let _serial = TESTS.lock().unwrap_or_else(|poison| poison.into_inner());
+        let _thread = crate::provider_worker::tests::one_thread();
+        *crate::thread::THREAD.lock().unwrap() = crate::thread::Thread::new();
+        let both = known_faces::FaceSwitches {
+            name_learn_fix: true,
+            ..switches()
+        };
+        for words in ["I'm Kesh.", "My name is Kesh."] {
+            let (answer, requests) =
+                own_name_exchange_with(words, "Kesh", false, both, json!({"remembered": "Kesh"}));
+            assert!(requests.is_empty(), "{words}: {requests:?}");
+            assert_eq!(answer["error"], known_faces::ASK_FACE_FIRST, "{words}");
+        }
+        // Heron's HOLD on #7622: a line keeping the face out keeps nothing
+        // and asks nothing, at setup (the step ends with the name only) or
+        // past it, with `LAMP_FACE_NO_ASK` or without, never the face
+        // question it just refused.
+        let kept_out = [
+            both,
+            known_faces::FaceSwitches {
+                face_no_ask: true,
+                ..both
+            },
+            known_faces::FaceSwitches {
+                at_setup: true,
+                ..both
+            },
+            known_faces::FaceSwitches {
+                at_setup: true,
+                face_no_ask: true,
+                ..both
+            },
+        ];
+        for chosen in kept_out {
+            for words in [
+                "Keep my face out of this, I'm Kesh.",
+                "I'm Kesh. Leave my face off it.",
+                "Forget my face, I'm Kesh.",
+            ] {
+                let (answer, requests) = own_name_exchange_with(
+                    words,
+                    "Kesh",
+                    false,
+                    chosen,
+                    json!({"remembered": "Kesh"}),
+                );
+                assert!(requests.is_empty(), "{words} {chosen:?}: {requests:?}");
+                let error = if chosen.at_setup {
+                    known_faces::SETUP_NOT_KEPT_NO_ASK
+                } else {
+                    known_faces::FACE_KEPT_OUT
+                };
+                assert_eq!(answer, json!({"error": error}), "{words} {chosen:?}");
+            }
+        }
+        // "Don't forget my face" is not a keep-out line: refused here as
+        // before, by the name's own check (`NOT_OWN_NAME`), never kept.
+        let (answer, requests) = own_name_exchange_with(
+            "Don't forget my face, I'm Kesh.",
+            "Kesh",
+            false,
+            both,
+            json!({"remembered": "Kesh"}),
+        );
+        assert!(requests.is_empty(), "{requests:?}");
+        assert_ne!(answer["error"], known_faces::FACE_KEPT_OUT, "{answer}");
+        assert!(answer.get("ok").is_none(), "{answer}");
+        for words in [
+            "I'm Kesh, remember my face.",
+            "Please remember my face. My name is Kesh.",
+        ] {
+            let (answer, requests) =
+                own_name_exchange_with(words, "Kesh", false, both, json!({"remembered": "Kesh"}));
+            assert_eq!(answer, json!({"ok": true, "remembered": "Kesh"}), "{words}");
+            assert_eq!(requests.len(), 1, "{words}");
+        }
+        // A yes to the lamp's face question, asked just before, keeps it.
+        let now = Instant::now();
+        {
+            let mut thread = crate::thread::THREAD.lock().unwrap();
+            thread.person("I'm Kesh.", true, now);
+            thread.lamp(REQUEST - 1, "Shall I remember your face as Kesh?", now);
+            thread.person("Yes, I'm Kesh.", true, now);
+        }
+        let (answer, requests) = own_name_exchange_with(
+            "Yes, I'm Kesh.",
+            "Kesh",
+            false,
+            both,
+            json!({"remembered": "Kesh"}),
+        );
+        *crate::thread::THREAD.lock().unwrap() = crate::thread::Thread::new();
+        assert_eq!(answer, json!({"ok": true, "remembered": "Kesh"}));
+        assert_eq!(requests.len(), 1);
+    }
+
+    /// The first builder's P2 on #7622: past setup, with
+    /// `LAMP_NAME_LEARN_FIX`, a known face's "Call me Jay." reaches the eyes
+    /// and their held rename (`known_as`, told nothing changed), never
+    /// `ASK_FACE_FIRST`. A face the eyes don't know saying it, while they
+    /// know another in view, is still asked first.
+    #[test]
+    fn remember_speaker_past_setup_known_face_rename_reaches_the_eyes_not_ask_face_first() {
+        let _serial = TESTS.lock().unwrap_or_else(|poison| poison.into_inner());
+        let _thread = crate::provider_worker::tests::one_thread();
+        *crate::thread::THREAD.lock().unwrap() = crate::thread::Thread::new();
+        let both = known_faces::FaceSwitches {
+            name_learn_fix: true,
+            ..switches()
+        };
+        let held = json!({"error": "known_as", "known_as": "Ada"});
+        let known = |face: &str| speaking_faces::LineSeen {
+            known: Some(("Ada".into(), face.into())),
+            ..seen(proof("Call me Jay."))
+        };
+        let (answer, requests) = exchange_seen(known("eyes/f1"), "Jay", false, both, held.clone());
+        assert_ne!(answer["error"], known_faces::ASK_FACE_FIRST, "{answer}");
+        assert_eq!(requests.len(), 1, "{requests:?}");
+        assert_eq!(requests[0]["remember_speaker"]["name"], "Jay");
+        assert_eq!(requests[0]["remember_speaker"]["face"], "eyes/f1");
+        let words = answer["error"].as_str().unwrap();
+        assert!(words.contains("not changed"), "{answer}");
+        assert!(!words.contains("Ada"), "{answer}");
+        // Another face known, not the one seen saying it: asked first.
+        let (answer, requests) = exchange_seen(known("eyes/f2"), "Jay", false, both, held);
+        assert!(requests.is_empty(), "{requests:?}");
+        assert_eq!(answer["error"], known_faces::ASK_FACE_FIRST);
+    }
+
+    /// The first builder's ruling on #7622 (18 Nov 23:10): with
+    /// `LAMP_FACE_NO_ASK`, the speaker-bound proof replaces the ask, even
+    /// with `LAMP_NAME_LEARN_FIX` on as in the product. A face seen saying
+    /// "I'm X" is kept with nothing asked; a silent face while another voice
+    /// says it, a TV or off-camera voice, or a parent naming a child keeps
+    /// nothing and asks nothing. Off (`LAMP_FACE_NO_ASK`), the lamp asks
+    /// first, as Heron's P1 wants.
+    #[test]
+    fn remember_speaker_with_no_ask_and_name_learn_fix_keeps_the_speaker_unasked() {
+        let _serial = TESTS.lock().unwrap_or_else(|poison| poison.into_inner());
+        let _thread = crate::provider_worker::tests::one_thread();
+        *crate::thread::THREAD.lock().unwrap() = crate::thread::Thread::new();
+        let product = |face_no_ask: bool| known_faces::FaceSwitches {
+            name_learn_fix: true,
+            face_no_ask,
+            ..switches()
+        };
+        let asks = |answer: &Value| {
+            let text = answer.to_string();
+            ["May I", "Shall I", "Should I", "Do you want", "look at me"]
+                .iter()
+                .any(|ask| text.contains(ask))
+        };
+        let kept = json!({"remembered": "Ada"});
+        // A face seen saying "I'm Ada": kept, nothing asked.
+        for words in ["I'm Ada.", "My name is Ada."] {
+            let (answer, requests) =
+                own_name_exchange_with(words, "Ada", false, product(true), kept.clone());
+            assert_eq!(answer["ok"], true, "{words}: {answer}");
+            assert!(
+                answer["note"]
+                    .as_str()
+                    .is_some_and(|note| note.contains("I'll know you next time.")),
+                "{answer}"
+            );
+            assert!(!asks(&answer), "{words}: {answer}");
+            assert_eq!(requests.len(), 1, "{words}");
+        }
+        // A face seen, silent, while another voice says it: no enrollment
+        // proof, nothing reaches the eyes, nothing asked.
+        let silent = speaking_faces::LineSeen {
+            request: REQUEST,
+            ..Default::default()
+        };
+        let (answer, requests) = exchange_seen(silent, "Ada", false, product(true), kept.clone());
+        assert!(requests.is_empty(), "{requests:?}");
+        assert_eq!(answer["error"], known_faces::NOT_KEPT_NO_ASK, "{answer}");
+        assert!(!asks(&answer), "{answer}");
+        // A TV or a voice off camera: nothing seen at all.
+        let home = crate::process::SessionDirectory::create().unwrap();
+        let socket = home.path.join("no-eyes.sock");
+        let owner = owner();
+        let answer = known_faces::run_scoped(
+            &socket,
+            &call(json!({"name": "Anna"})),
+            product(true),
+            None,
+            None,
+            REQUEST,
+            Some(&owner.lease()),
+        )
+        .0;
+        assert_eq!(answer["error"], known_faces::NOT_KEPT_NO_ASK, "{answer}");
+        assert!(!asks(&answer), "{answer}");
+        // A parent naming a child: nothing sent, nothing asked.
+        for words in ["This is my son Tom.", "Remember my face, this is Tom."] {
+            let (answer, requests) = own_name_exchange_with(
+                words,
+                "Tom",
+                false,
+                product(true),
+                json!({"remembered": "Tom"}),
+            );
+            assert!(requests.is_empty(), "{words}: {requests:?}");
+            assert_eq!(answer["error"], known_faces::NOT_KEPT_NO_ASK, "{words}");
+        }
+        // `LAMP_FACE_NO_ASK` off: a bare name is asked first, as before.
+        let (answer, requests) =
+            own_name_exchange_with("I'm Ada.", "Ada", false, product(false), kept);
+        assert!(requests.is_empty(), "{requests:?}");
+        assert_eq!(answer["error"], known_faces::ASK_FACE_FIRST, "{answer}");
     }
 
     /// `LAMP_FACE_NO_ASK` (the first builder 18:50; Thirteen's and Heron's
@@ -759,6 +982,13 @@ mod tests {
             ("No, my name is Kesh.", Some(ASKED), false),
             ("Yes? My name is Kesh.", Some(ASKED), false),
             ("Don't remember my face, I'm Kesh.", None, false),
+            ("Keep my face out of this, I'm Kesh.", None, false),
+            (
+                "I'm Kesh. Keep my face off it, but remember me.",
+                None,
+                false,
+            ),
+            ("Forget my face, I'm Kesh, remember that.", None, false),
             ("I'm Kesh, never remember my face.", Some(ASKED), false),
             ("I'm Kesh, remember her face.", None, false),
             (
