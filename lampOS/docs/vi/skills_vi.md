@@ -3780,6 +3780,19 @@ các kỹ năng nạp và chạy y hệt từng byte như trước. `lamp_skills
     chuyện). Welcome back và Reminders giữ nguyên: lời của một task cố định
     trong tệp của nó, nên nó không mang được ai vừa quay lại (`who` của giọng
     nói) hay lời nhắc chính người đó đặt, điều câu nói mỗi lần kích hoạt cần.
+  - Chưa, vì cùng lý do: FAQ (câu hỏi và phần `knowledge.md` của nó), Who was
+    here (bản ghi 12 giờ), các câu nói của Guard mode (`[watch.words]` của nó,
+    do watch nói, không phải một bước `[[do]]`), Task news (`say = { from =
+    "tasks" }`) và Onboarding (`say = { from = "onboarding" }`) đều cần những gì
+    lần kích hoạt hay lần gọi này mang theo, và ba cái đầu còn là lệnh gọi công
+    cụ của một cuộc trò chuyện. Chúng chờ một phần theo từng lần kích hoạt của
+    task, một phán quyết riêng: nó đưa nội dung riêng tư (một bản ghi, một câu
+    hỏi, một lời nhắc) vào lần chạy của agent. Các kỹ năng nhìn (Desk tutor, các
+    dấu của nó, Look for things, Point the light) cũng giữ nguyên: lamp-tasks
+    không đưa ảnh nào cho agent; một lần chạy có quyền `camera` có thể lấy khung
+    hình rộng 320 của mắt từ lamp-control (`camera.snapshot`), sau cái gật đầu
+    của chủ đèn, nhưng chưa biết agent nào ở đây đọc được nó, và câu trả lời
+    của chúng là của cuộc trò chuyện.
 - **Mỗi trigger một task.** Task của biến thể có thể nêu trigger của nó (`on`),
   như câu say của nó, cho kỹ năng mà các bước nêu trigger: mỗi câu như vậy một
   task, mỗi task một mình trong bảng của nó trừ `on` (chỉ trong biến thể; mọi kỹ
