@@ -257,6 +257,14 @@ account keeps too (the lamp's cloud API, `POST …/history/turns/delete`).
   it deleted). What a wipe removed is told under the old epoch.
   `{"op":"history_epoch"}` answers `{"ok":true,"epoch":…}`, for the turn's
   save to make the same id.
+- **For the save** (`LAMP_HISTORY_SEND`, [memory-days.md](memory-days.md)):
+  `{"op":"history_issued"}` answers the epoch and each scope's last id given,
+  `{"ok":true,"epoch":…,"issued":{"<scope>":<id>}}`, never a word;
+  `{"op":"exchanges_after","person":…,"after":N,"limit":L}` answers that
+  scope's exchanges after id N, oldest first (at most L, 20 by default and
+  100 at most, about 48 KiB of text), as `{"ok":true,"exchanges":[{"id",
+  "at_unix_ms","heard","said"}],"more":bool}`, for a restart to send what was
+  handed to the sender and never taken.
 - **What the voice queues** (the second route's worker, `history_forget`):
   for a known person's forget everything, `{"all":true,"person":<their p-
   id>}`; for every other forget, `{"ids":[…]}` of the turn ids named, as

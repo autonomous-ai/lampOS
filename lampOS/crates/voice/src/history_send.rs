@@ -50,14 +50,17 @@
 //! unsent turns are never let go. [`deleting`] takes the ids a forget
 //! queues for deletion, by their full id.
 //!
-//! **Nothing lost at a restart, and no words on disk:** only a mark per
-//! scope, the last id the server took with none before it unsent, is kept,
-//! in [`MARKS_FILE`] (0600, ids only). At start the sending thread asks the
-//! memory for its epoch and each scope's last id (`history_issued`), and
-//! sends what the memory kept after the marks (`exchanges_after`); the
-//! memory stays the one copy of the words. An epoch unlike the marks' (a
-//! first start, or a reset) starts the marks at what the memory holds now:
-//! nothing before the switch went on is sent.
+//! **Nothing lost at a restart, and no words on disk:** only ids are kept,
+//! in [`MARKS_FILE`] (0600): a mark per scope, the last id the server took
+//! with none before it unsent, and the last id handed over in each scope
+//! (written before the post that carries it). At start the sending thread
+//! asks the memory for its epoch and each scope's last id
+//! (`history_issued`), sends what the memory kept after the marks up to
+//! what was handed over (`exchanges_after`), and moves every mark to the
+//! memory's newest id: a turn kept while no sender ran (the switch off, or
+//! the Live route) is never sent, on that start or any after. The memory
+//! stays the one copy of the words. An epoch unlike the marks' (a first
+//! start, or a reset) starts the marks at what the memory holds now.
 //!
 //! **Never on the turn's path:** the memory's writer thread hands each turn
 //! over under a short lock with no I/O, into a bounded queue (at most
@@ -266,6 +269,8 @@ struct Queue {
     acked: BTreeMap<String, u64>,
     /// The marks as last written.
     marks: BTreeMap<String, u64>,
+    /// [`Self::offered`] as last written.
+    offered_written: BTreeMap<String, u64>,
     let_go: u64,
 }
 
@@ -458,14 +463,17 @@ fn held_by_forget(queue: &mut Queue, now: Instant) -> bool {
 /// The next turns to send, oldest first, at most [`BATCH_MOST`], and the
 /// epoch; waits until there are some, the epoch is known and no forget
 /// holds. `None`: a forget was answered, and the epoch is read again first.
-fn next_batch(shared: &Shared) -> Option<(Vec<Pending>, String)> {
+fn next_batch(shared: &Shared) -> Next {
     let mut queue = locked(shared);
     loop {
         let now = Instant::now();
         queue.age_out(now);
         let holding = held_by_forget(&mut queue, now);
         if !holding && queue.epoch_stale {
-            return None;
+            return Next::Epoch;
+        }
+        if queue.store.is_some() && queue.offered != queue.offered_written {
+            return Next::Write;
         }
         if !holding
             && !queue.ready.is_empty()
@@ -473,7 +481,7 @@ fn next_batch(shared: &Shared) -> Option<(Vec<Pending>, String)> {
         {
             let take = queue.ready.len().min(BATCH_MOST);
             let batch = queue.ready.drain(..take).collect();
-            return Some((batch, store));
+            return Next::Batch(batch, store);
         }
         let wait = match queue.paused_until {
             Some(until) => until
@@ -483,6 +491,16 @@ fn next_batch(shared: &Shared) -> Option<(Vec<Pending>, String)> {
         };
         queue = wait_on(shared, queue, wait);
     }
+}
+
+/// What the sending thread does next.
+enum Next {
+    /// These turns, under this epoch.
+    Batch(Vec<Pending>, String),
+    /// A forget was answered: the epoch is read again first.
+    Epoch,
+    /// What was handed over is written down first.
+    Write,
 }
 
 /// How a batch ended.
@@ -575,25 +593,37 @@ fn send_batch(
     Ended::Waits
 }
 
-/// The marks file's contents: the epoch and each scope's mark.
-fn read_marks(path: &Path) -> Option<(String, BTreeMap<String, u64>)> {
+/// An id per memory scope.
+type ByScope = BTreeMap<String, u64>;
+
+/// The marks file's contents: the epoch, each scope's mark, and the last
+/// id handed over in each scope.
+fn read_marks(path: &Path) -> Option<(String, ByScope, ByScope)> {
     let bytes = crate::config::read_private(path, 65_536).ok()?;
     let value: Value = serde_json::from_slice(&bytes).ok()?;
     let store = value.get("epoch")?.as_str()?.to_owned();
-    let marks = value
-        .get("marks")?
-        .as_object()?
-        .iter()
-        .filter_map(|(scope, mark)| Some((scope.clone(), mark.as_u64()?)))
-        .collect();
-    Some((store, marks))
+    let ids = |key: &str| -> BTreeMap<String, u64> {
+        value
+            .get(key)
+            .and_then(Value::as_object)
+            .into_iter()
+            .flatten()
+            .filter_map(|(scope, id)| Some((scope.clone(), id.as_u64()?)))
+            .collect()
+    };
+    Some((store, ids("marks"), ids("offered")))
 }
 
 /// The marks written whole (a new file renamed into place), 0600.
-fn write_marks(path: &Path, store: &str, marks: &BTreeMap<String, u64>) -> std::io::Result<()> {
+fn write_marks(
+    path: &Path,
+    store: &str,
+    marks: &BTreeMap<String, u64>,
+    offered: &BTreeMap<String, u64>,
+) -> std::io::Result<()> {
     use std::io::Write;
     use std::os::unix::fs::OpenOptionsExt;
-    let text = json!({"epoch": store, "marks": marks}).to_string();
+    let text = json!({"epoch": store, "marks": marks, "offered": offered}).to_string();
     let fresh = path.with_extension("json.new");
     let _ = std::fs::remove_file(&fresh);
     let mut file = std::fs::OpenOptions::new()
@@ -606,8 +636,9 @@ fn write_marks(path: &Path, store: &str, marks: &BTreeMap<String, u64>) -> std::
     std::fs::rename(&fresh, path)
 }
 
-/// Each scope's mark that rose written down, off the turn's path.
-fn keep_marks(shared: &Shared, path: Option<&Path>, scopes: &BTreeSet<String>) {
+/// Each scope's mark that rose written down, with what was handed over,
+/// off the turn's path; `force`: written whatever changed.
+fn keep_marks(shared: &Shared, path: Option<&Path>, scopes: &BTreeSet<String>, force: bool) {
     let mut queue = locked(shared);
     let Some(store) = queue.store.clone() else {
         return;
@@ -622,10 +653,13 @@ fn keep_marks(shared: &Shared, path: Option<&Path>, scopes: &BTreeSet<String>) {
         }
     }
     let marks = queue.marks.clone();
+    let offered = queue.offered.clone();
+    let handed = queue.offered_written != offered;
+    queue.offered_written = offered.clone();
     drop(queue);
-    if rose
+    if (rose || handed || force)
         && let Some(path) = path
-        && write_marks(path, &store, &marks).is_err()
+        && write_marks(path, &store, &marks, &offered).is_err()
     {
         eprintln!("lamp-voice history: the marks could not be written ({ENVIRONMENT})");
     }
@@ -660,28 +694,28 @@ fn catch_up(shared: &Shared, post: &mut Post, ask: &mut Ask, marks: Option<&Path
         drop(wait_on(shared, queue, waits.first));
     };
     let kept = marks.and_then(read_marks);
-    let from = match kept {
-        Some((kept_store, kept)) if kept_store == store => Some(kept),
-        _ => None,
+    let (from, carried) = match kept {
+        Some((kept_store, kept, offered)) if kept_store == store => (kept, offered),
+        // A first start, or a new epoch: nothing from before is sent.
+        _ => (issued.clone(), BTreeMap::new()),
     };
     {
         let mut queue = locked(shared);
         queue.store = Some(store.clone());
-        queue.marks = from.clone().unwrap_or_else(|| issued.clone());
+        queue.marks = from.clone();
+        for (scope, high) in &carried {
+            let offered = queue.offered.entry(scope.clone()).or_insert(0);
+            *offered = (*offered).max(*high);
+        }
         shared.1.notify_all();
     }
-    let Some(from) = from else {
-        if let Some(path) = marks
-            && write_marks(path, &store, &issued).is_err()
-        {
-            eprintln!("lamp-voice history: the marks could not be written ({ENVIRONMENT})");
-        }
-        return;
-    };
     let mut sent = 0usize;
     for (scope, last) in &issued {
         let mut after = from.get(scope).copied().unwrap_or(0);
-        while after < *last {
+        // Only what was handed over before and never taken: a turn kept
+        // while no sender ran (the switch off, the Live route) is passed.
+        let high = carried.get(scope).copied().unwrap_or(0).min(*last);
+        while after < high {
             let mut line = json!({"op":"exchanges_after","after":after,"limit":BATCH_MOST});
             if scope != ROOM_SCOPE {
                 line["person"] = json!(scope);
@@ -699,7 +733,7 @@ fn catch_up(shared: &Shared, post: &mut Post, ask: &mut Ask, marks: Option<&Path
                 .filter_map(|exchange| {
                     Some(Pending {
                         scope: scope.clone(),
-                        exchange: exchange["id"].as_u64().filter(|id| id <= last)?,
+                        exchange: exchange["id"].as_u64().filter(|id| *id <= high)?,
                         at_unix_ms: exchange["at_unix_ms"].as_u64()?,
                         heard: capped(exchange["heard"].as_str()?),
                         said: capped(exchange["said"].as_str()?),
@@ -723,7 +757,7 @@ fn catch_up(shared: &Shared, post: &mut Post, ask: &mut Ask, marks: Option<&Path
             let count = batch.len();
             let ended = send_batch(shared, post, &mut batch, &store, waits);
             ended_batch(shared, &batch, ended);
-            keep_marks(shared, marks, &BTreeSet::from([scope.clone()]));
+            keep_marks(shared, marks, &BTreeSet::from([scope.clone()]), false);
             if ended == Ended::Waits {
                 eprintln!(
                     "lamp-voice history: the store did not take what was unsent; it goes at the next start ({ENVIRONMENT})"
@@ -736,7 +770,14 @@ fn catch_up(shared: &Shared, post: &mut Post, ask: &mut Ask, marks: Option<&Path
                 break;
             }
         }
+        // Past what was kept with no sender: as taken, never sent.
+        let mut queue = locked(shared);
+        let acked = queue.acked.entry(scope.clone()).or_insert(0);
+        *acked = (*acked).max(*last);
+        drop(queue);
+        keep_marks(shared, marks, &BTreeSet::from([scope.clone()]), false);
     }
+    keep_marks(shared, marks, &BTreeSet::new(), true);
     if sent > 0 {
         eprintln!(
             "lamp-voice history: {sent} turns unsent before the start were sent ({ENVIRONMENT})"
@@ -790,6 +831,7 @@ fn reread_epoch(shared: &Shared, ask: &mut Ask, marks: Option<&Path>, waits: Wai
     queue.forgotten_order.clear();
     queue.emptied.clear();
     queue.offered.clear();
+    queue.offered_written.clear();
     queue.outstanding.clear();
     queue.deferred.clear();
     queue.acked.clear();
@@ -800,7 +842,7 @@ fn reread_epoch(shared: &Shared, ask: &mut Ask, marks: Option<&Path>, waits: Wai
         "lamp-voice history: the memory's epoch changed; {waiting} turns not sent go at the next start ({ENVIRONMENT})"
     );
     if let Some(path) = marks
-        && write_marks(path, &epoch, &BTreeMap::new()).is_err()
+        && write_marks(path, &epoch, &BTreeMap::new(), &BTreeMap::new()).is_err()
     {
         eprintln!("lamp-voice history: the marks could not be written ({ENVIRONMENT})");
     }
@@ -813,14 +855,23 @@ fn send_all(shared: &Shared, mut post: Post, mut ask: Ask, marks: Option<PathBuf
     catch_up(shared, &mut post, &mut ask, marks.as_deref(), waits);
     let mut saving = None;
     loop {
-        let Some((mut batch, store)) = next_batch(shared) else {
-            reread_epoch(shared, &mut ask, marks.as_deref(), waits);
-            continue;
+        let (mut batch, store) = match next_batch(shared) {
+            Next::Batch(batch, store) => (batch, store),
+            Next::Epoch => {
+                reread_epoch(shared, &mut ask, marks.as_deref(), waits);
+                continue;
+            }
+            Next::Write => {
+                keep_marks(shared, marks.as_deref(), &BTreeSet::new(), false);
+                continue;
+            }
         };
+        // What it hands over is written down before it goes.
+        keep_marks(shared, marks.as_deref(), &BTreeSet::new(), false);
         let ended = send_batch(shared, &mut post, &mut batch, &store, waits);
         ended_batch(shared, &batch, ended);
         let scopes = batch.iter().map(|pending| pending.scope.clone()).collect();
-        keep_marks(shared, marks.as_deref(), &scopes);
+        keep_marks(shared, marks.as_deref(), &scopes, false);
         let now_saving = match ended {
             Ended::Answered(Answer::Saved) => Some(true),
             Ended::Answered(_) | Ended::Waits => Some(false),
@@ -1159,6 +1210,28 @@ pub fn forget_answered(person: Option<&str>, everything: bool, answer: Option<&V
 /// half's queue (`LAMP_HISTORY_FORGET`).
 pub fn deleting(ids: &[String]) {
     with_sender(|sender| sender.deleting(ids));
+}
+
+/// A memory answer the voice read (`history_forget::answered`, every
+/// forget op's way): the turn ids its `exchanges` names are never posted.
+pub fn forget_seen(answer: &Value) {
+    if answer["ok"] != true {
+        return;
+    }
+    let Some(by_scope) = answer.get("exchanges").and_then(Value::as_object) else {
+        return;
+    };
+    let ids: Vec<String> = by_scope
+        .values()
+        .filter_map(Value::as_array)
+        .flatten()
+        .filter_map(Value::as_str)
+        .filter(|turn| parse_turn(turn).is_some())
+        .map(str::to_owned)
+        .collect();
+    if !ids.is_empty() {
+        deleting(&ids);
+    }
 }
 
 /// Where saves go, from the second route's `llm_base_url`: the lamp's own

@@ -908,18 +908,25 @@ khoản (Backend3, 19/11): `POST <base>/history/turns` với khóa của lamp tr
   đó đến lúc ấy. Khi câu trả lời không nêu id nào (hoặc không có câu trả lời),
   các lượt chưa gửi của người quên và của phòng chờ lần khởi động sau, khi bộ nhớ
   không còn giữ những gì đã đi. Lượt chưa gửi của người khác không bao giờ bị
-  bỏ. `history_send::deleting` nhận các id đầy đủ mà phần quên xếp hàng để xóa.
-  Một nguồn bị quên bên ngoài voice được coi như một lệnh quên không nêu id của
-  người đó.
-- **Không mất gì khi khởi động lại, và không có lời nào trên đĩa:** thứ duy nhất
-  được giữ là một mốc cho mỗi phạm vi, id cuối máy chủ đã nhận mà không còn id
-  nào trước nó chưa gửi, trong `/var/lib/lampOS/voice/history-marks.json` (0600,
-  `{"epoch","marks":{scope:id}}`, ghi nguyên tệp, ngoài đường của lượt nói). Khi
-  khởi động, luồng gửi hỏi bộ nhớ `history_issued` (đến khi nó trả lời; không POST gì
-  trước đó) và gửi những gì bộ nhớ đã giữ sau mỗi mốc, bằng `exchanges_after`,
-  với cùng các id. Bộ nhớ vẫn là bản duy nhất của lời. Một epoch khác với epoch của
-  các mốc (lần khởi động đầu, hoặc sau đặt lại) bắt đầu các mốc ở những gì bộ
-  nhớ đang giữ: không gửi gì đã nói trước khi bật công tắc.
+  bỏ. Mọi câu trả lời của bộ nhớ mà voice đọc có turn id trong `exchanges` (cả
+  năm lệnh quên, `history_forget::answered`) đều đến `history_send::deleting`,
+  nên các id đó không bao giờ được POST, dù `LAMP_HISTORY_FORGET` thế nào. Một
+  lệnh quên về một điều cũng giữ lại rồi thả các lần POST như mọi lệnh quên
+  khác. Một nguồn bị quên bên ngoài voice được coi như một lệnh quên không nêu
+  id của người đó.
+- **Không mất gì khi khởi động lại, và không có lời nào trên đĩa:** chỉ có id
+  được giữ, trong `/var/lib/lampOS/voice/history-marks.json` (0600,
+  `{"epoch","marks":{scope:id},"offered":{scope:id}}`, ghi nguyên tệp, ngoài
+  đường của lượt nói): một mốc cho mỗi phạm vi, id cuối máy chủ đã nhận mà không
+  còn id nào trước nó chưa gửi, và id cuối đã trao cho luồng gửi trong mỗi phạm
+  vi, ghi trước lần POST mang nó. Khi khởi động, luồng gửi hỏi bộ nhớ
+  `history_issued` (đến khi nó trả lời; không POST gì trước đó), gửi những gì bộ
+  nhớ đã giữ sau mỗi mốc cho đến id đã trao, bằng `exchanges_after`, với cùng
+  các id, rồi dời mọi mốc lên id mới nhất của bộ nhớ. Bộ nhớ vẫn là bản duy nhất
+  của lời. Vì vậy ở mọi lần khởi động, không chỉ lần đầu, những gì được giữ
+  trong lúc không có luồng gửi nào chạy không bao giờ được gửi: công tắc tắt,
+  tuyến Live, hay voice không chạy. Một epoch khác với epoch của các mốc (lần
+  khởi động đầu, hoặc sau đặt lại) bắt đầu các mốc ở những gì bộ nhớ đang giữ.
 - **Gửi đến đâu:** chỉ API đám mây của chính lamp, máy chủ relay mà
   `llm_base_url` của tuyến nêu (`https://campaign-api.autonomous.ai/api/v1/ai`,
   có hoặc không có `/v1`; `history_send::url`). Với base của một nhà cung cấp
