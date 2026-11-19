@@ -229,7 +229,7 @@ fn net_code_told() -> String {
          gives the run its web proxy, and it reaches only the public web on ports 80 and 443), \
          says what it found in a sentence or two with lamp.say (a plain spoken line when the \
          fetch fails), and then prints only \"{said}\", so the lamp's agent that ran it ends \
-         with a dash and it is heard once. \"{net}\" never sits beside camera, microphone, speech, notes, look or a linked service's grant. Never \
+         with a dash and it is heard once. \"{net}\" never sits beside camera, microphone, speech, look or a linked service's grant. Never \
          {cannot} for it, never {needs_net} for it, and never a say telling the person to look \
          it up themselves.",
         net = crate::skill_task_yes::NET.0,
@@ -4508,6 +4508,22 @@ pub(crate) mod tests {
     use std::io::{Read, Write};
     use std::os::unix::fs::PermissionsExt;
     use std::path::{Path, PathBuf};
+
+    /// #7901: the make is told `net` never sits beside exactly the private
+    /// grants the check refuses, so it no longer drops a skill's own notes
+    /// from a web skill that keeps them.
+    #[test]
+    fn the_make_is_told_net_never_sits_beside_only_the_private_grants() {
+        let told = net_code_told();
+        let beside = told
+            .split("never sits beside ")
+            .nth(1)
+            .and_then(|rest| rest.split(" or a linked service's grant").next())
+            .expect("the never-beside list");
+        let named: Vec<&str> = beside.split(", ").collect();
+        assert_eq!(named, crate::skill_task_yes::PRIVATE_GRANTS, "{told}");
+        assert!(!named.contains(&"notes"), "{told}");
+    }
 
     /// Heron's P1 on #6558: a voice make's write waits for the owner's yes
     /// only. A visitor's "yes" approves nothing and drops the wait; the
