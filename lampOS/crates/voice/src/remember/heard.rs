@@ -854,7 +854,7 @@ pub fn near_not_kept_told(near: &[(String, String)]) -> Value {
     json!({
         "remembered": false,
         "note": format!(
-            "Not kept: they were heard saying {heard}, not your words, and the lamp may have misheard, so nothing is kept. Tell them so in a few words, with no question, for example \"{}\" Never ask \"is that ...?\" or \"did you say ...?\", and never say it is kept or noted.",
+            "Not kept: they were heard saying {heard}, not your words, and the lamp may have misheard, so nothing is kept. Tell them so in a few words, with no question, for example \"{}\", and end your reply there: never ask \"is that ...?\" or \"did you say ...?\", or ask them to say it again, spell it or say more, and never say it is kept or noted.",
             super::doubted::NOT_CAUGHT_LINE
         ),
     })
@@ -986,6 +986,27 @@ pub fn answered(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// #7739: a near spelling not kept is told whole: nothing kept, the
+    /// not-caught line, and the reply ends there with nothing asked (the
+    /// 06c1 ROW at ac50913437 heard "… could you spell or say it again?").
+    #[test]
+    fn a_near_spelling_not_kept_is_said_and_asks_nothing() {
+        let told = near_not_kept_told(&[("renunculus".into(), "ranunculus".into())]);
+        assert_eq!(told["remembered"], false);
+        let note = told["note"].as_str().unwrap();
+        assert!(
+            note.contains(super::super::doubted::NOT_CAUGHT_LINE),
+            "{note}"
+        );
+        assert!(note.contains("end your reply there"), "{note}");
+        assert!(
+            note.contains("say it again, spell it or say more"),
+            "{note}"
+        );
+        assert!(note.contains("never say it is kept"), "{note}");
+        assert!(!note.contains("ranunculus"), "{note}");
+    }
     use std::time::Duration;
 
     const TEA: &str = "please remember that my favourite tea is jasmine";
