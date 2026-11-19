@@ -17,6 +17,7 @@
 //! (#4883, [`MOST_FILES`]).
 use super::SOUND_RATE;
 use crate::language::{Language, WOKEN_BY_NAME_LINE};
+use crate::speaker_stream::Feed;
 use sha2::{Digest, Sha256};
 use std::{
     fs,
@@ -263,6 +264,93 @@ impl TtsCache {
         in_pieces(text, |piece| render_in(piece, voice))
     }
 
+    /// `text` rendered now, never kept, to be played as it comes (#7892,
+    /// V2's 12:35 on #7897), in `voice` when one is given (the app's voice
+    /// preview, as [`Self::render_once_in`]). A line within
+    /// [`MOST_PIECE_CHARS`] is rendered whole, as before. A longer one's
+    /// first piece is rendered here, so its failure refuses the line as
+    /// before, and played at once from a feed of its own; the pieces after
+    /// it are rendered on a thread of their own ([`Self::render_rest`]),
+    /// each while the one before it plays.
+    pub fn render_played(
+        self: &Arc<Self>,
+        text: &str,
+        voice: Option<&str>,
+    ) -> Result<Played, String> {
+        let pieces = pieces(text);
+        if pieces.len() == 1 {
+            return match voice {
+                Some(voice) => self.render_once_in(text, voice),
+                None => self.render_once(text),
+            }
+            .map(Played::Whole);
+        }
+        let first = self.render_piece(&pieces[0], voice)?;
+        // Room for the piece playing and the one rendered after it, each
+        // within the cap.
+        let feed = Feed::for_line(2 * MOST_FRAMES as usize);
+        feed.push(&first);
+        let cache = Arc::clone(self);
+        let rest = pieces[1..].to_vec();
+        let voice = voice.map(str::to_owned);
+        let fed = Arc::clone(&feed);
+        let spawned = std::thread::Builder::new()
+            .name("say-pieces".into())
+            .spawn(move || cache.render_rest(&rest, voice.as_deref(), first.len(), &fed));
+        if let Err(why) = spawned {
+            eprintln!("lamp-voice: a long exact line's later pieces are not rendered: {why}");
+            feed.close_short();
+        }
+        Ok(Played::Pieces(Arc::new(Pieces { feed })))
+    }
+
+    /// One piece rendered, in `voice` when given, or why not, as
+    /// [`Self::render_once`] says it.
+    fn render_piece(&self, piece: &str, voice: Option<&str>) -> Result<Vec<i16>, String> {
+        match voice {
+            None => in_pieces(piece, |piece| (self.render)(piece)),
+            Some(voice) => {
+                let render_in = self.render_in.as_ref().ok_or_else(|| {
+                    "this lamp's speech service speaks in its own voice only".to_owned()
+                })?;
+                in_pieces(piece, |piece| render_in(piece, voice))
+            }
+        }
+    }
+
+    /// The pieces after the first, rendered in turn into `feed`, in order.
+    /// Each is rendered once all before the last one put in was taken to
+    /// play (`last` its samples): while that one plays, so at most one
+    /// piece waits rendered and the next is ready before it ends. Stopped,
+    /// and nothing more rendered, once nobody plays the line
+    /// ([`Feed::abandoned`]); a piece not rendered ends the line there,
+    /// not said whole ([`Feed::close_short`]).
+    fn render_rest(&self, rest: &[String], voice: Option<&str>, mut last: usize, feed: &Feed) {
+        for piece in rest {
+            while feed.held_samples() > last && !feed.abandoned() {
+                std::thread::sleep(PIECE_LOOK);
+            }
+            if feed.abandoned() {
+                return;
+            }
+            match self.render_piece(piece, voice) {
+                Ok(_) if feed.abandoned() => return,
+                Ok(samples) => {
+                    last = samples.len();
+                    feed.push(&samples);
+                }
+                Err(why) => {
+                    eprintln!(
+                        "lamp-voice: a long exact line's next piece was {why}: the line ends there"
+                    );
+                    feed.close_short();
+                    return;
+                }
+            }
+        }
+        feed.close();
+    }
+
     /// `text`'s samples if kept already, never rendered here: for a caller
     /// that must not wait on the speech service (#3748).
     pub fn kept(&self, text: &str) -> Option<Vec<i16>> {
@@ -413,6 +501,48 @@ fn in_pieces(
     }
     Ok(samples)
 }
+
+/// A long exact line's sound (#7892): played from its feed as its pieces
+/// come ([`TtsCache::render_played`]). Let go, by the last say or turn
+/// that holds it (the line cut, refused, expired or ended), its renderer
+/// stops and no later piece is rendered or played.
+#[derive(Debug)]
+pub struct Pieces {
+    feed: Arc<Feed>,
+}
+
+impl Pieces {
+    /// The feed its pieces come through, for the speaker.
+    pub fn feed(&self) -> Arc<Feed> {
+        Arc::clone(&self.feed)
+    }
+}
+
+impl Drop for Pieces {
+    fn drop(&mut self) {
+        self.feed.abandon();
+    }
+}
+
+/// A line's pieces are their own: equal only to themselves.
+impl PartialEq for Pieces {
+    fn eq(&self, other: &Self) -> bool {
+        std::ptr::eq(self, other)
+    }
+}
+
+impl Eq for Pieces {}
+
+/// An exact line rendered to play ([`TtsCache::render_played`]): whole, or
+/// in pieces that come as they are rendered.
+#[derive(Debug)]
+pub enum Played {
+    Whole(Vec<i16>),
+    Pieces(Arc<Pieces>),
+}
+
+/// How often a long line's renderer looks whether its last piece began.
+const PIECE_LOOK: Duration = Duration::from_millis(10);
 
 /// Where a long line is cut, coarsest first: sentence ends, then clause
 /// ends; past both, between words.
