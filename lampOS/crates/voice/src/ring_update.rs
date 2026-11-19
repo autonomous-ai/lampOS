@@ -496,6 +496,7 @@ mod tests {
                 started_at_unix_ms: ROUND,
                 step_started_at_unix_ms: ROUND,
                 target: Some(build(813)),
+                ..UpdateRound::default()
             }),
             engines: None,
             refused: None,
