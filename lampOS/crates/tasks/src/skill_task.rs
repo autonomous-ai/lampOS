@@ -8375,4 +8375,43 @@ mod tests {
         assert!(!lines.next().unwrap_or_default().contains("test-value-123"));
         assert!(!file.exists());
     }
+
+    /// #7873: a skill's run is told on `skills/tasks` by its id and the
+    /// engine it began on (`tasks/status` lists only the store's tasks,
+    /// which a skill's run never enters), then how it ended; a name that
+    /// isn't a skill's is never told.
+    #[test]
+    fn a_skills_run_is_told_by_its_id_and_engine() {
+        use crate::harness::EngineKind;
+        let run = "task-1795056147468-853891-0";
+        let started = run_news(
+            "mail-check",
+            run,
+            SkillTaskStage::Started,
+            Some(EngineKind::Openclaw),
+        );
+        started.check().unwrap();
+        assert_eq!(
+            serde_json::to_value(&started).unwrap(),
+            json!({"skill": "mail-check", "stage": "started", "run": run, "engine": "openclaw"})
+        );
+        let ran = run_news("mail-check", run, SkillTaskStage::Ran, None);
+        ran.check().unwrap();
+        assert_eq!(ran.engine, None);
+        assert!(
+            run_news("Mail Check", run, SkillTaskStage::Failed, None)
+                .check()
+                .is_err()
+        );
+        // Told where a run begins, on both paths a skill's run takes, and
+        // where it ends, whatever its runner.
+        let source = include_str!("skill_task.rs");
+        assert!(source.contains("tell_run(skill, &run.run, ended, None);"));
+        assert!(source.contains(
+            "if !self.makes {\n            tell_run(&run.skill, &run.run, SkillTaskStage::Started, Some(engine));"
+        ));
+        assert!(source.contains(
+            "        }\n        tell_run(&run.skill, &run.run, SkillTaskStage::Started, Some(engine));\n        // A run granted `net`"
+        ));
+    }
 }
