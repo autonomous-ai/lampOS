@@ -5986,22 +5986,40 @@ kept in the state folder's `task-telling.json` (its skill and when it
 began, never a word of it), so one a restart of lamp-skills drops unsaid is
 said at the next start (`what its agent found: dropped unsaid, lamp-skills
 restarted while it waited`, `task::telling_dropped`).
-The faces the gate counts, a read's and a told answer's, are the people
-lamp-voice counts at the lamp, by its own rule (`service_read::FacesSeen`,
-`known_faces::most_faces_lately`): with `LAMP_FACES_AT_DESK_ONLY=on` (on in
-`lamp-skills`' product unit as in the voice's) only faces at the desk
-(`known_faces::count_at_desk`), and the most of them seen in at least two of
-the eyes' looks of the last 3 s, each look counted once. So a small or unsure
-face far behind the owner, or one look's face never seen again, is not
-someone with them; a second face at the desk in two looks still holds the
-gate ("not alone") or stops a read under way. A look the bus says expired,
-older than 3 s or not whole is no look, and none in the last 3 s is nobody.
-Before, every face in the eyes' newest look counted: on lamp-52e6 (19 Nov,
-09:44, V2's report) a made skill's mail-check answer waited "not alone" 29
-times in two minutes while lamp-voice read one face at the desk and "2 faces
-not at the desk". Tests (`service_read::tests`):
+The faces the gate counts, a read's and a told answer's, are every face in
+view but a far one (`service_read::FacesSeen`, `service_read::near_faces`),
+with `LAMP_FACES_AT_DESK_ONLY=on` (on in `lamp-skills`' product unit as in
+the voice's), and the most of them seen in at least two of the eyes' looks
+of the last 3 s, each look counted once, as lamp-voice's
+`known_faces::most_faces_lately` counts. A face is dropped only for its
+height, never for the eyes being unsure of it alone (the first builder's
+ruling, 19 Nov 12:20 on #7814: a read is said unasked, so a person at the
+desk must hold it). A face is far when it is under 0.6 of the owner's face's
+height (`known_faces::AT_DESK_HEIGHT`). The owner's face is the eyes' known
+face at the lamp: the tallest face they are at least 0.70 sure of and at
+most 0.6 of the picture tall. With no owner's face to measure from (a lamp
+that knows nobody, as lamp-e82d, #7876, or the owner not known in view), a
+face is far when it is under 0.10 of the picture tall, the eyes' own near
+bar (`NEAR_ENOUGH`). So a small face far behind the owner (mostly a TV, a
+photo or someone passing), or one look's face never seen again, is not
+someone with them. A silent guest at the desk turned sideways (the eyes
+about 0.65 sure) still counts, and a second face at the desk in two looks
+holds the gate ("not alone") or stops a read under way. A far person who
+speaks still holds it too, by the voice heard ("a voice heard"): the silent
+far face is the only one let through. A look the bus says expired, older
+than 3 s or not whole is no look, and none in the last 3 s (the camera off,
+the eyes stopped) is nobody, which holds the gate; so is a look whose faces
+are all far. Before, every face in the eyes' newest look counted: on
+lamp-52e6 (19 Nov, 09:44, V2's report) a made skill's mail-check answer
+waited "not alone" 29 times in two minutes while lamp-voice read one face
+at the desk and "2 faces not at the desk". Tests (`service_read::tests`):
 `one_face_at_the_desk_beside_a_far_one_is_alone`,
-`a_stale_or_lost_track_is_not_counted`, `two_faces_at_the_desk_are_not_alone`.
+`a_stale_or_lost_track_is_not_counted`, `two_faces_at_the_desk_are_not_alone`,
+`an_unsure_face_at_the_desk_holds_the_read`,
+`a_far_face_under_six_tenths_of_the_owners_lets_the_read_through`,
+`a_far_face_with_a_voice_heard_holds_the_read`,
+`with_no_owners_face_known_the_eyes_near_bar_measures`,
+`the_camera_off_holds_the_read`.
 
 With `LAMP_TOLD_WHEN_ASKED=on` (`lamp-skills` and `lamp-voice`, off unless
 set; #7180, the first builder's ruling): a run the owner asked for by voice

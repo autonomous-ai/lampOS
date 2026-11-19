@@ -3376,8 +3376,8 @@ fn a_made_skills_read_is_in_the_private_room_too() {
         section(skills, "Service").contains(&"Environment=LAMP_PRIVATE_ROOM=on"),
         "lamp-skills lacks LAMP_PRIVATE_ROOM"
     );
-    // Its gate counts the people at the lamp as the voice does: only faces
-    // at the desk (V2, 19 Nov 09:53: "not alone" beside a far face).
+    // Its gate counts every face but a far one, by height only (V2, 19 Nov
+    // 09:53: "not alone" beside a far face; the first builder, 12:20 #7814).
     assert!(
         section(skills, "Service").contains(&"Environment=LAMP_FACES_AT_DESK_ONLY=on"),
         "lamp-skills lacks LAMP_FACES_AT_DESK_ONLY"

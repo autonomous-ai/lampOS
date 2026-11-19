@@ -32,8 +32,9 @@
 //!   name or known face. Counting faces is not an ownership check, so two
 //!   faces still hold it and a face that comes still stops it; a voice
 //!   heard still does, and nobody in view still holds it. The faces are
-//!   counted as lamp-voice counts the people at the lamp ([`FacesSeen`]):
-//!   only faces at the desk, in two of the eyes' looks of the last 3 s.
+//!   counted in two of the eyes' looks of the last 3 s ([`FacesSeen`]):
+//!   every face but a far one, by height alone, never by how sure the eyes
+//!   are of it, so a far face that speaks still holds it by its voice.
 //! - **One read at a time** ([`Turns`], [`TURNS`] for the lamp): two
 //!   skills' reads due together (Morning agenda held at its gate while
 //!   Morning mail came due, #5618) would say their lines in turn, one
@@ -537,23 +538,24 @@ pub fn judge(seen: &Seen) -> Result<(), Closed> {
     Ok(())
 }
 
-/// The faces the gate counts ([`Seen::faces`]): the people lamp-voice
-/// counts at the lamp, by its own rule. V2's report (19 Nov 09:53): on
-/// lamp-52e6 a made skill's `do.task` answer waited from 09:44 with "not
+/// The faces the gate counts ([`Seen::faces`]). V2's report (19 Nov 09:53):
+/// on lamp-52e6 a made skill's `do.task` answer waited from 09:44 with "not
 /// alone" 29 times in two minutes, while lamp-voice read one face at the
 /// desk and "2 faces not at the desk": the gate counted every face in the
-/// eyes' newest look. Now, as `lamp_voice::known_faces::most_faces_lately`
-/// counts (the voice's `services::owner_alone`, the owner alone for a
-/// service's records read in full):
+/// eyes' newest look. Now:
 ///
-/// - only faces at the desk, with `desk_only`
-///   (`LAMP_FACES_AT_DESK_ONLY`, `known_faces::count_at_desk`): a small or
-///   unsure face far behind the owner is not someone with them;
+/// - with `desk_only` (`LAMP_FACES_AT_DESK_ONLY`), every face but a far one
+///   ([`near_faces`]): a small face far behind the owner (mostly a TV, a
+///   photo or someone passing) is not someone with them. A face is never
+///   dropped for the eyes being unsure of it alone (the first builder's
+///   ruling, 19 Nov 12:20 on #7814): a read is said unasked, so a silent
+///   guest at the desk turned sideways still holds it;
 /// - the most faces seen in at least two of the eyes' looks of the last
 ///   `known_faces::FACES_WITHIN` (3 s), each look counted once by its
-///   publisher's boot and number (`FacesLately`): one look's face that is
-///   never seen again (a track lost at once) is not someone, and a second
-///   face at the desk in two looks is;
+///   publisher's boot and number (`FacesLately`), as lamp-voice's
+///   `known_faces::most_faces_lately` counts: one look's face that is never
+///   seen again (a track lost at once) is not someone, and a second face at
+///   the desk in two looks is;
 /// - a look the bus says expired, older than 3 s or not whole is no look,
 ///   and with none in the last 3 s nobody is counted, which holds the gate.
 #[derive(Debug, Default)]
@@ -561,15 +563,18 @@ pub struct FacesSeen(lamp_voice::known_faces::FacesLately);
 
 impl FacesSeen {
     /// The faces counted at `at` (wall clock `now_unix_ms`), with the eyes'
-    /// newest look on the bus (`humans/faces/tracked`), if any, taken in.
+    /// newest look on the bus (`humans/faces/tracked`), if any, taken in,
+    /// and `owner_in_view` whether the eyes know the owner's face at the
+    /// lamp now ([`near_faces`]).
     pub fn count(
         &mut self,
         at: std::time::Instant,
         now_unix_ms: u64,
         newest: Option<&lamp_bus::Message>,
         desk_only: bool,
+        owner_in_view: bool,
     ) -> Option<usize> {
-        use lamp_voice::known_faces::{FACES_WITHIN, count_at_desk};
+        use lamp_voice::known_faces::FACES_WITHIN;
         let fresh = newest.filter(|message| {
             !message.expired
                 && now_unix_ms.saturating_sub(message.header.at_unix_ms)
@@ -582,11 +587,43 @@ impl FacesSeen {
             self.0.look(
                 at,
                 (message.header.boot.clone(), message.header.seq),
-                count_at_desk(&faces, desk_only),
+                near_faces(&faces.faces, desk_only, owner_in_view),
             );
         }
         self.0.most(at)
     }
+}
+
+/// How many faces of one look the gate counts: without `desk_only`, every
+/// face; with it, every face but a far one, by height alone, never by how
+/// sure the eyes are of it. A face is far when it is under
+/// `known_faces::AT_DESK_HEIGHT` (0.6) of the owner's face's height. The
+/// owner's face is the eyes' known face at the lamp (`owner_in_view`): the
+/// near face they recognise, the tallest they are at least
+/// `known_faces::AT_DESK_CONFIDENCE` sure of and at most
+/// `known_faces::AT_DESK_TALLEST` of the picture tall, so a giant false box
+/// is never the measure (lamp-voice's own reference, `known_faces::at_desk`).
+/// With no owner's face to measure from (none known, as on lamp-e82d,
+/// #7876, or the owner not known in view now), a face is far when it is
+/// under the eyes' own near bar, [`crate::watch::NEAR`] (0.10) of the
+/// picture tall. A look whose faces are all far counts nobody.
+pub fn near_faces(faces: &[lamp_msgs::Face], desk_only: bool, owner_in_view: bool) -> usize {
+    use lamp_voice::known_faces::{AT_DESK_CONFIDENCE, AT_DESK_HEIGHT, AT_DESK_TALLEST};
+    if !desk_only {
+        return faces.len();
+    }
+    let height = |face: &lamp_msgs::Face| face.ymax - face.ymin;
+    let owner = faces
+        .iter()
+        .filter(|face| face.confidence >= AT_DESK_CONFIDENCE && height(face) <= AT_DESK_TALLEST)
+        .map(height)
+        .fold(0.0_f32, f32::max);
+    let bar = if owner_in_view && owner > 0.0 {
+        AT_DESK_HEIGHT * owner
+    } else {
+        crate::watch::NEAR
+    };
+    faces.iter().filter(|face| height(face) >= bar).count()
 }
 
 /// What a read needs of the lamp.
@@ -2185,6 +2222,11 @@ mod tests {
     /// The gate's count through `looks` read every 250 ms, as the gate
     /// polls ([`POLL`]): each the newest look then, or none.
     fn counted(looks: &[Option<lamp_bus::Message>]) -> Vec<Option<usize>> {
+        counted_by(looks, true)
+    }
+
+    /// [`counted`] with the eyes knowing the owner at the lamp or not.
+    fn counted_by(looks: &[Option<lamp_bus::Message>], owner_in_view: bool) -> Vec<Option<usize>> {
         let at = std::time::Instant::now();
         let mut seen = FacesSeen::default();
         looks
@@ -2197,6 +2239,7 @@ mod tests {
                     1_000_000 + after,
                     newest.as_ref(),
                     true,
+                    owner_in_view,
                 )
             })
             .collect()
@@ -2302,5 +2345,108 @@ mod tests {
             Some(look(3, 1_000_500, &[OWNER, BESIDE], false)),
         ];
         assert_eq!(counted(&looks)[2], Some(2));
+    }
+
+    /// The same faces in eight of the eyes' looks, 250 ms apart.
+    fn steady(faces: &[(f32, f32)]) -> Vec<Option<lamp_bus::Message>> {
+        (1..=8)
+            .map(|seq| Some(look(seq, 1_000_000 + 250 * (seq - 1), faces, false)))
+            .collect()
+    }
+
+    /// A second person at the desk turned sideways: full size, but the eyes
+    /// only about 0.65 sure of the face (the Reviewer-lead's HOLD on #7883).
+    const SIDEWAYS: (f32, f32) = (0.14, 0.65);
+
+    /// The first builder's ruling (19 Nov 12:20 on #7814): a skill's read is
+    /// said unasked, so a face is never dropped for being unsure alone. A
+    /// silent guest at the desk turned sideways holds the read, with the
+    /// owner's face known in view or not.
+    #[test]
+    fn an_unsure_face_at_the_desk_holds_the_read() {
+        for owner_in_view in [true, false] {
+            let counts = counted_by(&steady(&[OWNER, SIDEWAYS]), owner_in_view);
+            assert_eq!(counts.last().copied().flatten(), Some(2), "{counts:?}");
+            let seen = Seen {
+                faces: counts.last().copied().flatten(),
+                ..private_one()
+            };
+            assert_eq!(judge(&seen), Err(Closed::NotAlone));
+        }
+        // Alone at the desk and turned sideways, the owner is still one.
+        let counts = counted_by(&steady(&[SIDEWAYS]), false);
+        assert_eq!(counts.last().copied().flatten(), Some(1), "{counts:?}");
+    }
+
+    /// A face under 0.6 of the owner's face's height is far from the desk
+    /// and lets the read through, however sure the eyes are of it; at 0.6 or
+    /// over it is at the desk and holds it.
+    #[test]
+    fn a_far_face_under_six_tenths_of_the_owners_lets_the_read_through() {
+        // The owner 0.2 of the picture tall; a sure face 0.113 tall (0.57).
+        let behind = (0.085, 0.95);
+        let counts = counted_by(&steady(&[OWNER, behind]), true);
+        assert_eq!(counts.last().copied().flatten(), Some(1), "{counts:?}");
+        let seen = Seen {
+            faces: counts.last().copied().flatten(),
+            ..private_one()
+        };
+        assert_eq!(judge(&seen), Ok(()));
+        // 0.127 tall (0.63 of the owner's), unsure: at the desk.
+        let beside = (0.095, 0.62);
+        let counts = counted_by(&steady(&[OWNER, beside]), true);
+        assert_eq!(counts.last().copied().flatten(), Some(2), "{counts:?}");
+    }
+
+    /// The first builder's note 1: a far face that speaks still holds the
+    /// read, by the voice heard (`Closed::VoiceHeard`).
+    #[test]
+    fn a_far_face_with_a_voice_heard_holds_the_read() {
+        let counts = counted(&steady(&[OWNER, FAR]));
+        let seen = Seen {
+            faces: counts.last().copied().flatten(),
+            heard_ago: Some(Duration::from_secs(5)),
+            ..private_one()
+        };
+        assert_eq!(seen.faces, Some(1));
+        assert_eq!(judge(&seen), Err(Closed::VoiceHeard));
+    }
+
+    /// The first builder's note 2: with no owner's face known in view (a
+    /// lamp that knows nobody, as lamp-e82d, #7876), the bar is the eyes'
+    /// own near one, 0.10 of the picture tall (`NEAR_ENOUGH`): neither every
+    /// face nor none. A far face under it is dropped; one over it counts,
+    /// even where it would be under 0.6 of the owner's.
+    #[test]
+    fn with_no_owners_face_known_the_eyes_near_bar_measures() {
+        let counts = counted_by(&steady(&[OWNER, FAR]), false);
+        assert_eq!(counts.last().copied().flatten(), Some(1), "{counts:?}");
+        // 0.113 of the picture tall: over the near bar, so at the desk.
+        let behind = (0.085, 0.95);
+        let counts = counted_by(&steady(&[OWNER, behind]), false);
+        assert_eq!(counts.last().copied().flatten(), Some(2), "{counts:?}");
+        // Only a far face in view: nobody at the desk, and the read holds.
+        let counts = counted_by(&steady(&[FAR]), false);
+        assert_eq!(counts.last().copied().flatten(), Some(0), "{counts:?}");
+        let seen = Seen {
+            faces: counts.last().copied().flatten(),
+            ..private_one()
+        };
+        assert_eq!(judge(&seen), Err(Closed::Nobody));
+    }
+
+    /// The camera off: no look on the bus, so nobody is counted and the
+    /// read holds.
+    #[test]
+    fn the_camera_off_holds_the_read() {
+        for owner_in_view in [true, false] {
+            let counts = counted_by(&[None, None, None], owner_in_view);
+            assert_eq!(counts, vec![None, None, None]);
+        }
+        let seen = Seen {
+            faces: None,
+            ..private_one()
+        };
+        assert_eq!(judge(&seen), Err(Closed::Nobody));
     }
 }

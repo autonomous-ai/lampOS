@@ -6343,15 +6343,6 @@ fn exact_words(text: &str) -> serde_json::Value {
 impl lamp_skills::service_read::Room for LampRoom {
     fn seen(&mut self) -> lamp_skills::service_read::Seen {
         let now_ms = unix_ms();
-        // The people at the lamp as lamp-voice counts them: faces at the
-        // desk, in two of the eyes' looks of the last 3 s (V2, 19 Nov).
-        let newest = self.bus.latest(lamp_msgs::Faces::TOPIC).ok().flatten();
-        let faces = self.faces.count(
-            std::time::Instant::now(),
-            now_ms,
-            newest.as_ref(),
-            lamp_voice::known_faces::at_desk_only(),
-        );
         // The eyes' known face at the lamp, fresh: the owner's own.
         let owner_in_view = match (&self.owner, &self.known_file) {
             (Some(owner), Some(file)) => {
@@ -6360,6 +6351,18 @@ impl lamp_skills::service_read::Room for LampRoom {
             }
             _ => false,
         };
+        // The people at the lamp: every face but a far one, in two of the
+        // eyes' looks of the last 3 s (V2, 19 Nov; the first builder's
+        // ruling, 12:20 on #7814), measured from the owner's face when the
+        // eyes know it in view.
+        let newest = self.bus.latest(lamp_msgs::Faces::TOPIC).ok().flatten();
+        let faces = self.faces.count(
+            std::time::Instant::now(),
+            now_ms,
+            newest.as_ref(),
+            lamp_voice::known_faces::at_desk_only(),
+            owner_in_view,
+        );
         // Any voice heard, the owner's too: on the bus a voice is not told
         // from another, so every one counts ([`VOICE_HEARD_MS`]).
         let heard_ago = match VOICE_HEARD_MS.load(std::sync::atomic::Ordering::Relaxed) {

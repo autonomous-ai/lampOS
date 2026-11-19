@@ -2860,24 +2860,41 @@ bao giờ có lời của nó), nên câu trả lời bị bỏ dở vì lamp-sk
 lại được ghi ở lần khởi động sau (`what its agent found: dropped unsaid,
 lamp-skills restarted while it waited`, `task::telling_dropped`).
 Các khuôn mặt mà cổng đếm, của một lần đọc hay một câu trả lời cần nói, là
-những người mà lamp-voice đếm ở đèn, theo chính quy tắc của nó
-(`service_read::FacesSeen`, `known_faces::most_faces_lately`): với
-`LAMP_FACES_AT_DESK_ONLY=on` (bật trong unit sản phẩm của `lamp-skills` như
-trong unit của voice) chỉ các khuôn mặt ở bàn (`known_faces::count_at_desk`),
-và số lớn nhất trong số đó thấy được trong ít nhất hai lần nhìn của mắt trong
-3 giây gần nhất, mỗi lần nhìn chỉ đếm một lần. Vì vậy một khuôn mặt nhỏ hoặc
-không chắc ở xa phía sau chủ, hay khuôn mặt của một lần nhìn không bao giờ
-thấy lại, không phải là người đang ở cùng chủ; một khuôn mặt thứ hai ở bàn
+mọi khuôn mặt trong tầm nhìn trừ khuôn mặt ở xa (`service_read::FacesSeen`,
+`service_read::near_faces`), với `LAMP_FACES_AT_DESK_ONLY=on` (bật trong unit
+sản phẩm của `lamp-skills` như trong unit của voice), và số lớn nhất trong
+số đó thấy được trong ít nhất hai lần nhìn của mắt trong 3 giây gần nhất,
+mỗi lần nhìn chỉ đếm một lần, như `known_faces::most_faces_lately` của
+lamp-voice đếm. Một khuôn mặt chỉ bị bỏ vì chiều cao của nó, không bao giờ
+chỉ vì mắt không chắc về nó (quyết định của first builder, 19/11 12:20 trên
+#7814: một lần đọc được nói khi không ai hỏi, nên một người ở bàn phải giữ
+được nó). Một khuôn mặt là ở xa khi nó thấp hơn 0,6 chiều cao khuôn mặt của
+chủ (`known_faces::AT_DESK_HEIGHT`). Khuôn mặt của chủ là khuôn mặt mà mắt
+nhận ra ở đèn: khuôn mặt cao nhất mà mắt chắc ít nhất 0,70 và cao không quá
+0,6 khung hình. Khi không có khuôn mặt của chủ để đo (một đèn không biết ai,
+như lamp-e82d, #7876, hoặc chủ không được nhận ra trong tầm nhìn), một khuôn
+mặt là ở xa khi nó thấp hơn 0,10 khung hình, ngưỡng gần của chính mắt
+(`NEAR_ENOUGH`). Vì vậy một khuôn mặt nhỏ ở xa phía sau chủ (phần lớn là TV,
+ảnh hoặc người đi ngang), hay khuôn mặt của một lần nhìn không bao giờ thấy
+lại, không phải là người đang ở cùng chủ. Một vị khách im lặng ở bàn quay
+nghiêng (mắt chắc khoảng 0,65) vẫn được đếm, và một khuôn mặt thứ hai ở bàn
 trong hai lần nhìn vẫn giữ cổng ("not alone") hoặc dừng một lần đọc đang
-diễn ra. Một lần nhìn mà bus báo đã hết hạn, cũ hơn 3 giây hoặc không trọn
-vẹn thì không phải là một lần nhìn, và không có lần nhìn nào trong 3 giây
-gần nhất là không có ai. Trước đây, mọi khuôn mặt trong lần nhìn mới nhất
-của mắt đều được đếm: trên lamp-52e6 (19/11, 09:44, báo cáo của V2) câu trả
-lời kiểm tra thư của một skill tự tạo chờ "not alone" 29 lần trong hai phút
-trong khi lamp-voice đọc thấy một khuôn mặt ở bàn và "2 faces not at the
-desk". Test (`service_read::tests`):
-`one_face_at_the_desk_beside_a_far_one_is_alone`,
-`a_stale_or_lost_track_is_not_counted`, `two_faces_at_the_desk_are_not_alone`.
+diễn ra. Một người ở xa mà nói cũng vẫn giữ cổng, bằng giọng nói nghe được
+("a voice heard"): chỉ khuôn mặt ở xa im lặng là được cho qua. Một lần nhìn
+mà bus báo đã hết hạn, cũ hơn 3 giây hoặc không trọn vẹn thì không phải là
+một lần nhìn, và không có lần nhìn nào trong 3 giây gần nhất (camera tắt,
+mắt dừng) là không có ai, điều đó giữ cổng; một lần nhìn mà mọi khuôn mặt
+đều ở xa cũng vậy. Trước đây, mọi khuôn mặt trong lần nhìn mới nhất của mắt
+đều được đếm: trên lamp-52e6 (19/11, 09:44, báo cáo của V2) câu trả lời kiểm
+tra thư của một skill tự tạo chờ "not alone" 29 lần trong hai phút trong khi
+lamp-voice đọc thấy một khuôn mặt ở bàn và "2 faces not at the desk". Test
+(`service_read::tests`): `one_face_at_the_desk_beside_a_far_one_is_alone`,
+`a_stale_or_lost_track_is_not_counted`, `two_faces_at_the_desk_are_not_alone`,
+`an_unsure_face_at_the_desk_holds_the_read`,
+`a_far_face_under_six_tenths_of_the_owners_lets_the_read_through`,
+`a_far_face_with_a_voice_heard_holds_the_read`,
+`with_no_owners_face_known_the_eyes_near_bar_measures`,
+`the_camera_off_holds_the_read`.
 
 Với `LAMP_TOLD_WHEN_ASKED=on` (`lamp-skills` và `lamp-voice`, tắt nếu không
 đặt; #7180, quyết định của first builder): lần chạy chủ đèn nhờ bằng giọng
