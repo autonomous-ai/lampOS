@@ -26,19 +26,15 @@ def refuse(why):
     sys.exit(REFUSED)
 
 
-name = sys.argv[1] if len(sys.argv) > 1 else os.environ.get("LAMP_APP_NAME", "")
+name = os.environ.get("LAMP_APP_NAME", "")
 entry = os.environ.get("ENTRY", "")
 if not NAME.match(name):
     refuse("not an app name")
-os.environ["LAMP_APP_NAME"] = name
 if len(entry) > 128 or not ENTRY.match(entry):
     refuse("not an entry")
 
 root = os.environ.get("LAMP_APPS_ROOT", "/opt/lampOS/apps")
 sys.path.insert(0, os.path.join(root, name, "current", "src"))
-# The lamp's one copy of the SDK (lamp-update's, root's, read-only), after the
-# app's own src; `python3 -I` ignores PYTHONPATH.
-sys.path.append("/usr/local/lib/lampos/sdk-python")
 sys.dont_write_bytecode = True
 
 try:

@@ -10,10 +10,6 @@ publish.workspace = true
 # a fake `Effects`, the staging-path rule, the launcher. No binary, no unit
 # file; the binary (`lamp-apps asked`, `lamp-apps start-all`) is run by units
 # that land with piece C.
-[[bin]]
-name = "lamp-apps-manage"
-path = "src/main.rs"
-
 [dependencies]
 libc = "0.2"
 # Nine's FORMAT 2 reader (piece 1): the signature and every file checked there.
