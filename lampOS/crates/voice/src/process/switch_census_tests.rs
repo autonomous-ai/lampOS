@@ -106,7 +106,7 @@ const NOT_PASSED: &[(&str, &str)] = &[
     ("LAMP_NAMES", "the coordinator's, given as an argument"),
     (
         "LAMP_REMEMBER_SPEAKER",
-        "the coordinator's, given as --remember-speaker",
+        "the coordinator's, given as --remember-speaker (remember_speaker::given_to)",
     ),
     (
         "LAMP_WHO_WAS_HERE_NAMES",
@@ -756,6 +756,28 @@ fn remember_speaker_arguments_survive_both_workers_cleared_environments() {
                 .any(|(key, _)| key == crate::remember_speaker::ENVIRONMENT)
         );
     }
+}
+
+/// #8010's HOLDs: `LAMP_REMEMBER_SPEAKER` is never in a worker's
+/// environment, so no worker code reads it. The worker side names it only
+/// in `tools::arguments_from_environment`, which the coordinator runs to
+/// give it as `--remember-speaker`; the workers read that flag
+/// (`remember_speaker::given_to`).
+#[test]
+fn remember_speaker_is_read_by_the_coordinator_only_and_given_as_its_flag() {
+    let Census { read, .. } = census();
+    let seen = Vec::from_iter(read[crate::remember_speaker::ENVIRONMENT].iter().cloned());
+    assert_eq!(seen, ["tools.rs"], "read on the worker side in {seen:?}");
+    let tools = code(
+        &std::fs::read_to_string(Path::new(env!("CARGO_MANIFEST_DIR")).join("src/tools.rs"))
+            .unwrap(),
+    );
+    let readers: Vec<String> = functions(&tools)
+        .into_iter()
+        .filter(|(_, _, body)| body.contains("remember_speaker::ENVIRONMENT"))
+        .map(|(_, name, _)| name)
+        .collect();
+    assert_eq!(readers, ["arguments_from_environment"]);
 }
 
 #[test]

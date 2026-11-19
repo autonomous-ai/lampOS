@@ -87,6 +87,22 @@ pub(crate) enum NoAsk {
     Quiet,
 }
 
+/// The worker's [`NoAsk`], with `face_no_ask` (`LAMP_FACE_NO_ASK`): saved
+/// unasked only where the face save is speaker-bound
+/// (`LAMP_REMEMBER_SPEAKER`); elsewhere nothing kept and nothing asked
+/// (#7787's HOLDs, the first builder 21:13). Speaker-bound as the worker
+/// was given it (`--remember-speaker`, [`crate::remember_speaker::given_to`]):
+/// its environment never carries the variable (#8010's HOLDs).
+pub(crate) fn no_ask(face_no_ask: bool) -> NoAsk {
+    if !face_no_ask {
+        NoAsk::Off
+    } else if crate::remember_speaker::given_to() {
+        NoAsk::Save
+    } else {
+        NoAsk::Quiet
+    }
+}
+
 /// [`withheld`], with `no_ask` (`LAMP_FACE_NO_ASK`): nothing asked
 /// ([`face_save_note`]).
 pub(crate) fn withheld_as(
@@ -416,5 +432,41 @@ mod tests {
             (proposals(), 0)
         );
         assert_eq!(kept_proposals(proposals(), None, false), (proposals(), 0));
+    }
+
+    /// The HOLDs on #8010: a worker's environment never carries
+    /// `LAMP_REMEMBER_SPEAKER`, the coordinator gives it as
+    /// `--remember-speaker`. With that flag given and `LAMP_FACE_NO_ASK` on,
+    /// the worker's `needs_face` calls the face save ([`NoAsk::Save`]); not
+    /// given, nothing kept and nothing asked; `LAMP_FACE_NO_ASK` off, the
+    /// question as before.
+    #[test]
+    fn needs_face_saves_on_the_workers_remember_speaker_setting_without_its_environment() {
+        assert!(std::env::var_os(crate::remember_speaker::ENVIRONMENT).is_none());
+        let flags = [
+            "--who-socket".to_owned(),
+            "/tmp/eyes.sock".to_owned(),
+            crate::known_faces::NAMES_FLAG.to_owned(),
+            crate::remember_speaker::FLAG.to_owned(),
+        ];
+        let (settings, rest) = crate::tools::take(&flags).unwrap();
+        assert!(rest.is_empty() && settings.remember_speaker);
+        // As the worker starts with its tools.
+        crate::remember_speaker::given(&settings);
+        assert_eq!(no_ask(true), NoAsk::Save);
+        assert_eq!(no_ask(false), NoAsk::Off);
+        let told =
+            withheld_as(&remember("my name is Ada"), None, true, true, no_ask(true)).unwrap();
+        assert!(
+            told["note"].as_str().unwrap().contains(&format!(
+                "call {} with name \"Ada\" now",
+                crate::known_faces::REMEMBER
+            )),
+            "{told}"
+        );
+        let (plain, _) = crate::tools::take(&flags[..3]).unwrap();
+        crate::remember_speaker::given(&plain);
+        assert_eq!(no_ask(true), NoAsk::Quiet);
+        assert_eq!(no_ask(false), NoAsk::Off);
     }
 }

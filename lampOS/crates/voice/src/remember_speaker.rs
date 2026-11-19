@@ -17,6 +17,26 @@ worker_global! {
     fn epoch() -> AtomicU64 = AtomicU64::new(0);
 }
 
+worker_global! {
+    /// This worker's `--remember-speaker` ([`crate::tools::Settings`]'s
+    /// `remember_speaker`), set as it starts ([`given`]). A worker starts
+    /// with a cleared environment that never carries [`ENVIRONMENT`]: the
+    /// coordinator reads the switch and gives it as the flag (#8010).
+    fn given_on() -> AtomicBool = AtomicBool::new(false);
+}
+
+/// A worker's start: the speaker-bound face save as its tools were given
+/// it (`--remember-speaker`), for the code that runs in it ([`given_to`]).
+pub fn given(tools: &crate::tools::Settings) {
+    given_on().store(tools.remember_speaker, Ordering::Release);
+}
+
+/// Whether this worker was given `--remember-speaker` ([`given`]): the
+/// worker side's reading of the switch, never [`ENVIRONMENT`].
+pub fn given_to() -> bool {
+    given_on().load(Ordering::Acquire)
+}
+
 /// Captured with the request, so a transport thread reads the originating
 /// worker's epoch even when tests run several workers in one process.
 #[derive(Clone, Copy, Debug)]

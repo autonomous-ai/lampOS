@@ -2451,6 +2451,9 @@ pub fn serve(
     for line in lines {
         eprintln!("lamp-voice second: {line}");
     }
+    // The speaker-bound face save as given (`--remember-speaker`), for
+    // the memory's `needs_face` run here (#8010).
+    crate::remember_speaker::given(&files.tools);
     // A skill made by the lamp's own model asks this worker's chat.
     if files.tools.make_skill {
         crate::make_skill_local::set_config(config.clone());

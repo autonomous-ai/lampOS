@@ -1744,6 +1744,9 @@ pub async fn run_with_continuation(
     // A recall's weekly chapters (`LAMP_MEMORY_WEEKLY_CHAPTERS`): the
     // recall runs here, so this worker reads the switch itself.
     crate::nightly::chapters_from_environment();
+    // The speaker-bound face save as given (`--remember-speaker`), for
+    // the memory's `needs_face` run here (#8010).
+    crate::remember_speaker::given(&files.tools);
     LOOK_FULL.store(files.look_full, std::sync::atomic::Ordering::Relaxed);
     SESSION_FACT.store(files.session_fact, std::sync::atomic::Ordering::Relaxed);
     ROOM_FACTS.store(files.room_facts, std::sync::atomic::Ordering::Relaxed);
