@@ -41,7 +41,9 @@ A Timeline card's header line has the type icon (🎙 someone's words, ✦ the
 lamp's own) and what took the turn, the path badge from the voice's
 decision (#7267, [below](#what-the-lamp-decided-and-what-its-agent-did-7267)):
 **LOCAL · weather** green (with the tools it called), **AGENT · OpenClaw ·
-task 2 · started** blue, **HELD BACK** grey, an error's code red, or
+task 2 · started** blue, **AGENT · OpenClaw · task 1795056147468-853891-0 ·
+started** blue for a turn that ran a skill whose `do.task` lamp-tasks began
+([below](#a-skills-task-and-its-answer-at-its-gate-7873)), **HELD BACK** grey, an error's code red, or
 **PATH ?** grey where the bus has no decision (an older lamp; nothing is
 guessed). Then the status badge (`page::turn_status`): **ERROR** red when
 the record says the answer failed, or the decision, a step of its task or
@@ -82,7 +84,7 @@ and an **END** line.
 | Overview | The voice's state; the light shown (`on, blue at 3`, `off`); someone here or not; the camera's state, faces in view and who is followed; the lamp's health level and its worst item; the newest turn's first audio and the median of the last ten; any unit running another build than its release; the Harness tasks working, per engine, and how many were just handed over (`1 working (OpenClaw 1, Hermes 0)`, `none working, 1 just handed over`, `none working`) | the kept values below, `light/state`, the turns, `/status`'s rows, `tasks/status` |
 | Timeline | The newest 30 turns, newest first, step by step as V1's Flow Monitor: **heard**, **understood** (answered or held back, with the record's `admission_basis` and final words' time), **decided** (the path: the tools, or the engine and task handed to), **did** (the light asked for, when it changes, and each skill's stage), **said** (with the record's first audio and how it ended); in the card's events, each step of the task's agent (its number and tool; in monitor mode its arguments and result), its reply or error, at most 50 a task. Each step's time from the end of speech, the slowest wait marked, and the clock time in UTC. In monitor mode only, the words heard and said and the agent's words, and once, on top of the page, "Words anyone says to the lamp show here while this is on." | the bus ([below](#the-timeline-from-the-bus-5883-second-piece)): `voice/decision`, `tasks/step`, `tasks/status` too, joined with the turns' records |
 | Turns | The newest 20 turns, newest first, as V1's Flow: what took the turn (`local_speech`, or the lamp's own: `skill_says`, `lamp_tells_news`...; `lamp_speaks_first` in records from before #2825), then from the end of speech the final words, the first token and the first audio, each with its own time in brackets and the slowest marked; then how it ended (`played`, `no audio`, `failed`, or why it was cut) and what held it, if anything did | the voice's own session records ([below](#turns-from-the-voices-records)) where peek can read them; otherwise the bus's turns, as the Timeline's cards |
-| Tasks | A card for each Harness task the lamp handed over: its number, its engine (OpenClaw, Hermes, Claude, Codex, OpenCode, Devin, Devin Cloud, else the bus name escaped), its state as a badge (working blue; starting, installing, needs input amber; idle green; failed red; stopped, offline, unknown, missing grey), "started N min ago" (`working_s`), "last active N ago" (`last_active_unix_ms`), its progress line's changes and new signs as chips (tests pass, fixed, pull request ...). A task not read yet is "just handed over". Under **Ended**, greyed, each that settled: done (idle), needs input, stopped or failed, with the UTC time and how long ago. No status on the bus says "No word from lamp-tasks"; an empty one "Nothing is being worked on."; one that does not read, that it can't be read. Never a task's words, prompt, folder or answer: `tasks/status` carries none, and nothing else about tasks is read | `tasks/status`, the kept value `lamp-tasks serve --progress` publishes, read each push like the others (no subscriber) |
+| Tasks | A card for each Harness task the lamp handed over: its number, its engine (OpenClaw, Hermes, Claude, Codex, OpenCode, Devin, Devin Cloud, else the bus name escaped), its state as a badge (working blue; starting, installing, needs input amber; idle green; failed red; stopped, offline, unknown, missing grey), "started N min ago" (`working_s`), "last active N ago" (`last_active_unix_ms`), its progress line's changes and new signs as chips (tests pass, fixed, pull request ...). A task not read yet is "just handed over". Under **Ended**, greyed, each that settled: done (idle), needs input, stopped or failed, with the UTC time and how long ago. No status on the bus says "No word from lamp-tasks"; an empty one "Nothing is being worked on."; one that does not read, that it can't be read. Never a task's words, prompt, folder or answer: `tasks/status` carries none, and nothing else about tasks is read. Under **Skill tasks**, each skill's `do.task` run and each skill's answer at its gate ([below](#a-skills-task-and-its-answer-at-its-gate-7873)) | `tasks/status`, the kept value `lamp-tasks serve --progress` publishes, read each push like the others (no subscriber); `skills/tasks`, through the timeline |
 | Camera | The frame `/cam.svg` draws, faces as boxes | as `/cam` |
 | Body | Each joint where it is against where it was last asked to be (`commanded`), how far off (marked past 0.05 rad) and its effort; the body's own word: its level and sentence, its state (`ready`, `paused`, `stopping`), `standing` from 0 folded to 1 standing, the warmest joint, "met resistance" in the last minute and since it started; its last stop and why, as it said it | `body/joint_states`; the body's diagnostic, sent by the body about the body (`watch::body_of`) |
 | Health | Each part's item as `lamp-health show` gives it: its level, its message as it says it (cut to 160 characters, escaped), and how long ago; the parts never heard from; each unit's build | `lamp/health`; `/status`'s rows |
@@ -109,9 +111,40 @@ number `voice/heard`, `voice/turn` and `voice/said` share (the records'
 A request number seen again more than 60 s after its turn began is another
 turn: the voice counts again from its start. The newest 30 turns are kept,
 in memory only (`timeline::KEPT`). `light/command`, `skills/events`,
-`voice/decision`, `tasks/step` and `tasks/status` are read only for the
-timeline (`timeline::TOPICS`): `/bus` neither counts nor lists them. A
+`voice/decision`, `tasks/step`, `tasks/status` and `skills/tasks` are read
+only for the timeline (`timeline::TOPICS`): `/bus` neither counts nor lists them. A
 topic nobody publishes (an older lamp) leaves its part of the card empty.
+
+### A skill's task and its answer at its gate (#7873)
+
+A skill's `do.task` run is no task in lamp-tasks' store, so `tasks/status`
+never lists it: on lamp-52e6 (19 Nov) Tasks said "Nothing is being worked
+on" while mail-check's run went on OpenClaw. `skills/tasks`
+([msgs.md](msgs.md) `SkillTask`) says it, kept in memory as the newest 30
+(`timeline::SkillRun`):
+
+- **Its run**, from `lamp-tasks` (with `serve --progress`): `started`, with
+  the run's id as lamp-tasks' journal names it and the engine it began on,
+  then `ran` or `failed`. Tasks shows it under **Skill tasks**: `task
+  <ms>-<pid>-<n>`, the engine, working (blue), done (green) or failed (red),
+  the skill's name and when it began; while one works, Tasks no longer says
+  nothing is being worked on.
+- **The turn that began it**: a turn whose decision called `make_skill` or
+  `use_skill` (`timeline::RUNS_A_SKILL`) takes the newest run begun within
+  its minute (`timeline::TURN_LASTS_MS` from its first step), and its path
+  reads **AGENT · <engine> · task <ms>-<pid>-<n> · started** (then `ran` or
+  `failed`) instead of `LOCAL · make_skill`. No number joins them, so they
+  are joined by time.
+- **Its answer at its gate**, from `lamp-skills`: `held` with the gate's
+  own reason each time it changes (`not alone`, `a voice heard`, `private`,
+  `quiet hours` ...), then `told` or `dropped`, for a told answer of a run
+  and for a read's lines alike. Its card says "held for its gate: <why>",
+  then ", then told" or ", then dropped"; an answer with no run kept (a
+  read's) is a card of its own, "an answer".
+
+Names, the run's id, the engine and the gate's fixed reasons only: never a
+word of the task's, the agent's or the answer's. Empty after a restart of
+lamp-peek, as the rest of the timeline.
 
 ### What the lamp decided, and what its agent did (#7267)
 
