@@ -3960,3 +3960,24 @@ fn a_gateway_block_the_gateway_was_not_there_to_check_is_tried_again() {
         }
     }
 }
+
+/// The words lamp-tasks' and the one-shot's retry look for
+/// (`lamp_checked_replace::NO_GATEWAY`) are the words the installed
+/// wrapper says when it finds no gateway to join, so a reworded wrapper
+/// can't turn every retry into a final refusal (#7872's P3).
+#[test]
+fn the_wrappers_no_gateway_words_are_the_ones_the_retry_looks_for() {
+    for text in [
+        wrapper_text(),
+        wrapper_text_for(Shown {
+            one_path: true,
+            ..Shown::default()
+        }),
+    ] {
+        let line = text
+            .lines()
+            .find(|line| line.contains("lamp-openclaw-gateway.service) is not running"))
+            .expect("the wrapper's no-gateway line");
+        assert!(line.contains(lamp_checked_replace::NO_GATEWAY), "{line}");
+    }
+}
