@@ -6,14 +6,18 @@
 //! product (the owner's 13 Nov rule): the description's
 //! [`crate::known_faces`] `QUESTION_NOT_ASK` line does, and this scores it.
 //!
-//! Each line is asked as the next turn after the face was kept, as on
-//! lamp-74ff: "Remember my face, I'm Ana." called `remember_my_face`, the
-//! eyes kept it, and the lamp said so. Two arms, each with the names checked
+//! Each line is asked in four contexts, each counted apart (#8053: a
+//! single line is not how it is said at the desk): `first`, the line opens
+//! the conversation; `greeting`, after a greeting exchange only;
+//! `name_asked`, after the lamp asked the person's name; and `after_save`,
+//! the next turn after the face was kept, as on lamp-74ff: "Remember my
+//! face, I'm Ana." called `remember_my_face`, the eyes kept it, and the
+//! lamp said so. Two arms, each with the names checked
 //! as on the product: `before`, the description with the switch off, and
 //! `now`, with it on. A question should call nothing; an ask should call
 //! `remember_my_face`.
 //!
-//! Counts only: for each arm and kind (question or ask, English or
+//! Counts only: for each arm, context and kind (question or ask, English or
 //! Vietnamese), how many requests called `remember_my_face`. Never the
 //! character, a key, a URL or what the model said.
 use super::super::net::{self, Chat, Message, ToolCall};
@@ -116,6 +120,33 @@ impl Arm {
     }
 }
 
+/// What comes before the line in the conversation.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
+pub enum Context {
+    First,
+    Greeting,
+    NameAsked,
+    AfterSave,
+}
+
+impl Context {
+    pub const ALL: [Self; 4] = [
+        Self::First,
+        Self::Greeting,
+        Self::NameAsked,
+        Self::AfterSave,
+    ];
+
+    pub fn name(self) -> &'static str {
+        match self {
+            Self::First => "first",
+            Self::Greeting => "greeting",
+            Self::NameAsked => "name_asked",
+            Self::AfterSave => "after_save",
+        }
+    }
+}
+
 /// Every function a spoken turn declares, the face ones as `arm` declares
 /// them.
 pub fn functions(arm: Arm) -> Vec<lamp_gemini::Tool> {
@@ -127,95 +158,127 @@ pub fn functions(arm: Arm) -> Vec<lamp_gemini::Tool> {
     tools
 }
 
-/// The request for `line`: the character and the turn's changing part,
-/// then the save that kept the face as on lamp-74ff, then the line.
-pub fn messages(character: &str, line: &Line) -> Vec<Message> {
-    let call = ToolCall {
-        id: "call_0".into(),
-        name: REMEMBER.to_owned(),
-        args: json!({"name": "Ana"}),
-        extra: None,
-    };
-    vec![
-        Message::system(format!("{character}\n\n{}", super::cache::changing(0))),
-        Message::user("Remember my face, I'm Ana."),
-        Message::assistant_calls(None, std::slice::from_ref(&call)),
-        Message::tool(
-            call.id.clone(),
-            json!({"ok": true, "remembered": "Ana"}).to_string(),
-        ),
-        Message::assistant("Got it, Ana. I'll know you now."),
-        Message::user(line.said),
-    ]
+/// The request for `line` in `context`: the character and the turn's
+/// changing part, then what came before (nothing, a greeting, the lamp
+/// asking a name, or the save that kept the face as on lamp-74ff), then
+/// the line.
+pub fn messages(character: &str, context: Context, line: &Line) -> Vec<Message> {
+    let mut messages = vec![Message::system(format!(
+        "{character}\n\n{}",
+        super::cache::changing(0)
+    ))];
+    match context {
+        Context::First => {}
+        Context::Greeting => messages.extend([
+            Message::user("Hi there!"),
+            Message::assistant("Hi! Nice to see you."),
+        ]),
+        Context::NameAsked => messages.extend([
+            Message::user("Hello, lamp."),
+            Message::assistant("Hello! I don't think we've met. What's your name?"),
+        ]),
+        Context::AfterSave => {
+            let call = ToolCall {
+                id: "call_0".into(),
+                name: REMEMBER.to_owned(),
+                args: json!({"name": "Ana"}),
+                extra: None,
+            };
+            messages.extend([
+                Message::user("Remember my face, I'm Ana."),
+                Message::assistant_calls(None, std::slice::from_ref(&call)),
+                Message::tool(
+                    call.id.clone(),
+                    json!({"ok": true, "remembered": "Ana"}).to_string(),
+                ),
+                Message::assistant("Got it, Ana. I'll know you now."),
+            ]);
+        }
+    }
+    messages.push(Message::user(line.said));
+    messages
 }
 
-/// For each arm and line, how many requests called `remember_my_face`
+/// For each arm, context and line, how many requests called `remember_my_face`
 /// and how many were asked.
-pub type Counts = BTreeMap<(Arm, usize), (u32, u32)>;
+pub type Counts = BTreeMap<(Arm, Context, usize), (u32, u32)>;
 
-/// Each arm asks each line `runs` times.
+/// Each arm asks each line in each context `runs` times.
 pub async fn ask(chats: [&Chat; 2], character: &str, runs: u32) -> Counts {
     let mut counts = Counts::new();
     for _ in 0..runs {
         for arm in Arm::ALL {
             let chat = chats[usize::from(arm == Arm::Now)];
-            for (at, line) in LINES.iter().enumerate() {
-                let called = match super::tools::asked(chat, &messages(character, line)).await {
-                    Ok(name) => name == REMEMBER,
-                    Err(error) => {
-                        println!("face arm={} line={} failed: {error}", arm.name(), at + 1);
-                        continue;
-                    }
-                };
-                let entry = counts.entry((arm, at)).or_default();
-                entry.0 += u32::from(called);
-                entry.1 += 1;
+            for context in Context::ALL {
+                for (at, line) in LINES.iter().enumerate() {
+                    let request = messages(character, context, line);
+                    let called = match super::tools::asked(chat, &request).await {
+                        Ok(name) => name == REMEMBER,
+                        Err(error) => {
+                            println!(
+                                "face arm={} context={} line={} failed: {error}",
+                                arm.name(),
+                                context.name(),
+                                at + 1
+                            );
+                            continue;
+                        }
+                    };
+                    let entry = counts.entry((arm, context, at)).or_default();
+                    entry.0 += u32::from(called);
+                    entry.1 += 1;
+                }
             }
         }
     }
     counts
 }
 
-/// One line per arm and line, then per arm and kind and language: how
+/// One line per arm, context and line, then per arm, context, kind and
+/// language: how
 /// many requests called `remember_my_face`. A question right calls
 /// nothing; an ask right calls it.
 pub fn verdict(counts: &Counts) -> Vec<String> {
     let mut lines = Vec::new();
     for arm in Arm::ALL {
-        let mut kinds: BTreeMap<(Kind, bool), (u32, u32)> = BTreeMap::new();
-        for (at, line) in LINES.iter().enumerate() {
-            let (called, asked) = counts.get(&(arm, at)).copied().unwrap_or_default();
-            let kind = kinds.entry((line.kind, line.english)).or_default();
-            kind.0 += called;
-            kind.1 += asked;
-            lines.push(format!(
-                "face arm={} line={} {} {}: called={called}/{asked}",
-                arm.name(),
-                at + 1,
-                if line.kind == Kind::Question {
-                    "question"
+        for context in Context::ALL {
+            let mut kinds: BTreeMap<(Kind, bool), (u32, u32)> = BTreeMap::new();
+            for (at, line) in LINES.iter().enumerate() {
+                let (called, asked) = counts.get(&(arm, context, at)).copied().unwrap_or_default();
+                let kind = kinds.entry((line.kind, line.english)).or_default();
+                kind.0 += called;
+                kind.1 += asked;
+                lines.push(format!(
+                    "face arm={} context={} line={} {} {}: called={called}/{asked}",
+                    arm.name(),
+                    context.name(),
+                    at + 1,
+                    if line.kind == Kind::Question {
+                        "question"
+                    } else {
+                        "ask"
+                    },
+                    if line.english { "en" } else { "vi" },
+                ));
+            }
+            for ((kind, english), (called, asked)) in kinds {
+                let right = if kind == Kind::Question {
+                    asked - called
                 } else {
-                    "ask"
-                },
-                if line.english { "en" } else { "vi" },
-            ));
-        }
-        for ((kind, english), (called, asked)) in kinds {
-            let right = if kind == Kind::Question {
-                asked - called
-            } else {
-                called
-            };
-            lines.push(format!(
-                "face verdict arm={} {} {}: called={called}/{asked} right={right}/{asked}",
-                arm.name(),
-                if kind == Kind::Question {
-                    "questions"
-                } else {
-                    "asks"
-                },
-                if english { "en" } else { "vi" },
-            ));
+                    called
+                };
+                lines.push(format!(
+                    "face verdict arm={} context={} {} {}: called={called}/{asked} right={right}/{asked}",
+                    arm.name(),
+                    context.name(),
+                    if kind == Kind::Question {
+                        "questions"
+                    } else {
+                        "asks"
+                    },
+                    if english { "en" } else { "vi" },
+                ));
+            }
         }
     }
     lines
@@ -239,9 +302,10 @@ pub async fn run(provider_config: &Path, second_config: &Path, runs: u32) -> io:
     };
     let (before, now) = (chat(Arm::Before)?, chat(Arm::Now)?);
     println!(
-        "face: remember_my_face for a question whether known (LAMP_FACE_QUESTION_NOT_ASK), DeepSeek's {model} {}, thinking off, {} lines, {runs} runs of each arm",
+        "face: remember_my_face for a question whether known (LAMP_FACE_QUESTION_NOT_ASK), DeepSeek's {model} {}, thinking off, {} lines in {} contexts, {runs} runs of each arm",
         super::super::worker::deepseek_where(&config.hosted),
-        LINES.len()
+        LINES.len(),
+        Context::ALL.len()
     );
     for line in verdict(&ask([&before, &now], &character, runs).await) {
         println!("{line}");
@@ -280,12 +344,19 @@ mod tests {
     #[test]
     fn the_verdict_counts_a_question_right_when_nothing_is_called() {
         let mut counts = Counts::new();
-        counts.insert((Arm::Now, 0), (0, 2));
-        counts.insert((Arm::Now, 16), (2, 2));
+        counts.insert((Arm::Now, Context::First, 0), (0, 2));
+        counts.insert((Arm::Now, Context::First, 16), (2, 2));
+        counts.insert((Arm::Now, Context::NameAsked, 16), (1, 2));
         let verdict = verdict(&counts);
-        assert!(
-            verdict.contains(&"face verdict arm=now questions en: called=0/2 right=2/2".to_owned())
-        );
-        assert!(verdict.contains(&"face verdict arm=now asks en: called=2/2 right=2/2".to_owned()));
+        let has = |line: &str| verdict.contains(&line.to_owned());
+        assert!(has(
+            "face verdict arm=now context=first questions en: called=0/2 right=2/2"
+        ));
+        assert!(has(
+            "face verdict arm=now context=first asks en: called=2/2 right=2/2"
+        ));
+        assert!(has(
+            "face verdict arm=now context=name_asked asks en: called=1/2 right=1/2"
+        ));
     }
 }

@@ -1783,10 +1783,14 @@ With the switch:
   PROVIDER_CONFIG SECOND_CONFIG [RUNS] --face`
   (`second_provider/probe/face_question.rs`): 32 made-up lines, 16
   questions whether the lamp knows them and 16 asks to remember them, half
-  English and half Vietnamese, each asked as the next turn after a face was
-  kept, with the description as the switch off (`before`) and on (`now`),
-  names checked. It prints only how many requests called
-  `remember_my_face`, per arm, line, kind and language. Run it on a lamp as
+  English and half Vietnamese, each asked in four contexts, counted apart
+  (#8053): `first`, the line opens the conversation; `greeting`, after a
+  greeting exchange only; `name_asked`, after the lamp asked the person's
+  name; `after_save`, the next turn after a face was kept (the shape it
+  had before, kept as a control). With the description as the switch off
+  (`before`) and on (`now`), names checked. It prints only how many
+  requests called `remember_my_face`, per arm, context, line, kind and
+  language. Run it on a lamp as
   `probe-tools` is run (docs/second-voice.md), through the relay:
 
   ```sh
