@@ -281,6 +281,42 @@ pub fn services_to_agent_on() -> bool {
 pub const ASKS_OFF: &str =
     "a live ask's linked services are off on this lamp (LAMP_SERVICES_TO_AGENT is not on)";
 
+/// The skill name a make's tried run is minted as (#8157): a draft has no
+/// name the lamp knows yet, and no yes; its run is marked tried
+/// (`crate::runs::Run::tried`), so its writes are stubbed.
+pub const MAKE_TRY_SKILL: &str = "make-try";
+
+/// What a tried run's mint is told with the tasks' switch off.
+pub const TRIES_OFF: &str = "a make's tried run is off on this lamp (LAMP_SKILL_TASKS is not on)";
+
+/// The most grants a make's tried run is minted.
+pub const MOST_TRY_GRANTS: usize = 16;
+
+/// The grants of a make's tried run (#8157): each one the lamp names, once,
+/// never `skills` (a try puts nothing on the lamp); `net` is no token's
+/// grant (lamp-tasks gives the run its way out) and is dropped here.
+pub fn try_grants_of(asked: &[String]) -> Result<BTreeSet<Grant>, String> {
+    if asked.len() > MOST_TRY_GRANTS {
+        return Err(format!("try: at most {MOST_TRY_GRANTS} grants"));
+    }
+    let mut grants = BTreeSet::new();
+    for grant in asked {
+        if grant == "net" {
+            continue;
+        }
+        match serde_json::from_value::<Grant>(Value::String(grant.clone())) {
+            Ok(Grant::Skills) => return Err("try: a tried run never puts skills on".into()),
+            Ok(parsed) => {
+                if !grants.insert(parsed) {
+                    return Err(format!("try: {grant} is listed twice"));
+                }
+            }
+            Err(_) => return Err(format!("try: {grant:?} is not a grant the lamp names")),
+        }
+    }
+    Ok(grants)
+}
+
 /// The most grants a live ask's run is minted: one service's read. A
 /// `-write` is never minted for an ask in this cut (Heron's P2 5 on
 /// #7509): writes come with their own gates later.
@@ -326,6 +362,15 @@ impl KeptYes {
 }
 
 impl crate::runs::SkillYes for KeptYes {
+    /// A make's tried run's grants (#8157): with the tasks' switch on, the
+    /// draft's own ([`try_grants_of`]); its writes are stubbed by the door.
+    fn try_grants(&self, asked: &[String]) -> Result<BTreeSet<Grant>, String> {
+        if !self.on {
+            return Err(TRIES_OFF.into());
+        }
+        try_grants_of(asked)
+    }
+
     /// A live ask's grants (`{"mint": {"ask": [...]}}`): with the tasks'
     /// switch and [`KeptYes::services_to_agent`] on, one to
     /// [`MOST_ASK_GRANTS`] linked service read grants (`<code>-read`) of
@@ -1335,5 +1380,21 @@ mod tests {
             lamp_services::SERVICES_TO_AGENT_ENVIRONMENT
         );
         assert_eq!(VOICE_ASK_SKILL, lamp_services::VOICE_ASK_SKILL);
+    }
+
+    /// #8157: a make's tried run is minted the draft's own grants, each
+    /// once; `net` is lamp-tasks' way out, not a token's; never `skills`.
+    #[test]
+    fn a_tried_runs_grants_are_the_drafts_own() {
+        let asked = |grants: &[&str]| {
+            try_grants_of(&grants.iter().map(|g| (*g).to_owned()).collect::<Vec<_>>())
+        };
+        let grants = asked(&["net", "speak", "gmail-write"]).unwrap();
+        assert_eq!(grants.len(), 2, "{grants:?}");
+        assert!(grants.contains(&Grant::Speak));
+        assert!(asked(&["speak", "speak"]).is_err());
+        assert!(asked(&["skills"]).is_err());
+        assert!(asked(&["fly"]).is_err());
+        assert!(asked(&[]).unwrap().is_empty());
     }
 }

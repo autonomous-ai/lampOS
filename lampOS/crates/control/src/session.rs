@@ -801,6 +801,12 @@ impl Door {
         Ok(live)
     }
 
+    /// Marks live run `run` as a make's tried run
+    /// ([`crate::runs::Run::tried`], #8157).
+    pub fn mark_tried(&mut self, run: &str) {
+        self.runs.mark_tried(run);
+    }
+
     /// Marks live run `run` as a skill's fixed write's, `write`
     /// ([`crate::runs::Run::fixed_write`]).
     pub fn mark_fixed_write(&mut self, run: &str, write: &crate::runs::FixedWrite) {
@@ -1160,7 +1166,17 @@ impl Door {
             return refuse(ErrorCode::NoHello, "say hello first".to_owned());
         };
         // A skill run's linked services: off, nothing else is looked at.
-        if matches!(op, Op::ServiceRead { .. } | Op::ServiceWrite { .. }) && self.services.is_none()
+        // A make's tried run's write is stubbed below, linked services on
+        // or not (#8157).
+        let tried_write = matches!(op, Op::ServiceWrite { .. })
+            && session.run_socket
+            && self
+                .runs
+                .of_client(&client, now_us)
+                .is_some_and(|run| run.tried);
+        if matches!(op, Op::ServiceRead { .. } | Op::ServiceWrite { .. })
+            && self.services.is_none()
+            && !tried_write
         {
             return refuse(ErrorCode::Off, crate::services::OFF.to_owned());
         }
@@ -1202,6 +1218,18 @@ impl Door {
                     let fixed = run.fixed_write.clone().map(|held| (run.run.clone(), held));
                     (run.skill.clone(), run.run.clone(), fixed)
                 });
+            // A make's tried run's write (#8157): answered as if done from
+            // a stub, never sent to lamp-services; nothing changes in the
+            // world. Its reads go on live.
+            if tried_write {
+                eprintln!(
+                    "lamp-control: a make's tried run wrote to {service}: answered from the stub, not sent"
+                );
+                return ok(
+                    re,
+                    json!({"result": {"sent": false, "tried": true, "said": crate::runs::TRIED_WRITE}}),
+                );
+            }
             let (Some((skill, run_id, fixed_write)), Some(services)) = (run, self.services.clone())
             else {
                 return refuse(ErrorCode::NoGrant, crate::services::RUNS_ONLY.to_owned());
@@ -1602,6 +1630,11 @@ impl Door {
                 // Counted only once the part took it.
                 if let Some(class) = class {
                     self.rates.count(&client, class, now_us);
+                }
+                // A run's say the speaker took, counted for its end's
+                // answer (#8157).
+                if matches!(op, Op::Say { .. }) && session.run_socket {
+                    self.runs.count_said(&client, now_us);
                 }
                 match reply {
                     Reply::Now(with) => ok(re, with),
@@ -4706,5 +4739,83 @@ mod tests {
         extra.insert("service".into(), json!("gmail"));
         assert_eq!(lines[4]["args"], Value::Object(extra), "{}", lines[4]);
         let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    /// #8157: a make's tried run changes nothing in the world. Its
+    /// `service.write` is answered as if done from the stub and never
+    /// reaches lamp-services; its `service.read` goes there live.
+    #[test]
+    fn a_tried_runs_write_is_stubbed_and_its_read_is_live() {
+        use std::io::{BufRead as _, Write as _};
+        let dir =
+            std::env::temp_dir().join(format!("lamp-control-run-tried-{}", std::process::id()));
+        let _ = std::fs::create_dir_all(&dir);
+        let socket = dir.join("call.sock");
+        let _ = std::fs::remove_file(&socket);
+        let listener = std::os::unix::net::UnixListener::bind(&socket).unwrap();
+        let served = std::thread::spawn(move || {
+            let (mut stream, _) = listener.accept().unwrap();
+            let mut line = String::new();
+            std::io::BufReader::new(&stream)
+                .read_line(&mut line)
+                .unwrap();
+            writeln!(stream, r#"{{"ok":true,"result":{{"messages":[]}}}}"#).unwrap();
+            serde_json::from_str::<Value>(&line).unwrap()
+        });
+        let (mut door, mut session, mut fake) = run_door(
+            &[
+                service("gmail", protocol::Access::Read),
+                service("gmail", protocol::Access::Write),
+            ],
+            Some(socket),
+        );
+        door.mark_tried("r1");
+        // The write: answered at once from the stub, nothing sent.
+        let outcome = door.handle(&mut session, &write_frame("gmail"), &mut fake, S, 1);
+        assert!(outcome.later.is_none(), "{outcome:?}");
+        assert_eq!(reply(&outcome)["ok"], true, "{outcome:?}");
+        assert_eq!(reply(&outcome)["result"]["sent"], false, "{outcome:?}");
+        assert_eq!(reply(&outcome)["result"]["tried"], true, "{outcome:?}");
+        // The read: sent on to lamp-services, live; the one line it got.
+        let outcome = door.handle(&mut session, &read_frame("gmail"), &mut fake, S, 1);
+        outcome.later.expect("answered off the lock").reply();
+        let line = served.join().unwrap();
+        assert_eq!(line["name"], "service_read", "{line}");
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    /// #8157: a tried run's write is stubbed with linked services off too;
+    /// an untried run's is still off.
+    #[test]
+    fn a_tried_runs_write_is_stubbed_with_services_off() {
+        let (mut door, mut session, mut fake) =
+            run_door(&[service("gmail", protocol::Access::Write)], None);
+        let off = door.handle(&mut session, &write_frame("gmail"), &mut fake, S, 1);
+        assert_eq!(code_of(&off), Some("off"), "{off:?}");
+        door.mark_tried("r1");
+        let stubbed = door.handle(&mut session, &write_frame("gmail"), &mut fake, S, 1);
+        assert_eq!(reply(&stubbed)["result"]["sent"], false, "{stubbed:?}");
+    }
+
+    /// #8157: each `say` a run's parts took is counted on its run, told
+    /// when it ends; a refused one is not.
+    #[test]
+    fn a_runs_says_are_counted_to_its_end() {
+        let say = r#"{"id":3,"op":"say","text":"Hi."}"#;
+        let (mut door, mut session, mut fake) = run_door(&[Grant::Speak], None);
+        assert_eq!(
+            reply(&door.handle(&mut session, say, &mut fake, S, 1))["ok"],
+            true
+        );
+        assert_eq!(
+            reply(&door.handle(&mut session, say, &mut fake, 2 * S, 1))["ok"],
+            true
+        );
+        let ended = door.end_run("r1", None).unwrap();
+        assert_eq!(ended.said, 2);
+        let (mut door, mut session, mut fake) = run_door(&[Grant::Light], None);
+        let refused = door.handle(&mut session, say, &mut fake, S, 1);
+        assert_eq!(code_of(&refused), Some("no_grant"), "{refused:?}");
+        assert_eq!(door.end_run("r1", None).unwrap().said, 0);
     }
 }
