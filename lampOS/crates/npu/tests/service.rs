@@ -579,7 +579,9 @@ fn a_clients_next_frame_is_cropped_around_its_person_until_it_goes_stale() {
 #[test]
 fn a_model_the_npu_refused_is_never_fetched_again_but_a_new_one_is() {
     let mut fake = fake_movenet();
-    fake.refuse = Some(LoadError::Failed("vip create network: -1".to_owned()));
+    fake.refuse = Some(LoadError::Failed(
+        "buffer quantisation 3 is not one this lamp reads".to_owned(),
+    ));
     let rig = Rig::new(fake, true);
     rig.shelve(&rig.key.clone(), b"a model's bytes", "movenet");
     let t = Instant::now();
@@ -623,6 +625,153 @@ fn a_model_the_npu_refused_is_never_fetched_again_but_a_new_one_is() {
             .any(|path| path.ends_with("pose.nb")),
         "{:?}",
         rig.kept_files()
+    );
+}
+
+/// A load the NPU could not take now (`vip_create_network` short of
+/// memory, busy) keeps the model and never marks it refused: the load is
+/// tried again after 30 s, then 60 s, and works once the driver does
+/// (Fourteen's P2 1 on #7972).
+#[test]
+fn a_passing_load_failure_keeps_the_model_and_tries_again_after_a_wait() {
+    let fake = fake_movenet();
+    {
+        let mut fails = fake.fails_first.lock().unwrap();
+        fails.push_back(LoadError::Transient(
+            "vip create network failed: status -12".to_owned(),
+        ));
+        fails.push_back(LoadError::Transient(
+            "vip create network failed: status -16".to_owned(),
+        ));
+    }
+    let rig = Rig::new(fake, true);
+    rig.shelve(&rig.key.clone(), b"a model's bytes", "movenet");
+    let t = Instant::now();
+    rig.pose("c_1", t, OPEN);
+    rig.run_jobs();
+    let first = rig.pose("c_1", t + Duration::from_secs(1), OPEN);
+    assert_eq!(first["code"], "unavailable", "{first}");
+    assert_eq!(first["retry_ms"], 30_000);
+    let kept = rig.kept_files();
+    assert!(
+        kept.iter().any(|path| path.ends_with("pose.nb"))
+            && !kept.iter().any(|path| path.ends_with("pose.refused")),
+        "{kept:?}"
+    );
+    // Within the wait: no load tried, no fetch.
+    let soon = rig.pose("c_1", t + Duration::from_secs(20), OPEN);
+    assert_eq!(soon["code"], "unavailable", "{soon}");
+    assert_eq!(rig.run_jobs(), 0);
+    // After it: tried again, refused again, and the wait doubled.
+    let second = rig.pose("c_1", t + Duration::from_secs(32), OPEN);
+    assert_eq!(second["code"], "unavailable", "{second}");
+    assert_eq!(second["retry_ms"], 60_000);
+    let works = rig.pose("c_1", t + Duration::from_secs(93), OPEN);
+    assert_eq!(works["ok"], true, "{works}");
+    assert_eq!(rig.fake.loads.load(std::sync::atomic::Ordering::SeqCst), 1);
+    // Only the first fetch: the Store was never asked again.
+    assert_eq!(rig.shelf.asked(), 3);
+}
+
+/// A `vip_init` that fails (the driver not ready yet) is tried again with
+/// the same wait, never left as no NPU until a restart (Fourteen's P3 on
+/// #7972).
+#[test]
+fn a_failed_vip_init_is_tried_again_not_taken_as_no_npu() {
+    let fake = fake_movenet();
+    fake.fails_first
+        .lock()
+        .unwrap()
+        .push_back(LoadError::Transient(
+            "vip init failed: status -1".to_owned(),
+        ));
+    let rig = Rig::new(fake, true);
+    rig.shelve(&rig.key.clone(), b"a model's bytes", "movenet");
+    let t = Instant::now();
+    rig.pose("c_1", t, OPEN);
+    rig.run_jobs();
+    let first = rig.pose("c_1", t + Duration::from_secs(1), OPEN);
+    assert_eq!(first["code"], "unavailable", "{first}");
+    assert_eq!(first["retry_ms"], 30_000, "a wait, not unsupported");
+    let status = serve::answer(&rig.service, r#"{"op":"status"}"#, t, &|| OPEN);
+    assert_eq!(status["pose"]["state"], "ready", "{status}");
+    let works = rig.pose("c_1", t + Duration::from_secs(32), OPEN);
+    assert_eq!(works["ok"], true, "{works}");
+}
+
+/// A model swapped in by an update while an ask decodes its picture is
+/// the one that ask loads: never taken as lost, with no `unavailable` and
+/// no second download (Fourteen's P2 2 on #7972).
+#[test]
+fn a_model_swapped_during_an_asks_decode_is_loaded_not_lost() {
+    let rig = Rig::new(fake_movenet(), true);
+    rig.shelve(&rig.key.clone(), b"model version one", "movenet");
+    let t = Instant::now();
+    rig.pose("c_1", t, OPEN);
+    rig.run_jobs();
+    assert_eq!(
+        rig.pose("c_1", t + Duration::from_secs(1), OPEN)["ok"],
+        true
+    );
+    // Idle: let go, so the next ask loads.
+    let idle = t + Duration::from_secs(200);
+    assert!(!rig.service.tick(idle));
+    rig.shelve(&rig.key.clone(), b"model version two", "movenet");
+    let day = t + Duration::from_secs(7 * 60 * 60);
+    assert!(rig.service.refresh(day));
+    let asked = rig.shelf.asked();
+    // The ask decodes a large picture while the swap runs.
+    let service = rig.service.clone();
+    let line = json!({"op": "pose", "client": "c_1", "jpeg": STANDARD.encode(jpeg(1280, 720))});
+    let ask = std::thread::spawn(move || serve::answer(&service, &line.to_string(), day, &|| OPEN));
+    // Past its `prepare`, into its decode.
+    std::thread::sleep(Duration::from_millis(5));
+    rig.run_jobs();
+    let answer = ask.join().unwrap();
+    assert_eq!(answer["ok"], true, "{answer}");
+    assert_eq!(rig.fake.loads.load(std::sync::atomic::Ordering::SeqCst), 2);
+    // The update's manifest, signature and file; nothing fetched again.
+    assert_eq!(rig.shelf.asked(), asked + 3);
+    let kept = std::fs::read(rig.state.path().join("models/pose/pose.nb")).unwrap();
+    assert_eq!(kept, b"model version two");
+}
+
+/// A load that hangs holds the net's lock as a run does: past its own
+/// deadline it reads as hung, for the watchdog (Fourteen's P3 on #7972).
+#[test]
+fn a_load_past_its_deadline_reads_as_hung() {
+    let mut fake = fake_movenet();
+    fake.load_delay = Duration::from_millis(600);
+    let rig = Rig::new(fake, true);
+    rig.shelve(&rig.key.clone(), b"a model's bytes", "movenet");
+    let t = Instant::now();
+    rig.pose("c_1", t, OPEN);
+    rig.run_jobs();
+    let service = rig.service.clone();
+    let line = json!({"op": "pose", "client": "c_1", "jpeg": STANDARD.encode(jpeg(64, 48))});
+    let asked = std::thread::spawn(move || {
+        serve::answer(
+            &service,
+            &line.to_string(),
+            t + Duration::from_secs(1),
+            &|| OPEN,
+        )
+    });
+    std::thread::sleep(Duration::from_millis(300));
+    // Past the run's 5 s but not the load's 30 s: not hung yet.
+    assert_eq!(
+        rig.service.hung(Instant::now() + Duration::from_secs(6)),
+        None
+    );
+    let past = rig
+        .service
+        .hung(Instant::now() + Duration::from_secs(30))
+        .expect("hung past the load's deadline");
+    assert!(past >= Duration::from_secs(30));
+    assert_eq!(asked.join().unwrap()["ok"], true);
+    assert_eq!(
+        rig.service.hung(Instant::now() + Duration::from_secs(60)),
+        None
     );
 }
 

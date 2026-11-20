@@ -283,6 +283,8 @@ async fn a_computer_pairs_says_hello_and_is_answered_over_tls() {
 #[tokio::test]
 async fn another_path_or_an_oversized_frame_is_refused() {
     let lamp = lamp("refuse").await;
+    // Poses on: the door reads a pose's frame, and tells the rest.
+    lamp.shared.set_poses(true);
     assert!(connect(&lamp, "/v2").await.is_err());
     let mut socket = connect(&lamp, "/v1").await.unwrap();
     let _welcome = next(&mut socket).await;
@@ -328,6 +330,7 @@ async fn assert_closed_too_big(socket: &mut Socket) {
 #[tokio::test]
 async fn only_a_pose_after_hello_may_be_larger_than_64_kib() {
     let lamp = lamp("pose-frame").await;
+    lamp.shared.set_poses(true);
     let jpeg = "A".repeat(150 * 1024);
     let pose = json!({"id": 9, "op": "pose", "jpeg": jpeg}).to_string();
     assert!(pose.len() > server::FRAME_MAX && pose.len() < server::POSE_FRAME_MAX);
@@ -351,6 +354,21 @@ async fn only_a_pose_after_hello_may_be_larger_than_64_kib() {
     let notes = json!({"id": 11, "op": "notes.set", "key": "k", "value": "x".repeat(80 * 1024)});
     socket.send(Message::text(notes.to_string())).await.unwrap();
     assert_closed_too_big(&mut socket).await;
+}
+
+/// With poses off (`LAMP_NPU` not on) no door reads past 64 KiB, a
+/// `pose` after hello neither (Fourteen's P3 on #7972): the WebSocket's
+/// own cap closes the connection, with no answer.
+#[tokio::test]
+async fn with_poses_off_a_large_pose_is_closed_as_any_frame() {
+    let lamp = lamp("pose-off-frame").await;
+    let pose = json!({"id": 9, "op": "pose", "jpeg": "A".repeat(150 * 1024)}).to_string();
+    let mut socket = paired(&lamp, json!(["camera"]), 42).await;
+    let _ = socket.send(Message::text(pose)).await;
+    let closed = tokio::time::timeout(Duration::from_secs(5), socket.next())
+        .await
+        .expect("closed in time");
+    assert!(!matches!(closed, Some(Ok(Message::Text(_)))), "{closed:?}");
 }
 
 /// A computer paired with `grants` and said hello, as the SDK would.
