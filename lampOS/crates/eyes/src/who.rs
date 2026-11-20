@@ -975,14 +975,20 @@ impl People {
     }
 
     /// How alike this print is to the nearest of anyone's kept prints,
-    /// whether or not it reaches [`SAME_PERSON`]; `None` with nobody kept. For the
-    /// journal's line on each check: a number, never a name.
-    pub fn best_likeness(&self, print: &[f32]) -> Option<f32> {
+    /// whether or not it reaches [`SAME_PERSON`], and when that person's
+    /// prints were added (their `added_unix_s`: the file keeps one time per
+    /// person, not per print); `None` with nobody kept. For the journal's
+    /// line on each check ([`recognition_line`]): numbers, never a name.
+    pub fn best_likeness(&self, print: &[f32]) -> Option<(f32, u64)> {
         self.people
             .iter()
-            .flat_map(|person| &person.prints)
-            .map(|kept| likeness(kept, print))
-            .reduce(f32::max)
+            .flat_map(|person| {
+                person
+                    .prints
+                    .iter()
+                    .map(|kept| (likeness(kept, print), person.added_unix_s))
+            })
+            .max_by(|a, b| a.0.total_cmp(&b.0))
     }
 
     /// How alike this print is to `name`'s own kept prints, at best; `None`
@@ -1214,21 +1220,34 @@ impl People {
             }
         }
         let mut replaced = Vec::new();
-        let name =
-            self.remember_one_into(name, prints, now_unix_s, replace, apart, &mut replaced)?;
-        Ok(Remembered { name, replaced })
+        let mut already = false;
+        let name = self.remember_one_into(
+            name,
+            prints,
+            now_unix_s,
+            (replace, apart),
+            &mut replaced,
+            &mut already,
+        )?;
+        Ok(Remembered {
+            name,
+            replaced,
+            already,
+        })
     }
 
     /// [`Self::remember_one`]'s work: the people a `replace` forgets are
-    /// put in `replaced` once their removal is written.
+    /// put in `replaced` once their removal is written, and `already` says
+    /// the name was kept before and this face matched as theirs as a whole
+    /// ([`Remembered::already`]).
     fn remember_one_into(
         &mut self,
         name: &str,
         prints: Vec<Vec<f32>>,
         now_unix_s: u64,
-        replace: bool,
-        apart: bool,
+        (replace, apart): (bool, bool),
         replaced: &mut Vec<String>,
+        already: &mut bool,
     ) -> std::result::Result<String, Refused> {
         let kept = plain_name(name).ok_or(Refused::NotAName)?;
         // Whoever else these prints are, by the same likeness that
@@ -1321,9 +1340,12 @@ impl People {
                 .filter(|(_, alike)| *alike >= SAME_PERSON)
                 .map(|(print, _)| print.clone())
                 .collect();
-            return self
+            let kept_now = self
                 .remember(&kept, own, now_unix_s)
-                .map_err(|error| Refused::Store(error.to_string()));
+                .map_err(|error| Refused::Store(error.to_string()))?;
+            // Known already, and this face theirs: never a rename.
+            *already = !replace;
+            return Ok(kept_now);
         } else if known.is_empty() && !apart {
             let near = self
                 .people
@@ -1919,6 +1941,46 @@ pub fn ask_of(line: &[u8]) -> Option<Ask> {
 /// recognised and not remembered.
 pub const NEAR_ENOUGH: f32 = 0.10;
 
+/// The journal's line on each check (#3126): the best likeness and how many
+/// seconds ago the closest person's prints were added (#7424), then of
+/// `face` (the largest in a picture filled to `filled` pixels): its height
+/// and width as shares of the picture's, its turn (the nose's offset from the
+/// eyes' middle over the eyes' span, 0 front-on, the sign the side; `none`
+/// with the eyes on one point) and its box's centre across the picture
+/// (#7424), then the near gate and the threshold. Numbers only, never a
+/// name or an id.
+pub fn recognition_line(
+    best: Option<(f32, u64)>,
+    face: &crate::faces::Face,
+    filled: (usize, usize),
+    now_unix_s: u64,
+) -> String {
+    let (best, age) = best.map_or_else(
+        || ("none".to_owned(), "none".to_owned()),
+        |(how, added)| {
+            (
+                format!("{how:.3}"),
+                format!("{} s", now_unix_s.saturating_sub(added)),
+            )
+        },
+    );
+    let wide = filled.0.max(1) as f32;
+    let tall = filled.1.max(1) as f32;
+    let [left_eye, right_eye, nose, ..] = face.marks;
+    let span = right_eye.0 - left_eye.0;
+    let turn = if span.abs() > f32::EPSILON {
+        format!("{:.2}", (nose.0 - (left_eye.0 + right_eye.0) / 2.0) / span)
+    } else {
+        "none".to_owned()
+    };
+    format!(
+        "recognition best {best} height {:.3} width {:.3} turn {turn} across {:.3} prints age {age} (near at {NEAR_ENOUGH}, same at {SAME_PERSON})",
+        face.height / tall,
+        face.width / wide,
+        (face.x + face.width / 2.0) / wide,
+    )
+}
+
 /// Whether a look found anyone at the lamp: a face at least [`NEAR_ENOUGH`]
 /// of the picture's height `tall`. A far or flicker face is no one to
 /// [`Held::looked`] (#5546).
@@ -2457,6 +2519,11 @@ fn theirs_name(people: &[Person], name: &str) -> String {
 pub struct Remembered {
     pub name: String,
     pub replaced: Vec<String>,
+    /// The name was kept before this remembering and the face matched as
+    /// theirs as a whole (`SAME_PERSON`), not on a `replace`: their prints
+    /// kept in place, no new person. Said as `"already": true`; a voice that
+    /// doesn't read it ignores it (`LAMP_FACE_QUESTION_NOT_ASK`, lamp-74ff).
+    pub already: bool,
 }
 
 impl Remembered {
@@ -2465,6 +2532,7 @@ impl Remembered {
         Self {
             name,
             replaced: Vec::new(),
+            already: false,
         }
     }
 
@@ -2472,6 +2540,9 @@ impl Remembered {
     /// (`[]` when none), and, with visits counted, that they are.
     pub fn answer(&self, visits: bool) -> serde_json::Value {
         let mut answer = serde_json::json!({"remembered": self.name, "replaced": self.replaced});
+        if self.already {
+            answer["already"] = serde_json::Value::Bool(true);
+        }
         if visits {
             answer["visits"] = serde_json::Value::Bool(true);
         }
@@ -5116,6 +5187,54 @@ mod tests {
     }
 
     #[test]
+    fn the_recognition_line_says_the_face_width_turn_place_and_how_old_the_matched_prints_are() {
+        // A face 40 by 48 in a 320 by 240 picture, centred 120 px across,
+        // its nose 4 px right of its eyes' middle (20 px apart).
+        let face = |nose: f32| crate::faces::Face {
+            score: 0.9,
+            x: 100.0,
+            y: 50.0,
+            width: 40.0,
+            height: 48.0,
+            marks: [
+                (110.0, 60.0),
+                (130.0, 60.0),
+                (nose, 70.0),
+                (112.0, 85.0),
+                (128.0, 85.0),
+            ],
+        };
+        let mut people = People::open(file("recognition-line")).unwrap();
+        // Nobody kept: no likeness, no age.
+        assert_eq!(
+            recognition_line(
+                people.best_likeness(&print(0.3)),
+                &face(124.0),
+                (320, 240),
+                500
+            ),
+            "recognition best none height 0.200 width 0.125 turn 0.20 across 0.375 prints age none (near at 0.1, same at 0.363)"
+        );
+        people.remember("Bea", vec![print(0.3)], 100).unwrap();
+        people.remember("Cy", vec![print(1.7)], 400).unwrap();
+        // The age is of the closest person's prints (Bea's, 400 s), not
+        // the newest kept (Cy's, 100 s); turned the other way, the sign
+        // says so.
+        let (how, _) = people.best_likeness(&print(0.3)).unwrap();
+        assert_eq!(
+            recognition_line(
+                people.best_likeness(&print(0.3)),
+                &face(116.0),
+                (320, 240),
+                500
+            ),
+            format!(
+                "recognition best {how:.3} height 0.200 width 0.125 turn -0.20 across 0.375 prints age 400 s (near at 0.1, same at 0.363)"
+            )
+        );
+    }
+
+    #[test]
     fn nobody_is_known_until_asked_and_a_forgotten_face_is_gone_from_the_file() {
         let path = file("forget");
         let mut people = People::open(path.clone()).unwrap();
@@ -5129,8 +5248,8 @@ mod tests {
         assert_eq!(name, "A");
         assert!(how > 0.99);
         // The journal's number: the best likeness, matched or not.
-        assert_eq!(people.best_likeness(&print(0.3)), Some(how));
-        let far = people.best_likeness(&print(1.7)).unwrap();
+        assert_eq!(people.best_likeness(&print(0.3)), Some((how, 1)));
+        let (far, _) = people.best_likeness(&print(1.7)).unwrap();
         assert!(far < SAME_PERSON, "{far}");
         // Someone else is nobody.
         assert_eq!(people.who(&print(1.7)), None);
@@ -5662,6 +5781,7 @@ mod tests {
             Remembered {
                 name: "Bea".into(),
                 replaced: vec!["Original Owner".into()],
+                already: false,
             }
         );
         assert!(!people.names().contains(&"Original Owner".to_owned()));
@@ -5685,6 +5805,44 @@ mod tests {
             new.answer(true),
             serde_json::json!({"remembered": "Ines", "replaced": [], "visits": true})
         );
+    }
+
+    /// lamp-74ff, 19 Nov: a second remembering of a face already kept,
+    /// under its own name, said "I'll know you now" as a first one. It is
+    /// `already`, and said so; a first, a rename, another face under that
+    /// name and a new person are not.
+    #[test]
+    fn a_face_kept_again_under_its_own_name_is_said_to_be_known_already() {
+        let mut people = People::open(file("already")).unwrap();
+        let first = people
+            .remember_one_replacing("Ana", vec![print(0.3)], 1, false, false)
+            .unwrap();
+        assert!(!first.already, "{first:?}");
+        assert!(first.answer(false).get("already").is_none());
+        let again = people
+            .remember_one_replacing("Ana", vec![print(0.3)], 2, false, false)
+            .unwrap();
+        assert!(again.already, "{again:?}");
+        assert_eq!(
+            again.answer(true),
+            serde_json::json!({"remembered": "Ana", "replaced": [], "already": true, "visits": true})
+        );
+        assert_eq!(people.names(), vec!["Ana".to_owned()]);
+        // With `replace`, not.
+        let replaced = people
+            .remember_one_replacing("Ana", vec![print(0.3)], 3, true, false)
+            .unwrap();
+        assert!(!replaced.already, "{replaced:?}");
+        // Another face under that name is refused, and a new person is no
+        // `already`.
+        assert_eq!(
+            people.remember_one_replacing("Ana", vec![print(2.9)], 4, false, false),
+            Err(Refused::NotLikeThem)
+        );
+        let new = people
+            .remember_one_replacing("Ines", vec![print(2.9)], 5, false, false)
+            .unwrap();
+        assert!(!new.already, "{new:?}");
     }
 
     /// The reviewer on #1057: prints known by two names are refused with

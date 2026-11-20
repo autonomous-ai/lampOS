@@ -83,7 +83,7 @@ use std::{
 /// The switch, here, in the manage helper and in the voice. `on` only.
 pub const ENVIRONMENT: &str = lamp_voice::skill_task_yes::ENVIRONMENT;
 
-#[cfg(test)]
+#[cfg(any(test, feature = "share-fixture"))]
 thread_local! {
     /// The switch as a test of this thread sets it.
     static ON_HERE: std::cell::Cell<Option<bool>> = const { std::cell::Cell::new(None) };
@@ -91,15 +91,16 @@ thread_local! {
 
 /// Whether a skill's tasks are on in this process.
 pub fn on() -> bool {
-    #[cfg(test)]
+    #[cfg(any(test, feature = "share-fixture"))]
     if let Some(on) = ON_HERE.with(std::cell::Cell::get) {
         return on;
     }
     std::env::var(ENVIRONMENT).ok().as_deref() == Some("on")
 }
 
-/// The switch for this test's thread alone.
-#[cfg(test)]
+/// The switch for this test's thread alone (another crate's test too,
+/// with the `share-fixture` feature).
+#[cfg(any(test, feature = "share-fixture"))]
 pub fn set_on_here(on: Option<bool>) {
     ON_HERE.with(|here| here.set(on));
 }

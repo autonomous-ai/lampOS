@@ -218,6 +218,14 @@ impl Session {
         self.app.as_ref().map(|app| app.name.as_str())
     }
 
+    /// Whether this connection is an app that has the `speak` grant: its
+    /// `say` counts as taking a trigger offered it (`Live::took_by_say`).
+    pub fn app_may_speak(&self) -> bool {
+        self.app
+            .as_ref()
+            .is_some_and(|app| app.grants.contains(&crate::protocol::Grant::Speak))
+    }
+
     /// This connection comes from beyond the lamp's own network.
     /// The server's number for this connection.
     pub fn set_connection(&mut self, connection: u64) {

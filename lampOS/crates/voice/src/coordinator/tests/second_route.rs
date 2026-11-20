@@ -5817,47 +5817,93 @@ fn a_stop_while_the_second_route_alone_is_mid_request_is_clean() {
     assert!(run.events("stop_delivery_error").is_empty());
 }
 
-/// #1620 on the second route: a worker that reads Stop and goes on running
-/// is killed at the shared deadline, reaped, and named as the cleanup's
-/// cause (`ForcedStop`, its own role), exactly as Gemini's worker is. The
-/// rest of the rig still stops cleanly, and the conversation's own end
-/// (the mute) is kept beside the cleanup failure.
+/// #1620 on the second route: Gemini's worker that reads Stop and goes on
+/// running is killed at the shared deadline, reaped, and named as the
+/// cleanup's cause (`ForcedStop`, its own role). The rest of the rig still
+/// stops cleanly, and the conversation's own end (the mute) is kept beside
+/// the cleanup failure. The second route's worker is the exception since
+/// #8081 (`a_second_worker_that_ignores_stop_is_killed_and_the_mute_stays_a_mute`).
 #[test]
-fn a_second_worker_that_ignores_stop_is_killed_and_named_as_geminis_is() {
+fn a_provider_worker_that_ignores_stop_is_killed_and_named() {
     let _one = super::pilot_faults::one_session();
-    for (only, role) in [(false, "provider"), (true, "second")] {
-        let run = run(Script {
-            second: false,
-            only,
-            ignores_stop: Some(role),
-            ..Script::question(Live::Answer(12))
-        });
-        eprintln!("{}", run.summary());
-        let error = run.result.as_ref().unwrap_err().to_string();
-        let forced = run.events("worker_forced_shutdown");
-        assert_eq!(forced.len(), 1, "{role}: {}", run.summary());
-        assert_eq!(forced[0]["worker"], role);
-        let cause = forced[0]["error"].as_str().unwrap();
-        for said in [
-            format!("{role} worker did not stop within shared 300 ms deadline"),
-            "forced termination required; reaped with".to_owned(),
-        ] {
-            assert!(cause.contains(&said), "{role}: {cause}");
-            assert!(error.contains(&said), "{role}: {error}");
-        }
-        assert!(
-            error.contains("PhysicalMute") || error.contains("mute"),
-            "{role}: {error}"
-        );
-        for (exited_role, exited) in &run.exits {
-            assert!(exited, "{exited_role} child was not reaped ({role})");
-            assert!(
-                run.seen.stopped.contains(exited_role),
-                "{exited_role} never saw Stop"
-            );
-        }
-        assert!(run.exits.contains(&(role, true)), "{:?}", run.exits);
+    let (only, role) = (false, "provider");
+    let run = run(Script {
+        second: false,
+        only,
+        ignores_stop: Some(role),
+        ..Script::question(Live::Answer(12))
+    });
+    eprintln!("{}", run.summary());
+    let error = run.result.as_ref().unwrap_err().to_string();
+    let forced = run.events("worker_forced_shutdown");
+    assert_eq!(forced.len(), 1, "{role}: {}", run.summary());
+    assert_eq!(forced[0]["worker"], role);
+    let cause = forced[0]["error"].as_str().unwrap();
+    for said in [
+        format!("{role} worker did not stop within shared 300 ms deadline"),
+        "forced termination required; reaped with".to_owned(),
+    ] {
+        assert!(cause.contains(&said), "{role}: {cause}");
+        assert!(error.contains(&said), "{role}: {error}");
     }
+    assert!(
+        error.contains("PhysicalMute") || error.contains("mute"),
+        "{role}: {error}"
+    );
+    for (exited_role, exited) in &run.exits {
+        assert!(exited, "{exited_role} child was not reaped ({role})");
+        assert!(
+            run.seen.stopped.contains(exited_role),
+            "{exited_role} never saw Stop"
+        );
+    }
+    assert!(run.exits.contains(&(role, true)), "{:?}", run.exits);
+}
+
+/// #8081: a software mute while the second route's worker is still busy
+/// (mid-answer: 1 in 5 mutes on 14967) ended lamp-voice: the worker missed the
+/// shared 300 ms, was killed and reaped, `terminate_and_reap` named that a
+/// failure, the cleanup failure dropped the mute, the service exited 1 and the
+/// restart guard left the lamp muted. The worker holds no device, so killed and
+/// reaped it is a verified stop: the forced stop is recorded (and said), and the
+/// run's result is the mute itself, with no cleanup failure in it.
+#[test]
+fn a_second_worker_that_ignores_stop_is_killed_and_the_mute_stays_a_mute() {
+    let _one = super::pilot_faults::one_session();
+    let role = "second";
+    let run = run(Script {
+        second: false,
+        only: true,
+        ignores_stop: Some(role),
+        ..Script::question(Live::Answer(12))
+    });
+    eprintln!("{}", run.summary());
+    let error = run.result.as_ref().unwrap_err();
+    let said = error.to_string();
+    assert!(
+        error.is::<crate::service_privacy::SoftwareMute>()
+            || error.is::<crate::service_privacy::PhysicalMute>(),
+        "the run's result is the mute, not a cleanup failure: {said}"
+    );
+    assert!(!said.contains("verified cleanup failed"), "{said}");
+    assert!(!said.contains("did not stop within"), "{said}");
+    let forced = run.events("worker_forced_shutdown");
+    assert_eq!(forced.len(), 1, "{}", run.summary());
+    assert_eq!(forced[0]["worker"], role);
+    assert_eq!(forced[0]["failure"], false);
+    assert!(
+        forced[0]["error"].as_str().unwrap().contains("reaped with"),
+        "{}",
+        forced[0]
+    );
+    for (exited_role, exited) in &run.exits {
+        assert!(exited, "{exited_role} child was not reaped");
+        assert!(
+            run.seen.stopped.contains(exited_role),
+            "{exited_role} never saw Stop"
+        );
+    }
+    assert!(run.exits.contains(&(role, true)), "{:?}", run.exits);
 }
 
 /// #1567/#1864 on the second route: its worker says its link is Ready as

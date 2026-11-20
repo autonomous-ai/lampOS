@@ -382,12 +382,31 @@ enum Extra {
         #[serde(default)]
         all: bool,
     },
-    /// The next page of the exchanges the last forget removed that its
-    /// answer had no room for (#7771, `"exchanges_more":true`).
-    ForgotExchanges {},
+    /// The next page of the exchanges a forget removed that its answer had
+    /// no room for (#7771, `"exchanges_more":true`), by the
+    /// `exchanges_token` that answer gave: a token not kept is refused
+    /// (`rest_gone`), never answered with another forget's.
+    ForgotExchanges {
+        #[serde(default)]
+        token: Option<String>,
+    },
     /// The store's epoch for the account's history ids (#7771,
     /// [`lamp_msgs::history_turn_id`]).
     HistoryEpoch {},
+    /// What a Store app or a paired computer told, kept as the lamp's known
+    /// person's fact marked with its source (#7415,
+    /// `lamp_msgs::app_fact::REMEMBER_OP`, `Days::remember_app_fact`).
+    RememberAppFact {
+        person: String,
+        source: String,
+        #[serde(default)]
+        name: String,
+        at_unix_ms: u64,
+        text: String,
+    },
+    /// Every fact of one source, by its mark (#7415,
+    /// `lamp_msgs::app_fact::FORGET_OP`, `Days::forget_app_facts`).
+    ForgetAppFacts { source: String },
     /// A forget about a thing's subjects: a known person's own exchanges
     /// that have them forgotten (`Days::exchanges_forget`).
     ExchangesForget {
@@ -1361,11 +1380,38 @@ fn extra(store: &mut Days, request: Extra, now: u64) -> Result<Value> {
         Extra::ForgetAppleHealth {} => {
             json!({"ok":true,"removed":store.forget_apple_health()?})
         }
-        Extra::ForgotExchanges {} => {
-            let (page, more) = store.forgot_page(MOST_PAGED_EXCHANGES);
+        Extra::ForgotExchanges { token } => {
+            let (page, more) = token
+                .and_then(|token| store.forgot_page(&token, MOST_PAGED_EXCHANGES))
+                .ok_or_else(|| {
+                    Error::new(
+                        "rest_gone",
+                        "no rest is kept under this token (another store's, let go or paged out)",
+                    )
+                })?;
             json!({"ok":true,"exchanges":exchanges_value(&page),"more":more})
         }
         Extra::HistoryEpoch {} => json!({"ok":true,"epoch":store.history_epoch()}),
+        Extra::RememberAppFact {
+            person,
+            source,
+            name,
+            at_unix_ms,
+            text,
+        } => {
+            let person = Person::new(&person).ok_or_else(|| {
+                Error::new(
+                    "not_known",
+                    "an app's fact is kept only for the lamp's known person",
+                )
+            })?;
+            value(Response::Added {
+                id: store.remember_app_fact(&person, &source, &name, at_unix_ms, &text)?,
+            })
+        }
+        Extra::ForgetAppFacts { source } => {
+            json!({"ok":true,"removed":store.forget_app_facts(&source)?})
+        }
         Extra::ExchangesForget { person, about } => {
             json!({"ok":true,"removed":store.exchanges_forget(&one(person)?, &about)?})
         }
@@ -1500,6 +1546,8 @@ pub fn answer(store: &mut Days, line: &[u8], now: u64) -> protocol::Answer {
             "service_contacts",
             "service_contacts_forget",
             "exchanges_forget",
+            lamp_msgs::app_fact::REMEMBER_OP,
+            lamp_msgs::app_fact::FORGET_OP,
             lamp_msgs::health_fact::REMEMBER_OP,
             lamp_msgs::health_fact::FORGET_OP,
             lamp_msgs::MEMORY_FORGOT_EXCHANGES_OP,
@@ -1574,10 +1622,10 @@ pub fn answer(store: &mut Days, line: &[u8], now: u64) -> protocol::Answer {
             if !told.is_empty() {
                 response["exchanges"] = exchanges_value(&told);
             }
-            if !rest.is_empty() {
+            if let Some(token) = store.keep_forgot_rest(rest) {
                 response["exchanges_more"] = json!(true);
+                response["exchanges_token"] = json!(token);
             }
-            store.keep_forgot_rest(rest);
         }
         response
     });
@@ -1596,7 +1644,11 @@ pub fn answer(store: &mut Days, line: &[u8], now: u64) -> protocol::Answer {
             // clear an earlier failure to add a record.
             let wrote = matches!(
                 op.as_str(),
-                "append" | "remember" | "append_linked" | "remember_apple_health"
+                "append"
+                    | "remember"
+                    | "append_linked"
+                    | "remember_app_fact"
+                    | "remember_apple_health"
             ) && response["existing"] != true;
             (response, outcome, false, wrote)
         }
@@ -1833,6 +1885,143 @@ mod tests {
         assert_eq!(scratch.open().history_epoch(), minted);
     }
 
+    /// #7771 (the first builder's P2 on #7935): two big forgets in a row
+    /// each keep their rest under their own token, a forget with no rest
+    /// between replaces neither, every id of each is told, and a page asked
+    /// with no token, another forget's paged-out token, or a token given
+    /// before a restart is refused, never answered with another forget's.
+    #[test]
+    fn each_forgets_rest_is_kept_under_its_own_token() {
+        let (scratch, mut store) = Scratch::new("forgot-tokens");
+        let minh = "p-0123456789abcdef";
+        let lan = "p-fedcba9876543210";
+        let send = |store: &mut Days, request: Value| -> Value {
+            serde_json::from_str(&answer(store, request.to_string().as_bytes(), NOW).line).unwrap()
+        };
+        for (person, word) in [(minh, "coffee"), (lan, "tea")] {
+            for n in 0..250 {
+                send(
+                    &mut store,
+                    json!({"op":"append_linked","person":person,"at_unix_ms":NOW,"heard":format!("{word} {n}"),"said":"ok","source_ids":[]}),
+                );
+            }
+        }
+        let ids = |answer: &Value, scope: &str| -> Vec<String> {
+            answer["exchanges"][scope]
+                .as_array()
+                .into_iter()
+                .flatten()
+                .map(|id| id.as_str().unwrap().to_owned())
+                .collect()
+        };
+        let first = send(
+            &mut store,
+            json!({"op":"exchanges_forget","person":minh,"about":[["coffee"]]}),
+        );
+        let second = send(
+            &mut store,
+            json!({"op":"exchanges_forget","person":lan,"about":[["tea"]]}),
+        );
+        // A small forget between keeps no rest and replaces none.
+        send(
+            &mut store,
+            json!({"op":"append_linked","person":minh,"at_unix_ms":NOW,"heard":"juice","said":"ok","source_ids":[]}),
+        );
+        let small = send(&mut store, json!({"op":"forget_last","person":minh}));
+        assert!(small.get("exchanges_token").is_none(), "{small}");
+        let (a, b) = (
+            first["exchanges_token"].as_str().unwrap().to_owned(),
+            second["exchanges_token"].as_str().unwrap().to_owned(),
+        );
+        assert_ne!(a, b);
+        // Paged in the other order: each token gives only its own forget's.
+        let page_b = send(&mut store, json!({"op":"forgot_exchanges","token":b}));
+        assert_eq!(page_b["more"], false, "{page_b}");
+        assert!(ids(&page_b, minh).is_empty());
+        let page_a = send(&mut store, json!({"op":"forgot_exchanges","token":a}));
+        assert!(ids(&page_a, lan).is_empty());
+        for (told, page, scope) in [(&first, &page_a, minh), (&second, &page_b, lan)] {
+            let mut all = ids(told, scope);
+            all.extend(ids(page, scope));
+            all.sort_unstable();
+            all.dedup();
+            assert_eq!(all.len(), 250, "{scope}");
+        }
+        // No token, a paged-out one: refused.
+        for line in [
+            json!({"op":"forgot_exchanges"}),
+            json!({"op":"forgot_exchanges","token":a}),
+        ] {
+            let refused = send(&mut store, line);
+            assert_eq!(refused["error"], "rest_gone", "{refused}");
+        }
+        // A token given before a restart never names a rest kept after.
+        for n in 0..150 {
+            send(
+                &mut store,
+                json!({"op":"append_linked","person":minh,"at_unix_ms":NOW,"heard":format!("milk {n}"),"said":"ok","source_ids":[]}),
+            );
+        }
+        let before = send(
+            &mut store,
+            json!({"op":"exchanges_forget","person":minh,"about":[["milk"]]}),
+        );
+        let stale = before["exchanges_token"].as_str().unwrap().to_owned();
+        drop(store);
+        // Reopened (as after a restart), its rest is given a token of its
+        // own, and the old one names nothing.
+        let mut store = scratch.open();
+        for n in 0..150 {
+            send(
+                &mut store,
+                json!({"op":"append_linked","person":lan,"at_unix_ms":NOW,"heard":format!("soda {n}"),"said":"ok","source_ids":[]}),
+            );
+        }
+        let after = send(
+            &mut store,
+            json!({"op":"exchanges_forget","person":lan,"about":[["soda"]]}),
+        );
+        let fresh = after["exchanges_token"].as_str().unwrap().to_owned();
+        assert_ne!(fresh, stale);
+        drop(store);
+        // Two opens, each at its first rest (the same count), never give
+        // one token: the base is each open's own.
+        let one_rest = || {
+            vec![crate::days::Forgot {
+                scope: "everyone".into(),
+                id: 1,
+                turn: lamp_msgs::history_turn_id("0a1b2c3d", "everyone", 1),
+            }]
+        };
+        let first = scratch.open().keep_forgot_rest(one_rest()).unwrap();
+        let mut store = scratch.open();
+        let second = store.keep_forgot_rest(one_rest()).unwrap();
+        assert_ne!(first, second);
+        let refused = send(&mut store, json!({"op":"forgot_exchanges","token":first}));
+        assert_eq!(refused["error"], "rest_gone", "{refused}");
+        let paged = send(&mut store, json!({"op":"forgot_exchanges","token":second}));
+        assert_eq!(paged["ok"], true, "{paged}");
+    }
+
+    /// Past [`crate::days::FORGOT_RESTS_KEPT`] rests waiting, the oldest is
+    /// let go: its token is refused, the newest still pages.
+    #[test]
+    fn the_oldest_rest_goes_past_the_bound() {
+        let (_scratch, mut store) = Scratch::new("forgot-bound");
+        let forgot = |n: u64| crate::days::Forgot {
+            scope: "everyone".into(),
+            id: n,
+            turn: lamp_msgs::history_turn_id("0a1b2c3d", "everyone", n),
+        };
+        let tokens: Vec<String> = (0..=crate::days::FORGOT_RESTS_KEPT as u64)
+            .map(|n| store.keep_forgot_rest(vec![forgot(n)]).unwrap())
+            .collect();
+        assert!(store.forgot_page(&tokens[0], 10).is_none());
+        let (page, more) = store.forgot_page(tokens.last().unwrap(), 10).unwrap();
+        assert_eq!((page.len(), more), (1, false));
+        assert!(store.keep_forgot_rest(Vec::new()).is_none());
+    }
+
     /// #7771 (the first builder's P1 on #7935): a forget of more
     /// exchanges than one answer names tells them all, the rest paged by
     /// `forgot_exchanges`, never cut into a delete of more; a known
@@ -1865,9 +2054,10 @@ mod tests {
             .map(|id| id.as_str().unwrap().to_owned())
             .collect();
         assert_eq!(ids.len(), MOST_TOLD_EXCHANGES);
+        let token = first["exchanges_token"].as_str().unwrap().to_owned();
         // A request between leaves the rest to page.
         send(&mut store, json!({"op":"status","person":minh}));
-        let page = send(&mut store, json!({"op":"forgot_exchanges"}));
+        let page = send(&mut store, json!({"op":"forgot_exchanges","token":token}));
         assert_eq!(page["more"], false, "{page}");
         ids.extend(
             page["exchanges"][minh]
@@ -1879,8 +2069,10 @@ mod tests {
         ids.sort_unstable();
         ids.dedup();
         assert_eq!(ids.len(), 600);
-        let empty = send(&mut store, json!({"op":"forgot_exchanges"}));
-        assert_eq!(empty, json!({"ok":true,"exchanges":{},"more":false}));
+        // Paged out, its token is gone.
+        let empty = send(&mut store, json!({"op":"forgot_exchanges","token":token}));
+        assert_eq!(empty["ok"], false, "{empty}");
+        assert_eq!(empty["error"], "rest_gone");
         // The room's forget everything tells the room's ids.
         for n in 0..3 {
             send(

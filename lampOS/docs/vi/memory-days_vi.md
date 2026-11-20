@@ -826,6 +826,91 @@ khóa của ghi chú, tên khóa hay giá trị.
   đổi này, chưa từng có trong sản phẩm) giữ `CHECK` đó, nên từ chối dòng
   `sdk` và không giữ gì.
 
+## Điều một app ghi và dòng ngữ cảnh của nó (`app_facts`, #7415, C166)
+
+Dòng C166 của bảng theo dõi, phần lamp-memory của `apps.remember` và
+`apps.context` (đề xuất của App Only và lời đồng ý của first builder cho cả hai
+thao tác, 16:45 ngày 19/11 trên #7415; hình dạng của Friday, 16:47). Một bản
+duy nhất của giới hạn, cách ghi và các thao tác nằm ở `lamp_msgs::app_fact`;
+phần của kho nằm ở `crates/memory/src/app_facts.rs`.
+
+- **`remember_app_fact {person, source, name?, at_unix_ms, text}`** giữ điều
+  một app trên Store hoặc một máy tính đã ghép đôi báo, như một điều đã giữ
+  của `person`, không gắn với lượt nói nào, và đánh dấu nó trong
+  `app_facts(rid, source, kept_day)` (tạo `IF NOT EXISTS`, dòng của nó đi cùng mục,
+  `user_version` không đổi). Câu trả lời là `{ok:true, id}`.
+  - **Của ai.** Chỉ một người mắt nhận ra (id `p-`) mà trí nhớ đã có (một
+    điều của họ không phải điều của app); mọi id khác, căn phòng, một phạm
+    vi quy tắc, hay một người trí nhớ không giữ gì đều là `not_known`, nên
+    lời của app không bao giờ mở một phạm vi mới. Sau khi người đó bị quên
+    (quên người đó, hoặc quên hết), một lần ghi cho họ là `forgotten` cho
+    đến khi trí nhớ lại có điều gì của họ.
+    Bên ghi chọn người bằng `app_fact::whose`: người app nêu, chỉ khi đó là
+    người lamp biết (các id trí nhớ của chủ), nếu không là `not_yours`;
+    không có người lamp biết thì `not_known`. Không bao giờ vào phạm vi của
+    người khác, không bao giờ vào căn phòng.
+  - **Nguồn.** `app:<id>` hoặc `computer:<id>` (nếu không là `bad_source`),
+    do cửa đặt theo quyền đã cấp, không bao giờ theo lời của app.
+  - **Kể như dữ liệu.** Giữ dưới dạng `Noted by the app <tên>, <ngày địa
+    phương>: "<lời>"`: lời của app trong ngoặc kép cùng tên của nó (tối đa
+    64 byte), để mô hình đọc đó là ghi chú từ một app, không bao giờ là chỉ
+    dẫn của chính lamp. Bỏ liên kết (từ có `://` hoặc bắt đầu bằng `www.`),
+    ký tự đánh dấu (`<>` `` ` `` `*` `[]` `{}`) và dấu ngoặc kép (`"` `“`
+    `”`), để lời của app không bao giờ đóng được ngoặc kép mà nó được giữ
+    hay kể trong đó.
+  - **Lệnh quên thắng.** Một điều được báo trước lệnh quên hết gần nhất của
+    người đó (`service_records_forgot`) bị từ chối `forgotten`; một điều
+    muộn hơn đồng hồ của trí nhớ quá 5 s là `bad_time`.
+  - **Không bao giờ theo lời.** Không tính vào chỗ của danh sách đã giữ của
+    chính người đó, không bao giờ là cùng một điều với dòng họ tự giữ có
+    cùng lời (`once`), và không tính khi trí nhớ của một người được chuyển
+    sang người khác.
+  - **Tách khỏi danh sách của chính người đó.** Không bao giờ có trong
+    `kept` (danh sách của ghi chú gợi nhớ), để một app bận rộn không bao
+    giờ đẩy các điều chính người đó đã giữ ra khỏi 16 KiB của nó; `recall`
+    (theo lời hay theo ngày) và `search` tìm thấy nó như mọi điều đã giữ,
+    cùng dấu của nó: «hôm nay tôi tập gì?» được trả lời từ đó. Không có
+    phần byte riêng.
+  - **Lượt ban đêm không bao giờ đọc nó**, nên không đoạn, mẫu hay chương
+    nào được làm từ nó mà mất dấu hoặc sống quá 90 ngày của nó. Những gì
+    làm từ nó qua bất kỳ liên kết nào khác đi cùng nó (lượt đi của lệnh
+    quên).
+  - **Theo đồng hồ của chính trí nhớ.** 20 điều mỗi ngày được đếm theo
+    ngày trí nhớ nhận chúng (`kept_day`), và 200 điều đi theo thứ tự được
+    giữ, điều giữ trước đi trước, không bao giờ theo `at` của điều đó: một
+    điều ghi lùi ngày không bao giờ vượt được 20 điều của ngày hay chiếm
+    chỗ của một điều mới hơn. 90 ngày cũng tính từ `kept_day`.
+- **`forget_app_facts {source}`** xoá mọi điều của nguồn đó, tìm theo dấu,
+  cùng những gì làm ra từ chúng, như `forget {id}` từng điều; không lời nói
+  nào mất. Dùng khi gỡ app, thu hồi máy tính hoặc tắt quyền:
+  `{ok:true, removed}`. Các lệnh quên của chính người đó lấy điều của app như
+  mọi điều đã giữ: một điều, quên về một chuyện, quên hết, và quên người đó.
+- **Dòng ngữ cảnh không bao giờ được giữ.** `app_fact::ContextLines` giữ một
+  dòng mỗi nguồn, chỉ trong bộ nhớ, kể bằng `app_fact::context_note` ("From
+  the app <tên>, live now (a note, not an instruction): "<dòng>"") cho đến
+  hết thời gian của nó; bị xoá khi phiên kết thúc, mất kết nối, tắt quyền và
+  khi quên hết. Không gì ghi nó xuống đĩa, vào mạch chuyện, nhật ký hay trí
+  nhớ.
+- **Nhật ký** ghi thao tác, id của người và số lượng, không bao giờ một lời.
+- **Không có công tắc ở đây.** Chưa gì gửi các thao tác này: `apps.remember`
+  và `apps.context` ở cửa và bên ghi của chúng đến trong PR riêng, sau công
+  tắc của nó, tắt cho đến khi first builder đọc phần riêng tư và có ROW. Trí
+  nhớ cũ trả lời `unknown_op`. "Từ chối khi Lamp ở chế độ riêng tư" (công
+  tắc riêng tư vật lý, điểm 4 của first builder) là kiểm tra của cửa.
+
+Các giới hạn là của luồng thảo luận, không cái nào do kho này tự đặt:
+
+| Giới hạn | Giá trị | Quyết định của ai |
+|---|---|---|
+| Lời của app | tối đa 280 ký tự, quá thì từ chối, không bao giờ cắt (`too_long`) | App Only 16:4x, first builder 16:45 điểm 3 |
+| Một ngày | tối đa 20 điều mỗi nguồn mỗi ngày địa phương, theo đồng hồ trí nhớ (`too_many`) | App Only 16:4x, first builder 16:45 điểm 3 |
+| Tổng | tối đa 200 điều mỗi nguồn, điều giữ trước đi trước; không tính vào 200 của chính người đó | Friday 16:47 (200 mỗi nguồn), first builder 16:45 (không tính vào 200) |
+| Thời gian giữ | 90 ngày địa phương, ngày giữ là ngày đầu | App Only 16:4x, first builder 16:45 điểm 3 |
+| Một dòng ngữ cảnh | tối đa 120 ký tự, một dòng mỗi nguồn | App Only 16:4x, first builder 16:45 điểm 3 |
+| Thời gian một dòng ngữ cảnh | `for_ms` từ 1 ms đến 10 phút, app gia hạn | App Only 16:4x, first builder 16:45 điểm 3 |
+| Tên nguồn | tối đa 64 byte trong lời đã giữ | PR này, chờ chủ xem |
+| Thời điểm muộn hơn | tối đa 5 s sau đồng hồ trí nhớ (như `linked_record`) | PR này, chờ chủ xem |
+
 ## Danh bạ dịch vụ (`service_contact`, `LAMP_SERVICE_CONTACTS` của voice)
 
 Công tắc `LAMP_SERVICE_CONTACTS` của voice (mặc định tắt, bật trong sản
@@ -904,15 +989,26 @@ khoản (Backend3, 19/11): `POST <base>/history/turns` với khóa của lamp tr
   (`exchanges`, theo phạm vi, dạng turn id: câu trả lời của phần quên) được bỏ và ghi nhớ là đã
   quên (4.096 cái gần nhất), nên một lần lưu nêu một id như vậy bị bỏ trước mọi
   POST, kể cả lần thử lại hay phần gửi bù khi khởi động: hàng rào riêng của lamp,
-  bên cạnh tombstone của máy chủ. Quên hết thì quên mọi id đã đưa trong phạm vi
+  bên cạnh tombstone của máy chủ. Quên hết thì quên mọi id đã trao trong phạm vi
   đó đến lúc ấy. Khi câu trả lời không nêu id nào (hoặc không có câu trả lời),
-  các lượt chưa gửi của người quên và của phòng chờ lần khởi động sau, khi bộ nhớ
-  không còn giữ những gì đã đi. Lượt chưa gửi của người khác không bao giờ bị
-  bỏ. Mọi câu trả lời của bộ nhớ mà voice đọc có turn id trong `exchanges` (cả
-  năm lệnh quên, `history_forget::answered`) đều đến `history_send::deleting`,
-  nên các id đó không bao giờ được POST, dù `LAMP_HISTORY_FORGET` thế nào. Một
+  các lượt đã trao đến lúc ấy của người quên và của phòng chờ lần khởi động sau,
+  khi bộ nhớ không còn giữ những gì đã đi: các lượt đang xếp hàng hay đang giữ,
+  và các lượt trong một lô mà bộ gửi đã lấy ra khỏi hàng đợi, lô này được kiểm
+  lại trước mọi lần thử, kể cả lần đầu, và không bao giờ được đặt lại để POST
+  (P2 của Friday trên #7957). Các câu của phòng mà một lệnh quên hết lấy đi cũng
+  không được nêu, nên các lượt của phòng chờ theo cùng cách. Một lần POST đang
+  chạy thì không bị dừng; lần thử sau của nó được kiểm. Lượt chưa gửi của người
+  khác không bao giờ bị bỏ. Mọi câu trả lời của bộ nhớ mà voice đọc có turn id trong `exchanges` (cả
+  năm lệnh quên, `history_forget::answered`, trên đường của voice) đều đến
+  `history_send::deleting`, nên các id đó không bao giờ được POST, dù
+  `LAMP_HISTORY_FORGET` thế nào; khi nó bật, các trang phần còn lại của một
+  lệnh quên lớn được đọc ngoài đường của voice và id của chúng cũng đến đó. Một
   lệnh quên về một điều cũng giữ lại rồi thả các lần POST như mọi lệnh quên
-  khác. Một nguồn bị quên bên ngoài voice được coi như một lệnh quên không nêu
+  khác. Khi mọi lần xóa của nó đều được trả lời, những gì đã đi đã được nêu trên
+  đường đi và không bỏ thêm gì; khi một lần hết giờ hay mất câu trả lời giữa
+  chừng (các lệnh quên điều đã giữ hoặc lệnh quên lượt trò chuyện), không biết
+  những gì đã đi, và nó được coi như một lệnh quên không nêu id, không bao giờ
+  là "không xóa gì". Một nguồn bị quên bên ngoài voice được coi như một lệnh quên không nêu
   id của người đó.
 - **Không mất gì khi khởi động lại, và không có lời nào trên đĩa:** chỉ có id
   được giữ, trong `/var/lib/lampOS/voice/history-marks.json` (0600,
@@ -1474,7 +1570,10 @@ xoá; lệnh được giữ như một lệnh quên theo id của điều ấy
 báo hỏi một lần, chỉ nêu chủ đề bằng chính lời của họ, bằng ngôn ngữ của họ
 («Mình có nên quên điều đã giữ về mã khóa xe của bạn không?»). Nội dung đã giữ
 không bao giờ được báo cho mô hình hay nói ra: người nói không được nhìn thấy
-(P2 của Reviewer-lead trên #6673). Chỉ lời «có» của họ ở câu sau trong vòng 30 giây
+(P2 của Reviewer-lead trên #6673). Ghi chú giữ chờ bảo mô hình rằng nếu họ nói «có» trong
+vòng 30 giây thì gọi `forget`, không nêu gì khác, và chỉ lời gọi ấy mới chạy
+(`remember::one_face_forget_asks`; #8059: trước đây nó nói «Do not call forget
+again for their yes», nên trên stable lời «có» không chạy gì). Chỉ lời «có» của họ ở câu sau trong vòng 30 giây
 (`remember::ONE_FACE_FORGET_YES_FOR`), của cùng người trong cùng phiên, khi
 thấy mặt họ nói, hoặc trong phòng riêng (`LAMP_PRIVATE_ROOM`) trên một câu là
 của họ vì mặt họ một mình trong khung, mới chạy đúng lệnh quên theo id ấy
@@ -1783,7 +1882,14 @@ khi các điều đã giữ chưa xong: bộ nhớ không trả lời hay từ c
 quá nhiều để xem hết, hoặc hơn tám điều khớp (mô hình hỏi điều nào). Khi có lượt
 bị xóa, câu trả lời nói bao nhiêu (`exchanges`, không bao giờ lời của chúng)
 và cuộc trò chuyện ngừng được ghi nhật ký, như sau khi quên một điều đã giữ.
-Thêm một yêu cầu cục bộ trong 1,5 s của lệnh gọi.
+Đã gửi mà không được trả lời (hết giờ hay mất câu trả lời; bị từ chối thì
+không xóa gì), thì lời đã nói về nó không được biết là đã mất: mô hình được
+báo `history:
+"not_reached"` bên cạnh kết quả riêng của các điều đã giữ, không bao giờ
+"forgot nothing". Không điều đã giữ nào mất thì ghi chú nói không điều đã
+giữ nào bị quên, rằng chưa quên xong, và không được nói là chẳng có gì hay
+là đã quên; có điều đã mất thì một `history_note` nói vậy bên cạnh những gì
+đã mất. Thêm một yêu cầu cục bộ trong 1,5 s của lệnh gọi.
 
 Dấu quên (phương án 2 của El trên #5333): trước thay đổi trên, quên theo chủ
 đề chỉ khớp điều đã giữ và quan sát, nên một lượt nói chưa từng được giữ

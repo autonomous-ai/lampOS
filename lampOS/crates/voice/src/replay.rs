@@ -154,9 +154,11 @@ fn verdict(case: &Case) -> String {
     );
     match awaiting_yes(case.yes_awaited, || judge(line)) {
         Said::Held(held) => held.reason().to_owned(),
-        Said::Stands | Said::InConversation | Said::PoseUnread | Said::ToTheLamp => {
-            "answered".to_owned()
-        }
+        Said::Stands
+        | Said::InConversation
+        | Said::PoseUnread
+        | Said::AnswerNoLook
+        | Said::ToTheLamp => "answered".to_owned(),
     }
 }
 

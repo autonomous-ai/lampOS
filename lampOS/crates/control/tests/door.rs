@@ -283,11 +283,88 @@ async fn a_computer_pairs_says_hello_and_is_answered_over_tls() {
 #[tokio::test]
 async fn another_path_or_an_oversized_frame_is_refused() {
     let lamp = lamp("refuse").await;
+    // Poses on: the door reads a pose's frame, and tells the rest.
+    lamp.shared.set_poses(true);
     assert!(connect(&lamp, "/v2").await.is_err());
     let mut socket = connect(&lamp, "/v1").await.unwrap();
     let _welcome = next(&mut socket).await;
     let huge = "x".repeat(server::FRAME_MAX + 1);
     let _ = socket.send(Message::text(huge)).await;
+    assert_closed_too_big(&mut socket).await;
+    // Past even a pose's frame: closed by the WebSocket itself.
+    let mut socket = connect(&lamp, "/v1").await.unwrap();
+    let _welcome = next(&mut socket).await;
+    let _ = socket
+        .send(Message::text("x".repeat(server::POSE_FRAME_MAX + 1)))
+        .await;
+    let closed = tokio::time::timeout(Duration::from_secs(5), socket.next())
+        .await
+        .expect("closed in time");
+    assert!(!matches!(closed, Some(Ok(Message::Text(_)))), "{closed:?}");
+}
+
+/// A frame over 64 KiB that is not a taken pose: told `bad_request`, then
+/// closed.
+async fn assert_closed_too_big(socket: &mut Socket) {
+    match tokio::time::timeout(Duration::from_secs(5), socket.next())
+        .await
+        .expect("answered in time")
+    {
+        Some(Ok(Message::Text(text))) => {
+            let told: Value = serde_json::from_str(&text).unwrap();
+            assert_eq!(told["error"]["code"], "bad_request", "{told}");
+            assert_eq!(told["error"]["why"], server::FRAME_TOO_BIG);
+        }
+        other => panic!("{other:?}"),
+    }
+    let closed = tokio::time::timeout(Duration::from_secs(5), socket.next())
+        .await
+        .expect("closed in time");
+    assert!(!matches!(closed, Some(Ok(Message::Text(_)))), "{closed:?}");
+}
+
+/// Only a `pose` from a computer that said hello may pass 64 KiB on the
+/// lamp's own network (Heron's P2 on #7972): a large pose is answered (in
+/// the door's words), a large other op closes the connection, and so does a
+/// large pose before hello.
+#[tokio::test]
+async fn only_a_pose_after_hello_may_be_larger_than_64_kib() {
+    let lamp = lamp("pose-frame").await;
+    lamp.shared.set_poses(true);
+    let jpeg = "A".repeat(150 * 1024);
+    let pose = json!({"id": 9, "op": "pose", "jpeg": jpeg}).to_string();
+    assert!(pose.len() > server::FRAME_MAX && pose.len() < server::POSE_FRAME_MAX);
+    // Before hello: closed.
+    let mut stranger = connect(&lamp, "/v1").await.unwrap();
+    let _welcome = next(&mut stranger).await;
+    stranger.send(Message::text(pose.clone())).await.unwrap();
+    assert_closed_too_big(&mut stranger).await;
+    // After hello: answered (here unrouted), and the connection stays.
+    let mut socket = paired(&lamp, json!(["camera"]), 41).await;
+    socket.send(Message::text(pose)).await.unwrap();
+    let answer = next(&mut socket).await;
+    assert_eq!(answer["re"], 9, "{answer}");
+    let still = send(
+        &mut socket,
+        json!({"id": 10, "op": "get", "state": ["lamp"]}),
+    )
+    .await;
+    assert_eq!(still["re"], 10, "{still}");
+    // Another op as large: told and closed.
+    let notes = json!({"id": 11, "op": "notes.set", "key": "k", "value": "x".repeat(80 * 1024)});
+    socket.send(Message::text(notes.to_string())).await.unwrap();
+    assert_closed_too_big(&mut socket).await;
+}
+
+/// With poses off (`LAMP_NPU` not on) no door reads past 64 KiB, a
+/// `pose` after hello neither (Fourteen's P3 on #7972): the WebSocket's
+/// own cap closes the connection, with no answer.
+#[tokio::test]
+async fn with_poses_off_a_large_pose_is_closed_as_any_frame() {
+    let lamp = lamp("pose-off-frame").await;
+    let pose = json!({"id": 9, "op": "pose", "jpeg": "A".repeat(150 * 1024)}).to_string();
+    let mut socket = paired(&lamp, json!(["camera"]), 42).await;
+    let _ = socket.send(Message::text(pose)).await;
     let closed = tokio::time::timeout(Duration::from_secs(5), socket.next())
         .await
         .expect("closed in time");
@@ -3755,6 +3832,67 @@ async fn an_app_hellos_with_its_manifests_grants_and_uses_the_ops_only_it_has() 
     assert!(agent_next(&mut socket).await.is_none());
     // A second connection of the app: its panel stays until the last one goes.
     drop(socket);
+}
+
+/// #7979: an app's `say` within 3 s of a trigger offered it takes that line,
+/// but only once the door has accepted the `say`; a refused one takes nothing
+/// and the voice is not told (Heron's P2).
+#[tokio::test]
+async fn an_apps_say_takes_a_trigger_only_when_the_door_accepts_it() {
+    let says = Arc::new(std::sync::Mutex::new(Vec::new()));
+    let lamp = lamp_with("app-say-took", Box::new(Says(says.clone()))).await;
+    let path = app_socket(&lamp, "apps.sock", is_demo, apps_on).await;
+    // The manifest with a trigger: `install_app` has none.
+    let manifest_path = lamp
+        .dir
+        .join("apps")
+        .join("demo")
+        .join("current")
+        .join("lamp-skill.json");
+    let mut manifest: Value =
+        serde_json::from_slice(&std::fs::read(&manifest_path).unwrap()).unwrap();
+    manifest["triggers"] = json!(["start english practice"]);
+    std::fs::write(&manifest_path, manifest.to_string()).unwrap();
+    let told = std::sync::Arc::new(std::sync::Mutex::new(Vec::<(String, u64)>::new()));
+    let sink = told.clone();
+    lamp.shared
+        .set_took_sink(std::sync::Arc::new(move |app, turn| {
+            sink.lock().unwrap().push((app.to_owned(), turn));
+        }));
+    let mut socket = agent_connect(&path).await.unwrap();
+    let welcome = agent_next(&mut socket).await.unwrap();
+    assert_eq!(welcome["ev"], "welcome");
+    let hello = json!({"id": 1, "op": "hello", "client": "c_0", "sig": STANDARD.encode([0u8; 64])});
+    assert_eq!(app_ask(&mut socket, hello).await["ok"], true);
+    let said = |turn: u64| lamp_msgs::AppTrigger {
+        turn,
+        app: "demo".into(),
+        trigger: "start english practice".into(),
+        phrase: "start english practice".into(),
+        at_ms: 1,
+    };
+    // A refused say (no text) within the hold takes nothing.
+    assert!(lamp.shared.offer_trigger(&said(5)));
+    let offered = agent_next(&mut socket).await.unwrap();
+    assert_eq!(offered["ev"], "app.trigger", "{offered}");
+    assert_eq!(offered["turn"], "5", "{offered}");
+    let refused = app_ask(&mut socket, json!({"id": 20, "op": "say", "text": ""})).await;
+    assert_eq!(refused["ok"], false, "{refused}");
+    assert!(
+        told.lock().unwrap().is_empty(),
+        "a refused say took the line"
+    );
+    // An accepted say takes the newest turn offered, once.
+    assert!(lamp.shared.offer_trigger(&said(6)));
+    let offered = agent_next(&mut socket).await.unwrap();
+    assert_eq!(offered["turn"], "6", "{offered}");
+    let accepted = app_ask(
+        &mut socket,
+        json!({"id": 21, "op": "say", "text": "Hello."}),
+    )
+    .await;
+    assert_eq!(accepted["ok"], true, "{accepted}");
+    assert_eq!(*told.lock().unwrap(), vec![("demo".to_owned(), 6)]);
 }
 
 #[tokio::test]

@@ -98,6 +98,7 @@ differs. Folders are what the unit makes or names.
 | control | `lamp-control serve` (off unless `LAMP_CONTROL=on`, `control.md`) | lampos | `/var/lib/lampos-control/` (0700, its `StateDirectory`: certificate, key, paired computers); `/run/lampos-control/` (0700, the admin socket) | none | TCP 7731 (WebSocket over TLS, paired computers only); `admin.sock`; the body's `mood.sock`, the voice's `say.sock`, the bus |
 | peek | `lamp-peek` (the owner's dev monitor, #5883: off unless `LAMP_PEEK=monitor`, which the app's `monitor.set` writes as a drop-in; outside `lampos.target`, `lamp-peek.service` is `WantedBy=multi-user.target` once setup's marker exists, `peek.md`) | lampos | `/run/lampos-peek/` (0700, the admin socket) | none | TCP 80 to the local network only, while on; `admin.sock`; reads the bus |
 | seen | `lamp-seen frame-link`, then `lamp-seen serve` (off unless `LAMP_SEEN_ACTIVITY=on`, which the unit sets, `seen.md`); in the target before the eyes | lampos | `/var/lib/lampos-seen/` (0700, its `StateDirectory`, passed as `--state-folder`: the line said back; the reset plan wipes it); `/run/lampos-seen/` (0700, kept until the lamp restarts: the frame link's boots, `frame-link.env`, which the eyes read by `--frame-link-boots`, and `eyes-visits.env`) | setup's `backend.json` and the voice's key, through `LoadCredential=`; the opt-in, `/var/lib/lampOS/consent/seen-activity.json`, read only (the reset plan removes it) | the bus (`humans/doing`, `humans/doing_seen`, `humans/posture`, `light/mark`); the voice's `say.sock`; the eyes' frame link; the perception service, with the switch and the opt-in |
+| npu | `lamp-npu serve` (off unless `LAMP_NPU=on`, unset in the unit: it idles, touching nothing; `npu.md`, #7415); in the target | lampos (and `video`, which owns `/dev/vipcore` by the image's udev rule), `/dev/vipcore` only | `/var/lib/lampos-npu/` (0700, its `StateDirectory`: the models fetched from the Store, kept once their signature and SHA-256 are checked; the image carries none; the reset plan wipes it); `/run/lampos-npu/` (0700, removed as it stops) | the installed apps' manifests, `/opt/lampOS/apps`, read only; the bus, read only | `npu.sock` (lamp-control only, which forwards `pose` with its own `LAMP_NPU=on`); the Store, for a model |
 | cloud | `lamp-cloud --bus-root /run/lampos-bus` (on in the product, `LAMP_CLOUD=on` in its unit since #1815, `cloud.md`) | lampos | `/var/lib/lampos-cloud/` (0700, its `StateDirectory`) | setup's `backend.json`, the voice's key and update's `state.json`, through `LoadCredential=` | the company broker and the backend's ping; reads the bus |
 | records | `lamp-records check` (a timer, hourly) | root | `/run/lamp-records/` | `/etc/lampOS/records.json`, which install places (`deploy/product/settings/records.json`; it does nothing without it) | `last.json` |
 | selftest | `lamp-selftest --occasion first-boot` (a timer: 5 min after the lamp starts, then every 6 h; #812) | lampos, `CAP_SYSLOG` | `/var/lib/lamp-selftest/` (its own `StateDirectory`) | none | the bus (`lamp/selftest`), its runs' reports |
@@ -1366,9 +1367,9 @@ As root, on a lamp with the base image (`crates/update/src/install.rs`):
      never rewrites `lamp-update.service`, so a pin or switch written there
      would reach only a lamp installed after it. Instead the pinned Harness
      manifest itself is compiled into lamp-update (`product::MANIFEST`, from
-     `deploy/harness/cli-0.6.72.metadata.json`, a byte-for-byte copy of
+     `deploy/harness/cli-0.6.75.metadata.json`, a byte-for-byte copy of
      Harness's CDN manifest `https://storage.googleapis.com/s3-autonomous-upgrade-3/harness/cli/metadata.json`
-     when it named 0.6.72; 0.5.98 or newer is needed for Hermes on the lamp, openharness#3807, #5978). The signed manifest names lamp-update by its
+     when it named 0.6.75; 0.5.98 or newer is needed for Hermes on the lamp, openharness#3807, #5978). The signed manifest names lamp-update by its
      SHA-256, so the build's Ed25519 signature covers the pin (#3693's
      decision (a): a sha256 pin in our signed manifest is enough, as Harness
      signs nothing). Nothing is fetched or hosted for it: the one-shot checks
@@ -1383,7 +1384,7 @@ As root, on a lamp with the base image (`crates/update/src/install.rs`):
      never reads it again from its server.
      After the install, `harness
      version` is compared with the manifest's `cli.version` and journaled:
-     `Harness 0.6.72 is the pinned version`, or `Harness says version …, not
+     `Harness 0.6.75 is the pinned version`, or `Harness says version …, not
      the pinned …`. Another version, or none, is recorded `failed` with
      `version`, not `installed`, so the app can tell it apart. Harness is
      still there and lamp-tasks is still started again. While Harness is
@@ -1841,7 +1842,8 @@ As root, on a lamp with the base image (`crates/update/src/install.rs`):
           `/dev/video*`, `/dev/media*`, `/dev/v4l-subdev*`, `/dev/snd/*`,
           `/dev/ttyACM*`, `/dev/ttyUSB*`, `/dev/ttyS*`, `/dev/ttyAMA*`,
           `/dev/i2c-*`, `/dev/spidev*`, `/dev/gpiochip*`, `/dev/hidraw*`,
-          `/dev/fb*` and `/dev/dri/*` (a missing one is fine): under
+          `/dev/fb*`, `/dev/dri/*` and `/dev/vipcore` (a missing one is
+          fine): under
           `--map-root-user` `setgroups` is denied, so `lampos`'s groups
           can't be dropped, and the devices are hidden instead;
        5. back into the folder it was started in through the new mounts
@@ -2510,7 +2512,13 @@ As root, on a lamp with the base image (`crates/update/src/install.rs`):
      the wrapper as `lampos`, on loopback `ws://127.0.0.1:18789`, with the
      token in `/var/lib/lampos-openclaw/gateway-token` (0600 `lampos`),
      made once by lamp-update at the install. One Gateway serves every
-     pane. Its unit is written by a round only, never by the one-shot:
+     pane. With `LAMP_OPENCLAW_GATEWAY_BY_DEFAULT=on` (#8105, off until
+     its row) it runs only while OpenClaw is the lamp's default agent, as
+     lamp-tasks says it on its app socket: `serve` asks every 10 s and
+     each round once, enables and starts it for `openclaw`, disables and
+     stops it for another engine, and leaves it as it is while lamp-tasks
+     says nothing, a round runs, or this one-shot is at work (docs/switches.md,
+     its row). Its unit is written by a round only, never by the one-shot:
      a one-shot that finds an earlier build's unit (a lamp-update ahead
      of its units) changes nothing and takes nothing out, journals
      "OpenClaw's install waits: lamp-openclaw-gateway.service is not

@@ -497,7 +497,7 @@ fn system_net(reads: bool, agent: bool, net: bool) -> String {
          the request asks with the light, the head, a few exact words it says, its hum, \
          {own}or {may_also}, on one of the triggers below. {more} {blink} To speak, a skill has speak = \
          true in [permissions], {cooldown}, and one [[do]] step say = {{ text = \
-         \"Welcome back!\" }}: the exact words, one or two short sentences, no quotes, in the \
+         \"Welcome back!\" }}: the exact words, at most 300 characters, no quotes, in the \
          language the person asked in, said as written. Its one sound is a soft hum: a [[do]] \
          step cue = \"hum\", paced as a say, in place of a say; it has no other sound and no \
          sound file. When it runs is one \
@@ -9554,7 +9554,7 @@ printf 'tar of %s' \"$name\" > \"$3/$name-1.0.0.tar\"\n",
         let (root, keeping) = keeping("bounds");
         let never = || -> Result<Chat, String> { panic!("no model is asked") };
         assert!(make("  ", &keeping, never, NOW)["error"].is_string());
-        let long = "x".repeat(made_skill::MOST_REQUEST_BYTES + 1);
+        let long = "x".repeat(made_skill::MOST_REQUEST_CHARS + 1);
         assert!(make(&long, &keeping, never, NOW)["error"].is_string());
         let _ = std::fs::remove_dir_all(&root);
     }
@@ -9780,7 +9780,8 @@ printf 'tar of %s' \"$name\" > \"$3/$name-1.0.0.tar\"\n",
         made_skill::set_asks_here(None);
     }
 
-    /// A 2,000-byte request (18 Nov, [`made_skill::MOST_REQUEST_BYTES`]):
+    /// The longest request in bytes (2,000 characters of four bytes since
+    /// #7245, [`made_skill::MOST_REQUEST_BYTES`]):
     /// its longest repair, with the longest system prompt this worker can
     /// give (every switch that adds to it on), still fits the rules the
     /// lamp's agent's make run takes (`lamp_tasks::skill_make`), and the
@@ -9788,8 +9789,7 @@ printf 'tar of %s' \"$name\" > \"$3/$name-1.0.0.tar\"\n",
     /// the tasks part's 2,000 bytes any more.
     #[test]
     fn the_longest_repair_and_system_prompt_fit_the_agents_make_rules() {
-        let longest = "ộ".repeat(made_skill::MOST_REQUEST_BYTES / 3)
-            + &"a".repeat(made_skill::MOST_REQUEST_BYTES % 3);
+        let longest = made_skill::longest_request();
         assert_eq!(longest.len(), made_skill::MOST_REQUEST_BYTES);
         let repair = made_skill::repair_brief(&longest, &"y".repeat(5_000)).unwrap();
         assert!(repair.len() <= made_skill::MOST_REPAIR_BRIEF_BYTES);
@@ -9829,7 +9829,7 @@ printf 'tar of %s' \"$name\" > \"$3/$name-1.0.0.tar\"\n",
     #[test]
     fn a_said_start_and_asks_are_both_told_with_both_switches() {
         let request = "when I tell you I'm busy, turn red";
-        let longest = "x".repeat(made_skill::MOST_REQUEST_BYTES);
+        let longest = made_skill::longest_request();
         let said_alone = "A skill can't yet hear what is said in the room (a request told to the \
                           lamp is a [said] start, below), know who";
         let asks_alone = "A skill can't yet hear what is said in the room, other than the words \

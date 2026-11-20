@@ -1161,6 +1161,10 @@ thread_local! {
     /// From this time, on the scenario clock, the privacy worker kept fresh
     /// says the switch is closed.
     static PRIVACY_CLOSED_FROM: std::cell::Cell<Option<u64>> = const { std::cell::Cell::new(None) };
+    /// Within this span, from the loop's start (`gap_run`), Controls says the switch's
+    /// reading lapsed: the source peer reads it as the real worker reads a
+    /// stale acquisition (`SourceGap::stale`, #7224).
+    static PRIVACY_STALE: std::cell::Cell<Option<(u64, u64)>> = const { std::cell::Cell::new(None) };
     /// The privacy worker fails once, 100 ms into its silent span (#2602).
     static PRIVACY_FAULT_IN_GAP: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
     /// Exercise the bus worker's production expiry state machine, rather
@@ -1418,7 +1422,35 @@ impl SteppedPeer {
                 }
             }
         }
+        let stale = self.privacy
+            && PRIVACY_STALE
+                .with(std::cell::Cell::get)
+                .is_some_and(|(from, to)| (from..to).contains(&now_us));
+        if stale
+            && let Some(source) = &mut self.source
+            && !source.failed
+        {
+            match source.gap.stale(
+                self.privacy_said_us,
+                source.permitted && source.granted,
+                now_us,
+            ) {
+                Ok(event) => {
+                    source.gate.close();
+                    if let Some(event) = event {
+                        self.peer.control.send(event)?;
+                    }
+                }
+                Err(error) => {
+                    source.failed = true;
+                    self.peer.control.send(WorkerEvent::Fault {
+                        code: format!("{}{error}", crate::privacy_bus::UNREADABLE),
+                    })?;
+                }
+            }
+        }
         if self.privacy
+            && !stale
             && self.source.as_ref().is_none_or(|source| !source.failed)
             && PRIVACY_FRESH_UNTIL
                 .with(std::cell::Cell::get)
@@ -2611,6 +2643,9 @@ fn gap_run(ride: bool, fresh_us: u64, silent: (u64, u64), closed_from: Option<u6
             PRIVACY_FRESH_UNTIL.with(|until| until.set(Some(now + fresh_us)));
             PRIVACY_SILENT.with(|span| span.set(Some((now + silent.0, now + silent.1))));
             PRIVACY_CLOSED_FROM.with(|from| from.set(closed_from.map(|at| now + at)));
+            // Set from the loop's start, as the silent span.
+            PRIVACY_STALE
+                .with(|span| span.set(span.get().map(|(from, to)| (now + from, now + to))));
             HandControls::with_test_tap("test-hand-clock", now - 10_000_000).unwrap()
         },
         || {
@@ -2622,6 +2657,7 @@ fn gap_run(ride: bool, fresh_us: u64, silent: (u64, u64), closed_from: Option<u6
     );
     RIG_PRIVACY_CONTROLS.with(|on| on.set(false));
     TEST_PRIVACY_GAP_RIDE.with(|on| on.set(false));
+    PRIVACY_STALE.with(|span| span.set(None));
     PRIVACY_FRESH_UNTIL.with(|until| until.set(None));
     PRIVACY_SILENT.with(|span| span.set(None));
     PRIVACY_CLOSED_FROM.with(|from| from.set(None));
@@ -2673,6 +2709,64 @@ fn the_workers_own_expiry_rides_a_sixty_millisecond_silence_in_one_conversation(
     assert!(
         ran.ended_us
             <= began + 900_000 + crate::privacy::PRIVACY_FRESH_US + crate::privacy_gap::RIDE_US
+    );
+}
+
+/// #7224, Twelve's forced gap on lamp-c0a4 (20 Nov 07:08): Controls kept
+/// publishing while the slide's reading lapsed, and the worker ended on the
+/// stale reading 4 ms into the ride. Ridden by the worker's rule
+/// (`SourceGap::stale`), whether it begins the gap or comes in one already
+/// begun by a missing reading, the conversation goes on to the reopen;
+/// without the ride it ends at once.
+#[test]
+fn a_stale_reading_in_a_ridden_gap_keeps_the_conversation() {
+    for (silent, stale) in [
+        ((300_000, 300_000), (300_000, 360_000)),
+        ((300_000, 360_000), (360_000, 400_000)),
+    ] {
+        PRIVACY_SOURCE_EXPIRY.with(|on| on.set(true));
+        PRIVACY_STALE.with(|span| span.set(Some(stale)));
+        let (ran, began) = gap_run(true, 900_000, silent, None);
+        PRIVACY_STALE.with(|span| span.set(None));
+        PRIVACY_SOURCE_EXPIRY.with(|on| on.set(false));
+        let started = gap_marks(&ran, "began");
+        let reopened = gap_marks(&ran, "reopened");
+        assert_eq!(reopened.len(), 1, "{stale:?}: {}", ran.error);
+        assert_eq!(started.len(), 2, "{stale:?}: {}", ran.error);
+        let (gap_at, open_at) = (started[0].0, reopened[0].0);
+        assert!(
+            (began + 300_000..began + 360_000).contains(&gap_at),
+            "{stale:?}: {}",
+            gap_at - began
+        );
+        assert!(open_at >= began + stale.1, "{stale:?}: {}", open_at - began);
+        assert!(
+            !ran.trace
+                .iter()
+                .any(|row| row["kind"] == "privacy_gap" && row["why"] == "privacy worker failed"),
+            "{stale:?}: the worker's stale reading ended it"
+        );
+        assert!(
+            ran.capture_authorities
+                .iter()
+                .all(|at| !(gap_at..open_at).contains(at))
+        );
+        assert!(ran.capture_authorities.iter().any(|at| *at >= open_at));
+        // Only the second gap, after the readings stop at 900 ms, ends it.
+        assert!(ran.ended_us > began + 900_000, "{stale:?}: {}", ran.error);
+    }
+    PRIVACY_SOURCE_EXPIRY.with(|on| on.set(true));
+    PRIVACY_STALE.with(|span| span.set(Some((300_000, 360_000))));
+    let (ran, began) = gap_run(false, 900_000, (300_000, 300_000), None);
+    PRIVACY_STALE.with(|span| span.set(None));
+    PRIVACY_SOURCE_EXPIRY.with(|on| on.set(false));
+    assert!(gap_marks(&ran, "began").is_empty());
+    assert!(ran.ended_us < began + 360_000, "{}", ran.error);
+    assert!(
+        ran.error
+            .contains("physical privacy acquisition unavailable"),
+        "{}",
+        ran.error
     );
 }
 

@@ -1535,7 +1535,7 @@ fn every_part_of_the_lamp_waits_for_setups_marker_itself() {
             );
         }
     }
-    assert_eq!(gated.len(), 27, "{gated:?}");
+    assert_eq!(gated.len(), 28, "{gated:?}");
     for outside in ["lamp-update.service", "lamp-records.timer"] {
         assert!(!gated.contains(&outside), "{outside}");
     }
@@ -1811,6 +1811,25 @@ fn the_product_keeps_what_was_heard() {
         service.contains(&"Environment=LAMP_MEMORY_KEEP_HEARD=on"),
         "the voice lacks LAMP_MEMORY_KEEP_HEARD"
     );
+}
+
+/// A split-second lapse of the privacy switch's readings is ridden in the
+/// product (#7224 fault 5, the first builder's ruling of 19 Nov 23:59): the
+/// gap ride beside the stall ride, both exactly `on`.
+#[test]
+fn the_product_rides_a_short_privacy_gap() {
+    let voice = install::PRODUCT
+        .iter()
+        .find(|(unit, _)| *unit == "lamp-voice.service")
+        .unwrap()
+        .1;
+    let service = section(voice, "Service");
+    for line in [
+        "Environment=LAMP_PRIVACY_RIDES_STALL=on",
+        "Environment=LAMP_PRIVACY_GAP_RIDE=on",
+    ] {
+        assert!(service.contains(&line), "the voice lacks {line}");
+    }
 }
 
 /// CAM++ one way only (`LAMP_SAME_VOICE_CONFIRMS`, the memory owner's
@@ -2835,6 +2854,37 @@ fn the_skills_page_loads_skills_with_lamp_skills_own_switches() {
                 .count(),
             1,
             "{unit} lacks {net}"
+        );
+    }
+}
+
+/// Skills' runs wait late in a busy day so the voice keeps half of it (#7342,
+/// the first builder's DEFAULT-ON on #7814): `LAMP_SKILL_RUNS_VOICE_SHARE=on`
+/// once in the two units whose part reads it, alike, and named by no other
+/// product unit: `lamp-skills` (the bound, `relay_share::share`, where `on`
+/// is half the day) and `lamp-cloud` (its model forwarder keeps the reading).
+#[test]
+fn the_product_keeps_half_the_day_for_the_voice_alike_in_its_two_units() {
+    let name = lamp_skills::relay_share::SWITCH;
+    assert_eq!(name, "LAMP_SKILL_RUNS_VOICE_SHARE");
+    assert_eq!(
+        lamp_skills::relay_share::share_from(Some("on")),
+        Some(0.5),
+        "`on` keeps half the day"
+    );
+    let switch = format!("Environment={name}=on");
+    let readers = ["lamp-skills.service", "lamp-cloud.service"];
+    for (unit, text) in install::PRODUCT {
+        let service = section(text, "Service");
+        let on = service.iter().filter(|line| **line == switch).count();
+        let mentioned = service.iter().filter(|line| line.contains(name)).count();
+        assert_eq!(on, usize::from(readers.contains(unit)), "{unit}");
+        assert_eq!(mentioned, on, "{unit} names {name}");
+    }
+    for reader in readers {
+        assert!(
+            install::PRODUCT.iter().any(|(unit, _)| *unit == reader),
+            "{reader} is not a product unit"
         );
     }
 }

@@ -3002,6 +3002,94 @@ lamp stops spending it on what nobody asked for. Off unless
 - **At 1.0 (`SPENT`)**, the same, and the first 429 says the usage limit at
   once (above), not after `LIMIT_AFTER`.
 
+## Words of self-harm (`LAMP_CARE_LINE`, #7689)
+
+When a person says they might harm themselves or don't want to live,
+directly, indirectly or in passing, the lamp answers with care and always
+gives one fixed line with a real place to turn. Off unless
+`LAMP_CARE_LINE=on` (passed to the second worker with
+`LAMP_CARE_REGION` and `LAMP_CARE_LINES_FILE`; the coordinator and
+`ProviderConfig::instruction_without_person` read it too).
+
+- **Where the lamp is** (`care_line::region_now`): `LAMP_CARE_REGION`
+  (two letters, set by hand) first; else lamp-cloud's placement
+  (`/var/lib/lampos-cloud/region`) when it says `CN`; else the country of
+  the lamp's set time zone (`local_time::zone_here`, as setup's time zone
+  sets it: the US zones and their old names, Puerto Rico,
+  `Asia/Ho_Chi_Minh` or `Asia/Saigon`, the China zones); none of those,
+  the default line. The images' own zone (`care_line::IMAGE_ZONE`,
+  `America/New_York`, kept by setup when the app sends none it knows)
+  counts only for an owner who speaks English: in another language it may
+  never have been set, and the default is never a wrong number. Read again at each line, so a
+  time zone set after the worker starts counts. The language is the
+  owner's, not the speaker's.
+- **The model's instruction** (`care_line::instruction`). On every route
+  and after a forget, after the character: answer warmly and steadily,
+  keep listening, never argue, lecture or diagnose, never say it is calling
+  or telling anyone, never promise or mention secrecy, never end the
+  conversation, no jokes, offers or other topics; and give the region's
+  line word for word, no other number, unless a note says the lamp says it
+  itself. So a line the check misses, and the Live route, still get it from
+  the model. Built when the worker starts.
+- **The check in code** (`care_line::said_harm`). Phrases on word
+  boundaries, in English and Vietnamese, with and without the marks a
+  transcript drops, on NFC text (a transcript may give Vietnamese
+  decomposed). Not "tu tu" nor "treo co" (unmarked, also "từ từ" and
+  "treo cờ"). A few phrases are guarded by the word before or after (not
+  "nóng muốn chết", "wake up late", "can't go on Friday", "killing myself
+  laughing"). It leans to firing: a gentle line not needed is acceptable, a
+  miss isn't. Everyone heard counts, with no face check, and such a line is
+  never held by the said-to-me rule. The lamp's own line heard back within
+  30 s is not caught.
+- **A care turn on the second route.** The line caught (or, within the
+  hold, one asking who they can call, `care_line::asks_who_to_call`) is
+  told `care_line::NOTE` beside its words (`NOTE_SAID` when the line was
+  said in the last 5 min: don't repeat it), kept out of memory
+  (`remember::keep_out`) and held from the running summary and its talk
+  note (`care_line::hold_from_summary`, `Thread::held_for`), across a
+  restart too (`thread.json` keeps the mark). While a line is owed, any
+  other line is told `care_line::OWED_NOTE` (the lamp says it after this
+  answer), so the number isn't said twice, and the answer it follows is
+  held the same way. The line is
+  then owed (`Care::mark`), and the end of any answer says it
+  (`Care::owed_line`): this one's, whatever the model said or failed to
+  say, or, when a cut, a stop or a newer line ended it, the next answer's.
+  It plays from its clip rendered ahead as the worker starts (up to 20 s,
+  `care_line::MOST_SAMPLES`), else streamed, and ends its words again
+  (`Transcript` empty and finished). Only a line that played counts as
+  said; one that didn't stays owed.
+- **Nothing after a cut** (`care_line::StillHere`, the coordinator's): a
+  care turn's answer cut or stopped, and the lamp quiet and free for 3 s
+  (no later answer played whole), within 2 min: one written turn,
+  `care_line::STILL_HERE`, has the model say gently it is still here; the
+  second route's owed line follows it, and on Live the model gives the line
+  (`STILL_HERE_LIVE`). Once; a mute or sleep lets it go.
+- **The line** comes from the installed copy (`LAMP_CARE_LINES_FILE`,
+  default `/etc/lampOS/voice/care-lines.json`) when it is a good one, else
+  the shipped `deploy/character/care-lines.json` (`care_line::SHIPPED`);
+  a copy missing a shipped region is not a good one
+  (`CareLines::or_shipped_whole`). They are
+  kept by the safety reader: each region's line only from an official
+  source, with that source and the date it was checked, the default too.
+  US: 988. CN: 12356 and 120, no "any time" (hours vary by province). VN:
+  115 and someone you trust (no verified 24/7 national line). A region with
+  no entry gets the default: someone you trust or the local emergency
+  number. A known region's line is never replaced by the default; in a
+  language it lacks, its English line.
+- **Not again within 5 minutes** (`care_line::AGAIN_AFTER`, `Said`): a
+  later care turn in that time hears only the model, unless the person
+  asks who they can call; a line owed longer than that is let go.
+- **The hold** (`care_line::Hold`, the coordinator's): words of self-harm
+  heard on either route (the person's `Transcript`s, joined until the line is
+  finished, up to 4 KiB in memory) hold for 30 minutes (`care_line::HOLD`)
+  what nobody asked for: a skill's say not asked for (`say::asked_for`: the
+  shutdown's last words, the agent's answer, a run the owner asked for now
+  still go, `Says::take_asked`), a computer's turn and the photo-face ask.
+  Task news, the reminders the person set and the shutdown's last words
+  still go. While it holds, the session's trace keeps no transcript text.
+- **Not yet:** the body's playful motion and light are not held, and a
+  skill's speech under way is not stopped.
+
 ## What a person hears
 
 When the coordinator switches (below):
@@ -3629,15 +3717,29 @@ record is written.
 - **Its exit ends the voice**, as Gemini's does (`coordinator::mandatory`):
   it is the only voice. A standby's exit is still dropped, and Gemini goes
   on.
-- **Its stop is Gemini's (#1620).** On a stop (SIGTERM, a mute, a fault)
+- **Its stop is Gemini's (#1620), except that a killed worker is not a
+  failure (#8081).** On a stop (SIGTERM, a mute, a fault)
   `Rig::shutdown` sends it Stop with the other workers and holds it to the
   same shared deadline, exit recheck, kill, reap and cleanup accounting
-  (`ForcedStop`/`WorkerExit` under its own role, `second`). Speech to text,
+  (`WorkerExit` under its own role, `second`). One that is still busy at
+  the shared 300 ms is killed and reaped. For Gemini's worker, and every
+  worker that holds hardware, that stays a `ForcedStop` failure (a worker
+  not confirmed gone must keep a microphone or a ring from being reopened).
+  The second route's worker holds no device, only its sockets to the speech
+  services, which end with it: killed and reaped it is a verified stop, so
+  it is recorded (`worker_forced_shutdown` with `verified` true and
+  `failure` false) and said in the journal, and it is not a cleanup failure.
+  Before, such a worker missed 300 ms in about one mute in five while it
+  was answering (a computer's mute, measured on 14967), the cleanup failure
+  dropped the mute from the run's result, the voice exited 1 and the restart
+  guard left the lamp muted until the owner unmuted it. A kill or reap that
+  failed is still a failure. Speech to text,
   the chat and the voice are tasks inside this one process, not children of
   their own; the endpoint is the session's, on either route. Tested
   mid-request and for a worker that ignores Stop
   (`second_route::a_stop_while_the_second_route_alone_is_mid_request_is_clean`,
-  `a_second_worker_that_ignores_stop_is_killed_and_named_as_geminis_is`).
+  `a_provider_worker_that_ignores_stop_is_killed_and_named`,
+  `a_second_worker_that_ignores_stop_is_killed_and_the_mute_stays_a_mute`).
   A stop during a blocking call no longer holds it: `serve` ends its tokio
   runtime with `worker::finish` (`shutdown_background()`), since a plain
   drop waited, with no bound, for running `spawn_blocking` work (a tool
@@ -5579,6 +5681,50 @@ after a take-over, but now for every turn:
     is not told it was heard (LAMP_NAME_SECOND_SIGN, #7891)`. "Lamp?",
     "Hey Lamp.", "Hey, Lynn.", "Lamp, put it back.", "Okay?", a longer
     line and a line in a conversation's window are weighed as before.
+  - **A second sign belongs to its hearing** (`LAMP_NAME_SIGN_TIED=on`,
+    on in the product's lamp-voice.service, #8092). On lamp-74ff on 20 Nov (build 14967), in a
+    meeting, request 4, a 21 s line of one word with 0 looks, out of the
+    window, was ruled `not the name (LAMP_NAME_NEAR)` (lamp-name near at
+    0.86 by its start, its first word, set off, not like the name), and the
+    same line then counted its hearing, begun 15194 ms in, by `the name
+    said close to it`: the room microphone's rise read anywhere in the
+    line. Request 5 did the same at its start, and the lamp's answers
+    opened a conversation that carried about 10 lines of meeting talk.
+    With the switch and `LAMP_NAME_SECOND_SIGN=on`: a line whose first word
+    `LAMP_NAME_NEAR` ruled not the name (a near hearing of 0.5 or more by
+    its start on a word it did not take: one that doesn't sound like the
+    name, or of the name's shape with no face turned) counts the hearing
+    for nothing, whatever its second sign, unless its words call the lamp
+    by its literal name (`attention::called_by_real_name`); the engine
+    tells the rule before the line is judged
+    (`Engine::telling_near_not_the_name`). The journal says `its name,
+    heard only in the room's sound (began N ms into the line), counts for
+    nothing: LAMP_NAME_NEAR ruled the line not the name, and that verdict
+    wins over every second sign; the model is not told it was heard
+    (LAMP_NAME_SIGN_TIED, #8092)`. And "the name said close to it" counts
+    only when the rise came while a hearing of `attention::NEAR_SCORE`
+    (0.95) or more that counts for the line was said, from 1.5 s before
+    the hearing began to 0.3 s after (`worker::near_at_a_hearing`). The
+    line is then judged as one with no name. A word taken as the name, the
+    name in its words, and a line with no near hearing are as before.
+    The first builder's rulings at 12:45 on #8092 ("the bar is a pet's: it
+    looks up when it's called, and lets the room's talk go by") add two more
+    under the same switch. **One word:** a line of one word, `?` or not,
+    with no face turned to the lamp, counts the room's hearing only when its
+    word sounds like the name (`second_provider::sounds_like_the_name`, or
+    one written for it, or words calling it): "Yeah?" and "Okay?" stay said
+    to nobody, "Lamp?" and "Lump?" are weighed as before; the journal line
+    above says so. **The window:** with `LAMP_SAID_TO_ME=on` and eyes, a
+    line in the conversation's window with no look (no face turned to the
+    lamp and the speaker's pose unread; `PoseUnread` counts as no look) is
+    held, `held: no look in a conversation` (`said_to_me::Held::NoLook`).
+    The one exception is an answer to the lamp's waiting question
+    (`lamp_asked` and a fresh `question_waits`, never a stale one), let out
+    once as `an answer to the lamp's waiting question, no look: it renews
+    nothing` (`said_to_me::Said::AnswerNoLook`): its answer goes on the
+    chain, so it keeps no conversation going and renews no call
+    (`LAMP_BUSY_FOLLOW_UP_RENEWS`). After that the next line needs a look or
+    the name, until a line with one is played.
 - **A hearing of the name stays with its own line**
   (`LAMP_NAME_STAYS_IN_ITS_LINE=on`, on in the product unit). On lamp-4ace on
   2026-10-26 at 06:21 (build 6919, the busy scene played) `lamp-name` heard
@@ -8507,14 +8653,8 @@ Not shown on the host: the real second worker behind the switch (the
 tests' second route is a peer). On a lamp: a switch mid-line and Gemini's
 return, and the latency targets, which lamp-52e6 did not meet (above).
 
-## An installed app's spoken trigger (#7415 piece 6, `LAMP_APP_TRIGGERS`, off)
+## An installed app's spoken trigger (#7415 pieces 6 and 3b-2b, `LAMP_APP_TRIGGERS`, on in the product)
 
-A final line, heard clear of the lamp's voice and not let in only as the conversation going on (`CONVERSATION_ALONE`; the caller's own `FOLLOW_UP_NOTE` follow-up counts), and not while the lamp waits on an answer (a task read back, a write or skill say-back, a held forget or rename) or another person's cut words are kept for it, that is a whole trigger of a running
-app (the manifest's `triggers`, which lamp-control keeps on `apps/triggers`) is told
-to lamp-control on `apps/trigger` (the manifest's own trigger words, never the line around them) and held up to 3 s for `apps/took`
-(`app_triggers::told_and_taken`). The match is the whole line: the trigger's own words
-with only a polite word before or after ("please", "lamp", "can you"); "don't start my
-english lesson" is none, and a trigger made only of the lamp's own words ("yes go ahead", "send it now") is never matched. When the app takes the line the request ends in code as a normal end does (nothing of it carried), with
-no chat round and no words from the lamp (the app speaks for itself); a line nothing
-takes goes to the model as any other. Off, with no app running or with no bus, nothing
-changes. Tests: `second_provider::tests::app_triggers_in_code`, `app_triggers::tests`.
+A final line, heard clear of the lamp's voice and not let in only as the conversation going on (`CONVERSATION_ALONE`; the caller's own `FOLLOW_UP_NOTE` follow-up counts), and not while the lamp waits on an answer (a task read back, a write or skill say-back, a held forget or rename) or another person's cut words are kept for it, that **is** a trigger of a running app (the manifest's `triggers`, which lamp-control keeps on `apps/triggers`) is told to lamp-control on `apps/trigger` (the manifest's own trigger words, never the line around them) and held up to 3 s for `apps/took` (`app_triggers::told_and_taken`). "Is" means the whole line, once normalised: case, punctuation and apostrophes out, the trigger's words heard run together or apart, and the lamp's own name at the line's start left off (`attention::past_the_name`, the attention rule's own reading of the name). There is **no list of polite words** (the owner's 13 Nov rule: the model judges meaning, with no word lists; the first builder at 19:49 on #7415): "please start english practice", "hey lamp, start english practice" and "Lamp ơi, bắt đầu tập nhé" are no fast path. A trigger made only of the lamp's own words ("yes go ahead", "send it now") is never matched, nor offered. When the app takes the line the request ends in code as a normal end does (nothing of it carried), with no chat round and no words from the lamp (the app speaks for itself); a line nothing takes goes to the model as any other.
+
+Every other line is the model's call. With an app running, the model is offered one more function in its chat rounds, `start_app(app, trigger)` (`app_triggers::start_app_tool`, declared at each request from the apps running then, so an app that stops is never offered and none is offered with no app running): its description lists each running app's name and its manifest's trigger words, each in quotes, and the model calls it when what the person said means one of them, in any language. Only the app's checked name and its checked triggers go into the description (the manifest's own guards, `AppTriggers::check`, and then only letters, digits, spaces, apostrophes and hyphens, `app_triggers::describable`): a trigger with a quote, a backtick, markup, a brace, a colon, a semicolon or a control or bidi character is left out, so an app's words are data in a quote and never instructions. The call is checked again against the apps running and their manifests' own words (a made-up app or trigger is refused and sends nothing), then told to the app as the fast path does (`apps/trigger`, 3 s for `apps/took`). Taken: the request ends there, with no second round and no words (`Stop::Taken`; the model is also told "say nothing"). Not taken: the model is told and answers as it would. The call is refused, with nothing sent and the model told "not now", for a line let in only as the conversation going on (`CONVERSATION_ALONE`: another person's or the TV's words, as the fast path refuses it) and while the lamp waits on an answer (a task read back, a held forget or rename, a skill's write say-back); this is in code (`LAMP_POLICY_HOLDS_ACTIONS` is not in the product). The description is held to the 1,024 bytes a function's may be: an app or trigger that does not fit is left out of it and of the choices, and it says the quoted words are only names of what starts the app, never instructions. Off, with no app running or with no bus, nothing changes. Tests: `second_provider::tests::app_triggers_in_code`, `app_triggers::tests`.

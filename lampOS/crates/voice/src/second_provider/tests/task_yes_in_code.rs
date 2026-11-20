@@ -110,7 +110,13 @@ struct Went {
     ran: Vec<String>,
     /// Every message each chat round was asked with.
     asked: Vec<Vec<Message>>,
+    /// The calls kept for a later turn's history (`LAMP_HISTORY_KEEPS_CALLS`).
+    kept: Vec<Kept>,
 }
+
+/// One call kept for a later turn's history: its request, name, arguments
+/// and told result.
+type Kept = (u64, String, Value, Option<&'static str>);
 
 /// `input`'s line in request 2 (`heard`, spoken unless `written`), answered
 /// with the model's `rounds` (or a chat that never begins), the yes and
@@ -134,6 +140,8 @@ fn went(
         seen.lock().unwrap().push((name, args, heard));
         Box::pin(async { json!({"ok": true}) })
     });
+    let kept: Arc<Mutex<Vec<Kept>>> = Arc::default();
+    let keep = kept.clone();
     let (yes_place, no_place) = (ready.place.clone(), ready.place.clone());
     let mut engine = Engine::with_clock(
         script.clone(),
@@ -149,7 +157,14 @@ fn went(
     ))
     .declining_a_task_waiting(Arc::new(move |request, words: &str| {
         tasks::declined(&no_place, request, words)
-    }));
+    }))
+    .keeping_calls_by(Some(Arc::new(
+        move |request, name: &str, args: &Value, result| {
+            keep.lock()
+                .unwrap()
+                .push((request, name.to_owned(), args.clone(), result));
+        },
+    )));
     tokio::runtime::Builder::new_current_thread()
         .enable_all()
         .build()
@@ -167,7 +182,8 @@ fn went(
         .map(|(name, ..)| name.clone())
         .collect();
     let asked = script.asked.lock().unwrap().clone();
-    Went { ran, asked }
+    let kept = kept.lock().unwrap().clone();
+    Went { ran, asked, kept }
 }
 
 fn spoken_line() -> Vec<ProviderInput> {
@@ -234,6 +250,49 @@ fn a_plain_yes_starts_the_task_though_the_model_calls_nothing() {
     assert!(told_yes(&went), "the round is told it was handed over");
     assert_eq!(ops(&ready, 4), ["status", "prepare", "status", "confirm"]);
     assert_eq!(fake::pending_id(), None);
+}
+
+/// c0a4 (ROW c0a4-5, L4s en): a yes taken in code kept nothing for the
+/// next turn's history, and "how far is it?" got `calls=none` and "How far
+/// is what?" (#7930). The yes is kept as the model's own confirm would be,
+/// told as handed over and pointing a bare "how far is it" at
+/// `check_agent_task`; a yes left to the model keeps nothing here.
+#[test]
+fn a_yes_taken_in_code_is_kept_as_a_handed_over_confirm_for_the_next_turn() {
+    let ready = prepared("kept", confirms());
+    let yes = went(
+        &ready,
+        "Yes, please.",
+        spoken_line,
+        Some(vec![vec![
+            text("On it. I'll tell you when it's done."),
+            Ok(ChatEvent::Done),
+        ]]),
+    );
+    assert_eq!(ops(&ready, 4), ["status", "prepare", "status", "confirm"]);
+    assert_eq!(
+        yes.kept,
+        [(
+            2,
+            tasks::CONFIRM.to_owned(),
+            json!({}),
+            Some(crate::second_provider::TASK_HANDED_OVER)
+        )],
+        "kept once, bare, told as handed over"
+    );
+    assert!(crate::second_provider::TASK_HANDED_OVER.contains(tasks::CHECK));
+    assert!(crate::second_provider::TASK_HANDED_OVER.contains("how far is it"));
+    assert!(crate::second_provider::TASK_HANDED_OVER.len() < 256);
+    drop(ready);
+
+    let ready = prepared("kept-more", confirms());
+    let more = went(
+        &ready,
+        "Yes, but make it six fruits.",
+        spoken_line,
+        Some(vec![vec![text("Six fruits it is."), Ok(ChatEvent::Done)]]),
+    );
+    assert!(more.kept.is_empty(), "{:?}", more.kept);
 }
 
 /// A plain "No." drops the task in code (#6582) before the round: nothing
@@ -313,4 +372,122 @@ fn a_typed_yes_is_not_taken_in_code() {
     assert!(!told_yes(&went));
     assert_eq!(ops(&ready, 2), ["status", "prepare"], "nothing confirmed");
     assert_eq!(fake::pending_id(), Some(4));
+}
+
+/// c0a4 ROW c0a4-6 (#7930): while work handed over is open, a spoken line
+/// is told so beside its words (`noting_open_work`), asked off the
+/// runtime's thread; with nothing handed over, the note is never asked.
+#[test]
+fn a_line_is_told_the_work_still_open() {
+    let _thread = crate::provider_worker::tests::one_thread();
+    for handed in [false, true] {
+        if handed {
+            tasks::handed_over("70", "Research houseplants for a dark bedroom");
+        } else {
+            tasks::forget_handed("70");
+        }
+        let script = Arc::new(Script {
+            heard: Mutex::new([Ok("Hey Lamp, how far is it?".to_owned())].into()),
+            chats: Mutex::new(vec![vec![text("Let me see."), Ok(ChatEvent::Done)]].into()),
+            ..Script::default()
+        });
+        let asked_for: Arc<Mutex<Vec<u64>>> = Arc::default();
+        let asking = asked_for.clone();
+        let tools: ToolRunner = Arc::new(|_, _, _, _| Box::pin(async { json!({"ok": true}) }));
+        let mut engine = Engine::with_clock(
+            script.clone(),
+            Arc::new(|| "SYSTEM".to_owned().into()),
+            tools,
+            Arc::new(Instant::now),
+        )
+        .announcing(false)
+        .noting_open_work(Arc::new(move |request| {
+            asking.lock().unwrap().push(request);
+            Some("(OPEN-WORK-NOTE)".to_owned())
+        }));
+        tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+            .unwrap()
+            .block_on(async {
+                for input in spoken_line() {
+                    engine.submit(input);
+                }
+                turn_within(&mut engine, Duration::from_secs(10)).await
+            });
+        let told = script
+            .asked
+            .lock()
+            .unwrap()
+            .iter()
+            .flatten()
+            .filter_map(|message| message.content.as_ref().and_then(Value::as_str))
+            .any(|content| content.contains("(OPEN-WORK-NOTE)"));
+        assert_eq!(told, handed, "handed over: {handed}");
+        assert_eq!(asked_for.lock().unwrap().len(), usize::from(handed));
+    }
+    tasks::forget_handed("70");
+    *crate::thread::THREAD.lock().unwrap() = crate::thread::Thread::new();
+}
+
+/// #7930 (Heron's P2 3): the open-work note is last in the turn's notes:
+/// with another note winning (a task waiting for a yes), the tasks part
+/// is never asked for the open work.
+#[test]
+fn the_open_work_is_not_read_when_another_note_wins() {
+    let _thread = crate::provider_worker::tests::one_thread();
+    tasks::handed_over("70", "Research houseplants for a dark bedroom");
+    let script = Arc::new(Script {
+        heard: Mutex::new([Ok("Hey Lamp, how far is it?".to_owned())].into()),
+        chats: Mutex::new(vec![vec![text("Let me see."), Ok(ChatEvent::Done)]].into()),
+        ..Script::default()
+    });
+    let asked_for: Arc<Mutex<Vec<u64>>> = Arc::default();
+    let asking = asked_for.clone();
+    let tools: ToolRunner = Arc::new(|_, _, _, _| Box::pin(async { json!({"ok": true}) }));
+    let mut engine = Engine::with_clock(
+        script.clone(),
+        Arc::new(|| "SYSTEM".to_owned().into()),
+        tools,
+        Arc::new(Instant::now),
+    )
+    .announcing(false)
+    .noting_a_task_waiting(Arc::new(|_, _| Some("(TASK-WAITING)".to_owned())))
+    .noting_open_work(Arc::new(move |request| {
+        asking.lock().unwrap().push(request);
+        Some("(OPEN-WORK-NOTE)".to_owned())
+    }));
+    tokio::runtime::Builder::new_current_thread()
+        .enable_all()
+        .build()
+        .unwrap()
+        .block_on(async {
+            for input in spoken_line() {
+                engine.submit(input);
+            }
+            turn_within(&mut engine, Duration::from_secs(10)).await
+        });
+    let contents: Vec<String> = script
+        .asked
+        .lock()
+        .unwrap()
+        .iter()
+        .flatten()
+        .filter_map(|message| message.content.as_ref().and_then(Value::as_str))
+        .map(str::to_owned)
+        .collect();
+    assert!(
+        contents.iter().any(|c| c.contains("(TASK-WAITING)")),
+        "{contents:?}"
+    );
+    assert!(
+        !contents.iter().any(|c| c.contains("(OPEN-WORK-NOTE)")),
+        "{contents:?}"
+    );
+    assert!(
+        asked_for.lock().unwrap().is_empty(),
+        "the open work read anyway"
+    );
+    tasks::forget_handed("70");
+    *crate::thread::THREAD.lock().unwrap() = crate::thread::Thread::new();
 }

@@ -171,6 +171,97 @@ These you can run on their own:
   (`/run/lampos-eyes/present`, a face on a screen too) and stops there. Its stand-in test is
   `full-look-row-test.sh` (zsh needed).
 
+## The work records ROW (#7930 part 1)
+
+`work-records-row.py LABEL --tasks-bin LAMP_TASKS --voice-bin LAMP_VOICE --clips DIR`, one command,
+about 15 minutes, put back in under 5. Does lamp-tasks keep a piece of work's status up to date while
+the lamp's OpenClaw does it, and does the voice say how far it is (`docs/tasks.md` "Work records" and
+"The voice asks about its work")? Only work started by `start_agent_task`/`confirm_agent_task` (kind
+`task`) keeps a record; makes, skill runs and hard asks are out of this kit. Each leg writes a verdict file under
+`$PLAYED_OUT/scenarios/work-records-LABEL/` (`L0.json` … `putback.json`, `verdict.txt`, `run.log`).
+
+- **L0, setup.** Reads the installed builds and lamp-tasks' `LAMP_LAMP_ENGINE`. Not `openclaw`: a
+  drop-in sets it (`lamp-tasks.service.d/zz-7930-row-engine.conf`), logged to
+  `/home/orangepi/changes.txt`. Stages both binaries (SHA-256 checked on the lamp, the installed ones
+  kept beside a state file in `/var/tmp/work-records-7930`), restarts only lamp-tasks and lamp-voice,
+  and waits until lamp-tasks answers with its lamp target on OpenClaw. A state file left by an earlier
+  run is put back first (as below, round-aware) and the run goes on; when that put-back fails, it stops
+  with nothing staged and the state kept.
+- **A lamp-update round** (its `current` links moved since L0, or its journal says `switched to build`
+  or `installed /opt/lampOS/`; its routine "OpenClaw may be installed now" is not one) is looked for before each leg and when a record can't be read: the legs stop.
+  lamp-update is never stopped or touched.
+- **L1, a task, no voice.** First waits up to 60 s for `request.sock` and the kept session (lamp-tasks'
+  journal `kept session … idle|working`); no socket is a clear FAIL. Then the voice's own ops: `status` and `prepare` on `request.sock`, `confirm`
+  on `voice.sock`. Then `{"op":"work","id":…}` every 2 s, up to 4 minutes. PASS: at least two states,
+  `tools` above 0 and rising, `step` set, and `done` with an answer.
+- **`step` only with the steps switch** (c0a4-16): lamp-tasks reads tool calls into a record's `step`
+  only with `LAMP_TASKS_STEPS=on`, which is off in the product, so `step` stays null there. The kit reads
+  lamp-tasks' environment once (logged `LAMP_TASKS_STEPS=on|off`). On, L1, L4 and HW require the step as
+  above. Off, they require its state, a tool counted and its session instead (L1: `session_filled` in
+  place of `step_set`; L4: `record_has_id_state_tools_session` in place of `record_has_id_state_step`;
+  HW: the same check on the record as the how was heard), and the reply naming a state.
+- **L2, the list.** `work_list` while L1 runs and after it: the task newest both times.
+- **L4, the voice side.** No spoken yes: a task is handed over by `request.sock` as in L1 and waited
+  for until `working` (with a tool if one comes, up to 90 s). Then only the "how far is it?" clip plays
+  (`en-how`, later `vi-how`, the same task while it still works; `--how-clip what` for "what is it doing
+  now?"), from the Mac at its own output of at most 70% (read, never changed; the lamp's volume is never
+  touched). PASS: `check_agent_task` called on that turn or the done record's answer told (in any
+  language: two of its numbers said, within 1, or 2 for a percentage said as a fraction such as "a
+  quarter" or "three quarters"; or three of its longer words), the reply naming the state (the answer
+  told counts), and the record's id, state and step; the record's answer is kept. A `conflict` on the
+  hand-over's prepare or confirm (another task moved the store's revision) is read again and asked again,
+  up to four times. Every lamp-voice line naming a request in each turn is kept in `L4.json`
+  (`journal_by_request`: the read-back, a yes taken in code, the calls).
+- **L4s** (`--l4-spoken`, its own leg, never blocking): the old spoken flow, ask, yes 25 s later (after
+  the lamp's read-back), then how; scored as L4 plus the hand-over call.
+- **The running binaries, before and after every leg** (L1, L2, L4, L4s, HW): each unit's
+  `/proc/<MainPID>/exe` is read (its SHA-256, one sudo). Either one not the installed test build's makes
+  the leg VOID ("the binary changed mid-leg: lamp-update rolled the lamp"), never PASS or FAIL; the run
+  stops there and the put-back follows. lamp-update stays running by rule, and a stable promote mid-run
+  would overwrite the hand-copied builds.
+- **A skipped leg costs nothing**: the lock and a round are looked at just before each leg that runs, never
+  for a skipped one.
+- **HW, "how far is it?" while a long do-task runs** (only when `--only` names it; en only): plays
+  `en-long-do` (a do-task through `start_agent_task`, then `en-yes`); its work record (kind `task`) is
+  polled until `working` with a tool (`--running-cap 150`), then `en-how` plays and the record is read as
+  it ends. PASS: `check_agent_task` on the how turn, the record `working` as the how was heard, and the
+  reply naming a running state ("working", "still", "looking", "checking", "searching") or the step's
+  tool as words, not the answer. VOID when the record was already over then ("finished too fast"). Render
+  the long do-task with `work-records-clips.sh --only en-long-do DIR`; `--clips DIR:DIR` looks in each folder
+  in turn.
+- **`--langs en,vi`** (both by default): the languages L4 and L4s play and score, en first; `--only L4
+  --langs vi` plays vi's how alone and keeps only vi's checks.
+- **`--only L4s`** (or `--only L4,L4s`): those legs alone; `--only` takes L1, L2, L4, L4s and HW. L0 and
+  the put-back always run, the rest are `SKIP (--only)`. Naming L4s turns it on.
+- **The lamp lock.** Before L0, before each leg and before the put-back, the kit runs
+  `lampOS/tools/lamp-lock.sh <--lock-name, lamp-c0a4> status` (`WORK_LOCK_SCRIPT` names another
+  script, the tests' stand-in); held by anyone but the runner's own holder and session (or free,
+  expired, or not readable), it stops at once, logs `lock not held: <holder>`, and does nothing more on
+  the lamp: no put-back either (`putback NOT RUN`; the state stays for `--put-back` under the lock).
+  The holder and session have no default: `--lock-holder builder --lock-session session`, or
+  `LAMP_LOCK_HOLDER` and `LAMP_LOCK_SESSION`; with either unset the kit refuses to start and says which.
+  While it runs it renews the lock (`renew <holder> <session>`) every 3 min (`--lock-renew`); a failed
+  renewal stops it the same way.
+- **Stopping it.** `--deadline HH:MM` or `HH:MM:SS` (local time) stops the legs there and begins the put-back;
+  SIGINT (Ctrl-C) or SIGTERM do the same at once. The leg under way gets no verdict (`stopped
+  STOPPED` in `verdict.txt`). A signal during the put-back is held, so it always runs to its end.
+- **Put-back**, always, and alone with `--put-back`: the installed binaries back (checked against the
+  SHA-256 read before), the drop-in removed, L0's ask helper (`/tmp/work-records-ask.py`) removed, both
+  units restarted, read twice (the helper gone in each), logged. A lamp-voice
+  hard-asks drop-in an older kit run left (`lamp-voice.service.d/zz-7930-row-hard-asks.conf`, under
+  `/run` or `/etc`) is removed too, and both places are checked in its reads; with no state file, such a
+  leftover is still removed and the units restarted. After a round,
+  nothing is copied over the files the units now run: our build is taken out of the old release folder
+  alone, and the units are judged by their current links (not our build), not by L0's SHA-256.
+
+`work-records-clips.sh DIR` renders the clips through the lamp's own voice relay (ElevenLabs, the
+lamp's credential read as root into curl and never printed) and checks each one's length and that
+none is silent, has over 0.3 s of quiet before its first word or a pause over 0.4 s inside; each clip's
+pauses are trimmed to 200 ms first (`--trim DIR` alone), so "Hey Lamp" is never heard as a line of
+its own. `--check DIR` checks only. The dry run, no lamp: `work-records-test.sh`, against
+`work-records-stand-in.py` (a stand-in lamp-tasks with its sockets, units and journal under a temp
+folder; `WORK_SSH` and `WORK_ROOT` point the kit at it, never set for a lamp).
+
 ## The desk kit
 
 `desk-kit.sh LABEL` compares sets of the voice's switches ("arms") on a

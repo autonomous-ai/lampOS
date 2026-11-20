@@ -6926,6 +6926,9 @@ struct Watch {
     /// Since when this time's chance has waited for the trigger's
     /// `[[while]]` conditions (`wait`).
     waiting_us: Option<u64>,
+    /// The `waiting_us` of a kept rise whose `chance dropped` line was
+    /// said at the message its `wait` ran out: said once a wait.
+    wait_dropped: Option<u64>,
     ran_us: Option<u64>,
     /// With a rearm line: a chance was had, and the field has not stayed
     /// past the line long enough since.
@@ -7454,6 +7457,29 @@ fn next_morning_us(clock: Option<(i32, u64, u64)>, now_us: u64) -> u64 {
         86_400_000 - of_day + morning
     };
     now_us + (wait as u64) * 1_000
+}
+
+/// A chance let go past its `wait`: `<trigger> chance dropped: ...`, with
+/// the condition that held it when `held_by` (#1672, #2861).
+fn wait_dropped_run(skill: &Skill, trigger: &Trigger, held_by: Option<String>) -> Run {
+    let mut why = format!(
+        "{} chance dropped: it held, but the skill's conditions did not hold within its wait of {} s; it comes again only once the trigger ends and holds again",
+        trigger.name.as_deref().unwrap_or("trigger"),
+        trigger.wait_us / 1_000_000
+    );
+    if let Some(held_by) = held_by {
+        why = format!("{why} (held by {held_by})");
+    }
+    Run {
+        held: None,
+        generation: None,
+        skill: skill.name.clone(),
+        events: vec![event(&skill.name, SkillStage::Answered, why, Some(false))],
+        calls: Vec::new(),
+        ask: None,
+        queue: false,
+        from: None,
+    }
 }
 
 fn event(skill: &str, stage: SkillStage, why: String, allowed: Option<bool>) -> SkillEvent {
@@ -9835,6 +9861,9 @@ impl Engine {
                 // one (the sensor not knowing it yet) is passed over, as if
                 // it never came, and breaks nothing (#1684).
                 let mut rose = true;
+                // A rise kept for its `wait` until a message past it: still
+                // not risen there, as before, but its drop is said (below).
+                let mut kept_past_wait = false;
                 if let Some(rise) = &trigger.rise {
                     let Some(reading) = at(&value, &rise.field)
                         .as_f64()
@@ -9849,12 +9878,13 @@ impl Engine {
                     // or its `wait` runs out: a count that rose mid-turn
                     // reacts once the turn ends, though the readings since
                     // no longer rise. Only with a `wait`.
-                    rose = rose
-                        || (trigger.wait_us > 0
-                            && !watch.spent
-                            && watch.waiting_us.is_some_and(|since| {
-                                now_us.saturating_sub(since) < trigger.wait_us
-                            }));
+                    let kept = !rose && trigger.wait_us > 0 && !watch.spent;
+                    let waited = watch.waiting_us.map(|since| now_us.saturating_sub(since));
+                    kept_past_wait = kept
+                        && (trigger.when == When::Appears || rearm)
+                        && watch.wait_dropped != watch.waiting_us
+                        && waited.is_some_and(|waited| waited >= trigger.wait_us);
+                    rose = rose || (kept && waited.is_some_and(|waited| waited < trigger.wait_us));
                 }
                 watch.unknown_us = None;
                 if let Some(line) = rearm_line {
@@ -9869,6 +9899,34 @@ impl Engine {
                 // its topic's next message, or dropped (`holds`).
                 let restored = std::mem::take(&mut watch.restored);
                 if !(rose && holds && chooses(skill, &value)) {
+                    // A rise kept for its `wait` with its while still not
+                    // holding when the wait runs out says its `chance
+                    // dropped` line once, as any chance let go past its
+                    // `wait` does, and changes nothing else: the rise is
+                    // not taken, so a new rise is free as before.
+                    if kept_past_wait
+                        && holds
+                        && chooses(skill, &value)
+                        && !Self::conditions_hold(
+                            seen!(self, skill),
+                            &self.holding,
+                            self.sooner,
+                            skill,
+                            now_us,
+                        )
+                    {
+                        watch.wait_dropped = watch.waiting_us;
+                        let held_by = (!trigger.once_per_day).then(|| {
+                            Self::held_back(
+                                seen!(self, skill),
+                                &self.holding,
+                                self.sooner,
+                                skill,
+                                now_us,
+                            )
+                        });
+                        runs.push(wait_dropped_run(skill, trigger, held_by));
+                    }
                     if restored
                         || watch
                             .last_held_us
@@ -10448,38 +10506,16 @@ impl Engine {
                         if trigger.stands_in_for_group {
                             self.word_windows.insert(skill.name.clone(), 2);
                         }
-                        let mut why = format!(
-                            "{} chance dropped: it held, but the skill's conditions did not hold within its wait of {} s; it comes again only once the trigger ends and holds again",
-                            trigger.name.as_deref().unwrap_or("trigger"),
-                            trigger.wait_us / 1_000_000
-                        );
-                        if !trigger.once_per_day {
-                            why = format!(
-                                "{why} (held by {})",
-                                Self::held_back(
-                                    seen!(self, skill),
-                                    &self.holding,
-                                    self.sooner,
-                                    skill,
-                                    now_us
-                                )
-                            );
-                        }
-                        runs.push(Run {
-                            held: None,
-                            generation: None,
-                            skill: skill.name.clone(),
-                            events: vec![event(
-                                &skill.name,
-                                SkillStage::Answered,
-                                why,
-                                Some(false),
-                            )],
-                            calls: Vec::new(),
-                            ask: None,
-                            queue: false,
-                            from: None,
+                        let held_by = (!trigger.once_per_day).then(|| {
+                            Self::held_back(
+                                seen!(self, skill),
+                                &self.holding,
+                                self.sooner,
+                                skill,
+                                now_us,
+                            )
                         });
+                        runs.push(wait_dropped_run(skill, trigger, held_by));
                     }
                     // Without a `wait`, a chance a condition holds back is
                     // spent here and says so (#2602). One let go past a

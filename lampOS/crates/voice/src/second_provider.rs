@@ -567,6 +567,14 @@ pub(crate) const WRITE_KEPT_FIELDS: [&str; 3] = ["service", "action", "send_id"]
 /// The only fields a kept `use_skill` call may have ([`kept_args`]).
 pub(crate) const SKILL_KEPT_FIELDS: [&str; 4] = ["skill", "choice", "flag", "kind"];
 
+/// A kept `confirm_agent_task`, as told in a later turn's history
+/// ([`kept_result`]): the task was handed over then, and a later bare "how
+/// far is it?" or "is it done?" is about it. On c0a4 (ROW c0a4-5, L4s en)
+/// a yes taken in code kept nothing, and the next turn's "how far is it?"
+/// got `calls=none` and "How far is what?" (#7930). Read at call time:
+/// `check_agent_task` with no task answers the newest work.
+pub(crate) const TASK_HANDED_OVER: &str = "(done earlier: the task was handed over then and runs on its own. A bare \"how far is it\", \"is it done\" or \"how's it going\" after it is about it: call check_agent_task, which with no task answers the newest work.)";
+
 /// A kept skill's call, as told in a later turn's history ([`kept_result`]):
 /// it ran then, and a new ask for it is a call of its own (#7076).
 pub(crate) const SKILL_RAN_EARLIER: &str = "(done earlier: the skill ran then. The rest of its result was not kept. A new ask for it needs its own call.)";
@@ -655,6 +663,12 @@ pub(crate) fn failed_then_note(names: &[&str]) -> String {
 pub(crate) fn kept_result(name: &str, told: &serde_json::Value) -> Option<&'static str> {
     if name == crate::use_skill::NAME {
         return Some(SKILL_RAN_EARLIER);
+    }
+    // A task handed over, by the model's confirm or by the yes taken in
+    // code, is told as running, for a bare "how far is it?" later (#7930).
+    if name == crate::agent_tasks::CONFIRM {
+        return (told.get("handing_over") == Some(&serde_json::Value::Bool(true)))
+            .then_some(TASK_HANDED_OVER);
     }
     if name != crate::services::WRITE {
         return None;
@@ -996,6 +1010,16 @@ pub const NAME_SECOND_SIGN_ENVIRONMENT: &str = "LAMP_NAME_SECOND_SIGN";
 /// pass me the salt please?", said to a person, was heard at 0.95 to 0.99
 /// at its start and answered (#3945).
 pub const NAME_SAID_TO_A_PERSON_ENVIRONMENT: &str = "LAMP_NAME_SAID_TO_A_PERSON";
+
+/// Where the worker reads whether, with [`NAME_SECOND_SIGN_ENVIRONMENT`], a
+/// second sign must belong to the hearing it counts for (`on`, and nothing
+/// else): a line `LAMP_NAME_NEAR` ruled not the name counts the hearing by
+/// none, and "the name said close to it" counts only when the voice rose
+/// close while a hearing of `attention::NEAR_SCORE` or more was said. On
+/// lamp-74ff on 20 Nov (build 14967) a one-word line ruled not the name
+/// counted by closeness read 15 s before its hearing, and opened a
+/// conversation in a meeting (#8092).
+pub const NAME_SIGN_TIED_ENVIRONMENT: &str = "LAMP_NAME_SIGN_TIED";
 
 /// Where the worker reads whether a hearing of the lamp's name inside one
 /// line's sound stays with that line, never counting for the one begun
@@ -1774,6 +1798,11 @@ pub type TaskDeclined = Arc<dyn Fn(u64, &str) -> Option<String> + Send + Sync>;
 /// linked record), the task started in code and the note it gets, or
 /// nothing. Blocking: it asks the tasks part.
 pub type TaskYes = Arc<dyn Fn(u64, &str, Option<&str>) -> Option<String> + Send + Sync>;
+/// The note for a turn while the work this voice handed over last is still
+/// open (`crate::agent_tasks::open_work_note`, #7930), with its request.
+/// Blocking: it asks the tasks part, asked only while work was handed over
+/// (`crate::agent_tasks::work_handed`).
+pub type OpenWorkNote = Arc<dyn Fn(u64) -> Option<String> + Send + Sync>;
 /// A heard line that is a whole spoken trigger of a running app (#7415 piece
 /// 6, `crate::app_triggers`): with its request and words, whether the app
 /// took it. Blocking: it waits up to `app_triggers::HOLD` for the app.
@@ -2199,6 +2228,9 @@ struct Shared {
     /// With the tasks part: a heard whole plain yes starts the task waiting
     /// in code, before the chat round (#7027).
     task_yes: Option<TaskYes>,
+    /// With the tasks part: the note that work handed over is still open
+    /// (#7930).
+    open_work: Option<OpenWorkNote>,
     /// With `LAMP_APP_TRIGGERS=on`: a line that says an installed app's
     /// trigger is taken by that app, and the request ends here (#7415).
     app_line: Option<AppLine>,
@@ -2290,6 +2322,9 @@ struct Shared {
     /// lamp-name's near hearings, for a line's first word
     /// ([`Engine::hearing_the_name_near`]).
     name_near: Option<NameNear>,
+    /// Told the request whose line `name_near` ruled not the name
+    /// ([`Engine::telling_near_not_the_name`], #8092).
+    near_not_the_name: Option<Opened>,
     /// `LAMP_NAME_WORDLESS_BAR=on`: lamp-name's best hearing in a line, for
     /// one marked as only the name whose words came back empty
     /// ([`Engine::holding_a_wordless_call`]).
@@ -2304,6 +2339,9 @@ struct Shared {
     /// its own words at a line's start or end are taken out
     /// ([`Engine::holding_own_echo`]).
     own_echo: bool,
+    /// `LAMP_CARE_LINE` (#7689): words of self-harm caught on a line, and
+    /// the fixed care line said after its answer ([`Engine::caring`]).
+    care: Option<Arc<crate::care_line::Care>>,
     spare: Mutex<Option<Kept>>,
     spares: AtomicU64,
     /// The last send try's attempt id ([`send_attempt_in_context`], #5853).
@@ -3101,9 +3139,11 @@ fn spoken_form(word: &str) -> String {
         .map_or(spoken.to_owned(), |stem| format!("{stem}m"))
 }
 
-/// Whether a word sounds like the lamp's name at all ([`like_the_name`]).
-#[cfg(test)]
-fn sounds_like_the_name(word: &str) -> bool {
+/// Whether a word sounds like the lamp's name at all ([`like_the_name`]):
+/// with `LAMP_NAME_SIGN_TIED`, a one-word line whose word doesn't is never
+/// taken as the name with no look (`attention::Attention::weigh_the_name`,
+/// #8092).
+pub(crate) fn sounds_like_the_name(word: &str) -> bool {
     like_the_name(word) != LikeTheName::Not
 }
 
@@ -3150,13 +3190,13 @@ fn named_near(
     window: (u64, u64),
     near: &NameNear,
     as_a_sentence: bool,
-) -> String {
+) -> (String, bool) {
     let Some((start, end)) = first_word_set_off(&text) else {
-        return text;
+        return (text, false);
     };
     let word = &text[start..end];
     if word.eq_ignore_ascii_case(net::key_terms::NAME) || word.eq_ignore_ascii_case("lamb") {
-        return text;
+        return (text, false);
     }
     let like = like_the_name(word);
     let (heard, turned) = near(window);
@@ -3198,14 +3238,19 @@ fn named_near(
         }
         (LikeTheName::Not, None) => None,
     };
+    // Heard near by the line's start and not taken: ruled not the name.
+    let not_the_name = named.is_none() && near_enough.is_some();
     match named {
         Some(signs) => {
             eprintln!(
                 "lamp-voice second: request {request}: {signs}: it is the name (LAMP_NAME_NEAR)"
             );
-            format!("{}{}{}", &text[..start], net::key_terms::NAME, &text[end..])
+            (
+                format!("{}{}{}", &text[..start], net::key_terms::NAME, &text[end..]),
+                false,
+            )
         }
-        None => text,
+        None => (text, not_the_name),
     }
 }
 
@@ -4193,6 +4238,39 @@ async fn play_fixed(
     kept_words: bool,
 ) -> bool {
     let line = shared.fixed(english);
+    let kept = shared.fixed_clips.kept(english);
+    match play_words(
+        shared,
+        (request, heard_at),
+        (line, kept, DOWN_LINE_MOST_SAMPLES),
+        why,
+        kept_words,
+    )
+    .await
+    {
+        None => false,
+        Some((_, whole)) => {
+            // Kept for the next time only when said whole.
+            if let Some(clip) = whole {
+                shared.fixed_clips.keep(english, clip);
+            }
+            true
+        }
+    }
+}
+
+/// [`play_fixed`]'s words `line`: from `kept`, its clip rendered ahead,
+/// else streamed from the voice, at most `most` samples. None when the
+/// turn is gone; else how many samples played, and the clip when it was
+/// streamed whole (for its keeper to keep). The care line (#7689) is
+/// played this way too.
+async fn play_words(
+    shared: &Shared,
+    (request, heard_at): (u64, Instant),
+    (line, kept, most): (&str, Option<Vec<i16>>, usize),
+    why: &str,
+    kept_words: bool,
+) -> Option<(usize, Option<Vec<i16>>)> {
     if !shared
         .emit(ProviderOutput::Transcript {
             request: Some(request),
@@ -4201,10 +4279,9 @@ async fn play_fixed(
         })
         .await
     {
-        return false;
+        return None;
     }
     shared.said_piece(request, kept_words.then_some(line));
-    let kept = shared.fixed_clips.kept(english);
     let ahead = kept.is_some();
     let mut first = true;
     let mut play = |samples: Vec<i16>| {
@@ -4226,11 +4303,12 @@ async fn play_fixed(
         }
     };
     let mut played = 0;
+    let mut whole = None;
     if let Some(clip) = kept {
         for part in clip.chunks(PACKET_SAMPLES) {
             let audio = play(part.to_vec());
             if !shared.emit(audio).await {
-                return false;
+                return None;
             }
             shared.said_samples(request, part.len());
             played += part.len();
@@ -4250,20 +4328,19 @@ async fn play_fixed(
                 for part in packet.chunks(PACKET_SAMPLES) {
                     let audio = play(part.to_vec());
                     if !shared.emit(audio).await {
-                        return false;
+                        return None;
                     }
                     shared.said_samples(request, part.len());
                     played += part.len();
                 }
                 clip.extend(packet);
-                if clip.len() >= DOWN_LINE_MOST_SAMPLES {
+                if clip.len() >= most {
                     break;
                 }
             }
             if played > 0 {
-                // Kept for the next time only when said whole.
                 if !failed {
-                    shared.fixed_clips.keep(english, clip);
+                    whole = Some(clip);
                 }
                 break;
             }
@@ -4274,7 +4351,7 @@ async fn play_fixed(
             "lamp-voice second: request {request}: its fixed line could not be said: the voice gave no sound for it twice ({why})"
         );
     }
-    true
+    Some((played, whole))
 }
 
 /// The newest answer's pieces as written for the voice, in order
@@ -4732,7 +4809,15 @@ async fn render_line(services: &Arc<dyn Services>, text: &str) -> Vec<i16> {
 /// A voice's packets in one clip, at most `DOWN_LINE_MOST_SAMPLES`; empty
 /// if the voice failed.
 async fn clip_of(
+    speech: futures_util::stream::BoxStream<'static, net::Result<Vec<i16>>>,
+) -> Vec<i16> {
+    clip_up_to(speech, DOWN_LINE_MOST_SAMPLES).await
+}
+
+/// [`clip_of`], at most `most` samples.
+async fn clip_up_to(
     mut speech: futures_util::stream::BoxStream<'static, net::Result<Vec<i16>>>,
+    most: usize,
 ) -> Vec<i16> {
     let mut clip = Vec::new();
     while let Some(packet) = speech.next().await {
@@ -4740,8 +4825,8 @@ async fn clip_of(
             Ok(packet) => clip.extend(packet),
             Err(_) => return Vec::new(),
         }
-        if clip.len() >= DOWN_LINE_MOST_SAMPLES {
-            clip.truncate(DOWN_LINE_MOST_SAMPLES);
+        if clip.len() >= most {
+            clip.truncate(most);
             break;
         }
     }
@@ -5232,6 +5317,7 @@ impl Engine {
                 task_waiting: None,
                 task_declined: None,
                 task_yes: None,
+                open_work: None,
                 app_line: None,
                 spelled_name: None,
                 air: None,
@@ -5261,10 +5347,12 @@ impl Engine {
                 name_refused: Mutex::new(None),
                 one_speaker: None,
                 name_near: None,
+                near_not_the_name: None,
                 wordless_bar: None,
                 name_in_line: None,
                 name_as_a_sentence: false,
                 own_echo: false,
+                care: None,
                 spare: Mutex::new(None),
                 sent_write: Mutex::new(Vec::new()),
                 write_sent_in: Mutex::new(None),
@@ -6235,6 +6323,18 @@ impl Engine {
         self
     }
 
+    /// With [`Self::hearing_the_name_near`]: `told` is given the request
+    /// whose line [`named_near`] ruled not the name, lamp-name's near
+    /// hearing at its start on a first word, set off, that is not the name,
+    /// before its words are judged; the rule then counts no second sign for
+    /// that hearing (`LAMP_NAME_SIGN_TIED`, #8092). Before any turn only.
+    pub fn telling_near_not_the_name(mut self, told: Opened) -> Self {
+        if let Some(shared) = Arc::get_mut(&mut self.shared) {
+            shared.near_not_the_name = Some(told);
+        }
+        self
+    }
+
     /// `LAMP_NAME_WORDLESS_BAR=on` (#5385): a line marked as only the
     /// lamp's name whose words came back empty is asked as the name only
     /// when `best` says lamp-name heard it there at
@@ -6277,6 +6377,17 @@ impl Engine {
     /// run at its start or end is taken out of what the model is sent. A
     /// line adding words, or begun after its words and answering its offer
     /// or question, is never held. Before any turn only.
+    /// With `LAMP_CARE_LINE` (#7689): a line whose words say the person
+    /// might harm themselves ([`crate::care_line::said_harm`]) is told so
+    /// beside it, kept out of memory, and its answer is followed by the
+    /// fixed care line for the lamp's region and language.
+    pub fn caring(mut self, care: Option<Arc<crate::care_line::Care>>) -> Self {
+        if let Some(shared) = Arc::get_mut(&mut self.shared) {
+            shared.care = care;
+        }
+        self
+    }
+
     pub fn holding_own_echo(mut self, on: bool) -> Self {
         if let Some(shared) = Arc::get_mut(&mut self.shared) {
             shared.own_echo = on;
@@ -7452,6 +7563,19 @@ impl Engine {
         self
     }
 
+    /// While the work this voice handed over last is still open, a spoken
+    /// request is told so in one line (`note`, with the tasks part, #7930):
+    /// on c0a4 (ROW c0a4-6) "Hey Lamp, how far is it?" right after a
+    /// hand-over got "How far is what?" and no call. Asked off the
+    /// runtime's thread only while work was handed over. Before any turn
+    /// only.
+    pub fn noting_open_work(mut self, note: OpenWorkNote) -> Self {
+        if let Some(shared) = Arc::get_mut(&mut self.shared) {
+            shared.open_work = Some(note);
+        }
+        self
+    }
+
     /// A heard line that is a whole trigger of a running app is taken by
     /// that app (`take`, #7415 piece 6): told to it, and when it takes the
     /// line the request ends here with no chat round, the app speaking for
@@ -7716,6 +7840,27 @@ impl Engine {
         shared
             .fixed_clips
             .render(&shared.services, shared.language, lines);
+        // The care line (`LAMP_CARE_LINE`), rendered ahead for the lamp's
+        // region and language now, so a voice down later still says it (the
+        // first builder's P2 on #7752). Rendered again the next time if not.
+        if let Some(care) = &shared.care {
+            let line = care.line();
+            if care.clip(&line).is_none() {
+                let (care, services) = (care.clone(), shared.services.clone());
+                tokio::spawn(async move {
+                    let clip =
+                        clip_up_to(services.speak(line.clone()), crate::care_line::MOST_SAMPLES)
+                            .await;
+                    if clip.is_empty() {
+                        eprintln!(
+                            "lamp-voice second: the care line could not be rendered ahead; trying again at the next line"
+                        );
+                    } else {
+                        care.keep_clip(&line, clip);
+                    }
+                });
+            }
+        }
     }
 
     pub fn submit(&mut self, input: ProviderInput) {
@@ -10628,13 +10773,21 @@ async fn spoken(
     // with an earlier piece's words, whose start is not this line's
     // (reviewer-three's P3 on 194accd24).
     let text = match &shared.name_near {
-        Some(near) if !went_on => named_near(
-            request,
-            text,
-            said.lock().map_or((0, 0), |said| *said),
-            near,
-            shared.name_as_a_sentence,
-        ),
+        Some(near) if !went_on => {
+            let (text, not_the_name) = named_near(
+                request,
+                text,
+                said.lock().map_or((0, 0), |said| *said),
+                near,
+                shared.name_as_a_sentence,
+            );
+            // The rule counts no second sign for that hearing
+            // (`LAMP_NAME_SIGN_TIED`, #8092).
+            if not_the_name && let Some(told) = &shared.near_not_the_name {
+                told(request);
+            }
+            text
+        }
         _ => text,
     };
     // Said by the lamp's name just before, whose request this line dropped
@@ -10933,10 +11086,20 @@ async fn spoken(
     // plain yes to a task read back is taken in code (#7027), never one that
     // may be the lamp's own words heard back.
     let began_clear = !marks.over_the_lamps_voice && !in_echo_tail;
+    // `LAMP_CARE_LINE` (#7689): words of self-harm are never held by the
+    // said-to-me rule (the first builder's P2 on #7752): they are answered,
+    // and the care line follows, whoever said them.
+    let care_caught = !empty
+        && !held
+        && !echoed
+        && shared.care.as_ref().is_some_and(|care| {
+            crate::care_line::said_harm(&text) && !care.own_line_heard(&text, Instant::now())
+        });
     // The rule judges this very line (`carried_past_silent_undone`).
-    let heed_ran = shared.heed.is_some() && !echoed && !empty && !held;
+    let heed_ran = shared.heed.is_some() && !echoed && !empty && !held && !care_caught;
     let mut heeded = match &shared.heed {
         _ if echoed => Some(OWN_ECHO_HELD),
+        _ if care_caught => None,
         Some(heed) if !empty && !held => {
             let window = said.lock().map_or((0, 0), |said| *said);
             // Said by the name just before: its window begins with the
@@ -11908,6 +12071,16 @@ async fn spoken(
         if let Some(did) = &shared.did {
             did(Did::Worked(monotonic_us()));
         }
+        // Kept as the model's own confirm is kept, told as handed over, so
+        // a later turn's history shows the task started (#7930).
+        if let Some(keep) = &shared.keeps_calls {
+            keep(
+                request,
+                crate::agent_tasks::CONFIRM,
+                &serde_json::Value::Object(serde_json::Map::new()),
+                Some(TASK_HANDED_OVER),
+            );
+        }
     }
     let waiting = declined
         .or(taken)
@@ -11924,6 +12097,20 @@ async fn spoken(
             let owner = crate::services::owner_of(scope.as_ref());
             crate::services::waiting_note(request, owner.as_deref(), Instant::now())
         });
+    // Work handed over and still open (#7930), last in the chain: read
+    // from the tasks part off the runtime's thread, only while work was
+    // handed over and no other note won, so never on a line code took
+    // above.
+    let waiting = match (waiting, &shared.open_work) {
+        (None, Some(note)) if crate::agent_tasks::work_handed() => {
+            let note = note.clone();
+            tokio::task::spawn_blocking(move || note(request))
+                .await
+                .ok()
+                .flatten()
+        }
+        (waiting, _) => waiting,
+    };
     // At setup, a line that spells their name: the read-back to say, the
     // name as a word, never its letters (#5580 row 2).
     let spelled = shared.spelled_name.as_ref().and_then(|note| note(&text));
@@ -12185,6 +12372,40 @@ async fn spoken(
             SentWith::Told(Some(note)) => {
                 notes.insert(notes.len() - cut_in_told, note.to_owned());
             }
+        }
+    }
+    // `LAMP_CARE_LINE` (#7689): words of self-harm, or, within the hold
+    // after one, the person asking who they can call. The model is told,
+    // the exchange stays out of memory, and the care line follows the
+    // answer ([`answer`]). Everyone heard, no face asked first.
+    // Kept out of memory, and held from the running summary and its talk
+    // note (the safety read's P1 on #7752).
+    if let Some(care) = &shared.care {
+        let now = Instant::now();
+        let asks = care.holds(now) && crate::care_line::asks_who_to_call(&text);
+        if care_caught || asks {
+            care.mark(now, asks);
+            crate::remember::keep_out(request);
+            crate::care_line::hold_from_summary(request);
+            // The lamp's line follows only when it is due: said in the last
+            // five minutes, the model is told so, never that it comes.
+            let note = if care.owes(now) {
+                crate::care_line::NOTE
+            } else {
+                crate::care_line::NOTE_SAID
+            };
+            notes.insert(notes.len() - cut_in_told, note.to_owned());
+            eprintln!(
+                "lamp-voice second: request {request} is a care turn: the care line follows its answer, or the next one if this is cut (LAMP_CARE_LINE)"
+            );
+        } else if care.owes(now) {
+            // A line owed by a care turn cut before it: this answer is
+            // followed by it, so the model doesn't say it too (the safety
+            // read's P2 on #7752).
+            notes.insert(
+                notes.len() - cut_in_told,
+                crate::care_line::OWED_NOTE.to_owned(),
+            );
         }
     }
     if let Some(heard) = &shared.words_heard {
@@ -16840,6 +17061,9 @@ enum Stop {
     /// said. It ends as a silent turn; the Policy, which held it, is told
     /// no other verdict.
     Held,
+    /// `start_app`: an app took the line and speaks for itself. Nothing more
+    /// is said; the line was for the lamp, so it is no decline.
+    Taken,
     Failed(Fault),
     /// The engine is gone.
     Gone,
@@ -21316,7 +21540,30 @@ async fn answer(
                 // A voice make's waiting line is said in this turn as the
                 // agent begins ([`said_while_made`], #6749).
                 let made_call = call.name == crate::made_skill::MAKE;
+                // `start_app` is refused, nothing sent, for a line let in
+                // only as the conversation going on (another person's or the
+                // TV's words must not start the owner's app, as the fast
+                // path refuses it) and while the lamp waits on an answer (a
+                // yes to a held forget or rename or a task must not start an
+                // app): the same two checks as the fast path's. The model
+                // is told so and answers (Heron on #7996).
+                let app_start_blocked = call.name == crate::app_triggers::START_APP
+                    && (shared
+                        .conversation_alone
+                        .as_ref()
+                        .and_then(|note| note(request))
+                        == Some(worker::CONVERSATION_ALONE)
+                        || lamp_awaits_an_answer(shared, request));
                 let answering = async {
+                    if app_start_blocked {
+                        eprintln!(
+                            "lamp-voice second: request {request}: start_app refused: the line is not plainly for the lamp, or an answer is awaited ({})",
+                            crate::app_triggers::ENVIRONMENT
+                        );
+                        return crate::tools::ToolAnswer::plain(serde_json::json!({
+                            "error": "not now: nothing was started"
+                        }));
+                    }
                     match (&shared.requested_audio, spoken) {
                         (Some((worker_boot, runner)), Some(turn)) if turn.captured => {
                             let context = lamp_msgs::RequestedAudioContext {
@@ -21421,6 +21668,16 @@ async fn answer(
                 .await?;
                 if scope.as_ref().is_some_and(|scope| !scope.is_current()) {
                     return Err(Stop::Gone);
+                }
+                // An app the model started (`start_app`, #7415) took the
+                // line and speaks for itself: the request ends here as the
+                // fast path's does, with no further round and no words.
+                if call.name == crate::app_triggers::START_APP && answer.told["started"] == true {
+                    eprintln!(
+                        "lamp-voice second: request {request}: the model started an app, which took the line: the request ends here ({})",
+                        crate::app_triggers::ENVIRONMENT
+                    );
+                    return Err(Stop::Taken);
                 }
                 // An Apple Health read: its fixed words, built on the lamp,
                 // are said now as they are, and the model is told the short
@@ -22286,6 +22543,53 @@ async fn answer(
         wrote
     };
     let ended = tokio::try_join!(writing, saying);
+    // `LAMP_CARE_LINE` (#7689): the care line owed, after whatever the
+    // model said or failed to say: this care turn's, or one an earlier
+    // turn owed when a cut, a stop or a newer line ended it (the P1s on
+    // #7752). Not when a newer line took this turn: its answer says it.
+    // Never the model's words: the line for the lamp's region and language,
+    // from its clip rendered ahead when there is one.
+    if let Some(care) = &shared.care
+        && !matches!(ended, Err(Stop::Gone))
+        && let Some(line) = care.owed_line(Instant::now())
+        && {
+            // The answer it follows is held from memory and the summary
+            // too: the line says what the talk was about (the safety read's
+            // P2 on #7752).
+            crate::remember::keep_out(request);
+            crate::care_line::hold_from_summary(request);
+            true
+        }
+        && let Some((played, whole)) = play_words(
+            shared,
+            (request, heard_at),
+            (&line, care.clip(&line), crate::care_line::MOST_SAMPLES),
+            "the care line, LAMP_CARE_LINE",
+            true,
+        )
+        .await
+    {
+        if let Some(clip) = whole {
+            care.keep_clip(&line, clip);
+        }
+        if played == 0 {
+            eprintln!(
+                "lamp-voice second: request {request}: the care line could not be said: still owed to the next answer"
+            );
+        } else {
+            care.said(&line, Instant::now());
+            eprintln!("lamp-voice second: request {request}: the care line followed its answer");
+            // Its words are over again, as the answer's were: what reads
+            // the lamp's words line by line ends this one too.
+            let _ = shared
+                .emit(ProviderOutput::Transcript {
+                    request: Some(request),
+                    text: String::new(),
+                    finished: true,
+                })
+                .await;
+        }
+    }
     if shared.note_tools
         && let Ok(noted) = turn_tools.lock()
     {
@@ -22388,7 +22692,7 @@ async fn answer(
                 idle: true,
             }
         }
-        Err(Stop::GaveUp | Stop::Held) => ProviderOutput::TurnComplete {
+        Err(Stop::GaveUp | Stop::Held | Stop::Taken) => ProviderOutput::TurnComplete {
             request,
             idle: true,
         },

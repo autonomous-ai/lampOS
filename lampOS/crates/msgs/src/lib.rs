@@ -129,6 +129,9 @@ pub use speaker_state::*;
 /// The memory's id for a person the eyes know, and the `known` file (#2176).
 pub mod known;
 
+/// What a Store app or a paired computer tells Lamp's memory: a kept fact
+/// marked with its source, and a live context line never kept (#7415).
+pub mod app_fact;
 /// The owner's kept Apple Health facts: their wording and memory's removal
 /// of them (#7900).
 pub mod health_fact;
@@ -1217,8 +1220,10 @@ pub const MEMORY_FORGETS_TELLING_EXCHANGES: [&str; 5] = [
     "exchanges_forget",
 ];
 
-/// The memory request that pages the rest of the exchanges the last forget
-/// removed, when its answer said `"exchanges_more":true` (#7771).
+/// The memory request that pages the rest of the exchanges a forget
+/// removed, when its answer said `"exchanges_more":true`, by the
+/// `"exchanges_token"` that answer gave (`{"op":"forgot_exchanges",
+/// "token":…}`; a token not kept is refused `rest_gone`, #7771).
 pub const MEMORY_FORGOT_EXCHANGES_OP: &str = "forgot_exchanges";
 
 /// The memory request that answers its store's epoch,

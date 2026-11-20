@@ -2523,11 +2523,13 @@ fn a_devin_cloud_answer_is_read_as_idle_and_it_is_never_asked_to_close() {
         [
             Ended {
                 agent_id: CLOUD.into(),
-                state: "idle".into()
+                state: "idle".into(),
+                failure: None,
             },
             Ended {
                 agent_id: AGENT.into(),
-                state: "needs-input".into()
+                state: "needs-input".into(),
+                failure: None,
             }
         ]
     );
@@ -5138,6 +5140,7 @@ fn wait_holds_harness_own_wait_on_named_agents_beside_the_operation_lane() {
         vec![Ended {
             agent_id: AGENT.into(),
             state: "idle".into(),
+            failure: None,
         }]
     );
     let call = rig
@@ -5261,6 +5264,7 @@ fn the_wait_listing_is_read_only_for_the_agents_waited_on() {
         vec![Ended {
             agent_id: AGENT.into(),
             state: "idle".into(),
+            failure: None,
         }]
     );
     let odd = json!({"harnesses":[{"id":AGENT,"state":"has space"}]}).to_string();
@@ -5270,6 +5274,97 @@ fn the_wait_listing_is_read_only_for_the_agents_waited_on() {
     );
     assert_eq!(parse_wait(None, b"", &agents), Err("wait_failed"));
     assert_eq!(parse_wait(Some(124), b"", &agents), Ok(vec![]));
+}
+
+/// Harness 0.6.74 (openharness#4499, `cli/src/agentClient/commands.ts`
+/// v0.6.74_cli): `wait` exits 1 when a launch on this machine failed, its
+/// row `failed` with `failure: {error, detail}`. Read as that `failed`
+/// row with its `failure.error` kept (before #8062: `wait_failed`); exit 1
+/// with no row of ours `failed`, or not JSON, is still `wait_failed`.
+#[test]
+fn a_wait_exit_1_with_a_failed_launch_reads_failed_with_its_reason() {
+    let agents = [AGENT.to_owned()];
+    let failed = json!({"harnesses":[{
+        "name":"lamp-one-openclaw","id":AGENT,"state":"failed",
+        "failure":{"error":"OPENCLAW_NO_TOKEN","detail":"OpenClaw has no gateway token"},
+        "next":[]
+    }]})
+    .to_string();
+    assert_eq!(
+        parse_wait(Some(1), failed.as_bytes(), &agents),
+        Ok(vec![Ended {
+            agent_id: AGENT.into(),
+            state: "failed".into(),
+            failure: Some("OPENCLAW_NO_TOKEN".into()),
+        }])
+    );
+    // No `failure` given: still `failed`, with no reason.
+    let bare = json!({"harnesses":[{"id":AGENT,"state":"failed"}]}).to_string();
+    assert_eq!(
+        parse_wait(Some(1), bare.as_bytes(), &agents).unwrap()[0].failure,
+        None
+    );
+    // A `failed` row at exit 4 (a harness its machine refused) as before.
+    assert_eq!(
+        parse_wait(Some(4), failed.as_bytes(), &agents).unwrap()[0].state,
+        "failed"
+    );
+    // Not loosened: exit 1 with only an idle row, another agent's failed
+    // row, or an error object, is not read.
+    let idle = json!({"harnesses":[{"id":AGENT,"state":"idle"}]}).to_string();
+    assert_eq!(
+        parse_wait(Some(1), idle.as_bytes(), &agents),
+        Err("wait_failed")
+    );
+    let other = json!({"harnesses":[{"id":OTHER,"state":"failed"}]}).to_string();
+    assert_eq!(
+        parse_wait(Some(1), other.as_bytes(), &agents),
+        Err("wait_invalid_reply")
+    );
+    assert_eq!(
+        parse_wait(Some(1), br#"{"error":"USAGE"}"#, &agents),
+        Err("wait_invalid_reply")
+    );
+    assert_eq!(
+        parse_wait(Some(2), failed.as_bytes(), &agents),
+        Err("wait_failed")
+    );
+}
+
+/// Harness 0.6.74: `wait --after` on the one pane exits 1 with a `failed`
+/// row when its launch failed (`FIRST_TASK_NOT_TAKEN`): `failed`, so the
+/// turn takes the ladder at once (before #8062: `wait_failed`, waited on
+/// again). Exit 1 with anything else stays `wait_failed`.
+#[test]
+fn a_wait_after_exit_1_with_a_failed_launch_reads_failed() {
+    let mut rig = Rig::new();
+    rig.config.as_person = true;
+    let failed = json!({"harnesses":[{
+        "name":"lamp-one-openclaw","id":AGENT,"state":"failed",
+        "failure":{"error":"FIRST_TASK_NOT_TAKEN","detail":"OpenClaw did not take the first task. Close it and start it again."},
+        "next":[]
+    }]});
+    rig.plan(json!({
+        "wait":{"each":[
+            {"stdout":format!("{failed}\n"),"exit":1},
+            {"stdout":"{\"harnesses\":[{\"id\":\"x\",\"state\":\"idle\"}]}\n","exit":1},
+            {"stdout":"{\"error\":\"BAD\"}\n","exit":1}
+        ]},
+    }));
+    let cli = rig.cli();
+    let cancel = AtomicBool::new(false);
+    assert_eq!(
+        cli.wait_after(MACHINE, AGENT, "program:in-1", &cancel),
+        Ok(Some("failed".into()))
+    );
+    assert!(
+        cli.wait_after(MACHINE, AGENT, "program:in-1", &cancel)
+            .is_err()
+    );
+    assert!(
+        cli.wait_after(MACHINE, AGENT, "program:in-1", &cancel)
+            .is_err()
+    );
 }
 
 /// #1390: `harness close` on the machine the agent was started on, by the

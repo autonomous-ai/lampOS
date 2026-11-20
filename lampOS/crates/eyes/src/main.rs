@@ -2959,18 +2959,29 @@ fn run(arguments: Arguments) -> Result<(), Box<dyn std::error::Error + Send + Sy
                             // Each check with a face in view, at most every
                             // two seconds (with LAMP_FACE_REFOUND also once for
                             // an id not yet printed, retried at most every half
-                            // second): the best likeness and the largest
-                            // face's height, never a name.
+                            // second): the best likeness and its prints'
+                            // age, the largest face's height, width, turn
+                            // and place across, never a name. The largest
+                            // face is the near one the print was read
+                            // from whenever there is a likeness.
                             if who.taking.is_none()
-                                && let Some(tallest) = heights.iter().copied().reduce(f32::max)
+                                && let Some(tallest) =
+                                    faces.iter().max_by(|a, b| a.height.total_cmp(&b.height))
                             {
                                 let best = print
                                     .as_ref()
-                                    .and_then(|print| who.people.best_likeness(print))
-                                    .map_or_else(|| "none".to_owned(), |best| format!("{best:.3}"));
+                                    .and_then(|print| who.people.best_likeness(print));
+                                let now_unix_s = std::time::SystemTime::now()
+                                    .duration_since(std::time::UNIX_EPOCH)
+                                    .map_or(0, |since| since.as_secs());
                                 eprintln!(
-                                    "lamp-eyes: recognition best {best} height {tallest:.3} (near at {NEAR_ENOUGH}, same at {})",
-                                    lamp_eyes::who::SAME_PERSON
+                                    "lamp-eyes: {}",
+                                    lamp_eyes::who::recognition_line(
+                                        best,
+                                        tallest,
+                                        picture.filled,
+                                        now_unix_s,
+                                    )
                                 );
                             }
                             let near_face = near_id

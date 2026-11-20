@@ -3138,7 +3138,27 @@ impl OneSession {
                     short(&agent)
                 );
             }
-            self.first_words(harness, &name, token, until, ended);
+            // Harness 0.6.74: its first turn's wait said its launch
+            // failed: the ladder at once, within the open's bound.
+            if let Some(why) = self.first_words(harness, &name, token, until, ended) {
+                self.revive_or_replace(harness, &place.machine, &agent, &why, true);
+                // The open's last try failed too: never kept as opened. A
+                // failed open, its backoff counted (`next_open`), as any
+                // other open that failed.
+                if settles == 0 {
+                    return Err(self.open_failed(&format!(
+                        "{why}; tried {} times",
+                        3u8.saturating_sub(settles.min(2))
+                    )));
+                }
+                {
+                    let inner = self.lock();
+                    if inner.next_open.is_some() || inner.drop_due.is_some() {
+                        return Err(format!("{why}; a fresh one is opened next"));
+                    }
+                }
+                return self.open_kept(harness, place, token, until, ended, settles - 1);
+            }
         } else if settles > 0
             && let Some((why, died)) = self.settled(harness, place, &ensured, began, until, ended)
         {
@@ -3179,7 +3199,9 @@ impl OneSession {
 
     /// A new kept session's first words ([`OPEN_PROMPT`]), taken and
     /// waited for within `until`, so the first task finds it idle. Not a
-    /// turn; a failure is journaled only, and the first task waits instead.
+    /// turn; a failure is journaled only, and the first task waits instead,
+    /// except a launch Harness says failed (`wait` exit 1, Harness 0.6.74):
+    /// `Some` with why, so the open replaces it at once.
     fn first_words(
         &self,
         harness: &dyn PaneHarness,
@@ -3187,7 +3209,7 @@ impl OneSession {
         token: &Path,
         until: Instant,
         ended: &dyn Fn() -> bool,
-    ) {
+    ) -> Option<String> {
         // A fresh OpenClaw session refuses its first reply ENGINE_NOT_READY
         // for a while (~35 s seen): tried again within the open's bound,
         // never counted as stuck.
@@ -3204,17 +3226,23 @@ impl OneSession {
                 eprintln!(
                     "tasks: one session: the kept session's first words not taken: {other:?}"
                 );
-                return;
+                return None;
             }
         };
         let cancel = AtomicBool::new(false);
         let until = until.min(Instant::now() + self.open_idle_within);
         while Instant::now() < until && !ended() {
             match harness.wait_kept(name, token, &input, &cancel) {
-                Ok(Some(state)) if state == "idle" => return,
+                Ok(Some(state)) if state == "idle" => return None,
+                Ok(Some(state)) if state == "failed" => {
+                    eprintln!(
+                        "tasks: one session: the kept session's launch failed at its first words"
+                    );
+                    return Some("Harness says its launch failed".into());
+                }
                 Ok(Some(state)) => {
                     eprintln!("tasks: one session: the kept session's first turn ended {state}");
-                    return;
+                    return None;
                 }
                 Ok(None) => {}
                 Err(code) => {
@@ -3223,6 +3251,7 @@ impl OneSession {
                 }
             }
         }
+        None
     }
 
     /// #7906, a kept session `ensure` found (`live` or `resumed`) looked at
@@ -3243,8 +3272,11 @@ impl OneSession {
     ) -> Option<(String, bool)> {
         let agent = ensured.agent_id.as_str();
         // openharness#4484 (proposed): a real `stopped` is replaced at
-        // once. `starting` alone is never trusted (today Harness says it of
-        // every answer but `live`): `show` decides.
+        // once. `ensure`'s `starting` alone is never a verdict: `show`
+        // decides. Since Harness 0.6.74 (openharness#4499) `show` itself
+        // says `starting` until the first task is taken (an OpenClaw with
+        // no Gateway session bound, up to 60 s), read as Seen::Starting:
+        // stuck only past `open_idle_within` (120 s).
         if ensured.state == "stopped" {
             return Some(("Harness's ensure says it is stopped".into(), true));
         }
@@ -4376,6 +4408,10 @@ impl Turn<'_> {
                         "the lamp's default agent stopped to ask something, and a skill's run has no one to answer, so it was ended".into(),
                     );
                 }
+                // Harness 0.6.74: its launch failed (`wait` exit 1).
+                Ok(Some(state)) if state == "failed" => {
+                    return self.launch_failed(harness, machine, &agent, cancel, before_close);
+                }
                 Ok(Some(state)) => {
                     self.one
                         .gone(&agent, &format!("Harness said it is {state}"));
@@ -4513,6 +4549,15 @@ impl Turn<'_> {
                         "the lamp's default agent stopped to ask something, and a skill's run has no one to answer, so it was ended".into(),
                     );
                 }
+                // Harness 0.6.74 (openharness#4499): `wait` exits 1, its
+                // row `failed`, when the session's launch failed. The
+                // ladder at once, as for a died engine (a plain resume
+                // keeping its conversation first, a fresh one last), the
+                // turn's words typed again once with no tool run: never
+                // a look later, never the task dropped silently.
+                Ok(Some(state)) if state == "failed" => {
+                    return self.launch_failed(harness, machine, agent, cancel, before_close);
+                }
                 Ok(Some(state)) => {
                     self.one.gone(agent, &format!("Harness said it is {state}"));
                     return Ended::Failed(format!("the run ended as Harness says {state}"));
@@ -4527,6 +4572,34 @@ impl Turn<'_> {
                 }
             }
         }
+    }
+
+    /// The turn's `harness wait` said its session's launch failed
+    /// (`failed`, Harness 0.6.74's exit 1): [`Turn::stuck`] at once, as a
+    /// died one, so the ladder starts now. `show`'s tool count decides a
+    /// replay; unread, taken as one ran, so it is never replayed blindly.
+    fn launch_failed(
+        &self,
+        harness: &dyn PaneHarness,
+        machine: &str,
+        agent: &str,
+        cancel: &AtomicBool,
+        before_close: &dyn Fn(),
+    ) -> Ended {
+        let tools = match harness.observe(machine, agent) {
+            Ok(seen) => seen.seen.tools,
+            Err(code) if code == "gone" => 0,
+            Err(_) => 1,
+        };
+        self.stuck(
+            harness,
+            machine,
+            agent,
+            ("Harness says its launch failed", true),
+            tools,
+            cancel,
+            before_close,
+        )
     }
 
     /// #7906: the turn's session died under it. The owner's rule: never

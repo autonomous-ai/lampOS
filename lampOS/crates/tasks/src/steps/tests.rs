@@ -793,3 +793,57 @@ fn secrets_in_args_and_results_are_redacted() {
     let steps = own(&(call("c2", "exec", 1) + &result("c2", "3 files changed", 2)));
     assert_eq!(steps.last().unwrap().result, "3 files changed");
 }
+
+/// #7930: with `LAMP_TASKS_STEPS` on, a watched task's work record gets
+/// its latest tool call's number and name from the transcript, and the
+/// whole step goes on `tasks/step`. The record never holds a call's
+/// arguments or result.
+#[test]
+fn a_work_record_gets_its_step_and_the_bus_the_whole_step() {
+    use crate::works::{Board, TaskWork};
+    let text = call("c1", "web_search", 1_794_812_401_000)
+        + &result("c1", "SECRET RESULT", 1_794_812_402_000)
+        + &call("c2", "web_fetch", 1_794_812_403_000);
+    let mut board = Board::new();
+    board.tasks(
+        &[TaskWork {
+            task_id: TASK,
+            engine: crate::harness::EngineKind::Openclaw,
+            words: "w".into(),
+            state: None,
+            tools: 0,
+            answer: None,
+            session: None,
+            started_ago_ms: None,
+            ended_ago_ms: None,
+        }],
+        |_| None,
+        WALL,
+    );
+    let steps = own(&text);
+    assert!(!steps.is_empty());
+    let mut published: Vec<TaskStep> = Vec::new();
+    let mut publish = |step: &TaskStep| published.push(step.clone());
+    for step in &steps {
+        let mut record = |task: u64, n: u64, tool: &str| board.step(task, n, tool, WALL);
+        deliver(step, &mut record, &mut publish);
+    }
+    let work = board.get(&TASK.to_string(), WALL).unwrap();
+    let last_call = steps
+        .iter()
+        .filter(|step| step.kind == StepKind::Call)
+        .max_by_key(|step| step.n)
+        .unwrap();
+    assert_eq!(last_call.tool, "web_fetch");
+    assert_eq!(
+        work["step"],
+        serde_json::json!({"n": last_call.n, "tool": "web_fetch"})
+    );
+    assert_eq!(work["tools"], 2);
+    let said = work.to_string();
+    assert!(
+        !said.contains("SECRET") && !said.contains("command"),
+        "{said}"
+    );
+    assert_eq!(published, steps);
+}

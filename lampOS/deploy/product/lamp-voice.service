@@ -88,6 +88,8 @@ Environment=LAMP_PRIVACY_CONTROLS=on
 Environment=LAMP_PRIVACY_RIDES_STALL=on
 # LAMP_VOICE_UNSTARTED_FRAME_DROP: its why and rules are its row in docs/switches.md (#7224).
 Environment=LAMP_VOICE_UNSTARTED_FRAME_DROP=on
+# LAMP_PRIVACY_GAP_RIDE: its why and rules are its row in docs/switches.md (#2602, #7224 fault 5).
+Environment=LAMP_PRIVACY_GAP_RIDE=on
 Environment=LAMP_BUS_ROOT=/run/lampos-bus
 Environment=LAMP_BUS_AUDIO=on
 Environment=LAMP_ATTENTION=busy-near
@@ -142,6 +144,8 @@ Environment=LAMP_FIRST_SECONDS_QUIET=on
 Environment=LAMP_SECOND_OPEN_NAME=on
 Environment=LAMP_NAME_NEAR=on
 Environment=LAMP_NAME_SECOND_SIGN=on
+# LAMP_NAME_SIGN_TIED: its why and rules are its row in docs/switches.md (#8092).
+Environment=LAMP_NAME_SIGN_TIED=on
 # LAMP_NAME_AS_A_SENTENCE: its why and rules are its row in docs/switches.md (#5277, #6078).
 Environment=LAMP_NAME_AS_A_SENTENCE=on
 # LAMP_NAME_SAID_TO_A_PERSON: its why and rules are its row in docs/switches.md (#3945, #5233).
@@ -279,6 +283,9 @@ Environment=LAMP_NAMES_RENAME_ASKED=on
 Environment=LAMP_NAMES_RENAME_YES=on
 # LAMP_NAME_LEARN_FIX: its why and rules are its row in docs/switches.md (#7331).
 Environment=LAMP_NAME_LEARN_FIX=on
+# LAMP_FACE_QUESTION_NOT_ASK: "Do you remember my face?" is answered, not a face save, and a face already known by
+# the name asked for is told so (lamp-74ff, 19 Nov); its row in docs/switches.md.
+Environment=LAMP_FACE_QUESTION_NOT_ASK=on
 Environment=LAMP_STAFF_NOTE=on
 Environment=LAMP_TASK_NEWS_AT_PAUSE=on
 Environment=LAMP_MEMORY_RULES=on
@@ -683,6 +690,8 @@ Environment=LAMP_EYES_LOOK_FILE=/run/lampos-eyes/sight.jpg
 # What the lamp sees, when asked, from the eyes' full look (lamp-eyes --full-look), not the 320 working frame.
 Environment=LAMP_LOOK_FULL=on
 Environment=LAMP_EYES_FULL_LOOK_FILE=/run/lampos-eyes/look.jpg
+# LAMP_APP_TRIGGERS: #7415 piece 3b-2b; a line that spells a running app's trigger starts it with no chat round. Its rules are its row in docs/switches.md.
+Environment=LAMP_APP_TRIGGERS=on
 # Only the body opens the servo port. Defence in depth, not a mechanical stop.
 # With '-', a servo port that isn't there when the voice starts (a boot race: it comes up after the
 # unit starts; the body unplugged; a lamp without one) is passed over, and then not hidden for that run:

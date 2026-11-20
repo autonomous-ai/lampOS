@@ -35,11 +35,20 @@ sau:
 2. **Bản hướng dẫn** (`made_skill::brief`): chữ cố định, gồm định dạng kỹ
    năng và những gì một kỹ năng tạo ra được phép dùng, rồi đến yêu cầu của
    người dùng.
-   - Yêu cầu tối đa 2.000 byte (`MOST_REQUEST_BYTES`; lúc đầu là 180, từ
-     6/11 là 480 khi chủ sở hữu thấy 180 quá ngắn trong app, từ 18/11 là
-     2.000 khi một yêu cầu tiếng Việt, 2 hoặc 3 byte mỗi chữ, vẫn bị cắt ở
-     160 đến 240 chữ); dài hơn thì bị từ chối, không bao giờ bị cắt, và khi
-     đó không hỏi mô hình gì cả. MAKE IT của app và lần tạo bằng giọng nói
+   - Yêu cầu tối đa 2.000 ký tự (`MOST_REQUEST_CHARS`, #7245, 19/11: đếm
+     theo chữ, nên yêu cầu tiếng Việt dài bằng tiếng Anh; trước đó đếm theo
+     byte: lúc đầu là 180, để vừa task 1.000 byte của phần tasks cùng bản
+     hướng dẫn, từ 6/11 là 480 khi chủ sở hữu thấy 180 quá ngắn trong app,
+     từ 18/11 là 2.000 khi một yêu cầu tiếng Việt, 2 hoặc 3 byte mỗi chữ,
+     vẫn bị cắt ở 160 đến 240 chữ); dài hơn thì bị từ chối kèm giới hạn
+     ("That is too long to ask for as one skill, past 2,000 characters: say
+     it more shortly."), không bao giờ bị cắt, và khi đó không hỏi mô hình
+     gì cả. Vì sao có giới hạn: cả yêu cầu đi tới mô hình tạo kỹ năng cùng
+     system prompt, nên dài hơn nhiều chỉ khiến người dùng chờ lâu hơn cho
+     một kỹ năng làm một việc. Không đường truyền nào cần ít hơn 8.000 byte
+     tối đa của nó (bốn byte mỗi chữ, `MOST_REQUEST_BYTES`): một dòng của
+     socket app-make là 64 KiB, gói MQTT của lamp-cloud hơn 1 MiB, rules
+     tạo kỹ năng của agent 48 KiB. MAKE IT của app và lần tạo bằng giọng nói
      dùng chung giới hạn này.
    - Không có gì khác của cuộc trò chuyện đi kèm.
    - Giờ trong ngày được hỏi là khung giờ riêng của trigger,
@@ -62,8 +71,9 @@ sau:
      (coming to the desk is room/presence)" và `body = { gesture }`: system
      prompt liệt kê từng cái (`TRIGGER_MEANINGS`,
      `made_skill::gesture_names`). Vì vậy chữ riêng của bản hướng dẫn tối
-     đa 960 byte, bản hướng dẫn dài nhất là 2.960 byte với yêu cầu 2.000
-     byte (`MOST_BRIEF_BYTES`; 1.160 với 480, 1.440 khi bản hướng dẫn nêu
+     đa 960 byte, bản hướng dẫn dài nhất là 8.960 byte với yêu cầu 2.000
+     ký tự bốn byte (`MOST_BRIEF_BYTES`; 2.960 với yêu cầu 2.000 byte, 1.160
+     với 480, 1.440 khi bản hướng dẫn nêu
      bước remind và `every` của nó ở #7245, trước đó là 1.340) và các dòng
      kiểm tra của một lần sửa là 735 byte (`MOST_REPAIR_BYTES`, trước là
      560), đủ chỗ cho nghĩa của cả sáu trigger. Bản hướng dẫn chỉ đi tới
@@ -234,7 +244,11 @@ sau:
      warning của `[ask]`; và các trigger theo cái vỗ đầu (`controls/pet`),
      không khí ngột ngạt (`air/state` `co2_ppm` trên một mức) và việc người
      ở bàn đang làm (`room/activity`: cúi đầu, ở bàn, nghiêng lại gần). Câu
-     nói lại được dài 240 ký tự (trước là 200).
+     nói lại được dài 240 ký tự (trước là 200), và với một bước say thì
+     thêm chính lời của nó, 540 (`MOST_SAY_PLAIN_CHARS`, #7245), nên lời dài
+     tới mức kỹ năng được nói vẫn được nói lại trọn vẹn, không bao giờ "too
+     long for one breath"; phần mô tả được giữ tối đa 940 ký tự (640 cộng
+     300 của say).
    - **Kỹ năng được nói** (#6055, chủ ứng dụng, 10/11: "Say hello when I
      sit down at my desk", ví dụ của chính ứng dụng, bị từ chối hoặc bị sửa
      thành một lệnh đèn; #6062, đúng nguyên văn lời của nó). `speak = true`
@@ -242,8 +256,37 @@ sau:
      mỗi kỹ năng, như `lamp-skills` nhận), một mình hoặc cạnh bước đèn và
      cử chỉ: đúng nguyên văn lời cần nói, do mô hình tạo kỹ năng viết bằng
      ngôn ngữ người dùng đã hỏi, và được nói đúng như đã viết. Chỉ có khóa
-     `text` (không `priority`, `expires` hay danh sách câu), một hoặc hai
-     câu ngắn, tối đa 120 ký tự (`made_skill::MOST_SAY_TEXT_CHARS`), không
+     `text` (không `priority`, `expires` hay danh sách câu), tối đa 300 ký
+     tự (`made_skill::MOST_SAY_TEXT_CHARS`; trước #7245 là 120, trong một
+     hoặc hai câu, mà tiếng Việt chạm tới rất nhanh), bao nhiêu câu cũng
+     được trong giới hạn đó: khoảng 20 giây nói ở tốc độ ~15 ký tự mỗi giây
+     của giọng nói, câu dài nhất mà bộ nhớ đệm giọng nói giữ. Bên dưới là
+     giới hạn byte (`made_skill::most_say_text_bytes`, khoảng 730): mức cả
+     hai tuyến mang trọn vẹn, 900 byte của dịch vụ say
+     (`say::MOST_WORDS_BYTES`) và, trên tuyến live, 1.024 byte của một lượt
+     viết (`lamp_gemini::wire::MAX_NOTE_BYTES`) trừ phần khung của câu say
+     tự tạo (`say::made_turn`). 300 chữ tiếng Việt viết bình thường, khoảng
+     1,4 byte mỗi chữ, là khoảng 410 byte; chỉ lời dày đặc chữ ba hoặc bốn
+     byte mới chạm giới hạn byte. Dài hơn thì bị từ chối, không bao giờ bị cắt, và được nói
+     rõ là quá dài kèm con số (`made_skill::say_too_long`): "what it would
+     say is too long, 340 characters, 40 more than the 300 a skill can say
+     at once; try it in fewer words"; lần sửa được báo y như vậy với giới
+     hạn trong gợi ý ("at most 300 characters"), và khi hết lượt sửa người
+     dùng nghe đúng lý do đó (`plain_reason`), bằng ngôn ngữ của họ. Trong
+     giới hạn ký tự mà vượt giới hạn byte cũng được nói rõ, kèm số byte.
+     Lời của bước remind cũng được kiểm tra ở đây, theo giới hạn của
+     lamp-skills (120 ký tự, 300 byte của lịch, `made_skill::remind_too_long`),
+     và được báo cùng cách ("what its reminder would say is too long, …"),
+     không chỉ bị từ chối lúc đóng gói. Phần mô tả trích nguyên văn câu say;
+     câu "I made" được nói ra (`made_skill::on_line`) trích nhiều nhất có
+     thể để ghi chú bằng ngôn ngữ của người dùng vẫn nằm trong 900 byte của
+     dịch vụ say (`made_skill::most_line_bytes`, `quote_cut_to_fit`: cắt ở
+     một từ, kết thúc bằng "…"; chính kỹ năng vẫn nói trọn lời), nên một
+     câu say tiếng Việt dài không bao giờ bị nói bằng tiếng Anh hay bị bỏ
+     qua (P2 của Heron và Twelve trên #7977). Câu nói lại người dùng nghe
+     trước khi kỹ năng bật trích lời đó, nên say dài hơn thì câu nói lại dài hơn (tối đa khoảng 12
+     giây nói nhiều hơn so với 120 ký tự), và chính lần chạy cũng nói lâu
+     hơn chừng ấy; không gì phải chờ nó trước khi câu nói lại bắt đầu. Không
      có dấu ngoặc kép, ngoặc «», ngoặc nhọn hay dấu backtick (không có
      template), không có địa chỉ web (`://`, `www.`, `http`) và không có ký
      tự điều khiển hay ký tự định dạng (`char::is_control` và Unicode Cf như
@@ -1079,7 +1122,7 @@ sau:
    dùng khi có người hỏi, với `LAMP_SCHEDULE_TOOLS=on` trong `lamp-actions`.
    Cần tên hàm đó trong `[permissions] actions`, kiểm tra lúc nạp và lại lúc
    gọi. `words` là chữ cố định của kỹ năng, không bao giờ do mô hình viết lúc
-   chạy, cùng giới hạn của câu nói trong kỹ năng tự tạo: tối đa 120 ký tự, một
+   chạy, cùng giới hạn của câu nói trong kỹ năng tự tạo như #6066 đặt: tối đa 120 ký tự (không tăng theo 300 của say ở #7245: lịch giữ chữ của lời nhắc trong tối đa 300 byte, `lamp_schedule::engine::MAX_TEXT_BYTES`, cũng được kiểm tra ở đây, `remind::MOST_WORDS_BYTES`, nên chữ mà lịch sẽ từ chối thì kỹ năng bị từ chối ngay lúc nạp), một
    hoặc hai câu, không địa chỉ web, không dấu ngoặc kép, ngoặc nhọn hay dấu
    backtick, không ký tự điều khiển hay định dạng; sai thì kỹ năng bị từ chối
    lúc nạp. Chỉ trong kỹ năng do trigger hoặc chính lời của nó (`asks`) khởi động, không
@@ -4261,7 +4304,7 @@ công tắc không đọc được. Câu của kỹ năng vừa tạo, nếu h�
 từ chối ngay như mọi câu nói, và kỹ năng vẫn bật.
 
 - `{"make": {"words", "request_id"}}`: chữ thành cùng bản hướng dẫn (tối đa
-  2.000 byte) và được mô hình của đèn tạo ngay trên một luồng riêng
+  2.000 ký tự) và được mô hình của đèn tạo ngay trên một luồng riêng
   (`make_skill_local::make_kept`, `app_make::make_here`), được ghi là tạo từ
   `local:app:<ms>:1`: `making`, rồi `on`, hoặc `not_kept` kèm lý do. Không
   tạo được (hoặc kỹ năng viết trong ứng dụng không giữ được), đèn cũng nói
@@ -4338,8 +4381,17 @@ hình nào viết hay viết lại một chữ (`made_skill::Written`,
    trường được cắt khoảng trắng hai đầu và giữ nguyên phần giữa
    (`Written::new`): tên bắt đầu bằng chữ thường, rồi chữ thường, số và
    `-`, tối đa 40 byte (để tên hàm vừa 48 byte của lamp-skills); `when` một
-   dòng, tối đa 200 byte; hướng dẫn là văn bản thường, chỉ có xuống dòng
-   và tab, tối đa 2.000 byte. Trống, quá dài hay không phải văn bản thường
+   dòng, tối đa 200 ký tự; hướng dẫn là văn bản thường, chỉ có xuống dòng
+   và tab, tối đa 2.000 ký tự (cả hai là byte trước #7245; tên là ASCII,
+   nên số byte bằng số chữ). Bên dưới có một giới hạn byte: hai trường đi
+   nguyên vẹn vào ghi chú cho mô hình mỗi lần gọi, `{"next": NOTE}`, mà
+   đường truyền chỉ mang về trong 4.096 byte trừ 16 của `tools::sendable`
+   và ghi chú của `use_skill`, nên câu trả lời đó tối đa 3.700 byte
+   (`MOST_WRITTEN_NOTE_BYTES`, như `knowledge::TOLD_MOST_BYTES` của
+   lamp-skills); lời dày đặc chữ ba byte vượt mức đó bị từ chối ngay khi
+   viết, kèm số byte ("when to use it and what the lamp should do are too
+   long together: …"), không bao giờ được giữ thành một kỹ năng mà mọi
+   lần gọi đều trả lời `unavailable`. Trống, quá dài hay không phải văn bản thường
    thì bị từ chối bằng lời dễ hiểu, trước khi ghi lại bất cứ gì. Đây là
    một yêu cầu của ứng dụng (`app.json`, cùng quy tắc request id, mỗi lần
    một yêu cầu cùng `make`), có `"written": true`, và câu trả lời là
@@ -4413,7 +4465,7 @@ chối khi cài.
    điều người dùng sẽ nói với đèn, theo cách nói lại với họ ("you're busy",
    tối đa 60 ký tự, một dòng), và `when`, khi nào dùng nó, bằng lời của họ
    ("when they say they're busy or in a meeting", giữ như `when` của kỹ năng
-   viết trong ứng dụng, một dòng tối đa 200 byte; thiếu "when " thì được
+   viết trong ứng dụng, một dòng tối đa 200 ký tự; thiếu "when " thì được
    thêm vào trước); và một bước `[[do]]`, `light = { colour }`, một màu của
    đèn, với `level` từ 1 đến 5 chỉ khi được yêu cầu. Không bước nào khác,
    không `[trigger]` và không `[ask]`. Mô hình được biết kỹ năng chưa thể

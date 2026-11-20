@@ -5,6 +5,7 @@ mod action_claim;
 mod after_forget;
 mod agent_tasks_named;
 mod app_triggers_in_code;
+mod care_turn;
 mod chat_second_try;
 mod checking_line;
 mod clash_note;
@@ -10108,6 +10109,7 @@ fn every_function_that_grants_or_keeps_for_someone_is_withheld_from_a_held_line(
                 name_learn_fix: false,
                 face_no_ask: false,
                 face_save_known_only: false,
+                face_question: false,
             },
         ))
         .chain(crate::photo_faces::tools())
@@ -19031,8 +19033,11 @@ async fn requested_music_through_the_installed_runner_keeps_its_offer_private() 
 async fn requested_audio_runner_preserves_news_until_engine_takes_out_its_key() {
     for make_skill in [false, true] {
         let directory = crate::process::SessionDirectory::create().unwrap();
-        let peer = music_tool_peer(&directory.path.join("request.sock"), 3, |asked| {
+        // A lamp-tasks before #7930's work records: `work_list` refused as
+        // a line it can't read, then today's three reads.
+        let peer = music_tool_peer(&directory.path.join("request.sock"), 4, |asked| {
             match asked["op"].as_str().unwrap() {
+                "work_list" => json!({"ok":false,"error":"bad_request"}),
                 "list" => {
                     json!({"ok":true,"store_id":"music-news-fixture","items":[{"id":2,"dispatch":{"state":"accepted"}}]})
                 }
@@ -19121,7 +19126,7 @@ async fn requested_audio_runner_preserves_news_until_engine_takes_out_its_key() 
             .await
             .unwrap()
             .unwrap();
-        assert_eq!(seen.len(), 3);
+        assert_eq!(seen.len(), 4);
         assert!(
             seen.iter()
                 .all(|asked| asked.get("requested_audio_context").is_none())

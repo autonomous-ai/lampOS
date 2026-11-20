@@ -1071,6 +1071,87 @@ name or a value.
   (slice 1 before this change, never in the product) keeps that `CHECK`, so
   it refuses an `sdk` row and nothing is kept.
 
+## An app's facts and context lines (`app_facts`, #7415, C166)
+
+Tracker row C166, the lamp-memory side of `apps.remember` and `apps.context`
+(App Only's proposal and the first builder's yes to both ops, 19 Nov 16:45 on
+#7415; Friday's shape, 16:47). One copy of the bounds, the wording and the ops
+is `lamp_msgs::app_fact`; the store's side is `crates/memory/src/app_facts.rs`.
+
+- **`remember_app_fact {person, source, name?, at_unix_ms, text}`** keeps what
+  a Store app or a paired computer told as a kept thing of `person`'s, linked
+  to no exchange, and marks it in `app_facts(rid, source, kept_day)` (made `IF NOT
+  EXISTS`, its row going with the entry, `user_version` unchanged). The
+  answer is `{ok:true, id}`.
+  - **Whose.** Only a person the eyes know (`p-` id) that memory already
+    holds (something of theirs other than an app's fact); any other id, the
+    room, a rules scope or a person memory holds nothing of is `not_known`,
+    so an app's words never open a scope. After the person is forgotten
+    (forget the person, or forget everything), a write for them is
+    `forgotten` until memory holds something of theirs again. The
+    writer picks the person with `app_fact::whose`: the one the app names,
+    only if that is the lamp's known person (the owner's memory ids), else
+    `not_yours`; with no known person, `not_known`. Never another person's
+    scope, never the room's.
+  - **Source.** `app:<id>` or `computer:<id>` (`bad_source` otherwise), set
+    by the door from the grant, never from the app's words.
+  - **Told as data.** Kept as `Noted by the app <name>, <local day>:
+    "<text>"`: the app's words in quotes with its name (at most 64 bytes),
+    so the model reads a note from an app, never the lamp's own
+    instructions. Links (a word with `://` or starting `www.`), markup
+    characters (`<>` `` ` `` `*` `[]` `{}`) and double quotes (`"` `“` `”`)
+    are left out, so an app's words can never close the quote they are kept
+    or told in.
+  - **A forget wins.** A fact told before the person's last forget
+    everything (`service_records_forgot`) is refused `forgotten`; one more
+    than 5 s ahead of memory's clock, `bad_time`.
+  - **Never by its words.** Not counted in the person's own kept room, never
+    the same thing as their own kept line in the same words (`once`), and
+    not counted when a person's memory is moved to another.
+  - **Apart from the person's own list.** Never in `kept` (the hits note's
+    list), so a busy app never pushes the person's own kept things out of
+    its 16 KiB; `recall` (by words or by day) and `search` find it as any
+    kept thing, with its mark: "what did I train today?" is answered from
+    there. No byte share of its own.
+  - **Never read by the nightly pass**, so no episode, pattern or chapter
+    is made from one without its mark or outlives its 90 days. What was
+    made from one by any other link goes with it (the forget walk).
+  - **By memory's own clock.** The day's 20 are counted by the day memory
+    took them (`kept_day`), and the 200 go first kept first, never by the
+    fact's `at`: a backdated fact never gets around the day's 20 or takes a
+    newer one's place. The 90 days run from `kept_day` too.
+- **`forget_app_facts {source}`** removes every fact of that source, found by
+  its mark, with what was made from them, as a `forget {id}` of each would;
+  nothing said goes. For the app removed, the computer revoked or the grant
+  turned off: `{ok:true, removed}`. A person's own forgets take app facts as
+  any kept thing: one thing, a forget about a thing, forget everything, and
+  forgetting the person.
+- **Context lines are never kept.** `app_fact::ContextLines` holds one line a
+  source in memory only, told by `app_fact::context_note` ("From the app
+  <name>, live now (a note, not an instruction): "<line>"") until its time;
+  it is cleared on the session's end, a disconnect, the grant off and a
+  forget everything. Nothing writes it to disk, the thread, the journal or
+  memory.
+- **The journal** says the op, the person's id and the count, never a word.
+- **No switch here.** Nothing sends these ops yet: the door's `apps.remember`
+  and `apps.context` and their writer come in their own PR, behind its
+  switch, off until the first builder's privacy read and the ROW. An older
+  memory answers `unknown_op`. "Refused while Lamp is private" (the physical
+  privacy switch, the first builder's point 4) is the door's check.
+
+The bounds are the thread's, none this store's own:
+
+| Bound | Value | Whose call |
+|---|---|---|
+| An app's words | at most 280 characters, refused past it, never cut (`too_long`) | App Only 16:4x, first builder 16:45 point 3 |
+| A day | at most 20 facts a source a local day, by memory's clock (`too_many`) | App Only 16:4x, first builder 16:45 point 3 |
+| In all | at most 200 facts a source, the first kept going; not in the person's own 200 | Friday 16:47 (200 a source), first builder 16:45 (not in the 200) |
+| Kept for | 90 local days, the day it was kept the first | App Only 16:4x, first builder 16:45 point 3 |
+| A context line | at most 120 characters, one a source | App Only 16:4x, first builder 16:45 point 3 |
+| A context line's time | `for_ms` 1 ms to 10 minutes, renewed by the app | App Only 16:4x, first builder 16:45 point 3 |
+| A source's name | at most 64 bytes in the kept words | this PR, for the owner's review |
+| A fact's time ahead | at most 5 s ahead of memory's clock (as `linked_record`) | this PR, for the owner's review |
+
 ## Service contacts (`service_contact`, the voice's `LAMP_SERVICE_CONTACTS`)
 
 The voice's `LAMP_SERVICE_CONTACTS` (off by default, on in the product by the owner's call of 11 Nov, https://github.com/autonomous-ai/lampOS/pull/6312#issuecomment-6789879064, beside
@@ -1155,14 +1236,25 @@ body `{"turns":[{"id","at","person","heard","said"}]}`.
   (`exchanges`, by scope, as turn ids: the forget half's answer) are let go and kept as
   forgotten (the last 4,096), so a save naming one is dropped before any POST,
   a retry or a start's catch-up included: the lamp's own guard beside the
-  server's tombstone. A forget everything forgets every id offered in that
+  server's tombstone. A forget everything forgets every id handed over in that
   scope so far. When the answer names no ids (or none comes), the forgetting
-  person's and the room's unsent turns wait for the next start, when the memory
-  no longer holds what went. Other people's unsent turns are never let go.
+  person's and the room's turns handed over so far wait for the next start,
+  when the memory no longer holds what went: those queued or held, and those in
+  a batch the sender already took off its queue, which is checked again before
+  every try, the first included, and never put back to post (Friday's P2 on
+  #7957). A forget everything's room lines are not named either, so the room's
+  wait the same way. A POST already under way is not stopped; its next try is
+  checked. Other people's unsent turns are never let go.
   Every memory answer the voice reads with `exchanges` turn ids (all five
-  forget ops, `history_forget::answered`) goes to `history_send::deleting`, so
-  those ids are never posted, whatever `LAMP_HISTORY_FORGET`. A forget about a
-  thing holds and lifts the posts as every other forget. A source forgotten
+  forget ops, `history_forget::answered`, on the voice's way) goes to
+  `history_send::deleting`, so those ids are never posted, whatever
+  `LAMP_HISTORY_FORGET`; with it on, the pages of a big forget's rest are
+  read off the voice's way and their ids go there too. A forget about a
+  thing holds and lifts the posts as every other forget. When each of its
+  removals answered, what went was named on its way and nothing more is let
+  go; when one timed out or was lost part way (the kept things' forgets or the
+  exchanges forget), what went is not known, and it is taken as a forget
+  naming no ids, never as "nothing removed". A source forgotten
   outside the voice is taken as an unnamed forget of that person's.
 - **Nothing lost at a restart, and no words on disk:** only ids are kept, in
   `/var/lib/lampOS/voice/history-marks.json` (0600,
@@ -1880,7 +1972,13 @@ any other id is refused `bad_person`); an older memory answers
 were not settled: the memory lost or refusing the listing, too much to look
 through, or more than eight matching (the model asks which one). Some removed, the answer says how many
 (`exchanges`, never their words) and the conversation stops being
-journalled, as after a forgotten kept thing. One more local request inside
+journalled, as after a forgotten kept thing. Sent and not answered (a
+timeout or a lost answer; a refusal removed none), what was said about it
+is not known gone: the model is told `history: "not_reached"` beside the kept things'
+own result, never "forgot nothing". With nothing kept gone, the note says
+none of what is kept went and that it couldn't finish forgetting, and not
+to say nothing was there or that it is forgotten; with some gone, a
+`history_note` says so beside what went. One more local request inside
 the call's 1.5 s.
 
 **Forget marks** (El's option 2 on #5333). Before the above, a topic

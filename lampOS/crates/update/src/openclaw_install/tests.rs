@@ -23,6 +23,8 @@ struct Fake {
     reloads_fail: usize,
     /// How many times the gateway's loaded unit was shown.
     shown: usize,
+    /// The gateway's own `ActiveState` (#8105), when a test reads it.
+    gateway: Option<&'static str>,
 }
 
 /// The gateway's unit loaded as written, the gateway stopped.
@@ -33,6 +35,17 @@ const LOADED_AS_WRITTEN: &str = "DropInPaths=\n\
 
 impl Systemd for Fake {
     fn states(&mut self, units: &[String]) -> Result<Vec<UnitState>, String> {
+        if units == [UNIT] {
+            let active = self
+                .gateway
+                .expect("the gateway's state read with none set");
+            self.asked.push("gateway-state");
+            return Ok(vec![UnitState {
+                unit: UNIT.to_owned(),
+                active: active.to_owned(),
+                ..UnitState::default()
+            }]);
+        }
         let active = self.active.expect("only the watch asks a unit's state");
         assert_eq!(units, [harness_install::UNIT]);
         self.asked.push("state");
@@ -2915,4 +2928,269 @@ fn a_gateway_unit_loaded_as_written_is_left_alone() {
     assert_eq!(systemd.shown, 1, "checked once");
     assert!(systemd.asked.is_empty(), "{:?}", systemd.asked);
     assert!(not_loaded(&said).is_empty(), "{said:?}");
+}
+
+/// #8105: lamp-tasks' answer read, and the rule: the switch off is always
+/// wanted; on, only `openclaw` is wanted, another default is not, and no
+/// answer or no default leaves the gateway as it is.
+#[test]
+fn the_gateway_is_wanted_only_while_openclaw_is_the_lamps_agent() {
+    assert_eq!(
+        default_of(r#"{"ok":true,"default":"openclaw","chosen_in_app":true}"#),
+        Some(Some("openclaw".to_owned()))
+    );
+    assert_eq!(
+        default_of(r#"{"ok":true,"default":"hermes","chosen_in_app":false}"#),
+        Some(Some("hermes".to_owned()))
+    );
+    assert_eq!(default_of(r#"{"ok":true,"default":null}"#), Some(None));
+    assert_eq!(default_of(r#"{"ok":true,"default":" "}"#), Some(None));
+    assert_eq!(default_of(r#"{"ok":false,"error":"busy"}"#), None);
+    assert_eq!(default_of("not json"), None);
+
+    let said = |engine: &str| Some(Some(engine.to_owned()));
+    assert_eq!(gateway_wanted(false, said("hermes")), Gateway::Wanted);
+    assert_eq!(gateway_wanted(false, None), Gateway::Wanted);
+    assert_eq!(gateway_wanted(true, said("openclaw")), Gateway::Wanted);
+    assert_eq!(gateway_wanted(true, said("hermes")), Gateway::NotWanted);
+    assert_eq!(gateway_wanted(true, said("claude")), Gateway::NotWanted);
+    assert_eq!(gateway_wanted(true, Some(None)), Gateway::Unknown);
+    assert_eq!(gateway_wanted(true, None), Gateway::Unknown);
+}
+
+/// #8105: lamp-tasks asked on its app socket as lamp-cloud asks it, one
+/// line each way; nothing listening is no answer.
+#[test]
+fn lamp_tasks_is_asked_for_the_default_on_its_app_socket() {
+    use std::io::{BufRead, BufReader, Write};
+    let folder = tempfile::tempdir().unwrap();
+    let socket = folder.path().join("app.sock");
+    assert_eq!(said_default(&socket), None, "nobody listening");
+    let listener = std::os::unix::net::UnixListener::bind(&socket).unwrap();
+    let served = std::thread::spawn(move || {
+        let (stream, _) = listener.accept().unwrap();
+        let mut line = String::new();
+        BufReader::new(&stream).read_line(&mut line).unwrap();
+        (&stream)
+            .write_all(b"{\"ok\":true,\"default\":\"hermes\",\"chosen_in_app\":false}\n")
+            .unwrap();
+        line
+    });
+    assert_eq!(said_default(&socket), Some(Some("hermes".to_owned())));
+    assert_eq!(
+        served.join().unwrap(),
+        "{\"op\":\"app_engine_default_state\"}\n"
+    );
+}
+
+/// #8105: a round with OpenClaw there that doesn't want the gateway
+/// disables and stops it and never starts it; unknown leaves it as it is;
+/// wanted again enables and starts it.
+#[test]
+fn a_round_on_a_lamp_whose_agent_is_not_openclaw_stops_the_gateway() {
+    let lamp = Lamp::new();
+    lamp.harness_there();
+    round(&lamp, &mut Fake::default(), true, 1);
+    let runs = Runs::new(&lamp);
+    assert_eq!(install(&lamp, &runs, 2).unwrap().install, "installed");
+    let mut systemd = Fake::default();
+    round(&lamp, &mut systemd, true, 3);
+    assert!(
+        fs::symlink_metadata(lamp.at(WANTS)).is_ok(),
+        "enabled as before"
+    );
+
+    let at = |systemd: &mut Fake, gateway: Gateway, runs: &Runs, at: u64| {
+        after_round_with(
+            lamp.root(),
+            &lamp.records(),
+            sk(true),
+            gateway,
+            systemd,
+            &mut runs.runner(),
+            at,
+            Ok(crate::hermes_schedule::Window::Reached),
+            &mut quiet(),
+        )
+    };
+    let mut systemd = Fake {
+        gateway: Some("active"),
+        ..Fake::default()
+    };
+    let runs = Runs::new(&lamp);
+    at(&mut systemd, Gateway::NotWanted, &runs, 4);
+    assert!(
+        fs::symlink_metadata(lamp.at(WANTS)).is_err(),
+        "not started at boot"
+    );
+    assert!(
+        systemd.asked.contains(&"stop-gateway"),
+        "{:?}",
+        systemd.asked
+    );
+    assert!(
+        !systemd.asked.contains(&"start-gateway"),
+        "{:?}",
+        systemd.asked
+    );
+    assert!(
+        !runs.lines().iter().any(|line| line.contains("approvals")),
+        "nothing goes through a gateway that is stopped: {:?}",
+        runs.lines()
+    );
+
+    // Unknown: left as it is, nothing asked of the gateway.
+    let mut systemd = Fake::default();
+    at(&mut systemd, Gateway::Unknown, &Runs::new(&lamp), 5);
+    assert!(fs::symlink_metadata(lamp.at(WANTS)).is_err());
+    assert!(
+        !systemd.asked.iter().any(|asked| asked.contains("gateway")),
+        "{:?}",
+        systemd.asked
+    );
+
+    // Wanted again (OpenClaw chosen): enabled and started.
+    let mut systemd = Fake::default();
+    at(&mut systemd, Gateway::Wanted, &Runs::new(&lamp), 6);
+    assert!(fs::symlink_metadata(lamp.at(WANTS)).is_ok());
+    assert!(
+        systemd.asked.contains(&"start-gateway"),
+        "{:?}",
+        systemd.asked
+    );
+}
+
+/// #8105: between rounds, each [`KEEP_EVERY`]: a gateway already as wanted
+/// is left with no word and no systemctl but its state; one that isn't is
+/// started or stopped, and said once.
+#[test]
+fn between_rounds_the_gateway_follows_the_lamps_agent_and_is_quiet_when_settled() {
+    let lamp = Lamp::new();
+    lamp.harness_there();
+    round(&lamp, &mut Fake::default(), true, 1);
+    let runs = Runs::new(&lamp);
+    assert_eq!(install(&lamp, &runs, 2).unwrap().install, "installed");
+    round(&lamp, &mut Fake::default(), true, 3);
+    let keep = |gateway: Gateway, state: &'static str| {
+        let mut systemd = Fake {
+            gateway: Some(state),
+            active: Some("inactive"),
+            ..Fake::default()
+        };
+        let mut said = Vec::new();
+        keep_between_rounds(
+            lamp.root(),
+            &mut systemd,
+            gateway,
+            false,
+            &mut Runs::new(&lamp).runner(),
+            &mut |line: &str| said.push(line.to_owned()),
+        );
+        (systemd.asked, said)
+    };
+    // OpenClaw the agent, the gateway up and enabled: nothing done.
+    let (asked, said) = keep(Gateway::Wanted, "active");
+    assert_eq!(asked, ["state", "gateway-state"]);
+    assert!(said.is_empty(), "{said:?}");
+    // Hermes chosen: disabled and stopped, said.
+    let (asked, said) = keep(Gateway::NotWanted, "active");
+    assert!(asked.contains(&"stop-gateway"), "{asked:?}");
+    assert!(fs::symlink_metadata(lamp.at(WANTS)).is_err());
+    assert!(said.iter().any(|line| line.contains("stopped")), "{said:?}");
+    // Settled down: nothing more.
+    let (asked, said) = keep(Gateway::NotWanted, "inactive");
+    assert_eq!(asked, ["state", "gateway-state"]);
+    assert!(said.is_empty(), "{said:?}");
+    // lamp-tasks not reached: left down.
+    let (asked, _) = keep(Gateway::Unknown, "inactive");
+    assert_eq!(asked, ["state", "gateway-state"]);
+    assert!(fs::symlink_metadata(lamp.at(WANTS)).is_err());
+    // OpenClaw chosen in the app: enabled and started, said.
+    let (asked, said) = keep(Gateway::Wanted, "inactive");
+    assert!(asked.contains(&"start-gateway"), "{asked:?}");
+    assert!(fs::symlink_metadata(lamp.at(WANTS)).is_ok());
+    assert!(said.iter().any(|line| line.contains("started")), "{said:?}");
+    // Harness's one-shot at work: the gateway is left to it.
+    let mut systemd = Fake {
+        gateway: Some("active"),
+        active: Some("activating"),
+        ..Fake::default()
+    };
+    keep_between_rounds(
+        lamp.root(),
+        &mut systemd,
+        Gateway::NotWanted,
+        false,
+        &mut Runs::new(&lamp).runner(),
+        &mut quiet(),
+    );
+    assert_eq!(systemd.asked, ["state"]);
+    assert!(fs::symlink_metadata(lamp.at(WANTS)).is_ok());
+}
+
+/// Twelve's P2 on #8116: a gateway started between rounds because OpenClaw
+/// became the lamp's agent gets agent `main`'s entry added at once with the
+/// one run path on, through the running gateway; settled, nothing is run.
+#[test]
+fn a_gateway_started_for_openclaw_gets_agent_mains_entry_at_once() {
+    let lamp = Lamp::new();
+    lamp.harness_there();
+    tasks_there(&lamp, TASKS_BYTES);
+    let mut systemd = Fake::default();
+    round_shown(&lamp, &mut systemd, one_path());
+    install(&lamp, &Runs::new(&lamp), 20).unwrap();
+    let mut idle = Fake {
+        gateway: Some("active"),
+        active: Some("inactive"),
+        ..Fake::default()
+    };
+    keep_between_rounds(
+        lamp.root(),
+        &mut idle,
+        Gateway::NotWanted,
+        true,
+        &mut Runs::new(&lamp).runner(),
+        &mut quiet(),
+    );
+    assert!(fs::symlink_metadata(lamp.at(WANTS)).is_err());
+
+    let runs = Runs::new(&lamp);
+    let mut down = Fake {
+        gateway: Some("inactive"),
+        active: Some("inactive"),
+        ..Fake::default()
+    };
+    keep_between_rounds(
+        lamp.root(),
+        &mut down,
+        Gateway::Wanted,
+        true,
+        &mut runs.runner(),
+        &mut quiet(),
+    );
+    assert!(down.asked.contains(&"start-gateway"), "{:?}", down.asked);
+    assert_eq!(
+        approvals(&runs),
+        [approvals_line("add", "main", SKILL_START)]
+    );
+
+    let runs = Runs::new(&lamp);
+    let mut up = Fake {
+        gateway: Some("active"),
+        active: Some("inactive"),
+        ..Fake::default()
+    };
+    keep_between_rounds(
+        lamp.root(),
+        &mut up,
+        Gateway::Wanted,
+        true,
+        &mut runs.runner(),
+        &mut quiet(),
+    );
+    assert_eq!(
+        approvals(&runs),
+        Vec::<String>::new(),
+        "settled: nothing run"
+    );
 }

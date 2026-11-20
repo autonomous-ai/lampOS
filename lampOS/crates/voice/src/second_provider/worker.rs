@@ -1837,6 +1837,95 @@ pub(crate) fn audio_answering_weather(
     })
 }
 
+/// The model's `start_app` (#7415): told to the app the manifest's own
+/// trigger belongs to, and answered whether it took it. Blocking up to the
+/// hold, so off the runtime's thread.
+async fn app_start_answer(
+    start: &crate::app_triggers::AppStart,
+    request: u64,
+    args: &serde_json::Value,
+) -> serde_json::Value {
+    let (apps, args) = (start.0.clone(), args.clone());
+    tokio::task::spawn_blocking(move || {
+        crate::app_triggers::start_app_answer(&*apps, request, &args)
+    })
+    .await
+    .unwrap_or_else(|_| crate::tools::unavailable())
+}
+
+/// [`answering_weather`], for `start_app`, with the apps' bus on.
+pub(crate) fn answering_app_start(
+    runner: ToolRunner,
+    start: Option<crate::app_triggers::AppStart>,
+) -> ToolRunner {
+    let Some(start) = start else {
+        return runner;
+    };
+    Arc::new(move |request, heard, name, args| {
+        if name != crate::app_triggers::START_APP {
+            return runner(request, heard, name, args);
+        }
+        let start = start.clone();
+        Box::pin(async move { app_start_answer(&start, request, &args).await })
+    })
+}
+
+/// [`answering_app_start`] for the runner with the admitted request's memory
+/// authority: the call needs none.
+pub(crate) fn scoped_answering_app_start(
+    runner: crate::second_provider::ScopedToolRunner,
+    start: Option<crate::app_triggers::AppStart>,
+) -> crate::second_provider::ScopedToolRunner {
+    let Some(start) = start else {
+        return runner;
+    };
+    Arc::new(move |request, heard, name, args, scope| {
+        if name != crate::app_triggers::START_APP {
+            return runner(request, heard, name, args, scope);
+        }
+        let start = start.clone();
+        Box::pin(async move { app_start_answer(&start, request, &args).await })
+    })
+}
+
+/// [`answering_app_start`] for a spoken request's private audio runner: the
+/// call offers no audio.
+pub(crate) fn audio_answering_app_start(
+    runner: super::RequestedAudioRunner,
+    start: Option<crate::app_triggers::AppStart>,
+) -> super::RequestedAudioRunner {
+    let Some(start) = start else {
+        return runner;
+    };
+    Arc::new(move |context, call, scope| {
+        if call.name != crate::app_triggers::START_APP {
+            return runner(context, call, scope);
+        }
+        let start = start.clone();
+        Box::pin(async move {
+            crate::tools::ToolAnswer::plain(
+                app_start_answer(&start, context.request, &call.args).await,
+            )
+        })
+    })
+}
+
+/// Spoken turns are offered `start_app` with the apps running now: asked at
+/// each chat request, so an app that stops is never offered, and none is
+/// offered with no app running (#7415).
+fn with_app_start(
+    declare: crate::second_provider::net::Declare,
+    apps: Arc<dyn crate::app_triggers::Apps>,
+) -> crate::second_provider::net::Declare {
+    Arc::new(move || {
+        let mut tools = declare();
+        if let Some(start) = crate::app_triggers::start_app_tool(&apps.running()) {
+            tools.push(start);
+        }
+        tools
+    })
+}
+
 /// [`answered_here`] with the weather's call too when it is on: a lookup,
 /// never the lamp's action, so the Policy never holds it.
 pub(crate) fn answered_here_with_weather(
@@ -2660,6 +2749,21 @@ pub fn serve(
     // A forget called unasked is held for their yes (`LAMP_FORGET_ASKED`):
     // the forget functions say so to spoken turns.
     let spoken_declare = with_held_forgets(spoken_declare);
+    // The apps running offer their triggers to the model as one function
+    // (`LAMP_APP_TRIGGERS`, #7415): the model judges whether a line means
+    // one, in any language; a bare trigger never reaches it.
+    let app_taker = crate::app_triggers::on()
+        .then(|| {
+            files
+                .bus_root
+                .as_deref()
+                .and_then(crate::app_triggers::AppTaker::start)
+        })
+        .flatten();
+    let spoken_declare = match &app_taker {
+        Some(taker) => with_app_start(spoken_declare, taker.clone()),
+        None => spoken_declare,
+    };
     let spoken_declare = if they_apply {
         while_they_apply(spoken_declare)
     } else {
@@ -3419,20 +3523,32 @@ pub fn serve(
     let remember_speaker = tools.remember_speaker;
     // The weather's call is answered before any of these, as the search's
     // is inside them, with LAMP_SECOND_WEATHER=on.
+    let app_start = app_taker
+        .clone()
+        .map(|taker| crate::app_triggers::AppStart(taker));
     let audio_runner = tools.requested_audio.then(|| {
-        audio_answering_weather(
-            requested_audio_runner(tools.clone(), search.clone(), early.clone(), policed),
-            weather.clone(),
+        audio_answering_app_start(
+            audio_answering_weather(
+                requested_audio_runner(tools.clone(), search.clone(), early.clone(), policed),
+                weather.clone(),
+            ),
+            app_start.clone(),
         )
     });
-    let runner = answering_weather(
-        tool_runner(tools, search.clone(), early.clone(), policed),
-        weather.clone(),
+    let runner = answering_app_start(
+        answering_weather(
+            tool_runner(tools, search.clone(), early.clone(), policed),
+            weather.clone(),
+        ),
+        app_start.clone(),
     );
     // The same calls with the admitted request's memory authority (#1794).
-    let scoped_runner = scoped_answering_weather(
-        scoped_tool_runner(scoped_settings, search.clone(), early.clone(), policed),
-        weather,
+    let scoped_runner = scoped_answering_app_start(
+        scoped_answering_weather(
+            scoped_tool_runner(scoped_settings, search.clone(), early.clone(), policed),
+            weather,
+        ),
+        app_start,
     );
     let system: crate::second_provider::System = Arc::new(system);
     // The relay's routes, asked on the runtime below (#2882).
@@ -3903,6 +4019,31 @@ pub fn serve(
     } else {
         None
     };
+    // A name confirmed this session reused for the same near face's save
+    // (`LAMP_FACE_QUESTION_NOT_ASK`, lamp-74ff 19 Nov): the faces read
+    // above, or a reader of its own.
+    let _track_reader = if crate::known_faces::face_question_not_ask_on() {
+        let mut reader = None;
+        let eyes = enrollment_eyes
+            .clone()
+            .or_else(|| wordless_eyes.clone())
+            .or_else(|| {
+                files.bus_root.as_deref().and_then(|root| {
+                    let eyes = Arc::new(crate::speaking_faces::SpeakingFaces::default());
+                    reader = Some(crate::speaking_faces::read_from(eyes.clone(), root)?);
+                    Some(eyes)
+                })
+            });
+        if eyes.is_none() {
+            eprintln!(
+                "lamp-voice second: a confirmed name is not reused for a face save: no faces to read (LAMP_FACE_QUESTION_NOT_ASK)"
+            );
+        }
+        crate::known_faces::sees_tracks_with(eyes);
+        reader
+    } else {
+        None
+    };
     engine = engine.asking_wordless_only_seen_speaking(wordless_eyes);
     engine = engine.remembering_speaker(remember_speaker, enrollment_eyes);
     if let (Some(early), Some(search)) = (early, search) {
@@ -4087,6 +4228,21 @@ pub fn serve(
         );
         engine = engine.holding_own_echo(true);
     }
+    // `LAMP_CARE_LINE` (#7689): words of self-harm answered with care, and
+    // the fixed care line for the lamp's region and language after it.
+    if crate::care_line::on_from_environment() {
+        let language =
+            crate::language::from_environment().map_or("en", crate::language::Language::code);
+        // Where the lamp is is read again at each line: setup's time zone
+        // may be set after the worker starts.
+        let care =
+            crate::care_line::Care::reading(crate::care_line::CareLines::installed(), language);
+        eprintln!(
+            "lamp-voice second: words of self-harm are answered with care and the care line for region {} in {language} (LAMP_CARE_LINE)",
+            care.region().as_deref().unwrap_or("not known")
+        );
+        engine = engine.caring(Some(std::sync::Arc::new(care)));
+    }
     // A spoken turn's chat begun on the line's early words (#1712).
     if std::env::var(crate::second_provider::PREPARED_ENVIRONMENT)
         .ok()
@@ -4258,6 +4414,7 @@ pub fn serve(
         // And a heard whole plain yes to it starts it in code, before the
         // chat round (#7027).
         let yes_place = place.clone();
+        let work_place = place.clone();
         engine = engine.declining_a_task_waiting(Arc::new(move |request, words: &str| {
             crate::agent_tasks::declined(&place, request, words)
         }));
@@ -4266,6 +4423,16 @@ pub fn serve(
                 crate::agent_tasks::yes_taken(&yes_place, request, words, person)
             },
         ));
+        // And while work it handed over is open, each turn is told so in
+        // one line (#7930).
+        engine = engine.noting_open_work(Arc::new(move |request| {
+            crate::agent_tasks::open_work_note(
+                &work_place,
+                &crate::task_news::told_file(),
+                crate::agent_tasks::OPEN_WORK_DEADLINE,
+                request,
+            )
+        }));
     }
     // The last hour of what the lamp did, and why (#7757, LAMP_DID_KEEP, off):
     // kept in memory for the look-up; nothing is read or kept off.
@@ -4288,11 +4455,11 @@ pub fn serve(
     // A line that is a whole trigger of a running app is taken by that app
     // (#7415 piece 6, LAMP_APP_TRIGGERS, off).
     if crate::app_triggers::on() {
-        match files
-            .bus_root
-            .as_deref()
-            .and_then(crate::app_triggers::line_taker)
-        {
+        match app_taker
+            .clone()
+            .map(|taker| -> crate::second_provider::AppLine {
+                Arc::new(move |request, line| taker.take_line(request, line))
+            }) {
             Some(take) => {
                 eprintln!(
                     "lamp-voice second: a final line that is a running app's trigger is told to it and ends there when it takes it ({})",
@@ -4835,6 +5002,20 @@ pub fn serve(
             );
             if let Ok(mut heeding) = heeding.lock() {
                 heeding.attention.ask_a_second_sign_of_the_name(true);
+            }
+        }
+        // A second sign belongs to its hearing (`LAMP_NAME_SIGN_TIED=on`,
+        // #8092): `LAMP_NAME_NEAR`'s "not the name" wins, and closeness
+        // counts only while a sure hearing was said.
+        if std::env::var(crate::second_provider::NAME_SIGN_TIED_ENVIRONMENT)
+            .is_ok_and(|value| value == "on")
+        {
+            eprintln!(
+                "lamp-voice second: a second sign must belong to the name's hearing: a line LAMP_NAME_NEAR ruled not the name counts it by none, and said close counts only while a hearing of {} or more was said (LAMP_NAME_SIGN_TIED)",
+                crate::attention::NEAR_SCORE
+            );
+            if let Ok(mut heeding) = heeding.lock() {
+                heeding.attention.tie_the_second_sign(true);
             }
         }
         // A hearing at the line's start is no second sign of its own on a
@@ -5505,6 +5686,14 @@ pub fn serve(
                             heeding.turned_to_the_lamp(window),
                         )
                     })
+                }));
+                // Its "not the name" is told to the rule, which with
+                // `LAMP_NAME_SIGN_TIED=on` counts no second sign for it.
+                let ruled = heeding.clone();
+                engine = engine.telling_near_not_the_name(Arc::new(move |request| {
+                    if let Ok(mut heeding) = ruled.lock() {
+                        heeding.attention.near_not_the_name(request);
+                    }
                 }));
                 // A first word said as a sentence of its own is the name by
                 // the near hearing alone (`LAMP_NAME_AS_A_SENTENCE`, #5277).
@@ -7948,6 +8137,13 @@ pub(crate) struct Heeding {
     /// With it, `LAMP_BUSY_NO_FACE_RENEWS=on`
     /// ([`Self::renewing_no_face_follow_ups`]).
     no_face_renews: bool,
+    /// `LAMP_NAME_SIGN_TIED` (#8092): the request `LAMP_SAID_TO_ME` let out
+    /// as the one answer with no look to the lamp's waiting question
+    /// ([`crate::said_to_me::Said::AnswerNoLook`]): its answer renews
+    /// nothing. And whether that answer was played since the last line
+    /// played with a look or the name.
+    no_look_answer: Option<u64>,
+    look_free_used: bool,
     /// With it, the request let out as the caller's own follow-up
     /// ([`FOLLOW_UP_NOTE`]).
     follow_up_line: Option<u64>,
@@ -8903,6 +9099,49 @@ const NAMES_READ: usize = 64;
 /// this long before the line's first sound, which holds the sound read
 /// before the line was taken ([`Heeding::near_name`]).
 const NEAR_BEFORE_US: u64 = 300_000;
+/// `LAMP_NAME_SIGN_TIED` ([`near_at_a_hearing`]): the room microphone's rise
+/// counts for a hearing of the name from this long before the hearing
+/// began, which lamp-name dates as the name ends ("Hey Lamp, …" heard about
+/// 1.06 s after it was played on lamp-4ace, `attention::NAME_AT_THE_START_US`).
+// ponytail: from the one played greeting the line's start is set from; set
+// again from the journal once tied lines are read on a lamp.
+const NEAR_BEFORE_THE_HEARING_US: u64 = 1_500_000;
+/// And to this long after the hearing began: a level is read every
+/// [`LEVEL_EVERY`].
+const NEAR_AFTER_THE_HEARING_US: u64 = 300_000;
+
+/// `LAMP_NAME_SIGN_TIED` (#8092): whether the room microphone rose
+/// [`crate::attention::near_rise_db`] or more over its quiet while a
+/// hearing of the name of [`crate::attention::NEAR_SCORE`] or more, one
+/// that counts for the line in `began..=ended`, was said
+/// ([`NEAR_BEFORE_THE_HEARING_US`], [`NEAR_AFTER_THE_HEARING_US`]). On
+/// lamp-74ff (build 14967) a 21 s line's hearing 15 s in counted by a rise
+/// anywhere in the line. No levels: no.
+fn near_at_a_hearing(
+    levels: Option<&Levels>,
+    names: &[(u64, f32)],
+    (began, ended): (u64, u64),
+) -> bool {
+    let Some(levels) = levels.and_then(|levels| levels.lock().ok()) else {
+        return false;
+    };
+    let bar = crate::attention::near_rise_db();
+    names
+        .iter()
+        .filter(|(at, score)| {
+            *score >= crate::attention::NEAR_SCORE
+                && at.saturating_add(crate::attention::NAME_BEFORE_US) >= began
+                && *at <= ended
+        })
+        .any(|(at, _)| {
+            let from = at.saturating_sub(NEAR_BEFORE_THE_HEARING_US);
+            let until = at.saturating_add(NEAR_AFTER_THE_HEARING_US);
+            levels
+                .iter()
+                .any(|(level_at, rise)| (from..=until).contains(level_at) && *rise >= bar)
+        })
+}
+
 /// Near hearings are kept this long, and at most this many.
 const NEAR_KEPT_US: u64 = 30_000_000;
 const NEAR_HEARINGS_KEPT: usize = 32;
@@ -9046,6 +9285,8 @@ impl Heeding {
             from_start: false,
             follow_up_renews: false,
             no_face_renews: false,
+            no_look_answer: None,
+            look_free_used: false,
             follow_up_line: None,
             someone_elses_line: None,
             call_renewed_at: None,
@@ -11330,6 +11571,9 @@ impl Heeding {
                 at > self.said_until_us.unwrap_or_default()
                     && monotonic_us().saturating_sub(at) <= crate::room_told::BUSY_ENDS_AFTER_US
             }),
+            // `LAMP_NAME_SIGN_TIED` (#8092): only with eyes to give a look.
+            looks_needed: self.attention.second_sign_tied() && self.eyes.is_some(),
+            look_free_answered: self.look_free_used,
             ..Default::default()
         };
         // The eyes' signs as the replay of saved journals reads them
@@ -11349,6 +11593,8 @@ impl Heeding {
         }
         let going_on = signs.going_on;
         let decision = crate::said_to_me::judge(line);
+        self.no_look_answer =
+            (decision == crate::said_to_me::Said::AnswerNoLook).then_some(request);
         let mut pose = crate::said_to_me::pose(line.pitch, line.looking, looks);
         if skipped {
             pose.push_str(", the lone face's pose skipped: another voice");
@@ -11821,6 +12067,11 @@ impl Heeding {
         } else {
             String::new()
         };
+        // `LAMP_NAME_SIGN_TIED`: whether the voice rose close while a sure
+        // hearing counted for the line was said (#8092).
+        let near_at_the_name = signs.near
+            && near_at_a_hearing(self.levels.as_ref(), &signs.names, (began_us, ended_us));
+        attention.set_near_at_the_name(near_at_the_name);
         for (at_us, score) in signs.names {
             attention.name_heard_scored(at_us, score);
         }
@@ -11893,7 +12144,12 @@ impl Heeding {
         // rule's form.
         let said_to_a_person = self.attention.start_said_to_a_person();
         if self.attention.weigh_the_name(signs.turned, signs.going_on) {
-            if self.attention.name_dropped_as_short() {
+            if self.attention.name_dropped_by_near() {
+                eprintln!(
+                    "lamp-voice second: request {request}: its name, heard only in the room's sound (began {} ms into the line{soft_lead}), counts for nothing: LAMP_NAME_NEAR ruled the line not the name, or its one word, with no face turned, doesn't sound like the name, and that verdict wins over every second sign; the model is not told it was heard (LAMP_NAME_SIGN_TIED, #8092)",
+                    name_into_ms.map_or_else(|| "?".to_owned(), |ms| ms.to_string())
+                );
+            } else if self.attention.name_dropped_as_short() {
                 eprintln!(
                     "lamp-voice second: request {request}: its name, heard only in the room's sound (began {} ms into the line{soft_lead}), counts for nothing on a line of one or two words, not a question, with no word written for the name and no conversation going on; the model is not told it was heard (LAMP_NAME_SECOND_SIGN, #7891)",
                     name_into_ms.map_or_else(|| "?".to_owned(), |ms| ms.to_string())
@@ -12694,7 +12950,14 @@ impl Heeding {
         // said to the lamp ends the chain.
         // `LAMP_UNTIED_GOING_ON`: nor when it has no tie to the lamp, with
         // or without a sign of someone else (#3882).
-        if played && opens_nothing {
+        // `LAMP_NAME_SIGN_TIED` (#8092): the one answer with no look to the
+        // lamp's waiting question renews nothing, and is used up until a
+        // line with a look or the name is played.
+        let no_look_answer = played && self.no_look_answer == Some(request);
+        if played {
+            self.look_free_used = no_look_answer;
+        }
+        if played && (opens_nothing || no_look_answer) {
             // Its words renew no conversation going on (#4175).
             self.chain.push(request);
         } else if self.not_own && self.alone.is_some() {
@@ -12727,6 +12990,7 @@ impl Heeding {
             && alone
             && !untied
             && !opens_nothing
+            && !no_look_answer
             && !called
             && !someone_else
             && !(self.no_face_renews && seen.other_voice)
@@ -14819,6 +15083,12 @@ fn keep_scoped(
                         }
                     }
                     None => thread.lamp(*request, &text, now),
+                }
+                // A care turn's exchange too (`LAMP_CARE_LINE`, the safety
+                // read's P1 on #7752): kept for the talk going on, never
+                // given to the running summary or its talk note.
+                if crate::care_line::held_from_summary(*request) {
+                    thread.held_for(*request);
                 }
             }
         }
@@ -24099,6 +24369,56 @@ mod tests {
         *crate::thread::THREAD.lock().unwrap() = before;
     }
 
+    /// `LAMP_CARE_LINE` (the safety read's P1 on #7752): a care turn's
+    /// exchange stays in the thread but is never given to the running
+    /// summary or its talk note; another request's is.
+    #[test]
+    fn a_care_turns_exchange_never_reaches_the_summary() {
+        let _one = crate::provider_worker::tests::one_thread();
+        let (care, plain) = (u64::MAX - 7752, u64::MAX - 7753);
+        let mut thread = crate::thread::THREAD.lock().unwrap();
+        let before = std::mem::take(&mut *thread);
+        thread.forget();
+        drop(thread);
+        crate::care_line::hold_from_summary(care);
+        for (request, heard, said) in [
+            (care, "I want to kill myself", "I'm here with you."),
+            (plain, "What's the weather?", "Sunny."),
+        ] {
+            for event in [
+                ProviderOutput::Transcript {
+                    request: None,
+                    text: heard.into(),
+                    finished: true,
+                },
+                ProviderOutput::Transcript {
+                    request: Some(request),
+                    text: said.into(),
+                    finished: true,
+                },
+                ProviderOutput::TurnComplete {
+                    request,
+                    idle: true,
+                },
+            ] {
+                super::keep_scoped(&event, None, None, None);
+            }
+        }
+        let rest = crate::thread::THREAD
+            .lock()
+            .unwrap()
+            .summary_rest(None, Instant::now() + Duration::from_secs(1));
+        *crate::thread::THREAD.lock().unwrap() = before;
+        assert!(
+            !rest.iter().any(|(request, ..)| *request == care),
+            "{rest:?}"
+        );
+        assert!(
+            rest.iter().any(|(request, ..)| *request == plain),
+            "{rest:?}"
+        );
+    }
+
     /// #2137's redesign, step 5: the second worker's own path, not only
     /// `sign_in`'s functions. A sign-in's news marks the request it is
     /// written in, and the lamp's words of that request leave the engine as
@@ -24454,6 +24774,67 @@ mod tests {
         _: usize,
     ) -> (String, Option<crate::thread::NoteVersion>) {
         (String::new(), None)
+    }
+
+    /// c0a4 ROW c0a4-6 (#7930), rebuilt on the Mac: the ask, its read-back
+    /// with `start_agent_task` (never kept: its arguments are the person's
+    /// words), the model's own `confirm_agent_task` on "Yes, please.", then
+    /// "Hey Lamp, how far is it?". The history the second route sends for
+    /// that last line (`LAMP_HISTORY_KEEPS_CALLS`, `LAMP_HISTORY_SAID_ONCE`
+    /// on, as in the product) carries the hand-over as a kept confirm told
+    /// [`crate::second_provider::TASK_HANDED_OVER`], right before the
+    /// lamp's words.
+    #[test]
+    fn the_history_after_a_hand_over_carries_the_kept_confirm() {
+        let _one = crate::provider_worker::tests::one_thread();
+        let now = Instant::now();
+        {
+            let mut thread = crate::thread::THREAD.lock().unwrap();
+            thread.forget();
+            thread.person(
+                "ask the agent on the lamp to research the best houseplants for a dark bedroom.",
+                true,
+                now,
+            );
+            thread.lamp(
+                4,
+                "OpenClaw here on the lamp will research the best houseplants for a dark bedroom. Shall I start it?",
+                now,
+            );
+            thread.person("Yes, please.", true, now);
+            thread.called_told(
+                6,
+                crate::agent_tasks::CONFIRM,
+                &serde_json::json!({}),
+                crate::second_provider::kept_result(
+                    crate::agent_tasks::CONFIRM,
+                    &serde_json::json!({"handing_over": true, "work_id": "70", "label": "Research the best houseplants for a dark bedroom"}),
+                ),
+            );
+            thread.lamp(
+                6,
+                "Handing it to OpenClaw now. I'll tell you when it's done.",
+                now,
+            );
+        }
+        let _ = thread_and_history_summed(0, None, None, None, false, true, no_summary);
+        let history: Vec<Message> = crate::thread::THREAD
+            .lock()
+            .unwrap()
+            .recent_after_note(
+                None,
+                Instant::now(),
+                HISTORY_WITHIN,
+                HISTORY_EXCHANGES,
+                None,
+            )
+            .into_iter()
+            .flat_map(|exchange| messages_told(exchange, true))
+            .collect();
+        let told = history_text(&history);
+        assert!(told.contains(crate::agent_tasks::CONFIRM), "{told}");
+        assert!(told.contains("handed over then"), "{told}");
+        crate::thread::THREAD.lock().unwrap().forget();
     }
 
     /// `LAMP_HISTORY_SAID_ONCE` off (#6218): the thread's text is the
@@ -28010,6 +28391,43 @@ mod tests {
             None,
             "in the window"
         );
+    }
+
+    /// #8092 (lamp-74ff, build 14967, 20 Nov, a meeting): request 4, a 21 s
+    /// line, its hearing 15194 ms in, let out by "the name said close to
+    /// it" alone, the room microphone's rise read anywhere in the line.
+    /// Through `judge`, with `LAMP_NAME_SIGN_TIED=on`: closeness counts for
+    /// the hearing only when the rise came while it was said (from 1.5 s
+    /// before its hearing began to 0.3 s after) and the hearing reached
+    /// `attention::NEAR_SCORE`; and a line `LAMP_NAME_NEAR` ruled not the
+    /// name counts the hearing by no sign. Off, as on 14967.
+    #[test]
+    fn with_the_sign_tied_closeness_counts_only_at_a_sure_hearing() {
+        use crate::room_told::Room;
+        let line = (10_000_000, 31_000_000);
+        let at = 25_194_000;
+        let judged = |tied: bool, rise_at: u64, score: f32, ruled: bool| {
+            let mut heeding = room_name_heeding(true);
+            heeding.attention.tie_the_second_sign(tied);
+            if ruled {
+                heeding.attention.near_not_the_name(4);
+            }
+            heeding.levels = Some(std::sync::Arc::new(std::sync::Mutex::new(
+                std::collections::VecDeque::from([(rise_at, 40.0)]),
+            )));
+            heeding.judge(
+                4,
+                line,
+                "What time is it?",
+                room_name_signs(Room::Busy, false, None, true, vec![(at, score)]),
+            )
+        };
+        assert!(judged(true, 12_000_000, 0.97, false).is_some(), "far rise");
+        assert_eq!(judged(false, 12_000_000, 0.97, false), None, "off");
+        assert_eq!(judged(true, 25_000_000, 0.97, false), None, "at it");
+        assert!(judged(true, 25_000_000, 0.93, false).is_some(), "unsure");
+        assert!(judged(true, 25_000_000, 0.97, true).is_some(), "ruled");
+        assert_eq!(judged(false, 25_000_000, 0.97, true), None, "ruled, off");
     }
 
     /// #4226, `LAMP_NAME_START_USUAL=on`: a line whose sound began 0.3 s
@@ -32574,6 +32992,35 @@ mod tests {
         for word in ["remember", "keep", "forget"] {
             assert!(!super::QUIET_WITH_CALL_NOTE.contains(word), "{word}");
         }
+    }
+
+    /// #7415: `start_app` is asked for at each chat request from the apps
+    /// running then: none with no app, and an app that stops is never
+    /// offered again.
+    #[test]
+    fn start_app_is_offered_while_an_app_runs_and_never_after_it_stops() {
+        struct Running(Mutex<Vec<lamp_msgs::AppsTriggers>>);
+        impl crate::app_triggers::Apps for Running {
+            fn running(&self) -> Vec<lamp_msgs::AppsTriggers> {
+                self.0.lock().unwrap().clone()
+            }
+            fn take(&self, _: u64, _: &str, _: &str) -> bool {
+                false
+            }
+        }
+        let apps = Arc::new(Running(Mutex::new(Vec::new())));
+        let declare = super::with_app_start(Arc::new(Vec::new), apps.clone());
+        let names = |tools: Vec<lamp_gemini::Tool>| -> Vec<String> {
+            tools.into_iter().map(|tool| tool.name).collect()
+        };
+        assert!(names(declare()).is_empty(), "no app, no function");
+        *apps.0.lock().unwrap() = vec![lamp_msgs::AppsTriggers {
+            app: "english-practice".into(),
+            triggers: vec!["start english practice".into()],
+        }];
+        assert_eq!(names(declare()), [crate::app_triggers::START_APP]);
+        apps.0.lock().unwrap().clear();
+        assert!(names(declare()).is_empty(), "the app stopped");
     }
 
     #[test]

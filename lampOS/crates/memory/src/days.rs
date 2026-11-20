@@ -222,9 +222,16 @@ pub struct Days {
     /// to delete the same turns. Never on disk; taken by the request's
     /// answer ([`Self::take_forgot`]).
     forgot: Vec<Forgot>,
-    /// What the last forget's answer had no room for, paged by
-    /// `forgot_exchanges` ([`Self::forgot_page`]). Never on disk.
-    forgot_rest: std::collections::VecDeque<Forgot>,
+    /// What each recent forget's answer had no room for, under the token
+    /// its answer gave, paged by `forgot_exchanges` with that token
+    /// ([`Self::forgot_page`]): a forget between never replaces another's
+    /// rest (the first builder's P2 on #7935). The oldest goes past
+    /// [`FORGOT_RESTS_KEPT`]. Never on disk.
+    forgot_rests: std::collections::VecDeque<(String, std::collections::VecDeque<Forgot>)>,
+    /// This open store's random base for those tokens, read on its first
+    /// rest, and how many it has given.
+    forgot_rest_base: Option<u64>,
+    forgot_rests_made: u64,
     /// This store's epoch for the account's history ids
     /// ([`lamp_msgs::history_turn_id`], #7771), kept in `settings`.
     epoch: String,
@@ -301,7 +308,9 @@ impl Days {
             records_forgot_about: std::collections::VecDeque::new(),
             records_forgot_addresses: std::collections::VecDeque::new(),
             forgot: Vec::new(),
-            forgot_rest: std::collections::VecDeque::new(),
+            forgot_rests: std::collections::VecDeque::new(),
+            forgot_rest_base: None,
+            forgot_rests_made: 0,
             epoch: String::new(),
             taste_rules: false,
             _held: held,
@@ -481,10 +490,19 @@ impl Days {
         let health = Day::at(self.now, &self.local)
             .and_then(|today| today.before(lamp_msgs::health_fact::KEPT_DAYS))
             .map_or_else(|| "1970-01-01".into(), |d| d.to_string());
+        // An app's fact lasts `app_fact::KEPT_DAYS` local days, the day it
+        // was kept the first (#7415).
+        let app_facts = Day::at(self.now, &self.local)
+            .and_then(|today| today.before(lamp_msgs::app_fact::KEPT_DAYS))
+            .map_or_else(|| "1970-01-01".into(), |d| d.to_string());
         let tx = self.db.transaction()?;
         keep_origins(&tx)?;
         tx.execute("DELETE FROM doomed", [])?;
         tx.execute("INSERT INTO doomed SELECT rid FROM entries WHERE (kind='exchange' AND day<?1) OR (kind='observation' AND coalesce(category,'') NOT IN ('talk','episode','fact','profile','pattern','ahead','feeling','chapter') AND used_unix_ms<?2 AND NOT EXISTS (SELECT 1 FROM event_days d WHERE d.rid=entries.rid AND d.day>=?3))",params![day,unused,event])?;
+        tx.execute(
+            "INSERT OR IGNORE INTO doomed SELECT rid FROM app_facts WHERE kept_day<=?1",
+            [&app_facts],
+        )?;
         tx.execute(
             "INSERT OR IGNORE INTO doomed SELECT e.rid FROM apple_health a JOIN entries e ON e.rid=a.rid WHERE e.day<=?1",
             [&health],
@@ -882,10 +900,11 @@ impl Days {
 
     /// Whether this person's kept list has room for one more. Only active
     /// kept things count: a replaced version (#2510) is history, not a slot;
-    /// nor is an Apple Health fact (#7900), one a day for 14 days at most.
+    /// nor is an app's fact (#7415), held to its source's own bounds, nor
+    /// an Apple Health fact (#7900), one a day for 14 days at most.
     fn kept_room(&self, person: &Person) -> Result<()> {
         let count: u64 = self.db.query_row(
-            "SELECT count(*) FROM entries WHERE person=? AND kind='kept' AND active=1 AND rid NOT IN (SELECT rid FROM apple_health)",
+            "SELECT count(*) FROM entries WHERE person=? AND kind='kept' AND active=1 AND rid NOT IN (SELECT rid FROM app_facts) AND rid NOT IN (SELECT rid FROM apple_health)",
             [person.as_str()],
             |r| r.get(0),
         )?;
@@ -899,12 +918,13 @@ impl Days {
     }
 
     /// The id of this person's active kept thing with `text`, the same by
-    /// [`once_text`]. Never an Apple Health fact (#7900): a person's own
-    /// line in its words is their own, and stays when Apple Health goes.
+    /// [`once_text`]. Never an app's fact (#7415): a person's own line in
+    /// its words is their own, and stays when the app goes. Nor an Apple
+    /// Health fact (#7900), for the same reason.
     fn kept_already(&self, person: &Person, text: &str) -> Result<Option<u64>> {
         let wanted = once_text(person, text);
         let mut statement = self.db.prepare(
-            "SELECT id,text FROM entries WHERE person=? AND kind='kept' AND active=1 AND rid NOT IN (SELECT rid FROM apple_health) ORDER BY id",
+            "SELECT id,text FROM entries WHERE person=? AND kind='kept' AND active=1 AND rid NOT IN (SELECT rid FROM app_facts) AND rid NOT IN (SELECT rid FROM apple_health) ORDER BY id",
         )?;
         let mut rows = statement.query([person.as_str()])?;
         while let Some(row) = rows.next()? {
@@ -1070,8 +1090,9 @@ impl Days {
         observations: bool,
     ) -> Result<Vec<Kept>> {
         // A replaced kept thing (#2510) is no longer kept: only its history;
-        // and a superseded observation is no longer what was noticed.
-        let mut statement=self.db.prepare("SELECT id,at_unix_ms,text FROM entries WHERE person=?1 AND (kind='kept' OR (?2 AND kind='observation')) AND active=1 ORDER BY id DESC")?;
+        // and a superseded observation is no longer what was noticed. An
+        // app's fact (#7415) is not the person's own list: recall finds it.
+        let mut statement=self.db.prepare("SELECT id,at_unix_ms,text FROM entries WHERE person=?1 AND (kind='kept' OR (?2 AND kind='observation')) AND active=1 AND rid NOT IN (SELECT rid FROM app_facts) ORDER BY id DESC")?;
         let rows = statement.query_map(params![person.as_str(), observations], |r| {
             Ok(Kept {
                 id: r.get(0)?,
@@ -1685,18 +1706,47 @@ impl Days {
         std::mem::take(&mut self.forgot)
     }
 
-    /// The ids a forget's answer had no room for, kept for paging in place
-    /// of any earlier forget's.
-    pub fn keep_forgot_rest(&mut self, rest: Vec<Forgot>) {
-        self.forgot_rest = rest.into();
+    /// The ids a forget's answer had no room for, kept for paging beside
+    /// every other forget's, under the token returned (`None` for no
+    /// rest, and nothing kept). The token is this open store's own random
+    /// base and a count, so one given before a restart (or a reopen), or by
+    /// another store, never names a rest kept after.
+    pub fn keep_forgot_rest(&mut self, rest: Vec<Forgot>) -> Option<String> {
+        if rest.is_empty() {
+            return None;
+        }
+        let base = *self.forgot_rest_base.get_or_insert_with(forgot_rest_base);
+        self.forgot_rests_made += 1;
+        let token = format!("{:016x}", base.wrapping_add(self.forgot_rests_made));
+        while self.forgot_rests.len() >= FORGOT_RESTS_KEPT {
+            if let Some((_, gone)) = self.forgot_rests.pop_front() {
+                eprintln!(
+                    "lamp-memory days: {} exchange ids of an older forget were never paged; let go",
+                    gone.len()
+                );
+            }
+        }
+        self.forgot_rests.push_back((token.clone(), rest.into()));
+        Some(token)
     }
 
-    /// The next `most` of what [`Self::keep_forgot_rest`] kept, and
-    /// whether more remain.
-    pub fn forgot_page(&mut self, most: usize) -> (Vec<Forgot>, bool) {
-        let take = self.forgot_rest.len().min(most);
-        let page = self.forgot_rest.drain(..take).collect();
-        (page, !self.forgot_rest.is_empty())
+    /// The next `most` of what [`Self::keep_forgot_rest`] kept under
+    /// `token`, and whether more remain; `None` for a token not kept (never
+    /// given, let go, paged out, or from before a restart). The last page
+    /// lets the rest go.
+    pub fn forgot_page(&mut self, token: &str, most: usize) -> Option<(Vec<Forgot>, bool)> {
+        let at = self
+            .forgot_rests
+            .iter()
+            .position(|(kept, _)| kept == token)?;
+        let rest = &mut self.forgot_rests[at].1;
+        let take = rest.len().min(most);
+        let page = rest.drain(..take).collect();
+        let more = !rest.is_empty();
+        if !more {
+            self.forgot_rests.remove(at);
+        }
+        Some((page, more))
     }
 
     /// Everything kept for one person and every rule in their rules scope
@@ -1725,7 +1775,7 @@ impl Days {
     /// A set-aside database is the person's memory too, and this build can't
     /// reach a fact or a person inside it: every forget removes it whole,
     /// with its sidecars, so nothing said forgotten stays on disk (#2067).
-    fn forget_set_aside(&mut self) -> Result<()> {
+    pub(crate) fn forget_set_aside(&mut self) -> Result<()> {
         remove_set_aside(&self.dir, None)?;
         self.set_aside = None;
         Ok(())
@@ -2911,7 +2961,7 @@ impl Days {
             ("observation", MAX_OBSERVATIONS),
         ] {
             let after: u64 = tx.query_row(
-                "SELECT count(*) FROM entries WHERE kind=?2 AND (kind!='kept' OR active=1) AND coalesce(category,'')!='talk' AND rid NOT IN (SELECT rid FROM apple_health) AND (person=?1 OR rid IN (SELECT rid FROM adopting))",
+                "SELECT count(*) FROM entries WHERE kind=?2 AND (kind!='kept' OR active=1) AND coalesce(category,'')!='talk' AND rid NOT IN (SELECT rid FROM app_facts) AND rid NOT IN (SELECT rid FROM apple_health) AND (person=?1 OR rid IN (SELECT rid FROM adopting))",
                 params![to.as_str(), kind],
                 |r| r.get(0),
             )?;
@@ -3374,7 +3424,7 @@ fn said_after(tx: &Transaction<'_>, rid: i64, at: u64) -> Result<bool> {
 /// the scope as origin, not only an exchange (Reviewer-lead's P3). In the
 /// caller's transaction, before [`erase`]; never on expiry, so an exchange
 /// that ages out at `keep_days` leaves the time it was said again.
-fn said_again_with_doomed(tx: &Transaction<'_>) -> Result<()> {
+pub(crate) fn said_again_with_doomed(tx: &Transaction<'_>) -> Result<()> {
     tx.execute(
         "DELETE FROM said_again WHERE (rid,at_unix_ms) IN (SELECT a.rid,a.at_unix_ms FROM said_again a JOIN entries k ON k.rid=a.rid JOIN entries x ON x.person=k.person AND x.id=a.origin WHERE x.rid IN (SELECT rid FROM doomed))",
         [],
@@ -3760,7 +3810,7 @@ fn literal(text: &str) -> String {
 /// derives from them and every version, except a kept thing that isn't
 /// itself doomed already (#3113); for expiry, from the first day whose
 /// events no longer hold (`expiry`), what derives from them only.
-fn descendants(db: &Connection, expiry: Option<&str>) -> Result<()> {
+pub(crate) fn descendants(db: &Connection, expiry: Option<&str>) -> Result<()> {
     if let Some(event) = expiry {
         // Expiry: a kept thing never expires, even one remembered with its
         // conversation (#1693): the walk stops at it, and its link to an
@@ -3907,7 +3957,7 @@ fn room_from_citing(tx: &Transaction<'_>, person: &Person) -> Result<()> {
 /// for talk notes): it is one note of the whole conversation, in the
 /// lamp's words, so it may carry what was forgotten in any of them. Never
 /// on expiry: an exchange that ages out leaves the note kept.
-fn talk_with_doomed(tx: &Transaction<'_>) -> Result<()> {
+pub(crate) fn talk_with_doomed(tx: &Transaction<'_>) -> Result<()> {
     keep_origins(tx)?;
     tx.execute(
         "INSERT OR IGNORE INTO doomed SELECT DISTINCT s.child FROM sources s JOIN entries e ON e.rid=s.child WHERE s.parent IN (SELECT rid FROM doomed) AND e.kind='observation' AND e.category='talk'",
@@ -4029,6 +4079,25 @@ pub struct Forgot {
 
 /// The settings key of the store's epoch (#7771).
 const HISTORY_EPOCH: &str = "history_epoch";
+
+/// The most forgets whose rest waits to be paged at once
+/// ([`Days::keep_forgot_rest`]): far past one voice's forgets in flight.
+pub const FORGOT_RESTS_KEPT: usize = 8;
+
+/// A new random base for an open store's [`Days::keep_forgot_rest`]
+/// tokens (the clock and the process id if `/dev/urandom` can't be read).
+fn forgot_rest_base() -> u64 {
+    let mut bytes = [0u8; 8];
+    match File::open("/dev/urandom").and_then(|mut f| io::Read::read_exact(&mut f, &mut bytes)) {
+        Ok(()) => u64::from_be_bytes(bytes),
+        Err(_) => {
+            let nanos = std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .map_or(0, |d| d.as_nanos() as u64);
+            nanos ^ (u64::from(std::process::id()) << 32)
+        }
+    }
+}
 
 /// The store's epoch, minted when there is none: a new store, or one made
 /// before epochs (no turn was saved under it: both of #7771's switches

@@ -2204,6 +2204,35 @@ pub(crate) fn exchanges_forgotten(told: (Value, bool), exchanges: Option<u64>) -
     }
 }
 
+/// A forget about's `history` when the person's exchanges about it were
+/// asked to go and no answer came back (the memory timed out or was lost;
+/// a refusal, an older memory's `unknown_op`, removed none): some may
+/// have gone, so nothing about them is known,
+/// and the account's history gets no "nothing removed" either (Friday's
+/// read of #8091).
+pub(crate) const HISTORY_NOT_REACHED: &str = "not_reached";
+
+/// A forget about's answer `told` when its exchanges forget was not
+/// reached ([`HISTORY_NOT_REACHED`]): the kept things' own result stays as
+/// it was (`forgotten`, `count`, `records`, `contacts`), and `history`
+/// says what was said about it is not known gone. Nothing kept went, the
+/// note is replaced, so the model never tells "nothing was there" or
+/// "forgotten"; something kept went, a `history_note` is added beside it.
+pub(crate) fn exchanges_not_reached(told: (Value, bool)) -> (Value, bool) {
+    let (mut answer, answered) = told;
+    answer["history"] = json!(HISTORY_NOT_REACHED);
+    if answer["forgotten"] == true {
+        answer["history_note"] = json!(
+            "My memory couldn't be reached just now about what was said about it in conversation, so I can't tell whether that went too. Don't say all of it is forgotten. Tell them plainly what went, and that I couldn't finish forgetting what we said about it."
+        );
+    } else {
+        answer["note"] = json!(
+            "None of what I keep went, but my memory couldn't be reached just now about what was said about it in conversation, so I can't tell whether that went. Don't say there was nothing about it, and don't say it's forgotten. Tell them plainly: \"I couldn't finish forgetting that just now.\""
+        );
+    }
+    (answer, answered)
+}
+
 /// A forget about's answer `told` with the mail contacts it removed too
 /// (`LAMP_SERVICE_CONTACTS`): none, as it was; some, how many, and that
 /// nothing already sent is undone. Never a name or an address.
@@ -5144,6 +5173,21 @@ fn nothing_in_scope() {
     NOTHING_IN_SCOPE.with(|nothing| nothing.set(true));
 }
 
+/// Whom [`exchanges_forget_about`] asks for, and the key words of each
+/// subject of `about`: `None` with no known person or no words, when it is
+/// not asked at all.
+fn exchanges_forget_words<'a>(
+    about: &Value,
+    person: Option<&'a str>,
+) -> Option<(&'a str, Vec<Vec<String>>)> {
+    let person = person.filter(|person| lamp_msgs::known::is_person_id(person))?;
+    let words: Vec<Vec<String>> = about_subjects(about.as_str()?.trim())
+        .into_iter()
+        .map(|(_, words)| words)
+        .collect();
+    (!words.is_empty()).then_some((person, words))
+}
+
 /// `exchanges_forget` in the memory at `socket`: a known person's own
 /// exchanges with every key word of a subject of `about` (what was said,
 /// never kept), in their scope alone, never the room's
@@ -5156,28 +5200,55 @@ fn exchanges_forget_about(
     until: Instant,
     lease: Option<&crate::memory_scope::ScopeLease>,
 ) -> Option<u64> {
-    let person = person.filter(|person| lamp_msgs::known::is_person_id(person))?;
-    let words: Vec<Vec<String>> = about_subjects(about.as_str()?.trim())
-        .into_iter()
-        .map(|(_, words)| words)
-        .collect();
-    if words.is_empty() {
-        return None;
+    match exchanges_forget_heard(socket, about, person, until, lease) {
+        ExchangesForget::Answered(removed) => removed,
+        ExchangesForget::NotAsked | ExchangesForget::Unanswered => None,
     }
-    let left = until
+}
+
+/// What [`exchanges_forget_heard`] heard back from the memory.
+enum ExchangesForget {
+    /// No known person or no key words: nothing to forget.
+    NotAsked,
+    /// Asked, and no answer before `until`, or no time left to ask: some
+    /// may have gone (a timeout), so it is not known
+    /// ([`HISTORY_NOT_REACHED`]).
+    Unanswered,
+    /// Answered: how many went, `None` for a refusal (an older memory's
+    /// `unknown_op`), which removed none.
+    Answered(Option<u64>),
+}
+
+/// [`exchanges_forget_about`], telling a refusal apart from no answer.
+fn exchanges_forget_heard(
+    socket: &Path,
+    about: &Value,
+    person: Option<&str>,
+    until: Instant,
+    lease: Option<&crate::memory_scope::ScopeLease>,
+) -> ExchangesForget {
+    let Some((person, words)) = exchanges_forget_words(about, person) else {
+        return ExchangesForget::NotAsked;
+    };
+    let Some(left) = until
         .checked_duration_since(Instant::now())
-        .filter(|left| !left.is_zero())?;
-    let answer = bounded_exchange_scoped(
+        .filter(|left| !left.is_zero())
+    else {
+        return ExchangesForget::Unanswered;
+    };
+    let Some(answer) = bounded_exchange_scoped(
         socket,
         &json!({"op":"exchanges_forget","person":person,"about":words}),
         left,
         lease,
-    )?;
-    let removed = answer["removed"]
-        .as_u64()
-        .filter(|_| answer["ok"] == true)?;
-    eprintln!("lamp-voice provider: a forget about removed {removed} exchanges");
-    Some(removed)
+    ) else {
+        return ExchangesForget::Unanswered;
+    };
+    let removed = answer["removed"].as_u64().filter(|_| answer["ok"] == true);
+    if let Some(removed) = removed {
+        eprintln!("lamp-voice provider: a forget about removed {removed} exchanges");
+    }
+    ExchangesForget::Answered(removed)
 }
 
 /// The one-face forget their yes agreed to (#5627), held with the words it
@@ -5759,18 +5830,42 @@ mod one_kept_tests {
             .to_owned();
         assert!(held.contains('\u{2026}'), "cut");
     }
+
+    /// #8059: on their yes only the model's own `forget` call runs the held
+    /// one-face forget (`second_provider::Taken::Agrees`), so the held note
+    /// tells it to make that call on a yes, and never not to. Nor does it
+    /// give a cause the person can't fix: their face was in view.
+    #[test]
+    fn the_one_face_question_tells_the_model_to_call_forget_on_their_yes() {
+        let held = one_face_forget_asks("bike lock code")["held"]
+            .as_str()
+            .unwrap()
+            .to_owned();
+        assert!(
+            held.contains("If they say yes within 30 seconds, call forget then"),
+            "{held}"
+        );
+        assert!(held.contains("only that call runs it"), "{held}");
+        assert!(!held.contains("Do not call forget"), "{held}");
+        assert!(!held.contains("couldn't see"), "{held}");
+    }
 }
 
 /// What the model is told of a named forget on a one-face line held for the
 /// person's yes ([`ONE_FACE_FORGET_YES_FOR`], #5627): ask once about
 /// `subject`, their own words for it, in their language, and stop. Never
 /// the kept text: the speaker was not seen (the Reviewer-lead's P2 on
-/// #6673).
+/// #6673). On their yes the model calls `forget`, naming nothing else, and
+/// only that call runs the held forget (`second_provider::Taken::Agrees`,
+/// the first builder's ruling on leg (e) of #7960's ROW). It was told "do
+/// not call forget again for their yes", so a yes ran nothing (#8059;
+/// lamp-06c1, 2 of 2). Nor does it say the lamp couldn't see who was
+/// asking: their face was in view.
 pub fn one_face_forget_asks(subject: &str) -> Value {
     json!({
         "forgotten": false,
         "held": format!(
-            "Not done yet: I couldn't see who was asking, so this waits for their yes. Ask them once, in a few words and in the language they spoke, whether you should forget what you kept about {} (for example \"Shall I forget what you kept about your bike lock code?\" or \"Mình có nên quên điều đã giữ về mã khóa xe của bạn không?\"), and then stop. Do not say what was kept, its details, or anything you know about it. Only their yes within 30 seconds runs it; a no or nothing keeps it. Do not call forget again for their yes, and do not say it is forgotten.",
+            "Not done yet: this waits for their yes. Ask them once, in a few words and in the language they spoke, whether you should forget what you kept about {} (for example \"Shall I forget what you kept about your bike lock code?\" or \"Mình có nên quên điều đã giữ về mã khóa xe của bạn không?\"), and then stop. Do not say what was kept, its details, or anything you know about it. If they say yes within 30 seconds, call forget then, naming nothing else: only that call runs it. A no or nothing keeps it. Do not say it is forgotten until that forget has run.",
             cut_at_a_word(subject, WHAT_WENT_BYTES)
         )
     })
@@ -10911,12 +11006,18 @@ impl DaysClient {
                 // Twelve's P2 on #7957); what it removed is named in its
                 // answers (`history_send::forget_seen`), then posts go on.
                 crate::history_send::forgetting(person);
-                let (told, answered) =
+                let ((told, answered), known) =
                     self.forget_about(&call.args["about"], person, until, lease, heard_named(call));
+                // Every removal answered: what went was named on its way
+                // (`forget_seen`), so the hold lifts with nothing more let
+                // go. One timed out, lost or refused part way: what went is
+                // not known (Friday's P2 on #7957: an empty answer here then
+                // read as "nothing removed"), so `None`, and the person's and
+                // the room's turns wait for the next start.
                 crate::history_send::forget_answered(
                     person,
                     false,
-                    Some(&json!({"ok":true,"exchanges":{}})),
+                    known.then(|| json!({"ok":true,"exchanges":{}})).as_ref(),
                 );
                 // A forget done, for a yes alone soon after it (Bug C).
                 if told["forgotten"] == true
@@ -11632,7 +11733,12 @@ impl DaysClient {
     /// whole, forgets nothing either. The model is told how many went and
     /// the person's own `about`, never the kept texts. A write as `forget`
     /// is: uncertain until each removal is acknowledged, and journalling
-    /// stops after a confirmed one.
+    /// stops after a confirmed one. With it, whether what the memory removed
+    /// is known whole: every forget of a kept thing and the exchanges
+    /// forget asked answered (a nothing-found, a refused listing or too many
+    /// to look through removed nothing, and are known too); `false` when one
+    /// timed out or was lost part way, for the account's history
+    /// (`history_send::forget_answered`, `LAMP_HISTORY_SEND`).
     fn forget_about(
         &self,
         about: &Value,
@@ -11640,7 +11746,7 @@ impl DaysClient {
         until: Instant,
         lease: Option<&crate::memory_scope::ScopeLease>,
         named: bool,
-    ) -> (Value, bool) {
+    ) -> ((Value, bool), bool) {
         // Records and contacts are kept under the services' owner id
         // (`services::owner_of`), which in the private room is the first
         // owner id, not always the scope's person: forgotten under the same
@@ -11667,6 +11773,9 @@ impl DaysClient {
             (records, sent_to) => records.or(sent_to),
         };
         let told = self.forget_kept_about(about, person, until, lease, named);
+        // Unknown: the kept things' forget lost (`gone`), or some went
+        // before the memory stopped answering (`all: false`).
+        let mut known = told.1 && told.0.get("error").is_none() && told.0["all"] != false;
         // Their talk about it too, after the kept things, so each `forget
         // {id}` above still finds the exchanges a kept thing came from.
         // Not when the kept things were not settled (the memory lost or
@@ -11676,13 +11785,26 @@ impl DaysClient {
             || told.0.get("error").is_some()
             || told.0 == older_memory_refused().0
             || [ABOUT_TOO_MUCH, ABOUT_ASK_WHICH].contains(&told.0["note"].as_str().unwrap_or(""));
-        let exchanges = if held {
-            None
+        let (exchanges, not_reached) = if held {
+            (None, false)
         } else {
             self.forget_exchanges_about(about, person, until, lease)
         };
+        // Asked and not answered: the memory may have removed some.
+        if !held && exchanges.is_none() && exchanges_forget_words(about, person).is_some() {
+            known = false;
+        }
         let told = exchanges_forgotten(told, exchanges);
-        contacts_forgotten(records_forgotten(told, records), contacts)
+        let told = contacts_forgotten(records_forgotten(told, records), contacts);
+        // Asked and no answer at all (not a refusal): what was said about
+        // it is not known gone, told apart from a forget that found
+        // nothing. `known` is false then too.
+        let told = if not_reached {
+            exchanges_not_reached(told)
+        } else {
+            told
+        };
+        (told, known)
     }
 
     /// Every service record and mail contact of `owner` removed in the
@@ -11727,23 +11849,28 @@ impl DaysClient {
     /// told again (lamp-06c1, 11 Nov: "forget the recheck party"). Some
     /// gone, nothing of this conversation is journalled after it, as after
     /// a forget of a kept thing. An older memory answers `unknown_op`, and
-    /// none are said removed.
+    /// none are said removed. With it, whether it was asked and not
+    /// answered (a timeout): [`HISTORY_NOT_REACHED`].
     fn forget_exchanges_about(
         &self,
         about: &Value,
         person: Option<&str>,
         until: Instant,
         lease: Option<&crate::memory_scope::ScopeLease>,
-    ) -> Option<u64> {
-        let removed = exchanges_forget_about(&self.socket, about, person, until, lease)?;
-        if removed > 0 {
+    ) -> (Option<u64>, bool) {
+        let removed = match exchanges_forget_heard(&self.socket, about, person, until, lease) {
+            ExchangesForget::NotAsked => return (None, false),
+            ExchangesForget::Unanswered => return (None, true),
+            ExchangesForget::Answered(removed) => removed,
+        };
+        if removed.is_some_and(|removed| removed > 0) {
             let said = match self.context.try_lock() {
                 Ok(mut context) => self.forgotten(&mut context),
                 Err(_) => None,
             };
             say(said);
         }
-        Some(removed)
+        (removed, false)
     }
 
     /// `LAMP_SERVICE_CONTACTS`: a known person's mail contacts about
@@ -21117,7 +21244,7 @@ mod tests {
         assert!(about_words("what I told you about").is_empty());
         const MINH: &str = "p-be9688998f085098";
         // Any op is answered alike, so a search would find them too.
-        let (socket, served) = memory("forget-about-stop", 2, |request| {
+        let (socket, served) = memory("forget-about-stop", 3, |request| {
             match request["op"].as_str() {
                 Some("forget") => json!({"ok":true,"removed":1}),
                 _ => json!({"ok":true,"entries":[
@@ -21184,7 +21311,7 @@ mod tests {
         .into_iter()
         .enumerate()
         {
-            let (socket, served) = memory(&format!("forget-about-asks-{index}"), 2, answer);
+            let (socket, served) = memory(&format!("forget-about-asks-{index}"), 3, answer);
             let client = DaysClient::new(socket.clone()).unwrap();
             client.forget_about.store(true, Ordering::Release);
             let (told, _) = client.run_at(
@@ -21382,7 +21509,7 @@ mod tests {
     #[test]
     fn forget_about_my_bicycle_forgets_their_bicycle_and_never_tells_its_words() {
         const MINH: &str = "p-be9688998f085098";
-        let (socket, served) = memory("forget-about-their", 2, |request| {
+        let (socket, served) = memory("forget-about-their", 3, |request| {
             match request["op"].as_str() {
                 Some("forget") => json!({"ok":true,"removed":1}),
                 _ => json!({"ok":true,"entries":[
@@ -21439,7 +21566,9 @@ mod tests {
             }
         }
         // Not from this conversation: it stays, and they are told of it.
-        let (socket, served) = memory("forget-about-before", 2, answer);
+        // The exchanges forget is answered too (refused, as an older
+        // memory does): a lost one would be told not reached.
+        let (socket, served) = memory("forget-about-before", 3, answer);
         let client = DaysClient::new(socket.clone()).unwrap();
         client.forget_about.store(true, Ordering::Release);
         let (told, _) = client.run_at(
@@ -21462,6 +21591,7 @@ mod tests {
             [
                 json!({"op":"kept","max_bytes":ABOUT_BYTES,"observations":true,"person":MINH}),
                 json!({"op":"kept","max_bytes":ABOUT_BYTES,"observations":true}),
+                json!({"op":"exchanges_forget","person":MINH,"about":[["bicycle"]]}),
             ]
         );
         drop(client);
@@ -26878,12 +27008,22 @@ mod tests {
     /// `person`'s "forget what I said about coffee", through the voice's
     /// tools with a fake memory: nothing kept is about it, and the
     /// exchanges forget removes `removed` (its turn id under epoch
-    /// 0a1b2c3d, the forget half's answer).
-    pub(crate) fn forget_about_for_history_test(person: &'static str, removed: u64) {
+    /// 0a1b2c3d, the forget half's answer); `None`: "forget what I said
+    /// about tea", whose exchanges forget answers only after the forget's
+    /// time ran out (a timeout).
+    pub(crate) fn forget_about_for_history_test(person: &'static str, removed: Option<u64>) {
         static REMOVED: AtomicU64 = AtomicU64::new(0);
-        REMOVED.store(removed, Ordering::SeqCst);
+        if let Some(removed) = removed {
+            REMOVED.store(removed, Ordering::SeqCst);
+        }
         fn answer(request: &Value) -> Value {
             match request["op"].as_str() {
+                // Per request, never a static, and with no probe (the
+                // process's one, another test's): tests run side by side.
+                Some("exchanges_forget") if request["about"] == json!([["tea"]]) => {
+                    std::thread::sleep(Duration::from_millis(900));
+                    json!({"ok":true,"removed":0,"exchanges":{}})
+                }
                 Some("exchanges_forget") => {
                     crate::history_send::probe_forget();
                     let person = request["person"].as_str().unwrap_or("everyone");
@@ -26901,9 +27041,14 @@ mod tests {
         let (socket, stop, served) = history_memory(answer);
         let client = DaysClient::new(socket.clone()).unwrap();
         client.forget_about.store(true, Ordering::Release);
+        let (about, within) = if removed.is_some() {
+            ("coffee", Duration::from_secs(3))
+        } else {
+            ("tea", Duration::from_millis(400))
+        };
         let (told, answered) = client.run_at(
-            &call(FORGET, json!({"about":"coffee"})),
-            Duration::from_secs(3),
+            &call(FORGET, json!({"about":about})),
+            within,
             NOW,
             Some(&EAST),
             Some(person),
@@ -26913,6 +27058,91 @@ mod tests {
         stop.store(true, Ordering::Release);
         served.join().unwrap();
         let _ = std::fs::remove_file(&socket);
+    }
+
+    /// Friday's read of #8091: a forget about whose exchanges forget timed
+    /// out is told `history: "not_reached"`, never "forgot nothing"; one
+    /// the memory answered with none removed is told as before; and one
+    /// that forgot a kept thing before its exchanges forget timed out is
+    /// told what went, with the history not reached beside it.
+    #[test]
+    fn a_forget_about_whose_exchanges_forget_timed_out_is_told_not_reached() {
+        const MINH: &str = "p-be9688998f085098";
+        fn slow(request: &Value) -> Value {
+            if request["op"] == "exchanges_forget" {
+                std::thread::sleep(Duration::from_millis(900));
+                return json!({"ok":true,"removed":0});
+            }
+            match request["op"].as_str() {
+                Some("kept") | Some("search") => json!({"ok":true,"entries":[]}),
+                _ => json!({"ok":true,"removed":0}),
+            }
+        }
+        fn none_removed(request: &Value) -> Value {
+            match request["op"].as_str() {
+                Some("exchanges_forget") => json!({"ok":true,"removed":0,"exchanges":{}}),
+                Some("kept") | Some("search") => json!({"ok":true,"entries":[]}),
+                _ => json!({"ok":true,"removed":0}),
+            }
+        }
+        fn one_kept_then_slow(request: &Value) -> Value {
+            match request["op"].as_str() {
+                Some("kept") => json!({"ok":true,"entries":[
+                    {"id":5,"at_unix_ms":NOW,"text":"My coffee is in the cupboard"}
+                ]}),
+                Some("forget") => json!({"ok":true,"removed":1}),
+                _ => slow(request),
+            }
+        }
+        let forget = |answer: fn(&Value) -> Value, within: Duration| {
+            let (socket, stop, served) = history_memory(answer);
+            let client = DaysClient::new(socket.clone()).unwrap();
+            client.forget_about.store(true, Ordering::Release);
+            let told = client.run_at(
+                &call(FORGET, json!({"about":"coffee"})),
+                within,
+                NOW,
+                Some(&EAST),
+                Some(MINH),
+            );
+            drop(client);
+            stop.store(true, Ordering::Release);
+            served.join().unwrap();
+            let _ = std::fs::remove_file(&socket);
+            told
+        };
+        // Timed out: not reached, and not told as nothing found.
+        let (told, answered) = forget(slow, Duration::from_millis(400));
+        assert!(answered, "{told}");
+        assert_eq!(told["forgotten"], false, "{told}");
+        assert_eq!(told["history"], HISTORY_NOT_REACHED, "{told}");
+        let note = told["note"].as_str().unwrap();
+        assert!(!note.contains("forgot nothing"), "{told}");
+        assert!(!note.contains("couldn't find anything"), "{told}");
+        assert!(note.contains("couldn't be reached"), "{told}");
+        // Answered with none removed: unchanged, nothing found.
+        let (told, answered) = forget(none_removed, Duration::from_secs(3));
+        assert!(answered, "{told}");
+        assert_eq!(told["forgotten"], false, "{told}");
+        assert!(told.get("history").is_none(), "{told}");
+        assert!(
+            told["note"].as_str().unwrap().contains("forgot nothing"),
+            "{told}"
+        );
+        // A kept thing went, then the exchanges forget timed out: what went
+        // is told, and the history is not reached beside it.
+        let (told, answered) = forget(one_kept_then_slow, Duration::from_millis(400));
+        assert!(answered, "{told}");
+        assert_eq!(told["forgotten"], true, "{told}");
+        assert_eq!(told["count"], 1, "{told}");
+        assert_eq!(told["history"], HISTORY_NOT_REACHED, "{told}");
+        assert!(
+            told["history_note"]
+                .as_str()
+                .unwrap()
+                .contains("couldn't be reached"),
+            "{told}"
+        );
     }
 
     /// The room's conversation of exchanges 5 and 6 goes on as `to`'s,
@@ -32052,7 +32282,7 @@ mod tests {
     /// person's, reached by her forget: only her own scope is listed.
     #[test]
     fn a_named_forget_with_no_match_removes_nothing_and_says_so() {
-        let (socket, served) = memory("forget-named-none", 1, |request| {
+        let (socket, served) = memory("forget-named-none", 2, |request| {
             match (request["op"].as_str(), request["person"].as_str()) {
                 (Some("kept"), Some(MAI)) => json!({"ok":true,"entries":[
                     {"id":4,"at_unix_ms":NOW-DAY,"text":"Sister's wedding is on Saturday."}
@@ -32082,9 +32312,12 @@ mod tests {
         );
         assert!(!note.contains("I don't have"), "{note}");
         let read = served.join().unwrap();
-        assert_eq!(read.len(), 1, "{read:?}");
+        // Her own exchanges about it are asked to go too, and answered.
+        assert_eq!(read.len(), 2, "{read:?}");
         assert_eq!(read[0]["person"], MAI);
         assert_eq!(read[0]["op"], "kept");
+        assert_eq!(read[1]["op"], "exchanges_forget", "{read:?}");
+        assert_eq!(read[1]["person"], MAI);
         // Nothing more of this conversation is journalled or noticed, as
         // after a forget: a colour said earlier isn't noticed now.
         let context = client.context.lock().unwrap();

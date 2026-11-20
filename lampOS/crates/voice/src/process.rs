@@ -709,26 +709,43 @@ impl Worker {
     /// Always attempt wait, even if kill races a child that has already exited.
     /// Preserve both cleanup errors rather than returning early and losing a reap.
     pub(crate) fn terminate_and_reap(&mut self, kind: io::ErrorKind, reason: String) -> io::Error {
+        self.kill_and_reap(kind, reason).1
+    }
+
+    /// [`Self::terminate_and_reap`], and whether the child is verified gone: the
+    /// kill did not fail, the wait returned a status and its paths were cleaned.
+    /// The error is the same either way (what happened, in words).
+    pub(crate) fn kill_and_reap(
+        &mut self,
+        kind: io::ErrorKind,
+        reason: String,
+    ) -> (bool, io::Error) {
         let killed = self.child.kill();
         let reaped = self.child.wait();
+        let mut verified = true;
         let mut message = format!("{} worker {reason}", self.role);
         if let Err(error) = killed {
+            verified = false;
             message.push_str(&format!("; kill failed: {error}"));
         }
         match reaped {
             Ok(status) => {
                 message.push_str(&format!("; reaped with {status}"));
                 if let Err(error) = self.cleanup_ring_paths() {
+                    verified = false;
                     message.push_str(&format!("; {error}"));
                 }
             }
-            Err(error) => message.push_str(&format!("; reap failed: {error}")),
+            Err(error) => {
+                verified = false;
+                message.push_str(&format!("; reap failed: {error}"));
+            }
         }
         #[cfg(test)]
         if let Some(observe) = self.after_terminate.take() {
             observe();
         }
-        io::Error::new(kind, message)
+        (verified, io::Error::new(kind, message))
     }
     /// Signal only this owned child, without waiting for kernel teardown or
     /// reaping. Live optional-worker failure uses this once, then `try_exit`;
@@ -2874,6 +2891,7 @@ fn second_route_worker_environment(
         crate::second_provider::REGION_FILE_ENVIRONMENT,
         crate::second_provider::NAME_SECOND_SIGN_ENVIRONMENT,
         crate::second_provider::NAME_SAID_TO_A_PERSON_ENVIRONMENT,
+        crate::second_provider::NAME_SIGN_TIED_ENVIRONMENT,
         crate::second_provider::NAME_STAYS_ENVIRONMENT,
         // A repeat of the line before's end is no call by its text (#3923).
         crate::second_provider::NAME_REPEAT_NOT_A_CALL_ENVIRONMENT,
@@ -3095,6 +3113,10 @@ fn second_route_worker_environment(
         // A new face's save past the face question on a known file kept
         // only for a face the eyes know (#7704).
         crate::known_faces::FACE_SAVE_KNOWN_ONLY_ENVIRONMENT,
+        // A question whether the lamp knows them is no face save (lamp-74ff, 19 Nov).
+        crate::known_faces::FACE_QUESTION_NOT_ASK_ENVIRONMENT,
+        // Whether the eyes mark a name held, not matched (#7933's mark).
+        crate::known_faces::FACE_STICKY_ENVIRONMENT,
         // The model's decline of the walk's name ask (#7876).
         crate::onboarding::learn_later::ENVIRONMENT,
         // The owner's face linked to the typed name by their own words (#7501).
@@ -3108,6 +3130,10 @@ fn second_route_worker_environment(
         crate::owner_place::ENVIRONMENT,
         // The owner's chosen voice and character words (#5394).
         lamp_msgs::chosen_voice::ENVIRONMENT,
+        // Words of self-harm answered with care and the care line (#7689).
+        crate::care_line::ENVIRONMENT,
+        crate::care_line::REGION_ENVIRONMENT,
+        crate::care_line::FILE_ENVIRONMENT,
         crate::second_provider::net::key_terms::ENVIRONMENT,
         // Each turn told the light as `light/state` says it now (lamp-52e6,
         // 4 Nov: "what colour is the light?" guessed "White").
@@ -3303,6 +3329,7 @@ mod tests {
         for name in [
             crate::second_provider::NAME_SECOND_SIGN_ENVIRONMENT,
             crate::second_provider::NAME_SAID_TO_A_PERSON_ENVIRONMENT,
+            crate::second_provider::NAME_SIGN_TIED_ENVIRONMENT,
             crate::second_provider::NAME_STAYS_ENVIRONMENT,
             crate::second_provider::NAME_REPEAT_NOT_A_CALL_ENVIRONMENT,
             crate::attention::ONE_AS_LAMP_ENVIRONMENT,
@@ -3421,6 +3448,8 @@ mod tests {
             crate::known_faces::NAME_LEARN_FIX_ENVIRONMENT,
             crate::known_faces::FACE_NO_ASK_ENVIRONMENT,
             crate::known_faces::FACE_SAVE_KNOWN_ONLY_ENVIRONMENT,
+            crate::known_faces::FACE_QUESTION_NOT_ASK_ENVIRONMENT,
+            crate::known_faces::FACE_STICKY_ENVIRONMENT,
             crate::onboarding::learn_later::ENVIRONMENT,
             crate::owner_link::ENVIRONMENT,
             crate::second_provider::RENAME_SHORT_YES_ENVIRONMENT,
@@ -4483,6 +4512,7 @@ mod tests {
                     || name == crate::second_provider::net::weather::met::ENVIRONMENT
                     || name == crate::second_provider::NAME_SECOND_SIGN_ENVIRONMENT
                     || name == crate::second_provider::NAME_SAID_TO_A_PERSON_ENVIRONMENT
+                    || name == crate::second_provider::NAME_SIGN_TIED_ENVIRONMENT
                     || name == crate::second_provider::NAME_STAYS_ENVIRONMENT
                     || name == crate::second_provider::NAME_REPEAT_NOT_A_CALL_ENVIRONMENT
                     || name == crate::attention::ONE_AS_LAMP_ENVIRONMENT
@@ -4611,6 +4641,8 @@ mod tests {
                     || name == crate::known_faces::NAME_LEARN_FIX_ENVIRONMENT
                     || name == crate::known_faces::FACE_NO_ASK_ENVIRONMENT
                     || name == crate::known_faces::FACE_SAVE_KNOWN_ONLY_ENVIRONMENT
+                    || name == crate::known_faces::FACE_QUESTION_NOT_ASK_ENVIRONMENT
+                    || name == crate::known_faces::FACE_STICKY_ENVIRONMENT
                     || name == crate::onboarding::learn_later::ENVIRONMENT
                     || name == crate::owner_link::ENVIRONMENT
                     || name == crate::second_provider::RENAME_SHORT_YES_ENVIRONMENT
@@ -4623,6 +4655,12 @@ mod tests {
                     "off"
                 } else if name == crate::second_provider::FIRST_WORDS_ENVIRONMENT {
                     "4"
+                } else if name == crate::care_line::ENVIRONMENT {
+                    "on"
+                } else if name == crate::care_line::REGION_ENVIRONMENT {
+                    "VN"
+                } else if name == crate::care_line::FILE_ENVIRONMENT {
+                    "/etc/lampOS/voice/care-lines.json"
                 } else {
                     "a-secret"
                 },
@@ -4710,6 +4748,9 @@ mod tests {
                     "LAMP_BUSY_ENDS_SOONER=on",
                     "LAMP_BUSY_FOLLOW_UP_RENEWS=on",
                     "LAMP_BUSY_NO_FACE_RENEWS=on",
+                    "LAMP_CARE_LINE=on",
+                    "LAMP_CARE_LINES_FILE=/etc/lampOS/voice/care-lines.json",
+                    "LAMP_CARE_REGION=VN",
                     "LAMP_CARRIED_LINES_KEEP_TALK=on",
                     "LAMP_CARRY_UNANSWERED_SOUND=on",
                     "LAMP_CHOSEN_VOICE=on",
@@ -4732,7 +4773,9 @@ mod tests {
                     "LAMP_FACE_GAP_HOLD=on",
                     "LAMP_FACE_LEARN_LATER=on",
                     "LAMP_FACE_NO_ASK=on",
+                    "LAMP_FACE_QUESTION_NOT_ASK=on",
                     "LAMP_FACE_SAVE_KNOWN_ONLY=on",
+                    "LAMP_FACE_STICKY=on",
                     "LAMP_FIRST_SECONDS_QUIET=on",
                     "LAMP_FORGET_ASKED=off",
                     "LAMP_GOING_ON_NOT_OWN=on",
@@ -4810,6 +4853,7 @@ mod tests {
                     "LAMP_NAME_REPEAT_NOT_A_CALL=on",
                     "LAMP_NAME_SAID_TO_A_PERSON=on",
                     "LAMP_NAME_SECOND_SIGN=on",
+                    "LAMP_NAME_SIGN_TIED=on",
                     "LAMP_NAME_START_USUAL=on",
                     "LAMP_NAME_STAYS_IN_ITS_LINE=on",
                     "LAMP_NAME_WORDLESS_BAR=on",

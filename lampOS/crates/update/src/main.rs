@@ -1064,16 +1064,6 @@ fn on_the_lamp(command: &str, options: &BTreeMap<String, String>) -> ExitCode {
     // `serve` that acts, the one that says `update/status`.
     let mut app_check = (config.apply && command == "serve")
         .then(|| lamp_update::app_check::AppCheck::new(&bus_root, &mut say));
-    // The owner's Update now (#7517): only with its switch on, vouched for by
-    // lamp-cloud's mark under the lamp's root.
-    if lamp_update::update_now::on(
-        std::env::var(lamp_update::update_now::SWITCH)
-            .ok()
-            .as_deref(),
-    ) {
-        app_check = app_check
-            .map(|check| check.with_now(lamp_update::update_now::Marks::under(&config.root)));
-    }
     // The first update after setup (#6284, LAMP_FIRST_UPDATE=on): only
     // the `serve` that acts, the one the app's check is read by.
     let mut first = app_check
@@ -1095,6 +1085,14 @@ fn on_the_lamp(command: &str, options: &BTreeMap<String, String>) -> ExitCode {
         })
     };
     let switches = read_switches();
+    // The owner's Update now (#7517): only with its switch on (`switches.now`,
+    // so the carried /etc/lampOS/update.env turns it on for a lamp in a home,
+    // whose unit no round rewrites), vouched for by lamp-cloud's mark under
+    // the lamp's root.
+    if switches.now {
+        app_check = app_check
+            .map(|check| check.with_now(lamp_update::update_now::Marks::under(&config.root)));
+    }
     // The agents' switches (#5197, #5978, #6226), read in the one place the
     // image's pre-install reads them too (#7274): only a `serve` that acts
     // takes a product lamp's defaults.
@@ -1180,6 +1178,57 @@ fn on_the_lamp(command: &str, options: &BTreeMap<String, String>) -> ExitCode {
         }
         acts.then_some((on, shown))
     };
+    // OpenClaw's gateway only while OpenClaw is the lamp's default agent
+    // (#8105, LAMP_OPENCLAW_GATEWAY_BY_DEFAULT): lamp-tasks is asked every
+    // KEEP_EVERY between rounds, on a thread of its own, so a choice in the
+    // app starts the gateway within seconds and another default stops it.
+    // A round asks once more for its own OpenClaw step. One lock is held by
+    // the round for its whole run and by the thread for each look, so the
+    // two never touch the gateway at once (Twelve's P3 on #8116).
+    let gateway_by_default = matches!(openclaw, Some((true, _))) && switches.gateway_by_default;
+    let tasks_app_socket = config
+        .root
+        .join(lamp_update::openclaw_install::TASKS_APP_SOCKET.trim_start_matches('/'));
+    let gateway_lock = std::sync::Arc::new(std::sync::Mutex::new(()));
+    if gateway_by_default {
+        use lamp_update::openclaw_install as openclaw;
+        say(
+            "OpenClaw's gateway runs only while OpenClaw is the lamp's agent (LAMP_OPENCLAW_GATEWAY_BY_DEFAULT)",
+        );
+        let root = config.root.clone();
+        let socket = tasks_app_socket.clone();
+        let shown = openclaw.map(|(_, shown)| shown).unwrap_or_default();
+        let gateway_lock = gateway_lock.clone();
+        let started = std::thread::Builder::new()
+            .name("gateway-by-default".into())
+            .spawn(move || {
+                let mut systemd = Systemctl::default();
+                let mut said = |line: &str| eprintln!("lamp-update: {line}");
+                loop {
+                    // A round holds the lock: this look is skipped.
+                    if let Ok(_look) = gateway_lock.try_lock() {
+                        let gateway =
+                            openclaw::gateway_wanted(true, openclaw::said_default(&socket));
+                        {
+                            openclaw::keep_between_rounds(
+                                &root,
+                                &mut systemd,
+                                gateway,
+                                shown.one_path,
+                                &mut lamp_update::install::output_of,
+                                &mut said,
+                            );
+                        }
+                    }
+                    std::thread::sleep(openclaw::KEEP_EVERY);
+                }
+            });
+        if let Err(error) = started {
+            say(&format!(
+                "OpenClaw's gateway is not kept to the lamp's agent: no thread: {error}"
+            ));
+        }
+    }
     // Hermes's schedule (#5978): each install watched while it runs, the
     // voice heard from the start, so speech freezes it and a lost privacy
     // reading stops it; one watch for Hermes's and OpenClaw's both (#6226).
@@ -1264,6 +1313,8 @@ fn on_the_lamp(command: &str, options: &BTreeMap<String, String>) -> ExitCode {
         )
     }));
     loop {
+        // Held for the round and its after-steps (#8105).
+        let round_lock = gateway_lock.lock().unwrap_or_else(|e| e.into_inner());
         let before_setup = lamp_update::first_update::before_setup(&config);
         if let Some(first) = &mut first {
             first.begin(lamp_update::records::unix_ms(), &mut say);
@@ -1371,10 +1422,19 @@ fn on_the_lamp(command: &str, options: &BTreeMap<String, String>) -> ExitCode {
                         window
                     }
                 });
-                openclaw_install::after_round(
+                let gateway = if gateway_by_default {
+                    openclaw_install::gateway_wanted(
+                        true,
+                        openclaw_install::said_default(&tasks_app_socket),
+                    )
+                } else {
+                    openclaw_install::Gateway::Wanted
+                };
+                openclaw_install::after_round_with(
                     &config.root,
                     &records,
                     shown,
+                    gateway,
                     &mut systemd,
                     &mut lamp_update::install::output_of,
                     now_unix_ms,
@@ -1508,6 +1568,7 @@ fn on_the_lamp(command: &str, options: &BTreeMap<String, String>) -> ExitCode {
         // After each round: `update/current` may have moved and been
         // confirmed by another lamp-update meanwhile (#6898).
         onto_current(&config, &mut reexec_tried);
+        drop(round_lock);
         // Between rounds the bus is still read, so that what the voice said
         // meanwhile does not wait in the sockets. A check from the app ends
         // the wait (#4153); one that came during the round is dropped.

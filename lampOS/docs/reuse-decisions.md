@@ -2375,3 +2375,26 @@ TLS crates the other clients already pin, `tokio` =1.53.1,
 `rustls` 0.23 with the ring provider given to each client explicitly,
 `webpki-roots` 1, and `reqwest` 0.13 with `rustls-no-provider` for the
 public key's one GET. No OpenSSL; the lock gains no package.
+
+## The NPU's one owner, and its pose model from the Store (#7415)
+
+Keep: the reference binding proven on lamp-0c89 (the gym coach's ctypes
+binding over VIPLite's `libNBGlinker.so`, its buffer layout, property ids,
+flush and invalidate, and its YOLOv8-pose decode of the most confident
+anchor), ported to Rust as it is (`crates/npu/src/vip.rs`, `head.rs`).
+Change: the library is opened at run time (`libloading` =0.9.0, already in
+the lock through `ort`), so the build needs no vendor file and a lamp without
+it answers `unavailable`; one service owns `/dev/vipcore` instead of each
+caller opening it; the model is not in the image but fetched and checked.
+Reuse: the Store's signature check and keys (`lamp_skills::package::
+check_signature`, `store_keys`), so a model is trusted exactly as an app's
+package; `lamp_update::fetch` for HTTPS; `zune-jpeg` =0.4.21 for the JPEG,
+as the eyes; `board/heat` and `voice/privacy` as lamp-health and
+lamp-control say them. The lock gains no package. MoveNet's head ports the
+reference decode the NPU conversion was measured with (`mn.py`: the four
+raw maps the `.nb` gives, the centre weights, the crop around the person
+from the MoveNet tutorial), checked against fixtures it made. Proof: unit
+tests with a fake NPU, a fake Store and the service's own clock; the
+VIPLite struct's size; the ARM64 build; MoveNet converted and measured on
+the lamp by its own reference. Not yet proven: a run on the lamp's NPU
+through this service.

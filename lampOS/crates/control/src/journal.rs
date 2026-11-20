@@ -235,6 +235,7 @@ pub fn op_name(op: &Op) -> &'static str {
         Op::SkillRemove { .. } => "skill.remove",
         Op::CameraSnapshot {} => "camera.snapshot",
         Op::CameraStream { .. } => "camera.stream",
+        Op::Pose { .. } => "pose",
         Op::Volume { .. } => "volume",
         Op::MicrophoneStream { .. } => "microphone.stream",
         Op::ServiceRead { .. } => "service.read",
@@ -266,6 +267,7 @@ pub fn went(op: &Op) -> &'static str {
         Op::CameraSnapshot {} => "the eyes' newest frame, by sight.jpg",
         Op::CameraStream { .. } => "the eyes, by sight.jpg or their frames socket",
         Op::MicrophoneStream { .. } => "the ears, by mic1/audio",
+        Op::Pose { .. } => "the NPU, by lamp-npu's npu.sock",
         Op::ServiceRead { .. } | Op::ServiceWrite { .. } => {
             "lamp-services, by its tools' call.sock"
         }

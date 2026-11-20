@@ -15,6 +15,7 @@
 
 pub mod agent;
 pub mod app_socket;
+pub mod app_triggers;
 pub mod app_yes;
 pub mod body_info;
 pub mod body_lease;
@@ -30,6 +31,7 @@ pub mod lease;
 pub mod microphone;
 pub mod motion_done;
 pub mod notes;
+pub mod npu;
 pub mod paired_by;
 pub mod pairing;
 pub mod parts;
