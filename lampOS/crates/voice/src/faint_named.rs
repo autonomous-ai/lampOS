@@ -91,6 +91,16 @@ impl FaintNamed {
     }
 }
 
+impl FaintNamed {
+    /// Whether the floor turned away speech in a hearing begun at
+    /// `began_us`, said at `now_us`: the hearing [`Self::named`] says, said
+    /// before or not (`LAMP_NAME_FACE_OR_WORDS`, #8136).
+    pub fn turned_away(&self, began_us: u64, now_us: u64) -> bool {
+        let _ = (began_us, now_us);
+        false
+    }
+}
+
 /// A level on the voice's scale as dBFS (`ring_face::level_of`).
 fn dbfs(level: u8) -> f32 {
     -48.0 + f32::from(level) * 34.0 / 255.0
@@ -122,6 +132,24 @@ mod tests {
                 "lamp-voice: the lamp's name was heard (score 0.94) but the faint floor turned the line away: 40 of 40 speech blocks were under it, the loudest at -29.2 dBFS (level 141) against a floor of -28.0 dBFS (level 150)"
             )
         );
+    }
+
+    /// #8136, from #8114's shape 6 (lamp-74ff, 20 Nov 17:32:11: the loudest
+    /// at -28.1 dBFS against a floor of -28.0): a hearing over blocks the
+    /// floor turned away is one it turned away, said once or not; one over
+    /// blocks it let by is not.
+    #[test]
+    fn a_hearing_over_blocks_the_floor_turned_away_is_turned_away() {
+        let mut heard = FaintNamed::default();
+        under_the_floor(&mut heard);
+        assert!(heard.turned_away(1_050_000, 1_500_000));
+        assert!(heard.named(1_050_000, 1_500_000, 0.904).is_some());
+        assert!(heard.turned_away(1_050_000, 1_500_000));
+        let mut heard = FaintNamed::default();
+        for index in 0..40u64 {
+            heard.block(1_000_000 + index * BLOCK_US, 0.9, 170, Some(150), false);
+        }
+        assert!(!heard.turned_away(1_050_000, 1_500_000));
     }
 
     #[test]
