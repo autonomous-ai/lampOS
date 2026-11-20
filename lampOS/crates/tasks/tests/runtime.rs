@@ -4362,36 +4362,91 @@ fn a_look_at_a_named_session_answers_at_once_and_is_asked_again_for_what_it_foun
     assert_eq!(s.counts.launches.load(Ordering::SeqCst), 0);
 }
 
+/// The work records are one board a process (`lamp_tasks::works`): the
+/// tests that forget them, or read them, run one at a time, so one's
+/// forget never clears another's record mid-test (Heron's P3 on #8052).
+static WORKS: Mutex<()> = Mutex::new(());
+
+fn works_alone() -> std::sync::MutexGuard<'static, ()> {
+    WORKS
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner)
+}
+
+/// A task with `text` confirmed and held in its launch, so the store keeps
+/// it queued and the work records list it.
+fn held_task(s: &Running, text: &str) -> Value {
+    s.counts.hold_launch.store(true, Ordering::SeqCst);
+    let prepared = s.ask(json!({"op":"prepare","guard":s.guard(),"text":text,"target":"coding"}));
+    assert_eq!(prepared["ok"], true, "{prepared}");
+    assert_eq!(s.trusted(s.confirmation(&prepared))["ok"], true);
+    prepared["id"].clone()
+}
+
+/// Whether any work record, by `id` or in the list, holds `words`, within
+/// `for_ms` (the records are brought up to date every 500 ms).
+fn records_hold(s: &Running, id: &Value, words: &str, for_ms: u64) -> bool {
+    let start = Instant::now();
+    loop {
+        let by_id = s.ask(json!({"op":"work","id":id.to_string()}));
+        let list = s.ask(json!({"op":"work_list","limit":10}));
+        if by_id.to_string().contains(words) || list.to_string().contains(words) {
+            return true;
+        }
+        if start.elapsed() > Duration::from_millis(for_ms) {
+            return false;
+        }
+        thread::sleep(Duration::from_millis(20));
+    }
+}
+
 /// #7930: the owner's "forget everything" clears the work records too: a
-/// record's words and answer are gone after it, by id and in the list.
+/// store task's words and answer are gone after it, by id and in the
+/// list, and the next refreshes don't open it again.
 #[test]
 fn forget_sessions_clears_the_work_records() {
+    let _alone = works_alone();
     let s = Running::new(false);
-    let now = lamp_tasks::works::unix_ms();
-    lamp_tasks::works::with(|board| {
-        board.tasks(
-            &[lamp_tasks::works::TaskWork {
-                task_id: 4242,
-                engine: lamp_tasks::harness::EngineKind::Openclaw,
-                words: "Find the cheapest flight to Hanoi".into(),
-                state: Some(lamp_tasks::works::State::Done),
-                tools: 3,
-                answer: Some("Tuesday, 1.2 million dong.".into()),
-                session: None,
-                started_ago_ms: None,
-            }],
-            |_| None,
-            now,
-        );
-    });
-    let before = s.ask(json!({"op":"work","id":"4242"}));
-    assert_eq!(before["work"]["answer"], "Tuesday, 1.2 million dong.", "{before}");
+    let id = held_task(&s, "Find the cheapest flight to Hanoi");
+    assert!(
+        records_hold(&s, &id, "Hanoi", 3_000),
+        "on the records first"
+    );
     assert_eq!(s.trusted(json!({"op":"forget_sessions"}))["ok"], true);
-    let after = s.ask(json!({"op":"work","id":"4242"}));
-    assert_eq!(after["error"], "no_such_work", "{after}");
-    let list = s.ask(json!({"op":"work_list","limit":10}));
-    let shown = list.to_string();
-    assert!(!shown.contains("Hanoi") && !shown.contains("Tuesday"), "{shown}");
+    assert!(!records_hold(&s, &id, "Hanoi", 1_200));
+    s.counts.hold_launch.store(false, Ordering::SeqCst);
+}
+
+/// #7930 (Heron's P2 1): forget everything right after a confirm, before
+/// the records were brought up to date, leaves that task off them too.
+#[test]
+fn forget_sessions_covers_a_store_task_not_yet_on_the_records() {
+    let _alone = works_alone();
+    let s = Running::new(false);
+    let id = held_task(&s, "Book a table near Hoan Kiem lake");
+    assert_eq!(s.trusted(json!({"op":"forget_sessions"}))["ok"], true);
+    assert!(!records_hold(&s, &id, "Hoan Kiem", 1_200));
+    s.counts.hold_launch.store(false, Ordering::SeqCst);
+}
+
+/// #7930 (Heron's P2 1): after forget everything, a fresh lamp-tasks over
+/// the same store doesn't open the forgotten tasks again; one handed over
+/// after it is on the records.
+#[test]
+fn forget_sessions_holds_across_a_restart_of_lamp_tasks() {
+    let _alone = works_alone();
+    let mut s = Running::new(false);
+    let id = held_task(&s, "Compare rice cookers under two million dong");
+    assert!(records_hold(&s, &id, "rice cookers", 3_000));
+    let forgot = s.trusted(json!({"op":"forget_sessions"}));
+    assert_eq!(forgot["ok"], true, "{forgot}");
+    s.counts.hold_launch.store(false, Ordering::SeqCst);
+    s.stop();
+    s.start();
+    assert!(!records_hold(&s, &id, "rice cookers", 1_200));
+    let later = held_task(&s, "Find a quiet cafe in Ba Dinh");
+    assert!(records_hold(&s, &later, "quiet cafe", 3_000));
+    s.counts.hold_launch.store(false, Ordering::SeqCst);
 }
 
 /// #6274: the owner's "forget everything" (the voice's `forget_sessions`,
@@ -4400,6 +4455,7 @@ fn forget_sessions_clears_the_work_records() {
 /// refused and the index stays.
 #[test]
 fn forget_sessions_removes_the_index_of_the_sessions_the_lamp_started() {
+    let _alone = works_alone();
     let s = Running::new(false);
     let file = s.config.dir.join(lamp_tasks::runtime::SESSION_INDEX_FILE);
     lamp_tasks::session_index::record(

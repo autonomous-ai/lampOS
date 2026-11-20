@@ -2030,6 +2030,10 @@ fn owner<C: Clock>(
     ): Switches,
 ) -> io::Result<()> {
     let mut looks = Looks::new(session_lane);
+    // The owner's last "forget everything" (#7930), kept beside the store:
+    // the tasks it held are never on the work records again.
+    let forgotten_file = session_index.with_file_name(crate::works::FORGOTTEN_FILE);
+    let mut forgotten = crate::works::Forgotten::load(&forgotten_file);
     // The app's choice of the lamp's default engine (#6492), as kept.
     let lamp = set_up_later.as_ref().and_then(|later| later.lamp.clone());
     if let Some(side) = lamp.as_ref()
@@ -2756,7 +2760,12 @@ fn owner<C: Clock>(
                     requests = requests.saturating_add(1);
                     let _ = work.response.try_send(answer);
                 } else if let Request::Work { id } = &work.request {
-                    works_refresh(&engine, &clock.sample()?, tracker.as_ref());
+                    works_refresh(
+                        &engine,
+                        &clock.sample()?,
+                        tracker.as_ref(),
+                        forgotten.as_ref(),
+                    );
                     let found = crate::works::with(|board| board.get(id, unix_ms()));
                     let answer = match found {
                         Some(record) => engine.identified(json!({"work":record})),
@@ -2769,7 +2778,12 @@ fn owner<C: Clock>(
                     let _ = work.response.try_send(answer);
                 } else if let Request::WorkList { limit } = &work.request {
                     let answer = if (1..=crate::works::LIST_MOST).contains(limit) {
-                        works_refresh(&engine, &clock.sample()?, tracker.as_ref());
+                        works_refresh(
+                            &engine,
+                            &clock.sample()?,
+                            tracker.as_ref(),
+                            forgotten.as_ref(),
+                        );
                         let works =
                             crate::works::with(|board| board.list(usize::from(*limit), unix_ms()));
                         engine.identified(json!({"works":works}))
@@ -2789,16 +2803,22 @@ fn owner<C: Clock>(
                         // deleted, and a new one opened (openharness#4393).
                         crate::one_session::forgotten();
                         // The work records too, with the person's words
-                        // and the agents' answers in them (#7930).
+                        // and the agents' answers in them (#7930): every
+                        // task the store holds now, on the records yet or
+                        // not, kept off them after a restart too.
+                        let mark = engine.forget_mark();
+                        let kept = mark.save(&forgotten_file);
+                        forgotten = Some(mark);
                         crate::works::forget_all();
-                        match crate::session_index::forget(&session_index) {
-                            Ok(forgotten) => {
-                                if forgotten {
+                        let index = crate::session_index::forget(&session_index);
+                        match kept.and(index) {
+                            Ok(any) => {
+                                if any {
                                     eprintln!(
                                         "tasks: the sessions the lamp started were forgotten"
                                     );
                                 }
-                                engine.identified(json!({"forgotten":forgotten}))
+                                engine.identified(json!({"forgotten":any}))
                             }
                             Err(error) => {
                                 eprintln!(
@@ -2892,7 +2912,12 @@ fn owner<C: Clock>(
         // The work records too, before the watch lets a task's line go.
         if works_due <= Instant::now() {
             works_due = Instant::now() + WORKS_EVERY;
-            works_refresh(&engine, &clock.sample()?, tracker.as_ref());
+            works_refresh(
+                &engine,
+                &clock.sample()?,
+                tracker.as_ref(),
+                forgotten.as_ref(),
+            );
         }
         if !busy && !stop.load(Ordering::Acquire) {
             let now = clock.sample()?;
@@ -4455,8 +4480,13 @@ const WORKS_EVERY: Duration = Duration::from_millis(500);
 /// The store's tasks on the work records brought up to date from the store
 /// and the watch's read ([`crate::works::Board::tasks`]): in memory only,
 /// the records' lock held for that alone.
-fn works_refresh(engine: &Engine<Store>, now: &ClockSample, tracker: Option<&Tracker>) {
-    let seen = engine.works(now);
+fn works_refresh(
+    engine: &Engine<Store>,
+    now: &ClockSample,
+    tracker: Option<&Tracker>,
+    forgotten: Option<&crate::works::Forgotten>,
+) {
+    let seen = engine.works(now, forgotten);
     let at = unix_ms();
     crate::works::with(|board| {
         board.tasks(&seen, |task| crate::works::line_of(tracker, task), at);
