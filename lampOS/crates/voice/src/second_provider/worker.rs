@@ -8101,6 +8101,13 @@ pub(crate) struct Heeding {
     /// With it, `LAMP_BUSY_NO_FACE_RENEWS=on`
     /// ([`Self::renewing_no_face_follow_ups`]).
     no_face_renews: bool,
+    /// `LAMP_NAME_SIGN_TIED` (#8092): the request `LAMP_SAID_TO_ME` let out
+    /// as the one answer with no look to the lamp's waiting question
+    /// ([`crate::said_to_me::Said::AnswerNoLook`]): its answer renews
+    /// nothing. And whether that answer was played since the last line
+    /// played with a look or the name.
+    no_look_answer: Option<u64>,
+    look_free_used: bool,
     /// With it, the request let out as the caller's own follow-up
     /// ([`FOLLOW_UP_NOTE`]).
     follow_up_line: Option<u64>,
@@ -9242,6 +9249,8 @@ impl Heeding {
             from_start: false,
             follow_up_renews: false,
             no_face_renews: false,
+            no_look_answer: None,
+            look_free_used: false,
             follow_up_line: None,
             someone_elses_line: None,
             call_renewed_at: None,
@@ -11526,6 +11535,9 @@ impl Heeding {
                 at > self.said_until_us.unwrap_or_default()
                     && monotonic_us().saturating_sub(at) <= crate::room_told::BUSY_ENDS_AFTER_US
             }),
+            // `LAMP_NAME_SIGN_TIED` (#8092): only with eyes to give a look.
+            looks_needed: self.attention.second_sign_tied() && self.eyes.is_some(),
+            look_free_answered: self.look_free_used,
             ..Default::default()
         };
         // The eyes' signs as the replay of saved journals reads them
@@ -11545,6 +11557,8 @@ impl Heeding {
         }
         let going_on = signs.going_on;
         let decision = crate::said_to_me::judge(line);
+        self.no_look_answer =
+            (decision == crate::said_to_me::Said::AnswerNoLook).then_some(request);
         let mut pose = crate::said_to_me::pose(line.pitch, line.looking, looks);
         if skipped {
             pose.push_str(", the lone face's pose skipped: another voice");
@@ -12900,7 +12914,14 @@ impl Heeding {
         // said to the lamp ends the chain.
         // `LAMP_UNTIED_GOING_ON`: nor when it has no tie to the lamp, with
         // or without a sign of someone else (#3882).
-        if played && opens_nothing {
+        // `LAMP_NAME_SIGN_TIED` (#8092): the one answer with no look to the
+        // lamp's waiting question renews nothing, and is used up until a
+        // line with a look or the name is played.
+        let no_look_answer = played && self.no_look_answer == Some(request);
+        if played {
+            self.look_free_used = no_look_answer;
+        }
+        if played && (opens_nothing || no_look_answer) {
             // Its words renew no conversation going on (#4175).
             self.chain.push(request);
         } else if self.not_own && self.alone.is_some() {
@@ -12933,6 +12954,7 @@ impl Heeding {
             && alone
             && !untied
             && !opens_nothing
+            && !no_look_answer
             && !called
             && !someone_else
             && !(self.no_face_renews && seen.other_voice)

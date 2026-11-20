@@ -3117,9 +3117,11 @@ fn spoken_form(word: &str) -> String {
         .map_or(spoken.to_owned(), |stem| format!("{stem}m"))
 }
 
-/// Whether a word sounds like the lamp's name at all ([`like_the_name`]).
-#[cfg(test)]
-fn sounds_like_the_name(word: &str) -> bool {
+/// Whether a word sounds like the lamp's name at all ([`like_the_name`]):
+/// with `LAMP_NAME_SIGN_TIED`, a one-word line whose word doesn't is never
+/// taken as the name with no look (`attention::Attention::weigh_the_name`,
+/// #8092).
+pub(crate) fn sounds_like_the_name(word: &str) -> bool {
     like_the_name(word) != LikeTheName::Not
 }
 
