@@ -2990,13 +2990,24 @@ them) (`crates/tasks/src/openclaw_config.rs`):
 **OpenClaw checks the text before it lands** (#7108; on 15 Nov a merge
 OpenClaw 2026.11.2 refused, 78/CONFIG, took lamp-52e6's gateway down): a
 changed text goes to a new 0600 file beside `openclaw.json`, and OpenClaw's
-own `config validate --json` runs on it through lamp-update's wrapper
-`/usr/local/bin/openclaw` (`openclaw_config::validate`), pointed at that
-file by `OPENCLAW_CONFIG_PATH`, never the live one, joined to the running
-gateway's namespaces as the wrapper's every other call is (never
-`LAMP_OPENCLAW_GATEWAY=on`: OpenClaw 2026.11.2 refuses a check in
+own `config validate --json` runs on it (`openclaw_config::validate`),
+pointed at that file by `OPENCLAW_CONFIG_PATH`, never the live one, in
+OpenClaw's own environment, at most 60 s. While
+`lamp-openclaw-gateway.service` has a `MainPID` (its gateway runs), it
+runs through lamp-update's wrapper `/usr/local/bin/openclaw`, joined to
+the running gateway's namespaces as the wrapper's every other call is
+(never `LAMP_OPENCLAW_GATEWAY=on`: OpenClaw 2026.11.2 refuses a check in
 namespaces of its own while its gateway runs, `GatewayLockNamespaceError`,
-#7268's ROW FAIL on lamp-52e6), in OpenClaw's own environment, at most 60 s. Only
+#7268's ROW FAIL on lamp-52e6). With no gateway running (`MainPID` 0)
+there is no lock to clash with, and it runs inside `openclaw-ns` of its
+own with a stand-in `LAMP_HERMES_TOKEN`, the same command lamp-update's
+`gateway` block and lamp-setup's reset run with no gateway
+(`openclaw_install::own_namespace_validate_argv`: `validate_argv` without
+`runuser`, lamp-tasks being `lampos` already; #8060). So a config
+OpenClaw refuses that is already in `openclaw.json`, and keeps the
+gateway from starting (Restart=on-failure, then "Start request repeated
+too quickly"), is replaced at lamp-tasks' next write by a merged text
+OpenClaw takes; a merged text it refuses still writes nothing. Only
 status 0 renames it into place (`hermes_config::replace_checked`).
 Refused (or past 60 s), the new file is removed, `openclaw.json` stays byte
 for byte, and the journal line says "OpenClaw's settings not written: ...
@@ -3004,15 +3015,16 @@ OpenClaw's own config check refused it (status 1): <OpenClaw's words>".
 With no wrapper at `/usr/local/bin/openclaw` (OpenClaw not installed) the
 text is written as before, with a journal line "written unchecked". A
 wrapper that can't run OpenClaw (no forwarder token, no Node) refuses, so
-nothing is written until lamp-tasks' next start. With no gateway running
-the wrapper fails closed too, and lamp-tasks can start before the gateway
-(at a boot, or an update that restarts both: #7268's HOLD), so that
-refusal alone (the wrapper's "is not running in its own namespaces", or
-"'node': No such file or directory" from a gateway just started) is tried
-again after 5, 10, 20, 40 s and then 60 s four times, 5 min 15 s in all
+nothing is written until lamp-tasks' next start. lamp-tasks can start
+with the gateway (at a boot, or an update that restarts both: #7268's
+HOLD), so a gateway the check can't join yet (the wrapper's "is not
+running in its own namespaces" behind a `MainPID`, or "'node': No such
+file or directory" from a gateway just started), or one that came up
+under a check in `openclaw-ns` of its own (`GatewayLockNamespaceError`,
+#8060), alone is tried again after 5, 10, 20, 40 s and then 60 s four times, 5 min 15 s in all
 (`openclaw_config::GATEWAY_WAITS`), each wait one journal line "OpenClaw's
 settings wait for its gateway to check them; tried again in N s"; nothing
-is written before the gateway checks it. A check ended by a signal before
+is written before OpenClaw checks it. A check ended by a signal before
 OpenClaw gave a verdict ("status killed": on lamp-52e6, lamp-tasks and the
 gateway restarted together and the check raced the gateway's own start,
 #7268's FINDING), or one killed past its 60 s bound
@@ -3034,14 +3046,17 @@ reset (its cut to `gateway`, docs/setup.md). Both check with
 has a `MainPID` (its gateway runs), through the wrapper, joined to the
 gateway's namespaces as lamp-tasks' check is; with no gateway running (as
 at a first install) there is no lock to clash with, so it runs in
-`openclaw-ns` of its own as before. `GATEWAY_WAITS`, `NO_GATEWAY`,
-`NODE_NOT_READY` and `gateway_not_there` now live in
+`openclaw-ns` of its own as before. lamp-tasks' check makes the same
+choice from the same `MainPID` (`openclaw_install::gateway_runs` and
+`main_pid_argv`, which the reset uses too; #8060). `GATEWAY_WAITS`,
+`NO_GATEWAY`, `NODE_NOT_READY`, `GATEWAY_CAME_UP` and `gateway_not_there`
+now live in
 `lamp_checked_replace` (lamp-tasks re-exports them in `openclaw_config`,
 lamp-update re-exports `NODE_NOT_READY` in `openclaw_install`, and a test
 pins `NO_GATEWAY` to the wrapper's no-gateway line), and lamp-update's
 one-shot uses the same schedule: only a refusal because
-the gateway was not there to check is tried again, never a refusal of the
-text.
+the gateway was not there to check, or came up under the check, is tried
+again, never a refusal of the text.
 All three writers of `openclaw.json` (lamp-tasks' `write_checked`,
 lamp-update's `gateway_config`, lamp-setup's reset cut) hold one lock
 from before their read until after their rename (Seventh's P2 on
