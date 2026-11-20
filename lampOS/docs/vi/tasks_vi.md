@@ -2874,7 +2874,7 @@ không thêm gì vào prompt của lượt ngoài một dòng việc-còn-mở b
 - **Lúc giao việc, việc được đặt tên.** Câu trả lời của
   `confirm_agent_task` mang `work_id` (id của tác vụ, dạng chuỗi) và
   `label` (lời của tác vụ, hoặc câu hỏi của một tác vụ hỏi, bỏ đường dẫn,
-  trên một dòng, nhiều nhất 60 ký tự):
+  trên một dòng, nhiều nhất 60 ký tự, cắt ở một từ trọn vẹn):
 
   ```json
   {"handing_over":true,"who":"Claude Code","work_id":"7","label":"Write hello.txt","next":"…"}
@@ -3518,7 +3518,9 @@ lamp-c0a4) thì không đổi gì: OpenClaw vẫn là engine của đèn, và ph
   giờ của máy tính. OpenClaw cũng là một agent mà voice có thể gọi tên trên
   máy tính, nghe được là "OpenClaw", "open claw", "open clause", "open
   close", "open clow" hoặc "open klaw". Tin về việc do engine nào làm trên
-  đèn cũng được kể là làm ngay tại đèn.
+  đèn cũng được kể là làm ngay tại đèn. Lời đọc lại có `where` là "the lamp"
+  cho engine riêng của đèn, không bao giờ nói tên nó (#7930); "OpenClaw on
+  the lamp" chỉ khi người dùng tự nêu tên engine.
 - **Chỉ thấy trong test:** `agent_tasks::tests::new_work_goes_to_openclaw_on_the_lamp`,
   `agent_tasks::tests::with_the_lamps_target_the_hand_over_says_what_goes_where`,
   `agent_tasks::tests::with_named_only_the_words_name_an_agent_not_set_up`,

@@ -1959,7 +1959,9 @@ The product unit's test is `the_tasks_part_starts_with_no_targets_and_learns_the
     time, the weather, memory, skills) stay the lamp's. Test:
     `agent_tasks::tests::with_the_lamps_target_the_hand_over_says_what_goes_where`.
     The read-back and the yes
-    are as before (one yes for a named session too): "Hermes on the lamp".
+    are as before (one yes for a named session too): `where` is "the lamp"
+    for the lamp's own engine, never its name (#7930), and "Hermes on the
+    lamp" only for an engine the person named.
     Asked for with no `lamp` target, it says that isn't set up and nothing
     goes to a computer instead. A call naming no machine from a tool
     declared with the lamp's words goes to the lamp even when the `lamp`
@@ -7227,7 +7229,7 @@ nothing is added to a turn's prompt but the one open-work line below.
 - **The hand-over names the work.** `confirm_agent_task`'s answer carries
   `work_id` (the task's id, as a string) and `label` (the task's words, or
   a question task's question, without paths, on one line, at most 60
-  characters):
+  characters, cut at a whole word):
 
   ```json
   {"handing_over":true,"who":"Claude Code","work_id":"7","label":"Write hello.txt","next":"…"}
