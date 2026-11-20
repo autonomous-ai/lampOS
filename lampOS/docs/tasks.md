@@ -1982,8 +1982,11 @@ The product unit's test is `the_tasks_part_starts_with_no_targets_and_learns_the
   - **A make is `make_skill`'s (#8022 case 2).** While `make_skill` is
     declared, `start_agent_task`'s description ends "Making a skill is make_skill's, never this." (`agent_tasks::MAKE_TOLD`, added in `tools::core_tools`), only
     when the two still fit the link's 1,024 bytes; one that would not is
-    left as it was. Without `make_skill` it is never said. See
-    [skills.md](skills.md), "A make is never a task".
+    left as it was. Without `make_skill` it is never said. A make whose
+    first word is the lamp's name heard as another word is forced to
+    `make_skill` on a line that names the lamp, past that word. See
+    [skills.md](skills.md), "A make is never a task" and "Past the lamp's
+    name heard as another word".
   - **A named engine (#6492).** The voice keeps the lamp's engines from
     the `targets` answer: the `lamp` target's `engine` (its default) first,
     then its `engines`, each once (`[engine]` alone from an older tasks
