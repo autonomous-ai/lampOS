@@ -1880,7 +1880,14 @@ khi các điều đã giữ chưa xong: bộ nhớ không trả lời hay từ c
 quá nhiều để xem hết, hoặc hơn tám điều khớp (mô hình hỏi điều nào). Khi có lượt
 bị xóa, câu trả lời nói bao nhiêu (`exchanges`, không bao giờ lời của chúng)
 và cuộc trò chuyện ngừng được ghi nhật ký, như sau khi quên một điều đã giữ.
-Thêm một yêu cầu cục bộ trong 1,5 s của lệnh gọi.
+Đã gửi mà không được trả lời (hết giờ hay mất câu trả lời; bị từ chối thì
+không xóa gì), thì lời đã nói về nó không được biết là đã mất: mô hình được
+báo `history:
+"not_reached"` bên cạnh kết quả riêng của các điều đã giữ, không bao giờ
+"forgot nothing". Không điều đã giữ nào mất thì ghi chú nói không điều đã
+giữ nào bị quên, rằng chưa quên xong, và không được nói là chẳng có gì hay
+là đã quên; có điều đã mất thì một `history_note` nói vậy bên cạnh những gì
+đã mất. Thêm một yêu cầu cục bộ trong 1,5 s của lệnh gọi.
 
 Dấu quên (phương án 2 của El trên #5333): trước thay đổi trên, quên theo chủ
 đề chỉ khớp điều đã giữ và quan sát, nên một lượt nói chưa từng được giữ
