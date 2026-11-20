@@ -2505,6 +2505,9 @@ struct Shared {
     /// unbroken track alone in view, is theirs for the carry
     /// (`LAMP_CONVERSATION_CARRIES_OWN_TRACK`, [`Engine::carrying_own_track`]).
     carries_own_track: bool,
+    /// `LAMP_FACE_STICKY` ([`Engine::holding_sticky`]): the eyes hold the
+    /// name themselves, so the own-track carry is inert.
+    face_sticky: bool,
     /// A carried line may save into the conversation's scope
     /// (`LAMP_CONVERSATION_CARRIED_SAVES`, [`Engine::saving_carried`]).
     carried_saves: bool,
@@ -2712,7 +2715,11 @@ fn own_track_face(
     begun: Instant,
     finishing: Instant,
 ) -> Option<String> {
-    if !shared.carries_own_track {
+    // With `LAMP_FACE_STICKY` the eyes' own hold keeps naming the face;
+    // a name they let go of on that box went on a print they couldn't
+    // read as the person's, which may be someone else's: never carried as
+    // the person (Friday's P2 on #7933).
+    if !shared.carries_own_track || shared.face_sticky {
         return None;
     }
     eyes.own_track_alone(
@@ -5400,6 +5407,7 @@ impl Engine {
                 carries: None,
                 skill_yes_carry: false,
                 carries_own_track: false,
+                face_sticky: false,
                 carried_saves: false,
                 carried_memory: false,
                 held_words_seen: false,
@@ -5598,6 +5606,14 @@ impl Engine {
                     };
                     eprintln!("lamp-voice second: request {request}: memory scope {whose}: {told}");
                 }
+                // Why a heard line is the room's when the eyes' snapshot is
+                // empty, whatever the switches (the sticky plan's T0): a
+                // reason, ms and counts, never a name.
+                if let Some(told) = cache.room_told(now) {
+                    eprintln!(
+                        "lamp-voice second: request {request}: memory scope the room's: {told}"
+                    );
+                }
                 // A line held only by a gap is never journalled, whether or
                 // not its exchange is filed by its scope
                 // (`LAMP_SECOND_SCOPED_CONTEXT`): kept out as it is admitted,
@@ -5726,6 +5742,17 @@ impl Engine {
     pub fn carrying_own_track(mut self, on: bool) -> Self {
         let shared = Arc::get_mut(&mut self.shared).expect("configured before admission");
         shared.carries_own_track = on;
+        self
+    }
+
+    /// `LAMP_FACE_STICKY=on`: the eyes hold a known name through weak
+    /// prints on their own box and let go only of a face clearly someone
+    /// else's, so [`Self::carrying_own_track`] is inert: a let-go print on
+    /// the owner's box is never carried as the owner. Its switch is to be
+    /// removed once STICKY is the default (the sticky identity plan).
+    pub fn holding_sticky(mut self, on: bool) -> Self {
+        let shared = Arc::get_mut(&mut self.shared).expect("configured before admission");
+        shared.face_sticky = on;
         self
     }
 
@@ -15072,13 +15099,20 @@ fn one_face_refuses(name: &str, args: &Value, reminders: bool) -> bool {
 
 /// Whether `call` is refused on this scope by the one-face rule
 /// ([`one_face_refuses`]), by every runner.
+///
+/// A line from a name the eyes hold (`LAMP_FACE_STICKY`,
+/// `ScopeLease::sticky_held`) is refused all of them, the single-item yes
+/// (#5627) included: a held identity never runs a forget, correction or
+/// rule. Only the lamp's own take-back of its own keep still runs.
 fn one_face_refused(scope: Option<&crate::memory_scope::ScopeLease>, call: &net::ToolCall) -> bool {
     scope.is_some_and(|scope| {
-        scope.forgets_need_mouth()
-            // The lamp taking back its own keep of this request on its own
-            // doubt ([`undo_doubted_keep`]): no one's forget.
-            && !(call.name == crate::remember::FORGET
-                && (scope.undoes_own_keep(&call.args) || scope.agreed_forget(&call.args)))
+        let own_undo = call.name == crate::remember::FORGET && scope.undoes_own_keep(&call.args);
+        (scope.sticky_held() && !own_undo)
+            || (scope.forgets_need_mouth()
+                // The lamp taking back its own keep of this request on its own
+                // doubt ([`undo_doubted_keep`]): no one's forget.
+                && !(call.name == crate::remember::FORGET
+                    && (own_undo || scope.agreed_forget(&call.args))))
     }) && one_face_refuses(
         &call.name,
         &call.args,
@@ -16721,12 +16755,15 @@ fn ask_once_forget(
     scope: Option<&crate::memory_scope::ScopeLease>,
 ) -> Option<Value> {
     let lease = scope?;
+    // A line from a name the eyes hold (`LAMP_FACE_STICKY`) is asked
+    // nothing: its forget is refused, as a held identity runs none.
     if !heard
         || call.name != crate::remember::FORGET
         || held_by_gap(scope)
         || !lease.forgets_need_mouth()
         // Their yes to one asked about already ([`agree_held_forget`]).
         || lease.agreed_forget(&call.args)
+        || lease.sticky_held()
     {
         return None;
     }

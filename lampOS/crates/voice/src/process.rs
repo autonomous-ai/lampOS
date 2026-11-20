@@ -1601,6 +1601,18 @@ fn worker_command(
             role,
             var(crate::memory_scope::GAP_ENVIRONMENT).as_deref(),
         ))
+        .envs(face_no_face_hold_worker_environment(
+            role,
+            var(crate::memory_scope::NO_FACE_HOLD_ENVIRONMENT).as_deref(),
+        ))
+        .envs(face_sticky_worker_environment(
+            role,
+            var(crate::known_faces::STICKY_ENVIRONMENT).as_deref(),
+        ))
+        .envs(carried_journal_worker_environment(
+            role,
+            var(crate::second_provider::worker::CARRIED_JOURNAL_ENVIRONMENT).as_deref(),
+        ))
         .envs(quiet_evidence_worker_environment(
             role,
             var(crate::quiet_pace::EVIDENCE_ENVIRONMENT).as_deref(),
@@ -2717,6 +2729,39 @@ fn face_gap_worker_environment(
 ) -> Option<(&'static str, &'static str)> {
     (role == "second" && value == Some(std::ffi::OsStr::new("on")))
         .then_some((crate::memory_scope::GAP_ENVIRONMENT, "on"))
+}
+
+// The sticky plan's no-face hold (T1), to the one route whose memory scope
+// holds it: the second's, the exact `on`.
+fn face_no_face_hold_worker_environment(
+    role: &str,
+    value: Option<&std::ffi::OsStr>,
+) -> Option<(&'static str, &'static str)> {
+    (role == "second" && value == Some(std::ffi::OsStr::new("on")))
+        .then_some((crate::memory_scope::NO_FACE_HOLD_ENVIRONMENT, "on"))
+}
+
+// The sticky plan's T9 (`LAMP_CARRIED_JOURNAL`), to the second route only,
+// whose worker journals; the exact `on`.
+fn carried_journal_worker_environment(
+    role: &str,
+    value: Option<&std::ffi::OsStr>,
+) -> Option<(&'static str, &'static str)> {
+    (role == "second" && value == Some(std::ffi::OsStr::new("on"))).then_some((
+        crate::second_provider::worker::CARRIED_JOURNAL_ENVIRONMENT,
+        "on",
+    ))
+}
+
+// The sticky plan's voice part (the eyes' held mark), to both routes that
+// read the eyes' known file for memory and the owner's checks, the exact
+// `on`.
+fn face_sticky_worker_environment(
+    role: &str,
+    value: Option<&std::ffi::OsStr>,
+) -> Option<(&'static str, &'static str)> {
+    (matches!(role, "provider" | "second") && value == Some(std::ffi::OsStr::new("on")))
+        .then_some((crate::known_faces::STICKY_ENVIRONMENT, "on"))
 }
 
 // The echo evidence's skip (#705), to the one worker that runs it: capture.
@@ -4461,6 +4506,9 @@ mod tests {
                     crate::services_told::ENVIRONMENT,
                     crate::attention::NEAR_CALIBRATED_ENVIRONMENT,
                     crate::memory_scope::GAP_ENVIRONMENT,
+                    crate::memory_scope::NO_FACE_HOLD_ENVIRONMENT,
+                    crate::known_faces::STICKY_ENVIRONMENT,
+                    crate::second_provider::worker::CARRIED_JOURNAL_ENVIRONMENT,
                     crate::second_provider::worker::SCOPED_CONTEXT_ENVIRONMENT,
                     lamp_body::unplug::ENVIRONMENT,
                     lamp_msgs::SHUTDOWN_SWITCH,
@@ -4701,6 +4749,7 @@ mod tests {
                 vec![
                     "LAMP_ATTENTION_NEAR_CALIBRATED=on",
                     "LAMP_FACES_AT_DESK_ONLY=on",
+                    "LAMP_FACE_STICKY=on",
                     "LAMP_KERNEL_CLOCK=on",
                     "LAMP_LEDGER_REFENCE=on",
                     "LAMP_MEMORY_DAYS=on",
@@ -4751,6 +4800,7 @@ mod tests {
                     "LAMP_CARE_LINE=on",
                     "LAMP_CARE_LINES_FILE=/etc/lampOS/voice/care-lines.json",
                     "LAMP_CARE_REGION=VN",
+                    "LAMP_CARRIED_JOURNAL=on",
                     "LAMP_CARRIED_LINES_KEEP_TALK=on",
                     "LAMP_CARRY_UNANSWERED_SOUND=on",
                     "LAMP_CHOSEN_VOICE=on",
@@ -4773,6 +4823,7 @@ mod tests {
                     "LAMP_FACE_GAP_HOLD=on",
                     "LAMP_FACE_LEARN_LATER=on",
                     "LAMP_FACE_NO_ASK=on",
+                    "LAMP_FACE_NO_FACE_HOLD=on",
                     "LAMP_FACE_QUESTION_NOT_ASK=on",
                     "LAMP_FACE_SAVE_KNOWN_ONLY=on",
                     "LAMP_FACE_STICKY=on",

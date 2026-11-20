@@ -471,6 +471,31 @@ pub const SCOPED_CONTEXT_ENVIRONMENT: &str = "LAMP_SECOND_SCOPED_CONTEXT";
 /// again only when the person changes or the worker restarts.
 pub const REOPEN_QUIET_ENVIRONMENT: &str = "LAMP_MEMORY_REOPEN_QUIET";
 
+/// The sticky plan's T9 (Friday's P2 on #7933): a carried line read as its
+/// person's (`LAMP_CONVERSATION_CARRIED_MEMORY`) is journalled in their
+/// record. `on` only; off, kept out as before. Its own switch, switched on
+/// on its own evidence (T0's counts).
+pub const CARRIED_JOURNAL_ENVIRONMENT: &str = "LAMP_CARRIED_JOURNAL";
+
+/// Whether the service's environment says `LAMP_CARRIED_JOURNAL=on`, read
+/// once.
+pub fn carried_journal_on() -> bool {
+    static ON: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
+    *ON.get_or_init(|| std::env::var(CARRIED_JOURNAL_ENVIRONMENT).ok().as_deref() == Some("on"))
+}
+
+/// Carried lines journalled as their person's since the worker started
+/// ([`keep_out_scoped`]), for the journal's count.
+static CARRIED_JOURNALLED: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+
+/// The journal's line for a carried line journalled as its person's: the
+/// request and the count so far, no words and no name.
+pub(crate) fn carried_journalled_line(request: u64, count: u64) -> String {
+    format!(
+        "lamp-voice second: request {request}: a carried line read as its person's is journalled in their record ({count} so far, LAMP_CARRIED_JOURNAL)"
+    )
+}
+
 /// Whether the service's environment says `LAMP_SECOND_SCOPED_CONTEXT=on`.
 pub fn scoped_context_from_environment() -> bool {
     std::env::var(SCOPED_CONTEXT_ENVIRONMENT).ok().as_deref() == Some("on")
@@ -2970,23 +2995,35 @@ pub fn serve(
     // face in view keeps its memory scope (#2176 row 5b).
     // The eyes' faces in view, read beside the known file for that hold;
     // without them nothing can be held, so the hold is off.
-    let faces_bus = crate::memory_scope::gap_from_environment()
+    // With `LAMP_FACE_STICKY` too: a name the eyes hold is read for memory
+    // only with a face in view, so the faces are needed for it.
+    let sticky = crate::known_faces::sticky_on();
+    let faces_bus = (crate::memory_scope::gap_from_environment().is_some() || sticky)
+        .then_some(())
         .and(files.bus_root.clone())
         .and_then(|root| lamp_bus::Bus::new(root).ok())
         .map(Arc::new);
     let face_gap = faces_bus
         .as_ref()
         .and(crate::memory_scope::gap_from_environment());
-    match (crate::memory_scope::gap_from_environment(), &faces_bus) {
+    match (face_gap, &faces_bus) {
+        (Some(gap), Some(_)) if gap == crate::memory_scope::Gap::no_face() => eprintln!(
+            "lamp-voice second: a known face lost with no face in view keeps the conversation's person, told from the conversation only, for up to 30 s with no face and 2 min with nothing said (LAMP_FACE_NO_FACE_HOLD)"
+        ),
         (Some(_), Some(_)) => eprintln!(
             "lamp-voice second: a known face lost for a few seconds, with no face in view and while the lamp answers them, keeps its memory scope (LAMP_FACE_GAP_HOLD)"
         ),
-        (Some(_), None) => eprintln!(
-            "lamp-voice second: LAMP_FACE_GAP_HOLD is on but there is no bus to read the eyes' faces from, so no face is held"
+        (None, None) if crate::memory_scope::gap_from_environment().is_some() => eprintln!(
+            "lamp-voice second: LAMP_FACE_GAP_HOLD or LAMP_FACE_NO_FACE_HOLD is on but there is no bus to read the eyes' faces from, so no face is held"
         ),
         _ => {}
     }
-    let face_cache = Arc::new(crate::memory_scope::FaceCache::holding_gaps(face_gap));
+    if sticky {
+        eprintln!(
+            "lamp-voice second: a name the eyes hold, not match, is read and kept as theirs with a face in view, with no forget, correction, rule or yes (LAMP_FACE_STICKY)"
+        );
+    }
+    let face_cache = Arc::new(crate::memory_scope::FaceCache::holding(face_gap));
     // Cold from the voice's start (#2807): a room's line looks later for
     // its keeper until a face is named or `COLD_FOR` passes.
     face_cache.went_cold(Instant::now());
@@ -3280,8 +3317,20 @@ pub fn serve(
                     let name = name.as_str();
                     let faces = bus
                         .as_ref()
-                        .and_then(|_| crate::known_faces::most_faces_lately());
-                    let known_now = who.as_deref().and_then(crate::known_faces::known_lately);
+                        // With LAMP_FACE_STICKY, near faces only: a tiny
+                        // face far behind is no one at the lamp.
+                        .and_then(|_| {
+                            crate::known_faces::faces_for_name(crate::known_faces::sticky_on())
+                        });
+                    // A name the eyes hold, not match, is never the owner
+                    // present (`LAMP_FACE_STICKY`, the sticky plan's rule).
+                    let known_now = who
+                        .as_deref()
+                        .filter(|path| {
+                            !(crate::known_faces::sticky_on()
+                                && crate::known_faces::held_mark(path))
+                        })
+                        .and_then(crate::known_faces::known_lately);
                     let another = another_voice_told.load(std::sync::atomic::Ordering::Acquire);
                     // A face not at the desk seen speaking: a far guest who
                     // is the only voice (`LAMP_FACES_AT_DESK_ONLY`).
@@ -3941,7 +3990,13 @@ pub fn serve(
                 "lamp-voice second: a line no face was seen speaking carries on the face last named as them while the same unbroken track is alone in view, the eyes no longer naming it (LAMP_CONVERSATION_CARRIES_OWN_TRACK)"
             );
             engine = engine.carrying_own_track(true);
+            if crate::known_faces::sticky_on() {
+                eprintln!(
+                    "lamp-voice second: LAMP_CONVERSATION_CARRIES_OWN_TRACK is inert while LAMP_FACE_STICKY holds the name"
+                );
+            }
         }
+        engine = engine.holding_sticky(crate::known_faces::sticky_on());
     }
     // Where the eyes read speaking (`LAMP_EYES_SPEAKING=on`, #2377): a held
     // forget's yes counts only from the held person's face seen saying it.
@@ -5990,17 +6045,24 @@ pub fn serve(
                     let read = tokio::task::spawn_blocking(move || {
                         // An unsure hold's name moved aside is still the
                         // one known to this cache (#5738).
+                        // The eyes' held mark beside the known file, read
+                        // before the name so a match's write never reads as
+                        // held after it (`LAMP_FACE_STICKY`); and whether a
+                        // file is there at all, for why a line is the room's.
+                        let held = sticky && crate::known_faces::held_mark(&path);
                         let path = crate::speaking_faces::known_or_held(&path);
+                        let there = path.exists();
                         let mark = crate::known_faces::KnownMark::read(&path);
                         let at = Instant::now();
                         (
                             (mark, at),
                             crate::known_faces::FaceObservation::read(&path),
                             bus.as_deref().and_then(crate::known_faces::faces_in_view),
+                            (held, there),
                         )
                     })
                     .await;
-                    let Ok(((mark, at), observation, in_view)) = read else {
+                    let Ok(((mark, at), observation, in_view, (held, there))) = read else {
                         face_cache.replace_seen(token, None, None);
                         continue;
                     };
@@ -6009,7 +6071,8 @@ pub fn serve(
                             "lamp-voice second: the eyes' known file changed: the face cache is cold"
                         );
                     }
-                    face_cache.replace_seen(token, observation, in_view);
+                    face_cache.known_file_there(there);
+                    face_cache.replace_marked(token, observation, in_view, held);
                 }
             })
         });
@@ -14975,6 +15038,31 @@ pub(crate) fn keep_admitted(event: &ProviderOutput, lease: &crate::memory_scope:
     keep_scoped(event, None, Some(lease), None)
 }
 
+/// Keeps a line's exchange out of the journal for its admitted scope
+/// (`lease`): a held one (`LAMP_FACE_GAP_HOLD`, `LAMP_FACE_NO_FACE_HOLD`, a
+/// carry), or a carried one read as its person's. With `journal`
+/// (`LAMP_CARRIED_JOURNAL`, the sticky plan's T9), a carried line read as its
+/// person's is journalled in their record: it was carried only with their
+/// own face the one face in view through it and no other voice
+/// (`SpeakingFaces::one_face_in_view`, `LAMP_CONVERSATION_CARRIED_MEMORY`),
+/// so a face was seen. Still no forget, correction, rule or yes runs on it,
+/// and it is never summarised. Whether it was kept out.
+pub(crate) fn keep_out_scoped(lease: &crate::memory_scope::ScopeLease, journal: bool) -> bool {
+    let held = lease
+        .scope()
+        .is_some_and(crate::memory_scope::ScopeSnapshot::held);
+    let carried = lease.reads_carried();
+    if held || (carried && !journal) {
+        crate::remember::held_by_gap(lease.key().request);
+        return true;
+    }
+    if carried {
+        let count = CARRIED_JOURNALLED.fetch_add(1, std::sync::atomic::Ordering::Relaxed) + 1;
+        eprintln!("{}", carried_journalled_line(lease.key().request, count));
+    }
+    false
+}
+
 /// [`keep`] for a request's admitted scope (`lease`). With `held`
 /// (`LAMP_SAID_AS_HEARD`), an answer's hand-on to memory at its turn's end is
 /// held until it is known how much of it was heard.
@@ -14997,14 +15085,10 @@ fn keep_scoped(
     // keep their own face is seen saying yes to is written (the first
     // builder's call on #4508).
     // A carried line read as its person's (`LAMP_CONVERSATION_CARRIED_MEMORY`)
-    // is kept out too: its keep is written, its exchange never journalled.
-    if let Some(lease) = lease
-        && (lease
-            .scope()
-            .is_some_and(crate::memory_scope::ScopeSnapshot::held)
-            || lease.reads_carried())
-    {
-        crate::remember::held_by_gap(lease.key().request);
+    // is kept out too: its keep is written, its exchange never journalled,
+    // but with `LAMP_CARRIED_JOURNAL` ([`keep_out_scoped`]).
+    if let Some(lease) = lease {
+        keep_out_scoped(lease, carried_journal_on());
     }
     // A carried line keeps its person's memory conversation going, never
     // journalled (`LAMP_CARRIED_LINES_KEEP_TALK`).

@@ -161,9 +161,20 @@ pub fn reading_known(known: std::path::PathBuf) {
 
 /// The person the eyes know now, as a memory id, and their face's passing
 /// id (`fN`), read together ([`crate::speaking_faces::known_with_face`]);
-/// `None` without the known file, or with it stale.
+/// `None` without the known file, or with it stale, and with
+/// `LAMP_FACE_STICKY` while the eyes only hold the name (their held mark
+/// fresh): a held name never anchors a move (Friday's P1 on #7933).
 pub fn known_now() -> Option<(String, String)> {
-    let (name, face) = crate::speaking_faces::known_with_face(KNOWN.get()?)?;
+    known_now_from(KNOWN.get()?, crate::known_faces::sticky_on())
+}
+
+/// [`known_now`] from the known file `known`, with `LAMP_FACE_STICKY` as
+/// `sticky`.
+pub fn known_now_from(known: &std::path::Path, sticky: bool) -> Option<(String, String)> {
+    if sticky && crate::known_faces::held_mark(known) {
+        return None;
+    }
+    let (name, face) = crate::speaking_faces::known_with_face(known)?;
     Some((crate::known_faces::memory_person(&name), face))
 }
 
@@ -340,6 +351,20 @@ pub fn theirs(line: &Line, caller: &Line) -> Result<(), Why> {
     if agrees { Ok(()) } else { Err(Why::CantTell) }
 }
 
+/// With `LAMP_FACE_STICKY` (the sticky plan's T6, under the single-user
+/// decision): [`theirs`], and also a line with nothing to tell it by, no
+/// print and no face seen speaking it (off camera, too short to print),
+/// but only when `lone`: the caller first matched alone, their one face seen
+/// saying the anchor ([`anchored`]), and no line of the conversation showing
+/// another voice or face ([`Stayed::shows_someone_else`]). A line whose
+/// voice falls between the bars still stays the room's.
+pub fn theirs_alone(line: &Line, caller: &Line, lone: bool) -> Result<(), Why> {
+    match theirs(line, caller) {
+        Err(Why::CantTell) if lone && line.print.is_none() && line.faces.is_empty() => Ok(()),
+        judged => judged,
+    }
+}
+
 /// How many lines stayed the room's, and why.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct Stayed {
@@ -357,6 +382,12 @@ impl Stayed {
             Why::OtherFace => self.other_face += 1,
             Why::CantTell => self.cant_tell += 1,
         }
+    }
+
+    /// Whether a line showed someone else: two faces, another voice or
+    /// another face ([`theirs_alone`]'s `lone` needs none).
+    pub fn shows_someone_else(&self) -> bool {
+        self.two_faces + self.other_voice + self.other_face > 0
     }
 
     pub fn total(&self) -> usize {
@@ -588,5 +619,57 @@ mod tests {
         forgot_in(&lines, &forgets);
         assert!(lines.lock().unwrap().is_empty());
         assert_eq!(forgets.load(Ordering::Acquire), 1);
+    }
+
+    /// Friday's P1 on #7933: with `LAMP_FACE_STICKY`, a name the eyes only
+    /// hold (their held mark fresh) is no known face for a move's anchor.
+    #[test]
+    fn with_sticky_a_name_the_eyes_only_hold_anchors_nothing() {
+        let directory = std::env::temp_dir().join(format!("follows-held-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&directory);
+        std::fs::create_dir_all(&directory).unwrap();
+        let known = directory.join("known");
+        std::fs::write(&known, "Bramble\n").unwrap();
+        std::fs::write(crate::speaking_faces::known_face_of(&known), "f1").unwrap();
+        let matched = Some((
+            crate::known_faces::memory_person("Bramble"),
+            "f1".to_owned(),
+        ));
+        assert_eq!(known_now_from(&known, true), matched, "matched: no mark");
+        std::fs::write(crate::known_faces::known_held_of(&known), b"").unwrap();
+        assert_eq!(known_now_from(&known, true), None, "held: anchors nothing");
+        assert_eq!(known_now_from(&known, false), matched, "off: as before");
+        std::fs::remove_dir_all(&directory).unwrap();
+    }
+
+    /// T6 (`LAMP_FACE_STICKY`): with the caller matched alone and nobody
+    /// else shown, a line with no print and no face is theirs; a voice
+    /// between the bars, another face or another voice still stays; without
+    /// `lone`, as before.
+    #[test]
+    fn a_lone_match_takes_the_lines_with_nothing_against_them() {
+        let caller = line(Some(CALLER), &["f1"]);
+        assert_eq!(theirs_alone(&line(None, &[]), &caller, true), Ok(()));
+        assert_eq!(
+            theirs_alone(&line(None, &[]), &caller, false),
+            Err(Why::CantTell)
+        );
+        assert_eq!(
+            theirs_alone(&line(Some(BETWEEN), &[]), &caller, true),
+            Err(Why::CantTell)
+        );
+        assert_eq!(
+            theirs_alone(&line(Some(OTHER), &[]), &caller, true),
+            Err(Why::OtherVoice)
+        );
+        assert_eq!(
+            theirs_alone(&line(None, &["f2"]), &caller, true),
+            Err(Why::OtherFace)
+        );
+        let mut stayed = Stayed::default();
+        stayed.count(Why::CantTell);
+        assert!(!stayed.shows_someone_else());
+        stayed.count(Why::OtherVoice);
+        assert!(stayed.shows_someone_else());
     }
 }

@@ -4385,6 +4385,23 @@ pub fn at_desk(faces: &[lamp_msgs::Face], desk_only: bool) -> Vec<bool> {
     counted
 }
 
+/// A face this tall, as a share of the picture's height, is near the lamp:
+/// the eyes' own near rule (`lamp_eyes::who::NEAR_ENOUGH`, 0.10; people at
+/// lamp-4ace were 0.12 to 0.27). With `LAMP_FACE_STICKY`, only near faces
+/// count toward the by-default name's "more than one face" and "an unknown
+/// face in view" ([`most_near_faces_lately`]).
+pub const NEAR_ENOUGH: f32 = 0.10;
+
+/// The faces of one look [`count_at_desk`] counts that are also near
+/// ([`NEAR_ENOUGH`] tall).
+pub fn count_near_at_desk(faces: &lamp_msgs::Faces, desk_only: bool) -> usize {
+    at_desk(&faces.faces, desk_only)
+        .into_iter()
+        .zip(&faces.faces)
+        .filter(|(counted, face)| *counted && face.ymax - face.ymin >= NEAR_ENOUGH)
+        .count()
+}
+
 /// How many people are at the lamp in one look of the eyes: the faces
 /// [`at_desk`] keeps, with [`at_desk_only`]; every face without.
 pub fn people_at_lamp(faces: &lamp_msgs::Faces) -> usize {
@@ -4580,6 +4597,10 @@ impl FacesLately {
 static FACES_LATELY: std::sync::Mutex<FacesLately> =
     std::sync::Mutex::new(FacesLately(std::collections::VecDeque::new(), None, None));
 
+/// [`FACES_LATELY`] counting near faces only ([`count_near_at_desk`]).
+static NEAR_FACES_LATELY: std::sync::Mutex<FacesLately> =
+    std::sync::Mutex::new(FacesLately(std::collections::VecDeque::new(), None, None));
+
 /// Read the eyes' newest look every [`FACES_EVERY`] into
 /// [`most_faces_lately`], on a thread of its own.
 // ponytail: polls `latest`, so a look between two reads can be missed; a
@@ -4619,10 +4640,15 @@ fn keep_faces_counted_now(bus: lamp_bus::Bus) {
                     }
                     lately.look_told(
                         at,
-                        look,
+                        look.clone(),
                         count_at_desk(&faces, desk_only),
                         faces_told(&faces, desk_only),
                     );
+                    drop(lately);
+                    NEAR_FACES_LATELY
+                        .lock()
+                        .unwrap_or_else(|poisoned| poisoned.into_inner())
+                        .look(at, look, count_near_at_desk(&faces, desk_only));
                 }
             }
             std::thread::sleep(FACES_EVERY);
@@ -4637,6 +4663,29 @@ pub fn most_faces_lately() -> Option<usize> {
         .lock()
         .unwrap_or_else(|poisoned| poisoned.into_inner())
         .most(std::time::Instant::now())
+}
+
+/// [`most_faces_lately`] counting only near faces ([`NEAR_ENOUGH`]): a tiny
+/// face far in the background is no one at the lamp. For the by-default
+/// name only (`person::someone_else_now`, with `LAMP_FACE_STICKY`); the
+/// private read-backs' "owner alone in view" checks count every face
+/// ([`most_faces_lately`]). On lamp-74ff (19 Nov 12:07:29) the owner's
+/// name was held back for a second face 0.08 tall behind them.
+pub fn most_near_faces_lately() -> Option<usize> {
+    NEAR_FACES_LATELY
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner())
+        .most(std::time::Instant::now())
+}
+
+/// The faces counted for the by-default name: near ones only with
+/// `sticky` ([`most_near_faces_lately`]), every one without.
+pub fn faces_for_name(sticky: bool) -> Option<usize> {
+    if sticky {
+        most_near_faces_lately()
+    } else {
+        most_faces_lately()
+    }
 }
 
 /// Whether a face not at the desk read speaking in the eyes' looks of the
@@ -4689,6 +4738,87 @@ pub fn known_from_environment() -> Option<String> {
         .is_absolute()
         .then(|| known_now(&known_file_of(socket)))
         .flatten()
+}
+
+/// Only the exact value `on`: the sticky identity plan's voice part
+/// (`docs/face-recognition-sticky-identity-plan.md`). The eyes' held mark
+/// beside the known file (`lamp-eyes`'s `who::known_held_of`, written while
+/// they keep a name by a hold and not by a match, with their own
+/// `LAMP_FACE_STICKY`) is read: a line whose memory scope comes from a held
+/// name reads and keeps as theirs with their face in view, never runs a
+/// forget, correction, rule or yes, and a held name never counts as the
+/// owner present or alone for a private read-back ([`held_now`]). With it,
+/// a lone face's late match may move a room conversation's unseen lines
+/// (`follows_face::theirs_alone`), and a carried line read as theirs is
+/// journalled in their record. Off, nothing reads the mark.
+pub const STICKY_ENVIRONMENT: &str = "LAMP_FACE_STICKY";
+
+/// [`STICKY_ENVIRONMENT`], read once for the process.
+pub fn sticky_on() -> bool {
+    static ON: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
+    *ON.get_or_init(|| sticky_from(|name| std::env::var(name).ok()))
+}
+
+/// [`STICKY_ENVIRONMENT`] as `var` gives it: on only for exactly `on`.
+pub fn sticky_from(var: impl Fn(&str) -> Option<String>) -> bool {
+    var(STICKY_ENVIRONMENT).as_deref() == Some("on")
+}
+
+/// The eyes' held mark beside the known file `known`: `-held`.
+pub fn known_held_of(known: &Path) -> PathBuf {
+    let mut beside = known.as_os_str().to_owned();
+    beside.push("-held");
+    PathBuf::from(beside)
+}
+
+/// Whether the eyes' held mark beside `known` is fresh: written within
+/// [`FRESH`], as the known file is. Read whatever the switch; callers gate.
+pub fn held_mark(known: &Path) -> bool {
+    std::fs::metadata(known_held_of(known))
+        .and_then(|meta| meta.modified())
+        .ok()
+        .and_then(|written| SystemTime::now().duration_since(written).ok())
+        .is_some_and(|age| age < FRESH)
+}
+
+/// With [`STICKY_ENVIRONMENT`], whether the name in the eyes' known file
+/// (`LAMP_EYES_WHO_SOCKET`'s) is held, not matched, now ([`held_mark`]).
+/// Off, or with no socket, never.
+pub fn held_now() -> bool {
+    held_in(
+        sticky_on(),
+        std::env::var_os(ENVIRONMENT).map(PathBuf::from).as_deref(),
+    )
+}
+
+/// [`held_now`] with the switch `sticky` and the eyes' socket `socket`.
+pub fn held_in(sticky: bool, socket: Option<&Path>) -> bool {
+    sticky
+        && socket
+            .filter(|socket| socket.is_absolute())
+            .is_some_and(|socket| held_mark(&known_file_of(socket)))
+}
+
+/// The owner's checks for a private read-back read the known name through
+/// this: `None` while it is held ([`held_now`]), so a held name is never the
+/// owner present or alone (the sticky plan's §2).
+pub fn known_for_owner_checks() -> Option<String> {
+    if held_now() {
+        return None;
+    }
+    known_from_environment()
+}
+
+/// [`known_for_owner_checks`] with the switch `sticky` and the eyes'
+/// socket `socket`: `None` while the eyes' held mark is fresh (a held name,
+/// or a T7 rematch, which the eyes write held).
+pub fn known_for_owner_checks_in(sticky: bool, socket: Option<&Path>) -> Option<String> {
+    if held_in(sticky, socket) {
+        return None;
+    }
+    socket
+        .filter(|socket| socket.is_absolute())
+        .and_then(|socket| known_now(&known_file_of(socket)))
 }
 
 /// A known person counts as gone only after this long without a fresh known
@@ -6139,6 +6269,71 @@ mod tests {
 
     /// A face `width` of the frame wide at `confidence`, square in a 4:3
     /// frame, as the eyes report it.
+    /// lamp-74ff, 19 Nov 12:07:29: the owner (w0.07 h0.13 c0.90) and a
+    /// tiny face far behind (w0.05 h0.08 c0.81). With `LAMP_FACE_STICKY`
+    /// the by-default name counts near faces only: one face, the owner
+    /// named; two near faces, not. The read-backs' alone check still counts
+    /// every face: the far one blocks it.
+    #[test]
+    fn a_tiny_far_face_counts_for_no_one_but_still_blocks_an_alone_read_back() {
+        let face = |id: &str, width: f32, height: f32, confidence: f32| lamp_msgs::Face {
+            ymax: 0.2 + height,
+            ..desk_face(id, width, confidence)
+        };
+        let look = |faces: Vec<lamp_msgs::Face>| lamp_msgs::Faces { faces };
+        let owners = ["Ann".to_owned()];
+        let far = look(vec![
+            face("f1", 0.07, 0.13, 0.90),
+            face("f2", 0.05, 0.08, 0.81),
+        ]);
+        for desk_only in [false, true] {
+            assert_eq!(count_near_at_desk(&far, desk_only), 1, "{desk_only}");
+        }
+        let near = count_near_at_desk(&far, false);
+        assert_eq!(
+            crate::person::someone_else_now(&owners, Some(near), Some("Ann"), false, false, None),
+            None,
+            "the owner named"
+        );
+        // Off the sticky switch, every face: held back, as before.
+        let all = count_at_desk(&far, false);
+        assert_eq!(all, 2);
+        assert_eq!(
+            crate::person::someone_else_now(&owners, Some(all), Some("Ann"), false, false, None),
+            Some("more than one face in view")
+        );
+        // Two near faces: not named.
+        let two = look(vec![
+            face("f1", 0.07, 0.13, 0.90),
+            face("f2", 0.08, 0.11, 0.85),
+        ]);
+        assert_eq!(count_near_at_desk(&two, false), 2);
+        assert_eq!(
+            crate::person::someone_else_now(&owners, Some(2), Some("Ann"), false, false, None),
+            Some("more than one face in view")
+        );
+        // The alone read-back counts every face (`most_faces_lately`): the
+        // far face blocks it.
+        let mut every = FacesLately::default();
+        let mut nearly = FacesLately::default();
+        let at = std::time::Instant::now();
+        for seq in 0..2 {
+            every.look(at, ("b".into(), seq), count_at_desk(&far, at_desk_only()));
+            nearly.look(
+                at,
+                ("b".into(), seq),
+                count_near_at_desk(&far, at_desk_only()),
+            );
+        }
+        assert_eq!(nearly.most(at), Some(1));
+        assert_ne!(
+            every.most(at),
+            Some(1),
+            "not alone: the read-back is blocked"
+        );
+        assert!(!crate::services::alone_in(every.most(at), false));
+    }
+
     fn desk_face(id: &str, width: f32, confidence: f32) -> lamp_msgs::Face {
         lamp_msgs::Face {
             pitch: None,
