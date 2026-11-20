@@ -2492,7 +2492,7 @@ khi đăng xuất, và với 0.6.60 khi đăng nhập (ROW của #7507).
   hoặc bị kẹt thì được thay như bên dưới (#7906, dấu hiệu 1-4).
 - **Khởi chạy thất bại, xử lý ngay (#8062: openharness#4499 của Harness 0.6.74, có trong bản ghim 0.6.75).**
   `harness wait` thoát mã 1 khi một lần khởi chạy trên máy này thất bại (ví
-  dụ `OPENCLAW_NO_TOKEN`, hoặc `first_task_not_taken` sau 3 phút), dòng của
+  dụ `OPENCLAW_NO_TOKEN`, hoặc `FIRST_TASK_NOT_TAKEN` sau 3 phút), dòng của
   nó là `failed` kèm `failure: {error, detail}`. lamp-tasks đọc nó là dòng
   `failed` đó (`parse_wait` giữ `failure.error` trên dòng; `wait --after`
   ghi nó vào journal) chỉ khi một trong các dòng đang chờ nói `failed`; mọi
