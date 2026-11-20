@@ -3107,6 +3107,16 @@ them) (`crates/tasks/src/openclaw_config.rs`):
     on OpenClaw's own `webchat` channel. Other channels are kept;
   - `agents.defaults.elevatedDefault`: `"full"`;
   - `agents.defaults.sandbox.mode`: `"off"`;
+  - `tools.deny`: `skill_workshop` added (#8108). This is OpenClaw's own
+    tool that writes and patches the agent's learned skills in
+    `<agentDir>/workshop-skills/` (OpenClaw 2026.11.2 docs
+    `tools/skill-workshop.md`). On lamp-c0a4 it wrote a `lamp-skill-make`
+    skill of its own from the make guide and patched it five times in one
+    afternoon, and a skill run then tried to edit it. Denied, the agent
+    follows the lamp's skills and make guide and never keeps a changed
+    copy, and the background review that learns skills is off too
+    (`tools/self-learning.md`: denying `skill_workshop` opts the agent
+    out). Skills it learned before stay where they are;
   - `tools.deny`: `ask_user`, `secrets` and `suggest_task` added (#7906),
     a person's own entries kept, matched without regard to case as
     OpenClaw does. These are the tools that, when the model calls them,
