@@ -4105,6 +4105,60 @@ fn the_product_reads_speaking_on_steady_looks() {
     }
 }
 
+/// The sticky identity plan (docs/face-recognition-sticky-identity-plan.md),
+/// as its owner set it on #7933 (20 Nov, 01:55): the eyes and the voice both
+/// read `LAMP_FACE_STICKY`; the eyes hold a poor print on the held id
+/// (`LAMP_FACE_KNOWN_ON_ID`, T5), follow a new id in the held face's place
+/// (`LAMP_FACE_FOLLOW_NEAR_NEW_ID`) and count no poorly scored takeover look
+/// (`LAMP_FACE_TAKEOVER_SCORE`), the pair on by the owner's call (20 Nov);
+/// the voice holds the conversation's person
+/// with no face (`LAMP_FACE_NO_FACE_HOLD`, T1) and journals carried lines
+/// (`LAMP_CARRIED_JOURNAL`, T9). Each switch is in its own unit only.
+#[test]
+fn the_product_holds_a_known_name_sticky_with_the_plans_switches_on() {
+    for (name, on, off) in [
+        (
+            "lamp-eyes.service",
+            &[
+                "Environment=LAMP_FACE_STICKY=on",
+                "Environment=LAMP_FACE_KNOWN_ON_ID=on",
+                "Environment=LAMP_FACE_FOLLOW_NEAR_NEW_ID=on",
+                "Environment=LAMP_FACE_TAKEOVER_SCORE=on",
+            ][..],
+            &["LAMP_FACE_NO_FACE_HOLD=on", "LAMP_CARRIED_JOURNAL=on"][..],
+        ),
+        (
+            "lamp-voice.service",
+            &[
+                "Environment=LAMP_FACE_STICKY=on",
+                "Environment=LAMP_FACE_NO_FACE_HOLD=on",
+                "Environment=LAMP_CARRIED_JOURNAL=on",
+            ][..],
+            &[
+                "LAMP_FACE_KNOWN_ON_ID=on",
+                "LAMP_FACE_FOLLOW_NEAR_NEW_ID=on",
+                "LAMP_FACE_TAKEOVER_SCORE=on",
+            ][..],
+        ),
+    ] {
+        let text = install::PRODUCT
+            .iter()
+            .find(|(unit, _)| *unit == name)
+            .unwrap_or_else(|| panic!("no {name}"))
+            .1;
+        let service = section(text, "Service");
+        for line in on {
+            assert!(service.contains(line), "{name} lacks {line}");
+        }
+        for line in off {
+            assert!(
+                !service.iter().any(|kept| kept.contains(line)),
+                "{name} has {line}, not its own switch"
+            );
+        }
+    }
+}
+
 /// #2176 row 3: a rename keeps the person's memory, so the eyes and the
 /// voice both set the stable id. The voice uses an id only when its own
 /// switch and the eyes' agree, so one without the other keys nobody on it

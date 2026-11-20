@@ -782,6 +782,9 @@ fn run(arguments: Arguments) -> Result<(), Box<dyn std::error::Error + Send + Sy
         /// The passing ids a print was read for, the newest
         /// `who::PRINTED_IDS_KEPT` (`LAMP_FACE_REFOUND`, #4486).
         printed_ids: std::collections::VecDeque<String>,
+        /// `LAMP_FACE_STICKY`: a newly seen near face is checked at once
+        /// while a name is held (`who::NewFace`).
+        new_face: lamp_eyes::who::NewFace,
         /// `LAMP_FACE_REFOUND=on`: a new near id is recognised at once.
         refound: bool,
         taking: Option<(Taking, UnixStream)>,
@@ -817,11 +820,35 @@ fn run(arguments: Arguments) -> Result<(), Box<dyn std::error::Error + Send + Sy
         /// `LAMP_FACE_FULL_CROP=on`: faces cut from the frame at its own
         /// size, and the known person held through a short miss.
         held: lamp_eyes::who::Held,
+        /// `LAMP_FACE_STICKY=on`: another enrolled person's first look,
+        /// waiting for a second before it takes the name (T4).
+        takeover: lamp_eyes::who::Takeover,
+        /// `LAMP_FACE_STICKY=on`: who was last matched, for a match again
+        /// at the lower bar (T7). In memory only.
+        recent: lamp_eyes::who::Recent,
     }
     /// A held check keeps the known file as it was, its time renewed; with
     /// the hold carried to a followed passing id by its print (`who::Held::carry`,
     /// #4885), the known face beside it is rewritten to that id.
     fn keep_held(path: &std::path::Path, who: &Who, carried: bool, near_id: Option<&str>) {
+        // With `LAMP_FACE_STICKY`, the held mark first, so no reader takes the
+        // held name for a match (`who::known_held_of`).
+        if who.held.is_sticky() {
+            if let Some((name, ..)) = who.known.as_ref().filter(|_| carried) {
+                lamp_eyes::who::keep_known_held(
+                    path,
+                    name,
+                    who.people.id_of(name).as_deref(),
+                    near_id,
+                );
+                return;
+            }
+            if !lamp_eyes::who::known_unsure_of(path).exists() {
+                lamp_eyes::who::mark_held(path);
+                lamp_eyes::who::renew_known(path);
+                return;
+            }
+        }
         // Held unsure, the known file moved aside (`who::hold_unsure`): this
         // print keeps them, so it is written again, on the carried id or the
         // one held (#5738).
@@ -1219,6 +1246,7 @@ fn run(arguments: Arguments) -> Result<(), Box<dyn std::error::Error + Send + Sy
                 known: None,
                 looked_for: None,
                 printed_ids: std::collections::VecDeque::new(),
+                new_face: lamp_eyes::who::NewFace::default(),
                 refound: lamp_eyes::who::refound_on(),
                 taking: None,
                 visits: arguments.visits,
@@ -1254,7 +1282,11 @@ fn run(arguments: Arguments) -> Result<(), Box<dyn std::error::Error + Send + Sy
                 ))
                 .following(lamp_eyes::bus_out::follows_from_environment())
                 .unsure_holds(lamp_eyes::who::known_unsure_on())
-                .holds_on_id(lamp_eyes::who::known_on_id_on()),
+                .holds_on_id(lamp_eyes::who::known_on_id_on())
+                .sticky(lamp_eyes::who::sticky_on())
+                .follows_near(lamp_eyes::who::follow_near_new_id_on()),
+                takeover: lamp_eyes::who::Takeover::default(),
+                recent: lamp_eyes::who::Recent::default(),
             })
         }
         None => None,
@@ -2906,8 +2938,26 @@ fn run(arguments: Arguments) -> Result<(), Box<dyn std::error::Error + Send + Sy
                         let near_id = near.and_then(|(index, _)| {
                             bus_out.as_ref().and_then(|bus| bus.speaking_id(index))
                         });
+                        // A newly seen near face while a name is held
+                        // under LAMP_FACE_STICKY: one print at once, outside
+                        // the 2 s cadence (`who::NewFace`).
+                        if let Some(who) = who.as_mut() {
+                            let holding =
+                                who.held.is_sticky() && who.held.holding() && who.known.is_some();
+                            who.new_face.looked(
+                                near.map(|(_, (face, _))| (near_id.as_deref(), face.x + face.width / 2.0, face.width)),
+                                holding,
+                            );
+                            // The held face's last box, on its own or
+                            // followed id (`who::Held::saw_near`,
+                            // LAMP_FACE_FOLLOW_NEAR_NEW_ID).
+                            if let Some((_, (face, _))) = near {
+                                who.held.saw_near(near_id.as_deref(), face.x + face.width / 2.0, face.width);
+                            }
+                        }
                         if let Some(who) = who.as_mut()
-                            && (lamp_eyes::who::recognise_due_near(
+                            && (who.new_face.due(who.looked_for, Instant::now())
+                                || lamp_eyes::who::recognise_due_near(
                                 who.looked_for,
                                 who.taking.is_some(),
                                 Instant::now(),
@@ -2927,6 +2977,7 @@ fn run(arguments: Arguments) -> Result<(), Box<dyn std::error::Error + Send + Sy
                             // checks (the Reviewer-lead's P2 on #5546).
                             let checked = Instant::now();
                             who.looked_for = Some(checked);
+                            who.new_face.checked();
                             // A new near id that follows the held one's
                             // may carry the hold, once a print of it passes
                             // (both `LAMP_FACE_KNOWN_HOLD` and
@@ -2936,19 +2987,39 @@ fn run(arguments: Arguments) -> Result<(), Box<dyn std::error::Error + Send + Sy
                                 bus_out.as_ref().and_then(|bus| bus.followed_id(id))
                             });
                             if who.known.is_some() {
-                                who.held.follow(
+                                let near_faces = heights.iter().filter(|h| **h >= NEAR_ENOUGH).count();
+                                let follows = who.held.follow(
                                     checked,
                                     near_id.as_deref(),
                                     followed.as_deref(),
-                                    heights.iter().filter(|h| **h >= NEAR_ENOUGH).count(),
+                                    near_faces,
                                 );
+                                // With LAMP_FACE_FOLLOW_NEAR_NEW_ID: a new id
+                                // in the held face's place, the sitter not
+                                // standing up (`who::Held::follow_near`).
+                                if !follows
+                                    && who.held.follow_near(
+                                        checked,
+                                        near.zip(near_id.as_deref()).map(|((_, (face, _)), id)| {
+                                            (id, face.x + face.width / 2.0, face.width)
+                                        }),
+                                        near_faces,
+                                        bus_out.as_ref().is_some_and(|bus| bus.activity_not_standing_up()),
+                                    )
+                                {
+                                    eprintln!(
+                                        "lamp-eyes: a new id in the held face's place, the sitter not standing up: followed (LAMP_FACE_FOLLOW_NEAR_NEW_ID)"
+                                    );
+                                }
                             }
+                            let print_began = Instant::now();
                             let print = near
                                 .and_then(|(_, (face, _))| match full_frame.as_ref().filter(|_| full_crop) {
                                     Some(full) => lamp_eyes::who::align_full(full, &face.marks),
                                     None => align(&picture, &face.marks),
                                 })
                                 .and_then(|aligned| who.recogniser.print(&aligned).ok());
+                            let print_ms = print.as_ref().map(|_| print_began.elapsed().as_millis());
                             // The ids a print was read for: an id not among
                             // them is due at once (`LAMP_FACE_REFOUND`, #4486).
                             if print.is_some()
@@ -2983,6 +3054,24 @@ fn run(arguments: Arguments) -> Result<(), Box<dyn std::error::Error + Send + Sy
                                         now_unix_s,
                                     )
                                 );
+                                // T0 of the sticky identity plan: the near face's
+                                // eye distance, turn, detector score, the second
+                                // person's likeness and the print's time, beside
+                                // the best likeness. Numbers only.
+                                let near_face = near.map(|(_, (face, _))| face);
+                                let measures = lamp_eyes::who::RecognitionMeasures {
+                                    best: best.map(|(how, _)| how),
+                                    second: print.as_ref().and_then(|print| who.people.second_likeness(print)),
+                                    tallest: tallest.height / tall,
+                                    eyes_px: near_face.map(|face| {
+                                        let ((ax, ay), (bx, by)) = (face.marks[0], face.marks[1]);
+                                        ((ax - bx).powi(2) + (ay - by).powi(2)).sqrt()
+                                    }),
+                                    turned_deg: near_face.and_then(|face| lamp_eyes::facing::yaw_deg(&face.marks)),
+                                    score: near_face.map(|face| face.score),
+                                    print_ms,
+                                };
+                                eprintln!("{}", lamp_eyes::who::recognition_told(&measures));
                             }
                             let near_face = near_id
                                 .as_ref()
@@ -3006,10 +3095,107 @@ fn run(arguments: Arguments) -> Result<(), Box<dyn std::error::Error + Send + Sy
                                     frame_us, lamp_ipc::monotonic_us(), permit.held());
                             } else if let Some(print) = print {
                                 let now = checked;
-                                let found = who
+                                let mut found = who
                                     .people
                                     .who(&print)
                                     .map(|(name, likeness)| (name, likeness, now));
+                                // A T7 rematch is written held, never as a
+                                // real match (Friday's P1 on #7933).
+                                let mut rematched = false;
+                                // A rematch of another than the one held:
+                                // its likeness, not taken (`who::held_rematch`).
+                                let mut refused: Option<f32> = None;
+                                let held_name: Option<String> = who.known.as_ref().map(|known| known.0.clone());
+                                if who.held.is_sticky() {
+                                    match found.as_ref() {
+                                        Some((name, ..)) => who.recent.matched(name, now),
+                                        // T7: someone matched in the last ten
+                                        // minutes, again at the lower bar when
+                                        // nobody else scores higher; while
+                                        // someone is held, only them. No name
+                                        // in the journal.
+                                        None => {
+                                            let rematch = who.recent.rematch(
+                                                now,
+                                                |name| who.people.likeness_to(name, &print),
+                                                who.people.best_likeness(&print).map(|(how, _)| how),
+                                            );
+                                            match lamp_eyes::who::held_rematch(rematch, held_name.as_deref()) {
+                                                Some(lamp_eyes::who::Rematch::Taken(name, likeness)) => {
+                                                    rematched = true;
+                                                    eprintln!(
+                                                        "lamp-eyes: matched again at {likeness:.3}, someone matched within {} min (bar {})",
+                                                        lamp_eyes::who::REMATCH_WITHIN.as_secs() / 60,
+                                                        lamp_eyes::who::REMATCH_LIKENESS
+                                                    );
+                                                    found = Some((name, likeness, now));
+                                                }
+                                                Some(lamp_eyes::who::Rematch::Refused(likeness)) => {
+                                                    refused = Some(likeness);
+                                                }
+                                                None => {}
+                                            }
+                                        }
+                                    }
+                                }
+                                // T4: another enrolled person on the held
+                                // face takes the name only on a second look
+                                // within `who::TAKEOVER_WITHIN`, each over the
+                                // held person's likeness; the first keeps the
+                                // one held, as a held check does
+                                // (`who::sticky_look`).
+                                let look = lamp_eyes::who::sticky_look(
+                                    &who.held,
+                                    &mut who.takeover,
+                                    now,
+                                    held_name.as_deref(),
+                                    found.as_ref().map(|(name, likeness, _)| (name.as_str(), *likeness)),
+                                    held_name
+                                        .as_deref()
+                                        .and_then(|held_name| who.people.likeness_to(held_name, &print)),
+                                    near_id.as_deref(),
+                                    // A rematch never counts; with
+                                    // LAMP_FACE_TAKEOVER_SCORE, nor a poorly
+                                    // seen face (`who::takeover_uncounted`).
+                                    lamp_eyes::who::takeover_uncounted(
+                                        rematched,
+                                        near.map(|(_, (face, _))| face.score),
+                                        lamp_eyes::who::takeover_score_on(),
+                                    ),
+                                );
+                                let waits_takeover = matches!(
+                                    look,
+                                    lamp_eyes::who::StickyLook::KeepsHeld
+                                        | lamp_eyes::who::StickyLook::NotALook(_)
+                                );
+                                match look {
+                                    lamp_eyes::who::StickyLook::KeepsHeld => eprintln!(
+                                        "lamp-eyes: another known face on one look: the one held stays until a second (within {} s)",
+                                        lamp_eyes::who::TAKEOVER_WITHIN.as_secs()
+                                    ),
+                                    lamp_eyes::who::StickyLook::SecondLook => {
+                                        eprintln!("lamp-eyes: another known face on two looks: the name moves")
+                                    }
+                                    lamp_eyes::who::StickyLook::NotALook(
+                                        lamp_eyes::who::Uncounted::Rematch,
+                                    ) => eprintln!(
+                                        "lamp-eyes: another known face on a rematch at the lower bar: not a look, the one held stays"
+                                    ),
+                                    lamp_eyes::who::StickyLook::NotALook(
+                                        lamp_eyes::who::Uncounted::Score,
+                                    ) => eprintln!(
+                                        "lamp-eyes: another known face on a face scored {} (a look needs {}, LAMP_FACE_TAKEOVER_SCORE): not a look, the one held stays",
+                                        near.map_or_else(
+                                            || "none".to_owned(),
+                                            |(_, (face, _))| format!("{:.2}", face.score)
+                                        ),
+                                        lamp_eyes::who::TAKEOVER_SCORE
+                                    ),
+                                    lamp_eyes::who::StickyLook::AsFound => {}
+                                }
+                                if waits_takeover {
+                                    found = None;
+                                }
                                 // Nobody who asked: a face from a photo, maybe,
                                 // never named, only noted so the voice can ask.
                                 if found.is_none() {
@@ -3021,42 +3207,77 @@ fn run(arguments: Arguments) -> Result<(), Box<dyn std::error::Error + Send + Sy
                                 // After a gap, only this print reading the
                                 // held face keeps the hold, on their id or a
                                 // new one (`who::Held::printed`, #5546):
-                                // journaled with numbers only, never a name.
-                                if let Some((alike, same)) =
-                                    who.held.printed(&print, near_id.as_deref())
-                                    && who.known.is_some()
-                                {
-                                    let alike = alike
-                                        .map_or_else(|| "none".to_owned(), |alike| format!("{alike:.3}"));
-                                    eprintln!(
-                                        "lamp-eyes: known hold: after a gap the near face is {alike} to the last held print (same face at {}): {}",
-                                        lamp_eyes::who::SAME_PERSON,
-                                        if same { "same face" } else { "let go" }
-                                    );
-                                }
+                                // journaled with numbers only, never a name,
+                                // once the check has decided (`who::gap_told`).
+                                let gap_read = who
+                                    .held
+                                    .printed(&print, near_id.as_deref())
+                                    .filter(|_| who.known.is_some());
                                 // With the hold on (`LAMP_FACE_FULL_CROP` or
                                 // `LAMP_FACE_KNOWN_HOLD`), a miss within
                                 // the hold keeps the one known, as they were,
                                 // only while the face still looks like them
                                 // (`who::Held::keeps_print`): a stranger's
                                 // face lets them go at once (#3285).
-                                let held = found.is_none()
-                                    && matched.is_none()
-                                    && who.known.as_ref().is_some_and(|known| {
-                                        who.held.keeps_print(
-                                            now,
-                                            who.people.likeness_to(&known.0, &print),
-                                            near_id.as_deref(),
-                                        )
-                                    });
-                                if held {
+                                let held = waits_takeover
+                                    || (found.is_none()
+                                        && matched.is_none()
+                                        && who.known.as_ref().is_some_and(|known| {
+                                            who.held.keeps_print(
+                                                now,
+                                                who.people.likeness_to(&known.0, &print),
+                                                near_id.as_deref(),
+                                            )
+                                        }));
+                                // Sticky T3: a new unknown face away from
+                                // the held face's box is nobody near at their
+                                // place (`who::Held::keeps_away`): held, with
+                                // nothing renewed, followed or carried.
+                                let matched_any = found.is_some() || matched.is_some();
+                                let away = !held
+                                    && who.known.is_some()
+                                    && who.held.keeps_away(
+                                        now,
+                                        matched_any,
+                                        near_id
+                                            .as_deref()
+                                            .zip(near.map(|(_, (face, _))| face.x + face.width / 2.0)),
+                                    );
+                                if away
+                                    && let Some((_, (face, _))) = near
+                                {
+                                    eprintln!("{}", who.held.away_told(face.x + face.width / 2.0));
+                                }
+                                let held = held || away;
+                                if let Some(likeness) = refused {
+                                    eprintln!("{}", lamp_eyes::who::rematch_refused_told(likeness, held));
+                                }
+                                let mut carried = false;
+                                if away {
+                                    // As a check with nobody near: the name
+                                    // and the held mark stay, the 30 s from
+                                    // their last sighting runs on.
+                                    if let Some(known) = who.known.as_mut() {
+                                        known.2 = now;
+                                    }
+                                    if let Some(path) = &arguments.known_file {
+                                        keep_held(path, who, false, near_id.as_deref());
+                                    }
+                                } else if held {
                                     if let Some(known) = who.known.as_mut() {
                                         known.2 = now;
                                     }
                                     who.held.printed_theirs();
+                                    // Their face on its id: the sticky hold
+                                    // counts from here (T3); another person's
+                                    // first look renews nothing. A look that
+                                    // does not count is theirs (row 5).
+                                    if look != lamp_eyes::who::StickyLook::KeepsHeld {
+                                        who.held.seen_theirs(now);
+                                    }
                                     // A followed id carried by this print
                                     // (`who::Held::carry`, #4885).
-                                    let carried = who.held.carry(near_id.as_deref());
+                                    carried = who.held.carry(near_id.as_deref());
                                     if let Some(path) = &arguments.known_file {
                                         keep_held(path, who, carried, near_id.as_deref());
                                     }
@@ -3066,7 +3287,17 @@ fn run(arguments: Arguments) -> Result<(), Box<dyn std::error::Error + Send + Sy
                                     } else {
                                         who.held.let_go();
                                     }
+                                    who.takeover.reset();
                                     who.known = found;
+                                }
+                                if let Some((alike, same)) = gap_read {
+                                    let alike = alike
+                                        .map_or_else(|| "none".to_owned(), |alike| format!("{alike:.3}"));
+                                    eprintln!(
+                                        "lamp-eyes: known hold: after a gap the near face is {alike} to the last held print (same face at {}): {}",
+                                        lamp_eyes::who::SAME_PERSON,
+                                        lamp_eyes::who::gap_told(same, held, carried, matched_any, away)
+                                    );
                                 }
                                 // A print not the photo's: no longer here
                                 // (`photo::print_is_photos`, #2856).
@@ -3087,7 +3318,7 @@ fn run(arguments: Arguments) -> Result<(), Box<dyn std::error::Error + Send + Sy
                                     who.photo_seen.push((name.clone(), lamp_ipc::monotonic_us()));
                                     who.photo_here = Some((name, near_face.clone(), Instant::now()));
                                 }
-                                if who.visits && !held {
+                                if who.visits && !held && !rematched {
                                     let level = familiar(&mut who.people, who.known.as_ref());
                                     if let Some(bus) = bus_out.as_mut() {
                                         bus.familiar(level, lamp_ipc::monotonic_us());
@@ -3096,11 +3327,12 @@ fn run(arguments: Arguments) -> Result<(), Box<dyn std::error::Error + Send + Sy
                                 if let Some(path) = arguments.known_file.as_ref().filter(|_| !held) {
                                     let name = who.known.as_ref().map(|known| known.0.as_str());
                                     let id = name.and_then(|name| who.people.id_of(name));
-                                    lamp_eyes::who::keep_known(
+                                    lamp_eyes::who::keep_found(
                                         path,
                                         name,
                                         id.as_deref(),
                                         near_id.as_deref(),
+                                        rematched,
                                     );
                                 }
                             } else if let Some(unprinted) = who
@@ -3124,6 +3356,12 @@ fn run(arguments: Arguments) -> Result<(), Box<dyn std::error::Error + Send + Sy
                                 if let Some(known) = who.known.as_mut() {
                                     known.2 = checked;
                                 }
+                                // Their face on its id, unprinted (turned,
+                                // covered): the sticky hold counts from here
+                                // (T3). Nobody near renews nothing.
+                                if near.is_some() && unprinted == lamp_eyes::who::Unprinted::Sure {
+                                    who.held.seen_theirs(checked);
+                                }
                                 if let Some(path) = &arguments.known_file {
                                     // Unsure: the known file moved aside, so
                                     // no reader of it sees the name held
@@ -3133,13 +3371,21 @@ fn run(arguments: Arguments) -> Result<(), Box<dyn std::error::Error + Send + Sy
                                         lamp_eyes::who::Unprinted::Unsure => {
                                             lamp_eyes::who::hold_unsure(path)
                                         }
-                                        _ => lamp_eyes::who::renew_known(path),
+                                        _ => {
+                                            // Held, not matched: the mark first
+                                            // (`LAMP_FACE_STICKY`).
+                                            if who.held.is_sticky() {
+                                                lamp_eyes::who::mark_held(path);
+                                            }
+                                            lamp_eyes::who::renew_known(path)
+                                        }
                                     }
                                 }
                             } else {
                                 // Nobody near: nobody known at the lamp.
                                 if who.held.on() {
                                     who.held.let_go();
+                                    who.takeover.reset();
                                     who.known = None;
                                 }
                                 if let Some(path) = &arguments.known_file {

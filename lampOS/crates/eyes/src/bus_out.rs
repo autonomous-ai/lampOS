@@ -849,6 +849,14 @@ impl BusOut {
             .is_some_and(|number| self.ids.index_of(number).is_some())
     }
 
+    /// With activity on, whether the sitter check says the sitter is not
+    /// standing up (`activity::Judge::not_standing_up`); without it, false.
+    pub fn activity_not_standing_up(&self) -> bool {
+        self.activity
+            .as_ref()
+            .is_some_and(|activity| activity.judge.not_standing_up())
+    }
+
     /// The passing id the face `id` (`f3`) follows ([`Ids::followed`]), only
     /// while speaking is judged, as [`Self::speaking_id`].
     pub fn followed_id(&self, id: &str) -> Option<String> {
