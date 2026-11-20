@@ -429,3 +429,65 @@ fn a_line_is_told_the_work_still_open() {
     tasks::forget_handed("70");
     *crate::thread::THREAD.lock().unwrap() = crate::thread::Thread::new();
 }
+
+/// #7930 (Heron's P2 3): the open-work note is last in the turn's notes:
+/// with another note winning (a task waiting for a yes), the tasks part
+/// is never asked for the open work.
+#[test]
+fn the_open_work_is_not_read_when_another_note_wins() {
+    let _thread = crate::provider_worker::tests::one_thread();
+    tasks::handed_over("70", "Research houseplants for a dark bedroom");
+    let script = Arc::new(Script {
+        heard: Mutex::new([Ok("Hey Lamp, how far is it?".to_owned())].into()),
+        chats: Mutex::new(vec![vec![text("Let me see."), Ok(ChatEvent::Done)]].into()),
+        ..Script::default()
+    });
+    let asked_for: Arc<Mutex<Vec<u64>>> = Arc::default();
+    let asking = asked_for.clone();
+    let tools: ToolRunner = Arc::new(|_, _, _, _| Box::pin(async { json!({"ok": true}) }));
+    let mut engine = Engine::with_clock(
+        script.clone(),
+        Arc::new(|| "SYSTEM".to_owned().into()),
+        tools,
+        Arc::new(Instant::now),
+    )
+    .announcing(false)
+    .noting_a_task_waiting(Arc::new(|_, _| Some("(TASK-WAITING)".to_owned())))
+    .noting_open_work(Arc::new(move |request| {
+        asking.lock().unwrap().push(request);
+        Some("(OPEN-WORK-NOTE)".to_owned())
+    }));
+    tokio::runtime::Builder::new_current_thread()
+        .enable_all()
+        .build()
+        .unwrap()
+        .block_on(async {
+            for input in spoken_line() {
+                engine.submit(input);
+            }
+            turn_within(&mut engine, Duration::from_secs(10)).await
+        });
+    let contents: Vec<String> = script
+        .asked
+        .lock()
+        .unwrap()
+        .iter()
+        .flatten()
+        .filter_map(|message| message.content.as_ref().and_then(Value::as_str))
+        .map(str::to_owned)
+        .collect();
+    assert!(
+        contents.iter().any(|c| c.contains("(TASK-WAITING)")),
+        "{contents:?}"
+    );
+    assert!(
+        !contents.iter().any(|c| c.contains("(OPEN-WORK-NOTE)")),
+        "{contents:?}"
+    );
+    assert!(
+        asked_for.lock().unwrap().is_empty(),
+        "the open work read anyway"
+    );
+    tasks::forget_handed("70");
+    *crate::thread::THREAD.lock().unwrap() = crate::thread::Thread::new();
+}
