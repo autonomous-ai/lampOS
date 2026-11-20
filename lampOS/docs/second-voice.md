@@ -5199,7 +5199,12 @@ after a take-over, but now for every turn:
     the gap, the cosine, which line has no print, or no one face seen. One person
     is the two lines' prints at 0.70 or over (`same_voice::SAME_FROM`, over
     every pair of two voices on 18 Oct's labelled set), when the same-voice
-    check runs for another rule; or else one face, the same passing id,
+    check runs for another rule, or, with no face in view at either line,
+    the same-voice check's prints beside `LAMP_SAME_VOICE_FOR=services`,
+    a line the services would not print printed for the join alone, in
+    memory only, dropped once it can no longer be joined, never written,
+    sent or stored (#8003, the first builder's ruling on #7570: a long
+    request said in the dark had been cut and only its last piece asked); or else one face, the same passing id,
     seen speaking each line and no other face speaking either. **The eyes
     come first:** more than one face seen speaking either line, or each
     line's face another, is two people, whatever the voices say (the

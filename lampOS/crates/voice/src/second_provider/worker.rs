@@ -5013,7 +5013,12 @@ pub fn serve(
         // on #5293), known from `lamp-services` itself.
         // With `LAMP_SAME_VOICE_CONFIRMS` too, every line is printed, linked
         // or not: the confirm reads the same prints (`services_prints_while`).
+        // With `LAMP_JOIN_CUT_WORDS`, a line printed for neither is printed
+        // for the join of a request cut in the dark alone, in memory only
+        // (`Heeding::printing_for_the_join_too`, #8003).
         let confirms = confirming_where(printing, files.same_voice_confirms);
+        let joins = std::env::var(crate::second_provider::JOIN_CUT_WORDS_ENVIRONMENT)
+            .is_ok_and(|value| value == "on");
         if printing == Printing::ForServices
             && let Some(folder) = services_folder
             && let Ok(mut heeding) = heeding.lock()
@@ -5025,6 +5030,12 @@ pub fn serve(
                     .unwrap_or_else(|| crate::services::Linked::new(folder)),
                 confirms.is_some(),
             );
+            if joins {
+                heeding.printing_for_the_join_too();
+            }
+        }
+        if joins && printing == Printing::ForServices {
+            forgetting_old_join_prints(&heeding);
         }
         // What is linked, told to the owner's line, asked again as each line
         // begins (#5523), with or without the services' prints.
@@ -8489,6 +8500,39 @@ fn voice_shows_another(printing: Printing, confirms: Option<f32>) -> bool {
     printing == Printing::ForEverything && confirms.is_none()
 }
 
+/// Every second, the prints made for the join alone on `heeding` that came
+/// `CHAIN_MOST_FOR` ago or more are dropped
+/// (`Voices::forget_old_join_prints`, #8003), on a thread of its own that
+/// ends with the rule.
+fn forgetting_old_join_prints(heeding: &Arc<Mutex<Heeding>>) {
+    let kept = Arc::downgrade(heeding);
+    let started = std::thread::Builder::new()
+        .name("second-join-prints".into())
+        .spawn(move || {
+            loop {
+                std::thread::sleep(Duration::from_secs(1));
+                let Some(heeding) = kept.upgrade() else {
+                    return;
+                };
+                if let Ok(mut heeding) = heeding.lock()
+                    && let Some(voices) = heeding.kept_voices()
+                {
+                    voices.forget_old_join_prints();
+                }
+            }
+        });
+    if let Err(why) = started {
+        eprintln!(
+            "lamp-voice second: prints for the join alone cannot be timed out: {why}; none are made (LAMP_JOIN_CUT_WORDS)"
+        );
+        if let Ok(mut heeding) = heeding.lock()
+            && let Some(voices) = heeding.for_services.take()
+        {
+            heeding.for_services = Some(voices.printing_for_the_join_too(false));
+        }
+    }
+}
+
 /// The services' prints on `heeding`, made only while `linked` says a
 /// service is linked (the reader's P3 on #5293). With the confirm reading
 /// them (`confirming`), every heard line is printed, linked or not, as the
@@ -10001,7 +10045,9 @@ impl Heeding {
     ///   each line's face another, is two people, whatever the voices say;
     /// - their prints, when both have come: under
     ///   [`crate::same_voice::DIFFERENT_BELOW`] two people, whatever the eyes
-    ///   saw; at or over [`crate::same_voice::SAME_FROM`] the same one;
+    ///   saw; at or over [`crate::same_voice::SAME_FROM`] the same one; with
+    ///   no face in view at either, the services' prints too
+    ///   ([`Self::join_voices`], #8003);
     /// - else the eyes: one face, the same passing id, seen speaking each
     ///   line and no other face speaking either;
     /// - else no sign of a second person ([`Self::no_second_person`]),
@@ -10037,9 +10083,13 @@ impl Heeding {
         if several(&cut_faces) || several(&faces) || another {
             return Joined::Not("two faces were seen speaking them".to_owned());
         }
+        // With no face in view at either line, the prints the join reads
+        // are the services' too (`LAMP_SAME_VOICE_FOR=services`): in the dark
+        // nothing else tells one person's long request from two people
+        // (#8003, lamp-9adf on 19 Nov).
+        let dark = self.no_face_in_view(cut, request);
         let likeness = self
-            .voices
-            .as_mut()
+            .join_voices(dark)
             .and_then(|voices| voices.alike(cut, request));
         match likeness {
             Some(likeness) if likeness < crate::same_voice::DIFFERENT_BELOW => {
@@ -10056,13 +10106,12 @@ impl Heeding {
         };
         let coming = likeness.is_none()
             && self
-                .voices
-                .as_ref()
+                .join_voices(dark)
                 .is_some_and(|voices| voices.print_coming(cut) || voices.print_coming(request));
         // What was missing, for the journal: the voices (a print still to
         // come is said once its wait is over), the eyes, then the sign of a
         // second person.
-        let voice = match (likeness, self.voices.as_mut()) {
+        let voice = match (likeness, self.join_voices(dark)) {
             _ if coming => String::new(),
             (Some(likeness), _) => {
                 format!("a likeness between the bars (cosine {likeness:.2}), and ")
@@ -10095,6 +10144,32 @@ impl Heeding {
             Joined::Coming(Box::new(without))
         } else {
             without
+        }
+    }
+
+    /// Whether no face was in view as `cut` and `request` were judged
+    /// ([`Self::keeping_line_rooms`]): none in the eyes' newest look, or no
+    /// fresh look (the camera closed). Nothing kept of either is not dark.
+    fn no_face_in_view(&self, cut: u64, request: u64) -> bool {
+        [cut, request].iter().all(|of| {
+            self.rooms
+                .as_ref()
+                .and_then(|rooms| rooms.iter().rev().find(|(line, _)| line == of))
+                .is_some_and(|(_, room)| room.in_view.unwrap_or(0) == 0)
+        })
+    }
+
+    /// The prints [`Self::same_speaker`] reads: the conversation rules'
+    /// ([`Self::voices`]), or in the dark ([`Self::no_face_in_view`]) the
+    /// kept ones, the services' alone included ([`Self::kept_voices`], #8003).
+    fn join_voices(
+        &mut self,
+        dark: bool,
+    ) -> Option<&mut crate::same_voice::Voices<Box<dyn crate::same_voice::Printer>>> {
+        if dark {
+            self.kept_voices()
+        } else {
+            self.voices.as_mut()
         }
     }
 
@@ -10488,6 +10563,17 @@ impl Heeding {
                 )
                 .for_services_only(true),
         );
+    }
+
+    /// `LAMP_JOIN_CUT_WORDS` beside the services' prints: a line they would
+    /// not print is printed for the join of a cut line alone, kept in
+    /// memory apart from theirs and dropped once it can no longer be joined
+    /// (`Voices::printing_for_the_join_too`, #8003, the first builder's
+    /// ruling on #7570).
+    pub(crate) fn printing_for_the_join_too(&mut self) {
+        if let Some(voices) = self.for_services.take() {
+            self.for_services = Some(voices.printing_for_the_join_too(true));
+        }
     }
 
     /// The services' prints ([`Self::for_services`]) made only while a
@@ -11160,6 +11246,11 @@ impl Heeding {
             crate::second_provider::Did::Worked(at_us) => self.attention.worked(at_us),
             crate::second_provider::Did::Spoke(at_us) => self.attention.news_told(at_us),
             crate::second_provider::Did::Said(request, until_us) => {
+                // Its answer is said: no line up to it can be joined, so a
+                // print made for the join alone goes (#8003).
+                if let Some(voices) = self.kept_voices() {
+                    voices.request_ended(request);
+                }
                 if self.carries && self.carrying && !self.chain.contains(&request) {
                     self.carry_window.answered(request, until_us);
                 }
@@ -30970,6 +31061,105 @@ mod tests {
             voiced("nj", Busy, 1),
             Joined::Same(SAME_VOICE_JOINS),
             "the same voice"
+        );
+    }
+
+    /// #8003: on lamp-9adf on 19 Nov one person's 21 s request, said in the
+    /// dark (no face in view) in a room not known to be quiet, was cut into
+    /// five lines and only the last was asked: the prints were the linked
+    /// services' alone (`LAMP_SAME_VOICE_FOR=services`), made only while a
+    /// service is linked, and the join read none. With `LAMP_JOIN_CUT_WORDS`
+    /// every line is printed, those the services would not print for the
+    /// join alone, and with no face in view at either line the join reads
+    /// them: one voice joins, two voices never do, and a print too weak to
+    /// judge (between the bars) joins nothing.
+    #[test]
+    fn a_request_cut_in_the_dark_joins_on_the_services_prints() {
+        use crate::room_told::Room::{Busy, Unknown};
+        use crate::second_provider::Heard;
+        // Prints: 1 one voice, 2 between the bars (cosine 0.50), anything
+        // else another (cosine 0).
+        #[derive(Default)]
+        struct Voice(std::collections::VecDeque<(u64, Result<Vec<f32>, String>)>);
+        impl crate::same_voice::Printer for Voice {
+            fn ask(&mut self, request: u64, samples: &[i16]) -> bool {
+                let print = match samples[0] {
+                    1 => vec![1.0, 0.0],
+                    2 => vec![0.5, 0.75_f32.sqrt()],
+                    _ => vec![0.0, 1.0],
+                };
+                self.0.push_back((request, Ok(print)));
+                true
+            }
+            fn answer(&mut self) -> Option<(u64, Result<Vec<f32>, String>)> {
+                self.0.pop_front()
+            }
+        }
+        let dark = |name: &str, in_view, room, second: i16| {
+            let mut heeding = judged_in_rooms(name, in_view, room);
+            heeding.checking_the_voice_for_services(Box::new(Voice::default()));
+            // No service linked: the lines are printed for the join alone,
+            // in memory only (the first builder's ruling on #7570).
+            heeding.printing_only_while_linked(crate::services::Linked::told(false));
+            heeding.printing_for_the_join_too();
+            for (request, voice) in [(1, 1), (2, second)] {
+                heeding.hear(
+                    request,
+                    Heard::Began {
+                        over_the_lamps_voice: false,
+                    },
+                );
+                heeding.hear(request, Heard::Samples(&[voice; 48_000]));
+                heeding.hear(request, Heard::Ended);
+            }
+            heeding.same_speaker(1, 2)
+        };
+        assert_eq!(
+            dark("da", [Some(0), Some(0)], Unknown, 1),
+            Joined::Same(SAME_VOICE_JOINS),
+            "one voice, no face in view"
+        );
+        assert_eq!(
+            dark("db", [None, None], Busy, 1),
+            Joined::Same(SAME_VOICE_JOINS),
+            "one voice, the camera closed"
+        );
+        assert!(
+            matches!(dark("dc", [Some(0), Some(0)], Unknown, -1), Joined::Not(why) if why.starts_with("two voices")),
+            "two voices in the dark stay two"
+        );
+        assert!(
+            matches!(dark("dd", [Some(0), Some(0)], Unknown, 2), Joined::Not(_)),
+            "a print too weak to judge joins nothing"
+        );
+        // With a face in view the services' prints are read by no rule, as
+        // before: the join is the eyes' and the room's (one face in view at
+        // each is no sign of a second person, not the same voice).
+        assert!(
+            matches!(dark("de", [Some(1), Some(1)], Busy, 1), Joined::NoSecond(_)),
+            "one face in view at each: the prints are not read"
+        );
+        // The joined request's answer said: no print for the join is held.
+        let mut heeding = judged_in_rooms("df", [Some(0), Some(0)], Unknown);
+        heeding.checking_the_voice_for_services(Box::new(Voice::default()));
+        heeding.printing_only_while_linked(crate::services::Linked::told(false));
+        heeding.printing_for_the_join_too();
+        for request in [1, 2] {
+            heeding.hear(
+                request,
+                Heard::Began {
+                    over_the_lamps_voice: false,
+                },
+            );
+            heeding.hear(request, Heard::Samples(&[1; 48_000]));
+            heeding.hear(request, Heard::Ended);
+        }
+        assert_eq!(heeding.same_speaker(1, 2), Joined::Same(SAME_VOICE_JOINS));
+        heeding.lamp_did(crate::second_provider::Did::Said(2, monotonic_us()));
+        let voices = heeding.for_services.as_ref().unwrap();
+        assert!(
+            !voices.joins_by(1) && !voices.joins_by(2),
+            "gone as it ends"
         );
     }
 
