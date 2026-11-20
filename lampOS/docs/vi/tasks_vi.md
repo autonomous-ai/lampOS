@@ -2936,8 +2936,15 @@ không thêm gì vào prompt của lượt ngoài một dòng việc-còn-mở b
   - Không có câu trả lời nào (không tới được lamp-tasks): lượt đó không có
     dòng nào; việc giao được giữ.
 
-  Ghi chú rằng một tác vụ đang chờ tiếng "có", hay một lần ghi dịch vụ,
-  được ưu tiên trước. Mỗi lần đọc được ghi vào journal, chỉ ở lượt có đọc:
+  Nó đứng cuối trong các ghi chú của lượt: một tiếng "có" hay "không" được
+  code nhận, một tác vụ đang chờ tiếng "có", một lần ghi của skill run bị
+  từ chối hay một lần ghi dịch vụ đang chờ đều được ưu tiên, và khi đó
+  lamp-tasks hoàn toàn không được hỏi
+  (`the_open_work_is_not_read_when_another_note_wins`). Brief của một skill
+  được tạo (việc make của chính lamp) không bao giờ được giao như việc của
+  người dùng, nên nó không có dòng nào. Sau lệnh "quên hết" của owner cũng
+  không có dòng nào ("Bản ghi công việc", bên dưới).
+  Mỗi lần đọc được ghi vào journal, chỉ ở lượt có đọc:
   `lamp-voice: tasks: request N: open work <id> read in <ms> ms (<state>|none)`,
   `none` khi lamp-tasks không trả bản ghi (không tới được, bị từ chối, hoặc
   không có)
@@ -2958,8 +2965,12 @@ không thêm gì vào prompt của lượt ngoài một dòng việc-còn-mở b
   the latest, call this again without task; never guess which one."}`, trừ
   việc mà giọng nói giao gần nhất, trong 30 phút sau khi giao: việc đó đã
   mất khi lamp-tasks khởi động lại và được trả lời
-  `{"work_id":"<id>","label":"<label>","lost_track":true,"next":<LOST_AFTER_RESTART>}`,
-  không bịa ra trạng thái nào.
+  `{"work_id":"<id>","label":"<label>","lost_track":true,"next":"<LOST_AFTER_RESTART> <LABEL_QUOTED>"}`,
+  không bịa ra trạng thái nào, label được đánh dấu là lời của chính người
+  đó, được trích dẫn và không đáng tin. Brief của một skill được tạo
+  (`made_skill::is_brief`) không bao giờ được kể, theo id hay trong danh
+  sách, vì `check` gốc bỏ qua nó
+  (`a_made_skills_brief_is_never_told_as_the_persons_work`).
 - **Không có `task`.** Voice hỏi `{"op":"work_list","limit":5}` và trả lời
   bằng `works`, mới nhất trước. Mỗi dòng gồm `id`, `kind` (`task`), `who`
   (tên agent như tin báo nói), `label`, `state`, `done`, và khi bản ghi có
@@ -4138,25 +4149,55 @@ hay một file.
 
 **Quên hết.** Lệnh "quên hết" của owner (`forget_sessions`, #6274, trên
 route của giọng nói) cũng xoá mọi bản ghi (`works::forget_all`), cùng lời
-của người dùng và câu trả lời của agent trong đó, và các tác vụ của store
-mà chúng giữ không được lần cập nhật sau mở lại; một tác vụ giao sau đó có
-bản ghi của nó (`forget_all_leaves_no_record_words_or_answer`, `works.rs`;
-`forget_sessions_clears_the_work_records`, `tests/runtime.rs`).
+của người dùng và câu trả lời của agent trong đó. Lệnh này phủ mọi tác vụ
+mà store đang giữ vào lúc đó, dù đã có bản ghi hay chưa (một tác vụ được
+xác nhận trong 500 ms gần nhất, hoặc đã được nhận nhưng chưa được theo
+dõi): lamp-tasks giữ một dấu bên cạnh store, `works-forgotten.json` (mode
+0600, chỉ có id: id của store và id tác vụ mới nhất của nó lúc đó,
+`works::Forgotten`), và không tác vụ nào của store đó tới id ấy được mở
+lại, dù bởi lần cập nhật sau hay bởi một lamp-tasks khởi động lại trên
+cùng store. Một dấu không ghi được thì trả lời `forget_failed`. Một tác vụ
+giao sau đó có bản ghi của nó. Giọng nói cũng buông việc nó giao gần nhất
+(`HANDED`), nên không có ghi chú việc-còn-mở nào và không có "mất sau khi
+khởi động lại" nào theo sau
+(`forget_all_leaves_no_record_words_or_answer` và
+`the_forget_mark_hides_its_stores_tasks_up_to_its_id_and_is_kept`,
+`works.rs`;
+`forget_everything_leaves_every_store_task_off_the_work_records`,
+`engine.rs`; `forget_sessions_clears_the_work_records`,
+`forget_sessions_covers_a_store_task_not_yet_on_the_records` và
+`forget_sessions_holds_across_a_restart_of_lamp_tasks`,
+`tests/runtime.rs`; `forget_everything_leaves_no_open_work_note`,
+`agent_tasks.rs`).
 
 **Khởi động lại thì mất gì.** Bản ghi chỉ nằm trong bộ nhớ, không bao giờ
-được ghi ra. Khi lamp-tasks khởi động lại, bản ghi của mỗi tác vụ trong
+được ghi ra (chỉ dấu quên ở trên là được ghi). Khi lamp-tasks khởi động lại, bản ghi của mỗi tác vụ trong
 store được mở lại từ store, `started_ms` là của chính store (lúc xác nhận,
 nếu không thì lúc tạo, theo đồng hồ monotonic của lần boot, thứ được giữ
-qua lần khởi động lại lamp-tasks), nên `elapsed_s` tiếp tục; tác vụ từ lần
-boot trước, mà store không định được thời điểm, bắt đầu từ lúc lần chạy
-mới thấy nó lần đầu
-(`a_task_reopened_after_a_restart_keeps_its_start_from_the_store`,
+qua lần khởi động lại lamp-tasks), nên `elapsed_s` tiếp tục; một tác vụ đã
+xong giữ thời điểm kết thúc của nó theo cùng cách (quan sát đã chốt của
+nó, nếu không thì lúc dispatch của nó kết thúc), nên một tác vụ 40 s vẫn
+đọc là 40 s; tác vụ từ lần boot trước, mà store không định được thời
+điểm, bắt đầu từ lúc lần chạy mới thấy nó lần đầu
+(`a_task_reopened_after_a_restart_keeps_its_start_from_the_store` và
+`a_finished_task_reopened_after_a_restart_keeps_its_end_from_the_store`,
 `works.rs`;
 `a_task_on_the_work_records_is_dated_from_its_hand_over_across_a_restart`,
 `engine.rs`). Một bản ghi không được mở lại (`work` trả lời
 `no_such_work`) được giọng nói kể là đã mất dấu sau khi khởi động lại,
 không bao giờ là không có gì đang chạy, đối với việc nó giao gần nhất
 (dòng việc-còn-mở và `check_agent_task` ở trên).
+
+**Dòng của một việc trước trên cùng agent.** `ps` của Harness tính theo
+agent, nên trên một phiên được giữ nó có thể cho thấy dòng của một việc
+trước: một hàng có lần hoạt động cuối trước lúc việc này được giao (theo
+`accepted_ago_ms` của nó) không được giữ cho việc này, cả `about` lẫn
+`last_active_unix_ms`, cho tới khi agent hoạt động sau lúc giao (c0a4-17
+HW: câu trả lời của việc 224 và "im lặng khoảng một tiếng mười lăm phút"
+đã bị kể cho việc 225, mới 3 phút;
+`an_earlier_tasks_line_on_the_same_agent_is_not_the_new_tasks`,
+`progress.rs`). `last_active_ms` của bản ghi, bước và thời gian im lặng mà
+giọng nói kể đều lấy từ đó.
 
 Kiểm thử: `a_task_record_is_opened_updated_then_overwritten_by_a_later_observation`,
 `tasks_are_listed_newest_first`,
