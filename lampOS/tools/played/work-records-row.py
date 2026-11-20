@@ -850,6 +850,11 @@ class Row:
             removed = True
         return removed
 
+    def remove_helper(self):
+        """L0's ask helper removed from the lamp's /tmp; whether it is gone."""
+        self.lamp.run(f'rm -f {HELPER}', check=False)
+        return self.lamp.run(f'test -e {HELPER} && echo there || true').strip() != 'there'
+
     # put-back
     def put_back(self):
         lamp = self.lamp
@@ -858,15 +863,14 @@ class Row:
         except LockLost as holder:
             return self.verdict('putback', {'verdict': 'NOT RUN', 'why': f'lock not held: {holder}; the state is '
                                             'kept on the lamp for --put-back under the lock'})
-        # The ask helper L0 left in /tmp goes whatever else is put back.
-        lamp.run(f'rm -f {HELPER}', check=False)
         text = lamp.run(f'sudo -n cat {STATE}', check=False).strip()
         if not text:
             # No state, but a drop-in an older kit run left (/run or /etc) still goes, the units restarted on it.
             if not self.remove_drop_ins({}, self.label, time.strftime('%Y-%m-%d %H:%M')):
+                self.remove_helper()
                 return self.verdict('putback', {'verdict': 'PASS', 'why': 'nothing to put back (no state file)'})
             ready = self.restart(engine=None)
-            left = self.drop_in_left()
+            left = self.drop_in_left() or not self.remove_helper()
             ok = ready['ok'] and not left
             return self.verdict('putback', {'verdict': 'PASS' if ok else 'FAIL', 'ready': ready, 'drop_in': left,
                                             'why': 'no state file; leftover drop-ins removed' if ok else
@@ -909,14 +913,15 @@ class Row:
             reads.append({'running': {u: lamp.binary(u) for u in state['units']},
                           'sha256': {u: lamp.sha(lamp.binary(u)) for u in state['units']},
                           'engine': lamp.environment('lamp-tasks').get('LAMP_LAMP_ENGINE', ''),
-                          'drop_in': self.drop_in_left(),
-                          'helper_left': lamp.run(f'test -e {HELPER} && echo there || true').strip() == 'there'})
+                          'drop_in': self.drop_in_left()})
             time.sleep(3)
         def installed(unit, sha):
             row = state['units'][unit]
             return sha != row['staged_sha256'] and (round_ran or sha == row['installed_sha256'])
         ok = ready['ok'] and all(all(installed(u, r['sha256'][u]) for u in r['sha256']) and not r['drop_in']
-                                 and not r['helper_left'] for r in reads)
+                                 for r in reads)
+        # The ask helper L0 left in /tmp goes last: the restart and reads above ask through it.
+        ok = self.remove_helper() and ok
         if ok:
             lamp.run(f'sudo -n sh -c "rm -rf {STATE_DIR} && echo \'{stamp} #7930 work-records ROW {state["label"]}: '
                      f'put back, read twice\' >> {CHANGES}"')
