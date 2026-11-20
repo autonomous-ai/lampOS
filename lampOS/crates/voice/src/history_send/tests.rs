@@ -1125,3 +1125,85 @@ fn a_source_forgotten_elsewhere_lets_its_scope_wait() {
     assert_eq!(queued(&sender), (vec![format!("{B}:1")], vec![]));
     assert_eq!(sender.let_go(), 2);
 }
+
+/// A gate the test opens and closes.
+fn gate_on(open: &Arc<std::sync::atomic::AtomicBool>) -> Gate {
+    let open = open.clone();
+    Arc::new(move |_: &str| open.load(std::sync::atomic::Ordering::SeqCst))
+}
+
+/// The first builder's privacy read on #8125, item 3: a turn said just
+/// before the privacy switch closed is not sent while it is closed, and
+/// goes once it opens.
+#[test]
+fn a_turn_said_just_before_the_switch_closes_is_sent_only_after_it_opens() {
+    let (post, told) = recording(vec![Answer::Saved]);
+    let open = Arc::new(std::sync::atomic::AtomicBool::new(true));
+    let sender = Sender::new();
+    sender.guarded(gate_on(&open), Arc::new(|_: &[String]| {}));
+    // Said, then the switch closes before the sender takes it.
+    offer(&sender, Some(A), 1);
+    open.store(false, std::sync::atomic::Ordering::SeqCst);
+    sender.spawn(post, fresh(), None, QUICK).unwrap();
+    none_within(&told, Duration::from_millis(300));
+    open.store(true, std::sync::atomic::Ordering::SeqCst);
+    assert_eq!(ids(&next(&told)), [id(A, 1)]);
+}
+
+/// The first builder's privacy read on #8125, item 1: while a forget of a
+/// scope has not reached the account, no turn of that scope is sent; it
+/// goes once the forget has.
+#[test]
+fn a_turn_waits_while_its_scopes_forget_has_not_reached_the_account() {
+    let (post, told) = recording(vec![Answer::Saved]);
+    let unreached = Arc::new(Mutex::new(Some(A.to_owned())));
+    let held = unreached.clone();
+    let sender = Sender::new();
+    sender.guarded(
+        Arc::new(move |scope: &str| held.lock().unwrap().as_deref() != Some(scope)),
+        Arc::new(|_: &[String]| {}),
+    );
+    offer(&sender, Some(A), 3);
+    sender.spawn(post, fresh(), None, QUICK).unwrap();
+    none_within(&told, Duration::from_millis(300));
+    *unreached.lock().unwrap() = None;
+    assert_eq!(ids(&next(&told)), [id(A, 3)]);
+}
+
+/// The Reviewer-lead's must-fix on #8091: a POST already on the wire when
+/// a forget naming no ids (or a forget everything) of its person came is
+/// let land, and once it answered its turns' ids are handed to the
+/// forget's delete, so they never stay on the account; another person's
+/// turn in it is not.
+#[test]
+fn a_post_in_flight_when_a_forget_naming_no_ids_came_is_deleted_after() {
+    let (tell, told) = mpsc::channel();
+    let (go, gate) = mpsc::channel::<Answer>();
+    let post: Post = Box::new(move |body: &Value| {
+        let _ = tell.send(body.clone());
+        gate.recv_timeout(Duration::from_secs(5))
+            .unwrap_or(Answer::Saved)
+    });
+    let deleted = Arc::new(Mutex::new(Vec::<String>::new()));
+    let kept = deleted.clone();
+    let sender = Sender::new();
+    sender.guarded(
+        Arc::new(|_: &str| true),
+        Arc::new(move |ids: &[String]| kept.lock().unwrap().extend(ids.iter().cloned())),
+    );
+    offer(&sender, Some(A), 1);
+    offer(&sender, Some(B), 2);
+    sender.spawn(post, fresh(), None, QUICK).unwrap();
+    assert_eq!(ids(&next(&told)), [id(A, 1), id(B, 2)]);
+    // In flight: A's forget everything (the whole-person delete) comes.
+    sender.forgetting(Some(A));
+    sender.forget_answered(Some(A), true, Some(&json!({"ok":true})));
+    go.send(Answer::Saved).unwrap();
+    let started = Instant::now();
+    while deleted.lock().unwrap().is_empty() {
+        assert!(started.elapsed() < Duration::from_secs(5));
+        std::thread::sleep(Duration::from_millis(5));
+    }
+    assert_eq!(*deleted.lock().unwrap(), [id(A, 1)]);
+    none_within(&told, Duration::from_millis(100));
+}

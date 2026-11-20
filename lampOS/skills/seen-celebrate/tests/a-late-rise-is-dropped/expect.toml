@@ -1,0 +1,14 @@
+# 15:00, celebrating seen at 10 in a talk from 9 to 12, and at 36 in a talk from 35 to 40: one line at 12, once the voice rests; the one at 36 is kept 3 minutes from the sighting, dropped at 39 while they still talk, and never said after the turn.
+clock = "15:00"
+
+[[expect]]
+at = "12m"
+within = "1m"
+call = "body.gaze"
+args = { look_at = "face" }
+
+[[expect]]
+at = "12m"
+within = "1m"
+call = "say"
+args = { note = "You just saw them celebrate at the desk: clapping or cheering. Say one warm line, the way a friend would, at most twenty words: share the moment, and maybe ask what the good news is. Say only what you saw; nothing about their body or looks, and never mention a camera." }

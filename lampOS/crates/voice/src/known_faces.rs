@@ -260,25 +260,62 @@ pub(crate) fn lower_words(text: &str) -> Vec<String> {
 /// Refusing a yes costs a turn; keeping a wrong name does not fail safe.
 fn agrees(said: &str) -> bool {
     let words = lower_words(said);
-    let phrase_at = |at: usize, phrase: &[&str]| {
-        phrase
-            .iter()
-            .enumerate()
-            .all(|(next, word)| words.get(at + next).is_some_and(|said| said == word))
-    };
+    let pleasantry = pleasantries(&words);
+    let agreeing = (0..words.len())
+        .any(|at| pleasantry[at] || AGREE.iter().any(|phrase| phrase_at(&words, at, phrase)));
+    agreeing && !takes_back(&words, &pleasantry)
+}
+
+/// Whether `phrase` is said in `words` from `at`.
+fn phrase_at(words: &[String], at: usize, phrase: &[&str]) -> bool {
+    phrase
+        .iter()
+        .enumerate()
+        .all(|(next, word)| words.get(at + next).is_some_and(|said| said == word))
+}
+
+/// Which of `words` are in a yes that holds a no word ([`AGREE_WITH_A_NO`]:
+/// "No problem", "why not").
+fn pleasantries(words: &[String]) -> Vec<bool> {
     let mut pleasantry = vec![false; words.len()];
     for at in 0..words.len() {
-        if let Some(phrase) = AGREE_WITH_A_NO.iter().find(|phrase| phrase_at(at, phrase)) {
+        if let Some(phrase) = AGREE_WITH_A_NO
+            .iter()
+            .find(|phrase| phrase_at(words, at, phrase))
+        {
             pleasantry[at..at + phrase.len()].fill(true);
         }
     }
-    let agreeing = (0..words.len())
-        .any(|at| pleasantry[at] || AGREE.iter().any(|phrase| phrase_at(at, phrase)));
-    agreeing
-        && !words
-            .iter()
-            .zip(&pleasantry)
-            .any(|(word, kept)| !kept && DISAGREE.contains(&word.as_str()))
+    pleasantry
+}
+
+/// Whether a [`DISAGREE`] word stands in `words` outside a pleasantry
+/// (`pleasantry`, [`pleasantries`]): the half of [`agrees`] that takes a
+/// yes back, and of [`refuses`].
+fn takes_back(words: &[String], pleasantry: &[bool]) -> bool {
+    words
+        .iter()
+        .zip(pleasantry)
+        .any(|(word, kept)| !kept && DISAGREE.contains(&word.as_str()))
+}
+
+/// Whether the turn says no to the lamp's question and nothing that
+/// forgets (#8165): a no ([`DISAGREE`] outside a pleasantry, a plain no by
+/// `services::plain_no`, or a forget word negated, `remember::negates_a_forget`)
+/// and no forget word or phrase that is not negated
+/// (`remember::forgets_unnegated`). So "No.", "No, keep it.", "Don't.",
+/// "Lamp, no.", "No, don't forget it.", "Don't drop it.", "Đừng quên."
+/// refuse; "No problem, go ahead.", "No, just forget it.", "No, drop it."
+/// and "No, I don't need it." don't. A keep-side backstop to the model's
+/// judgment of a one-face forget's answer
+/// (`second_provider::take_held_forget`): it only ever keeps, never forgets.
+pub(crate) fn refuses(turn: &str) -> bool {
+    let words = lower_words(turn);
+    let pleasantry = pleasantries(&words);
+    (takes_back(&words, &pleasantry)
+        || crate::services::plain_no(turn)
+        || crate::remember::negates_a_forget(turn))
+        && !crate::remember::forgets_unnegated(turn)
 }
 
 /// How many letters the person said a name has: "three letters", "it's 4
@@ -3022,8 +3059,19 @@ fn said_by_known_face(line: Option<&crate::speaking_faces::LineSeen>) -> bool {
 /// With `LAMP_FACE_QUESTION_NOT_ASK`: a face the eyes already kept under
 /// this name, matched as theirs (their `already`), is said to be known
 /// already, never as a first save, and the visits line said at the first
-/// save is not said again (lamp-74ff). Never on a rename.
+/// save is not said again (lamp-74ff). A rename (`replacing`) is never
+/// told known already, but when the eyes replaced a kept name (their
+/// `replaced` not empty) the visits line is dropped too: the person heard
+/// it when that face was first kept. The rest of the answer (`ok`,
+/// `remembered`, the other `also_say` lines) stays. A replace that
+/// replaced nothing is a first save and keeps the line.
 fn told_already(told: Value, answer: &Value, switches: FaceSwitches, replacing: bool) -> Value {
+    if switches.face_question
+        && replacing
+        && replaced_of(answer).is_some_and(|replaced| !replaced.is_empty())
+    {
+        return without_visits_line(told);
+    }
     if switches.face_question
         && !replacing
         && answer.get("already").and_then(Value::as_bool) == Some(true)
@@ -3035,6 +3083,23 @@ fn told_already(told: Value, answer: &Value, switches: FaceSwitches, replacing: 
             "already_known": kept,
             "note": ALREADY_KNOWN_NOTE,
         });
+    }
+    told
+}
+
+/// `told` with [`VISITS_LINE`] taken out of its `also_say`, the leftover
+/// lines trimmed; no `also_say` at all when nothing is left.
+fn without_visits_line(mut told: Value) -> Value {
+    let Some(also_say) = told["also_say"].as_str() else {
+        return told;
+    };
+    let left = also_say.replace(VISITS_LINE, "").trim().to_owned();
+    if let Some(fields) = told.as_object_mut() {
+        if left.is_empty() {
+            fields.remove("also_say");
+        } else {
+            fields.insert("also_say".into(), json!(left));
+        }
     }
     told
 }
@@ -5690,6 +5755,64 @@ mod tests {
         assert!(!agreed_to("Jim", &corrected));
     }
 
+    /// #8165: a no to the one-face forget question refuses it, a pleasantry
+    /// and a yes never do, and a no beside a word that forgets after all
+    /// ("No, just forget it.") is no refusal.
+    #[test]
+    fn refuses_reads_the_noes_and_never_a_yes() {
+        for no in [
+            "No.",
+            "No, keep it.",
+            "Don't.",
+            "Lamp, no.",
+            "No, no, keep it.",
+            "Nope.",
+            "Nah, leave it.",
+            "No thanks.",
+            "Of course not.",
+            "Kh\u{f4}ng, gi\u{1eef} l\u{1ea1}i.",
+            "\u{110}\u{1eeb}ng.",
+            "No, don't forget it.",
+            "No, don't delete it.",
+            "Don't forget it.",
+            "\u{110}\u{1eeb}ng qu\u{ea}n.",
+            "No, don't get rid of it.",
+            "Don't drop it.",
+            "No, never drop that.",
+            "Don't scratch that.",
+        ] {
+            assert!(refuses(no), "{no}");
+        }
+        for not in [
+            "Yes.",
+            "Lamp, yes.",
+            "Loan. Yes.",
+            "Yes please.",
+            "Sure, go ahead.",
+            "No problem, go ahead.",
+            "No worries, do it.",
+            "Why not?",
+            "Yes, I don't mind.",
+            "No, just forget it.",
+            "No no, delete it.",
+            "No, I don't need it.",
+            "No, don't keep it.",
+            "No, erase it.",
+            "No, remove it.",
+            "No, drop it.",
+            "No, get rid of it.",
+            "No, do not keep it.",
+            "Why don't you forget it?",
+            // Forget said and taken back in one line: asked once more.
+            "No, don't keep it, forget it. No wait, don't delete it.",
+            "Wait.",
+            "Keep it.",
+            "",
+        ] {
+            assert!(!refuses(not), "{not}");
+        }
+    }
+
     /// The reviewer on #1208 at 04:40: a yes to the lamp's read-back holds
     /// nothing but yeses, the name and words that stand beside a yes. A
     /// correction with no "no" in it is asked about again.
@@ -7700,6 +7823,97 @@ mod tests {
             ..no_ask(true)
         };
         assert_eq!(told_already(told.clone(), &answer, off, false), told);
+        // A rename the eyes made (`replaced` not empty) drops the visits
+        // line said at the first save, keeping every other line; a replace
+        // that replaced nothing is a first save and keeps it. Off, as before.
+        let renamed = json!({"remembered": "Ben", "replaced": ["Ana"], "visits": true});
+        let first = json!({"remembered": "Ben", "replaced": [], "visits": true});
+        let with_line =
+            |also_say: String| json!({"ok": true, "remembered": "Ben", "also_say": also_say});
+        assert_eq!(
+            told_already(with_line(VISITS_LINE.into()), &renamed, no_ask(true), true),
+            json!({"ok": true, "remembered": "Ben"})
+        );
+        for other in [ASK_TO_NAME, VISITS_UNDO] {
+            assert_eq!(
+                told_already(
+                    with_line(format!("{VISITS_LINE} {other}")),
+                    &renamed,
+                    no_ask(true),
+                    true
+                ),
+                with_line(other.into())
+            );
+        }
+        let kept = with_line(VISITS_LINE.into());
+        assert_eq!(told_already(kept.clone(), &first, no_ask(true), true), kept);
+        assert_eq!(told_already(kept.clone(), &renamed, off, true), kept);
+    }
+
+    /// The person, 20 Nov 23:4x: a rename (the face re-saved under a
+    /// corrected name, Ana to Ben) is not told the visits line again; they
+    /// heard it when the face was first kept. Off, as before.
+    #[test]
+    fn with_face_question_a_rename_is_not_told_the_visits_line_again() {
+        let _serial = FACE_QUESTION_SERIAL
+            .lock()
+            .unwrap_or_else(|poison| poison.into_inner());
+        let call = ToolCall {
+            id: "1".into(),
+            name: REMEMBER.into(),
+            args: json!({"name": "Ben", "replace": true}),
+        };
+        let yes = Said {
+            this: "Yes, call me Ben.".into(),
+            before: vec![("Call me Ben.".into(), "Shall I call you Ben?".into())],
+        };
+        let run = |face_question: bool, replaced: Value| {
+            let (socket, sent) = eyes(vec![json!({
+                "remembered": "Ben", "replaced": replaced, "visits": true
+            })]);
+            std::fs::write(known_file_of(&socket), "Ana\n").unwrap();
+            let (told, _) = run_switched(
+                &socket,
+                &call,
+                FaceSwitches {
+                    checked: true,
+                    rename_yes: true,
+                    name_learn_fix: true,
+                    face_question,
+                    ..FaceSwitches::default()
+                },
+                &yes,
+                None,
+                &mut None,
+            );
+            assert_eq!(
+                sent.join().unwrap(),
+                vec![json!({"remember": "Ben", "one_face": true, "replace": true})]
+            );
+            let _ = std::fs::remove_dir_all(socket.parent().unwrap());
+            told
+        };
+        let on = run(true, json!(["Ana"]));
+        assert_eq!(on["ok"], true, "{on}");
+        assert_eq!(on["remembered"], "Ben", "{on}");
+        assert!(on.get("already_known").is_none(), "{on}");
+        assert!(!on.to_string().contains(VISITS_LINE), "{on}");
+        // Nothing replaced: a first save, the line kept.
+        let first = run(true, json!([]));
+        assert!(
+            first["also_say"]
+                .as_str()
+                .is_some_and(|line| line.contains(VISITS_LINE)),
+            "{first}"
+        );
+        // The switch off: as before, the line said.
+        let off = run(false, json!(["Ana"]));
+        assert!(
+            off["also_say"]
+                .as_str()
+                .is_some_and(|line| line.contains(VISITS_LINE)),
+            "{off}"
+        );
     }
 
     /// The owner, 20 Nov 02:18: "I already know your face" only on a fresh

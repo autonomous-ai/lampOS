@@ -384,10 +384,20 @@ long story …" line on "want" alone. A fact of nothing but such verbs
 keeps them, so the walk is never wider than before; search and the copy
 rule below keep them too. An unlinked
 row needs every word, or "favourite colour is violet" would take every
-"favourite" the person said. A fact with no distinctive word takes the old
-broad walk, plus its literal copies (whole words; a text under three
-characters, such as "B2", only as a whole field, so "B22" and "Seat B2 is
-free" stay). The walk goes on
+"favourite" the person said. A fact with no distinctive word ("Stop.")
+takes no walk: it goes with its evidence exchanges and its literal copies
+(whole words; a text under three characters, such as "B2", only as a whole
+field, so "B22" and "Seat B2 is free" stay), with every version it
+replaced back to the first (the same kept thing at an earlier time), and no
+other kept thing (#8031: on lamp-06c1, 20 Nov, the old broad walk took 28 rows for one kept
+"Stop.", four of them other things the person kept). In any forget the
+named row's own replaced versions go, of any kind (the same thing at an
+earlier time: forgetting a tidy observation that corrected a kept thing,
+finding N11, takes that kept thing too). No other kept thing goes: the walk
+never adds one, and a kept thing reached only as the version of a walked
+row that wasn't named stays, hidden, never current again (a worded forget
+whose walk takes that observation leaves the kept thing it corrected
+inactive; `days::walk_versions`). The walk goes on
 through linked rows that stay, so a wordless turn in between does not stop
 it; and a copy matches one version's own words, so a copy of the newer
 "violet" goes without the older "teal" (Reviewer-two, 03:15). The voice
@@ -1249,7 +1259,9 @@ body `{"turns":[{"id","at","person","heard","said"}]}`.
   forget ops, `history_forget::answered`, on the voice's way) goes to
   `history_send::deleting`, so those ids are never posted, whatever
   `LAMP_HISTORY_FORGET`; with it on, the pages of a big forget's rest are
-  read off the voice's way and their ids go there too. A forget about a
+  read off the voice's way and their ids go there too, as do those the
+  memory kept of a forget the worker never queued, read again at the next
+  start (`history_unsent`, [memory.md](memory.md)). A forget about a
   thing holds and lifts the posts as every other forget. When each of its
   removals answered, what went was named on its way and nothing more is let
   go; when one timed out or was lost part way (the kept things' forgets or the
@@ -1284,8 +1296,18 @@ body `{"turns":[{"id","at","person","heard","said"}]}`.
   or another refusal is not tried again. At most 200 turns wait (past it the
   oldest waits for the next start) and 64 room lines are held. The journal has
   counts only, never a word, an id or a key.
-- **Privacy:** what was said before the privacy switch closed may still be sent
-  while it is closed; nothing new is said to the lamp then.
+- **Privacy:** nothing is sent while the privacy switch is closed (the first
+  builder's privacy read on #8125): the save waits on the voice's own
+  `voice/privacy` lease (`history_privacy`), looked at again every 1 s, so a
+  turn said just before the switch closed goes only after it opens. While a
+  forget is in the forget worker's hands or its delete waits, no turn it
+  could reach is sent (`history_forget::holds`), and a turn on the wire as a
+  forget covering it came is deleted after its POST answers (the
+  Reviewer-lead's must-fix on #8091). A reset or a forget of everyone
+  deletes the lamp's whole history first (`{"all":true,"every_person":true}`;
+  one that missed the worker's hand-off is seen at the next read again by
+  the memory's changed epoch),
+  and nothing is saved before it goes ([memory.md](memory.md)).
 - **Off in every unit:** by the first builder's rulings (#7935, and 17:09 on
   #7957), the save goes on in the product only after the forget half
   (`LAMP_HISTORY_FORGET`) is on, with its row. The setup sentence the issue

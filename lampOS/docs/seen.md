@@ -329,7 +329,15 @@ that one too, aborts a burst under way.
   no file, one that can't be read or is over 4096 bytes, not exactly those
   two whole numbers, `every_s` outside 15–60 s, or `until_unix_s` reached.
   With the switch off it is a minute whatever the cloud says; the heat
-  pace multiplies the period in force ("The board's heat"). At 15 s,
+  pace multiplies the period in force ("The board's heat"). The seen
+  reactions (in the tree but not yet product skills, until their switch-on
+  pull request after the owner's working-day row, #7668) change none of this: no product unit sets
+  the switch (`no_product_unit_sets_the_fifteen_second_switch`), so every
+  lamp stays at a burst a minute until a unit sets it and Backend sends
+  `seen_clip`. Nor do the reactions send anything: they read
+  `humans/doing_more` on the lamp and make only a turn and a line
+  (skills.md, the seen reactions' row), so nothing seen leaves the lamp
+  but what lamp-seen already sends and counts here. At 15 s,
   against a minute, a seated lamp then sends the
   perception server four times the bursts and spends about four times the
   encode and TLS work. At either rate a burst under way holds the next back
@@ -457,7 +465,8 @@ that one too, aborts a burst under way.
     while a sitting lasts (not while it is kept through a short
     closing), and at once, with `humans/doing_more`, in the tick of a
     burst's answer that saw a kind of it or raised any count
-    (`drank_seen`, `ate_seen`, `tired_seen`, `celebrate_seen`; #7401: a
+    (`drank_seen`, `ate_seen`, `tired_seen`, `yawn_seen`, `stretch_seen`,
+    `celebrate_seen`; #7401: a
     count up is a seen reaction right away, not up to 30 s later); the
     30 s beat goes on from that saying.
     It goes out whether or not frames do (the opt-in off, the server busy,
@@ -469,6 +478,15 @@ that one too, aborts a burst under way.
     (`HumanDoingMore`), with `humans/doing` and as often: `tired_s_ago`
     and `tired_seen` (V1's `tired` group, a yawn, and a stretch of an arm
     or a leg, which still counts as a break on `humans/doing` too),
+    `yawn_s_ago` and `yawn_seen`, and `stretch_s_ago` and `stretch_seen`
+    (#8123: the two apart, each by the same sureness rule and counted as
+    `tired_seen` is, so Seen tired names only what was seen; a burst that
+    newly saw both counts only the surer, a yawn when as sure, and the
+    other goes on as already seen, so a yawn while stretching is one
+    count; tiredness counted only from the two together, an unsure yawn
+    and an unsure stretch in a run, raises `tired_seen` and neither;
+    `tired_s_ago` and `tired_seen` stay the two together; each read as 0
+    when absent, from an older `lamp-seen`),
     `desk_work_s_ago` with a coarse `desk_work` (V1's `sedentary` group:
     "using computer" and "playing controller" are `computer`, "texting"
     `phone`, "reading", "reading book" and "reading newspaper" `reading`,

@@ -85,6 +85,13 @@ pub trait Services: Send + Sync + 'static {
         let _ = (messages, without, name);
         None
     }
+    /// The function a chat on `messages`, told without `without`, must call
+    /// ([`net::Chat::forced`]), for round 1's journal line (#8022): inside,
+    /// none when nothing is forced. None, from services that cannot say.
+    fn forced(&self, messages: &[Message], without: &[&str]) -> Option<Option<&'static str>> {
+        let _ = (messages, without);
+        None
+    }
     /// A chat request's bytes and tool count on `messages`, told as `told`
     /// says, as it would be sent now, for a debug journal block
     /// (`LAMP_CUT_IN_PROMPT_LOG`, #6218). None, from services that cannot say.
@@ -518,12 +525,13 @@ impl Net {
             return None;
         };
         let (queue, bell) = crate::history_forget::queue();
-        Some(Box::pin(net::history::task(
+        Some(Box::pin(net::history::task_while(
             url,
             self.config.llm_key.expose().to_owned(),
             queue,
             bell.clone(),
             net::history::Pace::PRODUCT,
+            Arc::new(crate::history_privacy::open),
         )))
     }
 
@@ -1094,6 +1102,10 @@ impl Services for Net {
 
     fn declares(&self, messages: &[Message], without: &[&str], name: &str) -> Option<bool> {
         Some(self.chat.declares(messages, without, name))
+    }
+
+    fn forced(&self, messages: &[Message], without: &[&str]) -> Option<Option<&'static str>> {
+        Some(self.chat.forced(messages, without))
     }
 
     fn measured(&self, messages: &[Message], told: ChatTold) -> Option<(usize, usize)> {

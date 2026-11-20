@@ -253,6 +253,113 @@ pub fn unknown_told(name: &str, said: &str) -> String {
     )
 }
 
+/// What the model is told when the person said no to the lamp's one-face
+/// forget question (#8165: "No." to "Shall I forget what you kept about
+/// …?" ran the forget on lamp-06c1, the model calling it anyway): nothing
+/// was forgotten, it is still kept, and it says only that it kept it.
+/// `subject` is the thing asked about, in their words, given only while no
+/// one else is in view (`second_provider::take_held_forget`, the private
+/// read-backs' gate); without it the note names nothing.
+pub fn said_no_told(subject: Option<&str>) -> String {
+    kept_told("they said no", subject)
+}
+
+/// [`said_no_told`] for an answer asked about once more
+/// ([`FORGET_ASKED_AGAIN`]) and still not clear: nothing was forgotten.
+pub fn still_unclear_told(subject: Option<&str>) -> String {
+    kept_told("their answer was still not clear", subject)
+}
+
+/// [`said_no_told`]'s words, for `why`.
+fn kept_told(why: &str, subject: Option<&str>) -> String {
+    match subject {
+        Some(subject) => format!(
+            "(For you to know: {why}, so nothing was forgotten and what they kept about {} is still kept. Say only, in a few words, that you kept it, for example \"Okay, I'll keep it.\" Do not say it is forgotten, and do not call forget now.)",
+            cut_at_a_word(subject, WHAT_WENT_BYTES)
+        ),
+        None => format!(
+            "(For you to know: {why}, so nothing was forgotten and it is still kept. Say only, in a few words, that you kept it, for example \"Okay, I'll keep it.\" Do not say what was asked about, do not say it is forgotten, and do not call forget now.)"
+        ),
+    }
+}
+
+/// What the model is told when the answer to the one-face forget question
+/// both says to forget and says not to (#8165: "Forget it… no wait, don't
+/// delete it.", [`negates_a_forget`] and [`forgets_unnegated`] both): nothing
+/// was forgotten, and it asks once more. Never a silent forget.
+pub const FORGET_ASKED_AGAIN: &str = "(For you to know: their answer was not clear, so nothing was forgotten and it is still kept. Ask them once more, in a few words, \"Should I forget it?\", and then stop. Do not say what was asked about, do not say it is forgotten, and do not call forget now. If they then say yes, call forget then, naming nothing else.)";
+
+/// Phrases an answer to the one-face forget question may forget by, beside
+/// [`PHRASES`] (#8165): "No, I don't need it.", "No, drop it."
+const ANSWER_PHRASES: &[&[&str]] = &[
+    &["drop", "it"],
+    &["drop", "that"],
+    &["get", "rid"],
+    &["don't", "need"],
+    &["dont", "need"],
+    &["do", "not", "need"],
+];
+
+/// Whether a forget word or phrase of `said` is negated in its clause
+/// ("Don't forget it.", "No, don't delete it.", "Don't drop it.", "No,
+/// don't get rid of it.", "Đừng quên."; never "No, just forget it." nor
+/// "Why don't you forget it?"), as a keep reads a line ([`only_keeps`]),
+/// #8165.
+pub fn negates_a_forget(said: &str) -> bool {
+    forgets_read(said).0
+}
+
+/// Whether `said` asks to forget with a word or phrase not negated in its
+/// clause ("No, just forget it.", "No no, delete it.", "Why don't you
+/// forget it?", "No, get rid of it.", "No, drop it."), a phrase that holds
+/// its own negation among them ("No, don't keep it.", "No, I don't need
+/// it."), #8165.
+pub fn forgets_unnegated(said: &str) -> bool {
+    forgets_read(said).1
+}
+
+/// Whether `said` holds a forget negated in its clause, and one not
+/// ([`negates_a_forget`], [`forgets_unnegated`]). A forget word is read by
+/// [`clauses_of`]; a forget phrase ([`PHRASES`], [`ANSWER_PHRASES`]) the
+/// same way: negated when a [`KEEP_NEGATES`] word stands before it in its
+/// clause, never one in a polite ask ([`asks_politely`]). A phrase's own
+/// words ("don't keep", "don't need") never negate it.
+fn forgets_read(said: &str) -> (bool, bool) {
+    let (mut negated, mut unnegated) = (false, false);
+    for sentence in lower_line(said).split(SENTENCE_ENDS) {
+        let (clauses, kinds) = clauses_of(sentence);
+        for (clause, kind) in clauses.iter().zip(&kinds) {
+            if clause.iter().any(|word| forget_word(word)) {
+                match kind {
+                    Some(true) => negated = true,
+                    Some(false) => unnegated = true,
+                    None => {}
+                }
+            }
+            for at in 0..clause.len() {
+                let phrase = PHRASES
+                    .iter()
+                    .chain(ANSWER_PHRASES)
+                    .any(|phrase| clause[at..].starts_with(phrase));
+                if !phrase {
+                    continue;
+                }
+                let before = &clause[..at];
+                if before
+                    .iter()
+                    .enumerate()
+                    .any(|(at, word)| KEEP_NEGATES.contains(word) && !asks_politely(before, at))
+                {
+                    negated = true;
+                } else {
+                    unnegated = true;
+                }
+            }
+        }
+    }
+    (negated, unnegated)
+}
+
 /// What the model is told when a held forget's answer `said` comes too late
 /// from no one known on the line (the P3 on #7490): as [`unknown_told`],
 /// but naming neither the kind of thing held nor its call, since nothing
@@ -15184,7 +15291,8 @@ fn legacy_exchange(
     match lease {
         Some(_) => bounded_exchange_scoped(socket, line, budget, lease),
         None => {
-            let answer = crate::tools::exchange(socket, line, budget)?;
+            let answer =
+                crate::tools::exchange(socket, &crate::history_forget::asking(line), budget)?;
             // `LAMP_HISTORY_FORGET` (#7771), as [`exchange_guarded`].
             crate::history_forget::answered(socket, line, &answer);
             Some(answer)
@@ -15329,7 +15437,9 @@ fn exchange_guarded(
         // connection. Refuse promptly rather than spin or block in connect.
         Err(_) => return None,
     }
-    let mut bytes = serde_json::to_vec(line).ok()?;
+    // With `LAMP_HISTORY_FORGET=on`, a forget asks the memory to keep what
+    // it removes until the worker has it queued (#7771).
+    let mut bytes = serde_json::to_vec(&*crate::history_forget::asking(line)).ok()?;
     if bytes.len() >= 65_536 {
         return None;
     }
@@ -15589,6 +15699,76 @@ mod tests {
         io::{BufRead, BufReader, Write},
         os::unix::net::UnixListener,
     };
+
+    /// #8165: a forget word negated in its clause, and one that asks; a no
+    /// before a forget that asks is never a negated one.
+    #[test]
+    fn negated_and_unnegated_forget_words_are_read_by_clause() {
+        for negated in [
+            "No, don't forget it.",
+            "no don't forget it",
+            "Don't forget it.",
+            "No, don't delete it.",
+            "Never delete it.",
+            "\u{110}\u{1eeb}ng qu\u{ea}n.",
+        ] {
+            assert!(negates_a_forget(negated), "{negated}");
+            assert!(!forgets_unnegated(negated), "{negated}");
+        }
+        for negated in [
+            "No, don't get rid of it.",
+            "Don't drop it.",
+            "No, never drop that.",
+            "Don't scratch that.",
+        ] {
+            assert!(negates_a_forget(negated), "{negated}");
+            assert!(!forgets_unnegated(negated), "{negated}");
+        }
+        for asks in [
+            "No, just forget it.",
+            "No no, delete it.",
+            "Why don't you forget it?",
+            "Forget it.",
+            "No, don't keep it.",
+            "No, do not keep it.",
+            "No, get rid of it.",
+            "No, drop it.",
+            "No, I don't need it.",
+            "Scratch that.",
+        ] {
+            assert!(forgets_unnegated(asks), "{asks}");
+            assert!(!negates_a_forget(asks), "{asks}");
+        }
+        let both = "No, don't keep it, forget it. No wait, don't delete it.";
+        assert!(negates_a_forget(both) && forgets_unnegated(both));
+        for neither in ["No.", "No, keep it."] {
+            assert!(!negates_a_forget(neither), "{neither}");
+            assert!(!forgets_unnegated(neither), "{neither}");
+        }
+    }
+
+    /// #8165: the said-no note says nothing was forgotten, it is kept, and
+    /// to call no forget; it names the thing only when given it, and with
+    /// someone else in view (no subject) it names nothing.
+    #[test]
+    fn the_said_no_note_keeps_it_and_names_nothing_without_its_subject() {
+        for note in [
+            said_no_told(Some("umbrella")),
+            said_no_told(None),
+            still_unclear_told(None),
+        ] {
+            assert!(note.contains("nothing was forgotten"), "{note}");
+            assert!(note.contains("still kept"), "{note}");
+            assert!(note.contains("that you kept it"), "{note}");
+            assert!(note.contains("do not call forget"), "{note}");
+        }
+        assert!(said_no_told(Some("umbrella")).contains("umbrella"));
+        assert!(said_no_told(None).contains("they said no"));
+        assert!(!said_no_told(None).contains("kept about"));
+        assert!(said_no_told(None).contains("Do not say what was asked about"));
+        assert!(FORGET_ASKED_AGAIN.contains("Should I forget it?"));
+        assert!(FORGET_ASKED_AGAIN.contains("nothing was forgotten"));
+    }
 
     /// Finding N11 on #3504 (lamp-06c1, 27 Oct): the pass's "Works at a
     /// library now, not the bakery." retires the one shown "works at a

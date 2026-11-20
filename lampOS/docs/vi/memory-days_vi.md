@@ -31,9 +31,21 @@ trước; tìm kiếm và quy tắc bản sao dưới đây cũng vẫn giữ ch
 
 Mã chuẩn hóa chữ hoa/thường và `đ`, bỏ từ quá ngắn hoặc quá thông dụng, coi
 `s` số nhiều ở cuối từ tiếng Anh là tùy chọn, và ghép `allergy`, `allergies`,
-`allergic` thành một từ. Ghi chú không có từ đặc trưng dùng cách xóa rộng cũ,
-cộng các bản sao nguyên văn (khớp trọn từ; văn bản dưới ba ký tự, như «B2»,
-chỉ khi trùng nguyên một trường, nên «B22» và «Ghế B2 còn trống» được giữ). Lượt đi qua liên kết vẫn tiếp tục
+`allergic` thành một từ. Ghi chú không có từ đặc trưng («Stop.») không đi
+theo liên kết nào: chỉ nó, các lượt gốc của nó và các bản sao nguyên văn bị
+xóa (khớp trọn từ; văn bản dưới ba ký tự, như «B2», chỉ khi trùng nguyên một
+trường, nên «B22» và «Ghế B2 còn trống» được giữ), cùng mọi phiên bản cũ mà nó
+đã thay thế cho đến bản đầu tiên (vẫn là điều đó ở thời điểm trước), và không
+xóa điều đã ghi nhớ nào khác (#8031: trên lamp-06c1, 20/11, cách xóa rộng cũ đã xóa 28
+dòng cho một «Stop.», trong đó có bốn điều khác người đó đã ghi nhớ). Trong mọi
+lệnh quên, các phiên bản cũ mà dòng được nêu tên đã thay thế đều bị xóa, thuộc
+bất kỳ loại nào (vẫn là điều đó ở thời điểm trước: quên một quan sát của tidy
+đã sửa một điều đã ghi nhớ, phát hiện N11, thì xóa cả điều đó). Không điều đã
+ghi nhớ nào khác bị xóa: lượt đi không bao giờ thêm điều nào, và một điều đã ghi
+nhớ chỉ được chạm tới như phiên bản của một dòng lượt đi chạm tới mà không được
+nêu tên thì được giữ, vẫn ẩn, không bao giờ trở lại là hiện hành (một lệnh quên
+có từ đặc trưng mà lượt đi xóa quan sát ấy thì để lại điều đã ghi nhớ nó đã sửa
+ở trạng thái không hiện hành; `days::walk_versions`). Lượt đi qua liên kết vẫn tiếp tục
 qua những lượt được giữ lại, và bản sao được so với từ của từng phiên bản
 riêng, nên bản sao của «tím» mới vẫn bị xóa dù không có «xanh mòng két» cũ.
 Voice chỉ yêu cầu quy tắc này bằng `selective:true` khi không bật
@@ -1002,7 +1014,9 @@ khoản (Backend3, 19/11): `POST <base>/history/turns` với khóa của lamp tr
   năm lệnh quên, `history_forget::answered`, trên đường của voice) đều đến
   `history_send::deleting`, nên các id đó không bao giờ được POST, dù
   `LAMP_HISTORY_FORGET` thế nào; khi nó bật, các trang phần còn lại của một
-  lệnh quên lớn được đọc ngoài đường của voice và id của chúng cũng đến đó. Một
+  lệnh quên lớn được đọc ngoài đường của voice và id của chúng cũng đến đó,
+  cũng như các id mà bộ nhớ giữ lại của một lệnh quên mà worker chưa kịp xếp
+  hàng, được đọc lại ở lần khởi động sau (`history_unsent`, xem memory.md). Một
   lệnh quên về một điều cũng giữ lại rồi thả các lần POST như mọi lệnh quên
   khác. Khi mọi lần xóa của nó đều được trả lời, những gì đã đi đã được nêu trên
   đường đi và không bỏ thêm gì; khi một lần hết giờ hay mất câu trả lời giữa
@@ -1038,8 +1052,18 @@ khoản (Backend3, 19/11): `POST <base>/history/turns` với khóa của lamp tr
   kho tắt) hay một lời từ chối khác thì không thử lại. Tối đa 200 lượt chờ (quá
   thì lượt cũ nhất chờ lần khởi động sau) và 64 câu của phòng được giữ. Nhật ký
   chỉ có số đếm, không bao giờ có lời, id hay khóa.
-- **Quyền riêng tư:** những gì đã nói trước khi công tắc riêng tư đóng vẫn có
-  thể được gửi trong lúc nó đóng; khi đó không có lời mới nào nói với lamp.
+- **Quyền riêng tư:** không gửi gì khi công tắc riêng tư đóng (bản đọc quyền
+  riêng tư của first builder trên #8125): lần lưu chờ lease `voice/privacy`
+  của chính voice (`history_privacy`), xem lại mỗi 1 giây, nên một lượt nói
+  ngay trước khi công tắc đóng chỉ được gửi sau khi nó mở. Khi một lệnh quên
+  còn trong tay worker quên hoặc lệnh xóa của nó còn chờ, không lượt nào nó
+  có thể chạm tới được gửi (`history_forget::holds`), và một lượt đang trên
+  đường khi lệnh quên che nó đến sẽ được xóa sau khi POST của nó trả lời
+  (must-fix của Reviewer-lead trên #8091). Một lần reset hay quên hết mọi
+  người xóa toàn bộ lịch sử của lamp trước (`{"all":true,"every_person":true}`;
+  một lệnh như vậy lỡ lượt trao cho worker sẽ được thấy ở lần đọc lại kế tiếp
+  qua epoch đã đổi của memory),
+  và không lưu gì trước khi nó đi (xem memory.md).
 - **Tắt trong mọi unit:** theo các phán quyết của người xây dựng đầu tiên
   (#7935, và 17:09 trên #7957), phần lưu chỉ bật trong sản phẩm sau khi phần quên
   (`LAMP_HISTORY_FORGET`) đã bật, cùng hàng kiểm tra của nó. Câu thông báo trong

@@ -1849,7 +1849,7 @@ With the switch:
   (`known_faces::tests::a_new_face_is_kept_only_on_a_yes_to_keeping_it`).
 - **A known face only, when the known file let the save past the face
   question** (`LAMP_FACE_SAVE_KNOWN_ONLY=on`, lamp-voice; off unless set,
-  in no product unit; #7704). The known file stays up to its 3 s after a
+  on in the product unit; #7704). The known file stays up to its 3 s after a
   known face leaves, so a stranger who steps in and gives a name in that
   gap was saved as a new person with no face question. With the switch,
   that save alone (the face question skipped only because the known file
@@ -1954,6 +1954,13 @@ With the switch:
     knows their face ("I already know your face, Ana."), never "I'll know
     you now", and drops the visits line said at the first save
     (`ALREADY_KNOWN_NOTE`). Off, as a first save.
+  - **A rename is not told the visits line again.** A `replace` the eyes
+    made (their `replaced` not empty, Ana renamed Ben) is never told known
+    already, but the visits line (`VISITS_LINE`) is taken out of its
+    `also_say`, since the person heard it when the face was first kept;
+    the other lines, `ok` and `remembered` stay
+    (`known_faces::told_already`). A replace that replaced nothing is a
+    first save and keeps the line. Off, as before.
 - **A new face with nothing asked** (`LAMP_FACE_NO_ASK=on`, with names
   checked; off unless set; the first builder 18:50, 18 Nov, from the
   product owner). A face is kept unasked **only with speaking-face proof**
@@ -2913,7 +2920,9 @@ it is on in the product.
 - **Told:** when someone asks to be remembered, the eyes' answer carries
   `"visits": true`, and the voice tells the model to say in one short
   sentence that the lamp will notice how often they come by, so it can
-  greet them more warmly (`known_faces.rs`, `VISITS_LINE`).
+  greet them more warmly (`known_faces.rs`, `VISITS_LINE`); with
+  `LAMP_FACE_QUESTION_NOT_ASK`, not again on a save already kept or a
+  rename (above).
 
 Tests (a lamp at UTC+7): counted once in 16 hours with nothing written;
 written only once 03:00 local has passed, once, scored as of that 03:00; `regular` on the

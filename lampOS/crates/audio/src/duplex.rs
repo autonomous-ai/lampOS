@@ -327,7 +327,8 @@ pub struct Interruption {
     /// `LAMP_CUT_IN_LATE_YIELD=on`: see [`Self::commit_late_yields`].
     commits_late: bool,
     /// One flag per block of the last [`LATE_YIELD_WINDOW_BLOCKS`]: whether
-    /// it was heard plainly as a person over the lamp ([`Hearing::plain`])
+    /// it was heard plainly as a person over the lamp ([`Hearing::plain`]),
+    /// or unknown past the reply's start ([`LATE_YIELD_OVER_BLOCKS`]),
     /// while it had something to yield. A ring, written at `over_at`, with
     /// `over_count` flags set.
     over_window: [u64; 3],
@@ -349,7 +350,13 @@ pub struct Interruption {
 /// side remark at most 11. Only plain blocks count since lamp-4ace on
 /// 1 Nov, where the lamp's own voice, misjudged as a person over it but
 /// still partly explained by the render, made a late yield and stopped its
-/// own story twice with nobody talking (#4705).
+/// own story twice with nobody talking (#4705). Speech-like blocks with no
+/// alignment to judge by ([`Heard::Unknown`]) count as well once the reply
+/// is past its first [`Confirmation::early_blocks`]: on lamp-52e6 on 20 Nov
+/// (#7413) the "Wait" of "Wait, hold on." came where the alignment was
+/// stale, 11 blocks unknown, and its yield, with 4 plain, resumed. At a
+/// reply's start, and after a resume, an unknown block is the lamp's own
+/// first word heard against the last reply's alignment, and is not counted.
 pub const LATE_YIELD_OVER_BLOCKS: u8 = 14;
 /// The blocks [`LATE_YIELD_OVER_BLOCKS`] are counted in: 1.5 s, the most
 /// of a short question that can come before the yield.
@@ -604,7 +611,14 @@ impl Interruption {
         } else {
             0
         };
-        self.note_over(speaking, speaking && heard == Heard::Over && plain);
+        // Unknown counts only past the reply's first blocks (#7413).
+        let past_start = self.spoken > self.rule.early_blocks;
+        let person = match heard {
+            Heard::Over => plain,
+            Heard::Unknown => past_start,
+            _ => false,
+        };
+        self.note_over(speaking, speaking && person);
         let needed = self.onset_needed();
         let forced = std::mem::take(&mut self.forced) && speaking;
         match &mut self.state {
@@ -1474,6 +1488,103 @@ mod tests {
             }
         }
         assert_eq!(steps, [(59, Step::Resume)]);
+    }
+
+    /// Plays `blocks` (heard, plain, count) into `interruption` after 200
+    /// blocks of the lamp's own voice, past its first second; the steps,
+    /// counted from the first of `blocks`.
+    fn mid_reply(
+        interruption: &mut Interruption,
+        blocks: &[(Heard, bool, usize)],
+    ) -> Vec<(usize, Step)> {
+        assert_eq!(run(interruption, &[(Heard::Own, 200)]), []);
+        let mut steps = Vec::new();
+        let mut index = 0;
+        for &(heard, plain, count) in blocks {
+            for _ in 0..count {
+                match interruption.observe(heard, plain, true) {
+                    Step::Carry => {}
+                    step => steps.push((index, step)),
+                }
+                index += 1;
+            }
+        }
+        steps
+    }
+
+    /// #7413, lamp-52e6 on 20 Nov (15219, q-cutin try 19): "Wait, hold on."
+    /// over a story. "Wait" came where the render's alignment was stale, 11
+    /// blocks `Unknown`; 26 under; "hold on" 9 blocks over the lamp, 4 of
+    /// the 7 that made the yield plain; then its sound dying away, and
+    /// stillness. The yield is late (4 plain and 11 unknown in its window,
+    /// 15 of 14): with `LAMP_CUT_IN_LATE_YIELD=on` it commits; without it,
+    /// it resumes as it did on the lamp, 75 blocks after the yield.
+    const TRY_19: [(Heard, bool, usize); 10] = [
+        (Heard::Under, false, 106),
+        (Heard::Unknown, false, 11),
+        (Heard::Under, false, 26),
+        (Heard::Over, false, 2),
+        (Heard::Over, true, 4),
+        (Heard::Over, false, 3),
+        (Heard::Under, false, 7),
+        (Heard::Own, false, 4),
+        (Heard::Under, false, 22),
+        (Heard::Still, false, 50),
+    ];
+
+    #[test]
+    fn a_first_word_heard_unknown_makes_a_late_yield_that_commits_with_the_switch() {
+        for (switch, step) in [(true, Step::Commit), (false, Step::Resume)] {
+            let mut interruption = Interruption::new(Confirmation::EVALUATED);
+            if switch {
+                interruption.commit_late_yields();
+            }
+            let steps = mid_reply(&mut interruption, &TRY_19);
+            assert!(interruption.yield_was_late(), "{switch}");
+            assert_eq!(steps, [(149, Step::Yield), (149 + 75, step)], "{switch}");
+        }
+    }
+
+    /// With the switch, what is not a person still resumes: the lamp's own
+    /// first word after a pause heard `Unknown` with its onset run misjudged
+    /// over it (not plain), a short run with a few plain blocks, the two
+    /// together under the bound, and `Unknown` at the start of a reply,
+    /// where the alignment is the last reply's.
+    #[test]
+    fn unknown_blocks_alone_make_no_late_yield() {
+        for (unknown, plain) in [(11, 0), (0, 4), (6, 4)] {
+            let mut interruption = Interruption::new(Confirmation::EVALUATED);
+            interruption.commit_late_yields();
+            let blocks = [
+                (Heard::Under, false, 100),
+                (Heard::Unknown, false, unknown),
+                (Heard::Under, false, 26),
+                (Heard::Over, true, plain),
+                (Heard::Over, false, LATE - plain),
+                (Heard::Under, false, 30),
+                (Heard::Still, false, 40),
+            ];
+            let steps = mid_reply(&mut interruption, &blocks);
+            let yielded = 100 + unknown + 26 + LATE - 1;
+            assert!(!interruption.yield_was_late(), "{unknown} {plain}");
+            assert_eq!(
+                steps,
+                [(yielded, Step::Yield), (yielded + 70, Step::Resume)],
+                "{unknown} {plain}"
+            );
+        }
+        let mut interruption = Interruption::new(Confirmation::EVALUATED);
+        interruption.commit_late_yields();
+        let steps = run_plain(
+            &mut interruption,
+            &[
+                (Heard::Unknown, 40),
+                (Heard::Under, 26),
+                (Heard::Over, ONSET),
+            ],
+        );
+        assert_eq!(steps, [(40 + 26 + ONSET - 1, Step::Yield)]);
+        assert!(!interruption.yield_was_late());
     }
 
     /// The lamp's own voice, nobody talking, misjudged as a person over it

@@ -393,6 +393,20 @@ enum Extra {
     /// The store's epoch for the account's history ids (#7771,
     /// [`lamp_msgs::history_turn_id`]).
     HistoryEpoch {},
+    /// What forgets asked with `history_unsent` removed and the voice has
+    /// not said done, after `after`, oldest first
+    /// ([`lamp_msgs::MEMORY_HISTORY_UNSENT_OP`], `crate::history_unsent`).
+    HistoryUnsent {
+        #[serde(default)]
+        after: u64,
+    },
+    /// Those rows `from` to `to` let go: the voice has them on its queue
+    /// ([`lamp_msgs::MEMORY_HISTORY_UNSENT_DONE_OP`]).
+    HistoryUnsentDone {
+        #[serde(default)]
+        from: u64,
+        to: u64,
+    },
     /// What a Store app or a paired computer told, kept as the lamp's known
     /// person's fact marked with its source (#7415,
     /// `lamp_msgs::app_fact::REMEMBER_OP`, `Days::remember_app_fact`).
@@ -1369,6 +1383,10 @@ fn extra(store: &mut Days, request: Extra, now: u64) -> Result<Value> {
             json!({"ok":true,"exchanges":exchanges_value(&page),"more":more})
         }
         Extra::HistoryEpoch {} => json!({"ok":true,"epoch":store.history_epoch()}),
+        Extra::HistoryUnsent { after } => store.history_unsent(after)?,
+        Extra::HistoryUnsentDone { from, to } => {
+            json!({"ok":true,"removed":store.history_unsent_done(from, to)?})
+        }
         Extra::RememberAppFact {
             person,
             source,
@@ -1479,13 +1497,27 @@ pub fn answer(store: &mut Days, line: &[u8], now: u64) -> protocol::Answer {
     let mut who = "?".to_owned();
     // Only this request's forgets are told in its answer.
     store.take_forgot();
+    store.take_unsent();
+    store.unsent_asked = false;
     let result = (|| -> Result<Value> {
         if line.len() > protocol::MOST_LINE_BYTES {
             return Err(Error::new("too_long", "a request line is at most 64 KiB"));
         }
         store.maintain(now)?;
-        let parsed: Value = serde_json::from_slice(line)
+        let mut parsed: Value = serde_json::from_slice(line)
             .map_err(|_| Error::new("bad_json", "the request is not JSON"))?;
+        // A forget the voice asked to keep for the account's history
+        // (`LAMP_HISTORY_FORGET=on`): the field is taken off before the
+        // request is read, so it is a forget as any other besides.
+        let unsent_asked = parsed
+            .get("op")
+            .and_then(Value::as_str)
+            .is_some_and(|op| lamp_msgs::MEMORY_FORGETS_TELLING_EXCHANGES.contains(&op))
+            && parsed
+                .as_object_mut()
+                .and_then(|fields| fields.remove(lamp_msgs::MEMORY_HISTORY_UNSENT_FIELD))
+                .is_some_and(|asked| asked == true);
+        let parsed = parsed;
         let name = parsed
             .get("op")
             .and_then(Value::as_str)
@@ -1527,6 +1559,8 @@ pub fn answer(store: &mut Days, line: &[u8], now: u64) -> protocol::Answer {
             lamp_msgs::app_fact::FORGET_OP,
             lamp_msgs::MEMORY_FORGOT_EXCHANGES_OP,
             lamp_msgs::MEMORY_HISTORY_EPOCH_OP,
+            lamp_msgs::MEMORY_HISTORY_UNSENT_OP,
+            lamp_msgs::MEMORY_HISTORY_UNSENT_DONE_OP,
             crate::history_store::ISSUED_OP,
             "exchanges_after",
         ];
@@ -1565,6 +1599,7 @@ pub fn answer(store: &mut Days, line: &[u8], now: u64) -> protocol::Answer {
             ]
             .iter()
             .any(|field| parsed.get(field).is_some());
+        store.unsent_asked = unsent_asked;
         if NEW.contains(&name) || wider {
             extra(
                 store,
@@ -1580,7 +1615,9 @@ pub fn answer(store: &mut Days, line: &[u8], now: u64) -> protocol::Answer {
             )
         }
     })();
+    store.unsent_asked = false;
     let gone = store.take_forgot();
+    let unsent = store.take_unsent();
     let result = result.map(|mut response| {
         if lamp_msgs::MEMORY_FORGETS_TELLING_EXCHANGES.contains(&op.as_str())
             && response["ok"] == true
@@ -1600,6 +1637,9 @@ pub fn answer(store: &mut Days, line: &[u8], now: u64) -> protocol::Answer {
             if let Some(token) = store.keep_forgot_rest(rest) {
                 response["exchanges_more"] = json!(true);
                 response["exchanges_token"] = json!(token);
+            }
+            if let Some((from, to)) = unsent {
+                response["unsent"] = json!([from, to]);
             }
         }
         response

@@ -293,3 +293,16 @@ CREATE TABLE IF NOT EXISTS app_facts (
     kept_day TEXT NOT NULL
 );
 CREATE INDEX IF NOT EXISTS app_facts_source ON app_facts(source);
+-- #7771 (the first builder's switch-on condition on #8086): what a forget
+-- the voice asked with `history_unsent` removed, kept in the forget's own
+-- transaction until the voice has it on its queue for the account's
+-- history (`history_unsent_done`), read again at the voice's next start
+-- otherwise (`history_unsent`). A turn id each, or `turn` NULL for a known
+-- person's whole history; never a word. Never let go but by the voice's
+-- done. Older builds pass this table over;
+-- `user_version` stays 1.
+CREATE TABLE IF NOT EXISTS history_unsent (
+    seq INTEGER PRIMARY KEY AUTOINCREMENT,
+    scope TEXT NOT NULL,
+    turn TEXT
+);

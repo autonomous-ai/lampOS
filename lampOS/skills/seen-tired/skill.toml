@@ -1,15 +1,21 @@
-# Seen: tired. When lamp-seen newly sees tiredness at the desk (a yawn, or a
-# stretch of an arm or a leg), the lamp turns to the person and says one
-# light line, as V1's wellbeing skill named a yawn (#6543). Never a
-# diagnosis and never "you look tired": the line says what was seen. One of four seen
+# Seen: tired. When lamp-seen newly sees a yawn, or a stretch of an arm or
+# a leg, at the desk, the lamp turns to the person and says one light line,
+# as V1's wellbeing skill named a yawn (#6543). Never a diagnosis and never
+# "you look tired": the line names only what was seen, a yawn as a yawn and
+# a stretch as a stretch (#8123: a yawn was told as "Big stretch"). One of four seen
 # reactions (seen-celebrate, seen-drink, seen-eat, seen-tired), each its own
 # skill so its off is its own kind's. Written to lamp-skills' schema
 # (docs/skills.md, "The schema, as lamp-skills reads it").
 #
-# The owner's call on #7401 (19 Nov): each one seen is one reaction. No
-# cooldown, no day's most, no group's hour or gap, no quiet hours, no rest
-# and no other wait: only never while the lamp talks or listens, and never
-# while it sleeps.
+# The owner's call on #7401 (19 Nov): each one seen is one reaction, with
+# no day's most, no group's hour or gap and no rest. The switch-on (#7668)
+# keeps the first builder's rulings (#7401, 19:05 and 19:10): the same kind
+# is not said again within 20 minutes of its last line heard (a line never
+# heard costs nothing; a different kind may come sooner); a rise kept
+# through a talk is dropped 3 minutes after it was seen; no quiet
+# hours (the owner, 20 Nov 13:1x on #7668: someone may work late or wake
+# early); and never with the privacy slide closed, which drops a kept rise
+# at once. Never while the lamp talks or listens, and never while it sleeps.
 #
 # Whose: lamp-seen sends frames only with exactly one remembered face at
 # the desk, no stranger, awake and the slide open (docs/seen.md), so a
@@ -17,38 +23,62 @@
 # `humans/familiar` says which face is the owner's (B1), that is the
 # owner's rule here, with no face rule of its own.
 #
-# The count: `tired_seen` counts tiredness newly seen this sitting, one move
-# caught by two clips in a row once. A note is fixed words with no slot for
-# a reading, so the line carries no number. No "say nothing" outcome (B2):
-# the guards below are the silence.
+# The counts: `yawn_seen` and `stretch_seen` count a yawn and a stretch newly
+# seen this sitting, apart (#8123), one move caught by two clips in a row
+# once, and a yawn while stretching in one burst as the surer of the two
+# only. Two triggers, one a count, each with its own line (`do.on`), so a
+# note never has to choose: one skill, so its off, its stop kind and its
+# place in the product are as before. Each trigger keeps its own rest, so a
+# stretch may follow a yawn sooner, as another kind may. Tiredness that
+# lamp-seen counted only from the two together (`tired_seen` up, neither
+# count) is said as neither: no line. A note is fixed words with no slot
+# for a reading, so the line carries no number. No "say nothing" outcome
+# (B2): the guards below are the silence.
 needs = ["eyes", "body", "voice"]
 # Off, and not in the product's install (`install::NOT_PRODUCT_SKILLS`),
-# until the owner's day-long row at lamp-06c1 (at most one wrong remark in
-# a working day, through the lead); installable until then, since every
-# core skill is a product skill.
+# until the switch-on pull request after the owner's working-day row at
+# lamp-06c1 (#6543, #7668); installable until then, since every core skill
+# is a product skill. It says nothing without the owner's yes even then: it
+# reads only `humans/doing_more`, which lamp-seen says with
+# `LAMP_SEEN_MORE_DOINGS=on` and the owner's `seen_more` use.
 kind = "installable"
 enabled = false
 version = "1.0.0"
 
 # What it may read and use, and nothing more: what lamp-seen saw beyond
 # drinking, eating and breaks (the owner's `seen_more` use), the voice's
-# state, whether the lamp sleeps, and the faces for a turn toward the face.
+# state and privacy, whether the lamp sleeps, and the faces for a turn
+# toward the face. Nothing else: no service, no write, no history, so
+# nothing it sees leaves the lamp through it.
 [permissions]
 speak = true
-topics = ["humans/doing_more", "voice/state", "expression/state", "humans/faces/tracked"]
+topics = ["humans/doing_more", "voice/state", "voice/privacy", "expression/state", "humans/faces/tracked"]
 body = true
 
-# Tiredness newly seen: `tired_seen` went up by one since lamp-seen's last word
-# (said at once when it rises, else every 30 s: `within` one
-# of them and a margin). The count begins
-# again at 0 each sitting, so a new sitting is no yawn.
-[trigger]
+# A yawn newly seen: `yawn_seen` went up by one since lamp-seen's last word
+# (said at once when it rises, else every 30 s: `within` one of them and a
+# margin). The count begins again at 0 each sitting, so a new sitting is no
+# yawn.
+[[trigger]]
+name = "yawn"
 topic = "humans/doing_more"
-field = "tired_seen"
+field = "yawn_seen"
 above = 0
 rise = { by = 1, within = "45s" }
 rearm = "leaves"          # one rise, one reaction
-wait = "1h"               # a rise mid-turn is kept, and said once the turn ends (the most `wait` takes)
+cooldown = "20m"          # the per-kind rest: not again within 20 minutes of its last line heard
+wait = "3m"               # a rise mid-turn is kept, said once the turn ends, dropped 3 minutes after it was seen
+
+# A stretch of an arm or a leg newly seen, the same way.
+[[trigger]]
+name = "stretch"
+topic = "humans/doing_more"
+field = "stretch_seen"
+above = 0
+rise = { by = 1, within = "45s" }
+rearm = "leaves"
+cooldown = "20m"
+wait = "3m"
 
 [[while]]                 # never while the lamp talks or listens
 topic = "voice/state"
@@ -60,18 +90,31 @@ topic = "expression/state"
 field = "asleep"
 equals = false
 
+[[while]]                 # never with the privacy slide closed: closing it drops a kept rise at once (told by lamp-skills on a change, never subscribed)
+topic = "voice/privacy"
+field = "permitted"
+equals = true
+drops_kept = true
+
 # One function for the four seen reactions, shared by its `group` (no
 # limit with it): it stops the one that came last, or with all, every one.
 # Kept off until asked on again.
 [stop]
 tool = "seen_remarks"
 group = "seen-remarks"
-about = "When someone asks the lamp to stop remarking on what it sees them do (a drink, eating, a yawn or stretch, celebrating): snooze it until tomorrow morning, turn it off until they ask again, or on again. Leave all out for the one that came last; all = true for every one of them."
-when = "When asked to snooze, turn off or turn on again the lamp's remarks on what it sees them do (a drink, eating, a yawn, celebrating)."
+about = "Stop the lamp's remarks on what it sees them do (a drink, eating, a yawn, celebrating): snooze till morning, off till asked, or on again. All out: the last one; all = true: every one."
+when = "When asked to snooze, turn off or on again the lamp's remarks on what it sees them do."
 
 [ask]
 policy = "nudge"
 
 [[do]]
 body = { look_at = "face" }
-say = "You just saw them yawn or stretch at the desk. Say one short, light line about it, the way a friend would, at most twenty words; you may ask lightly if it has been a long day. Say only what you saw: never that they look tired, no feeling named, no diagnosis, nothing about sleep or bed, their health, body or looks, and never mention a camera."
+
+[[do]]
+on = "yawn"
+say = "You just saw them yawn at the desk. Say one short, light line about the yawn, the way a friend would, at most twenty words; you may ask lightly if it has been a long day. Name only the yawn, never a stretch. Never say they look tired, name a feeling or diagnose; nothing about sleep, bed, health, body or looks, and never mention a camera."
+
+[[do]]
+on = "stretch"
+say = "You just saw them stretch at the desk. Say one short, light line about the stretch, the way a friend would, at most twenty words; you may ask lightly if it has been a long day. Name only the stretch, never a yawn. Never say they look tired, name a feeling or diagnose; nothing about sleep, bed, health, body or looks, and never mention a camera."

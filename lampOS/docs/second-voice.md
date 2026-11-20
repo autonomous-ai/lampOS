@@ -6740,7 +6740,12 @@ stands), and eyes that can't be reached at all name nobody, as before. Without a
   their scope only; a line narrowed since forgets nothing and keeps it
   (`remember::AGREED_FORGET_NOT_NOW`) (`OneFaceForgetYes`,
   `ScopeLease::mark_forget_agreed`, which both runners and the memory route
-  let through); a no, another line, another face or 30 s keeps it. So are a correction
+  let through); a no, another line, another face or 30 s keeps it. A no
+  with no forget word, or every forget word negated ("No, don't forget
+  it.", `known_faces::refuses`), keeps it whatever the model calls, its
+  `forget` answered with `remember::said_no_told`, and a line with a
+  negated and an un-negated forget word is asked once more
+  (`one_face_answer`, #8165). So are a correction
   (`remember` with `replaces`), `keep_rule`, `list_rules`, `set_role` and
   `end_role` (the privacy read on #5385, also in
   `remember::role_for_guarded`), and
@@ -8176,18 +8181,22 @@ systemd-run --pty --wait \
 3 by default; `second_provider/probe/reminders.rs`), run as `probe-tools` is,
 with the unit's credentials. It measures `list_reminders`' description
 ([schedule.md](schedule.md), the person's call of 30 Oct) on DeepSeek,
-reached as `probe-tools` reaches it, thinking off. Each of eight lines is
+reached as `probe-tools` reaches it, thinking off. Each of ten lines is
 asked on its own as a spoken turn's first: the spoken character with the
 memory's note, a turn's changing part and the memory note
 (`tools::DAYS_NOTE`), with every function a spoken turn declares and the
 schedule's, read from the actions part's catalog in `LAMP_ACTIONS_DIR` as
 `probe-tools` reads it, so the arms differ only in that one description:
-`before` (`BEFORE`, held the same as `lamp_actions::schedule::LIST_BEFORE`
-by a test) and `now` (the installed one, which must be this build's: without
-"not recall" in it the probe refuses to run).
-Four lines ask about a reminder ("what did I ask you to remind me about?",
+`before` (`BEFORE`, the description before #7987, held the same as
+`lamp_actions::schedule::LIST_DESCRIBED_BEFORE` by a test) and `now` (the
+installed one, which must be this build's: without `NOW_SAYS`, "answered
+only after calling this in that turn", in it the probe refuses to run).
+Six lines ask about a reminder ("what did I ask you to remind me about?",
 "when is my reminder?", "when did I set that reminder?", "do I have any
-reminders for tomorrow?") and are right with `list_reminders` first; four
+reminders for tomorrow?", "Hey Lamp, what reminders do I?", a question heard
+a word short that is none of `LAMP_REMINDERS_ASKED`'s phrases, and "Mình có
+những lời nhắc nào?", the same question in Vietnamese; #7987) and are right
+with `list_reminders` first; four
 are right with anything else (a memory question, a new reminder, yesterday's
 talk, a greeting: never listed unasked). It prints counts only.
 ### A cut-in made plain (`probe-cut-in`)

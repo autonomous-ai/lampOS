@@ -103,14 +103,15 @@ pub enum DeskWork {
 /// `humans/doing_more`, which the owner agrees to as a use of its own. Said by `lamp-seen` only with
 /// `LAMP_SEEN_MORE_DOINGS=on`.
 ///
-/// Every field is always present (but `desk_s` and `celebrate_seen`, which
-/// an older `lamp-seen` leaves out), and each timer counts from the desk
+/// Every field is always present (but `desk_s`, `celebrate_seen` and the
+/// yawn and stretch fields, which an older `lamp-seen` leaves out), and each timer counts from the desk
 /// arrival until its kind is seen, as `HumanDoing`'s do. None of these ever
 /// sets `HumanDoing::last` or says `humans/doing_seen`.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct HumanDoingMore {
     /// Seconds since tiredness was seen (a yawn, or a stretch of an arm or
-    /// a leg), or since the desk arrival.
+    /// a leg: the two together; each apart below), or since the desk
+    /// arrival.
     pub tired_s_ago: u32,
     /// How many times tiredness was newly seen this sitting (not seen in
     /// the burst before), as a sighting is counted for `humans/doing_seen`.
@@ -137,6 +138,24 @@ pub struct HumanDoingMore {
     /// older `lamp-seen`) reads as 0.
     #[serde(default)]
     pub celebrate_seen: u32,
+    /// How many times a yawn was newly seen this sitting, apart from a
+    /// stretch (#8123: a yawn was told as a stretch), counted as
+    /// `tired_seen` is; a yawn while stretching, in one burst, counts only
+    /// as the surer of the two. 0 before any; absent (an older
+    /// `lamp-seen`) reads as 0.
+    #[serde(default)]
+    pub yawn_seen: u32,
+    /// Seconds since a yawn was seen, or since the desk arrival; absent
+    /// reads as 0.
+    #[serde(default)]
+    pub yawn_s_ago: u32,
+    /// The same as `yawn_seen` for a stretch of an arm or a leg.
+    #[serde(default)]
+    pub stretch_seen: u32,
+    /// Seconds since a stretch was seen, or since the desk arrival; absent
+    /// reads as 0.
+    #[serde(default)]
+    pub stretch_s_ago: u32,
 }
 
 impl HumanDoingMore {
@@ -360,9 +379,28 @@ mod tests {
             desk_work: DeskWork::Computer,
             desk_s: 1_200,
             celebrate_seen: 4,
+            yawn_seen: 1,
+            yawn_s_ago: 60,
+            stretch_seen: 1,
+            stretch_s_ago: 300,
         };
-        let text = r#"{"tired_s_ago":60,"tired_seen":2,"drank_seen":3,"ate_seen":1,"desk_work_s_ago":0,"desk_work":"computer","desk_s":1200,"celebrate_seen":4}"#;
+        let text = r#"{"tired_s_ago":60,"tired_seen":2,"drank_seen":3,"ate_seen":1,"desk_work_s_ago":0,"desk_work":"computer","desk_s":1200,"celebrate_seen":4,"yawn_seen":1,"yawn_s_ago":60,"stretch_seen":1,"stretch_s_ago":300}"#;
         round_trip(&more, text);
+        // The yawn and stretch fields came later (#8123): absent, 0.
+        assert_eq!(
+            serde_json::from_str::<HumanDoingMore>(&text.replace(
+                r#","yawn_seen":1,"yawn_s_ago":60,"stretch_seen":1,"stretch_s_ago":300"#,
+                ""
+            ))
+            .unwrap(),
+            HumanDoingMore {
+                yawn_seen: 0,
+                yawn_s_ago: 0,
+                stretch_seen: 0,
+                stretch_s_ago: 0,
+                ..more
+            }
+        );
         // `desk_s` came later: absent, it reads as 0.
         assert_eq!(
             serde_json::from_str::<HumanDoingMore>(&text.replace(r#""desk_s":1200,"#, "")).unwrap(),
@@ -372,7 +410,7 @@ mod tests {
         // `celebrate_s_ago` is passed over.
         assert_eq!(
             serde_json::from_str::<HumanDoingMore>(
-                &text.replace(r#""celebrate_seen":4"#, r#""celebrate_s_ago":600"#)
+                &text.replace(r#""celebrate_seen":4,"#, r#""celebrate_s_ago":600,"#)
             )
             .unwrap(),
             HumanDoingMore {

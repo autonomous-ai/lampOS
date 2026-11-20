@@ -944,6 +944,16 @@ Setup, its reset and the waking face start the same binary, `/opt/lampOS/setup/c
 lamp-update install --channel-url URL [--channel NAME] [--key-file PATH] [--setup on|off]
 ```
 
+The product unit it writes follows the CDN feed,
+`https://cdn.autonomous.ai/lampos/stable/` (#6589). A lamp installed before
+that keeps `--channel-url .../lampos-stable/` on GitHub, since no round
+rewrites lamp-update's unit; with `LAMP_UPDATE_CDN_FEED=on` (off unless set,
+#7728) its own lamp-update moves it to the CDN with the drop-in
+`lamp-update.service.d/zz-cdn-feed.conf`, only once the CDN's signed
+envelope is read and checked, and keeps the GitHub feed otherwise; on the
+CDN feed a round reads GitHub only after an hour of CDN failures, never
+sticking ([updates.md](updates.md), "Moving a lamp to the CDN feed").
+
 As root, on a lamp with the base image (`crates/update/src/install.rs`):
 
 1. Reads the channel's newest build and checks it with the image's key

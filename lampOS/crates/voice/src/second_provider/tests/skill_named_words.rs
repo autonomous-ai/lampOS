@@ -1136,11 +1136,20 @@ async fn made_ran(
     history: Vec<Message>,
     made: &'static [&'static str],
 ) -> Vec<(String, Value)> {
-    let asks: std::collections::BTreeMap<String, Vec<String>> = [(
-        "made:daily-brief".to_owned(),
-        vec!["daily brief".to_owned()],
-    )]
-    .into();
+    made_ran_of(line, history, made, ("made:daily-brief", "daily brief")).await
+}
+
+/// [`made_ran`] with the made skill `skill` offered by its one ask: its
+/// function and the ask.
+async fn made_ran_of(
+    line: &str,
+    history: Vec<Message>,
+    made: &'static [&'static str],
+    skill: (&'static str, &'static str),
+) -> Vec<(String, Value)> {
+    let (function, ask) = skill;
+    let asks: std::collections::BTreeMap<String, Vec<String>> =
+        [(function.to_owned(), vec![ask.to_owned()])].into();
     let script = Arc::new(Script {
         heard: Mutex::new([Ok(line.to_owned())].into()),
         chats: Mutex::new(
@@ -1169,7 +1178,7 @@ async fn made_ran(
     )
     .announcing(false)
     .calling_skills_named(Arc::new(move |heard: &str| {
-        crate::skill_named::asked(heard, &["made:daily-brief"], &asks)
+        crate::skill_named::asked(heard, &[function], &asks)
             .map(|function| crate::skill_named::call(true, function))
     }))
     .knowing_made_names(Arc::new(|said: &str| {
@@ -1293,4 +1302,32 @@ async fn a_made_skills_name_answers_a_question_of_the_lamps_made_skills() {
             assert_eq!(ran, [brief_run()], "{line} {lamp:?}: run in code");
         }
     }
+}
+
+/// The made skill mail-check, offered by its one ask, "mail check".
+const MAIL: (&str, &str) = ("made:mail-check", "mail check");
+
+/// The call that runs the made skill mail-check.
+fn mail_run() -> (String, Value) {
+    (
+        crate::made_skill::MAKE.to_owned(),
+        json!({ crate::made_run::RUN: "mail-check" }),
+    )
+}
+
+/// #8022: a line that calls the lamp by its name heard as another word
+/// ("Hey, Lynn. Mail check.", the lamp's name set off as speech to text
+/// wrote it on lamp-52e6) runs a made skill by its words past that word
+/// ([`past_the_name_heard_as`]), as `LAMP_MAKE_SKILL_ASKED`'s force reads a make; a
+/// question so opened still runs nothing.
+#[tokio::test]
+async fn a_made_skill_runs_past_the_lamps_name_heard_as_another_word() {
+    let made: &'static [&'static str] = &["made:mail-check"];
+    for line in ["Hey, Lynn. Mail check.", "Lynn, mail check."] {
+        let ran = made_ran_of(line, Vec::new(), made, MAIL).await;
+        assert_eq!(ran, [mail_run()], "{line}: run in code");
+    }
+    let control = "Hey, Lynn. What time is it?";
+    let ran = made_ran_of(control, Vec::new(), made, MAIL).await;
+    assert!(ran.is_empty(), "the control runs nothing: {ran:?}");
 }

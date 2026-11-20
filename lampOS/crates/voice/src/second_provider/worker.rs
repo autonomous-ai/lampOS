@@ -2632,6 +2632,20 @@ pub fn serve(
     if let Some(socket) = &tools.memory {
         // Each turn the memory keeps, sent to the account's history with
         // LAMP_HISTORY_SEND=on (#7771), with the relay's key, the lamp's own.
+        // What the memory kept of a forget this voice never queued (a
+        // restart or a crash between them) is read again, with
+        // LAMP_HISTORY_FORGET=on (#7771, the first builder's condition on
+        // #8086); off the voice's way, on the forget worker. Handed before
+        // the save starts, so the save holds until it is read.
+        crate::history_forget::recover_at_start(socket);
+        // Nothing reaches the account while the privacy switch is closed
+        // (the first builder's privacy read on #8125); read only with one
+        // of the history switches on.
+        if (crate::history_forget::on() || crate::history_send::on())
+            && let Some(root) = files.bus_root.as_deref()
+        {
+            crate::history_privacy::start(root);
+        }
         crate::history_send::start_from_environment(
             &config.llm_base_url,
             config.llm_key.expose(),
@@ -4235,6 +4249,18 @@ pub fn serve(
             "lamp-voice second: a line that is only the lamp's name, or short and begun with it, is answered no sooner than 2.5 s after its end, and a line begun before then is said by it when one person said both (LAMP_SECOND_NAME_CARRIES)"
         );
         engine = engine.carrying_the_name(true);
+    }
+    // A line the coordinator ended as only the lamp's name is a call only
+    // while its heard words are none or only the name (#8073).
+    if std::env::var(crate::second_provider::CALL_WORDS_OVER_WAIT_ENVIRONMENT)
+        .ok()
+        .as_deref()
+        == Some("on")
+    {
+        eprintln!(
+            "lamp-voice second: a line the coordinator ended as only the lamp's name, with heard words past the name, is judged by its words, not as a call (LAMP_CALL_WORDS_OVER_WAIT)"
+        );
+        engine = engine.judging_call_words(true);
     }
     // Asleep for the night and resting through sounds
     // (`LAMP_REST_THROUGH_SOUNDS=on`, #4285): the lamp's name alone is not

@@ -555,7 +555,17 @@ With the switch, a yield with at least 14 plain `Over` blocks
 (`LATE_YIELD_OVER_BLOCKS`; `Hearing::plain`, the render explaining at most
 20% of the block), onset run included, in the 150 blocks up to
 and including the one that made it (`LATE_YIELD_WINDOW_BLOCKS`) commits
-where stillness would resume it (`Interruption::commit_late_yields`). Its
+where stillness would resume it (`Interruption::commit_late_yields`).
+Speech-like blocks with no alignment to judge by (`Unknown`) count as well
+once the reply is past its first 120 blocks (`early_blocks`; a resume starts
+it over): on lamp-52e6 on 20 Nov (#7413, 15219, q-cutin try 19) the "Wait"
+of "Wait, hold on." came where the alignment was stale, 11 blocks `Unknown`,
+then 26 `Under` and an onset run with 4 plain; the yield resumed 750 ms on.
+At a reply's start an `Unknown` block is the lamp's own first word heard
+against the last reply's alignment (`fresh_blocks`), and is not counted.
+Nor are blocks with no evidence at all (the reference not trusted) or `Over`
+before the lamp's own sound was found (`MATCHED_BLOCKS`, 15): the mask hands
+both to the yield as `Under`, as it acts in every other rule there. Its
 deadline still resumes it; talk well under the asker
 (`LAMP_CUT_IN_NEAR_ASKER`), a room busy as the reply began with
 `LAMP_CUT_IN_OVER_BED=on` (#4868), and a yield awaiting or holding its

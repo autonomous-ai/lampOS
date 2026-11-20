@@ -25,9 +25,15 @@
 //!   told: a forget never deletes more of the account's history than the
 //!   lamp forgot. A whole-history delete is a known person's forget
 //!   everything only.
-//! - **not reached:** a forget of everything of every person, or a page
-//!   that could not be read, is said in the journal as not reaching the
-//!   account (the voice sends neither today).
+//! - **the lamp's whole history** (every person's, the room's too): a
+//!   forget of everything of every person, or a memory found wiped at a
+//!   start (a reset: its epoch changed since the last start, [`epoch_seen`]),
+//!   [`Call::Lamp`] ([`WHOLE_LAMP_BODY`]).
+//!
+//! A forget is never let go: one not queued (the worker behind or stopped,
+//! a page not read) is read again from what the memory kept for it
+//! ([`recover`]), and while any forget waits, the save sends no turn it
+//! could reach ([`holds`]).
 //!
 //! The person key is lamp-memory's own scope id: a known person's `p-`
 //! id (the eyes' person id), or `""` for the room's (`everyone`), as the
@@ -66,6 +72,16 @@ const MOST_PAGES: usize = 64;
 pub const MOST_IDS_A_CALL: usize = 100;
 /// The room's scope in lamp-memory; its person key on the server is `""`.
 const ROOM: &str = "everyone";
+/// The body of the delete of the lamp's whole history, every person's and
+/// the room's, on the same delete call (the first builder's privacy read on
+/// #8125, item 2; Backend3's server, 18:26 on #8125): it removes this
+/// lamp's turns and actions on the account and nothing of the owner's other
+/// lamps, and refuses a later save stamped at or before it. Until it is
+/// done, the save sends nothing ([`holds`]).
+pub const WHOLE_LAMP_BODY: &str = r#"{"all":true,"every_person":true}"#;
+/// How long a worker owing a read of what the memory kept waits for a job
+/// before it reads again, as the delete's first wait.
+const RECOVER_AGAIN: std::time::Duration = std::time::Duration::from_secs(5);
 
 /// Whether [`ENVIRONMENT`] is `on`, read once.
 pub fn on() -> bool {
@@ -89,6 +105,8 @@ pub fn person_key(scope: &str) -> Option<&str> {
 /// One delete call.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Call {
+    /// The lamp's whole history ([`WHOLE_LAMP_BODY`]).
+    Lamp,
     /// Everything of one person (`""` the room's): never without one.
     All { person: String },
     /// These turns, at most [`MOST_IDS_A_CALL`], of one person.
@@ -99,6 +117,7 @@ impl Call {
     /// The request's body.
     pub fn body(&self) -> Value {
         match self {
+            Self::Lamp => serde_json::from_str(WHOLE_LAMP_BODY).unwrap_or_default(),
             Self::All { person } => serde_json::json!({"all": true, "person": person}),
             Self::Ids { ids, .. } => serde_json::json!({"ids": ids}),
         }
@@ -107,7 +126,7 @@ impl Call {
     /// How many ids it names (an `all` none), for the journal.
     pub fn ids(&self) -> usize {
         match self {
-            Self::All { .. } => 0,
+            Self::Lamp | Self::All { .. } => 0,
             Self::Ids { ids, .. } => ids.len(),
         }
     }
@@ -116,6 +135,13 @@ impl Call {
 /// What waits, as kept on disk.
 #[derive(Debug, Default, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Pending {
+    /// The lamp's whole history is to go, before anything else.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub lamp: bool,
+    /// The memory store's epoch at the last start, to see a wipe (a reset)
+    /// at the next ([`Self::saw_epoch`]); `None`: not known.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub epoch: Option<String>,
     /// Person keys whose whole history is to go.
     #[serde(default)]
     pub all: BTreeSet<String>,
@@ -125,8 +151,38 @@ pub struct Pending {
 }
 
 impl Pending {
+    /// Nothing waits to be sent.
     pub fn is_empty(&self) -> bool {
-        self.all.is_empty() && self.ids.is_empty()
+        !self.lamp && self.all.is_empty() && self.ids.is_empty()
+    }
+
+    /// Whether a delete waits that a turn of memory `scope` could be in:
+    /// the lamp's, or that person's (`""` the room's).
+    pub fn reaches(&self, scope: &str) -> bool {
+        self.lamp
+            || person_key(scope).is_some_and(|person| {
+                self.all.contains(person) || self.ids.get(person).is_some_and(|ids| !ids.is_empty())
+            })
+    }
+
+    /// The lamp's whole history: everything else waiting goes with it.
+    pub fn add_lamp(&mut self) {
+        self.all.clear();
+        self.ids.clear();
+        self.lamp = true;
+    }
+
+    /// The memory's epoch at a start: a different one from the last start's
+    /// is a wiped memory (a reset, or a forget of everyone), so the lamp's
+    /// whole history goes. Kept for the next.
+    pub fn saw_epoch(&mut self, epoch: &str) {
+        if self.epoch.as_deref().is_some_and(|last| last != epoch) {
+            eprintln!(
+                "lamp-voice history: the lamp's memory was wiped since the last start; the lamp's whole history is deleted on the account"
+            );
+            self.add_lamp();
+        }
+        self.epoch = Some(epoch.to_owned());
     }
 
     fn count(&self) -> usize {
@@ -168,15 +224,13 @@ impl Pending {
                     self.add_all(&most);
                 }
                 None => {
-                    let over = self.count() - MOST_PENDING;
-                    if let Some(room) = self.ids.get_mut("") {
-                        for _ in 0..over {
-                            room.pop_last();
-                        }
-                    }
+                    // Only the room's past it: kept, never let go (the
+                    // first builder's privacy read on #8125).
                     eprintln!(
-                        "lamp-voice history: the forget queue is full; {over} of the room's turns are not reached on the account"
+                        "lamp-voice history: the forget queue holds {} of the room's turns past its bound; all are kept",
+                        self.count() - MOST_PENDING
                     );
+                    break;
                 }
             }
         }
@@ -185,6 +239,9 @@ impl Pending {
     /// The next call: a person's whole history first, then up to
     /// [`MOST_IDS_A_CALL`] of one person's ids.
     pub fn next(&self) -> Option<Call> {
+        if self.lamp {
+            return Some(Call::Lamp);
+        }
         if let Some(person) = self.all.first() {
             return Some(Call::All {
                 person: person.clone(),
@@ -200,6 +257,7 @@ impl Pending {
     /// `call` done: what it named waits no more.
     pub fn done(&mut self, call: &Call) {
         match call {
+            Call::Lamp => self.lamp = false,
             Call::All { person } => {
                 self.all.remove(person);
             }
@@ -224,18 +282,31 @@ impl Pending {
     pub fn add_answered(&mut self, line: &Value, answer: &Value) {
         let op = line["op"].as_str().unwrap_or_default();
         let forget = lamp_msgs::MEMORY_FORGETS_TELLING_EXCHANGES.contains(&op);
-        if answer["ok"] != true || !(forget || op == lamp_msgs::MEMORY_FORGOT_EXCHANGES_OP) {
+        let unsent = op == lamp_msgs::MEMORY_HISTORY_UNSENT_OP;
+        if answer["ok"] != true
+            || !(forget || unsent || op == lamp_msgs::MEMORY_FORGOT_EXCHANGES_OP)
+        {
             return;
+        }
+        if unsent {
+            // A known person's forget everything the memory kept for us:
+            // their whole history, never without one.
+            for person in answer["all"].as_array().into_iter().flatten() {
+                if let Some(person) = person
+                    .as_str()
+                    .filter(|p| lamp_msgs::known::is_person_id(p))
+                {
+                    self.add_all(person);
+                }
+            }
         }
         if op == "forget_all" {
             match line.get("person") {
                 Some(Value::String(person)) if lamp_msgs::known::is_person_id(person) => {
                     self.add_all(person);
                 }
-                // Every person's: memory tells no ids for it.
-                Some(Value::Null) => eprintln!(
-                    "lamp-voice history: a forget of every person's memory is not reached on the account"
-                ),
+                // Every person's: the lamp's whole history.
+                Some(Value::Null) => self.add_lamp(),
                 // The room's: its lines come by id below.
                 _ => {}
             }
@@ -280,7 +351,7 @@ impl Queue {
     /// What waits now; an unreadable file is nothing (said once in the
     /// journal by [`Self::change`]).
     pub fn pending(&self) -> Pending {
-        read(&self.path).unwrap_or_default()
+        load(&self.path, false)
     }
 
     /// `change` applied to what waits, written back when it changed.
@@ -289,22 +360,54 @@ impl Queue {
             .lock
             .lock()
             .unwrap_or_else(|poison| poison.into_inner());
-        let before = match read(&self.path) {
-            Ok(pending) => pending,
-            Err(error) if error.kind() == io::ErrorKind::NotFound => Pending::default(),
-            Err(_) => {
-                eprintln!(
-                    "lamp-voice history: the forget queue could not be read; it starts again empty"
-                );
-                Pending::default()
-            }
-        };
+        let before = load(&self.path, true);
         let mut pending = before.clone();
         change(&mut pending);
+        if pending.epoch != before.epoch
+            && let Some(epoch) = &pending.epoch
+        {
+            write_epoch(&self.path, epoch)?;
+        }
         if pending != before {
             write(&self.path, &pending)?;
         }
         Ok(pending)
+    }
+}
+
+/// The queue's epoch kept beside it (`<file>.epoch`), for a queue file
+/// found corrupt.
+fn epoch_path(path: &Path) -> PathBuf {
+    path.with_extension("epoch")
+}
+
+fn read_epoch(path: &Path) -> Option<String> {
+    let epoch = fs::read_to_string(epoch_path(path)).ok()?;
+    let epoch = epoch.trim();
+    lamp_msgs::is_history_epoch(epoch).then(|| epoch.to_owned())
+}
+
+fn write_epoch(path: &Path, epoch: &str) -> io::Result<()> {
+    write_whole(&epoch_path(path), epoch.as_bytes())
+}
+
+/// The queue at `path`: none, empty; one unreadable (corrupt), said in the
+/// journal when `say`, starts again empty but from its epoch kept beside
+/// it, so a wipe is still seen at the next start (Twelve's P3 on #8167).
+fn load(path: &Path, say: bool) -> Pending {
+    match read(path) {
+        Ok(pending) => pending,
+        Err(error) => {
+            if say && error.kind() != io::ErrorKind::NotFound {
+                eprintln!(
+                    "lamp-voice history: the forget queue was unreadable (corrupt: {error}); it starts again empty from its kept epoch"
+                );
+            }
+            Pending {
+                epoch: read_epoch(path),
+                ..Pending::default()
+            }
+        }
     }
 }
 
@@ -314,12 +417,22 @@ fn read(path: &Path) -> io::Result<Pending> {
 }
 
 fn write(path: &Path, pending: &Pending) -> io::Result<()> {
-    if pending.is_empty() {
+    if pending.is_empty() && pending.epoch.is_none() {
         return match fs::remove_file(path) {
             Err(error) if error.kind() == io::ErrorKind::NotFound => Ok(()),
             other => other,
         };
     }
+    write_whole(
+        path,
+        &serde_json::to_vec(pending).map_err(io::Error::other)?,
+    )
+}
+
+/// `bytes` written whole to `path` (a new file synced and renamed over it,
+/// 0600), then its folder synced, so the rename survives a power cut
+/// (Twelve's P3 on #8167).
+fn write_whole(path: &Path, bytes: &[u8]) -> io::Result<()> {
     let name = path
         .file_name()
         .and_then(|name| name.to_str())
@@ -331,15 +444,43 @@ fn write(path: &Path, pending: &Pending) -> io::Result<()> {
         .truncate(true)
         .mode(0o600)
         .open(&new)?;
-    file.write_all(&serde_json::to_vec(pending).map_err(io::Error::other)?)?;
+    file.write_all(bytes)?;
     file.sync_all()?;
-    fs::rename(&new, path)
+    fs::rename(&new, path)?;
+    if let Some(folder) = path.parent() {
+        fs::File::open(folder)?.sync_all()?;
+    }
+    Ok(())
 }
 
 /// The voice's queue at [`FILE`], and the bell that wakes its sender.
 pub fn queue() -> &'static (Queue, Arc<tokio::sync::Notify>) {
     static QUEUE: OnceLock<(Queue, Arc<tokio::sync::Notify>)> = OnceLock::new();
     QUEUE.get_or_init(|| (Queue::at(FILE), Arc::new(tokio::sync::Notify::new())))
+}
+
+/// The request `line` as sent to the memory: with the switch on, one of
+/// its forgets asks it to keep what it removes on its disk until the
+/// worker has it on the queue (`"history_unsent":true`, in the forget's own
+/// transaction, so no sync more before the reply). Anything else, or off,
+/// as it is.
+pub fn asking(line: &Value) -> std::borrow::Cow<'_, Value> {
+    if on() {
+        asking_with(line)
+    } else {
+        std::borrow::Cow::Borrowed(line)
+    }
+}
+
+/// [`asking`], the switch taken as on.
+pub fn asking_with(line: &Value) -> std::borrow::Cow<'_, Value> {
+    let op = line["op"].as_str().unwrap_or_default();
+    if !lamp_msgs::MEMORY_FORGETS_TELLING_EXCHANGES.contains(&op) || !line.is_object() {
+        return std::borrow::Cow::Borrowed(line);
+    }
+    let mut asked = line.clone();
+    asked[lamp_msgs::MEMORY_HISTORY_UNSENT_FIELD] = Value::Bool(true);
+    std::borrow::Cow::Owned(asked)
 }
 
 /// A memory request `line` to `socket` answered `answer`, on the voice's
@@ -374,14 +515,29 @@ pub struct Job {
 impl Job {
     /// The ids its answer names, for the journal's counts.
     fn ids(&self) -> usize {
-        self.answer["exchanges"].as_object().map_or(0, |scopes| {
-            scopes
-                .values()
-                .filter_map(Value::as_array)
-                .map(Vec::len)
-                .sum()
-        })
+        told_ids(&self.answer)
     }
+}
+
+/// How many turn ids `answer`'s `exchanges` names, for the journal.
+fn told_ids(answer: &Value) -> usize {
+    answer["exchanges"].as_object().map_or(0, |scopes| {
+        scopes
+            .values()
+            .filter_map(Value::as_array)
+            .map(Vec::len)
+            .sum()
+    })
+}
+
+/// What the voice hands its worker, in order.
+#[derive(Debug)]
+enum Handed {
+    /// One forget's answer.
+    Forget(Job),
+    /// At the start: what the memory kept and the worker never said done
+    /// ([`recover`]).
+    Recover(PathBuf),
 }
 
 /// The most forgets waiting for the worker; past it (the worker stuck on
@@ -402,13 +558,16 @@ struct Flight {
     held: Mutex<(usize, usize)>,
     done: std::sync::Condvar,
     stopping: std::sync::atomic::AtomicBool,
+    /// A forget not handed (the worker behind or stopped): what the memory
+    /// kept of it is read again after the next job ([`recover`]).
+    owed: std::sync::atomic::AtomicBool,
 }
 
 /// The forget worker: one thread taking the forgets in the order they were
 /// answered, started on the first, and again if it has stopped (said in
 /// the journal).
 pub struct Worker {
-    to: Mutex<Option<std::sync::mpsc::SyncSender<Job>>>,
+    to: Mutex<Option<std::sync::mpsc::SyncSender<Handed>>>,
     queue: &'static Queue,
     bell: Arc<tokio::sync::Notify>,
     ask: Arc<Ask>,
@@ -445,8 +604,8 @@ impl Worker {
     }
 
     /// Its thread, started.
-    fn start(&self) -> Option<std::sync::mpsc::SyncSender<Job>> {
-        let (to, from) = std::sync::mpsc::sync_channel::<Job>(MOST_HANDED);
+    fn start(&self) -> Option<std::sync::mpsc::SyncSender<Handed>> {
+        let (to, from) = std::sync::mpsc::sync_channel::<Handed>(MOST_HANDED);
         let (queue, bell, ask, flight) = (
             self.queue,
             self.bell.clone(),
@@ -456,16 +615,55 @@ impl Worker {
         let started = std::thread::Builder::new()
             .name("history-forget".into())
             .spawn(move || {
-                for job in from {
+                // The memory's socket last handed, for a read again owed
+                // with no job to come (a hand-off that failed, a start whose
+                // read failed): tried every [`RECOVER_AGAIN`].
+                let mut known: Option<PathBuf> = None;
+                loop {
+                    let handed = if flight.owed.load(std::sync::atomic::Ordering::SeqCst)
+                        && known.is_some()
+                    {
+                        match from.recv_timeout(RECOVER_AGAIN) {
+                            Ok(handed) => Some(handed),
+                            Err(std::sync::mpsc::RecvTimeoutError::Timeout) => None,
+                            Err(std::sync::mpsc::RecvTimeoutError::Disconnected) => break,
+                        }
+                    } else {
+                        match from.recv() {
+                            Ok(handed) => Some(handed),
+                            Err(_) => break,
+                        }
+                    };
                     let stopping = || flight.stopping.load(std::sync::atomic::Ordering::SeqCst);
-                    work(
-                        queue,
-                        &bell,
-                        &job,
-                        |page| (!stopping()).then(|| ask(&job.socket, page)).flatten(),
-                        crate::history_send::forget_seen,
-                    );
-                    flight.finish(job.ids());
+                    let (socket, ids) = match &handed {
+                        Some(Handed::Forget(job)) => (job.socket.clone(), job.ids()),
+                        Some(Handed::Recover(socket)) => (socket.clone(), 0),
+                        None => (known.clone().unwrap_or_default(), 0),
+                    };
+                    known = Some(socket.clone());
+                    let asked = |page: &Value| (!stopping()).then(|| ask(&socket, page)).flatten();
+                    let mut owed = match &handed {
+                        Some(Handed::Forget(job)) => {
+                            !work(queue, &bell, job, asked, crate::history_send::forget_seen)
+                        }
+                        Some(Handed::Recover(_)) | None => true,
+                    };
+                    owed |= flight.owed.swap(false, std::sync::atomic::Ordering::SeqCst);
+                    if owed {
+                        // The epoch on every owed read, not only at a start:
+                        // a forget of everyone keeps no row in the memory, so
+                        // one that missed the hand-off comes back only as a
+                        // changed epoch (Twelve's P2-1 on #8167).
+                        let read = !stopping()
+                            && epoch_seen(queue, &bell, asked)
+                            && recover(queue, &bell, asked, crate::history_send::forget_seen);
+                        if !read {
+                            flight.owed.store(true, std::sync::atomic::Ordering::SeqCst);
+                        }
+                    }
+                    if handed.is_some() {
+                        flight.finish(ids);
+                    }
                 }
             });
         match started {
@@ -486,12 +684,39 @@ impl Worker {
         if answer["ok"] != true || !lamp_msgs::MEMORY_FORGETS_TELLING_EXCHANGES.contains(&op) {
             return false;
         }
-        let mut job = Job {
+        let job = Job {
             socket: socket.to_owned(),
             line: line.clone(),
             answer: answer.clone(),
         };
         let ids = job.ids();
+        self.send(Handed::Forget(job), ids)
+    }
+
+    /// [`holds`] for this worker and its queue.
+    pub fn holds(&self, scope: &str) -> bool {
+        self.flight.owed.load(std::sync::atomic::Ordering::SeqCst)
+            || self
+                .flight
+                .held
+                .lock()
+                .unwrap_or_else(|poison| poison.into_inner())
+                .0
+                > 0
+            || self.queue.pending().reaches(scope)
+    }
+
+    /// At the voice's start: the worker reads what the memory kept for
+    /// the account and it never said done ([`recover`]), before any forget
+    /// handed after. Never blocks.
+    pub fn recover_from(&self, socket: &Path) -> bool {
+        self.send(Handed::Recover(socket.to_owned()), 0)
+    }
+
+    /// `handed` (of `ids` turns) to the thread, never blocking; one not
+    /// taken is said in the journal, and what the memory kept of it read
+    /// again after the next job.
+    fn send(&self, mut handed: Handed, ids: usize) -> bool {
         let mut to = self.to.lock().unwrap_or_else(|poison| poison.into_inner());
         for again in [false, true] {
             if to.is_none() {
@@ -501,10 +726,13 @@ impl Worker {
                 break;
             };
             self.flight.add(ids);
-            match sender.try_send(job) {
+            match sender.try_send(handed) {
                 Ok(()) => return true,
                 Err(std::sync::mpsc::TrySendError::Full(_)) => {
                     self.flight.finish(ids);
+                    self.flight
+                        .owed
+                        .store(true, std::sync::atomic::Ordering::SeqCst);
                     eprintln!(
                         "lamp-voice history: the forget worker is behind; a forget of {ids} turns is not reached on the account"
                     );
@@ -517,10 +745,13 @@ impl Worker {
                         if again { "" } else { "; it starts again" }
                     );
                     *to = None;
-                    job = back;
+                    handed = back;
                 }
             }
         }
+        self.flight
+            .owed
+            .store(true, std::sync::atomic::Ordering::SeqCst);
         eprintln!(
             "lamp-voice history: the forget worker is stopped; a forget of {ids} turns is not reached on the account"
         );
@@ -592,31 +823,211 @@ pub fn drain() {
     }
 }
 
+/// The second route starting with the memory at `socket`: with the switch
+/// on, the worker reads what the memory kept for the account and it never
+/// said done, a forget lost to a restart or a crash (the first builder's
+/// switch-on condition on #8086). Off, nothing.
+pub fn recover_at_start(socket: &Path) {
+    if on() {
+        Worker::voices().recover_from(socket);
+    }
+}
+
 /// One handed forget, off the voice's way: queued on disk, then every
 /// page of its rest asked by `ask` with its answer's token ([`pages`]),
 /// each page's answer given to `seen` (the save's hold,
-/// [`crate::history_send::forget_seen`]) and queued.
+/// [`crate::history_send::forget_seen`]) and queued; then, when the memory
+/// kept it (`"unsent":[from,to]`) and every id of it is on the queue, said
+/// done to the memory. Whether nothing of it is owed: `false` when the
+/// memory kept it and it was not all queued or not said done, read again by
+/// [`recover`].
 pub fn work(
     queue: &Queue,
     bell: &tokio::sync::Notify,
     job: &Job,
     ask: impl Fn(&Value) -> Option<Value>,
     seen: impl Fn(&Value),
-) {
-    answered_into(true, queue, bell, &job.line, &job.answer);
-    if job.answer["exchanges_more"] != true {
-        return;
-    }
-    let Some(token) = job.answer["exchanges_token"].as_str() else {
-        eprintln!(
-            "lamp-voice history: the rest of a forget's turns came with no token; they are not reached on the account"
-        );
-        return;
+) -> bool {
+    let kept = job.answer["unsent"]
+        .as_array()
+        .and_then(|range| Some((range.first()?.as_u64()?, range.get(1)?.as_u64()?)));
+    let every = job.line["op"] == "forget_all"
+        && job.line.get("person") == Some(&Value::Null)
+        && job.answer["ok"] == true;
+    let mut whole = if every {
+        // A forget of everyone wipes the store whole (a new epoch): the
+        // lamp's whole history goes, with the new epoch kept, so the next
+        // start does not take the wipe for another ([`epoch_seen`]).
+        let epoch = epoch_of(&ask);
+        match queue.change(|pending| {
+            pending.add_lamp();
+            pending.epoch = epoch.clone();
+        }) {
+            Ok(_) => {
+                bell.notify_one();
+                true
+            }
+            Err(_) => false,
+        }
+    } else {
+        answered_into(true, queue, bell, &job.line, &job.answer)
     };
-    for (line, answer) in pages(token, ask) {
-        seen(&answer);
-        answered_into(true, queue, bell, &line, &answer);
+    if job.answer["exchanges_more"] == true {
+        match job.answer["exchanges_token"].as_str() {
+            None => {
+                eprintln!(
+                    "lamp-voice history: the rest of a forget's turns came with no token; they are not reached on the account"
+                );
+                whole = false;
+            }
+            Some(token) => {
+                let (read, all) = pages(token, &ask);
+                whole &= all;
+                for (line, answer) in read {
+                    seen(&answer);
+                    whole &= answered_into(true, queue, bell, &line, &answer);
+                }
+            }
+        }
     }
+    let Some((from, to)) = kept else {
+        return true;
+    };
+    whole && done(&ask, from, to)
+}
+
+/// The memory store's epoch, asked of it.
+fn epoch_of(ask: impl Fn(&Value) -> Option<Value>) -> Option<String> {
+    let answer = ask(&serde_json::json!({"op": lamp_msgs::MEMORY_HISTORY_EPOCH_OP}))?;
+    let epoch = answer["epoch"].as_str()?;
+    (answer["ok"] == true && lamp_msgs::is_history_epoch(epoch)).then(|| epoch.to_owned())
+}
+
+/// At a start: the memory's epoch compared with the last start's, kept
+/// on the queue ([`Pending::saw_epoch`]): a wiped memory (a reset) deletes
+/// the lamp's whole history. Whether it was read and kept.
+pub fn epoch_seen(
+    queue: &Queue,
+    bell: &tokio::sync::Notify,
+    ask: impl Fn(&Value) -> Option<Value>,
+) -> bool {
+    let Some(epoch) = epoch_of(ask) else {
+        return false;
+    };
+    match queue.change(|pending| pending.saw_epoch(&epoch)) {
+        Ok(pending) => {
+            if pending.lamp {
+                bell.notify_one();
+            }
+            true
+        }
+        Err(_) => false,
+    }
+}
+
+/// Whether the save must not send a turn of memory `scope` now (the first
+/// builder's privacy read on #8125, item 1): with the switch on, while a
+/// forget is in the worker's hands or owed a read again, or a delete waits
+/// that the turn could be in. Off, never.
+pub fn holds(scope: &str) -> bool {
+    on() && Worker::voices().holds(scope)
+}
+
+/// Turn ids the save posted before a forget covering them came (the
+/// Reviewer-lead's must-fix on #8091), queued for delete; with the switch
+/// off, nothing.
+pub fn delete_posted(ids: &[String]) {
+    if !on() {
+        return;
+    }
+    let (queue, bell) = queue();
+    delete_posted_into(queue, bell, ids);
+}
+
+/// [`delete_posted`] on a given queue.
+pub fn delete_posted_into(queue: &Queue, bell: &tokio::sync::Notify, ids: &[String]) {
+    let mut scopes: BTreeMap<&str, Vec<String>> = BTreeMap::new();
+    for turn in ids {
+        if let Some(person) = lamp_msgs::history_turn_scope(turn).and_then(person_key) {
+            scopes.entry(person).or_default().push(turn.clone());
+        }
+    }
+    if scopes.is_empty() {
+        return;
+    }
+    // Into the ids even while that person's whole history waits: that
+    // delete may already be out and ran before the post landed (Twelve's
+    // P2-2 on #8167). `next` still sends the whole history first.
+    match queue.change(|pending| {
+        for (person, turns) in &scopes {
+            pending
+                .ids
+                .entry((*person).to_owned())
+                .or_default()
+                .extend(turns.iter().cloned());
+        }
+    }) {
+        Ok(_) => bell.notify_one(),
+        Err(_) => {
+            eprintln!("lamp-voice history: a posted turn's delete could not be queued (the file)")
+        }
+    }
+}
+
+/// The memory's rows `from` to `to` said done: they are on the queue.
+fn done(ask: impl Fn(&Value) -> Option<Value>, from: u64, to: u64) -> bool {
+    let line =
+        serde_json::json!({"op": lamp_msgs::MEMORY_HISTORY_UNSENT_DONE_OP, "from": from, "to": to});
+    ask(&line).is_some_and(|answer| answer["ok"] == true)
+}
+
+/// What the memory kept for the account and the worker never said done (a
+/// forget waiting in the hand-off at a crash or a stop, one not handed, a
+/// rest let go or lost to the memory's restart), read oldest first, a page
+/// at a time ([`lamp_msgs::MEMORY_HISTORY_UNSENT_OP`], at most
+/// [`MOST_PAGES`]): each page given to `seen`, queued, and only then said
+/// done up to its last row. Whether all of it was. Read twice is harmless:
+/// the queue is a set, and the server takes a turn already gone as done.
+pub fn recover(
+    queue: &Queue,
+    bell: &tokio::sync::Notify,
+    ask: impl Fn(&Value) -> Option<Value>,
+    seen: impl Fn(&Value),
+) -> bool {
+    let (mut after, mut turns, mut wholes) = (0u64, 0usize, 0usize);
+    let mut whole = false;
+    for _ in 0..MOST_PAGES {
+        let line = serde_json::json!({"op": lamp_msgs::MEMORY_HISTORY_UNSENT_OP, "after": after});
+        let Some(answer) = ask(&line).filter(|answer| answer["ok"] == true) else {
+            break;
+        };
+        let Some(to) = answer["to"].as_u64() else {
+            whole = true;
+            break;
+        };
+        seen(&answer);
+        if !answered_into(true, queue, bell, &line, &answer) || !done(&ask, after + 1, to) {
+            break;
+        }
+        turns += told_ids(&answer);
+        wholes += answer["all"].as_array().map_or(0, Vec::len);
+        after = to;
+        if answer["more"] != true {
+            whole = true;
+            break;
+        }
+    }
+    if turns + wholes > 0 {
+        eprintln!(
+            "lamp-voice history: {turns} turns and {wholes} whole histories a forget left unsent were queued again"
+        );
+    }
+    if !whole {
+        eprintln!(
+            "lamp-voice history: what the memory kept of earlier forgets could not all be read; it is read again later"
+        );
+    }
+    whole
 }
 
 /// How long one page may take.
@@ -627,7 +1038,7 @@ const PAGE_WITHIN: std::time::Duration = std::time::Duration::from_secs(2);
 /// `more`, at most [`MOST_PAGES`]. A page not answered, or refused (its
 /// rest let go, or the memory restarted: `rest_gone`), ends them, said in
 /// the journal as not reached; another forget's rest is never read.
-pub fn pages(token: &str, ask: impl Fn(&Value) -> Option<Value>) -> Vec<(Value, Value)> {
+pub fn pages(token: &str, ask: impl Fn(&Value) -> Option<Value>) -> (Vec<(Value, Value)>, bool) {
     let line = serde_json::json!({"op": lamp_msgs::MEMORY_FORGOT_EXCHANGES_OP, "token": token});
     let mut pages = Vec::new();
     for _ in 0..MOST_PAGES {
@@ -636,33 +1047,34 @@ pub fn pages(token: &str, ask: impl Fn(&Value) -> Option<Value>) -> Vec<(Value, 
                 let more = answer["more"] == true;
                 pages.push((line.clone(), answer));
                 if !more {
-                    return pages;
+                    return (pages, true);
                 }
             }
             _ => break,
         }
     }
     eprintln!(
-        "lamp-voice history: the rest of a forget's turns could not be read; they are not reached on the account"
+        "lamp-voice history: the rest of a forget's turns could not be read now; what the memory kept of it is read again later"
     );
-    pages
+    (pages, false)
 }
 
-/// [`answered`] on a given queue, `on` or not, with no pages.
+/// [`answered`] on a given queue, `on` or not, with no pages. Whether what
+/// it adds is on the queue's file (nothing to add is).
 pub fn answered_into(
     on: bool,
     queue: &Queue,
     bell: &tokio::sync::Notify,
     line: &Value,
     answer: &Value,
-) {
+) -> bool {
     if !on {
-        return;
+        return true;
     }
     let mut added = Pending::default();
     added.add_answered(line, answer);
     if added.is_empty() {
-        return;
+        return true;
     }
     match queue.change(|pending| pending.add_answered(line, answer)) {
         Ok(pending) => {
@@ -672,8 +1084,71 @@ pub fn answered_into(
                 pending.count()
             );
             bell.notify_one();
+            true
         }
-        Err(_) => eprintln!("lamp-voice history: a forget could not be queued (the file)"),
+        Err(_) => {
+            eprintln!("lamp-voice history: a forget could not be queued (the file)");
+            false
+        }
+    }
+}
+
+/// A memory for tests that keeps forgets' rows as lamp-memory's
+/// `history_unsent` does, two to a page, every request it was asked kept in
+/// order.
+#[cfg(test)]
+#[derive(Default)]
+pub(crate) struct FakeMemory {
+    pub rows: Mutex<Vec<(u64, String, Option<String>)>>,
+    pub asked: Mutex<Vec<Value>>,
+}
+
+#[cfg(test)]
+impl FakeMemory {
+    /// `scope`'s `turns` kept as one forget's rows (`None`: the whole
+    /// history), and their range, as the forget's answer says it.
+    pub fn kept(&self, scope: &str, turns: &[Option<String>]) -> Value {
+        let mut rows = self.rows.lock().unwrap();
+        let from = rows.last().map_or(1, |row| row.0 + 1);
+        for (n, turn) in turns.iter().enumerate() {
+            rows.push((from + n as u64, scope.to_owned(), turn.clone()));
+        }
+        serde_json::json!([from, from + turns.len() as u64 - 1])
+    }
+
+    pub fn answer(&self, line: &Value) -> Option<Value> {
+        self.asked.lock().unwrap().push(line.clone());
+        let mut rows = self.rows.lock().unwrap();
+        match line["op"].as_str() {
+            Some(lamp_msgs::MEMORY_HISTORY_UNSENT_OP) => {
+                let after = line["after"].as_u64().unwrap_or(0);
+                let next: Vec<_> = rows.iter().filter(|row| row.0 > after).cloned().collect();
+                let mut exchanges: BTreeMap<String, Vec<String>> = BTreeMap::new();
+                let mut all = Vec::new();
+                for (_, scope, turn) in next.iter().take(2) {
+                    match turn {
+                        Some(turn) => exchanges
+                            .entry(scope.clone())
+                            .or_default()
+                            .push(turn.clone()),
+                        None => all.push(scope.clone()),
+                    }
+                }
+                Some(
+                    serde_json::json!({"ok":true,"exchanges":exchanges,"all":all,
+                    "to":next[..next.len().min(2)].last().map(|row| row.0),"more":next.len() > 2}),
+                )
+            }
+            Some(lamp_msgs::MEMORY_HISTORY_EPOCH_OP) => {
+                Some(serde_json::json!({"ok":true,"epoch":"0a1b2c3d"}))
+            }
+            Some(lamp_msgs::MEMORY_HISTORY_UNSENT_DONE_OP) => {
+                let (from, to) = (line["from"].as_u64()?, line["to"].as_u64()?);
+                rows.retain(|row| row.0 < from || row.0 > to);
+                Some(serde_json::json!({"ok":true}))
+            }
+            _ => Some(serde_json::json!({"ok":false,"error":"rest_gone"})),
+        }
     }
 }
 
@@ -741,7 +1216,6 @@ mod tests {
                 json!({"op":"forget_all","person":"r-0123456789abcdef"}),
                 json!({"ok":true,"removed":1}),
             ),
-            (json!({"op":"forget_all","person":null}), json!({"ok":true})),
         ] {
             let mut pending = Pending::default();
             pending.add_answered(&line, &answer);
@@ -849,9 +1323,10 @@ mod tests {
             &json!({"op":"exchanges_forget","person":MINH}),
             &json!({"ok":true,"removed":600,"exchanges":{MINH:ids(MINH, 0..400)},"exchanges_more":true}),
         );
-        let paged = pages("t1", |_| {
+        let (paged, all) = pages("t1", |_| {
             Some(json!({"ok":true,"exchanges":{MINH:ids(MINH, 400..600)},"more":false}))
         });
+        assert!(all);
         assert_eq!(paged.len(), 1);
         for (line, answer) in &paged {
             pending.add_answered(line, answer);
@@ -871,13 +1346,16 @@ mod tests {
         );
         for (line, answer) in pages("t2", |_| {
             Some(json!({"ok":true,"exchanges":{"everyone":ids("everyone", 400..450)},"more":false}))
-        }) {
+        })
+        .0
+        {
             everything.add_answered(&line, &answer);
         }
         assert_eq!(everything.all, BTreeSet::from([LAN.to_owned()]));
         assert_eq!(everything.ids[""].len(), 450);
         // A page not answered ends the pages.
-        assert!(pages("t3", |_| None).is_empty());
+        let (none, all) = pages("t3", |_| None);
+        assert!(none.is_empty() && !all);
     }
 
     /// With 450 waiting, a second person's 51 stay 51; only past
@@ -900,10 +1378,11 @@ mod tests {
         full.add_ids(MINH, (0..20).map(|id| turn_id(MINH, id)));
         assert_eq!(full.all, BTreeSet::from([MINH.to_owned()]));
         assert_eq!(full.ids[LAN].len(), 5);
-        // Only the room's past it: its newest are let go, never its whole.
+        // Only the room's past it: kept, never let go and never its whole
+        // (the first builder's privacy read on #8125).
         full.add_ids("", (0..100).map(|id| turn_id("everyone", 1_000_000 + id)));
         assert!(!full.all.contains(""));
-        assert!(full.count() <= MOST_PENDING);
+        assert_eq!(full.ids[""].len(), MOST_PENDING - 10 + 100);
         let mut many = Pending::default();
         many.add_ids(LAN, (0..250).map(|id| turn_id(LAN, id)));
         assert_eq!(many.next().unwrap().ids(), MOST_IDS_A_CALL);
@@ -923,12 +1402,15 @@ mod tests {
             );
             assert!(pending.is_empty(), "{op}");
         }
+        // A forget of every person's memory: the lamp's whole history, never
+        // a person's delete without one.
         let mut every = Pending::default();
         every.add_answered(
             &json!({"op":"forget_all","person":null}),
             &json!({"ok":true,"removed":9}),
         );
-        assert!(every.is_empty());
+        assert_eq!(every.next(), Some(Call::Lamp));
+        assert!(every.all.is_empty());
         let mut room = Pending::default();
         room.add_answered(
             &json!({"op":"forget_all"}),
@@ -1109,7 +1591,9 @@ mod tests {
         assert!(!answered_with(&worker, socket, &forget(), &told()));
         assert!(started.elapsed() < std::time::Duration::from_millis(100));
         assert!(!path.exists());
-        let job: Job = from.try_recv().unwrap();
+        let Handed::Forget(job) = from.try_recv().unwrap() else {
+            panic!("a forget was handed")
+        };
         assert_eq!(job.socket, socket);
         work(
             worker.queue,
@@ -1177,5 +1661,396 @@ mod tests {
         let pending = worker.queue.pending();
         assert!(pending.ids[MINH].contains(&turn_id(MINH, 4)));
         assert!(pending.ids[MINH].contains(&turn_id(MINH, 8)));
+    }
+
+    /// Waits, at most 5 s, until `worker` holds nothing, without stopping
+    /// it (a drain cuts its memory asks short by design).
+    fn settled(worker: &Worker) -> bool {
+        let until = std::time::Instant::now() + std::time::Duration::from_secs(5);
+        while std::time::Instant::now() < until {
+            if worker.flight.held.lock().unwrap().0 == 0 {
+                return true;
+            }
+            std::thread::sleep(std::time::Duration::from_millis(5));
+        }
+        false
+    }
+
+    fn kept_turns(scope: &str, ids: impl IntoIterator<Item = u64>) -> Vec<Option<String>> {
+        turns(scope, ids).into_iter().map(Some).collect()
+    }
+
+    /// A worker on a queue at `path`, its memory `memory`.
+    fn remembering_worker(path: &Path, memory: &Arc<FakeMemory>) -> Worker {
+        let memory = memory.clone();
+        test_worker(
+            path,
+            Arc::new(move |_: &Path, line: &Value| memory.answer(line)),
+        )
+    }
+
+    /// With the switch on, a forget asks the memory to keep what it
+    /// removes; nothing else, and the line is otherwise the same.
+    #[test]
+    fn a_forget_asks_the_memory_to_keep_its_ids() {
+        let line = forget();
+        let asked = asking_with(&line);
+        assert_eq!(asked["history_unsent"], true);
+        let mut back = asked.into_owned();
+        back.as_object_mut().unwrap().remove("history_unsent");
+        assert_eq!(back, forget());
+        for line in [
+            json!({"op":"recall","person":MINH}),
+            json!({"op":"forgot_exchanges","token":"a"}),
+        ] {
+            assert!(matches!(asking_with(&line), std::borrow::Cow::Borrowed(_)));
+        }
+    }
+
+    /// The first builder's condition on #8086: a forget the memory kept,
+    /// handed to a worker that never wrote it (the voice restarted, or
+    /// crashed, before), reaches the queue at the next start, and the
+    /// memory lets it go only after.
+    #[test]
+    fn a_forget_lost_to_a_restart_is_queued_at_the_next_start() {
+        let path = scratch("restart-lost");
+        let memory = Arc::new(FakeMemory::default());
+        // A big forget: 2 told, its rest of 3 never paged; and a forget
+        // everything.
+        let range = memory.kept(MINH, &kept_turns(MINH, 1..6));
+        let whole = memory.kept(LAN, &[None]);
+        {
+            let before = remembering_worker(&path, &memory);
+            // The worker's thread taken by the test and never run: the
+            // voice stopped before it wrote anything.
+            let (to, from) = std::sync::mpsc::sync_channel(4);
+            *before.to.lock().unwrap() = Some(to);
+            let mut answer = told();
+            answer["unsent"] = range;
+            assert!(answered_with(
+                &before,
+                Path::new(SOCKET),
+                &forget(),
+                &answer
+            ));
+            let mut all = json!({"ok":true,"removed":3});
+            all["unsent"] = whole;
+            let line = json!({"op":"forget_all","person":LAN});
+            assert!(answered_with(&before, Path::new(SOCKET), &line, &all));
+            drop(from);
+        }
+        assert!(!path.exists());
+        let after = remembering_worker(&path, &memory);
+        assert!(after.recover_from(Path::new(SOCKET)));
+        assert!(settled(&after));
+        let pending = after.queue.pending();
+        assert_eq!(
+            pending.ids[MINH],
+            turns(MINH, 1..6).into_iter().collect::<BTreeSet<_>>()
+        );
+        assert_eq!(pending.all, BTreeSet::from([LAN.to_owned()]));
+        assert!(memory.rows.lock().unwrap().is_empty());
+    }
+
+    /// A forget the worker queued whole is said done once, and never read
+    /// again: the next start finds nothing, and once sent it is never
+    /// queued again.
+    #[test]
+    fn a_forget_said_done_is_never_queued_again() {
+        let path = scratch("said-done");
+        let memory = Arc::new(FakeMemory::default());
+        let worker = remembering_worker(&path, &memory);
+        let mut small = json!({"ok":true,"removed":1,"exchanges":{MINH:turns(MINH, [4])}});
+        small["unsent"] = memory.kept(MINH, &kept_turns(MINH, [4]));
+        assert!(answered_with(&worker, Path::new(SOCKET), &forget(), &small));
+        assert!(settled(&worker));
+        assert!(memory.rows.lock().unwrap().is_empty());
+        let dones = |memory: &FakeMemory| {
+            memory
+                .asked
+                .lock()
+                .unwrap()
+                .iter()
+                .filter(|line| line["op"] == lamp_msgs::MEMORY_HISTORY_UNSENT_DONE_OP)
+                .count()
+        };
+        assert_eq!(dones(&memory), 1);
+        // Sent: the queue is empty.
+        let call = worker.queue.pending().next().unwrap();
+        worker.queue.change(|pending| pending.done(&call)).unwrap();
+        assert!(worker.queue.pending().is_empty());
+        // Two more starts read nothing and queue nothing.
+        for _ in 0..2 {
+            assert!(recover(
+                worker.queue,
+                &bell(),
+                |line| memory.answer(line),
+                |_| {}
+            ));
+        }
+        assert!(worker.queue.pending().is_empty());
+        assert_eq!(dones(&memory), 1);
+    }
+
+    /// At a start, the memory's rows are read oldest first, a page at a
+    /// time, each said done only once it is on the queue's file, and
+    /// before any forget handed after; a page that could not be written is
+    /// never said done, and is read again later.
+    #[test]
+    fn recovery_keeps_order_and_says_done_only_what_it_wrote() {
+        let memory = Arc::new(FakeMemory::default());
+        memory.kept(MINH, &kept_turns(MINH, 1..4));
+        memory.kept("everyone", &kept_turns("everyone", [7]));
+        // The queue's folder is missing: nothing can be written.
+        let broken = Queue::at(std::env::temp_dir().join("lamp-history-forget-none/no/queue.json"));
+        assert!(!recover(
+            &broken,
+            &bell(),
+            |line| memory.answer(line),
+            |_| {}
+        ));
+        assert_eq!(memory.rows.lock().unwrap().len(), 4);
+        memory.asked.lock().unwrap().clear();
+        let path = scratch("order");
+        let worker = remembering_worker(&path, &memory);
+        // A forget answered just as the voice starts: its row is in the
+        // memory before the start's read, its hand-off after.
+        let mut later = json!({"ok":true,"removed":1,"exchanges":{MINH:turns(MINH, [9])}});
+        later["unsent"] = memory.kept(MINH, &kept_turns(MINH, [9]));
+        assert!(worker.recover_from(Path::new(SOCKET)));
+        assert!(answered_with(&worker, Path::new(SOCKET), &forget(), &later));
+        assert!(settled(&worker));
+        let asked: Vec<(String, Value, Value)> = memory
+            .asked
+            .lock()
+            .unwrap()
+            .iter()
+            .filter(|line| line["op"] != lamp_msgs::MEMORY_HISTORY_EPOCH_OP)
+            .map(|line| {
+                (
+                    line["op"].as_str().unwrap().to_owned(),
+                    line.get("after")
+                        .or(line.get("from"))
+                        .cloned()
+                        .unwrap_or_default(),
+                    line.get("to").cloned().unwrap_or_default(),
+                )
+            })
+            .collect();
+        let unsent = lamp_msgs::MEMORY_HISTORY_UNSENT_OP.to_owned();
+        let done = lamp_msgs::MEMORY_HISTORY_UNSENT_DONE_OP.to_owned();
+        // The start's pages first, two rows each, each said done after its
+        // own write; the later forget's own range only after them.
+        assert_eq!(
+            asked[..4],
+            [
+                (unsent.clone(), json!(0), Value::Null),
+                (done.clone(), json!(1), json!(2)),
+                (unsent.clone(), json!(2), Value::Null),
+                (done.clone(), json!(3), json!(4)),
+            ]
+        );
+        assert!(memory.rows.lock().unwrap().is_empty());
+        let pending = worker.queue.pending();
+        assert_eq!(
+            pending.ids[MINH],
+            turns(MINH, [1, 2, 3, 9])
+                .into_iter()
+                .collect::<BTreeSet<_>>()
+        );
+        assert_eq!(pending.ids[""], BTreeSet::from([turn_id("everyone", 7)]));
+    }
+
+    /// The first builder's privacy read on #8125, item 2: a memory wiped
+    /// since the last start (a reset: its epoch changed) deletes the
+    /// lamp's whole history, before anything else, once; and a forget of
+    /// everyone does too, with the new epoch kept so the next start does
+    /// not take that wipe for another.
+    #[test]
+    fn a_reset_deletes_the_lamps_whole_history() {
+        let queue = Queue::at(scratch("reset"));
+        let epoch = |e: &'static str| move |_: &Value| Some(json!({"ok":true,"epoch":e}));
+        assert!(epoch_seen(&queue, &bell(), epoch("0a1b2c3d")));
+        assert!(queue.pending().is_empty());
+        queue
+            .change(|pending| pending.add_ids(MINH, [turn_id(MINH, 1)]))
+            .unwrap();
+        // The lamp was reset: the memory's store is new.
+        assert!(epoch_seen(&queue, &bell(), epoch("9f8e7d6c")));
+        let pending = queue.pending();
+        assert_eq!(pending.next(), Some(Call::Lamp));
+        assert_eq!(
+            Call::Lamp.body(),
+            serde_json::from_str::<Value>(WHOLE_LAMP_BODY).unwrap()
+        );
+        assert!(Call::Lamp.body()["person"].is_null());
+        queue.change(|pending| pending.done(&Call::Lamp)).unwrap();
+        // The same store at the next start: nothing more.
+        assert!(epoch_seen(&queue, &bell(), epoch("9f8e7d6c")));
+        assert!(queue.pending().is_empty());
+        // A memory not answering: not taken as a wipe.
+        assert!(!epoch_seen(&queue, &bell(), |_: &Value| None));
+        assert!(queue.pending().is_empty());
+        // A forget of everyone: the lamp's whole history, the new epoch
+        // kept with it.
+        let job = Job {
+            socket: PathBuf::from(SOCKET),
+            line: json!({"op":"forget_all","person":null}),
+            answer: json!({"ok":true,"removed":4}),
+        };
+        assert!(work(&queue, &bell(), &job, epoch("11223344"), |_| {}));
+        assert_eq!(queue.pending().next(), Some(Call::Lamp));
+        queue.change(|pending| pending.done(&Call::Lamp)).unwrap();
+        assert!(epoch_seen(&queue, &bell(), epoch("11223344")));
+        assert!(queue.pending().is_empty());
+    }
+
+    /// The first builder's privacy read on #8125, item 1: while a forget is
+    /// in the worker's hands, owed a read again, or its delete waits, the
+    /// save holds the turns it could reach: that person's, or every turn
+    /// for the lamp's whole history; never another person's.
+    #[test]
+    fn a_waiting_forget_holds_the_turns_it_could_reach() {
+        let path = scratch("holds");
+        let worker = test_worker(&path, no_page());
+        assert!(!worker.holds(MINH));
+        worker
+            .queue
+            .change(|pending| pending.add_ids(MINH, [turn_id(MINH, 1)]))
+            .unwrap();
+        assert!(worker.holds(MINH));
+        assert!(!worker.holds(LAN));
+        assert!(!worker.holds("everyone"));
+        worker.queue.change(|pending| pending.add_all(LAN)).unwrap();
+        assert!(worker.holds(LAN));
+        worker.queue.change(|pending| pending.add_lamp()).unwrap();
+        assert!(worker.holds("everyone"));
+        worker
+            .queue
+            .change(|pending| pending.done(&Call::Lamp))
+            .unwrap();
+        assert!(!worker.holds("everyone"));
+        // A forget not handed: owed a read again, everything waits.
+        worker
+            .flight
+            .owed
+            .store(true, std::sync::atomic::Ordering::SeqCst);
+        assert!(worker.holds("everyone"));
+    }
+
+    /// The Reviewer-lead's must-fix on #8091: the ids of turns posted while
+    /// a forget came are queued for delete under their person.
+    #[test]
+    fn turns_posted_before_a_forget_came_are_queued_for_delete() {
+        let queue = Queue::at(scratch("posted"));
+        delete_posted_into(
+            &queue,
+            &bell(),
+            &[turn_id(MINH, 3), turn_id("everyone", 4), "bad".into()],
+        );
+        let pending = queue.pending();
+        assert_eq!(pending.ids[MINH], BTreeSet::from([turn_id(MINH, 3)]));
+        assert_eq!(pending.ids[""], BTreeSet::from([turn_id("everyone", 4)]));
+    }
+
+    /// Twelve's P2-2 on #8167, on the real queue: a person's whole-history
+    /// delete goes out while their turn is still being posted; the server
+    /// runs the delete, then stores the post, which answers late. Its id is
+    /// still queued and deleted after the whole history is done.
+    #[test]
+    fn a_post_answering_after_its_persons_whole_delete_went_out_is_still_deleted() {
+        let queue = Queue::at(scratch("posted-all"));
+        queue.change(|pending| pending.add_all(MINH)).unwrap();
+        let out = queue.pending().next().unwrap();
+        assert_eq!(
+            out,
+            Call::All {
+                person: MINH.into()
+            }
+        );
+        delete_posted_into(&queue, &bell(), &[turn_id(MINH, 7)]);
+        // The whole history still goes first.
+        assert_eq!(queue.pending().next(), Some(out.clone()));
+        queue.change(|pending| pending.done(&out)).unwrap();
+        assert_eq!(
+            queue.pending().next(),
+            Some(Call::Ids {
+                person: MINH.into(),
+                ids: vec![turn_id(MINH, 7)]
+            })
+        );
+    }
+
+    /// Twelve's P2-1 on #8167: a forget of everyone keeps no row in the
+    /// memory; when its hand-off is full, the next owed read sees the
+    /// memory's new epoch and the lamp's whole history is still deleted,
+    /// with no restart.
+    #[test]
+    fn a_forget_of_everyone_that_missed_a_full_hand_off_is_still_deleted() {
+        let path = scratch("missed-everyone");
+        let memory = Arc::new(FakeMemory::default());
+        let wiped = Arc::new(std::sync::atomic::AtomicBool::new(false));
+        let worker = {
+            let (memory, wiped) = (memory.clone(), wiped.clone());
+            test_worker(
+                &path,
+                Arc::new(move |_: &Path, line: &Value| {
+                    if line["op"] == lamp_msgs::MEMORY_HISTORY_EPOCH_OP {
+                        let epoch = if wiped.load(std::sync::atomic::Ordering::SeqCst) {
+                            "11223344"
+                        } else {
+                            EPOCH
+                        };
+                        return Some(json!({"ok":true,"epoch":epoch}));
+                    }
+                    memory.answer(line)
+                }),
+            )
+        };
+        // Seen at the start.
+        worker
+            .queue
+            .change(|pending| pending.saw_epoch(EPOCH))
+            .unwrap();
+        // The hand-off full: the forget of everyone is not taken.
+        let (to, _held) = std::sync::mpsc::sync_channel(0);
+        *worker.to.lock().unwrap() = Some(to);
+        wiped.store(true, std::sync::atomic::Ordering::SeqCst);
+        assert!(!answered_with(
+            &worker,
+            Path::new(SOCKET),
+            &json!({"op":"forget_all","person":null}),
+            &json!({"ok":true,"removed":4})
+        ));
+        assert!(worker.holds("everyone"));
+        // The worker again, a later forget handed: its owed read deletes
+        // the lamp's whole history.
+        *worker.to.lock().unwrap() = None;
+        let later = json!({"ok":true,"removed":1,"exchanges":{LAN:turns(LAN, [2])}});
+        assert!(answered_with(
+            &worker,
+            Path::new(SOCKET),
+            &json!({"op":"forget","person":LAN,"id":2}),
+            &later
+        ));
+        assert!(settled(&worker));
+        let pending = worker.queue.pending();
+        assert_eq!(pending.next(), Some(Call::Lamp));
+        assert_eq!(pending.epoch.as_deref(), Some("11223344"));
+        assert!(worker.holds("everyone"));
+    }
+
+    /// Twelve's P3 on #8167: a corrupt queue file is said in the journal
+    /// and starts again from its kept epoch, so a wipe since is still seen.
+    #[test]
+    fn a_corrupt_queue_keeps_its_epoch() {
+        let path = scratch("corrupt");
+        let queue = Queue::at(&path);
+        queue.change(|pending| pending.saw_epoch(EPOCH)).unwrap();
+        fs::write(&path, b"{not json").unwrap();
+        assert_eq!(queue.pending().epoch.as_deref(), Some(EPOCH));
+        let epoch = |_: &Value| Some(json!({"ok":true,"epoch":"9f8e7d6c"}));
+        assert!(epoch_seen(&queue, &bell(), epoch));
+        assert_eq!(queue.pending().next(), Some(Call::Lamp));
     }
 }

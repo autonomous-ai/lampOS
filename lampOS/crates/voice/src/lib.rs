@@ -61,6 +61,7 @@ pub mod did_history;
 pub mod did_ring;
 pub mod did_voice;
 pub mod history_forget;
+pub mod history_privacy;
 pub mod watches;
 // A developer's computer reads the microphone off the bus (`--microphone-device bus:mic1`).
 #[cfg(unix)]

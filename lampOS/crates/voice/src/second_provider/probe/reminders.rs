@@ -12,14 +12,17 @@
 //! `probe-tools` reads it, so the arms differ only in `list_reminders`'
 //! description:
 //!
-//! - **before**: `list_reminders` as it was described before ([`BEFORE`],
-//!   `lamp_actions::schedule::LIST_BEFORE`; a test holds the two the same).
+//! - **before**: `list_reminders` as it was described before a question in
+//!   any wording or language, even one heard a word short, was named in it
+//!   ([`BEFORE`], `lamp_actions::schedule::LIST_DESCRIBED_BEFORE`, #7987; a
+//!   test holds the two the same).
 //! - **now**: as the installed catalog describes it, which must be this
-//!   build's (it names recall), or the probe refuses to run.
+//!   build's (it has [`NOW_SAYS`]), or the probe refuses to run.
 //!
-//! The four reminder lines are right with `list_reminders` first; the four
-//! others (a memory question, a new reminder, yesterday's talk, a greeting)
-//! are right with anything but `list_reminders` (rule 8: never listed
+//! The six reminder lines (one heard a word short, one in Vietnamese) are
+//! right with `list_reminders` first; the four others (a memory question, a
+//! new reminder, yesterday's talk, a greeting) are right with anything but
+//! `list_reminders` (rule 8: never listed
 //! unasked). It prints counts only: never the character, a key, a URL or
 //! what the model said.
 use super::super::net::{self, Chat, Message};
@@ -27,14 +30,15 @@ use super::tools::DAYS_NOTE;
 use crate::second_config::{CREDENTIALS_ENV, SecondConfig};
 use std::{collections::BTreeMap, io, path::Path, sync::Arc};
 
-/// `list_reminders`' description before questions about reminders were
-/// named in it (`lamp_actions::schedule::LIST_BEFORE`: the voice has the
+/// `list_reminders`' description before a question in any wording or
+/// language, even one heard a word short, was named in it (#7987;
+/// `lamp_actions::schedule::LIST_DESCRIBED_BEFORE`: the voice has the
 /// actions part only for its tests, so a test holds the two the same).
-pub const BEFORE: &str = "Read one bounded page of active timers and reminders, oldest first. Each item's kind is timer (set with set_timer) or reminder. To say what is set, or to find one to cancel, leave pending_only out. If next_after_id is present, use it as after_id to read more; never describe an incomplete page as the whole list. If not_yet_due, how many are set and not yet due in all, is more than 0, timers or reminders are set: list again without pending_only before saying none are.";
+pub const BEFORE: &str = "Read one bounded page of active timers and reminders, oldest first. Each item's kind is timer (set with set_timer) or reminder. To say what is set, or to find one to cancel, leave pending_only out. If next_after_id is present, use it as after_id to read more; never describe an incomplete page as the whole list. If not_yet_due, how many are set and not yet due in all, is more than 0, timers or reminders are set: list again without pending_only before saying none are. Call this, not recall, for any question about their reminders or timers: what is set, when one is due, or when they set it; never say you do not remember a reminder before calling this. set_day and set_clock say when each was set, as 'yesterday at 09:00'; if they are null, say you don't know when. Never list reminders unasked. said_recently: ones already said; said_day/said_clock: when you said it; waiting_for_answer: said late, unanswered. Asked what was set earlier, use both lists: 'I reminded you at 10:49 about the report', never none set.";
 
 /// Words only this build's description has: an installed catalog without
 /// them is the old one, and both arms would be the same.
-pub const NOW_SAYS: &str = "not recall";
+pub const NOW_SAYS: &str = "answered only after calling this in that turn";
 
 /// The function the reminder lines are right with.
 pub const LIST: &str = "list_reminders";
@@ -45,7 +49,7 @@ pub struct Line {
     pub about_reminders: bool,
 }
 
-pub const LINES: [Line; 8] = [
+pub const LINES: [Line; 10] = [
     Line {
         said: "Hey Lamp, what did I ask you to remind me about?",
         about_reminders: true,
@@ -77,6 +81,18 @@ pub const LINES: [Line; 8] = [
     Line {
         said: "Hey Lamp, good morning! How are you?",
         about_reminders: false,
+    },
+    // Heard a word short ("have" lost, #7987): not one of the forced
+    // phrases, so the model's own choice decides it.
+    Line {
+        said: "Hey Lamp, what reminders do I?",
+        about_reminders: true,
+    },
+    // Deliberately non-ASCII: the same question in Vietnamese ("What
+    // reminders do I have?"), since the description covers any language.
+    Line {
+        said: "Mình có những lời nhắc nào?",
+        about_reminders: true,
     },
 ];
 
@@ -263,7 +279,7 @@ mod tests {
 
     #[test]
     fn before_is_the_actions_parts_old_description_and_now_is_told_apart() {
-        assert_eq!(BEFORE, lamp_actions::schedule::LIST_BEFORE);
+        assert_eq!(BEFORE, lamp_actions::schedule::LIST_DESCRIBED_BEFORE);
         assert!(!BEFORE.contains(NOW_SAYS));
         assert!(lamp_actions::schedule::LIST_DESCRIBED.contains(NOW_SAYS));
     }
@@ -297,7 +313,7 @@ mod tests {
             assert!(text.contains("Your memory"), "{text}");
             assert!(text.contains(line.said), "{text}");
         }
-        assert_eq!(LINES.iter().filter(|l| l.about_reminders).count(), 4);
+        assert_eq!(LINES.iter().filter(|l| l.about_reminders).count(), 6);
     }
 
     #[test]
@@ -317,6 +333,6 @@ mod tests {
             "{said:?}"
         );
         assert!(said.contains(&"reminders arm=now line=5 right=1/3 (not list_reminders): list_reminders=2 recall=1".to_owned()), "{said:?}");
-        assert!(said.contains(&"reminders arm=now reminder lines 8/12 list_reminders, other lines 4/12 not list_reminders".to_owned()), "{said:?}");
+        assert!(said.contains(&"reminders arm=now reminder lines 12/18 list_reminders, other lines 4/12 not list_reminders".to_owned()), "{said:?}");
     }
 }
