@@ -2537,6 +2537,39 @@ As root, on a lamp with the base image (`crates/update/src/install.rs`):
      check still failing is found again by the next round. There is no
      switch of its own: it only makes systemd run lamp-update's own unit
      as its text says.
+   - **The install's restart order (#8138):** once the new files are in
+     place and checked (`openclaw --version`, the entry points, the unit),
+     the one-shot restarts the gateway with no session talking to it:
+     1. `lamp-tasks.service`, when `systemctl is-active` says it runs, is
+        stopped. lamp-tasks closes no idle session at its stop: the kept
+        session's record and token stay (its pane then ends with the
+        gateway's namespace in step 2). A skill run
+        working at that moment is cancelled by the stop, and its kept
+        session closed `--now` (the gateway is still up then).
+     2. `systemctl restart lamp-openclaw-gateway.service`.
+     3. The gateway waited for until it answers `openclaw gateway call
+        health --json --timeout 3000`, as `lampos` through the wrapper: at
+        most 40 calls, 3 s apart (about two minutes plus the calls;
+        lamp-c0a4's gateway took 27-50 s). Answered: one journal line with
+        the seconds. Past the bound: one line, and the install goes on,
+        not failed (a slow gateway is not a broken install).
+     4. `lamp-tasks.service` started again (only when step 1 found it
+        running), which opens its session on the gateway now answering.
+     5. The set-aside OpenClaw removed, and agent `main`'s allow-list
+        edited through the gateway (above).
+
+     A restart that fails still starts lamp-tasks again; the install is
+     then `failed` with `gateway` and, as every failed install, stops the
+     gateway and takes the entry points out. A failure before step 1 (a
+     fetch, `npm ci`, a version check, the config, `--version`) never
+     stopped lamp-tasks, and the failed install stops the gateway and
+     takes the entry points out the same way; restarting the gateway
+     there would run a half-installed OpenClaw. This runs whenever the
+     one-shot restarts the gateway: a new install, and one with the
+     pinned package already there (its namespace script or wrapper
+     written again). Before #8138 lamp-tasks was `try-restart`ed before
+     the gateway's restart, after a new install only, so its session
+     opened on a gateway about to restart.
    - **The forwarder token:** the wrapper exports `LAMP_HERMES_TOKEN` from
      lamp-cloud's `/var/lib/lampos-cloud/hermes-token`, as Hermes's does,
      for the `lampos` provider's `apiKey` (`${LAMP_HERMES_TOKEN}`).

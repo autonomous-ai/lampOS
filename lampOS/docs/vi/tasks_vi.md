@@ -2521,6 +2521,12 @@ khi đăng xuất, và với 0.6.60 khi đăng nhập (ROW của #7507).
   chạy được xác nhận trong khoảng 0.3-0.6 s, và việc daemon Harness khởi
   động lại giữa lúc gõ tác vụ đầu tiên và lúc OpenClaw xác nhận không còn
   làm mất nó. 0.6.76 và 0.6.78 không đổi gì cho OpenClaw.
+- **Cài hoặc cập nhật OpenClaw (#8138, lamp-update).** lamp-update dừng
+  lamp-tasks trước khi khởi động lại gateway của OpenClaw, chờ tới khi
+  gateway trả lời `health` (tối đa 40 lần gọi, cách nhau 3 s), rồi mới
+  khởi động lại lamp-tasks, để phiên được giữ mở trên một gateway nhận
+  được nó; một lần khởi động lại thất bại cũng khởi động lại lamp-tasks
+  (install.md, "The install's restart order").
 - **Reply khi đã đăng nhập, có xác nhận.** Với Harness có xác nhận reply, mọi
   reply vào một phiên của người dùng (pane duy nhất của `harness new`,
   `--reply-named`, một phiên resumed, một tin nhắn đầu tiên) chỉ được tính là

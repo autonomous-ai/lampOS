@@ -435,7 +435,8 @@ fn on_with_harness_there_installs_the_pinned_openclaw_as_lampos() {
         format!("chown -h lampos:lampos {GATEWAY_TOKEN}"),
         format!("chown -h lampos:lampos {CONFIG}"),
         format!("systemctl restart {UNIT}"),
-        "systemctl try-restart lamp-tasks.service".to_owned(),
+        format!("systemctl stop {TASKS_UNIT}"),
+        format!("systemctl start {TASKS_UNIT}"),
     ] {
         runs.position(&wanted);
     }
@@ -514,12 +515,15 @@ fn on_with_harness_there_installs_the_pinned_openclaw_as_lampos() {
     let kept: serde_json::Value =
         serde_json::from_slice(&fs::read(lamp.at(CONFIG)).unwrap()).unwrap();
     assert_eq!(kept["models"]["mode"], "merge");
+    // #8138: the gateway restarted again (its namespace script written
+    // again), so lamp-tasks is stopped around it here too.
     assert!(
-        !again
-            .lines()
-            .iter()
-            .any(|line| line.contains("try-restart lamp-tasks")),
-        "lamp-tasks is started again only after a new install"
+        again.position(&format!("systemctl stop {TASKS_UNIT}"))
+            < again.position(&format!("systemctl restart {UNIT}"))
+            && again.position(&format!("systemctl restart {UNIT}"))
+                < again.position(&format!("systemctl start {TASKS_UNIT}")),
+        "{:#?}",
+        again.lines()
     );
 }
 
@@ -854,6 +858,171 @@ fn a_failed_install_takes_the_entry_points_out_and_stops_the_gateway() {
             Some("version")
         );
     }
+}
+
+/// The lines of `runs` that call the gateway's `health`.
+fn health_calls(runs: &Runs) -> Vec<usize> {
+    let call = as_lampos(&HEALTH_CALL).join(" ");
+    runs.lines()
+        .iter()
+        .enumerate()
+        .filter(|(_, line)| **line == call)
+        .map(|(at, _)| at)
+        .collect()
+}
+
+/// An install through `runs` whose `health` calls are refused `refused`
+/// times first (all of them with `u32::MAX`), with what it said.
+fn install_health_refused(
+    lamp: &Lamp,
+    runs: &Runs,
+    refused: u32,
+) -> (OpenclawInstall, Vec<String>) {
+    let call = as_lampos(&HEALTH_CALL).join(" ");
+    let mut inner = runs.runner();
+    let mut left = refused;
+    let mut run = |argv: &[String]| {
+        let ran = inner(argv);
+        if argv.join(" ") == call && left > 0 {
+            left -= 1;
+            return Err("gateway closed (1006 abnormal closure)".to_owned());
+        }
+        ran
+    };
+    let mut lines = Vec::new();
+    let said = install_with(
+        lamp.root(),
+        &lamp.records(),
+        &mut run,
+        &mut || 4,
+        &mut |line: &str| lines.push(line.to_owned()),
+        &kit(),
+    )
+    .unwrap()
+    .unwrap();
+    (said, lines)
+}
+
+/// #8138: an install stops a running lamp-tasks before the gateway's
+/// restart, so no session talks to the gateway while it changes, and
+/// starts it again only once the restarted gateway answers `health`; it
+/// is never restarted before the gateway any more. A lamp-tasks not
+/// running is neither stopped nor started.
+#[test]
+fn an_install_stops_lamp_tasks_and_starts_it_once_the_restarted_gateway_answers() {
+    let lamp = Lamp::new();
+    fs::write(lamp.unit(), UNIT_TEXT).unwrap();
+    lamp.ask();
+    let runs = Runs::new(&lamp);
+    let (said, lines) = install_health_refused(&lamp, &runs, 2);
+    assert_eq!(said.install, "installed", "{:#?}", runs.lines());
+    let active = runs.position(&format!("systemctl is-active --quiet {TASKS_UNIT}"));
+    let stop = runs.position(&format!("systemctl stop {TASKS_UNIT}"));
+    let restart = runs.position(&format!("systemctl restart {UNIT}"));
+    let health = health_calls(&runs);
+    let start = runs.position(&format!("systemctl start {TASKS_UNIT}"));
+    assert_eq!(health.len(), 3, "two refused, the third answered");
+    assert!(
+        runs.position(" --version") < active
+            && active < stop
+            && stop < restart
+            && restart < health[0]
+            && health[2] < start,
+        "{:#?}",
+        runs.lines()
+    );
+    assert!(
+        !runs
+            .lines()
+            .iter()
+            .any(|line| line.contains("restart lamp-tasks")),
+        "{:#?}",
+        runs.lines()
+    );
+    assert!(
+        lines
+            .iter()
+            .any(|line| line.starts_with(&format!("{UNIT} answers health "))),
+        "{lines:#?}"
+    );
+    assert_eq!(
+        HEALTH_CALL,
+        [
+            WRAPPER,
+            "gateway",
+            "call",
+            "health",
+            "--json",
+            "--timeout",
+            "3000"
+        ]
+    );
+    assert_eq!((ADD_TRIES, ADD_AGAIN), (40, Duration::from_millis(1)));
+
+    // lamp-tasks not running: left so, the gateway still waited for.
+    let lamp = Lamp::new();
+    fs::write(lamp.unit(), UNIT_TEXT).unwrap();
+    lamp.ask();
+    let runs = Runs {
+        fail_on: Some("is-active --quiet lamp-tasks"),
+        ..Runs::new(&lamp)
+    };
+    let (said, _) = install_health_refused(&lamp, &runs, 0);
+    assert_eq!(said.install, "installed", "{:#?}", runs.lines());
+    assert_eq!(health_calls(&runs).len(), 1);
+    assert!(
+        !runs
+            .lines()
+            .iter()
+            .any(|line| line == &format!("systemctl stop {TASKS_UNIT}")
+                || line == &format!("systemctl start {TASKS_UNIT}")),
+        "{:#?}",
+        runs.lines()
+    );
+}
+
+/// #8138: past the bound (40 `health` calls) the install goes on: lamp-tasks
+/// is started again, the install `installed`, one line naming the bound.
+#[test]
+fn a_gateway_that_never_answers_health_still_gets_lamp_tasks_started_again() {
+    let lamp = Lamp::new();
+    fs::write(lamp.unit(), UNIT_TEXT).unwrap();
+    lamp.ask();
+    let runs = Runs::new(&lamp);
+    let (said, lines) = install_health_refused(&lamp, &runs, u32::MAX);
+    assert_eq!(said.install, "installed", "{:#?}", runs.lines());
+    let health = health_calls(&runs);
+    assert_eq!(health.len(), ADD_TRIES as usize);
+    assert!(health[health.len() - 1] < runs.position(&format!("systemctl start {TASKS_UNIT}")));
+    assert!(
+        lines.iter().any(|line| line
+            .starts_with(&format!("{UNIT} did not answer health within 40 calls"))
+            && line.contains("lamp-tasks is started anyway")),
+        "{lines:#?}"
+    );
+}
+
+/// #8138: a gateway restart that fails still starts lamp-tasks again (it
+/// was stopped for the restart); the install fails `gateway` as before,
+/// the gateway stopped and the entry points taken out.
+#[test]
+fn a_failed_gateway_restart_still_starts_lamp_tasks_again() {
+    let lamp = Lamp::new();
+    fs::write(lamp.unit(), UNIT_TEXT).unwrap();
+    lamp.ask();
+    let runs = Runs {
+        fail_on: Some("systemctl restart lamp-openclaw"),
+        ..Runs::new(&lamp)
+    };
+    let (said, _) = install_health_refused(&lamp, &runs, 0);
+    assert_eq!(said.error.as_deref(), Some("gateway"));
+    let stop = runs.position(&format!("systemctl stop {TASKS_UNIT}"));
+    let restart = runs.position(&format!("systemctl restart {UNIT}"));
+    let start = runs.position(&format!("systemctl start {TASKS_UNIT}"));
+    assert!(stop < restart && restart < start, "{:#?}", runs.lines());
+    assert!(health_calls(&runs).is_empty());
+    assert!(start < runs.position(&format!("systemctl stop {UNIT}")));
+    assert!(!lamp.at(WRAPPER).exists() && !lamp.at(NS).exists());
 }
 
 /// Off: a round asks the one-shot to stop the gateway and take the entry
@@ -1917,7 +2086,7 @@ fn the_one_path_lets_agent_main_run_the_launcher_alone() {
     let restart = runs.position(&format!("systemctl restart {UNIT}"));
     assert!(
         made < restart
-            && runs.position("systemctl try-restart lamp-tasks.service") < restart
+            && runs.position(&format!("systemctl stop {TASKS_UNIT}")) < restart
             && restart < runs.position(&format!("systemctl is-active --quiet {UNIT}"))
             && restart < runs.position(" approvals allowlist add ")
     );

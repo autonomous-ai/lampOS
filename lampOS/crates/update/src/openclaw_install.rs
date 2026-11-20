@@ -1634,8 +1634,10 @@ fn remove_entry_points(root: &Path, run: &mut Runner, say: &mut dyn FnMut(&str))
 /// `openclaw --version` run in the namespace (OpenClaw's first run, which
 /// finishes its package step), the namespace script and the wrapper
 /// written, [`SKILL_START`] made as the one run path wants it
-/// ([`sync_launcher`]), after a new install lamp-tasks started again if it
-/// runs, the gateway (re)started (the round enables it), [`ASIDE`]
+/// ([`sync_launcher`]), lamp-tasks stopped if it runs ([`tasks_stopped`]),
+/// the gateway (re)started (the round enables it) and waited for until it
+/// answers `health` ([`gateway_answers`]), lamp-tasks started again (also
+/// when the restart failed), [`ASIDE`]
 /// removed, and agent `main`'s exec allow-list edited through the running
 /// gateway ([`exec_allowlist`]). OpenClaw there already: only the
 /// launcher and the allow-list, when not done yet.
@@ -1887,21 +1889,23 @@ fn steps(
             say,
         );
     }
-    // lamp-tasks merges OpenClaw's models and skills at its start. Before
-    // the gateway's (re)start: lamp-tasks' runtime folder is made again
-    // with it, and the gateway's namespace shows START_SOCKET_DIR as it is
-    // when the gateway starts.
-    if !pinned_there
-        && let Err(why) =
-            run(&["systemctl", "try-restart", "lamp-tasks.service"].map(str::to_owned))
-    {
-        say(&format!("lamp-tasks.service not started again: {why}"));
-    }
+    // #8138: no pane talks to the gateway while it restarts. lamp-tasks,
+    // when it runs, is stopped first (its kept session is left in Harness,
+    // nothing closed: lamp-tasks closes no idle session at its stop), and
+    // started again only once the restarted gateway answers, so its
+    // session opens on a gateway that takes it. START_SOCKET_DIR is
+    // lamp-update's folder, not lamp-tasks' runtime folder, so the socket
+    // lamp-tasks makes in it at its start shows in the gateway's namespace
+    // whichever starts first.
+    let tasks_ran = tasks_stopped(run, say);
     // Always on (the owner on #6226): started now, or restarted so one
     // running an older OpenClaw runs the new one. The round enables it.
     if let Err(why) = run(&["systemctl", "restart", UNIT].map(str::to_owned)) {
+        tasks_started(run, tasks_ran, say);
         return fail("gateway", format!("systemctl restart {UNIT}: {why}"), say);
     }
+    gateway_answers(run, say);
+    tasks_started(run, tasks_ran, say);
     remove_aside(root, say);
     // Through the gateway just (re)started; an add not done is retried by
     // the next round, never a failure of the install.
@@ -2051,6 +2055,82 @@ pub const ADD_AGAIN: Duration = if cfg!(test) {
 /// Whether the gateway's unit is active (`systemctl is-active`).
 fn gateway_active(run: &mut Runner) -> bool {
     run(&["systemctl", "is-active", "--quiet", UNIT].map(str::to_owned)).is_ok()
+}
+
+/// lamp-tasks' unit, stopped around the gateway's restart ([`steps`]).
+pub const TASKS_UNIT: &str = "lamp-tasks.service";
+
+/// [`TASKS_UNIT`] stopped when it is active: whether it was, so it is
+/// started again after the gateway's restart ([`tasks_started`]). One not
+/// active (not installed, or stopped by a person) is left as it is.
+fn tasks_stopped(run: &mut Runner, say: &mut dyn FnMut(&str)) -> bool {
+    if run(&["systemctl", "is-active", "--quiet", TASKS_UNIT].map(str::to_owned)).is_err() {
+        return false;
+    }
+    match run(&["systemctl", "stop", TASKS_UNIT].map(str::to_owned)) {
+        Ok(_) => say(&format!(
+            "{TASKS_UNIT} stopped while {UNIT} restarts, so no session talks to it meanwhile"
+        )),
+        Err(why) => say(&format!("{TASKS_UNIT} not stopped: {why}")),
+    }
+    true
+}
+
+/// [`TASKS_UNIT`] started again when [`tasks_stopped`] found it active,
+/// on every way out of the restart, a failed one too.
+fn tasks_started(run: &mut Runner, ran: bool, say: &mut dyn FnMut(&str)) {
+    if !ran {
+        return;
+    }
+    match run(&["systemctl", "start", TASKS_UNIT].map(str::to_owned)) {
+        Ok(_) => say(&format!("{TASKS_UNIT} started again")),
+        Err(why) => say(&format!("{TASKS_UNIT} not started again: {why}")),
+    }
+}
+
+/// The gateway's `health` call, as `lampos` through [`WRAPPER`] (which
+/// fails closed while the gateway has no main process yet), its own
+/// timeout 3 s.
+pub const HEALTH_CALL: [&str; 7] = [
+    WRAPPER,
+    "gateway",
+    "call",
+    "health",
+    "--json",
+    "--timeout",
+    "3000",
+];
+
+/// The gateway just restarted waited for until it answers [`HEALTH_CALL`],
+/// [`ADD_TRIES`] calls at most, [`ADD_AGAIN`] apart (40 × 3 s, two minutes
+/// plus the calls themselves; c0a4's gateway answered in 27-50 s). Whether
+/// it answered; past the bound one line, and the install goes on: a slow
+/// gateway is not a broken install, lamp-tasks waits for it again before
+/// its session opens, and the allow-list's adds retry on their own.
+fn gateway_answers(run: &mut Runner, say: &mut dyn FnMut(&str)) -> bool {
+    let started = std::time::Instant::now();
+    let argv = as_lampos(&HEALTH_CALL);
+    let mut last = String::new();
+    for tried in 1..=ADD_TRIES {
+        match run(&argv) {
+            Ok(_) => {
+                say(&format!(
+                    "{UNIT} answers health {} s after its restart",
+                    started.elapsed().as_secs()
+                ));
+                return true;
+            }
+            Err(why) => last = why,
+        }
+        if tried < ADD_TRIES {
+            std::thread::sleep(ADD_AGAIN);
+        }
+    }
+    say(&format!(
+        "{UNIT} did not answer health within {ADD_TRIES} calls ({} s): {last}; lamp-tasks is started anyway and waits for it",
+        started.elapsed().as_secs()
+    ));
+    false
 }
 
 /// An [`exec_allowlist_args`] edit as it is run: as `lampos`, through
