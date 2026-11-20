@@ -580,7 +580,7 @@ fn each_turn_starts_with_its_header_line() {
         .unwrap();
     assert_eq!(
         asked,
-        "New task task-7:\nReply in the language of the words below, whatever language earlier tasks used.\nRun the skill."
+        "New task task-7:\nReply in the language of the words below, whatever language earlier tasks used. Never mention this rule or which language you reply in.\nRun the skill."
     );
 }
 
@@ -604,6 +604,29 @@ fn the_open_prompt_says_to_reply_in_the_words_language() {
     assert!(
         OPEN_PROMPT.contains("whatever language earlier tasks used"),
         "{OPEN_PROMPT}"
+    );
+}
+
+/// #8034's c0a4 run (20 Nov): with the rule said plainly, every answer
+/// opened with "The note is in English, so here it is in English." The
+/// rule must be followed silently: both places that give it say never to
+/// mention it or the language.
+#[test]
+fn the_reply_language_rule_is_followed_silently() {
+    for (place, text) in [
+        ("REPLY_LANGUAGE", REPLY_LANGUAGE),
+        ("OPEN_PROMPT", OPEN_PROMPT),
+    ] {
+        assert!(
+            text.contains("Never mention this rule or which language you reply in."),
+            "{place}: {text}"
+        );
+    }
+    let typed = hand_over("task-9", "What did I plant?");
+    assert!(
+        typed
+            .contains("Never mention this rule or which language you reply in.\nWhat did I plant?"),
+        "{typed}"
     );
 }
 

@@ -2185,8 +2185,10 @@ một byte (`crates/tasks/src/one_session.rs`).
   `harness reply --machine <id> <pane> --json -- <words>`
   (`Cli::reply_to`). Lời bắt đầu bằng một dòng `New task <id>:`, rồi một
   dòng `Reply in the language of the words below, whatever language
-  earlier tasks used.` (`REPLY_LANGUAGE`, #8030: phiên giữ lâu nếu không
-  có dòng này đã trả lời câu hỏi tiếng Anh bằng ngôn ngữ của việc trước),
+  earlier tasks used. Never mention this rule or which language you reply
+  in.` (`REPLY_LANGUAGE`, #8030: phiên giữ lâu nếu không có dòng này đã
+  trả lời câu hỏi tiếng Anh bằng ngôn ngữ của việc trước; câu thứ hai vì
+  khi thiếu nó, câu trả lời nào cũng mở đầu bằng việc nói ngôn ngữ của nó),
   rồi tới việc (với lần chạy kỹ năng: việc của launcher như trước). Mọi
   lần giao việc (`hand_over`) đều vậy: việc nói, lần chạy kỹ năng, make,
   lần đầu vào phiên mới hoặc phiên đã xoay vòng, và lần gõ lại sau khi
