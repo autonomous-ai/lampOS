@@ -9786,7 +9786,12 @@ pub fn keep_asked(
     // A skill the lamp's agent made with code says what it uses, where its
     // result is and what it answers (#8157): never a built-in, Store or
     // pushed skill's, nor the lamp's own model's.
-    if request.made_with != MadeWith::DeepSeek && !files.scripts.is_empty() {
+    // The lamp's own one-line agent script (a task the lamp drafted for
+    // the agent, [`agent_script_only`]) is no code the agent wrote.
+    if request.made_with != MadeWith::DeepSeek
+        && !files.scripts.is_empty()
+        && !agent_script_only(&files.scripts)
+    {
         sections_held(&files.card)?;
     }
     // Each light show played by a step and held to its form (#7245).
@@ -18888,7 +18893,9 @@ task = { task = "take a photo and send it to the app", run = "scripts/main.py" }
         };
         let asked = made("glow green when I stand up, but not too often", "local:1");
         assert!(
-            asked.contains(&format!("\nmade_by: voice\n{LIMITS_ASKED}\n---")),
+            asked.contains(&format!(
+                "\nmade_by: voice\n{MADE_WITH}: deepseek\n{LIMITS_ASKED}\n---"
+            )),
             "{asked}"
         );
         assert!(asked.contains(&format!("most_a_day = {MANNERS_MOST_A_DAY}")));

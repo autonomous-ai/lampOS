@@ -9719,6 +9719,9 @@ printf 'tar of %s' \"$name\" > \"$3/$name-1.0.0.tar\"\n",
         task = { task = \"take a photo\", run = \"scripts/main.py\" }\n";
     pub(crate) const CODE_CARD: &str =
         "---\nname: photo-booth\ndescription: Takes a photo.\n---\n\n# Photo booth\n";
+    /// [`CODE_CARD`] as the lamp's agent writes it with code (#8157): its
+    /// `## Uses`, `## Result` and `## Answer`.
+    pub(crate) const AGENT_CODE_CARD: &str = "---\nname: photo-booth\ndescription: Takes a photo.\n---\n\n# Photo booth\n\n## Uses\n\n- scripts/main.py, no arguments.\n\n## Result\n\nNothing is printed: the result is said.\n\n## Answer\n\nThe script says it with lamp.say; the agent answers a lone -.\n";
     pub(crate) const CODE_REQUEST: &str =
         "make me a photo booth that takes a photo when I sit down";
 
@@ -11582,7 +11585,7 @@ printf 'tar of %s' \"$name\" > \"$3/$name-1.0.0.tar\"\n",
             .replace("take a photo", "fetch the Bitcoin price from the web");
         let main = net_code_main();
         let answer = format!(
-            "```skill.toml\n{toml}```\n\n```SKILL.md\n{CODE_CARD}```\n\n```scripts/main.py\n{main}```\n"
+            "```skill.toml\n{toml}```\n\n```SKILL.md\n{AGENT_CODE_CARD}```\n\n```scripts/main.py\n{main}```\n"
         );
         let rules_seen = std::sync::Arc::new(std::sync::Mutex::new(Vec::<String>::new()));
         let tasks = {
@@ -11674,7 +11677,7 @@ printf 'tar of %s' \"$name\" > \"$3/$name-1.0.0.tar\"\n",
             .replace("take a photo", "fetch the Bitcoin price from the web");
         let main = net_code_main();
         let answer = format!(
-            "```skill.toml\n{toml}```\n\n```SKILL.md\n{CODE_CARD}```\n\n```scripts/main.py\n{main}```\n"
+            "```skill.toml\n{toml}```\n\n```SKILL.md\n{AGENT_CODE_CARD}```\n\n```scripts/main.py\n{main}```\n"
         );
         let tasks = crate::make_skill_agent::tests::stub(
             Some("openclaw"),
@@ -11796,7 +11799,7 @@ printf 'tar of %s' \"$name\" > \"$3/$name-1.0.0.tar\"\n",
             .replace("take a photo", "fetch the Bitcoin price from the web");
         let main = net_code_main();
         let answer = format!(
-            "```skill.toml\n{toml}```\n\n```SKILL.md\n{CODE_CARD}```\n\n```scripts/main.py\n{main}```\n"
+            "```skill.toml\n{toml}```\n\n```SKILL.md\n{AGENT_CODE_CARD}```\n\n```scripts/main.py\n{main}```\n"
         );
         let tasks = crate::make_skill_agent::tests::stub(
             Some("openclaw"),
