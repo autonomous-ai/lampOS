@@ -29,7 +29,10 @@
 //!   = `full`; `agents.defaults.sandbox.mode` = `off`; and
 //!   [`NO_ASK_TOOLS`] in `tools.deny` (#7906), the tools that stop a turn
 //!   on a question in the pane (`ask_user`'s choice, `secrets`' masked
-//!   prompt, `suggest_task`'s offer), a person's own denies kept. So the
+//!   prompt, `suggest_task`'s offer), and [`NO_SELF_EDIT_TOOLS`]
+//!   (`skill_workshop`, #8108: the agent never writes or patches skills of
+//!   its own, so the lamp's skills and make guide are the only ones it
+//!   follows), a person's own denies kept. So the
 //!   lamp's OpenClaw runs a command headless as V1's did, with no ask
 //!   nobody can answer, and no tool it may call waits for a person; its
 //!   namespace (`openclaw-ns`) still bounds what it sees;
@@ -110,6 +113,19 @@ pub const ELEVATED_CHANNEL: &str = "webchat";
 /// deleted. Denying them only takes tools away; without `ask_user` the
 /// agent goes on with its best judgment, as after OpenClaw's `no_answer`.
 pub const NO_ASK_TOOLS: [&str; 3] = ["ask_user", "secrets", "suggest_task"];
+
+/// The tools denied to the lamp's OpenClaw with V1's tools on, beside
+/// [`NO_ASK_TOOLS`] (#8108; off, the file is today's again): `skill_workshop`, OpenClaw's own tool that writes and patches
+/// the agent's learned skills (`<agentDir>/workshop-skills/`, OpenClaw
+/// 2026.11.2 docs: `tools/skill-workshop.md`). On c0a4 it wrote a
+/// `lamp-skill-make` skill of its own from the make guide and patched it
+/// five times in one afternoon, and a skill run tried to edit it. The
+/// lamp's skills and its make guide are the lamp's: the agent follows
+/// them and never keeps a changed copy. Denying it also stops the
+/// background review that learns skills ("Denying `skill_workshop` ...
+/// opts that agent out", `tools/self-learning.md`). Skills it learned
+/// before are left where they are.
+pub const NO_SELF_EDIT_TOOLS: [&str; 1] = ["skill_workshop"];
 
 /// Whether [`V1_TOOLS_SWITCH`] is on: anything but `off` exactly.
 pub fn v1_tools_on(value: Option<&str>) -> bool {
@@ -216,17 +232,8 @@ fn v1_tools(root: &mut Map<String, Value>, on: bool) -> Result<(), Refused> {
         elevated.insert("enabled".into(), json!(true));
         object(elevated, "allowFrom", "tools.elevated.allowFrom")?
             .insert(ELEVATED_CHANNEL.into(), json!(["*"]));
-        let deny = deny_list(tools)?;
-        for tool in NO_ASK_TOOLS {
-            // OpenClaw matches tool names case-insensitively.
-            if !deny
-                .iter()
-                .filter_map(Value::as_str)
-                .any(|name| name.eq_ignore_ascii_case(tool))
-            {
-                deny.push(json!(tool));
-            }
-        }
+        deny_each(tools, &NO_ASK_TOOLS)?;
+        deny_each(tools, &NO_SELF_EDIT_TOOLS)?;
     } else {
         take(tools, "profile", &json!("full"));
         let exec = object(tools, "exec", "tools.exec")?;
@@ -245,10 +252,31 @@ fn v1_tools(root: &mut Map<String, Value>, on: bool) -> Result<(), Refused> {
         take_empty(tools, "elevated");
         if tools.get("deny").is_some_and(|deny| !deny.is_null()) {
             let deny = deny_list(tools)?;
-            deny.retain(|name| !NO_ASK_TOOLS.iter().any(|tool| name == tool));
+            deny.retain(|name| {
+                !NO_ASK_TOOLS
+                    .iter()
+                    .chain(&NO_SELF_EDIT_TOOLS)
+                    .any(|tool| name == tool)
+            });
             if deny.is_empty() {
                 tools.remove("deny");
             }
+        }
+    }
+    Ok(())
+}
+
+/// Each of `names` in `tools.deny` once: one there in any case is kept as
+/// it is, since OpenClaw matches tool names case-insensitively.
+fn deny_each(tools: &mut Map<String, Value>, names: &[&str]) -> Result<(), Refused> {
+    let deny = deny_list(tools)?;
+    for tool in names {
+        if !deny
+            .iter()
+            .filter_map(Value::as_str)
+            .any(|name| name.eq_ignore_ascii_case(tool))
+        {
+            deny.push(json!(tool));
         }
     }
     Ok(())
@@ -443,7 +471,7 @@ mod tests {
                 "profile": "full",
                 "exec": {"host": "gateway", "mode": "full"},
                 "elevated": {"enabled": true, "allowFrom": {"webchat": ["*"]}},
-                "deny": ["ask_user", "secrets", "suggest_task"],
+                "deny": ["ask_user", "secrets", "suggest_task", "skill_workshop"],
             })
         );
         assert_eq!(value["agents"]["defaults"]["elevatedDefault"], "full");
@@ -600,12 +628,26 @@ mod tests {
                 .get("deny")
                 .cloned()
         };
-        assert_eq!(deny("", true), Some(json!(NO_ASK_TOOLS)));
+        assert_eq!(
+            deny("", true),
+            Some(json!([
+                "ask_user",
+                "secrets",
+                "suggest_task",
+                "skill_workshop"
+            ]))
+        );
         assert_eq!(deny("", false), None);
         let own = r#"{"tools": {"deny": ["browser", "ASK_USER"]}}"#;
         assert_eq!(
             deny(own, true),
-            Some(json!(["browser", "ASK_USER", "secrets", "suggest_task"]))
+            Some(json!([
+                "browser",
+                "ASK_USER",
+                "secrets",
+                "suggest_task",
+                "skill_workshop"
+            ]))
         );
         let on = merge_config(own, 7741, Path::new(WORKSPACE), true, true).unwrap();
         assert_eq!(deny(&on, false), Some(json!(["browser", "ASK_USER"])));
@@ -622,6 +664,36 @@ mod tests {
                 );
             }
         }
+    }
+
+    /// #8108: with V1's tools on (the product's default) the lamp's agent
+    /// never writes or patches skills of its own: `skill_workshop` is
+    /// denied once, a person's deny of it in any case kept as theirs, a
+    /// merge again idle; V1's tools off takes ours out with the others.
+    #[test]
+    fn the_lamps_agent_cannot_write_or_patch_skills_of_its_own() {
+        let merged = |text: &str, skills, v1| {
+            let merged = merge_config(text, 7741, Path::new(WORKSPACE), skills, v1).unwrap();
+            let again = merge_config(&merged, 7741, Path::new(WORKSPACE), skills, v1).unwrap();
+            assert_eq!(again, merged, "a second merge is idle");
+            merged
+        };
+        let denied = |text: &str, name: &str| {
+            serde_json::from_str::<Value>(text).unwrap()["tools"]["deny"]
+                .as_array()
+                .map_or(0, |deny| deny.iter().filter(|tool| *tool == name).count())
+        };
+        for skills in [true, false] {
+            for text in ["", INSTALLED] {
+                let on = merged(text, skills, true);
+                assert_eq!(denied(&on, "skill_workshop"), 1, "{skills} {on}");
+                let off = merged(&on, skills, false);
+                assert_eq!(denied(&off, "skill_workshop"), 0, "{skills} {off}");
+            }
+        }
+        let theirs = merged(r#"{"tools": {"deny": ["Skill_Workshop"]}}"#, true, true);
+        assert_eq!(denied(&theirs, "skill_workshop"), 0, "{theirs}");
+        assert_eq!(denied(&theirs, "Skill_Workshop"), 1, "{theirs}");
     }
 
     /// `INSTALLED` with its `tools.exec` set to `exec`.
