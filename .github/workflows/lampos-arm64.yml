@@ -652,6 +652,7 @@ jobs:
           echo "cores: $(nproc)"
           filter='not (binary_id(lamp-ipc::relay_signals) | binary_id(lamp-turn-end-wire::process))'
           if [ -n "$PICKED" ]; then filter="$filter & ($PICKED)"; fi
+          filter="$filter & test(a_make_is_told_make_skills_only_while_make_skill_is_declared)"   # STUB ONLY (#8101 red), never merged
           # The archive extracts to target/, where the build job's paths (CARGO_BIN_EXE_*) point.
           cargo-nextest nextest run --archive-file "$RUNNER_TEMP/lampos-tests.tar.zst" \
             --workspace-remap . --extract-to . --extract-overwrite \
