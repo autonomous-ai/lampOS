@@ -2454,7 +2454,7 @@ impl OneSession {
             let here = crate::skill_task::harness_sign_in();
             let signed_out = here == crate::skill_task::HarnessHere::SignedOut;
             self.lamp_known(key.as_ref(), here);
-            self.confirm_if_warmed();
+            self.confirm_if_warmed(&*harness);
             self.gateway_look(&mut looks, Instant::now());
             self.remove_if_due(&looks, key.as_ref(), signed_out, &*harness);
             if self.lock().restart_due.is_some()
@@ -2709,12 +2709,16 @@ impl OneSession {
         match end {
             // Ended after `done`: no turn of ours on it, or nothing but the
             // state it was in already: rested until a hand-over.
+            // Ended after `done`. With no turn of ours held: rested until a
+            // hand-over. With one held (its `done` may be an earlier turn's
+            // first line), watched again 2 s later, so the turn's own end
+            // is never missed (#8138 review 2).
             WatchEnd::Settled => {
                 failures.1 = 0;
-                if heard <= 1 || self.lock().holder.is_none() {
+                if self.lock().holder.is_none() {
                     WatchRest::Idle
                 } else {
-                    WatchRest::None
+                    WatchRest::Retry
                 }
             }
             // At its own bound: watched again now.
@@ -2799,8 +2803,10 @@ impl OneSession {
                 });
                 let mut inner = self.lock();
                 // #8138 review (3): the spoken task handed over is ended at
-                // once, told, before the recovery.
-                if spoken {
+                // once, told, before the recovery; unless the watch read
+                // its turn's end first (`done` then `stopped`): its read
+                // decides, never ended stuck over its answer (review 2, 2).
+                if spoken && inner.turn_ended != holder {
                     inner.turn_broken = holder;
                 }
                 if inner.restart_due.is_none() {
@@ -4134,17 +4140,57 @@ impl OneSession {
     /// A pane open [`OneSession::open_idle_within`] (120 s) and still not
     /// confirmed (no watch, an older Harness, no hand-over): taken as up,
     /// so the lamp's agent never stays `starting` for good.
-    pub fn confirm_if_warmed(&self) {
-        let warmed =
-            self.lock().pane.as_ref().is_some_and(|pane| {
-                !pane.confirmed && pane.born.elapsed() >= self.open_idle_within
-            });
-        if warmed {
-            eprintln!(
-                "tasks: one session: the kept session was not confirmed taking input within {} s; taken as up",
-                self.open_idle_within.as_secs()
-            );
-            self.confirm();
+    pub fn confirm_if_warmed<H: PaneHarness>(&self, harness: &dyn Fn() -> Option<H>) {
+        let warmed = self
+            .lock()
+            .pane
+            .as_ref()
+            .filter(|pane| {
+                !pane.confirmed && pane.kept && pane.born.elapsed() >= self.open_idle_within
+            })
+            .map(|pane| (pane.agent.clone(), pane.place.machine.clone()));
+        let Some((agent, machine)) = warmed else {
+            return;
+        };
+        let Some(harness) = harness() else {
+            return;
+        };
+        // One `show` first (#8138 review 2, 3): never taken as up blind.
+        match self.pane_sign(&harness, &machine, &agent) {
+            Seen::Moving => {
+                eprintln!(
+                    "tasks: one session: the kept session was not confirmed taking input within {} s; show reads it up",
+                    self.open_idle_within.as_secs()
+                );
+                self.confirm();
+            }
+            Seen::Died(why) => self.broken_while_warming(&agent, why),
+            Seen::Starting => self.broken_while_warming(
+                &agent,
+                format!("still starting after {} s", self.open_idle_within.as_secs()),
+            ),
+            // No verdict: looked at again in 30 s.
+            Seen::Unknown => {
+                if let Some(pane) = self.lock().pane.as_mut().filter(|pane| pane.agent == agent) {
+                    pane.born = Instant::now()
+                        .checked_sub(self.open_idle_within.saturating_sub(KEEP_OPEN_WHILE_OPEN))
+                        .unwrap_or(pane.born);
+                }
+            }
+        }
+    }
+
+    /// A session never confirmed taking input that `show` reads dead or
+    /// still starting past its window: a fault, replaced fresh.
+    fn broken_while_warming(&self, agent: &str, why: String) {
+        eprintln!(
+            "tasks: one session: the kept session {} was never confirmed taking input: {why}; replaced fresh",
+            short(agent)
+        );
+        self.recovering(fault_code(&why));
+        let mut inner = self.lock();
+        if inner.restart_due.is_none() {
+            inner.restart_due = Some((agent.to_owned(), why));
         }
     }
 
@@ -4479,11 +4525,12 @@ impl Turn<'_> {
                     // and the one-session thread replaces the session with
                     // a fresh one once this turn lets the pane go. The task
                     // is never typed again after the recovery.
-                    // #8138 review (5): refused by a session still warming
-                    // up: this task ends told, the session is kept.
-                    Took::EngineNotReady | Took::NotRunning | Took::Timeout
-                        if self.one.warming(&agent) =>
-                    {
+                    // #8138 review (5): `ENGINE_NOT_READY` from a session
+                    // still warming up: this task ends told, the session is
+                    // kept. `NOT_RUNNING` (dead) or a whole hold not taken
+                    // (a late delivery could run a task told not done) is a
+                    // fault even then: closed `--now`, recovered fresh.
+                    Took::EngineNotReady if self.one.warming(&agent) => {
                         return self.refused_while_warming(&agent, &took);
                     }
                     Took::EngineNotReady | Took::NotRunning | Took::Timeout => {
@@ -4970,9 +5017,9 @@ impl Turn<'_> {
                 Some((name, token)) => {
                     match self.watched_wait(harness, agent, (name, token), &input, cancel, &watch) {
                         Ok(waited) => waited,
-                        // #7906 sign 4: handed over, not moving: the one
-                        // replace path, with its put-back (no tool ran:
-                        // typed again once; a tool ran: not replayed).
+                        // #7906 sign 4: handed over, not moving: the task
+                        // ends with its failed line, never typed again
+                        // (#8138), and the session is replaced fresh after.
                         Err(gone) => {
                             let tools = match harness.observe(machine, agent) {
                                 Ok(seen) => seen.seen.tools,
@@ -5045,10 +5092,10 @@ impl Turn<'_> {
                 }
                 // Harness 0.6.74 (openharness#4499): `wait` exits 1, its
                 // row `failed`, when the session's launch failed. The
-                // ladder at once, as for a died engine (a plain resume
-                // keeping its conversation first, a fresh one last), the
-                // turn's words typed again once with no tool run: never
-                // a look later, never the task dropped silently.
+                // turn ends at once with its failed line, as for a died
+                // engine, never typed again, and the session is replaced
+                // fresh after (#8138): never a look later, never the task
+                // dropped silently.
                 Ok(Some(state)) if state == "failed" => {
                     return self.launch_failed(harness, machine, agent, cancel, before_close);
                 }

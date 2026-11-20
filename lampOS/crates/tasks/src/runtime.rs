@@ -715,16 +715,9 @@ fn lamp_turn_news(
     engine: &mut Engine<Store>,
     now: &ClockSample,
 ) -> Result<(), EngineError> {
-    if let Some(name) = one.take_turn_broken() {
-        if engine.end_broken(&name, crate::one_session::STUCK_ENDED, now)? {
-            eprintln!(
-                "tasks: {name}: its session broke under it; ended at once ({})",
-                crate::one_session::STUCK_ENDED
-            );
-        } else {
-            one.put_turn_broken(name);
-        }
-    }
+    // Its turn's end first: an answer read before a break seen after it
+    // (`done` then `stopped`) is never ended as stuck (`end_broken` skips a
+    // task whose read is asked for).
     if let Some(name) = one.take_turn_end()
         && let Some(id) = engine.task_of_launch(&name)
     {
@@ -732,6 +725,21 @@ fn lamp_turn_news(
             eprintln!("tasks: {name}: its turn's end read at once (#8109)");
         } else if engine.active() {
             one.put_turn_end(name);
+        }
+    }
+    if let Some(name) = one.take_turn_broken() {
+        match engine.end_broken(&name, crate::one_session::STUCK_ENDED, now) {
+            Ok(true) => eprintln!(
+                "tasks: {name}: its session broke under it; ended at once ({})",
+                crate::one_session::STUCK_ENDED
+            ),
+            Ok(false) => one.put_turn_broken(name),
+            // Never the store's loop stopped for it: the task is left to
+            // its watch's bounds, as before #8138.
+            Err(error) => eprintln!(
+                "tasks: {name}: its session broke under it; not ended at once: {}",
+                error.code
+            ),
         }
     }
     Ok(())
@@ -5534,17 +5542,15 @@ pub fn serve_with_adapter<C: Clock, A: Adapter>(
         None
     };
     let mut status_published = 0u64;
-    // `tasks/agent` (#8138): with the one session on only, as only then is
-    // the lamp's own agent tracked; off, the topic is not touched.
-    let mut agent_out = if crate::one_session::LAMP.get().is_some() {
-        Some(bus.publisher_declared(
-            lamp_msgs::AgentReadiness::TOPIC,
-            &lamp_msgs::AgentReadiness::declaration(),
-            "tasks",
-        )?)
-    } else {
-        None
-    };
+    // `tasks/agent` (#8138): the lamp's own agent, tracked with the one
+    // session on. Off, `off` is published once at the start (the agent's
+    // value while untracked), so a `starting`/`tasks_restarting` kept from
+    // a stop before never stays (review 2, 4).
+    let mut agent_out = Some(bus.publisher_declared(
+        lamp_msgs::AgentReadiness::TOPIC,
+        &lamp_msgs::AgentReadiness::declaration(),
+        "tasks",
+    )?);
     let mut agent_seen = None;
     // An OpenClaw task's own steps (#7267): with `LAMP_TASKS_STEPS=on` only,
     // on a thread of their own, never on this accept loop; off, no reader

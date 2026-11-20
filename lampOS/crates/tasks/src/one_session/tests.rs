@@ -4681,9 +4681,10 @@ fn failed_opens_are_tried_quickly_then_slowly_as_an_error() {
 }
 
 /// #8138 review (2): `watch` says the state now first; an idle session's
-/// `done` (its last turn's) ends the watch at once. It is not started
-/// again until a hand-over (or [`WATCH_IDLE_REST`]); one that said more
-/// while a turn of ours runs is watched again at once.
+/// `done` (its last turn's) ends the watch at once. With no turn of ours
+/// held it is not started again until a hand-over (or [`WATCH_IDLE_REST`]);
+/// with one held, whatever it said, 2 s later ([`WATCH_RETRY`], review 2,
+/// 1), so an earlier turn's `done` never blinds this turn's end.
 #[test]
 fn a_watch_that_only_says_the_idle_state_rests_until_a_hand_over() {
     let dir = tempfile::tempdir().unwrap();
@@ -4699,16 +4700,22 @@ fn a_watch_that_only_says_the_idle_state_rests_until_a_hand_over() {
         one.watch_next(&|| Some(&fake), &stop, &mut failures),
         (WatchRest::Idle, Some(agent_of(1)))
     );
-    // A turn of ours: working, then its end, watched again at once.
+    // A turn of ours held: an old `done` alone, or working then done:
+    // watched again 2 s later, never rested.
     let turn = one.enter("task-1", Kind::Skill, far(), &|| false).unwrap();
-    fake.watches.lock().unwrap().push_back((
+    for events in [
+        vec![WatchEvent::Done],
         vec![WatchEvent::Working, WatchEvent::Done],
-        WatchEnd::Settled,
-    ));
-    assert_eq!(
-        one.watch_next(&|| Some(&fake), &stop, &mut failures).0,
-        WatchRest::None
-    );
+    ] {
+        fake.watches
+            .lock()
+            .unwrap()
+            .push_back((events, WatchEnd::Settled));
+        assert_eq!(
+            one.watch_next(&|| Some(&fake), &stop, &mut failures).0,
+            WatchRest::Retry
+        );
+    }
     drop(turn);
 }
 
@@ -4938,4 +4945,75 @@ fn a_session_read_installing_makes_the_agent_installing() {
     fake.states.lock().unwrap().remove(&agent_of(1));
     one.pane_sign(&fake, MACHINE, &agent_of(1));
     assert_eq!(one.readiness().state(), (Readiness::Ready, None));
+}
+
+/// #8138 review 2 (2): `done` then `stopped` on a spoken turn: its end is
+/// read (its answer decides), never also ended as stuck.
+#[test]
+fn a_turn_read_ended_before_its_session_stopped_is_not_ended_stuck() {
+    let dir = tempfile::tempdir().unwrap();
+    let (one, fake) = kept_on(dir.path());
+    one.open_if_due(&fake, &place());
+    assert!(matches!(
+        spoken_launch(&one, &fake, &spoken("lamp-1")),
+        Some(LaunchOutcome::Joined { .. })
+    ));
+    one.watched_event(&agent_of(1), WatchEvent::Done);
+    one.watched_event(&agent_of(1), WatchEvent::Stopped);
+    assert_eq!(one.take_turn_broken(), None);
+    assert_eq!(one.take_turn_end().as_deref(), Some("lamp-1"));
+}
+
+/// #8138 review 2 (3, 5): `NOT_RUNNING` (dead), or a whole hold not taken
+/// (a late delivery would run a task told not done), from a session still
+/// warming up is a fault: the task ends, the session is closed `--now` and
+/// recovered fresh. Only `ENGINE_NOT_READY` is warm-up.
+#[test]
+fn a_dead_or_untaken_hand_over_while_warming_is_a_fault() {
+    for took in [Took::NotRunning, Took::Timeout] {
+        let dir = tempfile::tempdir().unwrap();
+        let (one, fake) = kept_on(dir.path());
+        one.open_if_due(&fake, &place());
+        assert!(one.warming(&agent_of(1)), "{took:?}");
+        fake.takes.lock().unwrap().push_back(took.clone());
+        let turn = one.enter("task-1", Kind::Skill, far(), &|| false).unwrap();
+        assert!(matches!(
+            turn.send(&fake, &place(), "Run the skill.", far(), &|| false),
+            Sent::NotTyped(_)
+        ));
+        drop(turn);
+        fake.takes.lock().unwrap().clear();
+        one.restart_if_due(&fake);
+        assert_eq!(fake.count("close-kept"), 1, "{took:?}: {:?}", fake.calls());
+    }
+}
+
+/// #8138 review 2 (3): a session never confirmed taking input is looked at
+/// once with `show` past its window before it is taken as up: up, `ready`;
+/// dead, a fault replaced fresh, never `ready`.
+#[test]
+fn the_warm_up_fallback_looks_before_it_takes_the_session_as_up() {
+    use lamp_msgs::Readiness;
+    for dead in [false, true] {
+        let dir = tempfile::tempdir().unwrap();
+        let (one, fake) = kept_on(dir.path());
+        one.open_if_due(&fake, &place());
+        {
+            let mut inner = one.lock();
+            let pane = inner.pane.as_mut().unwrap();
+            pane.confirmed = false;
+            pane.born = Instant::now() - Duration::from_secs(5);
+        }
+        one.agent.session(crate::agent::Session::Opening);
+        if dead {
+            fake.shells.lock().unwrap().push(agent_of(1));
+        }
+        one.confirm_if_warmed(&|| Some(&fake));
+        if dead {
+            assert_eq!(one.readiness().state().0, Readiness::Recovering);
+            assert!(one.broken(&agent_of(1)).is_some());
+        } else {
+            assert_eq!(one.readiness().state(), (Readiness::Ready, None));
+        }
+    }
 }

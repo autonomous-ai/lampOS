@@ -2406,7 +2406,8 @@ impl<P: Persistence> Engine<P> {
     /// `not_sent` with `code` (the voice tells it as a refusal before the
     /// hand-over): never left to its watch's bounds, never typed again.
     /// Only a task still handed over with no answer settled, and with no
-    /// job under way ([`Engine::active`]: `Ok(false)`, tried again).
+    /// job under way ([`Engine::active`]) nor a read of it asked for (its
+    /// turn's end pending, which decides): `Ok(false)`, tried again.
     /// Its reads of the broken turn are dropped with its agent id, as a
     /// `not_sent` task has none.
     pub fn end_broken(&mut self, name: &str, code: &str, now: &Clock) -> Result<bool, Error> {
@@ -2421,6 +2422,13 @@ impl<P: Persistence> Engine<P> {
         }) else {
             return Ok(true);
         };
+        if self.state.tasks[index]
+            .read
+            .as_ref()
+            .is_some_and(|read| matches!(read.state, ReadState::Requested | ReadState::Attempting))
+        {
+            return Ok(false);
+        }
         let mut next = self.state.clone();
         let at = next_audit(&mut next, now)?;
         let task = &mut next.tasks[index];
@@ -2437,6 +2445,12 @@ impl<P: Persistence> Engine<P> {
         task.close = None;
         task.closable = false;
         task.updated = at;
+        // The last receipt kept for a retried request (an `observe` of
+        // this task, say) may name the read just dropped: no longer a
+        // retry to answer the same, so it is let go, as a new request's.
+        if next.check().is_err() {
+            next.last_receipt = None;
+        }
         self.save(next)?;
         Ok(true)
     }
@@ -4609,6 +4623,33 @@ mod tests {
                 &clock(2),
             )
             .unwrap();
+        // Its turn's end pending (a read asked for, not begun): that read
+        // decides.
+        engine
+            .handle(
+                &Request::Observe {
+                    guard: guard(&engine, "observe"),
+                    id,
+                },
+                &clock(3),
+                false,
+            )
+            .unwrap();
+        assert!(!engine.active());
+        assert!(
+            !engine
+                .end_broken(&name, "one_session_stuck", &clock(3))
+                .unwrap()
+        );
+        assert_eq!(
+            engine.state.tasks[0].dispatch.state,
+            DispatchState::Accepted
+        );
+        // Read, the agent still at work (no answer settled): ended now.
+        let job = engine.begin_observation(&clock(3)).unwrap().unwrap();
+        let mut working = data("");
+        working.state = "working".into();
+        engine.finish_observation(&job, working, &clock(3)).unwrap();
         assert!(
             engine
                 .end_broken(&name, "one_session_stuck", &clock(4))
