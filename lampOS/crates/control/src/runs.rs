@@ -59,6 +59,12 @@ pub trait SkillYes: Send + Sync {
     fn ask_grants(&self, _asked: &[String]) -> Result<BTreeSet<Grant>, String> {
         Err(crate::task_yes::ASKS_OFF.to_owned())
     }
+    /// The grants of a make's tried run (#8157, `{"mint": {"try": [...]}}`):
+    /// the draft's own grants, as lamp-tasks read them from the draft it
+    /// tries, or why none is minted. None by default.
+    fn try_grants(&self, _asked: &[String]) -> Result<BTreeSet<Grant>, String> {
+        Err(crate::task_yes::TRIES_OFF.to_owned())
+    }
 }
 
 /// A lamp that keeps no such yes yet: every mint is refused in words.
@@ -165,7 +171,20 @@ pub struct Run {
     /// names none of its own content is given this write
     /// ([`FixedWrite::covers`]), so the run's words never carry it.
     pub fixed_write: Option<FixedWrite>,
+    /// A make's tried run (#8157, [`Runs::mark_tried`]): minted for a
+    /// draft's own grants before it is kept. Its `service.write` is
+    /// answered as if done from a stub ([`TRIED_WRITE`]) and never reaches
+    /// lamp-services, so the try changes nothing in the world.
+    pub tried: bool,
+    /// How many `say`s the run's parts took (#8157): told in the admin
+    /// socket's `end` answer (`"said"`), so a make's tried run (and a
+    /// `run` step's, #8158) knows whether its script spoke.
+    pub said: u32,
 }
+
+/// What a tried run's `service.write` is answered (#8157): as if done,
+/// nothing sent.
+pub const TRIED_WRITE: &str = "tried at the make: not sent";
 
 /// A skill's fixed write as lamp-control read it from the skill's own file
 /// at the mint (`lamp_skills::service_write::fixed_write_of`): `service`,
@@ -250,6 +269,8 @@ impl Runs {
             until_us: now_us.saturating_add(for_ms.saturating_mul(1000)),
             serial: self.serial,
             fixed_write: None,
+            tried: false,
+            said: 0,
         };
         self.by_token.insert(token_key(token), live.clone());
         Ok(live)
@@ -262,6 +283,27 @@ impl Runs {
             if live.run == run {
                 live.fixed_write = Some(write.clone());
             }
+        }
+    }
+
+    /// Marks live run `run` as a make's tried run ([`Run::tried`]).
+    pub fn mark_tried(&mut self, run: &str) {
+        for live in self.by_token.values_mut() {
+            if live.run == run {
+                live.tried = true;
+            }
+        }
+    }
+
+    /// One `say` the parts took for `client`'s live run, if it has one
+    /// ([`Run::said`]).
+    pub fn count_said(&mut self, client: &str, now_us: u64) {
+        if let Some(live) = self
+            .by_token
+            .values_mut()
+            .find(|live| live.client == client && now_us < live.until_us)
+        {
+            live.said = live.said.saturating_add(1);
         }
     }
 
@@ -350,6 +392,24 @@ mod tests {
         assert!(runs.end("r1").is_some());
         assert!(runs.of(&token, 1).is_none());
         assert!(runs.end("r1").is_none());
+    }
+
+    #[test]
+    fn a_runs_says_are_counted_and_a_tried_run_is_marked() {
+        let mut runs = Runs::default();
+        let live = runs
+            .mint("a".repeat(43).as_str(), "r", "s", light(), None, 0)
+            .unwrap();
+        assert!(!live.tried);
+        runs.mark_tried("r");
+        runs.count_said(&live.client, 1);
+        runs.count_said(&live.client, 2);
+        // Another client's say, or one past the run's time, is not its.
+        runs.count_said("c_other", 3);
+        runs.count_said(&live.client, DEFAULT_MS * 1000);
+        let ended = runs.end("r").unwrap();
+        assert!(ended.tried);
+        assert_eq!(ended.said, 2);
     }
 
     #[test]
