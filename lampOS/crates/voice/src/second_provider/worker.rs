@@ -12599,6 +12599,7 @@ impl Heeding {
         let lamp_asked = signs.lamp_asked || crate::services::answer_awaited(heard);
         attention.lamp_asked(lamp_asked);
         let busy = signs.room == crate::room_told::Room::Busy;
+        attention.set_room_busy(busy);
         attention.set_near(signs.near);
         // `LAMP_BUSY_CALLED_STRICT=on`: in a busy room with nobody turned to
         // the lamp, a stand-in or "Lamp is broken, …" is no call in itself.
@@ -12706,6 +12707,11 @@ impl Heeding {
         } else {
             // Which second sign let the name count, never the words (#3945:
             // a "Ma'am, …" line let out with nothing saying why).
+            if self.attention.name_kept_as_sure() {
+                eprintln!(
+                    "lamp-voice second: request {request}: LAMP_NAME_NEAR ruled the line not the name, but lamp-name heard it near by the line's start at the sure score or more, and the room is not busy or a face is turned to the lamp: its hearing is weighed by its second signs (LAMP_NAME_SIGN_TIED, #8092)"
+                );
+            }
             let signs = self.attention.second_signs();
             if !signs.is_empty() {
                 eprintln!(

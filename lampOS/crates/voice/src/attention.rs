@@ -2016,6 +2016,10 @@ pub struct Attention {
     /// is still told it was heard: the line's words call the lamp
     /// ([`Self::name_note_kept`], #8136).
     name_note_kept: bool,
+    /// The name heard for the line last weighed outlived `LAMP_NAME_NEAR`'s
+    /// "not the name" as a sure hearing at the line's start, for the
+    /// journal (#8092).
+    name_sure_kept: bool,
 }
 
 /// The most text kept for one request.
@@ -2356,11 +2360,19 @@ impl Attention {
             && words.len() == 1
             && !written_for_the_name(&words[0])
             && !crate::second_provider::sounds_like_the_name(&words[0]);
-        let ruled_out = self
+        // A sure hearing at the line's start outlives that ruling when the
+        // room is not busy or a face is turned to the lamp (the first
+        // builder's rulings at 14:29 and 14:47 on #8092: lamp-52e6's 13:55
+        // call in a quiet room is a call, lamp-74ff's 10:55 request 5 in a
+        // busy meeting is not).
+        let ruled = self
             .near_not_the_name_of
-            .is_some_and(|(of, _)| of == self.request)
-            && !called_by_real_name(&self.heard);
+            .filter(|(of, _)| *of == self.request);
+        let sure_kept = ruled.is_some_and(|(_, score)| score >= SURE_SCORE)
+            && (!self.room_busy || turned == Some(true));
+        let ruled_out = ruled.is_some() && !sure_kept && !called_by_real_name(&self.heard);
         self.name_near_dropped = weighed && self.sign_tied && (ruled_out || one_word_unlike);
+        self.name_sure_kept = weighed && self.sign_tied && sure_kept && !self.name_near_dropped;
         // `LAMP_NAME_FACE_OR_WORDS`: under a sure hearing only a face turned
         // to the lamp or its words calling it count, busy room or not; the
         // start is the same false hearing again (#8136: lamp-74ff, 17:26:23,
@@ -2461,6 +2473,13 @@ impl Attention {
     /// [`NEAR_SCORE`] or more counted for the request in hand was said.
     pub fn set_near_at_the_name(&mut self, near: bool) {
         self.near_at_the_name = near;
+    }
+
+    /// Whether the name heard for the line last weighed outlived
+    /// `LAMP_NAME_NEAR`'s "not the name" as a sure hearing at the line's
+    /// start, the room not busy or a face turned to the lamp (#8092).
+    pub fn name_kept_as_sure(&self) -> bool {
+        self.name_sure_kept
     }
 
     /// Whether the name heard for the line last weighed was dropped because
