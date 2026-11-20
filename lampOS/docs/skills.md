@@ -5886,8 +5886,9 @@ words. Then, in code (`skill_about::told`), one local read, no agent and
 no network:
 - **Every skill on the lamp, from its own files.** Each folder of the
   skills folder and the pushed folder (`skills-dev`) with a `SKILL.md`,
-  core, Store, pushed, made or added from a file alike, at most 80, by
-  name: its `SKILL.md` `description`; its `skill.toml`'s top-level
+  core, Store, pushed, made or added from a file alike, every one however
+  many, by name (the lines told are cut at 80, below; the read never is,
+  so the core offer sees every lamp skill turned off, #8002's row): its `SKILL.md` `description`; its `skill.toml`'s top-level
   `enabled`, or its `[present]`'s with `LAMP_NUDGES_PRESENT=on` in the
   voice's own environment, as `lamp-skills` loads it (a `skill.toml`
   missing or not TOML is told off: its files don't load); its name in
@@ -5897,8 +5898,9 @@ no network:
   and its last run by itself (the latest of a kept hold's, its group's and
   its rest's, on the monotonic clock: kept only since the boot, and only
   for the skills `lamp-skills` keeps them for).
-- **What the model is told.** Every skill's line, its spoken name and its
-  state in a word (`sip of water: on`, `stretch break: off`, `reminders:
+- **What the model is told.** Every skill's line (at most 80, by name,
+  those made here left out first when the owner doesn't hear), its spoken
+  name and its state in a word (`sip of water: on`, `stretch break: off`, `reminders:
   snoozed until tomorrow morning`); the three whose words come nearest to
   what was asked (`skill_about::nearest`: a word in its name counts twice
   one in its description, each weighed by how few skills have it) in full,
@@ -8599,7 +8601,8 @@ the exact `on` to its `second` worker alone
 
 - **A model judges, before anything is made.** A voice `make_skill` call
   with a `request` first lists the candidates
-  (`make_core_offer::candidates`): of the skills on the lamp the person
+  (`make_core_offer::candidates`): of every skill on the lamp, however
+  many (#8002's row: none cut before this pick), those the person
   didn't make, every one turned off by voice or in the app, and the few
   others (on, or off in their files) whose words come nearest the request
   (`skill_about::nearest`), at most 40, each with its `SKILL.md`
