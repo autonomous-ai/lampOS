@@ -33,10 +33,15 @@ pub const NOT_READY: &str = "agent_not_ready";
 /// the session and the Gateway. Another default (Hermes) is read from its
 /// install and sign-in alone.
 pub const SESSION_ENGINE: &str = "openclaw";
-/// How long the Gateway may not answer and still be read as starting (its
-/// own start, 27-50 s on lamp-c0a4: [`crate::gateway::READY_WITHIN`]);
-/// past it, `error` with `gateway_down`.
-pub const GATEWAY_START_WITHIN: Duration = crate::gateway::READY_WITHIN;
+/// How long the Gateway may not answer and still be read as starting
+/// (`starting`/`gateway_starting`, or `recovering`/`gateway_down` after a
+/// session was open); past it, `error` with `gateway_down`. A cold start
+/// takes 27-50 s on lamp-c0a4 but 185-322 s on lamp-9b34 (#7174), so the
+/// bound is above the slowest seen.
+pub const GATEWAY_START_WITHIN: Duration = Duration::from_secs(360);
+/// The why published once when lamp-tasks stops ([`Agent::stopping`]):
+/// nothing reads its kept `ready` as true while it is down.
+pub const TASKS_RESTARTING: &str = "tasks_restarting";
 
 /// What the Gateway probe read last.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -94,6 +99,10 @@ pub struct Facts {
     /// A session was open at least once since the start: a Gateway down
     /// after it is a fault (`recovering`), before it its start.
     pub opened_once: bool,
+    /// Harness takes no reply here (`reply_off`, an older Harness): every
+    /// task goes the per-task way, with no kept session to wait for, so
+    /// the agent is `ready` past its install and sign-in.
+    pub per_task: bool,
 }
 
 impl Default for Facts {
@@ -108,6 +117,7 @@ impl Default for Facts {
             gateway: Gateway::Unknown,
             session: Session::Closed,
             opened_once: false,
+            per_task: false,
         }
     }
 }
@@ -130,7 +140,7 @@ pub fn state_of(facts: &Facts, now: Instant) -> (Readiness, Option<&'static str>
     if facts.signed_in == Some(false) {
         return (Readiness::Error, Some("signed_out"));
     }
-    if engine != SESSION_ENGINE {
+    if engine != SESSION_ENGINE || facts.per_task {
         // No session of lamp-tasks' own to read: its install and sign-in
         // above are all that is known.
         return (Readiness::Ready, None);
@@ -284,6 +294,21 @@ impl Agent {
         })
     }
 
+    /// The value published once as lamp-tasks stops: `starting` with
+    /// [`TASKS_RESTARTING`], so the voice and the app never trust a kept
+    /// `ready` while it is down. `None` while nothing is tracked.
+    pub fn stopping(&self) -> Option<AgentReadiness> {
+        let kept = self.kept.lock().unwrap_or_else(|e| e.into_inner());
+        let engine = kept.facts.engine.clone().filter(|_| kept.facts.on)?;
+        Some(AgentReadiness {
+            engine,
+            state: Readiness::Starting,
+            why: Some(TASKS_RESTARTING.to_owned()),
+            since_unix_ms: unix_ms(),
+            read_unix_ms: unix_ms(),
+        })
+    }
+
     /// Whether a task for the lamp's own agent on `engine` is refused at
     /// prepare now ([`NOT_READY`]), with the state: only while tracked, for
     /// the lamp's default engine itself, in any state but `ready` and
@@ -429,6 +454,62 @@ mod tests {
             ..openclaw()
         };
         assert_eq!(state_of(&hermes, now), (Readiness::Ready, None));
+    }
+
+    /// #8138 review (1): Harness taking no reply here (`reply_off`) sends
+    /// every task the per-task way: `ready`, never refused waiting for a
+    /// kept session that is never opened.
+    #[test]
+    fn a_lamp_with_no_kept_session_reads_ready_and_lets_tasks_through() {
+        let agent = Agent::default();
+        agent.update(|facts| *facts = openclaw());
+        assert_eq!(agent.refusal("openclaw"), Some(Readiness::Starting));
+        agent.update(|facts| facts.per_task = true);
+        assert_eq!(agent.state(), (Readiness::Ready, None));
+        assert_eq!(agent.refusal("openclaw"), None);
+        // Its install and sign-in still count.
+        agent.update(|facts| facts.signed_in = Some(false));
+        assert_eq!(agent.refusal("openclaw"), Some(Readiness::Error));
+    }
+
+    /// #8138 review (6): a Gateway cold start of 185-322 s (lamp-9b34,
+    /// #7174) reads `starting`, never `error`, until 360 s.
+    #[test]
+    fn a_slow_gateway_cold_start_is_starting_until_360_s() {
+        let now = Instant::now();
+        let facts = Facts {
+            gateway: Gateway::Down(now),
+            ..openclaw()
+        };
+        for secs in [60, 185, 322, 359] {
+            assert_eq!(
+                state_of(&facts, now + Duration::from_secs(secs)),
+                (Readiness::Starting, Some("gateway_starting")),
+                "{secs} s"
+            );
+        }
+        assert_eq!(
+            state_of(&facts, now + Duration::from_secs(360)),
+            (Readiness::Error, Some("gateway_down"))
+        );
+    }
+
+    /// #8138 review (7): lamp-tasks stopping publishes `starting` with
+    /// `tasks_restarting`, a value the bus's check takes; nothing while
+    /// untracked.
+    #[test]
+    fn stopping_reads_starting_tasks_restarting_and_passes_the_check() {
+        let agent = Agent::default();
+        assert!(agent.stopping().is_none());
+        agent.update(|facts| *facts = openclaw());
+        agent.session(Session::Ready);
+        let stopping = agent.stopping().unwrap();
+        assert_eq!(
+            (stopping.state, stopping.why.as_deref()),
+            (Readiness::Starting, Some(TASKS_RESTARTING))
+        );
+        assert_eq!(stopping.engine, "openclaw");
+        assert!(stopping.check().is_ok(), "{:?}", stopping.check());
     }
 
     #[test]

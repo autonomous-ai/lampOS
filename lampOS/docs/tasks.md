@@ -5625,25 +5625,28 @@ backoffs, a spoken task's 3 put-backs, a skill run's words typed again,
   (the voice's, the app's, lamp-update's read-only one) by
   `{"op":"agent"}` → `{"ok":true,"agent":{"engine","state","why",
   "since_unix_ms","read_unix_ms"}}`. Journal: `tasks: agent: <old> ->
-  <new> (<why>)`.
+  <new> (<why>)`. When lamp-tasks stops (SIGTERM) it publishes the value
+  once more as `starting` with `why` `tasks_restarting`
+  (`Agent::stopping`, `TASKS_RESTARTING`), so the voice and the app never
+  trust a kept `ready` while it is down.
 - **The rules (`agent::state_of`), the first that holds:**
 
   | Input | State | `why` |
   |---|---|---|
   | One session off, or no default engine | `off` | — |
-  | Harness reads the session `installing` (lamp-update installing) | `installing` | `installing` |
+  | Harness's `ensure` or `show` last read the kept session `installing` (an OTA installing OpenClaw; `OneSession::saw_state`) | `installing` | `installing` |
   | No Harness program on the lamp | `not_installed` | `harness_missing` |
   | The default engine known not found on the lamp (machines' look) | `not_installed` | `engine_missing` |
   | The default engine known not signed in on the lamp | `error` | `signed_out` |
-  | Another default than OpenClaw (Hermes: no session of lamp-tasks' own) | `ready` | — |
-  | Gateway not answering, under 60 s (`GATEWAY_START_WITHIN` = `gateway::READY_WITHIN`), no session open yet since the start | `starting` | `gateway_starting` |
-  | Gateway not answering, under 60 s, after a session was open | `recovering` | `gateway_down` |
-  | Gateway not answering for 60 s or more | `error` | `gateway_down` |
+  | Another default than OpenClaw (Hermes: no session of lamp-tasks' own), or Harness takes no reply here (`reply_off`: every task the per-task way) | `ready` | — |
+  | Gateway not answering, under 360 s (`GATEWAY_START_WITHIN`: a cold start takes 27-50 s on lamp-c0a4, 185-322 s on lamp-9b34, #7174), no session open yet since the start | `starting` | `gateway_starting` |
+  | Gateway not answering, under 360 s, after a session was open | `recovering` | `gateway_down` |
+  | Gateway not answering for 360 s or more | `error` | `gateway_down` |
   | Opens failed past `OPEN_QUICK_TRIES`, or `REPLACE_MOST` broken sessions in a row | `error` | `open_failed` / `stuck_again` |
   | A fault seen (below), until a fresh session is open | `recovering` | the fault's code |
   | No session yet and Harness not read yet | `starting` | `harness_starting` |
-  | Being opened | `starting` | `session_starting` |
-  | Open and idle | `ready` | — |
+  | Being opened, or open but not yet confirmed taking input (below) | `starting` | `session_starting` |
+  | Open, confirmed, and idle | `ready` | — |
   | On a turn (words taken; Harness's watch reads `working`) | `working` | — |
 
   Harness's own sign-out is not `error`: a signed-out lamp runs its agent
@@ -5659,6 +5662,18 @@ backoffs, a spoken task's 3 put-backs, a skill run's words typed again,
   one of `EARLY_REFUSALS`, so the machines are looked at again at once.
   No hand-over, no Harness call: well under 1 s. Tasks for the person's
   other computers are unchanged.
+- **Ready only once it takes input (warm-up).** A fresh OpenClaw session
+  refuses replies for a while (~35 s seen). The kept session is
+  `starting` until it is confirmed taking input: its first words taken
+  at the open, `ensure` saying `confirmed: true` (or a session already up
+  that Harness did not say unconfirmed), a hand-over taken, or the watch
+  reading it `idle`/`done`; with none of these, 120 s after it was opened
+  (`OPEN_IDLE_WITHIN`, `confirm_if_warmed`), so it never stays `starting`
+  for good. So `prepare` refuses during the warm-up and nothing is handed
+  to a warming session. A hand-over refused by a session still warming
+  (not confirmed, or `ensure` made it new under 120 s ago, `made_new`)
+  ends that task told (`one_session_not_started`) but does not replace
+  the session: the agent reads `starting` again until it is confirmed.
 - **A hand-over refused ends the task at the first sign, before any
   recovery.** The kept session's first reply of a hand-over is held 10 s
   (`REPLY_KEPT_FIRST_HELD`). Its first `ENGINE_NOT_READY` ends the task
@@ -5689,8 +5704,16 @@ backoffs, a spoken task's 3 put-backs, a skill run's words typed again,
   it within the watcher's 100 ms look instead (`CANCEL_LOOK`). The
   task's words are never typed again: `Turn::stuck`'s put-back is gone,
   and `RESTARTED_LINE` is said only for a task whose session was replaced
-  before its words were typed. A spoken task's turn joined to the store
-  is read at once when the watch reads it ended or broken (below).
+  before its words were typed. A spoken task already joined to the store
+  whose session breaks under it (the watch reads `held`, `failed` or
+  `stopped`, or the Gateway is read down while it is held) is ended at
+  once by the store `not_sent` `one_session_stuck` (`turn_broken`,
+  `Engine::end_broken`: its agent and reads dropped, as for a task never
+  handed over), so the voice tells it as it tells a refused hand-over,
+  then the session is replaced fresh. With a launch, read or close under
+  way the store tries again at its next pass (`put_turn_broken`); a
+  turn's end the store can't read yet is kept the same way
+  (`put_turn_end`).
 - **Fresh first, no blind backoff.** Every fault replaces the session:
   closed `--now`, its record and OpenClaw conversation deleted, and the
   next open `ensure --fresh` (`OneSession::replace_kept`;
@@ -5720,20 +5743,27 @@ backoffs, a spoken task's 3 put-backs, a skill run's words typed again,
   with no turn held, and for a spoken turn held its task is read at once
   by the store (`take_turn_end`, `Engine::push`), not at its wait's
   bound (#8109); `held`, `failed`, `stopped` are faults (`recovering`,
-  replacement due, a spoken turn read at once). Ended by Harness after
-  `done` or its bound, or cancelled when another session is open, it is
-  started again at once. A watch that fails leaves the state unknown:
+  replacement due, a spoken turn ended at once, above). `watch` says the
+  state now first: that first line is never read as the end of a turn of
+  ours. The lamp kills the watch on `done`; after that, with no turn of
+  ours held or nothing said but the first line (an idle session's last
+  `done`), it is not started again until a turn is handed over or 30 s
+  pass (`WATCH_IDLE_REST`): one Node child per 30 s while idle, not one
+  per 2-4 s. Ended at its own bound, or cancelled when another session
+  is open, it is started again at once. A watch that fails leaves the state unknown:
   with no turn held the session is let go (`recovering`, `watch_lost`)
   and ensured again at the next look, a live one coming back as it is,
   then watched again 2 s later (`WATCH_RETRY`). After 3 failures in a row
-  with no event (`WATCH_TRIES`), or with no `watch` (exit 2), that
+  of the same session (`WATCH_TRIES`, counted by its agent id, so a
+  session let go and ensured again between keeps its count), or with no
+  `watch` (exit 2), that
   session is not watched again until another opens or the daemon starts
   again; the idle `show` look (every 30 s, `KEEP_OPEN_WHILE_OPEN`) runs
   only while no watch is live. A watch is one Node child (~130 MB on a
   lamp) for as long as the session is open.
 - **Not covered here.** A spoken task's turn already joined to the store
-  that stalls with no event is still left to the store's own bounds; the
-  watch's `held`/`failed`/`stopped` only make the store read it at once.
+  that stalls with no watch event and the Gateway up is still left to
+  the store's own bounds.
   lamp-update closing the session around an OpenClaw install, the voice's
   "having a problem" and "ready again" lines and the app's view are the
   other parts of #8138.

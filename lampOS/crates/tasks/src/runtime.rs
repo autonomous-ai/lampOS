@@ -704,6 +704,39 @@ pub fn app_engine_default_operation(
     }))
 }
 
+/// The lamp's kept session's news for the store (#8138): a spoken task
+/// whose session broke under it ended at once `not_sent`
+/// [`crate::one_session::STUCK_ENDED`] (the voice tells it, as a refusal
+/// at the hand-over); a turn the watch read ended read now (#8109). Either
+/// one the store cannot take yet (a job under way) is kept for the next
+/// pass, never dropped.
+fn lamp_turn_news(
+    one: &crate::one_session::OneSession,
+    engine: &mut Engine<Store>,
+    now: &ClockSample,
+) -> Result<(), EngineError> {
+    if let Some(name) = one.take_turn_broken() {
+        if engine.end_broken(&name, crate::one_session::STUCK_ENDED, now)? {
+            eprintln!(
+                "tasks: {name}: its session broke under it; ended at once ({})",
+                crate::one_session::STUCK_ENDED
+            );
+        } else {
+            one.put_turn_broken(name);
+        }
+    }
+    if let Some(name) = one.take_turn_end()
+        && let Some(id) = engine.task_of_launch(&name)
+    {
+        if engine.push(id, now)? {
+            eprintln!("tasks: {name}: its turn's end read at once (#8109)");
+        } else if engine.active() {
+            one.put_turn_end(name);
+        }
+    }
+    Ok(())
+}
+
 /// The one session's turn for the store (#7246): the spoken task holding
 /// the pane released once the store has its answer; then [`pane_turn`].
 fn one_session_holds(
@@ -3070,13 +3103,10 @@ fn owner<C: Clock>(
                     // An agent Harness's `watch` or `wait` says ended is
                     // read first, and its idle answer kept at once.
                     // The lamp's kept session's turn too (#8138, #8109):
-                    // its watch read the spoken turn ended or broken.
-                    if let Some(one) = crate::one_session::LAMP.get()
-                        && let Some(name) = one.take_turn_end()
-                        && let Some(id) = engine.task_of_launch(&name)
-                        && engine.push(id, &now).map_err(io::Error::other)?
-                    {
-                        eprintln!("tasks: {name}: its turn's end read at once (#8109)");
+                    // its watch read the spoken turn ended; one broken
+                    // under it is ended at once, told (#8138 review (3)).
+                    if let Some(one) = crate::one_session::LAMP.get() {
+                        lamp_turn_news(one, &mut engine, &now).map_err(io::Error::other)?;
                     }
                     follows.push(&mut engine, &now).map_err(io::Error::other)?;
                     waits.push(&mut engine, &now).map_err(io::Error::other)?;
@@ -5880,6 +5910,10 @@ pub fn serve_with_adapter<C: Clock, A: Adapter>(
         thread::sleep(Duration::from_millis(5));
     }
     stop.store(true, Ordering::Release);
+    // #8138 review (7): never a kept `ready` while lamp-tasks is down.
+    if let (Some(out), Some(value)) = (agent_out.as_mut(), crate::agent::lamp().stopping()) {
+        publish(out, &value, &mut errors);
+    }
     drop(clients_tx);
     drop(owner_tx);
     for worker in workers {
