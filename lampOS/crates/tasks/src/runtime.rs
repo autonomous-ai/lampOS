@@ -6073,6 +6073,7 @@ mod tests {
                 Ok(vec![Ended {
                     agent_id: agent.into(),
                     state: "idle".into(),
+                    failure: None,
                 }])
             };
             if agents.iter().any(|agent| agent == "a") {
