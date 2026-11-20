@@ -238,6 +238,7 @@ async fn run_full_with_audio(
         print_of: Arc::new(|_| None),
     });
     let eyes = Arc::new(SpeakingFaces::default());
+    let carries = CARRIES.with(|on| on.replace(false));
     let mut engine = engine
         .with_memory_scope(
             lamp_turn_owner::BootId::new([12; 16]).unwrap(),
@@ -253,7 +254,12 @@ async fn run_full_with_audio(
         .holding_forgets_through_spelling(spelling)
         .undoing_doubted_keeps(doubt_undoes)
         .asking_near_heard_words(NEAR_ASKS.with(|on| on.replace(false)))
-        .not_keeping_unsure(UNSURE.with(|on| on.replace(false)));
+        .not_keeping_unsure(UNSURE.with(|on| on.replace(false)))
+        .judging_call_words(CALL_WORDS.with(|on| on.replace(false)))
+        .carrying_the_name(carries);
+    let called_at = CALLED_AT.with(|at| at.replace(None));
+    // A line begun with the name waits up to 2.5 s with the name's carry.
+    let each_event = Duration::from_secs(if carries { 4 } else { 2 });
     let audio_calls = Arc::new(AtomicUsize::new(0));
     if requested_audio {
         let seen = audio_calls.clone();
@@ -344,8 +350,15 @@ async fn run_full_with_audio(
             if sight.is_some() {
                 tokio::time::sleep(Duration::from_millis(40)).await;
             }
+            // Ended by the coordinator as only the lamp's name (#8073).
+            if called_at == Some(at) {
+                engine.submit(ProviderInput::Called {
+                    request,
+                    privacy_generation: 1,
+                });
+            }
             engine.submit(end(request));
-            events.extend(turn(&mut engine).await);
+            events.extend(turn_within(&mut engine, each_event).await);
             done.store(true, Ordering::Release);
             frame = feeder.join().unwrap();
             engine.retire_through(request);
@@ -394,6 +407,15 @@ thread_local! {
     /// `LAMP_MEMORY_UNSURE_NOT_KEPT` ([`Engine::not_keeping_unsure`], #7739)
     /// for the next [`run_full`] on this thread, once.
     static UNSURE: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
+    /// `LAMP_CALL_WORDS_OVER_WAIT` ([`Engine::judging_call_words`], #8073)
+    /// for the next [`run_full`] on this thread, once.
+    static CALL_WORDS: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
+    /// `LAMP_SECOND_NAME_CARRIES` ([`Engine::carrying_the_name`]), on in
+    /// the product, for the next [`run_full`] on this thread, once.
+    static CARRIES: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
+    /// The turn, by its place in the next [`run_full`]'s turns, that the
+    /// coordinator ends as only the lamp's name (`Called`), once.
+    static CALLED_AT: std::cell::Cell<Option<usize>> = const { std::cell::Cell::new(None) };
 }
 
 const FACE: &str = crate::known_faces::FORGET;
@@ -3099,5 +3121,45 @@ fn another_persons_yes_note_never_names_the_held_thing() {
             !note.contains("call forget"),
             "{name}: names the call: {note}"
         );
+    }
+}
+
+/// #8073: "Lamp, yes." while a held forget waits for its yes, its comma
+/// gap under the call's 200 ms pause, so the coordinator ends it as only
+/// the lamp's name (`Called`), with the name's carry on as in the product.
+/// With `LAMP_CALL_WORDS_OVER_WAIT` its words past the name are the
+/// answer: asked as they are, never told `CALLED_NOTE`; the yes runs the
+/// forget once, "Lamp, no." runs none. A bare "Lamp." is still a call.
+/// With the switch off, "Lamp, no." is told the model as a call (the fix's
+/// bite); "Lamp, yes." off still runs the forget in code, as a plain yes
+/// does, and the model is then told the forget's outcome, not the call.
+#[tokio::test]
+async fn a_called_lines_words_past_the_name_answer_a_held_forget() {
+    let called = Message::system(crate::provider_worker::CALLED_NOTE);
+    let asks = Lamp::Calls(EVERYTHING, "Shall I forget everything about you?");
+    let ask = ("A", "Forget everything about me.", asks, 0);
+    for (said, on, told_a_call, runs) in [
+        ("Lamp, yes.", true, false, 1),
+        ("Lamp, no.", true, false, 0),
+        ("Lamp.", true, true, 0),
+        ("Lamp, no.", false, true, 0),
+        ("Lamp, yes.", false, false, 1),
+    ] {
+        CALL_WORDS.with(|switch| switch.set(on));
+        CALLED_AT.with(|at| at.set(Some(1)));
+        CARRIES.with(|carries| carries.set(true));
+        let ran = run(&[ask, ("A", said, Lamp::Says("Okay."), 5)]).await;
+        let answer = ran.asked.last().unwrap();
+        assert_eq!(
+            answer.last(),
+            Some(&Message::user(said)),
+            "{said} {on}: asked with its words"
+        );
+        assert_eq!(
+            answer.contains(&called),
+            told_a_call,
+            "{said} {on}: {answer:?}"
+        );
+        assert_eq!(ran.forgets.len(), runs, "{said} {on}");
     }
 }

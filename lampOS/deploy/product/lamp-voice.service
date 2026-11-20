@@ -139,6 +139,9 @@ Environment=LAMP_SECOND_PLAYOUT_START_MS=100
 Environment=LAMP_SECOND_NAME_CARRIES=on
 # LAMP_CALL_TAKES_NEXT_LINE: its why and rules are its row in docs/switches.md (#3396, #3411).
 Environment=LAMP_CALL_TAKES_NEXT_LINE=on
+# LAMP_CALL_WORDS_OVER_WAIT: its why and rules are its row in docs/switches.md (#8073). Off until its lamp-06c1 ROW is
+# run, the first builder's DEFAULT-ON given there.
+# Environment=LAMP_CALL_WORDS_OVER_WAIT=on
 # LAMP_FIRST_SECONDS_QUIET: its why and rules are its row in docs/switches.md (#3711).
 Environment=LAMP_FIRST_SECONDS_QUIET=on
 Environment=LAMP_SECOND_OPEN_NAME=on

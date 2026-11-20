@@ -1253,3 +1253,52 @@ async fn the_line_after_a_bare_call_hears_the_calls_sound_first() {
     assert!(asked[0].contains(&Message::system(crate::called::NOTE)));
     assert!(!asked[0].contains(&Message::system(crate::provider_worker::CALLED_NOTE)));
 }
+
+/// #8073, nothing waiting for an answer: a line the coordinator ended as
+/// only the lamp's name (`Called`) with words past the name is judged by
+/// its words with `LAMP_CALL_WORDS_OVER_WAIT`, as the same line with no
+/// `Called` is: "Lamp, thanks." and "Lamp, yes." wait for the line after
+/// them and are asked as they are, never told `CALLED_NOTE`; "Lamp, stop."
+/// is asked at once. A bare "Lamp." and a name misheard ("Life.") are
+/// still calls. With the switch off, "Lamp, thanks." and "Lamp, yes." are
+/// told the model as calls, as before.
+#[tokio::test(start_paused = true)]
+async fn a_calls_words_past_the_name_are_judged_by_their_words() {
+    let called = Message::system(crate::provider_worker::CALLED_NOTE);
+    for (heard, on, waits, asked_as, told_a_call) in [
+        ("Lamp, thanks.", true, true, "Lamp, thanks.", false),
+        ("Lamp, yes.", true, true, "Lamp, yes.", false),
+        ("Lamp, stop.", true, false, "Lamp, stop.", false),
+        ("Lamp.", true, true, "Lamp.", true),
+        ("Life.", true, true, super::super::CALLED_WORDS, true),
+        ("Lamp, thanks.", false, true, "Lamp, thanks.", true),
+        ("Lamp, yes.", false, true, "Lamp, yes.", true),
+    ] {
+        let played = script(&[heard]);
+        let judged = Judged::default();
+        let (engine, _) = lamp(&played, true, &judged);
+        let mut engine = engine.judging_call_words(on);
+        say_the_name(&mut engine, true, false);
+        tokio::time::sleep(Duration::from_millis(100)).await;
+        assert_eq!(
+            asked(&played).is_empty(),
+            waits,
+            "{heard} {on}: waits for the line after it"
+        );
+        let heard_back = turn_within(&mut engine, Duration::from_secs(3)).await;
+        assert_eq!(heard_back.last().unwrap(), "complete");
+        let asked = asked(&played);
+        assert_eq!(asked.len(), 1, "{heard} {on}");
+        assert_eq!(
+            last_words(&asked[0]),
+            Some(&Message::user(asked_as)),
+            "{heard} {on}"
+        );
+        assert_eq!(
+            asked[0].contains(&called),
+            told_a_call,
+            "{heard} {on}: {:?}",
+            asked[0]
+        );
+    }
+}
