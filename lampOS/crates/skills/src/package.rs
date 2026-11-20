@@ -2605,6 +2605,8 @@ pub fn seen_more(
             "{name:?} is not a skill's name: 1 to 64 lowercase letters, digits and hyphens"
         ));
     }
+    // Its name is kept out of the journal from now on (`crate::journal`).
+    crate::journal::hide([name]);
     let _held = locked_within(skills, wait)?;
     let file = state.join(super::SEEN_MORE_FILE);
     let failed = |error: io::Error| format!("{}: {error}", file.display());

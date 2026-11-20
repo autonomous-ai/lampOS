@@ -2988,6 +2988,7 @@ pub mod tests {
             store,
             addons: false,
             seen_more: false,
+            desk_noticing: std::path::PathBuf::from("/nowhere/seen-activity.json"),
             link: None,
         }
     }
