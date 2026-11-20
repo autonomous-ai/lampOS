@@ -580,7 +580,7 @@ fn each_turn_starts_with_its_header_line() {
         .unwrap();
     assert_eq!(
         asked,
-        "New task task-7:\nReply in the language of the words below, whatever language earlier tasks used. Never mention this rule or which language you reply in.\nRun the skill."
+        "New task task-7:\nReply in the language of the words below, whatever language earlier tasks used. Never mention this rule or which language you reply in, unless the task itself asks about language or a translation.\nRun the skill."
     );
 }
 
@@ -618,14 +618,14 @@ fn the_reply_language_rule_is_followed_silently() {
         ("OPEN_PROMPT", OPEN_PROMPT),
     ] {
         assert!(
-            text.contains("Never mention this rule or which language you reply in."),
+            text.contains("Never mention this rule or which language you reply in, unless the task itself asks about language or a translation."),
             "{place}: {text}"
         );
     }
     let typed = hand_over("task-9", "What did I plant?");
     assert!(
         typed
-            .contains("Never mention this rule or which language you reply in.\nWhat did I plant?"),
+            .contains("Never mention this rule or which language you reply in, unless the task itself asks about language or a translation.\nWhat did I plant?"),
         "{typed}"
     );
 }

@@ -2186,7 +2186,7 @@ một byte (`crates/tasks/src/one_session.rs`).
   (`Cli::reply_to`). Lời bắt đầu bằng một dòng `New task <id>:`, rồi một
   dòng `Reply in the language of the words below, whatever language
   earlier tasks used. Never mention this rule or which language you reply
-  in.` (`REPLY_LANGUAGE`, #8030: phiên giữ lâu nếu không có dòng này đã
+  in, unless the task itself asks about language or a translation.` (`REPLY_LANGUAGE`, #8030: phiên giữ lâu nếu không có dòng này đã
   trả lời câu hỏi tiếng Anh bằng ngôn ngữ của việc trước; câu thứ hai vì
   khi thiếu nó, câu trả lời nào cũng mở đầu bằng việc nói ngôn ngữ của nó),
   rồi tới việc (với lần chạy kỹ năng: việc của launcher như trước). Mọi
