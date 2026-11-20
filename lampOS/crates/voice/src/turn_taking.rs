@@ -2704,6 +2704,82 @@ mod tests {
         assert_eq!(cut_in(true, OVER), [Step::Yield, Step::Resume]);
     }
 
+    /// #7413, Fifth's HOLD on #8159: with `LAMP_CUT_IN_LATE_YIELD=on`, an
+    /// unknown block counts toward a late yield only as a person's sound
+    /// with no alignment to judge by. Mid-story, 14 blocks with no evidence
+    /// (the reference not trusted), or 14 over the lamp before its own
+    /// sound was found (`MATCHED_BLOCKS`), then the lamp's own voice
+    /// misjudged for an onset run: no late yield, and the reply resumes.
+    #[test]
+    fn blocks_with_no_evidence_or_before_the_match_make_no_late_yield() {
+        let die_away = |mask: &mut PlaybackMask, sequence: &mut u64| {
+            let mut steps = hear(mask, sequence, 20, 0.1, &evidence(10, None), true);
+            steps.extend(hear(mask, sequence, 44, 0.1, &evidence(40, None), true));
+            steps
+        };
+        let onset = u64::from(Confirmation::EVALUATED.onset_blocks);
+        // No evidence.
+        let mut mask = PlaybackMask::duplex();
+        mask.cut_in_late_yield();
+        mask.assume_matched();
+        let mut sequence = 1;
+        let mut steps = hear(&mut mask, &mut sequence, 130, 0.9, &evidence(0, OWN), true);
+        for _ in 0..14 {
+            let listened = mask
+                .listen(sequence, 0.9, None, true, sequence * 10_000)
+                .unwrap();
+            assert_eq!(listened.step, Step::Carry);
+            sequence += 1;
+        }
+        steps.extend(hear(
+            &mut mask,
+            &mut sequence,
+            20,
+            0.9,
+            &evidence(0, OWN),
+            true,
+        ));
+        steps.extend(hear(
+            &mut mask,
+            &mut sequence,
+            onset,
+            0.9,
+            &evidence(0, OVER),
+            true,
+        ));
+        steps.extend(die_away(&mut mask, &mut sequence));
+        assert!(!mask.yield_was_late());
+        let steps = steps.into_iter().map(|(_, step)| step).collect::<Vec<_>>();
+        assert_eq!(steps, [Step::Yield, Step::Resume]);
+        // Over the lamp, plainly, before its own sound was found.
+        let mut mask = PlaybackMask::duplex();
+        mask.cut_in_late_yield();
+        let mut sequence = 1;
+        let mut steps = hear(&mut mask, &mut sequence, 130, 0.1, &evidence(0, OVER), true);
+        let plain = evidence(0, Some((10, 0)));
+        steps.extend(hear(&mut mask, &mut sequence, 14, 0.9, &plain, true));
+        steps.extend(hear(
+            &mut mask,
+            &mut sequence,
+            20,
+            0.9,
+            &evidence(0, OWN),
+            true,
+        ));
+        steps.extend(hear(
+            &mut mask,
+            &mut sequence,
+            onset,
+            0.9,
+            &evidence(0, OVER),
+            true,
+        ));
+        steps.extend(die_away(&mut mask, &mut sequence));
+        assert!(!mask.yield_was_late());
+        let steps = steps.into_iter().map(|(_, step)| step).collect::<Vec<_>>();
+        assert_eq!(steps, [Step::Yield, Step::Resume]);
+    }
+
     #[test]
     fn a_reply_that_twice_yields_to_nothing_stops_yielding_until_it_closes() {
         let mut mask = PlaybackMask::duplex();
