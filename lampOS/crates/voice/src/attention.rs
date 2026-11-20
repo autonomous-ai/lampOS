@@ -2236,10 +2236,18 @@ impl Attention {
         // counts the hearing by no second sign, unless its words call the
         // lamp by name (#8092: "not the name", then "counts by: the name
         // said close to it", on the same line).
-        self.name_near_dropped = weighed
-            && self.sign_tied
-            && self.near_not_the_name_of == Some(self.request)
-            && !called_by_real_name(&self.heard);
+        // And a one-word line, '?' or not, with no face turned to the lamp,
+        // is the name only when its word sounds like it (the first builder's
+        // ruling 1 on #8092: "Yeah?" and "Okay?" stay said to nobody).
+        let words = crate::not_speech::plain_words(&self.heard);
+        let one_word_unlike = turned != Some(true)
+            && !text_calls
+            && words.len() == 1
+            && !written_for_the_name(&words[0])
+            && !crate::second_provider::sounds_like_the_name(&words[0]);
+        let ruled_out =
+            self.near_not_the_name_of == Some(self.request) && !called_by_real_name(&self.heard);
+        self.name_near_dropped = weighed && self.sign_tied && (ruled_out || false && one_word_unlike);
         let alone =
             weighed && (signs.is_empty() || self.name_short_dropped || self.name_near_dropped);
         self.name_signs = if weighed && !alone { signs } else { Vec::new() };
@@ -2268,6 +2276,12 @@ impl Attention {
     /// was said ([`Self::set_near_at_the_name`]), not anywhere in the line.
     pub fn tie_the_second_sign(&mut self, on: bool) {
         self.sign_tied = on;
+    }
+
+    /// Whether [`Self::tie_the_second_sign`] is on: with it, `said_to_me`
+    /// also holds a line with no look in a conversation's window (#8092).
+    pub fn second_sign_tied(&self) -> bool {
+        self.sign_tied
     }
 
     /// `LAMP_NAME_NEAR` ruled `request`'s line not the name: lamp-name heard
@@ -7612,20 +7626,39 @@ mod tests {
             )
         );
         // Closeness anywhere in a 21 s line is no sign for a hearing 15 s
-        // in; at the hearing it is.
+        // in; at the hearing it is (four words: a one-word line is ruling
+        // 1's, below).
+        let longer = ("What time is it?", 15_194_000, false);
         assert_eq!(
-            weighed(true, None, request_4, false),
+            weighed(true, None, longer, false),
             (true, Vec::new(), false)
         );
         assert_eq!(
-            weighed(true, None, request_4, true),
+            weighed(true, None, longer, true),
             (false, vec!["the name said close to it"], false)
         );
         // A ruling on another request's line is not this one's.
         assert_eq!(
-            weighed(true, Some(3), request_4, true),
+            weighed(true, Some(3), longer, true),
             (false, vec!["the name said close to it"], false)
         );
+        // The first builder's ruling 1 (12:45): a one-word line, '?' or
+        // not, with no face turned, is the name only when its word sounds
+        // like it, whatever else shows, with no ruling of `LAMP_NAME_NEAR`.
+        for word in ["Yeah?", "Okay?", "Really?", "Yeah."] {
+            assert_eq!(
+                weighed(true, None, (word, 200_000, true), true),
+                (true, Vec::new(), true),
+                "{word}"
+            );
+            assert!(
+                !weighed(false, None, (word, 200_000, true), true).0,
+                "{word}, off"
+            );
+        }
+        for word in ["Lamp?", "Lump?", "Lamb."] {
+            assert!(!weighed(true, None, (word, 200_000, false), true).0, "{word}");
+        }
         // The control: a real call at the line's start, said close.
         assert_eq!(
             weighed(true, None, ("Lamp, what time is it?", 200_000, false), true),
