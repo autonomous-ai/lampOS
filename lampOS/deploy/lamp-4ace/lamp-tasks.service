@@ -22,6 +22,8 @@ ExecStart=/opt/lampOS/tasks/52d1c9de52f5aeabdc3aa95ffaa6108cc0f7970ae46674d45e07
 Restart=on-failure
 RestartSec=5s
 NoNewPrivileges=yes
+# Each skill run's own cgroup (#8180, crates/tasks/src/run_cgroup.rs): without it a run step is refused.
+Delegate=memory cpu pids
 
 [Install]
 WantedBy=multi-user.target
