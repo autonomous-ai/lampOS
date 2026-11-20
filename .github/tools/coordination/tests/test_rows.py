@@ -162,6 +162,14 @@ class Parts(unittest.TestCase):
 
 
 class NoRowNeeded(unittest.TestCase):
+    def test_a_quoted_no_row_needed_is_mentioned_not_said(self):
+        # 20 Nov (#8066): the Reviewer-lead's READ-OK said it would rather not call it "no row needed".
+        for q in ('"no row needed"', "“no row needed”", "'no row needed'", "`no row needed`"):
+            body = "READ-OK %s\n\nI'd rather not call it %s. The probe counts are its row." % (HEAD, q)
+            self.assertEqual(rows([c("writer-a", body)], HEAD, W, "7016"), "none", q)
+        bold = "READ-OK %s\n\nSixth, 10:02: docs only, **no row needed**." % HEAD
+        self.assertEqual(rows([c("writer-a", bold)], HEAD, W, "7016"), "no-row-needed")
+
     def test_in_a_read_ok_on_the_head(self):
         body = "READ-OK %s\n\nSixth, 10:02: docs only, no row needed." % HEAD
         self.assertEqual(rows([c("writer-a", body)], HEAD, W, "7016"), "no-row-needed")
