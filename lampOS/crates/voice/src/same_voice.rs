@@ -734,6 +734,16 @@ pub struct Voices<P: Printer> {
     /// Prints are made, but nothing is judged by them here
     /// ([`Self::confirming_only`]).
     confirm_only: bool,
+    /// A line [`Self::asking_only_while`] turns away is asked for anyway,
+    /// for the join of a cut line alone ([`Self::printing_for_the_join_too`]).
+    join_too: bool,
+    /// Lines asked for the join alone, their prints not come.
+    join_asked: VecDeque<u64>,
+    /// Prints made for the join alone (#8003): in memory only, read by
+    /// [`Self::alike`] and nothing else, never in [`Self::prints`] nor the
+    /// conversation's voice; only the newest line's is kept as a line
+    /// begins ([`Self::began`]).
+    join_prints: VecDeque<(u64, Vec<f32>)>,
 }
 
 /// The bar [`CONFIRM_BAR_ENVIRONMENT`] says: a number over 0 and at most 1,
@@ -946,6 +956,9 @@ impl<P: Printer> Voices<P> {
             for_services: false,
             asks_while: None,
             confirm_only: false,
+            join_too: false,
+            join_asked: VecDeque::new(),
+            join_prints: VecDeque::new(),
         }
     }
 
@@ -956,6 +969,17 @@ impl<P: Printer> Voices<P> {
     /// `crate::services::Linked`, the reader's P3 on #5293).
     pub fn asking_only_while(mut self, open: impl Fn() -> bool + Send + 'static) -> Self {
         self.asks_while = Some(Box::new(open));
+        self
+    }
+
+    /// A line [`Self::asking_only_while`] turns away is still printed, for
+    /// the join of a cut line alone (`LAMP_JOIN_CUT_WORDS`, #8003, the
+    /// first builder's ruling on #7570): its print is kept in memory only,
+    /// apart from every other ([`Self::join_prints`]), read by
+    /// [`Self::alike`] alone, and dropped once the line can no longer be
+    /// joined: when the line after the one that cut it begins.
+    pub fn printing_for_the_join_too(mut self, on: bool) -> Self {
+        self.join_too = on;
         self
     }
 
@@ -1047,6 +1071,14 @@ impl<P: Printer> Voices<P> {
     /// The line `request` began; it is judged only if it was said with the
     /// lamp quiet (`judged`).
     pub fn began(&mut self, request: u64, judged: bool) {
+        // A join is asked of a line and the one just before it: a print
+        // made for the join alone of any line older than that goes.
+        if self.join_too {
+            self.poll();
+        }
+        if let Some(&(newest, _)) = self.join_prints.back() {
+            self.join_prints.retain(|(of, _)| *of == newest);
+        }
         self.clip = judged.then(|| Clip {
             request,
             samples: Vec::with_capacity(ASKED_AT),
@@ -1085,11 +1117,22 @@ impl<P: Printer> Voices<P> {
         let Some(clip) = self.clip.take() else {
             return;
         };
-        if !self.asking() {
+        let for_the_join = !self.asking();
+        if for_the_join && !self.join_too {
             self.unprinted(clip.request);
             return;
         }
         if self.printer.ask(clip.request, &clip.samples) {
+            if for_the_join {
+                if self.join_asked.len() == KEPT {
+                    self.join_asked.pop_front();
+                }
+                self.join_asked.push_back(clip.request);
+                (self.journal)(&format!(
+                    "lamp-voice provider: request {}: asked for its voice print for the join alone, kept in memory only (LAMP_JOIN_CUT_WORDS)",
+                    clip.request
+                ));
+            }
             if self.asked.len() == KEPT {
                 self.asked.pop_front();
             }
@@ -1124,7 +1167,15 @@ impl<P: Printer> Voices<P> {
     fn poll(&mut self) {
         while let Some((request, print)) = self.printer.answer() {
             self.asked.retain(|asked| *asked != request);
+            let for_the_join = self.join_asked.contains(&request);
+            self.join_asked.retain(|asked| *asked != request);
             match print {
+                Ok(print) if for_the_join => {
+                    if self.join_prints.len() == KEPT {
+                        self.join_prints.pop_front();
+                    }
+                    self.join_prints.push_back((request, print));
+                }
                 Ok(print) => {
                     if let Some((_, new)) =
                         self.answered.filter(|(answered, _)| *answered == request)
@@ -1180,7 +1231,7 @@ impl<P: Printer> Voices<P> {
             || self
                 .clip
                 .as_ref()
-                .is_some_and(|clip| clip.request == request && self.asking())
+                .is_some_and(|clip| clip.request == request && (self.asking() || self.join_too))
     }
 
     /// How like the conversation's voice the line `request` is, when both
@@ -1215,7 +1266,22 @@ impl<P: Printer> Voices<P> {
         if self.confirm_only {
             return None;
         }
-        cosine(self.print(a)?, self.print(b)?)
+        let print = |of: u64| {
+            self.print(of).or_else(|| {
+                self.join_prints
+                    .iter()
+                    .rev()
+                    .find(|(line, _)| *line == of)
+                    .map(|(_, print)| print)
+            })
+        };
+        cosine(print(a)?, print(b)?)
+    }
+
+    /// Whether a print made for the join alone of the line `request` is
+    /// kept ([`Self::printing_for_the_join_too`]).
+    pub fn joins_by(&self, request: u64) -> bool {
+        self.join_prints.iter().any(|(of, _)| *of == request)
     }
 
     /// How alike the line `request` sounds to the conversation's asker: the
@@ -1237,7 +1303,7 @@ impl<P: Printer> Voices<P> {
     /// journal of a line not joined ([`Self::alike`]).
     pub fn printed(&mut self, request: u64) -> bool {
         self.poll();
-        !self.confirm_only && self.print(request).is_some()
+        !self.confirm_only && (self.print(request).is_some() || self.joins_by(request))
     }
 
     /// The highest cosine of `print` against the conversation's prints.
@@ -2455,6 +2521,50 @@ exec sleep 30"#,
         open.store(false, std::sync::atomic::Ordering::SeqCst);
         said_by(&mut voices, 4, 1);
         assert_eq!(asked(&voices), [2, 3]);
+    }
+
+    /// #8003, the first builder's ruling on #7570: with the gate closed
+    /// (no service linked) a line is printed for the join of a cut line
+    /// alone. Its print is in memory only: never in the services' store
+    /// (`print_of`, `print_to_confirm`, the conversation's voice), read
+    /// only as two lines' likeness, and gone once the line after the one
+    /// that cut it begins.
+    #[test]
+    fn a_print_for_the_join_alone_is_never_the_services_and_goes_when_its_request_ends() {
+        let mut voices = Voices::new(StandIn::default())
+            .for_services_only(true)
+            .asking_only_while(|| false)
+            .printing_for_the_join_too(true);
+        // Two pieces of one request, then another voice's piece.
+        said_by(&mut voices, 1, 1);
+        said_by(&mut voices, 2, 1);
+        assert_eq!(voices.alike(1, 2), Some(1.0), "the join reads them");
+        for request in [1, 2] {
+            assert_eq!(voices.print_of(request), None, "not the services'");
+            assert_eq!(voices.print_to_confirm(request), None, "nor the confirm's");
+            voices.decided(request, true, request == 2);
+            assert_eq!(
+                voices.likeness_so_far(request),
+                None,
+                "nor the conversation's"
+            );
+        }
+        assert!(voices.prints.is_empty() && voices.conversation.is_empty());
+        said_by(&mut voices, 3, -1);
+        assert!(
+            !voices.joins_by(1),
+            "request 1 can no longer be joined: gone"
+        );
+        assert_eq!(voices.alike(2, 3), Some(0.0), "two voices");
+        assert!(voices.joins_by(3));
+        said_by(&mut voices, 4, 1);
+        assert!(!voices.joins_by(2), "gone as the line after its cut began");
+        assert_eq!(voices.alike(3, 4), Some(0.0));
+        assert_eq!(voices.join_prints.len(), 2, "at most the newest two");
+        // Without the join, a line the gate turns away is asked for nothing.
+        let mut off = Voices::new(StandIn::default()).asking_only_while(|| false);
+        said_by(&mut off, 1, 1);
+        assert!(off.printer.asked.is_empty() && !off.joins_by(1));
     }
 
     fn said_by(voices: &mut Voices<StandIn>, request: u64, voice: i16) {

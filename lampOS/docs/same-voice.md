@@ -691,7 +691,9 @@ prints for the services alone:
   services being on is only their folder being there, which every product
   lamp has. So a heard line is printed only while the owner has at least
   one service linked; with none, the child is asked nothing for any line,
-  the owner's or a guest's, and uses no CPU on them. The voice asks
+  the owner's or a guest's, and uses no CPU on them, but with
+  `LAMP_JOIN_CUT_WORDS` on (as in the product): then a line is printed for
+  the join alone (below, #8003). The voice asks
   `lamp-services` `services_connected` on the folder's socket, which it
   already may (`services::Linked`): once at start, then as a line begins,
   at most once a second, on a thread of its own. A link whose token is
@@ -716,13 +718,38 @@ prints for the services alone:
   `Heeding::voices`, and so sees no print, exactly as without a model:
   #829's check and the rules on `voice_going_on_in` (`LAMP_SPOKEN_TO`,
   `LAMP_GOING_ON_NOT_OWN`, `LAMP_QUIET_GOING_ON_SAME_ONE`, someone else's
-  sign), joining a cut line (`same_speaker`, `LAMP_JOIN_CUT_WORDS`), the
+  sign), joining a cut line (`same_speaker`, `LAMP_JOIN_CUT_WORDS`) with a
+  face in view at either line, the
   same speaker's carry and its held colleagues
   (`LAMP_SAME_SPEAKER_CARRIES`), a line kept unjudged, the turned face's
   sign (`LAMP_TURNED_FACE_SPEAKS`), the asked person's answer
   (`LAMP_ANSWER_ASK_AGAIN`), the Policy's `like_asker` (`addressed.rs`),
   the memory that follows a face (`LAMP_MEMORY_FOLLOWS_FACE`), and
   `LAMP_CONVERSATION_CARRIES_PAST_SILENT`'s voice heard.
+- **Printed for the join alone** (#8003, the first builder's ruling on
+  #7570). With `LAMP_JOIN_CUT_WORDS` on, a line the services would not
+  print (none linked) is printed anyway, only to tell whether the same
+  voice goes on (`Voices::printing_for_the_join_too`). Its print is kept
+  in memory only, apart from the services' (`Voices::join_prints`): read
+  only as two lines' likeness (`Voices::alike`), never in the services'
+  store (`print_of`, `print_to_confirm`, the conversation's voice, the
+  owner's), never written and never sent. It is dropped once its line can
+  no longer be joined: when the line after the one that cut it begins, so
+  at most the newest two lines' are held. The journal says each such ask
+  (`asked for its voice print for the join alone`), beside the child's
+  time for every print (`its voice print came N ms after it was asked`),
+  for the cost on a lamp.
+- **What reads them: the join in the dark** (#8003). With no face in view
+  at either line (none in the eyes' newest look, or no fresh look), the
+  join of a cut line reads these prints and those made for it alone
+  (`Heeding::join_voices`): at 0.70
+  or over (`SAME_FROM`) one person, under 0.30 two, between the bars or
+  with no print nothing by voice, as before. On lamp-9adf on 19 Nov one
+  person's 21 s request said in the dark was cut into five lines, and only
+  the last was asked. With a face in view, the eyes and the room decide,
+  as before. The lamp's name carried to the line after it
+  (`LAMP_SECOND_NAME_CARRIES`) asks the same judgement, so it reads them
+  in the dark too.
   `LAMP_SAME_VOICE_CALLER_ONLY` shapes only which prints are the
   conversation's voice.
 - **Any other value** (`Services`, `everything`, empty) fails closed, said
