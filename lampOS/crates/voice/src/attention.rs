@@ -1915,8 +1915,8 @@ pub struct Attention {
     /// calling the lamp, for the journal (#8136).
     name_unsure_dropped: bool,
     /// The name heard for the line last weighed was dropped, but the model
-    /// is still told it was heard: the line's words call the lamp, or a
-    /// sure hearing began at its start ([`Self::name_note_kept`], #8136).
+    /// is still told it was heard: the line's words call the lamp
+    /// ([`Self::name_note_kept`], #8136).
     name_note_kept: bool,
 }
 
@@ -2277,18 +2277,16 @@ impl Attention {
                 || self.name_near_dropped
                 || self.name_unsure_dropped);
         self.name_signs = if weighed && !alone { signs } else { Vec::new() };
-        let sure_at_start = self.named_sure && self.named_at_start;
         if alone {
             self.named = false;
             self.named_sure = false;
             self.best_score = 0.0;
         }
         // `LAMP_NAME_FACE_OR_WORDS`: a dropped hearing is still told to the
-        // model when the verdict's own text check calls the lamp, or a sure
-        // hearing began at the line's start (gate 1111, request 19: a
-        // "Hey Lamp, …" ruled not the name, played, then `not_for_me`).
-        self.name_note_kept =
-            alone && self.face_or_words && (sure_at_start || self.called_in_text());
+        // model when the verdict's own text check calls the lamp (gate 1111,
+        // request 19: a "Hey Lamp, …" ruled not the name, played, then
+        // `not_for_me`). A sure start alone is #8119's, with its room rule.
+        self.name_note_kept = alone && self.face_or_words && self.called_in_text();
         alone
     }
 
@@ -2363,8 +2361,7 @@ impl Attention {
 
     /// Whether the name heard for the line last weighed, though dropped, is
     /// still told to the model: its words call the lamp (the verdict's "the
-    /// text shows it was called") or a sure hearing began at its start
-    /// ([`Self::need_a_face_or_words`], #8136).
+    /// text shows it was called"; [`Self::need_a_face_or_words`], #8136).
     pub fn name_note_kept(&self) -> bool {
         self.name_note_kept
     }
