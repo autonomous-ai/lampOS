@@ -48,6 +48,7 @@ pub mod admission;
 pub mod agent_asks;
 pub mod agent_tasks;
 pub mod air_told;
+pub mod app_context;
 pub mod app_make;
 pub mod app_remember;
 pub mod app_triggers;
