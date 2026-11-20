@@ -2959,8 +2959,34 @@ impl Rig {
                                 }
                                 continue;
                             }
-                            Ok(None) => worker.terminate_and_reap(io::ErrorKind::TimedOut,
-                                format!("did not stop within shared {} ms deadline; forced termination required", grace.as_millis())),
+                            Ok(None) => {
+                                let reason = format!(
+                                    "did not stop within shared {} ms deadline; forced termination required",
+                                    grace.as_millis()
+                                );
+                                let (verified, error) =
+                                    worker.kill_and_reap(io::ErrorKind::TimedOut, reason);
+                                // The second route's worker holds no device: no
+                                // microphone, speaker, ring or camera, only its
+                                // sockets to the speech services, which end with it.
+                                // Killed and reaped, it is a verified stop, and a mute
+                                // (a computer's, mid-answer: 1 in 5 on 14967) must not
+                                // end the voice for it (#8081). Every worker that holds
+                                // hardware keeps the strict rule.
+                                if verified && worker.role == "second" {
+                                    eprintln!(
+                                        "lamp-voice: the second route's worker was still busy after {} ms at the stop and was killed and reaped; nothing is held open and the voice goes on ({error})",
+                                        grace.as_millis()
+                                    );
+                                    let _ = record(
+                                        trace,
+                                        json!({"kind":"worker_forced_shutdown", "worker":worker.role,
+                                        "at_us":monotonic_us(), "error":error.to_string(), "verified":true, "failure":false}),
+                                    );
+                                    continue;
+                                }
+                                error
+                            }
                             Err(error) => worker.terminate_and_reap(
                                 io::ErrorKind::Other,
                                 format!("shutdown status failed at deadline: {error}"),
