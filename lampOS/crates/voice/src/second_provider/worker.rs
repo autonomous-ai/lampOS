@@ -4360,9 +4360,11 @@ pub fn serve(
     if let Some(settings) = skills_named {
         let named = Arc::new(crate::skill_named::Heard::new(settings));
         let made = named.clone();
+        let off = named.clone();
         engine = engine
             .calling_skills_named(Arc::new(move |heard: &str| named.heard(heard)))
-            .knowing_made_names(Arc::new(move |said: &str| made.names_made(said)));
+            .knowing_made_names(Arc::new(move |said: &str| made.names_made(said)))
+            .journaling_skill_off(Arc::new(move |heard: &str| off.nearest_off(heard)));
     }
     if let Some(place) = named_ask {
         engine = engine.asking_by_name(Arc::new(move |words: &str| {

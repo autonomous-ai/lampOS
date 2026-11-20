@@ -1753,6 +1753,10 @@ pub type SkillNamed = Arc<dyn Fn(&str) -> Option<(String, Value)> + Send + Sync>
 /// Whether words (the lamp's own) name a skill made on the lamp by its
 /// name, as words in a row (`crate::skill_named::Heard::names_made`).
 pub type MadeNamed = Arc<dyn Fn(&str) -> bool + Send + Sync>;
+/// A short heard line's shape against the installed skills' names, for the
+/// journal alone: its own words, and how many words off the nearest name
+/// is (`crate::skill_named::Heard::nearest_off`, #8022).
+pub type SkillOff = Arc<dyn Fn(&str) -> Option<(usize, usize)> + Send + Sync>;
 /// An installed skill's own ask phrases, by its function's name
 /// (`crate::tools::skill_asks`, #5749): what a called skill's recording
 /// may play for besides a line that asks to play.
@@ -2162,6 +2166,9 @@ struct Shared {
     /// Whether words name one of the skills made on the lamp, by its name
     /// ([`Engine::knowing_made_names`]).
     made_named: Option<MadeNamed>,
+    /// A short line's shape against the skills' names, journaled when it
+    /// named none ([`Engine::journaling_skill_off`]).
+    skill_off: Option<SkillOff>,
     /// A called skill's own ask phrases: a line that holds one that asks to
     /// play is an ask for its recording ([`Engine::playing_for_skill_asks`]).
     skill_asks: Option<SkillAsks>,
@@ -5259,6 +5266,7 @@ impl Engine {
                 read_back_asked: None,
                 skill_named: None,
                 made_named: None,
+                skill_off: None,
                 skill_asks: None,
                 named_agent: None,
                 named_agent_takes_line: false,
@@ -7283,6 +7291,17 @@ impl Engine {
     pub fn knowing_made_names(mut self, named: MadeNamed) -> Self {
         if let Some(shared) = Arc::get_mut(&mut self.shared) {
             shared.made_named = Some(named);
+        }
+        self
+    }
+
+    /// With [`Self::calling_skills_named`]: a short line that named no
+    /// skill is journaled by its shape (`off`), no word of it and no
+    /// skill's name, so a miss is told from words speech to text wrote
+    /// otherwise (#8022). Before any turn only.
+    pub fn journaling_skill_off(mut self, off: SkillOff) -> Self {
+        if let Some(shared) = Arc::get_mut(&mut self.shared) {
+            shared.skill_off = Some(off);
         }
         self
     }
@@ -17715,6 +17734,21 @@ async fn answer(
                 .and_then(|named| named(&said))
         })
         .flatten();
+    // A short line that named no skill, by its shape alone (#8022: on
+    // lamp-52e6, 20 Nov 13:32, "Hey Lamp, run my mail check skill now."
+    // got `calls=service_read` and no line of the matcher's): its own
+    // words, and how far the nearest skill's name is. No word of the line,
+    // and no skill's name.
+    if let Some((own, off)) = shared
+        .skill_off
+        .as_ref()
+        .filter(|_| heard && skill_named.is_none())
+        .and_then(|off| off(&said))
+    {
+        eprintln!(
+            "lamp-voice second: request {request}: the heard words named no skill; {own} word(s) of its own, nearest skill name {off} word(s) off"
+        );
+    }
     // The line a skill was matched in, for whether the lamp's last words
     // asked of that skill ([`lamp_awaits_answer_for`]); none, no copy.
     let named_said = skill_named.as_ref().map(|_| said.clone());

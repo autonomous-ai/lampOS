@@ -398,6 +398,19 @@ pub fn own_words_of(ask: &str) -> usize {
     own_words(&lower_words(ask)).len()
 }
 
+/// How many words `heard`'s own ([`own_words`]) and `name`'s differ by,
+/// either way: 0 when they are the same words. For the journal alone.
+pub fn words_off(heard: &str, name: &str) -> usize {
+    let heard = lower_words(heard);
+    let heard = own_words(&heard);
+    let name = lower_words(name);
+    heard
+        .iter()
+        .filter(|word| !name.iter().any(|n| n == *word))
+        .count()
+        + name.iter().filter(|n| !heard.contains(&n.as_str())).count()
+}
+
 /// Whether two ask phrases are matched as the same ([`loose_ask`]): "Take
 /// a photo" and "take a photo".
 pub fn same_ask(one: &str, other: &str) -> bool {
@@ -857,6 +870,42 @@ impl Heard {
         if !short(heard) {
             return None;
         }
+        self.with_kept(|wanted, shared| {
+            let wanted: Vec<(String, &str)> = wanted
+                .iter()
+                .map(|(name, function)| (name.clone(), function.as_str()))
+                .collect();
+            named_among(heard, &wanted)
+                .map(|function| call(self.settings.use_skill, function))
+                .or_else(|| shared_call(heard, shared))
+        })
+    }
+
+    /// The shape of a line short enough for [`Self::heard`], for the
+    /// journal alone (#8022): how many words of its own it has
+    /// ([`own_words_of`]), and how many words off ([`words_off`]) the
+    /// nearest name of the functions [`Self::heard`] matches is, as said
+    /// ([`spoken`]), made skills' included. None for a longer line. Read
+    /// from the kept functions: no file is read beyond what
+    /// [`Self::heard`] reads.
+    pub fn nearest_off(&self, heard: &str) -> Option<(usize, usize)> {
+        if !short(heard) {
+            return None;
+        }
+        let own = own_words_of(heard);
+        let off = self.with_kept(|wanted, _| {
+            wanted
+                .iter()
+                .map(|(_, function)| function.strip_prefix(MADE).unwrap_or(function.as_str()))
+                .map(|name| words_off(heard, &spoken(name)))
+                .min()
+        });
+        Some((own, off.unwrap_or(own)))
+    }
+
+    /// The kept functions and shared phrases ([`Kept`]), read again first
+    /// when their files changed ([`Self::stamps`]), given to `with`.
+    fn with_kept<R>(&self, with: impl FnOnce(&[(String, String)], &[Shared]) -> R) -> R {
         let stamps = self.stamps();
         let mut kept = self
             .kept
@@ -873,21 +922,10 @@ impl Heard {
                 .collect();
             *kept = Some((stamps, wanted, shared));
         }
-        let (wanted, shared): (Vec<(String, &str)>, &[Shared]) = kept
-            .as_ref()
-            .map(|(_, wanted, shared)| {
-                (
-                    wanted
-                        .iter()
-                        .map(|(name, function)| (name.clone(), function.as_str()))
-                        .collect(),
-                    shared.as_slice(),
-                )
-            })
-            .unwrap_or_default();
-        named_among(heard, &wanted)
-            .map(|function| call(self.settings.use_skill, function))
-            .or_else(|| shared_call(heard, shared))
+        match kept.as_ref() {
+            Some((_, wanted, shared)) => with(wanted, shared),
+            None => with(&[], &[]),
+        }
     }
 
     /// [`names_made`] over the skills made on the lamp that [`Self::heard`]
@@ -1495,6 +1533,78 @@ mod tests {
             assert_eq!(heard(&settings, line), None, "{line}");
         }
         assert!(!named.names_made("You have daily brief."));
+        crate::made_skill::set_asks_here(None);
+        std::fs::remove_dir_all(dir).ok();
+    }
+
+    /// #8022: on lamp-52e6, 20 Nov 13:32, request 30 ("Hey Lamp, run my
+    /// mail check skill now.") got `calls=service_read` and no line of the
+    /// matcher's, so speech to text likely wrote other words. This pins
+    /// that the matcher takes the clip's own words: the made skill
+    /// `mail-check`, with no asks of its own, runs now by its name through
+    /// `make_skill`'s `run`, inside a run and a "skill", or alone.
+    #[test]
+    fn a_made_skill_named_inside_run_my_skill_now_runs_it() {
+        let mut tools = on_a_lamp();
+        tools[crate::tools::MADE_ASKS] = json!({ "mail-check": [] });
+        let dir = skills_folder("mail", tools);
+        let settings = crate::tools::Settings {
+            skills: Some(dir.clone()),
+            use_skill: true,
+            ..Default::default()
+        };
+        let run = Some((
+            crate::made_skill::MAKE.to_owned(),
+            json!({ crate::made_run::RUN: "mail-check" }),
+        ));
+        crate::made_skill::set_asks_here(Some(true));
+        for line in [
+            "Hey Lamp, run my mail check skill now.",
+            "Hey Lamp, mail check.",
+        ] {
+            assert_eq!(heard(&settings, line), run, "{line}");
+            assert_eq!(Heard::new(settings.clone()).heard(line), run, "{line}");
+        }
+        crate::made_skill::set_asks_here(None);
+        std::fs::remove_dir_all(dir).ok();
+    }
+
+    /// #8022's miss line: a short line's own words, and how many words off
+    /// the nearest skill's name is, as said, made skills' included only
+    /// with their switch; none for a longer line.
+    #[test]
+    fn a_short_lines_shape_counts_its_own_words_and_the_nearest_name_off() {
+        assert_eq!(words_off("Hey Lamp, mail check.", "mail check"), 0);
+        assert_eq!(words_off("Hey Lamp, mail chuck.", "mail check"), 2);
+        assert_eq!(words_off("run my mail check skill now", "desk check"), 2);
+        assert_eq!(words_off("Hey Lamp.", "photo booth"), 2);
+        let mut tools = on_a_lamp();
+        tools[crate::tools::MADE_ASKS] = json!({ "mail-check": [] });
+        let dir = skills_folder("off", tools);
+        let settings = crate::tools::Settings {
+            skills: Some(dir.clone()),
+            use_skill: true,
+            ..Default::default()
+        };
+        crate::made_skill::set_asks_here(Some(true));
+        let named = Heard::new(settings.clone());
+        for (line, shape) in [
+            ("Hey Lamp, run my mail check skill now.", (2, 0)),
+            ("Hey Lamp, mail chuck.", (2, 2)),
+            ("Hey Lamp, desk chuck please.", (2, 2)),
+            ("Hey Lamp, what's the weather?", (2, 4)),
+        ] {
+            assert_eq!(named.nearest_off(line), Some(shape), "{line}");
+        }
+        let long = "one two three four five six seven eight nine ten eleven twelve thirteen \
+                    fourteen fifteen sixteen seventeen";
+        assert_eq!(named.nearest_off(long), None);
+        crate::made_skill::set_asks_here(Some(false));
+        assert_eq!(
+            Heard::new(settings).nearest_off("Hey Lamp, mail chuck."),
+            Some((2, 4)),
+            "the made skill is not among the names with its switch off"
+        );
         crate::made_skill::set_asks_here(None);
         std::fs::remove_dir_all(dir).ok();
     }

@@ -4732,7 +4732,20 @@ chính đèn (đèn, đầu, một câu nói). "When I say send my test note, em
    Chỉ báo cho câu của chủ đèn (`services::owner_hears`, như `made_run`
    không nêu tên kỹ năng cho người khác; P2 của sim-2 trên #7249): với câu
    của người khác thì không báo gì và không nêu tên kỹ năng nào. Hai kỹ năng
-   Store cùng một cụm vẫn như trước.
+   Store cùng một cụm vẫn như trước. Một câu ngắn (tối đa 16 từ,
+   `skill_named::MOST_WORDS`) không gọi tên kỹ năng nào được ghi vào
+   journal chỉ bằng hình dạng của nó, không bao giờ ghi từ nào của câu hay
+   tên kỹ năng nào: `lamp-voice second: request {request}: the heard words
+   named no skill; {own} word(s) of its own, nearest skill name {off}
+   word(s) off`. `own` là số từ riêng của câu, bỏ các từ nói quanh một lời
+   nhờ (`skill_named::own_words_of`); `off` là số từ mà tên kỹ năng đã cài
+   gần nhất, đọc như lời nói, tính cả kỹ năng tự tạo, khác với các từ đó,
+   tính cả hai chiều (`skill_named::words_off`, qua `Heard::nearest_off`
+   trên các tên matcher đang giữ, không đọc lại file). Một câu định gọi tên
+   một kỹ năng mà `off` lớn hơn 0 thì nhiều khả năng speech to
+   text đã viết thành từ khác (#8022: trên lamp-52e6, 20/11 13:32, "Hey
+   Lamp, run my mail check skill now." nhận `calls=service_read` và không
+   có dòng nào của matcher).
 7. **`SKILL.md` tải lên** (`upload_agent::files`, `LAMP_UPLOAD_TO_AGENT`):
    các trigger phrase của nó cũng là `asks = [...]` của tool
    (`upload_agent::asks_of`), nên `LAMP_SKILL_NAMED` gọi tool trong code khi
