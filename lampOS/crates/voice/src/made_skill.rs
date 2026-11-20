@@ -2382,7 +2382,13 @@ const AGENT_TRIES: [&str; 4] = [
 
 /// The reasons [`plain_reason`] gives as they are: the model's silence or
 /// cut, said plainly with what to try.
-const PLAIN_REASONS: [&str; 4] = [MODEL_CUT_OFF, MODEL_SILENT, NOT_READY_LINE, NOTHING_READS];
+const PLAIN_REASONS: [&str; 5] = [
+    MODEL_CUT_OFF,
+    MODEL_SILENT,
+    NOT_READY_LINE,
+    NOTHING_READS,
+    NOT_TRIED_LINE,
+];
 
 /// What the person is told, at once, when lamp-tasks says a make on the
 /// lamp's agent can't start because Harness or the gateway isn't ready yet
@@ -2437,7 +2443,7 @@ pub fn not_made_line(why: &str) -> String {
     // whole already.
     if why.starts_with(CANT_YET)
         || why.starts_with(ALREADY_HAVE)
-        || [NOT_MADE_TRY, NOT_KEPT_TRY, NOT_READY_LINE].contains(&why)
+        || [NOT_MADE_TRY, NOT_KEPT_TRY, NOT_READY_LINE, NOT_TRIED_LINE].contains(&why)
         || AGENT_TRIES.contains(&why)
         || crate::make_no_cannot::said_as_is(why)
     {
@@ -11088,13 +11094,17 @@ fn sections_held(card: &str) -> Result<(), Refused> {
 /// What the person is told of a made skill that failed its tried run
 /// (#8157) after its repairs.
 pub const NOT_TRIED_PASSED: &str = "it didn't work when the lamp tried it";
+/// What the person is told of a made skill whose tried run couldn't be
+/// made at all (#8180: lamp-tasks busy, no token, its fence, an older
+/// lamp-tasks): nothing is kept untried, and why is said plainly.
+pub const NOT_TRIED_LINE: &str = "I made it, but the lamp couldn't try it out, so I didn't keep it. Please ask me again in a minute.";
 /// What a made skill's read-back adds after its tried run passed (#8157).
 pub const TRIED_SAID: &str = "I tried it once and it worked.";
 
 /// A made skill's tried run (#8157) as its keep takes it: passed, its
 /// read-back's line; failed, refused with lamp-tasks' words for a repair;
-/// nothing to try, or a try that couldn't be made (journaled), kept as
-/// before.
+/// nothing to try, kept as before; a try that couldn't be made (journaled)
+/// fails closed: nothing kept, [`NOT_TRIED_LINE`] said (#8180).
 fn tried_said(tried: crate::make_skill_agent::Tried) -> Result<Option<String>, Refused> {
     use crate::make_skill_agent::Tried;
     match tried {
@@ -11115,8 +11125,8 @@ fn tried_said(tried: crate::make_skill_agent::Tried) -> Result<Option<String>, R
             ))
         }
         Tried::NotTried(why) => {
-            eprintln!("lamp-voice: a made skill was not tried ({why}): kept as before");
-            Ok(None)
+            eprintln!("lamp-voice: a made skill was not tried ({why}): not kept");
+            Err(Refused(NOT_TRIED_LINE.into(), None))
         }
     }
 }
@@ -20481,7 +20491,7 @@ task = { task = "take a photo and send it to the app", run = "scripts/main.py" }
 
     /// #8157: a passed try is told in the read-back; a failed one is
     /// refused with lamp-tasks' words, which go to a repair; nothing to
-    /// try, or a try that couldn't be made, keeps it as before.
+    /// try keeps it as before; a try that couldn't be made keeps nothing.
     #[test]
     fn a_tried_run_is_told_or_goes_to_a_repair() {
         use crate::make_skill_agent::Tried;
@@ -20490,7 +20500,23 @@ task = { task = "take a photo and send it to the app", run = "scripts/main.py" }
             Ok(Some(TRIED_SAID.to_owned()))
         );
         assert_eq!(tried_said(Tried::Nothing), Ok(None));
-        assert_eq!(tried_said(Tried::NotTried("old".into())), Ok(None));
+        // Fail closed (the Reviewer-lead's P2 on #8180): a try that
+        // couldn't be made keeps nothing, and the person is told why in
+        // a whole line of its own, never a repair.
+        for why in [
+            "not_tried",
+            "busy",
+            "bad_request",
+            "lamp-tasks can't be reached",
+        ] {
+            assert_eq!(
+                tried_said(Tried::NotTried(why.into())),
+                Err(Refused(NOT_TRIED_LINE.into(), None)),
+                "{why}"
+            );
+        }
+        assert_eq!(plain_reason(NOT_TRIED_LINE), NOT_TRIED_LINE);
+        assert_eq!(not_made_line(NOT_TRIED_LINE), NOT_TRIED_LINE);
         let Err(Refused(why, Some(lines))) =
             tried_said(Tried::Failed("scripts/main.py exited 1".into()))
         else {
