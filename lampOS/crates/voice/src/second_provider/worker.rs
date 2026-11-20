@@ -2064,14 +2064,18 @@ pub(crate) fn audio_answering_app_start(
 
 /// Spoken turns are offered `start_app` with the apps running now: asked at
 /// each chat request, so an app that stops is never offered, and none is
-/// offered with no app running (#7415).
+/// offered with no app running (#7415). With `only_on_a_start`
+/// (`app_help` offered too) it says to start one only when asked to.
 fn with_app_start(
     declare: crate::second_provider::net::Declare,
     apps: Arc<dyn crate::app_triggers::Apps>,
+    only_on_a_start: bool,
 ) -> crate::second_provider::net::Declare {
     Arc::new(move || {
         let mut tools = declare();
-        if let Some(start) = crate::app_triggers::start_app_tool(&apps.running()) {
+        if let Some(start) =
+            crate::app_triggers::start_app_tool_with(&apps.running(), only_on_a_start)
+        {
             tools.push(start);
         }
         tools
@@ -2091,6 +2095,100 @@ fn with_app_tools(
             crate::app_tools::now_ms(),
         )
     })
+}
+
+/// The model's `app_help` (#7415, `LAMP_APP_HELP`): read-only, answered
+/// here from `apps/help`; nothing is started or sent.
+async fn app_help_answer(
+    book: &crate::app_help::AppHelpBook,
+    args: &serde_json::Value,
+) -> serde_json::Value {
+    let (book, args) = (book.clone(), args.clone());
+    tokio::task::spawn_blocking(move || book.answer(&args))
+        .await
+        .unwrap_or_else(|_| crate::tools::unavailable())
+}
+
+/// [`answering_app_start`], for `app_help`, with `LAMP_APP_HELP` on and a bus.
+pub(crate) fn answering_app_help(
+    runner: ToolRunner,
+    help: Option<crate::app_help::AppHelpBook>,
+) -> ToolRunner {
+    let Some(help) = help else {
+        return runner;
+    };
+    Arc::new(move |request, heard, name, args| {
+        if name != crate::app_help::APP_HELP {
+            return runner(request, heard, name, args);
+        }
+        let help = help.clone();
+        Box::pin(async move { app_help_answer(&help, &args).await })
+    })
+}
+
+/// [`answering_app_help`] for the runner with the admitted request's memory
+/// authority: the call needs none.
+pub(crate) fn scoped_answering_app_help(
+    runner: crate::second_provider::ScopedToolRunner,
+    help: Option<crate::app_help::AppHelpBook>,
+) -> crate::second_provider::ScopedToolRunner {
+    let Some(help) = help else {
+        return runner;
+    };
+    Arc::new(move |request, heard, name, args, scope| {
+        if name != crate::app_help::APP_HELP {
+            return runner(request, heard, name, args, scope);
+        }
+        let help = help.clone();
+        Box::pin(async move { app_help_answer(&help, &args).await })
+    })
+}
+
+/// [`answering_app_help`] for a spoken request's private audio runner: the
+/// call offers no audio.
+pub(crate) fn audio_answering_app_help(
+    runner: super::RequestedAudioRunner,
+    help: Option<crate::app_help::AppHelpBook>,
+) -> super::RequestedAudioRunner {
+    let Some(help) = help else {
+        return runner;
+    };
+    Arc::new(move |context, call, scope| {
+        if call.name != crate::app_help::APP_HELP {
+            return runner(context, call, scope);
+        }
+        let help = help.clone();
+        Box::pin(async move {
+            crate::tools::ToolAnswer::plain(app_help_answer(&help, &call.args).await)
+        })
+    })
+}
+
+/// Spoken turns are offered `app_help` while an installed app has help:
+/// asked at each chat request, so an app removed is never offered (#7415).
+fn with_app_help(
+    declare: crate::second_provider::net::Declare,
+    help: crate::app_help::AppHelpBook,
+) -> crate::second_provider::net::Declare {
+    Arc::new(move || {
+        let mut tools = declare();
+        if let Some(tool) = help.tool() {
+            tools.push(tool);
+        }
+        tools
+    })
+}
+
+/// [`answered_here`] with `app_help` too when it is on: a lookup, never the
+/// lamp's action, so the Policy never holds it.
+pub(crate) fn answered_here_with_app_help(
+    here: crate::second_provider::policy::AnsweredHere,
+    help: bool,
+) -> crate::second_provider::policy::AnsweredHere {
+    if !help {
+        return here;
+    }
+    Arc::new(move |name| name == crate::app_help::APP_HELP || here(name))
 }
 
 /// [`answered_here`] with the weather's call too when it is on: a lookup,
@@ -2941,8 +3039,27 @@ pub fn serve(
                 .and_then(crate::app_triggers::AppTaker::start)
         })
         .flatten();
+    // The installed apps' help, read-only (`LAMP_APP_HELP`, #7415): the
+    // model is offered `app_help` while an installed app has help, and
+    // `start_app` then says to start one only when asked to.
+    let app_help = crate::app_help::on()
+        .then(|| {
+            files
+                .bus_root
+                .as_deref()
+                .and_then(crate::app_help::HelpReader::start)
+        })
+        .flatten()
+        .map(|reader| crate::app_help::AppHelpBook {
+            helps: reader,
+            language: crate::language::at_start().map_or("en", crate::language::Language::code),
+        });
     let spoken_declare = match &app_taker {
-        Some(taker) => with_app_start(spoken_declare, taker.clone()),
+        Some(taker) => with_app_start(spoken_declare, taker.clone(), app_help.is_some()),
+        None => spoken_declare,
+    };
+    let spoken_declare = match &app_help {
+        Some(book) => with_app_help(spoken_declare, book.clone()),
         None => spoken_declare,
     };
     let spoken_declare = if they_apply {
@@ -3756,7 +3873,10 @@ pub fn serve(
     );
     let policed = verdicts.is_some();
     let policy_settings = tools.clone();
-    let policy_here = answered_here_with_weather(answered_here(search.clone()), weather.is_some());
+    let policy_here = answered_here_with_app_help(
+        answered_here_with_weather(answered_here(search.clone()), weather.is_some()),
+        app_help.is_some(),
+    );
     // A held line's `reports_stop` is done, its answer kept held, as on the
     // Live route (`crate::attention::DONE_THOUGH_HELD`), with LAMP_REPORTS=on.
     let though_held = tools.reports_stop;
@@ -3767,28 +3887,37 @@ pub fn serve(
         .clone()
         .map(|taker| crate::app_triggers::AppStart(taker));
     let audio_runner = tools.requested_audio.then(|| {
-        audio_answering_app_start(
-            audio_answering_weather(
-                requested_audio_runner(tools.clone(), search.clone(), early.clone(), policed),
+        audio_answering_app_help(
+            audio_answering_app_start(
+                audio_answering_weather(
+                    requested_audio_runner(tools.clone(), search.clone(), early.clone(), policed),
+                    weather.clone(),
+                ),
+                app_start.clone(),
+            ),
+            app_help.clone(),
+        )
+    });
+    let runner = answering_app_help(
+        answering_app_start(
+            answering_weather(
+                tool_runner(tools, search.clone(), early.clone(), policed),
                 weather.clone(),
             ),
             app_start.clone(),
-        )
-    });
-    let runner = answering_app_start(
-        answering_weather(
-            tool_runner(tools, search.clone(), early.clone(), policed),
-            weather.clone(),
         ),
-        app_start.clone(),
+        app_help.clone(),
     );
     // The same calls with the admitted request's memory authority (#1794).
-    let scoped_runner = scoped_answering_app_start(
-        scoped_answering_weather(
-            scoped_tool_runner(scoped_settings, search.clone(), early.clone(), policed),
-            weather,
+    let scoped_runner = scoped_answering_app_help(
+        scoped_answering_app_start(
+            scoped_answering_weather(
+                scoped_tool_runner(scoped_settings, search.clone(), early.clone(), policed),
+                weather,
+            ),
+            app_start,
         ),
-        app_start,
+        app_help.clone(),
     );
     let system: crate::second_provider::System = Arc::new(system);
     // The relay's routes, asked on the runtime below (#2882).
@@ -4729,6 +4858,20 @@ pub fn serve(
             },
             crate::did_history::ENVIRONMENT
         );
+    }
+    // The installed apps' help, read-only (#7415, LAMP_APP_HELP, off).
+    if crate::app_help::on() {
+        if app_help.is_some() {
+            eprintln!(
+                "lamp-voice second: the model is offered app_help, an installed app's own help as a quoted note, while one has help ({})",
+                crate::app_help::ENVIRONMENT
+            );
+        } else {
+            eprintln!(
+                "lamp-voice second: there is no bus to read the apps' help on, so app_help is not offered ({})",
+                crate::app_help::ENVIRONMENT
+            );
+        }
     }
     // A line that is a whole trigger of a running app is taken by that app
     // (#7415 piece 6, LAMP_APP_TRIGGERS, off).
@@ -33949,7 +34092,7 @@ mod tests {
             }
         }
         let apps = Arc::new(Running(Mutex::new(Vec::new())));
-        let declare = super::with_app_start(Arc::new(Vec::new), apps.clone());
+        let declare = super::with_app_start(Arc::new(Vec::new), apps.clone(), false);
         let names = |tools: Vec<lamp_gemini::Tool>| -> Vec<String> {
             tools.into_iter().map(|tool| tool.name).collect()
         };
@@ -33961,6 +34104,60 @@ mod tests {
         assert_eq!(names(declare()), [crate::app_triggers::START_APP]);
         apps.0.lock().unwrap().clear();
         assert!(names(declare()).is_empty(), "the app stopped");
+    }
+
+    /// #7415 (`LAMP_APP_HELP`): `app_help` is offered while an installed
+    /// app has help, started or not, and `start_app` then carries the
+    /// "only when they ask to start it" clause; both answered here.
+    #[test]
+    fn app_help_is_offered_while_an_installed_app_has_help() {
+        struct Installed(Mutex<Vec<lamp_msgs::AppsHelp>>);
+        impl crate::app_help::Helps for Installed {
+            fn installed(&self) -> Vec<lamp_msgs::AppsHelp> {
+                self.0.lock().unwrap().clone()
+            }
+        }
+        struct Running;
+        impl crate::app_triggers::Apps for Running {
+            fn running(&self) -> Vec<lamp_msgs::AppsTriggers> {
+                vec![lamp_msgs::AppsTriggers {
+                    app: "gym-coach".into(),
+                    triggers: vec!["start my workout".into()],
+                }]
+            }
+            fn take(&self, _: u64, _: &str, _: &str) -> bool {
+                false
+            }
+        }
+        let installed = Arc::new(Installed(Mutex::new(Vec::new())));
+        let book = crate::app_help::AppHelpBook {
+            helps: installed.clone(),
+            language: "en",
+        };
+        let declare = super::with_app_help(
+            super::with_app_start(Arc::new(Vec::new), Arc::new(Running), true),
+            book,
+        );
+        let tools = declare();
+        assert_eq!(tools.len(), 1, "no help, no app_help");
+        assert!(
+            tools[0]
+                .description
+                .contains(crate::app_triggers::ONLY_ON_A_START)
+        );
+        *installed.0.lock().unwrap() = vec![lamp_msgs::AppsHelp {
+            app: "english-lessons".into(),
+            help: [("en".to_owned(), "Say start my english lesson.".to_owned())].into(),
+        }];
+        let names: Vec<String> = declare().into_iter().map(|tool| tool.name).collect();
+        assert_eq!(
+            names,
+            [crate::app_triggers::START_APP, crate::app_help::APP_HELP]
+        );
+        let here = super::answered_here_with_app_help(super::answered_here(None), true);
+        assert!(here(crate::app_help::APP_HELP));
+        let off = super::answered_here_with_app_help(super::answered_here(None), false);
+        assert!(!off(crate::app_help::APP_HELP));
     }
 
     #[test]
