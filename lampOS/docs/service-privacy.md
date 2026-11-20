@@ -347,7 +347,8 @@ Locationforecast 2.0 at `https://api.met.no/weatherapi/locationforecast/2.0/comp
 the lamp's verified roots and the same raced connection as Open-Meteo's
 (`net::public::get_public_json_as`, `net::weather::met`, #7593, #7732). It
 runs only with `LAMP_WEATHER_BACKUP=on` exactly; unset or any other value is
-off, and no product unit sets it, so a product lamp never asks it. Even with
+off. The product's `lamp-voice.service` sets it (the FB on #7814, 19 Nov
+09:44), so a product lamp asks it, under the rules below. Even with
 the switch on, it is asked only for a forecast Open-Meteo couldn't give: no
 connection to it opened, its name wasn't found or a step timed out, or it
 answered only with a server error (HTTP 500 to 599); never after a forecast
