@@ -12041,21 +12041,6 @@ async fn spoken(
             );
         }
     }
-    // Work handed over and still open (#7930): read from the tasks part
-    // off the runtime's thread, only while work was handed over, never on
-    // a line code took above.
-    let open_work = match &shared.open_work {
-        Some(note)
-            if declined.is_none() && taken.is_none() && crate::agent_tasks::work_handed() =>
-        {
-            let note = note.clone();
-            tokio::task::spawn_blocking(move || note(request))
-                .await
-                .ok()
-                .flatten()
-        }
-        _ => None,
-    };
     let waiting = declined
         .or(taken)
         .or_else(|| {
@@ -12070,8 +12055,21 @@ async fn spoken(
         .or_else(|| {
             let owner = crate::services::owner_of(scope.as_ref());
             crate::services::waiting_note(request, owner.as_deref(), Instant::now())
-        })
-        .or(open_work);
+        });
+    // Work handed over and still open (#7930), last in the chain: read
+    // from the tasks part off the runtime's thread, only while work was
+    // handed over and no other note won, so never on a line code took
+    // above.
+    let waiting = match (waiting, &shared.open_work) {
+        (None, Some(note)) if crate::agent_tasks::work_handed() => {
+            let note = note.clone();
+            tokio::task::spawn_blocking(move || note(request))
+                .await
+                .ok()
+                .flatten()
+        }
+        (waiting, _) => waiting,
+    };
     // At setup, a line that spells their name: the read-back to say, the
     // name as a word, never its letters (#5580 row 2).
     let spelled = shared.spelled_name.as_ref().and_then(|note| note(&text));
