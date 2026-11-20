@@ -1442,14 +1442,16 @@ fn place(fd: impl AsFd, at: i32) -> io::Result<OwnedFd> {
 }
 
 /// The run's fence exec'd: `unshare` with `crate::gateway::fence_args`,
-/// the token in a pipe on fd 3, the socket on fd 4, a run granted `net`'s
+/// the token in a pipe on fd 3, the socket on fd 4 (a make's tried run's,
+/// #8157: a sink, `crate::make_try::fence_main`), a run granted `net`'s
 /// egress socket on [`EGRESS_FD`] (#7742), an environment of
 /// `crate::gateway::SCRIPT_PATH` only.
-fn exec_fence(
+pub(crate) fn exec_fence(
     grant: &Grant,
-    stream: UnixStream,
+    stream: impl Into<OwnedFd>,
     egress: Option<OwnedFd>,
 ) -> io::Result<std::convert::Infallible> {
+    let stream: OwnedFd = stream.into();
     use std::os::unix::process::CommandExt;
     let (reader, writer) = rustix::pipe::pipe()?;
     let mut writer = std::fs::File::from(writer);
