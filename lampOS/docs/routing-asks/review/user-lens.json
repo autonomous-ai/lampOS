@@ -1,0 +1,14 @@
+[
+  {"item": "2.1", "ids": [13], "rule": "P2", "expect": "answer", "acts": "reminder", "agrees_with_reviewers": true},
+  {"item": "2.2", "ids": [19], "rule": "P2", "expect": "answer", "acts": "memory", "agrees_with_reviewers": true},
+  {"item": "2.3", "ids": [20, 21, 22], "rule": "P2", "expect": "answer", "acts": "weather", "agrees_with_reviewers": true},
+  {"item": "2.4", "ids": [33, 34, 35], "rule": "P2", "expect": "answer", "acts": "search", "agrees_with_reviewers": true},
+  {"item": "2.5", "ids": [44, 45], "rule": "P2", "expect": "answer", "acts": "skill", "agrees_with_reviewers": true},
+  {"item": "3.1", "ids": [15], "rule": "P2", "expect": "answer", "acts": "volume", "agrees_with_reviewers": true},
+  {"item": "3.2", "ids": [75], "rule": "P2", "expect": "answer", "acts": "memory", "agrees_with_reviewers": false},
+  {"item": "3.3", "ids": [77], "rule": "P3", "expect": "hand_over", "doors": ["ask"], "agrees_with_reviewers": true},
+  {"item": "3.4", "ids": [78], "rule": "P4b", "expect": "hand_over", "doors": ["ask", "task"], "agrees_with_reviewers": true},
+  {"item": "3.5", "ids": [82], "rule": "P4b", "expect": "hand_over", "doors": ["ask", "task"], "agrees_with_reviewers": true},
+  {"item": "3.6", "ids": [83], "rule": "P7b", "expect": "hand_over", "doors": ["answer", "task"], "agrees_with_reviewers": false},
+  {"item": "3.7", "ids": [94], "rule": "P4b", "expect": "hand_over", "doors": ["ask", "task"], "agrees_with_reviewers": true}
+]

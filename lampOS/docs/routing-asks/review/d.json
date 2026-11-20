@@ -1,0 +1,952 @@
+[
+ {
+  "id": 1,
+  "expect": "hand_over",
+  "doors": [
+   "task"
+  ],
+  "rule": "P4",
+  "confidence": "high"
+ },
+ {
+  "id": 2,
+  "expect": "hand_over",
+  "doors": [
+   "ask",
+   "task"
+  ],
+  "rule": "P4b",
+  "confidence": "high"
+ },
+ {
+  "id": 3,
+  "expect": "hand_over",
+  "doors": [
+   "ask",
+   "task"
+  ],
+  "rule": "P4b",
+  "confidence": "high"
+ },
+ {
+  "id": 4,
+  "expect": "hand_over",
+  "doors": [
+   "task"
+  ],
+  "rule": "P4",
+  "confidence": "high"
+ },
+ {
+  "id": 5,
+  "expect": "hand_over",
+  "doors": [
+   "ask",
+   "task"
+  ],
+  "rule": "P4b",
+  "confidence": "high"
+ },
+ {
+  "id": 6,
+  "expect": "answer",
+  "acts": "timer",
+  "rule": "P2",
+  "confidence": "high"
+ },
+ {
+  "id": 7,
+  "expect": "answer",
+  "rule": "P1",
+  "confidence": "high"
+ },
+ {
+  "id": 8,
+  "expect": "hand_over",
+  "doors": [
+   "ask"
+  ],
+  "rule": "P3",
+  "confidence": "medium",
+  "note": "Several shops compared; result sayable as a recommendation."
+ },
+ {
+  "id": 9,
+  "expect": "hand_over",
+  "doors": [
+   "ask",
+   "task"
+  ],
+  "rule": "P4b",
+  "confidence": "high"
+ },
+ {
+  "id": 10,
+  "expect": "hand_over",
+  "doors": [
+   "task"
+  ],
+  "rule": "P4",
+  "confidence": "high"
+ },
+ {
+  "id": 11,
+  "expect": "answer",
+  "rule": "P1",
+  "confidence": "high"
+ },
+ {
+  "id": 12,
+  "expect": "answer",
+  "acts": "light",
+  "rule": "P2",
+  "confidence": "high"
+ },
+ {
+  "id": 13,
+  "expect": "answer",
+  "rule": "P1",
+  "confidence": "high"
+ },
+ {
+  "id": 14,
+  "expect": "hand_over",
+  "doors": [
+   "task"
+  ],
+  "rule": "P4",
+  "confidence": "high"
+ },
+ {
+  "id": 15,
+  "expect": "hand_over",
+  "doors": [
+   "task"
+  ],
+  "rule": "P4",
+  "confidence": "high"
+ },
+ {
+  "id": 16,
+  "expect": "hand_over",
+  "doors": [
+   "ask"
+  ],
+  "rule": "P3",
+  "confidence": "medium",
+  "note": "Needs finding out from current sources; explained simply in a few sentences."
+ },
+ {
+  "id": 17,
+  "expect": "answer",
+  "rule": "P1",
+  "confidence": "high"
+ },
+ {
+  "id": 18,
+  "expect": "answer",
+  "acts": "search",
+  "rule": "P2",
+  "confidence": "high"
+ },
+ {
+  "id": 19,
+  "expect": "hand_over",
+  "doors": [
+   "ask",
+   "task"
+  ],
+  "rule": "P4b",
+  "confidence": "high"
+ },
+ {
+  "id": 20,
+  "expect": "hand_over",
+  "doors": [
+   "ask"
+  ],
+  "rule": "P3",
+  "confidence": "medium",
+  "note": "Comparison of a few universities' fees, sayable with a recommendation."
+ },
+ {
+  "id": 21,
+  "expect": "hand_over",
+  "doors": [
+   "answer",
+   "task"
+  ],
+  "rule": "P7b",
+  "confidence": "high"
+ },
+ {
+  "id": 22,
+  "expect": "hand_over",
+  "doors": [
+   "ask",
+   "task"
+  ],
+  "rule": "P4b",
+  "confidence": "high"
+ },
+ {
+  "id": 23,
+  "expect": "answer",
+  "acts": "memory",
+  "rule": "P2",
+  "confidence": "medium",
+  "note": "Recall of a stored fact about the person."
+ },
+ {
+  "id": 24,
+  "expect": "answer",
+  "acts": "search",
+  "rule": "P2",
+  "confidence": "medium",
+  "note": "Exchange rate is a fresh fact one search answers."
+ },
+ {
+  "id": 25,
+  "expect": "answer",
+  "rule": "P1",
+  "confidence": "high"
+ },
+ {
+  "id": 26,
+  "expect": "answer",
+  "acts": "reminder",
+  "rule": "P2",
+  "confidence": "high"
+ },
+ {
+  "id": 27,
+  "expect": "hand_over",
+  "doors": [
+   "task"
+  ],
+  "rule": "P4",
+  "confidence": "high"
+ },
+ {
+  "id": 28,
+  "expect": "answer",
+  "acts": "memory",
+  "rule": "P2",
+  "confidence": "medium",
+  "note": "'Nho giup' reads as remember; repeat_reminder (reminder class) also plausible."
+ },
+ {
+  "id": 29,
+  "expect": "answer",
+  "acts": "reminder",
+  "rule": "P2",
+  "confidence": "high"
+ },
+ {
+  "id": 30,
+  "expect": "answer",
+  "acts": "volume",
+  "rule": "P2",
+  "confidence": "high"
+ },
+ {
+  "id": 31,
+  "expect": "answer",
+  "rule": "P1",
+  "confidence": "high"
+ },
+ {
+  "id": 32,
+  "expect": "answer",
+  "rule": "P8",
+  "confidence": "medium",
+  "note": "Step 1 settles it; the 'ids >= 101' note refers to original ids, not blind ids."
+ },
+ {
+  "id": 33,
+  "expect": "answer",
+  "rule": "P1",
+  "confidence": "high"
+ },
+ {
+  "id": 34,
+  "expect": "hand_over",
+  "doors": [
+   "task"
+  ],
+  "rule": "P4",
+  "confidence": "high"
+ },
+ {
+  "id": 35,
+  "expect": "hand_over",
+  "doors": [
+   "ask"
+  ],
+  "rule": "P3",
+  "confidence": "medium",
+  "note": "Page summary is P3 per O2, though fetch_page is an own tool (P2)."
+ },
+ {
+  "id": 36,
+  "expect": "hand_over",
+  "doors": [
+   "ask",
+   "task"
+  ],
+  "rule": "P4b",
+  "confidence": "high"
+ },
+ {
+  "id": 37,
+  "expect": "hand_over",
+  "doors": [
+   "answer",
+   "task"
+  ],
+  "rule": "P7b",
+  "confidence": "high"
+ },
+ {
+  "id": 38,
+  "expect": "hand_over",
+  "doors": [
+   "task"
+  ],
+  "rule": "P4",
+  "confidence": "low",
+  "note": "Torn P4 vs P2 memory: a reading log to keep is a kept record, but remember could store the book."
+ },
+ {
+  "id": 39,
+  "expect": "answer",
+  "acts": "reminder",
+  "rule": "P2",
+  "confidence": "high"
+ },
+ {
+  "id": 40,
+  "expect": "hand_over",
+  "doors": [
+   "ask"
+  ],
+  "rule": "P3",
+  "confidence": "medium",
+  "note": "Several sources, result sayable in a few sentences."
+ },
+ {
+  "id": 41,
+  "expect": "hand_over",
+  "doors": [
+   "ask"
+  ],
+  "rule": "P3",
+  "confidence": "high"
+ },
+ {
+  "id": 42,
+  "expect": "answer",
+  "acts": "light",
+  "rule": "P2",
+  "confidence": "high"
+ },
+ {
+  "id": 43,
+  "expect": "hand_over",
+  "doors": [
+   "ask"
+  ],
+  "rule": "P3",
+  "confidence": "high"
+ },
+ {
+  "id": 44,
+  "expect": "hand_over",
+  "doors": [
+   "task"
+  ],
+  "rule": "P4",
+  "confidence": "high"
+ },
+ {
+  "id": 45,
+  "expect": "answer",
+  "rule": "P7a",
+  "confidence": "high"
+ },
+ {
+  "id": 46,
+  "expect": "hand_over",
+  "doors": [
+   "ask",
+   "task"
+  ],
+  "rule": "P4b",
+  "confidence": "high"
+ },
+ {
+  "id": 47,
+  "expect": "hand_over",
+  "doors": [
+   "ask",
+   "task"
+  ],
+  "rule": "P4b",
+  "confidence": "medium",
+  "note": "Essay to keep and edit, no file asked."
+ },
+ {
+  "id": 48,
+  "expect": "answer",
+  "acts": "light",
+  "rule": "P2",
+  "confidence": "high"
+ },
+ {
+  "id": 49,
+  "expect": "hand_over",
+  "doors": [
+   "ask",
+   "task"
+  ],
+  "rule": "P4b",
+  "confidence": "medium",
+  "note": "Finding out plus an evening schedule (a plan) to keep."
+ },
+ {
+  "id": 50,
+  "expect": "answer",
+  "rule": "P8",
+  "confidence": "low",
+  "note": "Torn P8 vs P5: covertly recording a spouse's phone call is a privacy refusal, else no function (P5)."
+ },
+ {
+  "id": 51,
+  "expect": "hand_over",
+  "doors": [
+   "ask"
+  ],
+  "rule": "P3",
+  "confidence": "high"
+ },
+ {
+  "id": 52,
+  "expect": "answer",
+  "rule": "P1",
+  "confidence": "high"
+ },
+ {
+  "id": 53,
+  "expect": "hand_over",
+  "doors": [
+   "task"
+  ],
+  "rule": "P4",
+  "confidence": "high"
+ },
+ {
+  "id": 54,
+  "expect": "answer",
+  "rule": "P1",
+  "confidence": "high"
+ },
+ {
+  "id": 55,
+  "expect": "answer",
+  "acts": "timer",
+  "rule": "P2",
+  "confidence": "high"
+ },
+ {
+  "id": 56,
+  "expect": "hand_over",
+  "doors": [
+   "task"
+  ],
+  "rule": "P4",
+  "confidence": "high"
+ },
+ {
+  "id": 57,
+  "expect": "hand_over",
+  "doors": [
+   "ask",
+   "task"
+  ],
+  "rule": "P4b",
+  "confidence": "high"
+ },
+ {
+  "id": 58,
+  "expect": "hand_over",
+  "doors": [
+   "ask",
+   "task"
+  ],
+  "rule": "P5",
+  "confidence": "high"
+ },
+ {
+  "id": 59,
+  "expect": "answer",
+  "rule": "P1",
+  "confidence": "high"
+ },
+ {
+  "id": 60,
+  "expect": "hand_over",
+  "doors": [
+   "ask",
+   "task"
+  ],
+  "rule": "P4b",
+  "confidence": "medium",
+  "note": "Research plus a plan to keep; not sayable in three sentences."
+ },
+ {
+  "id": 61,
+  "expect": "answer",
+  "rule": "P1",
+  "confidence": "high"
+ },
+ {
+  "id": 62,
+  "expect": "hand_over",
+  "doors": [
+   "answer",
+   "task"
+  ],
+  "rule": "P7b",
+  "confidence": "high"
+ },
+ {
+  "id": 63,
+  "expect": "hand_over",
+  "doors": [
+   "ask",
+   "task"
+  ],
+  "rule": "P4b",
+  "confidence": "high"
+ },
+ {
+  "id": 64,
+  "expect": "hand_over",
+  "doors": [
+   "ask",
+   "task"
+  ],
+  "rule": "P4b",
+  "confidence": "low",
+  "note": "Torn P3 vs P4b: three museums' hours and prices might be said in three sentences, but 'make a list' asks for writing to keep."
+ },
+ {
+  "id": 65,
+  "expect": "answer",
+  "rule": "P1",
+  "confidence": "high"
+ },
+ {
+  "id": 66,
+  "expect": "answer",
+  "acts": "light",
+  "rule": "P2",
+  "confidence": "high"
+ },
+ {
+  "id": 67,
+  "expect": "hand_over",
+  "doors": [
+   "task"
+  ],
+  "rule": "P4",
+  "confidence": "high"
+ },
+ {
+  "id": 68,
+  "expect": "hand_over",
+  "doors": [
+   "ask",
+   "task"
+  ],
+  "rule": "P4b",
+  "confidence": "high"
+ },
+ {
+  "id": 69,
+  "expect": "hand_over",
+  "doors": [
+   "task"
+  ],
+  "rule": "P4",
+  "confidence": "high"
+ },
+ {
+  "id": 70,
+  "expect": "hand_over",
+  "doors": [
+   "ask"
+  ],
+  "rule": "P3",
+  "confidence": "high"
+ },
+ {
+  "id": 71,
+  "expect": "answer",
+  "rule": "P1",
+  "confidence": "high"
+ },
+ {
+  "id": 72,
+  "expect": "hand_over",
+  "doors": [
+   "task"
+  ],
+  "rule": "P4",
+  "confidence": "high"
+ },
+ {
+  "id": 73,
+  "expect": "hand_over",
+  "doors": [
+   "answer",
+   "task"
+  ],
+  "rule": "P7b",
+  "confidence": "high"
+ },
+ {
+  "id": 74,
+  "expect": "answer",
+  "acts": "search",
+  "rule": "P2",
+  "confidence": "high"
+ },
+ {
+  "id": 75,
+  "expect": "answer",
+  "acts": "memory",
+  "rule": "P2",
+  "confidence": "high"
+ },
+ {
+  "id": 76,
+  "expect": "answer",
+  "rule": "P7a",
+  "confidence": "high"
+ },
+ {
+  "id": 77,
+  "expect": "answer",
+  "rule": "P1",
+  "confidence": "high"
+ },
+ {
+  "id": 78,
+  "expect": "answer",
+  "rule": "P1",
+  "confidence": "high"
+ },
+ {
+  "id": 79,
+  "expect": "answer",
+  "acts": "light",
+  "rule": "P2",
+  "confidence": "high"
+ },
+ {
+  "id": 80,
+  "expect": "hand_over",
+  "doors": [
+   "ask",
+   "task"
+  ],
+  "rule": "P4b",
+  "confidence": "high"
+ },
+ {
+  "id": 81,
+  "expect": "hand_over",
+  "doors": [
+   "ask",
+   "task"
+  ],
+  "rule": "P4b",
+  "confidence": "medium",
+  "note": "Several recipes written up: long writing, no file asked."
+ },
+ {
+  "id": 82,
+  "expect": "hand_over",
+  "doors": [
+   "ask"
+  ],
+  "rule": "P3",
+  "confidence": "high"
+ },
+ {
+  "id": 83,
+  "expect": "answer",
+  "rule": "P8",
+  "confidence": "low",
+  "note": "Torn P8 vs P2 memory: recalling what another person asked the lamp to keep is a privacy refusal, else a recall."
+ },
+ {
+  "id": 84,
+  "expect": "answer",
+  "rule": "P1",
+  "confidence": "high"
+ },
+ {
+  "id": 85,
+  "expect": "answer",
+  "rule": "P1",
+  "confidence": "high"
+ },
+ {
+  "id": 86,
+  "expect": "answer",
+  "rule": "P1",
+  "confidence": "high"
+ },
+ {
+  "id": 87,
+  "expect": "answer",
+  "acts": "reminder",
+  "rule": "P2",
+  "confidence": "high"
+ },
+ {
+  "id": 88,
+  "expect": "answer",
+  "acts": "weather",
+  "rule": "P2",
+  "confidence": "high"
+ },
+ {
+  "id": 89,
+  "expect": "answer",
+  "rule": "P1",
+  "confidence": "high"
+ },
+ {
+  "id": 90,
+  "expect": "answer",
+  "acts": "time",
+  "rule": "P2",
+  "confidence": "high"
+ },
+ {
+  "id": 91,
+  "expect": "hand_over",
+  "doors": [
+   "task"
+  ],
+  "rule": "P4",
+  "confidence": "high"
+ },
+ {
+  "id": 92,
+  "expect": "answer",
+  "acts": "reminder",
+  "rule": "P2",
+  "confidence": "high"
+ },
+ {
+  "id": 93,
+  "expect": "hand_over",
+  "doors": [
+   "ask"
+  ],
+  "rule": "P3",
+  "confidence": "high"
+ },
+ {
+  "id": 94,
+  "expect": "answer",
+  "rule": "P1",
+  "confidence": "high"
+ },
+ {
+  "id": 95,
+  "expect": "answer",
+  "acts": "volume",
+  "rule": "P2",
+  "confidence": "medium",
+  "note": "'Turn it down' with kids asleep reads as volume; light dimmer possible."
+ },
+ {
+  "id": 96,
+  "expect": "answer",
+  "acts": "time",
+  "rule": "P2",
+  "confidence": "high"
+ },
+ {
+  "id": 97,
+  "expect": "hand_over",
+  "doors": [
+   "task"
+  ],
+  "rule": "P4",
+  "confidence": "high"
+ },
+ {
+  "id": 98,
+  "expect": "hand_over",
+  "doors": [
+   "ask",
+   "task"
+  ],
+  "rule": "P5",
+  "confidence": "high"
+ },
+ {
+  "id": 99,
+  "expect": "hand_over",
+  "doors": [
+   "ask"
+  ],
+  "rule": "P3",
+  "confidence": "high"
+ },
+ {
+  "id": 100,
+  "expect": "answer",
+  "rule": "P8",
+  "confidence": "medium",
+  "note": "Step 1 settles it; the 'ids >= 101' note refers to original ids, not blind ids."
+ },
+ {
+  "id": 101,
+  "expect": "hand_over",
+  "doors": [
+   "ask"
+  ],
+  "rule": "P3",
+  "confidence": "medium",
+  "note": "Last year's data needs finding out; weather tool covers only today to a weekday ahead."
+ },
+ {
+  "id": 102,
+  "expect": "hand_over",
+  "doors": [
+   "ask",
+   "task"
+  ],
+  "rule": "P5",
+  "confidence": "high"
+ },
+ {
+  "id": 103,
+  "expect": "answer",
+  "acts": "weather",
+  "rule": "P2",
+  "confidence": "high"
+ },
+ {
+  "id": 104,
+  "expect": "hand_over",
+  "doors": [
+   "task"
+  ],
+  "rule": "P4",
+  "confidence": "high"
+ },
+ {
+  "id": 105,
+  "expect": "answer",
+  "rule": "P1",
+  "confidence": "high"
+ },
+ {
+  "id": 106,
+  "expect": "answer",
+  "acts": "weather",
+  "rule": "P2",
+  "confidence": "high"
+ },
+ {
+  "id": 107,
+  "expect": "answer",
+  "rule": "P1",
+  "confidence": "high"
+ },
+ {
+  "id": 108,
+  "expect": "answer",
+  "rule": "P1",
+  "confidence": "high"
+ },
+ {
+  "id": 109,
+  "expect": "answer",
+  "acts": "timer",
+  "rule": "P2",
+  "confidence": "high"
+ },
+ {
+  "id": 110,
+  "expect": "answer",
+  "acts": "skill",
+  "rule": "P2",
+  "confidence": "high"
+ },
+ {
+  "id": 111,
+  "expect": "answer",
+  "acts": "reminder",
+  "rule": "P2",
+  "confidence": "high"
+ },
+ {
+  "id": 112,
+  "expect": "hand_over",
+  "doors": [
+   "ask",
+   "task"
+  ],
+  "rule": "P4b",
+  "confidence": "low",
+  "note": "Torn P3 vs P4b: data must be found, but a ranking of ~11 countries is a list, not three spoken sentences."
+ },
+ {
+  "id": 113,
+  "expect": "hand_over",
+  "doors": [
+   "ask",
+   "task"
+  ],
+  "rule": "P5",
+  "confidence": "high"
+ },
+ {
+  "id": 114,
+  "expect": "answer",
+  "acts": "skill",
+  "rule": "P2",
+  "confidence": "high"
+ },
+ {
+  "id": 115,
+  "expect": "answer",
+  "rule": "P1",
+  "confidence": "high"
+ },
+ {
+  "id": 116,
+  "expect": "answer",
+  "rule": "P1",
+  "confidence": "high"
+ },
+ {
+  "id": 117,
+  "expect": "hand_over",
+  "doors": [
+   "ask"
+  ],
+  "rule": "P3",
+  "confidence": "medium",
+  "note": "Comparison with a recommendation of the easiest method."
+ }
+]
