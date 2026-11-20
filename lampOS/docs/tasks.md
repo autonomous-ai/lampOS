@@ -5627,7 +5627,13 @@ waiting after "I'll look into that":
   lamp-tasks, with no network wait: the model is told to say, at once and
   nothing more, "I'm having a problem right now; ask me again in a
   moment." lamp-tasks' own `agent_not_ready` at prepare (or at confirm) is
-  told the same way. Nothing is prepared, so no read-back and no "I'll
+  told the same way (its `readiness` and `why` read from the answer, or
+  the latest `why`). Lasting states keep their own lines, never "in a
+  moment": `not_installed` says the lamp's not-set-up line, and `error`
+  with why `signed_out` says "I've been signed out. Please set me up again
+  in the app."; neither counts for "ready again". `starting` (with why
+  `tasks_restarting` too), `installing`, `recovering` and any other
+  `error` get the problem line. Nothing is prepared, so no read-back and no "I'll
   look into that" comes first; the model says the line in the person's
   language. Work for a computer is never held to the lamp's readiness.
 - **A handed-over task that fails is told as not done.** `not_sent` with
