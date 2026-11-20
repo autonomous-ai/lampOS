@@ -77,6 +77,12 @@ pub struct AppManifest {
     #[serde(default)]
     pub phrases: Vec<String>,
     pub triggers: Vec<String>,
+    /// How the app is used, by language (`{"en": "...", "vi": "..."}`):
+    /// English required, the lamp's languages only, at most 300 bytes each
+    /// (`lamp_msgs::app_help::help_ok`). Told to the voice as a quoted note
+    /// for `app_help` (#7415); absent is none.
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub help: BTreeMap<String, String>,
     #[serde(default)]
     pub settings: Vec<Setting>,
     #[serde(default)]
@@ -385,6 +391,7 @@ pub fn check_manifest(manifest: &AppManifest) -> Result<(), String> {
             "{MANIFEST}: phrases and triggers need the hear grant"
         ));
     }
+    lamp_msgs::app_help::help_ok(&manifest.help).map_err(|why| format!("{MANIFEST}: {why}"))?;
     if manifest.settings.len() > MOST_SETTINGS {
         return Err(format!("{MANIFEST}: at most {MOST_SETTINGS} settings"));
     }

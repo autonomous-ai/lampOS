@@ -563,6 +563,7 @@ topic catalogue. Neither carries any sound.
 | `AppTriggers` | `apps/triggers` | latest | 10 s / 30 s | The spoken triggers of the apps running now (each manifest's `triggers`, at most 8 an app); written by lamp-control, read by the voice; local, no audio (#7415 piece 6, [apps.md](apps.md)) |
 | `AppTrigger` | `apps/trigger` | event | none / none | The voice holds a final line that says an app's trigger: the request (`turn`), the `app`, its `trigger`, the words heard and the time; the voice to lamp-control, once per line (#7415 piece 6) |
 | `AppTook` | `apps/took` | event | none / none | The app took that line (`turn`, `app`): the voice ends the request in code and says nothing; lamp-control to the voice (#7415 piece 6) |
+| `AppHelps` | `apps/help` | latest | 10 s / 30 s | The help of every installed app with one, started or not (each manifest's `help`, by language, English always there, at most 300 bytes each, tidied: no double quotes, markup, links, backslashes or bidi characters; at most 32 apps and 48,000 bytes); written by lamp-control every 5 s, read by the voice only with `LAMP_APP_HELP=on` for `app_help`; local, no audio (#7415, [apps.md](apps.md)) |
 
 Levels are dBFS from -120 (digital silence) to 0; `check()` refuses
 anything else, and a peak under its quiet.

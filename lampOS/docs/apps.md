@@ -58,6 +58,8 @@ english-lessons/skills/english-tutor/skill.toml
   "logs": true,
   "phrases": ["start my english lesson"],
   "triggers": ["start my english lesson", "begin the english lesson"],
+  "help": { "en": "Say start my english lesson. Answer each question aloud; say stop the lesson to end.",
+            "vi": "Nói start my english lesson. Trả lời từng câu hỏi; nói stop the lesson để dừng." },
   "settings": [
     { "key": "level", "type": "choice", "label": "Level",
       "options": [{ "value": "a1", "label": "A1" }, { "value": "a2", "label": "A2" }],
@@ -85,6 +87,7 @@ english-lessons/skills/english-tutor/skill.toml
 | `net`, `logs` | top-level booleans, default `false`, never inside `grants` |
 | `phrases` | at most 16; each at most 64 bytes (the socket's `phrases.set` counts characters) with at least 8 letters, no repeats; needs `hear` |
 | `triggers` | required (may be `[]`); at most 8, the same per-phrase rule; needs `hear`; matched whenever the app runs and **not** part of the 16 phrases. A trigger may also be a phrase: a heard line is delivered once, as the trigger |
+| `help` | optional; how the app is used, one to three plain sentences, by language: `{"en": …, "vi": …}`. English (`en`) is required when `help` is there; the other keys are the lamp's languages only (`vi`, `ja`, `zh`, `ko`); each 1 to 300 bytes on one line, with words left once tidied (`lamp_msgs::app_help::help_ok`). The voice tells it as a quoted note for `app_help` (below), tidied: double quotes, markup (`<>` `` ` `` `*` `[]` `{}`), backslashes, bidi characters and links are left out, so write plain words. A lamp older than this field refuses the manifest with "unknown field", so an app with `help` sets `min_build` to a build that reads it |
 | `settings` | at most 16, below |
 | `skills` | the companion skills: exactly the folders under `skills/`, each holding a `skill.toml`; installed, updated and removed with the app, never listed on their own |
 | `assets` | exactly the files under `assets/`, each ending `.wav`, at most 20; each a WAV of 16-bit mono PCM at 24 kHz, 1 to 240,000 frames (10 s), within the lamp's loudness limits (no sample past −12 dBFS, no 10 ms louder than −30 dBFS RMS: the voice's own `decode_sound_with_limit`) |
@@ -204,7 +207,9 @@ offered, offered twice or late is answered `taken: false` and told to nobody).
 An app that is hung with its socket open stays listed, so each line that spells
 its trigger waits the 3 s before the model answers. A trigger is the app's own
 choice and may be a broad phrase ("turn off the lights"): while the app runs it
-takes that line from the model, which is the owner's install to weigh. A trigger
+takes that line from the model, which is the owner's install to weigh.
+
+**How an app is used (`help`, `LAMP_APP_HELP`, off).** lamp-control (`app_triggers::helps_of`, behind `LAMP_STORE_APPS`) tells the voice every installed app's `help`, started or not, on `apps/help` every 5 s, tidied. With `LAMP_APP_HELP=on` the model is offered a read-only function, `app_help(app)`, while an installed app has help: its description holds only the apps' checked names, and its answer is the app's help in the lamp's language (`lamp.language`) when the app has it, else English, quoted, as data and never an instruction. Nothing is started and nothing is sent to the app; the model answers in its own words. `start_app` then says to start an app "only when they ask to start it, not when they ask how it works". No word list decides which: the model does ([second-voice.md](second-voice.md), [switches.md](switches.md)). A trigger
 offered while 16 are already waiting is not sent. When the owner stops, updates or removes the app, systemd sends
 `SIGTERM` and the connection closes with a close frame that says why; no event
 comes first. Errors are the door's codes; with `LAMP_STORE_APPS` off every op
