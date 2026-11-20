@@ -330,9 +330,9 @@ that one too, aborts a burst under way.
   two whole numbers, `every_s` outside 15–60 s, or `until_unix_s` reached.
   With the switch off it is a minute whatever the cloud says; the heat
   pace multiplies the period in force ("The board's heat"). The seen
-  reactions (in the tree but not yet product skills, until their switch-on
-  pull request after the owner's working-day row, #7668) change none of this: no product unit sets
-  the switch (`no_product_unit_sets_the_fifteen_second_switch`), so every
+  reactions' switch-on (#7668) leaves it dark: it waits for a heat read
+  and the perception service's capacity confirmation, and no product unit
+  sets it (`no_product_unit_sets_the_fifteen_second_switch`), so every
   lamp stays at a burst a minute until a unit sets it and Backend sends
   `seen_clip`. Nor do the reactions send anything: they read
   `humans/doing_more` on the lamp and make only a turn and a line
@@ -519,6 +519,15 @@ that one too, aborts a burst under way.
     the kept yes, nor while the opt-in is off: then what was seen is
     forgotten at once, each timer counting from the arrival again, so the
     opt-in off stops all of it (the first builder's condition on #6543).
+    The four seen reactions hear it under the same yes: the owner's
+    desk-noticing yes covers them (the owner's call, 23 Nov on #7668,
+    "make the desk-noticing yes toggle covers these 4 too"), so
+    lamp-skills gives `seen-drink`, `seen-eat`, `seen-tired` and
+    `seen-celebrate` the topic while `seen-activity.json` holds the yes,
+    read by `lamp_msgs::consent::allowed`'s rule as here, with no
+    `seen_more` line of their own (`lamp_skills::SEEN_PRODUCT`,
+    skills.md, "The owner's seen_more yes"). Any other skill still needs
+    its own `seen_more` yes. The yes taken back or a forget takes it away.
 - **Health**: with activity on, `diagnostics` also says `sends: activity`,
   its bursts (`bursts`, `answered`, `busy`, `failed`, `aborted`),
   `frames_sent`, `frames_wiped`, `wrong_frame` and `last_failure`.
@@ -972,6 +981,15 @@ the person did (the Reviewer-lead's P2 on #7251). The diagnostics switch
 `LAMP_SEEN_JOURNAL_LABELS=on` (exactly `on`; in no unit) adds them, as the
 "with labels" lines below show, and `serve` says once at start that it is
 on.
+
+`lamp-skills` keeps the same rule for the skills that read
+`humans/doing_more` (the privacy read on #8375): a seen reaction's name
+says what was seen, so with the switch off in lamp-skills' environment
+(read once at its start) its journal lines say `a seen reaction` in place
+of the skill, and `a reading` in place of a kind's reading, for example
+`lamp-skills: a seen reaction Triggered: humans/doing_more has held for 0
+s` rather than `seen-drink Triggered: …` ([skills.md](skills.md), "Journal
+names"). On, they name it.
 
 | When | Line |
 |---|---|

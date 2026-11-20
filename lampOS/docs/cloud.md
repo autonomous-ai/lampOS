@@ -1251,8 +1251,12 @@ build; not yet timed on a lamp). A folder that can't be read is answered
   yes to it hearing that (`skills.seen_more`, kept in
   `/var/lib/lampos-skills-state/seen_more`, a name a line, beside the off
   file); false when not, or when that file can't be read. A core skill
-  needs the yes too. Left out of every other row, and of every row with the
-  switch off, so the page is then as before.
+  needs the yes too, but the four seen reactions (`seen-drink`,
+  `seen-eat`, `seen-tired`, `seen-celebrate`, core), which are true while
+  the owner's desk-noticing yes stands (`seen-activity.json`, the owner's
+  call, 23 Nov on #7668), as `lamp-skills` then gives them the topic.
+  Left out of every other row, and of every row with the switch off, so
+  the page is then as before.
 - **`loads`** and **`why`**: whether the running `lamp-skills` loads it, and
   if not, why, in its words on one line (at most 300 bytes). A skill that
   doesn't load stays in its group, with its kind, version and permissions
@@ -1529,7 +1533,11 @@ refusal is V1's `failure` with why, nothing kept and no `seen_more`.
   there, core or not: no trigger on it, no `[[while]]` and no `sooner`
   reads it ([skills.md](skills.md), "The owner's seen_more yes"). The
   running `lamp-skills` reads the file again within 2 s, as the off file.
-  No shipped skill has the yes.
+  No shipped skill has the yes; the four seen reactions need none, since
+  the owner's desk-noticing yes covers them while it stands (the owner's
+  call, 23 Nov on #7668), and their rows show `seen_more_allowed` true
+  then ([skills.md](skills.md), "The desk-noticing yes covers the four
+  seen reactions").
 - Without `LAMP_SKILLS_PAGE=on`, `not on this lamp: skills.seen_more`.
 
 ### Installing from the Skills Store (`skills.install`)

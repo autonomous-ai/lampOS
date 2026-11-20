@@ -19,6 +19,18 @@ use std::{
     sync::Arc,
 };
 
+/// Every journal line of this crate goes through [`journal::line`], so a
+/// skill that reads `humans/doing_more` is not named there unless
+/// `LAMP_SEEN_JOURNAL_LABELS=on` (the privacy read on #8375).
+macro_rules! eprintln {
+    () => {
+        ::std::eprintln!()
+    };
+    ($($arg:tt)*) => {
+        $crate::journal::line(::std::format!($($arg)*))
+    };
+}
+
 pub mod addon;
 pub mod app_package;
 pub mod app_views;
@@ -28,6 +40,7 @@ pub mod daily;
 pub mod did;
 pub mod glow;
 pub mod holds;
+pub mod journal;
 pub mod knowledge;
 pub mod known;
 pub mod limits;
@@ -573,11 +586,54 @@ pub const CAMERA_FILE: &str = "camera";
 /// one name a line, written only by the manage helper
 /// ([`package::seen_more`]), as the camera's. A skill, core or not, that
 /// names the topic receives nothing from it while its name is not here: no
-/// trigger, no `[[while]]`, no `sooner` reads it ([`Engine::reread_seen_more`]).
+/// trigger, no `[[while]]`, no `sooner` reads it ([`Engine::reread_seen_more`]),
+/// but for [`SEEN_PRODUCT`] while the desk-noticing yes stands.
 pub const SEEN_MORE_FILE: &str = "seen_more";
 /// What the owner's [`SEEN_MORE_FILE`] yes gives: tiredness, desk work and
 /// celebrating (`lamp_msgs::HumanDoingMore`, `LAMP_SEEN_MORE_DOINGS=on`).
 pub const SEEN_MORE_TOPIC: &str = lamp_msgs::HumanDoingMore::TOPIC;
+/// The four seen reactions the product installs (`lamp-update`'s
+/// `install::PRODUCT_SKILLS`, #6543). The owner's call (23 Nov on #7668):
+/// the desk-noticing yes covers them, so a core skill of one of these names,
+/// not pushed, hears [`SEEN_MORE_TOPIC`] while that yes stands
+/// ([`DESK_NOTICING_YES`], [`desk_covers`]), as if its name were in
+/// [`SEEN_MORE_FILE`]. Taking the yes back or a forget (which removes it)
+/// takes that away. Each keeps its own off and the shared `seen_remarks`
+/// stop; any other skill still needs its own `seen_more` yes.
+pub const SEEN_PRODUCT: [&str; 4] = ["seen-celebrate", "seen-drink", "seen-eat", "seen-tired"];
+/// The owner's desk-noticing yes (`lamp_msgs::consent::SEEN_ACTIVITY`'s
+/// file), the one `lamp-seen` reads before it looks: read by
+/// [`desk_noticing_yes`] with `lamp_msgs::consent::allowed`'s rule.
+/// `lamp-seen` says [`SEEN_MORE_TOPIC`] only once the on line that names
+/// tiredness, desk work and celebrating has begun for this yes, so nothing
+/// reaches [`SEEN_PRODUCT`] before the person heard what the lamp reads.
+pub const DESK_NOTICING_YES: &str = "/var/lib/lampOS/consent/seen-activity.json";
+
+/// Whether the desk-noticing yes at `path` stands, by
+/// `lamp_msgs::consent::allowed`'s rule with `LAMP_NOTICING_BY_DEFAULT`'s
+/// default, as `lamp-seen` reads it.
+pub fn desk_noticing_yes(path: &Path) -> bool {
+    lamp_msgs::consent::allowed(
+        path,
+        lamp_msgs::consent::SEEN_ACTIVITY,
+        lamp_msgs::consent::noticing_by_default(),
+    )
+}
+
+/// Whether the desk-noticing yes covers `skill` ([`SEEN_PRODUCT`]): one of
+/// the four names, core and not pushed.
+pub fn desk_covers(skill: &Skill) -> bool {
+    SEEN_PRODUCT.contains(&skill.name.as_str())
+        && skill.kind == SkillKind::Core
+        && skill.pushed_by.is_none()
+}
+
+/// Whether `skill` hears [`SEEN_MORE_TOPIC`]: its name kept in
+/// [`SEEN_MORE_FILE`] (`kept`), or covered by the desk-noticing yes while
+/// it stands (`desk`, [`desk_covers`]).
+fn hears_more_with(kept: &BTreeSet<String>, desk: bool, skill: &Skill) -> bool {
+    kept.contains(&skill.name) || (desk && desk_covers(skill))
+}
 
 /// The names kept in `file` ([`OFF_FILE`], [`ON_FILE`], [`CAMERA_FILE`] or
 /// [`SEEN_MORE_FILE`]),
@@ -7196,11 +7252,12 @@ impl Run {
 
 /// The newest values `$skill` may read: every topic's, but
 /// [`SEEN_MORE_TOPIC`]'s only with the owner's `seen_more` yes for it
-/// ([`SEEN_MORE_FILE`]). Field by field, so it borrows beside a `&mut` of
-/// another of the engine's fields.
+/// ([`SEEN_MORE_FILE`]) or the desk-noticing yes's cover ([`desk_covers`]).
+/// Field by field, so it borrows beside a `&mut` of another of the
+/// engine's fields.
 macro_rules! seen {
     ($engine:ident, $skill:expr) => {
-        if $engine.seen_more.contains(&$skill.name) {
+        if hears_more_with(&$engine.seen_more, $engine.desk_noticing, $skill) {
             &$engine.latest
         } else {
             &$engine.latest_without_more
@@ -7225,6 +7282,10 @@ pub struct Engine {
     /// again with the off file ([`Engine::reread_seen_more`]). None without
     /// a state folder.
     seen_more: BTreeSet<String>,
+    /// The owner's desk-noticing yes stands ([`DESK_NOTICING_YES`]), so
+    /// [`SEEN_PRODUCT`] hear [`SEEN_MORE_TOPIC`] ([`Engine::set_desk_noticing`]).
+    /// False until said.
+    desk_noticing: bool,
     /// The skills whose refusal of [`SEEN_MORE_TOPIC`] the journal said,
     /// once each until a yes is given.
     seen_more_said: BTreeSet<String>,
@@ -7582,6 +7643,20 @@ impl Engine {
     /// asked still ([`asks_anyway`]). Without it, or `asking_the_policy`,
     /// nothing a skill starts is done.
     pub fn new(skills: Vec<Skill>, skip_ask: bool) -> Self {
+        // A skill that names `humans/doing_more` is kept out of the journal
+        // ([`journal`]).
+        journal::hide(
+            skills
+                .iter()
+                .filter(|skill| {
+                    skill
+                        .permissions
+                        .topics
+                        .iter()
+                        .any(|topic| topic == SEEN_MORE_TOPIC)
+                })
+                .map(|skill| skill.name.as_str()),
+        );
         Self {
             generation: Arc::new(()),
             skills: skills.into_iter().filter(|skill| skill.enabled).collect(),
@@ -7589,6 +7664,7 @@ impl Engine {
             latest: HashMap::new(),
             latest_without_more: HashMap::new(),
             seen_more: BTreeSet::new(),
+            desk_noticing: false,
             seen_more_said: BTreeSet::new(),
             holding: HashMap::new(),
             tool_ran: HashMap::new(),
@@ -8144,6 +8220,7 @@ impl Engine {
             );
             BTreeSet::new()
         });
+        journal::hide(self.seen_more.iter().map(String::as_str));
         Ok(self.off.iter().cloned().collect())
     }
 
@@ -8168,11 +8245,34 @@ impl Engine {
                 return None;
             }
         };
-        let taken: BTreeSet<String> = self.seen_more.difference(&yes).cloned().collect();
-        self.seen_more = yes;
+        let desk = self.desk_noticing;
+        Some(self.hearing_changed(yes, desk))
+    }
+
+    /// The owner's desk-noticing yes as it now stands ([`DESK_NOTICING_YES`],
+    /// [`desk_noticing_yes`]): while it does, [`SEEN_PRODUCT`] hear
+    /// [`SEEN_MORE_TOPIC`]. `None` when it did not change; taken back (a
+    /// forget's too), the runs ended, as [`Engine::reread_seen_more`]'s.
+    pub fn set_desk_noticing(&mut self, yes: bool) -> Option<Vec<Run>> {
+        if yes == self.desk_noticing {
+            return None;
+        }
+        let kept = self.seen_more.clone();
+        Some(self.hearing_changed(kept, yes))
+    }
+
+    /// The skills hearing [`SEEN_MORE_TOPIC`] now by the `seen_more` yeses
+    /// `kept` and the desk-noticing yes `desk`: a skill that no longer hears
+    /// it lets go of what it held on the topic (the runs returned).
+    fn hearing_changed(&mut self, kept: BTreeSet<String>, desk: bool) -> Vec<Run> {
+        journal::hide(kept.iter().map(String::as_str));
+        let before = self.hearing_more();
+        self.seen_more = kept;
+        self.desk_noticing = desk;
+        let after = self.hearing_more();
+        let taken: BTreeSet<String> = before.difference(&after).cloned().collect();
         // A yes given: a later no is said again.
-        self.seen_more_said
-            .retain(|name| !self.seen_more.contains(name));
+        self.seen_more_said.retain(|name| !after.contains(name));
         let mut ends = Vec::new();
         for skill in self
             .skills
@@ -8206,13 +8306,29 @@ impl Engine {
                 }
             }
         }
-        Some(ends)
+        ends
     }
 
-    /// Whether `skill` hears [`SEEN_MORE_TOPIC`]: only with the owner's yes
-    /// kept for its name ([`SEEN_MORE_FILE`]), a core skill's too.
+    /// The skills loaded that hear [`SEEN_MORE_TOPIC`] now.
+    fn hearing_more(&self) -> BTreeSet<String> {
+        self.skills
+            .iter()
+            .filter(|skill| hears_more_with(&self.seen_more, self.desk_noticing, skill))
+            .map(|skill| skill.name.clone())
+            .collect()
+    }
+
+    /// Whether `skill` hears [`SEEN_MORE_TOPIC`]: with the owner's yes kept
+    /// for its name ([`SEEN_MORE_FILE`]), a core skill's too, or, for one
+    /// of [`SEEN_PRODUCT`] loaded as core and not pushed, while the
+    /// desk-noticing yes stands ([`Engine::set_desk_noticing`]).
     pub fn hears_more(&self, skill: &str) -> bool {
         self.seen_more.contains(skill)
+            || (self.desk_noticing
+                && self
+                    .skills
+                    .iter()
+                    .any(|loaded| loaded.name == skill && desk_covers(loaded)))
     }
 
     /// The skills turned off read again from where they are kept, which
@@ -9699,7 +9815,7 @@ impl Engine {
             // A skill that names it without the owner's seen_more yes
             // receives nothing from it, said once a skill (#6543).
             for skill in &self.skills {
-                if !self.seen_more.contains(&skill.name)
+                if !hears_more_with(&self.seen_more, self.desk_noticing, skill)
                     && skill.permissions.topics.iter().any(|named| named == topic)
                     && self.seen_more_said.insert(skill.name.clone())
                 {
@@ -9715,7 +9831,7 @@ impl Engine {
         }
         let mut dropping: Vec<String> = Vec::new();
         for skill in &self.skills {
-            if more && !self.seen_more.contains(&skill.name) {
+            if more && !hears_more_with(&self.seen_more, self.desk_noticing, skill) {
                 continue;
             }
             for (index, condition) in skill.conditions.iter().enumerate() {
@@ -9856,7 +9972,9 @@ impl Engine {
                         .or_default()
                         .ran_us = Some(now_us);
                 }
-                if trigger.topic != topic || (more && !self.seen_more.contains(&skill.name)) {
+                if trigger.topic != topic
+                    || (more && !hears_more_with(&self.seen_more, self.desk_noticing, skill))
+                {
                     continue;
                 }
                 if trigger.when == When::Changes

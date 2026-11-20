@@ -521,6 +521,10 @@ fn every_skill_folder_says_its_kind_and_version() {
             "prepare-unplug",
             "reminders",
             "rest-your-eyes",
+            "seen-celebrate",
+            "seen-drink",
+            "seen-eat",
+            "seen-tired",
             "sip-of-water",
             "sit-back",
             "smoky-air",
@@ -545,10 +549,6 @@ fn every_skill_folder_says_its_kind_and_version() {
             "morning-agenda",
             "morning-mail",
             "quiet-focus",
-            "seen-celebrate",
-            "seen-drink",
-            "seen-eat",
-            "seen-tired",
             "tomorrows-plan",
             "who-was-here"
         ]
@@ -570,14 +570,8 @@ fn every_skill_folder_says_its_kind_and_version() {
             .filter(|skill| !skill.enabled)
             .map(|skill| skill.name.as_str())
             .collect::<Vec<_>>(),
-        [
-            "comfort-break",
-            "seen-celebrate",
-            "seen-drink",
-            "seen-eat",
-            "seen-tired"
-        ],
-        "every existing scene and skill retains its enabled default; Comfort break is on only by its [present] (#5207); Bedtime and Morning is on since #5753; the seen reactions are off until the owner's day-long row (#6543)"
+        ["comfort-break"],
+        "every existing scene and skill retains its enabled default; Comfort break is on only by its [present] (#5207); Bedtime and Morning is on since #5753; the seen reactions are on, silent without the owner's seen_more yes (#6543)"
     );
 }
 

@@ -135,6 +135,13 @@ pub struct Places {
     /// `can` names `skills.seen_more` and a row that names the topic
     /// carries `seen_more_allowed`; off, the page is as before.
     pub seen_more: bool,
+    /// The owner's desk-noticing yes's file
+    /// ([`lamp_skills::DESK_NOTICING_YES`]): while it stands, the four seen
+    /// reactions ([`lamp_skills::SEEN_PRODUCT`], core) carry
+    /// `seen_more_allowed` true, as `lamp-skills` gives them the topic
+    /// (the owner's call, 23 Nov on #7668). Read only with
+    /// [`Places::seen_more`] on.
+    pub desk_noticing: PathBuf,
     /// `lamp-services`' admin socket, asked once a list which services are
     /// linked, for each row's `needs_link` and the [`NEEDS_LINK_KIND`]
     /// event, with [`LINK_ENVIRONMENT`] on; none without it.
@@ -153,6 +160,7 @@ impl Places {
             manage: lamp_skills::package::MANAGE_SOCKET.into(),
             addons: std::env::var(lamp_skills::ADDONS_ENVIRONMENT).is_ok_and(|value| value == "on"),
             seen_more: std::env::var(SEEN_MORE_ENVIRONMENT).is_ok_and(|value| value == "on"),
+            desk_noticing: lamp_skills::DESK_NOTICING_YES.into(),
             link: link_on_from(std::env::var(LINK_ENVIRONMENT).ok().as_deref())
                 .then(|| crate::services::ADMIN_SOCKET.into()),
         }
@@ -525,8 +533,11 @@ pub struct Listed {
     /// (its `may_use` has `seen_more`): true when the owner said yes to it
     /// hearing that, `skills.seen_more`, kept in `lamp-skills`'
     /// `seen_more` beside the off file, false when not or when that file
-    /// can't be read (#6543). A core skill too needs the yes. Left out
-    /// otherwise, so the page is as before with the switch off.
+    /// can't be read (#6543). A core skill too needs the yes, but the four
+    /// seen reactions ([`lamp_skills::SEEN_PRODUCT`], core), which the
+    /// owner's desk-noticing yes covers while it stands
+    /// ([`Places::desk_noticing`]). Left out otherwise, so the page is as
+    /// before with the switch off.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub seen_more_allowed: Option<bool>,
     /// Whether the running `lamp-skills` loads it.
@@ -601,15 +612,21 @@ pub fn list(places: &Places) -> Result<Value, String> {
             rows.push(listed);
         }
     }
-    // The owner's seen_more yes, only with the switch on (#6543).
+    // The owner's seen_more yes, only with the switch on (#6543), and the
+    // desk-noticing yes's cover of the four seen reactions, as lamp-skills
+    // reads both (the owner's call, 23 Nov on #7668).
     if places.seen_more {
         let yes = read_off(&places.off.with_file_name(lamp_skills::SEEN_MORE_FILE));
+        let desk = lamp_skills::desk_noticing_yes(&places.desk_noticing);
         for listed in &mut rows {
+            let covered = desk
+                && listed.group == Group::Core
+                && lamp_skills::SEEN_PRODUCT.contains(&listed.name.as_str());
             listed.seen_more_allowed = listed
                 .may_use
                 .iter()
                 .any(|used| used.name == "seen_more")
-                .then(|| yes.as_ref().is_some_and(|yes| yes.contains(&listed.name)));
+                .then(|| covered || yes.as_ref().is_some_and(|yes| yes.contains(&listed.name)));
         }
     }
     rows.sort_by(|a, b| (a.group, &a.name).cmp(&(b.group, &b.name)));
@@ -1166,6 +1183,7 @@ pub mod tests {
             store: true,
             addons: false,
             seen_more: false,
+            desk_noticing: root.join("seen-activity.json"),
             link: None,
         }
     }
