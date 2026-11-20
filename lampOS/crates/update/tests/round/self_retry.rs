@@ -1,6 +1,7 @@
-//! An updater build put back is tried once more only when a reboot came
-//! in its minutes (#2810): its switch began on one boot and
-//! lamp-update-back put it back on another.
+//! An updater build put back is tried once more when a reboot came in
+//! its minutes (#2810): its switch began on one boot and lamp-update-back
+//! put it back on another. Put back on the boot it began on, it is tried
+//! once more on a later boot or a day later (#6901).
 use super::*;
 
 const BAD: &str = "#!/bin/sh\nexit 1\n";
@@ -26,15 +27,22 @@ fn switched_and_put_back(lamp: &mut Lamp, on: &str, then: &str) {
 }
 
 #[test]
-fn a_build_put_back_on_the_boot_it_began_on_stays_refused() {
+fn a_build_put_back_on_the_boot_it_began_on_is_tried_once_more_on_a_later_boot() {
     let mut lamp = Lamp::installed_switching_itself();
     let old = lamp.own_build();
+    let new = sha(BAD);
     product_build_with_updater(&mut lamp, 2, BAD);
     switched_and_put_back(&mut lamp, "boot-a", "boot-a");
+    // On the same boot, within its day: refused.
     assert_eq!(lamp.round(), Outcome::UpToDate(2), "{:?}", lamp.said);
-    // An ordinary reboot hours later does not reopen it (Tests' P2 on
-    // #4131).
-    boot(&lamp, "boot-b");
+    assert_eq!(lamp.own_build(), old);
+    // On a later boot it is tried once more (#6901, replacing Tests' P2 on
+    // #4131, which kept it refused): a Wi-Fi drop or a refused fetch in its
+    // ten minutes left a lamp waiting for a newer updater for good.
+    switched_and_put_back(&mut lamp, "boot-b", "boot-b");
+    assert_eq!(own::retried(&lamp.records()), vec![new.clone()]);
+    // Put back a second time: final, whatever the boot.
+    boot(&lamp, "boot-c");
     assert_eq!(lamp.round(), Outcome::UpToDate(2), "{:?}", lamp.said);
     assert_eq!(lamp.own_build(), old);
 }
@@ -84,7 +92,12 @@ fn an_updater_refused_for_good_does_not_block_a_newer_updater() {
     let old = lamp.own_build();
     product_build_with_updater(&mut lamp, 2, BAD);
     switched_and_put_back(&mut lamp, "boot-a", "boot-a");
-    assert!(own::refused_for_good(&lamp.records(), &sha(BAD)));
+    assert!(own::refused_for_good(
+        &lamp.records(),
+        &lamp.root,
+        &sha(BAD),
+        records_now()
+    ));
     product_build_with_updater(&mut lamp, 3, "lamp-update 3");
     assert_eq!(
         lamp.round(),
@@ -112,7 +125,12 @@ fn an_updater_refused_for_good_does_not_block_a_newer_updater() {
     );
     let back = lamp.back(update_unit("failed", "failed"), records_now());
     assert!(matches!(back, own::Back::PutBack(_)), "{back:?}");
-    assert!(own::refused_for_good(&lamp.records(), &sha(BAD)));
+    assert!(own::refused_for_good(
+        &lamp.records(),
+        &lamp.root,
+        &sha(BAD),
+        records_now()
+    ));
     assert!(
         matches!(lamp.round(), Outcome::Refused(_)),
         "{:?}",
