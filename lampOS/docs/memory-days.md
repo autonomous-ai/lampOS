@@ -1155,14 +1155,23 @@ body `{"turns":[{"id","at","person","heard","said"}]}`.
   (`exchanges`, by scope, as turn ids: the forget half's answer) are let go and kept as
   forgotten (the last 4,096), so a save naming one is dropped before any POST,
   a retry or a start's catch-up included: the lamp's own guard beside the
-  server's tombstone. A forget everything forgets every id offered in that
+  server's tombstone. A forget everything forgets every id handed over in that
   scope so far. When the answer names no ids (or none comes), the forgetting
-  person's and the room's unsent turns wait for the next start, when the memory
-  no longer holds what went. Other people's unsent turns are never let go.
+  person's and the room's turns handed over so far wait for the next start,
+  when the memory no longer holds what went: those queued or held, and those in
+  a batch the sender already took off its queue, which is checked again before
+  every try, the first included, and never put back to post (Friday's P2 on
+  #7957). A forget everything's room lines are not named either, so the room's
+  wait the same way. A POST already under way is not stopped; its next try is
+  checked. Other people's unsent turns are never let go.
   Every memory answer the voice reads with `exchanges` turn ids (all five
   forget ops, `history_forget::answered`) goes to `history_send::deleting`, so
   those ids are never posted, whatever `LAMP_HISTORY_FORGET`. A forget about a
-  thing holds and lifts the posts as every other forget. A source forgotten
+  thing holds and lifts the posts as every other forget. When each of its
+  removals answered, what went was named on its way and nothing more is let
+  go; when one timed out or was lost part way (the kept things' forgets or the
+  exchanges forget), what went is not known, and it is taken as a forget
+  naming no ids, never as "nothing removed". A source forgotten
   outside the voice is taken as an unnamed forget of that person's.
 - **Nothing lost at a restart, and no words on disk:** only ids are kept, in
   `/var/lib/lampOS/voice/history-marks.json` (0600,
