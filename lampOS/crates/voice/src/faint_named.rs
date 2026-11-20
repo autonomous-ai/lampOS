@@ -96,8 +96,10 @@ impl FaintNamed {
     /// `began_us`, said at `now_us`: the hearing [`Self::named`] says, said
     /// before or not (`LAMP_NAME_FACE_OR_WORDS`, #8136).
     pub fn turned_away(&self, began_us: u64, now_us: u64) -> bool {
-        let _ = (began_us, now_us);
-        false
+        let from_us = began_us.saturating_sub(SLACK_US);
+        self.blocks
+            .iter()
+            .any(|(at, .., under)| *under && (from_us..=now_us).contains(at))
     }
 }
 

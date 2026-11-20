@@ -7283,8 +7283,9 @@ fn conversation_with_gate_inner(
         );
     }
     leases.keep(rig, owner, &mut stalls)?;
-    let mut second_look =
-        crate::second_look::SecondLook::default().with_the_note(crate::called::on());
+    let mut second_look = crate::second_look::SecondLook::default()
+        .with_the_note(crate::called::on())
+        .holding_a_faint_wordless_call(crate::second_look::face_or_words_on());
     #[cfg(test)]
     let holding_on = crate::holding_answer::on() || TEST_HOLDING_ANSWER.with(std::cell::Cell::get);
     #[cfg(not(test))]
@@ -8423,8 +8424,9 @@ fn conversation_with_gate_inner(
                 submission_draining = admission.draining();
                 look_wanted = None;
                 answer_opening = None;
-                second_look =
-                    crate::second_look::SecondLook::default().with_the_note(crate::called::on());
+                second_look = crate::second_look::SecondLook::default()
+                    .with_the_note(crate::called::on())
+                    .holding_a_faint_wordless_call(crate::second_look::face_or_words_on());
                 holding_answer.clear();
                 care_still.clear();
                 look_note.clear();
@@ -8853,6 +8855,7 @@ fn conversation_with_gate_inner(
             }
             if words_heard(&event) {
                 last_turn_us = monotonic_us();
+                second_look.words_heard();
             }
             if let (
                 Some(hold),
@@ -12861,6 +12864,11 @@ fn conversation_with_gate_inner(
         if let Some(names) = name_in.as_mut()
             && let Some((began, score)) = names.newest_scored(clock)
         {
+            // `LAMP_NAME_FACE_OR_WORDS` (#8136): the floor's verdict on the
+            // hearing, for a request with no words.
+            if faint_named.turned_away(began, clock) {
+                second_look.turned_away(began);
+            }
             second_look.name_heard(began, score);
             name_began_us = name_began_us.max(Some(began));
         }
