@@ -4115,6 +4115,22 @@ gone ([switches.md](switches.md)). What happens:
      and not forced. Host tests:
      `round_one_forced::a_make_past_the_lamps_name_heard_as_another_word_is_forced_on_a_named_line_alone`,
      `wake_not_name::past_the_name_is_the_line_past_the_misheard_name_on_a_named_line`.
+   - **The other first-round forces read past the name the same way**
+     (#8022: on lamp-52e6 on 20 Nov the gates' timer and reminder asks
+     said `calls=none`). `second_provider::forced_past_the_name` reads a
+     force on the line as said and, when that forces nothing, on the line
+     past the lamp's name (`second_provider::past_the_name`: the reading
+     above, with the line's kept `named`): the keep ask
+     (`LAMP_MEMORY_KEEP_ASKED`), the schedule ask (`LAMP_SCHEDULE_ASKED`),
+     the reminders question (`LAMP_REMINDERS_ASKED`), the skill ask
+     (`LAMP_SKILL_ASKED`) and the face ask (`LAMP_SECOND_REMEMBER_ASKED`)
+     all go through it, and `make_asked` reads the same `past_the_name`.
+     The named agent ask (`LAMP_TASKS_NAMED_ASK`) and a known face's other
+     name (`LAMP_NAMES_RENAME_ASKED`) read the whole line, not its
+     opening, and are unchanged. A line said to a person ("Hey, Anna, …")
+     is read as said. Host tests:
+     `forces_past_name::each_force_reads_its_ask_past_the_lamps_name_set_off_or_misheard`,
+     `forces_past_name::a_misheard_name_is_read_past_only_while_the_line_names_the_lamp`.
    - **A make is never a task** (#8022 case 2, the first builder's yes at
      11:05): while `make_skill` is declared, `start_agent_task`'s
      description ends "Making a skill is make_skill's, never this." (`agent_tasks::MAKE_TOLD`), only

@@ -2297,6 +2297,10 @@ With the switch:
   (`known_faces::gives_a_name`) has its first round sent with
   `tool_choice` naming `remember_my_face`. The name is still checked, so
   one not in their words is refused, and the model asks them to spell it.
+  The ask is read past the lamp's name too
+  (`second_provider::forced_past_the_name`, #8022): "Hey, Lynn, remember
+  my face, I'm …" on a line that names the lamp, never "Hey, Anna, …" said
+  to a person.
   Not forced, the model's as before:
   - an ask with no name;
   - a name in the line after an ask, since the thread doesn't say the two

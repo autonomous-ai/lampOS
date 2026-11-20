@@ -4558,7 +4558,12 @@ then use that person's scope:
   named ask and a face ask. A question of what the lamp knows, a reminder
   ("remember to …"), a face ask, the phrase further in and a refusal
   before it are not forced. What the lamp then says follows what the
-  memory did: kept, or, below, not kept and said so. With the same switch
+  memory did: kept, or, below, not kept and said so. The ask is read past
+  the lamp's name too (`second_provider::forced_past_the_name`, #8022): its
+  own name set off by a stop ("Hey Lamp. Remember that …") and, on a line
+  that names the lamp, its name heard as another word ("Hey, Lynn,
+  remember that …"); a line said to a person ("Hey, Anna, …") is read as
+  said. With the same switch
   a face said saved with nothing saved is the same miss (#5141 row 8:
   lamp-0c4e, 3 Nov, "hold still while I take your face in" with no
   `remember_my_face` call). A reply that says the lamp is saving or saved

@@ -6346,8 +6346,14 @@ pub(crate) fn named_asks(place: crate::agent_tasks::Place) -> crate::second_prov
 /// is told to ask them to spell it. A name in a later line is the model's,
 /// as before: the thread's messages don't say whether the line before was
 /// the same person's, and in a room another's ask would file this one's
-/// name on the face at the lamp (reviewer-three's P2 on #3298).
+/// name on the face at the lamp (reviewer-three's P2 on #3298). Read past
+/// the lamp's name too (`second_provider::forced_past_the_name`, #8022).
 pub(crate) fn remember_asks() -> crate::second_provider::net::Force {
+    crate::second_provider::forced_past_the_name(remember_asks_as_said())
+}
+
+/// [`remember_asks`] on the line as said.
+fn remember_asks_as_said() -> crate::second_provider::net::Force {
     use crate::known_faces::{asks_to_remember, gives_a_name};
     Arc::new(|messages: &[Message]| {
         let last = messages.last().filter(|message| message.role == "user")?;

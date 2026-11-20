@@ -3419,6 +3419,32 @@ pub(crate) fn past_the_name_heard_as(said: &str, named: bool) -> Option<&str> {
     })
 }
 
+/// [`past_the_name_heard_as`] for a person's line as the first round's
+/// forces see it, `named` as `answer` kept it by the line's exact words
+/// (`crate::tools::make_skill_asked::heard_named`): a force sees only the
+/// messages.
+pub(crate) fn past_the_name(said: &str) -> Option<&str> {
+    past_the_name_heard_as(said, crate::tools::make_skill_asked::named(said))
+}
+
+/// `force` read on the person's line as said or, when that forces nothing,
+/// on the line past the lamp's name ([`past_the_name`]): "Hey Lamp. Remind
+/// me in ten minutes to stretch.", or "Hey, Lynn, remind me …" on a line
+/// that names the lamp. On lamp-52e6 on 20 Nov (#8022) the gates' timer
+/// and reminder asks said `calls=none`. Every first-round force that reads
+/// its ask at the line's opening goes through this one reading, so none
+/// drifts from another; a line said to a person ("Hey, Anna, …") is read
+/// as said. The line past the name is asked alone: these forces read only
+/// the last message.
+pub(crate) fn forced_past_the_name(force: net::Force) -> net::Force {
+    Arc::new(move |messages: &[Message]| {
+        force(messages).or_else(|| {
+            let last = messages.last().filter(|message| message.role == "user")?;
+            force(&[Message::user(past_the_name(last.words()?)?)])
+        })
+    })
+}
+
 /// Greetings a line may open with, set off by a comma or a stop, before
 /// the lamp's name as heard ([`wake_heard_as`]), NFC lower case. "Hey",
 /// "hi", "ok" and "okay" are passed over by [`first_word_set_off`] itself,
