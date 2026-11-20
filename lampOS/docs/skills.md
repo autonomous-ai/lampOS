@@ -4076,15 +4076,24 @@ gone ([switches.md](switches.md)). What happens:
      fired). Every round 1 the chat is asked (not a skill called in code by
      its name, not a quoted line) says, on the messages it is asked:
      `lamp-voice second: request N: round 1: task_offered=y make_offered=y
-     forced=make_skill make_ask=y sentences=1`. `task_offered` and
+     forced=make_skill make_ask=y sentences=1 ask_in=1 opening=name`.
+     `task_offered` and
      `make_offered` are whether `start_agent_task` and `make_skill` were
      given; `forced` the function its `tool_choice` named (`none` for
      none); `make_ask` whether the person's line asks to make a skill as
      the force reads it (`make_skill_asked::make_asked`, below), and
-     `sentences` how many sentences it counts in it. `?` where the
-     services can't say, or where the last message is no person's line.
-     Names, `y`/`n` and a count only, never a word. Host test:
-     `round_one_forced::round_one_says_its_force_and_the_make_ask_never_its_words`.
+     `sentences` how many sentences it counts in it; `ask_in` which
+     sentence (1-based, split as the force splits) alone opens with the ask
+     and says what the skill does, the first read past the lamp's name as
+     the force reads it (`make_skill_asked::ask_sentence`; `none` for none,
+     or a line with a doubt or a take-back), and `opening` how the line
+     opens: `name` with the lamp's own name set off (`name_call_rest`),
+     `misheard` with its name heard as another word on a line that names
+     it (`wake_heard_as`), `none` with neither. `?` where the services
+     can't say, or where the last message is no person's line. Names,
+     `y`/`n` and counts only, never a word. Host tests:
+     `round_one_forced::round_one_says_its_force_and_the_make_ask_never_its_words`,
+     `round_one_forced::round_one_says_which_sentence_asks_and_how_the_line_opens`.
    - **Past the lamp's name heard as another word** (#8022 case 2, third
      cause: kit-8101's ROW on lamp-52e6, 20 Nov 14:38, played the make
      ask; speech to text wrote the lamp's name as another word, set off,
