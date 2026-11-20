@@ -143,6 +143,11 @@ pub(crate) const WORDS_AFTER_CAP_NOTE: &str = "(For you to know: this request ma
 /// What the lamp says when that round has no words either: never silence
 /// after the person waited through every round.
 pub(crate) const UNFINISHED_LINE: &str = "Sorry, I couldn't finish that. Could you ask me again?";
+
+/// What a call is answered that can't run once an app the model started in
+/// the same round holds the turn (`start_app`, #7415): another app start, a
+/// skill made by voice, a sleep or a recording would speak over the app.
+pub(crate) const APP_TOOK_THE_TURN: &str = "not run: an app took the turn";
 /// A turn's first chat round that has not begun (no word, no call) this
 /// long after it was asked, which is as soon as speech to text gave the
 /// words, is given up and the turn ends unanswered: an answer said 12 s
@@ -21235,9 +21240,39 @@ async fn answer(
             };
             // A held call still ends the turn even if a forget stops the batch.
             let policy_held = policed.contains(&Policed::Held);
+            // An app the model started in this round took the line
+            // (`start_app`, #7415): the round's other calls still run, as
+            // they were asked ("turn the volume down and start the coach",
+            // the Reviewer-lead's must-fix on #8131), and the request ends
+            // as taken once they are answered. `reached` is how many calls
+            // the loop came to, so none is left without a word.
+            let mut app_took = false;
+            let mut reached = 0;
             for (call_index, ((call, held), policed)) in
                 calls.iter().zip(held_by_rule).zip(policed).enumerate()
             {
+                reached = call_index + 1;
+                // A call that can't run once an app holds the turn: another
+                // `start_app` (the line is taken already), a skill made by
+                // voice (its waiting line would speak over the app) and a
+                // sleep (it would end the app's turn). Answered as not run
+                // and journalled, never dropped without a word.
+                if app_took
+                    && (call.name == crate::app_triggers::START_APP
+                        || call.name == crate::made_skill::MAKE
+                        || crate::sleep_asked::is_tool(&call.name))
+                {
+                    eprintln!(
+                        "lamp-voice second: request {request} chat round {round}: {} not run: an app took the turn ({})",
+                        call.name,
+                        crate::app_triggers::ENVIRONMENT
+                    );
+                    messages.push(Message::tool(
+                        call.id.clone(),
+                        serde_json::json!({"error": APP_TOOK_THE_TURN}).to_string(),
+                    ));
+                    continue;
+                }
                 if let Some((_, note)) = dropped_told.as_ref().filter(|(id, _)| *id == call.id) {
                     messages.push(Message::tool(call.id.clone(), note.clone()));
                     continue;
@@ -21715,14 +21750,28 @@ async fn answer(
                     return Err(Stop::Gone);
                 }
                 // An app the model started (`start_app`, #7415) took the
-                // line and speaks for itself: the request ends here as the
-                // fast path's does, with no further round and no words.
+                // line and speaks for itself: the request ends after this
+                // round as the fast path's does, with no further round and
+                // no words; the round's other calls are answered first.
                 if call.name == crate::app_triggers::START_APP && answer.told["started"] == true {
                     eprintln!(
-                        "lamp-voice second: request {request}: the model started an app, which took the line: the request ends here ({})",
+                        "lamp-voice second: request {request}: the model started an app, which took the line: the request ends after this round's other calls ({})",
                         crate::app_triggers::ENVIRONMENT
                     );
-                    return Err(Stop::Taken);
+                    app_took = true;
+                    continue;
+                }
+                // A recording offered once an app holds the turn would play
+                // over the app: not played, and the model told so.
+                if app_took && answer.requested_audio.is_some() {
+                    eprintln!(
+                        "lamp-voice second: request {request} chat round {round}: {} offered a recording after an app took the turn; not played ({})",
+                        call.name,
+                        crate::app_triggers::ENVIRONMENT
+                    );
+                    answer = crate::tools::ToolAnswer::plain(serde_json::json!({
+                        "error": APP_TOOK_THE_TURN
+                    }));
                 }
                 // A skill turned off, its function asked for on a heard line
                 // (`LAMP_MADE_SKILL_OFF_SAID`; the first builder, 18:41 on 18
@@ -22109,6 +22158,19 @@ async fn answer(
                     }
                     dispatched.store(true, Ordering::Relaxed);
                 }
+            }
+            // An app took the line in this round: every call the loop came
+            // to is answered; any it did not come to (a forget after the
+            // start stops the batch) is journalled, and the request ends.
+            if app_took {
+                for call in &calls[reached..] {
+                    eprintln!(
+                        "lamp-voice second: request {request} chat round {round}: {} not run: an app took the turn ({})",
+                        call.name,
+                        crate::app_triggers::ENVIRONMENT
+                    );
+                }
+                return Err(Stop::Taken);
             }
             // Every call answered: the round goes with the words if a line
             // cuts them now (#5026). After a forget, no round before it
