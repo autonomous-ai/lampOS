@@ -729,9 +729,10 @@ a skill cut for it is named on the setup line (#1706).
 
 The switch declares two functions, `reports_stop` and `reports_state`
 (below), so a session is told two more than without it. The product's
-unit sets it: a product lamp's chat request offers 50 of the lamp's own
+unit sets it: a product lamp's chat request offers 51 of the lamp's own
 functions (`PRODUCT_FUNCTIONS`, `crates/update/tests/functions.rs`), the
-voice's own 32 with these two among them (and lamp-services' three since
+voice's own 33 with these two among them (and `change_skill` beside
+`make_skill` since #8008, and lamp-services' three since
 `LAMP_SERVICES` is on in the product, `set_role` and `end_role`
 since `LAMP_MEMORY_ROLE` is on in the product, 9 Nov, and `go_to_sleep`
 since `LAMP_SLEEP_ASKED` is on in the product, #6853, and seen activity's

@@ -938,11 +938,12 @@ pub(crate) mod tests {
     }
 
     /// #7975 (lamp-9adf, 19 Nov: "change rain check to seven thirty"
-    /// removed it): a change never removes. The remove's parameter, as the
-    /// product's unit has it (`LAMP_MADE_SKILL_OFF_SAID`, `LAMP_MAKE_NO_ASKS`
-    /// on), tells the model it is never for a change, which is
-    /// `crate::made_change::CHANGE` (#8008). Within the link's bounds with
-    /// every switch on.
+    /// removed it): a change never removes. As the product's unit has it
+    /// (`LAMP_MADE_SKILL_OFF_SAID`, `LAMP_MAKE_NO_ASKS` on), a change is
+    /// its own function, `crate::made_change::FUNCTION` (#8008), whose
+    /// words say it is never removed; the remove's parameter is for good
+    /// alone, and `make_skill` has no change of its own. Within the link's
+    /// bounds with every switch on.
     #[test]
     fn a_change_is_never_a_remove() {
         crate::made_skill::set_off_said_here(Some(true));
@@ -955,13 +956,16 @@ pub(crate) mod tests {
         let remove = parameters["properties"][REMOVE]["description"]
             .as_str()
             .unwrap();
+        assert!(remove.contains("for good"), "{remove}");
         assert!(
-            remove.contains("never to turn one off, pause, stop or change it"),
-            "{remove}"
-        );
-        assert!(
-            parameters["properties"][crate::made_change::CHANGE].is_object(),
+            parameters["properties"][crate::made_change::CHANGE].is_null(),
             "{parameters}"
+        );
+        let change = crate::made_change::tool();
+        assert!(
+            change.description.contains("never removed"),
+            "{}",
+            change.description
         );
         assert!(parameters.to_string().len() <= 4_096);
         assert!(tool.description.len() <= 1_024);
