@@ -3078,9 +3078,14 @@ fn between_rounds_the_gateway_follows_the_lamps_agent_and_is_quiet_when_settled(
             ..Fake::default()
         };
         let mut said = Vec::new();
-        keep_between_rounds(lamp.root(), &mut systemd, gateway, &mut |line: &str| {
-            said.push(line.to_owned())
-        });
+        keep_between_rounds(
+            lamp.root(),
+            &mut systemd,
+            gateway,
+            false,
+            &mut Runs::new(&lamp).runner(),
+            &mut |line: &str| said.push(line.to_owned()),
+        );
         (systemd.asked, said)
     };
     // OpenClaw the agent, the gateway up and enabled: nothing done.
@@ -3111,7 +3116,81 @@ fn between_rounds_the_gateway_follows_the_lamps_agent_and_is_quiet_when_settled(
         active: Some("activating"),
         ..Fake::default()
     };
-    keep_between_rounds(lamp.root(), &mut systemd, Gateway::NotWanted, &mut quiet());
+    keep_between_rounds(
+        lamp.root(),
+        &mut systemd,
+        Gateway::NotWanted,
+        false,
+        &mut Runs::new(&lamp).runner(),
+        &mut quiet(),
+    );
     assert_eq!(systemd.asked, ["state"]);
     assert!(fs::symlink_metadata(lamp.at(WANTS)).is_ok());
+}
+
+/// Twelve's P2 on #8116: a gateway started between rounds because OpenClaw
+/// became the lamp's agent gets agent `main`'s entry added at once with the
+/// one run path on, through the running gateway; settled, nothing is run.
+#[test]
+fn a_gateway_started_for_openclaw_gets_agent_mains_entry_at_once() {
+    let lamp = Lamp::new();
+    lamp.harness_there();
+    tasks_there(&lamp, TASKS_BYTES);
+    let mut systemd = Fake::default();
+    round_shown(&lamp, &mut systemd, one_path());
+    install(&lamp, &Runs::new(&lamp), 20).unwrap();
+    let mut idle = Fake {
+        gateway: Some("active"),
+        active: Some("inactive"),
+        ..Fake::default()
+    };
+    keep_between_rounds(
+        lamp.root(),
+        &mut idle,
+        Gateway::NotWanted,
+        true,
+        &mut Runs::new(&lamp).runner(),
+        &mut quiet(),
+    );
+    assert!(fs::symlink_metadata(lamp.at(WANTS)).is_err());
+
+    let runs = Runs::new(&lamp);
+    let mut down = Fake {
+        gateway: Some("inactive"),
+        active: Some("inactive"),
+        ..Fake::default()
+    };
+    keep_between_rounds(
+        lamp.root(),
+        &mut down,
+        Gateway::Wanted,
+        true,
+        &mut runs.runner(),
+        &mut quiet(),
+    );
+    assert!(down.asked.contains(&"start-gateway"), "{:?}", down.asked);
+    assert_eq!(
+        approvals(&runs),
+        [approvals_line("add", "main", SKILL_START)]
+    );
+
+    let runs = Runs::new(&lamp);
+    let mut up = Fake {
+        gateway: Some("active"),
+        active: Some("inactive"),
+        ..Fake::default()
+    };
+    keep_between_rounds(
+        lamp.root(),
+        &mut up,
+        Gateway::Wanted,
+        true,
+        &mut runs.runner(),
+        &mut quiet(),
+    );
+    assert_eq!(
+        approvals(&runs),
+        Vec::<String>::new(),
+        "settled: nothing run"
+    );
 }
