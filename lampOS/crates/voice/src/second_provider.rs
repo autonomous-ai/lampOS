@@ -15899,7 +15899,9 @@ fn lamp_awaits_answer_for(
 /// conversation, one of `made_here` ([`lamp_awaits_answer_for`]).
 fn made_named_here(name: &str, args: &Value, made_here: &[String]) -> bool {
     name == crate::made_skill::MAKE
-        && made_here.iter().any(|made| made == crate::skill_named::function_of(name, args))
+        && made_here
+            .iter()
+            .any(|made| made == crate::skill_named::function_of(name, args))
 }
 
 /// Whether a yes of any kind is held for the person's next words: a keep or
