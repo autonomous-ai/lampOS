@@ -1485,7 +1485,9 @@ fn without_progress_nothing_is_listed_the_topic_is_untouched_and_the_report_is_a
     );
     assert_eq!(s.counts.listings.load(Ordering::SeqCst), 0);
     // The topic was never made: no publisher, no declaration, no value.
-    assert!(!s.config.bus_root.join("tasks").exists());
+    // (`tasks/agent` is published `off` with the one session off, #8138.)
+    assert!(!s.config.bus_root.join(TaskStatus::TOPIC).exists());
+    assert!(!s.config.bus_root.join(lamp_msgs::SkillTask::TOPIC).exists());
     assert!(bus.latest(TaskStatus::TOPIC).unwrap().is_none());
     // Asked for anyway, the words are not there.
     assert_eq!(
