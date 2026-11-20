@@ -2766,6 +2766,7 @@ dependencies = [
  "sha2",
  "signal-hook",
  "tempfile",
+ "toml",
 ]
 
 [[package]]
