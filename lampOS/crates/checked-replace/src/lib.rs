@@ -84,6 +84,10 @@ pub const NO_GATEWAY: &str = "is not running in its own namespaces";
 /// What it says joining a gateway just started whose namespace does not
 /// show Node yet (re-exported as `lamp_update::openclaw_install::NODE_NOT_READY`).
 pub const NODE_NOT_READY: &str = "'node': No such file or directory";
+/// What OpenClaw 2026.11.2 says to a check in a namespace of its own while
+/// its gateway runs (#7268): a gateway that started between a writer
+/// finding none and its check there (#8060), not a refusal of the text.
+pub const GATEWAY_CAME_UP: &str = "GatewayLockNamespaceError";
 /// The waits before each new try of a write OpenClaw's gateway was not
 /// there to check (lamp-tasks' `write_waiting`, lamp-update's one-shot
 /// `gateway_block`), 5 min 15 s in all: lamp-tasks can
@@ -104,10 +108,10 @@ pub const GATEWAY_WAITS: [Duration; 8] = [
 ];
 
 /// Whether a write was refused only because OpenClaw's gateway was not
-/// there to check it ([`NO_GATEWAY`], [`NODE_NOT_READY`]), not for its
-/// text.
+/// there to check it ([`NO_GATEWAY`], [`NODE_NOT_READY`]), or came up
+/// under a check run without it ([`GATEWAY_CAME_UP`]), not for its text.
 pub fn gateway_not_there(error: &str) -> bool {
-    error.contains(NO_GATEWAY) || error.contains(NODE_NOT_READY)
+    error.contains(NO_GATEWAY) || error.contains(NODE_NOT_READY) || error.contains(GATEWAY_CAME_UP)
 }
 
 /// What [`validate`] says of a check ended by a signal, OpenClaw's verdict
