@@ -5116,6 +5116,27 @@ mod tests {
     }
 
     #[test]
+    fn the_recognition_line_says_the_face_width_and_how_old_the_matched_prints_are() {
+        let mut people = People::open(file("recognition-line")).unwrap();
+        // Nobody kept: no likeness, no age.
+        assert_eq!(
+            recognition_line(people.best_likeness(&print(0.3)), 0.152, 0.114, 500),
+            "recognition best none height 0.152 width 0.114 prints age none (near at 0.1, same at 0.363)"
+        );
+        people.remember("Bea", vec![print(0.3)], 100).unwrap();
+        people.remember("Cy", vec![print(1.7)], 400).unwrap();
+        // The age is of the closest person's prints (Bea's, 400 s), not
+        // the newest kept (Cy's, 100 s).
+        let (how, _) = people.best_likeness(&print(0.3)).unwrap();
+        assert_eq!(
+            recognition_line(people.best_likeness(&print(0.3)), 0.152, 0.114, 500),
+            format!(
+                "recognition best {how:.3} height 0.152 width 0.114 prints age 400 s (near at 0.1, same at 0.363)"
+            )
+        );
+    }
+
+    #[test]
     fn nobody_is_known_until_asked_and_a_forgotten_face_is_gone_from_the_file() {
         let path = file("forget");
         let mut people = People::open(path.clone()).unwrap();
