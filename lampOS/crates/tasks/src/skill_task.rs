@@ -6846,6 +6846,8 @@ mod tests {
             ("MemoryHigh=", MEMORY_HIGH),
             ("CPUQuota=", CPU_QUOTA),
             ("TasksMax=", TASKS_MAX_LINE),
+            // #8180: each run's own cgroup is made in the unit's.
+            ("Delegate=", crate::run_cgroup::DELEGATE),
         ] {
             let found: Vec<_> = lines.iter().filter(|line| line.starts_with(name)).collect();
             assert_eq!(found, [&cap], "{name} once in [Service]");

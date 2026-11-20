@@ -29,7 +29,9 @@
 //!   `127.0.0.1:3128`), lamp-tasks' relay alone shown again under `/opt`
 //!   ([`RELAY_EDITS`]). No yes for net: refused before any token. Keys are
 //!   never given ([`NO_KEYS_HERE`]).
-//! - **Its bounds**: its own caps ([`CAPS_EDIT`]: [`SCRIPT_MEMORY_KB`] of
+//! - **Its bounds**: its own cgroup ([`crate::run_cgroup`], #8180: a real
+//!   total of memory, CPU and tasks for the whole run, refused on Linux
+//!   without it), and its own caps ([`CAPS_EDIT`]: [`SCRIPT_MEMORY_KB`] of
 //!   address space, [`SCRIPT_CPU_SECS`] of CPU, niceness [`SCRIPT_NICE`],
 //!   no core file, each process; [`SCRIPT_PROCESSES`] for the whole run),
 //!   never lamp-tasks' whole budget; [`RUN_WITHIN`] from
@@ -164,10 +166,10 @@ pub const SCRIPT_PROCESSES: u64 = 64;
 /// bash's is `-u`. It is set in the fence's own user namespace, just before
 /// the script's nested one is made, so the kernel counts it per namespace
 /// (Linux 5.14 and later): the run's own processes, never lamp-tasks' or
-/// any other of `lampos`'s. lamp-tasks.service runs as `lampos` with no
-/// delegated cgroup (no `Delegate=`), so a transient scope or a sub-cgroup
-/// with `memory.max`, `cpu.max` and `pids.max` can't be made from it
-/// without root; these limits are the run's total instead.
+/// any other of `lampos`'s. These are a second line of defence: the run's
+/// real total is its own cgroup's (`crate::run_cgroup`, #8180:
+/// `memory.max`, `cpu.max` and `pids.max` in lamp-tasks.service's
+/// delegated cgroup).
 pub const CAPS_EDIT: (&str, &str) = (
     "\nexec unshare --user --map-user=\"$u\"",
     concat!(
@@ -236,6 +238,9 @@ pub struct DirectRunner {
     /// ([`crate::egress::Grant::lamp`], with [`NET_SWITCH`] on); None: such
     /// a run is refused before it starts.
     pub egress: Option<crate::egress::Grant>,
+    /// Where each run's own cgroup is made (#8180,
+    /// [`crate::run_cgroup`]): its real memory, CPU and process total.
+    pub cgroups: crate::run_cgroup::RunCgroups,
 }
 
 impl std::fmt::Debug for DirectRunner {
@@ -259,6 +264,7 @@ impl DirectRunner {
             tick: RUN_TICK,
             most_output: MOST_OUTPUT,
             egress: None,
+            cgroups: crate::run_cgroup::RunCgroups::Lamp,
         }
     }
 
@@ -397,6 +403,9 @@ impl Runner for DirectRunner {
         } else {
             None
         };
+        // Its own cgroup before anything starts: none, it is refused
+        // (`crate::run_cgroup::NO_CGROUP`) and nothing runs.
+        let cgroup = self.cgroups.for_run(&run.run)?;
         let token = run
             .env
             .iter()
@@ -420,6 +429,9 @@ impl Runner for DirectRunner {
             .stdout(Stdio::piped())
             .stderr(Stdio::piped())
             .process_group(0);
+        if let Some(cgroup) = &cgroup {
+            cgroup.join_at_exec(&mut command);
+        }
         if let Some((_, fd)) = &way_out {
             egress_at_fd_5(&mut command, fd);
         }
@@ -501,6 +513,8 @@ impl Runner for DirectRunner {
         let _ = kill_process_group(pid, Signal::KILL);
         let _ = child.kill();
         let _ = child.wait();
+        // What is left of the run killed and its cgroup removed.
+        drop(cgroup);
         drop(way_out);
         if let Some(output) = output {
             let _ = output.join();

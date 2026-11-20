@@ -410,6 +410,9 @@ pub struct FenceLaunch {
     pub tokens: Box<dyn Tokens + Send + Sync>,
     /// The program started as the fence: lamp-tasks' own.
     pub program: PathBuf,
+    /// Where each try's own cgroup is made (#8180,
+    /// [`crate::run_cgroup`]); none on Linux: the try is refused.
+    pub cgroups: crate::run_cgroup::RunCgroups,
 }
 
 impl FenceLaunch {
@@ -419,6 +422,7 @@ impl FenceLaunch {
             tokens: Box::new(crate::skill_task::ControlTokens::default()),
             program: std::env::current_exe()
                 .unwrap_or_else(|_| PathBuf::from(crate::gateway::RELAY)),
+            cgroups: crate::run_cgroup::RunCgroups::Lamp,
         }
     }
 }
@@ -468,6 +472,8 @@ impl Launch for FenceLaunch {
             return Err(NEVER_IN_A_TRY.into());
         }
         let id = crate::skill_task::run_id();
+        // Its own cgroup before its token: none, no token and no try.
+        let cgroup = self.cgroups.for_run(&id)?;
         let Minted { token, .. } = self.tokens.mint_try(grants, &id)?;
         let grant = crate::skill_start::Grant {
             script: skill.join(script),
@@ -479,7 +485,9 @@ impl Launch for FenceLaunch {
             token: token.secret().to_owned(),
             egress: None,
         };
-        let ran = run_fence(&self.program, &grant, within);
+        let ran = run_fence(&self.program, &grant, within, cgroup.as_ref());
+        // What is left of the try killed and its cgroup removed.
+        drop(cgroup);
         let said = self.tokens.end_said(&id);
         let mut ran = ran?;
         ran.said = said;
@@ -487,14 +495,20 @@ impl Launch for FenceLaunch {
     }
 }
 
-/// `program` started as [`FENCE_ARG`] with `grant` on its stdin, waited for
-/// up to `within`, then killed (its fence's PID namespace goes with it).
+/// `program` started as [`FENCE_ARG`] with `grant` on its stdin, in
+/// `cgroup` from before its exec, waited for up to `within`, then killed
+/// (its fence's PID namespace goes with it).
 pub fn run_fence(
     program: &Path,
     grant: &crate::skill_start::Grant,
     within: Duration,
+    cgroup: Option<&crate::run_cgroup::RunCgroup>,
 ) -> Result<Ran, String> {
-    let mut child = Command::new(program)
+    let mut command = Command::new(program);
+    if let Some(cgroup) = cgroup {
+        cgroup.join_at_exec(&mut command);
+    }
+    let mut child = command
         .arg(FENCE_ARG)
         .env_clear()
         .env("PATH", crate::gateway::SCRIPT_PATH)
@@ -915,7 +929,9 @@ mod tests {
                 minted: minted.clone(),
             }),
             program,
+            cgroups: crate::run_cgroup::RunCgroups::Fake(dir.path().join("cgroup")),
         };
+        std::fs::create_dir(dir.path().join("cgroup")).unwrap();
         let skill = dir.path().join("skill");
         let ran = launch
             .launch(
@@ -941,6 +957,46 @@ mod tests {
             assert_eq!(refused.unwrap_err(), NEVER_IN_A_TRY);
         }
         assert_eq!(minted.lock().unwrap().len(), 1, "no token for them");
+        // #8180: the try ran in its own cgroup, joined by its fence's
+        // process before its exec, and the cgroup was ended with it.
+        let ended: Vec<_> = std::fs::read_dir(dir.path().join("cgroup"))
+            .unwrap()
+            .map(|entry| entry.unwrap().file_name().into_string().unwrap())
+            .collect();
+        assert_eq!(ended.len(), 1, "{ended:?}");
+        assert!(ended[0].starts_with("done-"), "{ended:?}");
+        let joined = std::fs::read_to_string(
+            dir.path()
+                .join("cgroup")
+                .join(&ended[0])
+                .join("cgroup.procs"),
+        )
+        .unwrap();
+        assert_eq!(joined, "0");
+    }
+
+    /// #8180: a try whose own cgroup can't be made is refused before any
+    /// token is minted, so it is not tried (`not_tried`, nothing kept).
+    #[test]
+    fn a_try_without_its_own_cgroup_is_refused_before_its_token() {
+        let minted = Arc::new(Mutex::new(Vec::new()));
+        let dir = tempfile::tempdir().unwrap();
+        let launch = FenceLaunch {
+            tokens: Box::new(TriedTokens {
+                minted: minted.clone(),
+            }),
+            program: dir.path().join("never-started"),
+            cgroups: crate::run_cgroup::RunCgroups::Fake(dir.path().join("no-such-root")),
+        };
+        let refused = launch.launch(
+            &dir.path().join("skill"),
+            dir.path(),
+            "scripts/main.py",
+            &["speak".to_owned()],
+            TRY_WITHIN,
+        );
+        assert_eq!(refused.unwrap_err(), crate::run_cgroup::NO_CGROUP);
+        assert!(minted.lock().unwrap().is_empty(), "no token");
     }
 
     #[test]
@@ -960,9 +1016,22 @@ mod tests {
             token: "t".into(),
             egress: None,
         };
+        // #8180: ended in its own cgroup, which goes with it.
+        std::fs::create_dir(dir.path().join("cgroup")).unwrap();
+        let cgroup = crate::run_cgroup::RunCgroups::Fake(dir.path().join("cgroup"))
+            .for_run("t1")
+            .unwrap()
+            .unwrap();
         let began = Instant::now();
-        let ran = run_fence(&program, &grant, Duration::from_millis(300)).unwrap();
+        let ran = run_fence(&program, &grant, Duration::from_millis(300), Some(&cgroup)).unwrap();
         assert!(ran.timed_out);
         assert!(began.elapsed() < Duration::from_secs(10));
+        assert_eq!(
+            std::fs::read_to_string(cgroup.dir().join("cgroup.procs")).unwrap(),
+            "0"
+        );
+        drop(cgroup);
+        assert!(dir.path().join("cgroup/done-t1").is_dir());
+        assert!(!dir.path().join("cgroup/run-t1").exists());
     }
 }
