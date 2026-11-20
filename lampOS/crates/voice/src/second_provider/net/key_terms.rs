@@ -27,12 +27,12 @@ pub const MOST: usize = 49;
 /// A term is at most this many characters: setup's own limit for a name
 /// (`person::MOST_CHARS`).
 pub const MOST_CHARS: usize = 64;
-/// At most this many of the made skills' names and asks ([`made`]), after
+/// At most this many of the made skills' names ([`made`]), after
 /// every other term.
 pub const MOST_MADE: usize = 16;
 /// How often the names are read again.
 pub const READ_EVERY: Duration = Duration::from_secs(60);
-/// How often the made skills' names and asks are read again: a skill is
+/// How often the made skills' names are read again: a skill is
 /// often called the moment it is made (lamp-52e6, 20 Nov: its trigger's
 /// stream opened 44 s after lamp-skills loaded it), and the tools file is
 /// small, on tmpfs.
@@ -56,7 +56,7 @@ pub fn known() -> Vec<String> {
 /// on ([`SKILL_TERMS`]), then the owner's place's names from the app, with
 /// `LAMP_OWNER_PLACE=on` (`crate::owner_place::terms`, #4333), then the
 /// names the lamp knows ([`known`]), then, with [`SKILL_ENVIRONMENT`] on,
-/// at most [`MOST_MADE`] of the made skills' names and asks ([`made`]),
+/// at most [`MOST_MADE`] of the made skills' names ([`made`]),
 /// each once.
 pub fn listening(fixed: &[String]) -> Vec<String> {
     listening_with(fixed, skill_terms_on(), &made())
@@ -90,7 +90,7 @@ fn listening_with(fixed: &[String], skill: bool, made: &[String]) -> Vec<String>
 /// "Make me a skew every real morning" and "Plan. Acne rescue s 9AM" among
 /// them, and the model then read the mail now and set a daily reminder of
 /// the words; typed in the app, the same ask made the skill. The made
-/// skills' names and asks follow ([`made`], #8022).
+/// skills' names follow ([`made`], #8022).
 pub const SKILL_ENVIRONMENT: &str = "LAMP_SKILL_KEYTERM";
 
 /// The words listened for with [`SKILL_ENVIRONMENT`]: few, as Deepgram
@@ -107,7 +107,7 @@ pub fn on(value: Option<&str>) -> bool {
     value == Some("on")
 }
 
-/// The made skills' names and asks, as last read; none until
+/// The made skills' names, as last read; none until
 /// [`start_made_terms`] has read them, or without [`SKILL_ENVIRONMENT`].
 /// Never waits.
 pub fn made() -> Vec<String> {
@@ -118,22 +118,21 @@ pub fn made() -> Vec<String> {
 }
 
 /// Each made skill's name as said ("apple-file" as "apple file",
-/// `crate::skill_named::spoken`), then its asks, from the tools files'
-/// `made_asks` the made-skill matcher reads
-/// (`crate::tools::made_skill_asks`). Only what is heard changes: the
-/// match stays exact. On lamp-52e6 on 20 Nov "Hey Lamp, apple file." on a
-/// clean clip was written as two other words.
+/// `crate::skill_named::spoken`), from the tools files' `made_asks` the
+/// made-skill matcher reads (`crate::tools::made_skill_asks`); never its
+/// asks, which may hold most of a make's own words and pull a long make
+/// line apart (#8022, kit-8043 on lamp-52e6, 20 Nov 10:49). Only what is
+/// heard changes: the match stays exact. On lamp-52e6 on 20 Nov "Hey Lamp,
+/// apple file." on a clean clip was written as two other words.
 pub fn made_terms(settings: &crate::tools::Settings) -> Vec<String> {
     gather(
         crate::tools::made_skill_asks(settings)
-            .into_iter()
-            .flat_map(|(name, asks)| {
-                std::iter::once(crate::skill_named::spoken(&name)).chain(asks)
-            }),
+            .into_keys()
+            .map(|name| crate::skill_named::spoken(&name)),
     )
 }
 
-/// With [`SKILL_ENVIRONMENT`] on, the made skills' names and asks
+/// With [`SKILL_ENVIRONMENT`] on, the made skills' names
 /// ([`made_terms`]) are read now and every [`MADE_READ_EVERY`] after, on a
 /// thread of their own, so no stream waits on a file. Once a process; a
 /// second call changes nothing.
@@ -151,8 +150,7 @@ pub fn start_made_terms(settings: crate::tools::Settings) {
                 // Said when the count changes: never the words.
                 if said != Some(read.len()) {
                     eprintln!(
-                        "lamp-voice second: speech to text listens for {} made skills' names and \
-                         asks",
+                        "lamp-voice second: speech to text listens for {} made skills' names",
                         read.len()
                     );
                     said = Some(read.len());
@@ -314,13 +312,13 @@ mod tests {
         );
     }
 
-    /// With the skill switch, the made skills' names as said and their
-    /// asks, read from the tools file the matcher reads (`made_asks`),
-    /// follow the words of a make: lamp-52e6, 20 Nov, "Hey Lamp, apple
-    /// file." came back as two other words. Each once, within the bound;
-    /// off, none.
+    /// With the skill switch, the made skills' names as said, read from the
+    /// tools file the matcher reads (`made_asks`), never their asks, come
+    /// after every other term: lamp-52e6, 20 Nov, "Hey Lamp, apple file."
+    /// came back as two other words. Each once, within the bound; off,
+    /// none.
     #[test]
-    fn the_made_skills_names_and_asks_follow_a_makes_words_with_the_switch() {
+    fn the_made_skills_names_follow_every_other_term_with_the_switch() {
         let dir = std::env::temp_dir().join(format!("lvs-key-terms-made-{}", std::process::id()));
         std::fs::create_dir_all(&dir).unwrap();
         std::fs::write(
@@ -340,7 +338,7 @@ mod tests {
             ..Default::default()
         };
         let made = made_terms(&settings);
-        assert_eq!(made, ["apple file", "open my apple file", "Skill", "tech news"]);
+        assert_eq!(made, ["apple file", "tech news"]);
         let fixed = ["Hanoi"].map(String::from);
         if NAMES.get().is_none() {
             assert_eq!(listening_with(&fixed, false, &made), fixed);
@@ -352,7 +350,6 @@ mod tests {
                     "make a skill",
                     "new skill",
                     "apple file",
-                    "open my apple file",
                     "tech news",
                 ]
             );
@@ -362,7 +359,7 @@ mod tests {
             .collect();
         let heard = listening_with(&full, true, &made);
         assert!(heard.len() <= MOST, "{}", heard.len());
-        for term in ["apple file", "open my apple file", "tech news"] {
+        for term in ["apple file", "tech news"] {
             assert_eq!(heard.iter().filter(|said| *said == term).count(), 1, "{term}");
         }
         // Many made skills: at most MOST_MADE of their words, all after
