@@ -101,6 +101,9 @@ struct Fake {
     shown_session: Mutex<Option<String>>,
     /// `ensure` names no engine session at all (#8151).
     no_engine_session: Mutex<bool>,
+    /// When the last `ensure --fresh` came (seconds since the epoch):
+    /// Harness starts the next pane's engine session then (#8151).
+    fresh_at: Mutex<Option<f64>>,
 }
 
 fn agent_of(n: u32) -> String {
@@ -266,6 +269,9 @@ impl PaneHarness for Fake {
         ));
         assert_eq!(name, name_for(engine));
         assert!(token.exists(), "the token file is made before ensure");
+        if fresh {
+            *self.fresh_at.lock().unwrap() = Some(super::epoch_now());
+        }
         if let Some(code) = self.ensure_errors.lock().unwrap().pop_front() {
             return Err(code);
         }
@@ -6200,23 +6206,26 @@ fn the_live_hermes_session_is_never_in_a_deletes_tree() {
 }
 
 /// #8151: no engine session ever named (Harness's `ensure` gave none):
-/// the kept pane's sessions are found by its folder and open in Hermes's
-/// store (`cwd`, `started_at`), read-only; a store without those columns
-/// deletes nothing, and says so.
+/// the kept pane's sessions are found by its folder, open and close in
+/// Hermes's store (`cwd`, `started_at`), read-only; a session started in
+/// the same folder after the close (the next pane's, opened right after)
+/// is never deleted; a store without those columns deletes nothing, and
+/// says so.
 #[test]
 fn with_no_engine_session_the_kept_panes_hermes_sessions_are_found_by_folder() {
     let home = tempfile::tempdir().unwrap();
     let db = rusqlite::Connection::open(home.path().join(HERMES_STATE_DB)).unwrap();
     db.execute_batch(
         "CREATE TABLE sessions (id TEXT PRIMARY KEY, parent_session_id TEXT, cwd TEXT, started_at REAL);
-         INSERT INTO sessions VALUES ('old', NULL, '/w/one-session', 100.0),            ('k1', NULL, '/w/one-session', 1000.0), ('k2', 'k1', '/w/one-session', 1100.0),            ('run', NULL, '/w/skill-1', 1000.0);",
+         INSERT INTO sessions VALUES ('old', NULL, '/w/one-session', 100.0),            ('k1', NULL, '/w/one-session', 1000.0), ('k2', 'k1', '/w/one-session', 1100.0),            ('run', NULL, '/w/skill-1', 1000.0), ('next', NULL, '/w/one-session', 1150.5);",
     )
     .unwrap();
     let (cli, log) = hermes_cli(home.path(), "ok");
     let gone = HermesGone {
-        started_in: Some(("/w/one-session".into(), 1000.0)),
+        started_in: Some(("/w/one-session".into(), 1000.0, 1150.0)),
         ..HermesGone::default()
     };
+    assert_eq!(cli.found(&gone), ["k1", "k2"]);
     assert!(cli.delete(&gone).is_empty());
     assert_eq!(hermes_calls(home.path(), &log), ["k2", "k1"]);
     let other = tempfile::tempdir().unwrap();
@@ -6233,23 +6242,90 @@ fn a_hermes_pane_with_no_engine_session_is_looked_for_by_its_folder() {
     let dir = tempfile::tempdir().unwrap();
     let (one, fake, _, _) = hermes_kept_on(dir.path());
     let asked: Arc<Mutex<Vec<HermesGone>>> = Arc::default();
-    let seen = asked.clone();
-    let one = one.with_hermes_delete(Arc::new(move |gone: &HermesGone| {
-        seen.lock().unwrap().push(gone.clone());
-        Vec::new()
-    }));
+    let deleted: Arc<Mutex<Vec<HermesGone>>> = Arc::default();
+    let (seen, gone_to) = (asked.clone(), deleted.clone());
+    let pending_at_delete: Arc<Mutex<Vec<String>>> = Arc::default();
+    let pending_seen = pending_at_delete.clone();
+    let state = dir.path().join(STATE_FILE);
+    let one = one
+        .with_hermes_find(Arc::new(move |gone: &HermesGone| {
+            seen.lock().unwrap().push(gone.clone());
+            vec!["20261121_010000_aaaaaa".to_owned()]
+        }))
+        .with_hermes_delete(Arc::new(move |gone: &HermesGone| {
+            let record: serde_json::Value =
+                serde_json::from_slice(&std::fs::read(&state).unwrap_or_default())
+                    .unwrap_or_default();
+            pending_seen.lock().unwrap().extend(
+                record[PENDING_FIELD]
+                    .as_array()
+                    .into_iter()
+                    .flatten()
+                    .filter_map(|id| id.as_str().map(str::to_owned)),
+            );
+            gone_to.lock().unwrap().push(gone.clone());
+            Vec::new()
+        }));
     *fake.ensure_session.lock().unwrap() = None;
     *fake.no_engine_session.lock().unwrap() = true;
     hermes_turn(&one, &fake, "task-1");
+    let before_close = super::epoch_now();
     one.drop_when_free("the lamp signed out");
     one.tend(&fake, &hermes_place(), &|| false);
     one.deletes_done();
     let asked = asked.lock().unwrap();
     assert_eq!(asked.len(), 1, "{asked:?}");
     assert!(asked[0].ids.is_empty());
-    let (folder, opened) = asked[0].started_in.clone().unwrap();
+    let (folder, opened, closed) = asked[0].started_in.clone().unwrap();
     assert_eq!(folder, hermes_place().folder);
     assert!(opened > 1_000_000_000.0);
+    assert!(
+        closed >= before_close && closed >= opened,
+        "bounded at the close"
+    );
+    // The ids found are kept pending before their delete, which is asked
+    // by id, never by folder again.
+    assert_eq!(
+        *pending_at_delete.lock().unwrap(),
+        ["20261121_010000_aaaaaa"]
+    );
+    let deleted = deleted.lock().unwrap();
+    assert_eq!(deleted.len(), 1);
+    assert_eq!(deleted[0].ids, ["20261121_010000_aaaaaa"]);
+    assert_eq!(deleted[0].started_in, None);
+    assert!(one.pending().is_empty(), "done, taken out");
+}
+
+/// #8151 (HOLD 1): at a rotation with no engine session the old pane's
+/// lookup is bounded at its close, taken before `ensure --fresh` opens the
+/// next pane in the same folder: never a time after the new pane's open.
+#[test]
+fn a_rotated_hermes_panes_folder_lookup_ends_before_the_next_pane_opens() {
+    let dir = tempfile::tempdir().unwrap();
+    let (one, fake, _, _) = hermes_kept_on(dir.path());
+    let asked: Arc<Mutex<Vec<HermesGone>>> = Arc::default();
+    let seen = asked.clone();
+    let one = one.with_hermes_find(Arc::new(move |gone: &HermesGone| {
+        seen.lock().unwrap().push(gone.clone());
+        Vec::new()
+    }));
+    *fake.ensure_session.lock().unwrap() = None;
+    *fake.no_engine_session.lock().unwrap() = true;
+    for n in 0..ROTATE_TURNS {
+        hermes_turn(&one, &fake, &format!("task-{n}"));
+    }
+    hermes_turn(&one, &fake, "task-last");
+    one.deletes_done();
+    let fresh_at = fake.fresh_at.lock().unwrap().expect("ensure --fresh");
+    let asked = asked.lock().unwrap();
+    assert_eq!(asked.len(), 1, "{asked:?}");
+    let (_, _, closed) = asked[0].started_in.clone().unwrap();
+    // Harness starts the next pane's session in its `ensure --fresh`: a
+    // bound taken after it could take that live session.
+    assert!(
+        closed <= fresh_at,
+        "closed {closed} after the next pane's ensure {fresh_at}"
+    );
 }
 
 /// #8151: Hermes's `sessions delete` takes a unique prefix too, so a short

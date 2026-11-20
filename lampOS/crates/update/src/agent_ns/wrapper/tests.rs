@@ -923,11 +923,18 @@ fn hermes_in_the_kept_session_folder_has_approvals_off() {
             env.lines().any(|line| line == "HERMES_ACCEPT_HOOKS=1"),
             "{env}"
         );
-        let out = lamp.run_in(&near, &given, &path);
-        assert!(out.status.success(), "{out:?}");
-        let env = lamp.read("env").unwrap();
-        assert!(!env.contains("HERMES_YOLO_MODE"), "{env}");
-        assert!(!env.contains("HERMES_ACCEPT_HOOKS"), "{env}");
+        // Any other folder (a near name, a person's own pane): unset, even
+        // when the caller set it (First's ruling, #8151).
+        let own = lamp.top.join("project").join("my-pane");
+        fs::create_dir_all(&own).unwrap();
+        let preset = [("HERMES_YOLO_MODE", "1"), ("HERMES_NONINTERACTIVE", "1")];
+        for other in [&near, &own] {
+            let out = lamp.run_in(other, &preset, &path);
+            assert!(out.status.success(), "{out:?}");
+            let env = lamp.read("env").unwrap();
+            assert!(!env.contains("HERMES_YOLO_MODE"), "{env}");
+            assert!(!env.contains("HERMES_ACCEPT_HOOKS"), "{env}");
+        }
     }
 }
 

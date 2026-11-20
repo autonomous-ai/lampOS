@@ -972,10 +972,19 @@ pub struct HermesGone {
     /// The live kept session's ids: never deleted, nor any session made
     /// from them.
     pub keep: Vec<String>,
-    /// No engine session was ever named for the closed pane: its folder
-    /// and its open (seconds since the epoch), to find its sessions by in
-    /// Hermes's store (`cwd`, `started_at`).
-    pub started_in: Option<(String, f64)>,
+    /// No engine session was ever named for the closed pane: its folder,
+    /// its open and its close (seconds since the epoch), to find its
+    /// sessions by in Hermes's store (`cwd`, `started_at`). The close
+    /// bounds the lookup: the next pane opens in the same folder at once,
+    /// and a session started after the close is never the closed pane's.
+    pub started_in: Option<(String, f64, f64)>,
+}
+
+/// Seconds since the epoch now.
+fn epoch_now() -> f64 {
+    std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map_or(0.0, |since| since.as_secs_f64())
 }
 
 /// The kept record ([`STATE_FILE`]) and the lock held while it is read and
@@ -1105,6 +1114,10 @@ pub struct OneSession {
     /// Deletes Hermes sessions, with the sessions their compressions and
     /// branches made, with Hermes's own CLI ([`HermesDelete::lamp`]).
     delete_hermes: HermesDeletes,
+    /// Finds a closed pane's Hermes sessions by its folder, between its
+    /// open and its close, when no engine session was named for it
+    /// ([`HermesDelete::found`]).
+    find_hermes: HermesDeletes,
     /// [`STATE_FILE`] and its lock, shared with Hermes's delete threads.
     records: Arc<Records>,
     /// Hermes's deletes running aside ([`OneSession::deletes_done`]).
@@ -1594,31 +1607,46 @@ impl HermesDelete {
         }
     }
 
+    /// With no ids but [`HermesGone::started_in`]: the sessions started in
+    /// that folder between the closed pane's open and its close, read-only,
+    /// never one of `gone.keep`'s. Empty with no store or none found.
+    pub fn found(&self, gone: &HermesGone) -> Vec<String> {
+        let db = self.home.join(HERMES_STATE_DB);
+        let Some((folder, since, until)) = gone.started_in.as_ref().filter(|_| gone.ids.is_empty())
+        else {
+            return Vec::new();
+        };
+        if !db.is_file() {
+            return Vec::new();
+        }
+        match hermes_started_in(&db, folder, *since, *until) {
+            Ok(found) => found
+                .into_iter()
+                .filter(|id| !gone.keep.contains(id))
+                .collect(),
+            Err(why) => {
+                eprintln!("tasks: one session: nothing to delete: no engine session ({why})");
+                Vec::new()
+            }
+        }
+    }
+
     /// The conversations of `gone`'s session ids deleted, never a session
     /// of `gone.keep`'s nor one made from it; the ids whose delete failed,
     /// to be tried again. With no ids but [`HermesGone::started_in`], the
-    /// sessions started in that folder since then are found first. No
-    /// store: nothing to delete, and Hermes is never started (its CLI would
-    /// make one). An id that is not a plain session id is never passed on.
+    /// sessions [`HermesDelete::found`] first. No store: nothing to delete,
+    /// and Hermes is never started (its CLI would make one). An id that is
+    /// not a plain session id is never passed on.
     pub fn delete(&self, gone: &HermesGone) -> Vec<String> {
         // No store: never start Hermes's CLI, whose `sessions delete` opens
         // a writer that makes `state.db` where there was none.
         let db = self.home.join(HERMES_STATE_DB);
         let found;
-        let recorded = match &gone.started_in {
-            Some((folder, since)) if gone.ids.is_empty() && db.is_file() => {
-                found = match hermes_started_in(&db, folder, *since) {
-                    Ok(found) => found,
-                    Err(why) => {
-                        eprintln!(
-                            "tasks: one session: nothing to delete: no engine session ({why})"
-                        );
-                        Vec::new()
-                    }
-                };
-                &found
-            }
-            _ => &gone.ids,
+        let recorded = if gone.ids.is_empty() && gone.started_in.is_some() {
+            found = self.found(gone);
+            &found
+        } else {
+            &gone.ids
         };
         let recorded: Vec<String> = recorded
             .iter()
@@ -1827,11 +1855,18 @@ fn hermes_conversation(
     Ok(children_first(rows))
 }
 
-/// The sessions Hermes started in `folder` since `since` (seconds since
-/// the epoch, a minute's slack), read from its store `db` opened
-/// read-only: the kept pane's when Harness named no engine session for it
-/// (#8151). An `Err` when its `sessions` has no `cwd` or `started_at`.
-fn hermes_started_in(db: &Path, folder: &str, since: f64) -> Result<Vec<String>, String> {
+/// The sessions Hermes started in `folder` from `since` (seconds since
+/// the epoch, a minute's slack) to `until` (the pane's close, no slack:
+/// the next pane opens in the same folder right after), read from its
+/// store `db` opened read-only: the closed kept pane's when Harness named
+/// no engine session for it (#8151). An `Err` when its `sessions` has no
+/// `cwd` or `started_at`.
+fn hermes_started_in(
+    db: &Path,
+    folder: &str,
+    since: f64,
+    until: f64,
+) -> Result<Vec<String>, String> {
     use rusqlite::{Connection, OpenFlags};
     let kind = |error: rusqlite::Error| match error {
         rusqlite::Error::SqliteFailure(error, _) => format!("{:?}", error.code),
@@ -1859,11 +1894,13 @@ fn hermes_started_in(db: &Path, folder: &str, since: f64) -> Result<Vec<String>,
         return Err("its sessions table names no folder or start".into());
     }
     connection
-        .prepare("SELECT id FROM sessions WHERE cwd = ?1 AND started_at >= ?2 LIMIT ?3")
+        .prepare(
+            "SELECT id FROM sessions WHERE cwd = ?1 AND started_at >= ?2 AND started_at <= ?3 LIMIT ?4",
+        )
         .and_then(|mut found| {
             found
                 .query_map(
-                    rusqlite::params![folder, since - 60.0, HERMES_DELETE_MOST as i64],
+                    rusqlite::params![folder, since - 60.0, until, HERMES_DELETE_MOST as i64],
                     |row| row.get::<_, String>(0),
                 )
                 .and_then(|rows| rows.collect::<Result<Vec<_>, _>>())
@@ -1930,6 +1967,10 @@ impl OneSession {
             delete_hermes: {
                 let cli = HermesDelete::lamp();
                 Arc::new(move |gone: &HermesGone| cli.delete(gone))
+            },
+            find_hermes: {
+                let cli = HermesDelete::lamp();
+                Arc::new(move |gone: &HermesGone| cli.found(gone))
             },
             records: Arc::default(),
             deletes: Mutex::default(),
@@ -2252,11 +2293,36 @@ impl OneSession {
     /// `gone` deleted on a thread of its own (#8151), never on the
     /// one-session thread: a rotation, a forget or a sign-out never holds
     /// up an open or a spoken task. Its ids are kept pending first, and
-    /// those done taken out after.
+    /// those done taken out after. With no ids, its sessions are found by
+    /// its folder between its open and its close (the bound taken at the
+    /// close, before the next pane opens), and those found are kept
+    /// pending as ids before any delete: a later retry deletes those ids
+    /// and never looks by folder again.
     fn delete_hermes_aside(&self, gone: HermesGone) {
         self.records.add_pending(&gone.ids);
-        let (delete, records) = (Arc::clone(&self.delete_hermes), Arc::clone(&self.records));
+        let (delete, find, records) = (
+            Arc::clone(&self.delete_hermes),
+            Arc::clone(&self.find_hermes),
+            Arc::clone(&self.records),
+        );
         let run = move || {
+            let gone = if gone.ids.is_empty() && gone.started_in.is_some() {
+                let found = find(&gone);
+                if found.is_empty() {
+                    eprintln!(
+                        "tasks: one session: nothing to delete: no Hermes session found by its folder"
+                    );
+                    return;
+                }
+                records.add_pending(&found);
+                HermesGone {
+                    ids: found,
+                    keep: gone.keep,
+                    started_in: None,
+                }
+            } else {
+                gone
+            };
             let left = delete(&gone);
             records.left_pending(&gone.ids, &left);
         };
@@ -2281,16 +2347,17 @@ impl OneSession {
         }
     }
 
-    /// The kept pane `agent`'s folder and its open, when no engine session
-    /// was ever named for it (#8151): its Hermes sessions are found by
-    /// them.
-    fn started_in(&self, agent: &str) -> Option<(String, f64)> {
+    /// The kept pane `agent`'s folder, its open and its close `closed`,
+    /// when no engine session was ever named for it (#8151): its Hermes
+    /// sessions are found by them, never one started after `closed`.
+    fn started_in(&self, agent: &str, closed: f64) -> Option<(String, f64, f64)> {
         let record = self.record();
         (record["agent"] == agent)
             .then(|| {
                 Some((
                     record["folder"].as_str()?.to_owned(),
                     record["opened"].as_f64()?,
+                    closed,
                 ))
             })
             .flatten()
@@ -2336,7 +2403,7 @@ impl OneSession {
         agent: &str,
         engine: EngineKind,
         keys: Vec<String>,
-        started: Option<(String, f64)>,
+        started: Option<(String, f64, f64)>,
     ) {
         let store = match engine {
             EngineKind::Openclaw => "OpenClaw",
@@ -2426,7 +2493,7 @@ impl OneSession {
     /// session ([`OneSession::delete_conversation`]).
     fn kept_closed(&self, agent: &str, engine: EngineKind) {
         let key = self.conversation_key(agent, engine);
-        let started = self.started_in(agent);
+        let started = self.started_in(agent, epoch_now());
         self.closed_by_us(agent, engine, false);
         self.delete_conversation(agent, engine, key, started);
     }
@@ -2494,6 +2561,13 @@ impl OneSession {
     /// (tests).
     pub fn with_hermes_delete(mut self, delete: HermesDeletes) -> Self {
         self.delete_hermes = delete;
+        self
+    }
+
+    /// A closed pane's Hermes sessions found by `find` in place of
+    /// Hermes's own store (tests).
+    pub fn with_hermes_find(mut self, find: HermesDeletes) -> Self {
+        self.find_hermes = find;
         self
     }
 
@@ -2586,7 +2660,7 @@ impl OneSession {
                     keys
                 }
             };
-            let started = self.started_in(&agent);
+            let started = self.started_in(&agent, epoch_now());
             self.delete_conversation(&agent, kind, keys, started);
         }
         self.forget_record();
@@ -2730,11 +2804,7 @@ impl OneSession {
         let opened = before["opened"]
             .as_f64()
             .filter(|_| before["agent"] == agent)
-            .unwrap_or_else(|| {
-                std::time::SystemTime::now()
-                    .duration_since(std::time::UNIX_EPOCH)
-                    .map_or(0.0, |since| since.as_secs_f64())
-            });
+            .unwrap_or_else(epoch_now);
         let mut seen = std::collections::HashSet::new();
         sessions.retain(|id| seen.insert(id.clone()));
         let over = sessions.len().saturating_sub(HERMES_RECORDED_MOST);
@@ -2862,7 +2932,7 @@ impl OneSession {
         } else {
             self.recorded_sessions(agent)
         };
-        let started = self.started_in(agent);
+        let started = self.started_in(agent, epoch_now());
         if self.kept().is_some_and(|(kept, _, _)| kept == agent) {
             self.forget_record();
         }
@@ -3965,6 +4035,12 @@ impl OneSession {
                 })
             })
             .flatten();
+        // The old pane's folder, open and close, taken now, before
+        // `ensure` opens the next pane in the same folder: a session
+        // started after this is never the old pane's (#8151).
+        let old_started = old
+            .as_ref()
+            .and_then(|(_, agent, _)| self.started_in(agent, epoch_now()));
         let name = name_for(place.engine);
         // `ENGINE_NOT_READY` (the old engine still exiting after a crash,
         // a gateway still starting): tried again every few seconds within a
@@ -4047,8 +4123,7 @@ impl OneSession {
                 .filter(|key| Some(key) != ensured.engine_session.as_ref())
                 .collect();
             if keys.len() == named || !keys.is_empty() {
-                let started = self.started_in(&old);
-                self.delete_conversation(&old, engine, keys, started);
+                self.delete_conversation(&old, engine, keys, old_started);
             }
         }
         // Kept at once: the record says the kept session, so a sign-out

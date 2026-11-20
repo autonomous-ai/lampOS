@@ -5343,9 +5343,15 @@ in and signed out, and on 0.6.60, signed in (#7507's ROW).
       `engineSession`), the pane's sessions are found read-only by its
       folder and open, kept in `one-session.json` as `folder` and `opened`:
       `sessions` rows whose `cwd` is that folder and whose `started_at` is
-      no earlier than a minute before the open (Hermes v0.22.2 (the lamp reports 0.21.5+12940, commit d923a5e) records the
-      start folder in `cwd`); a store without those columns deletes
-      nothing, journaled `nothing to delete: no engine session (<why>)`.
+      no earlier than a minute before the open and no later than the
+      pane's close (Hermes v0.22.2 (the lamp reports 0.21.5+12940, commit d923a5e) records the
+      start folder in `cwd`). The close is taken when the pane is closed,
+      before the next pane opens in the same folder (at a rotation, before
+      its `ensure --fresh`), so the next pane's live session is never
+      found. The ids found are written to `hermes_pending` before any
+      delete, so a later retry deletes those ids and never looks by folder
+      again. A store without those columns deletes nothing, journaled
+      `nothing to delete: no engine session (<why>)`.
     - **Aside.** Every delete (a rotation, a forget, a sign-out, the idle
       close, a cancel or stuck replacement) runs on a thread of its own,
       never on the one-session thread, so the next open and a spoken task

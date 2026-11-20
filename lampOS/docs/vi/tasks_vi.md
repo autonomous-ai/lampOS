@@ -2583,8 +2583,14 @@ khi đăng xuất, và với 0.6.60 khi đăng nhập (ROW của #7507).
       không cho `engineSession`), các phiên của pane được tìm chỉ đọc theo
       thư mục và lúc mở của nó, giữ trong `one-session.json` là `folder` và
       `opened`: các dòng `sessions` có `cwd` là thư mục đó và `started_at`
-      không sớm hơn một phút trước lúc mở (Hermes v0.22.2 (the lamp reports 0.21.5+12940, commit d923a5e) ghi thư mục khởi
-      động vào `cwd`); kho không có các cột đó thì không xoá gì, ghi journal
+      không sớm hơn một phút trước lúc mở và không muộn hơn lúc pane đóng
+      (Hermes v0.22.2 (the lamp reports 0.21.5+12940, commit d923a5e) ghi thư mục khởi
+      động vào `cwd`). Lúc đóng được lấy khi pane đóng, trước khi pane kế
+      tiếp mở trong cùng thư mục (khi xoay vòng: trước `ensure --fresh`),
+      nên phiên đang chạy của pane kế tiếp không bao giờ bị tìm thấy. Các id
+      tìm được ghi vào `hermes_pending` trước mọi lần xoá, nên lần thử lại
+      sau xoá đúng các id đó và không bao giờ tìm theo thư mục nữa. Kho
+      không có các cột đó thì không xoá gì, ghi journal
       `nothing to delete: no engine session (<why>)`.
     - **Chạy riêng.** Mọi lần xoá (xoay vòng, quên, đăng xuất, đóng khi
       rảnh, huỷ hay thay phiên kẹt) chạy trên một luồng riêng, không bao giờ
