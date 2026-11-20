@@ -1,0 +1,2946 @@
+[
+  {
+    "id": 1,
+    "ask": "Is it nearly nine yet?",
+    "v2": {
+      "expect": "answer",
+      "doors": [
+        "answer"
+      ],
+      "acts": null,
+      "rule": null
+    },
+    "a": {
+      "expect": "answer",
+      "doors": [
+        "answer"
+      ],
+      "acts": null,
+      "rule": "P1"
+    },
+    "b": {
+      "expect": "answer",
+      "doors": [
+        "answer"
+      ],
+      "acts": null,
+      "rule": "P1"
+    },
+    "verdict": "keep"
+  },
+  {
+    "id": 2,
+    "ask": "Mấy giờ rồi nhỉ?",
+    "v2": {
+      "expect": "answer",
+      "doors": [
+        "answer"
+      ],
+      "acts": null,
+      "rule": null
+    },
+    "a": {
+      "expect": "answer",
+      "doors": [
+        "answer"
+      ],
+      "acts": null,
+      "rule": "P1"
+    },
+    "b": {
+      "expect": "answer",
+      "doors": [
+        "answer"
+      ],
+      "acts": null,
+      "rule": "P1"
+    },
+    "verdict": "keep"
+  },
+  {
+    "id": 3,
+    "ask": "Make the light a bit warmer, it's getting late.",
+    "v2": {
+      "expect": "answer",
+      "doors": [
+        "answer"
+      ],
+      "acts": "light",
+      "rule": null
+    },
+    "a": {
+      "expect": "answer",
+      "doors": [
+        "answer"
+      ],
+      "acts": "light",
+      "rule": "P2"
+    },
+    "b": {
+      "expect": "answer",
+      "doors": [
+        "answer"
+      ],
+      "acts": "light",
+      "rule": "P2"
+    },
+    "verdict": "keep"
+  },
+  {
+    "id": 4,
+    "ask": "Bật đèn sáng lên chút, mình đang đọc sách.",
+    "v2": {
+      "expect": "answer",
+      "doors": [
+        "answer"
+      ],
+      "acts": "light",
+      "rule": null
+    },
+    "a": {
+      "expect": "answer",
+      "doors": [
+        "answer"
+      ],
+      "acts": "light",
+      "rule": "P2"
+    },
+    "b": {
+      "expect": "answer",
+      "doors": [
+        "answer"
+      ],
+      "acts": "light",
+      "rule": "P2"
+    },
+    "verdict": "keep"
+  },
+  {
+    "id": 5,
+    "ask": "Dim the light, I'm just watching a video now.",
+    "v2": {
+      "expect": "answer",
+      "doors": [
+        "answer"
+      ],
+      "acts": "light",
+      "rule": null
+    },
+    "a": {
+      "expect": "answer",
+      "doors": [
+        "answer"
+      ],
+      "acts": "light",
+      "rule": "P2"
+    },
+    "b": {
+      "expect": "answer",
+      "doors": [
+        "answer"
+      ],
+      "acts": "light",
+      "rule": "P2"
+    },
+    "verdict": "keep"
+  },
+  {
+    "id": 6,
+    "ask": "Đổi đèn sang màu xanh dương đi.",
+    "v2": {
+      "expect": "answer",
+      "doors": [
+        "answer"
+      ],
+      "acts": "light",
+      "rule": null
+    },
+    "a": {
+      "expect": "answer",
+      "doors": [
+        "answer"
+      ],
+      "acts": "light",
+      "rule": "P2"
+    },
+    "b": {
+      "expect": "answer",
+      "doors": [
+        "answer"
+      ],
+      "acts": "light",
+      "rule": "P2"
+    },
+    "verdict": "keep"
+  },
+  {
+    "id": 7,
+    "ask": "Turn the lamp off, I'm done for tonight.",
+    "v2": {
+      "expect": "answer",
+      "doors": [
+        "answer"
+      ],
+      "acts": "light",
+      "rule": null
+    },
+    "a": {
+      "expect": "answer",
+      "doors": [
+        "answer"
+      ],
+      "acts": "light",
+      "rule": "P2"
+    },
+    "b": {
+      "expect": "answer",
+      "doors": [
+        "answer"
+      ],
+      "acts": "light",
+      "rule": "P2"
+    },
+    "verdict": "keep"
+  },
+  {
+    "id": 8,
+    "ask": "Set a timer for 25 minutes, I'm starting homework.",
+    "v2": {
+      "expect": "answer",
+      "doors": [
+        "answer"
+      ],
+      "acts": "timer",
+      "rule": null
+    },
+    "a": {
+      "expect": "answer",
+      "doors": [
+        "answer"
+      ],
+      "acts": "timer",
+      "rule": "P2"
+    },
+    "b": {
+      "expect": "answer",
+      "doors": [
+        "answer"
+      ],
+      "acts": "timer",
+      "rule": "P2"
+    },
+    "verdict": "keep"
+  },
+  {
+    "id": 9,
+    "ask": "Hẹn giờ 10 phút cho mình luộc trứng nhé.",
+    "v2": {
+      "expect": "answer",
+      "doors": [
+        "answer"
+      ],
+      "acts": "timer",
+      "rule": null
+    },
+    "a": {
+      "expect": "answer",
+      "doors": [
+        "answer"
+      ],
+      "acts": "timer",
+      "rule": "P2"
+    },
+    "b": {
+      "expect": "answer",
+      "doors": [
+        "answer"
+      ],
+      "acts": "timer",
+      "rule": "P2"
+    },
+    "verdict": "keep"
+  },
+  {
+    "id": 10,
+    "ask": "Timer for 15 minutes for the pasta, please.",
+    "v2": {
+      "expect": "answer",
+      "doors": [
+        "answer"
+      ],
+      "acts": "timer",
+      "rule": null
+    },
+    "a": {
+      "expect": "answer",
+      "doors": [
+        "answer"
+      ],
+      "acts": "timer",
+      "rule": "P2"
+    },
+    "b": {
+      "expect": "answer",
+      "doors": [
+        "answer"
+      ],
+      "acts": "timer",
+      "rule": "P2"
+    },
+    "verdict": "keep"
+  },
+  {
+    "id": 11,
+    "ask": "Nhắc mình 9 giờ tối nay gọi cho mẹ.",
+    "v2": {
+      "expect": "answer",
+      "doors": [
+        "answer"
+      ],
+      "acts": "reminder",
+      "rule": null
+    },
+    "a": {
+      "expect": "answer",
+      "doors": [
+        "answer"
+      ],
+      "acts": "reminder",
+      "rule": "P2"
+    },
+    "b": {
+      "expect": "answer",
+      "doors": [
+        "answer"
+      ],
+      "acts": "reminder",
+      "rule": "P2"
+    },
+    "verdict": "keep"
+  },
+  {
+    "id": 12,
+    "ask": "Remind me at 7 tomorrow morning to bring my PE clothes.",
+    "v2": {
+      "expect": "answer",
+      "doors": [
+        "answer"
+      ],
+      "acts": "reminder",
+      "rule": null
+    },
+    "a": {
+      "expect": "answer",
+      "doors": [
+        "answer"
+      ],
+      "acts": "reminder",
+      "rule": "P2"
+    },
+    "b": {
+      "expect": "answer",
+      "doors": [
+        "answer"
+      ],
+      "acts": "reminder",
+      "rule": "P2"
+    },
+    "verdict": "keep"
+  },
+  {
+    "id": 13,
+    "ask": "What reminders do I have left today?",
+    "v2": {
+      "expect": "answer",
+      "doors": [
+        "answer"
+      ],
+      "acts": null,
+      "rule": null
+    },
+    "a": {
+      "expect": "answer",
+      "doors": [
+        "answer"
+      ],
+      "acts": "reminder",
+      "rule": "P2"
+    },
+    "b": {
+      "expect": "answer",
+      "doors": [
+        "answer"
+      ],
+      "acts": "reminder",
+      "rule": "P2"
+    },
+    "verdict": "keep"
+  },
+  {
+    "id": 14,
+    "ask": "Wake me up at 6:30 tomorrow.",
+    "v2": {
+      "expect": "answer",
+      "doors": [
+        "answer"
+      ],
+      "acts": "reminder",
+      "rule": null
+    },
+    "a": {
+      "expect": "answer",
+      "doors": [
+        "answer"
+      ],
+      "acts": "reminder",
+      "rule": "P2"
+    },
+    "b": {
+      "expect": "answer",
+      "doors": [
+        "answer"
+      ],
+      "acts": "reminder",
+      "rule": "P2"
+    },
+    "verdict": "keep"
+  },
+  {
+    "id": 15,
+    "ask": "Turn it down a bit, the kids are asleep.",
+    "v2": {
+      "expect": "answer",
+      "doors": [
+        "answer"
+      ],
+      "acts": "volume",
+      "rule": null
+    },
+    "a": {
+      "expect": "answer",
+      "doors": [
+        "answer"
+      ],
+      "acts": "volume",
+      "rule": "P2"
+    },
+    "b": {
+      "expect": "answer",
+      "doors": [
+        "answer"
+      ],
+      "acts": "volume",
+      "rule": "P2"
+    },
+    "verdict": "keep"
+  },
+  {
+    "id": 16,
+    "ask": "Nói nhỏ lại chút, em bé đang ngủ.",
+    "v2": {
+      "expect": "answer",
+      "doors": [
+        "answer"
+      ],
+      "acts": "volume",
+      "rule": null
+    },
+    "a": {
+      "expect": "answer",
+      "doors": [
+        "answer"
+      ],
+      "acts": "volume",
+      "rule": "P2"
+    },
+    "b": {
+      "expect": "answer",
+      "doors": [
+        "answer"
+      ],
+      "acts": "volume",
+      "rule": "P2"
+    },
+    "verdict": "keep"
+  },
+  {
+    "id": 17,
+    "ask": "Please remember that my school bus comes at 7:10.",
+    "v2": {
+      "expect": "answer",
+      "doors": [
+        "answer"
+      ],
+      "acts": "memory",
+      "rule": null
+    },
+    "a": {
+      "expect": "answer",
+      "doors": [
+        "answer"
+      ],
+      "acts": "memory",
+      "rule": "P2"
+    },
+    "b": {
+      "expect": "answer",
+      "doors": [
+        "answer"
+      ],
+      "acts": "memory",
+      "rule": "P2"
+    },
+    "verdict": "keep"
+  },
+  {
+    "id": 18,
+    "ask": "Nhớ giùm mình là thứ Năm có buổi học piano lúc 5 giờ.",
+    "v2": {
+      "expect": "answer",
+      "doors": [
+        "answer"
+      ],
+      "acts": "memory",
+      "rule": null
+    },
+    "a": {
+      "expect": "answer",
+      "doors": [
+        "answer"
+      ],
+      "acts": "memory",
+      "rule": "P2"
+    },
+    "b": {
+      "expect": "answer",
+      "doors": [
+        "answer"
+      ],
+      "acts": "memory",
+      "rule": "P2"
+    },
+    "verdict": "keep"
+  },
+  {
+    "id": 19,
+    "ask": "When does my school bus come again?",
+    "v2": {
+      "expect": "answer",
+      "doors": [
+        "answer"
+      ],
+      "acts": null,
+      "rule": null
+    },
+    "a": {
+      "expect": "answer",
+      "doors": [
+        "answer"
+      ],
+      "acts": "memory",
+      "rule": "P2"
+    },
+    "b": {
+      "expect": "answer",
+      "doors": [
+        "answer"
+      ],
+      "acts": "memory",
+      "rule": "P2"
+    },
+    "verdict": "keep"
+  },
+  {
+    "id": 20,
+    "ask": "Is it going to be hot this afternoon?",
+    "v2": {
+      "expect": "answer",
+      "doors": [
+        "answer"
+      ],
+      "acts": null,
+      "rule": null
+    },
+    "a": {
+      "expect": "answer",
+      "doors": [
+        "answer"
+      ],
+      "acts": "weather",
+      "rule": "P2"
+    },
+    "b": {
+      "expect": "answer",
+      "doors": [
+        "answer"
+      ],
+      "acts": "weather",
+      "rule": "P2"
+    },
+    "verdict": "keep"
+  },
+  {
+    "id": 21,
+    "ask": "Hôm nay trời có mưa không?",
+    "v2": {
+      "expect": "answer",
+      "doors": [
+        "answer"
+      ],
+      "acts": null,
+      "rule": null
+    },
+    "a": {
+      "expect": "answer",
+      "doors": [
+        "answer"
+      ],
+      "acts": "weather",
+      "rule": "P2"
+    },
+    "b": {
+      "expect": "answer",
+      "doors": [
+        "answer"
+      ],
+      "acts": "weather",
+      "rule": "P2"
+    },
+    "verdict": "keep"
+  },
+  {
+    "id": 22,
+    "ask": "Do I need a jacket tomorrow morning?",
+    "v2": {
+      "expect": "answer",
+      "doors": [
+        "answer"
+      ],
+      "acts": null,
+      "rule": null
+    },
+    "a": {
+      "expect": "answer",
+      "doors": [
+        "answer"
+      ],
+      "acts": "weather",
+      "rule": "P2"
+    },
+    "b": {
+      "expect": "answer",
+      "doors": [
+        "answer"
+      ],
+      "acts": "weather",
+      "rule": "P2"
+    },
+    "verdict": "keep"
+  },
+  {
+    "id": 23,
+    "ask": "How many grams is a cup of flour?",
+    "v2": {
+      "expect": "answer",
+      "doors": [
+        "answer"
+      ],
+      "acts": null,
+      "rule": null
+    },
+    "a": {
+      "expect": "answer",
+      "doors": [
+        "answer"
+      ],
+      "acts": null,
+      "rule": "P1"
+    },
+    "b": {
+      "expect": "answer",
+      "doors": [
+        "answer"
+      ],
+      "acts": null,
+      "rule": "P1"
+    },
+    "verdict": "keep"
+  },
+  {
+    "id": 24,
+    "ask": "Một muỗng canh là bao nhiêu ml?",
+    "v2": {
+      "expect": "answer",
+      "doors": [
+        "answer"
+      ],
+      "acts": null,
+      "rule": null
+    },
+    "a": {
+      "expect": "answer",
+      "doors": [
+        "answer"
+      ],
+      "acts": null,
+      "rule": "P1"
+    },
+    "b": {
+      "expect": "answer",
+      "doors": [
+        "answer"
+      ],
+      "acts": null,
+      "rule": "P1"
+    },
+    "verdict": "keep"
+  },
+  {
+    "id": 25,
+    "ask": "Quick, what's the capital of Australia for my homework?",
+    "v2": {
+      "expect": "answer",
+      "doors": [
+        "answer"
+      ],
+      "acts": null,
+      "rule": null
+    },
+    "a": {
+      "expect": "answer",
+      "doors": [
+        "answer"
+      ],
+      "acts": null,
+      "rule": "P1"
+    },
+    "b": {
+      "expect": "answer",
+      "doors": [
+        "answer"
+      ],
+      "acts": null,
+      "rule": "P1"
+    },
+    "verdict": "keep"
+  },
+  {
+    "id": 26,
+    "ask": "Thủ đô của Canada là gì vậy?",
+    "v2": {
+      "expect": "answer",
+      "doors": [
+        "answer"
+      ],
+      "acts": null,
+      "rule": null
+    },
+    "a": {
+      "expect": "answer",
+      "doors": [
+        "answer"
+      ],
+      "acts": null,
+      "rule": "P1"
+    },
+    "b": {
+      "expect": "answer",
+      "doors": [
+        "answer"
+      ],
+      "acts": null,
+      "rule": "P1"
+    },
+    "verdict": "keep"
+  },
+  {
+    "id": 27,
+    "ask": "What does photosynthesis mean, in simple words?",
+    "v2": {
+      "expect": "answer",
+      "doors": [
+        "answer"
+      ],
+      "acts": null,
+      "rule": null
+    },
+    "a": {
+      "expect": "answer",
+      "doors": [
+        "answer"
+      ],
+      "acts": null,
+      "rule": "P1"
+    },
+    "b": {
+      "expect": "answer",
+      "doors": [
+        "answer"
+      ],
+      "acts": null,
+      "rule": "P1"
+    },
+    "verdict": "keep"
+  },
+  {
+    "id": 28,
+    "ask": "How do you spell necessary?",
+    "v2": {
+      "expect": "answer",
+      "doors": [
+        "answer"
+      ],
+      "acts": null,
+      "rule": null
+    },
+    "a": {
+      "expect": "answer",
+      "doors": [
+        "answer"
+      ],
+      "acts": null,
+      "rule": "P1"
+    },
+    "b": {
+      "expect": "answer",
+      "doors": [
+        "answer"
+      ],
+      "acts": null,
+      "rule": "P1"
+    },
+    "verdict": "keep"
+  },
+  {
+    "id": 29,
+    "ask": "Chữ kiên nhẫn tiếng Anh là gì?",
+    "v2": {
+      "expect": "answer",
+      "doors": [
+        "answer"
+      ],
+      "acts": null,
+      "rule": null
+    },
+    "a": {
+      "expect": "answer",
+      "doors": [
+        "answer"
+      ],
+      "acts": null,
+      "rule": "P1"
+    },
+    "b": {
+      "expect": "answer",
+      "doors": [
+        "answer"
+      ],
+      "acts": null,
+      "rule": "P1"
+    },
+    "verdict": "keep"
+  },
+  {
+    "id": 30,
+    "ask": "What's 15 percent of 240?",
+    "v2": {
+      "expect": "answer",
+      "doors": [
+        "answer"
+      ],
+      "acts": null,
+      "rule": null
+    },
+    "a": {
+      "expect": "answer",
+      "doors": [
+        "answer"
+      ],
+      "acts": null,
+      "rule": "P1"
+    },
+    "b": {
+      "expect": "answer",
+      "doors": [
+        "answer"
+      ],
+      "acts": null,
+      "rule": "P1"
+    },
+    "verdict": "keep"
+  },
+  {
+    "id": 31,
+    "ask": "Bảy nhân tám bằng mấy?",
+    "v2": {
+      "expect": "answer",
+      "doors": [
+        "answer"
+      ],
+      "acts": null,
+      "rule": null
+    },
+    "a": {
+      "expect": "answer",
+      "doors": [
+        "answer"
+      ],
+      "acts": null,
+      "rule": "P1"
+    },
+    "b": {
+      "expect": "answer",
+      "doors": [
+        "answer"
+      ],
+      "acts": null,
+      "rule": "P1"
+    },
+    "verdict": "keep"
+  },
+  {
+    "id": 32,
+    "ask": "How many minutes until 6 pm?",
+    "v2": {
+      "expect": "answer",
+      "doors": [
+        "answer"
+      ],
+      "acts": null,
+      "rule": null
+    },
+    "a": {
+      "expect": "answer",
+      "doors": [
+        "answer"
+      ],
+      "acts": null,
+      "rule": "P1"
+    },
+    "b": {
+      "expect": "answer",
+      "doors": [
+        "answer"
+      ],
+      "acts": null,
+      "rule": "P1"
+    },
+    "verdict": "keep"
+  },
+  {
+    "id": 33,
+    "ask": "Đổi 50 đô ra tiền Việt khoảng bao nhiêu?",
+    "v2": {
+      "expect": "answer",
+      "doors": [
+        "answer"
+      ],
+      "acts": null,
+      "rule": null
+    },
+    "a": {
+      "expect": "answer",
+      "doors": [
+        "answer"
+      ],
+      "acts": "search",
+      "rule": "P2"
+    },
+    "b": {
+      "expect": "answer",
+      "doors": [
+        "answer"
+      ],
+      "acts": "search",
+      "rule": "P2"
+    },
+    "verdict": "keep"
+  },
+  {
+    "id": 34,
+    "ask": "Did Arsenal win last night?",
+    "v2": {
+      "expect": "answer",
+      "doors": [
+        "answer"
+      ],
+      "acts": null,
+      "rule": null
+    },
+    "a": {
+      "expect": "answer",
+      "doors": [
+        "answer"
+      ],
+      "acts": "search",
+      "rule": "P2"
+    },
+    "b": {
+      "expect": "answer",
+      "doors": [
+        "answer"
+      ],
+      "acts": "search",
+      "rule": "P2"
+    },
+    "verdict": "keep"
+  },
+  {
+    "id": 35,
+    "ask": "Giá vàng hôm nay bao nhiêu?",
+    "v2": {
+      "expect": "answer",
+      "doors": [
+        "answer"
+      ],
+      "acts": null,
+      "rule": null
+    },
+    "a": {
+      "expect": "answer",
+      "doors": [
+        "answer"
+      ],
+      "acts": "search",
+      "rule": "P2"
+    },
+    "b": {
+      "expect": "answer",
+      "doors": [
+        "answer"
+      ],
+      "acts": "search",
+      "rule": "P2"
+    },
+    "verdict": "keep"
+  },
+  {
+    "id": 36,
+    "ask": "What year did the Berlin Wall fall?",
+    "v2": {
+      "expect": "answer",
+      "doors": [
+        "answer"
+      ],
+      "acts": null,
+      "rule": null
+    },
+    "a": {
+      "expect": "answer",
+      "doors": [
+        "answer"
+      ],
+      "acts": null,
+      "rule": "P1"
+    },
+    "b": {
+      "expect": "answer",
+      "doors": [
+        "answer"
+      ],
+      "acts": null,
+      "rule": "P1"
+    },
+    "verdict": "keep"
+  },
+  {
+    "id": 37,
+    "ask": "Tell me a joke, I need a break.",
+    "v2": {
+      "expect": "answer",
+      "doors": [
+        "answer"
+      ],
+      "acts": null,
+      "rule": null
+    },
+    "a": {
+      "expect": "answer",
+      "doors": [
+        "answer"
+      ],
+      "acts": null,
+      "rule": "P1"
+    },
+    "b": {
+      "expect": "answer",
+      "doors": [
+        "answer"
+      ],
+      "acts": null,
+      "rule": "P1"
+    },
+    "verdict": "keep"
+  },
+  {
+    "id": 38,
+    "ask": "Kể chuyện cười cho mình nghe đi.",
+    "v2": {
+      "expect": "answer",
+      "doors": [
+        "answer"
+      ],
+      "acts": null,
+      "rule": null
+    },
+    "a": {
+      "expect": "answer",
+      "doors": [
+        "answer"
+      ],
+      "acts": null,
+      "rule": "P1"
+    },
+    "b": {
+      "expect": "answer",
+      "doors": [
+        "answer"
+      ],
+      "acts": null,
+      "rule": "P1"
+    },
+    "verdict": "keep"
+  },
+  {
+    "id": 39,
+    "ask": "Say goodnight to my daughter, she's going to bed.",
+    "v2": {
+      "expect": "answer",
+      "doors": [
+        "answer"
+      ],
+      "acts": null,
+      "rule": null
+    },
+    "a": {
+      "expect": "answer",
+      "doors": [
+        "answer"
+      ],
+      "acts": null,
+      "rule": "P1"
+    },
+    "b": {
+      "expect": "answer",
+      "doors": [
+        "answer"
+      ],
+      "acts": null,
+      "rule": "P1"
+    },
+    "verdict": "keep"
+  },
+  {
+    "id": 40,
+    "ask": "Chào buổi sáng! Hôm nay là thứ mấy?",
+    "v2": {
+      "expect": "answer",
+      "doors": [
+        "answer"
+      ],
+      "acts": null,
+      "rule": null
+    },
+    "a": {
+      "expect": "answer",
+      "doors": [
+        "answer"
+      ],
+      "acts": null,
+      "rule": "P1"
+    },
+    "b": {
+      "expect": "answer",
+      "doors": [
+        "answer"
+      ],
+      "acts": null,
+      "rule": "P1"
+    },
+    "verdict": "keep"
+  },
+  {
+    "id": 41,
+    "ask": "What's today's date?",
+    "v2": {
+      "expect": "answer",
+      "doors": [
+        "answer"
+      ],
+      "acts": null,
+      "rule": null
+    },
+    "a": {
+      "expect": "answer",
+      "doors": [
+        "answer"
+      ],
+      "acts": null,
+      "rule": "P1"
+    },
+    "b": {
+      "expect": "answer",
+      "doors": [
+        "answer"
+      ],
+      "acts": null,
+      "rule": "P1"
+    },
+    "verdict": "keep"
+  },
+  {
+    "id": 42,
+    "ask": "Write me a little four-line poem about rain on the window.",
+    "v2": {
+      "expect": "answer",
+      "doors": [
+        "answer"
+      ],
+      "acts": null,
+      "rule": null
+    },
+    "a": {
+      "expect": "answer",
+      "doors": [
+        "answer"
+      ],
+      "acts": null,
+      "rule": "P1"
+    },
+    "b": {
+      "expect": "answer",
+      "doors": [
+        "answer"
+      ],
+      "acts": null,
+      "rule": "P1"
+    },
+    "verdict": "keep"
+  },
+  {
+    "id": 43,
+    "ask": "Làm một câu thơ ngắn chúc mừng sinh nhật bà đi.",
+    "v2": {
+      "expect": "answer",
+      "doors": [
+        "answer"
+      ],
+      "acts": null,
+      "rule": null
+    },
+    "a": {
+      "expect": "answer",
+      "doors": [
+        "answer"
+      ],
+      "acts": null,
+      "rule": "P1"
+    },
+    "b": {
+      "expect": "answer",
+      "doors": [
+        "answer"
+      ],
+      "acts": null,
+      "rule": "P1"
+    },
+    "verdict": "keep"
+  },
+  {
+    "id": 44,
+    "ask": "So what are you able to help me with?",
+    "v2": {
+      "expect": "answer",
+      "doors": [
+        "answer"
+      ],
+      "acts": null,
+      "rule": null
+    },
+    "a": {
+      "expect": "answer",
+      "doors": [
+        "answer"
+      ],
+      "acts": "skill",
+      "rule": "P2"
+    },
+    "b": {
+      "expect": "answer",
+      "doors": [
+        "answer"
+      ],
+      "acts": "skill",
+      "rule": "P2"
+    },
+    "verdict": "keep"
+  },
+  {
+    "id": 45,
+    "ask": "Bạn làm được những gì?",
+    "v2": {
+      "expect": "answer",
+      "doors": [
+        "answer"
+      ],
+      "acts": null,
+      "rule": null
+    },
+    "a": {
+      "expect": "answer",
+      "doors": [
+        "answer"
+      ],
+      "acts": "skill",
+      "rule": "P2"
+    },
+    "b": {
+      "expect": "answer",
+      "doors": [
+        "answer"
+      ],
+      "acts": "skill",
+      "rule": "P2"
+    },
+    "verdict": "keep"
+  },
+  {
+    "id": 46,
+    "ask": "I'm so tired of this essay.",
+    "v2": {
+      "expect": "answer",
+      "doors": [
+        "answer"
+      ],
+      "acts": null,
+      "rule": null
+    },
+    "a": {
+      "expect": "answer",
+      "doors": [
+        "answer"
+      ],
+      "acts": null,
+      "rule": "P1"
+    },
+    "b": {
+      "expect": "answer",
+      "doors": [
+        "answer"
+      ],
+      "acts": null,
+      "rule": "P1"
+    },
+    "verdict": "keep"
+  },
+  {
+    "id": 47,
+    "ask": "Mình buồn quá, nói chuyện với mình chút đi.",
+    "v2": {
+      "expect": "answer",
+      "doors": [
+        "answer"
+      ],
+      "acts": null,
+      "rule": null
+    },
+    "a": {
+      "expect": "answer",
+      "doors": [
+        "answer"
+      ],
+      "acts": null,
+      "rule": "P1"
+    },
+    "b": {
+      "expect": "answer",
+      "doors": [
+        "answer"
+      ],
+      "acts": null,
+      "rule": "P1"
+    },
+    "verdict": "keep"
+  },
+  {
+    "id": 48,
+    "ask": "Give me one quick tip to focus better.",
+    "v2": {
+      "expect": "answer",
+      "doors": [
+        "answer"
+      ],
+      "acts": null,
+      "rule": null
+    },
+    "a": {
+      "expect": "answer",
+      "doors": [
+        "answer"
+      ],
+      "acts": null,
+      "rule": "P1"
+    },
+    "b": {
+      "expect": "answer",
+      "doors": [
+        "answer"
+      ],
+      "acts": null,
+      "rule": "P1"
+    },
+    "verdict": "keep"
+  },
+  {
+    "id": 49,
+    "ask": "Nấu cơm 2 chén gạo thì cho bao nhiêu nước?",
+    "v2": {
+      "expect": "answer",
+      "doors": [
+        "answer"
+      ],
+      "acts": null,
+      "rule": null
+    },
+    "a": {
+      "expect": "answer",
+      "doors": [
+        "answer"
+      ],
+      "acts": null,
+      "rule": "P1"
+    },
+    "b": {
+      "expect": "answer",
+      "doors": [
+        "answer"
+      ],
+      "acts": null,
+      "rule": "P1"
+    },
+    "verdict": "keep"
+  },
+  {
+    "id": 50,
+    "ask": "For a soft egg, how many minutes in the boiling water?",
+    "v2": {
+      "expect": "answer",
+      "doors": [
+        "answer"
+      ],
+      "acts": null,
+      "rule": null
+    },
+    "a": {
+      "expect": "answer",
+      "doors": [
+        "answer"
+      ],
+      "acts": null,
+      "rule": "P1"
+    },
+    "b": {
+      "expect": "answer",
+      "doors": [
+        "answer"
+      ],
+      "acts": null,
+      "rule": "P1"
+    },
+    "verdict": "keep"
+  },
+  {
+    "id": 51,
+    "ask": "Can you look up three laptops under 15 million dong for a student and compare them?",
+    "v2": {
+      "expect": "hand_over",
+      "doors": [
+        "ask"
+      ],
+      "acts": null,
+      "rule": null
+    },
+    "a": {
+      "expect": "hand_over",
+      "doors": [
+        "ask"
+      ],
+      "acts": null,
+      "rule": "P3"
+    },
+    "b": {
+      "expect": "hand_over",
+      "doors": [
+        "ask"
+      ],
+      "acts": null,
+      "rule": "P3"
+    },
+    "verdict": "keep"
+  },
+  {
+    "id": 52,
+    "ask": "Tìm giúp mình vài trường đại học có ngành khoa học máy tính ở Hà Nội và so sánh học phí nhé.",
+    "v2": {
+      "expect": "hand_over",
+      "doors": [
+        "ask"
+      ],
+      "acts": null,
+      "rule": null
+    },
+    "a": {
+      "expect": "hand_over",
+      "doors": [
+        "ask"
+      ],
+      "acts": null,
+      "rule": "P3"
+    },
+    "b": {
+      "expect": "hand_over",
+      "doors": [
+        "ask"
+      ],
+      "acts": null,
+      "rule": "P3"
+    },
+    "verdict": "keep"
+  },
+  {
+    "id": 53,
+    "ask": "Read the latest news about this year's exam changes and give me a summary.",
+    "v2": {
+      "expect": "hand_over",
+      "doors": [
+        "ask"
+      ],
+      "acts": null,
+      "rule": null
+    },
+    "a": {
+      "expect": "hand_over",
+      "doors": [
+        "ask"
+      ],
+      "acts": null,
+      "rule": "P3"
+    },
+    "b": {
+      "expect": "hand_over",
+      "doors": [
+        "ask"
+      ],
+      "acts": null,
+      "rule": "P3"
+    },
+    "verdict": "keep"
+  },
+  {
+    "id": 54,
+    "ask": "Tìm hiểu giúp mình cách chăm cây lưỡi hổ, tổng hợp từ mấy nguồn nhé.",
+    "v2": {
+      "expect": "hand_over",
+      "doors": [
+        "ask"
+      ],
+      "acts": null,
+      "rule": null
+    },
+    "a": {
+      "expect": "hand_over",
+      "doors": [
+        "ask"
+      ],
+      "acts": null,
+      "rule": "P3"
+    },
+    "b": {
+      "expect": "hand_over",
+      "doors": [
+        "ask"
+      ],
+      "acts": null,
+      "rule": "P3"
+    },
+    "verdict": "keep"
+  },
+  {
+    "id": 55,
+    "ask": "Make me a two-week study plan for my maths final, an hour a day.",
+    "v2": {
+      "expect": "hand_over",
+      "doors": [
+        "ask"
+      ],
+      "acts": null,
+      "rule": null
+    },
+    "a": {
+      "expect": "hand_over",
+      "doors": [
+        "ask",
+        "task"
+      ],
+      "acts": null,
+      "rule": "P4b"
+    },
+    "b": {
+      "expect": "hand_over",
+      "doors": [
+        "ask",
+        "task"
+      ],
+      "acts": null,
+      "rule": "P4b"
+    },
+    "verdict": "change"
+  },
+  {
+    "id": 56,
+    "ask": "Lên kế hoạch ôn thi tiếng Anh trong một tháng cho mình.",
+    "v2": {
+      "expect": "hand_over",
+      "doors": [
+        "ask"
+      ],
+      "acts": null,
+      "rule": null
+    },
+    "a": {
+      "expect": "hand_over",
+      "doors": [
+        "ask",
+        "task"
+      ],
+      "acts": null,
+      "rule": "P4b"
+    },
+    "b": {
+      "expect": "hand_over",
+      "doors": [
+        "ask",
+        "task"
+      ],
+      "acts": null,
+      "rule": "P4b"
+    },
+    "verdict": "change"
+  },
+  {
+    "id": 57,
+    "ask": "Write a one-page essay draft about climate change for my class.",
+    "v2": {
+      "expect": "hand_over",
+      "doors": [
+        "ask"
+      ],
+      "acts": null,
+      "rule": null
+    },
+    "a": {
+      "expect": "hand_over",
+      "doors": [
+        "ask",
+        "task"
+      ],
+      "acts": null,
+      "rule": "P4b"
+    },
+    "b": {
+      "expect": "hand_over",
+      "doors": [
+        "ask",
+        "task"
+      ],
+      "acts": null,
+      "rule": "P4b"
+    },
+    "verdict": "change"
+  },
+  {
+    "id": 58,
+    "ask": "Viết giúp mình bài văn tả mẹ khoảng 400 chữ, mình sẽ sửa lại.",
+    "v2": {
+      "expect": "hand_over",
+      "doors": [
+        "ask"
+      ],
+      "acts": null,
+      "rule": null
+    },
+    "a": {
+      "expect": "hand_over",
+      "doors": [
+        "ask",
+        "task"
+      ],
+      "acts": null,
+      "rule": "P4b"
+    },
+    "b": {
+      "expect": "hand_over",
+      "doors": [
+        "ask",
+        "task"
+      ],
+      "acts": null,
+      "rule": "P4b"
+    },
+    "verdict": "change"
+  },
+  {
+    "id": 59,
+    "ask": "Write a cover letter for a part-time cafe job and save it so I can print it.",
+    "v2": {
+      "expect": "hand_over",
+      "doors": [
+        "task"
+      ],
+      "acts": null,
+      "rule": null
+    },
+    "a": {
+      "expect": "hand_over",
+      "doors": [
+        "task"
+      ],
+      "acts": null,
+      "rule": "P4"
+    },
+    "b": {
+      "expect": "hand_over",
+      "doors": [
+        "task"
+      ],
+      "acts": null,
+      "rule": "P4"
+    },
+    "verdict": "keep"
+  },
+  {
+    "id": 60,
+    "ask": "Soạn sẵn giúp mình một email xin nghỉ học gửi cô giáo, lưu lại để mình xem.",
+    "v2": {
+      "expect": "hand_over",
+      "doors": [
+        "task"
+      ],
+      "acts": null,
+      "rule": null
+    },
+    "a": {
+      "expect": "hand_over",
+      "doors": [
+        "task"
+      ],
+      "acts": null,
+      "rule": "P4"
+    },
+    "b": {
+      "expect": "hand_over",
+      "doors": [
+        "task"
+      ],
+      "acts": null,
+      "rule": "P4"
+    },
+    "verdict": "keep"
+  },
+  {
+    "id": 61,
+    "ask": "Write a Python script that renames all my photos by date.",
+    "v2": {
+      "expect": "hand_over",
+      "doors": [
+        "task"
+      ],
+      "acts": null,
+      "rule": null
+    },
+    "a": {
+      "expect": "hand_over",
+      "doors": [
+        "task"
+      ],
+      "acts": null,
+      "rule": "P4"
+    },
+    "b": {
+      "expect": "hand_over",
+      "doors": [
+        "task"
+      ],
+      "acts": null,
+      "rule": "P4"
+    },
+    "verdict": "keep"
+  },
+  {
+    "id": 62,
+    "ask": "Viết cho mình đoạn code Python tính điểm trung bình các môn.",
+    "v2": {
+      "expect": "hand_over",
+      "doors": [
+        "task"
+      ],
+      "acts": null,
+      "rule": null
+    },
+    "a": {
+      "expect": "hand_over",
+      "doors": [
+        "task"
+      ],
+      "acts": null,
+      "rule": "P4"
+    },
+    "b": {
+      "expect": "hand_over",
+      "doors": [
+        "task"
+      ],
+      "acts": null,
+      "rule": "P4"
+    },
+    "verdict": "keep"
+  },
+  {
+    "id": 63,
+    "ask": "Help me make a small web page for my school club.",
+    "v2": {
+      "expect": "hand_over",
+      "doors": [
+        "task"
+      ],
+      "acts": null,
+      "rule": null
+    },
+    "a": {
+      "expect": "hand_over",
+      "doors": [
+        "task"
+      ],
+      "acts": null,
+      "rule": "P4"
+    },
+    "b": {
+      "expect": "hand_over",
+      "doors": [
+        "task"
+      ],
+      "acts": null,
+      "rule": "P4"
+    },
+    "verdict": "keep"
+  },
+  {
+    "id": 64,
+    "ask": "Viết cho mình một chương trình nhỏ đoán số để mình học lập trình.",
+    "v2": {
+      "expect": "hand_over",
+      "doors": [
+        "task"
+      ],
+      "acts": null,
+      "rule": null
+    },
+    "a": {
+      "expect": "hand_over",
+      "doors": [
+        "task"
+      ],
+      "acts": null,
+      "rule": "P4"
+    },
+    "b": {
+      "expect": "hand_over",
+      "doors": [
+        "task"
+      ],
+      "acts": null,
+      "rule": "P4"
+    },
+    "verdict": "keep"
+  },
+  {
+    "id": 65,
+    "ask": "Make a weekly meal plan for a family of four with a shopping list.",
+    "v2": {
+      "expect": "hand_over",
+      "doors": [
+        "ask"
+      ],
+      "acts": null,
+      "rule": null
+    },
+    "a": {
+      "expect": "hand_over",
+      "doors": [
+        "ask",
+        "task"
+      ],
+      "acts": null,
+      "rule": "P4b"
+    },
+    "b": {
+      "expect": "hand_over",
+      "doors": [
+        "ask",
+        "task"
+      ],
+      "acts": null,
+      "rule": "P4b"
+    },
+    "verdict": "change"
+  },
+  {
+    "id": 66,
+    "ask": "Lên thực đơn một tuần cho cả nhà, kèm danh sách đi chợ nhé.",
+    "v2": {
+      "expect": "hand_over",
+      "doors": [
+        "ask"
+      ],
+      "acts": null,
+      "rule": null
+    },
+    "a": {
+      "expect": "hand_over",
+      "doors": [
+        "ask",
+        "task"
+      ],
+      "acts": null,
+      "rule": "P4b"
+    },
+    "b": {
+      "expect": "hand_over",
+      "doors": [
+        "ask",
+        "task"
+      ],
+      "acts": null,
+      "rule": "P4b"
+    },
+    "verdict": "change"
+  },
+  {
+    "id": 67,
+    "ask": "Find a few easy dinner recipes with chicken and broccoli and write them up for me.",
+    "v2": {
+      "expect": "hand_over",
+      "doors": [
+        "ask"
+      ],
+      "acts": null,
+      "rule": null
+    },
+    "a": {
+      "expect": "hand_over",
+      "doors": [
+        "ask",
+        "task"
+      ],
+      "acts": null,
+      "rule": "P4b"
+    },
+    "b": {
+      "expect": "hand_over",
+      "doors": [
+        "ask",
+        "task"
+      ],
+      "acts": null,
+      "rule": "P4b"
+    },
+    "verdict": "change"
+  },
+  {
+    "id": 68,
+    "ask": "Tìm mấy công thức làm bánh flan không cần lò, so sánh xem cách nào dễ nhất.",
+    "v2": {
+      "expect": "hand_over",
+      "doors": [
+        "ask"
+      ],
+      "acts": null,
+      "rule": null
+    },
+    "a": {
+      "expect": "hand_over",
+      "doors": [
+        "ask"
+      ],
+      "acts": null,
+      "rule": "P3"
+    },
+    "b": {
+      "expect": "hand_over",
+      "doors": [
+        "ask"
+      ],
+      "acts": null,
+      "rule": "P3"
+    },
+    "verdict": "keep"
+  },
+  {
+    "id": 69,
+    "ask": "We want to go to Da Lat for three days, can you plan it with a rough budget?",
+    "v2": {
+      "expect": "hand_over",
+      "doors": [
+        "ask"
+      ],
+      "acts": null,
+      "rule": null
+    },
+    "a": {
+      "expect": "hand_over",
+      "doors": [
+        "ask",
+        "task"
+      ],
+      "acts": null,
+      "rule": "P4b"
+    },
+    "b": {
+      "expect": "hand_over",
+      "doors": [
+        "ask",
+        "task"
+      ],
+      "acts": null,
+      "rule": "P4b"
+    },
+    "verdict": "change"
+  },
+  {
+    "id": 70,
+    "ask": "Lên lịch trình đi Hội An 2 ngày cho gia đình, kèm chi phí dự kiến.",
+    "v2": {
+      "expect": "hand_over",
+      "doors": [
+        "ask"
+      ],
+      "acts": null,
+      "rule": null
+    },
+    "a": {
+      "expect": "hand_over",
+      "doors": [
+        "ask",
+        "task"
+      ],
+      "acts": null,
+      "rule": "P4b"
+    },
+    "b": {
+      "expect": "hand_over",
+      "doors": [
+        "ask",
+        "task"
+      ],
+      "acts": null,
+      "rule": "P4b"
+    },
+    "verdict": "change"
+  },
+  {
+    "id": 71,
+    "ask": "Read the Wikipedia page on black holes and summarise it for me.",
+    "v2": {
+      "expect": "hand_over",
+      "doors": [
+        "ask"
+      ],
+      "acts": null,
+      "rule": null
+    },
+    "a": {
+      "expect": "hand_over",
+      "doors": [
+        "ask"
+      ],
+      "acts": null,
+      "rule": "P3"
+    },
+    "b": {
+      "expect": "hand_over",
+      "doors": [
+        "ask"
+      ],
+      "acts": null,
+      "rule": "P3"
+    },
+    "verdict": "keep"
+  },
+  {
+    "id": 72,
+    "ask": "Đọc trang Wikipedia về chiến dịch Điện Biên Phủ rồi tóm tắt ý chính giúp mình.",
+    "v2": {
+      "expect": "hand_over",
+      "doors": [
+        "ask"
+      ],
+      "acts": null,
+      "rule": null
+    },
+    "a": {
+      "expect": "hand_over",
+      "doors": [
+        "ask"
+      ],
+      "acts": null,
+      "rule": "P3"
+    },
+    "b": {
+      "expect": "hand_over",
+      "doors": [
+        "ask"
+      ],
+      "acts": null,
+      "rule": "P3"
+    },
+    "verdict": "keep"
+  },
+  {
+    "id": 73,
+    "ask": "Make me 20 flashcards for my biology chapter on cells and save them in a file.",
+    "v2": {
+      "expect": "hand_over",
+      "doors": [
+        "task"
+      ],
+      "acts": null,
+      "rule": null
+    },
+    "a": {
+      "expect": "hand_over",
+      "doors": [
+        "task"
+      ],
+      "acts": null,
+      "rule": "P4"
+    },
+    "b": {
+      "expect": "hand_over",
+      "doors": [
+        "task"
+      ],
+      "acts": null,
+      "rule": "P4"
+    },
+    "verdict": "keep"
+  },
+  {
+    "id": 74,
+    "ask": "Soạn 30 câu trắc nghiệm lịch sử lớp 9 để mình ôn, lưu vào file nhé.",
+    "v2": {
+      "expect": "hand_over",
+      "doors": [
+        "task"
+      ],
+      "acts": null,
+      "rule": null
+    },
+    "a": {
+      "expect": "hand_over",
+      "doors": [
+        "task"
+      ],
+      "acts": null,
+      "rule": "P4"
+    },
+    "b": {
+      "expect": "hand_over",
+      "doors": [
+        "task"
+      ],
+      "acts": null,
+      "rule": "P4"
+    },
+    "verdict": "keep"
+  },
+  {
+    "id": 75,
+    "ask": "Start a reading log for me and add The Hobbit, I finished it today.",
+    "v2": {
+      "expect": "hand_over",
+      "doors": [
+        "task"
+      ],
+      "acts": null,
+      "rule": null
+    },
+    "a": {
+      "expect": "hand_over",
+      "doors": [
+        "task"
+      ],
+      "acts": null,
+      "rule": "P4"
+    },
+    "b": {
+      "expect": "hand_over",
+      "doors": [
+        "task"
+      ],
+      "acts": null,
+      "rule": "P4"
+    },
+    "verdict": "keep"
+  },
+  {
+    "id": 76,
+    "ask": "Tạo cho mình một bảng tính chi tiêu tháng này nhé.",
+    "v2": {
+      "expect": "hand_over",
+      "doors": [
+        "task"
+      ],
+      "acts": null,
+      "rule": null
+    },
+    "a": {
+      "expect": "hand_over",
+      "doors": [
+        "task"
+      ],
+      "acts": null,
+      "rule": "P4"
+    },
+    "b": {
+      "expect": "hand_over",
+      "doors": [
+        "task"
+      ],
+      "acts": null,
+      "rule": "P4"
+    },
+    "verdict": "keep"
+  },
+  {
+    "id": 77,
+    "ask": "Get last year's monthly rainfall for Ho Chi Minh City and tell me which months were wettest.",
+    "v2": {
+      "expect": "hand_over",
+      "doors": [
+        "ask"
+      ],
+      "acts": null,
+      "rule": null
+    },
+    "a": {
+      "expect": "hand_over",
+      "doors": [
+        "ask"
+      ],
+      "acts": null,
+      "rule": "P3"
+    },
+    "b": {
+      "expect": "hand_over",
+      "doors": [
+        "ask"
+      ],
+      "acts": null,
+      "rule": "P3"
+    },
+    "verdict": "keep"
+  },
+  {
+    "id": 78,
+    "ask": "Lấy số liệu dân số các nước Đông Nam Á rồi xếp hạng giúp mình.",
+    "v2": {
+      "expect": "hand_over",
+      "doors": [
+        "ask"
+      ],
+      "acts": null,
+      "rule": null
+    },
+    "a": {
+      "expect": "hand_over",
+      "doors": [
+        "ask",
+        "task"
+      ],
+      "acts": null,
+      "rule": "P4b"
+    },
+    "b": {
+      "expect": "hand_over",
+      "doors": [
+        "ask",
+        "task"
+      ],
+      "acts": null,
+      "rule": "P4b"
+    },
+    "verdict": "change"
+  },
+  {
+    "id": 79,
+    "ask": "Compare iPhone 15 and Samsung S24 prices across a few online shops.",
+    "v2": {
+      "expect": "hand_over",
+      "doors": [
+        "ask"
+      ],
+      "acts": null,
+      "rule": null
+    },
+    "a": {
+      "expect": "hand_over",
+      "doors": [
+        "ask"
+      ],
+      "acts": null,
+      "rule": "P3"
+    },
+    "b": {
+      "expect": "hand_over",
+      "doors": [
+        "ask"
+      ],
+      "acts": null,
+      "rule": "P3"
+    },
+    "verdict": "keep"
+  },
+  {
+    "id": 80,
+    "ask": "So sánh giúp mình mấy gói cước internet của Viettel, VNPT và FPT.",
+    "v2": {
+      "expect": "hand_over",
+      "doors": [
+        "ask"
+      ],
+      "acts": null,
+      "rule": null
+    },
+    "a": {
+      "expect": "hand_over",
+      "doors": [
+        "ask"
+      ],
+      "acts": null,
+      "rule": "P3"
+    },
+    "b": {
+      "expect": "hand_over",
+      "doors": [
+        "ask"
+      ],
+      "acts": null,
+      "rule": "P3"
+    },
+    "verdict": "keep"
+  },
+  {
+    "id": 81,
+    "ask": "Research the best way to teach a seven-year-old multiplication and give me a plan.",
+    "v2": {
+      "expect": "hand_over",
+      "doors": [
+        "ask"
+      ],
+      "acts": null,
+      "rule": null
+    },
+    "a": {
+      "expect": "hand_over",
+      "doors": [
+        "ask",
+        "task"
+      ],
+      "acts": null,
+      "rule": "P4b"
+    },
+    "b": {
+      "expect": "hand_over",
+      "doors": [
+        "ask",
+        "task"
+      ],
+      "acts": null,
+      "rule": "P4b"
+    },
+    "verdict": "change"
+  },
+  {
+    "id": 82,
+    "ask": "Tìm hiểu xem trẻ 5 tuổi nên ngủ bao nhiêu tiếng rồi lên lịch sinh hoạt buổi tối cho bé.",
+    "v2": {
+      "expect": "hand_over",
+      "doors": [
+        "ask"
+      ],
+      "acts": null,
+      "rule": null
+    },
+    "a": {
+      "expect": "hand_over",
+      "doors": [
+        "ask",
+        "task"
+      ],
+      "acts": null,
+      "rule": "P4b"
+    },
+    "b": {
+      "expect": "hand_over",
+      "doors": [
+        "ask",
+        "task"
+      ],
+      "acts": null,
+      "rule": "P4b"
+    },
+    "verdict": "change"
+  },
+  {
+    "id": 83,
+    "ask": "Write a bedtime story about a dragon for my son, about ten minutes long.",
+    "v2": {
+      "expect": "hand_over",
+      "doors": [
+        "answer",
+        "ask"
+      ],
+      "acts": null,
+      "rule": null
+    },
+    "a": {
+      "expect": "answer",
+      "doors": [
+        "answer"
+      ],
+      "acts": null,
+      "rule": "P7a"
+    },
+    "b": {
+      "expect": "answer",
+      "doors": [
+        "answer"
+      ],
+      "acts": null,
+      "rule": "P7a"
+    },
+    "verdict": "change"
+  },
+  {
+    "id": 84,
+    "ask": "Viết một câu chuyện dài cho con gái mình nghe trước khi ngủ, về chú mèo đi lạc, đọc chừng mười phút.",
+    "v2": {
+      "expect": "hand_over",
+      "doors": [
+        "answer",
+        "ask"
+      ],
+      "acts": null,
+      "rule": null
+    },
+    "a": {
+      "expect": "answer",
+      "doors": [
+        "answer"
+      ],
+      "acts": null,
+      "rule": "P7a"
+    },
+    "b": {
+      "expect": "answer",
+      "doors": [
+        "answer"
+      ],
+      "acts": null,
+      "rule": "P7a"
+    },
+    "verdict": "change"
+  },
+  {
+    "id": 85,
+    "ask": "Write a speech for my grandparents' fiftieth anniversary, about three minutes long.",
+    "v2": {
+      "expect": "hand_over",
+      "doors": [
+        "answer",
+        "ask"
+      ],
+      "acts": null,
+      "rule": null
+    },
+    "a": {
+      "expect": "hand_over",
+      "doors": [
+        "answer",
+        "task"
+      ],
+      "acts": null,
+      "rule": "P7b"
+    },
+    "b": {
+      "expect": "hand_over",
+      "doors": [
+        "answer",
+        "task"
+      ],
+      "acts": null,
+      "rule": "P7b"
+    },
+    "verdict": "change"
+  },
+  {
+    "id": 86,
+    "ask": "Viết bài phát biểu khoảng 3 phút cho buổi họp lớp cuối năm.",
+    "v2": {
+      "expect": "hand_over",
+      "doors": [
+        "answer",
+        "ask"
+      ],
+      "acts": null,
+      "rule": null
+    },
+    "a": {
+      "expect": "hand_over",
+      "doors": [
+        "answer",
+        "task"
+      ],
+      "acts": null,
+      "rule": "P7b"
+    },
+    "b": {
+      "expect": "hand_over",
+      "doors": [
+        "answer",
+        "task"
+      ],
+      "acts": null,
+      "rule": "P7b"
+    },
+    "verdict": "change"
+  },
+  {
+    "id": 87,
+    "ask": "Go through the reviews of electric scooters sold in Vietnam and tell me which is best value.",
+    "v2": {
+      "expect": "hand_over",
+      "doors": [
+        "ask"
+      ],
+      "acts": null,
+      "rule": null
+    },
+    "a": {
+      "expect": "hand_over",
+      "doors": [
+        "ask"
+      ],
+      "acts": null,
+      "rule": "P3"
+    },
+    "b": {
+      "expect": "hand_over",
+      "doors": [
+        "ask"
+      ],
+      "acts": null,
+      "rule": "P3"
+    },
+    "verdict": "keep"
+  },
+  {
+    "id": 88,
+    "ask": "Tìm đọc mấy bài review máy lọc không khí cho phòng ngủ rồi tư vấn mình nên mua loại nào.",
+    "v2": {
+      "expect": "hand_over",
+      "doors": [
+        "ask"
+      ],
+      "acts": null,
+      "rule": null
+    },
+    "a": {
+      "expect": "hand_over",
+      "doors": [
+        "ask"
+      ],
+      "acts": null,
+      "rule": "P3"
+    },
+    "b": {
+      "expect": "hand_over",
+      "doors": [
+        "ask"
+      ],
+      "acts": null,
+      "rule": "P3"
+    },
+    "verdict": "keep"
+  },
+  {
+    "id": 89,
+    "ask": "Make a revision timetable for my six exams next month and save it as a file.",
+    "v2": {
+      "expect": "hand_over",
+      "doors": [
+        "task"
+      ],
+      "acts": null,
+      "rule": null
+    },
+    "a": {
+      "expect": "hand_over",
+      "doors": [
+        "task"
+      ],
+      "acts": null,
+      "rule": "P4"
+    },
+    "b": {
+      "expect": "hand_over",
+      "doors": [
+        "task"
+      ],
+      "acts": null,
+      "rule": "P4"
+    },
+    "verdict": "keep"
+  },
+  {
+    "id": 90,
+    "ask": "Write a short program that checks my answers to quadratic equations.",
+    "v2": {
+      "expect": "hand_over",
+      "doors": [
+        "task"
+      ],
+      "acts": null,
+      "rule": null
+    },
+    "a": {
+      "expect": "hand_over",
+      "doors": [
+        "task"
+      ],
+      "acts": null,
+      "rule": "P4"
+    },
+    "b": {
+      "expect": "hand_over",
+      "doors": [
+        "task"
+      ],
+      "acts": null,
+      "rule": "P4"
+    },
+    "verdict": "keep"
+  },
+  {
+    "id": 91,
+    "ask": "Find out what the new tax rules for freelancers are this year and explain them simply.",
+    "v2": {
+      "expect": "hand_over",
+      "doors": [
+        "ask"
+      ],
+      "acts": null,
+      "rule": null
+    },
+    "a": {
+      "expect": "hand_over",
+      "doors": [
+        "ask"
+      ],
+      "acts": null,
+      "rule": "P3"
+    },
+    "b": {
+      "expect": "hand_over",
+      "doors": [
+        "ask"
+      ],
+      "acts": null,
+      "rule": "P3"
+    },
+    "verdict": "keep"
+  },
+  {
+    "id": 92,
+    "ask": "Put together a reading list of ten good books for a twelve-year-old, with a line on each.",
+    "v2": {
+      "expect": "hand_over",
+      "doors": [
+        "ask"
+      ],
+      "acts": null,
+      "rule": null
+    },
+    "a": {
+      "expect": "hand_over",
+      "doors": [
+        "ask",
+        "task"
+      ],
+      "acts": null,
+      "rule": "P4b"
+    },
+    "b": {
+      "expect": "hand_over",
+      "doors": [
+        "ask",
+        "task"
+      ],
+      "acts": null,
+      "rule": "P4b"
+    },
+    "verdict": "change"
+  },
+  {
+    "id": 93,
+    "ask": "Tổng hợp giúp mình các mốc lịch sử chính của Việt Nam từ 1945 đến 1975 thành một bảng.",
+    "v2": {
+      "expect": "hand_over",
+      "doors": [
+        "ask"
+      ],
+      "acts": null,
+      "rule": null
+    },
+    "a": {
+      "expect": "hand_over",
+      "doors": [
+        "ask",
+        "task"
+      ],
+      "acts": null,
+      "rule": "P4b"
+    },
+    "b": {
+      "expect": "hand_over",
+      "doors": [
+        "ask",
+        "task"
+      ],
+      "acts": null,
+      "rule": "P4b"
+    },
+    "verdict": "change"
+  },
+  {
+    "id": 94,
+    "ask": "Look up the opening hours and ticket prices of three museums in Hanoi and make a list.",
+    "v2": {
+      "expect": "hand_over",
+      "doors": [
+        "ask"
+      ],
+      "acts": null,
+      "rule": null
+    },
+    "a": {
+      "expect": "hand_over",
+      "doors": [
+        "ask",
+        "task"
+      ],
+      "acts": null,
+      "rule": "P4b"
+    },
+    "b": {
+      "expect": "hand_over",
+      "doors": [
+        "ask",
+        "task"
+      ],
+      "acts": null,
+      "rule": "P4b"
+    },
+    "verdict": "change"
+  },
+  {
+    "id": 95,
+    "ask": "Help me write a business plan outline for a small home bakery.",
+    "v2": {
+      "expect": "hand_over",
+      "doors": [
+        "ask"
+      ],
+      "acts": null,
+      "rule": null
+    },
+    "a": {
+      "expect": "hand_over",
+      "doors": [
+        "ask",
+        "task"
+      ],
+      "acts": null,
+      "rule": "P4b"
+    },
+    "b": {
+      "expect": "hand_over",
+      "doors": [
+        "ask",
+        "task"
+      ],
+      "acts": null,
+      "rule": "P4b"
+    },
+    "verdict": "change"
+  },
+  {
+    "id": 96,
+    "ask": "Explain the whole chapter on Newton's laws with worked examples I can study from.",
+    "v2": {
+      "expect": "hand_over",
+      "doors": [
+        "ask"
+      ],
+      "acts": null,
+      "rule": null
+    },
+    "a": {
+      "expect": "hand_over",
+      "doors": [
+        "ask",
+        "task"
+      ],
+      "acts": null,
+      "rule": "P4b"
+    },
+    "b": {
+      "expect": "hand_over",
+      "doors": [
+        "ask",
+        "task"
+      ],
+      "acts": null,
+      "rule": "P4b"
+    },
+    "verdict": "change"
+  },
+  {
+    "id": 97,
+    "ask": "Check a few sites and tell me which online English courses for kids have the best reviews.",
+    "v2": {
+      "expect": "hand_over",
+      "doors": [
+        "ask"
+      ],
+      "acts": null,
+      "rule": null
+    },
+    "a": {
+      "expect": "hand_over",
+      "doors": [
+        "ask"
+      ],
+      "acts": null,
+      "rule": "P3"
+    },
+    "b": {
+      "expect": "hand_over",
+      "doors": [
+        "ask"
+      ],
+      "acts": null,
+      "rule": "P3"
+    },
+    "verdict": "keep"
+  },
+  {
+    "id": 98,
+    "ask": "Write my CV from scratch, I'm a third-year accounting student, and keep it in a file.",
+    "v2": {
+      "expect": "hand_over",
+      "doors": [
+        "task"
+      ],
+      "acts": null,
+      "rule": null
+    },
+    "a": {
+      "expect": "hand_over",
+      "doors": [
+        "task"
+      ],
+      "acts": null,
+      "rule": "P4"
+    },
+    "b": {
+      "expect": "hand_over",
+      "doors": [
+        "task"
+      ],
+      "acts": null,
+      "rule": "P4"
+    },
+    "verdict": "keep"
+  },
+  {
+    "id": 99,
+    "ask": "Work out a monthly budget from my 15 million salary with savings goals, in a spreadsheet.",
+    "v2": {
+      "expect": "hand_over",
+      "doors": [
+        "task"
+      ],
+      "acts": null,
+      "rule": null
+    },
+    "a": {
+      "expect": "hand_over",
+      "doors": [
+        "task"
+      ],
+      "acts": null,
+      "rule": "P4"
+    },
+    "b": {
+      "expect": "hand_over",
+      "doors": [
+        "task"
+      ],
+      "acts": null,
+      "rule": "P4"
+    },
+    "verdict": "keep"
+  },
+  {
+    "id": 100,
+    "ask": "Find me some science fair project ideas for grade 6, with materials and steps for each.",
+    "v2": {
+      "expect": "hand_over",
+      "doors": [
+        "ask"
+      ],
+      "acts": null,
+      "rule": null
+    },
+    "a": {
+      "expect": "hand_over",
+      "doors": [
+        "ask",
+        "task"
+      ],
+      "acts": null,
+      "rule": "P4b"
+    },
+    "b": {
+      "expect": "hand_over",
+      "doors": [
+        "ask",
+        "task"
+      ],
+      "acts": null,
+      "rule": "P4b"
+    },
+    "verdict": "change"
+  }
+]

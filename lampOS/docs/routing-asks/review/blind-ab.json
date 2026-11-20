@@ -1,0 +1,442 @@
+[
+  {
+    "id": 1,
+    "ask": "Go through the reviews of electric scooters sold in Vietnam and tell me which is best value."
+  },
+  {
+    "id": 2,
+    "ask": "What reminders do I have left today?"
+  },
+  {
+    "id": 3,
+    "ask": "Get last year's monthly rainfall for Ho Chi Minh City and tell me which months were wettest."
+  },
+  {
+    "id": 4,
+    "ask": "Set a timer for 25 minutes, I'm starting homework."
+  },
+  {
+    "id": 5,
+    "ask": "Make me 20 flashcards for my biology chapter on cells and save them in a file."
+  },
+  {
+    "id": 6,
+    "ask": "Đọc trang Wikipedia về chiến dịch Điện Biên Phủ rồi tóm tắt ý chính giúp mình.",
+    "lang": "vi"
+  },
+  {
+    "id": 7,
+    "ask": "Chữ kiên nhẫn tiếng Anh là gì?",
+    "lang": "vi"
+  },
+  {
+    "id": 8,
+    "ask": "When does my school bus come again?"
+  },
+  {
+    "id": 9,
+    "ask": "Write a cover letter for a part-time cafe job and save it so I can print it."
+  },
+  {
+    "id": 10,
+    "ask": "Viết cho mình đoạn code Python tính điểm trung bình các môn.",
+    "lang": "vi"
+  },
+  {
+    "id": 11,
+    "ask": "We want to go to Da Lat for three days, can you plan it with a rough budget?"
+  },
+  {
+    "id": 12,
+    "ask": "Viết một câu chuyện dài cho con gái mình nghe trước khi ngủ, về chú mèo đi lạc, đọc chừng mười phút.",
+    "lang": "vi"
+  },
+  {
+    "id": 13,
+    "ask": "Write me a little four-line poem about rain on the window."
+  },
+  {
+    "id": 14,
+    "ask": "Viết giúp mình bài văn tả mẹ khoảng 400 chữ, mình sẽ sửa lại.",
+    "lang": "vi"
+  },
+  {
+    "id": 15,
+    "ask": "Help me make a small web page for my school club."
+  },
+  {
+    "id": 16,
+    "ask": "Write my CV from scratch, I'm a third-year accounting student, and keep it in a file."
+  },
+  {
+    "id": 17,
+    "ask": "Explain the whole chapter on Newton's laws with worked examples I can study from."
+  },
+  {
+    "id": 18,
+    "ask": "Write a Python script that renames all my photos by date."
+  },
+  {
+    "id": 19,
+    "ask": "Đổi đèn sang màu xanh dương đi.",
+    "lang": "vi"
+  },
+  {
+    "id": 20,
+    "ask": "Make a revision timetable for my six exams next month and save it as a file."
+  },
+  {
+    "id": 21,
+    "ask": "How many grams is a cup of flour?"
+  },
+  {
+    "id": 22,
+    "ask": "Viết cho mình một chương trình nhỏ đoán số để mình học lập trình.",
+    "lang": "vi"
+  },
+  {
+    "id": 23,
+    "ask": "Hẹn giờ 10 phút cho mình luộc trứng nhé.",
+    "lang": "vi"
+  },
+  {
+    "id": 24,
+    "ask": "Nói nhỏ lại chút, em bé đang ngủ.",
+    "lang": "vi"
+  },
+  {
+    "id": 25,
+    "ask": "Lên thực đơn một tuần cho cả nhà, kèm danh sách đi chợ nhé.",
+    "lang": "vi"
+  },
+  {
+    "id": 26,
+    "ask": "Tìm hiểu xem trẻ 5 tuổi nên ngủ bao nhiêu tiếng rồi lên lịch sinh hoạt buổi tối cho bé.",
+    "lang": "vi"
+  },
+  {
+    "id": 27,
+    "ask": "Tạo cho mình một bảng tính chi tiêu tháng này nhé.",
+    "lang": "vi"
+  },
+  {
+    "id": 28,
+    "ask": "What year did the Berlin Wall fall?"
+  },
+  {
+    "id": 29,
+    "ask": "Giá vàng hôm nay bao nhiêu?",
+    "lang": "vi"
+  },
+  {
+    "id": 30,
+    "ask": "So what are you able to help me with?"
+  },
+  {
+    "id": 31,
+    "ask": "Đổi 50 đô ra tiền Việt khoảng bao nhiêu?",
+    "lang": "vi"
+  },
+  {
+    "id": 32,
+    "ask": "Do I need a jacket tomorrow morning?"
+  },
+  {
+    "id": 33,
+    "ask": "Timer for 15 minutes for the pasta, please."
+  },
+  {
+    "id": 34,
+    "ask": "Dim the light, I'm just watching a video now."
+  },
+  {
+    "id": 35,
+    "ask": "Nhắc mình 9 giờ tối nay gọi cho mẹ.",
+    "lang": "vi"
+  },
+  {
+    "id": 36,
+    "ask": "Write a short program that checks my answers to quadratic equations."
+  },
+  {
+    "id": 37,
+    "ask": "So sánh giúp mình mấy gói cước internet của Viettel, VNPT và FPT.",
+    "lang": "vi"
+  },
+  {
+    "id": 38,
+    "ask": "Is it going to be hot this afternoon?"
+  },
+  {
+    "id": 39,
+    "ask": "Read the latest news about this year's exam changes and give me a summary."
+  },
+  {
+    "id": 40,
+    "ask": "Lên kế hoạch ôn thi tiếng Anh trong một tháng cho mình.",
+    "lang": "vi"
+  },
+  {
+    "id": 41,
+    "ask": "Check a few sites and tell me which online English courses for kids have the best reviews."
+  },
+  {
+    "id": 42,
+    "ask": "Tell me a joke, I need a break."
+  },
+  {
+    "id": 43,
+    "ask": "Is it nearly nine yet?"
+  },
+  {
+    "id": 44,
+    "ask": "Find me some science fair project ideas for grade 6, with materials and steps for each."
+  },
+  {
+    "id": 45,
+    "ask": "Lên lịch trình đi Hội An 2 ngày cho gia đình, kèm chi phí dự kiến.",
+    "lang": "vi"
+  },
+  {
+    "id": 46,
+    "ask": "Thủ đô của Canada là gì vậy?",
+    "lang": "vi"
+  },
+  {
+    "id": 47,
+    "ask": "Tìm đọc mấy bài review máy lọc không khí cho phòng ngủ rồi tư vấn mình nên mua loại nào.",
+    "lang": "vi"
+  },
+  {
+    "id": 48,
+    "ask": "Quick, what's the capital of Australia for my homework?"
+  },
+  {
+    "id": 49,
+    "ask": "Can you look up three laptops under 15 million dong for a student and compare them?"
+  },
+  {
+    "id": 50,
+    "ask": "What's 15 percent of 240?"
+  },
+  {
+    "id": 51,
+    "ask": "Make a weekly meal plan for a family of four with a shopping list."
+  },
+  {
+    "id": 52,
+    "ask": "Research the best way to teach a seven-year-old multiplication and give me a plan."
+  },
+  {
+    "id": 53,
+    "ask": "Find out what the new tax rules for freelancers are this year and explain them simply."
+  },
+  {
+    "id": 54,
+    "ask": "Did Arsenal win last night?"
+  },
+  {
+    "id": 55,
+    "ask": "Viết bài phát biểu khoảng 3 phút cho buổi họp lớp cuối năm.",
+    "lang": "vi"
+  },
+  {
+    "id": 56,
+    "ask": "Make the light a bit warmer, it's getting late."
+  },
+  {
+    "id": 57,
+    "ask": "Một muỗng canh là bao nhiêu ml?",
+    "lang": "vi"
+  },
+  {
+    "id": 58,
+    "ask": "What does photosynthesis mean, in simple words?"
+  },
+  {
+    "id": 59,
+    "ask": "Tìm mấy công thức làm bánh flan không cần lò, so sánh xem cách nào dễ nhất.",
+    "lang": "vi"
+  },
+  {
+    "id": 60,
+    "ask": "Bật đèn sáng lên chút, mình đang đọc sách.",
+    "lang": "vi"
+  },
+  {
+    "id": 61,
+    "ask": "How many minutes until 6 pm?"
+  },
+  {
+    "id": 62,
+    "ask": "Write a speech for my grandparents' fiftieth anniversary, about three minutes long."
+  },
+  {
+    "id": 63,
+    "ask": "Soạn 30 câu trắc nghiệm lịch sử lớp 9 để mình ôn, lưu vào file nhé.",
+    "lang": "vi"
+  },
+  {
+    "id": 64,
+    "ask": "I'm so tired of this essay."
+  },
+  {
+    "id": 65,
+    "ask": "Bảy nhân tám bằng mấy?",
+    "lang": "vi"
+  },
+  {
+    "id": 66,
+    "ask": "Mấy giờ rồi nhỉ?",
+    "lang": "vi"
+  },
+  {
+    "id": 67,
+    "ask": "Compare iPhone 15 and Samsung S24 prices across a few online shops."
+  },
+  {
+    "id": 68,
+    "ask": "Mình buồn quá, nói chuyện với mình chút đi.",
+    "lang": "vi"
+  },
+  {
+    "id": 69,
+    "ask": "Nấu cơm 2 chén gạo thì cho bao nhiêu nước?",
+    "lang": "vi"
+  },
+  {
+    "id": 70,
+    "ask": "What's today's date?"
+  },
+  {
+    "id": 71,
+    "ask": "Write a bedtime story about a dragon for my son, about ten minutes long."
+  },
+  {
+    "id": 72,
+    "ask": "Tìm giúp mình vài trường đại học có ngành khoa học máy tính ở Hà Nội và so sánh học phí nhé.",
+    "lang": "vi"
+  },
+  {
+    "id": 73,
+    "ask": "Bạn làm được những gì?",
+    "lang": "vi"
+  },
+  {
+    "id": 74,
+    "ask": "Turn it down a bit, the kids are asleep."
+  },
+  {
+    "id": 75,
+    "ask": "Turn the lamp off, I'm done for tonight."
+  },
+  {
+    "id": 76,
+    "ask": "Lấy số liệu dân số các nước Đông Nam Á rồi xếp hạng giúp mình.",
+    "lang": "vi"
+  },
+  {
+    "id": 77,
+    "ask": "Remind me at 7 tomorrow morning to bring my PE clothes."
+  },
+  {
+    "id": 78,
+    "ask": "Say goodnight to my daughter, she's going to bed."
+  },
+  {
+    "id": 79,
+    "ask": "Read the Wikipedia page on black holes and summarise it for me."
+  },
+  {
+    "id": 80,
+    "ask": "Work out a monthly budget from my 15 million salary with savings goals, in a spreadsheet."
+  },
+  {
+    "id": 81,
+    "ask": "Hôm nay trời có mưa không?",
+    "lang": "vi"
+  },
+  {
+    "id": 82,
+    "ask": "Làm một câu thơ ngắn chúc mừng sinh nhật bà đi.",
+    "lang": "vi"
+  },
+  {
+    "id": 83,
+    "ask": "Give me one quick tip to focus better."
+  },
+  {
+    "id": 84,
+    "ask": "Soạn sẵn giúp mình một email xin nghỉ học gửi cô giáo, lưu lại để mình xem.",
+    "lang": "vi"
+  },
+  {
+    "id": 85,
+    "ask": "Look up the opening hours and ticket prices of three museums in Hanoi and make a list."
+  },
+  {
+    "id": 86,
+    "ask": "Chào buổi sáng! Hôm nay là thứ mấy?",
+    "lang": "vi"
+  },
+  {
+    "id": 87,
+    "ask": "Please remember that my school bus comes at 7:10."
+  },
+  {
+    "id": 88,
+    "ask": "Help me write a business plan outline for a small home bakery."
+  },
+  {
+    "id": 89,
+    "ask": "Make me a two-week study plan for my maths final, an hour a day."
+  },
+  {
+    "id": 90,
+    "ask": "Wake me up at 6:30 tomorrow."
+  },
+  {
+    "id": 91,
+    "ask": "Tìm hiểu giúp mình cách chăm cây lưỡi hổ, tổng hợp từ mấy nguồn nhé.",
+    "lang": "vi"
+  },
+  {
+    "id": 92,
+    "ask": "Nhớ giùm mình là thứ Năm có buổi học piano lúc 5 giờ.",
+    "lang": "vi"
+  },
+  {
+    "id": 93,
+    "ask": "Put together a reading list of ten good books for a twelve-year-old, with a line on each."
+  },
+  {
+    "id": 94,
+    "ask": "How do you spell necessary?"
+  },
+  {
+    "id": 95,
+    "ask": "Tổng hợp giúp mình các mốc lịch sử chính của Việt Nam từ 1945 đến 1975 thành một bảng.",
+    "lang": "vi"
+  },
+  {
+    "id": 96,
+    "ask": "Kể chuyện cười cho mình nghe đi.",
+    "lang": "vi"
+  },
+  {
+    "id": 97,
+    "ask": "For a soft egg, how many minutes in the boiling water?"
+  },
+  {
+    "id": 98,
+    "ask": "Find a few easy dinner recipes with chicken and broccoli and write them up for me."
+  },
+  {
+    "id": 99,
+    "ask": "Start a reading log for me and add The Hobbit, I finished it today."
+  },
+  {
+    "id": 100,
+    "ask": "Write a one-page essay draft about climate change for my class."
+  }
+]

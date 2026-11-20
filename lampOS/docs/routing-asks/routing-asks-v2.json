@@ -1,0 +1,914 @@
+{
+  "about": "v2 (#7930): what people say to a desk lamp, labelled by the capability table in README.md. doors (#7930, the first builder 03:05 and 04:08): with LAMP_HARD_ASKS_TO_AGENT on, the doors a hand-over may take: ask (ask_agent, a question, plan or list to find out and answer) or task (start_agent_task, something done or made: code, a saved file); a creative piece takes answer or ask; an answer ask takes answer. Scored by routing.py doors.",
+  "asks": [
+    {
+      "id": 1,
+      "ask": "Is it nearly nine yet?",
+      "expect": "answer",
+      "kind": "time",
+      "why": "The time is in the turn's context and the_time (LAMP_CLOCK=on); a second."
+    },
+    {
+      "id": 2,
+      "ask": "Mấy giờ rồi nhỉ?",
+      "expect": "answer",
+      "kind": "time",
+      "why": "The time is in the turn's context and the_time; a second.",
+      "lang": "vi"
+    },
+    {
+      "id": 3,
+      "ask": "Make the light a bit warmer, it's getting late.",
+      "expect": "answer",
+      "kind": "light",
+      "why": "light_warmer is in the lamp's action catalog.",
+      "acts": "light"
+    },
+    {
+      "id": 4,
+      "ask": "Bật đèn sáng lên chút, mình đang đọc sách.",
+      "expect": "answer",
+      "kind": "light",
+      "why": "light_brighter is in the lamp's action catalog.",
+      "lang": "vi",
+      "acts": "light"
+    },
+    {
+      "id": 5,
+      "ask": "Dim the light, I'm just watching a video now.",
+      "expect": "answer",
+      "kind": "light",
+      "why": "light_dimmer is in the lamp's action catalog.",
+      "acts": "light"
+    },
+    {
+      "id": 6,
+      "ask": "Đổi đèn sang màu xanh dương đi.",
+      "expect": "answer",
+      "kind": "light",
+      "why": "light_colour is in the lamp's action catalog.",
+      "lang": "vi",
+      "acts": "light"
+    },
+    {
+      "id": 7,
+      "ask": "Turn the lamp off, I'm done for tonight.",
+      "expect": "answer",
+      "kind": "light",
+      "why": "light_off is in the lamp's action catalog.",
+      "acts": "light"
+    },
+    {
+      "id": 8,
+      "ask": "Set a timer for 25 minutes, I'm starting homework.",
+      "expect": "answer",
+      "kind": "timer",
+      "why": "set_timer is one of the voice's schedule tools.",
+      "acts": "timer"
+    },
+    {
+      "id": 9,
+      "ask": "Hẹn giờ 10 phút cho mình luộc trứng nhé.",
+      "expect": "answer",
+      "kind": "timer",
+      "why": "set_timer is one of the voice's schedule tools.",
+      "lang": "vi",
+      "acts": "timer"
+    },
+    {
+      "id": 10,
+      "ask": "Timer for 15 minutes for the pasta, please.",
+      "expect": "answer",
+      "kind": "timer",
+      "why": "set_timer is one of the voice's schedule tools.",
+      "acts": "timer"
+    },
+    {
+      "id": 11,
+      "ask": "Nhắc mình 9 giờ tối nay gọi cho mẹ.",
+      "expect": "answer",
+      "kind": "reminder",
+      "why": "set_reminder is one of the voice's schedule tools; the call itself is the person's.",
+      "lang": "vi",
+      "acts": "reminder"
+    },
+    {
+      "id": 12,
+      "ask": "Remind me at 7 tomorrow morning to bring my PE clothes.",
+      "expect": "answer",
+      "kind": "reminder",
+      "why": "set_reminder is one of the voice's schedule tools.",
+      "acts": "reminder"
+    },
+    {
+      "id": 13,
+      "ask": "What reminders do I have left today?",
+      "expect": "answer",
+      "kind": "reminder",
+      "why": "list_reminders is one of the voice's schedule tools."
+    },
+    {
+      "id": 14,
+      "ask": "Wake me up at 6:30 tomorrow.",
+      "expect": "answer",
+      "kind": "alarm",
+      "why": "set_reminder at a time is the lamp's alarm.",
+      "acts": "reminder"
+    },
+    {
+      "id": 15,
+      "ask": "Turn it down a bit, the kids are asleep.",
+      "expect": "answer",
+      "kind": "volume",
+      "why": "volume_down is in the lamp's action catalog.",
+      "acts": "volume"
+    },
+    {
+      "id": 16,
+      "ask": "Nói nhỏ lại chút, em bé đang ngủ.",
+      "expect": "answer",
+      "kind": "volume",
+      "why": "volume_down is in the lamp's action catalog.",
+      "lang": "vi",
+      "acts": "volume"
+    },
+    {
+      "id": 17,
+      "ask": "Please remember that my school bus comes at 7:10.",
+      "expect": "answer",
+      "kind": "memory",
+      "why": "remember is the voice's memory tool (LAMP_MEMORY).",
+      "acts": "memory"
+    },
+    {
+      "id": 18,
+      "ask": "Nhớ giùm mình là thứ Năm có buổi học piano lúc 5 giờ.",
+      "expect": "answer",
+      "kind": "memory",
+      "why": "remember is the voice's memory tool.",
+      "lang": "vi",
+      "acts": "memory"
+    },
+    {
+      "id": 19,
+      "ask": "When does my school bus come again?",
+      "expect": "answer",
+      "kind": "memory",
+      "why": "recall is the voice's memory tool."
+    },
+    {
+      "id": 20,
+      "ask": "Is it going to be hot this afternoon?",
+      "expect": "answer",
+      "kind": "weather",
+      "why": "weather (LAMP_SECOND_WEATHER=on)."
+    },
+    {
+      "id": 21,
+      "ask": "Hôm nay trời có mưa không?",
+      "expect": "answer",
+      "kind": "weather",
+      "why": "weather (LAMP_SECOND_WEATHER=on).",
+      "lang": "vi"
+    },
+    {
+      "id": 22,
+      "ask": "Do I need a jacket tomorrow morning?",
+      "expect": "answer",
+      "kind": "weather",
+      "why": "weather (LAMP_SECOND_WEATHER=on)."
+    },
+    {
+      "id": 23,
+      "ask": "How many grams is a cup of flour?",
+      "expect": "answer",
+      "kind": "quick_fact",
+      "why": "The model's own knowledge, one sentence."
+    },
+    {
+      "id": 24,
+      "ask": "Một muỗng canh là bao nhiêu ml?",
+      "expect": "answer",
+      "kind": "quick_fact",
+      "why": "The model's own knowledge, one sentence.",
+      "lang": "vi"
+    },
+    {
+      "id": 25,
+      "ask": "Quick, what's the capital of Australia for my homework?",
+      "expect": "answer",
+      "kind": "quick_fact",
+      "why": "The model's own knowledge, one word."
+    },
+    {
+      "id": 26,
+      "ask": "Thủ đô của Canada là gì vậy?",
+      "expect": "answer",
+      "kind": "quick_fact",
+      "why": "The model's own knowledge, one word.",
+      "lang": "vi"
+    },
+    {
+      "id": 27,
+      "ask": "What does photosynthesis mean, in simple words?",
+      "expect": "answer",
+      "kind": "quick_fact",
+      "why": "The model's own knowledge, two sentences."
+    },
+    {
+      "id": 28,
+      "ask": "How do you spell necessary?",
+      "expect": "answer",
+      "kind": "quick_fact",
+      "why": "The model's own knowledge."
+    },
+    {
+      "id": 29,
+      "ask": "Chữ kiên nhẫn tiếng Anh là gì?",
+      "expect": "answer",
+      "kind": "quick_fact",
+      "why": "One-word translation from the model's own knowledge.",
+      "lang": "vi"
+    },
+    {
+      "id": 30,
+      "ask": "What's 15 percent of 240?",
+      "expect": "answer",
+      "kind": "maths",
+      "why": "Mental maths, one line."
+    },
+    {
+      "id": 31,
+      "ask": "Bảy nhân tám bằng mấy?",
+      "expect": "answer",
+      "kind": "maths",
+      "why": "Mental maths, one line.",
+      "lang": "vi"
+    },
+    {
+      "id": 32,
+      "ask": "How many minutes until 6 pm?",
+      "expect": "answer",
+      "kind": "maths",
+      "why": "The time is in context; one subtraction."
+    },
+    {
+      "id": 33,
+      "ask": "Đổi 50 đô ra tiền Việt khoảng bao nhiêu?",
+      "expect": "answer",
+      "kind": "quick_lookup",
+      "why": "One web_search for today's rate (LAMP_SECOND_SEARCH=deepseek).",
+      "lang": "vi"
+    },
+    {
+      "id": 34,
+      "ask": "Did Arsenal win last night?",
+      "expect": "answer",
+      "kind": "quick_lookup",
+      "why": "One web_search (LAMP_SECOND_SEARCH=deepseek)."
+    },
+    {
+      "id": 35,
+      "ask": "Giá vàng hôm nay bao nhiêu?",
+      "expect": "answer",
+      "kind": "quick_lookup",
+      "why": "One web_search (LAMP_SECOND_SEARCH=deepseek).",
+      "lang": "vi"
+    },
+    {
+      "id": 36,
+      "ask": "What year did the Berlin Wall fall?",
+      "expect": "answer",
+      "kind": "quick_fact",
+      "why": "The model's own knowledge, one year."
+    },
+    {
+      "id": 37,
+      "ask": "Tell me a joke, I need a break.",
+      "expect": "answer",
+      "kind": "joke",
+      "why": "A short joke, the model's own words."
+    },
+    {
+      "id": 38,
+      "ask": "Kể chuyện cười cho mình nghe đi.",
+      "expect": "answer",
+      "kind": "joke",
+      "why": "A short joke, the model's own words.",
+      "lang": "vi"
+    },
+    {
+      "id": 39,
+      "ask": "Say goodnight to my daughter, she's going to bed.",
+      "expect": "answer",
+      "kind": "small_talk",
+      "why": "Small talk, said at once."
+    },
+    {
+      "id": 40,
+      "ask": "Chào buổi sáng! Hôm nay là thứ mấy?",
+      "expect": "answer",
+      "kind": "date",
+      "why": "The date is in the turn's context.",
+      "lang": "vi"
+    },
+    {
+      "id": 41,
+      "ask": "What's today's date?",
+      "expect": "answer",
+      "kind": "date",
+      "why": "The date is in the turn's context."
+    },
+    {
+      "id": 42,
+      "ask": "Write me a little four-line poem about rain on the window.",
+      "expect": "answer",
+      "kind": "short_poem",
+      "why": "Four lines, the model's own words in a few seconds."
+    },
+    {
+      "id": 43,
+      "ask": "Làm một câu thơ ngắn chúc mừng sinh nhật bà đi.",
+      "expect": "answer",
+      "kind": "short_poem",
+      "why": "A short verse, the model's own words.",
+      "lang": "vi"
+    },
+    {
+      "id": 44,
+      "ask": "So what are you able to help me with?",
+      "expect": "answer",
+      "kind": "lamp_help",
+      "why": "lamp_help and the spoken character say what the lamp does."
+    },
+    {
+      "id": 45,
+      "ask": "Bạn làm được những gì?",
+      "expect": "answer",
+      "kind": "lamp_help",
+      "why": "lamp_help and the spoken character say what the lamp does.",
+      "lang": "vi"
+    },
+    {
+      "id": 46,
+      "ask": "I'm so tired of this essay.",
+      "expect": "answer",
+      "kind": "small_talk",
+      "why": "A word of encouragement, said at once."
+    },
+    {
+      "id": 47,
+      "ask": "Mình buồn quá, nói chuyện với mình chút đi.",
+      "expect": "answer",
+      "kind": "small_talk",
+      "why": "Comfort and talk, said at once.",
+      "lang": "vi"
+    },
+    {
+      "id": 48,
+      "ask": "Give me one quick tip to focus better.",
+      "expect": "answer",
+      "kind": "quick_tip",
+      "why": "One tip, the model's own knowledge."
+    },
+    {
+      "id": 49,
+      "ask": "Nấu cơm 2 chén gạo thì cho bao nhiêu nước?",
+      "expect": "answer",
+      "kind": "quick_fact",
+      "why": "A cooking fact, the model's own knowledge.",
+      "lang": "vi"
+    },
+    {
+      "id": 50,
+      "ask": "For a soft egg, how many minutes in the boiling water?",
+      "expect": "answer",
+      "kind": "quick_fact",
+      "why": "A cooking fact, the model's own knowledge."
+    },
+    {
+      "id": 51,
+      "ask": "Can you look up three laptops under 15 million dong for a student and compare them?",
+      "expect": "hand_over",
+      "kind": "research",
+      "why": "Several searches and pages, then a comparison: the agent's multi-step research.",
+      "doors": [
+        "ask"
+      ]
+    },
+    {
+      "id": 52,
+      "ask": "Tìm giúp mình vài trường đại học có ngành khoa học máy tính ở Hà Nội và so sánh học phí nhé.",
+      "expect": "hand_over",
+      "kind": "research",
+      "why": "Several sources and a comparison: the agent's research.",
+      "lang": "vi",
+      "doors": [
+        "ask"
+      ]
+    },
+    {
+      "id": 53,
+      "ask": "Read the latest news about this year's exam changes and give me a summary.",
+      "expect": "hand_over",
+      "kind": "research",
+      "why": "Reading several pages and summarising them: the agent.",
+      "doors": [
+        "ask"
+      ]
+    },
+    {
+      "id": 54,
+      "ask": "Tìm hiểu giúp mình cách chăm cây lưỡi hổ, tổng hợp từ mấy nguồn nhé.",
+      "expect": "hand_over",
+      "kind": "research",
+      "why": "Several sources put together: the agent's research.",
+      "lang": "vi",
+      "doors": [
+        "ask"
+      ]
+    },
+    {
+      "id": 55,
+      "ask": "Make me a two-week study plan for my maths final, an hour a day.",
+      "expect": "hand_over",
+      "kind": "plan",
+      "why": "A long structured plan, well past 10 s of writing: the agent.",
+      "doors": [
+        "ask"
+      ]
+    },
+    {
+      "id": 56,
+      "ask": "Lên kế hoạch ôn thi tiếng Anh trong một tháng cho mình.",
+      "expect": "hand_over",
+      "kind": "plan",
+      "why": "A month-long plan, long writing: the agent.",
+      "lang": "vi",
+      "doors": [
+        "ask"
+      ]
+    },
+    {
+      "id": 57,
+      "ask": "Write a one-page essay draft about climate change for my class.",
+      "expect": "hand_over",
+      "kind": "writing",
+      "why": "A page of writing, past 10 s: the agent.",
+      "doors": [
+        "ask"
+      ]
+    },
+    {
+      "id": 58,
+      "ask": "Viết giúp mình bài văn tả mẹ khoảng 400 chữ, mình sẽ sửa lại.",
+      "expect": "hand_over",
+      "kind": "writing",
+      "why": "400 words of writing: the agent.",
+      "lang": "vi",
+      "doors": [
+        "ask"
+      ]
+    },
+    {
+      "id": 59,
+      "ask": "Write a cover letter for a part-time cafe job and save it so I can print it.",
+      "expect": "hand_over",
+      "kind": "files",
+      "why": "A letter saved as a file in the agent's workspace.",
+      "doors": [
+        "task"
+      ]
+    },
+    {
+      "id": 60,
+      "ask": "Soạn sẵn giúp mình một email xin nghỉ học gửi cô giáo, lưu lại để mình xem.",
+      "expect": "hand_over",
+      "kind": "files",
+      "why": "A draft saved in the agent's workspace; the voice has no files.",
+      "lang": "vi",
+      "doors": [
+        "task"
+      ]
+    },
+    {
+      "id": 61,
+      "ask": "Write a Python script that renames all my photos by date.",
+      "expect": "hand_over",
+      "kind": "code",
+      "why": "Code, written and tried with the agent's exec.",
+      "doors": [
+        "task"
+      ]
+    },
+    {
+      "id": 62,
+      "ask": "Viết cho mình đoạn code Python tính điểm trung bình các môn.",
+      "expect": "hand_over",
+      "kind": "code",
+      "why": "Code, written and run with the agent's exec.",
+      "lang": "vi",
+      "doors": [
+        "task"
+      ]
+    },
+    {
+      "id": 63,
+      "ask": "Help me make a small web page for my school club.",
+      "expect": "hand_over",
+      "kind": "code",
+      "why": "HTML and CSS in a file: the agent's code and workspace.",
+      "doors": [
+        "task"
+      ]
+    },
+    {
+      "id": 64,
+      "ask": "Viết cho mình một chương trình nhỏ đoán số để mình học lập trình.",
+      "expect": "hand_over",
+      "kind": "code",
+      "why": "A program in the workspace: the agent.",
+      "lang": "vi",
+      "doors": [
+        "task"
+      ]
+    },
+    {
+      "id": 65,
+      "ask": "Make a weekly meal plan for a family of four with a shopping list.",
+      "expect": "hand_over",
+      "kind": "plan",
+      "why": "A week of meals and a list, long writing: the agent.",
+      "doors": [
+        "ask"
+      ]
+    },
+    {
+      "id": 66,
+      "ask": "Lên thực đơn một tuần cho cả nhà, kèm danh sách đi chợ nhé.",
+      "expect": "hand_over",
+      "kind": "plan",
+      "why": "A week of meals and a list: the agent.",
+      "lang": "vi",
+      "doors": [
+        "ask"
+      ]
+    },
+    {
+      "id": 67,
+      "ask": "Find a few easy dinner recipes with chicken and broccoli and write them up for me.",
+      "expect": "hand_over",
+      "kind": "research",
+      "why": "Several recipe pages read and written up: the agent.",
+      "doors": [
+        "ask"
+      ]
+    },
+    {
+      "id": 68,
+      "ask": "Tìm mấy công thức làm bánh flan không cần lò, so sánh xem cách nào dễ nhất.",
+      "expect": "hand_over",
+      "kind": "research",
+      "why": "Several recipes compared: the agent's research.",
+      "lang": "vi",
+      "doors": [
+        "ask"
+      ]
+    },
+    {
+      "id": 69,
+      "ask": "We want to go to Da Lat for three days, can you plan it with a rough budget?",
+      "expect": "hand_over",
+      "kind": "plan",
+      "why": "Research and an itinerary with costs: the agent.",
+      "doors": [
+        "ask"
+      ]
+    },
+    {
+      "id": 70,
+      "ask": "Lên lịch trình đi Hội An 2 ngày cho gia đình, kèm chi phí dự kiến.",
+      "expect": "hand_over",
+      "kind": "plan",
+      "why": "Research and an itinerary with costs: the agent.",
+      "lang": "vi",
+      "doors": [
+        "ask"
+      ]
+    },
+    {
+      "id": 71,
+      "ask": "Read the Wikipedia page on black holes and summarise it for me.",
+      "expect": "hand_over",
+      "kind": "summarise",
+      "why": "A long page fetched and summarised: the agent.",
+      "doors": [
+        "ask"
+      ]
+    },
+    {
+      "id": 72,
+      "ask": "Đọc trang Wikipedia về chiến dịch Điện Biên Phủ rồi tóm tắt ý chính giúp mình.",
+      "expect": "hand_over",
+      "kind": "summarise",
+      "why": "A long page fetched and summarised: the agent.",
+      "lang": "vi",
+      "doors": [
+        "ask"
+      ]
+    },
+    {
+      "id": 73,
+      "ask": "Make me 20 flashcards for my biology chapter on cells and save them in a file.",
+      "expect": "hand_over",
+      "kind": "files",
+      "why": "Twenty cards written to a file in the agent's workspace.",
+      "doors": [
+        "task"
+      ]
+    },
+    {
+      "id": 74,
+      "ask": "Soạn 30 câu trắc nghiệm lịch sử lớp 9 để mình ôn, lưu vào file nhé.",
+      "expect": "hand_over",
+      "kind": "files",
+      "why": "Thirty questions in a file: the agent's workspace.",
+      "lang": "vi",
+      "doors": [
+        "task"
+      ]
+    },
+    {
+      "id": 75,
+      "ask": "Start a reading log for me and add The Hobbit, I finished it today.",
+      "expect": "hand_over",
+      "kind": "files",
+      "why": "A file kept in the agent's workspace; the voice keeps no files.",
+      "doors": [
+        "task"
+      ]
+    },
+    {
+      "id": 76,
+      "ask": "Tạo cho mình một bảng tính chi tiêu tháng này nhé.",
+      "expect": "hand_over",
+      "kind": "files",
+      "why": "A spreadsheet file made with the agent's exec and workspace.",
+      "lang": "vi",
+      "doors": [
+        "task"
+      ]
+    },
+    {
+      "id": 77,
+      "ask": "Get last year's monthly rainfall for Ho Chi Minh City and tell me which months were wettest.",
+      "expect": "hand_over",
+      "kind": "data",
+      "why": "Fetching a data table and working through it: the agent.",
+      "doors": [
+        "ask"
+      ]
+    },
+    {
+      "id": 78,
+      "ask": "Lấy số liệu dân số các nước Đông Nam Á rồi xếp hạng giúp mình.",
+      "expect": "hand_over",
+      "kind": "data",
+      "why": "Fetching figures and ranking them: the agent.",
+      "lang": "vi",
+      "doors": [
+        "ask"
+      ]
+    },
+    {
+      "id": 79,
+      "ask": "Compare iPhone 15 and Samsung S24 prices across a few online shops.",
+      "expect": "hand_over",
+      "kind": "research",
+      "why": "Several shop pages compared: the agent's research.",
+      "doors": [
+        "ask"
+      ]
+    },
+    {
+      "id": 80,
+      "ask": "So sánh giúp mình mấy gói cước internet của Viettel, VNPT và FPT.",
+      "expect": "hand_over",
+      "kind": "research",
+      "why": "Three providers' pages compared: the agent's research.",
+      "lang": "vi",
+      "doors": [
+        "ask"
+      ]
+    },
+    {
+      "id": 81,
+      "ask": "Research the best way to teach a seven-year-old multiplication and give me a plan.",
+      "expect": "hand_over",
+      "kind": "research",
+      "why": "Research and a plan: the agent.",
+      "doors": [
+        "ask"
+      ]
+    },
+    {
+      "id": 82,
+      "ask": "Tìm hiểu xem trẻ 5 tuổi nên ngủ bao nhiêu tiếng rồi lên lịch sinh hoạt buổi tối cho bé.",
+      "expect": "hand_over",
+      "kind": "research",
+      "why": "Research then a routine written out: the agent.",
+      "lang": "vi",
+      "doors": [
+        "ask"
+      ]
+    },
+    {
+      "id": 83,
+      "ask": "Write a bedtime story about a dragon for my son, about ten minutes long.",
+      "expect": "hand_over",
+      "kind": "writing",
+      "why": "Ten minutes of story, long writing: the agent. A creative piece: answered here or by ask_agent, either is right; never the task door (the first builder, 04:08 on #7930).",
+      "doors": [
+        "answer",
+        "ask"
+      ]
+    },
+    {
+      "id": 84,
+      "ask": "Viết một câu chuyện dài cho con gái mình nghe trước khi ngủ, về chú mèo đi lạc, đọc chừng mười phút.",
+      "expect": "hand_over",
+      "kind": "writing",
+      "why": "Ten minutes of story, long writing: the agent. A creative piece: answered here or by ask_agent, either is right; never the task door (the first builder, 04:08 on #7930).",
+      "lang": "vi",
+      "doors": [
+        "answer",
+        "ask"
+      ]
+    },
+    {
+      "id": 85,
+      "ask": "Write a speech for my grandparents' fiftieth anniversary, about three minutes long.",
+      "expect": "hand_over",
+      "kind": "writing",
+      "why": "A three-minute speech, long writing: the agent. A creative piece: answered here or by ask_agent, either is right; never the task door (the first builder, 04:08 on #7930).",
+      "doors": [
+        "answer",
+        "ask"
+      ]
+    },
+    {
+      "id": 86,
+      "ask": "Viết bài phát biểu khoảng 3 phút cho buổi họp lớp cuối năm.",
+      "expect": "hand_over",
+      "kind": "writing",
+      "why": "A three-minute speech: the agent. A creative piece: answered here or by ask_agent, either is right; never the task door (the first builder, 04:08 on #7930).",
+      "lang": "vi",
+      "doors": [
+        "answer",
+        "ask"
+      ]
+    },
+    {
+      "id": 87,
+      "ask": "Go through the reviews of electric scooters sold in Vietnam and tell me which is best value.",
+      "expect": "hand_over",
+      "kind": "research",
+      "why": "Many reviews read and weighed: the agent's research.",
+      "doors": [
+        "ask"
+      ]
+    },
+    {
+      "id": 88,
+      "ask": "Tìm đọc mấy bài review máy lọc không khí cho phòng ngủ rồi tư vấn mình nên mua loại nào.",
+      "expect": "hand_over",
+      "kind": "research",
+      "why": "Several reviews read and weighed: the agent's research.",
+      "lang": "vi",
+      "doors": [
+        "ask"
+      ]
+    },
+    {
+      "id": 89,
+      "ask": "Make a revision timetable for my six exams next month and save it as a file.",
+      "expect": "hand_over",
+      "kind": "files",
+      "why": "A timetable written to a file: the agent's workspace.",
+      "doors": [
+        "task"
+      ]
+    },
+    {
+      "id": 90,
+      "ask": "Write a short program that checks my answers to quadratic equations.",
+      "expect": "hand_over",
+      "kind": "code",
+      "why": "Code, written and run with the agent's exec.",
+      "doors": [
+        "task"
+      ]
+    },
+    {
+      "id": 91,
+      "ask": "Find out what the new tax rules for freelancers are this year and explain them simply.",
+      "expect": "hand_over",
+      "kind": "research",
+      "why": "Several official pages read and explained: the agent.",
+      "doors": [
+        "ask"
+      ]
+    },
+    {
+      "id": 92,
+      "ask": "Put together a reading list of ten good books for a twelve-year-old, with a line on each.",
+      "expect": "hand_over",
+      "kind": "research",
+      "why": "Ten books chosen and written up: the agent.",
+      "doors": [
+        "ask"
+      ]
+    },
+    {
+      "id": 93,
+      "ask": "Tổng hợp giúp mình các mốc lịch sử chính của Việt Nam từ 1945 đến 1975 thành một bảng.",
+      "expect": "hand_over",
+      "kind": "writing",
+      "why": "A long table of dates, past 10 s of writing: the agent.",
+      "lang": "vi",
+      "doors": [
+        "ask"
+      ]
+    },
+    {
+      "id": 94,
+      "ask": "Look up the opening hours and ticket prices of three museums in Hanoi and make a list.",
+      "expect": "hand_over",
+      "kind": "research",
+      "why": "Three sites looked up and listed, several steps: the agent.",
+      "doors": [
+        "ask"
+      ]
+    },
+    {
+      "id": 95,
+      "ask": "Help me write a business plan outline for a small home bakery.",
+      "expect": "hand_over",
+      "kind": "writing",
+      "why": "A structured plan, long writing: the agent.",
+      "doors": [
+        "ask"
+      ]
+    },
+    {
+      "id": 96,
+      "ask": "Explain the whole chapter on Newton's laws with worked examples I can study from.",
+      "expect": "hand_over",
+      "kind": "writing",
+      "why": "A chapter's worth of explanation: the agent.",
+      "doors": [
+        "ask"
+      ]
+    },
+    {
+      "id": 97,
+      "ask": "Check a few sites and tell me which online English courses for kids have the best reviews.",
+      "expect": "hand_over",
+      "kind": "research",
+      "why": "Several sites compared: the agent's research.",
+      "doors": [
+        "ask"
+      ]
+    },
+    {
+      "id": 98,
+      "ask": "Write my CV from scratch, I'm a third-year accounting student, and keep it in a file.",
+      "expect": "hand_over",
+      "kind": "files",
+      "why": "A CV written to a file in the agent's workspace.",
+      "doors": [
+        "task"
+      ]
+    },
+    {
+      "id": 99,
+      "ask": "Work out a monthly budget from my 15 million salary with savings goals, in a spreadsheet.",
+      "expect": "hand_over",
+      "kind": "data",
+      "why": "A spreadsheet with sums made with the agent's exec.",
+      "doors": [
+        "task"
+      ]
+    },
+    {
+      "id": 100,
+      "ask": "Find me some science fair project ideas for grade 6, with materials and steps for each.",
+      "expect": "hand_over",
+      "kind": "research",
+      "why": "Several ideas researched and written up: the agent.",
+      "doors": [
+        "ask"
+      ]
+    }
+  ]
+}

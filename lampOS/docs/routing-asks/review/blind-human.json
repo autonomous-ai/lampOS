@@ -1,0 +1,89 @@
+[
+  {
+    "id": 1,
+    "ask": "Make me 20 flashcards for my biology chapter on cells and save them in a file."
+  },
+  {
+    "id": 2,
+    "ask": "Make a weekly meal plan for a family of four with a shopping list."
+  },
+  {
+    "id": 3,
+    "ask": "Bảy nhân tám bằng mấy?",
+    "lang": "vi"
+  },
+  {
+    "id": 4,
+    "ask": "Research the best way to teach a seven-year-old multiplication and give me a plan."
+  },
+  {
+    "id": 5,
+    "ask": "For a soft egg, how many minutes in the boiling water?"
+  },
+  {
+    "id": 6,
+    "ask": "Viết bài phát biểu khoảng 3 phút cho buổi họp lớp cuối năm.",
+    "lang": "vi"
+  },
+  {
+    "id": 7,
+    "ask": "Compare iPhone 15 and Samsung S24 prices across a few online shops."
+  },
+  {
+    "id": 8,
+    "ask": "Dim the light, I'm just watching a video now."
+  },
+  {
+    "id": 9,
+    "ask": "Set a timer for 25 minutes, I'm starting homework."
+  },
+  {
+    "id": 10,
+    "ask": "Order a pizza for dinner tonight."
+  },
+  {
+    "id": 11,
+    "ask": "Make the light a bit warmer, it's getting late."
+  },
+  {
+    "id": 12,
+    "ask": "Do I need a jacket tomorrow morning?"
+  },
+  {
+    "id": 13,
+    "ask": "Lên kế hoạch ôn thi tiếng Anh trong một tháng cho mình.",
+    "lang": "vi"
+  },
+  {
+    "id": 14,
+    "ask": "Viết cho mình một chương trình nhỏ đoán số để mình học lập trình.",
+    "lang": "vi"
+  },
+  {
+    "id": 15,
+    "ask": "Put together a reading list of ten good books for a twelve-year-old, with a line on each."
+  },
+  {
+    "id": 16,
+    "ask": "What's 15 percent of 240?"
+  },
+  {
+    "id": 17,
+    "ask": "Mình buồn quá, nói chuyện với mình chút đi.",
+    "lang": "vi"
+  },
+  {
+    "id": 18,
+    "ask": "Say goodnight to my daughter, she's going to bed."
+  },
+  {
+    "id": 19,
+    "ask": "Tìm giúp mình vài trường đại học có ngành khoa học máy tính ở Hà Nội và so sánh học phí nhé.",
+    "lang": "vi"
+  },
+  {
+    "id": 20,
+    "ask": "Tìm mấy công thức làm bánh flan không cần lò, so sánh xem cách nào dễ nhất.",
+    "lang": "vi"
+  }
+]
