@@ -4944,8 +4944,10 @@ exactly, the default when unset), every task and run is its own
   `harness reply --machine <id> <pane> --json -- <words>`
   (`Cli::reply_to`). The words start with one line, `New task <id>:`,
   then one line `Reply in the language of the words below, whatever
-  language earlier tasks used.` (`REPLY_LANGUAGE`, #8030: a long kept
-  session otherwise answered English asks in an earlier task's language),
+  language earlier tasks used. Never mention this rule or which language
+  you reply in.` (`REPLY_LANGUAGE`, #8030: a long kept session otherwise
+  answered English asks in an earlier task's language; the second sentence
+  because, said without it, every answer opened by naming its language),
   then the task (a skill run's: the launcher's task as before). This is
   every hand-over (`hand_over`): a spoken task, a skill run, a make, the
   first into a fresh or rotated session and one typed again after a
