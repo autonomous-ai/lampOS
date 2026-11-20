@@ -1980,9 +1980,7 @@ The product unit's test is `the_tasks_part_starts_with_no_targets_and_learns_the
     up "That isn't set up here yet."
     (`the_lamps_own_work_is_handed_over_in_the_first_person`).
   - **A make is `make_skill`'s (#8022 case 2).** While `make_skill` is
-    declared, `start_agent_task`'s description ends "An ask to make a
-    skill, even one whose work an agent does, is make_skill's, never
-    this." (`agent_tasks::MAKE_TOLD`, added in `tools::core_tools`), only
+    declared, `start_agent_task`'s description ends "Making a skill is make_skill's, never this." (`agent_tasks::MAKE_TOLD`, added in `tools::core_tools`), only
     when the two still fit the link's 1,024 bytes; one that would not is
     left as it was. Without `make_skill` it is never said. See
     [skills.md](skills.md), "A make is never a task".

@@ -3119,8 +3119,7 @@ lamp-c0a4) thì không đổi gì: OpenClaw vẫn là engine của đèn, và ph
   `a_restart_with_its_targets_settles_when_the_machines_answer_not_at_the_next_look`.
 - **Tạo kỹ năng là việc của `make_skill` (#8022 case 2).** Khi
   `make_skill` được khai báo, mô tả của `start_agent_task` kết thúc bằng
-  "An ask to make a skill, even one whose work an agent does, is
-  make_skill's, never this." (`agent_tasks::MAKE_TOLD`, thêm trong
+  "Making a skill is make_skill's, never this." (`agent_tasks::MAKE_TOLD`, thêm trong
   `tools::core_tools`), chỉ khi cả hai vẫn vừa 1.024 byte của link; mô tả
   nào không vừa thì giữ nguyên. Không có `make_skill` thì câu này không
   bao giờ được nói. Xem [skills_vi.md](skills_vi.md), "Tạo kỹ năng không
