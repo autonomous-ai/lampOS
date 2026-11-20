@@ -176,10 +176,6 @@ pub struct Run {
     /// answered as if done from a stub ([`TRIED_WRITE`]) and never reaches
     /// lamp-services, so the try changes nothing in the world.
     pub tried: bool,
-    /// How many `say`s the run's parts took (#8157): told in the admin
-    /// socket's `end` answer (`"said"`), so a make's tried run (and a
-    /// `run` step's, #8158) knows whether its script spoke.
-    pub said: u32,
 }
 
 /// What a tried run's `service.write` is answered (#8157): as if done,
@@ -270,7 +266,6 @@ impl Runs {
             serial: self.serial,
             fixed_write: None,
             tried: false,
-            said: 0,
         };
         self.by_token.insert(token_key(token), live.clone());
         Ok(live)
@@ -292,18 +287,6 @@ impl Runs {
             if live.run == run {
                 live.tried = true;
             }
-        }
-    }
-
-    /// One `say` the parts took for `client`'s live run, if it has one
-    /// ([`Run::said`]).
-    pub fn count_said(&mut self, client: &str, now_us: u64) {
-        if let Some(live) = self
-            .by_token
-            .values_mut()
-            .find(|live| live.client == client && now_us < live.until_us)
-        {
-            live.said = live.said.saturating_add(1);
         }
     }
 
@@ -395,21 +378,15 @@ mod tests {
     }
 
     #[test]
-    fn a_runs_says_are_counted_and_a_tried_run_is_marked() {
+    fn a_tried_run_is_marked() {
         let mut runs = Runs::default();
         let live = runs
             .mint("a".repeat(43).as_str(), "r", "s", light(), None, 0)
             .unwrap();
         assert!(!live.tried);
         runs.mark_tried("r");
-        runs.count_said(&live.client, 1);
-        runs.count_said(&live.client, 2);
-        // Another client's say, or one past the run's time, is not its.
-        runs.count_said("c_other", 3);
-        runs.count_said(&live.client, DEFAULT_MS * 1000);
         let ended = runs.end("r").unwrap();
         assert!(ended.tried);
-        assert_eq!(ended.said, 2);
     }
 
     #[test]
