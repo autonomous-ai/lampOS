@@ -9332,6 +9332,32 @@ mod tests {
         }
     }
 
+    /// What a line is, for `lamp/did` (`LAMP_DID_VOICE`): the update's two
+    /// lines are the update line, any other line of the walk is the walk's,
+    /// and a line that is not begun leaves no moment.
+    #[test]
+    fn a_line_is_told_as_an_update_line_or_a_walk_line_and_only_when_begun() {
+        use crate::did_voice::Moment;
+        let mut room = Room::new("moment-of");
+        assert_eq!(room.walk.moment_of(FIRST_UPDATE_LINE), Moment::UpdateLine);
+        assert_eq!(
+            room.walk.moment_of(FIRST_UPDATE_DONE_LINE),
+            Moment::UpdateLine
+        );
+        assert!(matches!(
+            room.walk.moment_of(FIRST_UPDATE_WAIT_LINE),
+            Moment::Onboarding(_)
+        ));
+        // Nothing begun: no moment is kept.
+        let quiet = 0;
+        assert_eq!(
+            room.walk
+                .tick_line(room.at, quiet, false, false, Some(NEAR_MIDDLE), true),
+            None
+        );
+        assert_eq!(room.walk.line_moment(), None);
+    }
+
     /// Every fixed line the walk begins ("Say only this: ...") is its own
     /// line, said as written with no chat (#5999: the model reworded or
     /// refused the walk's lines, and scene A's face question was not said

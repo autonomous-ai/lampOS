@@ -851,8 +851,8 @@ memory with `LAMP_DID_KEEP=on` for the conversation's look-up; nothing survives 
 restart and nothing else reads it. A run is told when it ends, so how it went
 is known (done, cut, or refused at once); a skill made on the lamp is told as
 "a made skill", never by a name that may carry a person's words; and the voice
-keeps only dids published by the names in `did_history::TELLERS`: `skills`
-and `body`; the body's dids have a share of at most 100 of the 200 kept, its own oldest dropped first, so with the presence on they never push the skills' out. The body tells (`LAMP_DID_BODY=on`) what it chooses: a shift at rest
+keeps only dids published by the names in `did_history::TELLERS`: `skills`,
+`body`, `ring` and `voice`; the body's dids have a share of at most 100 of the 200 kept, its own oldest dropped first, so with the presence on they never push the skills' out. The body tells (`LAMP_DID_BODY=on`) what it chooses: a shift at rest
 and the turn to a call, once each ends, from its publishing thread and at most one
 in 2 s, with fixed words and a clip's name as the reason. The ring tells (`LAMP_DID_RING=on`, source `ring`, a share of at most 20 of the 200)
 the four faces it shows on its own as each begins: the asleep face, the night's
