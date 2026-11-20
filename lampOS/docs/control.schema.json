@@ -2223,6 +2223,9 @@
         },
         "asleep": {
           "type": "boolean"
+        },
+        "muted_after_fault": {
+          "type": "boolean"
         }
       }
     },

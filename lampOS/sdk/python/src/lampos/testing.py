@@ -678,7 +678,7 @@ class FakeLamp:
             # null until the lamp has heard them, as lamp-control's Watch answers.
             "light": None,
             "mood": None,
-            "lamp": {"talking": False, "paused": False, "private": False, "asleep": False},
+            "lamp": {"talking": False, "paused": False, "private": False, "asleep": False, "muted_after_fault": False},
             # Made-up readings, as lamp-control answers them; `set_air` changes
             # the air and tells `air.changed`, `{"known": False}` for none.
             "air": dict(AIR),

@@ -58,7 +58,7 @@ pairing keeps it for later connects.
 | `sound.heard` (sound) | `class` (`music`, `laughter`, `door`, `footsteps`), `score` | a class's score rises past 0.5 |
 | `touch` | `kind`: `tap` or `pet` | a tap (shown from 11372) or a pet (not shown on a lamp yet) |
 | `button` | `press`: `long_press` | the button is held |
-| `lamp.changed` | `lamp_state`: `talking`, `paused`, `private`, `asleep` | one of them changes |
+| `lamp.changed` | `lamp_state`: `talking`, `paused`, `private`, `asleep`, `muted_after_fault` | one of them changes |
 | `volume.changed` (speak) | `level` (0–100 of what the lamp allows), `muted` | the speaker's volume changes, whoever changed it: the person by voice or in the app, or a computer |
 | `lamp.said` (speech) | `text`, `by` (`lamp`, `computer`), `source` (`reply`, `exact`, `cached`), `cut` | a line the lamp said out loud: its fixed phrases, a computer's own say back to it, a reply only when said to the owner; never what a person says; what it sends can't be taken back |
 | `air.changed` (air) | `pm1_0`, `pm2_5`, `pm4_0`, `pm10`, `co2_ppm`, `humidity`, `temperature`, `feel` (`fresh`, `fine`, `stuffy`, `very_stuffy`, `unknown`); a value the sensor doesn't know is left out | the first reading, then a value moves by its step (particles 5, CO2 50 ppm, humidity 3, temperature 0.5 °C) or `feel` changes; at most every 5 s |
@@ -69,7 +69,7 @@ pairing keeps it for later connects.
 **State** with `get`: `presence` (`count`, `near`, `facing`; needs look),
 `light` (the person's own `on`, `colour`, `level`, and `shows`: what the ring
 draws now), `mood` (`energy`, `warmth`, `awake`, `asleep`), `lamp`
-(`talking`, `paused`, `private`, `asleep`), `air` (the newest reading as
+(`talking`, `paused`, `private`, `asleep`, `muted_after_fault`), `air` (the newest reading as
 `air.changed` gives it; needs air), `device` (`cpu_load`, `memory_used`,
 `disk_free`, `uptime_s`, `temperature_c`; needs device), `volume`
 (`level`, `muted`; needs speak), `body` (needs body: `yaw`, `pitch`, `roll`,
