@@ -7343,6 +7343,48 @@ the same code for both writers.
   kept as a daily task), and after a true judgement each DeepSeek repair is
   held to `quick_reaction` too, one that is none going to the middle form
   (the Reviewer-lead's two P2s on #7764).
+  **A watch on outside data is a clock task, never a reminder (#8079).**
+  On lamp-9adf (20 Nov) "Lamp, if Bitcoin goes under ninety thousand
+  dollars, tell me right away." was put on a topic `price/bitcoin` the lamp
+  doesn't have, then answered `cannot:` as a reminder and refused as the
+  lamp's timer. After the reminder's refusal the one more call is now told
+  a watch (`make_no_cannot::WATCH`, with a whole answer for "if it starts
+  raining in Hanoi, tell me"): what only the internet tells, with no topic
+  of the lamp's (a price, the weather, a web page, a count on a service),
+  runs on lamp-skills' own clock every while, `clock/local`, `known`,
+  `true`, `cooldown = "90m"` (never under 90 minutes,
+  `made_skill::LEAST_WATCH_SECS`: 16 runs a day stay under lamp-skills'
+  `task::PER_SKILL` of 20 task runs per skill in 24 hours, whose floor is
+  72 minutes; a 15-minute watch would hand over its 20 in five hours and
+  then stop for the day), no `rearm`, `during` or `days`, `net`
+  among its grants; its one task checks the condition at each run and
+  speaks only when it holds. The model judges by meaning which a request
+  is; the lamp holds no list of words. Two structural repairs back it: a
+  trigger on a topic no part of the lamp carries
+  (`made_skill::topic_lamp_lacks`) is refused with the check's lines and
+  `WATCH_REPAIR` (it runs on the clock, the check inside the task, never
+  `cannot:`); and a `cannot:` reminder after such a trigger of the model's
+  own is asked again once as a watch (journal: `the model's cannot was a
+  reminder after its trigger on what the lamp has no topic for: asked
+  again as a watch on the clock`), refused as the lamp's timer only when
+  answered so again. A `cannot:` reminder with no such trigger before it
+  ("remind me at 5 pm to call the bakery") is the lamp's own timer exactly
+  as before. Such a clock watch is said "Every 90 minutes, …"; it is said
+  (and kept) only for a task for the lamp's agent made here
+  (`made_skill::clock_watch`, `watch_here`): a DeepSeek draft polling on
+  the clock is a repeating reminder and stays refused. The brief every
+  agent task runs (`make_no_cannot::SCRIPT`, `scripts/agent.py`) now ends
+  "…, or nothing at all when the task is only for when something holds and
+  it doesn't now", so a watch is silent until it holds. With
+  `LAMP_MADE_SKILL_LOOSE` on, as the product runs, no `most_a_day` or
+  `[budget]` caps it, and its 90-minute floor keeps it within
+  `task::PER_SKILL` all day (lamp-skills'
+  `a_made_watch_fits_the_task_runs_a_day` holds the two together). Tests:
+  `with_reactions_on_a_watch_on_outside_data_is_told_on_the_clock`,
+  `a_reminder_after_a_trigger_on_what_no_topic_carries_is_asked_again_as_a_watch`,
+  `a_reminder_with_no_watch_before_it_is_still_the_lamps_timer`,
+  `with_the_switch_a_price_watch_runs_on_the_clock_as_one_task_never_a_reminder`
+  and `with_the_switch_a_one_off_reminder_is_still_the_lamps_timer`.
   With no agent on the lamp at all (#7375's `missing`), "this lamp has no
   agent set up to make it"; with the agent not known (lamp-tasks' targets
   unread, or an engine no make run takes), no judgement and DeepSeek's as
