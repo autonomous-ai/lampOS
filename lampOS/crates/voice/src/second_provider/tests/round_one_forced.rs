@@ -108,5 +108,8 @@ fn a_make_past_the_lamps_name_heard_as_another_word_is_forced_on_a_named_line_al
     // The same words heard again with no name heard are not forced.
     crate::tools::make_skill_asked::heard_named(LYNN, false);
     let again = line(&made, LYNN);
-    assert!(again.ends_with("forced=none make_ask=n sentences=1"), "{again}");
+    assert!(
+        again.ends_with("forced=none make_ask=n sentences=1"),
+        "{again}"
+    );
 }
