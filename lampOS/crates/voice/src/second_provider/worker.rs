@@ -5942,9 +5942,9 @@ pub fn serve(
                 // Its "not the name" is told to the rule, which with
                 // `LAMP_NAME_SIGN_TIED=on` counts no second sign for it.
                 let ruled = heeding.clone();
-                engine = engine.telling_near_not_the_name(Arc::new(move |request| {
+                engine = engine.telling_near_not_the_name(Arc::new(move |request, score| {
                     if let Ok(mut heeding) = ruled.lock() {
-                        heeding.attention.near_not_the_name(request);
+                        heeding.attention.near_not_the_name(request, score);
                     }
                 }));
                 // A first word said as a sentence of its own is the name by
@@ -28960,7 +28960,7 @@ mod tests {
             let mut heeding = room_name_heeding(true);
             heeding.attention.tie_the_second_sign(tied);
             if ruled {
-                heeding.attention.near_not_the_name(4);
+                heeding.attention.near_not_the_name(4, 0.86);
             }
             heeding.levels = Some(std::sync::Arc::new(std::sync::Mutex::new(
                 std::collections::VecDeque::from([(rise_at, 40.0)]),
