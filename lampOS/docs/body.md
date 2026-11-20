@@ -1509,6 +1509,20 @@ the voice, Expression and lamp-skills (each with `energy_in::EnergyIn`, the body
   and headshake 1.02 (its own step, the larger head stretched under the servo's speed)
   (`energy::tests::no_level_bends_the_base_harder_than_level_one_does`).
 
+  Level 5 against V1 (#6893's bar), peak to peak in counts over the window V2 kept of V1's
+  `excited.csv` and `happy_wiggle.csv` (`energy::tests::level_five_sizes_excited_and_happy_against_v1`,
+  within 25% of V1 or a known gap):
+
+  | clip | joint | V1 | level 5 | share | held by |
+  |---|---|---|---|---|---|
+  | excited | head pitch | 146 | 133 | 0.91 | |
+  | excited | shoulder | 299 | 361 | 1.21 | |
+  | excited | elbow | 502 | 326 | 0.65 | the tip cap, x1.27 |
+  | happy | head pitch | 268 | 220 | 0.82 | the reach |
+  | happy | base yaw | 697 | 240 | 0.34 | x1.6 of a base cut to 0.22 of V1 |
+  | happy | shoulder | 178 | 274 | 1.54 | over V1: x1.6 of 0.96 of V1 |
+  | happy | elbow | 516 | 360 | 0.70 | the reach |
+
   **Where V1 stays out of reach, and why.** V1 played its recordings at their recorded speed with
   no servo ceiling: its emotion clips peak at a median of about 2,000 counts a second (excited's
   elbow 1,579 in the stretch kept, 1,923 over the whole clip). Level 5 stops at the servo's 1,000,
