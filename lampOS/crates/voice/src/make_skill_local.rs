@@ -1194,14 +1194,10 @@ fn parameters_with(writes: bool, tasks: bool, code: bool) -> Value {
         });
         // With `answer` "change" (#7912), `request` is the ask as it is
         // now, whole, never the change alone (Twelve's and Heron's HOLD on
-        // #7936 at bdd4728407): its own words say so beside "nothing else".
-        let request = format!(
-            "{} With answer change: the ask as it is now, whole.",
-            parameters["properties"]["request"]["description"]
-                .as_str()
-                .unwrap_or_default()
-        );
-        parameters["properties"]["request"]["description"] = json!(request);
+        // #7936 at bdd4728407): said in the notes that ask for it
+        // ([`making_note`], `skill_write_yes`'s wait), never on `request`,
+        // so the product's parameters stay within
+        // [`PRODUCT_MOST_PARAMETERS_BYTES`].
         // What the person answered (#6835 gap 2): a call made in code's
         // turn may be a no or unclear, never only a yes; a change of a
         // voice make under way or waiting for its yes (#7912) is its own
