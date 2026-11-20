@@ -21,8 +21,18 @@
 //!   environment of `PATH`, `HOME` (its run's folder), the socket, the SDK
 //!   and its one-run token only, read from a pipe. Never as lamp-skills,
 //!   never with any of its rights.
-//! - **Its bounds**: [`RUN_WITHIN`] from its start (its whole process group
-//!   killed then), at most [`MOST_OUTPUT`] bytes of output (none of it
+//! - **`net`**: the way out a net task gets today, with the same yes
+//!   (`crate::skill_task::Tokens::net_agreed`, [`NET_SWITCH`] on): its own
+//!   egress socket `skill-<run id>` ([`crate::egress::Grant`], the public
+//!   web on ports 80 and 443 only) on fd 5 of its fence, which
+//!   [`crate::gateway::FENCE_NET_EDITS`] relay to (`HTTPS_PROXY`
+//!   `127.0.0.1:3128`), lamp-tasks' relay alone shown again under `/opt`
+//!   ([`RELAY_EDITS`]). No yes for net: refused before any token. Keys are
+//!   never given ([`NO_KEYS_HERE`]).
+//! - **Its bounds**: its own caps ([`CAPS_EDIT`]: [`SCRIPT_MEMORY_KB`] of
+//!   address space, [`SCRIPT_CPU_SECS`] of CPU, niceness [`SCRIPT_NICE`],
+//!   no core file), never lamp-tasks' whole budget; [`RUN_WITHIN`] from
+//!   its start (its whole process group killed then), at most [`MOST_OUTPUT`] bytes of output (none of it
 //!   kept or journaled: past it, the run is ended), one at a time across
 //!   the lamp (beside, never behind, an agent's task). lamp-skills never
 //!   hands a failed one over again for that trigger.
@@ -32,7 +42,10 @@
 //!   is `run_failed` with the reason, for lamp-skills to journal (and, for a
 //!   run the person's words started, to say its one fixed line).
 use crate::protocol::refusal;
-use crate::skill_task::{HandOver, PYTHONPATH_ENV, RUN_TICK, Runner, SOCKET_ENV, SkillRun, Tokens};
+use crate::skill_task::{
+    HandOver, NET_GRANT, NET_SWITCH, PYTHONPATH_ENV, RUN_FOLDER_PREFIX, RUN_TICK, Runner,
+    SOCKET_ENV, SkillRun, Tokens,
+};
 use serde_json::{Value, json};
 use std::io::{BufRead, BufReader, Read, Write};
 use std::path::{Path, PathBuf};
@@ -62,9 +75,9 @@ pub const UNSHARE: &str = "/usr/bin/unshare";
 /// What lamp-tasks says of a run step whose script ended well but said
 /// nothing aloud.
 pub const SAID_NOTHING: &str = "its script ended well but nothing it asked lamp.say for was said";
-/// What a run step granted `net` is told: its fence has only `lo`.
-pub const NO_NET_HERE: &str =
-    "a run step's script never reaches the internet: a skill granted net runs its script as a task";
+/// What a run step granted `net` is told when the owner's yes for its
+/// folder as it is doesn't name net: a net task's words.
+pub const NO_NET_YES: &str = "the owner's yes for this skill's folder as it is doesn't name net, so its run doesn't reach the internet";
 /// What a run step whose skill names keys is told: none is given.
 pub const NO_KEYS_HERE: &str =
     "a run step's script is given no keys: a skill that names keys runs its script as a task";
@@ -94,11 +107,67 @@ pub const CONTROL_EDITS: [(&str, &str); 2] = [
     ),
 ];
 
-/// The gateway's fence ([`crate::gateway::fence_text`], no `net`) with
-/// [`CONTROL_EDITS`].
-pub fn fence_text() -> String {
-    let mut text = crate::gateway::fence_text(false);
-    for (from, to) in CONTROL_EDITS {
+/// What [`fence_text`] changes too for a run granted `net`, the same way
+/// as [`CONTROL_EDITS`]: lamp-tasks' own program
+/// ([`crate::gateway::RELAY`], which [`crate::gateway::FENCE_NET_EDITS`]
+/// start the run's relay with) bound to a staging file before `/opt` is
+/// hidden, and moved back alone once it is. Nothing else of `/opt` is
+/// shown.
+pub const RELAY_EDITS: [(&str, &str); 2] = [
+    (
+        "mount -n --bind \"$k\" \"$t2\" || no \"the skill's folder\"\n",
+        concat!(
+            "mount -n --bind \"$k\" \"$t2\" || no \"the skill's folder\"\n",
+            "t4=$(mktemp /tmp/lampos-relay.XXXXXX) && mount -n --bind /opt/lampOS/tasks/current/lamp-tasks \"$t4\" || no \"lamp-tasks' relay\"\n",
+        ),
+    ),
+    (
+        "mount -n --move \"$t2\" \"$k\" || no \"the skill's folder back\"\n",
+        concat!(
+            "mkdir -p /opt/lampOS/tasks/current && touch /opt/lampOS/tasks/current/lamp-tasks && mount -n --move \"$t4\" /opt/lampOS/tasks/current/lamp-tasks && rm -f \"$t4\" || no \"lamp-tasks' relay back\"\n",
+            "mount -n --move \"$t2\" \"$k\" || no \"the skill's folder back\"\n",
+        ),
+    ),
+];
+
+/// The script's own address space cap, in KiB (`ulimit -v`, soft and
+/// hard): 768 MiB, the per-script cap #7520 gives a gateway agent's
+/// script. Past it an allocation fails (Python's `MemoryError`), so the
+/// run fails; nothing else of the lamp is touched.
+pub const SCRIPT_MEMORY_KB: u64 = 768 * 1024;
+/// The script's own CPU time cap, in seconds (`ulimit -t`): [`RUN_WITHIN`]'s,
+/// so over its run it has at most one core's worth on average, as a
+/// gateway agent's turns have (`CPUQuota=100%` on its unit); past it the
+/// kernel ends it.
+pub const SCRIPT_CPU_SECS: u64 = 30;
+/// The script's niceness (`nice -n`): a gateway agent's unit's `Nice=10`,
+/// so a busy script yields the CPU to the voice and lamp-tasks' own work.
+pub const SCRIPT_NICE: u32 = 10;
+
+/// What [`fence_text`] changes last: the script's own caps, set just
+/// before its exec and after anything else of the fence (its relay
+/// included) started, so they are the script's alone: no core file
+/// (`ulimit -c 0`), [`SCRIPT_MEMORY_KB`], [`SCRIPT_CPU_SECS`] and
+/// [`SCRIPT_NICE`]. lamp-tasks.service has no delegated cgroup to give one
+/// run a cgroup of its own, so the caps are the process's own limits, which
+/// its children inherit.
+pub const CAPS_EDIT: (&str, &str) = (
+    "\nexec unshare --user --map-user=\"$u\"",
+    concat!(
+        "\nulimit -c 0 || no \"no core file\"\n",
+        "ulimit -v 786432 || no \"the script's memory cap\"\n",
+        "ulimit -t 30 || no \"the script's CPU time cap\"\n",
+        "exec nice -n 10 unshare --user --map-user=\"$u\"",
+    ),
+);
+
+/// The gateway's fence ([`crate::gateway::fence_text`], with its way out
+/// when `net`) with [`CONTROL_EDITS`], [`RELAY_EDITS`] when `net`, and
+/// [`CAPS_EDIT`].
+pub fn fence_text(net: bool) -> String {
+    let mut text = crate::gateway::fence_text(net);
+    let relay: &[(&str, &str)] = if net { &RELAY_EDITS } else { &[] };
+    for (from, to) in CONTROL_EDITS.iter().chain(relay).chain([&CAPS_EDIT]) {
         text = text.replacen(from, to, 1);
     }
     text
@@ -111,7 +180,7 @@ pub fn fence_text() -> String {
 pub const PLACE_FDS: &str = "exec 3<&0 4>&1 0</dev/null 1>&2; exec \"$0\" \"$@\"";
 
 /// Runs a run step's script itself, in its own fence: see the module.
-#[derive(Clone, Debug)]
+#[derive(Clone)]
 pub struct DirectRunner {
     /// `unshare` ([`UNSHARE`]); a test's stand-in elsewhere.
     pub unshare: PathBuf,
@@ -124,6 +193,20 @@ pub struct DirectRunner {
     pub tick: Duration,
     /// [`MOST_OUTPUT`].
     pub most_output: usize,
+    /// Where a run granted `net` gets its own egress socket
+    /// ([`crate::egress::Grant::lamp`], with [`NET_SWITCH`] on); None: such
+    /// a run is refused before it starts.
+    pub egress: Option<crate::egress::Grant>,
+}
+
+impl std::fmt::Debug for DirectRunner {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("DirectRunner")
+            .field("unshare", &self.unshare)
+            .field("project", &self.project)
+            .field("egress", &self.egress.as_ref().map(|grant| &grant.dir))
+            .finish_non_exhaustive()
+    }
 }
 
 impl DirectRunner {
@@ -136,13 +219,20 @@ impl DirectRunner {
             interpreter: crate::gateway::INTERPRETER.to_owned(),
             tick: RUN_TICK,
             most_output: MOST_OUTPUT,
+            egress: None,
         }
     }
 
-    /// The fence's arguments for `run` in its folder `folder`: the
-    /// gateway's ([`crate::gateway::fence_args`]) with [`fence_text`] in
-    /// place of its text. Never the token.
-    pub fn args(&self, run: &SkillRun, folder: &Path) -> Vec<std::ffi::OsString> {
+    /// The fence's arguments for `run` in its folder `folder`, its egress
+    /// socket `egress` when granted `net`: the gateway's
+    /// ([`crate::gateway::fence_args`]) with [`fence_text`] in place of its
+    /// text. Never the token.
+    pub fn args(
+        &self,
+        run: &SkillRun,
+        folder: &Path,
+        egress: Option<&Path>,
+    ) -> Vec<std::ffi::OsString> {
         let env_of = |name: &str| {
             run.env
                 .iter()
@@ -158,7 +248,7 @@ impl DirectRunner {
             socket: env_of(SOCKET_ENV),
             pythonpath: env_of(PYTHONPATH_ENV),
             token: String::new(),
-            egress: None,
+            egress: egress.map(Path::to_owned),
         };
         let hidden: Vec<&Path> = self.hidden.iter().map(PathBuf::as_path).collect();
         let mut args = crate::gateway::fence_args(
@@ -168,13 +258,83 @@ impl DirectRunner {
             &hidden,
         );
         if let Some(at) = args.iter().position(|arg| arg == "-c") {
-            args[at + 1] = fence_text()
+            args[at + 1] = fence_text(egress.is_some())
                 .replace("\"$SCRIPT_PATH\"", crate::gateway::SCRIPT_PATH)
                 .into();
         }
         args
     }
+
+    /// A run granted `net`'s way out (see the module): its own egress
+    /// socket, served until `until`, and an `O_PATH` descriptor of it for
+    /// its fence's fd 5. Refused in words, nothing kept, with [`NET_SWITCH`]
+    /// off or off Linux.
+    fn way_out(
+        &self,
+        run: &SkillRun,
+        until: Instant,
+    ) -> Result<(crate::egress::Served, std::os::fd::OwnedFd), String> {
+        let refused = |why: String| Err(crate::skill_task::net_refused(&why));
+        let Some(grant) = &self.egress else {
+            return refused(format!("{NET_SWITCH} is off in lamp-tasks"));
+        };
+        let socket = format!("{RUN_FOLDER_PREFIX}{}", run.run);
+        let served = match grant.open(&socket, until) {
+            Ok(served) => served,
+            Err(error) => {
+                return refused(format!("the run's way out was not made: {}", error.kind()));
+            }
+        };
+        let fd = match crate::skill_start::egress_fd(served.path()) {
+            Ok(fd) => fd,
+            Err(error) => {
+                return refused(format!(
+                    "its egress socket could not be handed to its fence: {}",
+                    error.kind()
+                ));
+            }
+        };
+        eprintln!(
+            "[lamp-tasks] skill run {}: granted net: its egress socket {socket}.sock made, its fence relays to it alone",
+            run.run
+        );
+        Ok((served, fd))
+    }
 }
+
+/// `egress` at [`crate::skill_start::EGRESS_FD`] in `command`'s child,
+/// kept across its exec, for the fence's relay
+/// ([`crate::gateway::FENCE_NET_EDITS`]).
+#[cfg(target_os = "linux")]
+#[allow(unsafe_code)]
+fn egress_at_fd_5(command: &mut std::process::Command, egress: &std::os::fd::OwnedFd) {
+    use std::os::fd::{AsRawFd, BorrowedFd, FromRawFd, OwnedFd};
+    use std::os::unix::process::CommandExt;
+    let raw = egress.as_raw_fd();
+    let at = crate::skill_start::EGRESS_FD;
+    // SAFETY: the closure runs in the forked child just before its exec,
+    // where only `fcntl` and `dup2` are called (async-signal-safe, nothing
+    // allocated or locked). `raw` is held open by the parent until `spawn`
+    // returns, so it is open in the child; fd 5 is only overwritten by
+    // `dup2`, never closed here (ManuallyDrop).
+    unsafe {
+        command.pre_exec(move || {
+            let source = BorrowedFd::borrow_raw(raw);
+            if raw == at {
+                let flags = rustix::io::fcntl_getfd(source)?;
+                rustix::io::fcntl_setfd(source, flags.difference(rustix::io::FdFlags::CLOEXEC))?;
+                return Ok(());
+            }
+            let mut placed = std::mem::ManuallyDrop::new(OwnedFd::from_raw_fd(at));
+            rustix::io::dup2(source, &mut placed)?;
+            Ok(())
+        });
+    }
+}
+
+/// Off Linux no descriptor is made ([`DirectRunner::way_out`] refuses).
+#[cfg(not(target_os = "linux"))]
+fn egress_at_fd_5(_: &mut std::process::Command, _: &std::os::fd::OwnedFd) {}
 
 /// Its own folder, removed however the run ends.
 struct RunFolder(PathBuf);
@@ -203,26 +363,44 @@ impl Runner for DirectRunner {
             .create(&folder)
             .map_err(|error| format!("the run's own folder was not made: {error}"))?;
         let _folder = RunFolder(folder.clone());
+        // Its way out before anything starts: refused, nothing runs.
+        let way_out = if run.net {
+            Some(self.way_out(run, began + run.deadline)?)
+        } else {
+            None
+        };
         let token = run
             .env
             .iter()
             .find(|(name, _)| *name == crate::skill_task::TOKEN_ENV)
             .map(|(_, token)| token.clone())
             .unwrap_or_default();
-        let mut child = Command::new("/bin/sh")
+        let mut command = Command::new("/bin/sh");
+        command
             .arg("-c")
             .arg(PLACE_FDS)
             .arg(&self.unshare)
-            .args(self.args(run, &folder))
+            .args(self.args(
+                run,
+                &folder,
+                way_out.as_ref().map(|(served, _)| served.path()),
+            ))
             .env_clear()
             .env("PATH", crate::gateway::SCRIPT_PATH)
             .current_dir("/")
             .stdin(Stdio::piped())
             .stdout(Stdio::piped())
             .stderr(Stdio::piped())
-            .process_group(0)
-            .spawn()
-            .map_err(|error| format!("its fence could not be started: {error}"))?;
+            .process_group(0);
+        if let Some((_, fd)) = &way_out {
+            egress_at_fd_5(&mut command, fd);
+        }
+        let spawned = command.spawn();
+        // The child holds its own; the socket stays served until the run
+        // ends (`way_out` dropped then).
+        let way_out = way_out.map(|(served, _)| served);
+        let mut child =
+            spawned.map_err(|error| format!("its fence could not be started: {error}"))?;
         let pid = Pid::from_child(&child);
         // The token through a pipe, never an argument or the environment.
         if let Some(mut stdin) = child.stdin.take() {
@@ -295,6 +473,7 @@ impl Runner for DirectRunner {
         let _ = kill_process_group(pid, Signal::KILL);
         let _ = child.kill();
         let _ = child.wait();
+        drop(way_out);
         if let Some(output) = output {
             let _ = output.join();
         }
@@ -314,7 +493,7 @@ impl Runner for DirectRunner {
                 "its script wrote more than {} KiB, so it was ended",
                 self.most_output / 1024
             )),
-            Some(Some(0)) if ran => Ok(0),
+            Some(Some(0)) if ran => Ok(at.map_or(0, |at| at.as_millis() as u64)),
             _ if !ran => {
                 let first = first.lock().unwrap_or_else(|p| p.into_inner()).clone();
                 let said = String::from_utf8_lossy(&first)
@@ -341,7 +520,8 @@ impl Runner for DirectRunner {
 }
 
 /// lamp-tasks' answer to a `run` step's hand-over, `hand` checked: its
-/// token minted as a task's, held to exactly the skill's grants, the script
+/// token minted as a task's, held to exactly the skill's grants (`net`
+/// only with the owner's yes naming it, as a net task's), the script
 /// run through `runner` within [`RUN_WITHIN`], the token ended and its
 /// said count read ([`Tokens::end_said`]): `{"ok":true,"id":0,"said":N}`
 /// for a run that ended well and said something, else the refusal.
@@ -351,15 +531,15 @@ pub fn answer(
     runner: &dyn Runner,
     keys_named: bool,
 ) -> Value {
-    if hand
-        .grants
-        .iter()
-        .any(|grant| grant == crate::skill_task::NET_GRANT)
-    {
-        return refusal("bad_request", NO_NET_HERE);
-    }
     if keys_named {
         return refusal("bad_request", NO_KEYS_HERE);
+    }
+    // `net` gets its way out only with lamp-control's yes naming it for
+    // this folder as it is, as a net task's: refused here, no token is
+    // minted and no egress socket made.
+    let net = hand.grants.iter().any(|grant| grant == NET_GRANT);
+    if net && !tokens.net_agreed(&hand.skill, &hand.sha256, &hand.grants) {
+        return refusal("no_token", NO_NET_YES);
     }
     let handed = Instant::now();
     let run_id = crate::skill_task::run_id();
@@ -367,7 +547,13 @@ pub fn answer(
         Ok(minted) => minted,
         Err(why) => return refusal("no_token", &why),
     };
-    let asked: std::collections::BTreeSet<&String> = hand.grants.iter().collect();
+    // The token names lamp-control's grants, never `net`, which is
+    // lamp-tasks' own.
+    let asked: std::collections::BTreeSet<&String> = hand
+        .grants
+        .iter()
+        .filter(|grant| *grant != NET_GRANT)
+        .collect();
     if minted
         .grants
         .iter()
@@ -383,13 +569,23 @@ pub fn answer(
     }
     let mut run = SkillRun::of_run(hand, &run_id, &minted.token);
     run.deadline = RUN_WITHIN;
+    run.net = net;
     drop(minted);
     eprintln!(
         "[lamp-tasks] skill run {run_id}: {} handed over, token minted in {} ms",
         hand.skill,
         handed.elapsed().as_millis()
     );
+    let to_runner = handed.elapsed();
     let ran = runner.run(&run, &|| {});
+    // Ok: how long into its run its script started; with the hand-over's
+    // own, what a ROW reads (#8158's latency).
+    if let Ok(into_run) = &ran {
+        eprintln!(
+            "[lamp-tasks] skill run {run_id}: hand-over to script start {} ms",
+            to_runner.as_millis() as u64 + into_run
+        );
+    }
     // Its says counted as its token ends: none can be said after.
     let said = tokens.end_said(&run_id);
     let began = run.started.load(Ordering::Acquire);

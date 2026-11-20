@@ -1032,7 +1032,7 @@ fn write_line(mut stream: &UnixStream, line: &str) -> io::Result<()> {
 /// A run's egress socket at `path` opened `O_PATH` (#7742): that socket
 /// alone, never through a link; anything else is refused.
 #[cfg(target_os = "linux")]
-fn egress_fd(path: &Path) -> io::Result<OwnedFd> {
+pub(crate) fn egress_fd(path: &Path) -> io::Result<OwnedFd> {
     use rustix::fs::{FileType, Mode, OFlags};
     let fd = rustix::fs::open(
         path,
@@ -1047,7 +1047,7 @@ fn egress_fd(path: &Path) -> io::Result<OwnedFd> {
 
 /// Off Linux no descriptor is sent: refused.
 #[cfg(not(target_os = "linux"))]
-fn egress_fd(_: &Path) -> io::Result<OwnedFd> {
+pub(crate) fn egress_fd(_: &Path) -> io::Result<OwnedFd> {
     Err(io::ErrorKind::Unsupported.into())
 }
 

@@ -3649,9 +3649,23 @@ runs its script itself: no agent, no Harness, no prompt
   task that may run for minutes; a second is refused `busy`.
 - **Its token**: minted from lamp-control's kept yes for the skill's folder
   and grants, exactly as a task's (`skill_run::answer`); a token naming other
-  grants than the line's is ended at once and nothing runs. A line granted
-  `net`, or for a skill that names keys, is refused before any token
-  (`skill_run::NO_NET_HERE`, `NO_KEYS_HERE`): use a `do.task`.
+  grants than the line's (`net` aside, lamp-tasks' own) is ended at once and
+  nothing runs. A line for a skill that names keys is refused before any
+  token (`skill_run::NO_KEYS_HERE`): use a `do.task`.
+- **`net`**: the same path and the same yes as a net task's
+  (`Tokens::net_agreed`: the owner's yes naming `net` for the folder as it
+  is; without it, `no_token`, `skill_run::NO_NET_YES`, before any token).
+  With `LAMP_TASK_NET` on, `DirectRunner::egress` makes the run's own egress
+  socket `skill-<run id>` (`egress::Grant::lamp`: the public web on ports
+  80 and 443 only), served until the run's bound, and puts an `O_PATH`
+  descriptor of it on fd 5 of the fence. The fence is the gateway's net
+  fence (`gateway::FENCE_NET_EDITS`: `lo` up, `resolv.conf` naming
+  `127.0.0.1`, `lamp-tasks net-relay --egress /proc/self/fd/5`, fd 5 closed
+  before the script, `HTTPS_PROXY`/`HTTP_PROXY` `http://127.0.0.1:3128`),
+  with lamp-tasks' own program alone shown again under `/opt` for the relay
+  (`skill_run::RELAY_EDITS`). With the switch off, or off Linux, a net run
+  is refused before its fence starts (`not_started`). The socket is removed
+  when the run ends.
 - **Its fence** (`skill_run::DirectRunner`): `/usr/bin/unshare` with the
   gateway run's arguments (`gateway::fence_args`: a user namespace with root
   mapped, a network of `lo` alone, its own mount and PID namespaces,
@@ -3672,7 +3686,16 @@ runs its script itself: no agent, no Harness, no prompt
 - **Its bounds**: 30 s from the fence's start (`skill_run::RUN_WITHIN`), its
   whole process group killed then; at most 64 KiB of output
   (`skill_run::MOST_OUTPUT`), counted and thrown away (never journaled),
-  past which it is ended.
+  past which it is ended. The script has caps of its own, set in its fence
+  just before its exec, after its relay (`skill_run::CAPS_EDIT`), so a
+  runaway script never uses lamp-tasks' whole budget (`MemoryHigh`,
+  `CPUQuota` on lamp-tasks.service): no core file (`ulimit -c 0`), 768 MiB
+  of address space (`ulimit -v`, `SCRIPT_MEMORY_KB`, the per-script cap
+  #7520 gives a gateway agent's script), 30 s of CPU time (`ulimit -t`,
+  `SCRIPT_CPU_SECS`: at most one core on average over its run, as a gateway
+  agent's `CPUQuota=100%`) and niceness 10 (`nice -n`, `SCRIPT_NICE`, as a
+  gateway agent's `Nice=10`). lamp-tasks.service delegates no cgroup, so
+  these are the process's own limits, which its children inherit.
 - **Its answer**: when the script ends, the token is ended with an admin
   `end`, whose answer now carries `said` ([control.md](control.md), "The run
   socket"): how many of the run's `say`s the voice said whole
@@ -3683,7 +3706,9 @@ runs its script itself: no agent, no Harness, no prompt
   `skills/tasks` tells its end (`Ran` or `Failed`, no engine).
 - **Timing**: the journal says when the token was minted after the line
   (`skill run RUN: SKILL handed over, token minted in N ms`), when the
-  script started (`its script started N ms into its run`) and its end. The
+  script started (`its script started N ms into its run`), the two together
+  (`skill run RUN: hand-over to script start N ms`, what a lamp's ROW
+  reads) and its end. The
   blocking hops are the mint (one local socket line), the fence's mounts and
   `python3`'s start. Measured at unit level with a stand-in fence
   (`skill_run::tests::a_script_that_ends_well_runs_in_its_own_folder_with_its_token`);
