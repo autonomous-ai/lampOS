@@ -253,4 +253,36 @@ mod tests {
             }
         }
     }
+
+    /// #8153: every built-in clip as level 5 plays it (`energy::livelier`,
+    /// up to 1.6 times its size), on each deployed lamp's standing pose,
+    /// is not refused by V1's rule at play time (no frame past 22 mm off the
+    /// axis) and leans the lamp back no farther than 16 mm. Prints the worst
+    /// of each, for the record (`cargo test -- --nocapture`).
+    #[test]
+    fn every_built_in_clip_at_level_five_passes_v1s_rule() {
+        for (lamp, stand, _) in LAMPS {
+            for clip in clips::ALL {
+                let played = crate::energy::livelier(clip, 5);
+                let (frame, mm) = worst_frame(stand, played.frames);
+                let (_, before) = worst_frame(stand, clip.frames);
+                let back = played
+                    .frames
+                    .iter()
+                    .map(|offsets| {
+                        let pose: [u16; 5] = std::array::from_fn(|joint| {
+                            (i32::from(stand[joint]) + i32::from(offsets[joint])) as u16
+                        });
+                        lean_back_mm(by_id(pose))
+                    })
+                    .fold(f64::MIN, f64::max);
+                eprintln!(
+                    "cog L5 {lamp} {:<13} off axis {mm:5.2} mm (level 1 {before:5.2}), back {back:5.2} mm",
+                    clip.name
+                );
+                assert!(mm < CLIP_MM, "{lamp} {} frame {frame}: {mm}", clip.name);
+                assert!(back <= LOOK_MM, "{lamp} {}: {back}", clip.name);
+            }
+        }
+    }
 }
