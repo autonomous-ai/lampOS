@@ -1,6 +1,6 @@
-//! The four seen reactions together, as a lamp that has them on holds them
-//! (#6543, the owner's call on #7401 and the first builder's rulings for
-//! the switch-on, #7668; not yet product skills): Seen celebrating, a
+//! The four seen reactions together, as the product ships them (#6543, the
+//! owner's call on #7401 and the first builder's rulings for the switch-on,
+//! #7668): Seen celebrating, a
 //! drink, eating and tired each say one line when lamp-seen's count of
 //! their kind rises, with no day's most, group's hour or gap, or rest; the
 //! same kind not again within 20 minutes of its last line heard (a
@@ -20,18 +20,15 @@ fn skills_root() -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR")).join("../../skills")
 }
 
-/// The seen reactions named, loaded and turned on, as a lamp that has them
-/// on would hold them: in the tree they are installable and off, not yet
-/// product skills, until their switch-on after the owner's working-day row
-/// (#7668).
+/// The seen reactions named, loaded as the product installs them: core
+/// skills, on.
 fn seen(names: &[&str]) -> Vec<Skill> {
     names
         .iter()
         .map(|name| {
-            let mut skill = load(&skills_root().join(name)).unwrap();
-            assert!(!skill.enabled, "{name} comes off");
-            assert_eq!(skill.kind, SkillKind::Installable, "{name}");
-            skill.enabled = true;
+            let skill = load(&skills_root().join(name)).unwrap();
+            assert!(skill.enabled, "{name} comes on");
+            assert_eq!(skill.kind, SkillKind::Core, "{name}");
             skill
         })
         .collect()
@@ -561,9 +558,7 @@ fn drops_kept_false_or_left_out_changes_nothing() {
     // (subscribed), and a rise kept through a talk is kept through the
     // slide's closing too, said once both hold.
     for edit in ["drops_kept = false\n", ""] {
-        let mut drink = drink_with(|toml| toml.replace("drops_kept = true\n", edit)).unwrap();
-        // Off in the tree, not yet a product skill (#7668): turned on.
-        drink.enabled = true;
+        let drink = drink_with(|toml| toml.replace("drops_kept = true\n", edit)).unwrap();
         let mut engine = Engine::new(vec![drink], true);
         assert!(!engine.reads_privacy(), "{edit:?}");
         assert!(engine.topics().iter().any(|topic| topic == "voice/privacy"));

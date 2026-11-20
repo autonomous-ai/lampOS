@@ -6182,7 +6182,7 @@ và ăn mừng, `lamp-seen` chỉ phát khi `LAMP_SEEN_MORE_DOINGS=on`, bật tr
 sản phẩm) là một chủ
 đề riêng: kỹ năng ghi nó hiện quyền dùng `seen_more`, riêng tư và tách khỏi
 `seen`, nên kỹ năng được `humans/doing` không bao giờ nhận nó. Bốn kỹ năng
-phản ứng với điều thấy được đọc nó, đang tắt (bên dưới). **Lời đồng ý seen_more của chủ đèn** (#6543): kỹ năng ghi chủ
+phản ứng với điều thấy được đọc nó, là kỹ năng sản phẩm từ lần bật (#7668, bên dưới). **Lời đồng ý seen_more của chủ đèn** (#6543): kỹ năng ghi chủ
 đề này không nhận được gì từ nó cho tới khi chủ đèn đồng ý cho chính kỹ năng
 đó trong app (`skills.seen_more`, [cloud.md](../cloud.md)), giữ theo tên
 trong tệp `seen_more` của `--state-dir`, như lời đồng ý camera (tệp
@@ -6275,15 +6275,13 @@ như một lần tạm hoãn). Kiểm thử
 (`crates/skills/tests/it/holds.rs`). Mô tả đầy đủ của `[stop.done]` ở
 [skills.md](../skills.md), hàng `[stop]`.
 
-### Bốn phản ứng với điều thấy được (#6543, #7668: có trong cây mã, chưa là kỹ năng sản phẩm)
+### Bốn phản ứng với điều thấy được (#6543, bật trong sản phẩm, #7668)
 
 `seen-drink`, `seen-eat`, `seen-tired` và `seen-celebrate`: phản ứng của
 kỹ năng wellbeing V1 với điều nó thấy, mỗi loại một kỹ năng để mỗi loại có
-lệnh tắt riêng. Đều là `installable`, tắt (`enabled = false`), có trong cây
-mã nhưng nằm trong `install::NOT_PRODUCT_SKILLS`: chưa được cài làm kỹ năng
-sản phẩm cho tới pull request bật chúng, sau hàng thử một ngày làm việc của
-chủ đèn trên lamp-06c1 (#6543, #7668); kể cả khi đó vẫn im lặng khi chưa có
-lời đồng ý `seen_more` của chủ đèn. Quyết định của chủ đèn trên #7401 (19/11):
+lệnh tắt riêng. Đều là `core`, bật, nằm trong `install::PRODUCT_SKILLS`
+(#7668, quyết định của chủ đèn ở c6957458843): được cài trên mọi đèn ở lượt
+cập nhật kế tiếp, và im lặng khi chưa có lời đồng ý `seen_more` của chủ đèn. Quyết định của chủ đèn trên #7401 (19/11):
 mỗi lần thấy là một phản ứng, cùng các phán quyết của first builder cho lần
 bật (#7401, 19:05 và 19:10). Mỗi kỹ
 năng đọc `humans/doing_more` (quyền dùng `seen_more` của chủ đèn,

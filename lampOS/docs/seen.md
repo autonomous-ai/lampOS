@@ -330,8 +330,7 @@ that one too, aborts a burst under way.
   two whole numbers, `every_s` outside 15–60 s, or `until_unix_s` reached.
   With the switch off it is a minute whatever the cloud says; the heat
   pace multiplies the period in force ("The board's heat"). The seen
-  reactions (in the tree but not yet product skills, until their switch-on
-  pull request after the owner's working-day row, #7668) change none of this: no product unit sets
+  reactions, product skills since their switch-on (#7668), change none of this: no product unit sets
   the switch (`no_product_unit_sets_the_fifteen_second_switch`), so every
   lamp stays at a burst a minute until a unit sets it and Backend sends
   `seen_clip`. Nor do the reactions send anything: they read
