@@ -17,6 +17,7 @@ pub mod openclaw_config;
 pub mod progress;
 pub mod protocol;
 pub mod readiness;
+pub mod run_cgroup;
 pub mod run_token_file;
 pub mod runtime;
 pub mod session_index;

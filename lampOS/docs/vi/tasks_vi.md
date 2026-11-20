@@ -1056,11 +1056,39 @@ lamp-tasks tự chạy script: không agent, không Harness, không prompt
   chỉ đếm trong namespace đó (Linux 5.14 trở lên), không bao giờ đếm tiến
   trình của lamp-tasks hay `lampos` khác. Quá mức thì fork hay tạo luồng thất
   bại và lần chạy kết thúc `run_failed`. Dùng `prlimit`, không dùng
-  `ulimit -u`: `/bin/sh` của đèn là dash, cờ của nó là `-p`.
-  lamp-tasks.service chạy bằng `lampos` và không ủy quyền cgroup, nên không
-  thể tạo scope tạm hay cgroup con (`memory.max`, `cpu.max`, `pids.max`) cho
-  một lần chạy khi không có root; giới hạn mỗi tiến trình nhân với giới hạn
-  số tiến trình, trong 30 s đồng hồ, là tổng của lần chạy.
+  `ulimit -u`: `/bin/sh` của đèn là dash, cờ của nó là `-p`. Các giới hạn
+  này là lớp phòng thủ thứ hai; tổng thật của lần chạy là cgroup riêng của
+  nó (mục sau).
+- **Cgroup riêng** (`run_cgroup`, #8180): lamp-tasks.service có
+  `Delegate=memory cpu pids` (`run_cgroup::DELEGATE`), nên khi `serve` khởi
+  động, lamp-tasks đọc cgroup của mình từ `/proc/self/cgroup` (dòng v2
+  `0::`), tạo lá `serve` trong đó, chuyển mọi pid của unit vào đó (cgroup
+  trao controller xuống thì không giữ tiến trình nào), rồi ghi
+  `+memory +cpu +pids` vào `cgroup.subtree_control`; các cgroup `run-*` cũ
+  bị xóa. Mỗi bước run và mỗi lần chạy thử lúc tạo kỹ năng có `run-<id>` với
+  `memory.max` 512M (`RUN_MEMORY_MAX_MB`), `memory.high` 448M
+  (`RUN_MEMORY_HIGH_MB`), `memory.swap.max` 0 khi kernel có file đó,
+  `cpu.max` `100000 100000` (`RUN_CPU_MAX`, một nhân) và `pids.max` 72
+  (`RUN_PIDS_MAX`: 64 của script và 8 cho chính hàng rào). Các tổng này đến
+  từ: lamp-tasks.service đo được 632 MiB lúc nghỉ và 1120 MiB lúc đỉnh của
+  một task Hermes (lamp-9adf, 12/11), nên một lần chạy ở 512M cạnh đỉnh đó
+  là 1632 MiB, dưới `MemoryHigh=2100M` của unit; số task 126 + 72, dưới
+  `TasksMax=512`; một nhân trong `CPUQuota=360%` của unit. Tiến trình đầu
+  tiên của hàng rào vào cgroup ngay trước khi exec (ghi `0` vào
+  `cgroup.procs` của cgroup, trong `pre_exec`), nên không phần nào của lần
+  chạy nằm ngoài nó; quá `memory.max` thì OOM killer của kernel chỉ kết
+  thúc tiến trình của lần chạy, không bao giờ `serve` hay `wait` và `watch`
+  của Harness. Khi lần chạy kết thúc, dù thế nào (xong, lỗi, quá 30 s, bị
+  hủy), `1` được ghi vào `cgroup.kill` và cgroup bị xóa. **Đóng khi lỗi**:
+  trên Linux, không có cgroup v2 được ủy quyền, hay cgroup của lần chạy
+  hoặc bất kỳ giới hạn nào không tạo được, thì lần chạy (và lần chạy thử,
+  khi đó là `not_tried`) bị từ chối với `run_cgroup::NO_CGROUP` ("the run's
+  own memory and CPU bounds could not be set, so it was not run"), lý do ghi
+  nhật ký (`[lamp-tasks] run <id>: refused, no own cgroup: …`), không bao
+  giờ chạy thiếu tổng; `serve` nói lúc khởi động là trường hợp nào
+  (`[lamp-tasks] each run gets its own cgroup under …` hoặc
+  `[lamp-tasks] runs have no own cgroup: …`). Ngoài Linux (máy Mac của nhà
+  phát triển, các test), lần chạy chỉ có giới hạn mỗi tiến trình.
 - **Câu trả lời**: khi script kết thúc, token được kết thúc bằng `end` của
   admin, mà câu trả lời giờ có `said`: số câu `say` của lần chạy mà giọng
   nói đã nói trọn (`Tokens::end_said`). Thoát 0 và `said` ít nhất 1 là
@@ -1365,7 +1393,9 @@ tạo một lần và trọn vẹn"); `lamp_tasks::make_try`.
   `skill_run::fence_args`, #8180): che toàn bộ `skill_run::HIDDEN`, trong đó
   có `/run` và cùng với nó `admin.sock` của lamp-control, chỉ cho thấy lại
   thư mục kỹ năng, thư mục lần chạy và `control.sock`, cùng các giới hạn của
-  bước run (`skill_run::CAPS_EDIT`, gồm giới hạn số tiến trình); fd 4 là nơi
+  bước run (`skill_run::CAPS_EDIT`, gồm giới hạn số tiến trình) và cgroup
+  riêng (`run_cgroup`, tạo trước token: trên Linux không có thì không token
+  và `not_tried`); fd 4 là nơi
   bỏ đi thay cho socket của launcher. Không agent nào tham gia.
 - **Lần thử chạy thiếu gì** (`make_try::TRIED_WITHOUT`, #8180): `net` (không
   bao giờ tạo socket egress, nên lệnh tải thất bại như khi ngoại tuyến và
