@@ -12247,8 +12247,16 @@ impl Heeding {
                     name_into_ms.map_or_else(|| "?".to_owned(), |ms| ms.to_string())
                 );
             }
-            // The name note goes with the name (`heed_signs`).
-            self.noted = Some((request, None));
+            // The name note goes with the name (`heed_signs`), but for a
+            // line whose words call the lamp or a sure hearing at its start
+            // (`LAMP_NAME_FACE_OR_WORDS`, #8136).
+            if self.attention.name_note_kept() {
+                eprintln!(
+                    "lamp-voice second: request {request}: its words call the lamp, or a sure hearing began at its start: the model is still told its name was heard (LAMP_NAME_FACE_OR_WORDS, #8136)"
+                );
+            } else {
+                self.noted = Some((request, None));
+            }
         } else {
             // Which second sign let the name count, never the words (#3945:
             // a "Ma'am, …" line let out with nothing saying why).
