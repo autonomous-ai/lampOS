@@ -7272,7 +7272,13 @@ nothing is added to a turn's prompt but the one open-work line below.
   - No answer at all (lamp-tasks not reached): no line on that turn; the
     hand-over is kept.
 
-  A note that a task waits for its yes, or a service write's, comes first.
+  It is last among the turn's notes: a code-taken yes or no, a task
+  waiting for its yes, a skill run's write declined or a service write
+  waiting each win, and then lamp-tasks is not asked at all
+  (`the_open_work_is_not_read_when_another_note_wins`). A made skill's
+  brief (the lamp's own make) is never handed over as the person's work,
+  so it gets no line. After the owner's "forget everything" there is none
+  either ("Work records", below).
   Each read is journalled, only on turns that read:
   `lamp-voice: tasks: request N: open work <id> read in <ms> ms (<state>|none)`,
   `none` when lamp-tasks gave no record (unreached, refused, or none of it)
@@ -7293,8 +7299,11 @@ nothing is added to a turn's prompt but the one open-work line below.
   the latest, call this again without task; never guess which one."}`,
   except for the work the voice handed over last, within 30 minutes of its
   hand-over: that one was lost in a lamp-tasks restart and is answered
-  `{"work_id":"<id>","label":"<label>","lost_track":true,"next":<LOST_AFTER_RESTART>}`,
-  no state made up.
+  `{"work_id":"<id>","label":"<label>","lost_track":true,"next":"<LOST_AFTER_RESTART> <LABEL_QUOTED>"}`,
+  no state made up, the label marked as the person's own words, quoted and
+  untrusted. A made skill's brief (`made_skill::is_brief`) is never told,
+  by id or in the list, as the base `check` skips it
+  (`a_made_skills_brief_is_never_told_as_the_persons_work`).
 - **Without `task`.** The voice asks `{"op":"work_list","limit":5}` and
   answers with `works`, newest first. Each line is `id`, `kind` (`task`),
   `who` (the agent's name as the news says it), `label`, `state`, `done`,
@@ -8462,7 +8471,15 @@ identity run it, and `serde_json` reads it.
   "revision":…,"completion":"unverified","id":3,"progress":{"engine","state",
   "about","run","changes","signs_seen","last_active_unix_ms","read_unix_ms"}}`;
   `not_read` for a task watched and not read yet, `not_found` for one not watched, and `progress_off` without the
-  switch. That is the only way the line leaves the tasks part. A task the
+  switch. That is the only way the line leaves the tasks part. `ps` is per
+  agent, so on a kept session it can show an earlier task's line: a row
+  last active before this task was handed over (its `accepted_ago_ms`) is
+  not kept for it, neither its `about` nor its `last_active_unix_ms`, until
+  the agent is active after the hand-over (c0a4-17 HW: task 224's answer
+  and "quiet for an hour and a quarter" were told of task 225, 3 min old;
+  `an_earlier_tasks_line_on_the_same_agent_is_not_the_new_tasks`,
+  `progress.rs`). The work record's `last_active_ms` and the voice's step
+  and quiet time come from it. A task the
   watch let go because its agent settled answers, while it is in
   `settled`, `{"ok":true,…,"id":3,"settled":{"task","engine","state",
   "settled":true,"at_unix_ms"}}`: what it ended in, not `not_found` (Ten and
@@ -8731,24 +8748,52 @@ held only to read or change them, never across a Harness call or a file.
 
 **Forget everything.** The owner's "forget everything" (`forget_sessions`,
 #6274, on the voice's route) clears every record too (`works::forget_all`),
-with the person's words and the agents' answers in them, and the store
-tasks they held are not opened again by the next refresh; a task handed
-over after it has its record (`forget_all_leaves_no_record_words_or_answer`,
-`works.rs`; `forget_sessions_clears_the_work_records`, `tests/runtime.rs`).
+with the person's words and the agents' answers in them. It covers every
+task the store holds at that moment, on the records yet or not (one
+confirmed in the last 500 ms, or accepted and not watched yet): lamp-tasks
+keeps a mark beside the store, `works-forgotten.json` (mode 0600, ids
+only: the store's id and its newest task id then, `works::Forgotten`), and
+no task of that store up to that id is opened again, by the next refresh
+or by a restarted lamp-tasks over the same store. A mark that can't be
+written answers `forget_failed`. A task handed over after it has its
+record. The voice lets go of the work it handed over last too
+(`HANDED`), so no open-work note and no "lost after a restart" follow
+(`forget_all_leaves_no_record_words_or_answer` and
+`the_forget_mark_hides_its_stores_tasks_up_to_its_id_and_is_kept`,
+`works.rs`;
+`forget_everything_leaves_every_store_task_off_the_work_records`,
+`engine.rs`; `forget_sessions_clears_the_work_records`,
+`forget_sessions_covers_a_store_task_not_yet_on_the_records` and
+`forget_sessions_holds_across_a_restart_of_lamp_tasks`,
+`tests/runtime.rs`; `forget_everything_leaves_no_open_work_note`,
+`agent_tasks.rs`).
 
-**What a restart loses.** The records are in memory only, never written. A
-restart of lamp-tasks opens each store task's record again from the store,
-its `started_ms` the store's own (when it was confirmed, else made, by the
-boot's monotonic clock, which a lamp-tasks restart keeps), so its
-`elapsed_s` goes on; one from an earlier boot, which the store cannot
-date, starts when the new run first saw it
-(`a_task_reopened_after_a_restart_keeps_its_start_from_the_store`,
+**What a restart loses.** The records are in memory only, never written
+(only the forget mark above is). A restart of lamp-tasks opens each store
+task's record again from the store, its `started_ms` the store's own (when
+it was confirmed, else made, by the boot's monotonic clock, which a
+lamp-tasks restart keeps), so its `elapsed_s` goes on; a finished one keeps
+its end the same way (its settled observation, else its dispatch's end), so
+a 40 s task still reads 40 s; one from an earlier boot, which the store
+cannot date, starts when the new run first saw it
+(`a_task_reopened_after_a_restart_keeps_its_start_from_the_store` and
+`a_finished_task_reopened_after_a_restart_keeps_its_end_from_the_store`,
 `works.rs`;
 `a_task_on_the_work_records_is_dated_from_its_hand_over_across_a_restart`,
 `engine.rs`). A record not opened again (`work` answers `no_such_work`)
 is told by the voice as lost after a restart, never as nothing running,
 for the work it handed over last (the open-work note and
 `check_agent_task` above).
+
+**An earlier task's line on the same agent.** Harness's `ps` is per agent,
+so on a kept session it can show an earlier task's line: a row last active
+before this task was handed over (its `accepted_ago_ms`) is not kept for
+it, neither its `about` nor its `last_active_unix_ms`, until the agent is
+active after the hand-over (c0a4-17 HW: task 224's answer and "quiet for
+about an hour and a quarter" were told of task 225, 3 min old;
+`an_earlier_tasks_line_on_the_same_agent_is_not_the_new_tasks`,
+`progress.rs`). The record's `last_active_ms` and the step and quiet time
+the voice tells all come from it.
 
 Tests: `a_task_record_is_opened_updated_then_overwritten_by_a_later_observation`,
 `tasks_are_listed_newest_first`,
