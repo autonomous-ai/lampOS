@@ -3795,8 +3795,18 @@ runs its script itself: no agent, no Harness, no prompt
   #7520 gives a gateway agent's script), 30 s of CPU time (`ulimit -t`,
   `SCRIPT_CPU_SECS`: at most one core on average over its run, as a gateway
   agent's `CPUQuota=100%`) and niceness 10 (`nice -n`, `SCRIPT_NICE`, as a
-  gateway agent's `Nice=10`). lamp-tasks.service delegates no cgroup, so
-  these are the process's own limits, which its children inherit.
+  gateway agent's `Nice=10`), each process's. The run as a whole holds at
+  most 64 processes and threads (`SCRIPT_PROCESSES`, #8180), its relay's
+  among them: `prlimit --nproc=64:64 --pid $$`, set in the fence's own user
+  namespace just before the script's nested one is made, so the kernel
+  counts it in that namespace alone (Linux 5.14 and later), never
+  lamp-tasks' or any other `lampos` process. Past it a fork or a thread
+  fails and the run ends `run_failed`. `prlimit`, not `ulimit -u`: a lamp's
+  `/bin/sh` is dash, whose flag is `-p`. lamp-tasks.service runs as
+  `lampos` and delegates no cgroup, so no transient scope or sub-cgroup
+  (`memory.max`, `cpu.max`, `pids.max`) can be made for one run without
+  root; the per-process caps times the process cap, within the 30 s wall
+  clock, are the run's total.
 - **Its answer**: when the script ends, the token is ended with an admin
   `end`, whose answer now carries `said` ([control.md](control.md), "The run
   socket"): how many of the run's `say`s the voice said whole
@@ -4141,14 +4151,22 @@ made once and whole"); `lamp_tasks::make_try`.
   and its helpers), at most 4. No script step: `{"ok":true,"tried":false}`.
 - **How**: the skill's files are written to a `make-try-*` folder of the
   make's work folder (swept with the makes' at start), a token is minted on
-  lamp-control's admin socket for the draft's own grants
-  (`{"mint":{"try":[...],"run"}}`, `Tokens::mint_try`; `net` is the run's
-  own egress socket, as a skill run's, only with `LAMP_TASK_NET` on), and
-  lamp-tasks starts itself as `lamp-tasks make-try-fence`
-  (`make_try::fence_main`) with the grant on stdin: it becomes the same
-  fence a gateway agent's run gets from the skill-start launcher
-  (`skill_start::exec_fence`, `gateway::FENCE_TEXT`; fd 4 a sink in place
-  of the launcher's socket). No agent takes part. Each script runs once, at
+  lamp-control's admin socket for the draft's own grants less `net`,
+  `camera` and `microphone` (`{"mint":{"try":[...],"run"}}`,
+  `Tokens::mint_try`), and lamp-tasks starts itself as
+  `lamp-tasks make-try-fence` (`make_try::fence_main`) with the grant on
+  stdin: it becomes a run step's own fence (`make_try::fence_args`, built by
+  the same `skill_run::fence_args`, #8180): all of `skill_run::HIDDEN`
+  covered, `/run` and with it lamp-control's `admin.sock` among them, only
+  the skill's folder, the run's folder and `control.sock` shown again, and
+  the run step's caps (`skill_run::CAPS_EDIT`, its process cap among them);
+  fd 4 a sink in place of the launcher's socket. No agent takes part.
+- **What a try runs without** (`make_try::TRIED_WITHOUT`, #8180): `net` (no
+  egress socket is ever made, so a fetch fails as offline and nothing is
+  sent), `camera` and `microphone` (lamp-control refuses to mint them for a
+  try too). The answer names them (`"without":["net"]`), and a failed try's
+  `why` says it was tried without them, so the repair writes a script that
+  says its failure line and exits 0, which passes. Each script runs once, at
   most 30 s (`TRY_WITHIN`), then is killed; its output is kept up to 8 KiB.
 - **Judged** (`make_try::judged`): exit 0 in time; a `run` step's script
   said at least one line (`said` from lamp-control's `end` answer,
@@ -4158,9 +4176,11 @@ made once and whole"); `lamp_tasks::make_try`.
   `{"ok":true,"tried":true,"passed":false,"why"}` (the words go to the
   voice's repair); a try that couldn't start (no token, no fence) is
   refused `not_tried`.
-- **Nothing is sent**: lamp-control marks the token tried; its
+- **Nothing is sent or kept**: lamp-control marks the token tried; its
   `service.write` is answered `{"result":{"sent":false,"tried":true}}` and
-  never reaches lamp-services, linked services on or not; its reads go on
+  never reaches lamp-services, linked services on or not; every other op
+  that changes kept state is answered from the stub too, and a capture is
+  refused ([control.md](control.md), "A make's tried run"); its reads go on
   live.
 - **The say count** (for #8158's `run` step too): lamp-control counts each
   of a run client's `say`s the voice said whole (`done` with
@@ -4176,7 +4196,13 @@ Tests: `a_run_step_tries_its_script_and_a_task_each_of_its_scripts`,
 `a_silent_run_step_fails_its_try_with_words_for_the_repair`,
 `a_skill_that_sends_is_tried_with_its_own_grants`,
 `the_fence_launch_mints_a_tried_token_and_reads_its_says`,
-`a_fence_that_runs_past_its_limit_is_ended`; lamp-control's
+`a_fence_that_runs_past_its_limit_is_ended`,
+`a_draft_granted_net_is_tried_with_no_way_out_and_told_so`,
+`a_tried_runs_fence_is_a_run_steps_with_no_admin_socket_and_its_caps`;
+lamp-tasks' run step's `a_run_steps_script_has_its_own_memory_and_cpu_caps`
+and, on Linux,
+`a_script_past_its_process_cap_fails_its_run_while_another_task_answers`;
+lamp-control's
 `a_tried_runs_write_is_stubbed_and_its_read_is_live`,
 `a_tried_runs_write_is_stubbed_with_services_off`,
 `a_runs_says_are_counted_to_its_end`,
