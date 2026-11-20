@@ -11951,9 +11951,18 @@ impl Heeding {
                     .as_mut()
                     .and_then(|voices| voices.likeness_so_far(request))
                     .is_some_and(|likeness| likeness < crate::same_voice::DIFFERENT_BELOW));
+        // `LAMP_NAME_SIGN_TIED` (#8092): only with eyes to give a look.
+        let looks_needed = self.attention.second_sign_tied() && self.eyes.is_some();
         let line = crate::said_to_me::Line {
             heard,
-            name_heard: !signs.names.is_empty(),
+            // With looks needed, in the window a hearing under
+            // `attention::NEAR_SCORE` is no name, so the no-look hold is
+            // read (Fifth's P3 on #8093: #7891 heard the name at 0.939 in
+            // meeting talk); words calling the lamp still name it
+            // (`said_to_me::named`).
+            name_heard: signs.names.iter().any(|(_, score)| {
+                !(looks_needed && signs.going_on) || *score >= crate::attention::NEAR_SCORE
+            }),
             going_on: signs.going_on,
             // A read-back asks for an answer, however its last sentence
             // reads (`services::answer_awaited`).
@@ -11966,8 +11975,7 @@ impl Heeding {
                 at > self.said_until_us.unwrap_or_default()
                     && monotonic_us().saturating_sub(at) <= crate::room_told::BUSY_ENDS_AFTER_US
             }),
-            // `LAMP_NAME_SIGN_TIED` (#8092): only with eyes to give a look.
-            looks_needed: self.attention.second_sign_tied() && self.eyes.is_some(),
+            looks_needed,
             look_free_answered: self.look_free_used,
             // Begun over the lamp's own answer, which it cut (#8205).
             cut_in: self.began_over == Some(request),
