@@ -943,7 +943,7 @@ impl Days {
         let (lines, changes, adds) = allowance(&tx, person, &day)?;
         let generation = generation(&tx, person)?;
         let rows = tx
-            .prepare("SELECT id,at_unix_ms,kind,heard,said,text FROM entries WHERE person=?1 AND day=?2 AND id>?3 AND active=1 AND ((kind='exchange' AND trim(heard)!='' AND at_unix_ms>coalesce((SELECT f.at_unix_ms+?4 FROM nightly_forgets f WHERE f.person=?1 AND f.day=?2),-1)) OR kind='kept') ORDER BY id")?
+            .prepare("SELECT id,at_unix_ms,kind,heard,said,text FROM entries WHERE person=?1 AND day=?2 AND id>?3 AND active=1 AND ((kind='exchange' AND trim(heard)!='' AND at_unix_ms>coalesce((SELECT f.at_unix_ms+?4 FROM nightly_forgets f WHERE f.person=?1 AND f.day=?2),-1)) OR (kind='kept' AND rid NOT IN (SELECT rid FROM app_facts))) ORDER BY id")?
             .query_map(params![person.as_str(), day, after_id, FORGET_TURN_MS], |r| {
                 Ok(json!({"id":r.get::<_,u64>(0)?,"at_unix_ms":r.get::<_,u64>(1)?,"kind":r.get::<_,String>(2)?,"heard":r.get::<_,String>(3)?,"said":r.get::<_,String>(4)?,"text":r.get::<_,String>(5)?}))
             })?
