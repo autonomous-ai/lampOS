@@ -525,6 +525,68 @@ mod tests {
         }
     }
 
+    /// #6893 / #8153: level 5 is judged against V1 (the lead's bar), joint by
+    /// joint, on the two clips the issue names. V1's peak to peak, counts,
+    /// over the window V2 kept of `hal/recordings/excited.csv` (2.70 to
+    /// 4.70 s) and `happy_wiggle.csv` (1.10 to 5.10 s), converted with the
+    /// ranges in `hal/calibration/robots/hal_follower/hal.json` (as
+    /// `tools/generate_clips.py` does; Sixth's #8153 table, 20 Nov 20:53,
+    /// recomputed from the CSVs 21 Nov). The tolerance is 25% of V1's: a
+    /// joint outside it is a known gap, listed with what holds it, so that
+    /// closing or opening one fails here and is said.
+    #[test]
+    fn level_five_sizes_excited_and_happy_against_v1() {
+        // (clip, joint, V1 p-p, level 5 p-p / V1 within 0.01, a known gap)
+        let lines: [(&Clip, usize, u16, f32, Option<&str>); 7] = [
+            (&crate::clips::EXCITED, 0, 146, 0.91, None),
+            (&crate::clips::EXCITED, 3, 299, 1.21, None),
+            (
+                &crate::clips::EXCITED,
+                4,
+                502,
+                0.65,
+                Some("the tip cap, x1.27"),
+            ),
+            (&crate::clips::HAPPY, 0, 268, 0.82, None),
+            (
+                &crate::clips::HAPPY,
+                2,
+                697,
+                0.34,
+                Some("x1.6 of a base cut to 0.22 of V1"),
+            ),
+            (
+                &crate::clips::HAPPY,
+                3,
+                178,
+                1.54,
+                Some("over V1: x1.6 of 0.96 of V1"),
+            ),
+            (&crate::clips::HAPPY, 4, 516, 0.70, Some("the reach, 360")),
+        ];
+        let peak_to_peak = |clip: &Clip, joint: usize| {
+            let at = clip.frames.iter().map(|frame| frame[joint]);
+            at.clone().max().unwrap() - at.min().unwrap()
+        };
+        // V1's excited has no base yaw, nor does the clip at any level.
+        assert_eq!(peak_to_peak(livelier(&crate::clips::EXCITED, 5), 2), 0);
+        for (clip, joint, v1, pinned, gap) in lines {
+            let five = peak_to_peak(livelier(clip, 5), joint);
+            let share = f32::from(five as u16) / f32::from(v1);
+            assert!(
+                (share - pinned).abs() <= 0.01,
+                "{} joint {joint}: {five} against V1 {v1}, {share:.2}",
+                clip.name
+            );
+            assert_eq!(
+                (share - 1.0).abs() > 0.25,
+                gap.is_some(),
+                "{} joint {joint}: {five} against V1 {v1}, {share:.2}",
+                clip.name
+            );
+        }
+    }
+
     /// #8153: level 1 plays every clip as recorded, the very clip; the clip
     /// size and pace lie evenly from x1 at level 1 to x1.6 and x1.5 at 5.
     #[test]
