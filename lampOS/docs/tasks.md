@@ -1972,7 +1972,11 @@ The product unit's test is `the_tasks_part_starts_with_no_targets_and_learns_the
     the person which agent runs their work; say what is being done or what
     was found." (`NO_AGENT_NAME`); an engine the person named is said back
     as named, and the task's words and the agent's answer are never changed
-    (`the_lamps_own_engine_is_never_named_in_its_news`).
+    (`the_lamps_own_engine_is_never_named_in_its_news`). Its hand-over is
+    said in the first person ("Sure, I'll work on that.", a question "Sure,
+    I'll look into that."), never "giving that to the lamp", and one not set
+    up "That isn't set up here yet."
+    (`the_lamps_own_work_is_handed_over_in_the_first_person`).
   - **A named engine (#6492).** The voice keeps the lamp's engines from
     the `targets` answer: the `lamp` target's `engine` (its default) first,
     then its `engines`, each once (`[engine]` alone from an older tasks
@@ -7318,7 +7322,10 @@ nothing is added to a turn's prompt but the one open-work line below.
   (`a_made_skills_brief_is_never_told_as_the_persons_work`).
 - **Without `task`.** The voice asks `{"op":"work_list","limit":5}` and
   answers with `works`, newest first. Each line is `id`, `kind` (`task`),
-  `who` (the agent's name as the news says it), `label`, `state`, `done`,
+  `who` (the agent's name as the news says it: "the lamp" for the lamp's
+  own engines, its read ones and Hermes and OpenClaw, never their name,
+  #7930, and a running one's step is told as "how far the task is";
+  `a_record_names_a_computers_agent_never_the_lamps_own`), `label`, `state`, `done`,
   and when the record has them `elapsed_s`, `tools` and `step` (the latest
   step's tool name, never the agent's words), and `session` once its agent
   started: `{"agent":"…"}`, with `"machine":"…"` too when there is one.
@@ -8766,10 +8773,13 @@ confirmed in the last 500 ms, or accepted and not watched yet): lamp-tasks
 keeps a mark beside the store, `works-forgotten.json` (mode 0600, ids
 only: the store's id and its newest task id then, `works::Forgotten`), and
 no task of that store up to that id is opened again, by the next refresh
-or by a restarted lamp-tasks over the same store. A mark that can't be
-written answers `forget_failed`. A task handed over after it has its
-record. The voice lets go of the work it handed over last too
-(`HANDED`), so no open-work note and no "lost after a restart" follow
+or by a restarted lamp-tasks over the same store. A task only prepared at
+the forget is left out of the mark (`prepared`): a yes after the forget
+puts it on the records
+(`forget_sessions_spares_a_task_prepared_before_and_confirmed_after`). A
+mark that can't be written answers `forget_failed`. A task handed over
+after it has its record. The voice lets go of the work it handed over
+last too (`HANDED`), whatever the tasks part answers, so no open-work note and no "lost after a restart" follow
 (`forget_all_leaves_no_record_words_or_answer` and
 `the_forget_mark_hides_its_stores_tasks_up_to_its_id_and_is_kept`,
 `works.rs`;
