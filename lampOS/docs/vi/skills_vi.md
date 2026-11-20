@@ -1734,11 +1734,12 @@ sau:
     mô hình gộp lại (ROW của #7936 trên lamp-9adf, 20/11 01:15: "every
     thirty minutes…", rồi "make it forty five minutes", được tạo lại từ lời
     nhờ đầu với lời của mô hình về thay đổi theo sau, và cả DeepSeek lẫn
-    agent đều giữ `cooldown = "30m"`). Chính tham số `request` cũng nói vậy,
-    bên cạnh quy tắc "nothing else" của nó cho một lần tạo mới; thay đổi
-    không có tham số riêng, vì JSON của tool bị giới hạn bởi
-    `lamp_gemini::MAX_TOOL_JSON_BYTES` (4.096 byte; khoảng 4.070 khi mọi
-    switch bật). Và các note nói rằng một thay đổi không bao giờ là lời "không": chỉ một câu có nghĩa
+    agent đều giữ `cooldown = "30m"`). Chỉ các note nói vậy, không bao giờ
+    chính tham số `request`, và thay đổi không có tham số riêng ngoài
+    `change` của `answer`: tham số của `make_skill` bị giới hạn bởi
+    `PRODUCT_MOST_PARAMETERS_BYTES` (3.750 trong 4.096 của
+    `lamp_gemini::MAX_TOOL_JSON_BYTES`; 3.746 khi các switch của sản phẩm
+    bật). Và các note nói rằng một thay đổi không bao giờ là lời "không": chỉ một câu có nghĩa
     là dừng mới từ chối nó. Một câu là thay đổi, lời "không" hay chuyện
     khác là việc mô hình phán đoán, không bao giờ là danh sách từ; code áp
     dụng nó (`make_skill_local::making_changed`). Một thay đổi chỉ được

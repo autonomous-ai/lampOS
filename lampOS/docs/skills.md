@@ -5016,11 +5016,12 @@ gone ([switches.md](switches.md)). What happens:
     merged by the model (#7936's ROW on lamp-9adf, 20 Nov 01:15: "every
     thirty minutes…", then "make it forty five minutes", was made again
     from the first ask with the model's words of the change after it, and
-    both DeepSeek and the agent kept `cooldown = "30m"`). `request`'s own
-    parameter says so too, beside its "nothing else" rule for a new make;
-    the change has no argument of its own, as the tool's JSON is held to
-    `lamp_gemini::MAX_TOOL_JSON_BYTES` (4,096 bytes; about 4,070 with every
-    switch on). And the notes say that a change is never a no: only a line that
+    both DeepSeek and the agent kept `cooldown = "30m"`). Only the notes
+    say so, never `request`'s own parameter, and the change has no
+    argument of its own beside `answer`'s `change`: `make_skill`'s
+    parameters are held to `PRODUCT_MOST_PARAMETERS_BYTES` (3,750 of
+    `lamp_gemini::MAX_TOOL_JSON_BYTES`' 4,096; 3,746 with the product's
+    switches on). And the notes say that a change is never a no: only a line that
     means stop declines it. Whether a line is a change, a no or about
     something else is the model's judgment, never a word list; code
     applies it (`make_skill_local::making_changed`). A change counts only
