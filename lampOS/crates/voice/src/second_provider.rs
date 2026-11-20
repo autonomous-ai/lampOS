@@ -3379,6 +3379,18 @@ pub(crate) fn wake_heard_as(text: &str) -> Option<(&str, &str)> {
     (!rest.is_empty() && !named && !common && !addresses_the_name(rest)).then_some((word, rest))
 }
 
+/// The line's words past the lamp's name heard as another word
+/// ([`wake_heard_as`]), on a line that names the lamp (`named`, as
+/// `answer` knows it): "Hey, Lynn, make me a skill that …" is "make me a
+/// skill that …". `None` on a line that doesn't name the lamp ("Hey,
+/// Anna, …" said to a person) or opens with no such word. The one reading
+/// the made-skill matcher and `LAMP_MAKE_SKILL_ASKED`'s force share
+/// (#8022), so they can't drift.
+pub(crate) fn past_the_name(said: &str, named: bool) -> Option<&str> {
+    let _ = (said, named);
+    None
+}
+
 /// Greetings a line may open with, set off by a comma or a stop, before
 /// the lamp's name as heard ([`wake_heard_as`]), NFC lower case. "Hey",
 /// "hi", "ok" and "okay" are passed over by [`first_word_set_off`] itself,
