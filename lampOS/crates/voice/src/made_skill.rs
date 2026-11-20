@@ -777,9 +777,9 @@ fn guards_said(table: &toml::Table) -> Option<String> {
     )
 }
 
-/// Who made a skill (#6811, with [`reactions_on`]): written by the lamp
-/// alone as `made_with: <key>` on its card, after `made_by`, and as
-/// `"made_with"` in its [`INDEX`] entry. A line the model wrote is dropped,
+/// Who made a skill (#6811; always since #8157, the engine that really
+/// wrote it): written by the lamp alone as `made_with: <key>` on its card,
+/// after `made_by`, and as `"made_with"` in its [`INDEX`] entry. A line the model wrote is dropped,
 /// as a `made_by` one is.
 pub const MADE_WITH: &str = "made_with";
 
@@ -9180,9 +9180,16 @@ fn keep_said(
     files: &Files,
     from: &str,
     keeping: &Keeping,
-    named: Option<&str>,
+    (named, made_with): (Option<&str>, MadeWith),
 ) -> Result<Made, Refused> {
-    let (name, marked) = card(&files.card, &said.description(), Maker::of(from))?;
+    // Who wrote it, always (#8157): the engine that really made it.
+    let (name, marked) = card_asked(
+        &files.card,
+        &said.description(),
+        Maker::of(from),
+        false,
+        Some(made_with),
+    )?;
     let (name, marked) = named_as_given(name, marked, named, MOST_WRITTEN_NAME_BYTES);
     // Its function's name within lamp-skills' 48 bytes, as a written one's.
     if name.len() > MOST_WRITTEN_NAME_BYTES
@@ -9675,7 +9682,7 @@ pub struct Asked<'a> {
     /// [`UNRELATED_ENVIRONMENT`]): none for the app's, and none off.
     pub judge: Option<Judge<'a>>,
     /// The engine whose answer this is ([`MadeWith`]), written on the card
-    /// and in the index with [`reactions_on`] alone.
+    /// and in the index always (#8157).
     pub made_with: MadeWith,
     /// The name the person gave the skill as they asked for it ("called
     /// evening rate", #7911), as the voice's model read it from their
@@ -9725,7 +9732,13 @@ pub fn keep_asked(
     if said_on()
         && let Some(said) = said_asked(&files.toml)?
     {
-        return keep_said(&said, &files, from, keeping, request.named);
+        return keep_said(
+            &said,
+            &files,
+            from,
+            keeping,
+            (request.named, request.made_with),
+        );
     }
     // A getting up's wait, which [`tidied`] takes out: said with what it
     // does, never dropped without a word (App Only's P2 on #6249).
@@ -9780,6 +9793,12 @@ pub fn keep_asked(
     // Each .py it wrote Python that parses, before its check and its
     // say-back (#6749 E): one that doesn't goes to a repair.
     scripts_parse(&files.scripts)?;
+    // A skill the lamp's agent made with code says what it uses, where its
+    // result is and what it answers (#8157): never a built-in, Store or
+    // pushed skill's, nor the lamp's own model's.
+    if request.made_with != MadeWith::DeepSeek && !files.scripts.is_empty() {
+        sections_held(&files.card)?;
+    }
     // Each light show played by a step and held to its form (#7245).
     shows_held(&files.toml, &files.shows)?;
     // A say that claims a file or a note its code never keeps (#7245),
@@ -9820,7 +9839,10 @@ pub fn keep_asked(
         waited: waited.as_deref(),
         asked,
         limits,
-        made_with: reactions_on().then_some(request.made_with),
+        // Who wrote it, always (#8157): the agent that ran the make
+        // (OpenClaw or Hermes, as the tasks part named it) or the lamp's
+        // own model; `made_by` stays who asked.
+        made_with: Some(request.made_with),
         from,
         keeping,
         named: request.named,
@@ -9854,7 +9876,7 @@ struct Ending<'a> {
     /// Whether the request asked for limits ([`limits_asked`]), marked on
     /// its card ([`LIMITS_ASKED`]).
     limits: bool,
-    /// Who made it ([`MADE_WITH`]), with [`reactions_on`] alone.
+    /// Who made it ([`MADE_WITH`]), always (#8157).
     made_with: Option<MadeWith>,
     from: &'a str,
     keeping: &'a Keeping,
@@ -10894,7 +10916,32 @@ fn packed_and_kept(
     })()
     .map_err(unkept);
     let packed = made.and_then(|()| pack(&keeping.program, &folder, &out, &name));
-    let result = packed.and(said).and_then(|description| {
+    // #8157: once its check has passed, a made skill with code is tried
+    // once by lamp-tasks, whichever agent made it, before it is kept; a
+    // failed try goes to a repair with its words, a passed one is told in
+    // its read-back.
+    let tried = packed.and_then(|()| {
+        if added || scripts.is_empty() {
+            return Ok(None);
+        }
+        let Some(tasks) = crate::make_skill_agent::try_tasks_dir() else {
+            return Ok(None);
+        };
+        let mut files = std::collections::BTreeMap::new();
+        files.insert("skill.toml".to_owned(), toml.to_owned());
+        files.insert("SKILL.md".to_owned(), marked.clone());
+        for (path, text) in scripts.iter().chain(shows.iter()) {
+            files.insert(path.clone(), text.clone());
+        }
+        tried_said(crate::make_skill_agent::try_made(&tasks, &name, &files))
+    });
+    let said = tried.and_then(|line| {
+        said.map(|description| match line {
+            Some(line) => format!("{description} {line}"),
+            None => description,
+        })
+    });
+    let result = said.and_then(|description| {
         let package = format!("{name}-{version}.tar");
         let bytes = fs::read(out.join(&package)).map_err(unkept)?;
         let sha256 = hex(&Sha256::digest(&bytes));
@@ -10958,6 +11005,92 @@ fn packed_and_kept(
     });
     let _ = fs::remove_dir_all(&work);
     result
+}
+
+/// The sections a `SKILL.md` the lamp's agent made with code has (#8157),
+/// each a `## ` heading: what it uses (each script or lamp-services tool
+/// and its arguments), where each result is, and what is said aloud.
+pub const MADE_SECTIONS: [&str; 3] = ["Uses", "Result", "Answer"];
+
+/// What a made skill missing [`MADE_SECTIONS`] is refused as.
+pub const NO_SECTIONS: &str = "its SKILL.md doesn't say what it uses, its result or its answer";
+
+/// Whether `card` (a `SKILL.md`) has each of [`MADE_SECTIONS`] as a `## `
+/// heading with words under it; else refused with the lines for a repair.
+fn sections_held(card: &str) -> Result<(), Refused> {
+    let lines: Vec<&str> = card.lines().collect();
+    let missing: Vec<&str> = MADE_SECTIONS
+        .iter()
+        .copied()
+        .filter(|section| {
+            let Some(at) = lines.iter().position(|line| {
+                line.trim()
+                    .strip_prefix("## ")
+                    .is_some_and(|head| head.trim().eq_ignore_ascii_case(section))
+            }) else {
+                return true;
+            };
+            !lines[at + 1..]
+                .iter()
+                .take_while(|line| !line.trim_start().starts_with('#'))
+                .any(|line| !line.trim().is_empty())
+        })
+        .collect();
+    if missing.is_empty() {
+        return Ok(());
+    }
+    eprintln!("lamp-voice: a made skill was not kept: its SKILL.md lacks {missing:?}");
+    Err(Refused(
+        NO_SECTIONS.into(),
+        Some(format!(
+            "SKILL.md needs these sections, each a heading with lines under it: {}. ## Uses: \
+             each script and lamp-services tool it uses, with its arguments. ## Result: where \
+             each script's result is (what it prints, a file). ## Answer: what is said aloud, \
+             in one to three plain sentences: a script says it with lamp.say and the agent \
+             answers a lone -, or the agent's final answer is only the spoken summary.",
+            missing
+                .iter()
+                .map(|section| format!("## {section}"))
+                .collect::<Vec<_>>()
+                .join(", ")
+        )),
+    ))
+}
+
+/// What the person is told of a made skill that failed its tried run
+/// (#8157) after its repairs.
+pub const NOT_TRIED_PASSED: &str = "it didn't work when the lamp tried it";
+/// What a made skill's read-back adds after its tried run passed (#8157).
+pub const TRIED_SAID: &str = "I tried it once and it worked.";
+
+/// A made skill's tried run (#8157) as its keep takes it: passed, its
+/// read-back's line; failed, refused with lamp-tasks' words for a repair;
+/// nothing to try, or a try that couldn't be made (journaled), kept as
+/// before.
+fn tried_said(tried: crate::make_skill_agent::Tried) -> Result<Option<String>, Refused> {
+    use crate::make_skill_agent::Tried;
+    match tried {
+        Tried::Passed { said } => {
+            eprintln!("lamp-voice: a made skill passed its tried run ({said} line(s) said)");
+            Ok(Some(TRIED_SAID.to_owned()))
+        }
+        Tried::Nothing => Ok(None),
+        Tried::Failed(why) => {
+            eprintln!("lamp-voice: a made skill failed its tried run: not kept");
+            Err(Refused(
+                NOT_TRIED_PASSED.into(),
+                Some(format!(
+                    "When the lamp tried the skill once, {why}. Fix its scripts so each runs on \
+                     its own, with no arguments, and ends within 30 s; a run step's script says \
+                     its success line and its failure line with lamp.say."
+                )),
+            ))
+        }
+        Tried::NotTried(why) => {
+            eprintln!("lamp-voice: a made skill was not tried ({why}): kept as before");
+            Ok(None)
+        }
+    }
 }
 
 /// `lamp-skills pack --out OUT FOLDER`: the checks a load makes, its
@@ -20211,5 +20344,99 @@ task = { task = "take a photo and send it to the app", run = "scripts/main.py" }
             .1;
         assert!(!unmarked.contains("made_with"), "{unmarked}");
         assert_eq!(card_mark(&unmarked, MADE_WITH), None);
+    }
+
+    /// #8157: a made skill always says who really wrote it, on its card and
+    /// in the index (`made_with: openclaw`, `hermes`, or `deepseek` for the
+    /// lamp's own model), whatever `LAMP_MAKE_REACTIONS_ONLY_DEEPSEEK`
+    /// says; `made_by` stays who asked.
+    #[test]
+    fn a_made_skill_always_says_the_engine_that_wrote_it() {
+        use std::os::unix::fs::PermissionsExt;
+        let dir = scratch("made-with-always");
+        let program = dir.join("pack");
+        fs::write(
+            &program,
+            "#!/bin/sh\nname=$(basename \"$4\")\ncat \"$4/SKILL.md\" > \"$3/$name-1.0.0.tar\"\nexit 0\n",
+        )
+        .unwrap();
+        fs::set_permissions(&program, fs::Permissions::from_mode(0o755)).unwrap();
+        let keeping = Keeping {
+            directory: dir.join("made"),
+            program,
+            manage: dir.join("manage.sock"),
+            installed: dir.join("skills"),
+        };
+        let made = |with: MadeWith, from: &str| {
+            let asked = Asked {
+                request: "dim the light a shade at 10 pm",
+                made_with: with,
+                ..Asked::default()
+            };
+            let made = keep_asked(&answer(TOML, CARD), false, from, &keeping, &asked).unwrap();
+            let card = fs::read_to_string(&made.package).unwrap();
+            let entry = entries(&keeping.directory)
+                .into_iter()
+                .find(|entry| entry["name"] == made.name.as_str())
+                .unwrap();
+            (card_mark(&card, MADE_WITH), entry[MADE_WITH].clone(), card)
+        };
+        let mut at = 0;
+        for switch in [Some(false), Some(true)] {
+            set_reactions_here(switch);
+            for (with, key) in [
+                (MadeWith::OpenClaw, "openclaw"),
+                (MadeWith::Hermes, "hermes"),
+                (MadeWith::DeepSeek, "deepseek"),
+            ] {
+                at += 1;
+                let (card, entry, text) = made(with, &format!("local:with:{at}"));
+                assert_eq!(card.as_deref(), Some(key), "{switch:?}: {text}");
+                assert_eq!(entry, key, "{switch:?}");
+                assert!(text.contains("\nmade_by: voice\n"), "{text}");
+            }
+        }
+        set_reactions_here(None);
+    }
+
+    /// #8157: a passed try is told in the read-back; a failed one is
+    /// refused with lamp-tasks' words, which go to a repair; nothing to
+    /// try, or a try that couldn't be made, keeps it as before.
+    #[test]
+    fn a_tried_run_is_told_or_goes_to_a_repair() {
+        use crate::make_skill_agent::Tried;
+        assert_eq!(
+            tried_said(Tried::Passed { said: 1 }),
+            Ok(Some(TRIED_SAID.to_owned()))
+        );
+        assert_eq!(tried_said(Tried::Nothing), Ok(None));
+        assert_eq!(tried_said(Tried::NotTried("old".into())), Ok(None));
+        let Err(Refused(why, Some(lines))) =
+            tried_said(Tried::Failed("scripts/main.py exited 1".into()))
+        else {
+            panic!("a failed try is refused with its lines");
+        };
+        assert_eq!(why, NOT_TRIED_PASSED);
+        assert!(lines.contains("scripts/main.py exited 1"), "{lines}");
+        assert!(lines.contains("lamp.say"), "{lines}");
+    }
+
+    /// #8157: a SKILL.md the agent made with code has its three sections,
+    /// each with words under it; one missing or empty goes to a repair.
+    #[test]
+    fn an_agents_skill_with_code_says_its_uses_result_and_answer() {
+        let whole = "---\nname: btc\ndescription: d\n---\n\n# BTC\n\n## Uses\n\n- scripts/main.py, no arguments\n\n## Result\n\nSaid aloud; nothing printed but a line.\n\n## Answer\n\nThe script says the price with lamp.say; the agent answers a lone -.\n";
+        assert_eq!(sections_held(whole), Ok(()));
+        let no_answer = whole.split("## Answer").next().unwrap();
+        let Err(Refused(why, Some(lines))) = sections_held(no_answer) else {
+            panic!("refused");
+        };
+        assert_eq!(why, NO_SECTIONS);
+        assert!(
+            lines.contains("## Answer") && !lines.contains("## Uses,"),
+            "{lines}"
+        );
+        let empty = whole.replace("- scripts/main.py, no arguments\n", "");
+        assert!(sections_held(&empty).is_err());
     }
 }
