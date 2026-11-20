@@ -398,6 +398,19 @@ pub fn own_words_of(ask: &str) -> usize {
     own_words(&lower_words(ask)).len()
 }
 
+/// How many words `heard`'s own ([`own_words`]) and `name`'s differ by,
+/// either way: 0 when they are the same words. For the journal alone.
+pub fn words_off(heard: &str, name: &str) -> usize {
+    let heard = lower_words(heard);
+    let heard = own_words(&heard);
+    let name = lower_words(name);
+    heard
+        .iter()
+        .filter(|word| !name.iter().any(|n| n == *word))
+        .count()
+        + name.iter().filter(|n| !heard.contains(&n.as_str())).count()
+}
+
 /// Whether two ask phrases are matched as the same ([`loose_ask`]): "Take
 /// a photo" and "take a photo".
 pub fn same_ask(one: &str, other: &str) -> bool {
