@@ -1539,11 +1539,18 @@ pub(crate) fn spoken_character(character: &str, look_by_call: bool, memory: bool
 }
 
 /// The look's function (#1712): a spoken turn with a full look looks by it.
+/// With `LAMP_LOOK_TOLD=on` it takes `question` and `told`, both optional
+/// ([`crate::look_told`]).
 pub(crate) fn look_tool() -> lamp_gemini::Tool {
+    look_tool_with(crate::look_told::told_on())
+}
+
+/// [`look_tool`], with its arguments when `told`.
+pub(crate) fn look_tool_with(told: bool) -> lamp_gemini::Tool {
     lamp_gemini::Tool {
         name: crate::second_provider::LOOK_CALL.into(),
         description: "Look with your eye at what is in front of you: when someone asks what you see, shows you something, or asks how they or something looks. Call it instead of answering; you will then be shown what you see, and answer from that. Never for looking something up on the web. It never moves your head.".into(),
-        parameters: None,
+        parameters: told.then(crate::look_told::parameters),
         silent: false,
     }
 }
@@ -3942,6 +3949,21 @@ pub fn serve(
     }
     if look_by_call {
         engine = engine.looking_by_call();
+        // What the person asked and told it goes beside the look's picture
+        // (`LAMP_LOOK_TOLD`), and the look is kept with its question in the
+        // asker's scope (`LAMP_LOOK_KEPT_WITH_ASK`).
+        if crate::look_told::told_on() {
+            eprintln!(
+                "lamp-voice second: a look is told beside its picture what they asked and told about it, with memory's hits for it (LAMP_LOOK_TOLD)"
+            );
+            engine = engine.telling_looks_what_was_said(true);
+        }
+        if crate::look_told::kept_on() {
+            eprintln!(
+                "lamp-voice second: a look goes on from the turn that asked it, kept with its question in the asker's scope (LAMP_LOOK_KEPT_WITH_ASK)"
+            );
+            engine = engine.keeping_looks_with_their_ask(true);
+        }
     }
     // A skill's answer that asks for a look takes the turn's full look, as
     // on the Live route (`LAMP_SECOND_SKILL_LOOK=on`, #941): only where the

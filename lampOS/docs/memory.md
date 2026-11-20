@@ -3842,6 +3842,65 @@ passed. Tests: the notes' exact texts in `remember::tests`.
   failure path; host recovery tests do not establish the lamp's six-minute spoken recall or
   raise the “Remembers you” quality score.
 
+### A look kept with its question (`LAMP_LOOK_KEPT_WITH_ASK=on`, #7814)
+
+When the model looks by its own call (`take_a_look`) in a spoken turn, the
+look's answer comes in a turn the lamp writes after "Let me look."
+([speaking-first.md](speaking-first.md), "Taking a look"). A written turn is
+admitted as the room's (`ScopeSnapshot::room()`), and the person's words had
+been taken by the asking turn's exchange, so a look was kept as two: the
+question with "Let me look." in the person's scope, and what the lamp saw,
+with nothing said, in the room's (lamp-06c1, 17 Nov).
+
+With the switch (on in the product):
+
+- **Scope.** The look turn goes on in the asking turn's scope, read from
+  that turn's lease as the look is asked (`second_provider::look_asked_by_call`,
+  kept in `look_told::LookAsk`: the look request's authority retires the
+  asking turn before the look turn begins): the known person's own while
+  it is current; the room's when that line was held only by a face's gap,
+  carried as a conversation going on (never journalled as theirs), revoked
+  by a privacy change, or nobody's (`second_provider::look_scope`). The
+  look turn's context, tools and memory are that scope's, with every rule
+  a turn in it has.
+- **Who is at the lamp, read again (privacy first, the memory owner's
+  ruling on #8019).** As the look turn begins the face cache and the eyes
+  are read again (`second_provider::asker_still_alone`). The look stays
+  the asker's only when the cache still names them and, with the eyes'
+  view, no other face, known or not, was in their looks of the last
+  1.2 s (`speaking_faces::IN_VIEW_BEFORE`): the asker's own face alone, or
+  no face at all when their gap holds them by the usual scope rules.
+  Anyone else in view (another known face, an unknown face), nobody named,
+  a privacy change or the camera not allowed, and the look is the room's,
+  as before this switch: its exchange is the room's, apart from the
+  asker's, and memory's hits for it (`LAMP_LOOK_TOLD`) are read in the
+  room's.
+- **One exchange.** In the lamp's thread the asking exchange waits for the
+  look's words (`Thread::look_asked`, `look_turn`): `remember::finished` at
+  the asking turn's end passes it over while it is the newest, and keeps
+  what its calls fetched for it. The look's words go on in it, when it is
+  still the newest, not yet handed on, and in the same scope; at the look's
+  end it is handed on as one exchange: said = the question, answer =
+  "Let me look." and what the lamp saw, under the asker (or the room's for
+  an unknown asker). Any other line opening first, the look let go
+  (`Thread::look_let_go`), its words in another scope, or a forgetting,
+  and the asking exchange is handed on as it stands, the look's words in
+  their own, as before. A look dropped before it begins (a mute or a
+  privacy close, `Engine::let_go_look`; a spoken stop) or a conversation
+  closed (`Thread::close_conversation`) lets it go and hands
+  the asking exchange on at once, so it is never left waiting for a turn
+  that never comes; a look turn the route refuses as retired lets it go
+  too. The asking turn's own end (an authority with no owner, which comes
+  as "Let me look." is said and before the picture) never drops it: on
+  lamp-06c1 that dropped 17 of 17 looks (the ROW on #8019).
+- **Words only.** Nothing of the picture is kept: the thread holds the
+  lamp's words, and the picture goes in the look's request alone.
+- **Unchanged.** A look the lamp began on its own, a skill's look, and every
+  turn with the switch off.
+
+A forget about it ("forget what I showed you about the toy motorcycle")
+takes the one exchange as it takes any of their talk (`exchanges_forget`).
+
 ### Told on each turn (`LAMP_SECOND_MEMORY_HITS=on`, #2176 row 5c)
 
 On in the product since the memory owner's call on 4 Nov: "Build it that way, on by default. Even though #4950 may not work well, I still want this so-great feature SECOND_MEMORY_HITS on by default and accept the privacy leak." The accepted risk is reviewer-two's on #3371: with a known person's face the only face in view and silent, and no face seen speaking the line, an off-camera caller's answer is told that person's kept notes.

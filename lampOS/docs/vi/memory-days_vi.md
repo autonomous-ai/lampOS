@@ -2153,3 +2153,53 @@ chạy với `--forget-socket /run/lampos-memory/forget.sock --forget-group lamp
 chỉ nhận `forget_person`. lamp-cloud chỉ hỏi nó khi `LAMP_FACES_PAGE=on`, nên
 khi công tắc đó còn tắt thì không có gì thay đổi với người dùng; khi nó bật, xóa
 một người trong app cũng xóa những gì bộ nhớ giữ về họ.
+
+## Một lần nhìn được giữ cùng câu hỏi, của người hỏi (`LAMP_LOOK_KEPT_WITH_ASK`, #7814)
+
+Khi model tự nhìn bằng hàm `take_a_look` trong một lượt có người nói, câu trả
+lời của lần nhìn đến trong một lượt do đèn viết, sau «Let me look.». Lượt viết
+được nhận là của căn phòng, và lời của người đã thuộc về lượt hỏi, nên một lần
+nhìn bị giữ thành hai: câu hỏi với «Let me look.» trong phạm vi của người, và
+điều đèn thấy, không kèm lời nào, trong phạm vi căn phòng (lamp-06c1, 17/11).
+
+Khi bật (bật trong bản sản phẩm):
+
+- **Phạm vi.** Lượt nhìn đi tiếp trong phạm vi của lượt hỏi, đọc từ lease của
+  lượt ấy lúc lần nhìn được gọi (`look_asked_by_call`, giữ trong `LookAsk`:
+  quyền của yêu cầu nhìn kết thúc lượt hỏi trước khi lượt nhìn bắt đầu): của
+  chính người quen khi còn hiệu lực; của căn phòng khi câu ấy chỉ được giữ nhờ
+  khoảng trống của khuôn mặt, được mang theo như cuộc trò chuyện đang diễn ra,
+  bị thu hồi vì thay đổi quyền riêng tư, hoặc không của ai
+  (`second_provider::look_scope`).
+- **Đọc lại ai đang ở trước đèn (quyền riêng tư trước hết, phán quyết của
+  người phụ trách bộ nhớ trên #8019).** Khi lượt nhìn bắt đầu, bộ đệm khuôn mặt
+  và mắt được đọc lại (`asker_still_alone`). Lần nhìn chỉ còn là của người hỏi
+  khi bộ đệm vẫn gọi tên họ và, với mắt, không có khuôn mặt nào khác, quen hay
+  lạ, trong 1,2 s gần nhất: chỉ khuôn mặt của họ, hoặc không có khuôn mặt nào
+  khi khoảng trống của họ giữ họ theo quy tắc phạm vi thông thường. Có ai khác
+  trong khung hình, không ai được gọi tên, thay đổi quyền riêng tư hoặc camera
+  không được phép, thì lần nhìn là của căn phòng như trước: trao đổi của nó
+  thuộc căn phòng, tách khỏi của người hỏi, và các mục bộ nhớ cho nó được đọc
+  trong phạm vi căn phòng.
+- **Một trao đổi.** Trong luồng hội thoại, trao đổi của lượt hỏi chờ lời của
+  lần nhìn và được chuyển cho bộ nhớ khi lần nhìn kết thúc, thành một trao đổi:
+  lời nói = câu hỏi, câu trả lời = «Let me look.» và điều đèn thấy. Nếu có câu
+  khác mở trước, lần nhìn bị bỏ, lời ở phạm vi khác, hoặc có một lần quên, thì
+  hai bên được giữ riêng như trước. Lần nhìn bị bỏ trước khi bắt đầu (tắt tiếng,
+  đóng quyền riêng tư, một lệnh dừng bằng lời) hoặc cuộc trò chuyện đóng lại
+  thì trao đổi của lượt hỏi được chuyển ngay, không chờ một lượt không bao giờ
+  đến; lượt nhìn bị từ chối vì đã kết thúc cũng vậy. Việc lượt hỏi tự kết
+  thúc (khi «Let me look.» được nói, trước khi có ảnh) không bao giờ bỏ lần
+  nhìn: trên lamp-06c1 điều đó đã bỏ 17 trên 17 lần nhìn (ROW trên #8019).
+- **Chỉ lời.** Không giữ gì của bức ảnh: không ảnh, không byte, không tham chiếu.
+- **Không đổi.** Lần nhìn đèn tự bắt đầu, lần nhìn của một skill, và mọi lượt
+  khi công tắc tắt.
+
+Một lệnh quên về nó lấy đi trao đổi ấy như mọi lời nói khác của họ
+(`exchanges_forget`).
+
+Cùng lúc, với `LAMP_LOOK_TOLD`, hàm nhìn nhận hai đối số tuỳ chọn do model viết,
+`question` (điều họ hỏi) và `told` (điều họ đã nói về nó), đặt cạnh bức ảnh,
+trước ghi chú, kèm các mục bộ nhớ (`LAMP_SECOND_MEMORY_HITS`) cho câu hỏi trong
+phạm vi người hỏi; người được giữ nhờ khoảng trống không nhận mục nào. Model tự
+phán đoán ý nghĩa, không có danh sách từ.

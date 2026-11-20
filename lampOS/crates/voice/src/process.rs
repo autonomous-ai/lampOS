@@ -3063,6 +3063,10 @@ fn second_route_worker_environment(
         crate::second_provider::CUE_AFTER_ENVIRONMENT,
         crate::second_provider::LOOK_NOTE_ENVIRONMENT,
         crate::second_provider::LOOK_WALK_ENVIRONMENT,
+        // A look is told what was asked and told of it, and kept with its
+        // question in the asker's scope.
+        crate::look_told::TOLD_ENVIRONMENT,
+        crate::look_told::KEPT_ENVIRONMENT,
         crate::second_provider::NOT_FOR_ME_WORDS_ENVIRONMENT,
         // A line the model declines says nothing and carries no
         // conversation (#3945).
@@ -3404,6 +3408,8 @@ mod tests {
             crate::person::BY_DEFAULT_ENVIRONMENT,
             crate::second_provider::LOOK_NOTE_ENVIRONMENT,
             crate::second_provider::LOOK_WALK_ENVIRONMENT,
+            crate::look_told::TOLD_ENVIRONMENT,
+            crate::look_told::KEPT_ENVIRONMENT,
             crate::second_provider::NOT_FOR_ME_WORDS_ENVIRONMENT,
             crate::second_provider::DECLINE_SILENT_ENVIRONMENT,
             crate::second_provider::BUSY_FOLLOW_UP_RENEWS_ENVIRONMENT,
@@ -4594,6 +4600,8 @@ mod tests {
                     || name == crate::person::BY_DEFAULT_ENVIRONMENT
                     || name == crate::second_provider::LOOK_NOTE_ENVIRONMENT
                     || name == crate::second_provider::LOOK_WALK_ENVIRONMENT
+                    || name == crate::look_told::TOLD_ENVIRONMENT
+                    || name == crate::look_told::KEPT_ENVIRONMENT
                     || name == crate::second_provider::NOT_FOR_ME_WORDS_ENVIRONMENT
                     || name == crate::second_provider::DECLINE_SILENT_ENVIRONMENT
                     || name == crate::second_provider::BUSY_FOLLOW_UP_RENEWS_ENVIRONMENT
@@ -4754,6 +4762,8 @@ mod tests {
                     "LAMP_LEDGER_REFENCE=on",
                     "LAMP_LIGHT_TOLD=on",
                     "LAMP_LIMIT_LOCAL_ASKS=on",
+                    "LAMP_LOOK_KEPT_WITH_ASK=on",
+                    "LAMP_LOOK_TOLD=on",
                     "LAMP_MADE_NOT_ON_TOLD=on",
                     "LAMP_MAKE_AGENT_FIRST=on",
                     "LAMP_MAKE_AGENT_GUIDE=on",
