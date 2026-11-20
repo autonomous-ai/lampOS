@@ -1891,6 +1891,20 @@ pub struct Attention {
     /// weighed as a short line without the name in its words
     /// ([`short_line_without_the_name`], #7891), for the journal.
     name_short_dropped: bool,
+    /// A second sign must belong to the hearing it counts for
+    /// (`LAMP_NAME_SIGN_TIED=on`, [`Self::tie_the_second_sign`], #8092).
+    sign_tied: bool,
+    /// The request whose line `LAMP_NAME_NEAR` ruled not the name: a near
+    /// hearing at its start, its first word, set off, not the name
+    /// ([`Self::near_not_the_name`]).
+    near_not_the_name_of: Option<u64>,
+    /// The voice rose close to the lamp while a hearing of
+    /// [`NEAR_SCORE`] or more was said ([`Self::set_near_at_the_name`]).
+    near_at_the_name: bool,
+    /// The name heard in the room's sound was dropped for the line last
+    /// weighed because `LAMP_NAME_NEAR` ruled it not the name, for the
+    /// journal (#8092).
+    name_near_dropped: bool,
 }
 
 /// The most text kept for one request.
@@ -2230,6 +2244,38 @@ impl Attention {
     /// none was asked.
     pub fn second_signs(&self) -> &[&'static str] {
         &self.name_signs
+    }
+
+    /// `LAMP_NAME_SIGN_TIED=on` (#8092), with
+    /// [`Self::ask_a_second_sign_of_the_name`]: a second sign must belong
+    /// to the hearing. A line whose first word `LAMP_NAME_NEAR` ruled not
+    /// the name ([`Self::near_not_the_name`]) counts the name heard in the
+    /// room's sound for nothing, whatever its second sign, unless its words
+    /// call the lamp by name; and "the name said close to it" counts only
+    /// when the voice rose close while a hearing of [`NEAR_SCORE`] or more
+    /// was said ([`Self::set_near_at_the_name`]), not anywhere in the line.
+    pub fn tie_the_second_sign(&mut self, on: bool) {
+        self.sign_tied = on;
+    }
+
+    /// `LAMP_NAME_NEAR` ruled `request`'s line not the name: lamp-name heard
+    /// the name near by its start, but its first word, set off, is not the
+    /// name (`second_provider::named_near`).
+    pub fn near_not_the_name(&mut self, request: u64) {
+        self.near_not_the_name_of = Some(request);
+    }
+
+    /// Whether the voice rose close to the lamp
+    /// ([`Self::set_near`]'s rise) while a hearing of the name of
+    /// [`NEAR_SCORE`] or more counted for the request in hand was said.
+    pub fn set_near_at_the_name(&mut self, near: bool) {
+        self.near_at_the_name = near;
+    }
+
+    /// Whether the name heard for the line last weighed was dropped because
+    /// `LAMP_NAME_NEAR` ruled the line not the name (#8092).
+    pub fn name_dropped_by_near(&self) -> bool {
+        self.name_near_dropped
     }
 
     /// Whether the name heard for the line last weighed was dropped as a
@@ -7483,6 +7529,112 @@ mod tests {
             assert!(!dropped("Lamp's here.", passing), "{passing}");
             assert!(dropped("Okay.", passing), "{passing}");
         }
+    }
+
+    /// #8092 (lamp-74ff, build 14967, 20 Nov, a meeting; the journal's
+    /// fixed lines, no words kept). Request 4: a 21 s line of one word,
+    /// out of the window, lamp-name near at 0.86 by its start and
+    /// `LAMP_NAME_NEAR` ruling its first word not the name; its hearing
+    /// began 15194 ms in and counted by "the name said close to it" alone.
+    /// Request 5: three words, the lamp's question open, near at 1.00 and
+    /// ruled not the name again, its hearing at the start; counted by
+    /// closeness and the start. Its words are not kept, so a one-word
+    /// question stands in for request 4's: the form #7918's short-line rule
+    /// lets by. With `LAMP_NAME_SIGN_TIED=on` a hearing ruled not the name
+    /// counts by no second sign, and closeness counts only at a hearing of
+    /// [`NEAR_SCORE`] or more. Off, both count as before; a real call at
+    /// the line's start, said close, counts on; a ruling on another
+    /// request's line changes nothing here.
+    #[test]
+    fn with_the_sign_tied_a_line_name_near_ruled_not_the_name_counts_by_no_second_sign() {
+        let began = 10_000_000;
+        // (dropped, second signs, dropped by the near ruling)
+        let weighed = |tied: bool,
+                       ruled: Option<u64>,
+                       line: (&str, u64, bool),
+                       near_at_the_name: bool| {
+            let (heard, into_us, lamp_asked) = line;
+            let mut attention = Attention::default();
+            attention.ask_a_second_sign_of_the_name(true);
+            attention.tie_the_second_sign(tied);
+            if let Some(request) = ruled {
+                attention.near_not_the_name(request);
+            }
+            attention.began_at(4, 1, began);
+            attention.name_heard_scored(began + into_us, 0.96);
+            attention.heard(heard);
+            attention.set_near(true);
+            attention.set_near_at_the_name(near_at_the_name);
+            attention.lamp_asked(lamp_asked);
+            let dropped = attention.weigh_the_name(None, false);
+            (
+                dropped,
+                attention.second_signs().to_vec(),
+                attention.name_dropped_by_near(),
+            )
+        };
+        let request_4 = ("Really?", 15_194_000, false);
+        let request_5 = ("Yes, it is.", 200_000, true);
+        for near_at_the_name in [false, true] {
+            for line in [request_4, request_5] {
+                assert_eq!(
+                    weighed(true, Some(4), line, near_at_the_name),
+                    (true, Vec::new(), true),
+                    "{line:?}, close at the hearing {near_at_the_name}"
+                );
+            }
+        }
+        // Off: as on 14967.
+        assert_eq!(
+            weighed(false, Some(4), request_4, false),
+            (false, vec!["the name said close to it"], false)
+        );
+        assert_eq!(
+            weighed(false, Some(4), request_5, false),
+            (
+                false,
+                vec!["the name said close to it", "its hearing at the line's start"],
+                false
+            )
+        );
+        // Closeness anywhere in a 21 s line is no sign for a hearing 15 s
+        // in; at the hearing it is.
+        assert_eq!(
+            weighed(true, None, request_4, false),
+            (true, Vec::new(), false)
+        );
+        assert_eq!(
+            weighed(true, None, request_4, true),
+            (false, vec!["the name said close to it"], false)
+        );
+        // A ruling on another request's line is not this one's.
+        assert_eq!(
+            weighed(true, Some(3), request_4, true),
+            (false, vec!["the name said close to it"], false)
+        );
+        // The control: a real call at the line's start, said close.
+        assert_eq!(
+            weighed(true, None, ("Lamp, what time is it?", 200_000, false), true),
+            (
+                false,
+                vec![
+                    "the name said close to it",
+                    "its words calling it",
+                    "its hearing at the line's start"
+                ],
+                false
+            )
+        );
+        // Words that call the lamp by name keep it, whatever the ruling.
+        assert!(
+            !weighed(
+                true,
+                Some(4),
+                ("Right. Lamp, what time is it?", 200_000, false),
+                true
+            )
+            .0
+        );
     }
 
     /// #4226, `LAMP_NAME_START_USUAL=on`: a line whose sound began 0.3 s

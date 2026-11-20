@@ -28199,6 +28199,43 @@ mod tests {
         );
     }
 
+    /// #8092 (lamp-74ff, build 14967, 20 Nov, a meeting): request 4, a 21 s
+    /// line, its hearing 15194 ms in, let out by "the name said close to
+    /// it" alone, the room microphone's rise read anywhere in the line.
+    /// Through `judge`, with `LAMP_NAME_SIGN_TIED=on`: closeness counts for
+    /// the hearing only when the rise came while it was said (from 1.5 s
+    /// before its hearing began to 0.3 s after) and the hearing reached
+    /// `attention::NEAR_SCORE`; and a line `LAMP_NAME_NEAR` ruled not the
+    /// name counts the hearing by no sign. Off, as on 14967.
+    #[test]
+    fn with_the_sign_tied_closeness_counts_only_at_a_sure_hearing() {
+        use crate::room_told::Room;
+        let line = (10_000_000, 31_000_000);
+        let at = 25_194_000;
+        let judged = |tied: bool, rise_at: u64, score: f32, ruled: bool| {
+            let mut heeding = room_name_heeding(true);
+            heeding.attention.tie_the_second_sign(tied);
+            if ruled {
+                heeding.attention.near_not_the_name(4);
+            }
+            heeding.levels = Some(std::sync::Arc::new(std::sync::Mutex::new(
+                std::collections::VecDeque::from([(rise_at, 40.0)]),
+            )));
+            heeding.judge(
+                4,
+                line,
+                "What time is it?",
+                room_name_signs(Room::Busy, false, None, true, vec![(at, score)]),
+            )
+        };
+        assert!(judged(true, 12_000_000, 0.97, false).is_some(), "far rise");
+        assert_eq!(judged(false, 12_000_000, 0.97, false), None, "off");
+        assert_eq!(judged(true, 25_000_000, 0.97, false), None, "at it");
+        assert!(judged(true, 25_000_000, 0.93, false).is_some(), "unsure");
+        assert!(judged(true, 25_000_000, 0.97, true).is_some(), "ruled");
+        assert_eq!(judged(false, 25_000_000, 0.97, true), None, "ruled, off");
+    }
+
     /// #4226, `LAMP_NAME_START_USUAL=on`: a line whose sound began 0.3 s
     /// before its usual start by the soft start's lead, the name heard
     /// 1.5 s into its sound (1.2 s from its usual start), is a call at its
