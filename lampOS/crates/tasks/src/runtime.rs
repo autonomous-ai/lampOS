@@ -2694,10 +2694,18 @@ fn owner<C: Clock>(
                 ) {
                     // The app's choice of the lamp's default engine (#6492):
                     // used at once, and the lamp's target written again.
+                    let update_read = work.route == Route::UpdateRead;
                     let answer =
                         app_engine_default_operation(&work.request, lamp.as_ref(), &engine_default)
                             .map(|mut body| {
                                 body["ok"] = true.into();
+                                // lamp-update's read also hears whether OpenClaw is in
+                                // use whatever the default (#8105, the first builder's
+                                // 15:29 on #8116): a launch or run waited for its
+                                // Gateway within the hold.
+                                if update_read {
+                                    body["openclaw_in_use"] = crate::gateway::in_use().into();
+                                }
                                 body
                             });
                     if answer.is_ok() && matches!(work.request, Request::AppEngineDefault { .. }) {

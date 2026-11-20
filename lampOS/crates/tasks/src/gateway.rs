@@ -36,6 +36,41 @@ const ANSWER_WITHIN: Duration = Duration::from_secs(2);
 /// The code a hand-over is not sent with when the Gateway did not answer.
 pub const NOT_READY: &str = "openclaw_gateway_not_ready";
 
+/// When lamp-tasks last needed OpenClaw's Gateway (#8105): a launch or a
+/// run on OpenClaw waiting for it, in unix ms, 0 for never in this start.
+/// Marked at each look of [`Gateway::before_launch_until`], whatever the
+/// lamp's default engine, so lamp-update keeps the Gateway up while
+/// OpenClaw is in use and starts it when a run asks for it.
+static WANTED_AT_UNIX_MS: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+
+/// How long a need of OpenClaw keeps it "in use" for lamp-update (#8105):
+/// the first builder's hold, so a person working with OpenClaw keeps its
+/// Gateway between their turns.
+pub const IN_USE_HOLD: Duration = Duration::from_secs(30 * 60);
+
+fn now_unix_ms() -> u64 {
+    std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map_or(0, |since| since.as_millis() as u64)
+}
+
+/// Marks OpenClaw's Gateway as needed now (#8105).
+pub fn mark_wanted() {
+    WANTED_AT_UNIX_MS.store(now_unix_ms(), std::sync::atomic::Ordering::Release);
+}
+
+/// Whether OpenClaw's Gateway was needed within `hold` of `now_unix_ms`
+/// (#8105): never marked is not in use.
+pub fn wanted_within(hold: Duration, now_unix_ms: u64) -> bool {
+    let at = WANTED_AT_UNIX_MS.load(std::sync::atomic::Ordering::Acquire);
+    at != 0 && now_unix_ms.saturating_sub(at) <= hold.as_millis() as u64
+}
+
+/// [`wanted_within`] the [`IN_USE_HOLD`], now.
+pub fn in_use() -> bool {
+    wanted_within(IN_USE_HOLD, now_unix_ms())
+}
+
 /// What the part's targets read of OpenClaw: whether the Harness on the
 /// lamp is too old for it (`refused`, before 0.6.11), so OpenClaw is not
 /// the lamp's engine.
@@ -568,6 +603,7 @@ impl Gateway {
         cancelled: &dyn Fn() -> bool,
     ) -> Result<(), String> {
         let began = Instant::now();
+        mark_wanted();
         let mut until = deadline.min(began + self.ready_within);
         // Whether the port has answered in this wait: once it has, the
         // Gateway is up or starting, and only `until` bounds it.
@@ -576,6 +612,7 @@ impl Gateway {
         // is starting, so the port is waited for to `until`.
         let mut starting = false;
         loop {
+            mark_wanted();
             if cancelled() {
                 return Err("the OpenClaw wait was cancelled".into());
             }
@@ -1211,6 +1248,18 @@ pub fn prompt(launcher: &Path, run: &SkillRun) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// #8105: a wait for the Gateway marks OpenClaw in use for the hold,
+    /// never before one, and not after the hold has gone by.
+    #[test]
+    fn a_wait_for_the_gateway_marks_openclaw_in_use_for_the_hold() {
+        mark_wanted();
+        let now = now_unix_ms();
+        assert!(wanted_within(IN_USE_HOLD, now));
+        assert!(wanted_within(IN_USE_HOLD, now + 60_000));
+        assert!(!wanted_within(Duration::from_secs(60), now + 10 * 60_000));
+        assert!(in_use());
+    }
 
     /// #7246: the approvals read's JSON allows the launcher only with an
     /// exact `pattern` in main's or `*`'s allow-list.
