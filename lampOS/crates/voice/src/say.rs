@@ -1855,6 +1855,12 @@ impl Says {
                 .as_deref()
                 == Some("on"),
         );
+        crate::speaker_stream::set_long_form(
+            std::env::var(crate::speaker_stream::LONG_FORM_ENVIRONMENT)
+                .ok()
+                .as_deref()
+                == Some("on"),
+        );
         let every_sound = std::env::var(EVERY_SOUND_ENVIRONMENT).ok().as_deref() == Some("on");
         if every_sound {
             eprintln!(
