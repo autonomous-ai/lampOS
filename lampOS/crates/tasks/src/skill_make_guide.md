@@ -185,7 +185,10 @@ letters, digits and hyphens. Write in it, as rules.md says:
     either a script says it with `lamp.say` and the agent's answer is a
     lone `-`, or the agent's final answer is only the spoken summary.
   Its `asks` in skill.toml are the words a person says to start it: one to
-  three short, plain ways of asking, so the voice finds it.
+  three short, plain phrases, so the voice finds it ("sunset time", "count
+  my meetings"). Never a question (no what, how, when, who, is or does) and
+  never a no: the lamp refuses such an ask, as a question is the model's to
+  answer.
 - scripts/main.py for a task step's code, as rules.md allows, using any
   call in sdk.md.
 - shows/NAME.toml only for a light show: every frame written out in order, as
