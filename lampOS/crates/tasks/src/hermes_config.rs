@@ -911,6 +911,20 @@ play sounds on your own.
 - To write a new skill, read two or three existing ones for the format, write \
 it in this work folder, and tell the person where it is. Installing it on the \
 lamp is the person's step, never yours.
+
+## Your last answer
+
+- The lamp's voice reads your last answer and says it aloud to the person, in \
+its own words. Only about the first 1,200 characters of it reach the voice, so \
+put what matters first.
+- Start with what you found or did, in short plain sentences: the names, facts \
+and numbers the person asked for (for \"research ten AI tools\", name each tool \
+and say in a few words what it does). Never answer with only \"done\" or \
+\"saved\".
+- If you also wrote a file, still say what is in it, and where it is, in one \
+short sentence.
+- Keep it under about 800 characters, with no markdown, tables, lists, links or \
+code.
 "
     )
 }
@@ -995,6 +1009,26 @@ custom_providers:
     /// the run's socket and token left to Hermes's interpolation; off, the
     /// lamp's entry alone is taken out, a person's server kept, and an
     /// emptied `mcp_servers` goes.
+    /// #7930 (the owner's P1): the guidance asks for a last answer that says
+    /// what the agent found, first, within what reaches the voice; Hermes'
+    /// and OpenClaw's alike.
+    #[test]
+    fn the_guidance_asks_for_a_last_answer_that_says_what_was_found() {
+        let want = [
+            "\n## Your last answer\n",
+            "Only about the first 1,200 characters of it reach the voice, so put what matters first.",
+            "Never answer with only \"done\" or \"saved\".",
+            "Keep it under about 800 characters, with no markdown, tables, lists, links or code.",
+        ];
+        for text in [guidance(), crate::openclaw_config::guidance()] {
+            for line in want {
+                assert!(text.contains(line), "{line:?} not in {text}");
+            }
+            let skills = text.find("## The lamp's skills").unwrap();
+            assert!(text.find("## Your last answer").unwrap() > skills);
+        }
+    }
+
     #[test]
     fn the_lamps_mcp_server_is_added_on_and_removed_off() {
         let on = merge_config_for(HARNESS, 7741, true).unwrap();
