@@ -2207,9 +2207,12 @@ impl Attention {
         // Reviewer-lead's P3 on #4082).
         let in_conversation = going_on;
         let going_on = going_on && said_to_a_person;
+        // `LAMP_NAME_SIGN_TIED`: close only while a sure hearing was said,
+        // not anywhere in the line (#8092: a 21 s line, its hearing 15 s in).
+        let near = self.near && (!self.sign_tied || self.near_at_the_name);
         let signs: Vec<&'static str> = [
             (turned == Some(true), "a face turned to the lamp"),
-            (self.near, "the name said close to it"),
+            (near, "the name said close to it"),
             (self.addressed, "said to the lamp from close to it"),
             (text_calls, "its words calling it"),
             (going_on, "a conversation going on"),
@@ -2229,7 +2232,16 @@ impl Attention {
             && !self.lamp_asked
             && !text_calls
             && short_line_without_the_name(&self.heard);
-        let alone = weighed && (signs.is_empty() || self.name_short_dropped);
+        // `LAMP_NAME_SIGN_TIED`: a line `LAMP_NAME_NEAR` ruled not the name
+        // counts the hearing by no second sign, unless its words call the
+        // lamp by name (#8092: "not the name", then "counts by: the name
+        // said close to it", on the same line).
+        self.name_near_dropped = weighed
+            && self.sign_tied
+            && self.near_not_the_name_of == Some(self.request)
+            && !called_by_real_name(&self.heard);
+        let alone =
+            weighed && (signs.is_empty() || self.name_short_dropped || self.name_near_dropped);
         self.name_signs = if weighed && !alone { signs } else { Vec::new() };
         if alone {
             self.named = false;
@@ -2796,6 +2808,7 @@ impl Attention {
         self.in_name_wake = false;
         self.best_score = 0.0;
         self.near = false;
+        self.near_at_the_name = false;
         self.addressed = false;
         self.sound = false;
         self.cut_in = false;
@@ -7549,30 +7562,28 @@ mod tests {
     fn with_the_sign_tied_a_line_name_near_ruled_not_the_name_counts_by_no_second_sign() {
         let began = 10_000_000;
         // (dropped, second signs, dropped by the near ruling)
-        let weighed = |tied: bool,
-                       ruled: Option<u64>,
-                       line: (&str, u64, bool),
-                       near_at_the_name: bool| {
-            let (heard, into_us, lamp_asked) = line;
-            let mut attention = Attention::default();
-            attention.ask_a_second_sign_of_the_name(true);
-            attention.tie_the_second_sign(tied);
-            if let Some(request) = ruled {
-                attention.near_not_the_name(request);
-            }
-            attention.began_at(4, 1, began);
-            attention.name_heard_scored(began + into_us, 0.96);
-            attention.heard(heard);
-            attention.set_near(true);
-            attention.set_near_at_the_name(near_at_the_name);
-            attention.lamp_asked(lamp_asked);
-            let dropped = attention.weigh_the_name(None, false);
-            (
-                dropped,
-                attention.second_signs().to_vec(),
-                attention.name_dropped_by_near(),
-            )
-        };
+        let weighed =
+            |tied: bool, ruled: Option<u64>, line: (&str, u64, bool), near_at_the_name: bool| {
+                let (heard, into_us, lamp_asked) = line;
+                let mut attention = Attention::default();
+                attention.ask_a_second_sign_of_the_name(true);
+                attention.tie_the_second_sign(tied);
+                if let Some(request) = ruled {
+                    attention.near_not_the_name(request);
+                }
+                attention.began_at(4, 1, began);
+                attention.name_heard_scored(began + into_us, 0.96);
+                attention.heard(heard);
+                attention.set_near(true);
+                attention.set_near_at_the_name(near_at_the_name);
+                attention.lamp_asked(lamp_asked);
+                let dropped = attention.weigh_the_name(None, false);
+                (
+                    dropped,
+                    attention.second_signs().to_vec(),
+                    attention.name_dropped_by_near(),
+                )
+            };
         let request_4 = ("Really?", 15_194_000, false);
         let request_5 = ("Yes, it is.", 200_000, true);
         for near_at_the_name in [false, true] {
@@ -7593,7 +7604,10 @@ mod tests {
             weighed(false, Some(4), request_5, false),
             (
                 false,
-                vec!["the name said close to it", "its hearing at the line's start"],
+                vec![
+                    "the name said close to it",
+                    "its hearing at the line's start"
+                ],
                 false
             )
         );

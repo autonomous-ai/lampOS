@@ -449,7 +449,10 @@ async fn told_not_the_name(heard: &str, near: Option<f32>, turned: bool) -> Vec<
 #[tokio::test]
 async fn a_line_name_near_rules_not_the_name_is_told_to_the_rule() {
     assert_eq!(told_not_the_name("Really?", Some(0.86), false).await, [1]);
-    assert_eq!(told_not_the_name("Yes, it is.", Some(1.0), false).await, [1]);
+    assert_eq!(
+        told_not_the_name("Yes, it is.", Some(1.0), false).await,
+        [1]
+    );
     assert_eq!(
         told_not_the_name("Leon, pass me that", Some(0.6), false).await,
         [1]

@@ -4968,6 +4968,20 @@ pub fn serve(
                 heeding.attention.ask_a_second_sign_of_the_name(true);
             }
         }
+        // A second sign belongs to its hearing (`LAMP_NAME_SIGN_TIED=on`,
+        // #8092): `LAMP_NAME_NEAR`'s "not the name" wins, and closeness
+        // counts only while a sure hearing was said.
+        if std::env::var(crate::second_provider::NAME_SIGN_TIED_ENVIRONMENT)
+            .is_ok_and(|value| value == "on")
+        {
+            eprintln!(
+                "lamp-voice second: a second sign must belong to the name's hearing: a line LAMP_NAME_NEAR ruled not the name counts it by none, and said close counts only while a hearing of {} or more was said (LAMP_NAME_SIGN_TIED)",
+                crate::attention::NEAR_SCORE
+            );
+            if let Ok(mut heeding) = heeding.lock() {
+                heeding.attention.tie_the_second_sign(true);
+            }
+        }
         // A hearing at the line's start is no second sign of its own on a
         // line said to a person ("Ma'am, …"), and a conversation going on
         // gives back only that start (`LAMP_NAME_SAID_TO_A_PERSON=on`, #3945).
@@ -5636,6 +5650,14 @@ pub fn serve(
                             heeding.turned_to_the_lamp(window),
                         )
                     })
+                }));
+                // Its "not the name" is told to the rule, which with
+                // `LAMP_NAME_SIGN_TIED=on` counts no second sign for it.
+                let ruled = heeding.clone();
+                engine = engine.telling_near_not_the_name(Arc::new(move |request| {
+                    if let Ok(mut heeding) = ruled.lock() {
+                        heeding.attention.near_not_the_name(request);
+                    }
                 }));
                 // A first word said as a sentence of its own is the name by
                 // the near hearing alone (`LAMP_NAME_AS_A_SENTENCE`, #5277).
@@ -9034,6 +9056,49 @@ const NAMES_READ: usize = 64;
 /// this long before the line's first sound, which holds the sound read
 /// before the line was taken ([`Heeding::near_name`]).
 const NEAR_BEFORE_US: u64 = 300_000;
+/// `LAMP_NAME_SIGN_TIED` ([`near_at_a_hearing`]): the room microphone's rise
+/// counts for a hearing of the name from this long before the hearing
+/// began, which lamp-name dates as the name ends ("Hey Lamp, …" heard about
+/// 1.06 s after it was played on lamp-4ace, `attention::NAME_AT_THE_START_US`).
+// ponytail: from the one played greeting the line's start is set from; set
+// again from the journal once tied lines are read on a lamp.
+const NEAR_BEFORE_THE_HEARING_US: u64 = 1_500_000;
+/// And to this long after the hearing began: a level is read every
+/// [`LEVEL_EVERY`].
+const NEAR_AFTER_THE_HEARING_US: u64 = 300_000;
+
+/// `LAMP_NAME_SIGN_TIED` (#8092): whether the room microphone rose
+/// [`crate::attention::near_rise_db`] or more over its quiet while a
+/// hearing of the name of [`crate::attention::NEAR_SCORE`] or more, one
+/// that counts for the line in `began..=ended`, was said
+/// ([`NEAR_BEFORE_THE_HEARING_US`], [`NEAR_AFTER_THE_HEARING_US`]). On
+/// lamp-74ff (build 14967) a 21 s line's hearing 15 s in counted by a rise
+/// anywhere in the line. No levels: no.
+fn near_at_a_hearing(
+    levels: Option<&Levels>,
+    names: &[(u64, f32)],
+    (began, ended): (u64, u64),
+) -> bool {
+    let Some(levels) = levels.and_then(|levels| levels.lock().ok()) else {
+        return false;
+    };
+    let bar = crate::attention::near_rise_db();
+    names
+        .iter()
+        .filter(|(at, score)| {
+            *score >= crate::attention::NEAR_SCORE
+                && at.saturating_add(crate::attention::NAME_BEFORE_US) >= began
+                && *at <= ended
+        })
+        .any(|(at, _)| {
+            let from = at.saturating_sub(NEAR_BEFORE_THE_HEARING_US);
+            let until = at.saturating_add(NEAR_AFTER_THE_HEARING_US);
+            levels
+                .iter()
+                .any(|(level_at, rise)| (from..=until).contains(level_at) && *rise >= bar)
+        })
+}
+
 /// Near hearings are kept this long, and at most this many.
 const NEAR_KEPT_US: u64 = 30_000_000;
 const NEAR_HEARINGS_KEPT: usize = 32;
@@ -11952,6 +12017,11 @@ impl Heeding {
         } else {
             String::new()
         };
+        // `LAMP_NAME_SIGN_TIED`: whether the voice rose close while a sure
+        // hearing counted for the line was said (#8092).
+        let near_at_the_name = signs.near
+            && near_at_a_hearing(self.levels.as_ref(), &signs.names, (began_us, ended_us));
+        attention.set_near_at_the_name(near_at_the_name);
         for (at_us, score) in signs.names {
             attention.name_heard_scored(at_us, score);
         }
@@ -12024,7 +12094,12 @@ impl Heeding {
         // rule's form.
         let said_to_a_person = self.attention.start_said_to_a_person();
         if self.attention.weigh_the_name(signs.turned, signs.going_on) {
-            if self.attention.name_dropped_as_short() {
+            if self.attention.name_dropped_by_near() {
+                eprintln!(
+                    "lamp-voice second: request {request}: its name, heard only in the room's sound (began {} ms into the line{soft_lead}), counts for nothing: LAMP_NAME_NEAR ruled the line not the name, and that verdict wins over every second sign; the model is not told it was heard (LAMP_NAME_SIGN_TIED, #8092)",
+                    name_into_ms.map_or_else(|| "?".to_owned(), |ms| ms.to_string())
+                );
+            } else if self.attention.name_dropped_as_short() {
                 eprintln!(
                     "lamp-voice second: request {request}: its name, heard only in the room's sound (began {} ms into the line{soft_lead}), counts for nothing on a line of one or two words, not a question, with no word written for the name and no conversation going on; the model is not told it was heard (LAMP_NAME_SECOND_SIGN, #7891)",
                     name_into_ms.map_or_else(|| "?".to_owned(), |ms| ms.to_string())

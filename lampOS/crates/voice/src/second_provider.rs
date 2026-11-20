@@ -997,6 +997,16 @@ pub const NAME_SECOND_SIGN_ENVIRONMENT: &str = "LAMP_NAME_SECOND_SIGN";
 /// at its start and answered (#3945).
 pub const NAME_SAID_TO_A_PERSON_ENVIRONMENT: &str = "LAMP_NAME_SAID_TO_A_PERSON";
 
+/// Where the worker reads whether, with [`NAME_SECOND_SIGN_ENVIRONMENT`], a
+/// second sign must belong to the hearing it counts for (`on`, and nothing
+/// else): a line `LAMP_NAME_NEAR` ruled not the name counts the hearing by
+/// none, and "the name said close to it" counts only when the voice rose
+/// close while a hearing of `attention::NEAR_SCORE` or more was said. On
+/// lamp-74ff on 20 Nov (build 14967) a one-word line ruled not the name
+/// counted by closeness read 15 s before its hearing, and opened a
+/// conversation in a meeting (#8092).
+pub const NAME_SIGN_TIED_ENVIRONMENT: &str = "LAMP_NAME_SIGN_TIED";
+
 /// Where the worker reads whether a hearing of the lamp's name inside one
 /// line's sound stays with that line, never counting for the one begun
 /// after it (`on`, and nothing else;
@@ -3156,13 +3166,13 @@ fn named_near(
     window: (u64, u64),
     near: &NameNear,
     as_a_sentence: bool,
-) -> String {
+) -> (String, bool) {
     let Some((start, end)) = first_word_set_off(&text) else {
-        return text;
+        return (text, false);
     };
     let word = &text[start..end];
     if word.eq_ignore_ascii_case(net::key_terms::NAME) || word.eq_ignore_ascii_case("lamb") {
-        return text;
+        return (text, false);
     }
     let like = like_the_name(word);
     let (heard, turned) = near(window);
@@ -3204,14 +3214,19 @@ fn named_near(
         }
         (LikeTheName::Not, None) => None,
     };
+    // Heard near by the line's start and not taken: ruled not the name.
+    let not_the_name = named.is_none() && near_enough.is_some();
     match named {
         Some(signs) => {
             eprintln!(
                 "lamp-voice second: request {request}: {signs}: it is the name (LAMP_NAME_NEAR)"
             );
-            format!("{}{}{}", &text[..start], net::key_terms::NAME, &text[end..])
+            (
+                format!("{}{}{}", &text[..start], net::key_terms::NAME, &text[end..]),
+                false,
+            )
         }
-        None => text,
+        None => (text, not_the_name),
     }
 }
 
@@ -10720,13 +10735,21 @@ async fn spoken(
     // with an earlier piece's words, whose start is not this line's
     // (reviewer-three's P3 on 194accd24).
     let text = match &shared.name_near {
-        Some(near) if !went_on => named_near(
-            request,
-            text,
-            said.lock().map_or((0, 0), |said| *said),
-            near,
-            shared.name_as_a_sentence,
-        ),
+        Some(near) if !went_on => {
+            let (text, not_the_name) = named_near(
+                request,
+                text,
+                said.lock().map_or((0, 0), |said| *said),
+                near,
+                shared.name_as_a_sentence,
+            );
+            // The rule counts no second sign for that hearing
+            // (`LAMP_NAME_SIGN_TIED`, #8092).
+            if not_the_name && let Some(told) = &shared.near_not_the_name {
+                told(request);
+            }
+            text
+        }
         _ => text,
     };
     // Said by the lamp's name just before, whose request this line dropped

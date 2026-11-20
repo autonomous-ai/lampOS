@@ -5667,6 +5667,33 @@ after a take-over, but now for every turn:
     is not told it was heard (LAMP_NAME_SECOND_SIGN, #7891)`. "Lamp?",
     "Hey Lamp.", "Hey, Lynn.", "Lamp, put it back.", "Okay?", a longer
     line and a line in a conversation's window are weighed as before.
+  - **A second sign belongs to its hearing** (`LAMP_NAME_SIGN_TIED=on`,
+    on in the product's lamp-voice.service, #8092). On lamp-74ff on 20 Nov (build 14967), in a
+    meeting, request 4, a 21 s line of one word with 0 looks, out of the
+    window, was ruled `not the name (LAMP_NAME_NEAR)` (lamp-name near at
+    0.86 by its start, its first word, set off, not like the name), and the
+    same line then counted its hearing, begun 15194 ms in, by `the name
+    said close to it`: the room microphone's rise read anywhere in the
+    line. Request 5 did the same at its start, and the lamp's answers
+    opened a conversation that carried about 10 lines of meeting talk.
+    With the switch and `LAMP_NAME_SECOND_SIGN=on`: a line whose first word
+    `LAMP_NAME_NEAR` ruled not the name (a near hearing of 0.5 or more by
+    its start on a word it did not take: one that doesn't sound like the
+    name, or of the name's shape with no face turned) counts the hearing
+    for nothing, whatever its second sign, unless its words call the lamp
+    by its literal name (`attention::called_by_real_name`); the engine
+    tells the rule before the line is judged
+    (`Engine::telling_near_not_the_name`). The journal says `its name,
+    heard only in the room's sound (began N ms into the line), counts for
+    nothing: LAMP_NAME_NEAR ruled the line not the name, and that verdict
+    wins over every second sign; the model is not told it was heard
+    (LAMP_NAME_SIGN_TIED, #8092)`. And "the name said close to it" counts
+    only when the rise came while a hearing of `attention::NEAR_SCORE`
+    (0.95) or more that counts for the line was said, from 1.5 s before
+    the hearing began to 0.3 s after (`worker::near_at_a_hearing`). The
+    line is then judged as one with no name. A word taken as the name, the
+    name in its words, and a line with no near hearing are as before.
+    Not changed: the short-line rule above, and the follow-up window.
 - **A hearing of the name stays with its own line**
   (`LAMP_NAME_STAYS_IN_ITS_LINE=on`, on in the product unit). On lamp-4ace on
   2026-10-26 at 06:21 (build 6919, the busy scene played) `lamp-name` heard

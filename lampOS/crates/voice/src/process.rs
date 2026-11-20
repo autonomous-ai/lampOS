@@ -2874,6 +2874,7 @@ fn second_route_worker_environment(
         crate::second_provider::REGION_FILE_ENVIRONMENT,
         crate::second_provider::NAME_SECOND_SIGN_ENVIRONMENT,
         crate::second_provider::NAME_SAID_TO_A_PERSON_ENVIRONMENT,
+        crate::second_provider::NAME_SIGN_TIED_ENVIRONMENT,
         crate::second_provider::NAME_STAYS_ENVIRONMENT,
         // A repeat of the line before's end is no call by its text (#3923).
         crate::second_provider::NAME_REPEAT_NOT_A_CALL_ENVIRONMENT,
@@ -3307,6 +3308,7 @@ mod tests {
         for name in [
             crate::second_provider::NAME_SECOND_SIGN_ENVIRONMENT,
             crate::second_provider::NAME_SAID_TO_A_PERSON_ENVIRONMENT,
+            crate::second_provider::NAME_SIGN_TIED_ENVIRONMENT,
             crate::second_provider::NAME_STAYS_ENVIRONMENT,
             crate::second_provider::NAME_REPEAT_NOT_A_CALL_ENVIRONMENT,
             crate::attention::ONE_AS_LAMP_ENVIRONMENT,
@@ -4487,6 +4489,7 @@ mod tests {
                     || name == crate::second_provider::net::weather::met::ENVIRONMENT
                     || name == crate::second_provider::NAME_SECOND_SIGN_ENVIRONMENT
                     || name == crate::second_provider::NAME_SAID_TO_A_PERSON_ENVIRONMENT
+                    || name == crate::second_provider::NAME_SIGN_TIED_ENVIRONMENT
                     || name == crate::second_provider::NAME_STAYS_ENVIRONMENT
                     || name == crate::second_provider::NAME_REPEAT_NOT_A_CALL_ENVIRONMENT
                     || name == crate::attention::ONE_AS_LAMP_ENVIRONMENT
@@ -4823,6 +4826,7 @@ mod tests {
                     "LAMP_NAME_REPEAT_NOT_A_CALL=on",
                     "LAMP_NAME_SAID_TO_A_PERSON=on",
                     "LAMP_NAME_SECOND_SIGN=on",
+                    "LAMP_NAME_SIGN_TIED=on",
                     "LAMP_NAME_START_USUAL=on",
                     "LAMP_NAME_STAYS_IN_ITS_LINE=on",
                     "LAMP_NAME_WORDLESS_BAR=on",
