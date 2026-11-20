@@ -15,17 +15,23 @@
 //! `harness show` alone.
 //!
 //! Kept in memory only, never written: after a restart of lamp-tasks a
-//! store task's record is opened again: its start the store's, when the
-//! store dates it in this boot, else when this run first saw it. The
-//! owner's "forget everything" (`forget_sessions`) clears them all
-//! ([`Board::forget_all`]). At most
+//! store task's record is opened again: its start and end the store's,
+//! when the store dates them in this boot, else when this run first saw
+//! it. The owner's "forget everything" (`forget_sessions`) clears them all
+//! ([`Board::forget_all`]) and keeps one mark beside the store
+//! ([`Forgotten`], [`FORGOTTEN_FILE`]): every store task it held then, on
+//! the records or not yet, is never opened again, after a restart too. At
+//! most
 //! [`MOST_WORKS`] records; one not changed for [`KEPT_MS`] goes. The lock
 //! is held only to read or change the records, never across I/O.
 use crate::{harness::EngineKind, progress::Tracker};
 use lamp_msgs::AgentState;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 use std::collections::VecDeque;
+use std::io::{self, Write};
+use std::os::unix::fs::OpenOptionsExt;
+use std::path::Path;
 use std::sync::{Mutex, PoisonError};
 
 /// At most this many records; past it the one changed longest ago goes.
@@ -46,6 +52,56 @@ pub const LIST_MOST: u16 = 10;
 /// the refresh from the store doesn't open them again: more than the
 /// store's own tasks ([`crate::engine::MAX_TASKS`]).
 const MOST_FORGOTTEN: usize = 32;
+/// The file beside the store keeping the owner's last "forget everything"
+/// ([`Forgotten`]).
+pub const FORGOTTEN_FILE: &str = "works-forgotten.json";
+
+/// The owner's last "forget everything" (#7930): the store it was and its
+/// newest task id then. Every task of that store up to it is never on the
+/// records again: one confirmed a moment before, not yet on the records,
+/// or one a restarted lamp-tasks would open again from the store. Kept
+/// beside the store ([`FORGOTTEN_FILE`]), ids only.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Forgotten {
+    pub store_id: String,
+    pub through: u64,
+}
+
+impl Forgotten {
+    /// Whether store `store_id`'s task `task` was forgotten.
+    pub fn hides(&self, store_id: &str, task: u64) -> bool {
+        self.store_id == store_id && task <= self.through
+    }
+
+    /// The mark kept in `file`; none when there is none or it can't be read.
+    pub fn load(file: &Path) -> Option<Self> {
+        let bytes = std::fs::read(file).ok()?;
+        serde_json::from_slice(&bytes).ok()
+    }
+
+    /// Kept in `file`: written whole beside it (mode 0600, never through a
+    /// link), then renamed over it.
+    pub fn save(&self, file: &Path) -> io::Result<()> {
+        let bytes = serde_json::to_vec(self).map_err(io::Error::other)?;
+        let partial = file.with_extension("json.partial");
+        let mut out = std::fs::OpenOptions::new()
+            .write(true)
+            .create(true)
+            .truncate(true)
+            .mode(0o600)
+            .custom_flags(rustix::fs::OFlags::NOFOLLOW.bits() as i32)
+            .open(&partial)?;
+        out.write_all(&bytes)?;
+        out.sync_all()?;
+        drop(out);
+        std::fs::rename(&partial, file)?;
+        if let Some(parent) = file.parent() {
+            std::fs::File::open(parent)?.sync_all()?;
+        }
+        Ok(())
+    }
+}
+
 /// What the work is.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "snake_case")]
@@ -140,6 +196,11 @@ pub struct TaskWork {
     /// that was in this boot: its record, opened again after a lamp-tasks
     /// restart, keeps that start. None when the store cannot date it.
     pub started_ago_ms: Option<u64>,
+    /// How long before this read the store first saw it over, when that
+    /// was in this boot: a finished task opened again after a restart
+    /// keeps its end, so its elapsed time is its own. None while not over,
+    /// or when the store cannot date it.
+    pub ended_ago_ms: Option<u64>,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -191,11 +252,11 @@ impl Work {
         })
     }
 
-    /// Into `state` at `now_ms`; its end kept the first time it is over.
-    fn set_state(&mut self, state: State, now_ms: u64) {
+    /// Into `state`; its end (`end_ms`) kept the first time it is over.
+    fn set_state(&mut self, state: State, end_ms: u64) {
         self.state = state;
         if state.over() {
-            self.ended_ms.get_or_insert(now_ms);
+            self.ended_ms.get_or_insert(end_ms);
         } else {
             self.ended_ms = None;
         }
@@ -237,17 +298,12 @@ impl Board {
     }
 
     /// The owner's "forget everything" (#7930): every record goes, with
-    /// the person's words and the agent's answers in it, and the store's
-    /// tasks it held are not opened again by the next refresh.
+    /// the person's words and the agents' answers in it. The store's tasks
+    /// it held are kept off the records by the store's mark
+    /// ([`Forgotten`], [`crate::engine::Engine::works`]), which covers the
+    /// ones not on the records yet and a restart too.
     pub fn forget_all(&mut self) {
-        for work in self.works.drain(..) {
-            if let Ok(task) = work.id.parse::<u64>() {
-                self.forgotten.push_back(task);
-            }
-        }
-        while self.forgotten.len() > MOST_FORGOTTEN {
-            self.forgotten.pop_front();
-        }
+        self.works.clear();
     }
 
     /// A store task's tool call `n`, to `tool`,
@@ -319,7 +375,10 @@ impl Board {
             work.who = who.to_owned();
             work.words.clone_from(&task.words);
             if state != work.state || (work.ended_ms.is_none() && state.over()) {
-                work.set_state(state, now_ms);
+                let end = task
+                    .ended_ago_ms
+                    .map_or(now_ms, |ago| now_ms.saturating_sub(ago));
+                work.set_state(state, end);
             }
             if last_active.is_some() {
                 work.last_active_ms = last_active;
@@ -447,6 +506,7 @@ mod tests {
             answer: None,
             session: None,
             started_ago_ms: None,
+            ended_ago_ms: None,
         }
     }
     fn none(_: u64) -> Option<(Option<State>, Option<u64>)> {
@@ -469,6 +529,41 @@ mod tests {
         assert_eq!(record["elapsed_s"], 91);
         board.tasks(&[task(7, None)], none, T0);
         assert_eq!(board.get("7", T0).unwrap()["started_ms"], T0);
+    }
+
+    /// #7930 (Twelve's P3): a finished task opened again after a restart
+    /// keeps the end the store dates, so a 40 s task reads 40 s, not the
+    /// time since it was handed over; an hour later it still does.
+    #[test]
+    fn a_finished_task_reopened_after_a_restart_keeps_its_end_from_the_store() {
+        let mut board = Board::new();
+        let done = TaskWork {
+            started_ago_ms: Some(90_000),
+            ended_ago_ms: Some(50_000),
+            answer: Some("Done.".into()),
+            ..task(6, Some(State::Done))
+        };
+        board.tasks(std::slice::from_ref(&done), none, T0);
+        assert_eq!(board.get("6", T0).unwrap()["elapsed_s"], 40);
+        board.tasks(&[done], none, T0 + 3_600_000);
+        assert_eq!(board.get("6", T0 + 3_600_000).unwrap()["elapsed_s"], 40);
+    }
+
+    /// #7930: the forget mark hides its own store's tasks up to its id
+    /// only, and is read back as it was kept.
+    #[test]
+    fn the_forget_mark_hides_its_stores_tasks_up_to_its_id_and_is_kept() {
+        let mark = Forgotten {
+            store_id: "s1".into(),
+            through: 4,
+        };
+        assert!(mark.hides("s1", 1) && mark.hides("s1", 4));
+        assert!(!mark.hides("s1", 5) && !mark.hides("s2", 1));
+        let dir = tempfile::tempdir().unwrap();
+        let file = dir.path().join(FORGOTTEN_FILE);
+        assert_eq!(Forgotten::load(&file), None);
+        mark.save(&file).unwrap();
+        assert_eq!(Forgotten::load(&file), Some(mark));
     }
 
     #[test]
@@ -641,8 +736,9 @@ mod tests {
     }
 
     /// The owner's "forget everything" (#7930): every record goes, the
-    /// person's words and the agent's answer with it, and the store's tasks
-    /// it held are not opened again from the store.
+    /// person's words and the agent's answer with it; the store's mark keeps
+    /// its tasks off after it (`engine.rs`,
+    /// `forget_everything_leaves_every_store_task_off_the_work_records`).
     #[test]
     fn forget_all_leaves_no_record_words_or_answer() {
         let mut board = Board::new();
@@ -650,15 +746,19 @@ mod tests {
             answer: Some("The cheapest is on Tuesday.".into()),
             ..task(8, Some(State::Done))
         };
-        board.tasks(&[done.clone(), task(9, None)], none, T0);
-        assert_eq!(board.get("8", T0).unwrap()["words"], "Find the cheapest flight to Hanoi");
+        board.tasks(&[done, task(9, None)], none, T0);
+        assert_eq!(
+            board.get("8", T0).unwrap()["words"],
+            "Find the cheapest flight to Hanoi"
+        );
         board.forget_all();
         assert!(board.get("8", T0).is_none() && board.get("9", T0).is_none());
         assert!(board.list(10, T0).is_empty());
-        board.tasks(&[done, task(9, None)], none, T0 + 1);
-        assert!(board.list(10, T0 + 1).is_empty());
         let shown = format!("{board:?}");
-        assert!(!shown.contains("Hanoi") && !shown.contains("Tuesday"), "{shown}");
+        assert!(
+            !shown.contains("Hanoi") && !shown.contains("Tuesday"),
+            "{shown}"
+        );
         // A task handed over after the forget has its record.
         board.tasks(&[task(10, None)], none, T0 + 2);
         assert!(board.get("10", T0 + 2).is_some());
