@@ -393,7 +393,7 @@ def build(lamp: Lamp, *, client: str | None = None, clock=time.monotonic) -> Fas
         "presence": "who is there (a count and how near, never who)",
         "light": "its light",
         "mood": "its mood",
-        "lamp": "whether it is talking, paused, private or asleep",
+        "lamp": "whether it is talking, paused, private, asleep or muted after a fault",
         "air": "the air at its sensor (particles, carbon dioxide, humidity, temperature, and how it feels)",
         "device": "its own computer (processor load, memory, disk free, temperatures)",
         "volume": "its speaker's volume (0 to 100, and whether muted)",

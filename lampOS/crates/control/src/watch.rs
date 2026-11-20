@@ -248,6 +248,11 @@ pub struct Watch {
     /// When the privacy lease was last heard; none before the first.
     privacy_us: Option<u64>,
     asleep: bool,
+    /// The voice's mute is the restart guard's, put on after a fault and not by
+    /// the person (`voice/mute`'s `muted_by: restart_guard`, #8081): the lamp
+    /// is deaf and nobody chose it. Its own state, not `private` (that is the
+    /// switch) and not `asleep`; lifting it stays the owner's.
+    muted_after_fault: bool,
     light: Value,
     /// What the ring draws now (`light/drawn`): the person's light, or a
     /// light a computer or a skill asked for over it; none until it says.
@@ -371,9 +376,12 @@ impl Watch {
                 payload["permitted"] == false || payload["physical_muted"] == true
             )),
             "lamp/pause" => Some(json!(payload["paused"] == true)),
-            "voice/mute" => Some(json!(
-                payload["muted"] == true && payload["reason"] == "sleep"
-            )),
+            // Two readings of one message, `[asleep, muted after a fault]`:
+            // a change in either is news.
+            "voice/mute" => Some(json!([
+                payload["muted"] == true && payload["reason"] == "sleep",
+                payload["muted"] == true && payload["muted_by"] == "restart_guard"
+            ])),
             "voice/state" => Some(json!(
                 payload["state"]
                     .as_str()
@@ -558,8 +566,16 @@ impl Watch {
                 LeaseWhy::Paused,
             ),
             "voice/mute" => {
-                let asleep = Self::kept_of(topic, payload) == Some(json!(true));
-                self.flag(asleep, |watch| &mut watch.asleep, LeaseWhy::Asleep)
+                let kept = Self::kept_of(topic, payload).unwrap_or_default();
+                let asleep = kept[0] == json!(true);
+                let fault = kept[1] == json!(true);
+                let mut out = self.flag(asleep, |watch| &mut watch.asleep, LeaseWhy::Asleep);
+                // Told as a change of `lamp_state`, with no lease lost: the
+                // body's leases are the person's and the lamp's own to end.
+                if std::mem::replace(&mut self.muted_after_fault, fault) != fault {
+                    out.push(self.lamp_changed());
+                }
+                out
             }
             "voice/privacy" => {
                 self.privacy_us = Some(now_us);
@@ -775,7 +791,7 @@ impl Watch {
                 crate::body_info::state(&heard(&self.body_limits), &heard(&self.body_joints))
             }
             StateKind::Lamp => {
-                json!({"talking": self.talking, "paused": self.paused, "private": self.private, "asleep": self.asleep})
+                json!({"talking": self.talking, "paused": self.paused, "private": self.private, "asleep": self.asleep, "muted_after_fault": self.muted_after_fault})
             }
         }
     }
@@ -785,7 +801,7 @@ impl Watch {
             EventKind::LampChanged,
             // Inside `lamp_state`, as control.schema.json's event says
             // (the Reviewer-lead's P2 on #3868).
-            json!({"lamp_state": {"talking": self.talking, "paused": self.paused, "private": self.private, "asleep": self.asleep}}),
+            json!({"lamp_state": {"talking": self.talking, "paused": self.paused, "private": self.private, "asleep": self.asleep, "muted_after_fault": self.muted_after_fault}}),
         )
     }
 
@@ -1239,6 +1255,94 @@ mod tests {
         }
     }
 
+    /// #8081: the restart guard's mute (`muted_by: restart_guard`, put on after
+    /// a fault) is its own state of the lamp, told as a change of `lamp_state`
+    /// by its edge and kept in the state read, with no lease lost. No other mute
+    /// sets it: the person's button or sleep, a computer's own, or listening.
+    #[test]
+    fn the_restart_guards_mute_is_its_own_state_and_no_other_mute_is() {
+        let lamp = |asleep: bool, fault: bool| json!({"talking": false, "paused": false, "private": false, "asleep": asleep, "muted_after_fault": fault});
+        let guard = json!({"muted": true, "reason": "software", "muted_by": "restart_guard"});
+        let mut watch = Watch::new();
+        assert_eq!(watch.state(StateKind::Lamp), lamp(false, false));
+        let out = watch.take("voice/mute", &guard, S);
+        assert_eq!(kinds(&out), [EventKind::LampChanged], "{out:?}");
+        assert!(
+            out.iter().all(|out| !matches!(out, Out::Lose(..))),
+            "{out:?}"
+        );
+        assert_eq!(
+            out,
+            vec![Out::Event(
+                EventKind::LampChanged,
+                json!({"lamp_state": lamp(false, true)})
+            )]
+        );
+        assert_eq!(watch.state(StateKind::Lamp), lamp(false, true));
+        // The voice says it every second: nothing new, nothing sent, and the
+        // bus thread passes the repeat over before it reaches here.
+        assert!(watch.take("voice/mute", &guard, 2 * S).is_empty());
+        assert_eq!(
+            Watch::kept_of("voice/mute", &guard),
+            Watch::kept_of(
+                "voice/mute",
+                &json!({"muted": true, "reason": "software", "muted_by": "restart_guard", "at": 9})
+            )
+        );
+        // The owner unmutes: it is false again, by its edge.
+        let out = watch.take("voice/mute", &json!({"muted": false}), 3 * S);
+        assert_eq!(
+            out,
+            vec![Out::Event(
+                EventKind::LampChanged,
+                json!({"lamp_state": lamp(false, false)})
+            )]
+        );
+        assert_eq!(watch.state(StateKind::Lamp), lamp(false, false));
+        // No other mute is it.
+        for (other, asleep) in [
+            (
+                json!({"muted": true, "reason": "button", "muted_by": "button"}),
+                false,
+            ),
+            (
+                json!({"muted": true, "reason": "software", "control": true}),
+                false,
+            ),
+            (
+                json!({"muted": true, "reason": "software", "muted_by": "unreadable"}),
+                false,
+            ),
+            (
+                json!({"muted": true, "reason": "sleep", "muted_by": "sleep"}),
+                true,
+            ),
+            (json!({"muted": false}), false),
+        ] {
+            let mut watch = Watch::new();
+            watch.take("voice/mute", &other, S);
+            assert_eq!(watch.state(StateKind::Lamp), lamp(asleep, false), "{other}");
+        }
+        // The guard's mute under a sleep or the other way round keeps both
+        // readings (sleep is a reason, the guard a muted_by: a record has one
+        // of each), and a change of either is news.
+        let mut watch = Watch::new();
+        watch.take("voice/mute", &guard, S);
+        let out = watch.take(
+            "voice/mute",
+            &json!({"muted": true, "reason": "sleep", "muted_by": "sleep"}),
+            2 * S,
+        );
+        assert_eq!(watch.state(StateKind::Lamp), lamp(true, false), "{out:?}");
+        assert_ne!(
+            Watch::kept_of("voice/mute", &guard),
+            Watch::kept_of(
+                "voice/mute",
+                &json!({"muted": true, "reason": "sleep", "muted_by": "sleep"})
+            )
+        );
+    }
+
     #[test]
     fn arrivals_and_leavings_are_edges_with_a_gap_never_every_frame() {
         let mut watch = Watch::new();
@@ -1428,7 +1532,7 @@ mod tests {
         );
         assert_eq!(
             watch.state(StateKind::Lamp),
-            json!({"talking": false, "paused": false, "private": true, "asleep": false})
+            json!({"talking": false, "paused": false, "private": true, "asleep": false, "muted_after_fault": false})
         );
         let stop = json!({"enabled": true, "gesture": "tap", "intent": "stop"});
         let out = watch.take("controls/gesture", &stop, S);

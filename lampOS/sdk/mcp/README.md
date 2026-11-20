@@ -182,7 +182,7 @@ All JSON, read when asked; none takes a parameter.
 | `lamp://state/presence` | who is there: a count and how near, never who | look (listed only with it) |
 | `lamp://state/light` | its light | none |
 | `lamp://state/mood` | its mood | none |
-| `lamp://state/lamp` | whether it is talking, paused, private or asleep | none |
+| `lamp://state/lamp` | whether it is talking, paused, private, asleep or muted after a fault | none |
 | `lamp://state/volume` | its speaker's volume: `level` 0 to 100 and `muted` | speak (listed only with it) |
 | `lamp://state/body` | what its body may do, joint by joint (degrees from home, bounds, poses, speed, load and heat limits), and where each joint is | body (listed only with it) |
 | `lamp://lease` | the leases this server holds now | none |
