@@ -11147,6 +11147,11 @@ impl Heeding {
             crate::second_provider::Did::Worked(at_us) => self.attention.worked(at_us),
             crate::second_provider::Did::Spoke(at_us) => self.attention.news_told(at_us),
             crate::second_provider::Did::Said(request, until_us) => {
+                // Its answer is said: no line up to it can be joined, so a
+                // print made for the join alone goes (#8003).
+                if let Some(voices) = self.kept_voices() {
+                    voices.request_ended(request);
+                }
                 if self.carries && self.carrying && !self.chain.contains(&request) {
                     self.carry_window.answered(request, until_us);
                 }
@@ -31013,6 +31018,28 @@ mod tests {
         assert!(
             matches!(dark("de", [Some(1), Some(1)], Busy, 1), Joined::NoSecond(_)),
             "one face in view at each: the prints are not read"
+        );
+        // The joined request's answer said: no print for the join is held.
+        let mut heeding = judged_in_rooms("df", [Some(0), Some(0)], Unknown);
+        heeding.checking_the_voice_for_services(Box::new(Voice::default()));
+        heeding.printing_only_while_linked(crate::services::Linked::told(false));
+        heeding.printing_for_the_join_too();
+        for request in [1, 2] {
+            heeding.hear(
+                request,
+                Heard::Began {
+                    over_the_lamps_voice: false,
+                },
+            );
+            heeding.hear(request, Heard::Samples(&[1; 48_000]));
+            heeding.hear(request, Heard::Ended);
+        }
+        assert_eq!(heeding.same_speaker(1, 2), Joined::Same(SAME_VOICE_JOINS));
+        heeding.lamp_did(crate::second_provider::Did::Said(2, monotonic_us()));
+        let voices = heeding.for_services.as_ref().unwrap();
+        assert!(
+            !voices.joins_by(1) && !voices.joins_by(2),
+            "gone as it ends"
         );
     }
 

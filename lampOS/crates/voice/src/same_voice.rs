@@ -744,6 +744,9 @@ pub struct Voices<P: Printer> {
     /// conversation's voice; only the newest line's is kept as a line
     /// begins ([`Self::began`]).
     join_prints: VecDeque<(u64, Vec<f32>)>,
+    /// The newest request ended ([`Self::request_ended`]): a print for the
+    /// join alone of it or an older line, come late, is dropped.
+    join_ended: u64,
 }
 
 /// The bar [`CONFIRM_BAR_ENVIRONMENT`] says: a number over 0 and at most 1,
@@ -959,6 +962,7 @@ impl<P: Printer> Voices<P> {
             join_too: false,
             join_asked: VecDeque::new(),
             join_prints: VecDeque::new(),
+            join_ended: 0,
         }
     }
 
@@ -977,7 +981,8 @@ impl<P: Printer> Voices<P> {
     /// first builder's ruling on #7570): its print is kept in memory only,
     /// apart from every other ([`Self::join_prints`]), read by
     /// [`Self::alike`] alone, and dropped once the line can no longer be
-    /// joined: when the line after the one that cut it begins.
+    /// joined: when its request ends ([`Self::request_ended`]) or the line
+    /// after the one that cut it begins.
     pub fn printing_for_the_join_too(mut self, on: bool) -> Self {
         self.join_too = on;
         self
@@ -1170,6 +1175,7 @@ impl<P: Printer> Voices<P> {
             let for_the_join = self.join_asked.contains(&request);
             self.join_asked.retain(|asked| *asked != request);
             match print {
+                Ok(_) if for_the_join && request <= self.join_ended => {}
                 Ok(print) if for_the_join => {
                     if self.join_prints.len() == KEPT {
                         self.join_prints.pop_front();
@@ -1276,6 +1282,15 @@ impl<P: Printer> Voices<P> {
             })
         };
         cosine(print(a)?, print(b)?)
+    }
+
+    /// The request `request` ended: its answer is being said, so no line
+    /// up to it can be joined any more. Every print made for the join alone
+    /// of it or an older line is dropped, and one still to come is dropped
+    /// as it comes (#8003, the first builder's ruling on #7570).
+    pub fn request_ended(&mut self, request: u64) {
+        self.join_ended = self.join_ended.max(request);
+        self.join_prints.retain(|(of, _)| *of > request);
     }
 
     /// Whether a print made for the join alone of the line `request` is
@@ -2561,6 +2576,18 @@ exec sleep 30"#,
         assert!(!voices.joins_by(2), "gone as the line after its cut began");
         assert_eq!(voices.alike(3, 4), Some(0.0));
         assert_eq!(voices.join_prints.len(), 2, "at most the newest two");
+        // The request ends (its answer said) with no later line: nothing of
+        // it is held, nor of a print still to come.
+        voices.request_ended(4);
+        assert!(voices.join_prints.is_empty(), "gone as its request ends");
+        voices.began(5, true);
+        for _ in 0..150 {
+            voices.heard(5, &[1; 320]);
+        }
+        voices.ended(5);
+        voices.request_ended(5);
+        assert_eq!(voices.alike(5, 5), None);
+        assert!(voices.join_prints.is_empty() && voices.prints.is_empty());
         // Without the join, a line the gate turns away is asked for nothing.
         let mut off = Voices::new(StandIn::default()).asking_only_while(|| false);
         said_by(&mut off, 1, 1);

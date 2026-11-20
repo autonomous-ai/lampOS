@@ -734,8 +734,10 @@ prints for the services alone:
   only as two lines' likeness (`Voices::alike`), never in the services'
   store (`print_of`, `print_to_confirm`, the conversation's voice, the
   owner's), never written and never sent. It is dropped once its line can
-  no longer be joined: when the line after the one that cut it begins, so
-  at most the newest two lines' are held. The journal says each such ask
+  no longer be joined: when its request ends, its answer said
+  (`Voices::request_ended`, from `Did::Said`), one still to come dropped as
+  it comes, or when the line after the one that cut it begins, so at most
+  the newest two lines' are held. The journal says each such ask
   (`asked for its voice print for the join alone`), beside the child's
   time for every print (`its voice print came N ms after it was asked`),
   for the cost on a lamp.
