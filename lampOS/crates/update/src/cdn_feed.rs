@@ -14,7 +14,16 @@
 //! [`DROP_IN`] with the same `ExecStart` naming [`CDN`]; reads it back; and
 //! reloads systemd. Any failure leaves the drop-in as it was, so the lamp
 //! keeps the feed it had.
-use crate::{fetch::Channel, manifest, round::OWN_UNIT};
+//!
+//! On the CDN feed, with the same switch, every round reads the CDN first;
+//! once the CDN has failed for an hour ([`DOWN_SINCE`] in the records) a
+//! round that fails on it is done again on [`GITHUB_STABLE`]
+//! ([`round_on`]). Nothing sticks: the next round reads the CDN first.
+use crate::{
+    fetch::Channel,
+    manifest,
+    round::{Config, OWN_UNIT, Outcome},
+};
 use lamp_msgs::harness_hold::feed;
 use std::{fs, path::Path};
 
@@ -187,11 +196,89 @@ pub fn args_on_cdn(args: impl Iterator<Item = std::ffi::OsString>) -> Vec<std::f
     .collect()
 }
 
+/// How long the CDN must have failed, round after round, before a round
+/// reads [`GITHUB_STABLE`] after it.
+pub const FALLBACK_AFTER_MS: u64 = 60 * 60 * 1000;
+/// In the records folder: the unix ms of the first CDN round that failed
+/// since one last read it. Kept there so lamp-update started again (its own
+/// switch, a changed `update.env`, a restart) keeps counting.
+pub const DOWN_SINCE: &str = "cdn-down-since";
+
+/// When the CDN started failing, as `records` keeps it; a file that is not
+/// a number, too long or ahead of `now` is none.
+fn down_since(records: &Path, now: u64) -> Option<u64> {
+    use std::io::Read;
+    let mut text = String::new();
+    fs::File::open(records.join(DOWN_SINCE))
+        .ok()?
+        .take(33)
+        .read_to_string(&mut text)
+        .ok()?;
+    if text.len() > 32 {
+        return None;
+    }
+    text.trim().parse().ok().filter(|since| *since <= now)
+}
+
+/// Whether the CDN has failed for [`FALLBACK_AFTER_MS`] by `now`.
+pub fn due(records: &Path, now: u64) -> bool {
+    down_since(records, now).is_some_and(|since| now - since >= FALLBACK_AFTER_MS)
+}
+
+/// `config` reading [`GITHUB_STABLE`] instead: the same key, channel and
+/// switches, so the same signature, channel and SHA-256 checks.
+pub fn on_github(config: &Config) -> Config {
+    Config {
+        channel_url: GITHUB_STABLE.into(),
+        ..config.clone()
+    }
+}
+
+/// A round on `config`'s feed. On [`CDN`], a round that cannot read it
+/// (out of reach, or no build published there) starts or keeps the clock
+/// in `records`; once that clock reaches [`FALLBACK_AFTER_MS`] the same
+/// round is done again on [`GITHUB_STABLE`]. Each round reads the CDN first,
+/// and one that reads it stops the clock. Any other feed: `round` alone.
+pub fn round_on(
+    config: &Config,
+    records: &Path,
+    now: u64,
+    round: &mut dyn FnMut(&Config) -> Outcome,
+    say: &mut dyn FnMut(&str),
+) -> Outcome {
+    let outcome = round(config);
+    if config.channel_url != CDN {
+        return outcome;
+    }
+    let path = records.join(DOWN_SINCE);
+    if !matches!(outcome, Outcome::Unreachable(_) | Outcome::NothingPublished) {
+        if fs::remove_file(&path).is_ok() {
+            say("the CDN feed is read again: GitHub is not read");
+        }
+        return outcome;
+    }
+    let since = down_since(records, now).unwrap_or_else(|| {
+        if let Err(error) = crate::records::write_whole(&path, now.to_string().as_bytes(), 0o644) {
+            say(&format!("{} cannot be written: {error}", path.display()));
+        }
+        now
+    });
+    if now - since < FALLBACK_AFTER_MS {
+        return outcome;
+    }
+    say(&format!(
+        "the CDN feed has failed for {} min ({outcome}): this round reads {GITHUB_STABLE}, the next one the CDN first",
+        (now - since) / 60_000
+    ));
+    let github = round(&on_github(config));
+    say(&format!("on {GITHUB_STABLE}: {github}"));
+    github
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::fetch::Fetch;
-    use crate::round::{Config, Outcome};
     use ring::{rand::SystemRandom, signature::Ed25519KeyPair, signature::KeyPair};
     use std::collections::HashMap;
 
@@ -470,7 +557,10 @@ mod tests {
         let t0 = 1_800_000_000_000;
         // The CDN up: the CDN only.
         let (outcome, read) = round_at(records, &config, t0, Outcome::UpToDate(14922));
-        assert_eq!((outcome, read), (Outcome::UpToDate(14922), vec![CDN.to_owned()]));
+        assert_eq!(
+            (outcome, read),
+            (Outcome::UpToDate(14922), vec![CDN.to_owned()])
+        );
         // Down under the hour: no GitHub, the CDN again next round.
         for minutes in [0, 15, 59] {
             let (outcome, read) = round_at(records, &config, t0 + minutes * MINUTE, down());
@@ -493,7 +583,12 @@ mod tests {
         let (_, read) = round_at(records, &config, t0 + 151 * MINUTE, down());
         assert_eq!(read, [CDN, GITHUB_STABLE]);
         // No build published on the CDN is the CDN failing too.
-        let (_, read) = round_at(records, &config, t0 + 152 * MINUTE, Outcome::NothingPublished);
+        let (_, read) = round_at(
+            records,
+            &config,
+            t0 + 152 * MINUTE,
+            Outcome::NothingPublished,
+        );
         assert_eq!(read, [CDN, GITHUB_STABLE]);
     }
 
@@ -530,7 +625,12 @@ mod tests {
             );
         }
         // A CDN round that read it removes the file.
-        round_at(records, &config, t0 + 121 * MINUTE, Outcome::UpToDate(14923));
+        round_at(
+            records,
+            &config,
+            t0 + 121 * MINUTE,
+            Outcome::UpToDate(14923),
+        );
         assert!(!records.join(DOWN_SINCE).exists());
     }
 
@@ -565,7 +665,13 @@ mod tests {
         let github = on_github(&config);
         assert_eq!(github.channel_url, GITHUB_STABLE);
         assert_eq!(
-            format!("{:?}", Config { channel_url: CDN.into(), ..github }),
+            format!(
+                "{:?}",
+                Config {
+                    channel_url: CDN.into(),
+                    ..github
+                }
+            ),
             format!("{config:?}")
         );
     }

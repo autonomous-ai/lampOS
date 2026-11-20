@@ -1019,7 +1019,29 @@ fn on_the_lamp(command: &str, options: &BTreeMap<String, String>) -> ExitCode {
                     target: &mut |_| {},
                     now: None,
                 };
-                own::confirm(&config, &mut world, running.as_deref())
+                let confirmed = own::confirm(&config, &mut world, running.as_deref());
+                // A new build taken from GitHub while the CDN is down
+                // (#7728) confirms on GitHub too, the CDN read first.
+                if matches!(confirmed, Ok(own::Confirm::NotProven(_)))
+                    && config.channel_url == lamp_update::cdn_feed::CDN
+                    && lamp_update::switches::update_switch(
+                        &config.root,
+                        lamp_update::cdn_feed::SWITCH,
+                        std::env::var_os(lamp_update::cdn_feed::SWITCH).as_deref(),
+                    )
+                    && lamp_update::cdn_feed::due(
+                        &config.on(&config.records),
+                        lamp_update::records::unix_ms(),
+                    )
+                {
+                    own::confirm(
+                        &lamp_update::cdn_feed::on_github(&config),
+                        &mut world,
+                        running.as_deref(),
+                    )
+                } else {
+                    confirmed
+                }
             };
             let why = match confirmed {
                 Ok(own::Confirm::Confirmed) => {
@@ -1357,7 +1379,20 @@ fn on_the_lamp(command: &str, options: &BTreeMap<String, String>) -> ExitCode {
                     .as_mut()
                     .map(|asked| asked as &mut dyn lamp_update::update_now::NowAsk),
             };
-            round(&config, &mut world)
+            if cdn_feed {
+                // On the CDN feed, GitHub after an hour of CDN failures
+                // (#7728): the CDN first on every round, never sticky.
+                let mut say = |line: &str| eprintln!("lamp-update: {line}");
+                lamp_update::cdn_feed::round_on(
+                    &config,
+                    &records,
+                    lamp_update::records::unix_ms(),
+                    &mut |config| round(config, &mut world),
+                    &mut say,
+                )
+            } else {
+                round(&config, &mut world)
+            }
         };
         // Once the channel was reached, so the lamp has its network; never
         // before a switch of its own, whose new build does its own round.
