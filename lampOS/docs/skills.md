@@ -7505,7 +7505,14 @@ forces one), a skill it makes is made whole, with everything a run needs:
   never the lamp's own skills or any other. The examples
   (`crates/tasks/src/make_examples/`) show `run` steps (`coin-flip`,
   `breathing-coach`, `exchange-rate`, `sun-times`) and a `task` with a
-  helper that reads the calendar (`agenda-count`).
+  helper that reads the calendar (`agenda-count`). Every line is said with
+  `await lamp.say(text, wait=True)`, so a script never exits before its
+  line is said (one dropped is not counted, and its run fails).
+- **The voice reads a `run` step as it reads a `task` step**: code of its
+  own, held to its grants and its script among the files written
+  (`made_skill::code_step`, `task_run`), and read back for the yes plainly,
+  "it runs its own script" (`made_skill::RUN_STEP_SAID`), then what its
+  code may use.
 - **Its `SKILL.md`** has a `when` line and, for a skill with code, three
   sections, each a `## ` heading with lines under it: `## Uses` (each
   script or lamp-services tool and its arguments), `## Result` (where each
