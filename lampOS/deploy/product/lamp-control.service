@@ -52,6 +52,8 @@ Environment=LAMP_NPU=on
 # docs/control.md "The control socket, lamp-control's side"). With LAMP_CONTROL off, lamp-control serves only it and
 # admin.sock (no TLS door), once the first builder's (b) of 12 Nov 08:15 lands.
 Environment=LAMP_CONTROL_RUN_SOCKET_USER=lampos
+# LAMP_STORE_APPS: #7415, the Store apps; on in the product by the first builder's DEFAULT-ON of 20 Nov; its rules are its rows in docs/switches.md.
+Environment=LAMP_STORE_APPS=on
 # Its certificate and paired computers in --state-dir, the owner's side on --admin-socket (0600),
 # the body's mood and lease sockets, the voice's say socket, lamp-actions' call socket (`volume`),
 # root's skills manage helper (skill push) and the ring's light requests on the bus.
