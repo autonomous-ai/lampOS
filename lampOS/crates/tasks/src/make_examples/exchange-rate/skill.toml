@@ -1,7 +1,8 @@
-asks = ["exchange rate"]
+asks = ["exchange rate", "euro to dollar rate"]
 kind = "installable"
 version = "1.0.0"
 grants = ["net", "speak"]
 
+# The script does the whole job and says its own line: no agent at run.
 [[do]]
-task = { task = "look up today's euro to dollar rate on the web and say it", run = "scripts/main.py" }
+run = "scripts/main.py"

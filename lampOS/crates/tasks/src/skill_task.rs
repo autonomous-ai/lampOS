@@ -648,6 +648,20 @@ pub trait Tokens {
     fn mint_ask(&self, _grants: &[String], _run: &str) -> Result<Minted, String> {
         Err("no live ask's token on this lamp".into())
     }
+    /// A token for a make's tried run `run` (#8157, `crate::make_try`):
+    /// lamp-control mints the draft's own `grants`, marked tried, so its
+    /// linked service writes are answered from a stub and never sent.
+    /// None by default.
+    fn mint_try(&self, _grants: &[String], _run: &str) -> Result<Minted, String> {
+        Err("no tried run's token on this lamp".into())
+    }
+    /// The run ended, as [`Tokens::end`], and how many `say`s its parts
+    /// took (#8157, lamp-control's `end` answer's `"said"`); none when
+    /// that isn't known.
+    fn end_said(&self, run: &str) -> Option<u32> {
+        self.end(run);
+        None
+    }
 }
 
 /// No lamp-control token: every run is refused.
@@ -724,6 +738,29 @@ impl Tokens for ControlTokens {
             }}),
             run,
         )
+    }
+
+    fn mint_try(&self, grants: &[String], run: &str) -> Result<Minted, String> {
+        self.mint_asked(
+            &json!({"mint": {
+                "try": grants,
+                "run": run,
+                "expires_in_ms": RUN_LIFETIME.as_millis() as u64,
+            }}),
+            run,
+        )
+    }
+
+    fn end_said(&self, run: &str) -> Option<u32> {
+        match self.ask(&json!({"end": {"run": run}})) {
+            Ok(answer) => answer["said"]
+                .as_u64()
+                .and_then(|said| u32::try_from(said).ok()),
+            Err(why) => {
+                eprintln!("[lamp-tasks] skill task: ending run {run}: {why}");
+                None
+            }
+        }
     }
 
     fn net_agreed(&self, skill: &str, sha256: &str, grants: &[String]) -> bool {
