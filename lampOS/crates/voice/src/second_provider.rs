@@ -14677,7 +14677,10 @@ fn round_one_line(
     let make_ask = said.map(crate::tools::make_skill_asked::make_asked);
     let sentences = said.map(crate::tools::make_skill_asked::sentence_count);
     let named = said.is_some_and(crate::tools::make_skill_asked::named);
-    let ask_in = said.map(|said| crate::tools::make_skill_asked::ask_sentence(said, named));
+    let ask_in = said.map(|said| {
+        crate::tools::make_skill_asked::ask_sentence(said, named)
+            .map_or("none".to_owned(), |at| at.to_string())
+    });
     let opening = said.map(|said| {
         if name_call_rest(said).is_some() {
             "name"
@@ -14694,7 +14697,7 @@ fn round_one_line(
         forced.map_or("?", |forced| forced.unwrap_or("none")),
         make_ask.map_or("?", yes),
         sentences.map_or("?".to_owned(), |count| count.to_string()),
-        ask_in.map_or("?".to_owned(), |at| at.map_or("none".to_owned(), |at| at.to_string())),
+        ask_in.as_deref().unwrap_or("?"),
         opening.unwrap_or("?"),
     )
 }

@@ -413,7 +413,11 @@ fn past_the_name_is_the_line_past_the_lamps_own_name_too() {
         assert_eq!(past_the_name_heard_as(said, true), Some(rest), "{said}");
         assert_eq!(past_the_name_heard_as(said, false), Some(rest), "{said}");
     }
-    for said in ["Hey Lamp.", "Turn off the lamp.", "Hello, Anna. Lamp, mail check."] {
+    for said in [
+        "Hey Lamp.",
+        "Turn off the lamp.",
+        "Hello, Anna. Lamp, mail check.",
+    ] {
         assert_eq!(past_the_name_heard_as(said, true), None, "{said}");
     }
 }
