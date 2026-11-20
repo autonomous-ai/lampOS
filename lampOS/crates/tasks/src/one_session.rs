@@ -3140,10 +3140,17 @@ impl OneSession {
             }
             // Harness 0.6.74: its first turn's wait said its launch
             // failed: the ladder at once, within the open's bound.
-            if let Some(why) = self.first_words(harness, &name, token, until, ended)
-                && settles > 0
-            {
+            if let Some(why) = self.first_words(harness, &name, token, until, ended) {
                 self.revive_or_replace(harness, &place.machine, &agent, &why, true);
+                // The open's last try failed too: never kept as opened. A
+                // failed open, its backoff counted (`next_open`), as any
+                // other open that failed.
+                if settles == 0 {
+                    return Err(self.open_failed(&format!(
+                        "{why}; tried {} times",
+                        3u8.saturating_sub(settles.min(2))
+                    )));
+                }
                 {
                     let inner = self.lock();
                     if inner.next_open.is_some() || inner.drop_due.is_some() {

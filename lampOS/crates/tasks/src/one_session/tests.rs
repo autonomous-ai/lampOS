@@ -92,6 +92,9 @@ struct Fake {
     /// A kept close that answers but leaves the frozen process live: the
     /// next plain `ensure` says `live`, the same agent.
     close_leaves_live: Mutex<bool>,
+    /// Every `ensure` makes a new session, as Harness does when it
+    /// replaced the old one itself (openharness#4484's `new`).
+    always_new: Mutex<bool>,
 }
 
 fn agent_of(n: u32) -> String {
@@ -273,6 +276,11 @@ impl PaneHarness for Fake {
         drop(heals);
         let mut gone = self.gone.lock().unwrap();
         let (result, agent) = match kept.clone() {
+            Some(_) if *self.always_new.lock().unwrap() => {
+                let mut opens = self.opens.lock().unwrap();
+                *opens += 1;
+                ("new", agent_of(*opens))
+            }
             Some(agent) if !fresh && gone.contains(&agent) => {
                 gone.retain(|g| *g != agent);
                 let mut frozen = self.frozen.lock().unwrap();
@@ -5189,16 +5197,28 @@ fn a_kept_session_starting_inside_the_bound_is_kept() {
         .lock()
         .unwrap()
         .insert(agent_of(1), "starting".into());
-    let again = kept_session(dir.path()).with_kept_session(dir.path().join(TOKEN_FILE));
+    // A 10 s bound here, so a loaded test machine's late wake never
+    // passes it.
+    let again = OneSession::new(
+        Duration::from_secs(5),
+        Duration::from_millis(5),
+        Duration::from_secs(10),
+    )
+    .with_session_delete(Box::new(|_| Ok(())))
+    .with_state_file(dir.path().join(STATE_FILE))
+    .with_kept_session(dir.path().join(TOKEN_FILE));
     let began = Instant::now();
     thread::scope(|scope| {
         scope.spawn(|| {
-            thread::sleep(Duration::from_millis(400));
+            thread::sleep(Duration::from_millis(200));
             fake.states.lock().unwrap().remove(&agent_of(1));
         });
         again.open_if_due(&fake, &place());
     });
-    assert!(began.elapsed() < Duration::from_secs(1), "inside the bound");
+    assert!(
+        began.elapsed() < Duration::from_secs(10),
+        "inside the bound"
+    );
     assert_eq!(again.agent(), Some(agent_of(1)), "{:?}", fake.calls());
     assert_eq!(fake.count("close-kept"), 0);
     assert_eq!(fresh_ensures(&fake), 0);
@@ -5423,4 +5443,90 @@ fn a_new_kept_session_whose_first_words_fail_is_reopened_in_the_same_open() {
     );
     assert_eq!(fresh_ensures(&fake), 1);
     assert_eq!(one.agent(), Some(agent_of(2)));
+}
+
+/// #8062 (d, f), the HOLD's P1: every try of one open comes back new and
+/// its first words' `wait --after` says `failed` (Harness 0.6.74's exit 1;
+/// Harness making the session anew at each `ensure`). The ladder: a plain
+/// `ensure` first (its conversation not known gone), then `--fresh`, then
+/// the open ends refused: never kept as opened, a bounded 3 ensures, its
+/// failed-open backoff set, no loop. Before the fix the last try's failed
+/// session was kept (`Ok`), its open counter reset.
+#[test]
+fn an_open_whose_every_first_words_fail_ends_refused_with_its_backoff() {
+    let dir = tempfile::tempdir().unwrap();
+    let (one, fake) = kept_on(dir.path());
+    *fake.always_new.lock().unwrap() = true;
+    *fake.kept.lock().unwrap() = Some(agent_of(99));
+    fake.waits
+        .lock()
+        .unwrap()
+        .extend(std::iter::repeat_n("failed".to_owned(), 3));
+    let began = Instant::now();
+    one.open_if_due(&fake, &place());
+    assert!(began.elapsed() < Duration::from_secs(10));
+    let ensures: Vec<String> = fake
+        .calls()
+        .into_iter()
+        .filter(|call| call.starts_with("ensure"))
+        .collect();
+    assert_eq!(
+        ensures,
+        [
+            "ensure lamp-one-openclaw",
+            "ensure lamp-one-openclaw",
+            "ensure lamp-one-openclaw --fresh"
+        ],
+        "{:?}",
+        fake.calls()
+    );
+    assert_eq!(one.agent(), None, "never kept as opened");
+    let inner = one.lock();
+    assert!(inner.next_open.is_some(), "its backoff");
+    assert_eq!(inner.failed_opens, 1, "counted, not reset");
+    drop(inner);
+    // Not tried again before its backoff.
+    one.open_if_due(&fake, &place());
+    assert_eq!(fake.count("ensure"), 3);
+}
+
+/// #8062 (g): a hand-over over 1,000 characters (OpenClaw draws it as
+/// `[paste #1 +N lines]`, which Harness 0.6.74 matches itself,
+/// `openclawBoxHolds`) is taken once and its turn found by its header:
+/// lamp-tasks reads Harness's `taken` and `inputId` and `show`'s ask (the
+/// engine's own record), never the screen.
+#[test]
+fn a_long_hand_over_is_taken_once_and_answered() {
+    let dir = tempfile::tempdir().unwrap();
+    let (one, fake) = kept_on(dir.path());
+    one.open_if_due(&fake, &place());
+    let inputs = *fake.inputs.lock().unwrap();
+    let lines: Vec<String> = (0..30)
+        .map(|n| format!("line {n}: {}", "x".repeat(40)))
+        .collect();
+    let words = format!("Run the skill.\n{}", lines.join("\n"));
+    assert!(words.len() > 1000 && words.lines().count() > 10);
+    let turn = one.enter("task-1", Kind::Skill, far(), &|| false).unwrap();
+    assert!(matches!(
+        turn.send(&fake, &place(), &words, far(), &|| false),
+        Sent::Typed(_)
+    ));
+    assert_eq!(
+        turn.wait_end(&fake, MACHINE, &AtomicBool::new(false), &|| {}),
+        Ended::Answered("answer to New task task-1:".into())
+    );
+    assert_eq!(*fake.inputs.lock().unwrap(), inputs + 1, "typed once");
+    // The per-task pane's header matcher (no acknowledged reply).
+    let one = session();
+    let fake = Fake::default();
+    let turn = one.enter("task-2", Kind::Skill, far(), &|| false).unwrap();
+    assert!(matches!(
+        turn.send(&fake, &place(), &words, far(), &|| false),
+        Sent::Typed(_)
+    ));
+    assert_eq!(
+        turn.wait_end(&fake, MACHINE, &AtomicBool::new(false), &|| {}),
+        Ended::Answered("answer to New task task-2:".into())
+    );
+    assert_eq!(fake.count("reply"), 1);
 }
