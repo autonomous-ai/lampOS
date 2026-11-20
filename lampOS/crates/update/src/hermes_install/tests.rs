@@ -700,6 +700,7 @@ fn the_namespace_script_hides_the_devices_and_gives_hermes_its_own_tmp() {
         "/dev/i2c-*",
         "/dev/spidev*",
         "/dev/gpiochip*",
+        "/dev/vipcore",
     ] {
         assert!(DEVICES.contains(&wanted), "{wanted}");
     }
