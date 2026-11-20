@@ -375,7 +375,9 @@ was none, and systemd reloaded again after a failed reload), says one line
 (`kept on the GitHub stable feed: ...`, said again only when the reason
 changes), and the lamp keeps updating from GitHub; it is tried again after
 the next round. Removing the drop-in and `systemctl daemon-reload` put the
-GitHub feed back by hand. The GitHub stable feed keeps being promoted until
+GitHub feed back by hand. While the drop-in is there it wins over the
+unit's own `ExecStart`, so a lamp moved by hand to another feed (the
+canary, say) has the drop-in removed too. The GitHub stable feed keeps being promoted until
 the fleet has moved. Tests only (`cdn_feed::tests`): not yet shown on a lamp.
 
 ### The build and its identity
