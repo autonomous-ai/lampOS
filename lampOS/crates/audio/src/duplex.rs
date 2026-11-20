@@ -327,7 +327,8 @@ pub struct Interruption {
     /// `LAMP_CUT_IN_LATE_YIELD=on`: see [`Self::commit_late_yields`].
     commits_late: bool,
     /// One flag per block of the last [`LATE_YIELD_WINDOW_BLOCKS`]: whether
-    /// it was heard plainly as a person over the lamp ([`Hearing::plain`])
+    /// it was heard plainly as a person over the lamp ([`Hearing::plain`]),
+    /// or unknown past the reply's start ([`LATE_YIELD_OVER_BLOCKS`]),
     /// while it had something to yield. A ring, written at `over_at`, with
     /// `over_count` flags set.
     over_window: [u64; 3],
@@ -349,7 +350,13 @@ pub struct Interruption {
 /// side remark at most 11. Only plain blocks count since lamp-4ace on
 /// 1 Nov, where the lamp's own voice, misjudged as a person over it but
 /// still partly explained by the render, made a late yield and stopped its
-/// own story twice with nobody talking (#4705).
+/// own story twice with nobody talking (#4705). Speech-like blocks with no
+/// alignment to judge by ([`Heard::Unknown`]) count as well once the reply
+/// is past its first [`Confirmation::early_blocks`]: on lamp-52e6 on 20 Nov
+/// (#7413) the "Wait" of "Wait, hold on." came where the alignment was
+/// stale, 11 blocks unknown, and its yield, with 4 plain, resumed. At a
+/// reply's start, and after a resume, an unknown block is the lamp's own
+/// first word heard against the last reply's alignment, and is not counted.
 pub const LATE_YIELD_OVER_BLOCKS: u8 = 14;
 /// The blocks [`LATE_YIELD_OVER_BLOCKS`] are counted in: 1.5 s, the most
 /// of a short question that can come before the yield.
@@ -604,7 +611,14 @@ impl Interruption {
         } else {
             0
         };
-        self.note_over(speaking, speaking && heard == Heard::Over && plain);
+        // Unknown counts only past the reply's first blocks (#7413).
+        let past_start = self.spoken > self.rule.early_blocks;
+        let person = match heard {
+            Heard::Over => plain,
+            Heard::Unknown => past_start,
+            _ => false,
+        };
+        self.note_over(speaking, speaking && person);
         let needed = self.onset_needed();
         let forced = std::mem::take(&mut self.forced) && speaking;
         match &mut self.state {
