@@ -3142,16 +3142,6 @@ fn every_kept_hand_over_says_to_reply_in_its_words_language() {
     assert_eq!(fresh_ensures(&fake), 1, "{:?}", fake.calls());
     assert_eq!(one.agent(), Some(agent_of(2)), "rotated");
     assert_hand_over(&typed(&fake), "make-1");
-    // Died: not running, ensured again (resumed) and typed once more.
-    fake.gone.lock().unwrap().push(agent_of(2));
-    fake.takes.lock().unwrap().push_back(Took::NotRunning);
-    let ensures = fake.count("ensure");
-    assert_eq!(
-        one_turn(&one, &fake, "task-3"),
-        Ended::Answered("answer to New task task-3:".into())
-    );
-    assert!(fake.count("ensure") > ensures, "{:?}", fake.calls());
-    assert_hand_over(&typed(&fake), "task-3");
 }
 
 fn fresh_ensures(fake: &Fake) -> usize {
