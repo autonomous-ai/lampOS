@@ -31,7 +31,8 @@
 //!   never given ([`NO_KEYS_HERE`]).
 //! - **Its bounds**: its own caps ([`CAPS_EDIT`]: [`SCRIPT_MEMORY_KB`] of
 //!   address space, [`SCRIPT_CPU_SECS`] of CPU, niceness [`SCRIPT_NICE`],
-//!   no core file), never lamp-tasks' whole budget; [`RUN_WITHIN`] from
+//!   no core file, each process; [`SCRIPT_PROCESSES`] for the whole run),
+//!   never lamp-tasks' whole budget; [`RUN_WITHIN`] from
 //!   its start (its whole process group killed then), at most [`MOST_OUTPUT`] bytes of output (none of it
 //!   kept or journaled: past it, the run is ended), one at a time across
 //!   the lamp (beside, never behind, an agent's task). lamp-skills never
@@ -144,19 +145,36 @@ pub const SCRIPT_CPU_SECS: u64 = 30;
 /// so a busy script yields the CPU to the voice and lamp-tasks' own work.
 pub const SCRIPT_NICE: u32 = 10;
 
+/// The most processes and threads the whole run may hold at once
+/// (`RLIMIT_NPROC`, #8180): its script's, every child's and its relay's
+/// together. Past it a fork or a new thread fails (Python's
+/// `BlockingIOError`), so a script that spawns too many fails its run.
+pub const SCRIPT_PROCESSES: u64 = 64;
+
 /// What [`fence_text`] changes last: the script's own caps, set just
 /// before its exec and after anything else of the fence (its relay
-/// included) started, so they are the script's alone: no core file
-/// (`ulimit -c 0`), [`SCRIPT_MEMORY_KB`], [`SCRIPT_CPU_SECS`] and
-/// [`SCRIPT_NICE`]. lamp-tasks.service has no delegated cgroup to give one
-/// run a cgroup of its own, so the caps are the process's own limits, which
-/// its children inherit.
+/// included) started: no core file (`ulimit -c 0`), [`SCRIPT_MEMORY_KB`],
+/// [`SCRIPT_CPU_SECS`] and [`SCRIPT_NICE`] for each process, and
+/// [`SCRIPT_PROCESSES`] for the run as a whole, so the per-process caps
+/// bound the whole: at most 64 processes of 768 MiB and 30 s of CPU each,
+/// within the 30 s wall clock, its PID namespace ended then.
+///
+/// The process cap is `prlimit`'s (util-linux, as `unshare` is), since the
+/// fence's `/bin/sh` is dash on a lamp, whose flag for it is `-p` where
+/// bash's is `-u`. It is set in the fence's own user namespace, just before
+/// the script's nested one is made, so the kernel counts it per namespace
+/// (Linux 5.14 and later): the run's own processes, never lamp-tasks' or
+/// any other of `lampos`'s. lamp-tasks.service runs as `lampos` with no
+/// delegated cgroup (no `Delegate=`), so a transient scope or a sub-cgroup
+/// with `memory.max`, `cpu.max` and `pids.max` can't be made from it
+/// without root; these limits are the run's total instead.
 pub const CAPS_EDIT: (&str, &str) = (
     "\nexec unshare --user --map-user=\"$u\"",
     concat!(
         "\nulimit -c 0 || no \"no core file\"\n",
         "ulimit -v 786432 || no \"the script's memory cap\"\n",
         "ulimit -t 30 || no \"the script's CPU time cap\"\n",
+        "prlimit --nproc=64:64 --pid $$ || no \"the run's process cap\"\n",
         "exec nice -n 10 unshare --user --map-user=\"$u\"",
     ),
 );
@@ -171,6 +189,27 @@ pub fn fence_text(net: bool) -> String {
         text = text.replacen(from, to, 1);
     }
     text
+}
+
+/// A run step's fence's `unshare` arguments for `grant`, `hidden` covered:
+/// the gateway's ([`crate::gateway::fence_args`]) with [`fence_text`] in
+/// place of its text (its way out when `grant` names an egress socket).
+/// One builder for a run step and a make's tried run
+/// (`crate::make_try::fence_args`, #8180), so the two can't drift. Never
+/// the token.
+pub fn fence_args(grant: &crate::skill_start::Grant, hidden: &[&Path]) -> Vec<std::ffi::OsString> {
+    let mut args = crate::gateway::fence_args(
+        grant,
+        rustix::process::getuid().as_raw(),
+        rustix::process::getgid().as_raw(),
+        hidden,
+    );
+    if let Some(at) = args.iter().position(|arg| arg == "-c") {
+        args[at + 1] = fence_text(grant.egress.is_some())
+            .replace("\"$SCRIPT_PATH\"", crate::gateway::SCRIPT_PATH)
+            .into();
+    }
+    args
 }
 
 /// What the fence's own `sh` is started through: the token's pipe (stdin)
@@ -251,18 +290,7 @@ impl DirectRunner {
             egress: egress.map(Path::to_owned),
         };
         let hidden: Vec<&Path> = self.hidden.iter().map(PathBuf::as_path).collect();
-        let mut args = crate::gateway::fence_args(
-            &grant,
-            rustix::process::getuid().as_raw(),
-            rustix::process::getgid().as_raw(),
-            &hidden,
-        );
-        if let Some(at) = args.iter().position(|arg| arg == "-c") {
-            args[at + 1] = fence_text(egress.is_some())
-                .replace("\"$SCRIPT_PATH\"", crate::gateway::SCRIPT_PATH)
-                .into();
-        }
-        args
+        fence_args(&grant, &hidden)
     }
 
     /// A run granted `net`'s way out (see the module): its own egress

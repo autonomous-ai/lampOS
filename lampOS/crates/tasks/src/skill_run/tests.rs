@@ -458,7 +458,9 @@ fn a_net_run_holds_its_own_egress_socket_on_fd_5() {
 /// The script's own caps, as a gateway agent's script gets them, set in
 /// its fence just before its exec, after its relay: its memory
 /// ([`SCRIPT_MEMORY_KB`]), its CPU time ([`SCRIPT_CPU_SECS`], its bound's)
-/// and its niceness ([`SCRIPT_NICE`]), never lamp-tasks' whole budget.
+/// and its niceness ([`SCRIPT_NICE`]) for each process, and the whole
+/// run's processes and threads ([`SCRIPT_PROCESSES`], #8180), so the
+/// per-process caps bound the whole; never lamp-tasks' whole budget.
 #[test]
 fn a_run_steps_script_has_its_own_memory_and_cpu_caps() {
     assert_eq!(SCRIPT_CPU_SECS, RUN_WITHIN.as_secs());
@@ -467,11 +469,18 @@ fn a_run_steps_script_has_its_own_memory_and_cpu_caps() {
         let memory = format!("ulimit -v {SCRIPT_MEMORY_KB} ||");
         let cpu = format!("ulimit -t {SCRIPT_CPU_SECS} ||");
         let nice = format!("exec nice -n {SCRIPT_NICE} unshare --user");
-        for cap in ["ulimit -c 0 ||", &memory, &cpu, &nice] {
+        let processes =
+            format!("prlimit --nproc={SCRIPT_PROCESSES}:{SCRIPT_PROCESSES} --pid $$ ||");
+        for cap in ["ulimit -c 0 ||", &memory, &cpu, &processes, &nice] {
             assert_eq!(text.matches(cap).count(), 1, "{cap}\n{text}");
         }
         let capped = text.find(&memory).unwrap();
         assert!(capped > text.find("cd \"$r\"").unwrap(), "{text}");
+        // The process cap is set just before the script's own user
+        // namespace is made, so it is counted in that namespace alone.
+        assert!(text.find(&processes).unwrap() < text.find(&nice).unwrap());
+        // Never `ulimit -u`: dash, a lamp's /bin/sh, has no such flag.
+        assert!(!text.contains("ulimit -u"), "{text}");
         if net {
             assert!(capped > text.find("net-relay").unwrap(), "{text}");
         }
@@ -484,4 +493,107 @@ fn a_run_steps_script_has_its_own_memory_and_cpu_caps() {
         arg.to_str()
             .is_some_and(|arg| arg.contains("ulimit -v 786432"))
     }));
+}
+
+/// #8180 (Heron 3): on Linux, a script that starts more processes than
+/// its run's cap ([`SCRIPT_PROCESSES`], the fence's own `prlimit` line,
+/// set as the fence sets it: in a user namespace, before the script's
+/// nested one) is refused the extra ones and its run ends `run_failed`,
+/// while another task in lamp-tasks still starts and answers. Skipped
+/// where nested user namespaces, `prlimit` or `python3` can't be had.
+#[cfg(target_os = "linux")]
+#[test]
+fn a_script_past_its_process_cap_fails_its_run_while_another_task_answers() {
+    use std::process::Command;
+    let works = |program: &str, args: &[&str]| {
+        Command::new(program)
+            .args(args)
+            .stdout(std::process::Stdio::null())
+            .stderr(std::process::Stdio::null())
+            .status()
+            .is_ok_and(|status| status.success())
+    };
+    if !works(
+        "unshare",
+        &[
+            "--user",
+            "--map-root-user",
+            "--",
+            "unshare",
+            "--user",
+            "--",
+            "true",
+        ],
+    ) || !works("prlimit", &["--version"])
+        || !works("python3", &["-c", "pass"])
+    {
+        eprintln!("skipped: no nested user namespace, prlimit or python3 here");
+        return;
+    }
+    let place = Place::new();
+    // The fence's own cap line, as its text has it.
+    let cap = CAPS_EDIT
+        .1
+        .lines()
+        .find(|line| line.starts_with("prlimit"))
+        .unwrap();
+    let inner = place.file(
+        "inner.sh",
+        &format!(
+            "no() {{ echo \"$1\" >&2; exit 1; }}\n{cap}\nexec unshare --user --map-user=\"$1\" --map-group=\"$2\" -- env -i PATH=/usr/bin:/bin \"$3\" \"$4\"\n"
+        ),
+        0o644,
+    );
+    let unshare = FAKE_UNSHARE.replacen(
+        "exec env -i PATH=/usr/bin:/bin HOME=\"$r\" LAMP_CONTROL_SOCKET=\"$so\" PYTHONPATH=\"$py\" LAMP_CONTROL_TOKEN=\"$t\" \"$i\" \"$s\"",
+        &format!(
+            "exec unshare --user --map-root-user -- /bin/sh {} \"$(id -u)\" \"$(id -g)\" \"$i\" \"$s\"",
+            inner.display()
+        ),
+        1,
+    );
+    assert_ne!(unshare, FAKE_UNSHARE);
+    let refused = place.dir.path().join("refused");
+    let mut forks = place.runner(&unshare);
+    forks.interpreter = "python3".into();
+    let hand = place.hand(&format!(
+        "import os, sys, time\n\
+         for n in range({}):\n    \
+             try:\n        pid = os.fork()\n    \
+             except OSError:\n        \
+                 open({:?}, 'w').write(str(n))\n        time.sleep(2)\n        sys.exit(3)\n    \
+             if pid == 0:\n        time.sleep(20)\n        os._exit(0)\n\
+         sys.exit(0)\n",
+        SCRIPT_PROCESSES * 4,
+        refused.display().to_string()
+    ));
+    let forked = std::thread::spawn(move || {
+        let control = Control {
+            grants: vec!["speak".into()],
+            said: Some(1),
+            ..Control::default()
+        };
+        answer(&hand, &control, &forks, false)
+    });
+    let began = Instant::now();
+    while !refused.exists() {
+        assert!(began.elapsed() < Duration::from_secs(20), "never refused");
+        std::thread::sleep(Duration::from_millis(20));
+    }
+    let refused_at: u64 = std::fs::read_to_string(&refused).unwrap().parse().unwrap();
+    assert!(refused_at < SCRIPT_PROCESSES, "{refused_at}");
+    // Meanwhile another task still starts and answers.
+    let other = Place::new();
+    let runner = other.runner(FAKE_UNSHARE);
+    let quick = Instant::now();
+    assert!(
+        runner
+            .run(&run_of(&other.hand("exit 0\n"), "task-8-1-80"), &|| {})
+            .is_ok()
+    );
+    assert!(quick.elapsed() < Duration::from_secs(5));
+    assert_eq!(
+        forked.join().unwrap(),
+        refusal("run_failed", "its script ended with status 3")
+    );
 }
