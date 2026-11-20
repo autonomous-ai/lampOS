@@ -14330,23 +14330,22 @@ fn conversation_with_gate_inner(
             && let Some(provider_session) = unasked_session(&cloud, unasked_paused)
             && let Some(ticket) = news_for_skill(news, says.as_mut(), news_by_skill, &mut news_held)
             // With the switch, tasks that finished together are told in
-            // one turn (the reviewer on #1161). Not while news waits for a
-            // skill: the skill tells each task in its own run (#1042), and a
-            // later run's ask would find its news told already. Nor when this
+            // one turn (the reviewer on #1161). While news waits for a
+            // skill, only a backlog whose skill's asks are over (#8051): the
+            // skill tells each task in its own run (#1042), and a later
+            // run's ask would find its news told already. Never when this
             // is told with a skill's ticket, or while a skill asks for news:
             // each run takes its own task's news (the reviewer on #1042 and
             // #1223).
-            && let Some(told) = if news_at_pause
-                && !news_by_skill
-                && ticket.is_none()
-                && !news.retelling_first()
-                && !says.as_ref().is_some_and(|says| {
-                    says.asks_for(crate::say::Source::Tasks, monotonic_us())
-                }) {
-                news.tell_together()
-            } else {
-                news.tell()
-            }
+            && let Some(told) = news.tell_waiting(
+                news_at_pause
+                    && ticket.is_none()
+                    && !news.retelling_first()
+                    && !says.as_ref().is_some_and(|says| {
+                        says.asks_for(crate::say::Source::Tasks, monotonic_us())
+                    }),
+                news_by_skill,
+            )
         {
             eprintln!(
                 "lamp-voice: telling news from the work handed over ({}{})",

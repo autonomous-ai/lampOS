@@ -3854,6 +3854,30 @@ Test: `news_refused_while_muted_or_listening_is_held_then_told_once`,
 `task_news_refused_under_the_restart_guards_mute_is_held_and_told_once`,
 `task_news_refused_muted_by_the_button_is_not_held` (bin).
 
+## Tin dồn lại lúc không có ai được kể chung khi người quay lại (#8051)
+
+Trên lamp-c0a4 ngày 20/11, hai mươi việc xong trong lúc không thấy hay nghe
+ai. Khi người quay lại, voice kể từng tin một, khoảng 20 s một tin, trong bảy
+phút, vì tin đi qua kỹ năng (`LAMP_TASK_NEWS=skill`) không bao giờ được kể
+chung. Giờ, với `LAMP_TASK_NEWS_AT_PAUSE=on`, tin đi qua kỹ năng được kể
+chung, tối đa ba tin một lượt, khi đó là tin dồn lại (`TaskNews::tell_waiting`,
+`TaskNews::backlog`): tin đầu hàng và ít nhất một tin nữa là việc đã xong có
+câu trả lời, mỗi tin trong ba tin đầu đã đến từ 10 s trước trở lên
+(`say::SKILL_WAITS_US`, nên thời gian chờ lời hỏi của kỹ năng đã hết và voice
+tự kể nó), không có lời hỏi tin nào của kỹ năng đang chờ, và tin không được
+kể với ticket của kỹ năng hay kể lại. Tin vừa đến vẫn chờ lời hỏi của kỹ năng
+riêng nó và được kể một mình, việc chỉ có một tin cũng vậy. Ba việc xong lúc
+người vắng mặt thành một lượt khi họ quay lại; nhiều hơn thì ba tin một lượt.
+Test:
+`task_news::tests::work_finished_while_nobody_was_there_is_told_together_through_the_skill`,
+`task_news::tests::news_through_the_skill_is_still_told_alone_when_just_in_or_asked_for`.
+
+Khi voice đánh dấu tin đã nghe (`told`) cho một việc lamp-tasks không còn
+giữ, journal ghi `the news heard (<key>) is of a task the tasks part no
+longer keeps`, không nói phần tasks không nhận: store đầy (16 việc,
+`MAX_TASKS`) bỏ việc đã xong cũ nhất, dù đã kể hay chưa, và với một phiên
+(`LAMP_TASKS_ONE_SESSION`) mọi việc chưa kể được giữ cho tới lúc đó.
+
 ## Việc giao là toàn bộ lời nhờ (#6527)
 
 Trên 52e6 ngày 12/11 (row-6361c), câu "have your agent list five fruits that

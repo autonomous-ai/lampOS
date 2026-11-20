@@ -6215,8 +6215,9 @@ used only to say it.
   together too: its gist in one plain line from its beginning, then that
   the rest is on their computer, never only that. A task waiting for the person,
   one that stopped, a hand-over that failed and progress are told on their
-  own, and so is all news while it waits for a skill (`LAMP_TASK_NEWS=skill`):
-  the skill tells each task in its own run (#1042). The record's `task_news` says `at_pause`, `since_turn_ms`, how long
+  own, and so is news while it waits for a skill (`LAMP_TASK_NEWS=skill`):
+  the skill tells each task in its own run (#1042), but for a backlog (#8051,
+  below in "Told when a skill asks"). The record's `task_news` says `at_pause`, `since_turn_ms`, how long
   after the last turn it was told, and `also`, the news told with it. The note gives the model the task's words
   and up to 1,200 characters of the answer, and asks for one or two natural
   sentences starting like "Oh, Claude Code just finished…" ("earlier" after
@@ -6379,6 +6380,30 @@ settled, is gone 20 s later; the reviewer's P2 on #1667)
 An ask that names its task (`"task":10`) is given that task's news only,
 so the skill's look and light go with its own task (the reviewer on #1042).
 Progress is the Policy's to time already and is told as before.
+
+**A backlog is told together** (#8051, lamp-c0a4, 20 Nov): twenty tasks
+finished while nobody was seen or heard, and on the person's return the
+voice told them one by one, about every 20 s, over seven minutes, since news
+through the skill was never told together. Now, with
+`LAMP_TASK_NEWS_AT_PAUSE=on`, news through the skill is told together as
+above, at most three in one turn, when it is a backlog
+(`TaskNews::tell_waiting`, `TaskNews::backlog`): the news first in line and
+at least one more are finished tasks with an answer, each of the first three
+came in at least 10 s ago (`say::SKILL_WAITS_US`, so its wait for the
+skill's ask is over and the voice tells it itself anyway), no skill's ask for
+news waits, and it is not told with a skill's ticket or told once more. News
+just in still waits for its own skill's ask and is told alone, and so is a
+lone task. Three tasks finished while the person was out are one turn on
+their return; more go three to a turn. Tests:
+`task_news::tests::work_finished_while_nobody_was_there_is_told_together_through_the_skill`,
+`task_news::tests::news_through_the_skill_is_still_told_alone_when_just_in_or_asked_for`.
+
+When the voice marks news heard (`told`) for a task lamp-tasks no longer
+keeps, the journal says `the news heard (<key>) is of a task the tasks part
+no longer keeps`, not that the tasks part failed to take it: a full store
+(16 tasks, `MAX_TASKS`) lets its oldest spent task go, told or not, and with
+one session (`LAMP_TASKS_ONE_SESSION`) every task waiting untold is kept
+until then.
 
 **Held while the lamp is muted or listening** (lamp-c0a4, 16 Nov 15:35): a
 task settled while the voice was restarting; its say service refused the
