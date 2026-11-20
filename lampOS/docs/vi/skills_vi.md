@@ -3910,6 +3910,62 @@ cả hai người viết.
   cho thấy terminal của Hermes chuyển các công tắc `LAMP_*` của lần chạy cho
   kiểm tra nó chạy; và câu trả lời mất bao lâu ở đó.
 
+### Một kỹ năng được tạo một lần và trọn vẹn (#8157)
+
+Dù đèn chạy agent nào (OpenClaw hay Hermes; không chỗ nào ở đây gọi tên hay
+ép một agent), kỹ năng nó tạo được tạo trọn vẹn, có mọi thứ một lần chạy cần:
+
+- **Hướng dẫn** (`lamp_tasks::skill_make::GUIDE`,
+  `crates/tasks/src/skill_make_guide.md`) dạy hai loại bước, chọn lúc tạo:
+  bước `run`, viết đúng `run = "scripts/main.py"`, có script làm trọn việc
+  và nói câu thành công lẫn câu thất bại bằng `lamp.say` (lamp-skills chạy
+  nó không cần agent; schema và runtime của khóa này thuộc #8158), và bước
+  `task` chỉ khi mỗi lần chạy cần agent tóm tắt hay suy luận, các script trợ
+  giúp của nó cũng được viết lúc tạo. Script được viết lúc tạo, không bao giờ
+  lúc chạy. Một dịch vụ liên kết được chính script đọc (`lamp.service_read`)
+  hoặc bước `read` của đèn: script chuyển giao một dòng không còn được dạy cho
+  agent (luật nó nhận cũng nói vậy, `make_skill_local::agents_own_scripts`;
+  của DeepSeek như trước). Agent chỉ viết bản nháp nó được giao, không bao giờ
+  sửa kỹ năng của đèn hay kỹ năng khác. Các ví dụ
+  (`crates/tasks/src/make_examples/`) có bước `run` (`coin-flip`,
+  `breathing-coach`, `exchange-rate`, `sun-times`) và một `task` có script
+  trợ giúp đọc lịch (`agenda-count`).
+- **`SKILL.md` của nó** có dòng `when` và, với kỹ năng có code, ba mục, mỗi
+  mục một tiêu đề `## ` có dòng bên dưới: `## Uses` (mỗi script hay công cụ
+  lamp-services và đối số của nó), `## Result` (mỗi kết quả nằm ở đâu) và
+  `## Answer` (điều được nói to, một đến ba câu đơn giản). Voice giữ kỹ năng
+  agent của đèn tạo có code theo ba mục này (`made_skill::sections_held`, từ
+  chối là `made_skill::NO_SECTIONS` kèm dòng để sửa); không áp cho kỹ năng
+  có sẵn, của Store, được đẩy lên hay thêm từ tệp, cũng không cho kỹ năng
+  DeepSeek tạo.
+- **Một lần chạy thử trước khi giữ.** Khi kiểm tra của voice đã đóng gói nó,
+  kỹ năng có code được gửi trọn sang lamp-tasks
+  (`make_skill_agent::try_made`, `"op":"make_try"`; [tasks_vi.md](tasks_vi.md),
+  "Lần chạy thử của kỹ năng được tạo") và chỉ được giữ khi lần thử đạt: mỗi
+  script thoát 0 trong 30 s, script của bước `run` đã nói ít nhất một câu
+  bằng `lamp.say`, script của bước `task` có in ra gì đó. Lần thử không thay
+  đổi gì ngoài đời: lamp-control trả lời lệnh ghi dịch vụ liên kết của lần
+  chạy thử như đã xong và không bao giờ gửi; lệnh đọc thì chạy thật. Lần thử
+  thất bại bị từ chối là `made_skill::NOT_TRIED_PASSED` kèm lời của
+  lamp-tasks, gửi lại agent như một lần sửa (tối đa hai), rồi lần tạo được
+  báo là thất bại và không giữ gì. Lần thử đạt thêm `made_skill::TRIED_SAID`
+  ("I tried it once and it worked.") vào lời đọc lại; vẫn hỏi người dùng đồng
+  ý như trước. Lần thử không làm được (lamp-tasks cũ, không có phần tasks)
+  được ghi nhật ký và kỹ năng được giữ như trước. Không áp cho kỹ năng thêm
+  từ tệp.
+- **Ai đã viết nó** luôn có trên thẻ và trong mục `made.json`:
+  `made_with: openclaw`, `hermes` (engine phần tasks báo cho lần tạo) hoặc
+  `deepseek` (model riêng của đèn), bất kể `LAMP_MAKE_REACTIONS_ONLY_DEEPSEEK`;
+  `made_by` vẫn là người yêu cầu (`voice`, `app`).
+
+Kiểm thử: `a_made_skill_always_says_the_engine_that_wrote_it`,
+`an_agents_skill_with_code_says_its_uses_result_and_answer`,
+`a_tried_run_is_told_or_goes_to_a_repair`,
+`a_tried_runs_answer_is_read_as_passed_failed_nothing_or_not_tried`,
+`a_made_skill_is_sent_whole_to_be_tried`,
+`the_agent_is_told_to_write_a_services_scripts_whole`, và các kiểm thử của
+lamp-tasks, lamp-control bên dưới.
+
 ### Một lần tạo khi lần khác đang chạy sẽ chờ đến lượt (`LAMP_MAKE_QUEUE=on`, tắt)
 
 Trên lamp-9adf (stock 14083, #7679) một người tạo một kỹ năng, 47 giây sau

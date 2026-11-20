@@ -3931,6 +3931,60 @@ engine's own is left on `lampos`'s login `PATH` (a failed look keeps it); a
 line that stays true round after round is logged once. Skill runs still go
 to Hermes alone (`HarnessRunner`, above).
 
+### A made skill's tried run (`make_try`, #8157)
+
+Before the voice keeps a skill it made with code, whichever agent made it,
+it asks lamp-tasks to try it once ([skills.md](skills.md), "A made skill is
+made once and whole"); `lamp_tasks::make_try`.
+
+- **The line**, on the make socket, from lamp-voice alone as a make's:
+  `{"op":"make_try","name","files"}`, its files by their path in the
+  skill's folder (`skill.toml`, `SKILL.md`, `scripts/...`), at most 64.
+  One try at a time (another is refused `busy`), beside a make's place.
+- **What is tried** (`make_try::plan`): a `run` step's script; or, with a
+  `task` step and no `run` step, each `.py` under `scripts/` (the task's own
+  and its helpers), at most 4. No script step: `{"ok":true,"tried":false}`.
+- **How**: the skill's files are written to a `make-try-*` folder of the
+  make's work folder (swept with the makes' at start), a token is minted on
+  lamp-control's admin socket for the draft's own grants
+  (`{"mint":{"try":[...],"run"}}`, `Tokens::mint_try`; `net` is the run's
+  own egress socket, as a skill run's, only with `LAMP_TASK_NET` on), and
+  lamp-tasks starts itself as `lamp-tasks make-try-fence`
+  (`make_try::fence_main`) with the grant on stdin: it becomes the same
+  fence a gateway agent's run gets from the skill-start launcher
+  (`skill_start::exec_fence`, `gateway::FENCE_TEXT`; fd 4 a sink in place
+  of the launcher's socket). No agent takes part. Each script runs once, at
+  most 30 s (`TRY_WITHIN`), then is killed; its output is kept up to 8 KiB.
+- **Judged** (`make_try::judged`): exit 0 in time; a `run` step's script
+  said at least one line (`said` from lamp-control's `end` answer,
+  `Tokens::end_said`; an older lamp-control that doesn't say is not held
+  against it); a task's script printed something. Answered
+  `{"ok":true,"tried":true,"passed":true,"said":N}` or
+  `{"ok":true,"tried":true,"passed":false,"why"}` (the words go to the
+  voice's repair); a try that couldn't start (no token, no fence) is
+  refused `not_tried`.
+- **Nothing is sent**: lamp-control marks the token tried; its
+  `service.write` is answered `{"result":{"sent":false,"tried":true}}` and
+  never reaches lamp-services, linked services on or not; its reads go on
+  live.
+- **The say count** (for #8158's `run` step too): lamp-control counts each
+  `say` the speaker took for a run's client (`runs::Run::said`) and answers
+  an admin `{"end":{"run"}}` with `{"ended":true,"said":N}`.
+
+Tests: `a_run_step_tries_its_script_and_a_task_each_of_its_scripts`,
+`a_try_passes_only_on_exit_0_in_time_and_for_a_run_step_a_say`,
+`a_tried_run_is_answered_and_its_folder_removed`,
+`a_silent_run_step_fails_its_try_with_words_for_the_repair`,
+`a_skill_that_sends_is_tried_with_its_own_grants`,
+`the_fence_launch_mints_a_tried_token_and_reads_its_says`,
+`a_fence_that_runs_past_its_limit_is_ended`; lamp-control's
+`a_tried_runs_write_is_stubbed_and_its_read_is_live`,
+`a_tried_runs_write_is_stubbed_with_services_off`,
+`a_runs_says_are_counted_to_its_end`,
+`a_runs_says_are_counted_and_a_tried_run_is_marked`,
+`a_tried_runs_grants_are_the_drafts_own` and
+`a_tried_run_is_minted_the_drafts_grants_and_its_end_tells_its_says`.
+
 ### A live spoken ask on the make socket (`voice_ask`, off unless set)
 
 The owner's rulings of 17 Nov: a linked service's live read, and an ask the
