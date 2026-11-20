@@ -1547,9 +1547,9 @@ fn lamp_tasks_own_namespace_check_is_the_installs_without_runuser() {
     assert!(own.contains(&NS.to_owned()), "{own:?}");
     assert_eq!(main_pid_argv()[0], "/usr/bin/systemctl");
     assert_eq!(main_pid_argv()[1..], MAIN_PID[1..]);
-    let says = |pid: &str| gateway_runs(&["echo".to_owned(), pid.to_owned()]);
+    let says = |pid: &str| gateway_is_running(&["echo".to_owned(), pid.to_owned()]);
     assert!(says("4242") && !says("0") && !says(""));
-    assert!(!gateway_runs(&["false".to_owned()]) && !gateway_runs(&[]));
+    assert!(!gateway_is_running(&["false".to_owned()]) && !gateway_is_running(&[]));
 }
 
 /// #7868 (the first builder, 02:02): OpenClaw 2026.11.2 refuses a `config

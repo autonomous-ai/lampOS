@@ -2592,7 +2592,7 @@ pub fn main_pid_argv() -> Vec<String> {
 
 /// Whether `main_pid` ([`main_pid_argv`] on the lamp) prints a running
 /// gateway's `MainPID` ([`has_main_pid`]); not run, or failed, it is not.
-pub fn gateway_runs(main_pid: &[String]) -> bool {
+pub fn gateway_is_running(main_pid: &[String]) -> bool {
     let Some((program, args)) = main_pid.split_first() else {
         return false;
     };
