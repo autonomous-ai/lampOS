@@ -71,7 +71,7 @@
 //! writes is OpenClaw's and no one else's; never through a link.
 use std::fs;
 use std::io;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::time::Duration;
 
 use serde_json::{Map, Value, json};
@@ -86,6 +86,32 @@ pub const VALIDATOR: &str = "/usr/local/bin/openclaw";
 /// The longest OpenClaw's config check runs before it counts as a
 /// refusal (`lamp_checked_replace::VALIDATE_WITHIN`).
 pub use lamp_checked_replace::VALIDATE_WITHIN;
+
+/// How OpenClaw's own check of a new text runs (#8060): through
+/// `wrapper`, joined to the running gateway's namespaces, while
+/// `main_pid` prints the gateway's unit's `MainPID`; else, with no
+/// gateway and so no lock to clash with, `own(file)` in OpenClaw's
+/// namespace of its own. With no `wrapper` there (OpenClaw not
+/// installed) nothing checks it.
+pub struct Check {
+    /// OpenClaw's wrapper ([`VALIDATOR`] on the lamp).
+    pub wrapper: PathBuf,
+    /// What prints the gateway's unit's `MainPID`.
+    pub main_pid: Vec<String>,
+    /// The check of `file` in OpenClaw's namespace of its own.
+    pub own: Box<dyn Fn(&str) -> Vec<String>>,
+}
+
+impl Check {
+    /// The lamp's.
+    pub fn lamp() -> Self {
+        Check {
+            wrapper: VALIDATOR.into(),
+            main_pid: Vec::new(),
+            own: Box::new(|_: &str| Vec::new()),
+        }
+    }
+}
 
 /// OpenClaw's settings file, in its state folder.
 pub const CONFIG_FILE: &str = "openclaw.json";
@@ -388,20 +414,20 @@ pub fn write(
         workspace,
         skills,
         v1,
-        Path::new(VALIDATOR),
+        &Check::lamp(),
         &GATEWAY_WAITS,
         &mut |line| eprintln!("{line}"),
     )
 }
 
-/// [`write`], with `validator` as OpenClaw's wrapper.
+/// [`write`], with OpenClaw's own check run as `check` says.
 pub fn write_checked(
     state_dir: &Path,
     port: u16,
     workspace: &Path,
     skills: bool,
     v1: bool,
-    validator: &Path,
+    check: &Check,
 ) -> io::Result<bool> {
     let path = state_dir.join(CONFIG_FILE);
     // Seventh's P2 on #7872: held from the read to the rename, as every
@@ -419,12 +445,12 @@ pub fn write_checked(
     if merged == text {
         return Ok(false);
     }
-    if validator.exists() {
-        replace_checked(&path, &merged, &mut |file| validate(validator, file))?;
+    if check.wrapper.exists() {
+        replace_checked(&path, &merged, &mut |file| validate(check, file))?;
     } else {
         eprintln!(
             "[lamp-tasks] OpenClaw's {CONFIG_FILE} written unchecked: no OpenClaw at {}",
-            validator.display()
+            check.wrapper.display()
         );
         replace_checked(&path, &merged, &mut |_| Ok(()))?;
     }
@@ -442,13 +468,13 @@ pub fn write_checked(
 /// (`crate::gateway::APPROVALS_ENV`) and nothing else, killed with its
 /// process group past [`VALIDATE_WITHIN`]. `Ok` only on status 0; else
 /// what OpenClaw said, on one line and short.
-pub fn validate(validator: &Path, file: &Path) -> Result<(), String> {
+pub fn validate(check: &Check, file: &Path) -> Result<(), String> {
     let file = file
         .to_str()
         .ok_or("OpenClaw's config check: the new file's path is not UTF-8")?;
     let mut env = crate::gateway::APPROVALS_ENV.to_vec();
     env.push(("OPENCLAW_CONFIG_PATH", file));
-    let argv = [validator.to_string_lossy().into_owned()]
+    let argv = [check.wrapper.to_string_lossy().into_owned()]
         .into_iter()
         .chain(["config", "validate", "--json"].map(str::to_owned))
         .collect::<Vec<_>>();
@@ -476,13 +502,13 @@ pub fn write_waiting(
     workspace: &Path,
     skills: bool,
     v1: bool,
-    validator: &Path,
+    check: &Check,
     waits: &[Duration],
     say: &mut dyn FnMut(&str),
 ) -> io::Result<bool> {
     let mut waits = waits.iter();
     loop {
-        match write_checked(state_dir, port, workspace, skills, v1, validator) {
+        match write_checked(state_dir, port, workspace, skills, v1, check) {
             Err(error)
                 if gateway_not_there(&error.to_string()) || error.to_string().contains(KILLED) =>
             {
@@ -1003,7 +1029,14 @@ mod tests {
         fs::write(&running, "").unwrap();
         fs::set_permissions(&wrapper, fs::Permissions::from_mode(0o755)).unwrap();
         let write = |validator: &Path| {
-            write_checked(&state, 7741, Path::new(WORKSPACE), true, true, validator)
+            write_checked(
+                &state,
+                7741,
+                Path::new(WORKSPACE),
+                true,
+                true,
+                &joined(validator),
+            )
         };
 
         fs::write(&verdict, "1").unwrap();
@@ -1029,6 +1062,137 @@ mod tests {
 
         assert!(write(&dir.path().join("none")).unwrap());
         assert_eq!(fs::read_to_string(&path).unwrap(), given);
+    }
+
+    /// A [`Check`] through the stand-in `wrapper`, the gateway's unit
+    /// naming a `MainPID` (its `own` never run).
+    fn joined(wrapper: &Path) -> Check {
+        Check {
+            wrapper: wrapper.into(),
+            main_pid: vec!["echo".into(), "4242".into()],
+            own: Box::new(|_: &str| vec!["false".into()]),
+        }
+    }
+
+    /// A stand-in script at `path`, 0755.
+    fn script(path: &Path, text: &str) {
+        fs::write(path, text).unwrap();
+        fs::set_permissions(path, fs::Permissions::from_mode(0o755)).unwrap();
+    }
+
+    /// A [`Check`] under `dir`: the gateway's unit's `MainPID` read from
+    /// `dir/pid`; the stand-in wrapper (`dir/openclaw`) joins the gateway,
+    /// failing closed with none, and logs `joined`; OpenClaw in its own
+    /// namespace (`dir/own`, given the new file) logs `own`. Either
+    /// refuses a text with `"ask"` in it, as OpenClaw 2026.11.2 refuses
+    /// `mode` beside `ask` (78, the gateway down), and else answers with
+    /// `dir/verdict`'s status. Neither is ever given the live file.
+    fn standing_in(dir: &Path, live: &Path) -> Check {
+        let check = |name: &str, file: &str| {
+            format!(
+                "[ \"{file}\" != {live} ] && [ -f \"{file}\" ] || exit 2\necho {name} >> {log}\n! grep -q '\"ask\"' \"{file}\" || {{ echo 'tools.exec: mode beside ask'; exit 1; }}\nexit \"$(cat {verdict})\"\n",
+                live = live.display(),
+                log = dir.join("log").display(),
+                verdict = dir.join("verdict").display(),
+            )
+        };
+        script(
+            &dir.join("openclaw"),
+            &format!(
+                "#!/bin/sh\n[ \"$*\" = \"config validate --json\" ] || exit 2\n[ \"$(cat {pid})\" != 0 ] || {{ echo 'openclaw: its gateway (lamp-openclaw-gateway.service) is not running in its own namespaces; nothing runs without it'; exit 1; }}\n{}",
+                check("joined", "$OPENCLAW_CONFIG_PATH"),
+                pid = dir.join("pid").display(),
+            ),
+        );
+        script(
+            &dir.join("own"),
+            &format!("#!/bin/sh\n{}", check("own", "$1")),
+        );
+        fs::write(dir.join("verdict"), "0").unwrap();
+        let own = dir.join("own").to_string_lossy().into_owned();
+        Check {
+            wrapper: dir.join("openclaw"),
+            main_pid: vec!["cat".into(), dir.join("pid").to_string_lossy().into_owned()],
+            own: Box::new(move |file: &str| vec![own.clone(), file.to_owned()]),
+        }
+    }
+
+    /// What the stand-ins of [`standing_in`] logged since the last call.
+    fn logged(dir: &Path) -> String {
+        let log = dir.join("log");
+        let said = fs::read_to_string(&log).unwrap_or_default();
+        let _ = fs::remove_file(&log);
+        said
+    }
+
+    /// #8060: with no gateway running (its unit's `MainPID` is 0) the
+    /// check runs in OpenClaw's namespace of its own, where no gateway
+    /// holds the lock, never failing closed for want of a gateway; with
+    /// one running it still joins it through the wrapper. Either way the
+    /// text is checked, on the new file, never the live one.
+    #[test]
+    fn with_no_gateway_running_the_check_runs_in_openclaws_own_namespace() {
+        let dir = tempfile::tempdir().unwrap();
+        let state = dir.path().join("state");
+        fs::create_dir_all(&state).unwrap();
+        let path = state.join(CONFIG_FILE);
+        let check = standing_in(dir.path(), &path);
+        let write = || write_checked(&state, 7741, Path::new(WORKSPACE), true, true, &check);
+
+        fs::write(&path, INSTALLED).unwrap();
+        fs::write(dir.path().join("pid"), "0\n").unwrap();
+        assert!(write().unwrap());
+        assert_eq!(logged(dir.path()), "own\n");
+        assert_ne!(fs::read_to_string(&path).unwrap(), INSTALLED);
+        assert_eq!(fs::read_dir(&state).unwrap().count(), 1);
+
+        fs::write(&path, INSTALLED).unwrap();
+        fs::write(dir.path().join("pid"), "4242\n").unwrap();
+        assert!(write().unwrap());
+        assert_eq!(logged(dir.path()), "joined\n");
+        assert_ne!(fs::read_to_string(&path).unwrap(), INSTALLED);
+
+        // Refused in its own namespace: nothing written there either.
+        fs::write(&path, INSTALLED).unwrap();
+        fs::write(dir.path().join("pid"), "0\n").unwrap();
+        fs::write(dir.path().join("verdict"), "1").unwrap();
+        let error = write().unwrap_err().to_string();
+        assert!(error.contains("status 1"), "{error}");
+        assert_eq!(logged(dir.path()), "own\n");
+        assert_eq!(fs::read_to_string(&path).unwrap(), INSTALLED);
+        assert_eq!(fs::read_dir(&state).unwrap().count(), 1);
+    }
+
+    /// #8060: a config OpenClaw refuses already in `openclaw.json` keeps
+    /// its gateway down (Restart=on-failure, then "Start request repeated
+    /// too quickly"), so no gateway runs to join. lamp-tasks' next write
+    /// still heals it: the merged text, which OpenClaw takes, is checked
+    /// in OpenClaw's own namespace and replaces the refused file. A merged
+    /// text OpenClaw refuses writes nothing.
+    #[test]
+    fn a_refused_file_in_place_is_healed_through_the_check() {
+        let dir = tempfile::tempdir().unwrap();
+        let state = dir.path().join("state");
+        fs::create_dir_all(&state).unwrap();
+        let path = state.join(CONFIG_FILE);
+        let check = standing_in(dir.path(), &path);
+        fs::write(dir.path().join("pid"), "0\n").unwrap();
+        let refused = with_exec(json!({"host": "gateway", "mode": "ask", "ask": "off"}));
+        let write = || write_checked(&state, 7741, Path::new(WORKSPACE), true, true, &check);
+
+        fs::write(&path, &refused).unwrap();
+        assert!(write().unwrap());
+        assert_eq!(logged(dir.path()), "own\n");
+        let healed = fs::read_to_string(&path).unwrap();
+        assert!(!healed.contains("\"ask\""), "{healed}");
+        assert!(healed.contains("kept-gateway-token"), "{healed}");
+        assert_eq!(fs::read_dir(&state).unwrap().count(), 1);
+
+        fs::write(&path, &refused).unwrap();
+        fs::write(dir.path().join("verdict"), "1").unwrap();
+        assert!(write().is_err());
+        assert_eq!(fs::read_to_string(&path).unwrap(), refused);
+        assert_eq!(fs::read_dir(&state).unwrap().count(), 1);
     }
 
     /// Whether `folder`'s lock (an exclusive `flock` on the folder) is held
@@ -1074,7 +1238,16 @@ mod tests {
         fs::set_permissions(&wrapper, fs::Permissions::from_mode(0o755)).unwrap();
         let writing = std::thread::spawn({
             let (state, wrapper) = (state.clone(), wrapper.clone());
-            move || write_checked(&state, 7741, Path::new(WORKSPACE), true, true, &wrapper)
+            move || {
+                write_checked(
+                    &state,
+                    7741,
+                    Path::new(WORKSPACE),
+                    true,
+                    true,
+                    &joined(&wrapper),
+                )
+            }
         });
         let began = std::time::Instant::now();
         while !inside.exists() {
@@ -1123,7 +1296,7 @@ mod tests {
                 Path::new(WORKSPACE),
                 true,
                 true,
-                &wrapper,
+                &joined(&wrapper),
                 &waits,
                 say,
             )
@@ -1198,7 +1371,7 @@ mod tests {
                 Path::new(WORKSPACE),
                 true,
                 true,
-                &wrapper,
+                &joined(&wrapper),
                 &waits,
                 say,
             )
