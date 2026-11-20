@@ -5427,9 +5427,9 @@ in and signed out, and on 0.6.60, signed in (#7507's ROW).
     put-back past the store's confirm bound (`CONFIRM_MS`, 120 s from the
     task's prepare) expired it unheard, so it sat until lamp-voice's 480 s
     bound (lamp-c0a4, 19 Nov 21:47-21:55). The waiting task ends with a
-    short "ask me again" line, told once by Task news (`failed_stuck`:
-    "I can't handle that right now; please ask me again in a few
-    minutes."); the close and the reopen go on as above, and the next one
+    short line, told once by Task news as not done (`failed_stuck`,
+    #8138: "I couldn't finish that; something went wrong. Ask me again in
+    a moment."), never redone later; the close and the reopen go on as above, and the next one
     goes to the reopened session.
     Beside #7895's bound: an `ENGINE_NOT_READY` refusal never spends one
     of a spoken task's `STARTING_RESUMES_MOST` (3) tries, which count only
@@ -5611,6 +5611,45 @@ the token in the environment the same way.
 The fix is #7024 (P1): lamp-tasks starts the fenced script itself,
 outside the gateway's namespaces, with the token from lamp-tasks and
 never through the launcher, and the same for Hermes's runs.
+
+## The lamp's own agent not ready: the voice's side (#8138)
+
+lamp-tasks publishes the lamp's own agent's readiness on `tasks/agent`
+(`lamp_msgs::AgentReadiness`: `off`, `not_installed`, `installing`,
+`starting`, `ready`, `working`, `recovering`, `error`). lamp-voice
+(`crates/voice/src/agent_ready.rs`) uses it so the person is never left
+waiting after "I'll look into that":
+
+- **Refused at once.** The provider worker follows `tasks/agent`. A
+  `start_agent_task` for the lamp's own agent (the default engine, or the
+  one `tasks/agent` names) while the latest value is not `ready` or
+  `working` (and not `off`) is refused before anything is asked of
+  lamp-tasks, with no network wait: the model is told to say, at once and
+  nothing more, "I'm having a problem right now; ask me again in a
+  moment." lamp-tasks' own `agent_not_ready` at prepare (or at confirm) is
+  told the same way. Nothing is prepared, so no read-back and no "I'll
+  look into that" comes first; the model says the line in the person's
+  language. Work for a computer is never held to the lamp's readiness.
+- **A handed-over task that fails is told as not done.** `not_sent` with
+  `one_session_stuck`, `one_session_not_started` or `agent_broken` is told
+  once by Task news (`failed_stuck`): "I couldn't finish that; something
+  went wrong. Ask me again in a moment." The note says it will not be done
+  later, and the voice has no "I restarted it and did your request" path.
+  Each change of `tasks/agent` wakes Task news' reader at once and again
+  2 s later, so the failure is read as soon as lamp-tasks keeps it, not up
+  to 10 s later, and told at the same moment as any task news.
+- **"Ready again", once.** Task news follows `tasks/agent` too. When the
+  agent goes from a state that takes no task to `ready`, and within the
+  last 15 minutes someone was refused (the provider worker notes it in
+  `agent-refused`, beside the file of what was told) or a task of its own
+  failed as above, "I'm ready again; you can ask me now." is offered once
+  as task news (key `agent-ready-<since_unix_ms>`): it waits for a quiet
+  moment like other news, is never told again, and is let go after
+  5 minutes. With nobody refused, at the voice's start, or on `working`,
+  nothing is said.
+- **Asked about it.** `harness_status` answers with `you`: the state and
+  a line for the model (never the engine or the `why`), so "is your agent
+  OK?" is answered truthfully. Its description names that question.
 
 ## Devin (#1854)
 
