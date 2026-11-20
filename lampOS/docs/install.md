@@ -2524,7 +2524,9 @@ As root, on a lamp with the base image (`crates/update/src/install.rs`):
      The one-shot's check joins the running gateway (above), and a gateway
      just (re)started may not be there to join yet: only that refusal (the
      wrapper's "is not running in its own namespaces", or "'node': No such
-     file or directory") is tried again, after 5, 10, 20, 40 s and then 60
+     file or directory"), or a gateway that came up under a check run in
+     `openclaw-ns` of its own (`GatewayLockNamespaceError`,
+     `lamp_checked_replace::GATEWAY_CAME_UP`, #8060), is tried again, after 5, 10, 20, 40 s and then 60
      s four times, 5 min 15 s at most (`lamp_checked_replace::GATEWAY_WAITS`,
      lamp-tasks' schedule since #7268), each wait one line
      "...openclaw.json's gateway block waits for OpenClaw's gateway to check
