@@ -302,7 +302,7 @@ const HERMES: &str = "Hermes";
 const OPENCLAW: &str = "OpenClaw";
 /// What the model is told when the work was asked for on the lamp itself
 /// and the lamp has no target of its own (#5978): nothing goes elsewhere.
-const LAMP_NOT_SET_UP: &str = "Work can't be done here on the lamp itself: that isn't set up on this lamp, so nothing was handed over. Say so plainly in a few words.";
+pub(crate) const LAMP_NOT_SET_UP: &str = "Work can't be done here on the lamp itself: that isn't set up on this lamp, so nothing was handed over. Say so plainly in a few words.";
 
 /// Said when the tasks part answers `"lamp":"installing"` (#5978: Hermes on
 /// the lamp is switched on but not installed yet) and no target of the
@@ -4722,12 +4722,16 @@ fn run_for_asked(
             // The lamp's own agent, read on `tasks/agent` as taking no task
             // now (#8138): refused at once, nothing asked of the tasks
             // part, so the person hears it within a second.
-            if on_the_lamp && let Some(state) = crate::agent_ready::refuses_now(engine.as_deref()) {
+            // Not installed or signed out keep their own lines.
+            if on_the_lamp && let Some(read) = crate::agent_ready::refuses_now(engine.as_deref()) {
                 eprintln!(
-                    "lamp-voice provider: request {request}: the lamp's own agent is {state:?}: refused at once, nothing prepared"
+                    "lamp-voice provider: request {request}: the lamp's own agent is {:?}: refused at once, nothing prepared",
+                    read.state
                 );
-                crate::agent_ready::note_refused();
-                return (crate::agent_ready::refusal(), true);
+                return (
+                    crate::agent_ready::refused(read.state, read.why.as_deref()),
+                    true,
+                );
             }
             let recorded;
             let task = if place.questions && is_question(task) {
@@ -4938,8 +4942,7 @@ fn run_for_asked(
                     // The lamp's own agent is not ready (#8138): told at
                     // once, nothing handed over, never "I'll look into it".
                     if code == Some(crate::agent_ready::NOT_READY_CODE) {
-                        crate::agent_ready::note_refused();
-                        return (crate::agent_ready::refusal(), true);
+                        return (crate::agent_ready::refused_by(&answer), true);
                     }
                     let told = match code {
                         Some("no_harness") => NO_HARNESS.to_owned(),
@@ -5105,8 +5108,7 @@ fn run_for_asked(
                         pending.engine.as_deref(),
                         lamp_msgs::HandStage::Declined,
                     );
-                    crate::agent_ready::note_refused();
-                    (crate::agent_ready::refusal(), true)
+                    (crate::agent_ready::refused_by(&answer), true)
                 }
                 Some(_) => (json!({"error": "It could not be started just now."}), true),
                 None => (unreached(place), false),

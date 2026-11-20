@@ -147,18 +147,61 @@ pub fn latest() -> Option<AgentReadiness> {
     LATEST.lock().ok().and_then(|latest| latest.clone())
 }
 
-/// The state that refuses a task for the lamp's own agent now, if any:
-/// the latest read says it takes none (not `ready` or `working`), for the
-/// engine `named` or, with none named, the lamp's default. An engine other
-/// than the one it reads is never refused here; lamp-tasks decides.
-pub fn refuses_now(named: Option<&str>) -> Option<Readiness> {
+/// The readiness that refuses a task for the lamp's own agent now, if
+/// any: the latest read says it takes none (not `ready` or `working`), for
+/// the engine `named` or, with none named, the lamp's default. An engine
+/// other than the one it reads is never refused here; lamp-tasks decides.
+pub fn refuses_now(named: Option<&str>) -> Option<AgentReadiness> {
     let latest = latest()?;
     if latest.state.takes_tasks() || latest.state == Readiness::Off {
         return None;
     }
     named
         .is_none_or(|named| named == latest.engine)
-        .then_some(latest.state)
+        .then_some(latest)
+}
+
+/// The `why` lamp-tasks gives a signed-out agent.
+pub const SIGNED_OUT_WHY: &str = "signed_out";
+
+/// What the model is told when a task for the lamp's own agent is refused
+/// in `state` with `why` (#8138): not installed, the not-set-up line;
+/// signed out, the lamp's signed-out line ([`crate::language::SIGNED_OUT`]);
+/// any other ([`Readiness::Starting`] with `tasks_restarting` among them),
+/// [`refusal`]'s problem line, noted for the ready-again line.
+pub fn refused(state: Readiness, why: Option<&str>) -> Value {
+    // Lasting states keep their existing lines, never "in a moment".
+    if state == Readiness::NotInstalled {
+        return json!({"error": crate::agent_tasks::LAMP_NOT_SET_UP});
+    }
+    if state == Readiness::Error && why == Some(SIGNED_OUT_WHY) {
+        return json!({"error": format!(
+            "Nothing was handed over: you are signed out. Tell them in these words, and nothing more: \"{}\"",
+            crate::language::SIGNED_OUT
+        )});
+    }
+    note_refused();
+    refusal()
+}
+
+/// [`refused`] for lamp-tasks' `agent_not_ready` `answer`: its `readiness`
+/// and `why`, the latest read's `why` when the answer has none and the
+/// states agree; a state it can't read is told as a problem of the moment.
+pub fn refused_by(answer: &Value) -> Value {
+    let state = answer
+        .get("readiness")
+        .and_then(|said| serde_json::from_value::<Readiness>(said.clone()).ok())
+        .unwrap_or(Readiness::Recovering);
+    let why = answer
+        .get("why")
+        .and_then(Value::as_str)
+        .map(str::to_owned)
+        .or_else(|| {
+            latest()
+                .filter(|latest| latest.state == state)
+                .and_then(|latest| latest.why)
+        });
+    refused(state, why.as_deref())
 }
 
 /// What the model is told when a task for the lamp's own agent is refused
@@ -366,6 +409,57 @@ mod tests {
         }
         LATEST_HERE.with(|here| *here.borrow_mut() = None);
         assert_eq!(refuses_now(None), None, "nothing read refuses nothing");
+    }
+
+    /// #8138, the adversarial read: not installed and signed out keep their
+    /// lasting lines, never "ask me again in a moment", and are no refusal
+    /// for the ready-again line; every other down state (`tasks_restarting`
+    /// among them) gets the problem line and is noted.
+    #[test]
+    fn lasting_states_keep_their_own_lines() {
+        let said = |state: Readiness, why: Option<&str>| {
+            let before = REFUSED_HERE.with(std::cell::Cell::get);
+            let told = refused(state, why)["error"].as_str().unwrap().to_owned();
+            (told, REFUSED_HERE.with(std::cell::Cell::get) > before)
+        };
+        let (told, noted) = said(Readiness::NotInstalled, None);
+        assert_eq!(told, crate::agent_tasks::LAMP_NOT_SET_UP);
+        assert!(!noted);
+        let (told, noted) = said(Readiness::Error, Some(SIGNED_OUT_WHY));
+        assert!(told.contains(crate::language::SIGNED_OUT), "{told}");
+        assert!(!told.contains(PROBLEM_LINE) && !noted, "{told}");
+        for (state, why) in [
+            (Readiness::Starting, Some("tasks_restarting")),
+            (Readiness::Starting, None),
+            (Readiness::Recovering, Some("deaf")),
+            (Readiness::Error, Some("launch_failed")),
+            (Readiness::Installing, None),
+        ] {
+            let (told, noted) = said(state, why);
+            assert!(
+                told.contains(PROBLEM_LINE) && noted,
+                "{state:?} {why:?}: {told}"
+            );
+        }
+        // lamp-tasks' answer: its readiness and why, else the latest's why.
+        let by = |answer: Value| refused_by(&answer)["error"].as_str().unwrap().to_owned();
+        assert_eq!(
+            by(json!({"ok":false,"error":"agent_not_ready","readiness":"not_installed"})),
+            crate::agent_tasks::LAMP_NOT_SET_UP
+        );
+        LATEST_HERE.with(|here| {
+            *here.borrow_mut() = Some(AgentReadiness {
+                why: Some(SIGNED_OUT_WHY.into()),
+                ..read(Readiness::Error)
+            })
+        });
+        assert!(
+            by(json!({"ok":false,"error":"agent_not_ready","readiness":"error"}))
+                .contains(crate::language::SIGNED_OUT)
+        );
+        LATEST_HERE.with(|here| *here.borrow_mut() = None);
+        assert!(by(json!({"ok":false,"error":"agent_not_ready","readiness":"starting","why":"tasks_restarting"})).contains(PROBLEM_LINE));
+        assert!(by(json!({"ok":false,"error":"agent_not_ready"})).contains(PROBLEM_LINE));
     }
 
     /// The lines carry no engine or technical words.
