@@ -274,7 +274,7 @@ pub fn named(said: &str) -> bool {
 /// ROW, lamp-52e6, 20 Nov 14:38). Said to a person ("Hey, Anna, make me a
 /// skill that …"), the line names nothing, and is read as said.
 pub fn make_asked(said: &str) -> bool {
-    let past = crate::second_provider::past_the_name_heard_as(said, named(said));
+    let past = crate::second_provider::past_the_name(said);
     asks_to_make(said) || past.is_some_and(asks_to_make)
 }
 

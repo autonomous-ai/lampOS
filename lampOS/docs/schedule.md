@@ -1113,7 +1113,12 @@ it another operation ("don't", "no", "wait", "cancel", "actually", "or",
 "for a week"; a later start: "starting at noon"; a condition: "when", "if",
 "once") and a
 question that isn't an ask are asked as before, and the round after the call is asked with its
-result, so the lamp says what the schedule did.
+result, so the lamp says what the schedule did. The ask is read past the lamp's
+name too (`second_provider::forced_past_the_name`, #8022: on lamp-52e6 on 20
+Nov the gates' timer asks said `calls=none`): its own name set off by a stop
+("Hey Lamp. Remind me in ten minutes to stretch.") and, on a line that names
+the lamp, its name heard as another word ("Hey, Lynn, remind me …"). A line
+said to a person ("Hey, Anna, remind me …") is read as said.
 
 ## First's Voice integration contract
 

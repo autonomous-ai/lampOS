@@ -877,6 +877,23 @@ sau:
      …" nói với một người) được đọc như đã nói và không bị ép. Test:
      `round_one_forced::a_make_past_the_lamps_name_heard_as_another_word_is_forced_on_a_named_line_alone`,
      `wake_not_name::past_the_name_is_the_line_past_the_misheard_name_on_a_named_line`.
+   - **Các lệnh ép vòng đầu khác cũng đọc sau tên đèn như vậy** (#8022:
+     trên lamp-52e6 ngày 20/11 các yêu cầu hẹn giờ và hỏi lời nhắc trong
+     gate ghi `calls=none`). `second_provider::forced_past_the_name` đọc
+     một lệnh ép trên dòng như đã nói, và khi không ép gì thì đọc trên phần
+     dòng sau tên đèn (`second_provider::past_the_name`: cách đọc ở trên,
+     với `named` đã giữ của dòng): yêu cầu ghi nhớ
+     (`LAMP_MEMORY_KEEP_ASKED`), yêu cầu hẹn giờ (`LAMP_SCHEDULE_ASKED`),
+     câu hỏi về lời nhắc (`LAMP_REMINDERS_ASKED`), yêu cầu kỹ năng
+     (`LAMP_SKILL_ASKED`) và yêu cầu nhớ khuôn mặt
+     (`LAMP_SECOND_REMEMBER_ASKED`) đều đi qua nó, và `make_asked` đọc
+     cùng `past_the_name`. Yêu cầu gọi agent theo tên
+     (`LAMP_TASKS_NAMED_ASK`) và tên khác của một khuôn mặt đã biết
+     (`LAMP_NAMES_RENAME_ASKED`) đọc cả dòng, không chỉ phần mở đầu, nên
+     không đổi. Một dòng nói với một người ("Hey, Anna, …") được đọc như
+     đã nói. Test:
+     `forces_past_name::each_force_reads_its_ask_past_the_lamps_name_set_off_or_misheard`,
+     `forces_past_name::a_misheard_name_is_read_past_only_while_the_line_names_the_lamp`.
    - **Tạo kỹ năng không bao giờ là một task** (#8022 case 2, first builder
      đồng ý lúc 11:05): khi `make_skill` được khai báo, mô tả của
      `start_agent_task` kết thúc bằng "Making a skill is make_skill's, never this."
