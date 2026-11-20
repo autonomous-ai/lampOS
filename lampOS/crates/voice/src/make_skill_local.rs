@@ -3669,9 +3669,9 @@ fn made_and_journaled_by(
     // call is DeepSeek's judgement of the request's meaning
     // ([`reaction_judged`]), never a draft. Judged one, DeepSeek drafts it,
     // and a draft that is no quick reaction ([`made_skill::quick_reaction`]:
-    // started by the person's own act, with only the light, a gesture, its
-    // exact words or its hum, never the model's marker said) is never
-    // kept. Judged none, unsure or with no answer, no draft is asked for.
+    // started by the lamp's own, words, no trigger or one on a topic the
+    // lamp has, with only the light, a gesture, its exact words or its
+    // hum, never the model's marker said) is never kept. Judged none, unsure or with no answer, no draft is asked for.
     // Either way the first builder's 19:50 ruling (the middle form): the
     // lamp writes it itself, as one task for its agent ([`agent_task`]):
     // the trigger its own model picks in one more call (or the words that
@@ -12147,6 +12147,16 @@ printf 'tar of %s' \"$name\" > \"$3/$name-1.0.0.tar\"\n",
         )
     }
 
+    /// [`presence_say`] held by a guard: never a quick reaction, a
+    /// `[[while]]` among its parts (the owner's 20 Nov ruling made a fixed
+    /// say on someone at the desk one).
+    fn presence_guarded() -> String {
+        format!(
+            "{}\n[[while]]\ntopic = \"voice/state\"\nfield = \"state\"\nequals = \"resting\"\n",
+            presence_say()
+        )
+    }
+
     /// A pat on the head, a nod: a quick reaction.
     fn pat_nod() -> String {
         "kind = \"installable\"\nversion = \"1.0.0\"\nneeds = [\"body\"]\n\n[permissions]\n\
@@ -12840,13 +12850,221 @@ printf 'tar of %s' \"$name\" > \"$3/$name-1.0.0.tar\"\n",
         let _ = std::fs::remove_dir_all(&root);
     }
 
+    /// The owner, 20 Nov: "make sure the quick reaction is DeepSeek's, and
+    /// everything else goes to the agent", with the ROW's own lines. Judged
+    /// quick, "whenever I come back to the desk, wave at me" (an arrival
+    /// and a greeting) and "glow pink when I pat your head" are DeepSeek's
+    /// drafts, kept as they are, `made_with: deepseek`. Judged none, the
+    /// gold price, the apple file and the stretch are the agent's, each
+    /// one task: the gold price on the clock, the stretch on a long
+    /// sitting, the apple file asked for by its phrase with its unknown
+    /// `file-write` left out (`LAMP_MAKE_NO_CANNOT` on), never "I can't
+    /// make that". And an arrival make sent to the agent whose one more
+    /// call named the moment but answered `asks:` keeps its arrival.
+    #[test]
+    fn with_the_owners_lines_a_quick_reaction_is_deepseeks_and_all_else_the_agents() {
+        made_skill::set_reactions_here(Some(true));
+        net_make_here(Some(true));
+        crate::make_no_cannot::set_on_here(Some(true));
+        made_skill::set_asks_here(Some(true));
+        let (root, keeping, copy) = keeping_copied("reactions-owner-lines");
+        const WAVE: &str = "whenever I come back to the desk, wave at me";
+        const PINK: &str = "glow pink when I pat your head";
+        let wave = "kind = \"installable\"\nversion = \"1.0.0\"\nneeds = [\"body\"]\n\n\
+                    [permissions]\nbody = true\ntopics = [\"room/presence\"]\n\n[trigger]\n\
+                    topic = \"room/presence\"\nfield = \"someone\"\nequals = true\n\
+                    when = \"appears\"\nabsent_for = \"5m\"\n\n[ask]\npolicy = \"nudge\"\n\n\
+                    [[do]]\nbody = { gesture = \"greeting\" }\n"
+            .to_owned();
+        let pink = "kind = \"installable\"\nversion = \"1.0.0\"\nneeds = [\"light\"]\n\n\
+                    [permissions]\nlight = true\ntopics = [\"controls/pet\"]\n\n[trigger]\n\
+                    topic = \"controls/pet\"\nfield = \"ended\"\nequals = false\n\
+                    rearm = \"ends\"\n\n[ask]\npolicy = \"nudge\"\n\n[[do]]\n\
+                    light = { colour = \"pink\", level = 3 }\n"
+            .to_owned();
+        for (at, (request, draft, name, kind, topic)) in [
+            (WAVE, wave, "wave-on-arrival", "body", "room/presence"),
+            (PINK, pink, "pink-pat", "light", "controls/pet"),
+        ]
+        .into_iter()
+        .enumerate()
+        {
+            let tasks = agent_answering(vec![]);
+            let (url, served) =
+                service_sent(vec![judgement(true), (200, route_answer(&draft, name))]);
+            let told = make_with_by(
+                0,
+                None,
+                request,
+                &keeping,
+                chat_at(url),
+                NOW + at as u64,
+                || None,
+                Some(&tasks.agent()),
+            );
+            let sent = served.join().unwrap();
+            assert_eq!(told["made"], name, "{told}");
+            assert_eq!((sent.len(), tasks.hand_overs()), (2, 0), "{told}");
+            assert!(is_judgement(&sent[0], request), "{}", sent[0]);
+            assert!(sent[1].contains(made_skill::BRIEF_HEAD), "{}", sent[1]);
+            assert_eq!(made_with_of(&keeping, name).as_deref(), Some("deepseek"));
+            let text = std::fs::read_to_string(&copy).unwrap();
+            let table: toml::Table = toml::from_str(&text).unwrap();
+            assert_eq!(table["trigger"]["topic"].as_str(), Some(topic), "{text}");
+            let steps = table["do"].as_array().unwrap();
+            assert!(
+                steps
+                    .iter()
+                    .all(|step| step.as_table().unwrap().keys().all(|key| key == kind)),
+                "{text}"
+            );
+            assert!(!table.contains_key("grants"), "{text}");
+        }
+        // The agent's, each one task on the trigger its one more call
+        // picked.
+        const GOLD: &str = "every evening at seven, tell me the gold price";
+        const STRETCH: &str = "remind me to stretch when I have been sitting a long time";
+        const WAVE_MADE: &str = "Lamp, make a skill: when I come back to the desk, wave at me.";
+        let seven = "field = \"known\"\nequals = true\nrearm = \"ends\"\n\
+                     during = { from = \"19:00\", to = \"19:01\" }\n";
+        let sat = "field = \"someone\"\nequals = true\nfor = \"30m\"\nrearm = \"leaves\"\n\
+                   cooldown = \"45m\"\nwait = \"10m\"\n";
+        let arrival = "field = \"someone\"\nequals = true\nwhen = \"appears\"\n\
+                       absent_for = \"5m\"\n";
+        let wave_asks = "runs: someone comes back to the desk\nname: wave-at-me\ngrants: body\n\
+                         asks: wave at me"
+            .to_owned();
+        for (at, (request, answers, name, topic)) in [
+            (
+                GOLD,
+                vec![trigger_answer(
+                    "gold-price",
+                    "net, speak",
+                    "clock/local",
+                    seven,
+                )],
+                "gold-price",
+                "clock/local",
+            ),
+            (
+                STRETCH,
+                vec![trigger_answer(
+                    "stretch-break",
+                    "speak",
+                    "room/presence",
+                    sat,
+                )],
+                "stretch-break",
+                "room/presence",
+            ),
+            (
+                WAVE,
+                vec![
+                    wave_asks.clone(),
+                    trigger_answer("wave-at-me", "body", "room/presence", arrival),
+                ],
+                "wave-at-me",
+                "room/presence",
+            ),
+            // The first ROW's form, "make a skill:" in the line.
+            (
+                WAVE_MADE,
+                vec![
+                    wave_asks.replace("wave-at-me", "wave-on-arrival"),
+                    trigger_answer("wave-on-arrival", "body", "room/presence", arrival),
+                ],
+                "wave-on-arrival",
+                "room/presence",
+            ),
+        ]
+        .into_iter()
+        .enumerate()
+        {
+            let rounds = answers.len();
+            let tasks = agent_answering(vec![]);
+            let mut served_answers = vec![judgement(false)];
+            served_answers.extend(answers.into_iter().map(|answer| (200, answer)));
+            let (url, served) = service_sent(served_answers);
+            let told = make_with_by(
+                0,
+                None,
+                request,
+                &keeping,
+                chat_at(url),
+                NOW + 10 + at as u64,
+                || None,
+                Some(&tasks.agent()),
+            );
+            let sent = served.join().unwrap();
+            assert_eq!((sent.len(), tasks.hand_overs()), (1 + rounds, 0), "{told}");
+            assert!(is_judgement(&sent[0], request), "{}", sent[0]);
+            assert!(
+                sent[1].contains("You choose, for a lamp, when a skill runs and what it needs"),
+                "never DeepSeek's draft: {}",
+                sent[1]
+            );
+            assert_eq!(told["made"], name, "{told}");
+            let words = crate::make_no_cannot::task_words(request);
+            let table = one_task_of(&copy, &words, crate::make_no_cannot::RUN);
+            assert_eq!(table["trigger"]["topic"].as_str(), Some(topic), "{table:?}");
+            assert_eq!(made_with_of(&keeping, name).as_deref(), Some("hermes"));
+        }
+        made_skill::set_asks_here(None);
+        crate::make_no_cannot::set_on_here(None);
+        net_make_here(None);
+        made_skill::set_reactions_here(None);
+        let _ = std::fs::remove_dir_all(&root);
+        // The apple file: asked for by its phrase, `file-write` left out.
+        made_skill::set_reactions_here(Some(true));
+        net_make_here(Some(true));
+        crate::make_no_cannot::set_on_here(Some(true));
+        const APPLE: &str =
+            "when I say apple file, have an agent write three apple facts into a file";
+        let (root, keeping) = super::tests::keeping("reactions-apple-file");
+        let helper = manage_helper(&keeping.manage);
+        let tasks = agent_answering(vec![]);
+        let (url, served) = service_sent(vec![
+            judgement(false),
+            (
+                200,
+                "runs: asked\nname: apple-file\ngrants: file-write, speak\nasks: apple file"
+                    .to_owned(),
+            ),
+        ]);
+        let told = make_with_by(
+            0,
+            None,
+            APPLE,
+            &keeping,
+            chat_at(url),
+            NOW + 20,
+            || None,
+            Some(&tasks.agent()),
+        );
+        let sent = served.join().unwrap();
+        assert_eq!((sent.len(), tasks.hand_overs()), (2, 0), "{told}");
+        assert!(helper.join().unwrap()["install_made"].is_string());
+        assert_eq!(told["made"], "apple-file", "{told}");
+        assert!(!told.to_string().contains("can't make"), "{told}");
+        let entries = made_skill::entries(&keeping.directory);
+        let [entry] = entries.as_slice() else {
+            panic!("{entries:?}")
+        };
+        assert_eq!(entry["agent"], true, "{entry}");
+        assert_eq!(entry["grants"], json!(["speak"]), "{entry}");
+        crate::make_no_cannot::set_on_here(None);
+        net_make_here(None);
+        made_skill::set_reactions_here(None);
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
     /// lamp-9adf, 18 Nov: "tell me the price of Zorbo coin" was kept as a
     /// say of DeepSeek's `internet:` line. Judged a quick reaction all the
     /// same, its draft is held to [`made_skill::quick_reaction`] and is no
     /// quick reaction: the request becomes one task for the lamp's agent,
     /// asked for by its words, granted `net`, never a say. So is a draft
-    /// on someone at the desk: a true judgement never lets a draft that
-    /// isn't one stand.
+    /// on someone at the desk held by a guard: a true judgement never lets
+    /// a draft that isn't one stand.
     #[test]
     fn with_the_switch_a_true_judgement_whose_draft_is_no_reaction_goes_to_the_agent() {
         made_skill::set_reactions_here(Some(true));
@@ -12889,12 +13107,13 @@ printf 'tar of %s' \"$name\" > \"$3/$name-1.0.0.tar\"\n",
             table["grants"],
             toml::Value::Array(vec!["net".into(), "speak".into()])
         );
-        // A draft on someone at the desk, judged a reaction: the agent's.
+        // A guarded draft on someone at the desk, judged a reaction: the
+        // agent's.
         const SIP: &str = "after I've sat a long while, suggest a sip of water";
         let sat = "field = \"someone\"\nequals = true\nfor = \"30m\"\nrearm = \"leaves\"\n";
         let (url, served) = service_sent(vec![
             judgement(true),
-            (200, route_answer(&presence_say(), "deepseek-draft")),
+            (200, route_answer(&presence_guarded(), "deepseek-draft")),
             (
                 200,
                 trigger_answer("sip-at-desk", "speak", "room/presence", sat),
@@ -13148,8 +13367,8 @@ printf 'tar of %s' \"$name\" > \"$3/$name-1.0.0.tar\"\n",
 
     /// The Reviewer-lead's P2 on #7764: judged a quick reaction, a first
     /// draft that can't be read gets DeepSeek's repairs, each held to
-    /// [`made_skill::quick_reaction`] as the first draft is: a repair on
-    /// someone at the desk is never kept. With no agent on the lamp, told
+    /// [`made_skill::quick_reaction`] as the first draft is: a guarded
+    /// repair is never kept. With no agent on the lamp, told
     /// so; for the app's make the agent didn't take, the middle form.
     #[test]
     fn with_the_switch_a_repaired_draft_that_is_no_reaction_is_never_kept() {
@@ -13159,7 +13378,7 @@ printf 'tar of %s' \"$name\" > \"$3/$name-1.0.0.tar\"\n",
         const SIP: &str = "after I've sat a long while, suggest a sip of water";
         // Fenced, but no TOML the check can read: refused with its lines.
         let unread = (200, route_answer("[[do]\nsay = = sip\n", "sip-unread"));
-        let repair = (200, route_answer(&presence_say(), "deepseek-draft"));
+        let repair = (200, route_answer(&presence_guarded(), "deepseek-draft"));
         // No agent on the lamp (the one path, no `lamp` target).
         let none = crate::make_skill_agent::tests::stub(None, std::sync::Arc::new(|_: &str| None));
         let on = crate::make_skill_agent::Agent {
