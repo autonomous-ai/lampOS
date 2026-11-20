@@ -2247,7 +2247,7 @@ impl Attention {
             && !crate::second_provider::sounds_like_the_name(&words[0]);
         let ruled_out =
             self.near_not_the_name_of == Some(self.request) && !called_by_real_name(&self.heard);
-        self.name_near_dropped = weighed && self.sign_tied && (ruled_out || false && one_word_unlike);
+        self.name_near_dropped = weighed && self.sign_tied && (ruled_out || one_word_unlike);
         let alone =
             weighed && (signs.is_empty() || self.name_short_dropped || self.name_near_dropped);
         self.name_signs = if weighed && !alone { signs } else { Vec::new() };
