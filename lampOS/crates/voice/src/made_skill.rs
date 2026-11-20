@@ -505,11 +505,12 @@ pub const GUARD_TOPICS: [&str; 2] = [lamp_msgs::VoiceState::TOPIC, ACTIVITY_TOPI
 /// and its step kinds alone, never a word. Both must hold:
 /// - its start is the lamp's own: words the person says (`asks`, or a
 ///   `[said]` start), nothing at all, run only when asked (no
-///   `[trigger]`), or a `[trigger]` on a topic the lamp has
-///   ([`lamp_has`]): a hand on the lamp, someone arriving or leaving, the
-///   lamp's clock, any other of its senses (the owner, 20 Nov: "make sure
+///   `[trigger]`), or a `[trigger]` its read-back says plainly
+///   ([`reaction_trigger`]): a hand on the lamp, someone arriving or
+///   leaving, the lamp's clock, stuffy air (the owner, 20 Nov: "make sure
 ///   the quick reaction is DeepSeek's, and everything else goes to the
-///   agent": a wave on arrival is one);
+///   agent": a wave on arrival is one), never the camera's frames or a
+///   microphone;
 /// - its steps are only the light, a gesture, its exact words or its hum
 ///   ([`REACTION_STEPS`]), with no `task`, no `[[while]]` and no code.
 ///
@@ -523,10 +524,7 @@ pub fn quick_reaction(toml: &str) -> bool {
     };
     let started_by_lamp = match table.get("trigger") {
         None => true,
-        Some(trigger) => trigger
-            .get("topic")
-            .and_then(toml::Value::as_str)
-            .is_some_and(lamp_has),
+        Some(trigger) => reaction_trigger(trigger),
     };
     let reaction_steps = table
         .get("do")
@@ -549,6 +547,22 @@ pub fn quick_reaction(toml: &str) -> bool {
         && !table.contains_key("while")
         && !table.contains_key("grants")
         && !says_a_marker(&table)
+}
+
+/// Whether a quick reaction may start on `trigger` (Heron's P2 on #7819,
+/// the first builder's narrowest fix, 20 Nov 11:41): a hand on the lamp
+/// (`controls/*`), or a trigger its read-back says plainly
+/// ([`trigger_plainly`]: an arrival or a leaving, a face in view, someone
+/// getting up, stuffy air, what the sitter is doing, the lamp going quiet,
+/// a time of day). Any other topic the lamp has (the camera's frames, a
+/// microphone, `voice/said`, `chat/in`, `speaker/audio`, `selftest/*`) is
+/// none: read back only as [`GENERAL_TRIGGER`], the person's yes would not
+/// hear that the camera or the microphone starts it, so the lamp's agent
+/// makes it, where those are held to an ask by phrase.
+fn reaction_trigger(trigger: &toml::Value) -> bool {
+    let topic = trigger.get("topic").and_then(toml::Value::as_str);
+    topic.is_some_and(|topic| topic.starts_with("controls/") && lamp_has(topic))
+        || (topic.is_some_and(lamp_has) && trigger_plainly(Some(trigger)).is_ok())
 }
 
 /// What the lamp's own model is told for a make's first call with
@@ -19993,6 +20007,25 @@ task = { task = "take a photo and send it to the app", run = "scripts/main.py" }
             (task, "on controls/pet"),
             (read, "not a quick reaction"),
             (reaction_of("", Some(pet), &[]), "on controls/pet"),
+            // Heron's P2 on #7819: a topic the lamp has but its read-back
+            // can't say plainly (the camera's frames, a microphone) is no
+            // reaction; the agent's side holds them to an ask by phrase.
+            (
+                reaction_of(
+                    "",
+                    Some("topic = \"camera/image\"\nfield = \"seq\"\nrearm = \"ends\""),
+                    &[light],
+                ),
+                "on camera/image",
+            ),
+            (
+                reaction_of(
+                    "",
+                    Some("topic = \"mic1/audio\"\nfield = \"seq\"\nrearm = \"ends\""),
+                    &[nod],
+                ),
+                "on mic1/audio",
+            ),
         ] {
             assert!(!quick_reaction(&made), "{made}");
             assert_eq!(

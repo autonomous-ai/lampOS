@@ -3508,9 +3508,9 @@ cả hai người viết.
   dịch vụ, đọc, gửi hay ghi nhớ, lời được chọn mỗi lần hay nói điều thay
   đổi, nhiều bước nối tiếp nhau, và một lời nhắc được viết cho người dùng
   mỗi lần (giãn cơ sau khi ngồi lâu). Nhắc việc một lần được đánh giá là
-  phản ứng nhanh, vì bộ hẹn giờ của đèn trả lời nó. Vì vậy "whenever I come
-  back to the desk, wave at me" và "glow pink when I pat your head" thuộc
-  về DeepSeek; giá vàng lúc bảy giờ, tệp apple file và lời nhắc giãn cơ
+  phản ứng nhanh, vì bộ hẹn giờ của đèn trả lời nó. Vì vậy "wave at me when
+  someone arrives at the desk" (với bất kỳ ai đến, kể cả khách) và "glow
+  pink when I pat your head" thuộc về DeepSeek; giá vàng lúc bảy giờ, tệp apple file và lời nhắc giãn cơ
   thuộc về agent
   (`made_skill::tests::the_reaction_judge_defines_a_quick_reaction_by_the_lamps_own_parts`,
   `make_skill_local::tests::with_the_owners_lines_a_quick_reaction_is_deepseeks_and_all_else_the_agents`). Được đánh giá là phản
@@ -3518,9 +3518,13 @@ cả hai người viết.
   là phản ứng nhanh (`made_skill::quick_reaction`, chỉ theo cách bắt đầu
   và loại bước, không bao giờ theo từ ngữ): do chính đèn khởi động (câu
   người dùng đặt, `asks` hoặc `[said]`; không có trigger, chỉ chạy khi
-  được gọi; hoặc `[trigger]` trên một topic đèn có: chạm, vuốt đầu, nút
-  bấm, ai đó đến hay rời đi, đồng hồ của đèn, bất kỳ giác quan nào khác của
-  nó), chỉ có
+  được gọi; hoặc `[trigger]` mà lời đọc lại nói rõ được,
+  `made_skill::reaction_trigger`: chạm, vuốt đầu, nút bấm, ai đó đến hay
+  rời đi, một khuôn mặt trong tầm nhìn, ai đó đứng dậy, không khí ngột
+  ngạt, đèn im lặng, đồng hồ của đèn; không bao giờ là khung hình camera,
+  micro, `voice/said`, `chat/in`, `speaker/audio` hay `selftest/*`, vì lời
+  đồng ý chỉ nghe thấy "When its moment comes", nên agent tạo những skill
+  đó, giữ theo câu hỏi bằng lời: P2 của Heron trên #7819), chỉ có
   `light`, `body`, một `say` đúng lời (không bao giờ là dấu `internet:`
   hay `cannot:` của mô hình) hoặc tiếng ngân, không `task`, không
   `[[while]]`, không `grants`. Được đánh giá không phải, không chắc, trễ
