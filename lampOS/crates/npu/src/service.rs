@@ -38,6 +38,10 @@ pub const PREPARING_RETRY: Duration = Duration::from_secs(2);
 /// watchdog ends the process so systemd starts it again (Heron's P2 6 on
 /// #7972), as a hung run holds the net's lock and every ask behind it.
 pub const RUN_DEADLINE: Duration = Duration::from_secs(5);
+/// A model's load (under a second) longer than this has hung: it holds the
+/// net's lock as a run does, so the same watchdog ends the process
+/// (Fourteen's P3 on #7972).
+pub const LOAD_DEADLINE: Duration = Duration::from_secs(30);
 /// How often a kept model is checked against the Store's, so a newer one
 /// (another SHA-256) reaches a lamp that already keeps one.
 pub const REFRESH_EVERY: Duration = Duration::from_secs(6 * 60 * 60);
@@ -60,6 +64,8 @@ pub struct Config {
     pub most_retry: Duration,
     /// [`RUN_DEADLINE`].
     pub run_deadline: Duration,
+    /// [`LOAD_DEADLINE`].
+    pub load_deadline: Duration,
     /// [`REFRESH_EVERY`].
     pub refresh: Duration,
 }
@@ -86,6 +92,7 @@ impl Config {
             first_retry: Duration::from_secs(30),
             most_retry: Duration::from_secs(30 * 60),
             run_deadline: RUN_DEADLINE,
+            load_deadline: LOAD_DEADLINE,
             refresh: REFRESH_EVERY,
         }
     }
@@ -188,9 +195,12 @@ pub struct Service {
     /// Each client's crop: forgotten after [`TRACK_FOR`], when the lamp is
     /// private and when the model is let go. Taken after `net`.
     tracks: Mutex<HashMap<String, Track>>,
-    /// When the NPU's run under way started, by the real clock: what the
-    /// watchdog reads ([`Service::hung`]).
-    running: Mutex<Option<Instant>>,
+    /// When the NPU's run or load under way started, by the real clock,
+    /// and its deadline: what the watchdog reads ([`Service::hung`]).
+    running: Mutex<Option<(Instant, Duration)>>,
+    /// After a load the NPU could not take now ([`LoadError::Transient`]):
+    /// when the kept model's load is tried again, and the wait after that.
+    load_wait: Mutex<Option<(Instant, Duration)>>,
     /// Whether an update check is under way, and when the next is due.
     updating: AtomicBool,
     next_refresh: Mutex<Option<Instant>>,
@@ -217,6 +227,7 @@ impl Service {
             asked: Mutex::new((HashMap::new(), None)),
             tracks: Mutex::new(HashMap::new()),
             running: Mutex::new(None),
+            load_wait: Mutex::new(None),
             updating: AtomicBool::new(false),
             next_refresh: Mutex::new(None),
         })
@@ -453,22 +464,39 @@ impl Service {
         self.updating.store(false, Ordering::SeqCst);
     }
 
-    /// How long the NPU's run under way has taken, once past the deadline:
-    /// the watchdog's cue to end the process.
+    /// How long the NPU's run or load under way has taken, once past its
+    /// deadline: the watchdog's cue to end the process.
     pub fn hung(&self, now: Instant) -> Option<Duration> {
-        let started = (*self.running.lock().expect("running"))?;
+        let (started, deadline) = (*self.running.lock().expect("running"))?;
         let taken = now.saturating_duration_since(started);
-        (taken >= self.config.run_deadline).then_some(taken)
+        (taken >= deadline).then_some(taken)
     }
 
-    /// A model that failed at its load: let go and, but for no NPU at
-    /// all, marked as refused by its SHA-256, so the next fetch reads only
-    /// the Store's manifest and takes a model of another SHA-256 alone
-    /// (Heron's P2 4 on #7972: the same 2-10 MB were fetched and written
-    /// every 30 s, for ever).
+    /// A model that failed at its load. Refused for good (a format this
+    /// build can't read): let go and marked as refused by its SHA-256, so
+    /// the next fetch reads only the Store's manifest and takes a model of
+    /// another SHA-256 alone (Heron's P2 4 on #7972: the same 2-10 MB were
+    /// fetched and written every 30 s, for ever). Not taken now (the
+    /// driver busy or short of memory): kept, and loaded again after a
+    /// wait that doubles, never marked (Fourteen's P2 1 on #7972).
     fn failed(&self, now: Instant, error: LoadError, sha256: &str) -> Refused {
+        if let LoadError::Transient(why) = error {
+            let mut load_wait = self.load_wait.lock().expect("load_wait");
+            let wait = load_wait.map_or(self.config.first_retry, |(_, wait)| wait);
+            *load_wait = Some((now + wait, (wait * 2).min(self.config.most_retry)));
+            eprintln!(
+                "[lamp-npu] the NPU could not load the model now, again in {} s: {why}",
+                wait.as_secs()
+            );
+            return Refused::new(
+                "unavailable",
+                format!("the pose model is unavailable: {why}"),
+                Some(wait),
+            );
+        }
         let mut model = self.model.lock().expect("model");
         match error {
+            LoadError::Transient(_) => unreachable!("answered above"),
             LoadError::Unsupported(why) => {
                 *model = Model::Unsupported(why.clone());
                 Refused::new("unavailable", why, None)
@@ -556,6 +584,23 @@ impl Service {
         let mut decode_ms = decode_at.elapsed();
         let mut net = self.net.lock().expect("net");
         if net.is_none() {
+            if let Some((retry_at, _)) = *self.load_wait.lock().expect("load_wait")
+                && now < retry_at
+            {
+                return Err(Refused::new(
+                    "unavailable",
+                    "the NPU could not load the pose model: tried again soon",
+                    Some(retry_at - now),
+                ));
+            }
+            // The model kept now: an update swaps it under this lock, so
+            // one swapped in since this ask's `prepare` (during its
+            // decode) is the one loaded, never taken as lost (Fourteen's
+            // P2 2 on #7972).
+            let kept = match &*self.model.lock().expect("model") {
+                Model::Kept(now_kept) => now_kept.clone(),
+                _ => kept,
+            };
             // Checked again as it is loaded: never a file changed since.
             let keys = (self.keys)().map_err(|why| Refused::new("unavailable", why, None))?;
             let checked = match self.store.load(&keys, POSE, &self.config.board) {
@@ -575,9 +620,14 @@ impl Service {
                     &sha256,
                 ));
             };
-            match self.backend.load(&checked.path) {
+            *self.running.lock().expect("running") =
+                Some((Instant::now(), self.config.load_deadline));
+            let loaded = self.backend.load(&checked.path);
+            *self.running.lock().expect("running") = None;
+            match loaded {
                 Ok(loaded) => {
                     eprintln!("[lamp-npu] model {} loaded", checked.manifest.id);
+                    *self.load_wait.lock().expect("load_wait") = None;
                     *net = Some(Loaded {
                         net: loaded,
                         head,
@@ -603,7 +653,7 @@ impl Service {
                 (region, frame)
             }
         };
-        *self.running.lock().expect("running") = Some(Instant::now());
+        *self.running.lock().expect("running") = Some((Instant::now(), self.config.run_deadline));
         let run = loaded.net.run(&frame);
         *self.running.lock().expect("running") = None;
         let (outputs, run) =

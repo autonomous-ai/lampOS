@@ -39,9 +39,11 @@ decision on the model's delivery, with the first builder's four rules of 16:55.
   on each side"). It is decoded and cropped before the NPU's lock is taken,
   so a slow picture never holds the others' runs.
 - **A hung NPU restarts the service.** A run (about 3 ms) that takes more
-  than 5 s (`RUN_DEADLINE`) has hung: a watchdog thread, looking each
-  second, ends the process (status 70) and systemd starts it again
-  (`Restart=on-failure`), since a hung run holds every ask behind it.
+  than 5 s (`RUN_DEADLINE`), or a model's load (under a second) that takes
+  more than 30 s (`LOAD_DEADLINE`), has hung: a watchdog thread, looking
+  each second, ends the process (status 70) and systemd starts it again
+  (`Restart=on-failure`), since a hung run or load holds every ask behind
+  it.
 - **Nothing is kept of a picture.** The JPEG and the keypoints live only for
   the ask; the journal says the model's loads, fetches and failures, never a
   picture or a pose.
@@ -170,8 +172,15 @@ with when it is tried again: 30 s, doubled each time up to 30 minutes. What
 is kept is checked again, signature and SHA-256, at every load; a file
 changed on the disk is removed, never run, and fetched again after the wait.
 
-A model the NPU refuses at its load (`vip_create_network`, or an output
-this build can't read) is removed and marked by its SHA-256
+A load the NPU can't take now (`vip_init`, or the driver's
+`vip_create_network`, `prepare` or buffer setup failing: no memory, busy)
+keeps the model and marks nothing: the ask is answered `unavailable`, and
+the kept model's load is tried again after 30 s, doubled each time up to
+30 minutes, with nothing fetched. A failed `vip_init` is such a failure,
+never taken as no NPU.
+
+A model the NPU refuses for good at its load (a format, a shape or a
+quantisation this build can't read) is removed and marked by its SHA-256
 (`/var/lib/lampos-npu/models/pose.refused`, kept across restarts). Each try
 after it reads only the Store's manifest and signature (a few KiB, nothing
 written): while the Store still offers that SHA-256 it stays `unavailable`,
@@ -184,7 +193,10 @@ is kept, 6 hours after one was just fetched): the manifest and signature
 alone, and when they name another model (another SHA-256, a re-conversion
 or a new version) its file is fetched and checked as above, then swapped in
 under the NPU's lock. The loaded model is let go and the next ask loads the
-new one, so a lamp that keeps v1 gets v2 without a reset. A model the NPU
+new one, so a lamp that keeps v1 gets v2 without a reset. An ask that was
+decoding its picture during the swap loads the new one too: it reads the
+kept model again under the NPU's lock, so the swap never reads as a lost
+model. A model the NPU
 refused is never taken again.
 
 `lamp-npu pack --key-file KEY --model FILE --id ID --head HEAD --licence SPDX

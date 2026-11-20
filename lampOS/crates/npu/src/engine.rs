@@ -164,14 +164,20 @@ pub enum LoadError {
     /// This lamp has no NPU, or not one this build can open: nothing to
     /// retry.
     Unsupported(String),
-    /// The NPU is there and refused this file.
+    /// The NPU is there and refused this file for good: a format, a
+    /// shape or a quantisation this build can't read. Marked refused.
     Failed(String),
+    /// The NPU could not take the file now (`vip_init`, or the driver's
+    /// `vip_create_network` or `prepare` failing: no memory, busy): the
+    /// file is kept and its load tried again after a wait, never marked
+    /// refused (Fourteen's P2 1 and P3 3 on #7972).
+    Transient(String),
 }
 
 impl std::fmt::Display for LoadError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::Unsupported(why) | Self::Failed(why) => f.write_str(why),
+            Self::Unsupported(why) | Self::Failed(why) | Self::Transient(why) => f.write_str(why),
         }
     }
 }
@@ -193,6 +199,10 @@ pub struct Fake {
     pub refuse: Option<LoadError>,
     /// How long each run takes: a slow or hung NPU.
     pub delay: std::time::Duration,
+    /// How long each load takes: a hung driver.
+    pub load_delay: std::time::Duration,
+    /// Failures given by the next loads, one each, before any load works.
+    pub fails_first: std::sync::Arc<std::sync::Mutex<std::collections::VecDeque<LoadError>>>,
 }
 
 impl Fake {
@@ -204,6 +214,8 @@ impl Fake {
             runs: Default::default(),
             refuse: None,
             delay: std::time::Duration::ZERO,
+            load_delay: std::time::Duration::ZERO,
+            fails_first: Default::default(),
         }
     }
 }
@@ -236,8 +248,12 @@ impl Net for FakeNet {
 
 impl Backend for Fake {
     fn load(&self, _model: &Path) -> Result<Box<dyn Net>, LoadError> {
+        std::thread::sleep(self.load_delay);
         if let Some(refused) = &self.refuse {
             return Err(refused.clone());
+        }
+        if let Some(failed) = self.fails_first.lock().expect("fails_first").pop_front() {
+            return Err(failed);
         }
         self.loads.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
         Ok(Box::new(FakeNet {
