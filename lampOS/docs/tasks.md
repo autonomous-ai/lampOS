@@ -3156,7 +3156,13 @@ for each run, and is answered once the run ends
   only the run id. A gateway agent's run (OpenClaw) gets no token file:
   its token goes through the skill-start launcher ("A skill's run on
   OpenClaw", below).
-- **The run:** one task for target `lamp`, its words the exact command
+- **The run:** one task for target `lamp`, its words first naming the
+  skill and its folder and telling the agent (whichever the lamp runs,
+  Hermes or OpenClaw: the words are the same) to read `<folder>/SKILL.md`
+  first and follow its `## Uses`, `## Result` and `## Answer` sections,
+  running the scripts already in its `scripts/` rather than working
+  anything out anew or reading the lamp's own files (#8158; on lamp-c0a4 a
+  made skill's agent had read the lamp's internals instead), then the exact command
   that runs the script from the skill's read-only folder,
   `PYTHONPATH=/usr/local/lib/lampos/sdk-python python3 <folder>/<run>`
   (the SDK's path in the command itself, so `lampos` imports whatever
@@ -3628,6 +3634,60 @@ lamp-control serving and `LAMP_SKILL_TASKS=on` in both units, a skill's run
 whose script runs `curl https://example.com` gets a failure (no name
 resolves, no route), while the same run's model call is answered and its
 `control.sock` call works with its token.
+
+### A skill's `run` step, run here with no agent (#8158, `skill_run`)
+
+A skill's `run = "scripts/main.py"` step ([skills.md](skills.md), "A skill's
+`run` step") is handed over on the same socket as a `do.task`, with
+`"op":"skill_run"` and the same fields (its `task` the fixed "run its own
+script"), checked whole as a task's line is (`HandOver::parse`). lamp-tasks
+runs its script itself: no agent, no Harness, no prompt
+(`crate::skill_run`).
+
+- **Its place**: one `run` step at a time across the lamp, in a place of its
+  own beside the agent's task (`HandOvers::one`), so it never waits behind a
+  task that may run for minutes; a second is refused `busy`.
+- **Its token**: minted from lamp-control's kept yes for the skill's folder
+  and grants, exactly as a task's (`skill_run::answer`); a token naming other
+  grants than the line's is ended at once and nothing runs. A line granted
+  `net`, or for a skill that names keys, is refused before any token
+  (`skill_run::NO_NET_HERE`, `NO_KEYS_HERE`): use a `do.task`.
+- **Its fence** (`skill_run::DirectRunner`): `/usr/bin/unshare` with the
+  gateway run's arguments (`gateway::fence_args`: a user namespace with root
+  mapped, a network of `lo` alone, its own mount and PID namespaces,
+  `--kill-child`) and the gateway's fence text with two edits
+  (`skill_run::CONTROL_EDITS`): lamp-control's `control.sock` bound aside
+  before anything is hidden and moved back, alone, after. Every path of
+  `skill_run::HIDDEN` that is there (`/var`, `/run`, `/home`, `/opt`,
+  `/srv`, `/mnt`, `/media`, `/dev/shm`) is covered by an empty tmpfs, so no
+  part's state or socket (lamp-control's admin socket, lamp-tasks' own
+  sockets and state) is there; only the skill's folder, the run's own folder
+  (`/var/lib/lampos-tasks/runs/run-<id>`, 0700, removed when it ends) and
+  `control.sock` are shown again. The script then runs as lamp-tasks' own
+  uid in a nested user namespace (no capability over those mounts), with
+  `PATH`, `HOME`, `LAMP_CONTROL_SOCKET`, `PYTHONPATH` (the SDK) and its token,
+  read from a pipe on fd 3, never an argument. It reaches the lamp only
+  through `control.sock` with its token's grants: lamp-control refuses any
+  other (`no_grant`).
+- **Its bounds**: 30 s from the fence's start (`skill_run::RUN_WITHIN`), its
+  whole process group killed then; at most 64 KiB of output
+  (`skill_run::MOST_OUTPUT`), counted and thrown away (never journaled),
+  past which it is ended.
+- **Its answer**: when the script ends, the token is ended with an admin
+  `end`, whose answer now carries `said` ([control.md](control.md), "The run
+  socket"): how many of the run's `say`s the voice said whole
+  (`Tokens::end_said`). Exit 0 and `said` at least 1 is
+  `{"ok":true,"id":0,"said":N}`; exit 0 and nothing said is `run_failed`
+  (`skill_run::SAID_NOTHING`); a failed exit, the 30 s limit or the output
+  cap is `run_failed` with the reason; a fence never made is `not_started`.
+  `skills/tasks` tells its end (`Ran` or `Failed`, no engine).
+- **Timing**: the journal says when the token was minted after the line
+  (`skill run RUN: SKILL handed over, token minted in N ms`), when the
+  script started (`its script started N ms into its run`) and its end. The
+  blocking hops are the mint (one local socket line), the fence's mounts and
+  `python3`'s start. Measured at unit level with a stand-in fence
+  (`skill_run::tests::a_script_that_ends_well_runs_in_its_own_folder_with_its_token`);
+  not yet on a lamp.
 
 ### Skills' runs and the voice's share of the day (#7342, `LAMP_SKILL_RUNS_VOICE_SHARE`, on in the product)
 

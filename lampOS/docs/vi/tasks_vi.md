@@ -482,7 +482,12 @@ lần chạy, và được trả lời khi lần chạy kết thúc
   nhật ký, lỗi hay trạng thái của Harness; đường dẫn chỉ chứa run id. Lần
   chạy của một gateway agent (OpenClaw) không có file token: token của nó
   đi qua launcher skill-start ("Lần chạy kỹ năng trên OpenClaw", bên dưới).
-- **Lần chạy:** một việc cho đích `lamp`, lời của nó là việc của kỹ năng,
+- **Lần chạy:** một việc cho đích `lamp`, lời của nó trước hết nêu tên kỹ
+  năng và thư mục của nó, bảo agent (dù đèn chạy Hermes hay OpenClaw: lời
+  là như nhau) đọc `<folder>/SKILL.md` trước và làm theo các phần
+  `## Uses`, `## Result` và `## Answer`, chạy các script đã có trong
+  `scripts/` thay vì tự nghĩ lại từ đầu hay đọc file riêng của đèn (#8158),
+  rồi việc của kỹ năng,
   lệnh chính xác chạy script từ thư mục chỉ đọc của kỹ năng,
   `PYTHONPATH=/usr/local/lib/lampos/sdk-python python3 <folder>/<run>`
   (đường dẫn của SDK nằm ngay trong lệnh, để `lampos` import được dù shell
@@ -985,6 +990,56 @@ chạy của một kỹ năng có script chạy `curl https://example.com` thì 
 (không tên nào phân giải được, không có route), trong khi lệnh gọi model của
 cùng lần chạy được trả lời và lệnh gọi `control.sock` của nó chạy được với
 token.
+
+### Bước `run` của một kỹ năng, chạy tại đây không cần agent (#8158, `skill_run`)
+
+Bước `run = "scripts/main.py"` của một kỹ năng ([skills_vi.md](skills_vi.md),
+"Bước `run` của một kỹ năng") được bàn giao trên cùng socket với `do.task`,
+với `"op":"skill_run"` và cùng các trường (`task` là câu cố định "run its
+own script"), được kiểm tra trọn như dòng của task (`HandOver::parse`).
+lamp-tasks tự chạy script: không agent, không Harness, không prompt
+(`crate::skill_run`).
+
+- **Chỗ của nó**: một bước `run` một lúc trên toàn đèn, ở một chỗ riêng bên
+  cạnh task của agent (`HandOvers::one`), nên không bao giờ chờ sau một task
+  có thể chạy nhiều phút; bước thứ hai bị từ chối `busy`.
+- **Token**: tạo từ lời đồng ý lamp-control giữ cho thư mục và các quyền của
+  kỹ năng, y như của task (`skill_run::answer`); token nêu quyền khác với
+  dòng thì bị kết thúc ngay và không gì chạy. Dòng có quyền `net`, hoặc của
+  kỹ năng nêu khóa, bị từ chối trước khi có token
+  (`skill_run::NO_NET_HERE`, `NO_KEYS_HERE`): hãy dùng `do.task`.
+- **Hàng rào** (`skill_run::DirectRunner`): `/usr/bin/unshare` với các đối số
+  của lần chạy gateway (`gateway::fence_args`: user namespace với root được
+  ánh xạ, mạng chỉ có `lo`, mount và PID namespace riêng, `--kill-child`) và
+  văn bản hàng rào của gateway với hai chỗ sửa (`skill_run::CONTROL_EDITS`):
+  `control.sock` của lamp-control được bind sang bên trước khi che, rồi
+  chuyển lại, một mình, sau đó. Mọi đường dẫn của `skill_run::HIDDEN` có mặt
+  (`/var`, `/run`, `/home`, `/opt`, `/srv`, `/mnt`, `/media`, `/dev/shm`) bị
+  che bằng một tmpfs rỗng, nên không còn trạng thái hay socket của phần nào
+  (socket admin của lamp-control, socket và trạng thái của lamp-tasks); chỉ
+  thư mục kỹ năng, thư mục riêng của lần chạy
+  (`/var/lib/lampos-tasks/runs/run-<id>`, 0700, xóa khi kết thúc) và
+  `control.sock` được hiện lại. Script chạy với uid của lamp-tasks trong một
+  user namespace lồng (không có quyền gì với các mount đó), với `PATH`,
+  `HOME`, `LAMP_CONTROL_SOCKET`, `PYTHONPATH` (SDK) và token, đọc từ pipe trên
+  fd 3, không bao giờ là đối số. Nó chỉ tới được đèn qua `control.sock` với
+  các quyền của token: lamp-control từ chối mọi quyền khác (`no_grant`).
+- **Giới hạn**: 30 s từ lúc hàng rào bắt đầu (`skill_run::RUN_WITHIN`), cả
+  nhóm tiến trình bị kill khi hết giờ; tối đa 64 KiB đầu ra
+  (`skill_run::MOST_OUTPUT`), chỉ đếm rồi bỏ (không ghi nhật ký), quá thì bị
+  dừng.
+- **Câu trả lời**: khi script kết thúc, token được kết thúc bằng `end` của
+  admin, mà câu trả lời giờ có `said`: số câu `say` của lần chạy mà giọng
+  nói đã nói trọn (`Tokens::end_said`). Thoát 0 và `said` ít nhất 1 là
+  `{"ok":true,"id":0,"said":N}`; thoát 0 mà không nói gì là `run_failed`
+  (`skill_run::SAID_NOTHING`); thoát lỗi, quá 30 s hay quá giới hạn đầu ra là
+  `run_failed` kèm lý do; hàng rào không dựng được là `not_started`.
+  `skills/tasks` báo kết thúc (`Ran` hoặc `Failed`, không engine).
+- **Thời gian**: nhật ký ghi lúc tạo token sau dòng bàn giao, lúc script
+  bắt đầu (`its script started N ms into its run`) và lúc kết thúc. Các
+  chặng chặn là tạo token (một dòng socket cục bộ), các mount của hàng rào
+  và khởi động `python3`. Đã đo ở mức unit với hàng rào thay thế; chưa đo
+  trên đèn.
 
 ### Một lần tạo bằng giọng nói trong namespace của lần chạy kỹ năng (`skill_make`, #6643)
 
