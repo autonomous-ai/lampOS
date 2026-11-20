@@ -80,7 +80,7 @@ pub const NO_NET: &str =
     "it reaches the internet, which a skill's task can't on this lamp (LAMP_TASK_NET is off)";
 /// What a file is told whose grants name the internet beside a private
 /// one (a linked service, the camera, the microphone, what the lamp says,
-/// its notes: [`crate::skill_task_yes::private_grant`]), with `private`
+/// `look`: [`crate::skill_task_yes::private_grant`]), with `private`
 /// said in the say-back's words: one run never holds both (Heron's P1 on
 /// #7590).
 pub fn net_beside_private(private: &str) -> String {
