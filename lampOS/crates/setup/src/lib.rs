@@ -2,6 +2,7 @@
 pub mod change;
 pub mod first_update;
 pub mod first_volume;
+pub mod history_forget;
 pub mod http;
 pub mod keys;
 pub mod light;

@@ -742,6 +742,49 @@ fn the_catch_up_leaves_out_what_was_forgotten() {
     let _ = std::fs::remove_dir_all(&dir);
 }
 
+/// Twelve's P3 (#7957, owed on #8125), pinned as it is: memory does not
+/// mark a turn's route, so a Live-route turn kept between the mark and
+/// `offered` in the same run is sent at the catch-up with the rest (a
+/// forget reaches it like any other). One kept above `offered` never is.
+#[test]
+fn a_live_turn_between_the_mark_and_offered_goes_at_the_catch_up() {
+    let dir = scratch("catch-up-live");
+    let marks = dir.join("history-marks.json");
+    write_marks(
+        &marks,
+        STORE,
+        &BTreeMap::from([(A.to_owned(), 0)]),
+        &BTreeMap::from([(A.to_owned(), 3)]),
+    )
+    .unwrap();
+    let (post, told) = recording(vec![Answer::Saved]);
+    let sender = Sender::new();
+    sender
+        .spawn(
+            post,
+            memory(
+                STORE,
+                json!({A:4}),
+                vec![
+                    (A, 1, "handed"),
+                    (A, 2, "said on the Live route"),
+                    (A, 3, "handed"),
+                    (A, 4, "said on the Live route after"),
+                ],
+            ),
+            Some(marks.clone()),
+            QUICK,
+        )
+        .unwrap();
+    let body = next(&told);
+    assert_eq!(ids(&body), [id(A, 1), id(A, 2), id(A, 3)]);
+    assert_eq!(body["turns"][1]["heard"], "said on the Live route");
+    marks_once(&marks, A, 4);
+    none_within(&told, Duration::from_millis(100));
+    // The sender may still be writing its marks: a best-effort cleanup.
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
 /// The first builder's must-fix (01:16 on #7957): turns the memory kept
 /// while the switch was off (no sender ran) are never sent, on the
 /// switch-on's start nor on any start after; only turns kept after it are.

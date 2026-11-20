@@ -3,7 +3,9 @@
 //! switch-on condition on #8086: "a forget's ids reach the server across a
 //! restart"). Only for a forget the voice asked with
 //! [`lamp_msgs::MEMORY_HISTORY_UNSENT_FIELD`] (its `LAMP_HISTORY_FORGET=on`);
-//! without it nothing is kept, as before.
+//! without it nothing is kept, as before, but for the app's removal of a
+//! person (`forget_person`, which lamp-cloud never asks): their whole
+//! history is always kept, one row, read by the voice on `memory/forgot`.
 //!
 //! The rows are written in the forget's own transaction (no commit of
 //! their own, so no sync more before the reply), each the turn id the
@@ -52,10 +54,9 @@ pub(crate) fn keep(
     // The room's forget everything is told by its ids, as any other.
     let whole = whole.filter(|person| lamp_msgs::known::is_person_id(person));
     if let Some(person) = whole {
-        tx.execute(
-            "DELETE FROM history_unsent WHERE scope=?1 AND turn IS NOT NULL",
-            [person],
-        )?;
+        // Their whole history takes every row of theirs: one row, however
+        // often they are forgotten before the voice takes it.
+        tx.execute("DELETE FROM history_unsent WHERE scope=?1", [person])?;
         tx.execute(
             "INSERT INTO history_unsent(scope,turn) VALUES (?1,NULL)",
             [person],
@@ -261,6 +262,39 @@ mod tests {
         let page = ask(&mut store, json!({"op":"history_unsent"}));
         assert_eq!(page["all"], json!([]), "{page}");
         assert_eq!(page["exchanges"], json!({LAN:[turn(&store, LAN, lan)]}));
+        drop(store);
+        std::fs::remove_dir_all(&dir).unwrap();
+    }
+
+    /// The Reviewer-lead's HOLD on #8125: the app's removal of a person
+    /// (`forget_person`, from lamp-cloud on the forget socket, which never
+    /// asks) keeps their whole history as one row, in the removal's own
+    /// transaction, across a restart of the memory; their rules' scope has
+    /// no saved turn, so nothing more. Removed again before the voice took
+    /// it, still one row.
+    #[test]
+    fn the_apps_removal_of_a_person_keeps_their_whole_history_across_a_restart() {
+        let dir = dir("removal");
+        let mut store = open(&dir);
+        said(&mut store, Some(MINH), 1);
+        said(&mut store, Some(MINH), 2);
+        said(&mut store, Some(LAN), 3);
+        for _ in 0..2 {
+            let removed = ask(&mut store, json!({"op":"forget_person","person":MINH}));
+            assert_eq!(removed["ok"], true, "{removed}");
+        }
+        drop(store);
+        let mut store = open(&dir);
+        let page = ask(&mut store, json!({"op":"history_unsent","after":0}));
+        assert_eq!(page["all"], json!([MINH]), "{page}");
+        assert_eq!(page["exchanges"], json!({}), "{page}");
+        let to = page["to"].clone();
+        ask(
+            &mut store,
+            json!({"op":"history_unsent_done","from":0,"to":to}),
+        );
+        let empty = ask(&mut store, json!({"op":"history_unsent","after":0}));
+        assert_eq!(empty["all"], json!([]), "{empty}");
         drop(store);
         std::fs::remove_dir_all(&dir).unwrap();
     }

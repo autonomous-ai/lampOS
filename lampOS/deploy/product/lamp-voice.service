@@ -624,6 +624,12 @@ Environment=LAMP_MEMORY_REPLACES=on
 Environment=LAMP_MEMORY_FORGET_ABOUT=on
 # LAMP_MEMORY_FORGET_JUST_KEPT: its why and rules are its row in docs/switches.md (#5022).
 Environment=LAMP_MEMORY_FORGET_JUST_KEPT=on
+# The account's conversation history (#7771): each turn the memory keeps is saved to it (LAMP_HISTORY_SEND), and
+# what a forget removes on the lamp is deleted from it (LAMP_HISTORY_FORGET). Always the two together, by the first
+# builder's ruling on #7957: the save never runs without the forget. Only to the lamp's own cloud API. Needs
+# LAMP_MEMORY_DAYS and LAMP_VOICE_ROUTE=second, both above. Their rules and caps are their rows in docs/switches.md.
+Environment=LAMP_HISTORY_FORGET=on
+Environment=LAMP_HISTORY_SEND=on
 # Recall's second version (#2176), with lamp-memory from the same build: on lamp-06c1 on 4 Nov (build 10012) "my"
 # alone found nothing (5 before), the drink order was found, and "last week" got a span answer (span=true).
 Environment=LAMP_MEMORY_RECALL_V2=on

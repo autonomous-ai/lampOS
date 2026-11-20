@@ -963,7 +963,7 @@ bị quên: không hết hạn, tidy hay nightly không đọc bảng này; `for
 người, liên hệ thay đổi lâu nhất bị bỏ trước khi vượt quá. Memory cũ trả
 `unknown_op`, nên voice chỉ gửi chúng khi công tắc của nó bật.
 
-## Lịch sử trên tài khoản (`LAMP_HISTORY_SEND` của voice, #7771, tắt)
+## Lịch sử trên tài khoản (`LAMP_HISTORY_SEND` của voice, #7771, bật trong sản phẩm)
 
 Quyết định của chủ sản phẩm ngày 18/11: các cuộc trò chuyện của một người với
 lamp cũng được giữ trên máy chủ của chúng ta. Với `LAMP_HISTORY_SEND=on` (chỉ
@@ -1037,7 +1037,14 @@ khoản (Backend3, 19/11): `POST <base>/history/turns` với khóa của lamp tr
   đường đi và không bỏ thêm gì; khi một lần hết giờ hay mất câu trả lời giữa
   chừng (các lệnh quên điều đã giữ hoặc lệnh quên lượt trò chuyện), không biết
   những gì đã đi, và nó được coi như một lệnh quên không nêu id, không bao giờ
-  là "không xóa gì". Một nguồn bị quên bên ngoài voice được coi như một lệnh quên không nêu
+  là "không xóa gì". Một lệnh quên đã gửi trọn mà voice thôi chờ câu trả lời
+  (bộ nhớ vẫn đang làm) hay mất câu trả lời thì lệnh xóa của nó được xếp hàng
+  khi bộ nhớ làm xong, không bao giờ chỉ ở lần khởi động sau (quyết định của
+  builder đầu tiên trên #8125, mục 2): khi `LAMP_HISTORY_FORGET` bật, worker
+  quên đọc những gì bộ nhớ giữ lại của nó (`history_forget::unanswered`, như
+  lúc khởi động), còn nợ và đọc lại mỗi 5 giây khi bộ nhớ bận, nên trong
+  khoảng 5 giây sau câu trả lời muộn của bộ nhớ; khi còn nợ, không lượt nào
+  được POST. Khi công tắc tắt, các id của nó chờ trong bộ nhớ như trên. Một nguồn bị quên bên ngoài voice được coi như một lệnh quên không nêu
   id của người đó.
 - **Không mất gì khi khởi động lại, và không có lời nào trên đĩa:** chỉ có id
   được giữ, trong `/var/lib/lampOS/voice/history-marks.json` (0600,
@@ -1076,12 +1083,19 @@ khoản (Backend3, 19/11): `POST <base>/history/turns` với khóa của lamp tr
   đường khi lệnh quên che nó đến sẽ được xóa sau khi POST của nó trả lời
   (must-fix của Reviewer-lead trên #8091). Một lần reset hay quên hết mọi
   người xóa toàn bộ lịch sử của lamp trước (`{"all":true,"every_person":true}`;
+  khi reset, lamp-setup gửi lệnh xóa này và đọc câu trả lời trước khi xóa
+  các khóa của lamp, tối đa 10 giây, 401 được coi là đã xong, xem setup.md;
   một lệnh như vậy lỡ lượt trao cho worker sẽ được thấy ở lần đọc lại kế tiếp
   qua epoch đã đổi của memory),
-  và không lưu gì trước khi nó đi (xem memory.md).
-- **Tắt trong mọi unit:** theo các phán quyết của người xây dựng đầu tiên
-  (#7935, và 17:09 trên #7957), phần lưu chỉ bật trong sản phẩm sau khi phần quên
-  (`LAMP_HISTORY_FORGET`) đã bật, cùng hàng kiểm tra của nó. Câu thông báo trong
+  và không lưu gì trước khi nó đi (xem memory.md). Một người bị xóa trong
+  ứng dụng (`forget_person`, từ lamp-cloud) cũng bị xóa toàn bộ lịch sử trên
+  tài khoản (`{"all":true,"person":<id p->}`): bộ nhớ giữ nó trong chính
+  transaction của lần xóa, và voice đọc nó khi có `memory/forgot` hoặc ở lần
+  khởi động sau (HOLD của Reviewer-lead trên #8125).
+- **Bật trong unit sản phẩm, cùng phần quên:** theo các phán quyết của người
+  xây dựng đầu tiên (#7935, và 17:09 trên #7957), phần lưu chỉ bật cùng lúc với
+  phần quên (`LAMP_HISTORY_FORGET`), không bao giờ bật một mình; unit đặt cả hai,
+  và bài kiểm tra cài đặt của nó ghim cặp này. Câu thông báo trong
   phần cài đặt mà issue ban đầu yêu cầu đã được chủ sản phẩm bỏ (18/11): thông
   báo nằm trong chính sách quyền riêng tư.
 
@@ -1940,14 +1954,27 @@ khi các điều đã giữ chưa xong: bộ nhớ không trả lời hay từ c
 quá nhiều để xem hết, hoặc hơn tám điều khớp (mô hình hỏi điều nào). Khi có lượt
 bị xóa, câu trả lời nói bao nhiêu (`exchanges`, không bao giờ lời của chúng)
 và cuộc trò chuyện ngừng được ghi nhật ký, như sau khi quên một điều đã giữ.
-Đã gửi mà không được trả lời (hết giờ hay mất câu trả lời; bị từ chối thì
-không xóa gì), thì lời đã nói về nó không được biết là đã mất: mô hình được
-báo `history:
-"not_reached"` bên cạnh kết quả riêng của các điều đã giữ, không bao giờ
-"forgot nothing". Không điều đã giữ nào mất thì ghi chú nói không điều đã
-giữ nào bị quên, rằng chưa quên xong, và không được nói là chẳng có gì hay
-là đã quên; có điều đã mất thì một `history_note` nói vậy bên cạnh những gì
-đã mất. Thêm một yêu cầu cục bộ trong 1,5 s của lệnh gọi.
+Không có câu trả lời (bị từ chối thì không xóa gì), thì lời đã nói về nó
+không được biết là đã mất, không bao giờ "forgot nothing", và mô hình được báo
+một trong hai điều bên cạnh kết quả riêng của các điều đã giữ (quyết định của
+builder đầu tiên trên #8125, mục 3):
+- **Đã gửi trọn, không có câu trả lời kịp:** bộ nhớ vẫn làm tiếp sau khi
+  voice thôi chờ (lamp-06c1, 20/11: một lệnh quên khoảng 100 lượt trả lời
+  khoảng 15 s sau 1,5 s của lệnh gọi), nên `history: "still_forgetting"`.
+  Không điều đã giữ nào mất thì ghi chú bảo nói "I'm still forgetting that.
+  It'll be gone in a moment." (đèn vẫn đang quên, lát nữa sẽ hết), không bao
+  giờ nói là không quên được, cũng không nói là chẳng có gì hay là đã quên
+  rồi; có điều đã mất thì một `history_note` nói những gì đã mất và phần còn
+  lại vẫn đang được quên. Lệnh xóa trên tài khoản theo sau khi bộ nhớ làm
+  xong (bên dưới).
+- **Không với tới bộ nhớ** (không kết nối được, yêu cầu không gửi trọn, hết
+  thời gian, hoặc đóng mà không trả lời): `history: "not_reached"`. Không
+  điều đã giữ nào mất thì ghi chú bảo nói "I couldn't finish forgetting that
+  just now." (chưa quên xong được), và không được nói là chẳng có gì hay là
+  đã quên; có điều đã mất thì một `history_note` nói những gì đã mất và rằng
+  chưa quên xong.
+
+Thêm một yêu cầu cục bộ trong 1,5 s của lệnh gọi.
 
 Dấu quên (phương án 2 của El trên #5333): trước thay đổi trên, quên theo chủ
 đề chỉ khớp điều đã giữ và quan sát, nên một lượt nói chưa từng được giữ
