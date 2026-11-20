@@ -2700,6 +2700,15 @@ mod tests {
         ] {
             assert!(!flat.contains(never), "{never}");
         }
+        // #8157: a script waits for each line it says, so it never exits
+        // before its say is said (a say dropped fails the run); each
+        // example's `lamp.say` does.
+        assert!(flat.contains("Always pass `wait=True`"), "{flat}");
+        for (path, text) in MAKE_EXAMPLES {
+            for line in text.lines().filter(|line| line.contains("lamp.say(")) {
+                assert!(line.contains("wait=True"), "{path}: {line}");
+            }
+        }
         // Anything but a boolean is no make's line.
         let refused = answer(
             &guided(json!("yes")),
