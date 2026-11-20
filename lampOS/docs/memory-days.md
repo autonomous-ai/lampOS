@@ -1246,8 +1246,10 @@ body `{"turns":[{"id","at","person","heard","said"}]}`.
   wait the same way. A POST already under way is not stopped; its next try is
   checked. Other people's unsent turns are never let go.
   Every memory answer the voice reads with `exchanges` turn ids (all five
-  forget ops, `history_forget::answered`) goes to `history_send::deleting`, so
-  those ids are never posted, whatever `LAMP_HISTORY_FORGET`. A forget about a
+  forget ops, `history_forget::answered`, on the voice's way) goes to
+  `history_send::deleting`, so those ids are never posted, whatever
+  `LAMP_HISTORY_FORGET`; with it on, the pages of a big forget's rest are
+  read off the voice's way and their ids go there too. A forget about a
   thing holds and lifts the posts as every other forget. When each of its
   removals answered, what went was named on its way and nothing more is let
   go; when one timed out or was lost part way (the kept things' forgets or the
