@@ -144,8 +144,8 @@ pub const PRODUCT: &[(&str, &str)] = &[
         "lamp-seen.service",
         include_str!("../../../deploy/product/lamp-seen.service"),
     ),
-    // The NPU's one owner (#7415, docs/npu.md); off unless LAMP_NPU=on, so
-    // with it unset it idles touching nothing. lamp-control forwards `pose`.
+    // The NPU's one owner (#7415, docs/npu.md); LAMP_NPU=on in the unit (with
+    // it unset it idles touching nothing). lamp-control forwards `pose`.
     (
         "lamp-npu.service",
         include_str!("../../../deploy/product/lamp-npu.service"),
