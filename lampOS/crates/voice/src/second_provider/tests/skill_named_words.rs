@@ -1318,7 +1318,7 @@ fn mail_run() -> (String, Value) {
 /// #8022: a line that calls the lamp by its name heard as another word
 /// ("Hey, Lynn. Mail check.", the lamp's name set off as speech to text
 /// wrote it on lamp-52e6) runs a made skill by its words past that word
-/// ([`past_the_name`]), as `LAMP_MAKE_SKILL_ASKED`'s force reads a make; a
+/// ([`past_the_name_heard_as`]), as `LAMP_MAKE_SKILL_ASKED`'s force reads a make; a
 /// question so opened still runs nothing.
 #[tokio::test]
 async fn a_made_skill_runs_past_the_lamps_name_heard_as_another_word() {
@@ -1327,6 +1327,7 @@ async fn a_made_skill_runs_past_the_lamps_name_heard_as_another_word() {
         let ran = made_ran_of(line, Vec::new(), made, MAIL).await;
         assert_eq!(ran, [mail_run()], "{line}: run in code");
     }
-    let ran = made_ran_of("Hey, Lynn. What time is it?", Vec::new(), made, MAIL).await;
+    let control = "Hey, Lynn. What time is it?";
+    let ran = made_ran_of(control, Vec::new(), made, MAIL).await;
     assert!(ran.is_empty(), "the control runs nothing: {ran:?}");
 }

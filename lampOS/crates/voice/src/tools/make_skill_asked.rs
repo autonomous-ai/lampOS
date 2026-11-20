@@ -207,21 +207,53 @@ pub fn sentence_count(said: &str) -> usize {
     sentences(said).len()
 }
 
-/// Keeps whether `said`, a person's line, names the lamp (`named`, as
-/// `second_provider::answer` knows it), for [`force`], which sees only the
-/// messages (#8022 case 2).
+/// The person's lines that name the lamp (`named`, as
+/// `second_provider::answer` knows it), newest last, at most
+/// [`NAMED_KEPT`], by their words: [`force`] sees only the messages
+/// (#8022 case 2).
+static NAMED: std::sync::Mutex<std::collections::VecDeque<String>> =
+    std::sync::Mutex::new(std::collections::VecDeque::new());
+const NAMED_KEPT: usize = 16;
+
+/// Keeps whether `said`, a person's line, names the lamp (`named`), for
+/// [`force`]: a line heard again without the name is no longer read so.
 pub fn heard_named(said: &str, named: bool) {
-    let _ = (said, named);
+    let Ok(mut lines) = NAMED.lock() else {
+        return;
+    };
+    lines.retain(|line| line != said);
+    if named {
+        lines.push_back(said.to_owned());
+        if lines.len() > NAMED_KEPT {
+            lines.pop_front();
+        }
+    }
+}
+
+/// What [`force`] reads of a person's line, and round 1's `make_ask=`:
+/// whether it asks to make a skill ([`asks_to_make`]) as said or, on a
+/// line that names the lamp ([`heard_named`]), past the lamp's name heard
+/// as another word (`second_provider::past_the_name_heard_as`, which the made-skill
+/// matcher reads too): "Hey, Lynn, make me a skill that …" (kit-8101's
+/// ROW, lamp-52e6, 20 Nov 14:38). Said to a person ("Hey, Anna, make me a
+/// skill that …"), the line names nothing, and is read as said.
+pub fn make_asked(said: &str) -> bool {
+    let named = NAMED
+        .lock()
+        .is_ok_and(|lines| lines.iter().any(|line| line == said));
+    let past = crate::second_provider::past_the_name_heard_as(said, named);
+    asks_to_make(said) || past.is_some_and(asks_to_make)
 }
 
 /// The force the second route's chat is given with the switch on
 /// (`second_provider::net::Chat::forcing`): a request whose last message is
-/// a person's line that plainly asks to make a skill must call
-/// `make_skill`. The chat forces it only when `make_skill` is declared.
+/// a person's line that plainly asks to make a skill ([`make_asked`]) must
+/// call `make_skill`. The chat forces it only when `make_skill` is
+/// declared.
 pub fn force() -> Force {
     std::sync::Arc::new(|messages: &[Message]| {
         let last = messages.last().filter(|message| message.role == "user")?;
-        asks_to_make(last.words()?).then_some(Forced {
+        make_asked(last.words()?).then_some(Forced {
             name: crate::made_skill::MAKE,
             only: None,
             fields: None,
