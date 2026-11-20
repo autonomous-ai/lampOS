@@ -4685,7 +4685,12 @@ chính đèn (đèn, đầu, một câu nói). "When I say send my test note, em
    kỹ năng. Một câu gọi đèn bằng tên bị nghe thành từ khác ("Hey, Lynn. An
    apple file.") cũng được so khớp bỏ qua từ đó, như dòng được giữ của nó
    (ROW của kit-8043, lamp-52e6, 20/11 09:14: câu như vậy bị
-   `calls=none`). Một lần chạy tự nói lời của nó
+   `calls=none`). Khi bật `LAMP_SKILL_KEYTERM=on`, speech to text cũng
+   nghe tên đọc ra của từng kỹ năng tự tạo và asks của nó
+   (`key_terms::made_terms`, cùng `made_asks` đó, đọc lại mỗi 2 giây), để
+   lời được viết đúng như đã nói; việc so khớp vẫn chính xác (#8022: trên
+   lamp-52e6 một câu "Hey Lamp, apple file." rõ ràng bị viết thành hai từ
+   khác). Một lần chạy tự nói lời của nó
    (`says` của lamp-skills, `made_run::speaks_itself`) kết thúc lượt ở đó,
    không có vòng 2 và không có câu nào của riêng đèn, nên câu say của kỹ
    năng, ở mức ưu tiên 8, là điều đầu tiên được nghe, khoảng một giây sau
