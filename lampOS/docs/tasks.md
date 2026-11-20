@@ -1966,7 +1966,13 @@ The product unit's test is `the_tasks_part_starts_with_no_targets_and_learns_the
     target went away since (the lamp's reading went stale): it is said not
     set up, never sent to a computer. A finished task's news adds that it was
     done here on the lamp ("I did it here on the lamp"); a session joined
-    on a computer is told as that computer's.
+    on a computer is told as that computer's. The lamp's own engine is never
+    named to the person (#7930, the owner): its read-back, `where` and
+    hand-over say "the lamp", its news says "the lamp" and adds "Never tell
+    the person which agent runs their work; say what is being done or what
+    was found." (`NO_AGENT_NAME`); an engine the person named is said back
+    as named, and the task's words and the agent's answer are never changed
+    (`the_lamps_own_engine_is_never_named_in_its_news`).
   - **A named engine (#6492).** The voice keeps the lamp's engines from
     the `targets` answer: the `lamp` target's `engine` (its default) first,
     then its `engines`, each once (`[engine]` alone from an older tasks
