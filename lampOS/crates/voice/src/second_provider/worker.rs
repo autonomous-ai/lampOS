@@ -28601,18 +28601,20 @@ mod tests {
     /// nobody turned to the lamp the name note's room rule
     /// (`LAMP_NAME_NOTE_BUSY=face`) withheld the note, and no tool was
     /// called. With `LAMP_NAME_FACE_OR_WORDS=on` a line whose words call
-    /// the lamp is told even so; a busy room where only the room's sound
-    /// carries the name, its words not calling it, is not told. Off, as
-    /// on 15177.
+    /// the lamp is told even so, but only on a sure hearing (the first
+    /// builder's ruling on #8149, 21 Nov 01:49): request 41's own 0.979 is
+    /// not told there, the bar's cost. A busy room where only the room's
+    /// sound carries the name, its words not calling it, is not told. Off,
+    /// as on 15177.
     #[test]
     fn a_line_its_words_call_is_told_the_name_in_a_busy_room_with_nobody_turned() {
         use crate::room_told::Room;
         let line = (10_000_000, 12_100_000);
-        let noted = |on: bool, heard: &str| {
+        let noted = |on: bool, heard: &str, score: f32| {
             let mut heeding = room_name_heeding(true);
             heeding.telling_the_name(true, false);
             heeding.attention.need_a_face_or_words(on);
-            let names = vec![(line.0 + 200_000, 0.979)];
+            let names = vec![(line.0 + 200_000, score)];
             heeding.heed_signs(
                 41,
                 line,
@@ -28621,18 +28623,56 @@ mod tests {
             );
             heeding.name_note_for(41)
         };
+        let sure = crate::attention::SURE_SCORE;
         let call = "Hey Lamp, make it blue.";
         let told = Some(crate::called::note(false));
-        assert_eq!(noted(true, call), told, "request 41");
-        assert_eq!(noted(false, call), None, "off, as on 15177");
+        assert_eq!(noted(true, call, sure), told, "a sure call");
+        assert_eq!(noted(true, call, 0.979), None, "request 41's 0.979");
+        assert_eq!(noted(false, call, 0.979), None, "off, as on 15177");
         let plain = "Yes, make it blue now.";
-        assert_eq!(noted(true, plain), None, "only the room's sound");
-        assert_eq!(noted(false, plain), None, "only the room's sound, off");
+        assert_eq!(noted(true, plain, 0.979), None, "only the room's sound");
+        assert_eq!(noted(false, plain, 0.979), None, "only the room's sound, off");
         // A stand-in for the name is office talk in a busy room (#1712,
         // the reviewer-lead's HOLD on #8149): never told there.
-        assert_eq!(noted(true, "Hey man, make it blue."), None, "hey man");
-        assert_eq!(noted(true, "Okay, Lynn, make it blue."), None, "Lynn");
-        assert_eq!(noted(true, "Hey Lamb, make it blue."), told, "Lamb");
+        assert_eq!(noted(true, "Hey man, make it blue.", 0.979), None, "hey man");
+        assert_eq!(noted(true, "Okay, Lynn, make it blue.", 0.979), None, "Lynn");
+        assert_eq!(noted(true, "Hey Lamb, make it blue.", sure), told, "Lamb");
+        assert_eq!(noted(true, "Hey Lamb, make it blue.", 0.979), None, "Lamb, near");
+    }
+
+    /// row-8149b on lamp-52e6 (21 Nov 01:2x, case B try 5, request 26):
+    /// "Man, that meeting ran long." played in a busy room with 0 faces;
+    /// speech to text wrote its "Man," as the name and lamp-name heard it
+    /// near, at 0.95, by the line's start, so the line's words called the
+    /// lamp and the model was told. The first builder's ruling on #8149
+    /// (21 Nov 01:49): in a busy room with nobody turned to the lamp, words
+    /// calling it are told only on a sure hearing (`SURE_SCORE`); a near
+    /// one counts only with a face turned to the lamp.
+    #[test]
+    fn a_busy_rooms_call_in_words_is_told_only_on_a_sure_hearing_or_with_a_look() {
+        use crate::room_told::Room;
+        let line = (10_000_000, 12_100_000);
+        let noted = |heard: &str, score: f32, turned: bool| {
+            let mut heeding = room_name_heeding(true);
+            heeding.telling_the_name(true, false);
+            heeding.attention.need_a_face_or_words(true);
+            let names = vec![(line.0 + 100_000, score)];
+            heeding.heed_signs(
+                26,
+                line,
+                heard,
+                room_name_signs(Room::Busy, false, Some(turned), false, names),
+            );
+            heeding.name_note_for(26)
+        };
+        let told = Some(crate::called::note(false));
+        let man = "Lamb. That meeting ran long.";
+        assert_eq!(noted(man, 0.95, false), None, "'Man,' heard as the name, near");
+        assert_eq!(noted(man, 0.95, true), told, "the same, with a look");
+        let call = "Hey Lamp, make it blue.";
+        let sure = crate::attention::SURE_SCORE;
+        assert_eq!(noted(call, sure, false), told, "a sure call, nobody turned");
+        assert_eq!(noted(call, 0.98, false), None, "a near call, nobody turned");
     }
 
     /// #4226, `LAMP_NAME_START_USUAL=on`: a line whose sound began 0.3 s
