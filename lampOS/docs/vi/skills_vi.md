@@ -3604,7 +3604,50 @@ cả hai người viết.
   `Uncovered::Reminder`, không bao giờ giữ thành task hằng ngày), và sau
   đánh giá đúng, mỗi lần DeepSeek sửa cũng phải qua `quick_reaction`, lần
   sửa không phải phản ứng nhanh chuyển sang dạng giữa (hai P2 của
-  Reviewer-lead trên #7764). Đèn không có agent nào (`missing` của
+  Reviewer-lead trên #7764).
+  **Theo dõi dữ liệu bên ngoài là task theo đồng hồ, không bao giờ là nhắc
+  việc (#8079).** Trên lamp-9adf (20/11) "Lamp, if Bitcoin goes under
+  ninety thousand dollars, tell me right away." bị đặt trên topic
+  `price/bitcoin` mà đèn không có, rồi được trả lời `cannot:` là nhắc việc
+  và bị từ chối là bộ hẹn giờ của đèn. Giờ, sau câu từ chối nhắc việc, lần
+  gọi thêm được nói về việc theo dõi (`make_no_cannot::WATCH`, kèm một câu
+  trả lời đầy đủ cho "if it starts raining in Hanoi, tell me"): điều chỉ
+  internet biết, không có topic nào của đèn (giá, thời tiết, một trang
+  web, một con số trên dịch vụ), chạy trên đồng hồ riêng của lamp-skills
+  mỗi khoảng, `clock/local`, `known`, `true`, `cooldown = "90m"` (không bao
+  giờ dưới 90 phút, `made_skill::LEAST_WATCH_SECS`: 16 lần chạy một ngày
+  vẫn dưới mức `task::PER_SKILL` của lamp-skills là 20 lần chạy task cho
+  mỗi skill trong 24 giờ, có mức sàn 72 phút; việc theo dõi 15 phút sẽ
+  dùng hết 20 lần trong năm giờ rồi dừng cả ngày), không `rearm`,
+  `during` hay `days`, có `net` trong grants; task duy nhất kiểm tra điều
+  kiện mỗi lần chạy và chỉ nói khi điều kiện đúng. Mô hình phán theo
+  nghĩa; đèn không giữ danh sách từ nào. Hai lần sửa theo cấu trúc đi kèm:
+  trigger trên topic không bộ phận nào của đèn mang
+  (`made_skill::topic_lamp_lacks`) bị từ chối với các dòng của phép kiểm
+  và `WATCH_REPAIR` (chạy theo đồng hồ, việc kiểm tra nằm trong task, không
+  bao giờ `cannot:`); và `cannot:` nhắc việc sau một trigger như thế của
+  chính mô hình được hỏi lại một lần như việc theo dõi (nhật ký: `the
+  model's cannot was a reminder after its trigger on what the lamp has no
+  topic for: asked again as a watch on the clock`), chỉ bị từ chối là bộ
+  hẹn giờ của đèn khi lại trả lời như vậy. `cannot:` nhắc việc không có
+  trigger như thế trước nó ("remind me at 5 pm to call the bakery") vẫn là
+  bộ hẹn giờ của đèn y như trước. Việc theo dõi theo đồng hồ được nói
+  "Every 90 minutes, …" và brief của lần chạy gọi tên nó ("has fired
+  (every 90 minutes)"); chỉ được nói (và giữ) cho task của agent đèn làm ở
+  đây (`made_skill::clock_watch`, `watch_here`): bản nháp DeepSeek hỏi đồng
+  hồ đều đặn là nhắc việc lặp lại và vẫn bị từ chối. Brief của mọi lần
+  chạy giờ kết thúc "…, or nothing at all when what they said is only for
+  when something holds and it doesn't now", nên việc theo dõi im lặng cho
+  tới khi điều kiện đúng. Khi `LAMP_MADE_SKILL_LOOSE` bật, như sản phẩm
+  chạy, không `most_a_day` hay `[budget]` nào giới hạn nó, và mức sàn 90
+  phút giữ nó trong `task::PER_SKILL` cả ngày (test
+  `a_made_watch_fits_the_task_runs_a_day` của lamp-skills giữ hai số này
+  khớp nhau). Test:
+  `with_reactions_on_a_watch_on_outside_data_is_told_on_the_clock`,
+  `a_reminder_after_a_trigger_on_what_no_topic_carries_is_asked_again_as_a_watch`,
+  `a_reminder_with_no_watch_before_it_is_still_the_lamps_timer`,
+  `with_the_switch_a_price_watch_runs_on_the_clock_as_one_task_never_a_reminder`
+  và `with_the_switch_a_one_off_reminder_is_still_the_lamps_timer`. Đèn không có agent nào (`missing` của
   #7375): "this lamp has no agent set up to make it"; chưa biết agent (chưa
   đọc được targets của lamp-tasks, hoặc engine không có lần chạy make):
   không đánh giá, của DeepSeek như trước. Câu trả lời `cannot:`

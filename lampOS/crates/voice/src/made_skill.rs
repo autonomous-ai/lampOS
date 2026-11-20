@@ -6971,7 +6971,10 @@ fn said_plainly(table: &toml::Table, reads: bool, general: bool) -> Result<Strin
     if let Some(guards) = &guards {
         said.push_str(guards);
     }
-    if let Some(cooldown) = trigger.get("cooldown") {
+    // A clock watch's cooldown is its every while, already said first
+    // ([`clock_watch`]).
+    let watched = watch_here() && clock_watch(trigger).is_some();
+    if let Some(cooldown) = trigger.get("cooldown").filter(|_| !watched) {
         match cooldown.as_str().and_then(duration) {
             Some((1, unit)) => said.push_str(&format!(", at most once {}", one(unit))),
             Some((count, unit)) => {
@@ -7641,6 +7644,11 @@ fn trigger_plainly(trigger: Option<&toml::Value>) -> Result<(String, &toml::Tabl
         // minute; on its `days` alone when it names them (#6066, as
         // lamp-skills reads them, [`weekdays`]); never a window's while.
         (lasting, absent) if topic.0 == Some(CLOCK_TOPIC) => {
+            // A watch on outside data, polled on the clock ([`clock_watch`],
+            // #8079): every while, for the lamp's agent's task alone.
+            if let Some(every) = clock_watch(trigger).filter(|_| watch_here()) {
+                return Ok((format!("Every {every}"), trigger));
+            }
             let at = (topic.1 == Some("known")
                 && topic.2 == Some(toml::Value::Boolean(true))
                 && lasting.is_none()
@@ -7774,6 +7782,72 @@ fn trigger_plainly(trigger: Option<&toml::Value>) -> Result<(String, &toml::Tabl
         said.push_str(&format!(", between {from} and {to}"));
     }
     Ok((said, trigger))
+}
+
+/// The least while a clock watch ([`clock_watch`]) runs again: 90 minutes,
+/// so a watch runs at most 16 times a day and stays under lamp-skills' cap
+/// of 20 task runs per skill in any 24 hours (`lamp_skills::task::PER_SKILL`,
+/// which this crate can't see; its floor is 72 minutes). A 15-minute watch
+/// would hand over its 20 in five hours and then stop for the day unsaid.
+pub const LEAST_WATCH_SECS: u64 = 90 * 60;
+
+/// lamp-skills' most task runs per skill in any 24 hours
+/// (`lamp_skills::task::PER_SKILL`), written here since lamp-skills depends
+/// on this crate; its own test holds [`LEAST_WATCH_SECS`] to the real one.
+#[cfg(test)]
+const TASK_RUNS_A_DAY: u64 = 20;
+
+/// A watch on outside data on lamp-skills' own clock (#8079, lamp-9adf, 20
+/// Nov: "if Bitcoin goes under ninety thousand dollars, tell me right away"
+/// was put on a topic `price/bitcoin` the lamp doesn't have, then refused
+/// as a reminder): known local time held, `cooldown` its every while of at
+/// least [`LEAST_WATCH_SECS`], no `rearm`, `during`, `days`, `for`, `when`
+/// or `absent_for`, so lamp-skills runs it again each time its cooldown
+/// ends; its one task (the lamp's agent's, granted `net`) checks the
+/// condition and speaks only when it holds. The while said after "Every"
+/// ("90 minutes", "2 hours"); none for any other trigger.
+fn clock_watch(trigger: &toml::Table) -> Option<String> {
+    let held = trigger.get("topic").and_then(toml::Value::as_str) == Some(CLOCK_TOPIC)
+        && trigger.get("field").and_then(toml::Value::as_str) == Some("known")
+        && trigger.get("equals") == Some(&toml::Value::Boolean(true))
+        && [
+            "rearm",
+            "during",
+            "days",
+            "for",
+            "when",
+            "absent_for",
+            "wait",
+        ]
+        .iter()
+        .all(|key| !trigger.contains_key(*key));
+    let cooldown = trigger.get("cooldown")?.as_str()?;
+    if !held || whole_ms(cooldown)? < LEAST_WATCH_SECS * 1_000 {
+        return None;
+    }
+    Some(match duration(cooldown)? {
+        (1, unit) => unit.to_owned(),
+        (count, unit) => format!("{count} {unit}s"),
+    })
+}
+
+/// Whether a clock watch ([`clock_watch`]) may be said here: only for a
+/// task for the lamp's agent (`LAMP_MAKE_NO_CANNOT` or a make of what only
+/// the internet tells, [`crate::make_no_cannot::agent_tasks_made`]), and,
+/// while a model's answer is kept, only when its code is the lamp's own
+/// agent script ([`AGENT_SCRIPT`]): a DeepSeek draft polling on the clock
+/// is a repeating reminder, the lamp's own timer, and stays refused.
+fn watch_here() -> bool {
+    crate::make_no_cannot::agent_tasks_made()
+        && AGENT_SCRIPT.with(|ours| ours.get()).unwrap_or(true)
+}
+
+/// Whether `topic` is one no part of the lamp carries (#7357, [`unread`]):
+/// neither one it has ([`lamp_has`]) nor a real one it can't start on yet
+/// ([`topic_cant_yet`]). The middle form reads a trigger on one as a watch
+/// on outside data (`crate::make_no_cannot`, #8079).
+pub(crate) fn topic_lamp_lacks(topic: &str) -> bool {
+    topic_cant_yet(topic).is_none() && !lamp_has(topic)
 }
 
 /// A `during` of one minute, `{ from = "22:00", to = "22:01" }`: its
@@ -14317,6 +14391,30 @@ light = { colour = "green", level = 3, for = "20s" }
         }
         assert!(lamp_has(lamp_msgs::Hand::TOPIC));
         assert!(!lamp_has("phone/battery"));
+    }
+
+    /// #8079: a clock watch every [`LEAST_WATCH_SECS`] runs fewer times a
+    /// day than lamp-skills' task runs per skill ([`TASK_RUNS_A_DAY`],
+    /// `lamp_skills::task::PER_SKILL`), so it never stops for the day; one
+    /// more often than that is no watch.
+    #[test]
+    fn a_clock_watch_fits_the_task_runs_a_day() {
+        const DAY_SECS: u64 = 24 * 60 * 60;
+        assert_eq!(LEAST_WATCH_SECS, 90 * 60);
+        assert_eq!(DAY_SECS.div_ceil(LEAST_WATCH_SECS), 16);
+        assert!(DAY_SECS.div_ceil(LEAST_WATCH_SECS) <= TASK_RUNS_A_DAY);
+        let watch = |cooldown: &str| {
+            let trigger: toml::Table = toml::from_str(&format!(
+                "topic = \"clock/local\"\nfield = \"known\"\nequals = true\n\
+                 cooldown = \"{cooldown}\""
+            ))
+            .unwrap();
+            clock_watch(&trigger)
+        };
+        assert_eq!(watch("90m").as_deref(), Some("90 minutes"));
+        for cooldown in ["15m", "72m", "89m", "1h"] {
+            assert_eq!(watch(cooldown), None, "{cooldown}");
+        }
     }
 
     /// #7357: every topic `lamp_msgs` names (each `TOPIC` const and

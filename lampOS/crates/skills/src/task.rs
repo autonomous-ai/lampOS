@@ -2047,6 +2047,17 @@ mod tests {
         set_made_here(None);
     }
 
+    /// #8079: a watch on outside data made by voice runs on the lamp's
+    /// clock no more often than lamp-voice's floor
+    /// (`made_skill::LEAST_WATCH_SECS`, 90 minutes), so its runs in any 24
+    /// hours (16) stay within [`PER_SKILL`] and it never stops for the day.
+    #[test]
+    fn a_made_watch_fits_the_task_runs_a_day() {
+        let least_ms = lamp_voice::made_skill::LEAST_WATCH_SECS * 1_000;
+        let runs = DAY_MS.div_ceil(least_ms);
+        assert!(runs <= PER_SKILL as u64, "{runs} runs a day");
+    }
+
     /// The owner's ruling (17 Nov): a task for the lamp's agent made by
     /// voice on its own trigger ("check the Bitcoin price every day at 9
     /// and tell me"), granted `net` with LAMP_TASK_NET on, loads as a made

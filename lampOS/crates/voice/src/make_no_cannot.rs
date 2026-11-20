@@ -152,10 +152,14 @@ did.\")\n";
 const SCRIPT_HEAD: &str = "print(\"A skill the person made has fired (";
 /// Between what fired it and the line they said when they made it.
 const SCRIPT_SAID: &str = "). When they made it, they said: «";
-/// How [`script`]'s brief ends.
+/// How [`script`]'s brief ends: what they said only for when something
+/// holds (a watch on outside data on the lamp's clock, [`WATCH`], #8079:
+/// "if Bitcoin goes under ninety thousand dollars, tell me") is told only
+/// when it holds, never at each run.
 const SCRIPT_TAIL: &str = "». Do now what it is for, with your own tools and only the skill's \
 grants, never making, changing or removing a skill; then tell the owner in a sentence or two what \
-you found or did.\")\n";
+you found or did, or nothing at all when what they said is only for when something holds and it \
+doesn't now.\")\n";
 
 /// [`RUN`]'s text for a task on a trigger: the brief the agent reads at
 /// each run (the first builder, 02:09 on #7819), naming what fired it
@@ -514,6 +518,55 @@ wait = \"10m\"
 /// The request [`SAT_EXAMPLE`] is for.
 const SAT_EXAMPLE_ASKED: &str = "when I've sat at my desk a long while, remind me to stretch";
 
+/// A watch on outside data, told the one more call with
+/// `LAMP_MAKE_REACTIONS_ONLY_DEEPSEEK` on, after the reminder's refusal
+/// (#8079, lamp-9adf, 20 Nov: "Lamp, if Bitcoin goes under ninety thousand
+/// dollars, tell me right away" was put on a topic `price/bitcoin` the lamp
+/// doesn't have, then answered as a reminder and refused as the lamp's own
+/// timer): what only the internet tells, with no topic of the lamp's, runs
+/// on the lamp's clock every while (`made_skill::clock_watch`, a cooldown
+/// of at least `made_skill::LEAST_WATCH_SECS`, 90 minutes: 16 runs a day
+/// stay under lamp-skills' 20 task runs per skill in 24 hours), its one task granted `net`
+/// checking the condition and speaking only when it holds; never a
+/// reminder. The model judges by meaning which a request is, as for the
+/// sitting ([`SITTING`]); the lamp holds no list of words.
+const WATCH: &str = " A watch on something only the internet tells, with no topic of the \
+lamp's (a price, the weather, a web page, a count on a service), to tell the person when it \
+holds, runs on the lamp's clock every while: \"clock/local\", \"known\", equals true, \
+cooldown = \"90m\" (or less often when the request asks, never under 90m), no rearm, during or \
+days; net among its grants, the task checks it each time and speaks only when it holds. A watch \
+is never a reminder: only a time or a while the request names for the person to be told \
+something is.";
+
+/// One whole answer for a watch on outside data ([`WATCH`]), shown to the
+/// model with `LAMP_MAKE_REACTIONS_ONLY_DEEPSEEK` on.
+const WATCH_EXAMPLE: &str = "name: rain-watch
+grants: net, speak
+```skill.toml
+[permissions]
+topics = [\"clock/local\"]
+
+[trigger]
+topic = \"clock/local\"
+field = \"known\"
+equals = true
+cooldown = \"90m\"
+```";
+
+/// The request [`WATCH_EXAMPLE`] is for.
+const WATCH_EXAMPLE_ASKED: &str = "if it starts raining in Hanoi, tell me";
+
+/// What a repair is told with `LAMP_MAKE_REACTIONS_ONLY_DEEPSEEK` on when
+/// the last answer's trigger was on a topic no part of the lamp carries
+/// (`made_skill::topic_lamp_lacks`), and again when a `cannot:` reminder
+/// follows such a trigger ([`made`], #8079): the condition is a watch on
+/// outside data, on the lamp's clock, the check inside the task.
+const WATCH_REPAIR: &str = "No topic of the lamp's carries that, so it is a watch on outside \
+data: answer its one [trigger] on the lamp's clock, topic = \"clock/local\", field = \"known\", \
+equals = true, cooldown = \"90m\", no rearm, during or days, topics = [\"clock/local\"], net \
+among its grants; the task checks the condition each time and speaks only when it holds. A \
+watch is never a reminder, so never cannot:.";
+
 /// What the one more call is told with `LAMP_MAKE_REACTIONS_ONLY_DEEPSEEK`
 /// on (lamp-9adf, 20 Nov: "when I come back to the desk, wave at me" was
 /// answered `asks:` and made a skill only asked for, its arrival lost):
@@ -534,6 +587,7 @@ const RUNS_ASKED: &str = "asked";
 const EXAMPLE_RUNS: &str = "runs: every morning at eight\n";
 const ASKED_EXAMPLE_RUNS: &str = "runs: asked\n";
 const SAT_EXAMPLE_RUNS: &str = "runs: someone has sat at the desk a long while\n";
+const WATCH_EXAMPLE_RUNS: &str = "runs: every 90 minutes, until it rains\n";
 
 /// One whole answer for a task only asked for, shown to the model.
 const ASKED_EXAMPLE: &str = "name: desk-photo
@@ -550,15 +604,20 @@ const ASKED_EXAMPLE_ASKED: &str =
 /// where a make judged no quick reaction comes here first, it also refuses
 /// a reminder as the make's own brief does ([`reminder_rule`], the
 /// Reviewer-lead's P2 on #7764), and is told sip-of-water's sitting beside
-/// the triggers ([`SITTING`]) with a whole answer for it ([`SAT_EXAMPLE`]);
+/// the triggers ([`SITTING`]) with a whole answer for it ([`SAT_EXAMPLE`]),
+/// and, after the reminder's refusal, a watch on outside data on the
+/// lamp's clock, never a reminder ([`WATCH`], [`WATCH_EXAMPLE`], #8079);
 /// off, as before.
 pub fn system() -> String {
     let reactions = made_skill::reactions_on();
     let (reminder, sitting, sat_example) = if reactions {
         (
-            reminder_rule(),
+            format!("{}{WATCH}", reminder_rule()),
             SITTING,
-            format!("\nAnd for \"{SAT_EXAMPLE_ASKED}\":\n\n{SAT_EXAMPLE_RUNS}{SAT_EXAMPLE}\n"),
+            format!(
+                "\nAnd for \"{SAT_EXAMPLE_ASKED}\":\n\n{SAT_EXAMPLE_RUNS}{SAT_EXAMPLE}\n\n\
+                 And for \"{WATCH_EXAMPLE_ASKED}\":\n\n{WATCH_EXAMPLE_RUNS}{WATCH_EXAMPLE}\n"
+            ),
         )
     } else {
         (String::new(), "", String::new())
@@ -1388,6 +1447,22 @@ pub fn on_the_clock(block: &str) -> bool {
     })
 }
 
+/// Whether `block`'s `[trigger]` is on a topic no part of the lamp carries
+/// (`made_skill::topic_lamp_lacks`), with `LAMP_MAKE_REACTIONS_ONLY_DEEPSEEK`
+/// on: the model judged the request a condition on something only the
+/// internet tells, a watch ([`WATCH`], #8079). A structural read of the
+/// model's own answer, never of the person's words. Off, never.
+fn outside_trigger(block: &str) -> bool {
+    made_skill::reactions_on()
+        && toml::from_str::<toml::Table>(block).is_ok_and(|table| {
+            table
+                .get("trigger")
+                .and_then(|trigger| trigger.get("topic"))
+                .and_then(toml::Value::as_str)
+                .is_some_and(made_skill::topic_lamp_lacks)
+        })
+}
+
 /// A task skill only asked for, in the form of an agent skill added from a
 /// file (`crate::upload_agent::files`): its `skill.toml` (a voice tool named
 /// for it, `grants`, one `do.task` of `words` that runs
@@ -1466,6 +1541,10 @@ pub fn made(
     let (mut task_missed, mut task_asked_again) = (false, false);
     // Whether an answer that named a moment but `asks:` was asked again.
     let mut runs_asked_again = false;
+    // Whether an answer's trigger was on a topic no part of the lamp
+    // carries (a watch on outside data, [`outside_trigger`]), and whether a
+    // `cannot:` reminder after one was asked again as a watch (#8079).
+    let (mut outside, mut watch_asked_again) = (false, false);
     for round in 0..=most {
         if !fits() {
             eprintln!(
@@ -1485,6 +1564,23 @@ pub fn made(
             }
         };
         let lines = match read(&answer) {
+            // A `cannot:` reminder after the model's own trigger on what no
+            // topic of the lamp's carries: its earlier answer already
+            // judged it a condition to watch, not a time to be told
+            // something, so it is asked again once as a watch on the
+            // lamp's clock ([`WATCH_REPAIR`], #8079); answered so again, or
+            // no round left, refused as the lamp's timer, as before.
+            Ok(Answer::Uncovered(Uncovered::Reminder))
+                if outside && !watch_asked_again && round < most && fits() =>
+            {
+                watch_asked_again = true;
+                eprintln!(
+                    "lamp-voice: a skill made here: the model's cannot was a reminder after its \
+                     trigger on what the lamp has no topic for: asked again as a watch on the \
+                     clock"
+                );
+                WATCH_REPAIR.to_owned()
+            }
             Ok(Answer::Uncovered(uncovered)) => return Err(uncovered.refused()),
             Ok(Answer::Skill {
                 name,
@@ -1548,6 +1644,8 @@ pub fn made(
                 when: When::Trigger(block),
             }) => match block_kept(&block) {
                 Ok(block) => {
+                    let watch = outside_trigger(&block);
+                    outside |= watch;
                     let grants = match covered(&grants, false) {
                         Ok(grants) => grants,
                         Err(uncovered) => return Err(uncovered.refused()),
@@ -1567,6 +1665,12 @@ pub fn made(
                                         grants.len()
                                     );
                                     return last;
+                                }
+                                // A trigger on what no topic carries: the
+                                // check's lines, then how a watch on
+                                // outside data runs (#8079).
+                                Err(Refused(_, Some(lines))) if watch => {
+                                    format!("{lines} {WATCH_REPAIR}")
                                 }
                                 Err(Refused(_, Some(lines))) => lines.clone(),
                                 Err(_) => return last,
@@ -2784,5 +2888,234 @@ mod tests {
         crate::skill_task_yes::set_on_here(None);
         crate::upload_agent::set_on_here(None);
         set_on_here(None);
+    }
+
+    /// lamp-9adf's answer for #8079's request: its trigger on a topic
+    /// `price/bitcoin`, which no part of the lamp carries.
+    const PRICED: &str = "runs: when Bitcoin goes under 90000 dollars
+name: bitcoin-watch
+grants: net, speak
+```skill.toml
+[permissions]
+topics = [\"price/bitcoin\"]
+
+[trigger]
+topic = \"price/bitcoin\"
+field = \"usd\"
+equals = true
+```";
+
+    /// A trigger on a topic the lamp has, refused by the check all the same.
+    const SEATED: &str = "name: desk-alarm
+grants: speak
+```skill.toml
+[permissions]
+topics = [\"room/presence\"]
+
+[trigger]
+topic = \"room/presence\"
+field = \"nobody\"
+equals = true
+```";
+
+    /// The model's `cannot:` reminder, as lamp-9adf's repair answered it.
+    fn price_reminder() -> String {
+        format!(
+            "cannot: I can't do that yet: a reminder when Bitcoin goes under ninety thousand \
+             dollars. {}",
+            made_skill::REMINDER_INSTEAD
+        )
+    }
+
+    /// Every switch the middle form needs, reactions among them, on (or
+    /// back to its default with `None`).
+    fn middle_on(on: Option<bool>) {
+        all_on(on);
+        crate::skill_task_yes::set_net_here(on);
+        made_skill::set_reactions_here(on);
+    }
+
+    /// [`made`] for #8079's request with the model answering `answers` in
+    /// turn: the outcome, the briefs sent and the skills handed to the
+    /// check, which refuses any trigger but the clock's with lines as the
+    /// read check's (`made_skill::plainly`) and keeps none.
+    fn watch_made(answers: &[String]) -> (Result<Made, Refused>, Vec<String>, Vec<String>) {
+        let briefs = std::cell::RefCell::new(Vec::new());
+        let texts = std::cell::RefCell::new(Vec::new());
+        let kept = |text: Result<String, String>| -> Result<Made, Refused> {
+            let text = text.unwrap();
+            let clock = text.contains("topic = \"clock/local\"");
+            texts.borrow_mut().push(text);
+            if clock {
+                return Err(Refused::new("kept here"));
+            }
+            Err(Refused(
+                made_skill::NOTHING_READS.into(),
+                Some("The lamp has nothing that reads that: the trigger's topic.".into()),
+            ))
+        };
+        let kept_asked =
+            |_: &made_skill::Files, _: &str| -> Result<Made, Refused> { unreachable!() };
+        let result = made(
+            "Lamp, if Bitcoin goes under ninety thousand dollars, tell me right away.",
+            |brief| {
+                let mut briefs = briefs.borrow_mut();
+                briefs.push(brief.to_owned());
+                Ok(answers[briefs.len() - 1].clone())
+            },
+            || true,
+            &kept,
+            kept_asked,
+            None,
+            None,
+        );
+        (result, briefs.into_inner(), texts.into_inner())
+    }
+
+    /// #8079: with `LAMP_MAKE_REACTIONS_ONLY_DEEPSEEK` on, the one more
+    /// call is told a watch on outside data after the reminder's refusal,
+    /// with a whole answer for one the lamp keeps: a trigger on its own
+    /// clock every 90 minutes, said so, for the lamp's agent's task alone.
+    /// A poll more often than that, or with no task for the agent made
+    /// here, is no watch. Off, the prompt is as before.
+    #[test]
+    fn with_reactions_on_a_watch_on_outside_data_is_told_on_the_clock() {
+        made_skill::set_reactions_here(Some(false));
+        let before = system();
+        assert!(
+            !before.contains(WATCH) && !before.contains(WATCH_EXAMPLE),
+            "{before}"
+        );
+        made_skill::set_reactions_here(Some(true));
+        let told = system();
+        made_skill::set_reactions_here(None);
+        let reminder = told.find(made_skill::REMINDER_IS_TIMER).unwrap();
+        let watch = told.find(WATCH).unwrap();
+        assert!(
+            reminder < watch,
+            "the watch told after the reminder: {told}"
+        );
+        let whole = format!("{WATCH_EXAMPLE_RUNS}{WATCH_EXAMPLE}");
+        assert!(told.contains(&whole), "{told}");
+        let Ok(Answer::Skill {
+            name,
+            grants,
+            when: When::Trigger(block),
+        }) = read(&whole)
+        else {
+            panic!("{whole}")
+        };
+        assert_eq!(name, "rain-watch");
+        assert_eq!(grants, ["net", "speak"]);
+        let block = block_kept(&block).unwrap();
+        assert!(on_the_clock(&block), "{block}");
+        middle_on(Some(true));
+        assert!(!outside_trigger(&block), "{block}");
+        for (every, said) in [
+            ("90m", "every 90 minutes"),
+            ("2h", "every 2 hours"),
+            ("24h", "every 24 hours"),
+        ] {
+            let block = block.replace("90m", every);
+            assert_eq!(made_skill::fire_said(&block).as_deref(), Some(said));
+        }
+        // More often than 90 minutes, held once (`rearm`), or
+        // with no while: no watch, refused as any clock trigger that isn't
+        // a daily time.
+        for unwatched in [
+            block.replace("90m", "15m"),
+            block.replace("90m", "1h"),
+            block.replace("90m", "89m"),
+            block.replace("cooldown = \"90m\"", "cooldown = \"90m\"\nrearm = \"ends\""),
+            block.replace("cooldown = \"90m\"", ""),
+        ] {
+            assert_eq!(made_skill::fire_said(&unwatched), None, "{unwatched}");
+        }
+        // No task for the lamp's agent made here: no watch either.
+        middle_on(None);
+        set_on_here(Some(false));
+        crate::skill_task_yes::set_net_here(Some(false));
+        assert_eq!(made_skill::fire_said(&block), None);
+        middle_on(None);
+    }
+
+    /// #8079, lamp-9adf, 20 Nov: "Lamp, if Bitcoin goes under ninety
+    /// thousand dollars, tell me right away." The model's trigger on
+    /// `price/bitcoin` is refused with the check's lines and the watch's
+    /// repair; its `cannot:` reminder after it is asked again once as a
+    /// watch on the clock, never refused as the lamp's timer; the clock's
+    /// answer is one task granted `net` on `clock/local` every 90 minutes.
+    /// Answered a reminder again, it is refused as the lamp's timer.
+    #[test]
+    fn a_reminder_after_a_trigger_on_what_no_topic_carries_is_asked_again_as_a_watch() {
+        middle_on(Some(true));
+        let watch = format!("runs: every 90 minutes\n{WATCH_EXAMPLE}")
+            .replace("rain-watch", "bitcoin-watch");
+        let (result, briefs, texts) = watch_made(&[PRICED.to_owned(), price_reminder(), watch]);
+        assert_eq!(result, Err(Refused::new("kept here")));
+        assert_eq!(briefs.len(), 3, "{briefs:?}");
+        assert!(!briefs[0].contains(WATCH_REPAIR), "{}", briefs[0]);
+        for brief in &briefs[1..] {
+            assert!(brief.contains(WATCH_REPAIR), "{brief}");
+        }
+        assert!(
+            briefs[1].contains("The lamp has nothing that reads that"),
+            "the check's own lines first: {}",
+            briefs[1]
+        );
+        let [_, clock] = texts.as_slice() else {
+            panic!("{texts:?}")
+        };
+        let files = made_skill::files(clock).unwrap();
+        let table: toml::Table = toml::from_str(&files.toml).unwrap();
+        let trigger = table["trigger"].as_table().unwrap();
+        assert_eq!(trigger["topic"].as_str(), Some("clock/local"), "{clock}");
+        assert_eq!(trigger["cooldown"].as_str(), Some("90m"), "{clock}");
+        assert!(!trigger.contains_key("rearm"), "{clock}");
+        assert!(table.get("while").is_none(), "never a guard: {clock}");
+        let grants = table["grants"].as_array().unwrap();
+        assert!(
+            grants.iter().any(|grant| grant.as_str() == Some("net")),
+            "{clock}"
+        );
+        let steps = table["do"].as_array().unwrap();
+        assert_eq!(steps.len(), 1, "{clock}");
+        assert_eq!(steps[0]["task"]["run"].as_str(), Some(RUN));
+        assert!(
+            files.scripts[0].1.contains("has fired (every 90 minutes)"),
+            "{:?}",
+            files.scripts
+        );
+        let (result, briefs, _) =
+            watch_made(&[PRICED.to_owned(), price_reminder(), price_reminder()]);
+        assert_eq!(result, Err(Refused(Uncovered::Reminder.line(), None)));
+        assert_eq!(briefs.len(), 3, "{briefs:?}");
+        middle_on(None);
+    }
+
+    /// #8079: a `cannot:` reminder is still the lamp's own timer when no
+    /// trigger on what no topic carries came before it: a one-off reminder
+    /// at once ("remind me at 5 pm to call the bakery"), one after a
+    /// trigger on a topic the lamp has, and any with the reactions switch
+    /// off, whose make is as before.
+    #[test]
+    fn a_reminder_with_no_watch_before_it_is_still_the_lamps_timer() {
+        middle_on(Some(true));
+        let bakery = format!(
+            "runs: at 5 pm\ncannot: I can't do that yet: a reminder at five to call the bakery. \
+             {}",
+            made_skill::REMINDER_INSTEAD
+        );
+        let refused = || Err(Refused(Uncovered::Reminder.line(), None));
+        let (result, briefs, texts) = watch_made(&[bakery]);
+        assert_eq!((result, briefs.len(), texts.len()), (refused(), 1, 0));
+        let (result, briefs, _) = watch_made(&[SEATED.to_owned(), price_reminder()]);
+        assert_eq!((result, briefs.len()), (refused(), 2));
+        assert!(!briefs[1].contains(WATCH_REPAIR), "{}", briefs[1]);
+        made_skill::set_reactions_here(Some(false));
+        let (result, briefs, _) = watch_made(&[PRICED.to_owned(), price_reminder()]);
+        assert_eq!((result, briefs.len()), (refused(), 2));
+        assert!(!briefs[1].contains(WATCH_REPAIR), "{}", briefs[1]);
+        middle_on(None);
     }
 }
