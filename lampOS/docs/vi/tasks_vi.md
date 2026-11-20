@@ -2594,8 +2594,11 @@ khi đăng xuất, và với 0.6.60 khi đăng nhập (ROW của #7507).
       mỗi id bị từ chối được thử thêm một lần sau 2 s, khi pane đã đóng.
       Vẫn bị từ chối (hoặc không có file token forwarder, hoặc quá giờ): nó
       được ghi journal và giữ trong `one-session.json` là `hermes_pending`,
-      tồn tại qua cả việc gỡ bản ghi, và được thử lại ở lần khởi động kế
-      tiếp của lamp-tasks và cùng lần đóng kế tiếp.
+      tồn tại qua cả việc gỡ bản ghi, và được thử lại cùng lần đóng kế tiếp
+      và ở lần khởi động kế tiếp của lamp-tasks: khi đó sau lần mở đầu tiên,
+      trên một luồng riêng, nên không bao giờ làm chậm việc mở hay một việc
+      nói, và không bao giờ cho một phiên của pane được giữ đang chạy (lần
+      đóng của chính nó sẽ xoá).
     - `MEMORY.md` và kỹ năng của Hermes không phải phiên và không bị đụng
       tới.
   - **Lần chạy kỹ năng và make** vẫn chạy riêng từng lần (ở trên, và

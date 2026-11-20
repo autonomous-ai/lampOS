@@ -5342,8 +5342,11 @@ in and signed out, and on 0.6.60, signed in (#7507's ROW).
       each refused id is tried once more 2 s later, the pane closed by
       then. Still refused (or no forwarder token, or no answer in time): it
       is journaled and kept in `one-session.json` as `hermes_pending`,
-      which outlives the record's removal, and tried again at lamp-tasks'
-      next start and with the next close.
+      which outlives the record's removal, and tried again with the next
+      close and at lamp-tasks' next start: there after the first open, on a
+      thread of its own, so it never holds up an open or a spoken task, and
+      never for a session of the live kept pane (that one's own close
+      deletes it).
     - Hermes's `MEMORY.md` and skills are not sessions and are not touched.
   - **Skill runs and makes** still run per run (above, and `MakeHermes`).
     A known gap: Hermes's wrapper reads each run's token file once, at its

@@ -5897,7 +5897,8 @@ fn hermes_store(home: &std::path::Path) -> rusqlite::Connection {
 }
 
 /// A stand-in `hermes` (#8151): each call's folder, `HERMES_HOME` and
-/// arguments logged; `STUB_MODE` says what it answers: `ok`, `busy` (a
+/// arguments logged; `STUB_MODE` says what it answers: `ok`, `slow` (done
+/// after 3 s), `busy` (a
 /// refusal, always), `once` (a refusal, then done), `gone` (Hermes's
 /// words for a session it has none of).
 const HERMES_STUB: &str = r#"
@@ -5905,6 +5906,7 @@ echo "$PWD|$HERMES_HOME|$*" >> "$STUB_LOG"
 case "$STUB_MODE" in
   ok) exit 0 ;;
   gone) echo "No session '$3'. Run: hermes sessions list to find the id."; exit 1 ;;
+  slow) sleep 3; exit 0 ;;
   once) [ -e "$STUB_LOG.$3" ] && exit 0; : > "$STUB_LOG.$3"; echo "Session '$3' is busy"; exit 1 ;;
   *) echo "Session '$3' is busy"; exit 1 ;;
 esac
@@ -6086,4 +6088,46 @@ fn a_failed_hermes_delete_is_kept_and_tried_at_the_next_close_and_start() {
     again.delete_pending();
     assert_eq!(*hermes.lock().unwrap(), ["hermes-2", "hermes-1"]);
     assert!(!dir.path().join(STATE_FILE).exists());
+}
+
+/// #8151: a Hermes delete left pending from before is tried after the
+/// first open, on a thread of its own: a slow Hermes holds up neither the
+/// open nor a spoken task, and the live kept session's id is never
+/// deleted by it (it stays pending; its own close deletes it).
+#[test]
+fn a_pending_hermes_retry_never_holds_up_the_first_open() {
+    let dir = tempfile::tempdir().unwrap();
+    let home = tempfile::tempdir().unwrap();
+    hermes_store(home.path());
+    std::fs::write(
+        dir.path().join(STATE_FILE),
+        r#"{"hermes_pending":["hermes-1","z"]}"#,
+    )
+    .unwrap();
+    let (one, fake, _, _) = hermes_kept_on(dir.path());
+    let (cli, log) = hermes_cli(home.path(), "slow");
+    let asked = Deleted::default();
+    let seen = asked.clone();
+    let one = Arc::new(one.with_hermes_delete(Box::new(move |ids| {
+        seen.lock().unwrap().extend(ids.iter().cloned());
+        cli.delete(ids)
+    })));
+    let began = Instant::now();
+    hermes_keep_open_step(&one, &fake, &mut Looks::default());
+    let retry = one.retry_pending_aside().expect("a retry started");
+    hermes_turn(&one, &fake, "task-1");
+    assert!(
+        began.elapsed() < Duration::from_secs(2),
+        "{:?}",
+        began.elapsed()
+    );
+    assert!(!retry.is_finished(), "the slow delete still runs aside");
+    retry.join().unwrap();
+    assert_eq!(*asked.lock().unwrap(), ["z"], "never the live session");
+    assert_eq!(hermes_calls(home.path(), &log), ["z"]);
+    let kept: serde_json::Value =
+        serde_json::from_str(&std::fs::read_to_string(dir.path().join(STATE_FILE)).unwrap())
+            .unwrap();
+    assert_eq!(kept["session"], "hermes-1");
+    assert_eq!(kept["hermes_pending"], serde_json::json!(["hermes-1"]));
 }

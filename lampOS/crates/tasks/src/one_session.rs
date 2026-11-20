@@ -1980,10 +1980,9 @@ impl OneSession {
         }
     }
 
-    /// The Hermes session ids `left` kept for another delete, in place of
-    /// those before.
-    fn set_pending(&self, left: &[String]) {
-        let _held = self.record_lock.lock().unwrap_or_else(|e| e.into_inner());
+    /// The Hermes session ids `left` kept for another delete
+    /// ([`PENDING_FIELD`]), in place of those before; the record lock held.
+    fn write_pending(&self, left: &[String]) {
         let mut record = self.record();
         if !record.is_object() {
             record = serde_json::json!({});
@@ -2011,11 +2010,20 @@ impl OneSession {
         self.write_record(&record);
     }
 
-    /// Hermes sessions whose delete failed before tried again: at
-    /// lamp-tasks' start ([`OneSession::keep_open`]) and with the next
-    /// close.
+    /// Hermes sessions whose delete failed before tried again: after
+    /// lamp-tasks' first open ([`OneSession::retry_pending_aside`]) and
+    /// with the next close. A session of the live kept pane is never
+    /// deleted here; it stays pending, and its own close deletes it.
     pub fn delete_pending(&self) {
-        let pending = self.pending();
+        let agent = self.lock().pane.as_ref().map(|pane| pane.agent.clone());
+        let live = agent
+            .map(|agent| self.recorded_sessions(&agent))
+            .unwrap_or_default();
+        let pending: Vec<String> = self
+            .pending()
+            .into_iter()
+            .filter(|id| !live.contains(id))
+            .collect();
         if pending.is_empty() {
             return;
         }
@@ -2023,9 +2031,33 @@ impl OneSession {
         self.left_pending(&pending, &left);
     }
 
+    /// [`OneSession::delete_pending`] on a thread of its own, so a slow or
+    /// refusing Hermes never holds up an open or a spoken task; `None`
+    /// when nothing is pending.
+    pub fn retry_pending_aside(self: &Arc<Self>) -> Option<std::thread::JoinHandle<()>> {
+        if self.pending().is_empty() {
+            return None;
+        }
+        let one = Arc::clone(self);
+        std::thread::Builder::new()
+            .name("one-session-hermes-delete".into())
+            .spawn(move || one.delete_pending())
+            .inspect_err(|error| {
+                eprintln!("tasks: one session: Hermes's pending deletes not started: {error}")
+            })
+            .ok()
+    }
+
     /// The deletes of `tried` done but `left`: those kept for later,
     /// beside any added meanwhile.
     fn left_pending(&self, tried: &[String], left: &[String]) {
+        if !left.is_empty() {
+            eprintln!(
+                "tasks: one session: {} Hermes session(s) not deleted; tried again at the next start or close",
+                left.len()
+            );
+        }
+        let _held = self.record_lock.lock().unwrap_or_else(|e| e.into_inner());
         let mut pending: Vec<String> = self
             .pending()
             .into_iter()
@@ -2036,13 +2068,7 @@ impl OneSession {
                 pending.push(id.clone());
             }
         }
-        if !left.is_empty() {
-            eprintln!(
-                "tasks: one session: {} Hermes session(s) not deleted; tried again at the next start or close",
-                left.len()
-            );
-        }
-        self.set_pending(&pending);
+        self.write_pending(&pending);
     }
 
     /// The engine of the pane `agent`: the pane's own, else the kept
@@ -2890,8 +2916,9 @@ impl OneSession {
         stop: Arc<AtomicBool>,
     ) {
         let mut looks = Looks::default();
-        // Hermes sessions a delete failed for before this start (#8151).
-        self.delete_pending();
+        // Hermes sessions a delete failed for before this start (#8151):
+        // tried after the first look's open, on a thread of their own.
+        let mut pending_tried = false;
         while !stop.load(Ordering::Acquire) {
             let key = key();
             let signed_out =
@@ -2904,6 +2931,10 @@ impl OneSession {
             }
             self.idle_look(&mut looks, Instant::now(), &*harness);
             self.look(&mut looks, Instant::now(), key, &*place);
+            if !pending_tried {
+                pending_tried = true;
+                let _ = self.retry_pending_aside();
+            }
             let until = Instant::now() + KEEP_OPEN_EVERY;
             while Instant::now() < until && !stop.load(Ordering::Acquire) {
                 std::thread::sleep(Duration::from_millis(100));
