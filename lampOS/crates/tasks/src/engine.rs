@@ -1712,6 +1712,15 @@ impl<P: Persistence> Engine<P> {
     pub fn store_id(&self) -> &str {
         &self.state.store_id
     }
+    /// The owner's "forget everything" now (#7930): this store and its
+    /// newest task id, so every task it holds, on the work records yet or
+    /// not, is left off them ([`Engine::works`]).
+    pub fn forget_mark(&self) -> crate::works::Forgotten {
+        crate::works::Forgotten {
+            store_id: self.state.store_id.clone(),
+            through: self.state.next_task_id.saturating_sub(1),
+        }
+    }
     pub fn session_id(&self) -> &str {
         &self.state.session_id
     }
@@ -2848,12 +2857,22 @@ impl<P: Persistence> Engine<P> {
     /// this boot. Its words and answer cut to the record's bounds; its
     /// state the dispatch's or the newest settled observation's, none
     /// while the agent has it with nothing settled.
-    pub fn works(&self, now: &Clock) -> Vec<crate::works::TaskWork> {
+    /// None of a store task the owner's "forget everything" held
+    /// (`forgotten`, [`crate::works::Forgotten`]).
+    pub fn works(
+        &self,
+        now: &Clock,
+        forgotten: Option<&crate::works::Forgotten>,
+    ) -> Vec<crate::works::TaskWork> {
         use crate::works::{MOST_ANSWER_CHARS, MOST_WORDS_CHARS, State, cut};
         let this_boot = |audit: &Audit| audit.boot_id == now.boot_id;
+        let ago = |audit: &Audit| {
+            this_boot(audit).then(|| now.monotonic_ms.saturating_sub(audit.monotonic_ms))
+        };
         self.state
             .tasks
             .iter()
+            .filter(|task| !forgotten.is_some_and(|mark| mark.hides(&self.state.store_id, task.id)))
             .filter_map(|task| {
                 let newest = task.observations.last();
                 let settled_seen = newest.filter(|seen| settled(&seen.data));
@@ -2904,6 +2923,11 @@ impl<P: Persistence> Engine<P> {
                     started_ago_ms: Some(task.dispatch.confirmed.as_ref().unwrap_or(&task.created))
                         .filter(|at| at.boot_id == now.boot_id)
                         .map(|at| now.monotonic_ms.saturating_sub(at.monotonic_ms)),
+                    // When the store first saw it over, if in this boot:
+                    // its settled observation, else its dispatch's end.
+                    ended_ago_ms: state.filter(|state| state.over()).and_then(|_| {
+                        settled_seen.map_or_else(|| ago(&task.updated), |seen| ago(&seen.observed))
+                    }),
                 })
             })
             .collect()
@@ -4268,11 +4292,11 @@ mod tests {
         let mut board = Board::new();
         let (mut engine, _) = opened();
         let prepared = prepare(&mut engine, 0);
-        assert!(engine.works(&clock(0)).is_empty(), "prepared only");
+        assert!(engine.works(&clock(0), None).is_empty(), "prepared only");
         engine
             .handle(&confirmation(&engine, prepared), &clock(0), true)
             .unwrap();
-        let queued = engine.works(&clock(0));
+        let queued = engine.works(&clock(0), None);
         assert_eq!(queued.len(), 1);
         assert_eq!(queued[0].state, Some(State::Queued));
         board.tasks(&queued, none, 1_000);
@@ -4296,7 +4320,7 @@ mod tests {
                 &clock(1),
             )
             .unwrap();
-        let working = engine.works(&clock(2));
+        let working = engine.works(&clock(2), None);
         assert_eq!(working[0].state, None);
         board.tasks(&working, none, 2_000);
         let record = board.get(&id, 2_000).unwrap();
@@ -4310,7 +4334,8 @@ mod tests {
         board.tasks(&working, |_| Some((Some(State::Idle), Some(1_900))), 3_000);
         assert_eq!(board.get(&id, 3_000).unwrap()["state"], "idle");
         observe(&mut engine, prepared, "Reviewed: two typos.", 40);
-        let settled = engine.works(&clock(41));
+        // Read as it settled: its end the store's, at this read.
+        let settled = engine.works(&clock(40), None);
         assert_eq!(settled[0].state, Some(State::Done));
         board.tasks(&settled, none, 41_000);
         let done = board.get(&id, 50_000).unwrap();
@@ -4324,7 +4349,7 @@ mod tests {
             boot_id: "next-boot".into(),
             monotonic_ms: 1,
         };
-        assert!(engine.works(&other).is_empty());
+        assert!(engine.works(&other, None).is_empty());
     }
 
     /// #7930: a task's work record dates from when it was handed over, by
@@ -4337,7 +4362,7 @@ mod tests {
         engine
             .handle(&confirmation(&engine, prepared), &clock(10), true)
             .unwrap();
-        assert_eq!(engine.works(&clock(10))[0].started_ago_ms, Some(0));
+        assert_eq!(engine.works(&clock(10), None)[0].started_ago_ms, Some(0));
         engine.begin_launch(&clock(11)).unwrap().unwrap();
         engine
             .finish_launch(
@@ -4350,9 +4375,49 @@ mod tests {
             .unwrap();
         drop(engine);
         let recovered = Engine::open(memory, targets(), STORE, RESTART, &clock(90_010)).unwrap();
-        let seen = recovered.works(&clock(90_010));
+        let seen = recovered.works(&clock(90_010), None);
         assert_eq!(seen[0].task_id, prepared);
         assert_eq!(seen[0].started_ago_ms, Some(90_000));
+    }
+
+    /// #7930 (Heron's P2 1): the owner's "forget everything" covers every
+    /// task the store holds then, one confirmed a moment before and not
+    /// yet on the records too, and one opened again over the same store
+    /// after a restart; a task handed over after it is on them. Its
+    /// settled end is the store's, so a finished task keeps its own time.
+    #[test]
+    fn forget_everything_leaves_every_store_task_off_the_work_records() {
+        use crate::works::Board;
+        let none = |_: u64| None;
+        let (mut engine, memory) = opened();
+        let prepared = prepare(&mut engine, 0);
+        engine
+            .handle(&confirmation(&engine, prepared), &clock(0), true)
+            .unwrap();
+        // Forgotten before any refresh put it on the records.
+        let mut board = Board::new();
+        let mark = engine.forget_mark();
+        board.forget_all();
+        board.tasks(&engine.works(&clock(1), Some(&mark)), none, 1_000);
+        assert!(board.list(10, 1_000).is_empty());
+        // A fresh lamp-tasks over the same store, the mark read back.
+        drop(engine);
+        let mut engine = Engine::open(memory, targets(), STORE, RESTART, &clock(5)).unwrap();
+        let mut board = Board::new();
+        board.tasks(&engine.works(&clock(5), Some(&mark)), none, 5_000);
+        assert!(board.get(&prepared.to_string(), 5_000).is_none());
+        // Handed over after the forget: on the records.
+        let later = prepare(&mut engine, 6);
+        engine
+            .handle(&confirmation(&engine, later), &clock(6), true)
+            .unwrap();
+        board.tasks(&engine.works(&clock(6), Some(&mark)), none, 6_000);
+        let ids: Vec<Value> = board
+            .list(10, 6_000)
+            .iter()
+            .map(|w| w["id"].clone())
+            .collect();
+        assert_eq!(ids, [json!(later.to_string())]);
     }
 
     /// `serve --route`: a task the router typed into a session the person
