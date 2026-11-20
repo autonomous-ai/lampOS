@@ -14550,8 +14550,13 @@ impl TurnTools {
 /// call (`forced`, `none` for none), whether the person's line asks to make
 /// a skill as the force reads it (`crate::tools::make_skill_asked::make_asked`,
 /// past the lamp's name heard as another word on a line that names it) and
-/// how many sentences it has. `?` where the services cannot say, or where the last
-/// message is no person's line. Names, `y`/`n` and a count: never a word.
+/// how many sentences it has; which sentence alone asks
+/// (`crate::tools::make_skill_asked::ask_sentence`, `none` for none) and how
+/// the line opens: with the lamp's own name set off (`name`,
+/// [`name_call_rest`]), its name heard as another word on a line that names
+/// it (`misheard`, [`wake_heard_as`]) or neither (`none`). `?` where the
+/// services cannot say, or where the last message is no person's line.
+/// Names, `y`/`n` and counts: never a word.
 fn round_one_line(
     request: u64,
     messages: &[Message],
@@ -14566,13 +14571,26 @@ fn round_one_line(
         .and_then(Message::words);
     let make_ask = said.map(crate::tools::make_skill_asked::make_asked);
     let sentences = said.map(crate::tools::make_skill_asked::sentence_count);
+    let named = said.is_some_and(crate::tools::make_skill_asked::named);
+    let ask_in = said.map(|said| crate::tools::make_skill_asked::ask_sentence(said, named));
+    let opening = said.map(|said| {
+        if name_call_rest(said).is_some() {
+            "name"
+        } else if named && wake_heard_as(said).is_some() {
+            "misheard"
+        } else {
+            "none"
+        }
+    });
     format!(
-        "lamp-voice second: request {request}: round 1: task_offered={} make_offered={} forced={} make_ask={} sentences={}",
+        "lamp-voice second: request {request}: round 1: task_offered={} make_offered={} forced={} make_ask={} sentences={} ask_in={} opening={}",
         offered(crate::agent_tasks::START),
         offered(crate::made_skill::MAKE),
         forced.map_or("?", |forced| forced.unwrap_or("none")),
         make_ask.map_or("?", yes),
         sentences.map_or("?".to_owned(), |count| count.to_string()),
+        ask_in.map_or("?".to_owned(), |at| at.map_or("none".to_owned(), |at| at.to_string())),
+        opening.unwrap_or("?"),
     )
 }
 
