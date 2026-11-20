@@ -904,15 +904,24 @@ khoản (Backend3, 19/11): `POST <base>/history/turns` với khóa của lamp tr
   (`exchanges`, theo phạm vi, dạng turn id: câu trả lời của phần quên) được bỏ và ghi nhớ là đã
   quên (4.096 cái gần nhất), nên một lần lưu nêu một id như vậy bị bỏ trước mọi
   POST, kể cả lần thử lại hay phần gửi bù khi khởi động: hàng rào riêng của lamp,
-  bên cạnh tombstone của máy chủ. Quên hết thì quên mọi id đã đưa trong phạm vi
+  bên cạnh tombstone của máy chủ. Quên hết thì quên mọi id đã trao trong phạm vi
   đó đến lúc ấy. Khi câu trả lời không nêu id nào (hoặc không có câu trả lời),
-  các lượt chưa gửi của người quên và của phòng chờ lần khởi động sau, khi bộ nhớ
-  không còn giữ những gì đã đi. Lượt chưa gửi của người khác không bao giờ bị
-  bỏ. Mọi câu trả lời của bộ nhớ mà voice đọc có turn id trong `exchanges` (cả
+  các lượt đã trao đến lúc ấy của người quên và của phòng chờ lần khởi động sau,
+  khi bộ nhớ không còn giữ những gì đã đi: các lượt đang xếp hàng hay đang giữ,
+  và các lượt trong một lô mà bộ gửi đã lấy ra khỏi hàng đợi, lô này được kiểm
+  lại trước mọi lần thử, kể cả lần đầu, và không bao giờ được đặt lại để POST
+  (P2 của Friday trên #7957). Các câu của phòng mà một lệnh quên hết lấy đi cũng
+  không được nêu, nên các lượt của phòng chờ theo cùng cách. Một lần POST đang
+  chạy thì không bị dừng; lần thử sau của nó được kiểm. Lượt chưa gửi của người
+  khác không bao giờ bị bỏ. Mọi câu trả lời của bộ nhớ mà voice đọc có turn id trong `exchanges` (cả
   năm lệnh quên, `history_forget::answered`) đều đến `history_send::deleting`,
   nên các id đó không bao giờ được POST, dù `LAMP_HISTORY_FORGET` thế nào. Một
   lệnh quên về một điều cũng giữ lại rồi thả các lần POST như mọi lệnh quên
-  khác. Một nguồn bị quên bên ngoài voice được coi như một lệnh quên không nêu
+  khác. Khi mọi lần xóa của nó đều được trả lời, những gì đã đi đã được nêu trên
+  đường đi và không bỏ thêm gì; khi một lần hết giờ hay mất câu trả lời giữa
+  chừng (các lệnh quên điều đã giữ hoặc lệnh quên lượt trò chuyện), không biết
+  những gì đã đi, và nó được coi như một lệnh quên không nêu id, không bao giờ
+  là "không xóa gì". Một nguồn bị quên bên ngoài voice được coi như một lệnh quên không nêu
   id của người đó.
 - **Không mất gì khi khởi động lại, và không có lời nào trên đĩa:** chỉ có id
   được giữ, trong `/var/lib/lampOS/voice/history-marks.json` (0600,
