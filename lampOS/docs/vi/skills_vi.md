@@ -2935,10 +2935,18 @@ lời ai (`service_read::tell_answer`, `Asker`; #7894, quyết định của V2 
   của đèn hay `[quiet]` riêng của skill (`task::TaskStep::quiet`), chờ tối
   đa 60 phút rồi bỏ qua không nói), trong lượt đọc duy nhất của đèn, cổng
   được xét lại trước mỗi dòng, có người đến thì dừng với "I'll tell you
-  the rest later."
+  the rest later." Câu trả lời cho lời hỏi bằng giọng nói của chủ đèn, sẵn
+  sàng sau năm phút đó (`answer_asked`), giữ cổng này trừ khuôn mặt thứ
+  hai: một khuôn mặt bên cạnh khuôn mặt của chủ ở bàn không còn giữ nó lại,
+  và nó được nói dù ai ở gần khi phần còn lại của cổng mở (#8049, lập
+  trường căn phòng riêng của chủ sản phẩm; `Seen::asked`). Lần chạy theo
+  giờ hay trigger giữ nguyên cổng.
 
 Một `do.read` theo lịch vẫn giữ nguyên cổng của nó, kể cả giờ yên lặng
-([services_vi.md](services_vi.md)). Các câu
+([services_vi.md](services_vi.md)). Một `do.read` chủ đèn chạy ngay bằng
+giọng nói (lịch hay thư của một kỹ năng tự làm) không bị khuôn mặt thứ hai
+giữ lại, được nói dù ai ở gần (#8049, `read_asked`); phần còn lại của cổng
+vẫn giữ. Các câu
 là của `task::told`: bỏ ký hiệu markdown, mỗi câu tối đa 900 byte của dịch
 vụ nói, tất cả tối đa khoảng 400 ký tự (`task::MOST_TOLD_CHARS`, người xây
 dựng đầu tiên trên #7591: một người trả lời bằng một hai câu) và 10 câu, cắt

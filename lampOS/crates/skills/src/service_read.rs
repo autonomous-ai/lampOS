@@ -31,7 +31,12 @@
 //!   ownership check runs: one face alone in view will do, with no owner's
 //!   name or known face. Counting faces is not an ownership check, so two
 //!   faces still hold it and a face that comes still stops it; a voice
-//!   heard still does, and nobody in view still holds it.
+//!   heard still does, and nobody in view still holds it. A read its
+//!   owner asked by voice ([`Seen::asked`]: a made skill's read run now,
+//!   or the told answer of a run they asked) is held by no second face, in
+//!   the private room or out of it, and a face that comes doesn't stop it
+//!   (#8049, the product owner's private-room stance): said whoever is
+//!   near. A time's or a trigger's run keeps the whole gate.
 //! - **One read at a time** ([`Turns`], [`TURNS`] for the lamp): two
 //!   skills' reads due together (Morning agenda held at its gate while
 //!   Morning mail came due, #5618) would say their lines in turn, one
@@ -476,6 +481,10 @@ pub struct Seen {
     /// ownership check, so the owner's name and their known face are not
     /// asked; one face alone in view and no voice still are.
     pub private_room: bool,
+    /// The read, or the run whose answer this tells, was asked by its
+    /// owner's voice (in the private room, whoever asked): a second face in
+    /// view doesn't hold it (#8049). A time's or a trigger's run never is.
+    pub asked: bool,
 }
 
 /// Why the gate is closed.
@@ -519,8 +528,9 @@ impl Closed {
 
 /// The gate: whether the lamp may read to the owner now. In the private
 /// room ([`Seen::private_room`]) never [`Closed::NoOwner`] or
-/// [`Closed::NotOwner`]: whoever is alone in view is the owner. A skill
-/// reads unasked, so [`Closed::NotAlone`] still holds there.
+/// [`Closed::NotOwner`]: whoever is alone in view is the owner. A run
+/// nobody asked still meets [`Closed::NotAlone`] there; one its owner
+/// asked by voice ([`Seen::asked`], #8049) never does, in it or out of it.
 pub fn judge(seen: &Seen) -> Result<(), Closed> {
     if !seen.owner_known && !seen.private_room {
         return Err(Closed::NoOwner);
@@ -535,9 +545,11 @@ pub fn judge(seen: &Seen) -> Result<(), Closed> {
         return Err(Closed::Quiet);
     }
     match seen.faces {
-        Some(n) if n > 1 => return Err(Closed::NotAlone),
-        Some(1) if !seen.private_room && !seen.owner_in_view => return Err(Closed::NotOwner),
-        Some(1) => {}
+        Some(n) if n > 1 && !seen.asked => return Err(Closed::NotAlone),
+        Some(n) if n > 0 && !seen.private_room && !seen.owner_in_view => {
+            return Err(Closed::NotOwner);
+        }
+        Some(n) if n > 0 => {}
         _ => return Err(Closed::Nobody),
     }
     if seen.heard_ago.is_some_and(|ago| ago < VOICE_WITHIN) {
@@ -993,6 +1005,7 @@ mod tests {
             paused: false,
             quiet: false,
             private_room: false,
+            asked: false,
         }
     }
 
@@ -1435,6 +1448,101 @@ mod tests {
             assert_eq!(run(&calendar(), &mut lamp), why);
             assert!(lamp.said.is_empty() && lamp.reads.is_empty());
             assert!(lamp.now - 1_000 >= WAIT.as_millis() as u64, "waited");
+        }
+    }
+
+    /// #8049 (the product owner's private-room stance, asked on the Queue
+    /// at 08:30): a mail or calendar read its owner asked for by voice is
+    /// said with a second face at the desk, in the private room (whoever
+    /// asked) and out of it (the owner's known face among them), and a face
+    /// that comes mid-read doesn't stop it.
+    #[test]
+    fn an_asked_read_is_said_with_two_faces_at_the_desk() {
+        let mails = json!({"source": "Gmail", "quoted": [
+            {"from": "Ann Lee <ann@x.test>", "subject": "Lunch on Friday"},
+        ]});
+        for two in [
+            Seen {
+                faces: Some(2),
+                asked: true,
+                ..alone()
+            },
+            Seen {
+                asked: true,
+                ..private_two()
+            },
+        ] {
+            for (step, answer, said) in [
+                (calendar(), events(), "read 2"),
+                (mail(), mails.clone(), "read 1"),
+            ] {
+                let mut lamp = Lamp::new(vec![two.clone()], answer);
+                lamp.after_read = Some((1, two.clone()));
+                assert_eq!(run(&step, &mut lamp), said, "{two:?}");
+                assert_eq!(lamp.reads.len(), 1);
+                assert!(!lamp.said.contains(&STOP_LINE.to_owned()), "{two:?}");
+            }
+        }
+    }
+
+    /// #8049: the told answer of a run its owner asked for by voice is
+    /// said with two faces at the desk: at once when ready within five
+    /// minutes of the ask, as before (#7894); ready later, behind the
+    /// read's gate but for the second face, so it is said once steady and
+    /// no voice is heard, never skipped "not alone".
+    #[test]
+    fn an_asked_runs_told_answer_later_is_said_with_two_faces() {
+        let lines = vec!["You have one recent mail.".to_owned()];
+        for two in [
+            Seen {
+                faces: Some(2),
+                asked: true,
+                ..alone()
+            },
+            Seen {
+                asked: true,
+                ..private_two()
+            },
+        ] {
+            let mut lamp = Lamp::new(vec![two.clone()], json!({}));
+            assert_eq!(tell_answer(&lines, Asker::Owner, &mut lamp), "told 1");
+            let mut lamp = Lamp::new(vec![two.clone()], json!({}));
+            assert_eq!(
+                tell_answer(&lines, Asker::Nobody, &mut lamp),
+                "told 1",
+                "{two:?}"
+            );
+            assert_eq!(lamp.said, lines);
+            assert!(lamp.said_at[0] >= 1_000 + STEADY.as_millis() as u64);
+        }
+    }
+
+    /// #8049: a run nobody asked (a time's or a trigger's) keeps the whole
+    /// gate with two faces at the desk, in the private room and out of it:
+    /// its read and its told answer wait their [`WAIT`] and are skipped
+    /// "not alone", nothing read or said.
+    #[test]
+    fn an_unasked_run_with_two_faces_is_still_held() {
+        let lines = vec!["You have one recent mail.".to_owned()];
+        for two in [
+            Seen {
+                faces: Some(2),
+                ..alone()
+            },
+            private_two(),
+        ] {
+            for step in [calendar(), mail()] {
+                let mut lamp = Lamp::new(vec![two.clone()], events());
+                assert_eq!(run(&step, &mut lamp), "skipped: not alone", "{two:?}");
+                assert!(lamp.said.is_empty() && lamp.reads.is_empty());
+                assert!(lamp.now - 1_000 >= WAIT.as_millis() as u64, "waited");
+            }
+            let mut lamp = Lamp::new(vec![two.clone()], json!({}));
+            assert_eq!(
+                tell_answer(&lines, Asker::Nobody, &mut lamp),
+                "skipped: not alone"
+            );
+            assert!(lamp.said.is_empty());
         }
     }
 
@@ -1890,6 +1998,30 @@ mod tests {
         let mut long_ago = alone();
         long_ago.heard_ago = Some(VOICE_WITHIN);
         assert_eq!(judge(&long_ago), Ok(()));
+        // Asked by its owner's voice (#8049): a second face no longer
+        // holds it; every other term still does.
+        let asked = |change: fn(&mut Seen)| {
+            let mut seen = Seen {
+                asked: true,
+                ..alone()
+            };
+            change(&mut seen);
+            judge(&seen)
+        };
+        assert_eq!(asked(|s| s.faces = Some(3)), Ok(()));
+        assert_eq!(
+            asked(|s| {
+                s.faces = Some(2);
+                s.owner_in_view = false;
+            }),
+            Err(Closed::NotOwner)
+        );
+        assert_eq!(asked(|s| s.faces = Some(0)), Err(Closed::Nobody));
+        assert_eq!(asked(|s| s.quiet = true), Err(Closed::Quiet));
+        assert_eq!(
+            asked(|s| s.heard_ago = Some(Duration::from_secs(1))),
+            Err(Closed::VoiceHeard)
+        );
     }
 
     /// The first builder's played check, "the owner alone": it waits the
