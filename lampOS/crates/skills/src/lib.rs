@@ -13439,6 +13439,62 @@ mod tests {
         lamp_voice::made_skill::set_asks_here(None);
     }
 
+    /// #8022 case 1 (lamp-52e6, 14951, 20 Nov 07:25): "make me a skill that,
+    /// when I say apple file, has an agent write three apple facts into a
+    /// file for me" was made and kept as `apple-file`, a task for the
+    /// lamp's agent with code of its own and the person's words as its
+    /// asks, and lamp-skills loaded it; "Hey Lamp, apple file." 14 s later
+    /// and again 58 s after that ran nothing in code, with no line that the
+    /// heard words named a skill. As lamp-skills writes its tools file for
+    /// such a skill, the voice's matcher (`lamp_voice::skill_named::Heard`)
+    /// reads the skill's words and its exact name, and both run it now
+    /// (`make_skill` with `run`).
+    #[test]
+    fn a_made_agent_task_is_heard_by_its_words_and_its_name() {
+        let dir = tempfile::tempdir().unwrap();
+        lamp_voice::made_skill::set_asks_here(Some(true));
+        let apple = made_here(
+            dir.path(),
+            "apple-file",
+            "asks = [\"apple file\"]\nkind = \"installable\"\nversion = \"1.0.0\"\n\
+             grants = [\"notes\"]\n[[do]]\n\
+             task = { task = \"Keep three facts about apples and read them back\", \
+             run = \"scripts/main.py\" }\n",
+        );
+        std::fs::create_dir_all(apple.join("scripts")).unwrap();
+        std::fs::write(
+            apple.join("scripts/main.py"),
+            "await lamp.notes.set('apples', 'three facts')\n",
+        )
+        .unwrap();
+        let skill = load(&apple).unwrap();
+        let file = tools_file(&[skill]);
+        assert_eq!(
+            file[lamp_voice::tools::MADE_ASKS],
+            json!({"apple-file": ["apple file"]}),
+            "{file}"
+        );
+        let tools = tempfile::tempdir().unwrap();
+        std::fs::write(
+            tools.path().join(lamp_voice::tools::CATALOG_FILE),
+            file.to_string(),
+        )
+        .unwrap();
+        let heard = lamp_voice::skill_named::Heard::new(lamp_voice::tools::Settings {
+            skills: Some(tools.path().to_path_buf()),
+            use_skill: true,
+            ..Default::default()
+        });
+        let run = Some((
+            lamp_voice::made_skill::MAKE.to_owned(),
+            json!({ lamp_voice::made_run::RUN: "apple-file" }),
+        ));
+        for line in ["Hey Lamp, apple file.", "Lamp, apple file.", "apple file"] {
+            assert_eq!(heard.heard(line), run, "{line}");
+        }
+        lamp_voice::made_skill::set_asks_here(None);
+    }
+
     /// An uploaded `SKILL.md`'s trigger phrases (`LAMP_MADE_SKILL_ASKS`)
     /// are its tool's asks as lamp-skills loads it, in its tools file beside
     /// its tool, as a Store skill's are, so `LAMP_SKILL_NAMED` calls it.

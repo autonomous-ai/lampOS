@@ -1331,3 +1331,100 @@ async fn a_made_skill_runs_past_the_lamps_name_heard_as_another_word() {
     let ran = made_ran_of(control, Vec::new(), made, MAIL).await;
     assert!(ran.is_empty(), "the control runs nothing: {ran:?}");
 }
+
+/// The made skill apple-file, offered by its one ask, "apple file".
+const APPLE: (&str, &str) = ("made:apple-file", "apple file");
+
+/// The call that runs the made skill apple-file.
+fn apple_run() -> (String, Value) {
+    (
+        crate::made_skill::MAKE.to_owned(),
+        json!({ crate::made_run::RUN: "apple-file" }),
+    )
+}
+
+/// #8022 case 1 (lamp-52e6, 14951, 20 Nov 07:25): a skill made by voice
+/// and kept, apple-file, started by the person's own words "apple file";
+/// "Hey Lamp, apple file." 14 s later, and again 58 s after that with no
+/// conversation going on, each got `calls=none`. The first builder's
+/// ruling (07:29): a line that is only a made skill's own words or exact
+/// name, for a skill made in this conversation (`crate::just_made`), runs
+/// in code even when the lamp's last words asked something, as the make's
+/// say-back or the lamp's answer to the first try may. A held yes, and a
+/// remove or turn the lamp's last turn ran (a kept `make_skill` call),
+/// still wait; with nothing made in this conversation, a question naming
+/// it is the model's to read, as before.
+#[tokio::test]
+async fn a_skill_made_in_this_conversation_runs_by_its_words_past_a_question() {
+    crate::made_skill::set_off_said_here(Some(true));
+    crate::person::set_private_room_for_test(Some(true));
+    let made = |said_back: &str| {
+        vec![
+            Message::user(
+                "Hey Lamp, make me a skill that, when I say apple file, has an agent write three \
+                 apple facts into a file for me.",
+            ),
+            Message::assistant(said_back),
+        ]
+    };
+    let tried = |answer: &str| {
+        let mut history = made("Made apple file. Say apple file to start it.");
+        history.push(Message::user("Hey Lamp, apple file."));
+        history.push(Message::assistant(answer));
+        history
+    };
+    let remove_asked = || {
+        let call = net::ToolCall {
+            id: format!("{}7-0", crate::thread::KEPT_CALL_ID),
+            name: crate::made_skill::MAKE.into(),
+            args: json!({ crate::made_remove::REMOVE: "apple-file" }),
+            extra: None,
+        };
+        let mut history = made("Made apple file. Say apple file to start it.");
+        history.extend([
+            Message::user("remove that skill"),
+            Message::assistant_calls(None, std::slice::from_ref(&call)),
+            Message::tool(call.id.clone(), MADE_REMOVE_ASKED),
+            Message::assistant("Remove apple file?"),
+        ]);
+        history
+    };
+    let lines = ["Hey Lamp, apple file.", "Lamp, apple file.", "apple file"];
+    // Nothing made in this conversation: a question naming it waits.
+    for line in lines {
+        let ran = made_ran_of(
+            line,
+            made("Made apple file. Want me to try it now?"),
+            &["made:apple-file"],
+            APPLE,
+        )
+        .await;
+        assert!(ran.is_empty(), "{line}: nothing made here, the model's: {ran:?}");
+    }
+    let owner = crate::services::owner_of(None);
+    crate::just_made::kept_from_make(
+        &json!({ "made": "apple-file", "on": true }),
+        owner.as_deref(),
+        std::time::Instant::now(),
+    );
+    for line in lines {
+        for (history, why) in [
+            (
+                made("Made apple file. Say apple file to start it, or say remove it to undo."),
+                "the say-back, no question",
+            ),
+            (
+                made("Made apple file. Want me to try it now?"),
+                "the say-back asks",
+            ),
+            (tried("Apple file, now?"), "58 s later, the lamp's answer asked"),
+        ] {
+            let ran = made_ran_of(line, history, &["made:apple-file"], APPLE).await;
+            assert_eq!(ran, [apple_run()], "{line} ({why}): run in code");
+        }
+        let ran = made_ran_of(line, remove_asked(), &["made:apple-file"], APPLE).await;
+        assert!(ran.is_empty(), "{line}: a remove asked waits: {ran:?}");
+    }
+    crate::made_skill::set_off_said_here(None);
+    crate::person::set_private_room_for_test(None);
+}
