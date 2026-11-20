@@ -421,6 +421,9 @@ impl Interruption {
         self.commits_late = true;
     }
 
+    /// `LAMP_CUT_IN_STALE_ONSET=on` (#7413): not wired yet.
+    pub fn count_unknown_onsets(&mut self) {}
+
     /// The yield in force, or the last one, was made late in a person's
     /// speech over the lamp ([`LATE_YIELD_OVER_BLOCKS`]), with the switch
     /// or without it.

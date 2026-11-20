@@ -2,6 +2,7 @@
 //! the crate is linked once for them, not once a file (#1806).
 mod cancelled_tail;
 mod capture_linux;
+mod cut_in_7413;
 mod dsp;
 mod evidence;
 mod fixtures;
