@@ -30889,6 +30889,76 @@ mod tests {
         );
     }
 
+    /// #8003: on lamp-9adf on 19 Nov one person's 21 s request, said in the
+    /// dark (no face in view) in a room not known to be quiet, was cut into
+    /// five lines and only the last was asked: the prints were the linked
+    /// services' alone (`LAMP_SAME_VOICE_FOR=services`), which the join did
+    /// not read. With no face in view at either line, the join reads them:
+    /// one voice joins, two voices never do, and a print too weak to judge
+    /// (between the bars) joins nothing.
+    #[test]
+    fn a_request_cut_in_the_dark_joins_on_the_services_prints() {
+        use crate::room_told::Room::{Busy, Unknown};
+        use crate::second_provider::Heard;
+        // Prints: 1 one voice, 2 between the bars (cosine 0.50), anything
+        // else another (cosine 0).
+        #[derive(Default)]
+        struct Voice(std::collections::VecDeque<(u64, Result<Vec<f32>, String>)>);
+        impl crate::same_voice::Printer for Voice {
+            fn ask(&mut self, request: u64, samples: &[i16]) -> bool {
+                let print = match samples[0] {
+                    1 => vec![1.0, 0.0],
+                    2 => vec![0.5, 0.75_f32.sqrt()],
+                    _ => vec![0.0, 1.0],
+                };
+                self.0.push_back((request, Ok(print)));
+                true
+            }
+            fn answer(&mut self) -> Option<(u64, Result<Vec<f32>, String>)> {
+                self.0.pop_front()
+            }
+        }
+        let dark = |name: &str, in_view, room, second: i16| {
+            let mut heeding = judged_in_rooms(name, in_view, room);
+            heeding.checking_the_voice_for_services(Box::new(Voice::default()));
+            for (request, voice) in [(1, 1), (2, second)] {
+                heeding.hear(
+                    request,
+                    Heard::Began {
+                        over_the_lamps_voice: false,
+                    },
+                );
+                heeding.hear(request, Heard::Samples(&[voice; 48_000]));
+                heeding.hear(request, Heard::Ended);
+            }
+            heeding.same_speaker(1, 2)
+        };
+        assert_eq!(
+            dark("da", [Some(0), Some(0)], Unknown, 1),
+            Joined::Same(SAME_VOICE_JOINS),
+            "one voice, no face in view"
+        );
+        assert_eq!(
+            dark("db", [None, None], Busy, 1),
+            Joined::Same(SAME_VOICE_JOINS),
+            "one voice, the camera closed"
+        );
+        assert!(
+            matches!(dark("dc", [Some(0), Some(0)], Unknown, -1), Joined::Not(why) if why.starts_with("two voices")),
+            "two voices in the dark stay two"
+        );
+        assert!(
+            matches!(dark("dd", [Some(0), Some(0)], Unknown, 2), Joined::Not(_)),
+            "a print too weak to judge joins nothing"
+        );
+        // With a face in view the services' prints are read by no rule, as
+        // before: the join is the eyes' and the room's.
+        assert!(
+            matches!(dark("de", [Some(1), Some(1)], Busy, 1), Joined::Not(_)),
+            "one face in view at each, a busy room"
+        );
+    }
+
     /// `LAMP_SECOND_NAME_CARRIES`: a line kept before it is judged is kept as
     /// a judgement keeps it, from the bus: the eyes' newest look and the
     /// room, so the name and the line after it are told apart as judged
