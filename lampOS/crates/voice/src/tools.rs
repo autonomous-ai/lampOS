@@ -2720,7 +2720,7 @@ fn run_call_with_scope(
                 _ => (told, answered),
             };
             // "Forget everything" heard, and kept: every made skill's notes
-            // go too (#7245), with their switch alone.
+            // go too (#7245), whatever their switch says (#7775).
             if heard
                 && model.name == crate::remember::FORGET_EVERYTHING
                 && told.get("error").is_none()

@@ -784,7 +784,8 @@ sau:
      một tệp người dùng mở được: lời đọc lại nói rõ nó giữ gì và khi nào đọc
      lại. Gỡ một kỹ năng (`task_yes_forget`) xóa ghi chú của nó; một câu
      "forget everything" được nghe sẽ gửi lamp-control `notes_forget_skills`,
-     xóa ghi chú của mọi kỹ năng tự tạo. Một quyền ghi chú viết dưới tên
+     xóa ghi chú của mọi kỹ năng tự tạo, công tắc này tắt hay bật đều vậy
+     (#7775: ghi chú luôn được giữ). Một quyền ghi chú viết dưới tên
      khác (`note`, hoặc `notes` hay `note` rồi `-`, `_` hoặc `:` và một từ, hoa
      hay thường, như `notes-write`; danh sách trên một hay nhiều dòng, có thể
      kèm chú thích) được viết lại thành `notes` trên một dòng trước khi kiểm

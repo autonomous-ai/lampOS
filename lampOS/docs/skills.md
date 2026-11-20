@@ -4027,7 +4027,8 @@ gone ([switches.md](switches.md)). What happens:
      what it keeps and when it reads it back. A skill's remove
      (`task_yes_forget`) deletes its notes; a heard "forget everything"
      sends lamp-control `notes_forget_skills`, deleting every made skill's
-     notes. A notes grant written under another name (`note`, or `notes`
+     notes, with this switch off as on (#7775: the notes are kept either
+     way). A notes grant written under another name (`note`, or `notes`
      or `note` then `-`, `_` or `:` and a word, any case, as `notes-write`;
      the list on one line or several, comments allowed) is written as
      `notes` on one line before the check (`made_skill::notes_granted`; c0a4, 18 Nov:

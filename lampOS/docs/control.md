@@ -1272,7 +1272,8 @@ a revoke that deletes everything.
   by no other skill, with no switch (#7775). The bounds and answers below are
   the same, the bounds counted for the skill; the rates stay each run's own
   (its session's client); two runs of one skill at once share its one write
-  at a time (`busy`).
+  at a time (`busy`). A run past its time but not yet swept is refused
+  (`no_grant`, "the run has ended"), never kept under its own run's client.
 - **The bounds, refused whole (nothing is partly kept).** A key is 1 to 64
   bytes of `A-Z a-z 0-9 . _ : -` (`bad_request` otherwise; a prefix is up to 64
   of them). A value is any JSON, at most 16,384 bytes serialized
