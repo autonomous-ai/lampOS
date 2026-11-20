@@ -131,7 +131,7 @@ connected apps.
 | `LAMP_SERVICES_WRITE=on` (on in the product's `lamp-services.service`) | `lamp-services` | `service_write` answers "writing to services is off on this lamp", and nothing is prepared or sent; reads are as before |
 | `LAMP_CALENDAR_EDITS=on` (on in the product's `lamp-services.service` since 11 Nov) | `lamp-services`, with `LAMP_SERVICES_WRITE=on` | `service_write`'s `update_event` and `delete_event` answer "changing or cancelling a calendar event is off on this lamp" before anything is read, held or sent, and `tools.json` lists only `create_event` for Google Calendar ("Changing or cancelling a calendar event", below) |
 | `LAMP_CALENDAR_EVENT_SEARCH=on` (tracker row C132; off in the product until its lamp check) | `lamp-services`, with `LAMP_CALENDAR_EDITS=on` | A Calendar `events` read takes no words: a `query` is ignored, and the read lists the next events from its start, so an event weeks away or behind a busy day is never found to move or cancel ("Finding an event to move or cancel", below) |
-| `LAMP_GMAIL_DRAFT_EDITS=on` (off in the product until its lamp check) | `lamp-services`, with `LAMP_SERVICES_WRITE=on` | `service_write`'s `update_draft` and `delete_draft` are unknown actions, answered with Gmail's list of writes as any other ("gmail writes: send_mail …, save_draft …") before anything is read, held or saved, and `tools.json` lists only `send_mail` and `save_draft` for Gmail ("Changing or deleting a saved Gmail draft", below) |
+| `LAMP_GMAIL_DRAFT_EDITS=on` (on in the product's `lamp-services.service` since 19 Nov) | `lamp-services`, with `LAMP_SERVICES_WRITE=on` | `service_write`'s `update_draft` and `delete_draft` are unknown actions, answered with Gmail's list of writes as any other ("gmail writes: send_mail …, save_draft …") before anything is read, held or saved, and `tools.json` lists only `send_mail` and `save_draft` for Gmail ("Changing or deleting a saved Gmail draft", below) |
 | `LAMP_SERVICES_LINKED_TOOLS=on` (#6218, off in the product until its rows) | `lamp-services` | `tools.json` names every service the lamp can link, linked or not, with every read's and write's fields (about 7.8 KB of the voice's request). On, it names only the linked ones: their codes in the `service` enums, their lines in what each reads and writes, and only the fields those lines name (`service`, `what`, `action`, `send_id`, `said` always). A read or a write no linked service has is left out, so with nothing linked the voice is offered `services_connected` alone, which still says what the lamp can link. It is written at start and again after each link, unlink and wipe on the admin socket, one write at a time under a lock (the newest list always wins, and the file is never torn), and the voice reads it for each request, so a link counts from the next turn. Measured offline on the product's spoken turn: 49,064 B with every service, 46,522 B with Gmail and Calendar, 45,539 B with Gmail alone, 43,249 B with nothing linked. **Off in every product unit until a privacy condition is met (#6476 read):** the file is declared on every request, whoever speaks, so with the switch on a guest's line, the room's, a held one, an app text and a scheduled turn would see the linked codes, where "The voice is told what is linked" keeps them to the owner's line. It is turned on only after non-owner lines are given the whole catalog (or `services_connected` alone), or after the memory and privacy owner accepts in writing that linked names reach every line, with this row saying so |
 | `LAMP_SERVICES_TOLD=on` (#5523) | `lamp-voice`'s two routes, with `LAMP_SERVICES=on` | The owner's line is told nothing of what is linked: the model knows only the three functions and asks `services_connected` when it thinks to ("The voice is told what is linked", below) |
 | `LAMP_SKILL_WRITES=on` (#6066; on in the product's four units since 11 Nov) | `lamp-services`, `lamp-skills` (and its `lamp-skills-manage@` helper) and `lamp-voice` | A made skill writes to no service: a skill with a `write` step or a `"write"` permission does not load, `lamp-services` refuses `skill_write` and `skill_write_approve`, and the voice makes none ("I can't do that yet: sending or writing on its own") nor takes a yes ("A made skill's write", below) |
@@ -458,7 +458,8 @@ heard line only, nothing kept.
   `draft_id` the new draft's id in Drafts from `APPEND`'s
   `[APPENDUID <validity> <uid>]` (UIDPLUS, RFC 4315; left out when the
   server names none), so the draft can be changed or deleted later
-  (`LAMP_GMAIL_DRAFT_EDITS`) and its service record keeps it as its result
+  (`LAMP_GMAIL_DRAFT_EDITS`; that UID is kept as the lamp's own,
+  `lamp_drafts`) and its service record keeps it as its result
   id; a refused `APPEND` is "not saved: Gmail couldn't be reached". The prepare's `next` says
   "Nothing is saved yet. Read read_back to the person in full; save the
   draft only if they agree, in any words."
@@ -1059,6 +1060,14 @@ Off unless `LAMP_SERVICES_WRITE=on`. Two phases (`writes.rs`):
    changed; nothing was saved" for a draft); the same account linked again
    still goes (Reviewer-two on #5982), unless its link itself changed
    (below). The journal says only "a confirmed write to <code> was sent".
+   A write refused or failed says one line of its kind of reason
+   (`serve::write_said`; lamp-9adf, 20 Nov: a `save_draft` failed in 18 ms
+   and the journal said nothing of why), never an address, a subject, a
+   mail's words or anything a service answered: "lamp-services: the voice's
+   service_write of gmail save_draft: refused: an address that isn't one"
+   (or "no address in to", "no subject", "too long or too many", "not a
+   draft the lamp saved", "failed: the service couldn't be reached", …; a
+   confirm is "a confirm", and a skill's run's "a skill run's").
 
 One write waits at a time (a new one replaces it), for 120 s. Bounds: a text
 at most 3,000 characters (line breaks kept), a subject or title one line of
@@ -1305,8 +1314,9 @@ Calendar's own `q` (`reads::plan_with`):
 On a tester's lamp on 11 Nov, "add my address and 'wear something casual'"
 to a draft the lamp had saved could only prepare a second draft, which left
 the old one in Drafts. Off unless `LAMP_GMAIL_DRAFT_EDITS=on` and
-`LAMP_SERVICES_WRITE=on` in `lamp-services` (off in the product until its
-lamp check). On, Gmail's actions in `tools.json` add `update_draft
+`LAMP_SERVICES_WRITE=on` in `lamp-services` (on in the product's
+`lamp-services.service` since 19 Nov, the first builder's DEFAULT-ON on
+#7814; a drop-in with `LAMP_GMAIL_DRAFT_EDITS=off` turns it off). On, Gmail's actions in `tools.json` add `update_draft
 {draft_id, to, cc, subject, text}` and `delete_draft {draft_id}`
 (`writes::GMAIL_DRAFT_EDITS`), and `service_write` takes a `draft_id`. The
 write's description lists Gmail as `send_mail, save_draft, update_draft,
@@ -1316,14 +1326,41 @@ Calendar's edits are given in `event_id`'s.
 
 - **Which draft: its id in Drafts.** A `draft_id` is `draft<UID>`, an id
   only a lamp's own save (its answer's `draft_id`, from `APPENDUID`) or a
-  `drafts` read gives. The model has it from the save's answer, from the
-  drafts read, or from the save's service record, which keeps it as its
-  result id (`LAMP_SERVICE_RECORDS_TOLD` tells it with the record, as a
-  created event's `event_id`). Any other id (the inbox's `41`, All Mail's
-  `all41`, Gmail's own API id) is refused before anything is read or held,
+  `drafts` read gives. The model has it from the save's answer or from the
+  save's service record, which keeps it as its result id
+  (`LAMP_SERVICE_RECORDS_TOLD` tells it with the record, as a created
+  event's `event_id`). Any other id (the inbox's `41`, All Mail's `all41`,
+  Gmail's own API id) is refused before anything is read or held,
   `writes::NOT_A_DRAFT`: "draft_id names no draft in Gmail's Drafts: use the
-  draft_id a save_draft or a drafts read gave, like draft12", so no other
-  mailbox is ever touched. A redo of a saved draft from its record
+  draft_id the lamp's own save_draft gave, like draft12", so no other
+  mailbox is ever touched.
+- **Only a draft the lamp saved itself** (the first builder's rule on
+  #8005, after lamp-9adf on 20 Nov, where the lamp's own save had failed and
+  "that draft" resolved to one the owner wrote in Gmail, whose delete a
+  spoken yes then confirmed). Every confirmed save keeps its account, its
+  UID in Drafts and Drafts' `UIDVALIDITY` (both from `APPENDUID`,
+  `mail::DraftUid`) in `lamp_drafts::FILE`, `gmail-lamp-drafts.json` in the
+  store folder (0600; it survives a restart, and a wipe takes it), never a
+  word of the mail; a change replaces it by the new draft's (none when
+  Gmail names none), and a delete, a draft found gone or found not the
+  lamp's at the yes (below), or unlinking Gmail (`remove`), takes it away; an
+  entry kept without its validity reads as none; at
+  most 100 are kept (`lamp_drafts::KEPT_MOST`), the oldest dropped first,
+  and a file that can't be read owns nothing. `update_draft` and
+  `delete_draft` take only a UID kept there for the linked account, checked
+  before anything is read or held, and again at the yes. A draft in Drafts
+  the lamp didn't save (the person's own, one a `drafts` read found) is
+  read, never changed or deleted: with drafts of its own kept,
+  `writes::NOT_LAMPS_DRAFT`, "Not changed: that draft isn't one the lamp
+  saved. The lamp changes or deletes only drafts it saved itself, so nothing
+  was changed. Say so plainly, and offer to write a new draft with
+  save_draft."; with none, `writes::NO_LAMP_DRAFTS`, "Not changed: the lamp
+  has no draft it saved itself, and it changes or deletes only those, so
+  nothing was changed. Say it has none, and offer to write one with
+  save_draft." Refused at the yes, either follows "not saved: " or "not
+  deleted: ". `draft_id`'s description says the same: "A draft the lamp
+  saved itself, by the id its save_draft gave, like draft12: only those can
+  be changed or deleted." A redo of a saved draft from its record
   (`LAMP_SERVICE_REDO`) is refused with the way to change it
   (`redo::DRAFT_DONE`), never saved again beside it; `update_draft` or
   `delete_draft` with `from_record` naming that record fills its
@@ -1331,7 +1368,7 @@ Calendar's edits are given in `event_id`'s.
 - **Read back from the draft as it is now.** Without `send_id`, the lamp
   first reads that one draft by its id (`EXAMINE` of Drafts and its UID,
   read-only, as `message {id}`). None there (sent, deleted or changed in
-  Gmail, or never one the lamp saved or read there) is `writes::DRAFT_GONE`:
+  Gmail) is `writes::DRAFT_GONE`, and it is the lamp's no longer:
   "That draft is no longer in Gmail's Drafts: it was sent, deleted or
   changed there, and nothing was changed. Say it's no longer there, and
   offer to save it again with save_draft." Nothing is held. An
@@ -1362,9 +1399,16 @@ Calendar's edits are given in `event_id`'s.
 - **Over IMAP, Drafts alone** (`mail::edit_draft_over`, one 15 s budget as
   a save's): `LOGIN`, `CAPABILITY`, `LIST "" "*"` for the mailbox flagged
   `\Drafts` (else `[Gmail]/Drafts`), `SELECT` of it (the one mailbox ever
-  opened to be changed), `UID SEARCH UID <uid>` (not there:
+  opened to be changed), whose `[UIDVALIDITY n]` must be the one the draft
+  was saved in (another, or none said: Drafts was renumbered, so the UID may
+  name another draft), `UID SEARCH UID <uid>` (not there:
   `writes::DRAFT_GONE` after "not saved: " or "not deleted: ", nothing
-  changed). An update then `APPEND`s the whole new draft to Drafts as
+  changed), then `UID FETCH <uid> (UID BODY.PEEK[HEADER.FIELDS
+  (MESSAGE-ID)])`, whose Message-ID must end in `@lamp.local>`, the domain
+  of every Message-ID the lamp writes (`mail::LAMP_MESSAGE_DOMAIN`). A
+  renumbered Drafts or another Message-ID is `mail::Failure::NotLampsDraft`:
+  nothing is changed, the entry is dropped, and the answer is
+  `writes::NOT_LAMPS_DRAFT` after "not saved: " or "not deleted: ". An update then `APPEND`s the whole new draft to Drafts as
   `save_draft` does; then the old UID alone is marked `UID STORE <uid>
   +FLAGS.SILENT (\Deleted)` and expunged with `UID EXPUNGE <uid>` when the
   server offers UIDPLUS; without it, a plain `EXPUNGE`, and only when `UID

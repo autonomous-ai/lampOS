@@ -153,7 +153,7 @@ dịch vụ.
 | `LAMP_SERVICES_WRITE=on` (bật trong `lamp-services.service` của sản phẩm) | `lamp-services` | `service_write` trả lời "writing to services is off on this lamp", và không gì được chuẩn bị hay gửi; việc đọc vẫn như trước |
 | `LAMP_CALENDAR_EDITS=on` (bật trong `lamp-services.service` của sản phẩm từ 11/11) | `lamp-services`, cùng `LAMP_SERVICES_WRITE=on` | `update_event` và `delete_event` của `service_write` trả lời "changing or cancelling a calendar event is off on this lamp" trước khi bất cứ gì được đọc, giữ hay gửi, và `tools.json` chỉ liệt kê `create_event` cho Google Calendar ("Đổi hoặc huỷ một sự kiện lịch", bên dưới) |
 | `LAMP_CALENDAR_EVENT_SEARCH=on` (dòng C132 của bảng theo dõi; tắt trong sản phẩm cho đến lần kiểm tra trên đèn) | `lamp-services`, cùng `LAMP_CALENDAR_EDITS=on` | Một lần đọc `events` của Calendar không nhận từ nào: `query` bị bỏ qua, và lần đọc liệt kê các sự kiện kế tiếp từ lúc bắt đầu, nên một sự kiện cách vài tuần hay nằm sau một ngày bận không bao giờ được tìm thấy để dời hay huỷ ("Tìm một sự kiện để dời hay huỷ", bên dưới) |
-| `LAMP_GMAIL_DRAFT_EDITS=on` (tắt trong sản phẩm cho đến lần kiểm tra trên đèn) | `lamp-services`, cùng `LAMP_SERVICES_WRITE=on` | `update_draft` và `delete_draft` của `service_write` là action không biết, được trả lời bằng danh sách lệnh ghi của Gmail như mọi action khác ("gmail writes: send_mail …, save_draft …") trước khi bất cứ gì được đọc, giữ hay lưu, và `tools.json` chỉ liệt kê `send_mail` và `save_draft` cho Gmail ("Đổi hoặc xoá một bản nháp Gmail đã lưu", bên dưới) |
+| `LAMP_GMAIL_DRAFT_EDITS=on` (bật trong `lamp-services.service` của sản phẩm từ 19/11) | `lamp-services`, cùng `LAMP_SERVICES_WRITE=on` | `update_draft` và `delete_draft` của `service_write` là action không biết, được trả lời bằng danh sách lệnh ghi của Gmail như mọi action khác ("gmail writes: send_mail …, save_draft …") trước khi bất cứ gì được đọc, giữ hay lưu, và `tools.json` chỉ liệt kê `send_mail` và `save_draft` cho Gmail ("Đổi hoặc xoá một bản nháp Gmail đã lưu", bên dưới) |
 | `LAMP_SERVICES_LINKED_TOOLS=on` (#6218, tắt trong sản phẩm cho đến khi chạy các hàng kiểm tra) | `lamp-services` | `tools.json` nêu mọi dịch vụ đèn có thể liên kết, dù đã liên kết hay chưa, cùng mọi trường của mọi lệnh đọc và ghi (khoảng 7,8 KB của yêu cầu gửi mô hình). Bật thì chỉ nêu các dịch vụ đã liên kết: mã của chúng trong enum `service`, dòng của chúng trong danh sách đọc và ghi, và chỉ các trường những dòng đó nêu (luôn có `service`, `what`, `action`, `send_id`, `said`). Hàm đọc hay ghi mà không dịch vụ đã liên kết nào có thì bị bỏ, nên khi chưa liên kết gì giọng nói chỉ được đưa `services_connected`, hàm này vẫn nói đèn có thể liên kết những gì. File được ghi lúc khởi động và ghi lại sau mỗi lần liên kết, huỷ liên kết và xoá hết trên socket quản trị, mỗi lần một lượt ghi dưới một khoá (danh sách mới nhất luôn thắng, file không bao giờ bị ghi dở); giọng nói đọc nó cho mỗi yêu cầu, nên liên kết có hiệu lực từ lượt sau. Đo offline trên lượt nói của sản phẩm: 49.064 B với mọi dịch vụ, 46.522 B với Gmail và Lịch, 45.539 B chỉ với Gmail, 43.249 B khi chưa liên kết gì. **Tắt trong mọi máy sản phẩm cho đến khi đạt một điều kiện riêng tư (bài đọc #6476):** file được khai báo cho mọi yêu cầu, dù ai nói, nên khi bật, dòng của khách, của phòng, dòng bị giữ, tin nhắn từ ứng dụng và lượt theo lịch đều thấy mã các dịch vụ đã liên kết, trong khi "Giọng nói được cho biết những gì đã liên kết" chỉ cho dòng của chủ biết. Chỉ bật sau khi các dòng không phải của chủ được đưa toàn bộ danh mục (hoặc chỉ `services_connected`), hoặc sau khi người phụ trách bộ nhớ và riêng tư chấp nhận bằng văn bản rằng tên dịch vụ đã liên kết đến mọi dòng, và dòng này nói rõ điều đó |
 | `LAMP_SERVICES_TOLD=on` (#5523) | hai tuyến của `lamp-voice`, với `LAMP_SERVICES=on` | Câu của chủ đèn không được báo gì về các dịch vụ đã liên kết: mô hình chỉ biết ba hàm và chỉ hỏi `services_connected` khi nó nghĩ tới ("Giọng nói được báo những gì đã liên kết", bên dưới) |
 | `LAMP_SKILL_WRITES=on` (#6066; bật trong bốn unit của sản phẩm từ 11/11) | `lamp-services`, `lamp-skills` (và helper `lamp-skills-manage@` của nó) và `lamp-voice` | Kỹ năng tự tạo không ghi vào dịch vụ nào: kỹ năng có bước `write` hay quyền `"write"` không được nạp, `lamp-services` từ chối `skill_write` và `skill_write_approve`, và giọng nói không tạo kỹ năng như vậy ("I can't do that yet: sending or writing on its own") cũng không nhận lời đồng ý ("Một kỹ năng tự tạo ghi vào dịch vụ", bên dưới) |
@@ -493,7 +493,8 @@ giữ gì.
   `draft_id` là id của bản nháp mới trong Drafts, lấy từ
   `[APPENDUID <validity> <uid>]` của `APPEND` (UIDPLUS, RFC 4315; bỏ đi khi
   máy chủ không nêu), để bản nháp có thể được đổi hay xoá sau đó
-  (`LAMP_GMAIL_DRAFT_EDITS`) và bản ghi dịch vụ của nó giữ nó làm id kết
+  (`LAMP_GMAIL_DRAFT_EDITS`; UID đó được giữ là của chính đèn,
+  `lamp_drafts`) và bản ghi dịch vụ của nó giữ nó làm id kết
   quả; một `APPEND` bị từ chối là "not saved: Gmail couldn't be reached". `next` của bước chuẩn bị
   nói "Nothing is saved yet. Read read_back to the person in full; save the
   draft only if they agree, in any words."
@@ -1128,6 +1129,15 @@ Tắt trừ khi `LAMP_SERVICES_WRITE=on`. Hai pha (`writes.rs`):
    được liên kết lại thì vẫn đi (Reviewer-two trên #5982), trừ khi chính
    liên kết của nó đã đổi (xem dưới). Journal chỉ ghi
    "a confirmed write to <code> was sent".
+   Một lần ghi bị từ chối hay thất bại ghi một dòng về loại lý do của nó
+   (`serve::write_said`; lamp-9adf, 20/11: một `save_draft` thất bại trong
+   18 ms mà journal không nói gì về lý do), không bao giờ một địa chỉ, một
+   tiêu đề, chữ của một thư hay bất cứ gì một dịch vụ trả lời:
+   "lamp-services: the voice's service_write of gmail save_draft: refused:
+   an address that isn't one" (hoặc "no address in to", "no subject", "too
+   long or too many", "not a draft the lamp saved", "failed: the service
+   couldn't be reached", …; một lần xác nhận là "a confirm", và lần chạy
+   của một skill là "a skill run's").
 
 Mỗi lúc chỉ một lần ghi chờ (lần mới thay lần cũ), trong 120 s. Giới hạn: một
 văn bản tối đa 3,000 ký tự (giữ dấu xuống dòng), một tiêu đề thư hay tiêu đề
@@ -1376,7 +1386,9 @@ Trên đèn của một người thử ngày 11/11, câu "thêm địa chỉ c�
 đó thoải mái'" cho một bản nháp đèn đã lưu chỉ chuẩn bị được một bản nháp
 thứ hai, để bản cũ vẫn nằm trong Drafts. Tắt trừ khi
 `LAMP_GMAIL_DRAFT_EDITS=on` và `LAMP_SERVICES_WRITE=on` trong
-`lamp-services` (tắt trong sản phẩm cho đến lần kiểm tra trên đèn). Khi bật,
+`lamp-services` (bật trong `lamp-services.service` của sản phẩm từ 19/11,
+theo DEFAULT-ON của người xây dựng đầu tiên trên #7814; một drop-in với
+`LAMP_GMAIL_DRAFT_EDITS=off` tắt nó). Khi bật,
 các action của Gmail trong `tools.json` thêm `update_draft {draft_id, to,
 cc, subject, text}` và `delete_draft {draft_id}`
 (`writes::GMAIL_DRAFT_EDITS`), và `service_write` nhận một `draft_id`. Mô tả
@@ -1388,13 +1400,41 @@ Calendar được nêu trong mô tả của `event_id`.
 - **Bản nháp nào: id của nó trong Drafts.** Một `draft_id` là
   `draft<UID>`, một id chỉ lần lưu của chính đèn (`draft_id` trong câu trả
   lời của nó, từ `APPENDUID`) hoặc một lần đọc `drafts` đưa ra. Mô hình có
-  nó từ câu trả lời của lần lưu, từ lần đọc nháp, hoặc từ bản ghi dịch vụ
-  của lần lưu, vốn giữ nó làm id kết quả (`LAMP_SERVICE_RECORDS_TOLD` báo nó
-  cùng bản ghi, như `event_id` của một sự kiện đã tạo). Mọi id khác (`41`
-  của hộp thư đến, `all41` của All Mail, id API riêng của Gmail) bị từ chối
-  trước khi bất cứ gì được đọc hay giữ, `writes::NOT_A_DRAFT`: "draft_id
-  names no draft in Gmail's Drafts: use the draft_id a save_draft or a
-  drafts read gave, like draft12", nên không hộp thư nào khác bị đụng tới.
+  nó từ câu trả lời của lần lưu hoặc từ bản ghi dịch vụ của lần lưu, vốn
+  giữ nó làm id kết quả (`LAMP_SERVICE_RECORDS_TOLD` báo nó cùng bản ghi,
+  như `event_id` của một sự kiện đã tạo). Mọi id khác (`41` của hộp thư
+  đến, `all41` của All Mail, id API riêng của Gmail) bị từ chối trước khi
+  bất cứ gì được đọc hay giữ, `writes::NOT_A_DRAFT`: "draft_id names no
+  draft in Gmail's Drafts: use the draft_id the lamp's own save_draft gave,
+  like draft12", nên không hộp thư nào khác bị đụng tới.
+- **Chỉ một bản nháp chính đèn đã lưu** (luật của người xây dựng đầu tiên
+  trên #8005, sau lamp-9adf ngày 20/11, khi lần lưu của chính đèn đã thất
+  bại và "bản nháp đó" trỏ tới một bản chủ nhân viết trong Gmail, và lần
+  xoá nó được một tiếng "có" xác nhận). Mỗi lần lưu đã xác nhận giữ tài
+  khoản, UID của nó trong Drafts và `UIDVALIDITY` của Drafts (cả hai từ
+  `APPENDUID`, `mail::DraftUid`) ở `lamp_drafts::FILE`,
+  `gmail-lamp-drafts.json` trong thư mục store (0600; còn sau khi khởi động
+  lại, và một lần xoá sạch lấy nó đi), không bao giờ một chữ của thư; một
+  lần đổi thay nó bằng chỗ của bản nháp mới (không có khi Gmail không nêu),
+  và một lần xoá, một bản nháp thấy đã mất hoặc thấy không phải của đèn lúc
+  "có" (xem dưới), hoặc gỡ liên kết Gmail (`remove`), lấy nó đi; một mục
+  được giữ mà không có validity thì đọc là không có; giữ tối đa 100
+  (`lamp_drafts::KEPT_MOST`), bỏ cái cũ nhất trước, và một tệp không đọc
+  được thì không sở hữu gì. `update_draft` và `delete_draft` chỉ nhận một
+  UID được giữ ở đó cho tài khoản đang liên kết, kiểm trước khi bất cứ gì
+  được đọc hay giữ, và kiểm lại lúc "có". Một bản nháp trong Drafts mà đèn
+  không lưu (của chính người đó, một bản mà lần đọc `drafts` thấy) được
+  đọc, không bao giờ bị đổi hay xoá: khi đèn có giữ bản nháp của mình,
+  `writes::NOT_LAMPS_DRAFT`, "Not changed: that draft isn't one the lamp
+  saved. The lamp changes or deletes only drafts it saved itself, so nothing
+  was changed. Say so plainly, and offer to write a new draft with
+  save_draft."; khi không có, `writes::NO_LAMP_DRAFTS`, "Not changed: the
+  lamp has no draft it saved itself, and it changes or deletes only those,
+  so nothing was changed. Say it has none, and offer to write one with
+  save_draft." Bị từ chối lúc "có", cả hai đứng sau "not saved: " hoặc "not
+  deleted: ". Mô tả của `draft_id` nói cùng điều đó: "A draft the lamp
+  saved itself, by the id its save_draft gave, like draft12: only those can
+  be changed or deleted."
   Làm lại một bản nháp đã lưu từ bản ghi của nó (`LAMP_SERVICE_REDO`) bị từ
   chối kèm cách đổi nó (`redo::DRAFT_DONE`), không bao giờ lưu thêm một bản
   bên cạnh; `update_draft` hoặc `delete_draft` với `from_record` chỉ đến
@@ -1403,8 +1443,7 @@ Calendar được nêu trong mô tả của `event_id`.
 - **Đọc lại từ bản nháp như nó đang là.** Không có `send_id`, đèn trước hết
   đọc đúng bản nháp đó theo id của nó (`EXAMINE` Drafts và UID của nó, chỉ
   đọc, như `message {id}`). Không có ở đó (đã gửi, đã xoá hay đã đổi trong
-  Gmail, hoặc chưa bao giờ là bản đèn đã lưu hay đọc ở đó) là
-  `writes::DRAFT_GONE`: "That draft is no longer in Gmail's Drafts: it was
+  Gmail) là `writes::DRAFT_GONE`, và nó không còn là của đèn nữa: "That draft is no longer in Gmail's Drafts: it was
   sent, deleted or changed there, and nothing was changed. Say it's no
   longer there, and offer to save it again with save_draft." Không gì được
   giữ. Một `update_draft` nhận toàn bộ bản nháp mới và được đọc lại đầy đủ,
@@ -1434,9 +1473,17 @@ Calendar được nêu trong mô tả của `event_id`.
 - **Qua IMAP, chỉ Drafts** (`mail::edit_draft_over`, một ngân sách 15 s như
   lần lưu): `LOGIN`, `CAPABILITY`, `LIST "" "*"` tìm hộp thư gắn cờ
   `\Drafts` (nếu không thì `[Gmail]/Drafts`), `SELECT` nó (hộp thư duy nhất
-  từng được mở để thay đổi), `UID SEARCH UID <uid>` (không có:
-  `writes::DRAFT_GONE` sau "not saved: " hoặc "not deleted: ", không gì thay
-  đổi). Một lần sửa rồi `APPEND` toàn bộ bản nháp mới vào Drafts như
+  từng được mở để thay đổi), mà `[UIDVALIDITY n]` của nó phải đúng cái bản
+  nháp được lưu trong đó (cái khác, hoặc không nói: Drafts đã được đánh số
+  lại, nên UID có thể chỉ một bản nháp khác), `UID SEARCH UID <uid>` (không
+  có: `writes::DRAFT_GONE` sau "not saved: " hoặc "not deleted: ", không gì
+  thay đổi), rồi `UID FETCH <uid> (UID BODY.PEEK[HEADER.FIELDS
+  (MESSAGE-ID)])`, mà Message-ID của nó phải kết thúc bằng `@lamp.local>`,
+  tên miền của mọi Message-ID đèn viết (`mail::LAMP_MESSAGE_DOMAIN`). Drafts
+  bị đánh số lại hoặc một Message-ID khác là
+  `mail::Failure::NotLampsDraft`: không gì thay đổi, mục đó bị bỏ, và câu
+  trả lời là `writes::NOT_LAMPS_DRAFT` sau "not saved: " hoặc "not
+  deleted: ". Một lần sửa rồi `APPEND` toàn bộ bản nháp mới vào Drafts như
   `save_draft`; rồi chỉ UID cũ được đánh dấu `UID STORE <uid> +FLAGS.SILENT
   (\Deleted)` và xoá hẳn bằng `UID EXPUNGE <uid>` khi máy chủ có UIDPLUS;
   không có thì một `EXPUNGE` thường, và chỉ khi `UID SEARCH DELETED` không

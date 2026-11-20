@@ -11,7 +11,7 @@ use crate::reads::{self, ANSWER_MOST, Asker, Plan};
 use crate::refresh::Backend;
 use crate::store::{Entry, Store};
 use crate::writes::{self, Action, Desk};
-use crate::{run_calls, skill_secrets, skill_writes, spoken, tools};
+use crate::{lamp_drafts, run_calls, skill_secrets, skill_writes, spoken, tools};
 use serde_json::{Value, json};
 use std::{
     fmt,
@@ -345,6 +345,9 @@ pub struct Services<H, M> {
     pub signed_out: AtomicBool,
     /// Held while a skill's write is counted against the bounds.
     skill_send: Mutex<()>,
+    /// Held across each read and change of the lamp's own saved drafts
+    /// ([`lamp_drafts::LampDrafts`]).
+    lamp_drafts: Mutex<()>,
     /// `LAMP_SKILL_TASKS=on`: `lamp-control` may call the tools' socket for
     /// a skill's run ([`Services::run_tool`]).
     pub skill_tasks: bool,
@@ -490,6 +493,7 @@ impl<H: Http, M: Mail> Services<H, M> {
             not_approved: AtomicUsize::new(0),
             signed_out: AtomicBool::new(false),
             skill_send: Mutex::new(()),
+            lamp_drafts: Mutex::new(()),
             skill_tasks: false,
             run_held: Mutex::new(None),
             skill_write_agent: false,
@@ -1018,6 +1022,15 @@ impl<H: Http, M: Mail> Services<H, M> {
                     .is_err()
                 {
                     eprintln!("lamp-services: {code}'s skill approvals were not dropped");
+                }
+                // Unlinking Gmail takes back which drafts were the lamp's.
+                if code == "gmail"
+                    && let Some(entry) = self.store.load("gmail")
+                {
+                    let (_held, drafts) = self.lamp_drafts();
+                    if drafts.forget(&entry.account()).is_err() {
+                        eprintln!("lamp-services: the lamp's saved drafts were not dropped");
+                    }
                 }
                 match self.store.remove(&code) {
                     Ok(()) => (json!({"ok": true}), format!("{code} unlinked")),
@@ -2086,10 +2099,80 @@ impl<H: Http, M: Mail> Services<H, M> {
         self.write_for(args, None).await
     }
 
+    /// The lamp's own saved drafts, read and changed under one lock.
+    fn lamp_drafts(&self) -> (std::sync::MutexGuard<'_, ()>, lamp_drafts::LampDrafts) {
+        let held = self
+            .lamp_drafts
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        (held, lamp_drafts::LampDrafts::new(&self.store.0))
+    }
+
+    /// The draft of `uid` in `account`'s Drafts, with the `UIDVALIDITY` it
+    /// was saved in, only when it is one the lamp saved itself; else why
+    /// not, in the words the model says.
+    fn lamps_draft(&self, account: &str, uid: u32) -> Result<mail::DraftUid, String> {
+        let (_held, drafts) = self.lamp_drafts();
+        match drafts.whose(account, uid) {
+            lamp_drafts::Whose::Lamps(at) => Ok(at),
+            whose => {
+                eprintln!(
+                    "lamp-services: a change of a Gmail draft refused: {}",
+                    if whose == lamp_drafts::Whose::Other {
+                        "not one the lamp saved"
+                    } else {
+                        "the lamp has saved none"
+                    }
+                );
+                Err(if whose == lamp_drafts::Whose::Other {
+                    writes::NOT_LAMPS_DRAFT
+                } else {
+                    writes::NO_LAMP_DRAFTS
+                }
+                .into())
+            }
+        }
+    }
+
+    /// A draft the lamp saved, kept as its own; one that can't be kept is
+    /// journaled, and is then not changed by the lamp.
+    fn lamp_draft_saved(&self, account: &str, at: mail::DraftUid) {
+        let (_held, drafts) = self.lamp_drafts();
+        if let Err(why) = drafts.saved(account, at) {
+            eprintln!("lamp-services: a saved draft couldn't be kept as the lamp's: {why}");
+        }
+    }
+
+    /// The lamp's draft of `old` replaced by `new`, or deleted or gone with
+    /// none.
+    fn lamp_draft_changed(&self, account: &str, old: u32, new: Option<mail::DraftUid>) {
+        let (_held, drafts) = self.lamp_drafts();
+        if let Err(why) = drafts.replaced(account, old, new) {
+            eprintln!("lamp-services: the lamp's drafts couldn't be kept: {why}");
+        }
+    }
+
     /// [`Self::write`], for the skill `run` names when a skill's run
     /// prepares it: a read-back too long for the voice's one note
     /// ([`run_read_back_room`]) is refused before it is held.
     async fn write_for(&self, args: &Value, run: Option<&str>) -> Result<Value, String> {
+        let written = self.write_once(args, run).await;
+        if let Err(why) = &written {
+            let code = args
+                .get("service")
+                .and_then(Value::as_str)
+                .and_then(|asked| self.named(asked))
+                .map(|service| service.code);
+            eprintln!(
+                "lamp-services: {}",
+                write_said(run.is_some(), code, args, why)
+            );
+        }
+        written
+    }
+
+    /// [`Self::write_for`] before its journal line.
+    async fn write_once(&self, args: &Value, run: Option<&str>) -> Result<Value, String> {
         if !self.write_on {
             return Err("writing to services is off on this lamp".into());
         }
@@ -2118,7 +2201,10 @@ impl<H: Http, M: Mail> Services<H, M> {
                 if entry.oauth() || service.code != "gmail" {
                     return Err(writes::NO_DRAFT_EDITS.into());
                 }
-                let (id, _) = writes::draft_named(args)?;
+                let (id, uid) = writes::draft_named(args)?;
+                // Only a draft the lamp saved itself, before anything is
+                // read or held (the first builder's rule on #8005).
+                self.lamps_draft(&entry.account(), uid)?;
                 let mut current = self
                     .mail
                     .read(
@@ -2129,7 +2215,10 @@ impl<H: Http, M: Mail> Services<H, M> {
                     .await
                     .map_err(|failure| failure.words().to_owned())?;
                 scrub_mail(&mut current, &entry);
-                let current = current.first().ok_or(writes::DRAFT_GONE)?;
+                let Some(current) = current.first() else {
+                    self.lamp_draft_changed(&entry.account(), uid, None);
+                    return Err(writes::DRAFT_GONE.into());
+                };
                 writes::Pending {
                     account: entry.account(),
                     ..writes::prepare_draft_edit(args, current, &entry)?
@@ -2312,7 +2401,13 @@ impl<H: Http, M: Mail> Services<H, M> {
                     .map_err(|failure| format!("not saved: {}", failure.words()))?;
                 eprintln!("lamp-services: a confirmed draft was saved in Gmail's Drafts");
                 answer = json!({"sent": false, "saved": true, "service": service.name});
-                draft_id = uid.map(|uid| format!("{}{uid}", mail::DRAFTS_ID));
+                match uid {
+                    Some(at) => self.lamp_draft_saved(&entry.account(), at),
+                    None => eprintln!(
+                        "lamp-services: Gmail named no UID for the saved draft: it can't be changed by the lamp"
+                    ),
+                }
+                draft_id = uid.map(|at| format!("{}{}", mail::DRAFTS_ID, at.uid));
             }
             // Changed over the app password's IMAP alone, as a draft is
             // saved.
@@ -2325,21 +2420,46 @@ impl<H: Http, M: Mail> Services<H, M> {
                 } else {
                     ("deleted", "not deleted")
                 };
+                let account = entry.account();
+                // Whose it is, again at the yes: one changed or deleted by
+                // another yes since its read-back is the lamp's no longer.
+                // Its place comes with it: the UIDVALIDITY it was saved in.
+                let at = self
+                    .lamps_draft(&account, uid)
+                    .map_err(|why| format!("{not}: {why}"))?;
                 let made = self
                     .mail
-                    .edit_draft(&entry.account(), &app_password(&entry), uid, out.as_ref())
+                    .edit_draft(&account, &app_password(&entry), at, out.as_ref())
                     .await
                     .map_err(|failure| match failure {
-                        Failure::DraftGone => format!("{not}: {}", writes::DRAFT_GONE),
+                        Failure::DraftGone => {
+                            self.lamp_draft_changed(&account, uid, None);
+                            format!("{not}: {}", writes::DRAFT_GONE)
+                        }
+                        // Drafts renumbered since the save, or a Message-ID
+                        // the lamp didn't write: never the lamp's again.
+                        Failure::NotLampsDraft => {
+                            eprintln!(
+                                "lamp-services: a change of a Gmail draft refused: Drafts renumbered or not the lamp's Message-ID"
+                            );
+                            self.lamp_draft_changed(&account, uid, None);
+                            format!("{not}: {}", writes::NOT_LAMPS_DRAFT)
+                        }
                         failure => format!("{not}: {}", failure.words()),
                     })?;
                 eprintln!("lamp-services: a confirmed draft in Gmail's Drafts was {done}");
+                if out.is_some() && made.is_none() {
+                    eprintln!(
+                        "lamp-services: Gmail named no UID for the new draft: it can't be changed by the lamp"
+                    );
+                }
+                self.lamp_draft_changed(&account, uid, made);
                 answer = if out.is_some() {
                     json!({"sent": false, "saved": true, "service": service.name})
                 } else {
                     json!({"sent": false, "deleted": true, "service": service.name})
                 };
-                draft_id = made.map(|uid| format!("{}{uid}", mail::DRAFTS_ID));
+                draft_id = made.map(|at| format!("{}{}", mail::DRAFTS_ID, at.uid));
             }
             Action::Http { method, url, body } => {
                 // A DELETE carries no body.
@@ -2570,6 +2690,86 @@ fn why_said(stage: Stage, why: &str) -> &'static str {
         Stage::Service if has("refused the lamp's link") => "error: the link refused",
         Stage::Service => "error",
     }
+}
+
+/// Why a `service_write` failed, for the journal (lamp-9adf, 20 Nov: a
+/// `save_draft` failed in 18 ms and the journal said nothing of why): the
+/// lamp's own words for its kind alone, never an address, a subject, a
+/// mail's words or anything a service answered.
+fn write_why(why: &str) -> &'static str {
+    let has = |words: &str| why.contains(words);
+    let done = ["not sent: ", "not saved: ", "not deleted: ", "not made: "]
+        .iter()
+        .any(|head| why.starts_with(head));
+    if why == writes::NOT_LAMPS_DRAFT || why.ends_with(writes::NOT_LAMPS_DRAFT) {
+        "refused: not a draft the lamp saved"
+    } else if why == writes::NO_LAMP_DRAFTS || why.ends_with(writes::NO_LAMP_DRAFTS) {
+        "refused: the lamp has saved no draft"
+    } else if has(writes::DRAFT_GONE) {
+        "refused: the draft is no longer in Drafts"
+    } else if why == writes::NOT_A_DRAFT {
+        "refused: not an id in Drafts"
+    } else if has(writes::NO_DRAFTS) || has(writes::NO_DRAFT_EDITS) {
+        "refused: this Gmail link saves or changes no drafts"
+    } else if has("writing to services is off") {
+        "refused: writes are off"
+    } else if has("nothing is waiting to be sent") {
+        "refused: nothing waiting for that send_id"
+    } else if has("send_id is for another service") {
+        "refused: the send_id is another service's"
+    } else if has("link changed") || why == LINK_CHANGED {
+        "refused: the link changed since the read-back"
+    } else if done && has("couldn't be reached") {
+        "failed: the service couldn't be reached"
+    } else if done && has("didn't answer in time") {
+        "failed: not answered in time"
+    } else if done && (has("refused the app password") || has("refused the lamp's link")) {
+        "failed: the link refused"
+    } else if done {
+        "failed"
+    } else if has("is not an email address") || has("is a list of email addresses") {
+        "refused: an address that isn't one"
+    } else if has("needs at least one address in to") {
+        "refused: no address in to"
+    } else if has("the write needs its subject") {
+        "refused: no subject"
+    } else if has("the write needs its text") {
+        "refused: no text"
+    } else if has("the write needs its action") {
+        "refused: no action"
+    } else if has(" characters") || has("at most") {
+        "refused: too long or too many"
+    } else if has("is linked without permission") {
+        "refused: the link has no permission for it"
+    } else if has(" writes: ") || has("the lamp only reads") {
+        "refused: an action the service doesn't have"
+    } else if has("not linked") || has("isn't linked") {
+        "refused: the service isn't linked"
+    } else {
+        "refused: its arguments"
+    }
+}
+
+/// The journal line of one failed `service_write`: who asked (the voice,
+/// or a skill's run), the service, its
+/// action (or that it was a confirm) and [`write_why`]. Never its fields.
+fn write_said(run: bool, code: Option<&str>, args: &Value, why: &str) -> String {
+    let action = args.get("action").and_then(Value::as_str).filter(|action| {
+        !action.is_empty()
+            && action.len() <= 32
+            && action.chars().all(|c| c.is_ascii_lowercase() || c == '_')
+    });
+    let what = match (action, args.get("send_id").is_some()) {
+        (_, true) => "a confirm".to_owned(),
+        (Some(action), false) => action.to_owned(),
+        (None, false) => "a write".to_owned(),
+    };
+    format!(
+        "{} service_write of {} {what}: {}",
+        if run { "a skill run's" } else { "the voice's" },
+        code.unwrap_or("an unknown service"),
+        write_why(why)
+    )
 }
 
 /// The journal line of one `service_read` (#5826: the lamp's journal said
@@ -2812,6 +3012,10 @@ mod tests {
         edits: Mutex<Vec<(u32, Option<Outgoing>)>>,
         /// UIDs no longer in Drafts.
         gone: Mutex<Vec<u32>>,
+        /// Drafts renumbered since: its UIDVALIDITY is 8, no longer 7.
+        renumbered: Mutex<bool>,
+        /// UIDs in Drafts whose Message-ID the lamp didn't write.
+        foreign: Mutex<Vec<u32>>,
     }
 
     impl Mail for FakeMail {
@@ -2862,26 +3066,45 @@ mod tests {
             user: &str,
             pass: &str,
             out: &Outgoing,
-        ) -> Result<Option<u32>, Failure> {
+        ) -> Result<Option<mail::DraftUid>, Failure> {
             self.login(user, pass).await?;
             let mut drafts = self.drafts.lock().unwrap();
             drafts.push(out.clone());
-            Ok(Some(11 + drafts.len() as u32))
+            Ok(Some(mail::DraftUid {
+                validity: 7,
+                uid: 11 + drafts.len() as u32,
+            }))
         }
-        /// Each change kept; the draft gone when [`Self::gone`] names it.
+        /// Each change kept; the draft gone when [`Self::gone`] names it,
+        /// and not the lamp's when Drafts was renumbered or its Message-ID
+        /// is [`Self::foreign`], as `mail::edit_draft_over` checks.
         async fn edit_draft(
             &self,
             user: &str,
             pass: &str,
-            uid: u32,
+            at: mail::DraftUid,
             out: Option<&Outgoing>,
-        ) -> Result<Option<u32>, Failure> {
+        ) -> Result<Option<mail::DraftUid>, Failure> {
             self.login(user, pass).await?;
-            if self.gone.lock().unwrap().contains(&uid) {
+            let validity = if *self.renumbered.lock().unwrap() {
+                8
+            } else {
+                7
+            };
+            if at.validity != validity {
+                return Err(Failure::NotLampsDraft);
+            }
+            if self.gone.lock().unwrap().contains(&at.uid) {
                 return Err(Failure::DraftGone);
             }
-            self.edits.lock().unwrap().push((uid, out.cloned()));
-            Ok(out.map(|_| uid + 100))
+            if self.foreign.lock().unwrap().contains(&at.uid) {
+                return Err(Failure::NotLampsDraft);
+            }
+            self.edits.lock().unwrap().push((at.uid, out.cloned()));
+            Ok(out.map(|_| mail::DraftUid {
+                validity,
+                uid: at.uid + 100,
+            }))
         }
     }
 
@@ -6462,9 +6685,9 @@ mod tests {
             &self,
             _: &str,
             _: &str,
-            _: u32,
+            _: mail::DraftUid,
             _: Option<&Outgoing>,
-        ) -> Result<Option<u32>, Failure> {
+        ) -> Result<Option<mail::DraftUid>, Failure> {
             Err(Failure::Unreached)
         }
         async fn draft(
@@ -6472,7 +6695,7 @@ mod tests {
             user: &str,
             pass: &str,
             out: &Outgoing,
-        ) -> Result<Option<u32>, Failure> {
+        ) -> Result<Option<mail::DraftUid>, Failure> {
             let (client, server) = tokio::io::duplex(1 << 16);
             tokio::spawn(mail::tests::scripted_holding(
                 server,
@@ -7657,16 +7880,30 @@ mod tests {
         json!({"op":"call","name":"service_write","args":args}).to_string()
     }
 
+    /// A draft saved by the lamp, confirmed: its id from the save's answer.
+    fn save_own_draft(services: &Services<FakeHttp, FakeMail>) -> String {
+        let asked = run(services.tool(&draft_edit(json!({
+            "action":"save_draft","to":"mom@home.test","subject":"Party",
+            "text":"Party on Saturday at 7."
+        }))));
+        let id = asked["result"]["send_id"].as_str().unwrap().to_owned();
+        let saved = run(services.tool(&mail_send("gmail", &id)));
+        assert_eq!(saved["result"]["saved"], true, "{saved}");
+        saved["result"]["draft_id"].as_str().unwrap().to_owned()
+    }
+
     /// The tester's lamp, 11 Nov: "add my address and 'wear something
     /// casual'" could only prepare a second draft, which left the old one
     /// in Drafts. Now the draft the lamp saved (its id, `draft12`, kept in
     /// the save's answer) is read first and the whole new draft read back;
     /// nothing changes until the yes, and then once, as one change of that
-    /// draft alone, answered with the new draft's id. Deleted the same way.
+    /// draft alone, answered with the new draft's id. Deleted the same way,
+    /// by that new id: the new draft is the lamp's own, the old one gone.
     #[test]
     fn a_saved_draft_is_replaced_then_deleted_by_its_id_after_a_read_back() {
         let dir = tempfile::tempdir().unwrap();
         let services = drafts_gmail(dir.path(), vec![party_draft()], true);
+        assert_eq!(save_own_draft(&services), "draft12");
         let new_text = "Party on Saturday at 7, at 12 Elm St. Wear something casual.";
         let asked = run(services.tool(&draft_edit(
             json!({"action":"update_draft","draft_id":"draft12","text":new_text}),
@@ -7727,10 +7964,15 @@ mod tests {
         assert_eq!(run(services.tool(&mail_send("gmail", &id)))["ok"], false);
         assert_eq!(services.mail.edits.lock().unwrap().len(), 1);
         assert!(services.mail.sent.lock().unwrap().is_empty());
-        assert!(services.mail.drafts.lock().unwrap().is_empty());
+        assert_eq!(services.mail.drafts.lock().unwrap().len(), 1);
+        // The old id is no longer the lamp's draft: nothing is read for it.
+        let old = run(services.tool(&draft_edit(
+            json!({"action":"delete_draft","draft_id":"draft12"}),
+        )));
+        assert_eq!(old["error"], writes::NOT_LAMPS_DRAFT, "{old}");
         // Deleted: read back by whom and what about, then one delete.
         let asked = run(services.tool(&draft_edit(
-            json!({"action":"delete_draft","draft_id":"draft12"}),
+            json!({"action":"delete_draft","draft_id":"draft112"}),
         )));
         assert_eq!(
             asked["result"]["read_back"],
@@ -7744,8 +7986,198 @@ mod tests {
             json!({"sent":false,"deleted":true,"service":"Gmail"}),
             "{deleted}"
         );
-        assert_eq!(services.mail.edits.lock().unwrap()[1], (12, None));
+        assert_eq!(services.mail.edits.lock().unwrap()[1], (112, None));
         assert!(services.http.calls.lock().unwrap().is_empty());
+        // Deleted, it is the lamp's no longer: it has none to change.
+        let again = run(services.tool(&draft_edit(
+            json!({"action":"update_draft","draft_id":"draft112","text":"T"}),
+        )));
+        assert_eq!(again["error"], writes::NO_LAMP_DRAFTS, "{again}");
+        assert_eq!(services.mail.edits.lock().unwrap().len(), 2);
+    }
+
+    /// The first builder's rule on #8005 (lamp-9adf, 20 Nov: the lamp's
+    /// save had failed, and "that draft" resolved to one the owner wrote
+    /// in Gmail, whose delete was confirmed by a yes): a draft the lamp
+    /// didn't save is never changed or deleted. With none of its own, the
+    /// lamp is told it has none; with its own beside, that this one isn't
+    /// its. Either way before anything is read or held, and nothing is
+    /// written. Its own draft still can be, after a restart too.
+    #[test]
+    fn a_draft_the_lamp_did_not_save_is_never_changed_or_deleted() {
+        let dir = tempfile::tempdir().unwrap();
+        let owners = MailItem {
+            id: "draft40".into(),
+            ..party_draft()
+        };
+        let services = drafts_gmail(dir.path(), vec![owners.clone()], true);
+        let refused = |services: &Services<FakeHttp, FakeMail>, error: &str| {
+            for args in [
+                json!({"action":"update_draft","draft_id":"draft40","text":"T"}),
+                json!({"action":"delete_draft","draft_id":"draft40"}),
+            ] {
+                let answer = run(services.tool(&draft_edit(args.clone())));
+                assert_eq!(answer["ok"], false, "{args}: {answer}");
+                assert_eq!(answer["error"], error, "{args}: {answer}");
+            }
+            assert!(services.mail.asked.lock().unwrap().is_empty());
+            assert!(services.mail.edits.lock().unwrap().is_empty());
+            assert!(!services.desk.waiting());
+        };
+        // The drafts read finds the owner's draft; the lamp saved none.
+        refused(&services, writes::NO_LAMP_DRAFTS);
+        // The lamp's own saved beside it: the owner's is still refused.
+        assert_eq!(save_own_draft(&services), "draft12");
+        refused(&services, writes::NOT_LAMPS_DRAFT);
+        // A restart keeps whose drafts are whose.
+        let dir_path = dir.path().to_path_buf();
+        let restarted = Services::new(
+            Store(dir_path.join("s")),
+            FakeHttp::default(),
+            FakeMail {
+                inbox: vec![owners],
+                ..FakeMail::default()
+            },
+            None,
+            true,
+        )
+        .with_draft_edits(true);
+        refused(&restarted, writes::NOT_LAMPS_DRAFT);
+        // The lamp's own draft is still changed and deleted, by its yes.
+        let asked = run(restarted.tool(&draft_edit(
+            json!({"action":"delete_draft","draft_id":"draft12"}),
+        )));
+        assert_eq!(asked["ok"], true, "{asked}");
+        let id = asked["result"]["send_id"].as_str().unwrap().to_owned();
+        let deleted = run(restarted.tool(&mail_send("gmail", &id)));
+        assert_eq!(deleted["result"]["deleted"], true, "{deleted}");
+        assert_eq!(restarted.mail.edits.lock().unwrap().clone(), [(12, None)]);
+    }
+
+    /// lamp-9adf, 20 Nov: a `save_draft` failed in 18 ms with no reason in
+    /// the journal. A failed write's line says its kind of reason, never
+    /// an address, a subject or a mail's words.
+    #[test]
+    fn a_failed_write_is_journaled_by_its_kind_alone() {
+        let said = |args: Value, why: &str| write_said(false, Some("gmail"), &args, why);
+        let to_myself =
+            json!({"action":"save_draft","to":"myself","subject":"Plans","text":"Secret words"});
+        let why = writes::prepare(
+            "gmail",
+            &to_myself,
+            &Entry {
+                connector: "gmail".into(),
+                ..Entry::default()
+            },
+        )
+        .err()
+        .unwrap();
+        let line = said(to_myself, &why);
+        assert_eq!(
+            line,
+            "the voice's service_write of gmail save_draft: refused: an address that isn't one"
+        );
+        let no_subject = json!({"action":"save_draft","to":"me@home.test","text":"T"});
+        assert_eq!(
+            said(no_subject, "the write needs its subject"),
+            "the voice's service_write of gmail save_draft: refused: no subject"
+        );
+        assert_eq!(
+            said(
+                json!({"send_id":"s1","said":"send"}),
+                "not saved: Gmail couldn't be reached"
+            ),
+            "the voice's service_write of gmail a confirm: failed: the service couldn't be reached"
+        );
+        assert_eq!(
+            said(
+                json!({"action":"delete_draft","draft_id":"draft40"}),
+                writes::NOT_LAMPS_DRAFT
+            ),
+            "the voice's service_write of gmail delete_draft: refused: not a draft the lamp saved"
+        );
+        assert!(
+            write_said(true, None, &json!({"action":"Ünïcode\nX"}), "x")
+                .starts_with("a skill run's service_write of an unknown service a write:")
+        );
+    }
+
+    /// Twelve's HOLD on #8005: at the yes, a draft of the lamp's UID found
+    /// renumbered (Drafts' UIDVALIDITY changed since the save) or with a
+    /// Message-ID the lamp didn't write is refused, nothing written, and
+    /// it is the lamp's no longer.
+    #[test]
+    fn a_renumbered_or_foreign_draft_is_refused_at_the_yes_and_dropped() {
+        for renumbered in [true, false] {
+            let dir = tempfile::tempdir().unwrap();
+            let services = drafts_gmail(dir.path(), vec![party_draft()], true);
+            assert_eq!(save_own_draft(&services), "draft12");
+            if renumbered {
+                *services.mail.renumbered.lock().unwrap() = true;
+            } else {
+                services.mail.foreign.lock().unwrap().push(12);
+            }
+            let asked = run(services.tool(&draft_edit(
+                json!({"action":"delete_draft","draft_id":"draft12"}),
+            )));
+            let id = asked["result"]["send_id"].as_str().unwrap().to_owned();
+            let deleted = run(services.tool(&mail_send("gmail", &id)));
+            assert_eq!(
+                deleted["error"],
+                format!("not deleted: {}", writes::NOT_LAMPS_DRAFT),
+                "{renumbered}: {deleted}"
+            );
+            assert!(services.mail.edits.lock().unwrap().is_empty());
+            let again = run(services.tool(&draft_edit(
+                json!({"action":"delete_draft","draft_id":"draft12"}),
+            )));
+            assert_eq!(again["error"], writes::NO_LAMP_DRAFTS, "{again}");
+        }
+    }
+
+    /// Unlinking Gmail alone takes back which drafts were the lamp's: linked
+    /// again, even to the same account, it has none.
+    #[test]
+    fn unlinking_gmail_drops_the_lamps_saved_drafts() {
+        let dir = tempfile::tempdir().unwrap();
+        let services = drafts_gmail(dir.path(), vec![party_draft()], true);
+        save_own_draft(&services);
+        let (answer, _) = run(services.admin(r#"{"op":"remove","code":"gmail"}"#));
+        assert_eq!(answer["ok"], true, "{answer}");
+        let (answer, _) = run(services.admin(&set_line(
+            "gmail",
+            json!({"auth_type":"pat","api_key":"goodpassword","credentials":{"email":"me@home.test"}}),
+        )));
+        assert_eq!(answer["ok"], true, "{answer}");
+        let asked = run(services.tool(&draft_edit(
+            json!({"action":"delete_draft","draft_id":"draft12"}),
+        )));
+        assert_eq!(asked["error"], writes::NO_LAMP_DRAFTS, "{asked}");
+        assert!(services.mail.asked.lock().unwrap().is_empty());
+    }
+
+    /// Whose a draft is is checked again at the yes: a draft held for its
+    /// change that is the lamp's no longer by then (taken from the record
+    /// here, as a change or delete of it would) writes nothing.
+    #[test]
+    fn a_held_draft_edit_is_checked_again_at_the_yes() {
+        let dir = tempfile::tempdir().unwrap();
+        let services = drafts_gmail(dir.path(), vec![party_draft()], true);
+        save_own_draft(&services);
+        let change = run(services.tool(&draft_edit(
+            json!({"action":"update_draft","draft_id":"draft12","text":"T"}),
+        )));
+        let change = change["result"]["send_id"].as_str().unwrap().to_owned();
+        lamp_drafts::LampDrafts::new(&dir.path().join("s"))
+            .replaced("me@home.test", 12, None)
+            .unwrap();
+        let changed = run(services.tool(&mail_send("gmail", &change)));
+        assert_eq!(
+            changed["error"],
+            format!("not saved: {}", writes::NO_LAMP_DRAFTS),
+            "{changed}"
+        );
+        assert!(services.mail.edits.lock().unwrap().is_empty());
     }
 
     /// Only a draft in Drafts by the id a save or a drafts read gave: an
@@ -7764,15 +8196,22 @@ mod tests {
         }
         assert!(services.mail.asked.lock().unwrap().is_empty());
         assert!(!services.desk.waiting());
-        // Not in Drafts: nothing there by that id.
+        // The lamp's own, no longer in Drafts: told gone, and the lamp's
+        // no longer.
         let dir = tempfile::tempdir().unwrap();
         let empty = drafts_gmail(dir.path(), Vec::new(), true);
+        save_own_draft(&empty);
         let answer = run(empty.tool(&draft_edit(
-            json!({"action":"update_draft","draft_id":"draft99","text":"T"}),
+            json!({"action":"update_draft","draft_id":"draft12","text":"T"}),
         )));
         assert_eq!(answer["error"], writes::DRAFT_GONE, "{answer}");
         assert!(!empty.desk.waiting());
+        let answer = run(empty.tool(&draft_edit(
+            json!({"action":"update_draft","draft_id":"draft12","text":"T"}),
+        )));
+        assert_eq!(answer["error"], writes::NO_LAMP_DRAFTS, "{answer}");
         // Read, then sent or deleted in Gmail before the yes.
+        save_own_draft(&services);
         let asked = run(services.tool(&draft_edit(
             json!({"action":"update_draft","draft_id":"draft12","subject":"Saturday"}),
         )));

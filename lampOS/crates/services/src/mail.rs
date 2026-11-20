@@ -94,6 +94,10 @@ pub enum Failure {
     /// A draft's change saved the new draft, but the old one could not be
     /// removed: both are in Drafts.
     OldDraftKept,
+    /// The draft a change names isn't the lamp's own: Drafts was renumbered
+    /// since it was saved (another `UIDVALIDITY`), or its Message-ID isn't
+    /// one the lamp wrote (`@lamp.local`). Nothing was changed.
+    NotLampsDraft,
 }
 
 impl Failure {
@@ -106,6 +110,7 @@ impl Failure {
             Self::OldDraftKept => {
                 "the new draft was saved, but the old one is still in Gmail's Drafts"
             }
+            Self::NotLampsDraft => "that draft isn't one the lamp saved",
         }
     }
 }
@@ -139,6 +144,18 @@ pub enum MailAsk {
     /// in Drafts; Gmail's own id over the REST API), with its text.
     Message(String),
 }
+
+/// A draft's place in Drafts, as APPENDUID names it (RFC 4315): its UID,
+/// which holds only within Drafts' `UIDVALIDITY`.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub struct DraftUid {
+    pub validity: u32,
+    pub uid: u32,
+}
+
+/// The domain of every Message-ID the lamp writes ([`message`]): a draft
+/// is changed only when its own Message-ID ends in it.
+pub const LAMP_MESSAGE_DOMAIN: &str = "@lamp.local>";
 
 /// One message to send, or to save as a draft, from the account itself.
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -174,25 +191,25 @@ pub trait Mail {
         id: &str,
         pick: &Pick,
     ) -> impl Future<Output = Result<Option<MailItem>, Failure>>;
-    /// `out` saved in the account's Drafts, never sent: its UID there
-    /// when Gmail gives it (APPENDUID), for its id (`draft12`).
+    /// `out` saved in the account's Drafts, never sent: its UID there and
+    /// Drafts' `UIDVALIDITY` when Gmail gives them (APPENDUID), for its id
+    /// (`draft12`).
     fn draft(
         &self,
         user: &str,
         pass: &str,
         out: &Outgoing,
-    ) -> impl Future<Output = Result<Option<u32>, Failure>>;
-    /// The draft of UID `uid` in the account's Drafts replaced by `out`,
-    /// or deleted with none ([`edit_draft_over`]): the new draft's UID
-    /// when Gmail gives it. Nothing is sent, and no other mailbox is
-    /// opened.
+    ) -> impl Future<Output = Result<Option<DraftUid>, Failure>>;
+    /// The draft at `at` in the account's Drafts replaced by `out`, or
+    /// deleted with none ([`edit_draft_over`]): the new draft's place when
+    /// Gmail gives it. Nothing is sent, and no other mailbox is opened.
     fn edit_draft(
         &self,
         user: &str,
         pass: &str,
-        uid: u32,
+        at: DraftUid,
         out: Option<&Outgoing>,
-    ) -> impl Future<Output = Result<Option<u32>, Failure>>;
+    ) -> impl Future<Output = Result<Option<DraftUid>, Failure>>;
 }
 
 mod attachments;
@@ -2114,13 +2131,27 @@ fn searched(found: &[Response]) -> Vec<u32> {
     uids
 }
 
-/// The UID an APPEND's tagged OK names (`OK [APPENDUID 7 12] ...` gives
-/// 12), none when it names none.
-fn appended_uid(status: &str) -> Option<u32> {
+/// The place an APPEND's tagged OK names (`OK [APPENDUID 7 12] ...` gives
+/// UID 12 in validity 7), none when it names none.
+fn appended_uid(status: &str) -> Option<DraftUid> {
     let at = status.to_ascii_uppercase().find("[APPENDUID ")?;
     let mut fields = status[at + 11..].split_whitespace();
-    fields.next()?.parse::<u32>().ok()?;
-    fields.next()?.strip_suffix(']')?.parse().ok()
+    let validity = fields.next()?.parse::<u32>().ok()?;
+    let uid = fields.next()?.strip_suffix(']')?.parse().ok()?;
+    Some(DraftUid { validity, uid })
+}
+
+/// The `UIDVALIDITY` a SELECT's untagged `OK [UIDVALIDITY n]` names.
+fn selected_validity(said: &[Response]) -> Option<u32> {
+    said.iter().find_map(|response| {
+        let upper = response.text.to_ascii_uppercase();
+        let at = upper.find("[UIDVALIDITY ")?;
+        response.text[at + 13..]
+            .split(|c: char| !c.is_ascii_digit())
+            .next()?
+            .parse()
+            .ok()
+    })
 }
 
 /// Why reading a line broke, for the journal.
@@ -2574,7 +2605,7 @@ impl<S: AsyncRead + AsyncWrite + Unpin> Imap<S> {
         &mut self,
         mailbox: &str,
         message: &[u8],
-    ) -> Result<Option<u32>, Failure> {
+    ) -> Result<Option<DraftUid>, Failure> {
         let mailbox = imap_quoted(mailbox).ok_or(Failure::Unreached)?;
         self.run_status(&format!("APPEND {mailbox} (\\Draft \\Seen)"), Some(message))
             .await
@@ -2602,13 +2633,37 @@ impl<S: AsyncRead + AsyncWrite + Unpin> Imap<S> {
 
     /// SELECT of Drafts: the one mailbox ever opened to be changed, for a
     /// draft's change ([`edit_draft_over`]); every read opens its mailbox
-    /// with [`Self::examine`].
-    async fn select_drafts(&mut self, drafts: &str) -> Result<(), Failure> {
+    /// with [`Self::examine`]. Its `UIDVALIDITY`, when the server says it.
+    async fn select_drafts(&mut self, drafts: &str) -> Result<Option<u32>, Failure> {
         let mailbox = imap_quoted(drafts).ok_or(Failure::Unreached)?;
         self.run(&format!("SELECT {mailbox}"), None)
             .await
-            .map(|_| ())
+            .map(|said| selected_validity(&said))
             .map_err(|_| Failure::Unreached)
+    }
+
+    /// Whether the message of `uid` in the mailbox open has a Message-ID
+    /// the lamp wrote ([`LAMP_MESSAGE_DOMAIN`]), read with PEEK.
+    async fn lamps_message_id(&mut self, uid: u32) -> Result<bool, Failure> {
+        let fetched = self
+            .run(
+                &format!("UID FETCH {uid} (UID BODY.PEEK[HEADER.FIELDS (MESSAGE-ID)])"),
+                None,
+            )
+            .await
+            .map_err(|_| Failure::Unreached)?;
+        Ok(fetched
+            .iter()
+            .filter(|response| response.text.contains(" FETCH ("))
+            .flat_map(|response| &response.literals)
+            .filter(|(label, _)| label.contains("HEADER"))
+            .any(|(_, bytes)| {
+                Headers::parse(bytes).get("message-id").is_some_and(|id| {
+                    id.trim()
+                        .to_ascii_lowercase()
+                        .ends_with(LAMP_MESSAGE_DOMAIN)
+                })
+            }))
     }
 
     /// UID SEARCH by `criteria` the lamp wrote (never the person's words):
@@ -2899,7 +2954,7 @@ pub async fn draft_over<S, C>(
     pass: &str,
     message: &[u8],
     within: Duration,
-) -> Result<Option<u32>, Failure>
+) -> Result<Option<DraftUid>, Failure>
 where
     S: AsyncRead + AsyncWrite + Unpin + Send + 'static,
     C: Future<Output = Result<S, Failure>>,
@@ -2925,16 +2980,20 @@ pub async fn save_draft<S: AsyncRead + AsyncWrite + Unpin + Send + 'static>(
     pass: &str,
     message: &[u8],
     within: Duration,
-) -> Result<Option<u32>, Failure> {
+) -> Result<Option<DraftUid>, Failure> {
     draft_over(async { Ok(stream) }, user, pass, message, within).await
 }
 
 /// One saved draft changed on the stream `connect` gives, all within
 /// `within` (`LAMP_GMAIL_DRAFT_EDITS`): login, CAPABILITY, Drafts found by
 /// its `\Drafts` flag (else [`DRAFTS_FALLBACK`]) and opened with SELECT,
-/// the one mailbox ever opened to be changed. The draft of UID `uid` must
-/// still be there (`UID SEARCH UID <uid>`), else [`Failure::DraftGone`] and
-/// nothing is changed. With `message`, it is APPENDed to Drafts as a draft
+/// the one mailbox ever opened to be changed. Its `UIDVALIDITY` must be
+/// `at`'s, else [`Failure::NotLampsDraft`] (Drafts renumbered since the
+/// save, so the UID may name another draft) and nothing is changed. The
+/// draft of `at`'s UID must still be there (`UID SEARCH UID <uid>`), else
+/// [`Failure::DraftGone`] and nothing is changed; and its Message-ID must be
+/// one the lamp wrote ([`LAMP_MESSAGE_DOMAIN`]), else
+/// [`Failure::NotLampsDraft`] and nothing is changed. With `message`, it is APPENDed to Drafts as a draft
 /// first; then the old draft alone is marked `\Deleted` (`UID STORE`) and
 /// expunged: `UID EXPUNGE <uid>` with UIDPLUS, else a plain EXPUNGE, and
 /// that only when no other message in Drafts was already marked deleted
@@ -2946,10 +3005,10 @@ pub async fn edit_draft_over<S, C>(
     connect: C,
     user: &str,
     pass: &str,
-    uid: u32,
+    at: DraftUid,
     message: Option<&[u8]>,
     within: Duration,
-) -> Result<Option<u32>, Failure>
+) -> Result<Option<DraftUid>, Failure>
 where
     S: AsyncRead + AsyncWrite + Unpin + Send + 'static,
     C: Future<Output = Result<S, Failure>>,
@@ -2960,9 +3019,15 @@ where
         imap.login(user, pass).await?;
         let uidplus = imap.uidplus().await?;
         let drafts = imap.drafts().await?;
-        imap.select_drafts(&drafts).await?;
+        if imap.select_drafts(&drafts).await? != Some(at.validity) {
+            return Err(Failure::NotLampsDraft);
+        }
+        let uid = at.uid;
         if !imap.search_by(&format!("UID {uid}")).await?.contains(&uid) {
             return Err(Failure::DraftGone);
+        }
+        if !imap.lamps_message_id(uid).await? {
+            return Err(Failure::NotLampsDraft);
         }
         // A plain EXPUNGE removes every message marked deleted: used only
         // when this draft will be the one.
@@ -3472,7 +3537,12 @@ impl Mail for Gmail {
         .map_err(|_| Failure::Unreached)?
     }
 
-    async fn draft(&self, user: &str, pass: &str, out: &Outgoing) -> Result<Option<u32>, Failure> {
+    async fn draft(
+        &self,
+        user: &str,
+        pass: &str,
+        out: &Outgoing,
+    ) -> Result<Option<DraftUid>, Failure> {
         let id = crate::writes::random_id();
         let text = message(user, out, &rfc5322_date(crate::now_secs()), &id);
         // One budget from connecting to APPEND's OK; LOGOUT after it apart.
@@ -3490,9 +3560,9 @@ impl Mail for Gmail {
         &self,
         user: &str,
         pass: &str,
-        uid: u32,
+        at: DraftUid,
         out: Option<&Outgoing>,
-    ) -> Result<Option<u32>, Failure> {
+    ) -> Result<Option<DraftUid>, Failure> {
         let text = out.map(|out| {
             let id = crate::writes::random_id();
             message(user, out, &rfc5322_date(crate::now_secs()), &id)
@@ -3502,7 +3572,7 @@ impl Mail for Gmail {
             connect(IMAP_HOST, IMAP_PORT),
             user,
             pass,
-            uid,
+            at,
             text.as_deref(),
             DRAFT_WITHIN,
         )
@@ -4109,7 +4179,7 @@ pub(crate) mod tests {
     fn scripted_draft(
         message: &[u8],
         replies: Vec<String>,
-    ) -> (Result<Option<u32>, Failure>, String) {
+    ) -> (Result<Option<DraftUid>, Failure>, String) {
         let (client, server) = duplex(1 << 16);
         run(async {
             let server = tokio::spawn(scripted(server, "* OK Gimap ready\r\n", replies));
@@ -4142,7 +4212,13 @@ pub(crate) mod tests {
             ],
         );
         // Its UID in Drafts, from APPENDUID, is the draft's id (`draft12`).
-        assert_eq!(saved, Ok(Some(12)));
+        assert_eq!(
+            saved,
+            Ok(Some(DraftUid {
+                validity: 7,
+                uid: 12
+            }))
+        );
         let lines: Vec<&str> = heard.lines().collect();
         assert_eq!(lines[0], "A1 LOGIN \"a@b.c\" \"pw\"");
         assert_eq!(lines[1], "A2 LIST \"\" \"*\"");
@@ -4229,7 +4305,13 @@ pub(crate) mod tests {
                 "A4 OK\r\n".into(),
             ],
         );
-        assert_eq!(saved, Ok(Some(12)));
+        assert_eq!(
+            saved,
+            Ok(Some(DraftUid {
+                validity: 7,
+                uid: 12
+            }))
+        );
         assert!(heard.contains("From: a@b.c\r\nSubject: s\r\n\r\nt\r\n\r\nA4 LOGOUT"));
         let (saved, heard) = scripted_draft(
             text,
@@ -4265,7 +4347,13 @@ pub(crate) mod tests {
             ));
             save_draft(client, "a@b.c", "pw", text, Duration::from_millis(500)).await
         });
-        assert_eq!(saved, Ok(Some(12)));
+        assert_eq!(
+            saved,
+            Ok(Some(DraftUid {
+                validity: 7,
+                uid: 12
+            }))
+        );
         // Answered at APPEND's OK, LOGOUT not waited on.
         let took = started.elapsed();
         assert!(took < Duration::from_millis(500), "{took:?}");
@@ -4276,15 +4364,34 @@ pub(crate) mod tests {
         uid: u32,
         message: Option<&[u8]>,
         replies: Vec<String>,
-    ) -> (Result<Option<u32>, Failure>, String) {
+    ) -> (Result<Option<DraftUid>, Failure>, String) {
+        // Saved in Drafts' UIDVALIDITY 7.
+        let at = DraftUid { validity: 7, uid };
         let (client, server) = duplex(1 << 16);
         run(async {
             let server = tokio::spawn(scripted(server, "* OK Gimap ready\r\n", replies));
             let edited =
-                edit_draft_over(async { Ok(client) }, "a@b.c", "pw", uid, message, WITHIN).await;
+                edit_draft_over(async { Ok(client) }, "a@b.c", "pw", at, message, WITHIN).await;
             (edited, server.await.unwrap())
         })
     }
+
+    /// SELECT of Drafts in UIDVALIDITY 7, tagged `A4`.
+    const SELECTED_7: &str =
+        "* 3 EXISTS\r\n* OK [UIDVALIDITY 7] UIDs valid\r\nA4 OK [READ-WRITE] selected\r\n";
+
+    /// The answer, tagged `A<tag>`, to the FETCH of draft 12's Message-ID:
+    /// `id` its whole value.
+    fn fetched_id(tag: u32, id: &str) -> String {
+        let header = format!("Message-ID: {id}\r\n\r\n");
+        format!(
+            "* 3 FETCH (UID 12 BODY[HEADER.FIELDS (MESSAGE-ID)] {{{}}}\r\n{header})\r\nA{tag} OK fetched\r\n",
+            header.len()
+        )
+    }
+
+    /// The FETCH a change sends for draft 12's Message-ID.
+    const FETCH_ID_12: &str = "UID FETCH 12 (UID BODY.PEEK[HEADER.FIELDS (MESSAGE-ID)])";
 
     /// Gmail's CAPABILITY, UIDPLUS among them.
     const CAPABILITY_UIDPLUS: &str =
@@ -4312,16 +4419,23 @@ pub(crate) mod tests {
                 "A1 OK\r\n".into(),
                 CAPABILITY_UIDPLUS.into(),
                 format!("{LIST_VI_DRAFTS}A3 OK listed\r\n"),
-                "* 3 EXISTS\r\nA4 OK [READ-WRITE] selected\r\n".into(),
+                SELECTED_7.into(),
                 "* SEARCH 12\r\nA5 OK\r\n".into(),
+                fetched_id(6, "<id2@lamp.local>"),
                 "+ go ahead\r\n".into(),
-                "A6 OK [APPENDUID 7 13] appended\r\n".into(),
-                "A7 OK stored\r\n".into(),
-                "* 2 EXPUNGE\r\nA8 OK expunged\r\n".into(),
-                "A9 OK\r\n".into(),
+                "A7 OK [APPENDUID 7 13] appended\r\n".into(),
+                "A8 OK stored\r\n".into(),
+                "* 2 EXPUNGE\r\nA9 OK expunged\r\n".into(),
+                "A10 OK\r\n".into(),
             ],
         );
-        assert_eq!(edited, Ok(Some(13)));
+        assert_eq!(
+            edited,
+            Ok(Some(DraftUid {
+                validity: 7,
+                uid: 13
+            }))
+        );
         let drafts = "\"[Gmail]/Th&AbA- nh&AOE-p\"";
         let lines: Vec<&str> = heard.lines().collect();
         assert_eq!(lines[0], "A1 LOGIN \"a@b.c\" \"pw\"");
@@ -4329,13 +4443,14 @@ pub(crate) mod tests {
         assert_eq!(lines[2], "A3 LIST \"\" \"*\"");
         assert_eq!(lines[3], format!("A4 SELECT {drafts}"));
         assert_eq!(lines[4], "A5 UID SEARCH UID 12");
+        assert_eq!(lines[5], format!("A6 {FETCH_ID_12}"));
         assert_eq!(
-            lines[5],
-            format!("A6 APPEND {drafts} (\\Draft \\Seen) {{{}}}", text.len())
+            lines[6],
+            format!("A7 APPEND {drafts} (\\Draft \\Seen) {{{}}}", text.len())
         );
         let literal = std::str::from_utf8(&text).unwrap();
         assert!(heard.contains(&format!(
-            "{}}}\r\n{literal}\r\nA7 UID STORE 12 +FLAGS.SILENT (\\Deleted)\r\nA8 UID EXPUNGE 12\r\nA9 LOGOUT\r\n",
+            "{}}}\r\n{literal}\r\nA8 UID STORE 12 +FLAGS.SILENT (\\Deleted)\r\nA9 UID EXPUNGE 12\r\nA10 LOGOUT\r\n",
             text.len()
         )));
         // One APPEND, one STORE and one EXPUNGE, each of that draft alone.
@@ -4359,16 +4474,17 @@ pub(crate) mod tests {
                 "A1 OK\r\n".into(),
                 CAPABILITY_UIDPLUS.into(),
                 format!("{LIST_VI_DRAFTS}A3 OK listed\r\n"),
-                "A4 OK [READ-WRITE] selected\r\n".into(),
+                SELECTED_7.into(),
                 "* SEARCH 12\r\nA5 OK\r\n".into(),
-                "A6 OK stored\r\n".into(),
-                "* 2 EXPUNGE\r\nA7 OK expunged\r\n".into(),
-                "A8 OK\r\n".into(),
+                fetched_id(6, "<id2@lamp.local>"),
+                "A7 OK stored\r\n".into(),
+                "* 2 EXPUNGE\r\nA8 OK expunged\r\n".into(),
+                "A9 OK\r\n".into(),
             ],
         );
         assert_eq!(edited, Ok(None));
         assert!(heard.contains(
-            "A5 UID SEARCH UID 12\r\nA6 UID STORE 12 +FLAGS.SILENT (\\Deleted)\r\nA7 UID EXPUNGE 12\r\nA8 LOGOUT\r\n"
+            "A5 UID SEARCH UID 12\r\nA6 UID FETCH 12 (UID BODY.PEEK[HEADER.FIELDS (MESSAGE-ID)])\r\nA7 UID STORE 12 +FLAGS.SILENT (\\Deleted)\r\nA8 UID EXPUNGE 12\r\nA9 LOGOUT\r\n"
         ));
         assert!(!heard.contains("APPEND"));
         // No UIDPLUS, nothing else marked: a plain EXPUNGE.
@@ -4379,17 +4495,18 @@ pub(crate) mod tests {
                 "A1 OK\r\n".into(),
                 "* CAPABILITY IMAP4rev1 IDLE\r\nA2 OK\r\n".into(),
                 format!("{LIST_VI_DRAFTS}A3 OK listed\r\n"),
-                "A4 OK [READ-WRITE] selected\r\n".into(),
+                SELECTED_7.into(),
                 "* SEARCH 12\r\nA5 OK\r\n".into(),
-                "* SEARCH\r\nA6 OK\r\n".into(),
-                "A7 OK stored\r\n".into(),
-                "A8 OK expunged\r\n".into(),
-                "A9 OK\r\n".into(),
+                fetched_id(6, "<id2@lamp.local>"),
+                "* SEARCH\r\nA7 OK\r\n".into(),
+                "A8 OK stored\r\n".into(),
+                "A9 OK expunged\r\n".into(),
+                "A10 OK\r\n".into(),
             ],
         );
         assert_eq!(edited, Ok(None));
         assert!(heard.contains(
-            "A6 UID SEARCH DELETED\r\nA7 UID STORE 12 +FLAGS.SILENT (\\Deleted)\r\nA8 EXPUNGE\r\n"
+            "A7 UID SEARCH DELETED\r\nA8 UID STORE 12 +FLAGS.SILENT (\\Deleted)\r\nA9 EXPUNGE\r\n"
         ));
         // No UIDPLUS and another draft already marked: nothing changed.
         let (edited, heard) = scripted_edit(
@@ -4399,9 +4516,10 @@ pub(crate) mod tests {
                 "A1 OK\r\n".into(),
                 "* CAPABILITY IMAP4rev1 IDLE\r\nA2 OK\r\n".into(),
                 format!("{LIST_VI_DRAFTS}A3 OK listed\r\n"),
-                "A4 OK [READ-WRITE] selected\r\n".into(),
+                SELECTED_7.into(),
                 "* SEARCH 12\r\nA5 OK\r\n".into(),
-                "* SEARCH 9\r\nA6 OK\r\n".into(),
+                fetched_id(6, "<id2@lamp.local>"),
+                "* SEARCH 9\r\nA7 OK\r\n".into(),
             ],
         );
         assert_eq!(edited, Err(Failure::Unreached));
@@ -4419,7 +4537,7 @@ pub(crate) mod tests {
                 "A1 OK\r\n".into(),
                 CAPABILITY_UIDPLUS.into(),
                 format!("{LIST_VI_DRAFTS}A3 OK listed\r\n"),
-                "A4 OK [READ-WRITE] selected\r\n".into(),
+                SELECTED_7.into(),
                 "* SEARCH\r\nA5 OK\r\n".into(),
             ],
         );
@@ -4435,17 +4553,76 @@ pub(crate) mod tests {
                 "A1 OK\r\n".into(),
                 CAPABILITY_UIDPLUS.into(),
                 format!("{LIST_VI_DRAFTS}A3 OK listed\r\n"),
-                "A4 OK [READ-WRITE] selected\r\n".into(),
+                SELECTED_7.into(),
                 "* SEARCH 12\r\nA5 OK\r\n".into(),
+                fetched_id(6, "<id2@lamp.local>"),
                 "+ go ahead\r\n".into(),
-                "A6 OK [APPENDUID 7 13] appended\r\n".into(),
-                "A7 NO planted words\r\n".into(),
+                "A7 OK [APPENDUID 7 13] appended\r\n".into(),
+                "A8 NO planted words\r\n".into(),
             ],
         );
         assert_eq!(edited, Err(Failure::OldDraftKept));
-        assert!(appended_uid("OK [APPENDUID 7 13] appended") == Some(13));
+        assert!(
+            appended_uid("OK [APPENDUID 7 13] appended")
+                == Some(DraftUid {
+                    validity: 7,
+                    uid: 13
+                })
+        );
         assert_eq!(appended_uid("OK appended"), None);
         assert_eq!(appended_uid("OK [APPENDUID 7 x] appended"), None);
+    }
+
+    /// Twelve's HOLD on #8005: a UID holds only within Drafts'
+    /// UIDVALIDITY. Drafts renumbered since the save (another validity, or
+    /// none said), or a draft whose Message-ID the lamp didn't write, is
+    /// not the lamp's: nothing is appended, marked or expunged.
+    #[test]
+    fn a_draft_renumbered_or_not_the_lamps_changes_nothing() {
+        let before_search = |selected: &str| {
+            vec![
+                "A1 OK\r\n".to_owned(),
+                CAPABILITY_UIDPLUS.into(),
+                format!("{LIST_VI_DRAFTS}A3 OK listed\r\n"),
+                selected.to_owned(),
+            ]
+        };
+        for selected in [
+            "* OK [UIDVALIDITY 8] UIDs valid\r\nA4 OK [READ-WRITE] selected\r\n",
+            "* 3 EXISTS\r\nA4 OK [READ-WRITE] selected\r\n",
+        ] {
+            let (edited, heard) = scripted_edit(12, None, before_search(selected));
+            assert_eq!(edited, Err(Failure::NotLampsDraft), "{selected}");
+            for never in ["SEARCH", "FETCH", "APPEND", "STORE", "EXPUNGE"] {
+                assert!(!heard.contains(never), "{never}: {heard}");
+            }
+        }
+        // The person's own draft at that UID: its Message-ID is Gmail's.
+        for id in [
+            "<CAB12xyz@mail.gmail.com>",
+            "<id1@lamp.local.evil.test>",
+            "",
+        ] {
+            let mut replies = before_search(SELECTED_7);
+            replies.push("* SEARCH 12\r\nA5 OK\r\n".into());
+            replies.push(fetched_id(6, id));
+            let (edited, heard) = scripted_edit(12, Some(b"From: a@b.c\r\n\r\nt\r\n"), replies);
+            assert_eq!(edited, Err(Failure::NotLampsDraft), "{id}");
+            assert!(heard.contains(&format!("A6 {FETCH_ID_12}\r\n")), "{heard}");
+            for never in ["APPEND", "STORE", "EXPUNGE"] {
+                assert!(!heard.contains(never), "{never}: {heard}");
+            }
+        }
+        // Its own, in any case.
+        let mut replies = before_search(SELECTED_7);
+        replies.push("* SEARCH 12\r\nA5 OK\r\n".into());
+        replies.push(fetched_id(6, "<ID9@LAMP.LOCAL>"));
+        replies.push("A7 OK stored\r\n".into());
+        replies.push("A8 OK expunged\r\n".into());
+        replies.push("A9 OK\r\n".into());
+        let (edited, heard) = scripted_edit(12, None, replies);
+        assert_eq!(edited, Ok(None), "{heard}");
+        assert_eq!(selected_validity(&[]), None);
     }
 
     /// "Read my drafts": Drafts found by its flag and read read-only, each

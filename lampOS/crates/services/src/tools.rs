@@ -299,7 +299,7 @@ fn catalog_for(offset_minutes: Option<i32>, edits: Edits, linked: Option<&[Strin
             .find(|(code, _)| *code == "gmail")
             .map_or("", |(_, actions)| actions);
         let draft_id = string(&format!(
-            "A Gmail draft's id, like draft12, as a save_draft or a drafts read gave it. gmail actions: {gmail}, {} (app password link only).",
+            "A draft the lamp saved itself, by the id its save_draft gave, like draft12: only those can be changed or deleted. gmail actions: {gmail}, {} (app password link only).",
             writes::GMAIL_DRAFT_EDITS
         ));
         if shown("gmail") {

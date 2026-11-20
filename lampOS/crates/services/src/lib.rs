@@ -20,6 +20,7 @@
 //! kept here too, and `lamp-tasks.service` may ask for a run's
 //! ([`skill_secrets`]).
 pub mod catalog;
+pub mod lamp_drafts;
 pub mod mail;
 pub mod mcp;
 pub mod mcp_server;
