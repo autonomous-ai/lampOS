@@ -3928,9 +3928,10 @@ memory and sessions (it keeps the turn's transcript), and the Gateway's
 tools, messaging channels and network. It is held to an answer by its
 rules alone (`voice_ask::ANSWER_ONLY`, Heron's P2 on #7509): send, buy,
 change, delete or post nothing, run nothing that does, use no messaging
-channel, and say what would be needed instead. Hermes's rules keep "do
-what they asked": its fresh home has no channel and none of the owner's
-memory. Its answer carries `"owner_alone":true` (`voice_ask::OWNER_ALONE`,
+channel, and say what would be needed instead. Hermes's rules hold it to
+the same answer (`ANSWER_ONLY`, Heron's and Twelve's HOLD on #8006): its
+fresh home has no channel and none of the owner's memory, but its run
+keeps the host network, and no yes was asked at the lamp. OpenClaw's answer carries `"owner_alone":true` (`voice_ask::OWNER_ALONE`,
 AppOnly's P2 on #7509): lamp-voice says it only while the owner is seen
 alone, as a full read's. Its answer is `answer.md`, else the agent's final chat
 answer when Harness didn't cut it (`voice_ask::run_answer`), held to 120 s
@@ -3943,7 +3944,8 @@ Hermes pick while lamp-tasks' read of the lamp's default
 whatever `LAMP_SKILL_DEFAULT_AGENT` says) names another agent is refused
 `not_ready`. A
 failed pick (a default agent that takes no run) is `run_failed`. With no
-grant it is taken only with `LAMP_HARD_ASKS_TO_AGENT=on`, on Hermes on
+grant it is taken only with `LAMP_HARD_ASKS_TO_AGENT=on` (on in the
+product's `lamp-tasks.service` and `lamp-voice.service` since 19 Nov), on Hermes on
 the make's runner (the network as `LAMP_MAKE_AGENT_NET` says, the
 lamp's local ports included until the net runner lands; lamp-voice sends it
 only for the owner's own line); with one service's `<code>-read` grant (a

@@ -2905,7 +2905,8 @@ grace before the fixed line; then the say service's next free moment.
 These are expected numbers, not measured on a lamp.
 
 Lines heard by the voice's own ask for the lamp's agent that is not a
-service's (`LAMP_HARD_ASKS_TO_AGENT`, [switches.md](switches.md)) take the
+service's (`LAMP_HARD_ASKS_TO_AGENT`, [switches.md](switches.md), on in the
+product's `lamp-voice.service` and `lamp-tasks.service` since 19 Nov) take the
 same path with no grant and no token, only for the owner's own line (as a
 `service_read` is held, `services::owner_of`). On an OpenClaw default,
 that run is one turn in the owner's own Gateway, not a fresh home: it
@@ -2914,7 +2915,9 @@ transcript), and has the Gateway's tools, messaging channels and network.
 It is held to an answer by its rules, not by isolation
 (`voice_ask::ANSWER_ONLY`): send, buy, change, delete or post nothing, run
 nothing that does, use no messaging channel, and say what would be needed
-instead. Its answer may come from the owner's memory, so lamp-tasks marks
+instead. A Hermes hard ask is held to the same answer by the same rules
+(Heron's and Twelve's HOLD on #8006): its fresh home has no channel, but
+its run keeps the host network. OpenClaw's answer may come from the owner's memory, so lamp-tasks marks
 it `"owner_alone":true` (`voice_ask::OWNER_ALONE`, AppOnly's P2 on #7509)
 and it is said only while the owner is seen alone, as a full read's is
 (`say::NOT_ALONE`), else `agent_asks::NOT_ALONE_LINE`; a Hermes hard ask's

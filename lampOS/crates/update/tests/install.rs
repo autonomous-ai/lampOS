@@ -2492,6 +2492,42 @@ fn the_product_tells_the_app_a_skill_needs_a_connector() {
     }
 }
 
+/// An ask the second route's model can't answer at once goes to the lamp's
+/// default agent (`ask_agent`; the owner's ruling, 17 Nov; the first
+/// builder's DEFAULT-ON on #7814): `LAMP_HARD_ASKS_TO_AGENT=on` once in the
+/// two units whose part reads it, alike, and named by no other product
+/// unit: `lamp-voice` (passed to the second route's worker, beside its
+/// tasks part, `LAMP_TASKS_DIR`) and `lamp-tasks` (`voice_ask`, beside
+/// `LAMP_SKILL_TASKS`, with which it binds the make socket).
+#[test]
+fn the_product_hands_a_hard_ask_to_the_lamps_agent_in_its_two_units() {
+    let name = lamp_voice::agent_asks::HARD_ENVIRONMENT;
+    assert_eq!(name, "LAMP_HARD_ASKS_TO_AGENT");
+    let switch = format!("Environment={name}=on");
+    let readers = ["lamp-voice.service", "lamp-tasks.service"];
+    for (unit, text) in install::PRODUCT {
+        let service = section(text, "Service");
+        let on = service.iter().filter(|line| **line == switch).count();
+        let mentioned = service.iter().filter(|line| line.contains(name)).count();
+        assert_eq!(on, usize::from(readers.contains(unit)), "{unit}");
+        assert_eq!(mentioned, on, "{unit} names {name}");
+        if *unit == "lamp-voice.service" {
+            assert!(
+                service
+                    .iter()
+                    .any(|line| line.starts_with("Environment=LAMP_TASKS_DIR=")),
+                "{unit} lacks its tasks part"
+            );
+        }
+        if *unit == "lamp-tasks.service" {
+            assert!(
+                service.contains(&"Environment=LAMP_SKILL_TASKS=on"),
+                "{unit} lacks LAMP_SKILL_TASKS"
+            );
+        }
+    }
+}
+
 /// A voice make the lamp's own model can't keep goes to the lamp's own agent
 /// (#6059's proposal, `make_skill_agent`): on in lamp-voice alone, once,
 /// whose second route's worker reads it, beside the maker and the tasks part

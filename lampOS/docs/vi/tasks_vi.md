@@ -1278,8 +1278,10 @@ lần tạo với `"one_path":true` (`skill_make::MakeGateway`,
   lời bằng quy tắc của nó (`voice_ask::ANSWER_ONLY`, P2 của Heron trên
   #7509): không gửi, mua, đổi, xoá hay đăng gì, không chạy gì làm việc đó,
   không dùng kênh nhắn tin nào, và nói điều cần làm thay vì làm. Quy tắc của
-  Hermes giữ "làm điều họ yêu cầu": home mới của nó không có kênh nào và
-  không có bộ nhớ nào của chủ đèn. Câu trả lời mang `"owner_alone":true`
+  Hermes giữ nó ở cùng mức chỉ trả lời đó (`ANSWER_ONLY`, HOLD của Heron và
+  Twelve trên #8006): home mới của nó không có kênh nào và không có bộ nhớ
+  nào của chủ đèn, nhưng lần chạy vẫn giữ mạng của máy, và đèn chưa hỏi lời
+  đồng ý nào. Câu trả lời của OpenClaw mang `"owner_alone":true`
   (`voice_ask::OWNER_ALONE`, P2 của AppOnly trên #7509): lamp-voice chỉ nói
   nó khi chủ đèn được thấy một mình. Câu trả lời là `answer.md`, nếu không có
   thì câu trả lời chat cuối của tác tử khi Harness không cắt nó
@@ -1290,7 +1292,8 @@ lần tạo với `"one_path":true` (`skill_make::MakeGateway`,
   Hermes: một lựa chọn Hermes bị từ chối `not_ready`. Lựa chọn thất bại là
   `run_failed`.
 
-Không có quyền nào, nó chỉ được nhận với `LAMP_HARD_ASKS_TO_AGENT=on`, trên
+Không có quyền nào, nó chỉ được nhận với `LAMP_HARD_ASKS_TO_AGENT=on` (bật
+trong `lamp-tasks.service` và `lamp-voice.service` của sản phẩm từ 19/11), trên
 Hermes bằng runner của lần tạo (mạng như `LAMP_MAKE_AGENT_NET` nói); với một
 quyền `<code>-read` của một dịch vụ (chỉ đọc: `-write` hay quyền thứ hai bị
 từ chối `bad_request`) chỉ với `LAMP_SERVICES_TO_AGENT=on` và

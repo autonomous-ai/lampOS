@@ -69,26 +69,27 @@ const SERVICES: &str = "services";
 /// the product, #5750, and Harness's `harness_status` since
 /// `LAMP_TASKS_HARNESS_STATUS` is on in the product, #6061, and the asked
 /// sleep's `go_to_sleep` since `LAMP_SLEEP_ASKED` is on in the product,
-/// #6853), the
+/// #6853, and the lamp's agent's `ask_agent` since
+/// `LAMP_HARD_ASKS_TO_AGENT` is on in the product, the first builder's
+/// DEFAULT-ON on #7814), the
 /// actions part's 17 and the skills' 1: `use_skill`, which reaches every
 /// skill's function (`LAMP_USE_SKILL=on` since #2826; Dance's `dance`,
 /// Pose's `set_pose` and the wellbeing skills' `[stop]`, `wellbeing_nudges`,
 /// were 3 before it; the FAQ's `lamp_help` since #5790, Light show's
 /// `light_show` since #5745, Light scenes' `light_scene` and Point the
-/// light's `point_light` since #5744): 50, and 54 with the route's 4 (the
+/// light's `point_light` since #5744): 51, and 55 with the route's 4 (the
 /// search, its fetch, the weather and the look), within the bound of 64;
 /// 52 was past the bound of 48 it had until #7433, which left out the
 /// fetch, the time elsewhere, `reports_state` and the weather on every lamp. However many skills
 /// are installed, the skills' stay 1. The test prints this split. A change
 /// to it is a change to what every session is told: say in its pull
 /// request what is left out past the bound, if anything.
-const PRODUCT_FUNCTIONS: usize = 50;
+const PRODUCT_FUNCTIONS: usize = 51;
 
-/// The lamp's own with `LAMP_HARD_ASKS_TO_AGENT` on (off in the product, a
-/// lamp's drop-in): [`PRODUCT_FUNCTIONS`] and the lamp's agent's
-/// `ask_agent` (Heron's P2 7 on #7509). With the route's 4 that is 53,
-/// within the bound of 64 (#7433), so nothing is cut.
-const HARD_ASKS_FUNCTIONS: usize = PRODUCT_FUNCTIONS + 1;
+/// The lamp's own with `LAMP_HARD_ASKS_TO_AGENT=off` (a lamp's drop-in; on
+/// in the product): [`PRODUCT_FUNCTIONS`] without the lamp's agent's
+/// `ask_agent` (Heron's P2 7 on #7509).
+const HARD_ASKS_OFF_FUNCTIONS: usize = PRODUCT_FUNCTIONS - 1;
 
 /// Every `Environment=` of a voice unit's `[Service]`.
 fn voice_environment(unit: &str) -> Vec<(String, String)> {
@@ -402,18 +403,28 @@ fn a_product_lamp_declares_every_function_it_has_within_the_bound() {
     }
 }
 
-/// Heron's P2 7 on #7509: with `LAMP_HARD_ASKS_TO_AGENT` on, `ask_agent`
-/// is counted among the lamp's own ([`HARD_ASKS_FUNCTIONS`]) and a product
-/// chat request still stays within the bound, nothing left out: the
-/// actions part's, `use_skill` and the route's own all told.
+/// Heron's P2 7 on #7509: with `LAMP_HARD_ASKS_TO_AGENT` on, as the product
+/// sets it, `ask_agent` is counted among the lamp's own
+/// ([`PRODUCT_FUNCTIONS`]) and a product chat request still stays within
+/// the bound, nothing left out: the actions part's, `use_skill` and the
+/// route's own all told. A drop-in turning it off leaves `ask_agent` out
+/// alone ([`HARD_ASKS_OFF_FUNCTIONS`]).
 #[test]
 fn with_hard_asks_on_the_lamps_agent_is_counted_within_the_bound() {
+    let off = product_with(&[(lamp_voice::agent_asks::HARD_ENVIRONMENT, "off")]);
+    assert!(
+        !off.chat
+            .iter()
+            .any(|told| told == lamp_voice::agent_asks::TOOL),
+        "{:?}",
+        off.chat
+    );
     let Product {
         executive,
         chat,
         left_out,
         ..
-    } = product_with(&[(lamp_voice::agent_asks::HARD_ENVIRONMENT, "on")]);
+    } = product_with(&[]);
     assert!(left_out.is_empty(), "left out by the link: {left_out:?}");
     assert!(
         chat.len() <= lamp_voice::second_provider::MAX_TOOLS,
@@ -433,7 +444,16 @@ fn with_hard_asks_on_the_lamps_agent_is_counted_within_the_bound() {
         .iter()
         .filter(|name| !routes_own.contains(&name.as_str()))
         .count();
-    assert_eq!(lamps, HARD_ASKS_FUNCTIONS, "{chat:?}");
+    assert_eq!(lamps, PRODUCT_FUNCTIONS, "{chat:?}");
+    assert_eq!(
+        off.chat
+            .iter()
+            .filter(|name| !routes_own.contains(&name.as_str()))
+            .count(),
+        HARD_ASKS_OFF_FUNCTIONS,
+        "{:?}",
+        off.chat
+    );
     for name in executive
         .iter()
         .map(|function| function.name)
