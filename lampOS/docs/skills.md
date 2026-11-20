@@ -4092,7 +4092,10 @@ gone ([switches.md](switches.md)). What happens:
      that names the lamp (`named`: the name in its words, its name
      detector's note, or a wake by name before it), the force also reads
      the line past that word: `second_provider::past_the_name_heard_as`,
-     the rest after `wake_heard_as`'s word, the one reading the made-skill
+     the rest after `wake_heard_as`'s word, or after the lamp's own name
+     set off by a stop or a comma (`name_call_rest`: "Hey Lamp." and then
+     the make, two sentences, three of three in kit-8101's second ROW,
+     15:54), the one reading the made-skill
      matcher (item 6 of "A start by the person's own words") shares, so
      the two can't drift. The force sees only the messages, so the line's
      `named` is kept for it by its words (`make_skill_asked::heard_named`,

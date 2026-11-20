@@ -3372,18 +3372,21 @@ pub(crate) fn wake_heard_as(text: &str) -> Option<(&str, &str)> {
     (!rest.is_empty() && !named && !common && !addresses_the_name(rest)).then_some((word, rest))
 }
 
-/// The line's words past the lamp's name heard as another word
-/// ([`wake_heard_as`]), on a line that names the lamp (`named`, as
-/// `answer` knows it): "Hey, Lynn, make me a skill that …" is "make me a
-/// skill that …". `None` on a line that doesn't name the lamp ("Hey,
-/// Anna, …" said to a person) or opens with no such word. The one reading
-/// the made-skill matcher and `LAMP_MAKE_SKILL_ASKED`'s force share
-/// (#8022), so they can't drift.
+/// The line's words past the lamp's name, heard as itself ([`name_call_rest`]:
+/// "Hey Lamp. Make me a skill that …", kit-8101's second ROW, lamp-52e6,
+/// 20 Nov 15:54) or, on a line that names the lamp (`named`, as `answer`
+/// knows it), as another word ([`wake_heard_as`]): "Hey, Lynn, make me a
+/// skill that …" is "make me a skill that …". `None` on a line that opens
+/// with no call of the lamp, or calls a person ("Hey, Anna, …" with no name
+/// heard). The one reading the made-skill matcher and
+/// `LAMP_MAKE_SKILL_ASKED`'s force share (#8022), so they can't drift.
 pub(crate) fn past_the_name_heard_as(said: &str, named: bool) -> Option<&str> {
-    named
-        .then(|| wake_heard_as(said))
-        .flatten()
-        .map(|(_, rest)| rest)
+    name_call_rest(said).or_else(|| {
+        named
+            .then(|| wake_heard_as(said))
+            .flatten()
+            .map(|(_, rest)| rest)
+    })
 }
 
 /// Greetings a line may open with, set off by a comma or a stop, before
