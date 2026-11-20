@@ -3929,7 +3929,14 @@ Dù đèn chạy agent nào (OpenClaw hay Hermes; không chỗ nào ở đây g�
   sửa kỹ năng của đèn hay kỹ năng khác. Các ví dụ
   (`crates/tasks/src/make_examples/`) có bước `run` (`coin-flip`,
   `breathing-coach`, `exchange-rate`, `sun-times`) và một `task` có script
-  trợ giúp đọc lịch (`agenda-count`).
+  trợ giúp đọc lịch (`agenda-count`). Mỗi câu được nói bằng
+  `await lamp.say(text, wait=True)`, để script không bao giờ thoát trước khi
+  câu được nói (câu bị bỏ không được đếm, và lần chạy thất bại).
+- **Giọng đọc bước `run` như đọc bước `task`**: code riêng, giữ theo grant
+  của nó và script của nó phải nằm trong các file đã viết
+  (`made_skill::code_step`, `task_run`), và được đọc lại để xin đồng ý một
+  cách đơn giản, "it runs its own script" (`made_skill::RUN_STEP_SAID`),
+  rồi những gì code của nó được dùng.
 - **`SKILL.md` của nó** có dòng `when` và, với kỹ năng có code, ba mục, mỗi
   mục một tiêu đề `## ` có dòng bên dưới: `## Uses` (mỗi script hay công cụ
   lamp-services và đối số của nó), `## Result` (mỗi kết quả nằm ở đâu) và
