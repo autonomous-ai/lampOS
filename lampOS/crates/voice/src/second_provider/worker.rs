@@ -5073,6 +5073,20 @@ pub fn serve(
                 heeding.attention.tie_the_second_sign(true);
             }
         }
+        // Under a sure hearing, a face or the name in the words
+        // (`LAMP_NAME_FACE_OR_WORDS=on`, #8136): the line's start, closeness
+        // and a conversation going on no longer count alone.
+        if std::env::var(crate::second_provider::NAME_FACE_OR_WORDS_ENVIRONMENT)
+            .is_ok_and(|value| value == "on")
+        {
+            eprintln!(
+                "lamp-voice second: a hearing of the lamp's name only in the room's sound under {} counts only with a face turned to the lamp or its words calling it, busy room or not (LAMP_NAME_FACE_OR_WORDS)",
+                crate::attention::SURE_SCORE
+            );
+            if let Ok(mut heeding) = heeding.lock() {
+                heeding.attention.need_a_face_or_words(true);
+            }
+        }
         // A hearing at the line's start is no second sign of its own on a
         // line said to a person ("Ma'am, …"), and a conversation going on
         // gives back only that start (`LAMP_NAME_SAID_TO_A_PERSON=on`, #3945).
@@ -12210,6 +12224,11 @@ impl Heeding {
             if self.attention.name_dropped_by_near() {
                 eprintln!(
                     "lamp-voice second: request {request}: its name, heard only in the room's sound (began {} ms into the line{soft_lead}), counts for nothing: LAMP_NAME_NEAR ruled the line not the name, or its one word, with no face turned, doesn't sound like the name, and that verdict wins over every second sign; the model is not told it was heard (LAMP_NAME_SIGN_TIED, #8092)",
+                    name_into_ms.map_or_else(|| "?".to_owned(), |ms| ms.to_string())
+                );
+            } else if self.attention.name_dropped_as_unsure() {
+                eprintln!(
+                    "lamp-voice second: request {request}: its name, heard only in the room's sound under a sure hearing (began {} ms into the line{soft_lead}), counts for nothing: no face is turned to the lamp and its words don't call it; its start or closeness is not enough; the model is not told it was heard (LAMP_NAME_FACE_OR_WORDS, #8136)",
                     name_into_ms.map_or_else(|| "?".to_owned(), |ms| ms.to_string())
                 );
             } else if self.attention.name_dropped_as_short() {

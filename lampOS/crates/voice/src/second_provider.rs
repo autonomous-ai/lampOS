@@ -1021,6 +1021,19 @@ pub const NAME_SAID_TO_A_PERSON_ENVIRONMENT: &str = "LAMP_NAME_SAID_TO_A_PERSON"
 /// conversation in a meeting (#8092).
 pub const NAME_SIGN_TIED_ENVIRONMENT: &str = "LAMP_NAME_SIGN_TIED";
 
+/// Where the worker and the coordinator read whether a hearing of the
+/// lamp's name needs a face or its words (`on`, and nothing else): on the
+/// second route, a hearing only in the room's sound under
+/// `attention::SURE_SCORE` counts only with a face turned to the lamp or
+/// the line's words calling it (`attention::Attention::need_a_face_or_words`);
+/// and a request with no words whose hearing the faint floor turned away
+/// owes no second look (`second_look::SecondLook::holding_a_faint_wordless_call`).
+/// On lamp-74ff on 20 Nov (build 15146) two people talking Vietnamese with
+/// their backs to it were answered on a 0.921 hearing at a line's start,
+/// and a 0.904 hearing the floor turned away made the lamp speak unasked
+/// and open a window (#8114's shapes 5-7, #8136).
+pub const NAME_FACE_OR_WORDS_ENVIRONMENT: &str = "LAMP_NAME_FACE_OR_WORDS";
+
 /// Where the worker reads whether a hearing of the lamp's name inside one
 /// line's sound stays with that line, never counting for the one begun
 /// after it (`on`, and nothing else;

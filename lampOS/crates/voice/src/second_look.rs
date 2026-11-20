@@ -52,6 +52,15 @@ pub fn on() -> bool {
     std::env::var(ENVIRONMENT).ok().as_deref() == Some("on")
 }
 
+/// Whether `LAMP_NAME_FACE_OR_WORDS` is on
+/// ([`SecondLook::holding_a_faint_wordless_call`], #8136).
+pub fn face_or_words_on() -> bool {
+    std::env::var(crate::second_provider::NAME_FACE_OR_WORDS_ENVIRONMENT)
+        .ok()
+        .as_deref()
+        == Some("on")
+}
+
 #[derive(Debug, Default)]
 pub struct SecondLook {
     /// The request in hand that was heard, and when it began.
@@ -112,11 +121,18 @@ impl SecondLook {
     /// `began_us` (`crate::faint_named::FaintNamed::turned_away`). Told
     /// before [`Self::name_heard`] for the same hearing.
     pub fn turned_away(&mut self, began_us: u64) {
-        let _ = began_us;
+        // ponytail: the newest few only; a hearing is said about once a
+        // second, and a request's counts within `BEFORE_US` of its start.
+        if self.faint.len() == MOST_RECENT {
+            self.faint.remove(0);
+        }
+        self.faint.push(began_us);
     }
 
     /// Words were heard: the request in hand has some.
-    pub fn words_heard(&mut self) {}
+    pub fn words_heard(&mut self) {
+        self.worded |= self.began.is_some();
+    }
 
     /// The name began to be heard at `began_us`, with this score.
     pub fn name_heard(&mut self, began_us: u64, score: f32) {
@@ -157,6 +173,7 @@ impl SecondLook {
             .reduce(|best, next| if next.1 > best.1 { next } else { best });
         self.open = true;
         self.ended = None;
+        self.worded = false;
         // Heard as the request began: the note goes at its opening.
         self.told = self.named.is_some_and(|(_, score)| score >= LEAST_SCORE);
     }
@@ -182,8 +199,15 @@ impl SecondLook {
         self.open = false;
         self.ended = None;
         let told = std::mem::take(&mut self.told) && self.told_while_speaking;
-        let (_, score) = self.named.take()?;
+        let worded = std::mem::take(&mut self.worded);
+        let (began, score) = self.named.take()?;
         if !said_nothing || score < LEAST_SCORE || told {
+            return None;
+        }
+        if self.faint_held && !worded && self.faint.contains(&began) {
+            eprintln!(
+                "lamp-voice: request {turn}: its name was heard (score {score:.2}) where the faint floor turned the line away, and no words came: the lamp says nothing and opens no window (LAMP_NAME_FACE_OR_WORDS, #8136)"
+            );
             return None;
         }
         self.due = Some((turn, now_us));
