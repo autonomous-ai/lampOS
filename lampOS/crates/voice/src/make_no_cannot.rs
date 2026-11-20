@@ -6,8 +6,13 @@
 //! was the model's own `cannot:` (the lamp's own model's, or the lamp's
 //! agent's when the make was handed to it, `LAMP_MAKE_SKILL_AGENT`) is not
 //! dropped:
-//! - **Its task is the person's request**, in their words, plain and at most
-//!   [`made_skill::MOST_TASK_CHARS`] ([`task_words`]). A request longer than
+//! - **Its task is the task alone**, one plain sentence the model writes in
+//!   the same call (`task:`, at most [`made_skill::MOST_TASK_CHARS`]: what
+//!   the agent does each time, never the ask to make a skill or the words
+//!   that ask for it; #7819, Twelve's c0a4 FAIL, 20 Nov), kept only when
+//!   every number, time, threshold and named thing in the request survives
+//!   in it ([`task_kept`]); else, for a request that fits, the person's
+//!   request in their words, plain ([`task_words`]). A request longer than
 //!   that is never cut short: its task is one plain sentence the model
 //!   writes in the same call (`task:`), kept only when every number, time,
 //!   threshold and named thing in the request survives in it
@@ -248,9 +253,13 @@ pub fn kept_refusal(why: &str) -> Option<(&'static str, &'static str)> {
 /// How the line for a request with no time or moment begins.
 pub const NO_WHEN_HEAD: &str = "I can make that as a task for the lamp's agent";
 
-/// The line a task skill only asked for carries in its card, beside
-/// `crate::upload_agent::MARK`: made from the person's own ask, never from
-/// a file (lamp-skills' `task_asks` then says it comes from [`FROM`]).
+/// The line a task skill only asked for carries in its card in place of
+/// `crate::upload_agent::MARK`, its one `agent:` key (#7819, Twelve's c0a4
+/// FAIL, 20 Nov: written beside it, the card had two `agent:` keys, and
+/// OpenClaw's front-matter reader refused it `DUPLICATE_KEY`): an agent
+/// skill kept as a file's is (`crate::upload_agent::is_agent_card`), made
+/// from the person's own ask, never from a file (lamp-skills' `task_asks`
+/// then says it comes from [`FROM`]).
 pub const ASKED_MARK: &str = "agent: asked";
 
 /// Where such a skill's task is said to come from in its read-back.
@@ -573,8 +582,9 @@ pub fn system() -> String {
         "You choose, for a lamp, when a skill runs and what it needs. The lamp's agent, an AI \
          agent on the lamp, does the person's request itself as one task each time the skill \
          runs, with only the grants the skill names; the lamp reads the skill back to the person \
-         and runs it only once they agree. You never write the task or any code: only its name, \
-         its grants and when it runs. Answer exactly in this form and nothing else: a line \
+         and runs it only once they agree. You never write any code or the task's steps: only \
+         its name, its grants, when it runs and the task's line the request asks for. Answer \
+         exactly in this form and nothing else: a line \
          name: and a short name, lowercase words joined by -, the name the request gives the \
          skill when it gives one; a line grants: and the fewest \
          grants the task needs, joined by commas, or none; then, when the request names a time \
@@ -623,7 +633,10 @@ pub fn brief(request: &str, hint: Option<&str>) -> String {
         })
         .unwrap_or_default();
     // A request longer than its read-back: its task's words are the
-    // model's, checked by [`task_kept`].
+    // model's, checked by [`task_kept`]. One that fits is asked for its
+    // task alone too (#7819, Twelve's c0a4 FAIL, 20 Nov: the do.task was
+    // the whole "Make me a skill. When I say apple file, ..." ask), kept by
+    // [`task_kept`] only when nothing the request names is left out.
     let task = if task_cut(request) {
         format!(
             "\n\nThe request is too long to read back whole: also answer a line task: and the \
@@ -632,7 +645,13 @@ pub fn brief(request: &str, hint: Option<&str>) -> String {
             made_skill::MOST_TASK_CHARS
         )
     } else {
-        String::new()
+        format!(
+            "\n\nAlso answer a line task: and the task alone, what the lamp's agent does each \
+             time it runs, in one plain sentence of at most {} characters: never the ask to \
+             make a skill or the words said to ask for it, and keep every number, time, \
+             threshold and named thing in the request.",
+            made_skill::MOST_TASK_CHARS
+        )
     };
     format!(
         "{}, as one task for the lamp's agent: choose its name, grants and when it runs.\n\n\
@@ -1023,15 +1042,47 @@ pub fn task_cut(request: &str) -> bool {
 }
 
 /// The task's words for `request`, from the model's `answer` for a skill
-/// named `name`: the request's own ([`task_words`]) when it fits; else the
-/// answer's `task:` line, plain as [`task_words`] makes it, at most
-/// [`made_skill::MOST_TASK_CHARS`], kept only when nothing the request
-/// names is left out of it ([`left_out`]). Else what a repair is told.
+/// named `name`: the answer's `task:` line, plain as [`task_words`] makes
+/// it, at most [`made_skill::MOST_TASK_CHARS`], kept only when nothing the
+/// request names is left out of it ([`left_out`]). A request that fits
+/// keeps its own words ([`task_words`]) when the line is missing or not
+/// kept (#7819, 20 Nov: the task alone, never the ask to make a skill,
+/// whenever the model's line holds it); a longer one is told what a repair
+/// is told.
 pub fn task_kept(request: &str, answer: &str, name: &str) -> Result<String, String> {
+    let most = made_skill::MOST_TASK_CHARS;
+    // A request that fits (#7819, Twelve's c0a4 FAIL, 20 Nov): the
+    // answer's `task:` line, the task alone as the model judged it, when it
+    // fits and leaves out nothing the request names ([`left_out`]); else
+    // the request's own words, as before, never a refusal.
     if !task_cut(request) {
+        let said = task_plain(said_task(answer).unwrap_or_default());
+        let said = said
+            .trim()
+            .trim_end_matches(['.', '!', '?', ',', ';', ':'])
+            .trim();
+        let fits = !said.is_empty() && said.chars().count() <= most;
+        if fits && left_out(request, said, name).is_empty() {
+            eprintln!(
+                "lamp-voice: a skill made here: the agent's task is the model's own sentence \
+                 ({} characters)",
+                said.chars().count()
+            );
+            return Ok(said.to_owned());
+        }
+        if !said.is_empty() {
+            eprintln!(
+                "lamp-voice: a skill made here: the model's task line {}: the request's own \
+                 words kept",
+                if fits {
+                    "left out what the request names"
+                } else {
+                    "was too long"
+                }
+            );
+        }
         return Ok(task_words(request));
     }
-    let most = made_skill::MOST_TASK_CHARS;
     let told = format!(
         "the request is too long to read back whole, so answer a line task: and its task in one \
          plain sentence of at most {most} characters that keeps every number, time, threshold \
@@ -1420,10 +1471,11 @@ pub fn asked_files(
         crate::upload_agent::INSTRUCTIONS,
     );
     let instructions = format!(
-        "---\nname: {name}\ndescription: {words}\n---\n\n# {name}\n\nA skill the lamp's owner \
-         made has been asked for now. When they made it, they said the line below. Do now what \
-         it is for, never making, changing or removing a skill, and tell them in a sentence or \
-         two what you found or did:\n\n{words}\n"
+        "---\nname: {name}\ndescription: \"{}\"\n---\n\n# {name}\n\nA skill the lamp's owner \
+         made has been asked for now. Its task, as they agreed to it, is below. Do it now, \
+         never making, changing or removing a skill, and tell them in a sentence or two what \
+         you found or did:\n\n{words}\n",
+        words.replace(['"', '\\'], "'")
     );
     made_skill::Files {
         toml,
@@ -2619,17 +2671,84 @@ mod tests {
         all_on(None);
     }
 
-    /// A request that fits stays the task's words as it is, whatever the
-    /// model writes, and its brief asks for no words.
+    /// A request that fits is asked for its task alone too (#7819, 20 Nov),
+    /// but keeps its own words when the model's line leaves out what it
+    /// names, or is missing: never a refusal for it.
     #[test]
     fn a_short_requests_task_stays_its_own_words() {
         all_on(Some(true));
         let short = "every night at nine, tell me the dollar to dong rate";
         assert!(!task_cut(short));
-        let (made, words, briefs) = evening_made(short, "Tell me something else");
-        assert_eq!(made, Err(Refused::new("kept here")));
-        assert_eq!(words, [task_words(short)]);
-        assert!(!briefs[0].contains("task:"), "{}", briefs[0]);
+        for left in ["Tell me something else", ""] {
+            let (made, words, briefs) = evening_made(short, left);
+            assert_eq!(made, Err(Refused::new("kept here")));
+            assert_eq!(words, [task_words(short)], "{left}");
+            assert!(briefs[0].contains("task:"), "{}", briefs[0]);
+            assert!(briefs[0].contains("the task alone"), "{}", briefs[0]);
+        }
+        // One that keeps what it names is the task, as the model wrote it.
+        let (_, words, _) = evening_made(short, "At nine each night, tell the dollar to dong rate");
+        assert_eq!(words, ["At nine each night, tell the dollar to dong rate"]);
+        all_on(None);
+    }
+
+    /// #7819, Twelve's c0a4 FAIL (20 Nov): the apple-file make's do.task is
+    /// the task alone, the model's own sentence, never the person's whole
+    /// "Make me a skill" ask, on its file's instructions and its read-back
+    /// too.
+    #[test]
+    fn the_apple_file_makes_task_is_the_task_alone() {
+        all_on(Some(true));
+        let ask = "Make me a skill. When I say apple file, that writes three apple facts into a \
+                   file.";
+        assert!(!task_cut(ask));
+        let kept = |_: Result<String, String>| -> Result<Made, Refused> { unreachable!() };
+        let seen = std::cell::RefCell::new(Vec::new());
+        let kept_asked = |files: &made_skill::Files, words: &str| {
+            seen.borrow_mut().push((
+                files.toml.clone(),
+                files.scripts[0].1.clone(),
+                words.to_owned(),
+            ));
+            Err(Refused::new("kept here"))
+        };
+        let answer = "name: apple-facts-file\ngrants: none\ntask: Write three apple facts into a \
+                      file.\nasks: apple file";
+        let briefs = std::cell::RefCell::new(Vec::new());
+        assert_eq!(
+            made(
+                ask,
+                |brief| {
+                    briefs.borrow_mut().push(brief.to_owned());
+                    Ok(answer.to_owned())
+                },
+                || true,
+                &kept,
+                kept_asked,
+                None,
+                None
+            ),
+            Err(Refused::new("kept here"))
+        );
+        assert!(briefs.borrow()[0].contains("never the ask to make a skill"));
+        let seen = seen.into_inner();
+        let [(toml, instructions, words)] = seen.as_slice() else {
+            panic!("{seen:?}")
+        };
+        assert_eq!(words, "Write three apple facts into a file");
+        let table: toml::Table = toml::from_str(toml).unwrap();
+        let task = table["do"].as_array().unwrap()[0]["task"]["task"]
+            .as_str()
+            .unwrap()
+            .to_owned();
+        assert_eq!(task, "Write three apple facts into a file");
+        for text in [task.as_str(), instructions.as_str()] {
+            let lower = text.to_lowercase();
+            assert!(
+                !lower.contains("make me a skill") && !lower.contains("when i say"),
+                "{text}"
+            );
+        }
         all_on(None);
     }
 
@@ -2707,7 +2826,7 @@ mod tests {
             "asks:",
             "needs: and what",
             ASKED_EXAMPLE,
-            "never write the task or any code",
+            "never write any code or the task's steps",
             made_skill::TRIGGER_MEANINGS,
             EXAMPLE,
         ] {

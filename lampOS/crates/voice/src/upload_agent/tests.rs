@@ -765,8 +765,13 @@ fn a_task_made_here_only_asked_may_carry_every_grant_a_file_may_not() {
         )
     };
     let file = format!("---\nname: t\n---\n\nmade: here\n{MARK}\n");
-    let asked = format!("{file}{}\n", crate::make_no_cannot::ASKED_MARK);
+    // Its one `agent:` key says asked (#7819, 20 Nov), never beside `agent: file`.
+    let asked = format!(
+        "---\nname: t\n---\n\nmade: here\n{}\n",
+        crate::make_no_cannot::ASKED_MARK
+    );
     assert!(is_asked_card(&asked) && !is_asked_card(&file));
+    assert!(is_agent_card(&asked) && is_agent_card(&file));
     for grant in ASKED_GRANTS {
         let text = toml(grant);
         assert!(capped_asked(&text).is_ok(), "{grant}");

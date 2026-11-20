@@ -117,7 +117,14 @@ pub fn failed_line(skill: &str, sent: &Result<String, Unrun>) -> Option<String> 
         "missing_secret" => Some(format!(
             "{name} couldn't run: it needs a key added in the app, on its page."
         )),
-        "off" | "bad_request" | "too_long" | "no_token" | "not_started" | "no_secrets" => not_run(),
+        // `not_held_off` (#7819, 20 Nov): refused before its agent began.
+        "off"
+        | "bad_request"
+        | "too_long"
+        | "no_token"
+        | "not_started"
+        | "no_secrets"
+        | crate::task::NOT_HELD_OFF => not_run(),
         _ => not_finished(),
     }
 }

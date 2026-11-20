@@ -204,9 +204,17 @@ pub fn set_on_here(on: Option<bool>) {
     ON_HERE.with(|here| here.set(on));
 }
 
-/// Whether a `SKILL.md` is an agent skill's card ([`MARK`]).
+/// Whether a `SKILL.md` is an agent skill's card: its one `agent:` key
+/// [`MARK`], or [`crate::make_no_cannot::ASKED_MARK`] for a task made here
+/// from the person's own ask, which is kept as a file's agent skill is
+/// (#7819, Twelve's c0a4 FAIL, 20 Nov: one key, never both, which
+/// OpenClaw's front-matter reader refused `DUPLICATE_KEY`). A card kept
+/// before then with both lines reads the same.
 pub fn is_agent_card(card: &str) -> bool {
-    card.lines().any(|line| line.trim() == MARK)
+    card.lines().any(|line| {
+        let line = line.trim();
+        line == MARK || line == crate::make_no_cannot::ASKED_MARK
+    })
 }
 
 /// The file's words, lowercased, split on anything but a letter or digit.

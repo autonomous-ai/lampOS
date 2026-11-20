@@ -2077,9 +2077,15 @@ task = { task = "Take a photo and send it to my phone", run = "scripts/main.py" 
   full). A run is counted as it is handed over, and taken back off the
   ledger when lamp-tasks refused it before its agent began (the fixed
   write's `NOT_TAKEN`: `busy` with another skill's run, `not_started`, off,
-  a bad line or no token, or lamp-tasks not reached): the journal adds
-  "; not counted". A run that may have begun (`run_failed`, no answer)
-  stays counted. On lamp-9adf on 15 Nov, a presence skill refused `busy`
+  a bad line or no token, `no_net`, `not_held_off`, or lamp-tasks not
+  reached): the journal adds "; not counted". An agent skill's run whose
+  agent can't be held to it (`not_held_off`, `task::NOT_HELD_OFF`; #7819,
+  20 Nov: the held runner the one run path's wrapper won't take, or an
+  OpenClaw default asked for a grant) is also said aloud, "I can't run
+  that one yet: this lamp's agent can't be kept to only what the skill may
+  use, so nothing ran." (`task::NOT_HELD_OFF_SAID`), never a `run_failed`
+  that counts and says only that it didn't finish. A run that may have
+  begun (`run_failed`, no answer) stays counted. On lamp-9adf on 15 Nov, a presence skill refused `busy`
   spent the day's last run, and the skill that came due 4 s later found
   none.
   With `LAMP_SKILL_TASK_SURE=on` (`lamp-skills` alone, off unless set, on
@@ -6651,11 +6657,17 @@ the same code for both writers.
     test note"), with `LAMP_UPLOAD_TO_AGENT=on`: kept in an agent skill's
     form (`make_no_cannot::asked_files`, `made_skill::keep_agent_asked`): a
     voice tool whose note carries the words to say, one `do.task` that has
-    the agent follow `scripts/SKILL.md` (the person's whole request, in the
-    lamp's own words around it), its grants the same and the camera
+    the agent follow `scripts/SKILL.md` (the task, in the lamp's own words
+    around it), its grants the same and the camera
     (light, speak, camera, the internet with `LAMP_TASK_NET=on`, a
     service's),
-    its card marked `agent: asked`, so its read-back says it comes from
+    its card's one `agent:` key `agent: asked` (in place of `agent: file`,
+    never beside it: #7819, Twelve's c0a4 FAIL, 20 Nov, two `agent:` keys
+    made OpenClaw's front-matter reader refuse the card `DUPLICATE_KEY` and
+    skip the skill; `made_skill::agent_card`, and an `agent:` key the card
+    itself carried is never kept), read as an agent skill
+    (`upload_agent::is_agent_card` takes either value; a card kept before
+    with both lines reads the same), so its read-back says it comes from
     "what you asked the lamp for" (lamp-skills' `task_asks`). It goes on,
     its task not agreed, and the lamp says "I can have the lamp's agent do
     that, as test note: only when you ask for it, it hands one task to the
@@ -6922,8 +6934,17 @@ the same code for both writers.
   refused for its length nor cut: its task is the model's own sentence in
   the one more call (`task:`), kept only when every number, time and name
   of the line survives (`make_no_cannot::task_kept`, #7904; the first
-  builder's call on #7819), and that sentence is what the brief quotes. So
-  is the task of the internet's route
+  builder's call on #7819), and that sentence is what the brief quotes. A
+  line that fits is asked for its task alone in the same call too (#7819,
+  Twelve's c0a4 FAIL, 20 Nov: the apple-file make's `do.task` was the
+  whole "Make me a skill. When I say apple file, that writes…" ask): the
+  model's `task:` line, what the agent does each time it runs, never the
+  ask to make a skill or the words that ask for it, is the task when it
+  fits and keeps every number, time and name of the line (the same
+  `task_kept` check, the model judging the meaning, no word list); else
+  the line's own words, as before, never a refusal (journaled by class
+  and length, never the words; `the_apple_file_makes_task_is_the_task_alone`).
+  So is the task of the internet's route
   (`make_skill_local::net_made`, `LAMP_TASK_NET`) and of the model's
   `cannot:` (`make_skill_local::no_cannot`, `LAMP_MAKE_NO_CANNOT`): the
   same own line, the same checked words for one too long, on a trigger as

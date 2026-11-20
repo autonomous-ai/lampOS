@@ -8762,10 +8762,12 @@ fn card_marked(text: &str, description: &str, marks: &str) -> Result<(String, St
     for line in front.lines() {
         let continued = in_description && line.starts_with([' ', '\t']);
         in_description = continued || line.starts_with("description:");
+        // `agent` too (#7819, 20 Nov): an agent skill's card has the
+        // lamp's one `agent:` key alone, never a second one of the card's.
         let marker = line.split_once(':').is_some_and(|(key, _)| {
             matches!(
                 key.trim(),
-                "made" | MADE_BY | MADE_WITH | "added" | "limits"
+                "made" | MADE_BY | MADE_WITH | "added" | "limits" | "agent"
             )
         });
         if !in_description && !marker {
@@ -10601,15 +10603,7 @@ pub fn keep_agent(files: &Files, from: &str, keeping: &Keeping) -> Result<Made, 
          on its own.",
         crate::skill_task_yes::uses_said(&grants)
     );
-    let (name, marked) = card_marked(
-        &files.card,
-        &written_description(&files.card).unwrap_or_default(),
-        &format!(
-            "made: here\n{MADE_BY}: {}\n{ADDED_FROM_FILE}\n{}",
-            Maker::App.key(),
-            crate::upload_agent::MARK
-        ),
-    )?;
+    let (name, marked) = agent_card(&files.card, Maker::App, false)?;
     let made = packed_and_kept(
         keeping,
         from,
@@ -10643,11 +10637,40 @@ pub fn keep_agent(files: &Files, from: &str, keeping: &Keeping) -> Result<Made, 
     Ok(made)
 }
 
+/// An agent skill's card as it is kept ([`keep_agent`],
+/// [`keep_agent_asked`]): `card` marked `made: here`, made by `maker`,
+/// [`ADDED_FROM_FILE`] and one `agent:` key, [`crate::upload_agent::MARK`]
+/// for a file's, [`crate::make_no_cannot::ASKED_MARK`] for a task made here
+/// from the person's own ask (`asked`), which means both: an agent skill
+/// kept as a file's is, and asked for (#7819, Twelve's c0a4 FAIL, 20 Nov:
+/// both lines were written, two `agent:` keys, and OpenClaw's front-matter
+/// reader refused the card `DUPLICATE_KEY` and skipped the skill). An
+/// `agent:` key the card itself carried is never kept ([`card_marked`]).
+pub(crate) fn agent_card(
+    card: &str,
+    maker: Maker,
+    asked: bool,
+) -> Result<(String, String), Refused> {
+    let agent = if asked {
+        crate::make_no_cannot::ASKED_MARK
+    } else {
+        crate::upload_agent::MARK
+    };
+    card_marked(
+        card,
+        &written_description(card).unwrap_or_default(),
+        &format!(
+            "made: here\n{MADE_BY}: {}\n{ADDED_FROM_FILE}\n{agent}",
+            maker.key()
+        ),
+    )
+}
+
 /// A task for the lamp's agent only asked for (`LAMP_MAKE_NO_CANNOT`,
 /// `crate::make_no_cannot::asked_files`): kept as an agent skill added from
 /// a file is ([`keep_agent`]: its cap, its card's marks, so the manage
-/// helper holds it to the same cap), its card also marked
-/// [`crate::make_no_cannot::ASKED_MARK`] and made by whoever asked
+/// helper holds it to the same cap), its card's one `agent:` key
+/// [`crate::make_no_cannot::ASKED_MARK`] ([`agent_card`]) and made by whoever asked
 /// ([`Maker::of`] `from`), what it does said as the task the agent will do
 /// (`words`) and when, never as made, and its uses marked
 /// [`Uses::agent_task`]. On, its task waits for the spoken yes at its first
@@ -10677,16 +10700,7 @@ pub fn keep_agent_asked(
             .strip_suffix(RUNS_ONCE_AGREED)
             .unwrap_or_default()
     );
-    let (name, marked) = card_marked(
-        &files.card,
-        &written_description(&files.card).unwrap_or_default(),
-        &format!(
-            "made: here\n{MADE_BY}: {}\n{ADDED_FROM_FILE}\n{}\n{}",
-            Maker::of(from).key(),
-            crate::upload_agent::MARK,
-            crate::make_no_cannot::ASKED_MARK
-        ),
-    )?;
+    let (name, marked) = agent_card(&files.card, Maker::of(from), true)?;
     let made = packed_and_kept(
         keeping,
         from,
@@ -12303,6 +12317,107 @@ fn cut_chars(text: &str, most: usize) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// A card's front matter read as strict YAML reads a flat mapping, as
+    /// OpenClaw's reader does: every top-level line `key: value` (or an
+    /// indented continuation of the one before), a plain value with no
+    /// `: ` in it unless quoted, and no key twice (`DUPLICATE_KEY`). The
+    /// keys, or why not.
+    fn strict_front_matter(card: &str) -> Result<Vec<String>, String> {
+        let rest = card.strip_prefix("---\n").ok_or("no front matter")?;
+        let (front, _) = rest.split_once("\n---").ok_or("front matter not closed")?;
+        let mut keys: Vec<String> = Vec::new();
+        for line in front.lines() {
+            if line.trim().is_empty() || line.trim_start().starts_with('#') {
+                continue;
+            }
+            if line.starts_with([' ', '\t']) {
+                if keys.is_empty() {
+                    return Err(format!("a continuation with no key: {line:?}"));
+                }
+                continue;
+            }
+            let (key, value) = line
+                .split_once(':')
+                .ok_or_else(|| format!("not a key: {line:?}"))?;
+            let key = key.trim();
+            if key.is_empty() || key.contains(char::is_whitespace) {
+                return Err(format!("not a plain key: {line:?}"));
+            }
+            let value = value.trim();
+            let quoted = value.starts_with('"') && value.ends_with('"') && value.len() >= 2;
+            if !quoted && value.contains(": ") {
+                return Err(format!("a plain value holding ': ': {line:?}"));
+            }
+            if keys.iter().any(|kept| kept == key) {
+                return Err(format!("DUPLICATE_KEY: {key}"));
+            }
+            keys.push(key.to_owned());
+        }
+        Ok(keys)
+    }
+
+    /// #7819, Twelve's c0a4 FAIL (20 Nov): every agent skill card the make
+    /// keeps (a file's, a task made here only asked for, and either from a
+    /// card that carried an `agent:` key of its own) parses as strict YAML
+    /// with one `agent:` key, its value saying which it is, so OpenClaw's
+    /// front-matter reader takes it. Both kinds read as an agent skill, the
+    /// asked one alone as asked; a card kept before with both lines, which
+    /// that reader refuses, still reads the same here.
+    #[test]
+    fn every_agent_card_the_make_keeps_has_one_agent_key() {
+        let asked = crate::make_no_cannot::asked_files(
+            "apple-facts-file",
+            &["apple file".to_owned()],
+            &[],
+            "Write three apple facts into a file",
+        );
+        let file_card = "---\nname: photo-booth\ndescription: Takes three photos.\n---\n\n# Photo \
+                         booth\n";
+        let carried = "---\nname: photo-booth\ndescription: Takes three photos.\nagent: file\n\
+                       agent: asked\n---\n\n# Photo booth\n";
+        for (card, maker, as_asked) in [
+            (asked.card.as_str(), Maker::Voice, true),
+            (asked.card.as_str(), Maker::App, true),
+            (file_card, Maker::App, false),
+            (carried, Maker::App, false),
+            (carried, Maker::Voice, true),
+        ] {
+            let (_, marked) = agent_card(card, maker, as_asked).unwrap();
+            let keys = strict_front_matter(&marked).unwrap_or_else(|why| panic!("{why}\n{marked}"));
+            assert_eq!(
+                keys.iter().filter(|key| *key == "agent").count(),
+                1,
+                "{marked}"
+            );
+            assert!(crate::upload_agent::is_agent_card(&marked), "{marked}");
+            assert_eq!(
+                crate::upload_agent::is_asked_card(&marked),
+                as_asked,
+                "{marked}"
+            );
+            let agent = if as_asked {
+                crate::make_no_cannot::ASKED_MARK
+            } else {
+                crate::upload_agent::MARK
+            };
+            assert!(marked.lines().any(|line| line == agent), "{marked}");
+        }
+        // Its instructions file has front matter too: strict YAML as well.
+        strict_front_matter(&asked.scripts[0].1).unwrap();
+        // The card kept before with both lines: refused by a strict reader,
+        // still an asked agent skill here.
+        let both = format!(
+            "---\nname: t\ndescription: \"x\"\nmade: here\n{ADDED_FROM_FILE}\n{}\n{}\n---\n",
+            crate::upload_agent::MARK,
+            crate::make_no_cannot::ASKED_MARK
+        );
+        assert!(
+            strict_front_matter(&both).is_err_and(|why| why.starts_with("DUPLICATE_KEY")),
+            "{both}"
+        );
+        assert!(crate::upload_agent::is_asked_card(&both));
+    }
 
     /// #7874: a kept, on skill named `my-day` is found by its name as
     /// written and by "my day", never looked up as `day`; `desk-check`

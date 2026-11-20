@@ -4400,11 +4400,12 @@ one runner (a fresh home per run, the token as a file) with no new rules:
     and says `task::NO_NET_SAID` aloud, behind a told answer's gate:
     "I can't run that one: it needs the internet, and this lamp's agent
     can't reach it yet." The journal keeps lamp-tasks' words.
-  - The make's runner, which an agent skill's run and a run given keys
-    still go through, can't be held by the one run path's wrapper (it holds
-    only a run started in its own `skill-<run-id>` folder): refused
+  - The make's runner can't be held by the one run path's wrapper (it
+    holds only a run started in its own `skill-<run-id>` folder): refused
     `NOT_HELD_OFF_ONE_PATH`, which no longer blames `LAMP_SKILL_TASKS` or
-    a round.
+    a round. An agent skill's run and a run given keys no longer go through
+    it there (#7819, below): by the one run path they take the lamp's own
+    engine.
   - Tests: `harness::a_net_run_by_the_one_run_path_gets_its_egress_socket_before_harness_new`,
     `skill_task::tests::a_net_run_is_marked_its_home_named_by_its_id_and_refused_as_no_net`,
     `the_one_path_wrappers_carry_the_egress_lines_once`,
@@ -4417,11 +4418,43 @@ one runner (a fresh home per run, the token as a file) with no new rules:
   with no way out but the model's unless lamp-control's yes names `net`. Hermes is told to read that file
   in the skill's read-only folder and do what it says, as data, reaching the lamp only
   through `control.sock` with the run's own token, never asking anyone for
-  a key or token by voice nor saying one aloud. It goes through the make's
-  runner held off the network (`skill_make::lamp_runner(home, true)`)
-  unless granted `net`. Its environment is lamp-tasks' cleared one, the
-  control socket, the token, the SDK's path and its fresh home below: no
-  key. `admin.sock` is never shown in Hermes's namespace.
+  a key or token by voice nor saying one aloud. It goes through the held
+  runner a live ask held off the network has (`skill_make::AskRunner`,
+  `HandOvers::held`) unless granted `net`: with lamp-update's one run path,
+  the lamp's Hermes by its wrapper's task entry in the run's own
+  `skill-<run id>` folder (`--net`, its token from its file, its fresh home
+  `make-<run id>/home` named by `LAMP_NS_HOME`, its keys by the run's id);
+  without it, the make's runner held off the network
+  (`skill_make::lamp_runner(home, true)`), as before. Its environment is
+  lamp-tasks' cleared one, the control socket, the token, the SDK's path
+  and its fresh home below: no key. `admin.sock` is never shown in Hermes's
+  namespace.
+- **On the lamp's own engine** (#7819, Twelve's c0a4 FAIL, 20 Nov: on an
+  OpenClaw lamp with the one run path a made agent skill was kept but
+  never ran: lamp-tasks gave it to the held make's runner, which refused it
+  `NOT_HELD_OFF_ONE_PATH`). With `LAMP_SKILL_DEFAULT_AGENT` on, an agent
+  skill's run without `net` is picked an agent as a make is
+  (`skill_make::MakeGateway`'s pick, `HandOvers::gateway`): the lamp's
+  Hermes runs it held as above; a gateway agent (OpenClaw) takes it as one
+  turn of its own (`skill_task::on_gateway_agent`, `harness new openclaw`
+  or the lamp's one kept pane), in a folder of the run's own,
+  `make-<run id>` in the work folder with no home, removed however it ends.
+  Only a run that asks for no grant and no key goes to the gateway (the
+  apple-file make, its unknown grant left out by `LAMP_MAKE_NO_CANNOT`, has
+  none): its gateway keeps the network and the owner's workspace, memory
+  and sessions, and a run's token or keys would sit where every agent of
+  the gateway reads, so one with any is refused `not_held_off` in words
+  (`skill_task::gateway_holds_none`) before a token is minted, never run
+  open and never handed to Hermes instead. The owner's yes is still checked
+  by a token minted for no grants and ended with the run; the turn is given
+  no token or environment. Its words (`SkillRun::gateway_prompt`) have it
+  read `scripts/SKILL.md` and do it, using nothing of the lamp's and
+  making, changing or removing no skill, and write what the lamp says to
+  its folder's `answer.md`, told as any run's answer behind lamp-skills'
+  gate for a told answer. A pick that fails is refused in its words. Off,
+  every agent skill's run is the lamp's Hermes's, as before. A run with a fresh home its runner can't hold (`NOT_HELD_OFF`, `NOT_HELD_OFF_ONE_PATH`, `NO_RUN_NAMESPACE`) is answered `not_held_off` too (`skill_task::NOT_HELD_OFF_CODE`), never `run_failed`: lamp-skills takes it off the day's runs and says it aloud (docs/skills.md). Tests:
+  `skill_task::tests::a_made_agent_skill_with_no_grant_runs_on_an_openclaw_lamps_own_agent`,
+  `an_agent_skills_held_runner_takes_the_one_run_path`.
 - **Every agent skill's run, and every `net` run, starts in a fresh home
   with the person's Hermes data hidden**, as a make does (the P1 #6643
   closed for makes): `make-<run id>` in the work folder with only

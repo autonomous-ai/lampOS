@@ -293,9 +293,11 @@ pub const NOT_SENT_LINE: &str =
 /// (`lamp_tasks::skill_task::NOT_STARTED`: Harness signed out or not set
 /// up, no Hermes target, a launch Harness never sent), or a run granted
 /// `net` that can't be given its way out (`no_net`,
-/// `lamp_tasks::skill_task::NO_NET`, said aloud: [`crate::task::refusal_said`]).
+/// `lamp_tasks::skill_task::NO_NET`, said aloud: [`crate::task::refusal_said`]),
+/// or an agent skill's run its agent can't be held to (`not_held_off`,
+/// [`crate::task::NOT_HELD_OFF`], said aloud too; #7819, 20 Nov).
 /// `run_failed` is none of them: the run had begun.
-pub const NOT_TAKEN: [&str; 7] = [
+pub const NOT_TAKEN: [&str; 8] = [
     "off",
     "bad_request",
     "too_long",
@@ -303,6 +305,7 @@ pub const NOT_TAKEN: [&str; 7] = [
     "busy",
     "not_started",
     crate::task::NO_NET,
+    crate::task::NOT_HELD_OFF,
 ];
 
 /// lamp-tasks' answer to a fixed write's line, read when its run ended:

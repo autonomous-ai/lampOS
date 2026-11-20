@@ -3257,10 +3257,16 @@ cả hai người viết.
     test note"), với `LAMP_UPLOAD_TO_AGENT=on`: lưu theo dạng kỹ năng agent
     (`make_no_cannot::asked_files`, `made_skill::keep_agent_asked`): một công
     cụ giọng nói có ghi chú chứa lời cần nói, một `do.task` để agent làm theo
-    `scripts/SKILL.md` (toàn bộ yêu cầu của người dùng, bọc trong lời của
-    đèn), quyền là quyền của kỹ năng agent (light, speak, camera,
-    internet khi `LAMP_TASK_NET=on`, quyền của dịch vụ liên kết), thẻ được
-    đánh dấu `agent: asked`, nên phần đọc lại nói nó đến từ "what you asked
+    `scripts/SKILL.md` (việc cần làm, bọc trong lời của đèn), quyền là
+    quyền của kỹ năng agent (light, speak, camera,
+    internet khi `LAMP_TASK_NET=on`, quyền của dịch vụ liên kết), khóa
+    `agent:` duy nhất của thẻ là `agent: asked` (thay cho `agent: file`,
+    không bao giờ đặt cạnh nó: #7819, FAIL của Twelve trên c0a4, 20/11, hai
+    khóa `agent:` khiến trình đọc front matter của OpenClaw từ chối thẻ
+    `DUPLICATE_KEY` và bỏ qua kỹ năng; `made_skill::agent_card`, và khóa
+    `agent:` mà chính thẻ mang theo không bao giờ được giữ), được đọc là
+    kỹ năng agent (`upload_agent::is_agent_card` nhận cả hai giá trị; thẻ
+    lưu trước đó có cả hai dòng vẫn được đọc như cũ), nên phần đọc lại nói nó đến từ "what you asked
     the lamp for" (`task_asks` của lamp-skills). Nó được bật, việc chưa được
     đồng ý, và đèn nói "I can have the lamp's agent do that, as test note:
     only when you ask for it, it hands one task to the lamp's agent: “…”. …
@@ -3544,6 +3550,16 @@ cả hai người viết.
   trong lần gọi thêm (`task:`), chỉ được giữ khi mọi con số, giờ giấc và
   tên trong câu đều còn (`make_no_cannot::task_kept`, #7904; quyết định
   của người xây dựng đầu tiên trên #7819), và lời dặn trích chính câu đó.
+  Câu vừa sức chứa cũng được xin riêng phần việc trong cùng lần gọi (#7819,
+  FAIL của Twelve trên c0a4, 20/11: `do.task` của lần tạo apple file là
+  nguyên lời "Make me a skill. When I say apple file, that writes…"): dòng
+  `task:` của mô hình, việc agent làm mỗi lần chạy, không bao giờ là lời
+  xin tạo kỹ năng hay lời dùng để gọi nó, là task khi nó vừa sức chứa và
+  giữ mọi con số, giờ giấc và tên trong câu (cùng phép kiểm tra
+  `task_kept`, mô hình phán đoán ý nghĩa, không có danh sách từ); nếu
+  không, vẫn là lời của chính câu đó như trước, không bao giờ bị từ chối
+  (nhật ký chỉ ghi loại và độ dài, không ghi lời;
+  `the_apple_file_makes_task_is_the_task_alone`).
   Task của đường internet
   (`make_skill_local::net_made`, `LAMP_TASK_NET`) và của `cannot:` do mô
   hình nói (`make_skill_local::no_cannot`, `LAMP_MAKE_NO_CANNOT`) cũng vậy:
@@ -5940,7 +5956,14 @@ vụ lần chạy (#6432, #6306). Chi tiết đầy đủ ở
   chạy được đếm khi giao đi, và được gỡ khỏi sổ khi lamp-tasks từ chối nó
   trước khi agent bắt đầu (`NOT_TAKEN` của lần ghi cố định: `busy` vì đang
   chạy tác vụ của kỹ năng khác, `not_started`, tắt, dòng sai hay thiếu
-  token, hoặc không tới được lamp-tasks): journal ghi thêm "; not counted".
+  token, `no_net`, `not_held_off`, hoặc không tới được lamp-tasks): journal
+  ghi thêm "; not counted". Lần chạy của kỹ năng agent mà agent không thể
+  bị giữ trong phạm vi của nó (`not_held_off`, `task::NOT_HELD_OFF`;
+  #7819, 20/11: runner bị giữ mà wrapper của đường chạy chung không nhận,
+  hoặc agent mặc định OpenClaw được xin một quyền) còn được nói thành
+  tiếng, "I can't run that one yet: this lamp's agent can't be kept to only
+  what the skill may use, so nothing ran." (`task::NOT_HELD_OFF_SAID`),
+  không bao giờ là `run_failed` vẫn bị đếm và chỉ nói là chưa xong.
   Lần chạy có thể đã bắt đầu (`run_failed`, không có trả lời) vẫn được đếm.
   Trên lamp-9adf ngày 15/11, một kỹ năng hiện diện bị từ chối `busy` đã tiêu
   lần chạy cuối của ngày, và kỹ năng đến lượt 4 giây sau không còn lần nào.

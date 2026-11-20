@@ -14294,16 +14294,19 @@ mod tests {
                 .card
                 .replacen("\n---\n", &format!("\n{marks}\n---\n"), 1)
         };
-        std::fs::write(
-            folder.join("SKILL.md"),
-            card("made: here\nmade_by: voice\nadded: file\nagent: file\nagent: asked"),
-        )
-        .unwrap();
-        from_store(&folder, "desk-photo", false);
-        let asks = package::task_asks(&root, None, "desk-photo").unwrap();
-        assert_eq!(asks["from"], lamp_voice::make_no_cannot::FROM, "{asks}");
-        assert_eq!(asks["task"], words);
-        assert_eq!(asks["grants"], json!(["camera", "speak"]));
+        // Its one `agent:` key (#7819, 20 Nov), and a card kept before with
+        // both lines: each read as asked.
+        for marks in [
+            "made: here\nmade_by: voice\nadded: file\nagent: asked",
+            "made: here\nmade_by: voice\nadded: file\nagent: file\nagent: asked",
+        ] {
+            std::fs::write(folder.join("SKILL.md"), card(marks)).unwrap();
+            from_store(&folder, "desk-photo", false);
+            let asks = package::task_asks(&root, None, "desk-photo").unwrap();
+            assert_eq!(asks["from"], lamp_voice::make_no_cannot::FROM, "{asks}");
+            assert_eq!(asks["task"], words);
+            assert_eq!(asks["grants"], json!(["camera", "speak"]));
+        }
         std::fs::write(
             folder.join("SKILL.md"),
             card("made: here\nmade_by: app\nadded: file\nagent: file"),

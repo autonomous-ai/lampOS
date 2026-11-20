@@ -1165,14 +1165,34 @@ pub const NO_NET: &str = "no_net";
 pub const NO_NET_SAID: &str =
     "I can't run that one: it needs the internet, and this lamp's agent can't reach it yet.";
 
+/// lamp-tasks' code for an agent skill's run it refused before its agent
+/// began, because the lamp's agent can't be held to it
+/// (`lamp_tasks::skill_task::NOT_HELD_OFF_CODE`; #7819, the doc reader's
+/// finding on 4e421884da, 20 Nov): off the network or in a fresh home of
+/// its own (a wrapper whose round hasn't run), or, on a gateway agent such
+/// as OpenClaw, to the grants or keys it asks. Taken off the day's runs
+/// ([`crate::service_write::NOT_TAKEN`]) and said ([`NOT_HELD_OFF_SAID`]),
+/// never a `run_failed` that counts and says only that it didn't finish.
+pub const NOT_HELD_OFF: &str = "not_held_off";
+
+/// What the lamp says aloud when lamp-tasks refused a run as
+/// [`NOT_HELD_OFF`]: nothing of it ran, in plain words.
+pub const NOT_HELD_OFF_SAID: &str = "I can't run that one yet: this lamp's agent can't be kept to only what the skill may use, so nothing ran.";
+
 /// The plain line to say of lamp-tasks' answer to a hand-over (`answer`)
 /// when it refused the run in a way the person must hear: [`NO_NET_SAID`]
-/// for [`NO_NET`]. None for any other answer.
+/// for [`NO_NET`], [`NOT_HELD_OFF_SAID`] for [`NOT_HELD_OFF`]. None for
+/// any other answer.
 pub fn refusal_said(answer: &str) -> Option<&'static str> {
     let answer: serde_json::Value = serde_json::from_str(answer.trim()).ok()?;
-    (answer.get("ok").and_then(serde_json::Value::as_bool) != Some(true)
-        && answer["error"] == NO_NET)
-        .then_some(NO_NET_SAID)
+    if answer.get("ok").and_then(serde_json::Value::as_bool) == Some(true) {
+        return None;
+    }
+    match answer["error"].as_str()? {
+        NO_NET => Some(NO_NET_SAID),
+        NOT_HELD_OFF => Some(NOT_HELD_OFF_SAID),
+        _ => None,
+    }
 }
 
 /// The most sentences of an agent's answer said ([`told`]): as many as a
@@ -1694,6 +1714,64 @@ mod tests {
         assert_eq!(take_asked_by_voice("asked-other"), None);
         assert_eq!(take_asked_by_voice("asked-once"), Some(1_000));
         assert_eq!(take_asked_by_voice("asked-once"), None);
+    }
+
+    /// #7819, the doc reader's finding on 4e421884da (20 Nov): an agent
+    /// skill's run lamp-tasks refused `not_held_off` before its agent began
+    /// (the lamp's agent can't be held to it: an OpenClaw default asked for
+    /// a grant, or a held runner the one run path's wrapper won't take) is
+    /// said aloud in plain words, never the journal's, and spends none of
+    /// the day's runs; its failed line says it couldn't run, not that it
+    /// didn't finish.
+    #[test]
+    fn an_agent_run_lamp_tasks_could_not_hold_is_said_and_not_counted() {
+        assert_eq!(NOT_HELD_OFF, lamp_tasks::skill_task::NOT_HELD_OFF_CODE);
+        let unheld = serde_json::json!({
+            "ok": false,
+            "error": lamp_tasks::skill_task::NOT_HELD_OFF_CODE,
+            "message": lamp_tasks::skill_task::gateway_holds_none(
+                lamp_tasks::harness::EngineKind::Openclaw
+            ),
+        })
+        .to_string();
+        assert_eq!(refusal_said(&unheld), Some(NOT_HELD_OFF_SAID));
+        assert!(!NOT_HELD_OFF_SAID.contains("openclaw") && !NOT_HELD_OFF_SAID.contains("LAMP_"));
+        assert_eq!(
+            crate::task_sure::failed_line("apple-facts-file", &Ok(unheld.clone())).as_deref(),
+            Some("Apple facts file couldn't run this time.")
+        );
+        let dir = tempfile::tempdir().unwrap();
+        let state = dir.path().join("state");
+        fs::create_dir_all(&state).unwrap();
+        let folder = folder(dir.path());
+        let step = step(&folder, "scripts/main.py").unwrap();
+        let socket = dir.path().join("tasks.sock");
+        let control_socket = dir.path().join("control.sock");
+        let place = Place {
+            state: Some(&state),
+            control: &control_socket,
+            socket: Some(&socket),
+        };
+        let lamp_control = control(&control_socket, vec![serde_json::json!({"agreed": true})]);
+        set_on_here(Some(true));
+        let said = hand(
+            "apple-facts-file",
+            &step,
+            &folder,
+            &[],
+            place,
+            1,
+            |_, _| crate::service_write::agent_answered(&unheld),
+            || -> String { panic!("asked aloud") },
+        );
+        assert!(said.ends_with("; not counted"), "{said}");
+        assert!(said.contains("did not take it"), "{said}");
+        let ledger: Vec<(String, u64)> = fs::read(state.join(RUNS_FILE))
+            .map(|bytes| serde_json::from_slice(&bytes).unwrap())
+            .unwrap_or_default();
+        assert!(ledger.is_empty(), "{ledger:?}");
+        set_on_here(None);
+        lamp_control.join().unwrap();
     }
 
     /// A run lamp-tasks refused before its agent began (busy with another

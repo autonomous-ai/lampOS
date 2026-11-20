@@ -1723,11 +1723,12 @@ sang runner chung của #6510 bước 2 mà không cần luật mới.
     cùng cổng như câu trả lời được kể: "I can't run that one: it needs the
     internet, and this lamp's agent can't reach it yet." Journal giữ lời
     của lamp-tasks.
-  - Runner của lần tạo, mà lần chạy của kỹ năng agent và lần chạy có khóa
-    vẫn đi qua, không được wrapper của đường chạy chung giữ (nó chỉ giữ lần
-    chạy bắt đầu trong thư mục `skill-<run-id>` riêng): bị từ chối
+  - Runner của lần tạo không được wrapper của đường chạy chung giữ (nó chỉ
+    giữ lần chạy bắt đầu trong thư mục `skill-<run-id>` riêng): bị từ chối
     `NOT_HELD_OFF_ONE_PATH`, không còn đổ lỗi cho `LAMP_SKILL_TASKS` hay
-    vòng của lamp-update.
+    vòng của lamp-update. Lần chạy của kỹ năng agent và lần chạy có khóa
+    không còn đi qua nó ở đó (#7819, bên dưới): theo đường chạy chung chúng
+    chạy trên engine của chính đèn.
   - Test: `harness::a_net_run_by_the_one_run_path_gets_its_egress_socket_before_harness_new`,
     `skill_task::tests::a_net_run_is_marked_its_home_named_by_its_id_and_refused_as_no_net`,
     `the_one_path_wrappers_carry_the_egress_lines_once`,
@@ -1739,9 +1740,42 @@ sang runner chung của #6510 bước 2 mà không cần luật mới.
   lamp-control, và mạng bị giữ trừ khi lời đồng ý của lamp-control có `net`. Hermes được
   bảo đọc tệp đó và làm theo, chỉ chạm tới đèn qua `control.sock` với token
   của lần chạy, không bao giờ hỏi khóa hay token bằng giọng nói. Nó đi qua
-  runner của lần tạo, bị giữ ngoài mạng (`skill_make::lamp_runner(home, true)`)
-  trừ khi có `net`. Môi trường chỉ có socket, token, đường dẫn SDK và home
-  mới bên dưới: không có khóa.
+  runner bị giữ mà một câu hỏi trực tiếp bị giữ ngoài mạng dùng
+  (`skill_make::AskRunner`, `HandOvers::held`) trừ khi có `net`: với đường
+  chạy chung của lamp-update, Hermes của đèn qua lối vào task của wrapper,
+  trong thư mục `skill-<run id>` riêng (`--net`, token lấy từ tệp, home mới
+  `make-<run id>/home` do `LAMP_NS_HOME` chỉ ra, khóa theo id của lần chạy);
+  không có đường đó, runner của lần tạo bị giữ ngoài mạng
+  (`skill_make::lamp_runner(home, true)`) như trước. Môi trường chỉ có
+  socket, token, đường dẫn SDK và home mới bên dưới: không có khóa.
+- **Trên engine của chính đèn** (#7819, FAIL của Twelve trên c0a4, 20/11:
+  trên đèn OpenClaw có đường chạy chung, một kỹ năng agent được tạo vẫn được
+  giữ nhưng không bao giờ chạy: lamp-tasks đưa nó cho runner bị giữ của lần
+  tạo, runner này từ chối `NOT_HELD_OFF_ONE_PATH`). Khi
+  `LAMP_SKILL_DEFAULT_AGENT` bật, lần chạy không có `net` của kỹ năng agent
+  được chọn agent như một lần tạo (lựa chọn của `skill_make::MakeGateway`,
+  `HandOvers::gateway`): Hermes của đèn chạy nó bị giữ như trên; một agent
+  gateway (OpenClaw) nhận nó như một lượt riêng của mình
+  (`skill_task::on_gateway_agent`, `harness new openclaw` hoặc pane giữ sẵn
+  duy nhất của đèn), trong thư mục riêng của lần chạy, `make-<run id>`
+  trong thư mục làm việc, không có home, bị xóa dù kết thúc thế nào. Chỉ
+  lần chạy không xin quyền và không có khóa mới đến gateway (lần tạo apple
+  file, quyền lạ đã bị `LAMP_MAKE_NO_CANNOT` bỏ ra, không có quyền nào):
+  gateway giữ mạng cùng workspace, bộ nhớ và phiên của chủ đèn, và token
+  hay khóa của lần chạy sẽ nằm nơi mọi agent của gateway đọc được, nên lần
+  chạy có bất kỳ thứ nào bị từ chối `not_held_off` bằng lời
+  (`skill_task::gateway_holds_none`) trước khi tạo token, không bao giờ
+  chạy mở và không bao giờ chuyển sang Hermes. Lời đồng ý của chủ đèn vẫn
+  được kiểm tra bằng một token không mang quyền nào, kết thúc cùng lần
+  chạy; lượt đó không được đưa token hay môi trường. Lời của nó
+  (`SkillRun::gateway_prompt`) bảo đọc `scripts/SKILL.md` và làm theo,
+  không dùng gì của đèn và không tạo, đổi hay xóa kỹ năng nào, rồi ghi điều
+  đèn nói vào `answer.md` trong thư mục của nó, được nói như câu trả lời
+  của mọi lần chạy, sau cổng của lamp-skills cho câu trả lời được nói. Lựa
+  chọn thất bại bị từ chối bằng lời của nó. Tắt, mọi lần chạy của kỹ năng
+  agent là của Hermes như trước. Lần chạy có home mới mà runner không giữ được (`NOT_HELD_OFF`, `NOT_HELD_OFF_ONE_PATH`, `NO_RUN_NAMESPACE`) cũng được trả lời `not_held_off` (`skill_task::NOT_HELD_OFF_CODE`), không bao giờ là `run_failed`: lamp-skills gỡ nó khỏi số lần chạy trong ngày và nói thành tiếng (docs/skills.md). Test:
+  `skill_task::tests::a_made_agent_skill_with_no_grant_runs_on_an_openclaw_lamps_own_agent`,
+  `an_agent_skills_held_runner_takes_the_one_run_path`.
 - **Mọi lần chạy của kỹ năng agent, và mọi lần chạy có `net`, bắt đầu trong
   một home mới, dữ liệu Hermes của người dùng bị ẩn**, như một lần tạo
   (lỗi P1 mà #6643 đã đóng cho lần tạo): `make-<run id>` trong thư mục làm

@@ -965,6 +965,14 @@ fn fresh_home_named(work: &Path, name: &str, services: bool) -> std::io::Result<
     Ok(made)
 }
 
+/// An agent skill's run's own folder on a gateway agent (OpenClaw;
+/// `crate::skill_task`, #7819, Twelve's c0a4 FAIL, 20 Nov): `make-<run id>`
+/// in `work`, 0700, empty and with no home, as the gateway agent runs in
+/// its own; removed however the run ends.
+pub(crate) fn folder_for_run(work: &Path, run: &str) -> std::io::Result<MadeFolder> {
+    fresh_folder(work, &format!("{FOLDER_HEAD}{run}"))
+}
+
 /// A fresh folder `name` (`make-<run id>`) in `work`, 0700 before anything
 /// is in it, made new (never one there), opened never through a link and
 /// removed however its run ends.
@@ -1852,6 +1860,19 @@ impl Runner for NetRunner {
 /// [`NOT_HELD_OFF_ONE_PATH`] there. Never through Harness, which passes the
 /// wrapper none of lamp-tasks' variables. Without the one run path, `make`
 /// ([`lamp_runner`] held), as before.
+///
+/// An agent skill's run on the lamp's Hermes goes through it too
+/// (`crate::skill_task::HandOvers::held`; #7819, Twelve's c0a4 FAIL, 20
+/// Nov): with lamp-update's one run path the held make's runner refused
+/// every such run [`NOT_HELD_OFF_ONE_PATH`], so a made agent skill never
+/// ran there. By the one run path it now runs as a live ask held off the
+/// network does: Hermes's task entry in the run's own `skill-<run id>`
+/// folder (`--net`), its token from its file, its fresh home
+/// `make-<run id>/home` named as a make's, its keys read by the wrapper by
+/// the run's id; no hold of the held make's is dropped. Such a run tells
+/// what its agent wrote to its own folder's [`ANSWER_FILE`], as the held
+/// make's runner has it ([`Runner::answers`]); a live ask reads its answer
+/// itself and never tells (its `SkillRun::tells` is off).
 pub struct AskRunner {
     pub make: MakeHermes,
     pub one_path: Option<Arc<crate::skill_task::HarnessRunner>>,
@@ -1897,14 +1918,31 @@ impl Runner for AskRunner {
         }
     }
 
+    /// As the held make's runner: what the run's agent wrote to its own
+    /// folder's [`ANSWER_FILE`], either way (by the one run path the agent
+    /// namespace starts it in that folder, `make-<run id>`).
+    fn answers(&self) -> bool {
+        true
+    }
+
+    fn tell_words(&self, start_in: Option<&Path>) -> String {
+        self.make.tell_words(start_in)
+    }
+
     fn run(&self, run: &SkillRun, end_token: &dyn Fn()) -> Result<u64, String> {
         match self.by_one_path() {
-            Some(harness) => harness.run_task_entry(
-                crate::harness::EngineKind::Hermes,
-                &self.home,
-                run,
-                end_token,
-            ),
+            Some(harness) => {
+                let ran = harness.run_task_entry(
+                    crate::harness::EngineKind::Hermes,
+                    &self.home,
+                    run,
+                    end_token,
+                );
+                if ran.is_ok() {
+                    keep_told_answer(run);
+                }
+                ran
+            }
             None => self.make.run(run, end_token),
         }
     }

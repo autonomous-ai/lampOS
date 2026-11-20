@@ -3929,9 +3929,11 @@ fn stays_deepseeks(
 /// one that keeps people and their services safe is said with the lamp's
 /// own plain reason ([`crate::make_no_cannot::kept_refusal`]), any other as
 /// the model wrote it. The agent's ([`crate::make_no_cannot::AGENTS_CANNOT`])
-/// is never said. Its task's `words` are the person's own make line, as
-/// the middle form's (Twelve's follow-up on #7819, 02:41). Off, or any
-/// other make, `made` as it is.
+/// is never said. Its `words` are the person's own make line, as the
+/// middle form's (Twelve's follow-up on #7819, 02:41), and its task the
+/// task alone the model writes of it when that keeps what the line names,
+/// else the line ([`crate::make_no_cannot::task_kept`], #7819, 20 Nov).
+/// Off, or any other make, `made` as it is.
 fn no_cannot(
     made: Result<Made, Refused>,
     models_cannot: &std::cell::Cell<bool>,
@@ -3989,8 +3991,9 @@ fn no_cannot(
 /// `LAMP_MAKE_NO_CANNOT`: asked for by its words, an agent skill granted
 /// `net` that reads back and waits for the yes at its first ask; on a
 /// trigger, a made task for the agent on it, granted `net` (the owner's
-/// ruling, 17 Nov), said back and waiting for the spoken yes. Its task's
-/// `words` are the person's own make line, as the middle form's (Twelve's
+/// ruling, 17 Nov), said back and waiting for the spoken yes. Its
+/// `words` (its task the task alone of them, [`crate::make_no_cannot::task_kept`],
+/// #7819, 20 Nov) are the person's own make line, as the middle form's (Twelve's
 /// follow-up on #7819, 02:41). Any other make, `made` as it is.
 fn net_made(
     made: Result<Made, Refused>,
