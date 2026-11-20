@@ -25,6 +25,17 @@ pub const WORKER_STARTUP_TIMEOUT: Duration = Duration::from_secs(3);
 /// ([`YOUNG_BOOT`]) and `LAMP_VOICE_YOUNG_BOOT_GRACE=on` (#7224: lamp-c0a4's
 /// cold boot, load 7.9, a worker missed its 3 s twice within 67 s of boot).
 pub const YOUNG_BOOT_STARTUP_TIMEOUT: Duration = Duration::from_secs(10);
+/// How long in all the `second` worker's ready is waited for when it is
+/// still running at its deadline (#7224 fault 5): its deadline is moved on by
+/// [`WORKER_STARTUP_TIMEOUT`] at a time, at most three times, up to this
+/// bound from its spawn. A warm start is ready in about 2 s; lamp-06c1's
+/// cold boot was still in the worker's setup at 3 s, and lamp-c0a4 under
+/// load 7.9 needed more than 3 s. Ready is still required: a worker that
+/// never says it ends with the same timeout, now at this bound.
+pub const SECOND_READY_BOUND: Duration = Duration::from_secs(12);
+/// The most deadline moves a `second` worker is given within
+/// [`SECOND_READY_BOUND`].
+const SECOND_READY_RETRIES: u32 = 3;
 /// How long after boot, on `CLOCK_BOOTTIME`, the system counts as young.
 pub const YOUNG_BOOT: Duration = Duration::from_secs(120);
 const YOUNG_BOOT_GRACE: &str = "LAMP_VOICE_YOUNG_BOOT_GRACE";
@@ -131,6 +142,17 @@ fn startup_bound(role: &str, var: impl Fn(&str) -> Option<std::ffi::OsString>) -
         );
     }
     (bound, on)
+}
+
+/// The journal line for the `second` worker's deadline moved on once more:
+/// it was waited for `waited` ms, is still running, and is waited for up to
+/// `window` ms more, retry `retry` of [`SECOND_READY_RETRIES`] (#7224).
+fn second_retry_line(waited: u128, window: u128, retry: u32) -> String {
+    format!(
+        "lamp-voice: second worker not ready after {waited} ms and still running; \
+         waiting up to {window} ms more (retry {retry} of {SECOND_READY_RETRIES}, bound {} ms)",
+        SECOND_READY_BOUND.as_millis()
+    )
 }
 
 /// Notes that `role`'s worker has said ready, with the grace's switch on
@@ -552,6 +574,7 @@ impl Worker {
         let began = startup_now();
         let mut deadline = began + bound;
         let mut busy_at_start = false;
+        let mut retries = 0;
         let role = self.role.clone();
         let peer_c = directory.join(format!("{role}.c.w"));
         let peer_d = directory.join(format!("{role}.d.w"));
@@ -606,6 +629,28 @@ impl Worker {
                 }
                 Some(_) => return Err(io::Error::other("unexpected worker startup message")),
                 None => {}
+            }
+            if startup_now() >= deadline && role == "second" && retries < SECOND_READY_RETRIES {
+                // The `second` worker does its whole setup before it says
+                // ready, and at a cold boot that can run past 3 s (#7224
+                // fault 5). It was found running just above, so it is waited
+                // for longer rather than the run ended: never past
+                // [`SECOND_READY_BOUND`] from its spawn, and still only
+                // ready ends the wait.
+                let cap = began + bound.max(SECOND_READY_BOUND);
+                if deadline < cap {
+                    let now = startup_now();
+                    retries += 1;
+                    deadline = (deadline + WORKER_STARTUP_TIMEOUT).min(cap);
+                    eprintln!(
+                        "{}",
+                        second_retry_line(
+                            (now - began).as_millis(),
+                            deadline.saturating_duration_since(now).as_millis(),
+                            retries,
+                        )
+                    );
+                }
             }
             if startup_now() >= deadline {
                 // The role and the wait are named, so a journal tells which
@@ -957,19 +1002,20 @@ mod fixture_tests {
         assert!((3000..4000).contains(&waited), "waited {waited} ms: {said}");
     }
 
-    /// A capture worker waited for up to `bound`, the startup clock moved on
+    /// A `role` worker waited for up to `bound`, the startup clock moved on
     /// 500 ms each wait and Ready sent once it has moved `ready_after`, if
     /// at all; gives the wait's result and how far the clock moved.
     fn capture_waited(
+        role: &str,
         bound: Duration,
         ready_after: Option<Duration>,
     ) -> (io::Result<()>, Duration) {
         let directory = SessionDirectory::create().unwrap();
         let dir = &directory.path;
         let (parent, boot) = (new_boot().unwrap(), new_boot().unwrap());
-        let channels = WorkerChannels::bind(dir, "capture", parent, boot, false).unwrap();
-        let mut peer = WorkerChannels::bind(dir, "capture", parent, boot, true).unwrap();
-        peer.connect(dir, "capture", true).unwrap();
+        let channels = WorkerChannels::bind(dir, role, parent, boot, false).unwrap();
+        let mut peer = WorkerChannels::bind(dir, role, parent, boot, true).unwrap();
+        peer.connect(dir, role, true).unwrap();
         let child = Command::new("sleep")
             .arg("60")
             .stdin(Stdio::null())
@@ -981,7 +1027,7 @@ mod fixture_tests {
             channels,
             child,
             boot,
-            role: "capture".into(),
+            role: role.into(),
             diagnostic_start: None,
             ring_resources: None,
             on_stop: None,
@@ -1001,13 +1047,80 @@ mod fixture_tests {
 
     /// How long a timed-out capture worker says it waited.
     fn waited_ms(result: io::Result<()>) -> u128 {
+        role_waited_ms("capture", result)
+    }
+
+    /// How long a timed-out `role` worker says it waited.
+    fn role_waited_ms(role: &str, result: io::Result<()>) -> u128 {
         let error = result.unwrap_err();
         assert_eq!(error.kind(), io::ErrorKind::TimedOut);
         let said = error.to_string();
-        said.strip_prefix("worker readiness timed out (capture after ")
+        said.strip_prefix(&format!("worker readiness timed out ({role} after "))
             .and_then(|rest| rest.strip_suffix(" ms)"))
             .and_then(|ms| ms.parse::<u128>().ok())
             .unwrap_or_else(|| panic!("role and wait not named: {said}"))
+    }
+
+    /// A `second` worker still in its setup at 3 s is waited for, not
+    /// ended (#7224 fault 5: lamp-06c1's cold boot).
+    #[test]
+    fn a_second_worker_ready_after_three_seconds_is_waited_for() {
+        let (ready, moved) = capture_waited(
+            "second",
+            WORKER_STARTUP_TIMEOUT,
+            Some(Duration::from_millis(3500)),
+        );
+        ready.unwrap();
+        assert_eq!(moved, Duration::from_millis(3500));
+    }
+
+    /// Twice past its 3 s, a `second` worker is still waited for.
+    #[test]
+    fn a_second_worker_ready_after_six_seconds_is_waited_for() {
+        let (ready, moved) = capture_waited(
+            "second",
+            WORKER_STARTUP_TIMEOUT,
+            Some(Duration::from_millis(6500)),
+        );
+        ready.unwrap();
+        assert_eq!(moved, Duration::from_millis(6500));
+    }
+
+    /// A `second` worker that never says ready ends at the 12 s bound, with
+    /// the usual timeout's words.
+    #[test]
+    fn a_second_worker_never_ready_ends_at_twelve_seconds() {
+        let waited = role_waited_ms(
+            "second",
+            capture_waited("second", WORKER_STARTUP_TIMEOUT, None).0,
+        );
+        assert!((12_000..13_000).contains(&waited), "waited {waited} ms");
+    }
+
+    /// Only the `second` worker is waited for past its bound: a capture
+    /// worker ready at 3.5 s still ends at 3 s.
+    #[test]
+    fn a_capture_worker_is_not_retried() {
+        let waited = waited_ms(
+            capture_waited(
+                "capture",
+                WORKER_STARTUP_TIMEOUT,
+                Some(Duration::from_millis(3500)),
+            )
+            .0,
+        );
+        assert!((3000..4000).contains(&waited), "waited {waited} ms");
+    }
+
+    /// The retry's journal line says the wait so far, the window and the
+    /// bound.
+    #[test]
+    fn second_retry_line_says_the_wait() {
+        assert_eq!(
+            second_retry_line(3000, 3000, 1),
+            "lamp-voice: second worker not ready after 3000 ms and still running; \
+             waiting up to 3000 ms more (retry 1 of 3, bound 12000 ms)"
+        );
     }
 
     const YOUNG: fn() -> Option<Duration> = || Some(Duration::from_secs(31));
@@ -1019,7 +1132,7 @@ mod fixture_tests {
     fn a_worker_started_young_with_the_grace_on_is_ready_at_five_seconds() {
         let bound = readiness_bound(young_boot_grace(true, YOUNG, false));
         assert_eq!(bound, YOUNG_BOOT_STARTUP_TIMEOUT);
-        let (ready, moved) = capture_waited(bound, Some(Duration::from_secs(5)));
+        let (ready, moved) = capture_waited("capture", bound, Some(Duration::from_secs(5)));
         ready.unwrap();
         assert_eq!(moved, Duration::from_secs(5));
     }
@@ -1029,7 +1142,7 @@ mod fixture_tests {
     #[test]
     fn a_worker_started_young_with_the_grace_on_that_never_says_ready_ends_at_ten_seconds() {
         let bound = readiness_bound(young_boot_grace(true, YOUNG, false));
-        let waited = waited_ms(capture_waited(bound, None).0);
+        let waited = waited_ms(capture_waited("capture", bound, None).0);
         assert!((10_000..11_000).contains(&waited), "waited {waited} ms");
     }
 
@@ -1041,7 +1154,7 @@ mod fixture_tests {
         assert_eq!(young_boot_grace(true, || None, false), None);
         assert_eq!(young_boot_grace(true, YOUNG, true), None);
         let bound = readiness_bound(young_boot_grace(true, NOT_YOUNG, false));
-        let waited = waited_ms(capture_waited(bound, Some(Duration::from_secs(5))).0);
+        let waited = waited_ms(capture_waited("capture", bound, Some(Duration::from_secs(5))).0);
         assert!((3000..4000).contains(&waited), "waited {waited} ms");
     }
 
@@ -1054,8 +1167,14 @@ mod fixture_tests {
             false,
         );
         assert_eq!(grace, None);
-        let waited =
-            waited_ms(capture_waited(readiness_bound(grace), Some(Duration::from_secs(5))).0);
+        let waited = waited_ms(
+            capture_waited(
+                "capture",
+                readiness_bound(grace),
+                Some(Duration::from_secs(5)),
+            )
+            .0,
+        );
         assert!((3000..4000).contains(&waited), "waited {waited} ms");
     }
 
@@ -1072,7 +1191,11 @@ mod fixture_tests {
                 .filter(|ready| *ready == role)
                 .count()
         };
-        let (ready, _) = capture_waited(WORKER_STARTUP_TIMEOUT, Some(Duration::from_secs(1)));
+        let (ready, _) = capture_waited(
+            "capture",
+            WORKER_STARTUP_TIMEOUT,
+            Some(Duration::from_secs(1)),
+        );
         ready.unwrap();
         ready_noted("grace-off-probe", false);
         ready_noted("grace-off-probe", false);

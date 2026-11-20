@@ -370,6 +370,19 @@ Two of the voice's start-up failures, found on lamp-52e6 and lamp-4ace on
   `lamp-voice: capture was given the young-boot grace (system up 31 s):
   readiness bound 10 s`. Off, the bound and the journal are as before.
   Off Linux there is no boot clock read, so no start is young.
+  Whatever the switch, the `second` worker is waited for past its bound
+  while it is still running (#7224 fault 5: lamp-06c1, stable 15203,
+  20 Nov 23:28, a normal reboot: `worker readiness timed out (second after
+  3000 ms)` 9 s after the start, a restart, ready 15 s after the start).
+  It does all its setup before it says ready, so at the deadline, with its
+  process found running, the deadline moves on by 3 s, at most three
+  times and never past `SECOND_READY_BOUND`, 12 s from its spawn (or the
+  grace's 10 s when that is longer, so still 12 s). Each move says
+  `lamp-voice: second worker not ready after <W> ms and still running;
+  waiting up to <N> ms more (retry <n> of 3, bound 12000 ms)`. Ready still
+  gates `listening_ready`; a worker that ends is caught at once; one that
+  never says ready ends at 12 s with the same `worker readiness timed out
+  (second after <W> ms)`. Other roles are not waited for past their bound.
 - **The privacy worker's lease lapsing in the muted wait after boot.** On
   lamp-06c1 on 2026-10-30, a cold boot, run 1: `onboarding skill loaded`
   at 15.82, `schedule-consumer: due reminders available` at 15.89, then
