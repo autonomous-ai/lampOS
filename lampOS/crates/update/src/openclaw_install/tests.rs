@@ -1533,6 +1533,25 @@ fn a_gateway_block_write_holds_the_state_folders_lock_through_its_check() {
     );
 }
 
+/// #8060: lamp-tasks, already `lampos`, runs the same own-namespace check
+/// as the `gateway` block with no gateway, only without `runuser`; and a
+/// `MainPID` of 0, or none printed, is no gateway running.
+#[test]
+fn lamp_tasks_own_namespace_check_is_the_installs_without_runuser() {
+    let all = validate_argv("1001", "1002", "/x/.openclaw.json.new", false);
+    let own = own_namespace_validate_argv("1001", "1002", "/x/.openclaw.json.new");
+    assert_eq!(all[..4], ["runuser", "-u", USER, "--"]);
+    assert_eq!(own, all[4..]);
+    assert_eq!(own[0], "env");
+    assert!(own.contains(&CHECK_TOKEN.to_owned()), "{own:?}");
+    assert!(own.contains(&NS.to_owned()), "{own:?}");
+    assert_eq!(main_pid_argv()[0], "/usr/bin/systemctl");
+    assert_eq!(main_pid_argv()[1..], MAIN_PID[1..]);
+    let says = |pid: &str| gateway_runs(&["echo".to_owned(), pid.to_owned()]);
+    assert!(says("4242") && !says("0") && !says(""));
+    assert!(!gateway_runs(&["false".to_owned()]) && !gateway_runs(&[]));
+}
+
 /// #7868 (the first builder, 02:02): OpenClaw 2026.11.2 refuses a `config
 /// validate` run in namespaces other than its running gateway's
 /// (`GatewayLockNamespaceError`, #7268). With the gateway's unit holding a

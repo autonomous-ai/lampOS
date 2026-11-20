@@ -2534,9 +2534,8 @@ fn tool_checks() -> Vec<(&'static str, Vec<String>)> {
 /// `args` as `lampos`, with [`PLACE`] as `HOME` (npm's cache goes there),
 /// OpenClaw's state folder, [`INSTALL_PATH`] and `SHELL=/bin/sh`.
 fn as_lampos(args: &[&str]) -> Vec<String> {
-    let mut argv: Vec<String> = ["runuser", "-u", USER, "--", "env"]
-        .map(str::to_owned)
-        .into();
+    let mut argv: Vec<String> = RUNUSER.map(str::to_owned).into();
+    argv.push("env".to_owned());
     argv.extend([
         format!("HOME={PLACE}"),
         format!("{STATE_ENV}={STATE}"),
@@ -2564,6 +2563,9 @@ fn in_namespace(uid: &str, gid: &str, npm_ci: bool, args: &[&str]) -> Vec<String
     as_lampos(&tail)
 }
 
+/// What [`as_lampos`] runs a command as `lampos` with.
+const RUNUSER: [&str; 4] = ["runuser", "-u", USER, "--"];
+
 /// What OpenClaw's own config check sees for `${LAMP_HERMES_TOKEN}`
 /// ([`validate_argv`]): a stand-in, as the check reads the file and calls
 /// no provider, and the forwarder's own token never goes on a command line.
@@ -2579,6 +2581,31 @@ pub fn has_main_pid(said: &str) -> bool {
     !pid.is_empty() && pid != "0"
 }
 
+/// [`MAIN_PID`] as a part not run through lamp-update's runner runs it,
+/// `systemctl` by its full path (lamp-setup's reset, lamp-tasks).
+pub fn main_pid_argv() -> Vec<String> {
+    std::iter::once("/usr/bin/systemctl")
+        .chain(MAIN_PID[1..].iter().copied())
+        .map(str::to_owned)
+        .collect()
+}
+
+/// Whether `main_pid` ([`main_pid_argv`] on the lamp) prints a running
+/// gateway's `MainPID` ([`has_main_pid`]); not run, or failed, it is not.
+pub fn gateway_runs(main_pid: &[String]) -> bool {
+    let Some((program, args)) = main_pid.split_first() else {
+        return false;
+    };
+    std::process::Command::new(program)
+        .args(args)
+        .stdin(std::process::Stdio::null())
+        .stderr(std::process::Stdio::null())
+        .output()
+        .is_ok_and(|out| {
+            out.status.success() && has_main_pid(&String::from_utf8_lossy(&out.stdout))
+        })
+}
+
 /// OpenClaw's own check of the config in `file` (a path on the lamp beside
 /// `openclaw.json`, never the live one, readable by `lampos`): `config
 /// validate --json` as `lampos`, pointed at `file` by
@@ -2590,7 +2617,9 @@ pub fn has_main_pid(said: &str) -> bool {
 /// Else, with no gateway and so no lock to clash with, inside OpenClaw's
 /// namespace of its own, as the install's `--version` runs
 /// ([`in_namespace`]), with [`CHECK_TOKEN`]. The install's `gateway` block
-/// (#7868) and lamp-setup's reset cut both run it.
+/// (#7868) and lamp-setup's reset cut both run it; lamp-tasks, already
+/// `lampos`, runs its own-namespace form ([`own_namespace_validate_argv`],
+/// #8060).
 pub fn validate_argv(uid: &str, gid: &str, file: &str, joined: bool) -> Vec<String> {
     let config = format!("OPENCLAW_CONFIG_PATH={file}");
     if joined {
@@ -2603,6 +2632,15 @@ pub fn validate_argv(uid: &str, gid: &str, file: &str, joined: bool) -> Vec<Stri
         .unwrap_or(argv.len());
     argv.insert(at, CHECK_TOKEN.to_owned());
     argv.insert(at, config);
+    argv
+}
+
+/// [`validate_argv`] in OpenClaw's namespace of its own (not `joined`),
+/// for a caller that is `lampos` already (lamp-tasks' `openclaw.json`
+/// writer, #8060): the same command, without `runuser`.
+pub fn own_namespace_validate_argv(uid: &str, gid: &str, file: &str) -> Vec<String> {
+    let mut argv = validate_argv(uid, gid, file, false);
+    argv.drain(..RUNUSER.len());
     argv
 }
 
