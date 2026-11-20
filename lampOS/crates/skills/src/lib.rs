@@ -1074,6 +1074,11 @@ struct StepFile {
     /// A task handed to the lamp's agent, its script in the skill's own
     /// `scripts/` ([`task`], #6305): alone in its `[[do]]` table.
     task: Option<task::TaskFile>,
+    /// `run = "scripts/main.py"` (#8158): the skill's own script run by
+    /// lamp-tasks itself, with no agent ([`task::TaskStep::run_step`]),
+    /// held to everything a `do.task` is; alone in its `[[do]]` table, and
+    /// a skill's one task.
+    run: Option<String>,
 }
 
 /// `propose = { ... }`: what an add-on suggests, as its folder writes it.
@@ -2578,7 +2583,7 @@ impl Skill {
     /// (`lamp_voice::made_skill::task_words_plain`).
     fn task_refuses(&self) -> Option<&'static str> {
         self.task_step()
-            .filter(|task| !lamp_voice::made_skill::task_words_plain(&task.words))
+            .filter(|task| !task.direct && !lamp_voice::made_skill::task_words_plain(&task.words))
             .map(|_| TASK_WORDS_NOT_PLAIN)
     }
 
@@ -5087,6 +5092,7 @@ fn manifest(
                 && step.propose.is_none()
                 && step.remind.is_none()
                 && step.task.is_none()
+                && step.run.is_none()
                 && step.on.is_none()
                 && step.after.is_none()
                 && step.if_choice.is_none()
@@ -5104,7 +5110,12 @@ fn manifest(
     }
     // A task handed to the lamp's agent (#6305): one a skill, its grants
     // beside it and nowhere else, in an installable skill only.
-    let tasks = file.steps.iter().filter(|step| step.task.is_some()).count();
+    // A `run` step (#8158) is a task too: one a skill, its grants beside it.
+    let tasks = file
+        .steps
+        .iter()
+        .filter(|step| step.task.is_some() || step.run.is_some())
+        .count();
     // A core skill's line through the lamp's agent may hand one task for
     // each of its triggers' lines (`on`), its variant checked as read.
     let via_agent = file.via_agent;
@@ -5145,6 +5156,36 @@ fn manifest(
     for step in file.steps {
         if let Some(read) = step.read {
             steps.push(Step::Call(Call::ServiceRead(Box::new(read.step(quiet)?))));
+            ons.resize(steps.len(), None);
+            continue;
+        }
+        if let Some(run) = &step.run {
+            if step.task.is_some()
+                || step.body.is_some()
+                || step.light.is_some()
+                || step.say.is_some()
+                || step.sound.is_some()
+                || step.cue.is_some()
+                || step.rest.is_some()
+                || step.requested_audio.is_some()
+                || step.look.is_some()
+                || step.show.is_some()
+                || step.stand.is_some()
+                || step.propose.is_some()
+                || step.remind.is_some()
+                || step.write.is_some()
+                || step.on.is_some()
+                || step.after.is_some()
+                || step.if_choice.is_some()
+            {
+                return Err(
+                    "do.run is alone in its [[do]] table: the light, a cue or a say are steps of their own"
+                        .into(),
+                );
+            }
+            steps.push(Step::Call(Call::Task(Box::new(task::TaskStep::run_step(
+                dir, run, quiet,
+            )?))));
             ons.resize(steps.len(), None);
             continue;
         }
@@ -14058,6 +14099,85 @@ mod tests {
             assert!(refused.contains("is not a grant"), "{name}: {refused}");
         }
         task::set_agent_services_here(None);
+    }
+
+    /// #8158: a `run = "scripts/main.py"` step loads as a task run with no
+    /// agent: held as a `do.task` is (one a skill, its grants beside it,
+    /// alone in its table, a plain file in its own `scripts/`), a Python
+    /// file, its words the fixed [`task::RUN_WORDS`] (never refused as a
+    /// made skill's task words), and handed over as `skill_run`.
+    #[test]
+    fn a_run_step_loads_as_a_task_with_no_agent() {
+        const BRIEF: &str = "version = \"1.0.0\"\ngrants = [\"speak\"]\n\
+            tool = \"daily_brief\"\n[permissions]\nspeak = true\n\
+            [[do]]\nrun = \"scripts/main.py\"\n";
+        let dir = tempfile::tempdir().unwrap();
+        let folder = task_skill(dir.path(), "daily-brief", BRIEF);
+        let skill = load(&folder).unwrap();
+        assert_eq!(skill.grants, ["speak"]);
+        let step = skill.task_step().unwrap();
+        assert!(step.direct);
+        assert_eq!(step.run, "scripts/main.py");
+        assert_eq!(step.task, task::RUN_WORDS);
+        assert_eq!(skill.made_refuses(), None);
+        let line: Value = serde_json::from_str(
+            &task::HandOver {
+                skill: "daily-brief",
+                step,
+                folder: &folder,
+                sha256: &"a".repeat(64),
+                grants: &skill.grants,
+            }
+            .line(),
+        )
+        .unwrap();
+        assert_eq!(line["op"], "skill_run");
+        assert_eq!(line["run"], "scripts/main.py");
+        // A `do.task` is handed over as before.
+        let booth = load(&task_skill(dir.path(), "photo-booth", PHOTO_BOOTH)).unwrap();
+        assert!(!booth.task_step().unwrap().direct);
+        let refused = |name: &str, toml: String, why: &str| {
+            let folder = task_skill(dir.path(), name, &toml);
+            let refused = load(&folder).unwrap_err();
+            assert!(refused.contains(why), "{name}: {refused}");
+        };
+        refused(
+            "run-not-alone",
+            BRIEF.replace("[[do]]\nrun", "[[do]]\nsay = \"Hi.\"\nrun"),
+            "do.run is alone in its [[do]] table",
+        );
+        refused(
+            "run-and-task",
+            format!("{BRIEF}[[do]]\ntask = {{ task = \"again\", run = \"scripts/main.py\" }}\n"),
+            "one do.task step",
+        );
+        refused(
+            "run-out-of-scripts",
+            BRIEF.replace("scripts/main.py", "../main.py"),
+            "do.run",
+        );
+        refused(
+            "run-missing",
+            BRIEF.replace("scripts/main.py", "scripts/other.py"),
+            "do.run",
+        );
+        let shell = task_skill(
+            dir.path(),
+            "run-shell",
+            &BRIEF.replace("main.py", "main.sh"),
+        );
+        std::fs::write(shell.join("scripts/main.sh"), "echo hi\n").unwrap();
+        let refused = load(&shell).unwrap_err();
+        assert!(refused.contains("is a Python file"), "{refused}");
+        let grants_alone = task_skill(
+            dir.path(),
+            "run-grants-alone",
+            &BRIEF.replace(
+                "[[do]]\nrun = \"scripts/main.py\"\n",
+                "[[do]]\nsay = \"Hi.\"\n",
+            ),
+        );
+        assert!(load(&grants_alone).unwrap_err().contains("only beside one"));
     }
 
     /// #6305: a `do.task` loads with its grants beside the skill's other

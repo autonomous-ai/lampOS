@@ -1633,6 +1633,11 @@
             }
           },
           "description": "A task handed to the lamp's agent, alone in its [[do]] table, one a skill, in an installable skill (do.task, docs/skills.md)."
+        },
+        "run": {
+          "type": "string",
+          "pattern": "^scripts/.+\\.py$",
+          "description": "A run step (#8158): the skill's own Python script, a plain file inside its scripts/, run by lamp-tasks itself with no agent, at most 30 s; it succeeds when it exits 0 and something it asked lamp.say for was said. Alone in its [[do]] table, and the skill's one task (do.run, docs/skills.md)."
         }
       }
     },

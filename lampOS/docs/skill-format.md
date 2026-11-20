@@ -35,8 +35,9 @@ A packaged skill adds `lamp-skill.json`, with `format: 1`, the skill's
 shares, the author's own, carrying their public key (`lamp-skills pack
 --key-file KEY --author`; skills.md, "A shared package"). A folder with a `run.py`, or any script,
 is refused: script skills are a later format, except the `scripts/` of a skill whose `[[do]]` has a
-`task = { task, run }` (format 2, with its top-level `grants`; skills.md, "A skill's task"): `lamp
-skill check` holds that as the lamp does, and a push may carry it. `lamp-skills pack` refuses a
+`task = { task, run }` or a `run = "scripts/main.py"` step (format 2, with its top-level `grants`;
+skills.md, "A skill's task" and "A skill's `run` step"): `lamp skill check` holds that as the lamp
+does, and a push may carry it. `lamp-skills pack` refuses a
 task whose words are empty, longer than 120 characters or not plain (#7874).
 
 **`SKILL.md`** starts with front matter between two `---` lines. Two keys
@@ -227,6 +228,7 @@ it) or `if_choice` (the tool's values it runs for).
 | (none) | `stand = N`: a percent of the lamp's own stand, 1 to 100, kept until the next ask; tool only | `body` |
 | (none) | `rest = { op = "rest"\|"wake"\|"cancel", during, resettle }` | `body` |
 | (none) | `remind = { in = "25m", words = "…" }`, `remind = { at = "22:00", words = "…" }` or `remind = { every = "30m", words = "…" }`: one timer, reminder or repeating reminder (every 15 m to 24 h, until cancelled by voice) set in the lamp's schedule, said when due; its words fixed (at most 120 characters, one or two sentences); at most 3 a day, none stacked; never in a skill with a tool | `actions = ["set_timer"]` for `in`, `["set_reminder"]` for `at`, `["repeat_reminder"]` for `every` |
+| (none) | `run = "scripts/main.py"`: the skill's own Python script, a plain file in its `scripts/`, run by lamp-tasks with no agent in its own fence for at most 30 s; it succeeds when it exits 0 and something it asked `lamp.say` for was said, and a failure started by the person's words says "<name> couldn't finish this time."; alone in its `[[do]]`, the skill's one task, never beside a `task` (#8158; skills.md, "A skill's `run` step") | the top-level `grants`, as a `task`'s |
 | (none) | `read = { service, what, ... }`: a read of one of the owner's linked services, said to them alone behind its gate; the skill's only step, alone, from a trigger, no tool or `each`; only with `LAMP_SKILL_READS=on` ("Reading a linked service", below) | `speak` and `services = { <service> = "read" }` |
 
 Light values are the protocol's: colours `yellow`, `red`, `green`,
