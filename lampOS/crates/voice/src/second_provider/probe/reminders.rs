@@ -19,9 +19,10 @@
 //! - **now**: as the installed catalog describes it, which must be this
 //!   build's (it has [`NOW_SAYS`]), or the probe refuses to run.
 //!
-//! The four reminder lines are right with `list_reminders` first; the four
-//! others (a memory question, a new reminder, yesterday's talk, a greeting)
-//! are right with anything but `list_reminders` (rule 8: never listed
+//! The six reminder lines (one heard a word short, one in Vietnamese) are
+//! right with `list_reminders` first; the four others (a memory question, a
+//! new reminder, yesterday's talk, a greeting) are right with anything but
+//! `list_reminders` (rule 8: never listed
 //! unasked). It prints counts only: never the character, a key, a URL or
 //! what the model said.
 use super::super::net::{self, Chat, Message};
@@ -48,7 +49,7 @@ pub struct Line {
     pub about_reminders: bool,
 }
 
-pub const LINES: [Line; 8] = [
+pub const LINES: [Line; 10] = [
     Line {
         said: "Hey Lamp, what did I ask you to remind me about?",
         about_reminders: true,
@@ -80,6 +81,18 @@ pub const LINES: [Line; 8] = [
     Line {
         said: "Hey Lamp, good morning! How are you?",
         about_reminders: false,
+    },
+    // Heard a word short ("have" lost, #7987): not one of the forced
+    // phrases, so the model's own choice decides it.
+    Line {
+        said: "Hey Lamp, what reminders do I?",
+        about_reminders: true,
+    },
+    // Deliberately non-ASCII: the same question in Vietnamese ("What
+    // reminders do I have?"), since the description covers any language.
+    Line {
+        said: "Mình có những lời nhắc nào?",
+        about_reminders: true,
     },
 ];
 
@@ -300,7 +313,7 @@ mod tests {
             assert!(text.contains("Your memory"), "{text}");
             assert!(text.contains(line.said), "{text}");
         }
-        assert_eq!(LINES.iter().filter(|l| l.about_reminders).count(), 4);
+        assert_eq!(LINES.iter().filter(|l| l.about_reminders).count(), 6);
     }
 
     #[test]
@@ -320,6 +333,6 @@ mod tests {
             "{said:?}"
         );
         assert!(said.contains(&"reminders arm=now line=5 right=1/3 (not list_reminders): list_reminders=2 recall=1".to_owned()), "{said:?}");
-        assert!(said.contains(&"reminders arm=now reminder lines 8/12 list_reminders, other lines 4/12 not list_reminders".to_owned()), "{said:?}");
+        assert!(said.contains(&"reminders arm=now reminder lines 12/18 list_reminders, other lines 4/12 not list_reminders".to_owned()), "{said:?}");
     }
 }
