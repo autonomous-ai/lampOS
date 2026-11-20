@@ -326,6 +326,8 @@ pub struct Interruption {
     over_bed: bool,
     /// `LAMP_CUT_IN_LATE_YIELD=on`: see [`Self::commit_late_yields`].
     commits_late: bool,
+    /// `LAMP_CUT_IN_STALE_ONSET=on`: see [`Self::count_unknown_onsets`].
+    unknown_onsets: bool,
     /// One flag per block of the last [`LATE_YIELD_WINDOW_BLOCKS`]: whether
     /// it was heard plainly as a person over the lamp ([`Hearing::plain`]),
     /// or unknown past the reply's start ([`LATE_YIELD_OVER_BLOCKS`]),
@@ -400,6 +402,7 @@ impl Interruption {
             onset_plain_only: false,
             over_bed: false,
             commits_late: false,
+            unknown_onsets: false,
             over_window: [0; 3],
             over_at: 0,
             over_count: 0,
@@ -421,8 +424,23 @@ impl Interruption {
         self.commits_late = true;
     }
 
-    /// `LAMP_CUT_IN_STALE_ONSET=on` (#7413): not wired yet.
-    pub fn count_unknown_onsets(&mut self) {}
+    /// `LAMP_CUT_IN_STALE_ONSET=on` (#7413): a block heard
+    /// [`Heard::Unknown`] past the reply's first
+    /// [`Confirmation::early_blocks`] counts toward the run of
+    /// [`Confirmation::onset_blocks`] that makes the lamp yield, as
+    /// [`Heard::Over`] does (never as plain). On lamp-52e6 on 20-21 Nov a
+    /// person's "Wait, hold on." in a pause of the lamp's story, or just
+    /// after one, was heard Unknown for 12 to 25 blocks: the render silent
+    /// where its echo would be, or the alignment 50-80 blocks old; never 7
+    /// Over in a row, so never yielded to (3 of the misses). The lamp's own
+    /// story going on after a pause, at the same stale alignment, was heard
+    /// Under there (the canceller took it); its own voice let through and
+    /// heard Unknown for 7 blocks mid-reply has not been measured. At a
+    /// reply's start and after a resume, Unknown is the lamp's own first
+    /// word against the last alignment and still counts for nothing.
+    pub fn count_unknown_onsets(&mut self) {
+        self.unknown_onsets = true;
+    }
 
     /// The yield in force, or the last one, was made late in a person's
     /// speech over the lamp ([`LATE_YIELD_OVER_BLOCKS`]), with the switch
@@ -626,7 +644,9 @@ impl Interruption {
         let forced = std::mem::take(&mut self.forced) && speaking;
         match &mut self.state {
             State::Listening { over, plain: seen } => {
-                if speaking && heard == Heard::Over {
+                let onset = heard == Heard::Over
+                    || (self.unknown_onsets && heard == Heard::Unknown && past_start);
+                if speaking && onset {
                     *over = over.saturating_add(1);
                     *seen = seen.saturating_add(u8::from(plain));
                 } else {
