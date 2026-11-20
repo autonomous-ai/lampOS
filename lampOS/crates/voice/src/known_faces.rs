@@ -3022,8 +3022,19 @@ fn said_by_known_face(line: Option<&crate::speaking_faces::LineSeen>) -> bool {
 /// With `LAMP_FACE_QUESTION_NOT_ASK`: a face the eyes already kept under
 /// this name, matched as theirs (their `already`), is said to be known
 /// already, never as a first save, and the visits line said at the first
-/// save is not said again (lamp-74ff). Never on a rename.
+/// save is not said again (lamp-74ff). A rename (`replacing`) is never
+/// told known already, but when the eyes replaced a kept name (their
+/// `replaced` not empty) the visits line is dropped too: the person heard
+/// it when that face was first kept. The rest of the answer (`ok`,
+/// `remembered`, the other `also_say` lines) stays. A replace that
+/// replaced nothing is a first save and keeps the line.
 fn told_already(told: Value, answer: &Value, switches: FaceSwitches, replacing: bool) -> Value {
+    if switches.face_question
+        && replacing
+        && replaced_of(answer).is_some_and(|replaced| !replaced.is_empty())
+    {
+        return without_visits_line(told);
+    }
     if switches.face_question
         && !replacing
         && answer.get("already").and_then(Value::as_bool) == Some(true)
@@ -3035,6 +3046,23 @@ fn told_already(told: Value, answer: &Value, switches: FaceSwitches, replacing: 
             "already_known": kept,
             "note": ALREADY_KNOWN_NOTE,
         });
+    }
+    told
+}
+
+/// `told` with [`VISITS_LINE`] taken out of its `also_say`, the leftover
+/// lines trimmed; no `also_say` at all when nothing is left.
+fn without_visits_line(mut told: Value) -> Value {
+    let Some(also_say) = told["also_say"].as_str() else {
+        return told;
+    };
+    let left = also_say.replace(VISITS_LINE, "").trim().to_owned();
+    if let Some(fields) = told.as_object_mut() {
+        if left.is_empty() {
+            fields.remove("also_say");
+        } else {
+            fields.insert("also_say".into(), json!(left));
+        }
     }
     told
 }
@@ -7700,6 +7728,97 @@ mod tests {
             ..no_ask(true)
         };
         assert_eq!(told_already(told.clone(), &answer, off, false), told);
+        // A rename the eyes made (`replaced` not empty) drops the visits
+        // line said at the first save, keeping every other line; a replace
+        // that replaced nothing is a first save and keeps it. Off, as before.
+        let renamed = json!({"remembered": "Ben", "replaced": ["Ana"], "visits": true});
+        let first = json!({"remembered": "Ben", "replaced": [], "visits": true});
+        let with_line =
+            |also_say: String| json!({"ok": true, "remembered": "Ben", "also_say": also_say});
+        assert_eq!(
+            told_already(with_line(VISITS_LINE.into()), &renamed, no_ask(true), true),
+            json!({"ok": true, "remembered": "Ben"})
+        );
+        for other in [ASK_TO_NAME, VISITS_UNDO] {
+            assert_eq!(
+                told_already(
+                    with_line(format!("{VISITS_LINE} {other}")),
+                    &renamed,
+                    no_ask(true),
+                    true
+                ),
+                with_line(other.into())
+            );
+        }
+        let kept = with_line(VISITS_LINE.into());
+        assert_eq!(told_already(kept.clone(), &first, no_ask(true), true), kept);
+        assert_eq!(told_already(kept.clone(), &renamed, off, true), kept);
+    }
+
+    /// The person, 20 Nov 23:4x: a rename (the face re-saved under a
+    /// corrected name, Ana to Ben) is not told the visits line again; they
+    /// heard it when the face was first kept. Off, as before.
+    #[test]
+    fn with_face_question_a_rename_is_not_told_the_visits_line_again() {
+        let _serial = FACE_QUESTION_SERIAL
+            .lock()
+            .unwrap_or_else(|poison| poison.into_inner());
+        let call = ToolCall {
+            id: "1".into(),
+            name: REMEMBER.into(),
+            args: json!({"name": "Ben", "replace": true}),
+        };
+        let yes = Said {
+            this: "Yes, call me Ben.".into(),
+            before: vec![("Call me Ben.".into(), "Shall I call you Ben?".into())],
+        };
+        let run = |face_question: bool, replaced: Value| {
+            let (socket, sent) = eyes(vec![json!({
+                "remembered": "Ben", "replaced": replaced, "visits": true
+            })]);
+            std::fs::write(known_file_of(&socket), "Ana\n").unwrap();
+            let (told, _) = run_switched(
+                &socket,
+                &call,
+                FaceSwitches {
+                    checked: true,
+                    rename_yes: true,
+                    name_learn_fix: true,
+                    face_question,
+                    ..FaceSwitches::default()
+                },
+                &yes,
+                None,
+                &mut None,
+            );
+            assert_eq!(
+                sent.join().unwrap(),
+                vec![json!({"remember": "Ben", "one_face": true, "replace": true})]
+            );
+            let _ = std::fs::remove_dir_all(socket.parent().unwrap());
+            told
+        };
+        let on = run(true, json!(["Ana"]));
+        assert_eq!(on["ok"], true, "{on}");
+        assert_eq!(on["remembered"], "Ben", "{on}");
+        assert!(on.get("already_known").is_none(), "{on}");
+        assert!(!on.to_string().contains(VISITS_LINE), "{on}");
+        // Nothing replaced: a first save, the line kept.
+        let first = run(true, json!([]));
+        assert!(
+            first["also_say"]
+                .as_str()
+                .is_some_and(|line| line.contains(VISITS_LINE)),
+            "{first}"
+        );
+        // The switch off: as before, the line said.
+        let off = run(false, json!(["Ana"]));
+        assert!(
+            off["also_say"]
+                .as_str()
+                .is_some_and(|line| line.contains(VISITS_LINE)),
+            "{off}"
+        );
     }
 
     /// The owner, 20 Nov 02:18: "I already know your face" only on a fresh
