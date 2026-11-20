@@ -5144,6 +5144,21 @@ fn nothing_in_scope() {
     NOTHING_IN_SCOPE.with(|nothing| nothing.set(true));
 }
 
+/// Whom [`exchanges_forget_about`] asks for, and the key words of each
+/// subject of `about`: `None` with no known person or no words, when it is
+/// not asked at all.
+fn exchanges_forget_words<'a>(
+    about: &Value,
+    person: Option<&'a str>,
+) -> Option<(&'a str, Vec<Vec<String>>)> {
+    let person = person.filter(|person| lamp_msgs::known::is_person_id(person))?;
+    let words: Vec<Vec<String>> = about_subjects(about.as_str()?.trim())
+        .into_iter()
+        .map(|(_, words)| words)
+        .collect();
+    (!words.is_empty()).then_some((person, words))
+}
+
 /// `exchanges_forget` in the memory at `socket`: a known person's own
 /// exchanges with every key word of a subject of `about` (what was said,
 /// never kept), in their scope alone, never the room's
@@ -5156,14 +5171,7 @@ fn exchanges_forget_about(
     until: Instant,
     lease: Option<&crate::memory_scope::ScopeLease>,
 ) -> Option<u64> {
-    let person = person.filter(|person| lamp_msgs::known::is_person_id(person))?;
-    let words: Vec<Vec<String>> = about_subjects(about.as_str()?.trim())
-        .into_iter()
-        .map(|(_, words)| words)
-        .collect();
-    if words.is_empty() {
-        return None;
-    }
+    let (person, words) = exchanges_forget_words(about, person)?;
     let left = until
         .checked_duration_since(Instant::now())
         .filter(|left| !left.is_zero())?;
@@ -10854,12 +10862,18 @@ impl DaysClient {
                 // Twelve's P2 on #7957); what it removed is named in its
                 // answers (`history_send::forget_seen`), then posts go on.
                 crate::history_send::forgetting(person);
-                let (told, answered) =
+                let ((told, answered), known) =
                     self.forget_about(&call.args["about"], person, until, lease, heard_named(call));
+                // Every removal answered: what went was named on its way
+                // (`forget_seen`), so the hold lifts with nothing more let
+                // go. One timed out, lost or refused part way: what went is
+                // not known (Friday's P2 on #7957: an empty answer here then
+                // read as "nothing removed"), so `None`, and the person's and
+                // the room's turns wait for the next start.
                 crate::history_send::forget_answered(
                     person,
                     false,
-                    Some(&json!({"ok":true,"exchanges":{}})),
+                    known.then(|| json!({"ok":true,"exchanges":{}})).as_ref(),
                 );
                 // A forget done, for a yes alone soon after it (Bug C).
                 if told["forgotten"] == true
@@ -11575,7 +11589,12 @@ impl DaysClient {
     /// whole, forgets nothing either. The model is told how many went and
     /// the person's own `about`, never the kept texts. A write as `forget`
     /// is: uncertain until each removal is acknowledged, and journalling
-    /// stops after a confirmed one.
+    /// stops after a confirmed one. With it, whether what the memory removed
+    /// is known whole: every forget of a kept thing and the exchanges
+    /// forget asked answered (a nothing-found, a refused listing or too many
+    /// to look through removed nothing, and are known too); `false` when one
+    /// timed out or was lost part way, for the account's history
+    /// (`history_send::forget_answered`, `LAMP_HISTORY_SEND`).
     fn forget_about(
         &self,
         about: &Value,
@@ -11583,7 +11602,7 @@ impl DaysClient {
         until: Instant,
         lease: Option<&crate::memory_scope::ScopeLease>,
         named: bool,
-    ) -> (Value, bool) {
+    ) -> ((Value, bool), bool) {
         // Records and contacts are kept under the services' owner id
         // (`services::owner_of`), which in the private room is the first
         // owner id, not always the scope's person: forgotten under the same
@@ -11610,6 +11629,9 @@ impl DaysClient {
             (records, sent_to) => records.or(sent_to),
         };
         let told = self.forget_kept_about(about, person, until, lease, named);
+        // Unknown: the kept things' forget lost (`gone`), or some went
+        // before the memory stopped answering (`all: false`).
+        let mut known = told.1 && told.0.get("error").is_none() && told.0["all"] != false;
         // Their talk about it too, after the kept things, so each `forget
         // {id}` above still finds the exchanges a kept thing came from.
         // Not when the kept things were not settled (the memory lost or
@@ -11624,8 +11646,15 @@ impl DaysClient {
         } else {
             self.forget_exchanges_about(about, person, until, lease)
         };
+        // Asked and not answered: the memory may have removed some.
+        if !held && exchanges.is_none() && exchanges_forget_words(about, person).is_some() {
+            known = false;
+        }
         let told = exchanges_forgotten(told, exchanges);
-        contacts_forgotten(records_forgotten(told, records), contacts)
+        (
+            contacts_forgotten(records_forgotten(told, records), contacts),
+            known,
+        )
     }
 
     /// Every service record and mail contact of `owner` removed in the
@@ -26821,12 +26850,22 @@ mod tests {
     /// `person`'s "forget what I said about coffee", through the voice's
     /// tools with a fake memory: nothing kept is about it, and the
     /// exchanges forget removes `removed` (its turn id under epoch
-    /// 0a1b2c3d, the forget half's answer).
-    pub(crate) fn forget_about_for_history_test(person: &'static str, removed: u64) {
+    /// 0a1b2c3d, the forget half's answer); `None`: "forget what I said
+    /// about tea", whose exchanges forget answers only after the forget's
+    /// time ran out (a timeout).
+    pub(crate) fn forget_about_for_history_test(person: &'static str, removed: Option<u64>) {
         static REMOVED: AtomicU64 = AtomicU64::new(0);
-        REMOVED.store(removed, Ordering::SeqCst);
+        if let Some(removed) = removed {
+            REMOVED.store(removed, Ordering::SeqCst);
+        }
         fn answer(request: &Value) -> Value {
             match request["op"].as_str() {
+                // Per request, never a static, and with no probe (the
+                // process's one, another test's): tests run side by side.
+                Some("exchanges_forget") if request["about"] == json!([["tea"]]) => {
+                    std::thread::sleep(Duration::from_millis(900));
+                    json!({"ok":true,"removed":0,"exchanges":{}})
+                }
                 Some("exchanges_forget") => {
                     crate::history_send::probe_forget();
                     let person = request["person"].as_str().unwrap_or("everyone");
@@ -26844,9 +26883,14 @@ mod tests {
         let (socket, stop, served) = history_memory(answer);
         let client = DaysClient::new(socket.clone()).unwrap();
         client.forget_about.store(true, Ordering::Release);
+        let (about, within) = if removed.is_some() {
+            ("coffee", Duration::from_secs(3))
+        } else {
+            ("tea", Duration::from_millis(400))
+        };
         let (told, answered) = client.run_at(
-            &call(FORGET, json!({"about":"coffee"})),
-            Duration::from_secs(3),
+            &call(FORGET, json!({"about":about})),
+            within,
             NOW,
             Some(&EAST),
             Some(person),

@@ -472,6 +472,47 @@ fn a_forget_during_an_in_flight_save_leaves_the_turn_gone() {
     none_within(&told, Duration::from_millis(100));
 }
 
+/// Friday's P2 on #7957: a forget that names no ids (a lost answer, a
+/// timeout, a forget everything's room lines) covers a batch already taken
+/// off the queue too. Its next try leaves the forgetting person's and the
+/// room's turns out, to wait for the next start; another person's go.
+#[test]
+fn an_in_flight_batch_is_not_posted_after_a_forget_naming_no_ids() {
+    let (tell, told) = mpsc::channel();
+    let (go, gate) = mpsc::channel::<Answer>();
+    let post: Post = Box::new(move |body: &Value| {
+        let _ = tell.send(body.clone());
+        gate.recv_timeout(Duration::from_secs(5))
+            .unwrap_or(Answer::Saved)
+    });
+    let sender = Sender::new();
+    offer(&sender, Some(A), 1);
+    offer(&sender, Some(B), 2);
+    sender.spawn(post, fresh(), None, QUICK).unwrap();
+    assert_eq!(ids(&next(&told)), [id(A, 1), id(B, 2)]);
+    // Taken off the queue and in flight: A's forget, its answer lost.
+    sender.forgetting(Some(A));
+    sender.forget_answered(Some(A), false, None);
+    go.send(Answer::Again).unwrap();
+    assert_eq!(ids(&next(&told)), [id(B, 2)]);
+    go.send(Answer::Saved).unwrap();
+    none_within(&told, Duration::from_millis(100));
+    assert_eq!(locked(&sender.shared).deferred.get(A), Some(&1));
+    // A forget everything: the room's lines it took are not named, and the
+    // room's line in flight waits too; a new turn of A's goes.
+    offer(&sender, None, 4);
+    sender.settled(&[4]);
+    assert_eq!(ids(&next(&told)), [id(ROOM_SCOPE, 4)]);
+    sender.forgetting(Some(B));
+    sender.forget_answered(Some(B), true, Some(&json!({"ok":true})));
+    go.send(Answer::Again).unwrap();
+    none_within(&told, Duration::from_millis(100));
+    assert_eq!(locked(&sender.shared).deferred.get(ROOM_SCOPE), Some(&4));
+    offer(&sender, Some(A), 5);
+    assert_eq!(ids(&next(&told)), [id(A, 5)]);
+    go.send(Answer::Saved).unwrap();
+}
+
 /// After a forget the epoch is read again: a changed one (a wipe whole)
 /// lets the unsent turns wait for the next start and starts the marks
 /// again under it, and new turns go under it.
@@ -1031,7 +1072,7 @@ fn a_forget_said_on_the_lamp_holds_and_lets_go_of_what_it_removed() {
     *FORGET_PROBE.lock().unwrap() = Some(sender.clone());
     HELD_AT_FORGET.store(false, std::sync::atomic::Ordering::SeqCst);
     as_the_voices(&sender, || {
-        crate::remember::forget_about_for_history_test(A, 21)
+        crate::remember::forget_about_for_history_test(A, Some(21))
     });
     *FORGET_PROBE.lock().unwrap() = None;
     assert!(HELD_AT_FORGET.load(std::sync::atomic::Ordering::SeqCst));
@@ -1044,6 +1085,28 @@ fn a_forget_said_on_the_lamp_holds_and_lets_go_of_what_it_removed() {
     );
     let queue = locked(&sender.shared);
     assert!(queue.is_forgotten(A, 21));
+    assert!(queue.paused_until.is_none());
+}
+
+/// Friday's P2 on #7957: a forget about whose exchanges forget timed out
+/// does not tell the sender `{"exchanges":{}}` ("nothing removed"): what
+/// went is not known, so the person's and the room's unsent turns wait for
+/// the next start, none of them forgotten by id; another person's go on.
+#[test]
+fn a_forget_about_that_timed_out_is_not_taken_as_nothing_removed() {
+    let sender = Sender::new();
+    offer(&sender, Some(A), 21);
+    offer(&sender, Some(A), 22);
+    offer(&sender, Some(B), 19);
+    offer(&sender, None, 23);
+    as_the_voices(&sender, || {
+        crate::remember::forget_about_for_history_test(A, None)
+    });
+    assert_eq!(queued(&sender), (vec![format!("{B}:19")], vec![]));
+    let queue = locked(&sender.shared);
+    assert!(!queue.is_forgotten(A, 21));
+    assert_eq!(queue.deferred.get(A), Some(&21));
+    assert_eq!(queue.deferred.get(ROOM_SCOPE), Some(&23));
     assert!(queue.paused_until.is_none());
 }
 
