@@ -340,9 +340,12 @@ fn made_here(card: &str) -> bool {
 }
 
 /// Every skill on the lamp at `places`, by name, its state as of `now_us`
-/// (the monotonic clock) with `present` (`LAMP_NUDGES_PRESENT`); at most
-/// [`LISTED_MOST`]. Why not, when the skills folder or a record of
-/// `lamp-skills`' that is there can't be read: never a guess.
+/// (the monotonic clock) with `present` (`LAMP_NUDGES_PRESENT`): every
+/// one, however many, so a caller's filter sees them all (the core offer's
+/// turned-off lamp skills behind 80 made ones, #8002's row); what is told
+/// is bounded where it is told ([`lines`]). Why not, when the skills folder
+/// or a record of `lamp-skills`' that is there can't be read: never a
+/// guess.
 pub fn skills(places: &Places, now_us: u64, present: bool) -> Result<Vec<Skill>, String> {
     let off = turned_off(&places.state)?;
     let holds = holds(&places.tools)?;
@@ -373,7 +376,6 @@ pub fn skills(places: &Places, now_us: u64, present: bool) -> Result<Vec<Skill>,
     }
     folders
         .into_iter()
-        .take(LISTED_MOST)
         .map(|(name, folder)| -> Result<Skill, String> {
             let card = read_record(&folder.join("SKILL.md"))?.unwrap_or_default();
             let says =
@@ -574,7 +576,7 @@ pub fn told(
     // Counts only: the journal holds no skill's name and no words.
     eprintln!(
         "lamp-voice: request {request}: skills' state told: {} listed, {} in full",
-        skills.len(),
+        skills.len().min(LISTED_MOST),
         nearest.len()
     );
     let mut waits = Some(waits);
@@ -708,10 +710,12 @@ fn heard_skills(
     Ok((skills, not_named))
 }
 
-/// Each skill's line: its spoken name and its state in a word.
+/// Each skill's line: its spoken name and its state in a word; at most
+/// [`LISTED_MOST`].
 fn lines(skills: &[Skill]) -> Vec<String> {
     skills
         .iter()
+        .take(LISTED_MOST)
         .map(|skill| {
             format!(
                 "{}: {}",
@@ -790,7 +794,7 @@ fn with_lines(
             eprintln!(
                 "lamp-voice: request {request}: {} told with {} skills' lines",
                 notes.what,
-                skills.len()
+                skills.len().min(LISTED_MOST)
             );
             told[SKILLS_ON_THE_LAMP] = json!(lines(&skills));
             told[SKILLS_NOTE] = json!(notes.told);
@@ -1688,6 +1692,48 @@ mod tests {
             about.to_string().len()
         );
         assert!(about[LEFT_OUT].as_u64().is_some_and(|n| n > 0), "{about}");
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    /// #8002's row: on a lamp with more skills than [`LISTED_MOST`], 80
+    /// made ones before it by name, a lamp skill turned off that sorts last
+    /// is still read, and still the core offer's candidate; what is told
+    /// stays bounded.
+    #[test]
+    fn a_turned_off_lamp_skill_past_eighty_made_ones_is_still_offered() {
+        let made: Vec<String> = (0..LISTED_MOST)
+            .map(|n| format!("a-made-reminder-{n:02}"))
+            .collect();
+        let core = "kind = \"core\"\n[[do]]\nsay = \"x\"\n";
+        let mut skills: Vec<(&str, &str, &str)> = made
+            .iter()
+            .map(|name| (name.as_str(), "Every hour, a reminder.", core))
+            .collect();
+        skills.push((
+            "rest-your-eyes",
+            "After a long while at the screen, a hint to rest your eyes.",
+            core,
+        ));
+        let (root, places) = lamp("past-eighty", &skills);
+        for name in &made {
+            let card = places.installed.join(name).join("SKILL.md");
+            let text = std::fs::read_to_string(&card).unwrap();
+            std::fs::write(&card, text.replacen("\n---\n", "\nmade: here\n---\n", 1)).unwrap();
+        }
+        std::fs::write(places.state.join(OFF_FILE), "rest-your-eyes\n").unwrap();
+        let read = super::skills(&places, MINUTE, true).unwrap();
+        assert_eq!(read.len(), LISTED_MOST + 1);
+        assert_eq!(by_name(&read, "rest-your-eyes").state, State::TurnedOff);
+        let offered = crate::make_core_offer::candidates("remind me to rest my eyes", &read);
+        assert!(
+            offered.iter().any(|skill| skill.name == "rest-your-eyes"),
+            "{:?}",
+            offered.iter().map(|skill| &skill.name).collect::<Vec<_>>()
+        );
+        // What is told stays at most LISTED_MOST lines.
+        let mut told = json!({"reminders": []});
+        with_reminders(&mut told, &places, MINUTE, true, 1, true, || true);
+        assert!(told[SKILLS_ON_THE_LAMP].as_array().unwrap().len() <= LISTED_MOST);
         let _ = std::fs::remove_dir_all(&root);
     }
 

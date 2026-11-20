@@ -4912,8 +4912,9 @@ hoàn tác". `lamp-voice` chỉ truyền đúng `on` cho worker `second`
 
 - **Một mô hình phán xét, trước khi tạo gì.** Một lần gọi `make_skill` bằng
   giọng nói có `request` trước hết lập danh sách ứng viên
-  (`make_core_offer::candidates`): trong các kỹ năng trên đèn mà người dùng
-  không tự tạo, mọi cái đã tắt bằng giọng nói hay trong app, và vài cái
+  (`make_core_offer::candidates`): trong mọi kỹ năng trên đèn, bao nhiêu
+  cũng vậy (dòng thử của #8002: không cái nào bị cắt trước lượt chọn này),
+  những cái người dùng không tự tạo, mọi cái đã tắt bằng giọng nói hay trong app, và vài cái
   khác (đang bật, hoặc tắt trong tệp của nó) có lời gần với request nhất
   (`skill_about::nearest`), tối đa 40, mỗi cái kèm mô tả trong `SKILL.md`
   cắt ở 200 byte. Không có ứng viên thì tạo ngay. Nếu có, một lần gọi ngắn
