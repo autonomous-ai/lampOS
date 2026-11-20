@@ -5564,6 +5564,40 @@ impl std::fmt::Display for ForgetNotAsked {
     }
 }
 
+/// What the model is told of a forget on a one-face line not asked about
+/// because two or more kept things match what they named (#8038): the face
+/// was in view, so it never asks them to face the lamp.
+pub const FORGET_SEVERAL_MATCH: &str = "Nothing was forgotten: more than one thing kept for them matches what they named, so I didn't ask. Tell them so in a few words and ask which one they mean, naming it more fully. Don't ask them to look at you or to say it again the same way.";
+
+/// The same, when nothing kept for them matches what they named.
+pub const FORGET_NO_MATCH: &str = "Nothing was forgotten: nothing kept for them matches what they named. Tell them so in a few words. Don't ask them to look at you.";
+
+/// The same, when their words named no one thing to forget.
+pub const FORGET_NAME_ONE: &str = "Nothing was forgotten: their words didn't name one thing to forget. Ask them which thing they want forgotten, naming it. Don't ask them to look at you.";
+
+impl ForgetNotAsked {
+    /// What the model is told for this reason, naming the real cause
+    /// (#8038), when the person can put it right by what they name: two
+    /// matches, none, or no one thing named. `None` for a reason of the
+    /// lamp's own (no memory taking ids, a listing that failed or may be
+    /// cut), told as before.
+    pub fn told(&self) -> Option<&'static str> {
+        match self {
+            Self::SeveralMatch(..) => Some(FORGET_SEVERAL_MATCH),
+            Self::NoMatch(_) => Some(FORGET_NO_MATCH),
+            Self::NothingNamed(_) | Self::SourceIdUnnamed(_) | Self::AboutNotText => {
+                Some(FORGET_NAME_ONE)
+            }
+            Self::NotAForget
+            | Self::ForgetAllOff
+            | Self::NoDaysMemory
+            | Self::ListingFailed(_)
+            | Self::ListingMayBeCut
+            | Self::ContextUnreadable => None,
+        }
+    }
+}
+
 /// The one kept thing of `person`'s that a named `forget` on a line theirs
 /// only by their face alone in view asks to remove, by its id, and the
 /// subject the lamp asks about, in the person's own words (the PM's cost
@@ -5597,7 +5631,8 @@ pub fn one_face_forget_target(
         .filter(|client| client.forget_all.load(Ordering::Acquire))
         .ok_or(ForgetNotAsked::NoDaysMemory)?;
     let entries = client.kept_listing(person, &want, lease)?;
-    let (id, subject) = one_face_pick(call, said, &entries)?;
+    let kept = client.kept_ids(person, lease);
+    let (id, subject) = one_face_pick_among(call, said, &entries, kept.as_deref())?;
     let line = client
         .context
         .lock()
@@ -5646,8 +5681,19 @@ pub fn one_face_pick(
     said: &str,
     entries: &[(u64, String)],
 ) -> Result<(u64, String), ForgetNotAsked> {
+    one_face_pick_among(call, said, entries, None)
+}
+
+/// [`one_face_pick`], with `kept` the ids of `entries` that are kept
+/// things ([`one_kept_among`]).
+fn one_face_pick_among(
+    call: &ToolCall,
+    said: &str,
+    entries: &[(u64, String)],
+    kept: Option<&[u64]>,
+) -> Result<(u64, String), ForgetNotAsked> {
     let (want, subject) = forget_want(call, said)?;
-    let (id, _) = one_kept_of(entries, &want)?;
+    let (id, _) = one_kept_among(entries, kept, &want)?;
     Ok((id, subject))
 }
 
@@ -5686,6 +5732,94 @@ impl DaysClient {
     }
 }
 
+impl DaysClient {
+    /// The ids of `person`'s kept things alone, no observations
+    /// ([`one_kept_among`]): `None` for a listing that failed, and then
+    /// two matches ask nothing, as before.
+    fn kept_ids(&self, person: &str, lease: &crate::memory_scope::ScopeLease) -> Option<Vec<u64>> {
+        let list = for_person(
+            json!({"op":"kept","max_bytes":ABOUT_BYTES,"observations":false}),
+            Some(person),
+        );
+        let answer = exchange_within(
+            &self.socket,
+            &list,
+            crate::tools::ASK_DEADLINE,
+            Some(lease),
+            ABOUT_ANSWER_BYTES,
+        )?;
+        let entries = kept_entries(&answer).ok()?;
+        Some(entries.into_iter().map(|(id, _)| id).collect())
+    }
+}
+
+/// After the one-face forget their yes agreed to (#5627) forgot its kept
+/// thing by id (`told`), the observations of `person`'s that name what it
+/// was about (`about`), as the ask matched them beside it
+/// ([`one_kept_among`]), go with it, each by its id: none is left to name
+/// the thing they asked to forget (#8038). Only after a by-id forget the
+/// memory confirmed, in `person`'s scope alone. How many went is logged,
+/// counts only; the answer is as it was.
+pub fn agreed_forget_observations(
+    socket: &Path,
+    told: (Value, bool),
+    about: &Value,
+    person: &str,
+    deadline: Duration,
+    lease: &crate::memory_scope::ScopeLease,
+) -> (Value, bool) {
+    if !told.1 || told.0["forgotten"] != true || !lease.is_current() {
+        return told;
+    }
+    let Some(about) = about
+        .as_str()
+        .map(str::trim)
+        .filter(|about| !about.is_empty())
+    else {
+        return told;
+    };
+    let until = Instant::now() + deadline;
+    let left = || {
+        until
+            .checked_duration_since(Instant::now())
+            .filter(|left| !left.is_zero())
+    };
+    let listing = |observations: bool| {
+        let list = for_person(
+            json!({"op":"kept","max_bytes":ABOUT_BYTES,"observations":observations}),
+            Some(person),
+        );
+        exchange_within(socket, &list, left()?, Some(lease), ABOUT_ANSWER_BYTES)
+            .and_then(|answer| kept_entries(&answer).ok())
+    };
+    let (Some(all), Some(things)) = (listing(true), listing(false)) else {
+        eprintln!("lamp-voice provider: an agreed forget's observations were not listed");
+        return told;
+    };
+    let mut removed = 0;
+    for (id, _) in all
+        .iter()
+        .filter(|(id, text)| !things.iter().any(|(kept, _)| kept == id) && names_about(text, about))
+    {
+        let Some(budget) = left() else { break };
+        let forget = for_person(
+            json!({"op":"forget","id":id,"selective":true}),
+            Some(person),
+        );
+        if bounded_exchange_scoped(socket, &forget, budget, Some(lease))
+            .is_some_and(|answer| answer["ok"] == true)
+        {
+            removed += 1;
+        }
+    }
+    if removed > 0 {
+        eprintln!(
+            "lamp-voice provider: an agreed forget took {removed} observation(s) naming the same thing with it"
+        );
+    }
+    told
+}
+
 /// The entries (id, text) of a kept listing's `answer`, for
 /// [`DaysClient::kept_listing`]: an error for an answer not ok, or an entry
 /// without a valid id or text.
@@ -5715,33 +5849,135 @@ pub fn one_kept_of(
     entries: &[(u64, String)],
     want: &ForgetWant,
 ) -> Result<(u64, String), ForgetNotAsked> {
-    let mut found = entries.iter().filter(|(id, text)| match want {
-        ForgetWant::Id(want) => id == want,
-        ForgetWant::About(about) => {
-            let has = kept_words(text);
-            about_subjects(about).iter().any(|(_, words)| {
-                !words.is_empty()
-                    && words
-                        .iter()
-                        .all(|word| has.iter().any(|kept| about_same(word, kept)))
-            })
+    one_kept_among(entries, None, want)
+}
+
+/// Whether `text`, a kept thing's or an observation's, is one `want` names
+/// by what it is about: every word of one of its subjects, as a forget
+/// about matches ([`DaysClient::about_matching`]). Never by id.
+fn names_about(text: &str, about: &str) -> bool {
+    let has = kept_words(text);
+    about_subjects(about).iter().any(|(_, words)| {
+        !words.is_empty()
+            && words
+                .iter()
+                .all(|word| has.iter().any(|kept| about_same(word, kept)))
+    })
+}
+
+/// [`one_kept_of`], with `kept` the ids of `entries` that are kept things,
+/// the others what was noticed of the person (observations), when known.
+/// Two or more matching by what it is about, exactly one of them a kept
+/// thing: that one. The observations matching beside it name the same
+/// thing, so they never count as a second match, and they go with it on
+/// their yes ([`agreed_forget_observations`]; #8038: the pass had kept
+/// their own forget request as an observation of the thing, and every
+/// later forget of it matched two). Decided by the rows' kinds, never by
+/// their words. Two kept things, or only observations, still ask nothing.
+pub fn one_kept_among(
+    entries: &[(u64, String)],
+    kept: Option<&[u64]>,
+    want: &ForgetWant,
+) -> Result<(u64, String), ForgetNotAsked> {
+    let found: Vec<&(u64, String)> = entries
+        .iter()
+        .filter(|(id, text)| match want {
+            ForgetWant::Id(want) => id == want,
+            ForgetWant::About(about) => names_about(text, about),
+        })
+        .collect();
+    match found.as_slice() {
+        [] => Err(ForgetNotAsked::NoMatch(want.clone())),
+        [one] => Ok((*one).clone()),
+        several => {
+            let things: Vec<&&(u64, String)> = several
+                .iter()
+                .filter(|(id, _)| kept.is_some_and(|kept| kept.contains(id)))
+                .collect();
+            match things.as_slice() {
+                [thing] if matches!(want, ForgetWant::About(_)) => Ok((**thing).clone()),
+                _ => Err(ForgetNotAsked::SeveralMatch(want.clone(), several.len())),
+            }
         }
-    });
-    let one = found
-        .next()
-        .ok_or_else(|| ForgetNotAsked::NoMatch(want.clone()))?;
-    match found.next() {
-        None => Ok(one.clone()),
-        Some(_) => Err(ForgetNotAsked::SeveralMatch(
-            want.clone(),
-            2 + found.count(),
-        )),
     }
 }
 
 #[cfg(test)]
 mod one_kept_tests {
     use super::*;
+
+    /// #8038: the pass had kept their forget request as an observation
+    /// naming the thing, and a forget of it then matched two. With the
+    /// kinds known, one kept thing beside observations naming the same is
+    /// that kept thing; two kept things, or observations alone, still ask
+    /// nothing. Without the kinds, as before.
+    #[test]
+    fn an_observation_beside_one_kept_thing_is_no_second_match() {
+        let rows = vec![
+            (2388, "My kayak paddle is up in the garage loft.".to_owned()),
+            (
+                2390,
+                "Wants the lamp to forget the kayak paddle.".to_owned(),
+            ),
+            (4, "My bike lock code is 4512.".to_owned()),
+        ];
+        let about = ForgetWant::About("kayak paddle".to_owned());
+        assert_eq!(
+            one_kept_among(&rows, Some(&[2388, 4]), &about),
+            Ok(rows[0].clone())
+        );
+        assert_eq!(
+            one_kept_of(&rows, &about),
+            Err(ForgetNotAsked::SeveralMatch(about.clone(), 2)),
+            "kinds unknown: as before"
+        );
+        assert_eq!(
+            one_kept_among(&rows, Some(&[4]), &about),
+            Err(ForgetNotAsked::SeveralMatch(about.clone(), 2)),
+            "observations alone"
+        );
+        assert_eq!(
+            one_kept_among(&rows, Some(&[2388, 2390]), &about),
+            Err(ForgetNotAsked::SeveralMatch(about.clone(), 2)),
+            "two kept things"
+        );
+    }
+
+    /// #8038: a forget not asked is told its real cause when what they name
+    /// can put it right, never to face the lamp; a cause of the lamp's own
+    /// is told as before.
+    #[test]
+    fn a_forget_not_asked_names_the_real_cause() {
+        let about = ForgetWant::About("kayak paddle".to_owned());
+        assert_eq!(
+            ForgetNotAsked::SeveralMatch(about.clone(), 2).told(),
+            Some(FORGET_SEVERAL_MATCH)
+        );
+        assert_eq!(ForgetNotAsked::NoMatch(about).told(), Some(FORGET_NO_MATCH));
+        assert_eq!(
+            ForgetNotAsked::NothingNamed("a bare forget").told(),
+            Some(FORGET_NAME_ONE)
+        );
+        assert_eq!(ForgetNotAsked::ForgetAllOff.told(), None);
+        for told in [FORGET_SEVERAL_MATCH, FORGET_NO_MATCH, FORGET_NAME_ONE] {
+            assert!(!told.contains("couldn't see"), "{told}");
+        }
+    }
+
+    /// #8038: a forget the model called is kept out of the journal and
+    /// counted for the observation pass, whatever became of it; any other
+    /// call is not.
+    #[test]
+    fn a_forget_called_is_kept_out_and_counted() {
+        let before = OBSERVE_FORGETS.load(Ordering::Acquire);
+        assert!(!forget_called(9_803_811, RECALL));
+        assert!(!kept_out(9_803_811));
+        assert!(forget_called(9_803_812, FORGET));
+        assert!(kept_out(9_803_812));
+        assert!(OBSERVE_FORGETS.load(Ordering::Acquire) > before);
+        assert!(forget_called(9_803_813, FORGET_EVERYTHING));
+        assert!(kept_out(9_803_813));
+    }
 
     /// #5627: the question names exactly the kept thing its yes forgets,
     /// and only it: by what it is about or by id, one match only; two
@@ -6792,6 +7028,25 @@ pub fn keep_back(request: u64) {
     if let Ok(mut kept_out) = KEPT_OUT.lock() {
         kept_out.retain(|kept| *kept != request);
     }
+}
+
+/// The model called `forget` or `forget_everything` in `request`, whatever
+/// becomes of the call: run, held for their yes, asked about once, or not
+/// run by a check before the memory (#8038: on the second route a forget
+/// held or not asked never reached [`keep_out`], so its exchange was
+/// journalled, and the observation pass kept "they want the lamp to forget
+/// X" from it). Decided by the call, never by the line's words. Its
+/// exchange is kept out of the journal, and the forget is counted for the
+/// observation pass ([`OBSERVE_FORGETS`]) as one the memory answers is, so
+/// a pass of the conversation going on as it was asked is closed with
+/// nothing kept. True for a forget.
+pub fn forget_called(request: u64, name: &str) -> bool {
+    if !matches!(name, FORGET | FORGET_EVERYTHING) {
+        return false;
+    }
+    keep_out(request);
+    OBSERVE_FORGETS.fetch_add(1, Ordering::AcqRel);
+    true
 }
 
 /// The request was admitted held only by a known face's gap

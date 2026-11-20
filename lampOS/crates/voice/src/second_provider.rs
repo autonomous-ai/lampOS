@@ -17028,7 +17028,15 @@ fn ask_once_forget(
         Ok(target) => target,
         Err(why) => {
             eprintln!("{}", one_face_forget_not_asked(request, &why));
-            return None;
+            // Told the real cause when what they name can put it right,
+            // never "I couldn't see who was talking": their face was in
+            // view (#8038). A cause of the lamp's own is refused as before.
+            let told = why.told()?;
+            eprintln!(
+                "lamp-voice second: request {request}: {} not run: {why} (LAMP_PERSON_SCOPE_ONE_FACE_READS)",
+                call.name
+            );
+            return Some(serde_json::json!({ "error": told }));
         }
     };
     let held = net::ToolCall {
@@ -21449,6 +21457,14 @@ async fn answer(
             let dropped_told = held_forget_dropped.take().and_then(|(held, note)| {
                 told_on_forget(request, round, &heard_words, &held, &calls).map(|id| (id, note))
             });
+            // A forget the model called, whatever becomes of it below
+            // (held for their yes, asked about once, refused): its
+            // exchange is kept out of the journal and the conversation it
+            // was asked in is observed by no pass, as for one the memory
+            // answers (#8038: decided by the call, never by the words).
+            for call in &calls {
+                crate::remember::forget_called(request, &call.name);
+            }
             // A skill's call answered with `"look": true`, by its name, with
             // its arguments and its note for the picture
             // (`LAMP_SECOND_SKILL_LOOK`).

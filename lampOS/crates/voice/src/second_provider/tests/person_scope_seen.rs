@@ -76,6 +76,10 @@ thread_local! {
     /// forget whose line or `about` says "umbrella".
     static FORGET_TARGET: std::cell::Cell<Option<(u64, &'static str)>> =
         const { std::cell::Cell::new(None) };
+    /// Added to each line's request in the next [`lines_known`] on this
+    /// thread, once, for a test reading what is kept by request across the
+    /// crate (`remember::kept_out`).
+    static REQUEST_BASE: std::cell::Cell<u64> = const { std::cell::Cell::new(0) };
 }
 
 /// The worker's own setup (`worker::see_who_speaks`) with
@@ -709,7 +713,7 @@ async fn lines_known(
     let base = match (real, cut_first) {
         (Some(real), _) => real.base,
         (None, Some(_)) => 9_240_000 + 10 * CUT_BASE.fetch_add(1, Ordering::Relaxed),
-        (None, None) => 0,
+        (None, None) => REQUEST_BASE.with(|base| base.replace(0)),
     };
     let murmured = MURMUR_MOUTHS
         .with(std::cell::Cell::take)
@@ -3937,6 +3941,63 @@ async fn a_named_one_face_forget_the_mouth_was_not_seen_saying_asks_once() {
     assert_eq!(forgets_ran(&got), Vec::<Value>::new(), "nothing removed");
     assert!(asked_about_umbrella(&got), "asked once: {:?}", got.rounds);
     assert!(!refused_by_one_face(&got), "not refused");
+}
+
+/// #8038: a named one-face forget held for their yes is kept out of the
+/// journal, as a forget the memory ran is: the observation pass never sees
+/// it, so it never keeps "they want the lamp to forget the umbrella".
+/// Decided by the forget call, not by the line's words.
+#[tokio::test]
+async fn a_held_one_face_forget_is_kept_out_of_the_journal() {
+    REQUEST_BASE.with(|base| base.set(9_803_800));
+    let got = asked_once(
+        "ask-once-kept-out",
+        vec![line(FORGET_UMBRELLA, vec![("f1", false)], 0)],
+        &[],
+        false,
+    )
+    .await;
+    assert!(asked_about_umbrella(&got), "held: {:?}", got.rounds);
+    assert!(
+        crate::remember::kept_out(9_803_801),
+        "the held forget's exchange is not journalled"
+    );
+}
+
+/// #8038: a named one-face forget that names nothing kept is told so, and
+/// never told the lamp couldn't see who was talking: their face was in
+/// view. Nothing is run.
+#[tokio::test]
+async fn a_one_face_forget_matching_nothing_is_told_the_real_cause() {
+    let chats = vec![
+        vec![
+            Ok(ChatEvent::ToolCalls(vec![call(
+                "f1",
+                crate::remember::FORGET,
+                json!({"about": "scarf"}),
+            )])),
+            Ok(ChatEvent::Done),
+        ],
+        vec![text("Nothing is kept about a scarf."), Ok(ChatEvent::Done)],
+    ];
+    let got = asked_once_chats(
+        "ask-once-no-match",
+        vec![line("Lamp, forget my scarf.", vec![("f1", false)], 0)],
+        chats,
+        false,
+        None,
+    )
+    .await;
+    assert_eq!(forgets_ran(&got), Vec::<Value>::new(), "nothing removed");
+    assert!(!refused_by_one_face(&got), "not told to face the lamp");
+    assert!(
+        got.rounds
+            .iter()
+            .flatten()
+            .any(|message| format!("{message:?}").contains("nothing kept for them matches")),
+        "told nothing matches: {:?}",
+        got.rounds
+    );
 }
 
 /// #5627 (2): their yes within 30 s, their face seen saying it, runs that
