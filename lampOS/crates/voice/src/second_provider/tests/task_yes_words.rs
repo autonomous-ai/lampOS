@@ -115,7 +115,17 @@ fn photo2_the_forced_round_is_told_only_the_approval_fields() {
     told.sort_unstable();
     assert_eq!(told, [yes::ANSWER, yes::APPROVE_ID, yes::NAMED]);
     assert_eq!(form["required"], json!(yes::APPROVE_FIELDS));
-    assert_eq!(form["properties"][yes::ANSWER]["enum"], json!(yes::ANSWERS));
+    // A voice make's change (#7912) is the form's answer too.
+    assert_eq!(
+        form["properties"][yes::ANSWER]["enum"],
+        json!([
+            "yes",
+            "no",
+            "unclear",
+            "new_ask",
+            crate::make_skill_local::CHANGE
+        ])
+    );
     yes::clear_for_test();
     let whole_form = make_form("Yes.");
     assert!(whole_form["properties"].as_object().unwrap().len() > 2);
@@ -214,7 +224,7 @@ fn photo2_a_yes_after_a_task_said_back_unasked_is_forced_to_the_approval_and_kep
     let form = crate::make_skill_local::tool().parameters.unwrap();
     assert_eq!(
         form["properties"][yes::ANSWER]["enum"],
-        json!(["yes", "no", "unclear", "new_ask"])
+        json!(["yes", "no", "unclear", "new_ask", "change"])
     );
     let went = went(
         "Yes.",

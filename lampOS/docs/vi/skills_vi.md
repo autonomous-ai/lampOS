@@ -1602,7 +1602,7 @@ sau:
     hình được bảo chỉ nói "Alright, I won't make it."
     (`make_skill_local::WONT_MAKE_NEXT`), không hỏi gì. Lần tạo tìm lời
     "không" một lần, khi kỹ năng được viết xong, và trong cùng lần khoá đó
-    tự đánh dấu đang hoàn tất (`OneAsk::dropped_or_finishing`): một lời
+    tự đánh dấu đang hoàn tất (`OneAsk::settled`): một lời
     "không" sau đó, trong lúc helper quản lý bật nó (có thể mất vài giây)
     hoặc câu của nó được nói, được báo là đã quá muộn để dừng, rằng họ sẽ
     nghe trong giây lát và khi đó có thể nhờ gỡ nó
@@ -1615,7 +1615,106 @@ sau:
     lời "có" được đáp theo cùng cách: note bảo mô hình gọi một lời từ chối
     hay hoãn là `answer: "no"`, bỏ nó với cùng câu đó, và không bao giờ nói
     nó đã bật hay cách khởi động nó trước lời "có"; ghi của một kỹ năng, đã
-    bật rồi, vẫn không gọi gì khi bị từ chối. Tham số `request` nói không
+    bật rồi, vẫn không gọi gì khi bị từ chối.
+
+    **Một thay đổi nói trong lúc đang tạo sẽ đổi nó, không bao giờ huỷ nó**
+    (#7912, lamp-9adf, 19/11, cả hai lượt chạy: "…remind me to take a break
+    after forty five minutes", rồi "make it fifty", được đáp "Alright, I
+    won't make it." và không gì được tạo). Cả hai note (của lần tạo đang
+    chạy, và của code một lần tạo bằng giọng nói đang chờ lời "có") bảo mô
+    hình rằng một câu đổi hay thêm vào kỹ năng (một con số, tên của nó, một
+    bước nữa) là `answer: "change"` với `request`, lời nhờ như bây giờ, trọn
+    vẹn, với thay đổi của họ ở trong, không bao giờ chỉ riêng thay đổi, do
+    mô hình gộp lại (ROW của #7936 trên lamp-9adf, 20/11 01:15: "every
+    thirty minutes…", rồi "make it forty five minutes", được tạo lại từ lời
+    nhờ đầu với lời của mô hình về thay đổi theo sau, và cả DeepSeek lẫn
+    agent đều giữ `cooldown = "30m"`). Chỉ các note nói vậy, không bao giờ
+    chính tham số `request`, và thay đổi không có tham số riêng ngoài
+    `change` của `answer`: tham số của `make_skill` bị giới hạn bởi
+    `PRODUCT_MOST_PARAMETERS_BYTES` (3.750 trong 4.096 của
+    `lamp_gemini::MAX_TOOL_JSON_BYTES`; 3.746 khi các switch của sản phẩm
+    bật). Và các note nói rằng một thay đổi không bao giờ là lời "không": chỉ một câu có nghĩa
+    là dừng mới từ chối nó. Một câu là thay đổi, lời "không" hay chuyện
+    khác là việc mô hình phán đoán, không bao giờ là danh sách từ; code áp
+    dụng nó (`make_skill_local::making_changed`). Một thay đổi chỉ được
+    tính khi đến từ người đã nhờ tạo (người của họ trong memory scope, giữ
+    cùng lời nhờ, `AskedBy`; một lần tạo đã chờ lượt giữ người được đọc lúc
+    nhờ) hoặc chủ của đèn, đúng quy tắc huỷ của hàng đợi (HOLD 1 của Heron
+    trên #7936): của bất kỳ ai khác, hay một câu không ai được biết nói, không
+    đổi gì, không bao giờ vào câu nghe được của lần tạo, và được báo chỉ
+    người đã nhờ mới đổi được (`"error": "not_theirs"`); với một kỹ năng
+    vừa tạo xong, rằng họ có thể nhờ một kỹ năng của riêng mình. Một câu là
+    của người đã nhờ chỉ vì riêng khuôn mặt họ trong tầm nhìn
+    (`LAMP_PERSON_SCOPE_ONE_FACE_READS`) không phải câu của họ để hành động
+    theo (`services::acting_person`, quy tắc của chính chủ; lệnh huỷ của
+    một lần tạo đang chờ cũng đọc nó). Cùng quy tắc áp dụng cho một lời
+    "không" với lần tạo đang chạy: "never mind" của một vị khách không bao
+    giờ bỏ lần tạo của chủ, và được báo là nó vẫn đang được tạo
+    (`NOT_THEIRS_NO_NEXT`). Một thay đổi làm
+    lời nhờ dài quá `made_skill::MOST_REQUEST_BYTES` không đổi gì và được
+    báo ngay (`"error": "too_long"`), không bao giờ "đã đổi" rồi mới "quá
+    dài". Khi đang chạy, thay đổi được giữ cho lần tạo: ở lần nhìn cuối
+    (`OneAsk::settled`) kỹ năng viết trước được thả như một kỹ năng bị từ
+    chối (`forget_unput`, không bao giờ được nói) và lời nhờ được tạo lại,
+    trong cùng lần tạo, từ cả ba, theo thứ tự: request đầu nguyên vẹn, ghi
+    là lời lẽ trước của nó (`make_skill_local::EARLIER_WORDING`), nên một
+    lần gộp sai hay một `request` chỉ có thay đổi không bao giờ làm mất
+    trigger hay các bước của nó (HOLD của Twelve và Heron trên #7936 tại
+    bdd4728407); `request` của mô hình cho thay đổi mới nhất, nếu có
+    (`AS_NOW`); và lời mới nhất của người đó, được nói là thắng mọi lời lẽ
+    trước ở bất cứ chỗ nào khác nhau (`LATEST_WORD_WINS`): câu nghe được
+    của từng thay đổi theo thứ tự, hoặc lời của mô hình về nó khi không
+    nghe được câu nào, nên lời khẳng định đó không bao giờ bị bỏ. Khác nhau
+    thế nào là việc của bên tạo đọc, không bao giờ của code. Câu nghe được của thay
+    đổi đi sau câu đầu (một ghi được giữ theo cả hai); một lời "không" hay
+    thay đổi sau đó vẫn thấy nó đang chạy. Lượt của thay đổi được báo là nó
+    đã được nhận (`"changed": true`, `CHANGED_NEXT`), không bao giờ là nó sẽ
+    không được tạo. Một thay đổi sau "never mind", khi lần tạo còn đang
+    chạy, lấy lại lần tạo: nó được tạo, cùng thay đổi. Một thay đổi quá lần
+    nhìn cuối được báo là sắp xong và có thể nhờ đổi khi nó sẵn sàng
+    (`FINISHING_CHANGE_NEXT`). Code của một lần tạo bằng giọng nói đang chờ
+    lời "có", được đổi qua id của lần tạo hay id của chính lần chờ: với
+    `LAMP_MAKE_QUEUE`, lần tạo lại trước hết lấy chỗ của hàng đợi từ lần
+    tạo đang chờ (`make_queue::retake`, HOLD 2), nên một lần tạo xếp hàng
+    sau nó không bao giờ chạy cùng lúc với lần tạo lại và lần chờ "có" duy
+    nhất không bao giờ bị dùng chung; khi một lần tạo khác giữ chỗ, không
+    gì được đổi (`"error": "busy"`). Rồi lần chờ bị bỏ, gói của nó (chưa
+    từng bật) bị quên, và lượt của thay đổi được báo ngay, như khi đang
+    chạy (`CHANGED_NEXT`, HOLD 3); lần tạo lại chạy ngoài lượt
+    (`second_provider::worker::run_remade`), theo người đã nhờ đầu tiên,
+    câu của nó được nói qua dịch vụ nói như của một lần tạo đã chờ lượt,
+    và việc đó trả chỗ. Một lần tạo lại thất bại mà không có câu riêng
+    (phần đó không chạy, một brief bị từ chối, lời nhờ chưa rõ theo bộ phán
+    xét với `LAMP_MAKE_NO_ASKS`) nói lý do, "I couldn't make it with your
+    change: …", bất kể người đó đã nói gì sau đó, như thất bại của một lần
+    tạo đã xếp hàng; một lần bị bỏ bởi lời "không" sau đó của họ không nói
+    gì (`run_remade_with`). Một lần tạo bị thay đổi khi đang làm mà lượt của
+    nó sau đó bị cắt cũng nói câu của nó qua dịch vụ nói, kể cả khi thất bại,
+    bất kể người đó đã nói gì sau đó: chính câu thay đổi không phải là đi
+    tiếp khỏi nó (`make_skill_local::take_changed_here`; ROW của #7936 trên
+    lamp-9adf ở 09ede55c76, "make it seven thirty instead", thất bại của lần
+    tạo lại không bao giờ được nói). Một lần tạo đã xong và đã bật được báo rằng thay
+    đổi của nó là một lần tạo mới, cả lời nhờ cùng thay đổi. Một câu về
+    chuyện khác để yên lần tạo. "change" cho một lần chờ không phải của một
+    lần tạo bằng giọng nói (tác vụ của một kỹ năng, một lần gỡ, một bản ghi
+    đã thả) được đọc là chưa rõ, không bao giờ là lời "không". Kiểm thử:
+    `a_change_said_while_made_makes_it_with_the_change`,
+    `a_change_while_made_is_remade_from_the_whole_ask_the_latest_word_winning`,
+    `a_remake_is_made_from_the_merged_ask_the_latest_word_said_to_win`,
+    `a_change_only_request_keeps_the_first_ask_the_latest_word_winning`,
+    `a_change_to_a_make_waiting_for_its_yes_makes_it_again`,
+    `a_change_counts_only_from_its_asker_or_the_owner`,
+    `a_face_only_line_never_changes_the_askers_make`,
+    `a_change_after_a_waiting_yes_is_told_before_it_is_made_again`,
+    `make_queue_runs::a_remake_that_fails_says_its_line`,
+    `made_line::a_change_mid_make_whose_remake_fails_is_said_after_the_cut`,
+    `a_change_to_a_wait_of_no_make_reads_as_unclear`,
+    `a_change_past_the_longest_ask_is_told_at_once`,
+    `make_queue::tests::a_remake_after_a_waiting_yes_keeps_the_slot`,
+    `never_mind_said_while_made_ends_it`,
+    `an_unrelated_line_while_made_leaves_the_make_alone`.
+
+    Tham số `request` nói không
     bao giờ gọi nó cho một lời nhờ mà người dùng rút lại trong cùng câu
     ("make a skill that waters my plants. Actually, never mind."). Chỉ một
     lần tạo còn đang chạy mới được báo như vậy: một lần tạo đã kết thúc

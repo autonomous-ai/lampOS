@@ -6223,9 +6223,11 @@ async fn run_call(
     // any other use of the function, as before.
     let queue_slot = made && heard && crate::make_queue::on();
     if queue_slot && let Some(id) = crate::make_queue::cancel_of(&call.args) {
+        // Never a line theirs only by their face alone in view: the same
+        // read as a make's change (`services::acting_person`).
         return ToolAnswer::plain(crate::make_queue::cancel(
             id,
-            speaker_of(scope.as_ref()).as_deref(),
+            crate::services::acting_person(scope.as_ref()).as_deref(),
             crate::services::owner_of(scope.as_ref()).is_some(),
         ));
     }
@@ -6413,6 +6415,46 @@ pub(crate) fn run_queued(entry: crate::make_queue::Entry) {
     );
 }
 
+/// A voice make changed as its say-back waited for a yes (#7912), made
+/// again for the line `request` that changed it, off that line's turn
+/// (Heron's HOLD 3 on #7936: the turn is told the change at once), as a
+/// make that waited its turn is: its line said through the say service,
+/// and with `LAMP_MAKE_QUEUE` the slot it took
+/// (`make_queue::retake`) told once that line is said.
+pub(crate) fn run_remade(request: u64, work: crate::make_queue::Work) {
+    run_remade_with(request, work, say_made_line, move || {
+        crate::make_queue::said(request);
+    });
+}
+
+/// [`run_remade`] with its `say` and what is done once the line is said,
+/// `ended`. A remake that failed with no line of its own (the part not
+/// running, a brief refused, the judge's unclear ask with
+/// `LAMP_MAKE_NO_ASKS`, the same ask refused) says why, as a make that
+/// waited its turn does (`make_queue::Entry::run`, Twelve's and Heron's
+/// HOLD on #7936): the person was told they'll hear when it's ready, so,
+/// as for a queued make, it is said whatever they said since. One dropped
+/// by their later no has no error and says nothing.
+fn run_remade_with(
+    request: u64,
+    work: crate::make_queue::Work,
+    say: impl FnOnce(String) + Send + 'static,
+    ended: impl FnOnce() + Send + 'static,
+) {
+    let work: crate::make_queue::Work = Box::new(move || {
+        let answer = work();
+        crate::make_skill_local::failed_unless_said(|| {
+            crate::make_queue::failed_line(REMADE_LABEL, &answer.told)
+        });
+        answer
+    });
+    run_queued_with(request, work, say, ended);
+}
+
+/// What a remake's failed line calls it ([`run_remade_with`]): "I couldn't
+/// make it with your change: …".
+const REMADE_LABEL: &str = "it with your change";
+
 /// [`run_queued`] with its `say` and what is done once the line is said,
 /// `ended`.
 fn run_queued_with(
@@ -6546,9 +6588,13 @@ fn made_on_this_thread<F: FnOnce() + Send + 'static>(
     crate::make_skill_agent::set_made_for(request);
     // Nothing an earlier call left on this thread is taken as this one's.
     let _ = crate::make_skill_local::take_said_outcome();
+    let _ = crate::make_skill_local::take_changed_here();
     let answer = work();
     crate::make_skill_agent::set_made_for(0);
     let made = crate::make_skill_local::take_said_outcome();
+    // Changed while it was made (#7912): the change's own line is no going
+    // on from it, and its person was told they'll hear when it's ready.
+    let changed = crate::make_skill_local::take_changed_here();
     let queued = given.is_none();
     let answer = match given {
         Some(given) => match given.send(answer) {
@@ -6586,7 +6632,11 @@ fn made_on_this_thread<F: FnOnce() + Send + 'static>(
     // Failed, and the person went on since (lamp-9adf, 17 Nov 18:10: a
     // make cut by the next ask failed 88 s later, and "I couldn't make
     // that" was said in a later, unrelated turn): nothing is said.
-    if outcome == Outcome::Failed && went_on(request) {
+    // A make changed while it was made is said whatever followed (#7936's
+    // ROW on lamp-9adf at 09ede55c76: request 7's "make it seven thirty
+    // instead" read as going on from request 6, and its failed remake was
+    // never said).
+    if outcome == Outcome::Failed && !changed && went_on(request) {
         eprintln!(
             "lamp-voice second: request {request}: its turn was cut while make_skill ran, and it kept nothing; the person went on with a line of their own: nothing is said"
         );
