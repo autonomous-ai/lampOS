@@ -2088,8 +2088,7 @@ fn on_the_lamp_description(place: &Place, staff: &[Member]) -> String {
 /// an agent does, not forced to `make_skill` (`LAMP_MAKE_SKILL_ASKED`),
 /// called this twice of two, and the yes started a plain task. The model
 /// still judges; no word is matched.
-pub const MAKE_TOLD: &str =
-    " An ask to make a skill, even one whose work an agent does, is make_skill's, never this.";
+pub const MAKE_TOLD: &str = " Making a skill is make_skill's, never this.";
 
 /// The link's most for a description (`lamp_gemini::Tool::validate`).
 const MOST_DESCRIPTION_BYTES: usize = 1_024;
