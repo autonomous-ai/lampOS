@@ -74,8 +74,12 @@
 //! saved then waits for the next start too. The marks are written on that
 //! thread. The journal has counts only, never a word, an id or a key.
 //!
-//! What was said before the privacy switch closed may still be sent while
-//! it is closed: nothing new is said to the lamp then.
+//! Nothing is sent while the privacy switch is closed
+//! ([`crate::history_privacy`]): a turn said just before it closed goes once
+//! it opens. While a forget is in the forget worker's hands or its delete
+//! has not reached the account, no turn it could reach is sent
+//! ([`crate::history_forget::holds`]); a turn a forget covered that was
+//! already on the wire is deleted after its POST answers.
 use lamp_msgs::{MEMORY_HISTORY_EPOCH_OP, history_turn_id, is_history_epoch};
 use serde_json::{Value, json};
 use std::{
@@ -245,8 +249,20 @@ pub type Post = Box<dyn FnMut(&Value) -> Answer + Send>;
 /// One line asked of the memory, and its answer if it gave one.
 pub type Ask = Box<dyn FnMut(&Value) -> Option<Value> + Send>;
 
+/// Whether a turn of a memory scope may be sent now ([`Sender::guarded`]).
+pub type Gate = Arc<dyn Fn(&str) -> bool + Send + Sync>;
+/// Turn ids posted while a forget came that covers them, to delete.
+pub type Posted = Arc<dyn Fn(&[String]) + Send + Sync>;
+
+/// How often a batch the gate holds is looked at again.
+pub const GATE_AGAIN: Duration = Duration::from_secs(1);
+
 #[derive(Default)]
 struct Queue {
+    /// None: every turn may go (tests).
+    gate: Option<Gate>,
+    /// None: nothing is deleted after a post (tests).
+    posted_forgotten: Option<Posted>,
     ready: VecDeque<Pending>,
     held: VecDeque<Pending>,
     /// The memory store's epoch, once the memory told it: nothing is
@@ -574,6 +590,16 @@ fn send_batch(
 ) -> Ended {
     let mut wait = waits.first;
     for tries in 1..=TRIES {
+        // The privacy switch closed, or a forget of a scope in the batch
+        // still in the forget's hands or waiting to reach the account: the
+        // batch waits, the queue's lock free (the first builder's privacy
+        // read on #8125, items 1 and 3).
+        let gate = locked(shared).gate.clone();
+        if let Some(gate) = gate {
+            while batch.iter().any(|pending| !gate(&pending.scope)) {
+                std::thread::sleep(GATE_AGAIN);
+            }
+        }
         {
             let mut queue = locked(shared);
             loop {
@@ -617,6 +643,9 @@ fn send_batch(
             "turns": batch.iter().map(|pending| pending.wire(store)).collect::<Vec<_>>()
         });
         let answer = post(&body);
+        if matches!(answer, Answer::Saved | Answer::Again) {
+            posted_while_forgotten(shared, batch, store);
+        }
         if answer != Answer::Again {
             return Ended::Answered(answer);
         }
@@ -634,6 +663,34 @@ fn send_batch(
         wait = (wait * 2).min(waits.longest);
     }
     Ended::Waits
+}
+
+/// The Reviewer-lead's must-fix on #8091: a POST already under way when a
+/// forget came that covers some of its turns (by id, a forget everything,
+/// or one naming no ids) may have landed. Once it answered, those turns'
+/// ids are handed to the forget's delete ([`Queue::posted_forgotten`]), so
+/// a turn forgotten during its POST never stays on the account.
+fn posted_while_forgotten(shared: &Shared, batch: &[Pending], store: &str) {
+    let (ids, posted) = {
+        let queue = locked(shared);
+        let ids: Vec<String> = batch
+            .iter()
+            .filter(|pending| {
+                queue.is_forgotten(&pending.scope, pending.exchange) || queue.waits(pending)
+            })
+            .map(|pending| history_turn_id(store, &pending.scope, pending.exchange))
+            .collect();
+        (ids, queue.posted_forgotten.clone())
+    };
+    if let Some(posted) = posted
+        && !ids.is_empty()
+    {
+        eprintln!(
+            "lamp-voice history: {} turns a forget covered were posted before it came; their delete is queued",
+            ids.len()
+        );
+        posted(&ids);
+    }
 }
 
 /// An id per memory scope.
@@ -958,6 +1015,15 @@ impl Sender {
     /// A queue with no thread yet: what is offered waits for [`Self::spawn`].
     pub fn new() -> Self {
         Self::default()
+    }
+
+    /// Before [`Self::spawn`]: each batch waits while `gate` says no for a
+    /// scope in it, and `posted` is given the ids of turns a forget covered
+    /// that were posted before it came.
+    pub fn guarded(&self, gate: Gate, posted: Posted) {
+        let mut queue = locked(&self.shared);
+        queue.gate = Some(gate);
+        queue.posted_forgotten = Some(posted);
     }
 
     /// The thread that sends, with `post` for each call, `ask` for the
@@ -1315,17 +1381,46 @@ pub fn start_from(
     let ask: Ask = Box::new(move |line: &Value| {
         crate::tools::exchange_up_to(&socket, line, MEMORY_WITHIN, MEMORY_ANSWER_MOST)
     });
-    start_at(value, url(llm_base_url), key, ask, Some(marks.to_owned()))
+    // Nothing is sent while the privacy switch is closed, nor a turn a
+    // waiting forget could reach (the first builder's privacy read on
+    // #8125); a turn posted as a forget covering it came is deleted after
+    // (the Reviewer-lead's must-fix on #8091).
+    let gate: Gate = Arc::new(|scope: &str| {
+        crate::history_privacy::open() && !crate::history_forget::holds(scope)
+    });
+    let posted: Posted = Arc::new(crate::history_forget::delete_posted);
+    start_guarded(
+        value,
+        url(llm_base_url),
+        key,
+        ask,
+        Some(marks.to_owned()),
+        Some((gate, posted)),
+    )
 }
 
 /// [`start_from`] with the save's URL already worked out (`None`: not the
 /// lamp's cloud API) and the memory's asker.
+#[cfg(test)]
 fn start_at(
     value: Option<&str>,
     url: Option<String>,
     key: &str,
     ask: Ask,
     marks: Option<PathBuf>,
+) -> Option<Sender> {
+    start_guarded(value, url, key, ask, marks, None)
+}
+
+/// [`start_at`], each batch held by `guard` ([`Sender::guarded`]) when
+/// given: the product's, the privacy switch and the forget's hold.
+fn start_guarded(
+    value: Option<&str>,
+    url: Option<String>,
+    key: &str,
+    ask: Ask,
+    marks: Option<PathBuf>,
+    guard: Option<(Gate, Posted)>,
 ) -> Option<Sender> {
     if !on_from(value) {
         return None;
@@ -1347,6 +1442,9 @@ fn start_at(
         return refused("no HTTPS client");
     };
     let sender = Sender::new();
+    if let Some((gate, posted)) = guard {
+        sender.guarded(gate, posted);
+    }
     if sender.spawn(post, ask, marks, Waits::default()).is_err() {
         return refused("no thread to send from");
     }

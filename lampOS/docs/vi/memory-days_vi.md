@@ -1002,7 +1002,9 @@ khoản (Backend3, 19/11): `POST <base>/history/turns` với khóa của lamp tr
   năm lệnh quên, `history_forget::answered`, trên đường của voice) đều đến
   `history_send::deleting`, nên các id đó không bao giờ được POST, dù
   `LAMP_HISTORY_FORGET` thế nào; khi nó bật, các trang phần còn lại của một
-  lệnh quên lớn được đọc ngoài đường của voice và id của chúng cũng đến đó. Một
+  lệnh quên lớn được đọc ngoài đường của voice và id của chúng cũng đến đó,
+  cũng như các id mà bộ nhớ giữ lại của một lệnh quên mà worker chưa kịp xếp
+  hàng, được đọc lại ở lần khởi động sau (`history_unsent`, xem memory.md). Một
   lệnh quên về một điều cũng giữ lại rồi thả các lần POST như mọi lệnh quên
   khác. Khi mọi lần xóa của nó đều được trả lời, những gì đã đi đã được nêu trên
   đường đi và không bỏ thêm gì; khi một lần hết giờ hay mất câu trả lời giữa
@@ -1038,8 +1040,18 @@ khoản (Backend3, 19/11): `POST <base>/history/turns` với khóa của lamp tr
   kho tắt) hay một lời từ chối khác thì không thử lại. Tối đa 200 lượt chờ (quá
   thì lượt cũ nhất chờ lần khởi động sau) và 64 câu của phòng được giữ. Nhật ký
   chỉ có số đếm, không bao giờ có lời, id hay khóa.
-- **Quyền riêng tư:** những gì đã nói trước khi công tắc riêng tư đóng vẫn có
-  thể được gửi trong lúc nó đóng; khi đó không có lời mới nào nói với lamp.
+- **Quyền riêng tư:** không gửi gì khi công tắc riêng tư đóng (bản đọc quyền
+  riêng tư của first builder trên #8125): lần lưu chờ lease `voice/privacy`
+  của chính voice (`history_privacy`), xem lại mỗi 1 giây, nên một lượt nói
+  ngay trước khi công tắc đóng chỉ được gửi sau khi nó mở. Khi một lệnh quên
+  còn trong tay worker quên hoặc lệnh xóa của nó còn chờ, không lượt nào nó
+  có thể chạm tới được gửi (`history_forget::holds`), và một lượt đang trên
+  đường khi lệnh quên che nó đến sẽ được xóa sau khi POST của nó trả lời
+  (must-fix của Reviewer-lead trên #8091). Một lần reset hay quên hết mọi
+  người xóa toàn bộ lịch sử của lamp trước (`{"all":true,"every_person":true}`;
+  một lệnh như vậy lỡ lượt trao cho worker sẽ được thấy ở lần đọc lại kế tiếp
+  qua epoch đã đổi của memory),
+  và không lưu gì trước khi nó đi (xem memory.md).
 - **Tắt trong mọi unit:** theo các phán quyết của người xây dựng đầu tiên
   (#7935, và 17:09 trên #7957), phần lưu chỉ bật trong sản phẩm sau khi phần quên
   (`LAMP_HISTORY_FORGET`) đã bật, cùng hàng kiểm tra của nó. Câu thông báo trong

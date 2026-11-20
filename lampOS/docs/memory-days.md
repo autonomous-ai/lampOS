@@ -1249,7 +1249,9 @@ body `{"turns":[{"id","at","person","heard","said"}]}`.
   forget ops, `history_forget::answered`, on the voice's way) goes to
   `history_send::deleting`, so those ids are never posted, whatever
   `LAMP_HISTORY_FORGET`; with it on, the pages of a big forget's rest are
-  read off the voice's way and their ids go there too. A forget about a
+  read off the voice's way and their ids go there too, as do those the
+  memory kept of a forget the worker never queued, read again at the next
+  start (`history_unsent`, [memory.md](memory.md)). A forget about a
   thing holds and lifts the posts as every other forget. When each of its
   removals answered, what went was named on its way and nothing more is let
   go; when one timed out or was lost part way (the kept things' forgets or the
@@ -1284,8 +1286,18 @@ body `{"turns":[{"id","at","person","heard","said"}]}`.
   or another refusal is not tried again. At most 200 turns wait (past it the
   oldest waits for the next start) and 64 room lines are held. The journal has
   counts only, never a word, an id or a key.
-- **Privacy:** what was said before the privacy switch closed may still be sent
-  while it is closed; nothing new is said to the lamp then.
+- **Privacy:** nothing is sent while the privacy switch is closed (the first
+  builder's privacy read on #8125): the save waits on the voice's own
+  `voice/privacy` lease (`history_privacy`), looked at again every 1 s, so a
+  turn said just before the switch closed goes only after it opens. While a
+  forget is in the forget worker's hands or its delete waits, no turn it
+  could reach is sent (`history_forget::holds`), and a turn on the wire as a
+  forget covering it came is deleted after its POST answers (the
+  Reviewer-lead's must-fix on #8091). A reset or a forget of everyone
+  deletes the lamp's whole history first (`{"all":true,"every_person":true}`;
+  one that missed the worker's hand-off is seen at the next read again by
+  the memory's changed epoch),
+  and nothing is saved before it goes ([memory.md](memory.md)).
 - **Off in every unit:** by the first builder's rulings (#7935, and 17:09 on
   #7957), the save goes on in the product only after the forget half
   (`LAMP_HISTORY_FORGET`) is on, with its row. The setup sentence the issue

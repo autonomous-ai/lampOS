@@ -15184,7 +15184,8 @@ fn legacy_exchange(
     match lease {
         Some(_) => bounded_exchange_scoped(socket, line, budget, lease),
         None => {
-            let answer = crate::tools::exchange(socket, line, budget)?;
+            let answer =
+                crate::tools::exchange(socket, &crate::history_forget::asking(line), budget)?;
             // `LAMP_HISTORY_FORGET` (#7771), as [`exchange_guarded`].
             crate::history_forget::answered(socket, line, &answer);
             Some(answer)
@@ -15329,7 +15330,9 @@ fn exchange_guarded(
         // connection. Refuse promptly rather than spin or block in connect.
         Err(_) => return None,
     }
-    let mut bytes = serde_json::to_vec(line).ok()?;
+    // With `LAMP_HISTORY_FORGET=on`, a forget asks the memory to keep what
+    // it removes until the worker has it queued (#7771).
+    let mut bytes = serde_json::to_vec(&*crate::history_forget::asking(line)).ok()?;
     if bytes.len() >= 65_536 {
         return None;
     }

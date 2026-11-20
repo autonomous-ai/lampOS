@@ -277,31 +277,84 @@ account keeps too (the lamp's cloud API, `POST …/history/turns/delete`).
   go). The person key is memory's own scope id: a known
   person's `p-` id, `""` for the room's. A forget never deletes more of the
   account's history than the lamp forgot: a whole-history delete is a known
-  person's forget everything only, and never sent without a person. Only
-  memory's forgets and their pages are read (the list shared in
-  `lamp_msgs::MEMORY_FORGETS_TELLING_EXCHANGES`). A forget of every
-  person's memory, or a page that can't be read or is refused (`rest_gone`),
-  is journalled as not reached.
+  person's forget everything only, and never sent without a person, but
+  the lamp's whole history (below). Only memory's forgets and their pages
+  are read (the list shared in `lamp_msgs::MEMORY_FORGETS_TELLING_EXCHANGES`).
+  A page that can't be read or is refused (`rest_gone`) is read again from
+  what the memory kept (below).
+- **The lamp's whole history** (the first builder's privacy read on #8125,
+  item 2): a forget of every person's memory, or a memory found wiped at a
+  start (a reset: the store's epoch differs from the one kept on the queue
+  at the last start, `history_forget::epoch_seen`; a forget of everyone
+  keeps the new epoch with it, so it is not taken for a second wipe), queues
+  one delete of the lamp's whole history, every person's and the room's,
+  sent before anything else (`Call::Lamp`, body
+  `{"all":true,"every_person":true}` on the same delete call,
+  `WHOLE_LAMP_BODY`; Backend3's server, 18:26 on #8125: it removes this
+  lamp's turns and actions for every person, nothing of the owner's other
+  lamps, works with the account's history switch off, and refuses a later
+  save stamped at or before it). Until it is done, the save sends nothing.
+- **A forget is never let go, and holds the save** (item 1): while a forget
+  is in the worker's hands, owed a read again (a hand-off that failed, a
+  start whose read failed, read again every 5 s, `RECOVER_AGAIN`), or its
+  delete waits on the queue (that person's ids or whole history, or the
+  lamp's), the save sends no turn it could reach
+  (`history_forget::holds`, looked at again every 1 s,
+  `history_send::GATE_AGAIN`). A turn already on the wire when a forget
+  covering it came (by id, a forget everything, or one naming no ids) is
+  let land, and once its POST answers, its id is queued for delete
+  (`history_forget::delete_posted`, the Reviewer-lead's must-fix on #8091).
+- **Nothing is sent while the privacy switch is closed** (item 3): the
+  save and the delete each send only while the voice's own
+  `voice/privacy` lease is valid and permits (`history_privacy`, open for
+  50 ms after each lease, renewed every 10 ms); closed, stale or unread,
+  both queues wait, looked at again every 1 s
+  (`net::history::PRIVACY_AGAIN`, `GATE_AGAIN`). A turn said just before
+  the switch closed goes only after it opens.
 - **Never on the reply's way:** "forgotten" follows the lamp's own delete, as
   before. On the voice's way the answer's ids are only held from the save
   (`history_send::deleting`, in memory) and the answer handed to one worker
   thread (`history_forget::Worker::hand`, at most 256 waiting, never
-  blocking; past it, journalled as not reached; a worker that has stopped is
+  blocking; past it, journalled and read again below; a worker that has stopped is
   journalled as stopped and started again once). The worker, in the order
   the forgets were answered, writes the queue (fsync) and reads the rest's
   pages by its token, each page's ids held from the save too, so neither
   the SD card nor a page read is paid before the reply or its deadline. On
   a clean stop (`lamp-voice`'s `main`, after its run) the worker is given
-  at most 2 s (`DRAIN_WITHIN`) to write what it holds, pages cut short and
-  journalled as not reached; what it still holds is journalled as a count.
-  A crash between the reply and the worker's write (one fsync, or longer
-  behind an earlier big forget's pages) loses that forget's account delete,
-  never a post: the save's hold runs before the reply. The queue is a file
+  at most 2 s (`DRAIN_WITHIN`) to write what it holds, pages cut short;
+  what it still holds is journalled as a count, and both are read again at
+  the next start (below).
+- **Nothing lost to a restart or a crash** (the first builder's switch-on
+  condition on #8086): with the switch on, each of the five forgets is sent
+  to the memory with `"history_unsent":true` (`history_forget::asking`), and
+  the memory keeps what it removed in its `history_unsent` table, in the
+  forget's own transaction (no commit of its own, so no sync more before the
+  reply): each turn id, or one row for a known person's whole history, never
+  a word, never let go but by the voice's done. The answer says the rows' range (`"unsent":[from,to]`). Once the
+  worker has every id of that forget on its queue file (its told ids and
+  every page of its rest), it says them done
+  (`{"op":"history_unsent_done","from","to"}`) and the memory lets them go.
+  What it never said done (a forget in the hand-off at a crash or a stop, one
+  not handed, a page not read, a rest let go or lost to the memory's
+  restart) is read again: at the second route's start
+  (`history_forget::recover_at_start`, the worker's first job, before any
+  forget handed after), and after the next job when one was not handed or
+  could not all be queued. It is read oldest first,
+  `{"op":"history_unsent","after":N}`, at most 900 rows a page and 64 pages
+  at once; each page's ids are held from the save, written to the queue,
+  and only then said done up to the page's last row. A page not written is
+  never said done. Read twice is harmless: the queue is a set and the server
+  takes a turn already gone as done. Without the field nothing is kept, as
+  before. The queue is a file
   in the voice's state folder
-  (`/var/lib/lampOS/voice/history-forget.json`, 0600), kept across a
-  restart, at most 20,000 ids (past it, the known person with the most
+  (`/var/lib/lampOS/voice/history-forget.json`, 0600, synced with its
+  folder), kept across a restart, its memory epoch kept beside it
+  (`history-forget.epoch`) so a queue file found corrupt (journalled,
+  started again empty) still sees a wipe; every read again owed (a
+  hand-off missed, not only a start) checks the epoch too, at most 20,000 ids (past it, the known person with the most
   waiting is coalesced into their whole history, never the room's, whose
-  newest past it are let go; each journalled as a count). It is sent in the
+  turns past it are kept, never let go; each journalled as a count). It is
+  sent in the
   background with the lamp's key in `x-api-key`, 100 ids a call, and only
   to the lamp's own cloud API (`https://campaign-api.autonomous.ai`); with
   any other base, nothing is sent and the forgets wait on the lamp.
@@ -317,8 +370,21 @@ account keeps too (the lamp's cloud API, `POST …/history/turns/delete`).
   `a_stale_rest_is_never_sent_for_another_forget`,
   `the_forget_turn_does_no_disk_or_page_on_the_voice_path`,
   `a_stopped_worker_is_started_again`,
-  `a_clean_stop_drains_what_the_worker_holds`) and
-  `second_provider::net::history`'s (a fake server), and `days_protocol`'s
+  `a_clean_stop_drains_what_the_worker_holds`,
+  `a_forget_lost_to_a_restart_is_queued_at_the_next_start`,
+  `a_forget_said_done_is_never_queued_again`,
+  `recovery_keeps_order_and_says_done_only_what_it_wrote`) and
+  `second_provider::net::history`'s (a fake server, among them
+  `a_forget_lost_to_a_restart_reaches_the_server_after_start`,
+  `a_forget_while_the_server_is_down_reaches_it_after_a_restart`,
+  `nothing_is_sent_while_the_switch_is_closed_and_the_lamps_history_goes_first`),
+  `history_forget`'s `a_reset_deletes_the_lamps_whole_history`,
+  `a_waiting_forget_holds_the_turns_it_could_reach` and
+  `turns_posted_before_a_forget_came_are_queued_for_delete`, `history_send`'s
+  `a_turn_said_just_before_the_switch_closes_is_sent_only_after_it_opens`,
+  `a_turn_waits_while_its_scopes_forget_has_not_reached_the_account` and
+  `a_post_in_flight_when_a_forget_naming_no_ids_came_is_deleted_after`,
+  `history_unsent`'s (a real store, reopened), and `days_protocol`'s
   `a_forget_names_the_exchanges_it_removed_by_scope_and_id` and
   `each_forgets_rest_is_kept_under_its_own_token`.
 

@@ -518,12 +518,13 @@ impl Net {
             return None;
         };
         let (queue, bell) = crate::history_forget::queue();
-        Some(Box::pin(net::history::task(
+        Some(Box::pin(net::history::task_while(
             url,
             self.config.llm_key.expose().to_owned(),
             queue,
             bell.clone(),
             net::history::Pace::PRODUCT,
+            Arc::new(crate::history_privacy::open),
         )))
     }
 
