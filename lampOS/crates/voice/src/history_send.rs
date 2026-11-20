@@ -44,9 +44,12 @@
 //! until the memory answers it ([`Sender::forget_answered`]): the ids the
 //! memory removed are let go and kept as forgotten, so a save naming one is
 //! dropped before any POST, the first included (the lamp's second guard;
-//! the server keeps a tombstone). When the answer does not name its ids,
-//! the forgetting person's and the room's unsent turns wait for the next
-//! start, when the memory no longer holds what it forgot. Other people's
+//! the server keeps a tombstone). When the answer does not name its ids
+//! (none comes, or a forget about a thing timed out part way), the
+//! forgetting person's and the room's turns handed over so far wait for the
+//! next start, when the memory no longer holds what it forgot: a batch
+//! already taken off the queue to send included, checked before its every
+//! try (Friday's P2 on #7957). Other people's
 //! unsent turns are never let go. [`deleting`] takes the ids a forget
 //! queues for deletion, by their full id.
 //!
@@ -259,6 +262,13 @@ struct Queue {
     forgotten: HashSet<(String, u64)>,
     forgotten_order: VecDeque<(String, u64)>,
     emptied: BTreeMap<String, u64>,
+    /// Each scope whose turns, through this id, wait for the next start: a
+    /// forget answered without naming what it removed, or not answered in
+    /// time. The batch already taken off the queue to send is checked
+    /// against it before every try, the first included, as against
+    /// [`Self::forgotten`] (Friday's P2 on #7957: such a batch was put back
+    /// and posted).
+    waits_through: BTreeMap<String, u64>,
     /// The last id offered in each scope this run.
     offered: BTreeMap<String, u64>,
     /// Ids queued, held or being sent, by scope.
@@ -281,6 +291,39 @@ impl Queue {
                 .emptied
                 .get(scope)
                 .is_some_and(|through| exchange <= *through)
+    }
+
+    /// Waits for the next start: a forget that named no ids covered it.
+    fn waits(&self, pending: &Pending) -> bool {
+        self.waits_through
+            .get(&pending.scope)
+            .is_some_and(|through| pending.exchange <= *through)
+    }
+
+    /// The highest id of `scope` handed over this run: offered, or queued,
+    /// held or being sent (a room line moved to a person goes under its new
+    /// id, which `offered` never saw).
+    fn handed_through(&self, scope: &str) -> u64 {
+        let offered = self.offered.get(scope).copied().unwrap_or(0);
+        let outstanding = self
+            .outstanding
+            .get(scope)
+            .and_then(|ids| ids.last().copied())
+            .unwrap_or(0);
+        offered.max(outstanding)
+    }
+
+    /// A forget that names no ids, of `scopes`: every turn of theirs handed
+    /// over so far waits for the next start, when the memory no longer
+    /// holds what it forgot. Those queued or held now, and those in a batch
+    /// already taken to send ([`Self::waits`]), so none of them is posted.
+    fn wait_unnamed(&mut self, scopes: &[&str]) {
+        for scope in scopes {
+            let through = self.handed_through(scope);
+            let waits = self.waits_through.entry((*scope).to_owned()).or_insert(0);
+            *waits = (*waits).max(through);
+        }
+        self.let_go_where(false, |pending| scopes.contains(&pending.scope.as_str()));
     }
 
     fn remember_forgotten(&mut self, scope: &str, exchange: u64) {
@@ -448,9 +491,7 @@ fn held_by_forget(queue: &mut Queue, now: Instant) -> bool {
         Some(_) => {
             queue.paused_until = None;
             let scope = std::mem::take(&mut queue.paused_scope);
-            queue.let_go_where(false, |pending| {
-                pending.scope == scope || pending.scope == ROOM_SCOPE
-            });
+            queue.wait_unnamed(&[&scope, ROOM_SCOPE]);
             eprintln!(
                 "lamp-voice history: a forget gave no answer in time; the turns waiting go at the next start ({ENVIRONMENT})"
             );
@@ -510,15 +551,20 @@ enum Ended {
     /// Not saved in its tries, or held past a forget's bound: waits for the
     /// next start.
     Waits,
-    /// Everything in it was forgotten before it went.
+    /// Everything in it was forgotten, or waits for the next start since a
+    /// forget naming no ids covered it, before it went.
     Forgotten,
     /// Put back to go first, once the epoch is read again after a forget.
     Requeued,
 }
 
 /// One batch, tried up to [`TRIES`] times. Before every try, the first
-/// included, it waits for a forget's answer and drops each turn forgotten
-/// (the lamp's guard); the rest go with the same ids.
+/// included, it waits for a forget's answer, drops each turn forgotten
+/// (the lamp's guard) and lets each turn a forget naming no ids covered
+/// wait for the next start (`waits_through`), before a batch put back
+/// after a forget is queued again; the rest go with the same ids. A POST
+/// already under way is not stopped: its next try is checked, and a turn
+/// the store took is the server's tombstone's to refuse again.
 fn send_batch(
     shared: &Shared,
     post: &mut Post,
@@ -538,26 +584,12 @@ fn send_batch(
                     }
                     Some(_) => {
                         // The hold ran out: the forgetting person's and the
-                        // room's wait for the next start, here as queued.
-                        let scope = queue.paused_scope.clone();
+                        // room's wait for the next start, this batch's too
+                        // (below).
                         held_by_forget(&mut queue, now);
-                        let (waits, rest): (Vec<_>, Vec<_>) =
-                            std::mem::take(batch).into_iter().partition(|pending| {
-                                pending.scope == scope || pending.scope == ROOM_SCOPE
-                            });
-                        for pending in &waits {
-                            queue.defer(pending);
-                        }
-                        *batch = rest;
                     }
                     None => break,
                 }
-            }
-            if queue.epoch_stale {
-                for pending in batch.drain(..).rev() {
-                    queue.ready.push_front(pending);
-                }
-                return Ended::Requeued;
             }
             let (forgotten, rest): (Vec<_>, Vec<_>) = std::mem::take(batch)
                 .into_iter()
@@ -565,7 +597,18 @@ fn send_batch(
             for pending in &forgotten {
                 queue.drop_forgotten(pending);
             }
+            let (later, rest): (Vec<_>, Vec<_>) =
+                rest.into_iter().partition(|pending| queue.waits(pending));
+            for pending in &later {
+                queue.defer(pending);
+            }
             *batch = rest;
+            if queue.epoch_stale && !batch.is_empty() {
+                for pending in batch.drain(..).rev() {
+                    queue.ready.push_front(pending);
+                }
+                return Ended::Requeued;
+            }
         }
         if batch.is_empty() {
             return Ended::Forgotten;
@@ -830,6 +873,7 @@ fn reread_epoch(shared: &Shared, ask: &mut Ask, marks: Option<&Path>, waits: Wai
     queue.forgotten.clear();
     queue.forgotten_order.clear();
     queue.emptied.clear();
+    queue.waits_through.clear();
     queue.offered.clear();
     queue.offered_written.clear();
     queue.outstanding.clear();
@@ -1023,8 +1067,11 @@ impl Sender {
     /// `everything` for a forget everything: the ids it names removed are
     /// let go and kept as forgotten (`exchanges`, by scope; or `removed`'s
     /// one exchange); a forget everything's scope is forgotten through the
-    /// last id offered in it. With no ids named, the person's and the
-    /// room's unsent turns wait for the next start. Sends go on after.
+    /// last id handed over in it. With no ids named (a memory answer that
+    /// names none, a lost answer, or `None`: what it removed is not known),
+    /// the person's and the room's turns handed over so far wait for the
+    /// next start, those in a batch already taken to send included
+    /// ([`Queue::wait_unnamed`]). Sends go on after.
     pub fn forget_answered(&self, person: Option<&str>, everything: bool, answer: Option<&Value>) {
         let scope = person.unwrap_or(ROOM_SCOPE).to_owned();
         let mut queue = locked(&self.shared);
@@ -1058,7 +1105,7 @@ impl Sender {
                 .map(|id| vec![(scope.clone(), id)])
         });
         if ok && everything {
-            let through = queue.offered.get(&scope).copied().unwrap_or(0);
+            let through = queue.handed_through(&scope);
             let emptied = queue.emptied.entry(scope.clone()).or_insert(0);
             *emptied = (*emptied).max(through);
             let gone = scope.clone();
@@ -1078,12 +1125,12 @@ impl Sender {
             None if !(ok && everything) => {
                 // What went is not named: the person's and the room's wait
                 // for the next start, when the memory no longer has it.
-                queue.let_go_where(false, |pending| {
-                    pending.scope == scope || pending.scope == ROOM_SCOPE
-                });
+                queue.wait_unnamed(&[&scope, ROOM_SCOPE]);
             }
             None => {
-                queue.let_go_where(false, |pending| pending.scope == ROOM_SCOPE);
+                // Theirs is emptied above (`emptied`); the room's lines a
+                // forget everything took are not named.
+                queue.wait_unnamed(&[ROOM_SCOPE]);
             }
         }
         queue.paused_until = None;
