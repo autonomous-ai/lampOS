@@ -1,4 +1,4 @@
-asks = ["count my day", "how busy is my day"]
+asks = ["count my meetings", "my day's agenda"]
 kind = "installable"
 version = "1.0.0"
 grants = ["google_calendar-read"]
