@@ -2943,8 +2943,10 @@ fn run(arguments: Arguments) -> Result<(), Box<dyn std::error::Error + Send + Sy
                             // two seconds (with LAMP_FACE_REFOUND also once for
                             // an id not yet printed, retried at most every half
                             // second): the best likeness and its prints'
-                            // age, the largest face's height and width,
-                            // never a name.
+                            // age, the largest face's height, width, turn
+                            // and place across, never a name. The largest
+                            // face is the near one the print was read
+                            // from whenever there is a likeness.
                             if who.taking.is_none()
                                 && let Some(tallest) =
                                     faces.iter().max_by(|a, b| a.height.total_cmp(&b.height))
@@ -2952,7 +2954,6 @@ fn run(arguments: Arguments) -> Result<(), Box<dyn std::error::Error + Send + Sy
                                 let best = print
                                     .as_ref()
                                     .and_then(|print| who.people.best_likeness(print));
-                                let wide = picture.filled.0.max(1) as f32;
                                 let now_unix_s = std::time::SystemTime::now()
                                     .duration_since(std::time::UNIX_EPOCH)
                                     .map_or(0, |since| since.as_secs());
@@ -2960,8 +2961,8 @@ fn run(arguments: Arguments) -> Result<(), Box<dyn std::error::Error + Send + Sy
                                     "lamp-eyes: {}",
                                     lamp_eyes::who::recognition_line(
                                         best,
-                                        tallest.height / tall,
-                                        tallest.width / wide,
+                                        tallest,
+                                        picture.filled,
                                         now_unix_s,
                                     )
                                 );

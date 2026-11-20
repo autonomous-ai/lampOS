@@ -1873,13 +1873,17 @@ pub fn ask_of(line: &[u8]) -> Option<Ask> {
 pub const NEAR_ENOUGH: f32 = 0.10;
 
 /// The journal's line on each check (#3126): the best likeness and how many
-/// seconds ago the closest person's prints were added (#7424), the largest
-/// face's height and width as shares of the picture's, the near gate and the
-/// threshold. Numbers only, never a name or an id.
+/// seconds ago the closest person's prints were added (#7424), then of
+/// `face` (the largest in a picture filled to `filled` pixels): its height
+/// and width as shares of the picture's, its turn (the nose's offset from the
+/// eyes' middle over the eyes' span, 0 front-on, the sign the side; `none`
+/// with the eyes on one point) and its box's centre across the picture
+/// (#7424), then the near gate and the threshold. Numbers only, never a
+/// name or an id.
 pub fn recognition_line(
     best: Option<(f32, u64)>,
-    height: f32,
-    width: f32,
+    face: &crate::faces::Face,
+    filled: (usize, usize),
     now_unix_s: u64,
 ) -> String {
     let (best, age) = best.map_or_else(
@@ -1891,8 +1895,20 @@ pub fn recognition_line(
             )
         },
     );
+    let wide = filled.0.max(1) as f32;
+    let tall = filled.1.max(1) as f32;
+    let [left_eye, right_eye, nose, ..] = face.marks;
+    let span = right_eye.0 - left_eye.0;
+    let turn = if span.abs() > f32::EPSILON {
+        format!("{:.2}", (nose.0 - (left_eye.0 + right_eye.0) / 2.0) / span)
+    } else {
+        "none".to_owned()
+    };
     format!(
-        "recognition best {best} height {height:.3} width {width:.3} prints age {age} (near at {NEAR_ENOUGH}, same at {SAME_PERSON})"
+        "recognition best {best} height {:.3} width {:.3} turn {turn} across {:.3} prints age {age} (near at {NEAR_ENOUGH}, same at {SAME_PERSON})",
+        face.height / tall,
+        face.width / wide,
+        (face.x + face.width / 2.0) / wide,
     )
 }
 
