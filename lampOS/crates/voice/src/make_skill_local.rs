@@ -1076,11 +1076,14 @@ fn parameters(writes: bool, code: bool) -> Value {
 }
 
 /// The most bytes `make_skill`'s parameters come to with every switch the
-/// product's `lamp-voice` unit sets on (#8002): short of the link's 4,096
-/// ([`lamp_gemini::MAX_TOOL_JSON_BYTES`]) by the room one more parameter
-/// needs, about 336 bytes for #7765's `remake_old` and `put_back`. Each
-/// description is said in as few words as keep its meaning.
-pub const PRODUCT_MOST_PARAMETERS_BYTES: usize = 3_750;
+/// product's `lamp-voice` unit sets on (#8002). The room #8002 kept short
+/// of the link's 4,096 ([`lamp_gemini::MAX_TOOL_JSON_BYTES`]) is now used
+/// by #7765's `remake_old` and `put_back` (`LAMP_REMAKE_OLD_SKILLS`): 4,003,
+/// and 4,055 with the undo's word added while a remake is the latest thing
+/// done ([`crate::made_remake::PUT_BACK_UNDO_TOLD`]). A later addition to
+/// `make_skill` goes into its own function instead (as #8008's change
+/// does). Each description is said in as few words as keep its meaning.
+pub const PRODUCT_MOST_PARAMETERS_BYTES: usize = 4_003;
 
 /// [`parameters`], and with a skill's tasks on (#6305) the same
 /// `approve_id` and `read_back` for a skill's task. A parameter given
@@ -1180,13 +1183,13 @@ fn parameters_with(writes: bool, tasks: bool, code: bool) -> Value {
         parameters["properties"][crate::made_remake::REMAKE_OLD] = json!({
             "type": "string",
             "enum": crate::made_remake::ANSWERS,
-            "description": "Given alone, only when the person themselves asks you to remake or update their old skills, in any words."
+            "description": "Only when they ask to remake or update their old skills: alone."
         });
     }
     if crate::made_remake::put_back_offered() {
         parameters["properties"][crate::made_remake::PUT_BACK] = json!({
             "type": "string",
-            "description": "Only when the person asks to put back the old version of a skill the lamp fixed or moved (\"put it back\" right after you told them): its name as they said it, or as you told it to them, given alone."
+            "description": "Only to undo the lamp's fix or move of a skill (\"put it back\" once told): its name, alone."
         });
         // A remake is the latest thing done: the undo gives way to it
         // (Twelve's P2 on #7765), and its dispatch does too.
@@ -1196,9 +1199,8 @@ fn parameters_with(writes: bool, tasks: bool, code: bool) -> Value {
             && crate::made_remake::put_back_for_undo_here(crate::make_no_asks::LAST).is_some()
         {
             parameters["properties"][crate::make_no_asks::UNDO]["description"] = json!(format!(
-                "{described} Never for putting back the old version of a skill the lamp fixed or \
-                 moved: that is {}.",
-                crate::made_remake::PUT_BACK
+                "{described}{}",
+                crate::made_remake::PUT_BACK_UNDO_TOLD
             ));
         }
     }

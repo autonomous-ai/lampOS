@@ -100,6 +100,10 @@ pub const ASKED: &str = "asked";
 /// `make_skill`'s argument that puts a remade skill's old one back: its
 /// name as heard.
 pub const PUT_BACK: &str = "put_back";
+/// What `make_skill`'s undo adds while a remake is the latest thing done
+/// ([`put_back_for_undo_here`]): a remade skill's old version is put back
+/// by [`PUT_BACK`], never the undo (Twelve's P2 on #7765).
+pub const PUT_BACK_UNDO_TOLD: &str = " Not for a fixed or moved skill's old one: put_back.";
 /// The pass's own record, in the made skills' folder.
 pub const STATE_FILE: &str = "remake.json";
 /// The most remakes begun in a day.
@@ -138,7 +142,22 @@ pub enum Scope {
 
 /// Whether the switch is on in this process's environment.
 pub fn on() -> bool {
+    #[cfg(test)]
+    if let Some(on) = ON_HERE.with(std::cell::Cell::get) {
+        return on;
+    }
     scope().is_some()
+}
+
+#[cfg(test)]
+thread_local! {
+    static ON_HERE: std::cell::Cell<Option<bool>> = const { std::cell::Cell::new(None) };
+}
+
+/// [`on`] for this test's thread alone; `None` reads the environment again.
+#[cfg(test)]
+pub(crate) fn set_on_here(on: Option<bool>) {
+    ON_HERE.with(|here| here.set(on));
 }
 
 /// Whether the switch's value `value` turns it on ([`scope_with`]).
@@ -3520,6 +3539,58 @@ mod tests {
         )
         .unwrap();
         assert_eq!(put_back_for_undo(&keeping2.directory, "last", later), None);
+    }
+
+    /// The link takes `make_skill` whole with this switch and every other
+    /// the product's `lamp-voice` unit sets on that shapes it (writes,
+    /// tasks, code, the turn-off, the make at once, the core offer's undo
+    /// and the repeat told on the request): its description
+    /// within 1,024 bytes, and its parameters within
+    /// [`lamp_gemini::MAX_TOOL_JSON_BYTES`] with the undo's word that a
+    /// remake's put-back is its own ([`PUT_BACK_UNDO_TOLD`], added while one
+    /// is the latest thing done) counted in. Before, they came to 4,245
+    /// bytes and the product lamp's chat requests left `make_skill` out;
+    /// now 4,055, the remake's two and the undo's word 318 of them.
+    #[test]
+    fn make_skill_is_within_the_link_with_remakes_and_the_products_switches_on() {
+        made_skill::set_writes_here(Some(true));
+        made_skill::set_scripts_here(Some(true));
+        made_skill::set_off_said_here(Some(true));
+        crate::skill_task_yes::set_on_here(Some(true));
+        crate::make_no_asks::set_here(Some(true));
+        crate::long_make::set_on_here(Some(false));
+        crate::make_core_offer::set_on_here(Some(true));
+        crate::skill_recurring::set_on_here(Some(true));
+        set_on_here(Some(true));
+        let all = crate::make_skill_local::tool();
+        let parameters = all.parameters.as_ref().unwrap();
+        for part in [
+            REMAKE_OLD,
+            PUT_BACK,
+            crate::made_turn::TURN_OFF,
+            crate::make_no_asks::UNDO,
+        ] {
+            assert!(parameters["properties"][part].is_object(), "{part}");
+        }
+        assert!(all.description.len() <= 1_024, "{}", all.description.len());
+        let bytes = parameters.to_string().len();
+        assert!(
+            bytes <= crate::make_skill_local::PRODUCT_MOST_PARAMETERS_BYTES,
+            "{bytes}"
+        );
+        let worst = bytes + PUT_BACK_UNDO_TOLD.len();
+        assert!(worst <= lamp_gemini::MAX_TOOL_JSON_BYTES, "{worst}");
+        let (kept, left_out) = crate::tools::admitted(vec![all]);
+        assert_eq!((kept.len(), left_out), (1, Vec::<String>::new()));
+        set_on_here(None);
+        crate::skill_recurring::set_on_here(None);
+        crate::make_core_offer::set_on_here(None);
+        crate::long_make::set_on_here(None);
+        crate::make_no_asks::set_here(None);
+        crate::skill_task_yes::set_on_here(None);
+        made_skill::set_off_said_here(None);
+        made_skill::set_scripts_here(None);
+        made_skill::set_writes_here(None);
     }
 
     #[test]

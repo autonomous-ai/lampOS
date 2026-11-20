@@ -8577,10 +8577,14 @@ reset still ask. On (`crate::make_no_asks`):
   (`make_no_asks::REMOVE_AT_ONCE_TOLD`); its `undo` adds
   `make_no_asks::UNDO_RESTORE_TOLD`. With every switch the product's
   unit sets on, the description stays within the link's 1,024 bytes and
-  the parameters within 3,750 of its 4,096
-  (`make_skill_local::PRODUCT_MOST_PARAMETERS_BYTES`, room for a later
-  parameter; #8002: 4,174 before, each description said shorter, every
-  parameter and its meaning kept).
+  the parameters within 4,003 of its 4,096
+  (`make_skill_local::PRODUCT_MOST_PARAMETERS_BYTES`; #8002: 4,174
+  before, each description said shorter, every parameter and its meaning
+  kept). The room #8002 kept is now used by `LAMP_REMAKE_OLD_SKILLS`' two
+  parameters (#7765): 4,003, and 4,055 with the undo's word a remake adds
+  ("Old skills remade in the middle form", "Within the link"). A later
+  addition to `make_skill` goes into its own function instead (as #8008's
+  change does).
 
 `lamp-voice` passes the exact `on` to its `provider` and `second` workers.
 Off, every make and remove is byte for byte as before.
@@ -9103,6 +9107,18 @@ taken.
   an owner's reads only `remake.json`. The scan is in the pass's look a
   minute, and with nothing new to queue it runs again only once the made
   index's time or size changed.
+- **Within the link** (#7765). `make_skill`'s `remake_old` ("Only when
+  they ask to remake or update their old skills: alone."), its `put_back`
+  ("Only to undo the lamp's fix or move of a skill ("put it back" once
+  told): its name, alone.") and the undo's word while
+  a remake is the latest thing done (" Not for a fixed or moved skill's
+  old one: put_back.", `made_remake::PUT_BACK_UNDO_TOLD`) come to 318
+  bytes. With every switch the product's `lamp-voice` unit sets on, its
+  parameters come to 4,055 bytes at most, within the link's 4,096
+  (`made_remake`'s
+  `make_skill_is_within_the_link_with_remakes_and_the_products_switches_on`;
+  4,245 before, and the product lamp's chat requests left `make_skill`
+  out).
 - **Remade one at a time** (`made_remake::step`, a look a minute in the
   second route's worker): only in idle time (no line heard for 10
   minutes, and no spoken turn open or ended within 15 s,
@@ -9133,7 +9149,7 @@ taken.
   says "a made skill's remake: not kept:" and a short reason. It is tried
   at most once more, on another day.
 - **Undo for 7 days, one undo store.** `make_skill`'s `put_back` ("put it
-  back", the name as heard or as told) puts the old package back on, on
+  back", the name as heard) puts the old package back on, on
   or off as it was, and deletes the new one. One put back is never queued
   on its own again. After 7 days the old package is deleted and `old`
   dropped. A remade skill removed takes its kept old package with it, and

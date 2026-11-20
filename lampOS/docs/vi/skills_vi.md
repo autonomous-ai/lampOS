@@ -4891,10 +4891,14 @@ và khôi phục cài đặt gốc là còn hỏi. Khi bật (`crate::make_no_as
   only when two skills they made fit alike, never of "it"." (`make_no_asks::REMOVE_AT_ONCE_TOLD`); `undo` thêm
   `make_no_asks::UNDO_RESTORE_TOLD`. Với mọi công
   tắc mà unit của sản phẩm bật, mô tả vẫn trong 1.024 byte của kết nối và
-  các tham số trong 3.750 byte của 4.096 byte
-  (`make_skill_local::PRODUCT_MOST_PARAMETERS_BYTES`, chừa chỗ cho một
-  tham số sau này; #8002: trước đó là 4.174, mỗi mô tả được nói ngắn hơn,
-  giữ mọi tham số và ý nghĩa của nó).
+  các tham số trong 4.003 byte của 4.096 byte
+  (`make_skill_local::PRODUCT_MOST_PARAMETERS_BYTES`; #8002: trước đó là
+  4.174, mỗi mô tả được nói ngắn hơn, giữ mọi tham số và ý nghĩa của nó).
+  Chỗ #8002 chừa lại nay được hai tham số của `LAMP_REMAKE_OLD_SKILLS`
+  (#7765) dùng: 4.003 byte, và 4.055 byte khi có lời của `undo` mà một lần
+  làm lại thêm vào (mục "Vừa liên kết" của phần kỹ năng cũ được làm lại).
+  Một phần thêm sau này cho `make_skill` đi vào hàm riêng của nó (như phần
+  thay đổi của #8008).
 
 `lamp-voice` truyền đúng `on` cho worker `provider` và `second`. Khi tắt,
 mọi lần tạo và xóa giống hệt từng byte như trước.
@@ -6493,6 +6497,17 @@ duy nhất của lamp-tasks không bao giờ bị chiếm.
   chủ chỉ đọc `remake.json`. Việc quét nằm trong lần nhìn mỗi phút của
   lượt chạy, và khi không có gì mới để xếp hàng thì chỉ quét lại khi thời
   gian hoặc kích thước của chỉ mục đổi.
+- **Vừa liên kết** (#7765). `remake_old` của `make_skill` ("Only when
+  they ask to remake or update their old skills: alone."), `put_back` của
+  nó ("Only to undo the lamp's fix or move of a skill ("put it back" once
+  told): its name, alone.") và lời của `undo` khi một
+  lần làm lại là việc mới nhất (" Not for a fixed or moved skill's old
+  one: put_back.", `made_remake::PUT_BACK_UNDO_TOLD`) tổng cộng 318 byte.
+  Với mọi công tắc mà unit `lamp-voice` của sản phẩm bật, các tham số tối
+  đa 4.055 byte, trong 4.096 byte của liên kết (`made_remake`
+  `make_skill_is_within_the_link_with_remakes_and_the_products_switches_on`;
+  trước đó là 4.245, và các yêu cầu chat của đèn sản phẩm bỏ mất
+  `make_skill`).
 - **Làm lại từng cái một** (`made_remake::step`, mỗi phút một lần trong
   worker của route thứ hai): chỉ khi rảnh (10 phút không nghe câu nào, và
   không có lượt nói nào đang mở hay vừa kết thúc trong 15 giây,
@@ -6525,7 +6540,7 @@ duy nhất của lamp-tasks không bao giờ bị chiếm.
   skill's remake: not kept:" và một lý do ngắn. Nó được thử tối đa một lần
   nữa, vào ngày khác.
 - **Hoàn tác trong 7 ngày, một kho hoàn tác.** `put_back` của `make_skill`
-  ("put it back", tên như nghe hoặc như đã báo) bật lại gói cũ, bật hay tắt
+  ("put it back", tên như nghe) bật lại gói cũ, bật hay tắt
   như cũ, và xoá bản mới. Kỹ năng đã đặt lại không bao giờ tự xếp hàng lại.
   Sau 7 ngày gói cũ bị xoá và `old` bị bỏ. Kỹ năng làm lại bị gỡ mang theo
   gói cũ đã giữ, và "forget everything" của chủ xoá kho hoàn tác này cùng
