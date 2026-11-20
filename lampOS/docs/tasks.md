@@ -3802,11 +3802,39 @@ runs its script itself: no agent, no Harness, no prompt
   counts it in that namespace alone (Linux 5.14 and later), never
   lamp-tasks' or any other `lampos` process. Past it a fork or a thread
   fails and the run ends `run_failed`. `prlimit`, not `ulimit -u`: a lamp's
-  `/bin/sh` is dash, whose flag is `-p`. lamp-tasks.service runs as
-  `lampos` and delegates no cgroup, so no transient scope or sub-cgroup
-  (`memory.max`, `cpu.max`, `pids.max`) can be made for one run without
-  root; the per-process caps times the process cap, within the 30 s wall
-  clock, are the run's total.
+  `/bin/sh` is dash, whose flag is `-p`. These caps are a second line of
+  defence; the run's real total is its own cgroup's (next).
+- **Its own cgroup** (`run_cgroup`, #8180): lamp-tasks.service has
+  `Delegate=memory cpu pids` (`run_cgroup::DELEGATE`), so at `serve`'s start
+  lamp-tasks reads its cgroup from `/proc/self/cgroup` (the v2 `0::` line),
+  makes a leaf `serve` in it, moves every pid of the unit there (a cgroup
+  that hands controllers down holds no process), then writes
+  `+memory +cpu +pids` to its `cgroup.subtree_control`; stale `run-*`
+  cgroups are removed. Each run step and each make's tried run then gets
+  `run-<id>` with `memory.max` 512M (`RUN_MEMORY_MAX_MB`), `memory.high`
+  448M (`RUN_MEMORY_HIGH_MB`), `memory.swap.max` 0 whenever the kernel has
+  the file, `cpu.max` `100000 100000` (`RUN_CPU_MAX`, one core) and
+  `pids.max` 72 (`RUN_PIDS_MAX`: the script's 64 and 8 for the fence's own).
+  Where the totals come from: lamp-tasks.service measured 632 MiB at rest
+  and 1120 MiB at a Hermes task's peak (lamp-9adf, 12 Nov), so a run at its
+  512M beside that peak is 1632 MiB, under the unit's `MemoryHigh=2100M`;
+  its tasks, 126 + 72, under `TasksMax=512`; one core of the unit's
+  `CPUQuota=360%`. The fence's first process joins the cgroup just before
+  its exec (it writes `0` to the cgroup's `cgroup.procs`, in `pre_exec`),
+  so nothing of the run is ever outside it; past `memory.max` the kernel's
+  OOM killer ends the run's processes alone, never `serve` or Harness's
+  `wait` and `watch`es. When the run ends, however it ended (well, failed,
+  past its 30 s, cancelled), `1` is written to its `cgroup.kill` and the
+  cgroup removed. **Fail closed**: on Linux, with no delegated cgroup v2,
+  or a run's cgroup or any of its limits not made, the run (and a make's
+  try, which is then `not_tried`) is refused with
+  `run_cgroup::NO_CGROUP` ("the run's own memory and CPU bounds could not be
+  set, so it was not run"), the reason journaled
+  (`[lamp-tasks] run <id>: refused, no own cgroup: …`), never run without
+  its total; `serve` says at start which it is
+  (`[lamp-tasks] each run gets its own cgroup under …` or
+  `[lamp-tasks] runs have no own cgroup: …`). Off Linux (a developer's Mac,
+  its tests) a run goes on with the per-process caps alone.
 - **Its answer**: when the script ends, the token is ended with an admin
   `end`, whose answer now carries `said` ([control.md](control.md), "The run
   socket"): how many of the run's `say`s the voice said whole
@@ -4159,8 +4187,9 @@ made once and whole"); `lamp_tasks::make_try`.
   the same `skill_run::fence_args`, #8180): all of `skill_run::HIDDEN`
   covered, `/run` and with it lamp-control's `admin.sock` among them, only
   the skill's folder, the run's folder and `control.sock` shown again, and
-  the run step's caps (`skill_run::CAPS_EDIT`, its process cap among them);
-  fd 4 a sink in place of the launcher's socket. No agent takes part.
+  the run step's caps (`skill_run::CAPS_EDIT`, its process cap among them)
+  and its own cgroup (`run_cgroup`, made before its token: none on Linux,
+  no token and `not_tried`); fd 4 a sink in place of the launcher's socket. No agent takes part.
 - **What a try runs without** (`make_try::TRIED_WITHOUT`, #8180): `net` (no
   egress socket is ever made, so a fetch fails as offline and nothing is
   sent), `camera` and `microphone` (lamp-control refuses to mint them for a

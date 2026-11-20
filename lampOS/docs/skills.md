@@ -2281,7 +2281,11 @@ run = "scripts/main.py"
 - **Its own caps**: the script runs with its own memory (768 MiB of address
   space), CPU time (30 s) and niceness (10) for each process, and at most 64
   processes and threads for the whole run (#8180), never lamp-tasks' whole
-  budget. Its try at the make gets the same fence and caps.
+  budget; its real total is its own cgroup's: 512M of memory, no swap, one
+  core and 72 tasks for the whole run, in lamp-tasks.service's delegated
+  cgroup ([tasks.md](tasks.md), "Its own cgroup"); on a lamp without one it
+  is refused, never run without that total. Its try at the make gets the
+  same fence, caps and cgroup.
 - **Timing** (each hop, trigger to script): the fire's thread spawns the
   hand-over thread; the folder is hashed (the skill's few files); the yes
   asked of lamp-control (one local socket line); the ledger written; one
