@@ -28544,6 +28544,11 @@ mod tests {
         let plain = "Yes, make it blue now.";
         assert_eq!(noted(true, plain), None, "only the room's sound");
         assert_eq!(noted(false, plain), None, "only the room's sound, off");
+        // A stand-in for the name is office talk in a busy room (#1712,
+        // the reviewer-lead's HOLD on #8149): never told there.
+        assert_eq!(noted(true, "Hey man, make it blue."), None, "hey man");
+        assert_eq!(noted(true, "Okay, Lynn, make it blue."), None, "Lynn");
+        assert_eq!(noted(true, "Hey Lamb, make it blue."), told, "Lamb");
     }
 
     /// #4226, `LAMP_NAME_START_USUAL=on`: a line whose sound began 0.3 s
