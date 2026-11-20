@@ -2290,6 +2290,9 @@ struct Shared {
     /// lamp-name's near hearings, for a line's first word
     /// ([`Engine::hearing_the_name_near`]).
     name_near: Option<NameNear>,
+    /// Told the request whose line `name_near` ruled not the name
+    /// ([`Engine::telling_near_not_the_name`], #8092).
+    near_not_the_name: Option<Opened>,
     /// `LAMP_NAME_WORDLESS_BAR=on`: lamp-name's best hearing in a line, for
     /// one marked as only the name whose words came back empty
     /// ([`Engine::holding_a_wordless_call`]).
@@ -5304,6 +5307,7 @@ impl Engine {
                 name_refused: Mutex::new(None),
                 one_speaker: None,
                 name_near: None,
+                near_not_the_name: None,
                 wordless_bar: None,
                 name_in_line: None,
                 name_as_a_sentence: false,
@@ -6275,6 +6279,18 @@ impl Engine {
     pub fn hearing_the_name_near(mut self, near: NameNear) -> Self {
         if let Some(shared) = Arc::get_mut(&mut self.shared) {
             shared.name_near = Some(near);
+        }
+        self
+    }
+
+    /// With [`Self::hearing_the_name_near`]: `told` is given the request
+    /// whose line [`named_near`] ruled not the name, lamp-name's near
+    /// hearing at its start on a first word, set off, that is not the name,
+    /// before its words are judged; the rule then counts no second sign for
+    /// that hearing (`LAMP_NAME_SIGN_TIED`, #8092). Before any turn only.
+    pub fn telling_near_not_the_name(mut self, told: Opened) -> Self {
+        if let Some(shared) = Arc::get_mut(&mut self.shared) {
+            shared.near_not_the_name = Some(told);
         }
         self
     }
