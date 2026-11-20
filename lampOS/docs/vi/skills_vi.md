@@ -4261,7 +4261,11 @@ run = "scripts/main.py"
 - **Giới hạn riêng**: script chạy với giới hạn bộ nhớ (768 MiB không gian
   địa chỉ), thời gian CPU (30 s) và độ nice (10) cho mỗi tiến trình, và tối
   đa 64 tiến trình và luồng cho cả lần chạy (#8180), không bao giờ dùng cả
-  ngân sách của lamp-tasks. Lần chạy thử lúc tạo có cùng hàng rào và giới hạn.
+  ngân sách của lamp-tasks; tổng thật là cgroup riêng của nó: 512M bộ nhớ,
+  không swap, một nhân và 72 task cho cả lần chạy, trong cgroup được ủy quyền
+  của lamp-tasks.service ([tasks_vi.md](tasks_vi.md), "Cgroup riêng"); trên
+  đèn không có cgroup đó thì bị từ chối, không bao giờ chạy thiếu tổng đó.
+  Lần chạy thử lúc tạo có cùng hàng rào, giới hạn và cgroup.
 - **Thời gian** (từng chặng, từ trigger đến script): luồng của lần kích
   hoạt tạo luồng bàn giao; thư mục được băm (vài file của kỹ năng); hỏi
   lamp-control lời đồng ý (một dòng socket cục bộ); ghi sổ; một dòng tới

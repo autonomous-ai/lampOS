@@ -126,6 +126,12 @@ NoNewPrivileges=yes
 MemoryHigh=2100M
 CPUQuota=360%
 TasksMax=512
+# Each run's own cgroup (#8180; crates/tasks/src/run_cgroup.rs, docs/tasks.md): the three controllers handed to lampos,
+# so serve moves itself into a leaf "serve" and makes "run-<id>" for each skill run step and make's tried run, with
+# memory.max 512M (memory.high 448M), memory.swap.max 0, cpu.max one core and pids.max 72: a real total for one run,
+# where the caps above are the whole part's. 1120 MiB (a Hermes task's peak) + 512 stays under MemoryHigh. Without it
+# (no delegation) every run step and try is refused on Linux, never run without its total.
+Delegate=memory cpu pids
 
 [Install]
 WantedBy=lampos.target

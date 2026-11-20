@@ -233,6 +233,9 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
         report_every: REPORT_EVERY,
         daemon_retry_after: DAEMON_RETRY_AFTER,
     };
+    // Each run's own cgroup (#8180): serve into its leaf, the unit's
+    // controllers handed down; said once either way.
+    lamp_tasks::run_cgroup::set_up();
     let clock = SystemClock::new(boot_id.as_deref())?;
     let executable = executable.ok_or("--harness is required")?;
     let stop = Arc::new(AtomicBool::new(false));

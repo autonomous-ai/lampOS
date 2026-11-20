@@ -30,9 +30,9 @@ struct Place {
 
 impl Place {
     fn new() -> Self {
-        Self {
-            dir: tempfile::tempdir().unwrap(),
-        }
+        let dir = tempfile::tempdir().unwrap();
+        std::fs::create_dir(dir.path().join("cgroup")).unwrap();
+        Self { dir }
     }
 
     fn file(&self, name: &str, text: &str, mode: u32) -> PathBuf {
@@ -53,6 +53,7 @@ impl Place {
             tick: Duration::from_millis(5),
             most_output: MOST_OUTPUT,
             egress: None,
+            cgroups: crate::run_cgroup::RunCgroups::Fake(self.dir.path().join("cgroup")),
         }
     }
 
@@ -200,6 +201,49 @@ fn a_script_that_ends_well_runs_in_its_own_folder_with_its_token() {
         took.as_millis()
     );
     assert!(took < Duration::from_secs(2), "{took:?}");
+}
+
+/// #8180: a run step runs in its own cgroup, which its fence's first
+/// process joins before its exec (`0` written to its `cgroup.procs`), and
+/// which is ended with the run however it ended: well, failed or past
+/// its bound.
+#[test]
+fn a_run_step_runs_in_its_own_cgroup_ended_with_it() {
+    let place = Place::new();
+    let runner = place.runner(FAKE_UNSHARE);
+    let mut over = run_of(&place.hand("sleep 5\n"), "task-8-1-3");
+    over.deadline = Duration::from_millis(200);
+    assert!(runner.run(&over, &|| {}).is_err());
+    let well = run_of(&place.hand("exit 0\n"), "task-8-1-1");
+    assert!(runner.run(&well, &|| {}).is_ok());
+    let failed = run_of(&place.hand("exit 3\n"), "task-8-1-2");
+    assert!(runner.run(&failed, &|| {}).is_err());
+    let cgroups = place.dir.path().join("cgroup");
+    for id in ["task-8-1-1", "task-8-1-2", "task-8-1-3"] {
+        assert!(!cgroups.join(format!("run-{id}")).exists(), "{id}");
+        let joined = std::fs::read_to_string(cgroups.join(format!("done-{id}/cgroup.procs")));
+        assert_eq!(joined.unwrap(), "0", "{id}");
+        let max = std::fs::read_to_string(cgroups.join(format!("done-{id}/memory.max")));
+        assert_eq!(max.unwrap(), "512M", "{id}");
+    }
+}
+
+/// #8180 (fail closed): a run step whose own cgroup can't be made is
+/// refused with [`crate::run_cgroup::NO_CGROUP`], its script never run.
+#[test]
+fn a_run_step_without_its_own_cgroup_is_refused_and_never_runs() {
+    let place = Place::new();
+    let out = place.dir.path().join("ran");
+    let hand = place.hand(&format!("touch {}\n", out.display()));
+    let mut runner = place.runner(FAKE_UNSHARE);
+    runner.cgroups = crate::run_cgroup::RunCgroups::Fake(place.dir.path().join("no-such-root"));
+    let run = run_of(&hand, "task-8-2-1");
+    assert_eq!(
+        runner.run(&run, &|| {}),
+        Err(crate::run_cgroup::NO_CGROUP.to_owned())
+    );
+    assert!(!out.exists());
+    assert!(!run.started.load(Ordering::Acquire));
 }
 
 /// A script that fails, outlives its bound, or writes past its output
