@@ -2931,30 +2931,56 @@ fn a_gateway_unit_loaded_as_written_is_left_alone() {
 }
 
 /// #8105: lamp-tasks' answer read, and the rule: the switch off is always
-/// wanted; on, only `openclaw` is wanted, another default is not, and no
-/// answer or no default leaves the gateway as it is.
+/// wanted; on, OpenClaw the default or in use is wanted, another default
+/// with OpenClaw not in use is not, and anything less known leaves the
+/// gateway as it is.
 #[test]
-fn the_gateway_is_wanted_only_while_openclaw_is_the_lamps_agent() {
+fn the_gateway_is_wanted_while_openclaw_is_the_lamps_agent_or_in_use() {
+    let said = |default: Option<&str>, in_use: Option<bool>| Said {
+        default: default.map(str::to_owned),
+        openclaw_in_use: in_use,
+    };
     assert_eq!(
         default_of(r#"{"ok":true,"default":"openclaw","chosen_in_app":true}"#),
-        Some(Some("openclaw".to_owned()))
+        Some(said(Some("openclaw"), None))
     );
     assert_eq!(
-        default_of(r#"{"ok":true,"default":"hermes","chosen_in_app":false}"#),
-        Some(Some("hermes".to_owned()))
+        default_of(r#"{"ok":true,"default":"hermes","openclaw_in_use":false}"#),
+        Some(said(Some("hermes"), Some(false)))
     );
-    assert_eq!(default_of(r#"{"ok":true,"default":null}"#), Some(None));
-    assert_eq!(default_of(r#"{"ok":true,"default":" "}"#), Some(None));
+    assert_eq!(
+        default_of(r#"{"ok":true,"default":null,"openclaw_in_use":true}"#),
+        Some(said(None, Some(true)))
+    );
+    assert_eq!(
+        default_of(r#"{"ok":true,"default":" "}"#),
+        Some(said(None, None))
+    );
     assert_eq!(default_of(r#"{"ok":false,"error":"busy"}"#), None);
     assert_eq!(default_of("not json"), None);
 
-    let said = |engine: &str| Some(Some(engine.to_owned()));
-    assert_eq!(gateway_wanted(false, said("hermes")), Gateway::Wanted);
+    let rule = |default, in_use| gateway_wanted(true, Some(said(default, in_use)));
+    assert_eq!(
+        gateway_wanted(false, Some(said(Some("hermes"), Some(false)))),
+        Gateway::Wanted
+    );
     assert_eq!(gateway_wanted(false, None), Gateway::Wanted);
-    assert_eq!(gateway_wanted(true, said("openclaw")), Gateway::Wanted);
-    assert_eq!(gateway_wanted(true, said("hermes")), Gateway::NotWanted);
-    assert_eq!(gateway_wanted(true, said("claude")), Gateway::NotWanted);
-    assert_eq!(gateway_wanted(true, Some(None)), Gateway::Unknown);
+    assert_eq!(rule(Some("openclaw"), Some(false)), Gateway::Wanted);
+    assert_eq!(rule(Some("openclaw"), None), Gateway::Wanted);
+    assert_eq!(rule(Some("hermes"), Some(true)), Gateway::Wanted, "in use");
+    assert_eq!(
+        rule(None, Some(true)),
+        Gateway::Wanted,
+        "in use, no default"
+    );
+    assert_eq!(rule(Some("hermes"), Some(false)), Gateway::NotWanted);
+    assert_eq!(rule(Some("claude"), Some(false)), Gateway::NotWanted);
+    assert_eq!(
+        rule(Some("hermes"), None),
+        Gateway::Unknown,
+        "an older lamp-tasks"
+    );
+    assert_eq!(rule(None, Some(false)), Gateway::Unknown);
     assert_eq!(gateway_wanted(true, None), Gateway::Unknown);
 }
 
@@ -2972,11 +2998,19 @@ fn lamp_tasks_is_asked_for_the_default_on_its_app_socket() {
         let mut line = String::new();
         BufReader::new(&stream).read_line(&mut line).unwrap();
         (&stream)
-            .write_all(b"{\"ok\":true,\"default\":\"hermes\",\"chosen_in_app\":false}\n")
+            .write_all(
+                b"{\"ok\":true,\"default\":\"hermes\",\"chosen_in_app\":false,\"openclaw_in_use\":false}\n",
+            )
             .unwrap();
         line
     });
-    assert_eq!(said_default(&socket), Some(Some("hermes".to_owned())));
+    assert_eq!(
+        said_default(&socket),
+        Some(Said {
+            default: Some("hermes".to_owned()),
+            openclaw_in_use: Some(false),
+        })
+    );
     assert_eq!(
         served.join().unwrap(),
         "{\"op\":\"app_engine_default_state\"}\n"
