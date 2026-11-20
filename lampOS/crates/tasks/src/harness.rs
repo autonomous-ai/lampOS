@@ -639,6 +639,10 @@ pub enum WatchEvent {
     /// their number changes; `done` follows once none runs. Still at work
     /// (#5689).
     Background,
+    /// Harness holds the input it was given, its engine not taking it (no
+    /// Gateway, a deaf TUI; Harness 0.6.77): a fault for the lamp's kept
+    /// session (#8138).
+    Held,
 }
 
 impl WatchEvent {
@@ -652,6 +656,7 @@ impl WatchEvent {
             "failed" => Self::Failed,
             "stopped" => Self::Stopped,
             "background" => Self::Background,
+            "held" => Self::Held,
             _ => return None,
         })
     }
@@ -666,6 +671,7 @@ impl WatchEvent {
             Self::Failed => "failed",
             Self::Stopped => "stopped",
             Self::Background => "background",
+            Self::Held => "held",
         }
     }
     /// Whether the agent has settled, for now or for good: its task is read
