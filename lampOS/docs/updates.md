@@ -237,7 +237,8 @@ CDN mirror, `--channel-url https://cdn.autonomous.ai/lampos/stable/` ("The
 stable build on the CDN"), so a lamp in China, which can't reach GitHub,
 updates too. There is no GitHub fallback for the feed: the updater reads
 one. No round switches its own unit, so a lamp installed before keeps the
-GitHub stable feed. A model has two sources (#7709, `install::model_urls`):
+GitHub stable feed, unless `LAMP_UPDATE_CDN_FEED=on` moves it ("Moving a lamp
+to the CDN feed", below; off by default). A model has two sources (#7709, `install::model_urls`):
 `lamp-update install` and `lamp-keeper prepare` ask for a model of
 `deploy/product/models.json` (a GitHub release URL) at the CDN's
 sequence-free copy `lampos/models/<release>/<name>` first, then at GitHub; a
@@ -334,6 +335,48 @@ made; any other destination stops the step. The job runs from `lamp-voice`
 only, never for a pull request or a tag. The `lampos-cdn-probe` workflow,
 run by hand on `lamp-voice`, writes one file under `lampos/_probe/`, reads it
 back with `gcloud` and through the CDN, and deletes it.
+
+### Moving a lamp to the CDN feed (`LAMP_UPDATE_CDN_FEED`, off)
+
+A lamp installed before #6589 follows
+`--channel-url https://github.com/autonomous-ai/lampOS/releases/download/lampos-stable/`,
+and no round rewrites lamp-update's unit. With `LAMP_UPDATE_CDN_FEED=on`
+(#7728; in lamp-update's environment, or, not set there, in the carried
+`/etc/lampOS/update.env`, which does not set it: off unless set), a `serve`
+that acts does this after every round, an up-to-date or unreachable one too,
+so the build that carries it moves the lamp itself, not one build later (the
+rule #7018 gives a new unit) (`cdn_feed::move_to_cdn`):
+
+1. It reads lamp-update's own `ExecStart` from the unit and its `.conf`
+   drop-ins in name order, the last one winning and an empty `ExecStart=`
+   clearing those before. Only when that line's `--channel-url` and the one
+   lamp-update runs with are both exactly the GitHub stable feed does it go
+   on. The lamp-voice feed (the canary, #6300), a `file:///` folder, the CDN
+   feed already, and every other feed are left alone, as is a `once` by hand
+   with another feed.
+2. It reads the CDN's `lampos-manifest.json`, checks its signature with the
+   lamp's key and its channel, and reads GitHub's the same way. A CDN
+   envelope it can't read or trust, or one whose build is older than
+   GitHub's, keeps the lamp on GitHub. GitHub out of reach does not hold the
+   move.
+3. It writes the drop-in
+   `/etc/systemd/system/lamp-update.service.d/zz-cdn-feed.conf` whole
+   (`ExecStart=` and the same line with only the feed changed to
+   `https://cdn.autonomous.ai/lampos/stable/`), reads it back, and checks
+   that the unit and its drop-ins now leave the CDN feed. The unit file
+   itself is not changed.
+4. It runs `systemctl daemon-reload`, then starts itself again in its own
+   place with the same options but the CDN feed, as a changed
+   `update.env` does: no restart through systemd, so `OnFailure=` is not
+   involved.
+
+Any failure in 2 to 4 puts the drop-in back as it was (removed when there
+was none, and systemd reloaded again after a failed reload), says one line
+(`kept on the GitHub stable feed: ...`, said again only when the reason
+changes), and the lamp keeps updating from GitHub; it is tried again after
+the next round. Removing the drop-in and `systemctl daemon-reload` put the
+GitHub feed back by hand. The GitHub stable feed keeps being promoted until
+the fleet has moved. Tests only (`cdn_feed::tests`): not yet shown on a lamp.
 
 ### The build and its identity
 
@@ -1372,7 +1415,10 @@ one-shot unit of its own, as the settings writer's (below) and
 `lamp-update-apply.service` do. Widening this line never reaches a lamp
 already in a home. A test pins the product unit's sandbox to 7071's and
 each folder a round writes itself to inside it (`own_unit_line_tests` in
-`main.rs`, #4540).
+`main.rs`, #4540). The one exception is the feed: with
+`LAMP_UPDATE_CDN_FEED=on`, a drop-in beside this unit moves a lamp on the
+GitHub stable feed to the CDN feed, its `ExecStart` otherwise the same and
+the unit file untouched ("Moving a lamp to the CDN feed", above).
 
 When planning a newer product build, the round names an installed regular
 `lamp-update.service` as "not carried by rounds; its installed unit is kept"

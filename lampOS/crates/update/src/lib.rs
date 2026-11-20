@@ -15,6 +15,7 @@ pub mod added;
 pub mod agent_ns;
 pub mod app_check;
 pub mod apply;
+pub mod cdn_feed;
 pub mod check_units;
 pub mod companion;
 pub mod engines;
