@@ -317,7 +317,8 @@ fn product_with(extra: &[(&str, &str)]) -> Product {
 /// #8002: with the product voice unit's environment (the make flow's five
 /// switches on), `make_skill`'s parameters stay within
 /// `lamp_voice::make_skill_local::PRODUCT_MOST_PARAMETERS_BYTES`, short of
-/// the link's 4,096 by the room a later parameter needs.
+/// the link's 4,096 by the undo's word a remake adds (#7765, which uses the
+/// room #8002 kept); a later addition goes into its own function (#8008).
 #[test]
 fn a_product_lamp_s_make_skill_parameters_leave_room_within_the_link() {
     let Product {

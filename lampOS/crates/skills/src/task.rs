@@ -153,6 +153,91 @@ pub const DAY_MS: u64 = 86_400_000;
 /// The longest a run is waited for: lamp-tasks answers the hand-over line
 /// when the run ends.
 pub const RUN_MOST: Duration = Duration::from_secs(15 * 60);
+
+/// How long after a remade skill's fire (`[[otherwise]]`, #7765, the first
+/// builder's 06:08 ruling) its agent's answer may take to be ready, before
+/// the old skill's own steps run in its place.
+pub const OTHERWISE_AFTER_MS: u64 = 10_000;
+
+/// The main loop's word, on its runs' ends channel, to run a remade
+/// skill's old steps (`lamp_skills::Engine::run_otherwise`): never a run's
+/// end, never published.
+pub const OTHERWISE_DUE: &str = "its old steps are due in its agent's place";
+
+/// Which way one fire of a remade skill (`[[otherwise]]`, #7765) went: its
+/// agent's run ended well within [`OTHERWISE_AFTER_MS`] (its answer told,
+/// if it has words), or the yes asked aloud in its place, or its old
+/// steps, once the wait ran out, or the task wasn't handed over or failed.
+/// Whichever comes first wins; the other then never happens, so the owner
+/// never hears both.
+#[derive(Debug, Default)]
+pub struct Otherwise(Mutex<Option<bool>>);
+
+/// What one fire of a remade skill does once its hand-over returned
+/// ([`Otherwise::after_hand`]).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum OtherwiseAfter {
+    /// Its run ended well in time: what its agent found, if anything, is
+    /// told as any run's.
+    Tell,
+    /// Not handed over, failed, or no answer: its old steps run now.
+    OldSteps,
+    /// The other way came first: nothing more of this fire.
+    Nothing,
+}
+
+impl Otherwise {
+    /// Its agent's answer is ready: whether it is told (no old steps ran).
+    pub fn answered(&self) -> bool {
+        self.settle(true)
+    }
+
+    /// The wait ran out, or the task brought no answer: whether the old
+    /// steps run now (no answer was told first, and they haven't run).
+    pub fn old_steps(&self) -> bool {
+        self.settle(false)
+    }
+
+    /// The lamp asked aloud for the owner's yes in place of this run
+    /// ([`ask_yes`]): that question is the fire's line, so the old steps
+    /// never run after it. Whether it was first.
+    pub fn asked(&self) -> bool {
+        self.settle(true)
+    }
+
+    /// The way one fire goes once its hand-over returned, with lamp-tasks'
+    /// `answer` (none when nothing was handed over). A run that ended well
+    /// is its agent's answer even with nothing to tell (Thirteen's P2 on
+    /// #7765: an answer already said aloud through the lamp ends with a
+    /// lone `-`, and a runner may keep no answer); only one not handed
+    /// over, failed, or past [`OTHERWISE_AFTER_MS`] runs the old steps.
+    pub fn after_hand(&self, answer: Option<&str>) -> OtherwiseAfter {
+        let ready = answer.is_some_and(|answer| answered(answer).is_ok());
+        if ready {
+            if self.answered() {
+                OtherwiseAfter::Tell
+            } else {
+                OtherwiseAfter::Nothing
+            }
+        } else if self.old_steps() {
+            OtherwiseAfter::OldSteps
+        } else {
+            OtherwiseAfter::Nothing
+        }
+    }
+
+    fn settle(&self, answer: bool) -> bool {
+        let mut way = self.0.lock().unwrap_or_else(|poison| poison.into_inner());
+        match *way {
+            None => {
+                *way = Some(answer);
+                true
+            }
+            Some(_) => false,
+        }
+    }
+}
+
 /// In `--state-dir`: when each skill's task was handed over, for the bounds.
 pub const RUNS_FILE: &str = "task-runs.json";
 /// In `--state-dir`: the told answers waiting for the read gate, each its
@@ -1332,6 +1417,53 @@ pub fn not_ready_line(
 mod tests {
     use super::*;
     use serde_json::json;
+
+    /// Thirteen's P2 and P3 on #7765: a remade skill's run that ended well
+    /// with nothing to tell (its agent said it aloud through the lamp and
+    /// ended with a lone `-`, or a runner that keeps no answer) is its
+    /// answer, so its old steps never play after it; only a run not handed
+    /// over, failed, or past the wait runs them. A yes asked aloud in its
+    /// place is the fire's line: no old steps after it either.
+    #[test]
+    fn a_remade_skills_run_that_ended_well_with_nothing_to_tell_runs_no_old_steps() {
+        let ended_well = [
+            json!({"ok": true, "id": 3, "answer": "-"}).to_string(),
+            json!({"ok": true, "id": 4, "answer": ""}).to_string(),
+            json!({"ok": true, "id": 5}).to_string(),
+            json!({"ok": true, "id": 6, "answer": "The moon is drifting away."}).to_string(),
+        ];
+        for answer in &ended_well {
+            let fire = Otherwise::default();
+            assert_eq!(
+                fire.after_hand(Some(answer)),
+                OtherwiseAfter::Tell,
+                "{answer}"
+            );
+            assert!(!fire.old_steps(), "the wait ran out after: {answer}");
+        }
+        let failed = json!({"ok": false, "error": "run_failed", "message": "x"}).to_string();
+        for answer in [None, Some(failed.as_str()), Some("not json")] {
+            let fire = Otherwise::default();
+            assert_eq!(
+                fire.after_hand(answer),
+                OtherwiseAfter::OldSteps,
+                "{answer:?}"
+            );
+        }
+        // The wait ran out first: a late answer is dropped.
+        let fire = Otherwise::default();
+        assert!(fire.old_steps());
+        assert_eq!(
+            fire.after_hand(Some(&ended_well[3])),
+            OtherwiseAfter::Nothing
+        );
+        // The yes asked aloud in its place: no old steps after it, and
+        // none when its wait runs out.
+        let fire = Otherwise::default();
+        assert!(fire.asked());
+        assert_eq!(fire.after_hand(None), OtherwiseAfter::Nothing);
+        assert!(!fire.old_steps());
+    }
 
     /// A run the person asked for, refused as the lamp is still getting
     /// ready (its Gateway, Harness not running), is told the not-ready

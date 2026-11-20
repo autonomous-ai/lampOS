@@ -458,8 +458,14 @@ thread_local! {
     static REACTIONS_HERE: std::cell::Cell<Option<bool>> = const { std::cell::Cell::new(None) };
 }
 
-/// Whether only a quick reaction is made by DeepSeek in this process.
+/// Whether only a quick reaction is made by DeepSeek in this process. On
+/// too while an old skill is remade on this thread (`crate::made_remake`,
+/// `LAMP_REMAKE_OLD_SKILLS`): its make is the route's, its guards taken and
+/// who made it written, whatever this switch says.
 pub fn reactions_on() -> bool {
+    if REMAKE_AS.with(|remake| remake.borrow().is_some()) {
+        return true;
+    }
     if let Some(on) = REACTIONS_HERE.with(std::cell::Cell::get) {
         return on;
     }
@@ -593,11 +599,17 @@ fn says_a_marker(table: &toml::Table) -> bool {
         .flatten()
         .filter_map(|step| step.get("say")?.get("text")?.as_str())
         .any(|text| {
-            [crate::make_no_cannot::NEEDS_NET, CANNOT]
+            SAY_MARKERS
                 .iter()
                 .any(|marker| after_word(text.trim_start(), marker).is_some())
         })
 }
+
+/// The make's own markers for what no step does ([`says_a_marker`]), one
+/// list: an old skill whose say begins with one is broken
+/// (`crate::made_remake::stand_in_say`, the first builder's 10:29 on
+/// #7814).
+pub const SAY_MARKERS: [&str; 2] = [crate::make_no_cannot::NEEDS_NET, CANNOT];
 
 /// Why `answer`, a DeepSeek draft, goes to the lamp's agent with
 /// [`reactions_on`]: `on <topic>`, its trigger's, or `not a quick
@@ -9574,16 +9586,26 @@ fn forget_others(directory: &Path, name: &str, from: &str) -> io::Result<()> {
     })
 }
 
-/// The packages of the index entries `gone`, each unless one of `entries`,
-/// still kept, names it.
+/// The package files an index entry names: its own, and a remade skill's
+/// old one kept to be put back (its `old`, `crate::made_remake`).
+pub(crate) fn packages_named(entry: &Value) -> impl Iterator<Item = &str> {
+    [&entry["package"], &entry["old"]["package"]]
+        .into_iter()
+        .filter_map(Value::as_str)
+}
+
+/// The packages of the index entries `gone`, a remade one's kept old one
+/// too, each unless one of `entries`, still kept, names it.
 fn drop_packages(directory: &Path, gone: Vec<Value>, entries: &[Value]) {
     for entry in gone {
         // The same words make the same package: kept while one still names it.
-        if let Some(package) = entry["package"].as_str().filter(|package| {
+        for package in packages_named(&entry).filter(|package| {
             !package.is_empty()
                 && !package.contains('/')
                 && !package.starts_with('.')
-                && !entries.iter().any(|kept| kept["package"] == *package)
+                && !entries
+                    .iter()
+                    .any(|kept| packages_named(kept).any(|named| named == *package))
         }) {
             let _ = fs::remove_file(directory.join(package));
         }
@@ -9731,6 +9753,18 @@ pub fn keep_asked(
     let limits =
         limits_asked(request.request) || (reactions_on() && behaviour_trigger_of(&files.toml));
     files.toml = paced_for(&files.toml, asked, limits, repeat);
+    // An old skill remade (`crate::made_remake`): its trigger and timing
+    // exactly the old one's, or nothing is kept and the old one stays, with
+    // no repair (the first builder, 19 Nov 01:22 and 01:29 on #7820).
+    if let Some(timing) = remake_timing()
+        && !crate::made_remake::same_timing(&timing, &files.toml)
+    {
+        eprintln!(
+            "lamp-voice: an old made skill's remake was not kept: its trigger or timing would \
+             not be the old one's"
+        );
+        return Err(Refused(REMAKE_TIMING_CHANGED.into(), None));
+    }
     let waited = waited.filter(|_| dropped_wait(&files.toml).is_none());
     // A blink's gap, which [`tidied`] takes out: the blinking said as left
     // out, with whatever else the model left out.
@@ -9824,7 +9858,8 @@ pub fn keep_asked(
             if why == NOT_PASSED
                 && loose_on()
                 && uses.writes.is_empty()
-                && files.scripts.is_empty() =>
+                && files.scripts.is_empty()
+                && !remaking_here() =>
         {
             match loosened(&files.toml, &files.card, from, keeping) {
                 Some((toml, out)) => ending.checked_and_kept(&toml, &out),
@@ -9948,11 +9983,14 @@ impl Ending<'_> {
         } else {
             renamed_card(&marked, &free)
         };
+        // A working old skill remade (phase 2): its own steps kept beside
+        // its task, to run in the agent's place, packed and checked whole.
+        let toml = with_remake_old_steps(toml)?;
         packed_and_kept(
             keeping,
             from,
             Card {
-                toml,
+                toml: &toml,
                 name: free,
                 marked,
                 version,
@@ -10382,6 +10420,11 @@ fn free_name(
     toml: &str,
     most: usize,
 ) -> Result<String, Refused> {
+    // An old skill remade in the middle form (`crate::made_remake`):
+    // kept under its own name, to replace it once it passes.
+    if let Some(name) = REMAKE_AS.with(|remake| remake.borrow().clone()) {
+        return Ok(name);
+    }
     drop_gone(keeping);
     if !name_taken(keeping, installed, name) {
         return Ok(name.to_owned());
@@ -10413,8 +10456,87 @@ fn free_name(
     )))
 }
 
+/// Why an old skill's remake kept nothing (`crate::made_remake`): the
+/// middle form could not hold its trigger and timing exactly.
+pub const REMAKE_TIMING_CHANGED: &str = "its trigger or timing can't be kept as it was";
+
 /// The most numbers [`free_name`] tries after a taken name.
 const MOST_NAME_TRIES: u32 = 99;
+
+std::thread_local! {
+    /// The name an old made skill is remade under on this thread
+    /// (`crate::made_remake`), while its make runs.
+    static REMAKE_AS: std::cell::RefCell<Option<String>> = const { std::cell::RefCell::new(None) };
+    /// The old skill's own trigger and timing, as its `skill.toml` wrote
+    /// them (`crate::made_remake::kept_timing`), while its remake runs on
+    /// this thread: the remake's start, never one the model picks.
+    static REMAKE_TIMING: std::cell::RefCell<Option<String>> = const { std::cell::RefCell::new(None) };
+    /// A working old skill's own `skill.toml` while it is remade on this
+    /// thread (phase 2, `crate::made_remake::with_old_steps`): its steps
+    /// kept beside the remake's task, to run in the agent's place.
+    static REMAKE_OLD_STEPS: std::cell::RefCell<Option<String>> = const { std::cell::RefCell::new(None) };
+}
+
+/// Why an old skill's remake kept nothing: its old steps couldn't be kept
+/// beside its task (`crate::made_remake::OLD_STEPS_NOT_KEPT`).
+pub const REMAKE_OLD_STEPS_NOT_KEPT: &str = crate::made_remake::OLD_STEPS_NOT_KEPT;
+
+/// Whether an old made skill is being remade on this thread
+/// (`crate::made_remake`).
+pub(crate) fn remaking_here() -> bool {
+    REMAKE_AS.with(|remake| remake.borrow().is_some())
+}
+
+/// The old skill's own trigger and timing while it is remade on this thread
+/// ([`RemakeAs`]): `most_a_day`, `[trigger]` (its `cooldown` with it),
+/// `[active]` and `[quiet]`, as its `skill.toml` wrote them.
+pub(crate) fn remake_timing() -> Option<String> {
+    REMAKE_TIMING.with(|timing| timing.borrow().clone())
+}
+
+/// While held, a skill kept on this thread takes `name` (`crate::made_remake`:
+/// an old skill remade under its own name), never a free one, starts
+/// exactly as `timing` (the old skill's own, [`remake_timing`]) says, and,
+/// with `old_steps` (a working old skill's own `skill.toml`, phase 2), keeps
+/// its steps beside its task (`crate::made_remake::with_old_steps`).
+pub(crate) struct RemakeAs;
+
+impl RemakeAs {
+    pub(crate) fn set(name: &str, timing: &str, old_steps: Option<&str>) -> Self {
+        REMAKE_AS.with(|remake| *remake.borrow_mut() = Some(name.to_owned()));
+        REMAKE_TIMING.with(|kept| *kept.borrow_mut() = Some(timing.to_owned()));
+        REMAKE_OLD_STEPS.with(|kept| *kept.borrow_mut() = old_steps.map(str::to_owned));
+        Self
+    }
+}
+
+impl Drop for RemakeAs {
+    fn drop(&mut self) {
+        REMAKE_AS.with(|remake| *remake.borrow_mut() = None);
+        REMAKE_TIMING.with(|kept| *kept.borrow_mut() = None);
+        REMAKE_OLD_STEPS.with(|kept| *kept.borrow_mut() = None);
+    }
+}
+
+/// `toml`, the `skill.toml` kept on this thread, with a working old
+/// skill's own steps beside its task while it is remade ([`RemakeAs`],
+/// `crate::made_remake::with_old_steps`); as it is otherwise. Refused when
+/// they can't be kept so: nothing is kept and the old skill stays.
+fn with_remake_old_steps(toml: &str) -> Result<std::borrow::Cow<'_, str>, Refused> {
+    let Some(old) = REMAKE_OLD_STEPS.with(|kept| kept.borrow().clone()) else {
+        return Ok(std::borrow::Cow::Borrowed(toml));
+    };
+    match crate::made_remake::with_old_steps(toml, &old) {
+        Some(text) => Ok(std::borrow::Cow::Owned(text)),
+        None => {
+            eprintln!(
+                "lamp-voice: an old made skill's remake was not kept: its old steps can't be kept \
+                 beside its task"
+            );
+            Err(Refused(REMAKE_OLD_STEPS_NOT_KEPT.into(), None))
+        }
+    }
+}
 
 /// A marked `SKILL.md` ([`card_marked`]) with its front matter's `name:`
 /// line saying `name`.
@@ -11349,7 +11471,7 @@ fn remember(
 
 /// `made` kept in the index as the comment above `remember` says, with
 /// who made it (`made_with`, [`MADE_WITH`]) in its entry when its card
-/// says so.
+/// says so. Done holding the index's lock ([`index_locked`]).
 fn remember_with(
     directory: &Path,
     from: &str,
@@ -11520,7 +11642,8 @@ pub fn writes_of(directory: &Path, sha256: &str) -> Vec<Value> {
 }
 
 /// The made skills' index written whole (`crate::make_no_asks`: a skill
-/// removed with no yes kept aside, or put back).
+/// removed with no yes kept aside, or put back; `crate::made_remake`'s
+/// replace and undo).
 pub(crate) fn write_entries(directory: &Path, entries: &[Value]) -> io::Result<()> {
     write_index(directory, entries)
 }

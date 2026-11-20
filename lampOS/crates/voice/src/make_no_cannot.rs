@@ -1194,11 +1194,13 @@ fn task_plain(request: &str) -> String {
 /// of a conversation or with the head down. Off, as before. Never on a
 /// clock (`made_skill::CLOCK_TOPIC`): its one minute's run is never spent
 /// waiting on a guard ("tell me the BTC price at 9" with the owner head
-/// down at 9 still runs; Twelve's P1 on #7764, the first builder's 01:29
-/// and 02:41).
+/// down at 9 still runs; Twelve's P1 on #7764 and #7765, the first
+/// builder's 01:29 and 02:41).
 pub fn skill_text(name: &str, grants: &[String], block: &str, words: &str) -> String {
     let grants: Vec<String> = grants.iter().map(|grant| format!("\"{grant}\"")).collect();
-    let guards = if made_skill::reactions_on() && !on_the_clock(block) {
+    // Never on a clock, nor on a start that is the person's own words
+    // (a remade skill's `asks`, `crate::made_remake`): they asked for it.
+    let guards = if made_skill::reactions_on() && !on_the_clock(block) && triggered(block) {
         format!("{}\n\n", made_skill::template_guards())
     } else {
         String::new()
@@ -1211,6 +1213,12 @@ pub fn skill_text(name: &str, grants: &[String], block: &str, words: &str) -> St
          {words}\n```\n\n```{RUN}\n{SCRIPT}```\n",
         grants = grants.join(", "),
     )
+}
+
+/// Whether `block` has a `[trigger]`: none for a start that is only the
+/// person's own words (`asks`).
+fn triggered(block: &str) -> bool {
+    toml::from_str::<toml::Table>(block).is_ok_and(|table| table.contains_key("trigger"))
 }
 
 /// Whether `block`'s `[trigger]` is the lamp's own clock
@@ -1294,6 +1302,7 @@ pub fn made(
     if words.is_empty() {
         return Err(Uncovered::Other.refused());
     }
+    let kept_timing = made_skill::remake_timing();
     let mut brief = brief(request, hint);
     let most = crate::make_skill_local::MOST_REPAIRS;
     let mut last = Err(Refused::new(made_skill::MODEL_SILENT));
@@ -1318,7 +1327,19 @@ pub fn made(
                 return Err(Refused::new(made_skill::MODEL_SILENT));
             }
         };
-        let lines = match read(&answer) {
+        // An old skill remade (`crate::made_remake`): its own trigger and
+        // timing, whatever the model wrote or whether it named one; only
+        // its name and grants are the model's (the first builder, 19 Nov
+        // 01:22 on #7820: never a trigger picked again).
+        let read = read(&answer).map(|answer| match (answer, &kept_timing) {
+            (Answer::Skill { name, grants, .. }, Some(timing)) => Answer::Skill {
+                name,
+                grants,
+                when: When::Trigger(timing.clone()),
+            },
+            (answer, _) => answer,
+        });
+        let lines = match read {
             Ok(Answer::Uncovered(uncovered)) => return Err(uncovered.refused()),
             Ok(Answer::Skill {
                 name,
@@ -1363,7 +1384,7 @@ pub fn made(
                 name,
                 grants,
                 when: When::Trigger(block),
-            }) => match block_kept(&block) {
+            }) => match kept_timing.clone().map_or_else(|| block_kept(&block), Ok) {
                 Ok(block) => {
                     let grants = match covered(&grants, false) {
                         Ok(grants) => grants,
@@ -2313,7 +2334,8 @@ mod tests {
     /// `LAMP_MAKE_REACTIONS_ONLY_DEEPSEEK` on, a task the lamp writes on a
     /// trigger carries sip-of-water's three guards and still only its one
     /// task step, no say; its cap takes it. Never on the lamp's clock
-    /// (Twelve's P1 on #7764, the first builder's 19 Nov 01:29 and 02:41):
+    /// (Twelve's P1 on #7764 and #7765, the first builder's 19 Nov 01:29
+    /// and 02:41):
     /// "tell me the BTC price at 9" runs at 9 whatever the room does. Off,
     /// as before, byte for byte.
     #[test]

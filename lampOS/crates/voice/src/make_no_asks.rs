@@ -543,6 +543,17 @@ fn records(directory: &Path, now_unix_ms: u64) -> Vec<Value> {
     kept
 }
 
+/// When the latest action [`undo`]'s "last" would take was done, by the
+/// lamp's clock: none with no record kept. `crate::made_remake` reads it
+/// so a remake told after it is the one "put it back" undoes (Twelve's P2
+/// on #7765).
+pub fn latest_at(directory: &Path, now_unix_ms: u64) -> Option<u64> {
+    records(directory, now_unix_ms)
+        .iter()
+        .filter_map(|record| record["at_unix_ms"].as_u64())
+        .max()
+}
+
 /// The keep trimmed ([`records`]), and any package in [`KEPT_FOLDER`] no
 /// record names (a crash's) deleted: at the voice's start and every
 /// [`PURGE_EVERY`] ([`start_purge`]), so a kept package goes within an
@@ -587,10 +598,12 @@ pub fn start_purge() {
     }
 }
 
-/// The keep in `directory` deleted whole, [`RECORDS`] and [`KEPT_FOLDER`]:
-/// whether there was any.
+/// The keep in `directory` deleted whole, [`RECORDS`] and [`KEPT_FOLDER`],
+/// and with it the old skills' remake's own undo (`crate::made_remake::clear`:
+/// every remade skill's kept old one and `remake.json`), so the made skills
+/// keep one undo store (Twelve's P2 on #7820): whether there was any.
 pub fn clear(directory: &Path) -> io::Result<bool> {
-    let mut any = false;
+    let mut any = crate::made_remake::clear(directory)?;
     match fs::remove_file(directory.join(RECORDS)) {
         Ok(()) => any = true,
         Err(error) if error.kind() == io::ErrorKind::NotFound => {}
@@ -704,8 +717,20 @@ pub fn remove_at_once(
     sha256: &str,
     remove: impl FnOnce(&str) -> Result<(), String>,
 ) -> Result<(), String> {
+    made_skill::index_locked(&keeping.directory, || {
+        remove_locked(keeping, name, sha256, remove)
+    })
+}
+
+/// [`remove_at_once`], holding the index's lock.
+fn remove_locked(
+    keeping: &Keeping,
+    name: &str,
+    sha256: &str,
+    remove: impl FnOnce(&str) -> Result<(), String>,
+) -> Result<(), String> {
     let entries = made_skill::entries(&keeping.directory);
-    let Some(entry) = entries
+    let Some(mut entry) = entries
         .iter()
         .find(|entry| entry["name"] == name && entry["sha256"] == sha256)
         .cloned()
@@ -729,6 +754,11 @@ pub fn remove_at_once(
         .filter(|other| !(other["name"] == name && other["sha256"] == sha256))
         .cloned()
         .collect();
+    // A remade skill's kept old one goes with it, its package too: one
+    // undo, of what was removed (Twelve's P2 on #7820).
+    if let Some(old) = entry.as_object_mut().and_then(|entry| entry.remove("old")) {
+        crate::made_remake::drop_package_of(&keeping.directory, &old, &rest);
+    }
     let record = json!({ "kind": "removed", "name": name, "entry": entry });
     // Its package kept aside: moved, or copied while another entry still
     // names the same file.

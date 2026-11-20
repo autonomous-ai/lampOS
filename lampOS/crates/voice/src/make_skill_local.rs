@@ -1076,11 +1076,14 @@ fn parameters(writes: bool, code: bool) -> Value {
 }
 
 /// The most bytes `make_skill`'s parameters come to with every switch the
-/// product's `lamp-voice` unit sets on (#8002): short of the link's 4,096
-/// ([`lamp_gemini::MAX_TOOL_JSON_BYTES`]) by the room one more parameter
-/// needs, about 336 bytes for #7765's `remake_old` and `put_back`. Each
-/// description is said in as few words as keep its meaning.
-pub const PRODUCT_MOST_PARAMETERS_BYTES: usize = 3_750;
+/// product's `lamp-voice` unit sets on (#8002). The room #8002 kept short
+/// of the link's 4,096 ([`lamp_gemini::MAX_TOOL_JSON_BYTES`]) is now used
+/// by #7765's `remake_old` and `put_back` (`LAMP_REMAKE_OLD_SKILLS`): 4,003,
+/// and 4,055 with the undo's word added while a remake is the latest thing
+/// done ([`crate::made_remake::PUT_BACK_UNDO_TOLD`]). A later addition to
+/// `make_skill` goes into its own function instead (as #8008's change
+/// does). Each description is said in as few words as keep its meaning.
+pub const PRODUCT_MOST_PARAMETERS_BYTES: usize = 4_003;
 
 /// [`parameters`], and with a skill's tasks on (#6305) the same
 /// `approve_id` and `read_back` for a skill's task. A parameter given
@@ -1170,6 +1173,36 @@ fn parameters_with(writes: bool, tasks: bool, code: bool) -> Value {
             crate::make_no_asks::REMOVE_AT_ONCE_TOLD
         );
         parameters["properties"][crate::made_remove::REMOVE]["description"] = json!(remove);
+    }
+    // Old skills remade in the middle form (`LAMP_REMAKE_OLD_SKILLS`,
+    // [`crate::made_remake`]): the person's own ask (never an offer's
+    // answer: remade without asking), and a remade one's old version put
+    // back, with the switch off too while one is kept (Thirteen's P3 on
+    // #7765).
+    if crate::made_remake::on() {
+        parameters["properties"][crate::made_remake::REMAKE_OLD] = json!({
+            "type": "string",
+            "enum": crate::made_remake::ANSWERS,
+            "description": "Only when they ask to remake or update their old skills: alone."
+        });
+    }
+    if crate::made_remake::put_back_offered() {
+        parameters["properties"][crate::made_remake::PUT_BACK] = json!({
+            "type": "string",
+            "description": "Only to undo the lamp's fix or move of a skill (\"put it back\" once told): its name, alone."
+        });
+        // A remake is the latest thing done: the undo gives way to it
+        // (Twelve's P2 on #7765), and its dispatch does too.
+        if let Some(described) = parameters["properties"][crate::make_no_asks::UNDO]["description"]
+            .as_str()
+            .map(str::to_owned)
+            && crate::made_remake::put_back_for_undo_here(crate::make_no_asks::LAST).is_some()
+        {
+            parameters["properties"][crate::make_no_asks::UNDO]["description"] = json!(format!(
+                "{described}{}",
+                crate::made_remake::PUT_BACK_UNDO_TOLD
+            ));
+        }
     }
     parameters["properties"][crate::made_clash::CHOICE] = json!({
         "type": "string",
@@ -4352,6 +4385,93 @@ fn cannot_asked_again(
     )
 }
 
+/// An old made skill remade in the middle form (`crate::made_remake`,
+/// `LAMP_REMAKE_OLD_SKILLS`; the first builder's 19:50 ruling on #6811, and
+/// his 19 Nov 01:22 and 01:29 on #7820): `request`, the person's own kept
+/// request, written by the lamp as one task for its agent as a new make
+/// judged no quick reaction is ([`agent_task`]): its grants from its own
+/// model in one more call (`chat`), its start and timing the old skill's
+/// own (`made_skill::RemakeAs`, never the trigger that call writes), one
+/// `do.task` of the request's words, and sip-of-water's guards but on a
+/// clock (`crate::make_no_cannot::skill_text`, taken while a remake runs:
+/// `made_skill::reactions_on`). Kept from `from` as made by `engine`, the
+/// agent that does its task ([`made_skill::MADE_WITH`]), through the same
+/// checks and repairs. No DeepSeek draft is asked for, and the agent is
+/// never asked to write it. Why not, in the lamp's own words.
+pub(crate) fn remade_as_task(
+    request: &str,
+    keeping: &Keeping,
+    from: &str,
+    engine: &str,
+    chat: impl Fn() -> Result<Chat, String> + Send + Sync + 'static,
+) -> Result<Made, String> {
+    let began = std::time::Instant::now();
+    let chat = Arc::new(chat);
+    let asked = made_skill::Asked {
+        request,
+        own: own_accounts_now(),
+        heard: None,
+        judge: None,
+        made_with: made_skill::MadeWith::of_engine(engine),
+        // A remake keeps the old skill's own name (`made_skill::RemakeAs`).
+        named: None,
+    };
+    let kept = |answer: Result<String, String>| match answer {
+        Ok(text) => made_skill::keep_asked(&text, false, from, keeping, &asked),
+        Err(_) => Err(Refused(made_skill::MODEL_SILENT.into(), None)),
+    };
+    agent_task(request, &chat, began, &kept, (from, keeping, None)).map_err(|Refused(why, _)| why)
+}
+
+/// A broken old quick reaction or lamp-only fire remade as one still
+/// (`crate::made_remake::Quick`, the first builder's 10:29 on #7814): the
+/// lamp's own model (`chat`) asked once to add its left-out part from the
+/// person's own words ([`crate::made_remake::QUICK_SYSTEM`]), its answer
+/// held to the old skill but the added steps
+/// ([`crate::made_remake::quick_fixed`]) and kept under `name`, its start
+/// and timing the old one's (`made_skill::RemakeAs`), made by DeepSeek. No
+/// task and no agent. Why not, for the journal alone: a `none` (nothing of
+/// theirs names a value) leaves the old one untouched and untold.
+pub(crate) fn remade_as_quick(
+    quick: &crate::made_remake::Quick,
+    name: &str,
+    keeping: &Keeping,
+    from: &str,
+    chat: impl Fn() -> Result<Chat, String> + Send + Sync + 'static,
+) -> Result<Made, String> {
+    let answer = ask_in(
+        Arc::new(chat),
+        crate::made_remake::QUICK_SYSTEM.to_owned(),
+        crate::made_remake::quick_brief(quick),
+    )?;
+    let toml = crate::made_remake::quick_fixed(quick, &answer).map_err(str::to_owned)?;
+    let description = if quick.said.is_empty() {
+        &quick.part
+    } else {
+        &quick.said
+    }
+    .split_whitespace()
+    .collect::<Vec<_>>()
+    .join(" ");
+    let toml = format!("{}\n", toml.trim_end());
+    let text = format!(
+        "```skill.toml\n{toml}```\n\n```SKILL.md\n---\nname: {name}\ndescription: \
+         {description}\n---\n\n# {name}\n\n{description}\n```\n"
+    );
+    // Its first line of the person's words, without its head.
+    let first = quick.words.lines().next().unwrap_or_default();
+    let asked = made_skill::Asked {
+        request: first.split_once(": ").map_or(first, |(_, words)| words),
+        own: own_accounts_now(),
+        heard: None,
+        judge: None,
+        made_with: made_skill::MadeWith::DeepSeek,
+        // A remake keeps the old skill's own name (`made_skill::RemakeAs`).
+        named: None,
+    };
+    made_skill::keep_asked(&text, false, from, keeping, &asked).map_err(|Refused(why, _)| why)
+}
+
 std::thread_local! {
     /// The voice turn waiting on this thread's make, while it waits: gone
     /// once the turn was cut (`second_provider::worker::made_running`).
@@ -4889,7 +5009,25 @@ pub fn answer(
     if crate::make_no_asks::on()
         && let Some(asked) = call.args[crate::make_no_asks::UNDO].as_str()
     {
+        // A remake told after every other action: "put it back" is its
+        // put-back, never an older remove's undo (Twelve's P2 on #7765).
+        if let Some(name) = crate::made_remake::put_back_for_undo_here(asked) {
+            return crate::made_remake::put_back_here(&name, request, heard, lease);
+        }
         return crate::make_no_asks::undo_here(asked, request, heard, lease);
+    }
+    // Old skills remade in the middle form (`LAMP_REMAKE_OLD_SKILLS`): the
+    // owner's own ask, or a remade one's old put back (with the switch off
+    // too while one is kept).
+    if crate::made_remake::on()
+        && let Some(answer) = call.args[crate::made_remake::REMAKE_OLD].as_str()
+    {
+        return crate::made_remake::answered_here(answer, request, heard, lease);
+    }
+    if let Some(name) = call.args[crate::made_remake::PUT_BACK].as_str()
+        && crate::made_remake::put_back_offered()
+    {
+        return crate::made_remake::put_back_here(name, request, heard, lease);
     }
     // A skill the person made, removed by voice (#6960): matched in code
     // to their own made skills, asked once by its name, removed on the yes.
@@ -5638,11 +5776,13 @@ light = { dim = 1 }
                     let body = std::str::from_utf8(&body).expect("authenticated chat body is UTF-8");
                     sent.push(body.to_owned());
                     // A make's brief, its judge's question (#7621), or the
-                    // judgement of a quick reaction (#7764).
+                    // judgement of a quick reaction (#7764), or a broken
+                    // quick reaction's fix (#7765).
                     assert!(
                         body.contains(made_skill::BRIEF_HEAD)
                             || body.contains("Does the made skill do what was asked?")
-                            || body.contains("You judge, for a desk lamp"),
+                            || body.contains("You judge, for a desk lamp")
+                            || body.contains("You fix a desk lamp's skill"),
                         "{body}"
                     );
                     assert!(!body.contains("\"tools\""), "{body}");
@@ -12440,6 +12580,280 @@ printf 'tar of %s' \"$name\" > \"$3/$name-1.0.0.tar\"\n",
         one_task_of(&copy, SIP, crate::make_no_cannot::RUN);
         assert!(made_with_of(&keeping, "deepseek-draft").is_none());
         made_skill::set_asks_here(None);
+        net_make_here(None);
+        made_skill::set_reactions_here(None);
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    /// An old skill's `skill.toml` as DeepSeek kept it for `request`: the
+    /// trigger `trigger` and a say of the model's own words each run, as
+    /// its make paced it.
+    fn old_kept(request: &str, trigger: &str) -> String {
+        made_skill::paced_for(
+            &format!(
+                "kind = \"installable\"\nversion = \"1.0.0\"\nneeds = [\"voice\"]\n\n\
+                 [permissions]\nspeak = true\n\n{trigger}\n[[do]]\n\
+                 say = {{ note = \"One short line.\" }}\n"
+            ),
+            &made_skill::asked_windows(request),
+            true,
+            None,
+        )
+    }
+
+    /// An old skill remade (`crate::made_remake`, `LAMP_REMAKE_OLD_SKILLS`)
+    /// in the middle form (the first builder's 19:50 ruling), held to his
+    /// 19 Nov 01:22 and 01:29: its start and timing exactly the old one's,
+    /// whatever trigger the model's one call wrote (`[trigger]` with its
+    /// cooldown, `[quiet]`, `most_a_day`), one task step of the person's
+    /// own kept request word for word, sip-of-water's guards, no say; no
+    /// judgement, no DeepSeek draft, the agent never asked to write it;
+    /// kept under the old skill's own name, `made_with` the agent's, even
+    /// with `LAMP_MAKE_REACTIONS_ONLY_DEEPSEEK` off.
+    #[test]
+    fn an_old_skill_is_remade_on_its_own_trigger_and_timing_as_one_task_of_its_request() {
+        made_skill::set_reactions_here(Some(false));
+        net_make_here(Some(true));
+        let (root, keeping, copy) = keeping_copied("remade-middle");
+        const WATER: &str = "When someone sits at the desk a long while, suggest a sip of water";
+        let old = old_kept(
+            WATER,
+            "[trigger]\ntopic = \"room/presence\"\nfield = \"someone\"\nequals = true\n\
+             for = \"30m\"\nrearm = \"leaves\"\ncooldown = \"1h\"\n",
+        );
+        let timing = crate::made_remake::kept_timing(&old).unwrap();
+        // The model writes another trigger: it is never taken.
+        let faces = "when = \"appears\"\n";
+        let (url, served) = service_sent(vec![(
+            200,
+            trigger_answer("sip-at-desk", "speak", "humans/faces/tracked", faces),
+        )]);
+        let made = {
+            let _as = made_skill::RemakeAs::set("water", &timing, None);
+            remade_as_task(WATER, &keeping, "local:remake:1", "Hermes", chat_at(url))
+        }
+        .unwrap();
+        let sent = served.join().unwrap();
+        assert_eq!(sent.len(), 1);
+        assert_eq!(made.name, "water");
+        assert!(made.uses.code && made.uses.agent_task, "{:?}", made.uses);
+        // The person's request, word for word.
+        let table = one_task_of(&copy, WATER, crate::make_no_cannot::RUN);
+        let kept = std::fs::read_to_string(&copy).unwrap();
+        assert!(
+            crate::made_remake::same_timing(&timing, &kept),
+            "{old}\n---\n{kept}"
+        );
+        let old: toml::Table = toml::from_str(&old).unwrap();
+        for key in ["trigger", "quiet", "most_a_day", "active"] {
+            assert_eq!(table.get(key), old.get(key), "{key}: {kept}");
+        }
+        assert_eq!(table["trigger"]["cooldown"].as_str(), Some("1h"));
+        assert_eq!(
+            table["while"].as_array().map(Vec::len),
+            Some(3),
+            "{table:?}"
+        );
+        assert_eq!(made_with_of(&keeping, "water").as_deref(), Some("hermes"));
+        net_make_here(None);
+        made_skill::set_reactions_here(None);
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    /// The first builder's 06:08 on #7814, phase 2: a working old skill
+    /// started by its owner's words ("moon fact") remade keeps its `asks`
+    /// exactly, its task its asks phrase, no guard, and its own old steps
+    /// beside the task as `[[otherwise]]`, its permissions taken in, so
+    /// lamp-skills runs them in the agent's place when its answer is late.
+    #[test]
+    fn a_working_old_skill_remade_keeps_its_old_steps_beside_its_task() {
+        made_skill::set_reactions_here(Some(false));
+        made_skill::set_asks_here(Some(true));
+        net_make_here(Some(true));
+        let (root, keeping, copy) = keeping_copied("remade-moon");
+        const MOON: &str = "kind = \"installable\"\nversion = \"1.0.0\"\n\
+            asks = [\"moon fact\"]\n[permissions]\nspeak = true\nlight = true\n\n\
+            [[do]]\nlight = { colour = \"blue\" }\n\n[[do]]\nsay = \"Tell one short fact about the moon.\"\n";
+        let timing = crate::made_remake::kept_timing(MOON).unwrap();
+        let (url, served) = service_sent(vec![(
+            200,
+            trigger_answer("moon-time", "speak", "room/presence", "equals = true\n"),
+        )]);
+        let made = {
+            let _as = made_skill::RemakeAs::set("moon-time", &timing, Some(MOON));
+            remade_as_task(
+                "moon fact",
+                &keeping,
+                "local:remake:3",
+                "Hermes",
+                chat_at(url),
+            )
+        };
+        served.join().unwrap();
+        let made = made.unwrap();
+        assert_eq!(made.name, "moon-time");
+        let kept = std::fs::read_to_string(&copy).unwrap();
+        let table: toml::Table = toml::from_str(&kept).unwrap();
+        let old: toml::Table = toml::from_str(MOON).unwrap();
+        let steps = table["do"].as_array().unwrap();
+        assert_eq!(steps.len(), 1, "{kept}");
+        assert_eq!(
+            steps[0]["task"]["task"].as_str(),
+            Some("moon fact"),
+            "{kept}"
+        );
+        assert_eq!(table.get("otherwise"), old.get("do"), "{kept}");
+        assert_eq!(table["asks"], old["asks"], "{kept}");
+        assert!(
+            table.get("trigger").is_none() && table.get("while").is_none(),
+            "{kept}"
+        );
+        assert_eq!(
+            table["permissions"]["speak"].as_bool(),
+            Some(true),
+            "{kept}"
+        );
+        assert_eq!(
+            table["permissions"]["light"].as_bool(),
+            Some(true),
+            "{kept}"
+        );
+        net_make_here(None);
+        made_skill::set_asks_here(None);
+        made_skill::set_reactions_here(None);
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    /// The first builder's 10:29 on #7814: lamp-9adf's focus-mode, a broken
+    /// quick reaction, remade by the lamp's own model in one call is kept
+    /// as a quick reaction still, through the make's own checks: its asks,
+    /// its line and its grants as they were, a light step of the colour its
+    /// request names added, no task, no code, made by DeepSeek. Nothing of
+    /// theirs naming a colour, the model's `none` keeps nothing.
+    #[test]
+    fn a_broken_quick_reaction_remade_is_kept_as_one_with_its_named_colour() {
+        made_skill::set_asks_here(Some(true));
+        let (root, keeping, copy) = keeping_copied("remade-quick");
+        const FOCUS: &str = "kind = \"installable\"\nversion = \"1.0.0\"\n\
+            asks = [\"focus mode\"]\n[permissions]\nlight = true\nspeak = true\n[ask]\n\
+            policy = \"nudge\"\n[[do]]\nsay = { text = \"Focus mode activated.\" }\n";
+        let quick = crate::made_remake::Quick {
+            old: FOCUS.to_owned(),
+            part: "its colour in a step that changes the light".into(),
+            words: "Their request: focus mode, and turn the light blue\n\
+                    Their words to start it: focus mode"
+                .into(),
+            said: "When you say focus mode, it says focus mode is on.".into(),
+        };
+        let timing = crate::made_remake::kept_timing(FOCUS).unwrap();
+        let fixed = format!("{FOCUS}\n[[do]]\nlight = {{ colour = \"blue\" }}\n");
+        let (url, served) = service_sent(vec![(200, format!("```skill.toml\n{fixed}```"))]);
+        let made = {
+            let _as = made_skill::RemakeAs::set("focus-mode", &timing, None);
+            remade_as_quick(
+                &quick,
+                "focus-mode",
+                &keeping,
+                "local:remake:4",
+                chat_at(url),
+            )
+        };
+        let sent = served.join().unwrap();
+        assert_eq!(sent.len(), 1);
+        assert!(sent[0].contains("Left out: its colour"), "{}", sent[0]);
+        let made = made.unwrap();
+        assert_eq!(made.name, "focus-mode");
+        assert!(!made.uses.code && !made.uses.agent_task, "{:?}", made.uses);
+        let kept = std::fs::read_to_string(&copy).unwrap();
+        let table: toml::Table = toml::from_str(&kept).unwrap();
+        let old: toml::Table = toml::from_str(FOCUS).unwrap();
+        assert_eq!(table["asks"], old["asks"], "{kept}");
+        let steps = table["do"].as_array().unwrap();
+        let said = |step: &toml::Value, kind: &str, key: &str| {
+            step.get(kind)
+                .and_then(|kind| kind.get(key))
+                .and_then(toml::Value::as_str)
+                .map(str::to_owned)
+        };
+        assert!(
+            steps
+                .iter()
+                .any(|step| said(step, "light", "colour").as_deref() == Some("blue")),
+            "{kept}"
+        );
+        assert!(
+            steps
+                .iter()
+                .any(|step| said(step, "say", "text").as_deref() == Some("Focus mode activated.")),
+            "{kept}"
+        );
+        assert!(
+            steps.iter().all(|step| step.get("task").is_none()),
+            "{kept}"
+        );
+        assert!(made_skill::quick_reaction(&kept), "{kept}");
+        assert_eq!(
+            made_with_of(&keeping, "focus-mode").as_deref(),
+            Some("deepseek")
+        );
+        // Nothing names a colour: the model's `none`, nothing kept.
+        let (url, served) = service_sent(vec![(200, "none".to_owned())]);
+        let none = {
+            let _as = made_skill::RemakeAs::set("focus-mode", &timing, None);
+            remade_as_quick(
+                &quick,
+                "focus-mode",
+                &keeping,
+                "local:remake:5",
+                chat_at(url),
+            )
+        };
+        served.join().unwrap();
+        assert!(none.is_err(), "{none:?}");
+        made_skill::set_asks_here(None);
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    /// Twelve's P1 on #7765, the first builder's 01:29: "every morning at
+    /// 8, tell me the weather" remade keeps its clock and gets no
+    /// `[[while]]` guard, so with the owner head down at 8 it still runs.
+    #[test]
+    fn a_clock_skill_remade_gets_no_guards_and_keeps_its_clock() {
+        made_skill::set_reactions_here(Some(false));
+        net_make_here(Some(true));
+        let (root, keeping, copy) = keeping_copied("remade-clock");
+        const MORNING: &str = "every morning at 8, tell me the weather";
+        let old = old_kept(
+            MORNING,
+            "[trigger]\ntopic = \"clock/local\"\nfield = \"known\"\nequals = true\n\
+             rearm = \"ends\"\nduring = { from = \"08:00\", to = \"08:01\" }\n",
+        );
+        let timing = crate::made_remake::kept_timing(&old).unwrap();
+        let sat = "field = \"someone\"\nequals = true\n";
+        let (url, served) = service_sent(vec![(
+            200,
+            trigger_answer("morning-weather", "net, speak", "room/presence", sat),
+        )]);
+        let made = {
+            let _as = made_skill::RemakeAs::set("morning-weather", &timing, None);
+            remade_as_task(MORNING, &keeping, "local:remake:2", "Hermes", chat_at(url))
+        };
+        served.join().unwrap();
+        let made = made.unwrap();
+        assert_eq!(made.name, "morning-weather");
+        let table = one_task_of(&copy, MORNING, crate::make_no_cannot::RUN);
+        let kept = std::fs::read_to_string(&copy).unwrap();
+        assert!(table.get("while").is_none(), "{kept}");
+        assert_eq!(table["trigger"]["topic"].as_str(), Some("clock/local"));
+        assert!(
+            crate::made_remake::same_timing(&timing, &kept),
+            "{old}\n---\n{kept}"
+        );
+        // Head down at 8: no guard of the skill's own holds it back.
+        assert!(
+            !kept.contains("head_down") && !kept.contains("voice/state"),
+            "{kept}"
+        );
         net_make_here(None);
         made_skill::set_reactions_here(None);
         let _ = std::fs::remove_dir_all(&root);
