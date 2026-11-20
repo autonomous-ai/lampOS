@@ -2366,6 +2366,14 @@ impl Attention {
         self.name_note_kept
     }
 
+    /// Whether the line last judged is told the name heard whatever the
+    /// room: its words call the lamp (the verdict's "the text shows it was
+    /// called"), with [`Self::need_a_face_or_words`] (#8136; lamp-52e6,
+    /// request 41, a busy room with nobody turned to the lamp).
+    pub fn told_by_its_words(&self) -> bool {
+        self.face_or_words && self.called_in_text()
+    }
+
     /// In a busy room, let a line out only as the conversation going on
     /// once the Policy has said it is the lamp's ([`crate::going_on_asks`]).
     pub fn ask_policy_when_going_on(&mut self, on: bool) {

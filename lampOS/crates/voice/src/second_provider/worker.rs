@@ -11233,6 +11233,16 @@ impl Heeding {
                     );
                     Some(crate::called::note(heard_as))
                 }
+                // `LAMP_NAME_FACE_OR_WORDS`: a line whose own words call the
+                // lamp is told in a busy room too (lamp-52e6, request 41: a
+                // "Hey Lamp, …" played with 0 faces, the note withheld, no
+                // tool called).
+                Err(why) if self.attention.told_by_its_words() => {
+                    eprintln!(
+                        "lamp-voice second: request {request}: the lamp's name was heard in a busy room and {why}, but its words call the lamp: the model is told (LAMP_NAME_FACE_OR_WORDS, #8136)"
+                    );
+                    Some(crate::called::note(heard_as))
+                }
                 Err(why) => {
                     eprintln!(
                         "lamp-voice second: request {request}: the lamp's name was heard in a busy room and {why}; the model is not told"
