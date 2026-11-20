@@ -20126,10 +20126,9 @@ async fn answer(
         // "applefile" read as 0, its name never counted as the lamp's
         // words are). No word of the line, and no skill's name.
         if heard && skill_named.is_none() && !made_here.is_empty() {
-            let read = shared
-                .made_read
-                .as_ref()
-                .map_or(0, |read| made_here.iter().filter(|made| read(made.as_str())).count());
+            let read = shared.made_read.as_ref().map_or(0, |read| {
+                made_here.iter().filter(|made| read(made.as_str())).count()
+            });
             // The matcher's input shape, no word of it: its own words past
             // those said around an ask, and how far the nearest made name is.
             let line = skill_words.as_str();
