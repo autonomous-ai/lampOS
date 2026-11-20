@@ -232,6 +232,13 @@ pub struct Days {
     /// rest, and how many it has given.
     forgot_rest_base: Option<u64>,
     forgot_rests_made: u64,
+    /// Whether this request's forget was asked with
+    /// `lamp_msgs::MEMORY_HISTORY_UNSENT_FIELD` (set by the request's
+    /// answer, never on disk): its removed ids are then kept in its own
+    /// transaction ([`crate::history_unsent::keep`]), and the rows' range
+    /// told in its answer ([`Self::take_unsent`]).
+    pub(crate) unsent_asked: bool,
+    unsent: Option<(u64, u64)>,
     /// This store's epoch for the account's history ids
     /// ([`lamp_msgs::history_turn_id`], #7771), kept in `settings`.
     epoch: String,
@@ -311,6 +318,8 @@ impl Days {
             forgot_rests: std::collections::VecDeque::new(),
             forgot_rest_base: None,
             forgot_rests_made: 0,
+            unsent_asked: false,
+            unsent: None,
             epoch: String::new(),
             taste_rules: false,
             _held: held,
@@ -1490,9 +1499,11 @@ impl Days {
         crate::nightly::with_doomed(&tx)?;
         said_again_with_doomed(&tx)?;
         let gone = doomed_exchanges(&tx)?;
+        let unsent = crate::history_unsent::keep(&tx, self.unsent_asked, &self.epoch, &gone, None)?;
         let count = erase(&tx)?;
         tx.commit()?;
         self.told(gone);
+        self.unsent = crate::history_unsent::joined(self.unsent, unsent);
         Ok(count)
     }
     /// The room's lines `speaker` said (#2849, the voice's
@@ -1539,9 +1550,11 @@ impl Days {
         talk_with_doomed(&tx)?;
         said_again_with_doomed(&tx)?;
         let gone = doomed_exchanges(&tx)?;
+        let unsent = crate::history_unsent::keep(&tx, self.unsent_asked, &self.epoch, &gone, None)?;
         let count = erase(&tx)?;
         tx.commit()?;
         self.told(gone);
+        self.unsent = crate::history_unsent::joined(self.unsent, unsent);
         self.forget_set_aside()?;
         Ok(count)
     }
@@ -1575,6 +1588,18 @@ impl Days {
         let mut gone = Vec::new();
         let count = empty(&tx, person, &mut gone)?;
         crate::service_records::mark_forgot(&tx, person, self.now)?;
+        // Everyone's forget everything reaches nothing on the account: none
+        // kept for it. A known person's is kept as their whole history.
+        let unsent = match person {
+            Some(person) => crate::history_unsent::keep(
+                &tx,
+                self.unsent_asked,
+                &self.epoch,
+                &gone,
+                Some(person.as_str()),
+            )?,
+            None => None,
+        };
         // Everyone's forget everything wipes the store whole: a new epoch,
         // so no id given after it names a turn of before (#7771). What it
         // removed is told under the old.
@@ -1585,6 +1610,7 @@ impl Days {
         };
         tx.commit()?;
         self.told(gone);
+        self.unsent = crate::history_unsent::joined(self.unsent, unsent);
         if let Some(epoch) = epoch {
             self.epoch = epoch;
         }
@@ -1613,6 +1639,12 @@ impl Days {
     /// id, and none kept after (#7771).
     pub fn take_forgot(&mut self) -> Vec<Forgot> {
         std::mem::take(&mut self.forgot)
+    }
+
+    /// The range of the rows this request's forgets kept for the account's
+    /// history ([`crate::history_unsent`]), and none kept after.
+    pub fn take_unsent(&mut self) -> Option<(u64, u64)> {
+        self.unsent.take()
     }
 
     /// The ids a forget's answer had no room for, kept for paging beside

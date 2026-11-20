@@ -2632,6 +2632,20 @@ pub fn serve(
     if let Some(socket) = &tools.memory {
         // Each turn the memory keeps, sent to the account's history with
         // LAMP_HISTORY_SEND=on (#7771), with the relay's key, the lamp's own.
+        // What the memory kept of a forget this voice never queued (a
+        // restart or a crash between them) is read again, with
+        // LAMP_HISTORY_FORGET=on (#7771, the first builder's condition on
+        // #8086); off the voice's way, on the forget worker. Handed before
+        // the save starts, so the save holds until it is read.
+        crate::history_forget::recover_at_start(socket);
+        // Nothing reaches the account while the privacy switch is closed
+        // (the first builder's privacy read on #8125); read only with one
+        // of the history switches on.
+        if (crate::history_forget::on() || crate::history_send::on())
+            && let Some(root) = files.bus_root.as_deref()
+        {
+            crate::history_privacy::start(root);
+        }
         crate::history_send::start_from_environment(
             &config.llm_base_url,
             config.llm_key.expose(),

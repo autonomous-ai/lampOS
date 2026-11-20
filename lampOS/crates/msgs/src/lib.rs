@@ -1223,6 +1223,26 @@ pub const MEMORY_FORGETS_TELLING_EXCHANGES: [&str; 5] = [
 /// "token":…}`; a token not kept is refused `rest_gone`, #7771).
 pub const MEMORY_FORGOT_EXCHANGES_OP: &str = "forgot_exchanges";
 
+/// The field a voice with `LAMP_HISTORY_FORGET=on` adds, `true`, to each of
+/// [`MEMORY_FORGETS_TELLING_EXCHANGES`]: the memory then keeps what the
+/// forget removed on its disk, in the forget's own transaction, until the
+/// voice says it is on its own queue ([`MEMORY_HISTORY_UNSENT_DONE_OP`]),
+/// and the answer says the rows' range, `"unsent":[from,to]`. Without it,
+/// nothing is kept (the first builder's switch-on condition on #8086).
+pub const MEMORY_HISTORY_UNSENT_FIELD: &str = "history_unsent";
+
+/// The memory request that pages what forgets asked with
+/// [`MEMORY_HISTORY_UNSENT_FIELD`] removed and the voice has not yet said
+/// done, oldest first: `{"op":"history_unsent","after":<seq>}` answered
+/// `{"ok":true,"exchanges":{"<scope>":[turn ids]},"all":["p-…"],
+/// "to":<last seq or null>,"more":…}`.
+pub const MEMORY_HISTORY_UNSENT_OP: &str = "history_unsent";
+
+/// The memory request that lets go of those rows once the voice has them on
+/// its own queue: `{"op":"history_unsent_done","from":<seq>,"to":<seq>}`,
+/// both included.
+pub const MEMORY_HISTORY_UNSENT_DONE_OP: &str = "history_unsent_done";
+
 /// The memory request that answers its store's epoch,
 /// `{"ok":true,"epoch":"<8 hex>"}` (#7771): for [`history_turn_id`].
 pub const MEMORY_HISTORY_EPOCH_OP: &str = "history_epoch";

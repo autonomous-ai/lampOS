@@ -666,23 +666,38 @@ mod tests {
         );
     }
 
-    /// The first builder's condition on #8068 (11:09): a store made by
-    /// stable's schema opens under this build unchanged. This PR's whole
-    /// schema change is the `app_facts` block at the end of `days.sql`, so
-    /// a store made here with that table dropped is stable's. Opened again
-    /// here: the same kept list, recall and search hits; `maintain` dooms
-    /// nothing; `app_facts` is made, empty. Read then with stable's own SQL
-    /// (the kept count, the kept-already list, the nightly read): the same.
+    /// The first builder's condition on #8068 (11:09), held for #8167 too
+    /// (00:59 on #8167): a store made by stable's schema opens under this
+    /// build unchanged. `app_facts` is on stable now; stable's schema is
+    /// `days.sql` without #8167's `history_unsent` block, found by its
+    /// markers, so a store made here with that table dropped is stable's.
+    /// Opened again here: the same kept list, recall and search hits;
+    /// `maintain` dooms nothing; `history_unsent` is made, empty. Read then
+    /// with stable's own SQL (the kept count, the kept-already list, the
+    /// nightly read): the same.
     #[test]
     fn a_store_made_by_stables_schema_opens_and_reads_the_same() {
-        const MARK: &str = "-- #7415 (C166";
+        // #8167's block: from its comment's first line to its table's end.
+        const START: &str = "-- #7771 (the first builder's switch-on condition on #8086)";
+        const TABLE: &str = "CREATE TABLE IF NOT EXISTS history_unsent (";
         let schema = include_str!("days.sql");
-        let block = &schema[schema.find(MARK).expect("the app_facts block")..];
+        let from = schema
+            .find(START)
+            .expect("the history_unsent block's start");
+        let table = from + schema[from..].find(TABLE).expect("its table");
+        let to = table + schema[table..].find(");").expect("its table's end") + 2;
+        let block = &schema[from..to];
+        assert_eq!(
+            block.matches("CREATE ").count(),
+            1,
+            "#8167's block is one table, no index"
+        );
+        let stable = format!("{}{}", &schema[..from], &schema[to..]);
+        assert!(!stable.contains("history_unsent"), "{stable}");
         assert!(
-            block.contains("CREATE TABLE IF NOT EXISTS app_facts (")
-                && block.contains("CREATE INDEX IF NOT EXISTS app_facts_source ")
-                && block.matches("CREATE ").count() == 2,
-            "the app_facts block is the end of days.sql, one table and one index"
+            stable.contains("CREATE TABLE IF NOT EXISTS app_facts (")
+                && stable.contains("CREATE INDEX IF NOT EXISTS app_facts_source "),
+            "app_facts is stable's"
         );
         let (scratch, mut store) = Scratch::new("stable-schema");
         talk(&mut store, ANN, NOW);
@@ -709,10 +724,10 @@ mod tests {
                 params![ANN, NOW + 20],
             )
             .unwrap();
-        // Stable's store: this build's, less the one block.
+        // Stable's store: this build's, less #8167's one block.
         store
             .db
-            .execute_batch("DROP INDEX app_facts_source; DROP TABLE app_facts;")
+            .execute_batch("DROP TABLE history_unsent;")
             .unwrap();
         drop(store);
         let path = scratch.0.join(crate::days::DATABASE);
@@ -787,9 +802,9 @@ mod tests {
         );
         let empty: u64 = store
             .db
-            .query_row("SELECT count(*) FROM app_facts", [], |r| r.get(0))
+            .query_row("SELECT count(*) FROM history_unsent", [], |r| r.get(0))
             .unwrap();
-        assert_eq!(empty, 0, "app_facts is made, empty");
+        assert_eq!(empty, 0, "history_unsent is made, empty");
         let first = reads(&mut store);
         assert_eq!(
             first.0,

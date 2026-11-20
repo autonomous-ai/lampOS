@@ -114,6 +114,24 @@ pub async fn send(client: &reqwest::Client, url: &str, key: &str, call: &Call) -
 /// a kept call is tried again after its wait (or at once when something
 /// new is queued). Runs as long as the runtime does.
 pub async fn task(url: String, key: String, queue: &'static Queue, bell: Arc<Notify>, pace: Pace) {
+    task_while(url, key, queue, bell, pace, Arc::new(|| true)).await;
+}
+
+/// How often a closed privacy switch is looked at again.
+pub const PRIVACY_AGAIN: Duration = Duration::from_secs(1);
+
+/// [`task`], sending only while `open` (the privacy switch open,
+/// [`crate::history_privacy::open`]): closed, the queue waits, looked at
+/// again every [`PRIVACY_AGAIN`] (the first builder's privacy read on
+/// #8125, item 3).
+pub async fn task_while(
+    url: String,
+    key: String,
+    queue: &'static Queue,
+    bell: Arc<Notify>,
+    pace: Pace,
+    open: Arc<dyn Fn() -> bool + Send + Sync>,
+) {
     let client = match http_client() {
         Ok(client) => client,
         Err(_) => {
@@ -127,6 +145,10 @@ pub async fn task(url: String, key: String, queue: &'static Queue, bell: Arc<Not
             bell.notified().await;
             continue;
         };
+        if !open() {
+            tokio::time::sleep(PRIVACY_AGAIN).await;
+            continue;
+        }
         match send(&client, &url, &key, &call).await {
             Outcome::Done(how) => {
                 wait = pace.first;
@@ -162,6 +184,7 @@ pub async fn task(url: String, key: String, queue: &'static Queue, bell: Arc<Not
 /// A call in the journal's words: counts only.
 fn told(call: &Call) -> String {
     match call {
+        Call::Lamp => "the lamp's whole history".into(),
         Call::All { .. } => "a person's whole history".into(),
         Call::Ids { ids, .. } => format!("{} turns", ids.len()),
     }
@@ -423,6 +446,134 @@ mod tests {
         bell.notify_one();
         assert!(until_empty(queue).await);
         assert_eq!(server.seen.lock().unwrap().len(), 5);
+        task.abort();
+    }
+
+    /// The first builder's condition on #8086, end to end: a forget the
+    /// memory kept and the voice never queued (it restarted between) is
+    /// read at the next start and reaches the server, and once sent no
+    /// later start sends it again.
+    #[tokio::test]
+    async fn a_forget_lost_to_a_restart_reaches_the_server_after_start() {
+        let server = fake(vec![Say::Answer(200, r#"{"deleted_count":3}"#)]).await;
+        let queue = queue("restart");
+        let memory = crate::history_forget::FakeMemory::default();
+        memory.kept(MINH, &[4, 5, 6].map(|id| Some(turn_id(MINH, id))));
+        let start = || {
+            crate::history_forget::recover(
+                queue,
+                &Notify::new(),
+                |line| memory.answer(line),
+                |_| {},
+            )
+        };
+        assert!(start());
+        let bell = Arc::new(Notify::new());
+        let task = tokio::spawn(task(
+            delete_at(&server.url),
+            "k".into(),
+            queue,
+            bell.clone(),
+            FAST,
+        ));
+        assert!(until_empty(queue).await, "{:?}", queue.pending());
+        assert!(start());
+        assert!(queue.pending().is_empty());
+        let seen: Vec<Value> = server
+            .seen
+            .lock()
+            .unwrap()
+            .iter()
+            .map(|seen| seen.2.clone())
+            .collect();
+        assert_eq!(
+            seen,
+            [json!({"ids":[turn_id(MINH, 4), turn_id(MINH, 5), turn_id(MINH, 6)]})]
+        );
+        task.abort();
+    }
+
+    /// The first builder's privacy read on #8125, item 1: a forget while
+    /// the server is down is kept, and reaches it after a restart.
+    #[tokio::test]
+    async fn a_forget_while_the_server_is_down_reaches_it_after_a_restart() {
+        let down = fake(vec![Say::Answer(503, "{}")]).await;
+        let queue = queue("down-restart");
+        queue
+            .change(|pending: &mut Pending| pending.add_ids(MINH, [turn_id(MINH, 7)]))
+            .unwrap();
+        let before = tokio::spawn(task(
+            delete_at(&down.url),
+            "k".into(),
+            queue,
+            Arc::new(Notify::new()),
+            FAST,
+        ));
+        let started = std::time::Instant::now();
+        while down.seen.lock().unwrap().len() < 2 {
+            assert!(started.elapsed() < Duration::from_secs(10));
+            tokio::time::sleep(Duration::from_millis(10)).await;
+        }
+        // The voice restarts: the delete is still waiting on disk.
+        before.abort();
+        assert_eq!(queue.pending().ids[MINH].len(), 1);
+        let up = fake(vec![Say::Answer(200, r#"{"deleted_count":1}"#)]).await;
+        let after = tokio::spawn(task(
+            delete_at(&up.url),
+            "k".into(),
+            queue,
+            Arc::new(Notify::new()),
+            FAST,
+        ));
+        assert!(until_empty(queue).await, "{:?}", queue.pending());
+        assert_eq!(
+            up.seen.lock().unwrap()[0].2,
+            json!({"ids":[turn_id(MINH, 7)]})
+        );
+        after.abort();
+    }
+
+    /// The first builder's privacy read on #8125, items 2 and 3: nothing is
+    /// deleted while the privacy switch is closed; once it opens, the
+    /// lamp's whole history goes first.
+    #[tokio::test]
+    async fn nothing_is_sent_while_the_switch_is_closed_and_the_lamps_history_goes_first() {
+        let server = fake(vec![Say::Answer(200, r#"{"deleted_count":1}"#)]).await;
+        let queue = queue("closed");
+        queue
+            .change(|pending: &mut Pending| {
+                pending.add_lamp();
+                pending.add_ids(MINH, [turn_id(MINH, 8)]);
+            })
+            .unwrap();
+        let open = Arc::new(std::sync::atomic::AtomicBool::new(false));
+        let seen = open.clone();
+        let task = tokio::spawn(task_while(
+            delete_at(&server.url),
+            "k".into(),
+            queue,
+            Arc::new(Notify::new()),
+            FAST,
+            Arc::new(move || seen.load(std::sync::atomic::Ordering::SeqCst)),
+        ));
+        tokio::time::sleep(Duration::from_millis(300)).await;
+        assert!(server.seen.lock().unwrap().is_empty());
+        open.store(true, std::sync::atomic::Ordering::SeqCst);
+        assert!(until_empty(queue).await, "{:?}", queue.pending());
+        let seen: Vec<Value> = server
+            .seen
+            .lock()
+            .unwrap()
+            .iter()
+            .map(|seen| seen.2.clone())
+            .collect();
+        assert_eq!(
+            seen,
+            [
+                serde_json::from_str::<Value>(crate::history_forget::WHOLE_LAMP_BODY).unwrap(),
+                json!({"ids":[turn_id(MINH, 8)]}),
+            ]
+        );
         task.abort();
     }
 }
