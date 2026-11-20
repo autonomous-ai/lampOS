@@ -914,6 +914,10 @@ impl Lamp for Real {
         self.latest(lamp_msgs::UpdateStatus::TOPIC)
     }
 
+    fn agent_readiness(&self) -> Option<lamp_bus::Message> {
+        self.latest(lamp_msgs::AgentReadiness::TOPIC)
+    }
+
     fn update_events(&self) -> Option<PathBuf> {
         crate::update_events::kept_in()
     }

@@ -149,18 +149,111 @@ pub fn status(kept: Option<lamp_bus::Message>, engines: bool) -> Result<Option<V
 }
 
 /// Whether `engine` may be installed by the app, as `status` (as [`status`]
-/// answers it) says: `not_installed` or `failed`. Refused with
-/// [`NO_ENGINE`] when it is not said, [`NOT_INSTALLABLE`] for one this
-/// build cannot install ([`INSTALLABLE`]), and [`NOT_MISSING`] otherwise.
+/// answers it, with [`add_agent`]) says: `not_installed` or `failed`.
+/// Refused with [`NO_ENGINE`] when it is not said, [`NOT_INSTALLABLE`] for
+/// one this build cannot install ([`INSTALLABLE`]), [`RUNNING_AGENT`] while
+/// it is `running` (#8138), and [`NOT_MISSING`] otherwise.
 pub fn installable(status: &Value, engine: &str) -> Result<(), String> {
     let state = status["engines"][engine]["state"].as_str();
     if state.is_some() && !INSTALLABLE.contains(&engine) {
         return Err(NOT_INSTALLABLE.to_owned());
     }
+    // The lamp's own agent, running (#8138): never reinstalled under it.
+    if state.is_some() && status["engines"][engine]["running"] == true {
+        return Err(RUNNING_AGENT.to_owned());
+    }
     match state {
         Some("not_installed" | "failed") => Ok(()),
         Some(_) => Err(NOT_MISSING.to_owned()),
         None => Err(NO_ENGINE.to_owned()),
+    }
+}
+
+/// `update.status`'s `agent` (#8138): the lamp's own agent as lamp-tasks
+/// last said it on `tasks/agent` (`lamp_msgs::AgentReadiness`), `{"engine",
+/// "state", "why"?, "since_unix_ms"}`; `{"state": "unknown"}` before
+/// lamp-tasks has said one, or for one it could not have said. `engine` is
+/// left out while `off`.
+pub fn agent(kept: Option<lamp_bus::Message>) -> Value {
+    let Some(said) = kept
+        .and_then(|message| message.parse::<lamp_msgs::AgentReadiness>().ok())
+        .filter(|said| said.check().is_ok())
+    else {
+        return json!({"state": UNKNOWN_AGENT});
+    };
+    let mut agent = json!({"state": said.state, "since_unix_ms": said.since_unix_ms});
+    if !said.engine.is_empty() {
+        agent["engine"] = json!(said.engine);
+    }
+    if let Some(why) = said.why {
+        agent["why"] = json!(why);
+    }
+    agent
+}
+
+/// `agent`'s `state` before lamp-tasks has said one.
+pub const UNKNOWN_AGENT: &str = "unknown";
+
+/// The readiness states in which the lamp's own agent runs (#8138): its
+/// engine is there and up or coming up, so a reinstall would pull it out
+/// from under a live gateway.
+pub const RUNS: [&str; 4] = ["ready", "working", "starting", "recovering"];
+
+/// `engines.install`, refused: the agent asked for is the lamp's own and
+/// its readiness says it runs ([`RUNS`], #8138).
+pub const RUNNING_AGENT: &str = "the agent is installed and running";
+
+/// Puts [`agent`] in `status` (as [`status`] answers it) and, in its
+/// `engines`, `running` on each agent said: `true` on the readiness's
+/// engine while it runs ([`RUNS`]), `false` on the others. With the agent
+/// `unknown`, no `running` is given.
+pub fn add_agent(status: &mut Value, kept: Option<lamp_bus::Message>) {
+    let agent = agent(kept);
+    if agent["state"] != UNKNOWN_AGENT
+        && let Some(engines) = status.get_mut("engines").and_then(Value::as_object_mut)
+    {
+        let runs = agent["state"]
+            .as_str()
+            .is_some_and(|state| RUNS.contains(&state));
+        let running = agent["engine"].as_str().filter(|_| runs);
+        // `default` and `default_chosen_in_app` are not agents.
+        for (name, engine) in engines.iter_mut() {
+            if let Some(engine) = engine.as_object_mut() {
+                engine.insert("running".into(), json!(running == Some(name.as_str())));
+            }
+        }
+    }
+    status["agent"] = agent;
+}
+
+/// The kind pushed unasked when the lamp's own agent moves (#8138): the
+/// query's own, with its whole answer.
+pub const PUSHED: &str = "update.status";
+
+/// How often [`AgentFollow`] looks at `tasks/agent`.
+pub const AGENT_EVERY: std::time::Duration = std::time::Duration::from_secs(1);
+
+/// The lamp's own agent followed for the app (#8138): `update.status` is
+/// pushed unasked whenever [`agent`] moves, as `harness.sign_in.state` is.
+#[derive(Default)]
+pub struct AgentFollow {
+    next: Option<Instant>,
+    last: Option<Value>,
+}
+
+impl AgentFollow {
+    /// Whether [`agent`] moved since the last look at `now`, looked at
+    /// every [`AGENT_EVERY`]. The first look pushes nothing: the app asks
+    /// `update.status` when its page opens.
+    pub fn due(&mut self, now: Instant, kept: impl FnOnce() -> Option<lamp_bus::Message>) -> bool {
+        if self.next.is_some_and(|next| now < next) {
+            return false;
+        }
+        self.next = Some(now + AGENT_EVERY);
+        let agent = agent(kept());
+        let moved = self.last.as_ref().is_some_and(|last| *last != agent);
+        self.last = Some(agent);
+        moved
     }
 }
 
@@ -546,6 +639,191 @@ mod tests {
                 .is_none()
         );
         assert_eq!(install_started(), json!({"install": "started"}));
+    }
+
+    /// `tasks/agent` as lamp-tasks says it, kept on `bus` (#8138).
+    fn says_agent(bus: &Bus, readiness: &lamp_msgs::AgentReadiness) {
+        bus.publisher_declared(
+            lamp_msgs::AgentReadiness::TOPIC,
+            &lamp_msgs::AgentReadiness::declaration(),
+            "tasks",
+        )
+        .unwrap()
+        .publish_json(0, readiness)
+        .unwrap();
+    }
+
+    fn readiness(state: lamp_msgs::Readiness, why: Option<&str>) -> lamp_msgs::AgentReadiness {
+        lamp_msgs::AgentReadiness {
+            engine: if state == lamp_msgs::Readiness::Off {
+                String::new()
+            } else {
+                "openclaw".into()
+            },
+            state,
+            why: why.map(str::to_owned),
+            since_unix_ms: 1_700_000_000_000,
+            read_unix_ms: 1_700_000_000_500,
+        }
+    }
+
+    fn agent_kept(bus: &Bus) -> Option<lamp_bus::Message> {
+        bus.latest(lamp_msgs::AgentReadiness::TOPIC).unwrap()
+    }
+
+    /// #8138: `agent` is lamp-tasks' readiness as it said it, `unknown`
+    /// before it says one, and `running` marks the agent that runs.
+    #[test]
+    fn the_status_carries_the_agent_and_which_engine_runs() {
+        use lamp_msgs::Readiness;
+        let root = tempfile::tempdir().unwrap();
+        let bus = Bus::new(root.path()).unwrap();
+        let engines = || {
+            json!({"engines": {
+                "openclaw": {"state": "installed"},
+                "hermes": {"state": "installed"},
+                "default": "openclaw",
+            }})
+        };
+        // Nothing said yet: unknown, and no engine marked either way.
+        let mut status = engines();
+        add_agent(&mut status, agent_kept(&bus));
+        assert_eq!(status["agent"], json!({"state": "unknown"}), "{status}");
+        assert!(status["engines"]["openclaw"].get("running").is_none());
+        assert!(status["engines"]["hermes"].get("running").is_none());
+
+        says_agent(&bus, &readiness(Readiness::Recovering, Some("deaf")));
+        let mut status = engines();
+        add_agent(&mut status, agent_kept(&bus));
+        assert_eq!(
+            status["agent"],
+            json!({"engine": "openclaw", "state": "recovering", "why": "deaf",
+                   "since_unix_ms": 1_700_000_000_000u64}),
+            "{status}"
+        );
+        assert_eq!(status["engines"]["openclaw"]["running"], json!(true));
+        assert_eq!(status["engines"]["hermes"]["running"], json!(false));
+        assert_eq!(status["engines"]["default"], json!("openclaw"));
+
+        for (state, runs) in [
+            (Readiness::Ready, true),
+            (Readiness::Working, true),
+            (Readiness::Starting, true),
+            (Readiness::Recovering, true),
+            (Readiness::Error, false),
+            (Readiness::NotInstalled, false),
+            (Readiness::Installing, false),
+        ] {
+            says_agent(&bus, &readiness(state, None));
+            let mut status = engines();
+            add_agent(&mut status, agent_kept(&bus));
+            assert_eq!(status["agent"]["engine"], "openclaw", "{state:?}");
+            assert_eq!(
+                status["engines"]["openclaw"]["running"],
+                json!(runs),
+                "{state:?}"
+            );
+            assert_eq!(status["engines"]["hermes"]["running"], json!(false));
+        }
+
+        // Off: no engine named, none running.
+        says_agent(&bus, &readiness(Readiness::Off, None));
+        let mut status = engines();
+        add_agent(&mut status, agent_kept(&bus));
+        assert_eq!(
+            status["agent"],
+            json!({"state": "off", "since_unix_ms": 1_700_000_000_000u64})
+        );
+        assert_eq!(status["engines"]["openclaw"]["running"], json!(false));
+
+        // One lamp-tasks could not have said: unknown, as before any.
+        let mut odd = readiness(Readiness::Ready, None);
+        odd.why = Some("Gateway Down".into());
+        says_agent(&bus, &odd);
+        let mut status = engines();
+        add_agent(&mut status, agent_kept(&bus));
+        assert_eq!(status["agent"], json!({"state": "unknown"}));
+        assert!(status["engines"]["openclaw"].get("running").is_none());
+
+        // No `engines` (its switch off): the agent alone.
+        let mut status = json!({"now": "idle"});
+        says_agent(&bus, &readiness(Readiness::Ready, None));
+        add_agent(&mut status, agent_kept(&bus));
+        assert_eq!(status["agent"]["state"], "ready");
+        assert!(status.get("engines").is_none());
+    }
+
+    /// #8138: no reinstall under a live agent (the 9b34 case): refused while
+    /// its readiness says it runs, taken once it does not.
+    #[test]
+    fn an_install_is_refused_while_the_agent_runs() {
+        use lamp_msgs::Readiness;
+        let root = tempfile::tempdir().unwrap();
+        let bus = Bus::new(root.path()).unwrap();
+        let told = |install: &str, state: Readiness| {
+            says_agent(&bus, &readiness(state, None));
+            let mut status = json!({"engines": {
+                "openclaw": {"state": install},
+                "hermes": {"state": "failed"},
+            }});
+            add_agent(&mut status, agent_kept(&bus));
+            status
+        };
+        for install in ["failed", "not_installed", "installed"] {
+            for state in [
+                Readiness::Ready,
+                Readiness::Working,
+                Readiness::Starting,
+                Readiness::Recovering,
+            ] {
+                let status = told(install, state);
+                assert_eq!(
+                    installable(&status, "openclaw"),
+                    Err(RUNNING_AGENT.to_owned()),
+                    "{install} {state:?}"
+                );
+                // Another agent, not the one running: as before.
+                assert_eq!(installable(&status, "hermes"), Ok(()));
+            }
+        }
+        for install in ["failed", "not_installed"] {
+            for state in [Readiness::Error, Readiness::NotInstalled, Readiness::Off] {
+                let status = told(install, state);
+                assert_eq!(
+                    installable(&status, "openclaw"),
+                    Ok(()),
+                    "{install} {state:?}"
+                );
+            }
+        }
+        assert_eq!(
+            installable(&told("installed", Readiness::Error), "openclaw"),
+            Err(NOT_MISSING.to_owned())
+        );
+        assert_eq!(RUNNING_AGENT, "the agent is installed and running");
+    }
+
+    /// #8138: the push follows the agent: nothing at the first look, one
+    /// when it moves, none again until it moves, at most once a second.
+    #[test]
+    fn the_agent_is_pushed_when_it_moves() {
+        use lamp_msgs::Readiness;
+        let root = tempfile::tempdir().unwrap();
+        let bus = Bus::new(root.path()).unwrap();
+        let mut follow = AgentFollow::default();
+        let start = Instant::now();
+        assert!(!follow.due(start, || agent_kept(&bus)));
+        says_agent(&bus, &readiness(Readiness::Ready, None));
+        // Within the second: not looked at yet.
+        assert!(!follow.due(start + Duration::from_millis(500), || agent_kept(&bus)));
+        assert!(follow.due(start + AGENT_EVERY, || agent_kept(&bus)));
+        assert!(!follow.due(start + AGENT_EVERY * 2, || agent_kept(&bus)));
+        says_agent(
+            &bus,
+            &readiness(Readiness::Recovering, Some("gateway_down")),
+        );
+        assert!(follow.due(start + AGENT_EVERY * 3, || agent_kept(&bus)));
+        assert!(!follow.due(start + AGENT_EVERY * 4, || agent_kept(&bus)));
     }
 
     /// #6240: one install ask a minute reaches lamp-update, with the engine
