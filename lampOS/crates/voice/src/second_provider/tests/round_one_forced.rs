@@ -113,3 +113,20 @@ fn a_make_past_the_lamps_name_heard_as_another_word_is_forced_on_a_named_line_al
         "{again}"
     );
 }
+
+/// #8022 case 2, kit-8101's second ROW (lamp-52e6, 20 Nov 15:54): the lamp's
+/// name was heard as itself but set off by a stop, so the line was two
+/// sentences ("Hey Lamp." and the make) and round 1 said `forced=none
+/// make_ask=n sentences=2` three times of three. The make past the name is
+/// read as the make past a misheard name is ([`past_the_name_heard_as`]).
+const LAMP_STOP: &str = "Hey Lamp. Make me a skill that, when I say apple file, has an agent write three apple facts into a file for me.";
+
+#[test]
+fn a_make_after_the_lamps_own_name_set_off_by_a_stop_is_forced() {
+    let made = chat(true);
+    crate::tools::make_skill_asked::heard_named(LAMP_STOP, true);
+    assert_eq!(
+        line(&made, LAMP_STOP),
+        "lamp-voice second: request 7: round 1: task_offered=y make_offered=y forced=make_skill make_ask=y sentences=2"
+    );
+}
