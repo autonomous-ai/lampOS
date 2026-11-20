@@ -1970,7 +1970,13 @@ any other id is refused `bad_person`); an older memory answers
 were not settled: the memory lost or refusing the listing, too much to look
 through, or more than eight matching (the model asks which one). Some removed, the answer says how many
 (`exchanges`, never their words) and the conversation stops being
-journalled, as after a forgotten kept thing. One more local request inside
+journalled, as after a forgotten kept thing. Sent and not answered (a
+timeout or a lost answer; a refusal removed none), what was said about it
+is not known gone: the model is told `history: "not_reached"` beside the kept things'
+own result, never "forgot nothing". With nothing kept gone, the note says
+none of what is kept went and that it couldn't finish forgetting, and not
+to say nothing was there or that it is forgotten; with some gone, a
+`history_note` says so beside what went. One more local request inside
 the call's 1.5 s.
 
 **Forget marks** (El's option 2 on #5333). Before the above, a topic
