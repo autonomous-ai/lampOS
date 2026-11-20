@@ -44,6 +44,19 @@ pub enum Request {
     /// ([`crate::now`]): who has it, its state and since when, and its last
     /// step in the agent's own words, marked untrusted.
     TasksNow {},
+    /// One piece of work handed to an agent, by its id (#7930,
+    /// [`crate::works`]): a store task's id as a decimal string. Its
+    /// record, or `no_such_work`.
+    Work {
+        id: String,
+    },
+    /// The work records, newest handed over first: at most `limit`, 1 to
+    /// [`crate::works::LIST_MOST`], [`crate::works::LIST_DEFAULT`] when
+    /// not named.
+    WorkList {
+        #[serde(default = "work_list_size")]
+        limit: u16,
+    },
     Prepare {
         guard: Guard,
         text: String,
@@ -195,6 +208,10 @@ const fn page_size() -> u16 {
     MAX_PAGE_SIZE
 }
 
+const fn work_list_size() -> u16 {
+    crate::works::LIST_DEFAULT
+}
+
 impl Request {
     pub fn parse(bytes: &[u8]) -> Result<Self, &'static str> {
         if bytes.len() > MAX_LINE_BYTES {
@@ -266,6 +283,8 @@ impl Request {
             Self::GetObservation { .. } => "get_observation",
             Self::GetProgress { .. } => "get_progress",
             Self::TasksNow {} => "tasks_now",
+            Self::Work { .. } => "work",
+            Self::WorkList { .. } => "work_list",
             Self::Prepare { .. } => "prepare",
             Self::Confirm { .. } => "confirm",
             Self::Session { .. } => "session",
@@ -331,6 +350,44 @@ mod tests {
                 limit: MAX_PAGE_SIZE
             }
         );
+    }
+
+    /// #7930: a work record by its id, a string; the list by an optional
+    /// limit. Reads, on no trusted route, with no other field.
+    #[test]
+    fn the_work_operations_take_an_id_or_a_limit_and_nothing_else() {
+        let one = Request::parse(br#"{"op":"work","id":"12"}"#).unwrap();
+        assert_eq!(one, Request::Work { id: "12".into() });
+        assert!(!one.trusted() && !one.app() && one.guard().is_none());
+        assert_eq!(one.name(), "work");
+        let run = Request::parse(br#"{"op":"work","id":"task-1795063412694-39573-92"}"#).unwrap();
+        assert_eq!(
+            run,
+            Request::Work {
+                id: "task-1795063412694-39573-92".into()
+            }
+        );
+        let list = Request::parse(br#"{"op":"work_list","limit":3}"#).unwrap();
+        assert_eq!(list, Request::WorkList { limit: 3 });
+        assert!(!list.trusted() && !list.app() && list.guard().is_none());
+        assert_eq!(list.name(), "work_list");
+        assert_eq!(
+            Request::parse(br#"{"op":"work_list"}"#).unwrap(),
+            Request::WorkList {
+                limit: crate::works::LIST_DEFAULT
+            }
+        );
+        for bytes in [
+            br#"{"op":"work"}"#.as_slice(),
+            br#"{"op":"work","id":12}"#,
+            br#"{"op":"work","id":"1","kind":"task"}"#,
+            br#"{"op":"work_list","limit":-1}"#,
+            br#"{"op":"work_list","limit":"5"}"#,
+            br#"{"op":"work_list","limit":5,"kind":"make"}"#,
+            br#"{"op":"work_list","limit":65536}"#,
+        ] {
+            assert_eq!(Request::parse(bytes), Err("bad_request"));
+        }
     }
 
     #[test]

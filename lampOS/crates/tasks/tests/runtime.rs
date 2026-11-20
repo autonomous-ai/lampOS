@@ -4362,6 +4362,38 @@ fn a_look_at_a_named_session_answers_at_once_and_is_asked_again_for_what_it_foun
     assert_eq!(s.counts.launches.load(Ordering::SeqCst), 0);
 }
 
+/// #7930: the owner's "forget everything" clears the work records too: a
+/// record's words and answer are gone after it, by id and in the list.
+#[test]
+fn forget_sessions_clears_the_work_records() {
+    let s = Running::new(false);
+    let now = lamp_tasks::works::unix_ms();
+    lamp_tasks::works::with(|board| {
+        board.tasks(
+            &[lamp_tasks::works::TaskWork {
+                task_id: 4242,
+                engine: lamp_tasks::harness::EngineKind::Openclaw,
+                words: "Find the cheapest flight to Hanoi".into(),
+                state: Some(lamp_tasks::works::State::Done),
+                tools: 3,
+                answer: Some("Tuesday, 1.2 million dong.".into()),
+                session: None,
+                started_ago_ms: None,
+            }],
+            |_| None,
+            now,
+        );
+    });
+    let before = s.ask(json!({"op":"work","id":"4242"}));
+    assert_eq!(before["work"]["answer"], "Tuesday, 1.2 million dong.", "{before}");
+    assert_eq!(s.trusted(json!({"op":"forget_sessions"}))["ok"], true);
+    let after = s.ask(json!({"op":"work","id":"4242"}));
+    assert_eq!(after["error"], "no_such_work", "{after}");
+    let list = s.ask(json!({"op":"work_list","limit":10}));
+    let shown = list.to_string();
+    assert!(!shown.contains("Hanoi") && !shown.contains("Tuesday"), "{shown}");
+}
+
 /// #6274: the owner's "forget everything" (the voice's `forget_sessions`,
 /// on its route only) removes the index of the sessions the lamp started,
 /// whole, and says whether there was one; asked on the public route it is
