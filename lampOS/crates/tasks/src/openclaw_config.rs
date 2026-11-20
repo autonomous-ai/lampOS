@@ -493,7 +493,7 @@ pub fn validate(check: &Check, file: &Path) -> Result<(), String> {
         .ok_or("OpenClaw's config check: the new file's path is not UTF-8")?;
     let mut env = crate::gateway::APPROVALS_ENV.to_vec();
     env.push(("OPENCLAW_CONFIG_PATH", file));
-    let argv = if lamp_update::openclaw_install::gateway_runs(&check.main_pid) {
+    let argv = if lamp_update::openclaw_install::gateway_is_running(&check.main_pid) {
         [check.wrapper.to_string_lossy().into_owned()]
             .into_iter()
             .chain(["config", "validate", "--json"].map(str::to_owned))

@@ -3047,7 +3047,7 @@ has a `MainPID` (its gateway runs), through the wrapper, joined to the
 gateway's namespaces as lamp-tasks' check is; with no gateway running (as
 at a first install) there is no lock to clash with, so it runs in
 `openclaw-ns` of its own as before. lamp-tasks' check makes the same
-choice from the same `MainPID` (`openclaw_install::gateway_runs` and
+choice from the same `MainPID` (`openclaw_install::gateway_is_running` and
 `main_pid_argv`, which the reset uses too; #8060). `GATEWAY_WAITS`,
 `NO_GATEWAY`, `NODE_NOT_READY`, `GATEWAY_CAME_UP` and `gateway_not_there`
 now live in

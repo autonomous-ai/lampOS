@@ -720,7 +720,7 @@ fn openclaw_check(root: &Path, file: &Path) -> Result<(), String> {
         return Ok(());
     }
     let owner = fs::metadata(file).map_err(|error| format!("{}: {error}", file.display()))?;
-    let joined = lamp_update::openclaw_install::gateway_runs(
+    let joined = lamp_update::openclaw_install::gateway_is_running(
         &lamp_update::openclaw_install::main_pid_argv(),
     );
     let argv = cut_check_argv(
