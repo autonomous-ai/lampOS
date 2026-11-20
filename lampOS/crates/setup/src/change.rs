@@ -143,6 +143,11 @@ pub enum Change {
     /// energy with them. With them, the energy the owner chose, if any
     /// (#6893): otherwise worked out from the words when kept.
     Character(Option<String>, Option<u8>),
+    /// The owner's movement level alone (#7566, `{"character": {"energy":
+    /// N}}` with no `text`): kept as chosen, the kept words left as they
+    /// are, so the app's picker sets a level in one tap, with or without
+    /// words.
+    Energy(u8),
     /// One of the owner's yeses from the app (a key of
     /// [`lamp_msgs::consent::FILES`]): kept, or removed.
     Consent(&'static str, bool),
@@ -216,7 +221,8 @@ pub fn fit_name(name: &str) -> Result<String, &'static str> {
 /// The one line `lamp-cloud` sends, checked against `config`: exactly
 /// `{"person_name": s}`, `{"display_name": s}`, `{"timezone": s}`,
 /// `{"language": s}`, `{"voice": s}`, `{"character": s}` (`""` clears
-/// either; or `{"character": {"text": s, "energy"?: 1..5}}`, #6893), or `{"owner_place": {"name", "lat", "lon", "set_at"}}`
+/// either; or `{"character": {"text": s, "energy"?: 1..5}}`, #6893, or
+/// `{"character": {"energy": 1..5}}` alone, the words kept, #7566), or `{"owner_place": {"name", "lat", "lon", "set_at"}}`
 /// (`null` clears it), or `{"control": bool}`, `{"local_agent": bool}`, `{"monitor": bool}`, or `{"consent": {KEY: bool}}`
 /// with exactly one key of [`lamp_msgs::consent::FILES`], or
 /// `{"desk_noticing": {"allow": bool, "request_id": N}}` (N a positive
@@ -265,6 +271,13 @@ pub fn parse(line: &str, config: &Config) -> Result<Change, String> {
         // `{"text", "energy"?}` (#6893), or the words alone as an older
         // lamp-cloud sends them.
         "character" => {
+            // The level alone, no `text` (#7566): the words are kept.
+            if let Some(asked) = given.as_object()
+                && matches!(asked.get("text"), None | Some(Value::Null))
+                && let Some(energy) = lamp_msgs::chosen_voice::energy_in(given)?
+            {
+                return Ok(Change::Energy(energy));
+            }
             let (words, energy) = match given.as_object() {
                 Some(asked) => (
                     asked.get("text").and_then(Value::as_str),
@@ -601,6 +614,31 @@ pub fn apply_or(change: &Change, config: &Config, by_default: bool) -> io::Resul
                     ),
                     None => "the character's words were cleared".into(),
                 },
+            })
+        }
+        // The level alone (#7566): kept as the owner's choice beside the
+        // words, which stay as they are; like any energy, it never restarts
+        // the voice.
+        Change::Energy(level) => {
+            let words = fs::read_to_string(beside_language(config, "character"))
+                .ok()
+                .map(|words| words.trim().to_owned())
+                .filter(|words| !words.is_empty());
+            keep_line(
+                &beside_language(config, "energy"),
+                Some(lamp_msgs::chosen_voice::energy_line(*level, true).as_str()),
+            )?;
+            Ok(Done {
+                data: json!({
+                    "text": words.as_deref().unwrap_or(""),
+                    "energy": level,
+                }),
+                restart_schedule: false,
+                restart_voice: false,
+                restart_control: false,
+                restart_ears: false,
+                restart_peek: false,
+                said: format!("the character's movement level was set to {level}"),
             })
         }
         Change::Consent(key, yes) => {
