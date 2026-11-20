@@ -1182,13 +1182,14 @@ fn on_the_lamp(command: &str, options: &BTreeMap<String, String>) -> ExitCode {
     // (#8105, LAMP_OPENCLAW_GATEWAY_BY_DEFAULT): lamp-tasks is asked every
     // KEEP_EVERY between rounds, on a thread of its own, so a choice in the
     // app starts the gateway within seconds and another default stops it.
-    // A round asks once more for its own OpenClaw step, and the thread
-    // leaves the gateway alone while a round runs.
+    // A round asks once more for its own OpenClaw step. One lock is held by
+    // the round for its whole run and by the thread for each look, so the
+    // two never touch the gateway at once (Twelve's P3 on #8116).
     let gateway_by_default = matches!(openclaw, Some((true, _))) && switches.gateway_by_default;
     let tasks_app_socket = config
         .root
         .join(lamp_update::openclaw_install::TASKS_APP_SOCKET.trim_start_matches('/'));
-    let round_running = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
+    let gateway_lock = std::sync::Arc::new(std::sync::Mutex::new(()));
     if gateway_by_default {
         use lamp_update::openclaw_install as openclaw;
         say(
@@ -1196,18 +1197,27 @@ fn on_the_lamp(command: &str, options: &BTreeMap<String, String>) -> ExitCode {
         );
         let root = config.root.clone();
         let socket = tasks_app_socket.clone();
-        let round_running = round_running.clone();
+        let shown = openclaw.map(|(_, shown)| shown).unwrap_or_default();
+        let gateway_lock = gateway_lock.clone();
         let started = std::thread::Builder::new()
             .name("gateway-by-default".into())
             .spawn(move || {
                 let mut systemd = Systemctl::default();
                 let mut said = |line: &str| eprintln!("lamp-update: {line}");
                 loop {
-                    if !round_running.load(std::sync::atomic::Ordering::Acquire) {
+                    // A round holds the lock: this look is skipped.
+                    if let Ok(_look) = gateway_lock.try_lock() {
                         let gateway =
                             openclaw::gateway_wanted(true, openclaw::said_default(&socket));
-                        if !round_running.load(std::sync::atomic::Ordering::Acquire) {
-                            openclaw::keep_between_rounds(&root, &mut systemd, gateway, &mut said);
+                        {
+                            openclaw::keep_between_rounds(
+                                &root,
+                                &mut systemd,
+                                gateway,
+                                shown.one_path,
+                                &mut lamp_update::install::output_of,
+                                &mut said,
+                            );
                         }
                     }
                     std::thread::sleep(openclaw::KEEP_EVERY);
@@ -1303,7 +1313,8 @@ fn on_the_lamp(command: &str, options: &BTreeMap<String, String>) -> ExitCode {
         )
     }));
     loop {
-        round_running.store(true, std::sync::atomic::Ordering::Release);
+        // Held for the round and its after-steps (#8105).
+        let round_lock = gateway_lock.lock().unwrap_or_else(|e| e.into_inner());
         let before_setup = lamp_update::first_update::before_setup(&config);
         if let Some(first) = &mut first {
             first.begin(lamp_update::records::unix_ms(), &mut say);
@@ -1557,7 +1568,7 @@ fn on_the_lamp(command: &str, options: &BTreeMap<String, String>) -> ExitCode {
         // After each round: `update/current` may have moved and been
         // confirmed by another lamp-update meanwhile (#6898).
         onto_current(&config, &mut reexec_tried);
-        round_running.store(false, std::sync::atomic::Ordering::Release);
+        drop(round_lock);
         // Between rounds the bus is still read, so that what the voice said
         // meanwhile does not wait in the sockets. A check from the app ends
         // the wait (#4153); one that came during the round is dropped.

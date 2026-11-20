@@ -1613,6 +1613,26 @@ pub fn app_caller_may(caller: Option<&Caller>, own_uid: u32) -> bool {
     })
 }
 
+/// The one unit that may read the lamp's default engine on the app's
+/// socket besides lamp-cloud (#8105): lamp-update, which keeps OpenClaw's
+/// gateway to the lamp's agent.
+pub const UPDATE_CALLER_UNIT: &str = "lamp-update.service";
+
+/// Whether a caller the kernel named is lamp-update (#8105): root, and
+/// [`UPDATE_CALLER_UNIT`]. Such a caller gets only the read of the lamp's
+/// default engine (`app_engine_default_state`), never the app's sign-in or
+/// its choice; any other caller stays refused.
+pub fn update_caller_may(caller: Option<&Caller>) -> bool {
+    caller
+        .is_some_and(|caller| caller.uid == 0 && caller.unit.as_deref() == Some(UPDATE_CALLER_UNIT))
+}
+
+/// What a request on the read-only route may be (#8105): the lamp's
+/// default engine read, nothing else.
+pub fn update_read_may(request: &Request) -> bool {
+    matches!(request, Request::AppEngineDefaultState {})
+}
+
 /// [`app_caller_may`] with this process's own uid: the part's check on a
 /// lamp ([`Config::app_caller`]).
 pub fn app_caller_is_lamp_cloud(caller: Option<&Caller>) -> bool {
@@ -1641,6 +1661,9 @@ enum Route {
     Public,
     Voice,
     App,
+    /// lamp-update's read of the lamp's default engine on the app's socket
+    /// (#8105, [`update_caller_may`]): `app_engine_default_state` alone.
+    UpdateRead,
 }
 
 struct Work {
@@ -2637,6 +2660,12 @@ fn owner<C: Clock>(
                         code: "timeout",
                         message: "The queued request expired before it started.",
                     }));
+                } else if work.route == Route::UpdateRead && !update_read_may(&work.request) {
+                    // lamp-update reads the lamp's default engine alone (#8105).
+                    let _ = work.response.try_send(Err(EngineError {
+                        code: "not_on_this_route",
+                        message: "lamp-update's route reads only the lamp's default engine.",
+                    }));
                 } else if work.route == Route::App && !work.request.app() {
                     // The app's route takes the app's sign-in alone: never a
                     // hand-over's confirm, nor the voice's sign-in.
@@ -2644,7 +2673,10 @@ fn owner<C: Clock>(
                         code: "not_on_this_route",
                         message: "The app's route takes only the app's sign-in operations.",
                     }));
-                } else if work.request.app() && work.route != Route::App {
+                } else if work.request.app()
+                    && work.route != Route::App
+                    && work.route != Route::UpdateRead
+                {
                     let _ = work.response.try_send(Err(EngineError {
                         code: "untrusted",
                         message: "This operation requires the app's route.",
@@ -5449,9 +5481,14 @@ pub fn serve_with_adapter<C: Clock, A: Adapter>(
                     Ok((stream, _)) => {
                         // The app's route is lamp-cloud's only (#5379): any
                         // other caller is closed with no answer.
+                        // lamp-update may read the lamp's default engine
+                        // there, and nothing else (#8105).
+                        let mut route = route;
                         if route == Route::App {
                             let caller = lamp_ipc::caller::of_stream(&stream);
-                            if !(config.app_caller)(caller.as_ref()) {
+                            if update_caller_may(caller.as_ref()) {
+                                route = Route::UpdateRead;
+                            } else if !(config.app_caller)(caller.as_ref()) {
                                 eprintln!(
                                     "tasks: the app's route refused {}",
                                     refused_caller(caller.as_ref())
@@ -5793,6 +5830,47 @@ mod tests {
 
     use super::*;
     use std::os::unix::fs::symlink;
+
+    /// #8105: lamp-update, root in its own unit, may read the lamp's
+    /// default engine on the app's socket and nothing else; lamp-cloud is
+    /// not taken for it, nor root in another unit, nor lamp-update as
+    /// another user.
+    #[test]
+    fn lamp_update_may_read_the_lamps_default_engine_and_nothing_else() {
+        let caller = |unit: Option<&str>, uid| Caller {
+            pid: 7,
+            uid,
+            unit: unit.map(str::to_owned),
+        };
+        assert!(update_caller_may(Some(&caller(
+            Some("lamp-update.service"),
+            0
+        ))));
+        assert!(!update_caller_may(Some(&caller(
+            Some("lamp-update.service"),
+            990
+        ))));
+        assert!(!update_caller_may(Some(&caller(
+            Some("lamp-cloud.service"),
+            0
+        ))));
+        assert!(!update_caller_may(Some(&caller(Some("ssh.service"), 0))));
+        assert!(!update_caller_may(Some(&caller(None, 0))), "no unit read");
+        assert!(!update_caller_may(None));
+        assert!(
+            !app_caller_may(Some(&caller(Some("lamp-update.service"), 0)), 990),
+            "lamp-update never gets the app's route itself"
+        );
+        assert!(update_read_may(
+            &Request::parse(br#"{"op":"app_engine_default_state"}"#).unwrap()
+        ));
+        for refused in [
+            &br#"{"op":"app_engine_default","engine":"openclaw"}"#[..],
+            br#"{"op":"app_sign_in_state"}"#,
+        ] {
+            assert!(!update_read_may(&Request::parse(refused).unwrap()));
+        }
+    }
 
     /// #5379: only lamp-cloud's unit, run as the part's own user, may use
     /// the app's route; another unit, another user, a caller whose unit
