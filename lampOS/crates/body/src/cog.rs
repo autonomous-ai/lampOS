@@ -254,12 +254,19 @@ mod tests {
         }
     }
 
+    /// The most a clip at level 5 may take the centre of gravity off the
+    /// axis on a stand pose (#8153): half a millimetre under [`CLIP_MM`],
+    /// for a mood's lean at play time (listening, speaking) that the stand
+    /// pose here does not have.
+    const L5_MM: f64 = 21.5;
+
     /// #8153: every built-in clip as level 5 plays it (`energy::livelier`,
     /// up to 1.6 times its size, `energy::CLIP_SIZE_CAP` where held), on
-    /// each deployed lamp's standing pose, passes V1's rule: no frame 22 mm
-    /// or more off the axis, so none refused at play time, and none leaning
-    /// the lamp back past 16 mm. A frame within 85% of 22 mm is said, as V1
-    /// said it, and still plays. Prints the worst
+    /// each deployed lamp's standing pose, keeps [`L5_MM`] under V1's rule:
+    /// no frame past 21.5 mm off the axis, half a millimetre inside the
+    /// 22 mm at which one is refused at play time, and none leaning the lamp
+    /// back past 16 mm. A frame within 85% of 22 mm is said, as V1 said it,
+    /// and still plays. Prints the worst
     /// of each, for the record (`cargo test -- --nocapture`).
     #[test]
     fn every_built_in_clip_at_level_five_passes_v1s_rule() {
@@ -283,7 +290,7 @@ mod tests {
                     "cog L5 {lamp} {:<13} off axis {mm:5.2} mm (level 1 {before:5.2}), back {back:5.2} mm",
                     clip.name
                 );
-                if mm >= CLIP_MM || back > LOOK_MM {
+                if mm > L5_MM || back > LOOK_MM {
                     failed.push(format!(
                         "{lamp} {} frame {frame}: {mm} back {back}",
                         clip.name
@@ -307,7 +314,7 @@ mod tests {
                         lean_back_mm(by_id(pose))
                     })
                     .fold(f64::MIN, f64::max);
-                worst_frame(*stand, more.frames).1 >= CLIP_MM || back > LOOK_MM
+                worst_frame(*stand, more.frames).1 > L5_MM || back > LOOK_MM
             });
             assert!(fails, "{name} passes at {}", cap + 0.01);
         }
