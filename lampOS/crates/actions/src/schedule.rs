@@ -53,7 +53,7 @@ macro_rules! list_before {
 }
 macro_rules! list_asked {
     () => {
-        "Call this, not recall, for any question about their reminders or timers: what is set, when one is due, or when they set it; never say you do not remember a reminder before calling this. set_day and set_clock say when each was set, as 'yesterday at 09:00'; if they are null, say you don't know when. Never list reminders unasked."
+        "Any question about their reminders or timers (what is set, when due or set), in any wording or language, even one that sounds a word short, is answered only after calling this in that turn, not recall. set_day/set_clock say when each was set, as 'yesterday at 09:00'; if null, say you don't know when. Never list reminders unasked."
     };
 }
 macro_rules! list_asked_before {
@@ -72,7 +72,10 @@ pub const LIST_BEFORE: &str = list_before!();
 /// What `list_reminders`' description adds (the person's call, 30 Oct): a
 /// question about a reminder, what is set, when it is due or when it was
 /// set, is answered from this list, not from memory, and the list is never
-/// read out unasked (rule 8). On both routes: they declare the same catalog.
+/// read out unasked (rule 8). Any such question, in any wording or language,
+/// even one heard a word short, is answered only after the call in that turn
+/// (#7987: the exact phrases' forced call stays as it is). On both routes:
+/// they declare the same catalog.
 pub const LIST_ASKED: &str = list_asked!();
 /// What it adds for reminders already said (29e7, 2 Nov: four said late,
 /// then gone, and six minutes later "I don't see either still set").
