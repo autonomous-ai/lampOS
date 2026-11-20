@@ -132,7 +132,8 @@ pub const VOICE_ENVIRONMENT: &str = lamp_msgs::chosen_voice::ENVIRONMENT;
 /// The chosen voice (`voice.set`, V1's `tts.set` shape:
 /// `{"provider"?, "voice", "language"?, "speed"?}`, `language` and `speed`
 /// taken and left alone) and the character words (`character.set`,
-/// `{"text", "energy"?}`, `energy` 1 to 5, #6893), each `""` to clear, answered `starting` and then its result,
+/// `{"text", "energy"?}`, `energy` 1 to 5, #6893, or `{"energy"}` alone,
+/// the kept words left as they are, #7566), each `""` to clear, answered `starting` and then its result,
 /// as the names are.
 pub const VOICE_KINDS: [&str; 2] = ["voice.set", "character.set"];
 
@@ -247,6 +248,12 @@ pub fn voice_line(kind: &str, data: &Value) -> Result<String, String> {
         // With an `energy` (#6893), the object the helper takes; without
         // one, the words alone, as before, so an older helper takes it.
         "character.set" => {
+            // The level alone, no `text` (#7566): the helper keeps the words.
+            if matches!(data.get("text"), None | Some(Value::Null))
+                && let Some(energy) = lamp_msgs::chosen_voice::energy_in(data)?
+            {
+                return Ok(json!({ "character": {"energy": energy} }).to_string());
+            }
             let words = lamp_msgs::chosen_voice::fit_character(text("text")?)?.unwrap_or_default();
             Ok(match lamp_msgs::chosen_voice::energy_in(data)? {
                 Some(energy) => json!({ "character": {"text": words, "energy": energy} }),
@@ -2832,6 +2839,25 @@ mod tests {
                 Err(lamp_msgs::chosen_voice::ENERGY_UNFIT.into())
             );
         }
+        // #7566: the level alone goes as the level alone, so the helper
+        // keeps the words; a bad level is refused, and neither is refused
+        // as before.
+        assert_eq!(
+            line("character.set", json!({"energy": 4})),
+            Ok(r#"{"character":{"energy":4}}"#.into())
+        );
+        assert_eq!(
+            line("character.set", json!({"energy": 3, "text": null})),
+            Ok(r#"{"character":{"energy":3}}"#.into())
+        );
+        assert_eq!(
+            line("character.set", json!({"energy": 9})),
+            Err(lamp_msgs::chosen_voice::ENERGY_UNFIT.into())
+        );
+        assert_eq!(
+            line("character.set", json!({})),
+            Err("text must be text".into())
+        );
         assert!(!voice_gates(Some("on"), Some("on"), None));
         assert!(!voice_gates(Some("on"), None, Some("on")));
         assert!(voice_gates(Some("on"), Some("on"), Some("on")));
