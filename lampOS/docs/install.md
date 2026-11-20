@@ -1814,7 +1814,8 @@ As root, on a lamp with the base image (`crates/update/src/install.rs`):
           `/dev/video*`, `/dev/media*`, `/dev/v4l-subdev*`, `/dev/snd/*`,
           `/dev/ttyACM*`, `/dev/ttyUSB*`, `/dev/ttyS*`, `/dev/ttyAMA*`,
           `/dev/i2c-*`, `/dev/spidev*`, `/dev/gpiochip*`, `/dev/hidraw*`,
-          `/dev/fb*` and `/dev/dri/*` (a missing one is fine): under
+          `/dev/fb*`, `/dev/dri/*` and `/dev/vipcore` (a missing one is
+          fine): under
           `--map-root-user` `setgroups` is denied, so `lampos`'s groups
           can't be dropped, and the devices are hidden instead;
        5. back into the folder it was started in through the new mounts
