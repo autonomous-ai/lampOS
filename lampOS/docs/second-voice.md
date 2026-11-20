@@ -5755,6 +5755,25 @@ after a take-over, but now for every turn:
     the hearing began to 0.3 s after (`worker::near_at_a_hearing`). The
     line is then judged as one with no name. A word taken as the name, the
     name in its words, and a line with no near hearing are as before.
+    **A sure hearing at the start** (the first builder's rulings at 14:29
+    and 14:47 on #8092: "a pet answers a clear call even when it couldn't
+    spell the word"): the engine tells the rule the near score with the
+    ruling, and a near hearing of `attention::SURE_SCORE` (0.999) or more
+    by the line's start (`LAMP_NAME_NEAR`'s own window, 1.3 s) outlives
+    "not the name" when the room is not busy (the worker's verdict of the
+    room, `Room::Busy`; an unknown room is not busy) or a face is turned to
+    the lamp. The rule then weighs the hearing by its second signs as any
+    other, and the journal says `LAMP_NAME_NEAR ruled the line not the
+    name, but lamp-name heard it near by the line's start at the sure score
+    or more, and the room is not busy or a face is turned to the lamp: its
+    hearing is weighed by its second signs (LAMP_NAME_SIGN_TIED, #8092)`.
+    On lamp-52e6 at 13:55, request 16, a real call in a quiet room with no
+    look, near at 1.00 with its hearing 1250 ms in, had been ruled out and
+    was answered only because a conversation was open: now it is a call.
+    lamp-74ff's 10:55 request 5 has the same numbers in a busy meeting
+    room with no look, so it stays held; a hearing under the sure score
+    (request 4 at 0.86, a line at 0.998) stays held in any room. A one-word
+    line with no face turned is still ruling 1's, below.
     The first builder's rulings at 12:45 on #8092 ("the bar is a pet's: it
     looks up when it's called, and lets the room's talk go by") add two more
     under the same switch. **One word:** a line of one word, `?` or not,
