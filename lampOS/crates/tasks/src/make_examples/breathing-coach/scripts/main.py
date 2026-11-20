@@ -13,7 +13,7 @@ async def main():
         await lamp.light("blue", 1, 4000)
         await lamp.say("And out.", wait=True)
         await asyncio.sleep(3)
-    await lamp.say("Well done.")
+    await lamp.say("Well done.", wait=True)
     await lamp.close()
 
 
