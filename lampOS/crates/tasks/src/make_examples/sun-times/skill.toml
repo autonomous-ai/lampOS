@@ -1,4 +1,4 @@
-asks = ["sunset time", "when does the sun set"]
+asks = ["sunset time", "today's sunset"]
 kind = "installable"
 version = "1.0.0"
 grants = ["net", "speak"]
