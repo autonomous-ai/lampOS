@@ -5986,7 +5986,7 @@ fn a_hermes_conversation_is_deleted_by_hermes_own_cli_children_first() {
     let home = tempfile::tempdir().unwrap();
     let db = hermes_store(home.path());
     let (cli, log) = hermes_cli(home.path(), "ok");
-    assert!(cli.delete(&gone_ids(&["b".into()])).is_empty());
+    assert!(cli.delete(&gone_ids(&["b"])).is_empty());
     assert_eq!(hermes_calls(home.path(), &log), ["c", "b", "a"]);
     let count = |sql: &str| db.query_row(sql, [], |row| row.get::<_, i64>(0)).unwrap();
     assert_eq!(count("SELECT count(*) FROM sessions"), 4, "only read");
@@ -5994,7 +5994,7 @@ fn a_hermes_conversation_is_deleted_by_hermes_own_cli_children_first() {
     // A session Hermes has none of: already gone, so done.
     std::fs::remove_file(&log).unwrap();
     let (cli, log) = hermes_cli(home.path(), "gone");
-    assert!(cli.delete(&gone_ids(&["z".into()])).is_empty());
+    assert!(cli.delete(&gone_ids(&["z"])).is_empty());
     assert_eq!(hermes_calls(home.path(), &log), ["z"]);
 }
 
@@ -6006,11 +6006,11 @@ fn a_refused_hermes_delete_is_tried_once_more_then_left_pending() {
     let home = tempfile::tempdir().unwrap();
     hermes_store(home.path());
     let (cli, log) = hermes_cli(home.path(), "busy");
-    assert_eq!(cli.delete(&gone_ids(&["z".into()])), ["z"]);
+    assert_eq!(cli.delete(&gone_ids(&["z"])), ["z"]);
     assert_eq!(hermes_calls(home.path(), &log), ["z", "z"]);
     std::fs::remove_file(&log).unwrap();
     let (cli, log) = hermes_cli(home.path(), "once");
-    assert!(cli.delete(&gone_ids(&["b".into()])).is_empty());
+    assert!(cli.delete(&gone_ids(&["b"])).is_empty());
     assert_eq!(
         hermes_calls(home.path(), &log),
         ["c", "b", "a", "c", "b", "a"]
@@ -6023,7 +6023,7 @@ fn a_refused_hermes_delete_is_tried_once_more_then_left_pending() {
 fn no_hermes_store_means_no_hermes_delete() {
     let home = tempfile::tempdir().unwrap();
     let (cli, log) = hermes_cli(home.path(), "ok");
-    assert!(cli.delete(&gone_ids(&["a".into()])).is_empty());
+    assert!(cli.delete(&gone_ids(&["a"])).is_empty());
     assert!(!log.exists(), "never started");
     assert!(!home.path().join(HERMES_STATE_DB).exists());
 }
@@ -6040,7 +6040,7 @@ fn a_hermes_store_of_another_schema_has_its_recorded_ids_only_deleted() {
     )
     .unwrap();
     let (cli, log) = hermes_cli(home.path(), "ok");
-    assert!(cli.delete(&gone_ids(&["b".into(), "x".into()])).is_empty());
+    assert!(cli.delete(&gone_ids(&["b", "x"])).is_empty());
     assert_eq!(hermes_calls(home.path(), &log), ["b", "x"]);
 }
 
