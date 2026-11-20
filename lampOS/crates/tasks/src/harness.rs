@@ -444,6 +444,25 @@ pub struct PaneSeen {
     /// Harness keeps the pane as a plain shell (#6835 gap 1, #7906's sign
     /// 2), which `wait` reads idle.
     pub shell: bool,
+    /// The engine's own session `show` names (`engineSession`), when it
+    /// names one ([`engine_session_named`]). Hermes moves to a new session
+    /// id when it compresses its context and Harness follows it, so this
+    /// is read again rather than kept from the open (#8151).
+    pub engine_session: Option<String>,
+}
+
+/// An engine session id as Harness names one (`engineSession` in `ensure`
+/// and `show`): plain characters only, at most 128.
+pub fn engine_session_named(said: &Value) -> Option<String> {
+    said.as_str()
+        .filter(|session| {
+            !session.is_empty()
+                && session.len() <= 128
+                && session.bytes().all(|byte| {
+                    byte.is_ascii_alphanumeric() || matches!(byte, b':' | b'_' | b'-' | b'.')
+                })
+        })
+        .map(str::to_owned)
 }
 
 /// Whether `show`'s answer says the last words typed were taken
@@ -3807,9 +3826,11 @@ impl Cli {
             });
         }
         let seen = parse_reading(&reply.stdout, agent_id).map_err(str::to_string)?;
+        let said = serde_json::from_slice::<Value>(&reply.stdout).unwrap_or_default();
         Ok(PaneSeen {
             taken: told_taken(&reply.stdout),
             shell: shown_agent(&reply.stdout, agent_id).as_deref() == Some(SHELL_AGENT),
+            engine_session: engine_session_named(&said["engineSession"]),
             seen,
         })
     }
@@ -6854,16 +6875,7 @@ fn parse_ensured(bytes: &[u8], name: &str) -> Option<Ensured> {
         why: reply["why"]
             .as_str()
             .map(|why| cut_at_word(why, MOST_LOOK_ABOUT_CHARS)),
-        engine_session: reply["engineSession"]
-            .as_str()
-            .filter(|session| {
-                !session.is_empty()
-                    && session.len() <= 128
-                    && session.bytes().all(|byte| {
-                        byte.is_ascii_alphanumeric() || matches!(byte, b':' | b'_' | b'-' | b'.')
-                    })
-            })
-            .map(str::to_owned),
+        engine_session: engine_session_named(&reply["engineSession"]),
         confirmed: reply["confirmed"].as_bool(),
         why_code: reply["whyCode"]
             .as_str()

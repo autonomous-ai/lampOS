@@ -95,6 +95,10 @@ struct Fake {
     /// Every `ensure` makes a new session, as Harness does when it
     /// replaced the old one itself (openharness#4484's `new`).
     always_new: Mutex<bool>,
+    /// The engine session `ensure` names; none: `agent:main:kept-<id>`.
+    ensure_session: Mutex<Option<String>>,
+    /// The engine session `show` names (#8151); none: none named.
+    shown_session: Mutex<Option<String>>,
 }
 
 fn agent_of(n: u32) -> String {
@@ -213,6 +217,7 @@ impl PaneHarness for Fake {
                 .unwrap()
                 .iter()
                 .any(|shell| shell == agent),
+            engine_session: self.shown_session.lock().unwrap().clone(),
         })
     }
     fn close_now(&self, machine: &str, agent: &str) -> Result<Closed, String> {
@@ -308,7 +313,13 @@ impl PaneHarness for Fake {
                 .clone()
                 .unwrap_or_else(|| "idle".into()),
             why: None,
-            engine_session: Some(format!("agent:main:kept-{}", agent_id_now)),
+            engine_session: Some(
+                self.ensure_session
+                    .lock()
+                    .unwrap()
+                    .clone()
+                    .unwrap_or_else(|| format!("agent:main:kept-{}", agent_id_now)),
+            ),
             confirmed: *self.ensure_confirmed.lock().unwrap(),
             why_code: self.ensure_why_code.lock().unwrap().clone(),
         })
@@ -5628,4 +5639,319 @@ fn a_long_hand_over_is_taken_once_and_answered() {
         Ended::Answered("answer to New task task-2:".into())
     );
     assert_eq!(fake.count("reply"), 1);
+}
+
+/// #8151: the lamp's Hermes at the same machine as [`place`].
+fn hermes_place() -> Place {
+    Place {
+        engine: EngineKind::Hermes,
+        ..place()
+    }
+}
+
+/// #8151: the kept session switch on for a Hermes lamp, Hermes's deletes
+/// and OpenClaw's recorded, Hermes's `ensure` naming session `hermes-1`.
+type Deleted = Arc<Mutex<Vec<String>>>;
+fn hermes_kept_on(dir: &std::path::Path) -> (OneSession, Fake, Deleted, Deleted) {
+    let (hermes, openclaw) = (Deleted::default(), Deleted::default());
+    let (seen_hermes, seen_openclaw) = (hermes.clone(), openclaw.clone());
+    let (one, fake) = kept_on(dir);
+    let one = one
+        .with_hermes_delete(Box::new(move |id| {
+            seen_hermes.lock().unwrap().push(id.to_owned());
+            Ok(())
+        }))
+        .with_session_delete(Box::new(move |key| {
+            seen_openclaw.lock().unwrap().push(key.to_owned());
+            Ok(())
+        }));
+    *fake.ensure_session.lock().unwrap() = Some("hermes-1".into());
+    (one, fake, hermes, openclaw)
+}
+
+/// [`one_turn`] on the lamp's Hermes.
+fn hermes_turn(one: &OneSession, fake: &Fake, id: &str) -> Ended {
+    let turn = one.enter(id, Kind::Skill, far(), &|| false).unwrap();
+    assert!(
+        matches!(
+            turn.send(fake, &hermes_place(), "Do the task.", far(), &|| false),
+            Sent::Typed(_)
+        ),
+        "typed"
+    );
+    turn.wait_end(fake, MACHINE, &AtomicBool::new(false), &|| {})
+}
+
+/// [`keep_open_step`] on the lamp's Hermes.
+fn hermes_keep_open_step(one: &OneSession, fake: &Fake, looks: &mut Looks) {
+    let place_now = || -> Result<(&Fake, Place), String> { Ok((fake, hermes_place())) };
+    one.remove_if_due(looks, None, false, &|| Some(fake));
+    one.look(looks, Instant::now(), None, &place_now);
+}
+
+/// #8151: Hermes's spoken tasks share the one session as OpenClaw's do;
+/// a skill run stays per run for Hermes (its wrapper reads the run's token
+/// file once at its own start); any other engine shares nothing.
+#[test]
+fn hermes_shares_the_session_but_its_skill_runs_keep_their_own() {
+    assert!(shares(EngineKind::Openclaw));
+    assert!(shares(EngineKind::Hermes));
+    assert!(!shares(EngineKind::Claude));
+    assert!(skill_runs_share(EngineKind::Openclaw));
+    assert!(!skill_runs_share(EngineKind::Hermes));
+}
+
+/// #8151: three tasks in a row on a Hermes lamp go into one kept session:
+/// one `harness ensure` of `lamp-one-hermes`, then an acknowledged reply
+/// each, never a `new`; a spoken task for the lamp's Hermes joins it.
+#[test]
+fn a_hermes_lamp_keeps_one_session_for_every_task() {
+    let dir = tempfile::tempdir().unwrap();
+    let (one, fake, _, _) = hermes_kept_on(dir.path());
+    let one = Arc::new(one);
+    for n in 1..=3 {
+        assert_eq!(
+            hermes_turn(&one, &fake, &format!("task-{n}")),
+            Ended::Answered(format!("answer to New task task-{n}:"))
+        );
+    }
+    assert!(
+        fake.calls()
+            .iter()
+            .any(|call| call == "ensure lamp-one-hermes"),
+        "{:?}",
+        fake.calls()
+    );
+    assert_eq!(fake.count("ensure"), 1, "{:?}", fake.calls());
+    assert_eq!(fake.count("new"), 0);
+    assert_eq!(one.turns(), 3);
+    let mut launch = spoken("lamp-4");
+    launch.target.engine = EngineKind::Hermes;
+    assert_eq!(
+        spoken_launch(&one, &fake, &launch),
+        Some(LaunchOutcome::Joined {
+            agent_id: agent_of(1),
+            session: None
+        })
+    );
+    assert_eq!(fake.count("ensure"), 1);
+    let kept: serde_json::Value =
+        serde_json::from_str(&std::fs::read_to_string(dir.path().join(STATE_FILE)).unwrap())
+            .unwrap();
+    assert_eq!(
+        (&kept["engine"], &kept["kept"], &kept["session"]),
+        (
+            &serde_json::json!("hermes"),
+            &serde_json::json!(true),
+            &serde_json::json!("hermes-1")
+        )
+    );
+}
+
+/// #8151: the owner's "forget everything" on a Hermes lamp closes the kept
+/// session and deletes its conversation from Hermes's own store by the
+/// session id Harness named last, never OpenClaw's; a new one opens.
+#[test]
+fn a_forget_deletes_the_kept_hermes_conversation() {
+    let dir = tempfile::tempdir().unwrap();
+    let (one, fake, hermes, openclaw) = hermes_kept_on(dir.path());
+    let mut looks = Looks::default();
+    hermes_keep_open_step(&one, &fake, &mut looks);
+    hermes_turn(&one, &fake, "task-1");
+    one.forget_conversation();
+    hermes_keep_open_step(&one, &fake, &mut looks);
+    assert_eq!(fake.count("close-kept"), 1);
+    assert_eq!(*hermes.lock().unwrap(), vec!["hermes-1".to_owned()]);
+    assert!(openclaw.lock().unwrap().is_empty());
+    assert_eq!(one.agent(), Some(agent_of(2)), "{:?}", fake.calls());
+}
+
+/// #8151: a sign-out and the idle close ([`KEPT_IDLE_MAX`]) delete the
+/// kept Hermes conversation too, so nothing outlives them.
+#[test]
+fn a_sign_out_or_an_idle_close_deletes_the_kept_hermes_conversation() {
+    let dir = tempfile::tempdir().unwrap();
+    let (one, fake, hermes, _) = hermes_kept_on(dir.path());
+    hermes_turn(&one, &fake, "task-1");
+    one.drop_when_free("the lamp signed out");
+    one.tend(&fake, &hermes_place(), &|| false);
+    assert_eq!(fake.count("close-kept"), 1);
+    assert_eq!(*hermes.lock().unwrap(), vec!["hermes-1".to_owned()]);
+    assert!(!dir.path().join(STATE_FILE).exists());
+
+    let dir = tempfile::tempdir().unwrap();
+    let (mut one, fake, hermes, openclaw) = hermes_kept_on(dir.path());
+    let mut looks = Looks::default();
+    hermes_keep_open_step(&one, &fake, &mut looks);
+    one.kept_idle_max = Duration::ZERO;
+    hermes_keep_open_step(&one, &fake, &mut looks);
+    assert_eq!(fake.count("close-kept"), 1);
+    assert_eq!(*hermes.lock().unwrap(), vec!["hermes-1".to_owned()]);
+    assert!(openclaw.lock().unwrap().is_empty());
+}
+
+/// #8151: Hermes moves to a new session id when it compresses its
+/// context. The id `show` names after a turn is taken and recorded, and a
+/// later delete is by it, never the stale one `ensure` named at the open.
+#[test]
+fn a_hermes_session_id_moved_by_a_compression_is_followed() {
+    let dir = tempfile::tempdir().unwrap();
+    let (one, fake, hermes, _) = hermes_kept_on(dir.path());
+    hermes_turn(&one, &fake, "task-1");
+    *fake.shown_session.lock().unwrap() = Some("hermes-2".into());
+    hermes_turn(&one, &fake, "task-2");
+    let kept: serde_json::Value =
+        serde_json::from_str(&std::fs::read_to_string(dir.path().join(STATE_FILE)).unwrap())
+            .unwrap();
+    assert_eq!(kept["session"], "hermes-2");
+    one.drop_when_free("the lamp signed out");
+    one.tend(&fake, &hermes_place(), &|| false);
+    assert_eq!(*hermes.lock().unwrap(), vec!["hermes-2".to_owned()]);
+}
+
+/// #8151: OpenClaw's key is `ensure`'s alone: a `show` naming another
+/// session never moves it.
+#[test]
+fn an_openclaw_session_key_is_not_moved_by_show() {
+    let dir = tempfile::tempdir().unwrap();
+    let (one, fake) = kept_on(dir.path());
+    let deleted = Deleted::default();
+    let seen = deleted.clone();
+    let one = one.with_session_delete(Box::new(move |key| {
+        seen.lock().unwrap().push(key.to_owned());
+        Ok(())
+    }));
+    one_turn(&one, &fake, "task-1");
+    *fake.shown_session.lock().unwrap() = Some("other".into());
+    one_turn(&one, &fake, "task-2");
+    one.drop_when_free("the lamp signed out");
+    one.tend(&fake, &place(), &|| false);
+    assert_eq!(
+        *deleted.lock().unwrap(),
+        vec![format!("agent:main:kept-{}", agent_of(1))]
+    );
+}
+
+/// #8151: Hermes's kept session keeps its safety bound: after
+/// [`ROTATE_TURNS`] turns the next is `ensure --fresh`, and the rotated
+/// conversation is deleted from Hermes's store.
+#[test]
+fn a_hermes_kept_session_is_rotated_at_its_bound_and_the_old_one_deleted() {
+    let dir = tempfile::tempdir().unwrap();
+    let (one, fake, hermes, openclaw) = hermes_kept_on(dir.path());
+    for n in 0..ROTATE_TURNS {
+        hermes_turn(&one, &fake, &format!("task-{n}"));
+    }
+    assert!(!fake.calls().iter().any(|call| call.ends_with("--fresh")));
+    *fake.ensure_session.lock().unwrap() = Some("hermes-new".into());
+    hermes_turn(&one, &fake, "task-last");
+    assert!(
+        fake.calls()
+            .iter()
+            .any(|call| call == "ensure lamp-one-hermes --fresh"),
+        "{:?}",
+        fake.calls()
+    );
+    assert_eq!(*hermes.lock().unwrap(), vec!["hermes-1".to_owned()]);
+    assert!(openclaw.lock().unwrap().is_empty());
+    assert_eq!(one.turns(), 1);
+}
+
+/// #8151: OpenClaw's Gateway check is OpenClaw's: a Hermes kept session
+/// that died is resumed plainly first, its conversation kept, even when
+/// the Gateway check would say "not held" for its key.
+#[test]
+fn a_died_hermes_session_is_resumed_without_a_gateway_check() {
+    let dir = tempfile::tempdir().unwrap();
+    let (one, fake, hermes, _) = hermes_kept_on(dir.path());
+    hermes_turn(&one, &fake, "task-1");
+    *fake.holds.lock().unwrap() = Some(false);
+    *fake.held.lock().unwrap() = Some(Vec::new());
+    let reads = *fake.holds_read.lock().unwrap();
+    assert!(one.revive_or_replace(&fake, MACHINE, &agent_of(1), "its engine exited", true));
+    assert_eq!(*fake.holds_read.lock().unwrap(), reads, "no Gateway read");
+    assert_eq!(fake.count("close-kept"), 0);
+    assert!(hermes.lock().unwrap().is_empty());
+}
+
+/// A Hermes `state.db` as Hermes makes it: its sessions, their messages
+/// with the search index its triggers keep, and a usage table.
+fn hermes_store(home: &std::path::Path) -> rusqlite::Connection {
+    let db = rusqlite::Connection::open(home.join(HERMES_STATE_DB)).unwrap();
+    db.execute_batch(
+        "CREATE TABLE sessions (id TEXT PRIMARY KEY, parent_session_id TEXT, \
+           FOREIGN KEY (parent_session_id) REFERENCES sessions(id));
+         CREATE TABLE messages (id INTEGER PRIMARY KEY AUTOINCREMENT, \
+           session_id TEXT NOT NULL REFERENCES sessions(id), content TEXT);
+         CREATE VIRTUAL TABLE messages_fts USING fts5(content, content=messages, content_rowid=id);
+         CREATE TRIGGER messages_fts_insert AFTER INSERT ON messages BEGIN \
+           INSERT INTO messages_fts(rowid, content) VALUES (new.id, new.content); END;
+         CREATE TRIGGER messages_fts_delete AFTER DELETE ON messages BEGIN \
+           INSERT INTO messages_fts(messages_fts, rowid, content) VALUES('delete', old.id, old.content); END;
+         CREATE TABLE session_model_usage (session_id TEXT NOT NULL \
+           REFERENCES sessions(id) ON DELETE CASCADE, model TEXT);
+         INSERT INTO sessions VALUES ('a', NULL), ('b', 'a'), ('c', 'b'), ('z', NULL);
+         INSERT INTO messages (session_id, content) VALUES \
+           ('a', 'first blue'), ('b', 'second blue'), ('c', 'third blue'), ('z', 'other green');
+         INSERT INTO session_model_usage VALUES ('b', 'm'), ('z', 'm');",
+    )
+    .unwrap();
+    db
+}
+
+/// #8151: a kept Hermes conversation is deleted whole from Hermes's own
+/// store by any id on its chain: the session a compression moved it to
+/// (`b`, then `c`) goes with the id read before (`a`), with every row
+/// keyed by those sessions, their search index and their transcripts;
+/// another conversation (`z`) stays.
+#[test]
+fn a_hermes_conversation_is_deleted_whole_from_its_store() {
+    let home = tempfile::tempdir().unwrap();
+    let db = hermes_store(home.path());
+    let sessions = home.path().join("sessions");
+    std::fs::create_dir(&sessions).unwrap();
+    for file in [
+        "a.json",
+        "b.jsonl",
+        "session_c.json",
+        "request_dump_b_1.json",
+        "z.json",
+    ] {
+        std::fs::write(sessions.join(file), "x").unwrap();
+    }
+    assert_eq!(delete_hermes_session(home.path(), "a"), Ok(3));
+    let count = |sql: &str| db.query_row(sql, [], |row| row.get::<_, i64>(0)).unwrap();
+    assert_eq!(count("SELECT count(*) FROM sessions"), 1);
+    assert_eq!(count("SELECT count(*) FROM sessions WHERE id = 'z'"), 1);
+    assert_eq!(count("SELECT count(*) FROM messages"), 1);
+    assert_eq!(count("SELECT count(*) FROM session_model_usage"), 1);
+    assert_eq!(
+        count("SELECT count(*) FROM messages_fts WHERE messages_fts MATCH 'blue'"),
+        0
+    );
+    assert_eq!(
+        count("SELECT count(*) FROM messages_fts WHERE messages_fts MATCH 'green'"),
+        1
+    );
+    let left: Vec<String> = std::fs::read_dir(&sessions)
+        .unwrap()
+        .map(|entry| entry.unwrap().file_name().into_string().unwrap())
+        .collect();
+    assert_eq!(left, vec!["z.json".to_owned()]);
+    // From the newest id too, and none left: nothing more.
+    assert_eq!(delete_hermes_session(home.path(), "z"), Ok(1));
+    assert_eq!(delete_hermes_session(home.path(), "z"), Ok(0));
+}
+
+/// #8151: no store, or an id that could name a path: nothing deleted, and
+/// no store made.
+#[test]
+fn a_hermes_delete_never_makes_a_store_or_reads_a_path() {
+    let home = tempfile::tempdir().unwrap();
+    assert!(delete_hermes_session(home.path(), "a").is_err());
+    assert!(!home.path().join(HERMES_STATE_DB).exists());
+    hermes_store(home.path());
+    for bad in ["", "../a", ".a", "a/b"] {
+        assert!(delete_hermes_session(home.path(), bad).is_err(), "{bad}");
+    }
 }

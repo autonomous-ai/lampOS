@@ -10309,13 +10309,15 @@ fn with_one_session_on_as_an_agent_each_run_keeps_its_own_pane() {
     assert_eq!((count("new"), count("close"), count("reply")), (2, 2, 0));
 }
 
-/// #7246: only an OpenClaw default shares the one pane. A Hermes default
-/// whose wrapper is a gateway agent's (its run's token through the
-/// skill-start launcher, as OpenClaw's) keeps today's per-run path, even
-/// with the switch on and Harness called as the person: each run its own
-/// `new hermes` and `close`, nothing typed with `reply`.
+/// #7246, #8151: only an OpenClaw default's skill runs share the one pane
+/// (`one_session::skill_runs_share`). A Hermes default's spoken tasks
+/// share its kept session, but its skill runs keep the per-run path, even
+/// with a wrapper that is a gateway agent's (its run's token through the
+/// skill-start launcher, as OpenClaw's), the switch on and Harness called
+/// as the person: each run its own `new hermes` and `close`, nothing typed
+/// with `reply`.
 #[test]
-fn with_one_session_on_a_hermes_default_keeps_the_per_run_path() {
+fn with_one_session_on_a_hermes_default_keeps_the_per_run_path_for_skill_runs() {
     let mut rig = Rig::new();
     rig.config.as_person = true;
     one_session_plan(&rig);

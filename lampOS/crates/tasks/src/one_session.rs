@@ -4,9 +4,10 @@
 //! default engine known), and everything goes into it as a message with
 //! `harness reply` ([`crate::harness::Cli::reply_to`]): every skill run
 //! for a gateway default agent (OpenClaw; its run's pass and token for
-//! linked services still per run, through the skill-start launcher), and
-//! every spoken task for the lamp itself on that engine
-//! ([`spoken_launch`]). No own process or namespace per run. Off
+//! linked services still per run, through the skill-start launcher,
+//! [`skill_runs_share`]), and every spoken task for the lamp itself on
+//! that engine, OpenClaw or Hermes ([`shares`], [`spoken_launch`]). No own
+//! process or namespace per run. Off
 //! (anything but `on` exactly), nothing here is made and every task is as
 //! before.
 //!
@@ -100,8 +101,21 @@
 //!   fresh pane after [`ROTATE_TURNS`] turns or [`ROTATE_TOKENS`] tokens
 //!   (estimated), as Hermes' gateway rotates its sessions.
 //!
-//! Out of scope for phase 1 (#7246): a Hermes default's pane (its skill
-//! wrapper reads the run's token file once at its own start).
+//! - **Hermes too (#8151).** A Hermes default keeps one kept session as
+//!   OpenClaw's does: `harness ensure hermes`, an acknowledged `reply`,
+//!   `wait --after`. Its engine session id is taken from each `ensure`
+//!   (and from `show` when Harness names one there), never kept from an
+//!   older open: Hermes moves to a new session id when it compresses its
+//!   context, and Harness follows it. It is rotated at [`ROTATE_TURNS`] /
+//!   [`ROTATE_TOKENS`]; OpenClaw's own-record checks (the context's size,
+//!   #7906's Gateway signs 3 and 4, #8001's probes) stay OpenClaw's, so a
+//!   Hermes turn is watched by `show`/`wait` and the reply-hold bounds
+//!   only. Its conversation, closed by lamp-tasks (a forget, a sign-out,
+//!   [`KEPT_IDLE_MAX`], a rotation, a stuck or cancelled turn), is deleted
+//!   from Hermes's own store ([`delete_hermes_session`]) as OpenClaw's is
+//!   from the Gateway's. A Hermes skill run still goes its own way: its
+//!   wrapper reads the run's token file once at its own start, in a
+//!   namespace of that run's ([`skill_runs_share`]).
 //!
 //! **Opened as the person** (`--harness-as-person`, as the product's
 //! lamp-tasks runs): Harness closes an idle pane after 30 min only when an
@@ -134,8 +148,8 @@ pub fn on(value: Option<&str>) -> bool {
 /// environment: `on` exactly ([`on`]), and only with [`SWITCH`] on. On,
 /// and Harness keeping program sessions (`harness capabilities`), the pane
 /// is the lamp's own kept session: opened with `harness ensure`, typed into
-/// with an acknowledged `reply`, closed with `close` and its OpenClaw
-/// session deleted. Else, or off,
+/// with an acknowledged `reply`, closed with `close` and its conversation
+/// deleted from its engine's own store. Else, or off,
 /// the pane is as before.
 pub const KEPT_SWITCH: &str = "LAMP_TASKS_KEPT_SESSION";
 /// The kept session's token file, in lamp-tasks' state folder: 0600, this
@@ -756,8 +770,9 @@ struct Pane {
     /// The input the kept session last took (`harness reply`'s `inputId`),
     /// for `harness wait --after`.
     input: Option<String>,
-    /// The kept session's engine session (`harness ensure`'s
-    /// `engineSession`), deleted from OpenClaw's store when it is closed.
+    /// The engine session (`harness ensure`'s `engineSession`, or
+    /// `show`'s for Hermes, #8151), deleted from its engine's own store
+    /// when it is closed.
     session: Option<String>,
     /// Its open, or the last turn typed into it ([`KEPT_IDLE_MAX`]).
     used: Instant,
@@ -924,14 +939,24 @@ fn known_key(key: Option<&String>) -> Option<(&str, &str)> {
         .filter(|(machine, engine)| !machine.is_empty() && !engine.is_empty())
 }
 
-/// Whether a default engine's runs share the one pane: OpenClaw only. A
-/// Hermes default keeps today's per-run path (#7246, until H1 is shown on
-/// a Hermes lamp).
+/// Whether a default engine's spoken tasks share the one pane: OpenClaw
+/// (#7246) and Hermes (#8151). Any other engine keeps the per-task way.
 pub fn shares(engine: EngineKind) -> bool {
+    matches!(engine, EngineKind::Openclaw | EngineKind::Hermes)
+}
+
+/// Whether a default engine's skill runs are typed into the one pane:
+/// OpenClaw only, whose run's token reaches the run through the
+/// skill-start launcher over lamp-tasks' socket. A Hermes run's wrapper
+/// reads the run's token file once, at its own start, in a namespace of
+/// that run's (`lamp_update::hermes_install`): a kept Hermes started once
+/// can't take a later run's token, so each Hermes run keeps its own pane.
+pub fn skill_runs_share(engine: EngineKind) -> bool {
     engine == EngineKind::Openclaw
 }
 
-/// Deletes an OpenClaw session from OpenClaw's own store by its key.
+/// Deletes an engine's session from that engine's own store by its key
+/// (OpenClaw's session key, Hermes's session id).
 pub type SessionDelete = Box<dyn Fn(&str) -> Result<(), String> + Send + Sync>;
 /// Where the lamp's pane is to be: `None`, nowhere (no Harness set up);
 /// `Some((cli, None))`, a pane held is to be removed.
@@ -947,6 +972,10 @@ pub struct OneSession {
     /// Deletes an OpenClaw session from OpenClaw's own store by its key
     /// ([`delete_openclaw_session`] on a lamp).
     delete_session: SessionDelete,
+    /// Deletes a Hermes session, with the sessions its compressions and
+    /// branches made, from Hermes's own store by its id
+    /// ([`delete_hermes_session`] in [`crate::runtime::HERMES_HOME`]).
+    delete_hermes: SessionDelete,
     queue_wait: Duration,
     look: Duration,
     open_idle_within: Duration,
@@ -1047,8 +1076,8 @@ pub fn forgotten() {
 
 /// Where the lamp's pane would be now, for [`OneSession::keep_open`]: only
 /// with Harness set up (`slot`), the lamp's own target known, and its
-/// default agent a gateway agent's engine (OpenClaw: a Hermes default's
-/// runs stay per run in phase 1) whose gateway answers now; its folder
+/// default engine one the pane takes ([`shares`]: OpenClaw, whose gateway
+/// must answer now, or Hermes); its folder
 /// [`FOLDER`] in `project`, made 0700. Else why not.
 /// How long [`lamp_place`] waits for the Gateway to serve its approvals
 /// read: one read's bound (`gateway`'s 20 s) plus a margin.
@@ -1075,7 +1104,7 @@ pub fn lamp_place(
     let engine = (harness.default_engine)().unwrap_or(lamp.engine);
     if !shares(engine) {
         return Err(format!(
-            "the default engine is {}, not OpenClaw",
+            "the default engine is {}; the one session takes OpenClaw or Hermes",
             engine.argument()
         ));
     }
@@ -1086,7 +1115,11 @@ pub fn lamp_place(
     // (`gateway::Serving`), and a success is kept per Gateway start, so this
     // bound covers one read; it runs on the keep-open thread, never on a
     // hand-over's way. A 1 s bound could never see a read through.
-    if !kept && let Some(mut gateway) = (harness.gateway)() {
+    // OpenClaw's Gateway only: Hermes has none to wait for.
+    if !kept
+        && engine == EngineKind::Openclaw
+        && let Some(mut gateway) = (harness.gateway)()
+    {
         gateway
             .before_launch_until(Instant::now() + LAMP_PLACE_GATEWAY_WITHIN, &|| false)
             .map_err(|why| format!("OpenClaw's gateway is not ready: {why}"))?;
@@ -1310,6 +1343,184 @@ pub fn delete_openclaw_session(key: &str) -> Result<(), String> {
     }
 }
 
+/// Hermes's own session store in its home (`HERMES_HOME`): one SQLite
+/// file, its `sessions` and every table keyed by `session_id`.
+pub const HERMES_STATE_DB: &str = "state.db";
+/// Hermes's transcript folder in its home.
+const HERMES_SESSIONS: &str = "sessions";
+/// The most sessions one delete removes: a kept conversation and the
+/// sessions its compressions, branches and delegations made. More is
+/// not a conversation of the lamp's, and nothing is deleted.
+pub const HERMES_DELETE_MOST: usize = 10_000;
+/// How long a delete waits for Hermes's own writer to let the store go.
+const HERMES_BUSY_WITHIN: Duration = Duration::from_secs(5);
+
+/// Whether `id` may be a Hermes session id: plain characters, never a
+/// path (it names transcript files).
+fn hermes_session_id(id: &str) -> bool {
+    !id.is_empty()
+        && id.len() <= 128
+        && !id.starts_with('.')
+        && id
+            .bytes()
+            .all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'_' | b'-' | b'.' | b':'))
+}
+
+/// The Hermes session `id`'s whole conversation deleted from Hermes's own
+/// store in `home` (#8151): `id`, the sessions before it on its
+/// `parent_session_id` chain, and every session made from any of them
+/// (a compression's continuation, a branch, a delegation), so an id read
+/// before a compression still deletes the session Hermes moved to. In one
+/// transaction: the rows of every ordinary table with a `session_id`
+/// column (`messages`, whose triggers keep Hermes's search index), then
+/// the `sessions` rows; then each one's transcript files in `sessions/`
+/// (`<id>.json`, `<id>.jsonl`, `session_<id>.json`,
+/// `request_dump_<id>_*.json`). The sessions deleted; `0` when Hermes
+/// has no such session. Never creates the store.
+pub fn delete_hermes_session(home: &Path, id: &str) -> Result<usize, String> {
+    use rusqlite::{Connection, OpenFlags, TransactionBehavior};
+    let kind = |error: rusqlite::Error| match error {
+        rusqlite::Error::SqliteFailure(error, _) => format!("{:?}", error.code),
+        _ => "sqlite".to_owned(),
+    };
+    if !hermes_session_id(id) {
+        return Err("not a Hermes session id".into());
+    }
+    let db = home.join(HERMES_STATE_DB);
+    if !db.is_file() {
+        return Err("no Hermes session store".into());
+    }
+    let mut connection = Connection::open_with_flags(
+        &db,
+        OpenFlags::SQLITE_OPEN_READ_WRITE | OpenFlags::SQLITE_OPEN_NO_MUTEX,
+    )
+    .map_err(|error| format!("open: {}", kind(error)))?;
+    connection
+        .busy_timeout(HERMES_BUSY_WITHIN)
+        .map_err(|error| format!("busy timeout: {}", kind(error)))?;
+    let tx = connection
+        .transaction_with_behavior(TransactionBehavior::Immediate)
+        .map_err(|error| format!("begin: {}", kind(error)))?;
+    let columns = |table: &str| -> Result<Vec<String>, String> {
+        let mut info = tx
+            .prepare("SELECT name FROM pragma_table_info(?1)")
+            .map_err(|error| format!("read columns: {}", kind(error)))?;
+        info.query_map([table], |row| row.get::<_, String>(0))
+            .and_then(|rows| rows.collect::<Result<Vec<_>, _>>())
+            .map_err(|error| format!("read columns: {}", kind(error)))
+    };
+    let lineage = columns("sessions")?
+        .iter()
+        .any(|column| column == "parent_session_id");
+    let ids: Vec<String> = {
+        let sql = if lineage {
+            "WITH RECURSIVE up(id, parent) AS ( \
+               SELECT id, parent_session_id FROM sessions WHERE id = ?1 \
+               UNION SELECT s.id, s.parent_session_id FROM sessions s JOIN up ON s.id = up.parent), \
+             tree(id) AS ( \
+               SELECT id FROM up \
+               UNION SELECT s.id FROM sessions s JOIN tree ON s.parent_session_id = tree.id) \
+             SELECT id FROM tree LIMIT ?2"
+        } else {
+            "SELECT id FROM sessions WHERE id = ?1 LIMIT ?2"
+        };
+        let mut found = tx
+            .prepare(sql)
+            .map_err(|error| format!("read sessions: {}", kind(error)))?;
+        found
+            .query_map(
+                rusqlite::params![id, (HERMES_DELETE_MOST + 1) as i64],
+                |row| row.get::<_, String>(0),
+            )
+            .and_then(|rows| rows.collect::<Result<Vec<_>, _>>())
+            .map_err(|error| format!("read sessions: {}", kind(error)))?
+    };
+    if ids.len() > HERMES_DELETE_MOST {
+        return Err(format!(
+            "more than {HERMES_DELETE_MOST} sessions on its chain; nothing deleted"
+        ));
+    }
+    if !ids.is_empty() {
+        let tables: Vec<String> = {
+            let mut names = tx
+                .prepare(
+                    "SELECT name FROM sqlite_master WHERE type = 'table' \
+                     AND name <> 'sessions' AND name NOT LIKE 'sqlite_%' \
+                     AND sql NOT LIKE 'CREATE VIRTUAL%'",
+                )
+                .map_err(|error| format!("read tables: {}", kind(error)))?;
+            names
+                .query_map([], |row| row.get::<_, String>(0))
+                .and_then(|rows| rows.collect::<Result<Vec<_>, _>>())
+                .map_err(|error| format!("read tables: {}", kind(error)))?
+        };
+        let listed = serde_json::to_string(&ids).map_err(|_| "ids not listed".to_owned())?;
+        for table in tables {
+            if !columns(&table)?.iter().any(|column| column == "session_id") {
+                continue;
+            }
+            let quoted = table.replace('"', "\"\"");
+            tx.execute(
+                &format!(
+                    "DELETE FROM \"{quoted}\" WHERE session_id IN (SELECT value FROM json_each(?1))"
+                ),
+                [&listed],
+            )
+            .map_err(|error| format!("delete from {table}: {}", kind(error)))?;
+        }
+        tx.execute(
+            "DELETE FROM sessions WHERE id IN (SELECT value FROM json_each(?1))",
+            [&listed],
+        )
+        .map_err(|error| format!("delete sessions: {}", kind(error)))?;
+    }
+    tx.commit()
+        .map_err(|error| format!("commit: {}", kind(error)))?;
+    let folder = home.join(HERMES_SESSIONS);
+    let dumps: Vec<std::ffi::OsString> = std::fs::read_dir(&folder)
+        .map(|entries| {
+            entries
+                .filter_map(Result::ok)
+                .map(|entry| entry.file_name())
+                .collect()
+        })
+        .unwrap_or_default();
+    for session in ids.iter().map(String::as_str).chain([id]) {
+        if !hermes_session_id(session) {
+            continue;
+        }
+        let dump = format!("request_dump_{session}_");
+        let named = [
+            format!("{session}.json"),
+            format!("{session}.jsonl"),
+            format!("session_{session}.json"),
+        ];
+        let files = named.into_iter().map(std::ffi::OsString::from).chain(
+            dumps
+                .iter()
+                .filter(|name| {
+                    name.to_str()
+                        .is_some_and(|name| name.starts_with(&dump) && name.ends_with(".json"))
+                })
+                .cloned(),
+        );
+        for file in files {
+            match std::fs::remove_file(folder.join(&file)) {
+                Ok(()) => {}
+                Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
+                Err(error) => {
+                    return Err(format!(
+                        "a transcript of {} not removed: {}",
+                        short(session),
+                        error.kind()
+                    ));
+                }
+            }
+        }
+    }
+    Ok(ids.len())
+}
+
 fn short(agent: &str) -> &str {
     agent.get(..8).unwrap_or(agent)
 }
@@ -1331,6 +1542,9 @@ impl OneSession {
             turned: Condvar::new(),
             state_file: None,
             delete_session: Box::new(delete_openclaw_session),
+            delete_hermes: Box::new(|id| {
+                delete_hermes_session(Path::new(crate::runtime::HERMES_HOME), id).map(|_| ())
+            }),
             queue_wait,
             look,
             open_idle_within,
@@ -1526,42 +1740,132 @@ impl OneSession {
             .is_some_and(|kept| kept["kept"].as_bool() == Some(true))
     }
 
-    /// The kept session `agent`'s OpenClaw session key: `harness ensure`'s
-    /// `engineSession`, from the pane or the kept record, else Harness's
-    /// usual `agent:main:harness-<id>`.
-    fn kept_session_key(&self, agent: &str) -> String {
+    /// The pane `agent`'s engine session as last named (`harness
+    /// ensure`'s `engineSession`, or `show`'s), from the pane or the kept
+    /// record; `None` when neither names one.
+    fn recorded_session(&self, agent: &str) -> Option<String> {
         let from_pane = self
             .lock()
             .pane
             .as_ref()
             .filter(|pane| pane.agent == agent)
             .and_then(|pane| pane.session.clone());
-        from_pane
-            .or_else(|| {
-                let text = std::fs::read_to_string(self.state_file.as_ref()?).ok()?;
-                let kept: serde_json::Value = serde_json::from_str(&text).ok()?;
-                (kept["agent"] == agent)
-                    .then(|| kept["session"].as_str().map(str::to_owned))
-                    .flatten()
-            })
+        from_pane.or_else(|| {
+            let text = std::fs::read_to_string(self.state_file.as_ref()?).ok()?;
+            let kept: serde_json::Value = serde_json::from_str(&text).ok()?;
+            (kept["agent"] == agent)
+                .then(|| kept["session"].as_str().map(str::to_owned))
+                .flatten()
+        })
+    }
+
+    /// The kept session `agent`'s OpenClaw session key: `harness ensure`'s
+    /// `engineSession`, from the pane or the kept record, else Harness's
+    /// usual `agent:main:harness-<id>`.
+    fn kept_session_key(&self, agent: &str) -> String {
+        self.recorded_session(agent)
             .unwrap_or_else(|| openclaw_session_key(agent))
     }
 
-    /// The kept session `agent` closed by us: its record forgotten, and
-    /// its conversation deleted from OpenClaw's own store by its engine
-    /// session, since Harness's close keeps it (`close --forget` is not
-    /// built yet, openharness#4393).
-    fn kept_closed(&self, agent: &str, engine: EngineKind) {
-        let key = self.kept_session_key(agent);
-        self.closed_by_us(agent, engine, false);
-        if engine == EngineKind::Openclaw
-            && let Err(code) = (self.delete_session)(&key)
-        {
+    /// The engine of the pane `agent`: the pane's own, else the kept
+    /// record's, else OpenClaw's (the only engine an older record named).
+    fn engine_of(&self, agent: &str) -> EngineKind {
+        let from_pane = self
+            .lock()
+            .pane
+            .as_ref()
+            .filter(|pane| pane.agent == agent)
+            .map(|pane| pane.place.engine);
+        from_pane
+            .or_else(|| {
+                self.kept()
+                    .filter(|(kept, _, _)| kept == agent)
+                    .and_then(|(_, _, engine)| engine_named(&engine))
+            })
+            .unwrap_or(EngineKind::Openclaw)
+    }
+
+    /// What the kept session `agent` on `engine` is deleted by in its
+    /// engine's own store: OpenClaw's session key
+    /// ([`OneSession::kept_session_key`]), Hermes's session id as last
+    /// named ([`OneSession::recorded_session`]); `None` when not known.
+    fn conversation_key(&self, agent: &str, engine: EngineKind) -> Option<String> {
+        match engine {
+            EngineKind::Openclaw => Some(self.kept_session_key(agent)),
+            EngineKind::Hermes => self.recorded_session(agent),
+            _ => None,
+        }
+    }
+
+    /// The pane `agent`'s conversation `key` deleted from its `engine`'s
+    /// own store, since Harness's close keeps it (`close --forget` is not
+    /// built yet, openharness#4393): OpenClaw's by the Gateway, Hermes's
+    /// from its `state.db` (#8151). Any other engine keeps none here.
+    fn delete_conversation(&self, agent: &str, engine: EngineKind, key: Option<String>) {
+        let (delete, store) = match engine {
+            EngineKind::Openclaw => (&self.delete_session, "OpenClaw"),
+            EngineKind::Hermes => (&self.delete_hermes, "Hermes"),
+            _ => return,
+        };
+        let Some(key) = key else {
             eprintln!(
-                "tasks: one session: the kept session {}'s OpenClaw session not deleted: {code}",
+                "tasks: one session: {}'s {store} session is not known; nothing deleted",
+                short(agent)
+            );
+            return;
+        };
+        if let Err(code) = delete(&key) {
+            eprintln!(
+                "tasks: one session: {}'s {store} session not deleted: {code}",
                 short(agent)
             );
         }
+    }
+
+    /// #7906: whether OpenClaw's Gateway still holds the kept session
+    /// `agent`'s conversation ([`PaneHarness::session_held`]). `None`,
+    /// never taken as gone, when it can't be read or the pane is not
+    /// OpenClaw's: Hermes keeps its conversation in its own store, with no
+    /// Gateway record to read (#8151).
+    fn gateway_holds(&self, harness: &dyn PaneHarness, agent: &str) -> Option<bool> {
+        (self.engine_of(agent) == EngineKind::Openclaw)
+            .then(|| harness.session_held(&self.kept_session_key(agent)))
+            .flatten()
+    }
+
+    /// `show` of the pane `agent` named its engine session `session`
+    /// (#8151): a Hermes pane's taken, and its record rewritten, when it
+    /// moved (Hermes moves to a new session id when it compresses its
+    /// context, and Harness follows it). OpenClaw's key stays `ensure`'s.
+    fn saw_session(&self, agent: &str, session: Option<String>) {
+        let Some(session) = session else {
+            return;
+        };
+        let place = {
+            let mut inner = self.lock();
+            let Some(pane) = inner
+                .pane
+                .as_mut()
+                .filter(|pane| pane.agent == agent && pane.place.engine == EngineKind::Hermes)
+            else {
+                return;
+            };
+            if pane.session.as_deref() == Some(session.as_str()) {
+                return;
+            }
+            pane.session = Some(session);
+            pane.place.clone()
+        };
+        self.keep_as(agent, &place, false);
+    }
+
+    /// The kept session `agent` closed by us: its record forgotten, and
+    /// its conversation deleted from its engine's own store by its engine
+    /// session ([`OneSession::delete_conversation`]).
+    fn kept_closed(&self, agent: &str, engine: EngineKind) {
+        let key = self.conversation_key(agent, engine);
+        self.closed_by_us(agent, engine, false);
+        self.delete_conversation(agent, engine, key);
     }
 
     /// Harness says the kept session is not ours (`NAME_TAKEN`,
@@ -1618,6 +1922,13 @@ impl OneSession {
     /// OpenClaw sessions deleted by `delete` in place of the gateway (tests).
     pub fn with_session_delete(mut self, delete: SessionDelete) -> Self {
         self.delete_session = delete;
+        self
+    }
+
+    /// Hermes sessions deleted by `delete` in place of Hermes's own store
+    /// (tests).
+    pub fn with_hermes_delete(mut self, delete: SessionDelete) -> Self {
+        self.delete_hermes = delete;
         self
     }
 
@@ -1693,13 +2004,15 @@ impl OneSession {
             Ok(_) => {}
             Err(code) => eprintln!("tasks: one session: {} not closed: {code}", short(&agent)),
         }
-        if engine == EngineKind::Openclaw.argument()
-            && let Err(code) = (self.delete_session)(&openclaw_session_key(&agent))
-        {
-            eprintln!(
-                "tasks: one session: {}'s OpenClaw session not deleted: {code}",
-                short(&agent)
-            );
+        if let Some(kind) = engine_named(&engine) {
+            let key = match kind {
+                EngineKind::Openclaw => Some(openclaw_session_key(&agent)),
+                _ => pane
+                    .as_ref()
+                    .and_then(|pane| pane.session.clone())
+                    .or_else(|| self.recorded_session(&agent)),
+            };
+            self.delete_conversation(&agent, kind, key);
         }
         if let Some(file) = &self.state_file
             && let Err(error) = std::fs::remove_file(file)
@@ -1822,13 +2135,10 @@ impl OneSession {
             .then(|| self.kept_signed_in());
         let (signed_in, program, session) = {
             let inner = self.lock();
-            let pane = inner
-                .pane
-                .as_ref()
-                .filter(|pane| pane.kept && pane.agent == agent);
+            let pane = inner.pane.as_ref().filter(|pane| pane.agent == agent);
             (
                 signed_in || recorded.unwrap_or(!inner.signed_out),
-                pane.is_some(),
+                pane.is_some_and(|pane| pane.kept),
                 pane.and_then(|pane| pane.session.clone()),
             )
         };
@@ -1944,9 +2254,17 @@ impl OneSession {
     }
 
     /// A pane lamp-tasks closed itself: its kept id forgotten, so no later
-    /// open adopts or resumes it; with `delete`, its OpenClaw session
-    /// deleted from OpenClaw's own store too (Harness's close keeps it).
+    /// open adopts or resumes it; with `delete`, its conversation deleted
+    /// from its engine's own store too (Harness's close keeps it):
+    /// OpenClaw's by Harness's usual key, Hermes's by its session id as
+    /// last named, read before the record goes.
     fn closed_by_us(&self, agent: &str, engine: EngineKind, delete: bool) {
+        let key = delete
+            .then(|| match engine {
+                EngineKind::Openclaw => Some(openclaw_session_key(agent)),
+                _ => self.recorded_session(agent),
+            })
+            .flatten();
         if let Some(file) = &self.state_file
             && self.kept().is_some_and(|(kept, _, _)| kept == agent)
             && let Err(error) = std::fs::remove_file(file)
@@ -1957,14 +2275,8 @@ impl OneSession {
                 file.display()
             );
         }
-        if delete
-            && engine == EngineKind::Openclaw
-            && let Err(code) = (self.delete_session)(&openclaw_session_key(agent))
-        {
-            eprintln!(
-                "tasks: one session: {}'s OpenClaw session not deleted: {code}",
-                short(agent)
-            );
+        if delete {
+            self.delete_conversation(agent, engine, key);
         }
     }
 
@@ -2884,11 +3196,7 @@ impl OneSession {
                 }
                 Ok(_) => {}
             }
-            let engine = if engine == EngineKind::Openclaw.argument() {
-                EngineKind::Openclaw
-            } else {
-                place.engine
-            };
+            let engine = engine_named(&engine).unwrap_or(place.engine);
             self.closed_by_us(&old, engine, true);
             eprintln!(
                 "tasks: one session: dropped {} (not taken back)",
@@ -3053,8 +3361,10 @@ impl OneSession {
         // made a new one (Harness's close keeps it in OpenClaw's store).
         let old = fresh
             .then(|| {
-                self.kept()
-                    .map(|(agent, _, _)| (self.kept_session_key(&agent), agent))
+                self.kept().map(|(agent, _, engine)| {
+                    let engine = engine_named(&engine).unwrap_or(place.engine);
+                    (self.conversation_key(&agent, engine), agent, engine)
+                })
             })
             .flatten();
         let name = name_for(place.engine);
@@ -3128,15 +3438,13 @@ impl OneSession {
             }
             return self.open_kept(harness, place, token, until, ended, settles);
         }
-        if let Some((key, old)) = old
+        // The rotated conversation deleted from its engine's own store,
+        // never the one `--fresh` just made.
+        if let Some((key, old, engine)) = old
             && old != agent
-            && place.engine == EngineKind::Openclaw
-            && let Err(code) = (self.delete_session)(&key)
+            && (key.is_none() || key != ensured.engine_session)
         {
-            eprintln!(
-                "tasks: one session: the rotated kept session {}'s OpenClaw session not deleted: {code}",
-                short(&old)
-            );
+            self.delete_conversation(&old, engine, key);
         }
         // Kept at once: the record says the kept session, so a sign-out
         // while lamp-tasks is down still removes it.
@@ -3363,12 +3671,7 @@ impl OneSession {
             "tasks: one session: {} is gone or stuck ({why}); closed, forgotten and replaced with a fresh session (#7906)",
             short(agent)
         );
-        let engine = self
-            .lock()
-            .pane
-            .as_ref()
-            .filter(|pane| pane.agent == agent)
-            .map_or(EngineKind::Openclaw, |pane| pane.place.engine);
+        let engine = self.engine_of(agent);
         match self.kept_now(agent) {
             Some((name, token)) => match self.close_kept(harness, &name, &token, true) {
                 Ok(()) => self.kept_closed(agent, engine),
@@ -3493,13 +3796,13 @@ impl OneSession {
         let revive = died
             && key.is_some()
             && self.lock().revived != key
-            && harness.session_held(&self.kept_session_key(agent)) != Some(false);
+            && self.gateway_holds(harness, agent) != Some(false);
         if !revive {
             self.replace_kept(harness, machine, agent, why);
             return false;
         }
         eprintln!(
-            "tasks: one session: {} died ({why}); OpenClaw still holds its conversation, so a plain resume first (#7906)",
+            "tasks: one session: {} died ({why}); its conversation is still held, so a plain resume first (#7906)",
             short(agent)
         );
         self.lock().revived = key;
@@ -3542,7 +3845,7 @@ impl OneSession {
             .map(|(name, token)| format!("{name}:{}", token.display()));
         let restart = key.is_some()
             && self.lock().revived != key
-            && harness.session_held(&self.kept_session_key(agent)) != Some(false);
+            && self.gateway_holds(harness, agent) != Some(false);
         let closed = match kept.filter(|_| restart) {
             // Harness's own close, not `close_kept`'s: a close refused as
             // its conversation already gone has nothing to resume, so
@@ -4381,13 +4684,17 @@ impl Turn<'_> {
                             before_close,
                         );
                     }
-                    Ok(PaneSeen { seen, .. })
-                        if seen.state == "idle"
-                            && seen
-                                .ask
-                                .as_deref()
-                                .is_some_and(|ask| ask.starts_with(&mine)) =>
+                    Ok(PaneSeen {
+                        seen,
+                        engine_session,
+                        ..
+                    }) if seen.state == "idle"
+                        && seen
+                            .ask
+                            .as_deref()
+                            .is_some_and(|ask| ask.starts_with(&mine)) =>
                     {
+                        self.one.saw_session(&agent, engine_session);
                         if let Some(pane) = self.one.lock().pane.as_mut() {
                             pane.tokens += tokens_in(&seen.answer);
                         }
@@ -4413,7 +4720,8 @@ impl Turn<'_> {
                     // today; the pane is closed `--now` and opened again,
                     // so an ask no one answers never holds every later turn.
                     let _ = harness.close_now(machine, &agent);
-                    self.one.closed_by_us(&agent, EngineKind::Openclaw, true);
+                    self.one
+                        .closed_by_us(&agent, self.one.engine_of(&agent), true);
                     self.one.gone(&agent, "its turn asked something");
                     eprintln!(
                         "tasks: one session: {}'s turn asks something; closed --now, opened again next",
@@ -4531,7 +4839,12 @@ impl Turn<'_> {
                             before_close,
                         );
                     }
-                    Ok(PaneSeen { seen, .. }) => {
+                    Ok(PaneSeen {
+                        seen,
+                        engine_session,
+                        ..
+                    }) => {
+                        self.one.saw_session(agent, engine_session);
                         if let Some(pane) = self.one.lock().pane.as_mut() {
                             pane.tokens += tokens_in(&seen.answer);
                         }
@@ -4548,11 +4861,12 @@ impl Turn<'_> {
                     match kept {
                         Some((name, token)) => {
                             let _ = self.one.close_kept(harness, name, token, false);
-                            self.one.kept_closed(agent, EngineKind::Openclaw);
+                            self.one.kept_closed(agent, self.one.engine_of(agent));
                         }
                         None => {
                             let _ = harness.close_now(machine, agent);
-                            self.one.closed_by_us(agent, EngineKind::Openclaw, true);
+                            self.one
+                                .closed_by_us(agent, self.one.engine_of(agent), true);
                         }
                     }
                     self.one.gone(agent, "its turn asked something");
@@ -4772,7 +5086,7 @@ impl Turn<'_> {
                     .close_kept(harness, &name, &token, true)
                     .map(|()| Closed::Closed);
                 match &closed {
-                    Ok(_) => self.one.kept_closed(agent, EngineKind::Openclaw),
+                    Ok(_) => self.one.kept_closed(agent, self.one.engine_of(agent)),
                     // Not closed (Harness busy, or no answer): the record
                     // and the conversation are kept, and the close `--now`
                     // is tried again at the next look as a due removal
@@ -4789,7 +5103,8 @@ impl Turn<'_> {
             }
             None => {
                 let closed = harness.close_now(machine, agent);
-                self.one.closed_by_us(agent, EngineKind::Openclaw, true);
+                self.one
+                    .closed_by_us(agent, self.one.engine_of(agent), true);
                 closed
             }
         };

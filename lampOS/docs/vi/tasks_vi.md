@@ -2101,16 +2101,21 @@ nguyên văn, mặc định khi không đặt), mỗi việc và mỗi lần ch�
 `harness new` riêng như trên, tức các pane theo từng việc như cũ, không đổi
 một byte (`crates/tasks/src/one_session.rs`).
 
-- **OpenClaw trước.** Pane chỉ được mở khi agent mặc định của đèn là
-  OpenClaw. Đèn mặc định Hermes giữ đường đi hiện nay theo từng việc, một
-  pane cho mỗi việc và mỗi lần chạy, cho tới khi dòng thử H1 chạy được
-  trên một đèn Hermes.
+- **OpenClaw và Hermes (#8151).** Pane chỉ được mở khi agent mặc định
+  của đèn là OpenClaw hoặc Hermes (`one_session::shares`); engine khác
+  giữ đường đi theo từng việc. Việc nói trên đèn Hermes vào phiên duy nhất
+  của nó như trên đèn OpenClaw (`lamp-one-hermes`; xem "Phiên được giữ").
+  Lần chạy kỹ năng chỉ dùng chung phiên trên OpenClaw
+  (`one_session::skill_runs_share`): wrapper của lần chạy Hermes đọc file
+  token của lần chạy một lần, lúc chính nó khởi động, trong namespace riêng
+  của lần chạy đó, nên Hermes được giữ đã khởi động một lần không nhận được
+  token của lần chạy sau, và mỗi lần chạy kỹ năng Hermes giữ pane riêng.
 - **Mở ngay khi khởi động, khi agent sẵn sàng.** Khi công tắc bật (cùng
   `LAMP_SKILL_TASKS` và `LAMP_SKILL_DEFAULT_AGENT`), một luồng của
   lamp-tasks (`one-session`) chạy mỗi 2 s. Nó chỉ mở pane khi Harness đã
   thiết lập, Harness được gọi với tư cách người dùng
   (`--harness-as-person`, như unit sản phẩm), biết máy của đèn, agent mặc
-  định là OpenClaw và gateway trả lời trong 25 s
+  định là OpenClaw hoặc Hermes, và với OpenClaw, gateway trả lời trong 25 s
   (`LAMP_PLACE_GATEWAY_WITHIN`: một lần đọc approvals của nó, khoảng 10 s
   trên đèn kể cả khi đã ấm; chỉ đọc trên luồng này, không bao giờ trên
   đường giao việc). Lệnh mở là `harness new openclaw` trong
@@ -2119,7 +2124,7 @@ một byte (`crates/tasks/src/one_session.rs`).
   với lời nhắc đầu ngắn; nó chờ tối đa 120 s cho lượt đầu rảnh. `new` lỗi
   thì thử lại sau 5 s, gấp đôi dần tới 5 phút.
 - **Chưa có agent sẵn sàng: không phiên, không vòng lặp.** Trên đèn mới
-  hoặc đã đăng xuất, hoặc đèn có mặc định không phải OpenClaw, không mở
+  hoặc đã đăng xuất, hoặc đèn có mặc định không phải OpenClaw hay Hermes, không mở
   pane nào và không thử `harness new` nào. Đèn được xem lại sau 60 s
   (`NOT_READY_FIRST`), gấp đôi dần tới 10 phút (`NOT_READY_MOST`), hoặc
   ngay lập tức khi có tác nhân: daemon của Harness khởi động, hoặc máy hay
@@ -2127,16 +2132,16 @@ một byte (`crates/tasks/src/one_session.rs`).
   gọi gateway). Mỗi lý do mới được ghi journal một lần: `tasks: one
   session: not opened: <why>`, ví dụ `Harness is not set up`, `Harness is
   called as an agent`, `the lamp's own machine is not known (signed
-  out?)`, `the default engine is hermes, not OpenClaw` hoặc `OpenClaw's
-  gateway is not ready: <why>`. Khi pane đã mở thì không tìm lại nữa.
+  out?)`, `the default engine is codex; the one session takes OpenClaw or
+  Hermes` hoặc `OpenClaw's gateway is not ready: <why>`. Khi pane đã mở thì không tìm lại nữa.
 - **Chỉ khi gọi với tư cách người dùng.** Harness chỉ đóng pane rảnh sau
   30 phút khi pane do agent mở, nên khi Harness được gọi với tư cách agent
   thì không mở pane nào và mọi việc đi đường riêng.
 - **Đường riêng, khi công tắc bật.** Việc nói vẫn có `harness new` riêng
   chỉ khi nó không dành cho pane (máy hoặc engine khác với mặc định của
   chính đèn, hoặc người dùng nêu một phiên); lần chạy kỹ năng chỉ khi nó
-  không dành cho OpenClaw là agent mặc định của gateway (ví dụ mặc định
-  Hermes) hoặc Harness được gọi với tư cách agent. Cả hai cũng đi đường
+  không dành cho OpenClaw là agent mặc định của gateway (ví dụ lần chạy
+  kỹ năng của mặc định Hermes, ở trên) hoặc Harness được gọi với tư cách agent. Cả hai cũng đi đường
   riêng khi Harness không nhận reply ở đây (`reply_off`, bên dưới). Ngoài
   ra việc dành cho pane không bao giờ lùi về `new` riêng.
 - **Giữ lại khi chưa biết vị trí của đèn.** Việc nói có thể dành cho pane
@@ -2301,14 +2306,16 @@ một byte (`crates/tasks/src/one_session.rs`).
   ở lại trong phiên (giai đoạn này chỉ một người dùng, lý do 2 của lead).
   Pane của OpenClaw không bao giờ bị xoay theo số lượt: gateway của nó tự
   nén phiên (`agents.defaults.compaction`), nên đèn giữ một hội thoại
-  (`rotation_due`). Chỉ engine không tự nén mới có pane mới sau 40 lượt
+  (`rotation_due`). Pane của Hermes có pane mới sau 40 lượt
   (`ROTATE_TURNS`) hoặc 250k token (`ROTATE_TOKENS`), như gateway của
-  Hermes xoay vòng (`runtimes/hermes/rotation.go`). Harness không cho biết
+  Hermes xoay vòng (`runtimes/hermes/rotation.go`): một giới hạn an toàn,
+  vì Hermes tự nén ngữ cảnh trước đó (#8151). Harness không cho biết
   số token, nên token được ước tính 4 ký tự một token từ lời đã gõ, câu
   trả lời của các lần chạy kỹ năng đã đọc và câu trả lời của việc nói mà
   store đã đọc. Bộ đếm bắt đầu từ 0 khi pane được mở hoặc nhận lại. Ở lượt
-  kế tiếp sau khi vượt một trong hai ngưỡng, pane cũ bị đóng `--now`, phiên
-  OpenClaw của nó bị xoá (`sessions.delete`) và id đã giữ bị quên, rồi một
+  kế tiếp sau khi vượt một trong hai ngưỡng, pane cũ bị đóng `--now`, cuộc
+  hội thoại của nó bị xoá khỏi kho riêng của engine (của OpenClaw bằng
+  `sessions.delete`, của Hermes khỏi `state.db`) và id đã giữ bị quên, rồi một
   pane mới được mở, không bao giờ nhận lại pane cũ. Trong một pane, nén
   ngữ cảnh là việc của engine.
 - **Theo từng lần chạy, như trước.** Thư mục `skill-<run id>`, claim của
@@ -2317,8 +2324,8 @@ một byte (`crates/tasks/src/one_session.rs`).
   chung. Ghi vào dịch vụ liên kết vẫn cần chủ đèn nói đồng ý.
 - **Huỷ hoặc hết hạn của lần chạy kỹ năng** kết thúc lượt: token của lần
   chạy bị kết thúc trước, rồi pane bị đóng `--now`, vì Harness không có
-  lệnh ngắt, phiên OpenClaw của nó bị xoá (`sessions.delete`) và file id
-  đã giữ bị xoá; lần mở sau tạo pane mới. Đóng do `needs-input` của lần
+  lệnh ngắt, cuộc hội thoại của nó bị xoá khỏi kho riêng của engine và
+  file id đã giữ bị xoá; lần mở sau tạo pane mới. Đóng do `needs-input` của lần
   chạy kỹ năng cũng vậy.
 - **Journal.** Id là 8 ký tự đầu của pane; mỗi dòng bắt đầu bằng
   `tasks: one session: ` trừ các dòng theo từng việc và từng lần chạy ở
@@ -2333,7 +2340,8 @@ một byte (`crates/tasks/src/one_session.rs`).
   already wait`; `<task> waited its most, refused busy`; `<task>'s turn
   is done; the queue goes on`; `<task>: open failed: <why>`; `<task> not
   typed: <why>`; `the old pane <id> not closed: <why>`; `<id> not closed:
-  <code>`; `<id> already gone (UNKNOWN_HARNESS); a new pane`; `<id>'s OpenClaw session not deleted: <code>`;
+  <code>`; `<id> already gone (UNKNOWN_HARNESS); a new pane`; `<id>'s OpenClaw session not deleted: <code>` (hoặc `Hermes session`);
+  `<id>'s Hermes session is not known; nothing deleted`;
   `closed --now after <task>'s turn was cancelled; opened again next`,
   hoặc `not closed after <task>'s turn was cancelled: <why>`;
   `<task>'s turn asks something; closed --now, opened again next`;
@@ -2363,16 +2371,17 @@ Lời trong pane được giữ ở các nơi sau trên đèn, đều thuộc `l
 | Thư mục của pane, nơi chạy `harness new` | `/var/lib/lampos-tasks/harnesses/lamp-tasks/one-session` | thư mục 0700 (lamp-tasks tạo); `/var/lib/lampos-tasks` là 0700 (`StateDirectoryMode=0700`) |
 | Bản ghi của Harness về pane (registry, bản ghi agent đã dừng) | `/var/lib/lampos-tasks/.harness/cli/data/registry.json`, `.../cli/data/stopped-agents/` | trong home Harness 0700 |
 | Chính cuộc hội thoại (phiên OpenClaw `agent:main:harness-<agent id>`) | `/var/lib/lampos-openclaw/state/agents/main/agent/openclaw-agent.sqlite` (bản OpenClaw cũ: `state/agents/main/sessions/*.jsonl`) | `/var/lib/lampos-openclaw` và `state` 0700 (lamp-update tạo); OpenClaw ghi không có `UMask=`, nên chính các thư mục 0700 chặn người dùng khác |
-| Với pane Hermes (không mở ở giai đoạn 1) | `/var/lib/lampos-hermes/.hermes/state.db` (+ `-wal`, `-shm`), `sessions/` | `/var/lib/lampos-hermes` 0700 |
+| Với pane Hermes (#8151; session id của Hermes là `session` trong `one-session.json`) | `/var/lib/lampos-hermes/.hermes/state.db` (+ `-wal`, `-shm`), `sessions/` | `/var/lib/lampos-hermes` 0700 |
 
 Khi nào bị xoá:
 
-- **Đổi engine mặc định: xoá.** Khi mặc định không còn là OpenClaw, hoặc
-  machine id của đèn đổi, luồng `one-session` đóng pane `--now`, xoá
-  phiên OpenClaw của nó qua gateway
-  (`openclaw gateway call sessions.delete`, kèm transcript), và xoá
+- **Đổi engine mặc định: xoá.** Khi engine mặc định đổi, hoặc
+  machine id của đèn đổi, luồng `one-session` đóng pane `--now`, xoá cuộc
+  hội thoại của nó (của OpenClaw qua gateway,
+  `openclaw gateway call sessions.delete` kèm transcript; của Hermes khỏi
+  `state.db` của chính Hermes, `delete_hermes_session`, bên dưới), và xoá
   `one-session.json` (`OneSession::drop_pane`). `close` của Harness giữ
-  nguyên kho của OpenClaw, nên lamp-tasks tự xoá phiên. Chỉ tính khi thật
+  nguyên kho của engine, nên lamp-tasks tự xoá phiên. Chỉ tính khi thật
   sự đổi: máy và engine cũ lẫn mới đều đã biết và khác nhau. Một lần đọc
   mà một trong hai chưa biết (Harness chưa thiết lập, danh sách máy lỗi)
   thì giữ pane; trường khác của vị trí pane, như thư mục, cũng giữ pane.
@@ -2530,6 +2539,45 @@ khi đăng xuất, và với 0.6.60 khi đăng nhập (ROW của #7507).
   và không bao giờ gửi lại, và lượt của pane duy nhất kết thúc bằng
   `harness wait --after <inputId>`. Câu trả lời của Harness cũ được đọc như
   trước.
+- **Phiên được giữ của Hermes (#8151).** Trên đèn Hermes cùng đường đi đó
+  chạy với `harness ensure hermes <folder> --name lamp-one-hermes`, cùng
+  token, `reply` có xác nhận và `wait --after` (Harness resume Hermes theo
+  resume id của nó). Khác biệt:
+  - **Session id.** Hermes chuyển sang session id mới khi nó nén ngữ
+    cảnh, và Harness đi theo. Id được lấy từ mỗi lần `ensure`
+    (`engineSession`) và từ `show` của một lượt khi Harness nêu id ở đó
+    (`show` của Harness 0.6.78 không nêu), ghi vào `one-session.json` là
+    `session`, không bao giờ giữ từ một lần mở cũ hơn.
+  - **Xoay vòng.** 40 lượt hoặc 250k token ước tính (`ROTATE_TURNS`,
+    `ROTATE_TOKENS`) là giới hạn an toàn: `ensure --fresh`, cuộc hội thoại
+    cũ bị xoá. Kiểm tra kích thước trong bản ghi SQLite của OpenClaw
+    (`near_context_limit`) chỉ dành cho OpenClaw.
+  - **Dấu hiệu bị kẹt.** Chỉ `show`, `wait` và các giới hạn giữ reply.
+    Các kiểm tra Gateway của #7906 (dấu hiệu 3, hội thoại còn được giữ;
+    dấu hiệu 4, bản ghi không nhích; kiểm tra "còn được giữ" của bậc
+    resume thường) cùng probe và lần nhìn lúc rảnh của #8001 đọc bản ghi
+    riêng của OpenClaw và được so theo engine, nên phiên Hermes không bao
+    giờ bị xét bằng chúng: phiên chết được resume thường một lần, giữ
+    hội thoại, rồi mới thay.
+  - **Xoá hội thoại.** Quên hết, đăng xuất, đổi engine, đóng khi rảnh
+    (`KEPT_IDLE_MAX`), xoay vòng, huỷ và thay phiên kẹt đều đóng nó như
+    của OpenClaw, rồi xoá nó khỏi kho riêng của Hermes
+    (`delete_hermes_session`, trong `/var/lib/lampos-hermes/.hermes`, của
+    `lampos`): trong một giao dịch SQLite trên `state.db`, phiên đó, các
+    phiên trước nó trên chuỗi `parent_session_id` và mọi phiên sinh ra từ
+    bất kỳ phiên nào trong số đó (phần tiếp của một lần nén, một nhánh, một
+    uỷ quyền), nên id đọc trước một lần nén vẫn tới được phiên Hermes đã
+    chuyển sang; các dòng của mọi bảng thường có cột `session_id`
+    (`messages`, có trigger giữ chỉ mục tìm kiếm của Hermes, và các dòng
+    usage), rồi các dòng `sessions`; rồi transcript của từng phiên trong
+    `sessions/` (`<id>.json`, `<id>.jsonl`, `session_<id>.json`,
+    `request_dump_<id>_*.json`). Tối đa 10.000 phiên
+    (`HERMES_DELETE_MOST`); nhiều hơn thì không xoá gì. Nó không bao giờ
+    tạo kho. Lần xoá lỗi được ghi journal (`<id>'s Hermes session not
+    deleted: <why>`). `MEMORY.md` và kỹ năng của Hermes không phải phiên
+    và không bị đụng tới.
+  - **Lần chạy kỹ năng và make** vẫn chạy riêng từng lần (ở trên, và
+    `MakeHermes`).
 - **Xoay vòng và gỡ bỏ.** Phiên giữ lại của OpenClaw không bị xoay theo
   số lượt (gateway của nó tự nén phiên, `agents.defaults.compaction`); khi có
   xoay vòng thì là `ensure --fresh`. Huỷ, câu hỏi không ai trả lời, đăng xuất
@@ -2577,11 +2625,13 @@ khi đăng xuất, và với 0.6.60 khi đăng nhập (ROW của #7507).
   <ms> ms)`.
 - **Quên, và rảnh lâu: bị gỡ, rồi mở phiên mới.** Lệnh "quên hết" của chủ
   đèn (`ForgetSessions`, #6274) gỡ phiên được giữ như khi đăng xuất, khi
-  không còn gì giữ nó: `harness close`, rồi `sessions.delete` với
-  `engineSession` của nó, rồi xoá file token, để việc tiếp theo không nhớ
+  không còn gì giữ nó: `harness close`, rồi xoá cuộc hội thoại (của
+  OpenClaw bằng `sessions.delete` với `engineSession` của nó; của Hermes
+  khỏi `state.db` theo session id, #8151), rồi xoá file token, để việc tiếp theo không nhớ
   gì (`one_session::forgotten`). Phiên được giữ không có việc nào trong 7 ngày
   (`KEPT_IDLE_MAX`, tính từ lúc mở hoặc lượt cuối) cũng bị gỡ cùng cách, vì
-  phiên của OpenClaw không bao giờ bị xoay theo số lượt. Cả hai trường hợp,
+  phiên của OpenClaw không bao giờ bị xoay theo số lượt (phiên Hermes cũng
+  vậy, cuộc hội thoại bị xoá khỏi kho của Hermes). Cả hai trường hợp,
   vòng keep-open mở một phiên mới (agent id và token mới, nên là một phiên
   OpenClaw mới) ngay trong cùng lần nhìn, ngay sau khi gỡ, không đợi tới
   việc tiếp theo. Việc nào cần pane trong lúc việc gỡ đã được yêu cầu

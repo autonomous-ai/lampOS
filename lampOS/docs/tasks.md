@@ -4860,16 +4860,22 @@ exactly, the default when unset), every task and run is its own
 `harness new` as above, the old per-task panes, byte for byte
 (`crates/tasks/src/one_session.rs`).
 
-- **OpenClaw first.** The pane is opened only when the lamp's default
-  agent is OpenClaw. A Hermes default keeps today's per-task path, one
-  pane per task and per run, until row H1 shows it on a Hermes lamp.
+- **OpenClaw and Hermes (#8151).** The pane is opened only when the
+  lamp's default agent is OpenClaw or Hermes (`one_session::shares`); any
+  other engine keeps the per-task path. A Hermes lamp's spoken tasks go
+  into its one session as an OpenClaw lamp's do (`lamp-one-hermes`; see
+  "The kept session"). Skill runs share it on OpenClaw only
+  (`one_session::skill_runs_share`): a Hermes run's wrapper reads the
+  run's token file once, at its own start, in a namespace of that run's,
+  so a kept Hermes started once can't take a later run's token, and each
+  Hermes skill run keeps its own pane.
 - **Opened at start, when the agent is ready.** With the switch on (and
   `LAMP_SKILL_TASKS` and `LAMP_SKILL_DEFAULT_AGENT`), a thread of
   lamp-tasks (`one-session`) ticks every 2 s. It opens the pane only once
   Harness is set up, Harness is called as the person
   (`--harness-as-person`, as the product's unit does), the lamp's own
-  machine is known, its default agent is OpenClaw and the gateway
-  answers within 25 s (`LAMP_PLACE_GATEWAY_WITHIN`: one read of its
+  machine is known, its default agent is OpenClaw or Hermes, and, for
+  OpenClaw, the gateway answers within 25 s (`LAMP_PLACE_GATEWAY_WITHIN`: one read of its
   approvals, about 10 s on a lamp even warm; read on this thread only,
   never on a hand-over's way). The open is `harness new openclaw` in
   `~/harnesses/lamp-tasks/one-session` (lamp-tasks' Harness project
@@ -4878,7 +4884,7 @@ exactly, the default when unset), every task and run is its own
   it waits up to 120 s for that first turn to be idle. A `new` that fails
   is tried again after 5 s, doubling to 5 min.
 - **No agent ready: no session, no loop.** On a fresh or signed-out lamp,
-  or one whose default is not OpenClaw, no pane is opened and no `harness
+  or one whose default is neither OpenClaw nor Hermes, no pane is opened and no `harness
   new` is tried. The lamp is looked at again after 60 s
   (`NOT_READY_FIRST`), doubling to 10 min (`NOT_READY_MOST`), or at once
   when a trigger fires: Harness's daemon started, or the lamp's machine or
@@ -4886,8 +4892,8 @@ exactly, the default when unset), every task and run is its own
   gateway call). Each new reason is journaled once: `tasks: one session:
   not opened: <why>`, for example `Harness is not set up`, `Harness is
   called as an agent`, `the lamp's own machine is not known (signed
-  out?)`, `the default engine is hermes, not OpenClaw` or `OpenClaw's
-  gateway is not ready: <why>`. Once the pane is open, it is not looked
+  out?)`, `the default engine is codex; the one session takes OpenClaw or
+  Hermes` or `OpenClaw's gateway is not ready: <why>`. Once the pane is open, it is not looked
   for again.
 - **As the person only.** Harness closes an idle pane after 30 min only
   when an agent started it, so with Harness called as an agent no pane is
@@ -4896,7 +4902,7 @@ exactly, the default when unset), every task and run is its own
   own `harness new` only when it is not for the pane (another machine or
   engine than the lamp's own default, or a session the person named); a
   skill run only when it is not for OpenClaw as the gateway default agent
-  (a Hermes default, say) or Harness is called as an agent. Both also go
+  (a Hermes default's skill runs, above) or Harness is called as an agent. Both also go
   the per-run way once Harness takes no reply here (`reply_off`, below).
   Otherwise work for the pane never falls back to its own `new`.
 - **Held while the lamp's place is not known.** A spoken task that may be
@@ -5058,15 +5064,17 @@ exactly, the default when unset), every task and run is its own
   (one user in this phase, the lead's reason 2). OpenClaw's pane is never
   rotated by count: its gateway compacts the session itself
   (`agents.defaults.compaction`), so the lamp keeps one conversation
-  (`rotation_due`). Only an engine without compaction would get a new pane
-  after 40 turns (`ROTATE_TURNS`) or 250k tokens (`ROTATE_TOKENS`), as
-  Hermes' gateway rotates (`runtimes/hermes/rotation.go`).
+  (`rotation_due`). Hermes's pane gets a new one after 40 turns
+  (`ROTATE_TURNS`) or 250k tokens (`ROTATE_TOKENS`), as Hermes' gateway
+  rotates (`runtimes/hermes/rotation.go`): a safety bound, since Hermes
+  compresses its own context before then (#8151).
   Harness shows no token count, so tokens are estimated at 4 characters
   a token from the words typed, the skill runs' answers read and the
   spoken tasks' answers the store read. The counts start at 0 when a pane
   is opened or adopted. At the next turn past either bound the old pane
-  is closed `--now`, its OpenClaw session is deleted
-  (`sessions.delete`) and its kept id forgotten, and a new one is opened,
+  is closed `--now`, its conversation is deleted from its engine's own
+  store (OpenClaw's by `sessions.delete`, Hermes's from its `state.db`)
+  and its kept id forgotten, and a new one is opened,
   never adopted back. Within a pane, compaction is the engine's own.
 - **Per run, as before.** A skill run's folder `skill-<run id>`, its
   launcher claim, its pass and its token for linked services stay its
@@ -5074,8 +5082,8 @@ exactly, the default when unset), every task and run is its own
   A write to a linked service still needs the owner's spoken yes.
 - **A skill run's cancel or deadline** ends the turn: the run's token is
   ended first, then the pane is closed `--now`, since Harness has no
-  interrupt verb, its OpenClaw session is deleted (`sessions.delete`) and
-  its kept id file removed; the next open makes a new pane. A skill run's
+  interrupt verb, its conversation is deleted from its engine's own store
+  and its kept id file removed; the next open makes a new pane. A skill run's
   `needs-input` close is the same.
 - **Journal.** Ids are the pane's first 8 characters; each line starts
   `tasks: one session: ` but the per-task and per-run lines at the end.
@@ -5089,7 +5097,8 @@ exactly, the default when unset), every task and run is its own
   already wait`; `<task> waited its most, refused busy`; `<task>'s turn
   is done; the queue goes on`; `<task>: open failed: <why>`; `<task> not
   typed: <why>`; `the old pane <id> not closed: <why>`; `<id> not closed:
-  <code>`; `<id> already gone (UNKNOWN_HARNESS); a new pane`; `<id>'s OpenClaw session not deleted: <code>`;
+  <code>`; `<id> already gone (UNKNOWN_HARNESS); a new pane`; `<id>'s OpenClaw session not deleted: <code>` (or `Hermes session`);
+  `<id>'s Hermes session is not known; nothing deleted`;
   `closed --now after <task>'s turn was cancelled; opened again next`,
   or `not closed after <task>'s turn was cancelled: <why>`;
   `<task>'s turn asks something; closed --now, opened again next`;
@@ -5120,17 +5129,18 @@ The pane's words are kept in these places on the lamp, all owned by
 | The pane's folder, where `harness new` is started | `/var/lib/lampos-tasks/harnesses/lamp-tasks/one-session` | folder 0700 (lamp-tasks creates it); `/var/lib/lampos-tasks` is 0700 (`StateDirectoryMode=0700`) |
 | Harness's records of the pane (registry, stopped-agent record) | `/var/lib/lampos-tasks/.harness/cli/data/registry.json`, `.../cli/data/stopped-agents/` | inside the 0700 Harness home |
 | The conversation itself (OpenClaw session `agent:main:harness-<agent id>`) | `/var/lib/lampos-openclaw/state/agents/main/agent/openclaw-agent.sqlite` (older OpenClaw releases: `state/agents/main/sessions/*.jsonl`) | `/var/lib/lampos-openclaw` and `state` 0700 (lamp-update creates them); OpenClaw writes with no `UMask=`, so the 0700 folders keep other users out |
-| With a Hermes pane (not opened in phase 1) | `/var/lib/lampos-hermes/.hermes/state.db` (+ `-wal`, `-shm`), `sessions/` | `/var/lib/lampos-hermes` 0700 |
+| With a Hermes pane (#8151; Hermes session id as `session` in `one-session.json`) | `/var/lib/lampos-hermes/.hermes/state.db` (+ `-wal`, `-shm`), `sessions/` | `/var/lib/lampos-hermes` 0700 |
 
 When it is removed:
 
-- **Default engine switch: removed.** When the default is no longer
-  OpenClaw, or the lamp's machine id changes, the `one-session` thread
-  closes the pane `--now`, deletes its OpenClaw session through the
-  gateway (`openclaw gateway call sessions.delete`, with its transcript),
-  and deletes `one-session.json` (`OneSession::drop_pane`). Harness's
-  `close` keeps OpenClaw's own store, which is why lamp-tasks deletes the
-  session itself. Only a real move counts: the old and the new machine
+- **Default engine switch: removed.** When the default engine changes,
+  or the lamp's machine id changes, the `one-session` thread closes the
+  pane `--now`, deletes its conversation (OpenClaw's through the gateway,
+  `openclaw gateway call sessions.delete` with its transcript; Hermes's
+  from Hermes's own `state.db`, `delete_hermes_session`, below), and
+  deletes `one-session.json` (`OneSession::drop_pane`). Harness's
+  `close` keeps the engine's own store, which is why lamp-tasks deletes
+  the session itself. Only a real move counts: the old and the new machine
   and engine both known and different. A read with either unknown
   (Harness not set up yet, the machine list failed) keeps the pane, and
   so does any other field of its place, such as its folder.
@@ -5277,6 +5287,44 @@ in and signed out, and on 0.6.60, signed in (#7507's ROW).
   line now reads `working`; sign W still needs two looks and the record
   unmoved for 600 s.
 - **Signed-in replies, acknowledged.** With a Harness that acknowledges replies, every reply into a session of the person's (the one pane of `harness new`, `--reply-named`, a resumed session, a first message) counts as handed over only on `taken` with its `inputId`; a `TIMEOUT` with `cancelled: true` is typed again (a first message's is not: any answer but `taken` leaves it uncertain, `type_first_message`), one with `cancelled: false` and an `inputId` is typed and never sent again, and the one pane's turn ends with `harness wait --after <inputId>`. An older Harness's answers read as before.
+- **Hermes's kept session (#8151).** On a Hermes lamp the same path runs
+  with `harness ensure hermes <folder> --name lamp-one-hermes`, the same
+  token, acknowledged `reply` and `wait --after` (Harness resumes Hermes by
+  its resume id). What differs:
+  - **Its session id.** Hermes moves to a new session id when it
+    compresses its context, and Harness follows it. The id is taken from
+    every `ensure` (`engineSession`) and from a turn's `show` when Harness
+    names one there (Harness 0.6.78's `show` names none), written to
+    `one-session.json` as `session`, never kept from an older open.
+  - **Rotation.** 40 turns or 250k estimated tokens (`ROTATE_TURNS`,
+    `ROTATE_TOKENS`) is its safety bound: `ensure --fresh`, the rotated
+    conversation deleted. OpenClaw's size check in its own SQLite record
+    (`near_context_limit`, below) is OpenClaw's only.
+  - **Stuck signs.** `show`, `wait` and the reply holds only. #7906's
+    Gateway checks (sign 3, its conversation held; sign 4, its record not
+    moving; the plain-resume ladder's "still held" check) and #8001's
+    probes and idle look read OpenClaw's own record and are matched on the
+    engine, so a Hermes session is never judged by them: a died one is
+    resumed plainly once, its conversation kept, then replaced.
+  - **Its conversation deleted.** A forget-all, a sign-out, an engine
+    switch, the idle close (`KEPT_IDLE_MAX`), a rotation, a cancel and a
+    stuck replacement close it as OpenClaw's, then delete it from Hermes's
+    own store (`delete_hermes_session`, in
+    `/var/lib/lampos-hermes/.hermes`, `lampos`'s): in one SQLite
+    transaction on `state.db`, the session, the sessions before it on its
+    `parent_session_id` chain and every session made from any of them (a
+    compression's continuation, a branch, a delegation), so an id read
+    before a compression still reaches the session Hermes moved to; the
+    rows of every ordinary table with a `session_id` column (`messages`,
+    whose triggers keep Hermes's search index, and its usage rows), then
+    the `sessions` rows; then each one's transcripts in `sessions/`
+    (`<id>.json`, `<id>.jsonl`, `session_<id>.json`,
+    `request_dump_<id>_*.json`). At most 10,000 sessions
+    (`HERMES_DELETE_MOST`); more deletes nothing. The store is never made
+    by it. A delete that fails is journaled (`<id>'s Hermes session not
+    deleted: <why>`). Hermes's `MEMORY.md` and skills are not sessions and
+    are not touched.
+  - **Skill runs and makes** still run per run (above, and `MakeHermes`).
 - **Rotation and removal.** OpenClaw's kept session is not rotated by
   count (its gateway compacts the session itself, `agents.defaults.compaction`);
   a rotation, where one is due, is `ensure --fresh`. A cancel, an ask no one
@@ -5325,12 +5373,15 @@ in and signed out, and on 0.6.60, signed in (#7507's ROW).
   messages, ~<t> tokens) before a make: a fresh session (read in <ms> ms)`.
 - **Forget, and a long idle: dropped, and a new one opened.** The owner's
   "forget everything" (`ForgetSessions`, #6274) drops the kept session as
-  a sign-out does, once nothing holds it: `harness close`, then
-  `sessions.delete` of its `engineSession`, then its token file removed,
+  a sign-out does, once nothing holds it: `harness close`, then its
+  conversation deleted (OpenClaw's by `sessions.delete` of its
+  `engineSession`; Hermes's from its `state.db` by its session id,
+  #8151), then its token file removed,
   so the next task recalls nothing (`one_session::forgotten`). A kept
   session left with no task for 7 days (`KEPT_IDLE_MAX`, from its open or its
   last turn) is dropped the same way, since OpenClaw's is never rotated by
-  count. Either way the keep-open loop opens a new one (a new agent id and
+  count (a Hermes one the same way, its conversation deleted from Hermes's
+  store). Either way the keep-open loop opens a new one (a new agent id and
   token, so a new OpenClaw session) in the same look, right after the
   drop, not at the next task. A task that asks for the pane while a drop
   is asked for or under way (a forget, a sign-out) waits for it in the
