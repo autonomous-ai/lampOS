@@ -148,6 +148,7 @@ const PARTS: &[&str] = &[
     "lamp-name",
     "lamp-npu",
     "lamp-peek",
+    "lamp-play",
     "lamp-policy",
     "lamp-records",
     "lamp-region",
