@@ -3629,15 +3629,29 @@ record is written.
 - **Its exit ends the voice**, as Gemini's does (`coordinator::mandatory`):
   it is the only voice. A standby's exit is still dropped, and Gemini goes
   on.
-- **Its stop is Gemini's (#1620).** On a stop (SIGTERM, a mute, a fault)
+- **Its stop is Gemini's (#1620), except that a killed worker is not a
+  failure (#8081).** On a stop (SIGTERM, a mute, a fault)
   `Rig::shutdown` sends it Stop with the other workers and holds it to the
   same shared deadline, exit recheck, kill, reap and cleanup accounting
-  (`ForcedStop`/`WorkerExit` under its own role, `second`). Speech to text,
+  (`WorkerExit` under its own role, `second`). One that is still busy at
+  the shared 300 ms is killed and reaped. For Gemini's worker, and every
+  worker that holds hardware, that stays a `ForcedStop` failure (a worker
+  not confirmed gone must keep a microphone or a ring from being reopened).
+  The second route's worker holds no device, only its sockets to the speech
+  services, which end with it: killed and reaped it is a verified stop, so
+  it is recorded (`worker_forced_shutdown` with `verified` true and
+  `failure` false) and said in the journal, and it is not a cleanup failure.
+  Before, such a worker missed 300 ms in about one mute in five while it
+  was answering (a computer's mute, measured on 14967), the cleanup failure
+  dropped the mute from the run's result, the voice exited 1 and the restart
+  guard left the lamp muted until the owner unmuted it. A kill or reap that
+  failed is still a failure. Speech to text,
   the chat and the voice are tasks inside this one process, not children of
   their own; the endpoint is the session's, on either route. Tested
   mid-request and for a worker that ignores Stop
   (`second_route::a_stop_while_the_second_route_alone_is_mid_request_is_clean`,
-  `a_second_worker_that_ignores_stop_is_killed_and_named_as_geminis_is`).
+  `a_provider_worker_that_ignores_stop_is_killed_and_named`,
+  `a_second_worker_that_ignores_stop_is_killed_and_the_mute_stays_a_mute`).
   A stop during a blocking call no longer holds it: `serve` ends its tokio
   runtime with `worker::finish` (`shutdown_background()`), since a plain
   drop waited, with no bound, for running `spawn_blocking` work (a tool

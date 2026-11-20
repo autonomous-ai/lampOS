@@ -709,26 +709,43 @@ impl Worker {
     /// Always attempt wait, even if kill races a child that has already exited.
     /// Preserve both cleanup errors rather than returning early and losing a reap.
     pub(crate) fn terminate_and_reap(&mut self, kind: io::ErrorKind, reason: String) -> io::Error {
+        self.kill_and_reap(kind, reason).1
+    }
+
+    /// [`Self::terminate_and_reap`], and whether the child is verified gone: the
+    /// kill did not fail, the wait returned a status and its paths were cleaned.
+    /// The error is the same either way (what happened, in words).
+    pub(crate) fn kill_and_reap(
+        &mut self,
+        kind: io::ErrorKind,
+        reason: String,
+    ) -> (bool, io::Error) {
         let killed = self.child.kill();
         let reaped = self.child.wait();
+        let mut verified = true;
         let mut message = format!("{} worker {reason}", self.role);
         if let Err(error) = killed {
+            verified = false;
             message.push_str(&format!("; kill failed: {error}"));
         }
         match reaped {
             Ok(status) => {
                 message.push_str(&format!("; reaped with {status}"));
                 if let Err(error) = self.cleanup_ring_paths() {
+                    verified = false;
                     message.push_str(&format!("; {error}"));
                 }
             }
-            Err(error) => message.push_str(&format!("; reap failed: {error}")),
+            Err(error) => {
+                verified = false;
+                message.push_str(&format!("; reap failed: {error}"));
+            }
         }
         #[cfg(test)]
         if let Some(observe) = self.after_terminate.take() {
             observe();
         }
-        io::Error::new(kind, message)
+        (verified, io::Error::new(kind, message))
     }
     /// Signal only this owned child, without waiting for kernel teardown or
     /// reaping. Live optional-worker failure uses this once, then `try_exit`;
