@@ -1792,6 +1792,12 @@ thread_local! {
     static ALONE_FOR_TEST: std::cell::Cell<Option<bool>> = const { std::cell::Cell::new(None) };
 }
 
+/// [`owner_alone`] for this thread's tests: `None` reads the eyes.
+#[cfg(test)]
+pub(crate) fn set_alone_for_test(alone: Option<bool>) {
+    ALONE_FOR_TEST.with(|cell| cell.set(alone));
+}
+
 /// Whether a read is said in full: the owner's face seen saying the line
 /// (`seen_saying_owner`), the owner the one face in view, and the line in
 /// the conversation's voice ([`VoiceAsk::Conversation`] at

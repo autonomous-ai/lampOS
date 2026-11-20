@@ -15886,6 +15886,46 @@ fn a_yes_held(shared: &Shared) -> bool {
         || crate::services::write_waits(now)
 }
 
+/// How an answer to the one-face forget question is read (#8165), only
+/// ever toward keeping: the model judges what it means (the owner's rule),
+/// and the words here only stop a forget.
+#[derive(Debug, PartialEq)]
+enum OneFaceAnswer {
+    /// A yes, or anything else: the model's forget call on the line, naming
+    /// nothing else, runs it ([`Taken::Agrees`]).
+    ModelsCall,
+    /// A no with no forget word, or with every forget word negated ("No,
+    /// don't forget it.", `known_faces::refuses`): kept, whatever the model
+    /// calls.
+    Refuses,
+    /// Forget said and taken back in one line: a forget word negated and one
+    /// not ("Forget it… no wait, don't delete it."). Kept, and asked once
+    /// more.
+    Unclear,
+}
+
+/// [`OneFaceAnswer`] of the line `said`.
+fn one_face_answer(said: &str) -> OneFaceAnswer {
+    if crate::known_faces::refuses(said) {
+        OneFaceAnswer::Refuses
+    } else if crate::remember::negates_a_forget(said) && crate::remember::forgets_unnegated(said) {
+        OneFaceAnswer::Unclear
+    } else {
+        OneFaceAnswer::ModelsCall
+    }
+}
+
+/// What a dropped one-face forget's note may name of the thing kept: its
+/// subject in their words, only while no one else is in view, by the
+/// private read-backs' gate (`services::owner_sees_alone`: the private
+/// room, or the one face the eyes see; the person is already theirs here);
+/// otherwise nothing.
+fn kept_subject(held: &net::ToolCall) -> Option<&str> {
+    (crate::person::private_room() || crate::services::owner_alone())
+        .then(|| held.args["about"].as_str())
+        .flatten()
+}
+
 fn take_held_forget(
     shared: &Shared,
     request: u64,
@@ -15969,7 +16009,10 @@ fn take_held_forget(
     // a plain yes from the same session's person (`line_person`, whoever
     // the line is theirs by), within `remember::ONE_FACE_FORGET_YES_FOR`,
     // their face seen saying it, or in the private room on a line theirs by
-    // their face alone in view. A no, anything else or too late keeps it.
+    // their face alone in view. Too late or anyone else's keeps it. Whether
+    // it is a yes is the model's ([`Taken::Agrees`]), but a no keeps it
+    // whatever the model calls, and a line that says forget and takes it
+    // back is asked once more ([`one_face_answer`], #8165).
     if held.one_face {
         let seen = shared.forget_sight.is_some()
             && sight.is_some_and(|(seen, speakers, known)| {
@@ -16012,16 +16055,54 @@ fn take_held_forget(
                 dropped_on_forget(held.call, why, line_person, &held.asker, false)
             }
             None => {
-                eprintln!(
-                    "lamp-voice second: request {request}: the one-face forget held in request {} runs on the model's forget call on this line, naming nothing else ({})",
-                    held.request,
-                    if seen {
-                        "seen saying it"
-                    } else {
-                        "the private room"
+                let how = if seen {
+                    "seen saying it"
+                } else {
+                    "the private room"
+                };
+                match one_face_answer(said) {
+                    OneFaceAnswer::ModelsCall => {
+                        eprintln!(
+                            "lamp-voice second: request {request}: the one-face forget held in request {} runs on the model's forget call on this line, naming nothing else ({how})",
+                            held.request
+                        );
+                        Taken::Agrees(held.call)
                     }
-                );
-                Taken::Agrees(held.call)
+                    OneFaceAnswer::Refuses => {
+                        eprintln!(
+                            "lamp-voice second: request {request}: dropped a held one-face forget (held in request {}): they said no ({how}); it is kept, whatever the model calls (LAMP_PERSON_SCOPE_ONE_FACE_READS)",
+                            held.request
+                        );
+                        let note = crate::remember::said_no_told(kept_subject(&held.call));
+                        Taken::OnForget(held.call, note)
+                    }
+                    OneFaceAnswer::Unclear if held.asked_again => {
+                        eprintln!(
+                            "lamp-voice second: request {request}: dropped a held one-face forget (held in request {}): asked once more, its answer still said forget and took it back ({how}); it is kept (LAMP_PERSON_SCOPE_ONE_FACE_READS)",
+                            held.request
+                        );
+                        let note = crate::remember::still_unclear_told(kept_subject(&held.call));
+                        Taken::OnForget(held.call, note)
+                    }
+                    OneFaceAnswer::Unclear => {
+                        eprintln!(
+                            "lamp-voice second: request {request}: held a one-face forget (held in request {}) on: its answer said forget and took it back ({how}); nothing runs, and the model's forget on this line asks once more (LAMP_PERSON_SCOPE_ONE_FACE_READS)",
+                            held.request
+                        );
+                        // Its answer must ask about it again
+                        // ([`settle_held_forget`]), and the next answer is
+                        // judged as this one was, from now.
+                        let call = held.call.clone();
+                        hold.held = Some(HeldForget {
+                            request,
+                            at: now,
+                            asked: false,
+                            asked_again: true,
+                            ..held
+                        });
+                        Taken::OnForget(call, crate::remember::FORGET_ASKED_AGAIN.to_owned())
+                    }
+                }
             }
         };
     }

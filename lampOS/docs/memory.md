@@ -970,7 +970,27 @@ place exactly as held, by its kept id and words, never the model's raw
 call (`second_provider::agree_held_forget`, `Taken::Agrees`). A line the
 model answers with no `forget` runs nothing and the thing stays kept; a
 `forget` naming another thing is that other forget, and the held one is
-kept. A yes after its
+kept. **A no keeps it whatever the model calls** (#8165: on lamp-06c1 "No."
+ran the forget, the model calling it anyway), a keep-side backstop to the
+model's judgment whose words only ever keep (`second_provider::one_face_answer`):
+a no (a no word outside a pleasantry, "No.", "No, keep it.", "Don't.",
+"Lamp, no.", never "No problem, go ahead."; a plain no; or a forget word
+or phrase negated in its clause, "No, don't forget it.", "Don't drop it.",
+"No, don't get rid of it.") with no forget word or phrase that is not
+negated (`known_faces::refuses`, `remember::forgets_read`; "No, just forget
+it.", "No no, delete it.", "No, drop it." and "No, I don't need it." stay
+the model's call) drops the hold, and
+the model's `forget` on that line is answered that they said no, nothing
+was forgotten and it is still kept, and to say only that it kept it
+(`remember::said_no_told`). That note names the thing asked about only in
+the private room or with one face in view (`services::owner_alone`, the
+private read-backs' gate); otherwise it names nothing. A line that says
+forget and takes it back, a forget word negated and one not ("No, don't
+keep it, forget it. No wait, don't delete it."), runs nothing either: its
+`forget` is answered to ask once more, "Should I forget it?"
+(`remember::FORGET_ASKED_AGAIN`), the hold is kept for one more answer,
+judged the same way from then, and such a line again drops it
+(`remember::still_unclear_told`). A yes after its
 30 s is journaled "too late", whoever the line is by then; one not theirs
 says why after "not the same person": "no one known on the line", "theirs,
 in a later session" or "another person" (`second_provider::not_theirs`, ids
