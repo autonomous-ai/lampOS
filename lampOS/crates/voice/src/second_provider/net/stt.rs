@@ -41,6 +41,41 @@ const MOST_HELD: usize = 500;
 const QUEUE: usize = 300;
 const MAX_MESSAGE: usize = 1 << 20;
 
+/// The switch (#8114): the language speech to text is asked to hear in,
+/// apart from the lamp's own. `multi` (Nova-3's code-switching) hears a
+/// line in more than one language, Vietnamese talk on an English lamp
+/// among them, so its words come back as said instead of forced into the
+/// lamp's language. A language code (`vi`, `en`, …) asks for that one.
+/// Unset, or anything else, the lamp's language as before. The lamp still
+/// speaks its own language: the character's rule says so whatever it hears.
+pub const HEARD_LANGUAGE_ENVIRONMENT: &str = "LAMP_STT_HEARD_LANGUAGE";
+
+/// [`HEARD_LANGUAGE_ENVIRONMENT`]'s value when it is one speech to text
+/// takes: `multi`, or a code of two or three lower-case letters with an
+/// optional `-` region (`en-US`). None for anything else.
+pub fn heard_language(value: Option<&str>) -> Option<&str> {
+    let value = value?.trim();
+    if value == "multi" {
+        return Some(value);
+    }
+    let (code, region) = value.split_once('-').unwrap_or((value, ""));
+    let code_ok = (2..=3).contains(&code.len()) && code.bytes().all(|b| b.is_ascii_lowercase());
+    let region_ok = region.is_empty()
+        || ((2..=3).contains(&region.len()) && region.bytes().all(|b| b.is_ascii_alphanumeric()));
+    (code_ok && region_ok).then_some(value)
+}
+
+/// The hearing language from lamp-voice's environment, read once.
+fn heard_language_from_environment() -> Option<&'static str> {
+    static HEARD: std::sync::OnceLock<Option<String>> = std::sync::OnceLock::new();
+    HEARD
+        .get_or_init(|| {
+            let value = std::env::var(HEARD_LANGUAGE_ENVIRONMENT).ok();
+            heard_language(value.as_deref()).map(str::to_owned)
+        })
+        .as_deref()
+}
+
 /// V1's query for nova models, in its order, with the lamp's name as a
 /// key term as V1 boosts it: without it, on lamp-52e6 on 2026-10-15, "Hey
 /// Lamp" came back as "Palin", "Palan" and "Len", and the model took the
@@ -55,6 +90,23 @@ fn query<'a>(
     key_terms: &'a [String],
     fillers: bool,
 ) -> Vec<(&'static str, &'a str)> {
+    query_hearing(
+        language,
+        heard_language_from_environment(),
+        key_terms,
+        fillers,
+    )
+}
+
+/// [`query`], with the hearing language ([`HEARD_LANGUAGE_ENVIRONMENT`])
+/// over the lamp's when one is given.
+fn query_hearing<'a>(
+    language: Option<&'a str>,
+    heard: Option<&'a str>,
+    key_terms: &'a [String],
+    fillers: bool,
+) -> Vec<(&'static str, &'a str)> {
+    let language = heard.or(language);
     let mut query = vec![
         ("model", MODEL),
         ("encoding", "linear16"),
@@ -1428,6 +1480,31 @@ fn closed_by_service(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// #8114: the hearing language asks speech to text for `multi` (or one
+    /// code) over the lamp's own; unset or not one it takes, the lamp's.
+    #[test]
+    fn a_hearing_language_is_asked_for_over_the_lamps_own() {
+        assert_eq!(heard_language(Some("multi")), Some("multi"));
+        assert_eq!(heard_language(Some(" vi ")), Some("vi"));
+        assert_eq!(heard_language(Some("en-US")), Some("en-US"));
+        for refused in ["", "MULTI", "vietnamese", "v", "vi&keyterm=x", "en_US"] {
+            assert_eq!(heard_language(Some(refused)), None, "{refused}");
+        }
+        assert_eq!(heard_language(None), None);
+        let asked = |language, heard| {
+            query_hearing(language, heard, &[], false)
+                .into_iter()
+                .find(|(key, _)| *key == "language")
+                .map(|(_, value)| value.to_owned())
+        };
+        assert_eq!(asked(None, None).as_deref(), Some("en"));
+        assert_eq!(asked(Some("vi"), None).as_deref(), Some("vi"));
+        assert_eq!(asked(None, Some("multi")).as_deref(), Some("multi"));
+        assert_eq!(asked(Some("ja"), Some("multi")).as_deref(), Some("multi"));
+        // The lamp's name stays a key term whatever it hears in.
+        assert!(query_hearing(None, Some("multi"), &[], false).contains(&("keyterm", "Lamp")));
+    }
 
     const QUERY: &str = "model=nova-3-general&encoding=linear16&sample_rate=16000&channels=1\
         &language=en&smart_format=true&interim_results=true&endpointing=300&vad_events=true\
