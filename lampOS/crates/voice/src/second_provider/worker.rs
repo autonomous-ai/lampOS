@@ -28499,6 +28499,43 @@ mod tests {
         assert_eq!(noted(false, call, 1.0), None, "off, as on 15164");
     }
 
+    /// Seen on lamp-52e6 (20 Nov 19:5x, build 15177 with #8137, request
+    /// 41, a five-word "Hey Lamp, …" clip; the journal's fixed lines, no
+    /// words kept): 0 faces, lamp-name at 0.979, the name counted by its
+    /// words calling it and its hearing at the line's start, the line
+    /// played as "the text shows it was called"; but in a busy room with
+    /// nobody turned to the lamp the name note's room rule
+    /// (`LAMP_NAME_NOTE_BUSY=face`) withheld the note, and no tool was
+    /// called. With `LAMP_NAME_FACE_OR_WORDS=on` a line whose words call
+    /// the lamp is told even so; a busy room where only the room's sound
+    /// carries the name, its words not calling it, is not told. Off, as
+    /// on 15177.
+    #[test]
+    fn a_line_its_words_call_is_told_the_name_in_a_busy_room_with_nobody_turned() {
+        use crate::room_told::Room;
+        let line = (10_000_000, 12_100_000);
+        let noted = |on: bool, heard: &str| {
+            let mut heeding = room_name_heeding(true);
+            heeding.telling_the_name(true, false);
+            heeding.attention.need_a_face_or_words(on);
+            let names = vec![(line.0 + 200_000, 0.979)];
+            heeding.heed_signs(
+                41,
+                line,
+                heard,
+                room_name_signs(Room::Busy, false, Some(false), false, names),
+            );
+            heeding.name_note_for(41)
+        };
+        let call = "Hey Lamp, make it blue.";
+        let told = Some(crate::called::note(false));
+        assert_eq!(noted(true, call), told, "request 41");
+        assert_eq!(noted(false, call), None, "off, as on 15177");
+        let plain = "Yes, make it blue now.";
+        assert_eq!(noted(true, plain), None, "only the room's sound");
+        assert_eq!(noted(false, plain), None, "only the room's sound, off");
+    }
+
     /// #4226, `LAMP_NAME_START_USUAL=on`: a line whose sound began 0.3 s
     /// before its usual start by the soft start's lead, the name heard
     /// 1.5 s into its sound (1.2 s from its usual start), is a call at its
