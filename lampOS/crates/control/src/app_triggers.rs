@@ -241,17 +241,24 @@ mod tests {
         install(
             &apps,
             "gym-coach",
-            json!({"en": "Stand \"side-on\", see https://x.io", "vi": "Đứng nghiêng."}),
+            json!({"en": "Stand side-on.\nSay stop workout to end.", "vi": "Đứng nghiêng.", "pt-br": "Fique de lado."}),
         );
         install(&apps, "no-help", serde_json::Value::Null);
         install(&apps, "only-vi", json!({"vi": "Đứng nghiêng."}));
         install(&apps, "too-long", json!({"en": "a".repeat(301)}));
+        install(&apps, "quoted", json!({"en": "Say \"stop\""}));
+        // The Store takes a bidi character; the voice is never told it.
+        install(&apps, "bidi", json!({"en": "Stand side-on \u{202E}ok"}));
         let told = helps_of(&apps);
         assert!(told.check().is_ok());
         assert_eq!(told.apps.len(), 1, "{told:?}");
         assert_eq!(told.apps[0].app, "gym-coach");
-        assert_eq!(told.apps[0].help["en"], "Stand side-on, see");
+        assert_eq!(
+            told.apps[0].help["en"],
+            "Stand side-on. Say stop workout to end."
+        );
         assert_eq!(told.apps[0].help["vi"], "Đứng nghiêng.");
+        assert_eq!(told.apps[0].help["pt-br"], "Fique de lado.", "carried");
         let _ = std::fs::remove_dir_all(&apps);
     }
 }

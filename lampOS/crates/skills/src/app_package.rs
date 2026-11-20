@@ -92,8 +92,8 @@ pub struct AppManifest {
     pub phrases: Vec<String>,
     pub triggers: Vec<String>,
     /// How the app is used, by language (`{"en": "...", "vi": "..."}`):
-    /// English required, the lamp's languages only, at most 300 bytes each
-    /// (`lamp_msgs::app_help::help_ok`). Told to the voice as a quoted note
+    /// the production Store's rules exactly (`lamp_msgs::app_help::help_ok`:
+    /// `en` required, at most 8 language keys, 1 to 300 bytes and 3 lines). Told to the voice as a quoted note
     /// for `app_help` (#7415); absent is none.
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     pub help: BTreeMap<String, String>,
