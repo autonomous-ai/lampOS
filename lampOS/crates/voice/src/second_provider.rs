@@ -3379,9 +3379,11 @@ pub(crate) fn wake_heard_as(text: &str) -> Option<(&str, &str)> {
 /// Anna, …" said to a person) or opens with no such word. The one reading
 /// the made-skill matcher and `LAMP_MAKE_SKILL_ASKED`'s force share
 /// (#8022), so they can't drift.
-pub(crate) fn past_the_name(said: &str, named: bool) -> Option<&str> {
-    let _ = (said, named);
-    None
+pub(crate) fn past_the_name_heard_as(said: &str, named: bool) -> Option<&str> {
+    named
+        .then(|| wake_heard_as(said))
+        .flatten()
+        .map(|(_, rest)| rest)
 }
 
 /// Greetings a line may open with, set off by a comma or a stop, before
@@ -14336,6 +14338,14 @@ fn prepared_on(
                 .as_ref()
                 .filter(|_| !held_by_gap(scope))
                 .and_then(|note| note(request, &words, scope));
+            // Whether the early words name the lamp, as known before the
+            // line's notes, for `LAMP_MAKE_SKILL_ASKED`'s force (#8022 case
+            // 2); a line named by a note alone isn't begun early's to stand.
+            crate::tools::make_skill_asked::heard_named(
+                &words,
+                crate::attention::called_by_name_on(&words, true)
+                    || crate::attention::marked_woken_by_name(request).is_some(),
+            );
             // The opening's note as the final words will be told it, so a
             // chat begun here still fits them (`LAMP_OPENS_FURTHER`).
             let opens = opening_note(
@@ -14535,8 +14545,9 @@ impl TurnTools {
 /// Round 1's journal line (#8022 case 2): whether `start_agent_task` and
 /// `make_skill` were offered (`offered`), the function it was forced to
 /// call (`forced`, `none` for none), whether the person's line asks to make
-/// a skill (`crate::tools::make_skill_asked::asks_to_make`) and how many
-/// sentences it has. `?` where the services cannot say, or where the last
+/// a skill as the force reads it (`crate::tools::make_skill_asked::make_asked`,
+/// past the lamp's name heard as another word on a line that names it) and
+/// how many sentences it has. `?` where the services cannot say, or where the last
 /// message is no person's line. Names, `y`/`n` and a count: never a word.
 fn round_one_line(
     request: u64,
@@ -14550,7 +14561,7 @@ fn round_one_line(
         .last()
         .filter(|message| message.role == "user")
         .and_then(Message::words);
-    let make_ask = said.map(crate::tools::make_skill_asked::asks_to_make);
+    let make_ask = said.map(crate::tools::make_skill_asked::make_asked);
     let sentences = said.map(crate::tools::make_skill_asked::sentence_count);
     format!(
         "lamp-voice second: request {request}: round 1: task_offered={} make_offered={} forced={} make_ask={} sentences={}",
@@ -17645,6 +17656,12 @@ async fn answer(
                 [crate::called::NOTE, crate::called::NOTE_HEARD_AS].contains(&note.as_str())
             })
             || crate::attention::marked_woken_by_name(request).is_some());
+    // `LAMP_MAKE_SKILL_ASKED`'s force reads a make past the lamp's name
+    // heard as another word on a line that names the lamp alone
+    // ([`past_the_name_heard_as`], #8022 case 2): it sees only the messages.
+    if heard {
+        crate::tools::make_skill_asked::heard_named(&said, named);
+    }
     // `LAMP_LIMIT_LOCAL_ASKS` (#7346): only a line said to the lamp is
     // acted on without the model: one named, or one not let out only as the
     // conversation going on, which the model alone could judge not for it
@@ -17859,7 +17876,14 @@ async fn answer(
                 .skill_named
                 .as_ref()
                 .filter(|_| read_back_named.is_none())
-                .and_then(|named| named(&said))
+                .and_then(|skill| {
+                    // Past the lamp's name heard as another word, as its
+                    // kept line is ([`past_the_name_heard_as`]): "Hey, Lynn. An
+                    // apple file." (#8022's kit-8043 ROW, lamp-52e6, 20 Nov
+                    // 09:14: `calls=none`).
+                    let past = || skill(past_the_name_heard_as(&said, named)?);
+                    skill(&said).or_else(past)
+                })
         })
         .flatten();
     // The line a skill was matched in, for whether the lamp's last words

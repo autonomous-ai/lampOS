@@ -4079,11 +4079,30 @@ gone ([switches.md](switches.md)). What happens:
      forced=make_skill make_ask=y sentences=1`. `task_offered` and
      `make_offered` are whether `start_agent_task` and `make_skill` were
      given; `forced` the function its `tool_choice` named (`none` for
-     none); `make_ask` whether `asks_to_make` matched the person's line,
-     and `sentences` how many sentences it counts in it. `?` where the
+     none); `make_ask` whether the person's line asks to make a skill as
+     the force reads it (`make_skill_asked::make_asked`, below), and
+     `sentences` how many sentences it counts in it. `?` where the
      services can't say, or where the last message is no person's line.
      Names, `y`/`n` and a count only, never a word. Host test:
      `round_one_forced::round_one_says_its_force_and_the_make_ask_never_its_words`.
+   - **Past the lamp's name heard as another word** (#8022 case 2, third
+     cause: kit-8101's ROW on lamp-52e6, 20 Nov 14:38, played the make
+     ask; speech to text wrote the lamp's name as another word, set off,
+     and round 1 said `forced=none make_ask=n sentences=1`). On a line
+     that names the lamp (`named`: the name in its words, its name
+     detector's note, or a wake by name before it), the force also reads
+     the line past that word: `second_provider::past_the_name_heard_as`,
+     the rest after `wake_heard_as`'s word, the one reading the made-skill
+     matcher (item 6 of "A start by the person's own words") shares, so
+     the two can't drift. The force sees only the messages, so the line's
+     `named` is kept for it by its words (`make_skill_asked::heard_named`,
+     at most 16, set where the line is answered and where its chat is
+     begun on its early words); `make_skill_asked::make_asked` is what the
+     force and round 1's `make_ask` read. A line not said to the lamp
+     ("Hey, Anna, make me a skill that …" to a person) is read as said
+     and not forced. Host tests:
+     `round_one_forced::a_make_past_the_lamps_name_heard_as_another_word_is_forced_on_a_named_line_alone`,
+     `wake_not_name::past_the_name_is_the_line_past_the_misheard_name_on_a_named_line`.
    - **A make is never a task** (#8022 case 2, the first builder's yes at
      11:05): while `make_skill` is declared, `start_agent_task`'s
      description ends "Making a skill is make_skill's, never this." (`agent_tasks::MAKE_TOLD`), only
@@ -8391,6 +8410,12 @@ grants, its code, or the lamp's own steps (the light, the head, a say).
    #7916's row on lamp-9adf, 19 Nov: speech to text gave "Um, daily
    brief." back as "Daily briefs."); "tell me
    about your daily brief idea" holds other words and is the model's. A
+   line that calls the lamp by its name heard as another word ("Hey,
+   Lynn. Mail check.") is matched past that word too, on a line that
+   names the lamp (`second_provider::past_the_name_heard_as`, which
+   `LAMP_MAKE_SKILL_ASKED`'s force reads too; #8022's kit-8043 ROW,
+   lamp-52e6, 20 Nov 09:14: such a line got `calls=none`). Host test:
+   `skill_named_words::a_made_skill_runs_past_the_lamps_name_heard_as_another_word`. A
    no, a question, a phrase two skills give, a part of the name, or a line
    while a yes is held starts nothing. After the lamp's last words asked
    something (`remarks::lamp_asked`), the line is the model's, told the
