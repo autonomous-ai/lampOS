@@ -194,6 +194,99 @@ pub struct TaskStep {
     /// ([`told`]) is held to it beside the lamp's quiet hours, as a
     /// `do.read`'s is ([`crate::service_read::ReadStep::quiet`]).
     pub quiet: Option<(u16, u16)>,
+    /// A `run` step (#8158, [`TaskStep::run_step`]): its script run by
+    /// lamp-tasks itself, with no agent, handed over as `skill_run`. Its
+    /// `task` and `words` are [`RUN_WORDS`]. False for a `do.task`.
+    pub direct: bool,
+}
+
+/// What a `run` step stands for where a task's words go (the owner's yes
+/// read-back, the hand-over line): it has none of its own (#8158).
+pub const RUN_WORDS: &str = "run its own script";
+
+/// The longest a `run` step's hand-over is waited for: lamp-tasks ends its
+/// script at 30 s (`lamp_tasks::skill_run::RUN_WITHIN`), and the token's
+/// mint and end take a few seconds at most.
+pub const RUN_STEP_MOST: Duration = Duration::from_secs(60);
+
+/// The one line the lamp says when a `run` step started by the person's
+/// words failed (#8158): "<spoken name> couldn't finish this time.". A run
+/// a trigger started says nothing; the journal says why.
+pub fn run_failed_line(skill: &str) -> String {
+    format!(
+        "{} couldn't finish this time.",
+        crate::task_sure::spoken_name(skill)
+    )
+}
+
+/// Whether lamp-tasks' answer to a `run` step's hand-over says it
+/// succeeded: its script exited 0 within its bound and said something
+/// (`{"ok":true,...,"said":N}` with N at least 1).
+pub fn run_succeeded(answer: &str) -> bool {
+    serde_json::from_str::<serde_json::Value>(answer.trim()).is_ok_and(|answer| {
+        answer["ok"] == true && answer["said"].as_u64().is_some_and(|said| said > 0)
+    })
+}
+
+/// What a `run` step's hand-over ended with (`sent`: lamp-tasks' answer,
+/// or why none came), for a run the person's words started (`by_words`):
+/// the journal's words, and the one line to say, if any (#8158). A run
+/// that succeeded ([`run_succeeded`]) says nothing more (its script said
+/// it); one that failed says [`run_failed_line`] only when the person's
+/// words started it, and a trigger's says nothing.
+pub fn run_outcome(
+    skill: &str,
+    sent: &Result<String, crate::service_write::Unrun>,
+    by_words: bool,
+) -> (String, Option<String>) {
+    use crate::service_write::Unrun;
+    let journal = match sent {
+        Ok(answer) if run_succeeded(answer) => {
+            let said = serde_json::from_str::<serde_json::Value>(answer.trim())
+                .ok()
+                .and_then(|answer| answer["said"].as_u64())
+                .unwrap_or(0);
+            return (
+                format!("do.run: its script ran and said {said} line(s)"),
+                None,
+            );
+        }
+        Ok(answer) => match answered(answer) {
+            Ok(_) => "do.run: failed: its script said nothing aloud".to_owned(),
+            Err(why) => format!("do.run: failed: {why}"),
+        },
+        Err(Unrun::NotTaken(why) | Unrun::Unknown(why) | Unrun::NotMade(why)) => {
+            format!("do.run: failed: {why}")
+        }
+    };
+    let said = by_words.then(|| run_failed_line(skill));
+    let journal = if said.is_some() {
+        format!("{journal}; its line said, as the person's words started it")
+    } else {
+        format!("{journal}; nothing said, as a trigger started it")
+    };
+    (journal, said)
+}
+
+impl TaskStep {
+    /// A `run = "scripts/main.py"` step of the skill in `dir` (#8158): a
+    /// plain Python file inside the skill's own `scripts/`, as a task's
+    /// `run` is ([`run_ok`]), with the skill's `[quiet]`.
+    pub fn run_step(dir: &Path, run: &str, quiet: Option<(u16, u16)>) -> Result<Self, String> {
+        run_ok(dir, run).map_err(|why| why.replacen("do.task: run", "do.run", 1))?;
+        if !run.ends_with(".py") {
+            return Err(format!(
+                "do.run: {run:?} is a Python file, like \"{SCRIPTS}/main.py\""
+            ));
+        }
+        Ok(Self {
+            task: RUN_WORDS.to_owned(),
+            words: RUN_WORDS.to_owned(),
+            run: run.to_owned(),
+            quiet,
+            direct: true,
+        })
+    }
 }
 
 impl TaskFile {
@@ -212,6 +305,7 @@ impl TaskFile {
             words: self.task.clone(),
             run: self.run,
             quiet,
+            direct: false,
         })
     }
 }
@@ -901,10 +995,11 @@ pub struct HandOver<'a> {
 
 impl HandOver<'_> {
     /// `{"op": "skill_task", "skill", "task", "run", "folder", "sha256",
-    /// "grants"}`: the contract lamp-tasks' hand-over takes (#6306).
+    /// "grants"}`: the contract lamp-tasks' hand-over takes (#6306); a
+    /// `run` step's `op` is `skill_run` (#8158), its `task` [`RUN_WORDS`].
     pub fn line(&self) -> String {
         serde_json::json!({
-            "op": "skill_task",
+            "op": if self.step.direct { "skill_run" } else { "skill_task" },
             "skill": self.skill,
             "task": self.step.task,
             "run": self.step.run,
@@ -1456,6 +1551,46 @@ mod tests {
         assert_eq!(refused, ("bad_request", NOT_A_TASK_LINE.to_owned()));
     }
 
+
+    /// #8158: a `run` step's outcome. Succeeded (exit 0 within its bound
+    /// and something said), nothing more is said. Failed in any way, the
+    /// one fixed line is said only when the person's words started it, and
+    /// the journal says why either way; never lamp-tasks' words aloud.
+    #[test]
+    fn a_run_steps_failure_is_said_only_when_words_started_it() {
+        use crate::service_write::Unrun;
+        let ok = Ok(r#"{"ok":true,"id":0,"said":2}"#.to_owned());
+        assert!(run_succeeded(ok.as_ref().unwrap()));
+        for by_words in [true, false] {
+            let (journal, said) = run_outcome("daily-brief", &ok, by_words);
+            assert_eq!(said, None);
+            assert!(journal.contains("said 2"), "{journal}");
+        }
+        let failures = [
+            Ok(r#"{"ok":false,"error":"run_failed","message":"its script ended with status 1"}"#.to_owned()),
+            Ok(r#"{"ok":false,"error":"run_failed","message":"its script was ended at its 30 s limit"}"#.to_owned()),
+            Ok(r#"{"ok":true,"id":0,"said":0}"#.to_owned()),
+            Ok(r#"{"ok":true,"id":0}"#.to_owned()),
+            Err(Unrun::NotTaken("lamp-tasks couldn't be reached".into())),
+            Err(Unrun::Unknown("lamp-tasks' answer never came".into())),
+        ];
+        for sent in &failures {
+            if let Ok(answer) = sent {
+                assert!(!run_succeeded(answer), "{answer}");
+            }
+            let (journal, said) = run_outcome("daily-brief", sent, true);
+            assert_eq!(
+                said.as_deref(),
+                Some("Daily brief couldn't finish this time.")
+            );
+            assert!(journal.starts_with("do.run: failed"), "{journal}");
+            let (journal, said) = run_outcome("daily-brief", sent, false);
+            assert_eq!(said, None, "a trigger's run says nothing");
+            assert!(journal.contains("nothing said"), "{journal}");
+        }
+        let (journal, _) = run_outcome("daily-brief", &failures[1], false);
+        assert!(journal.contains("30 s limit"), "{journal}");
+    }
     use super::*;
     use serde_json::json;
 

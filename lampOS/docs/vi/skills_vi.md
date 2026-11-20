@@ -4198,6 +4198,65 @@ từng byte. **Chưa thử trên đèn:** hai lần tạo liên tiếp bằng gi
 được làm theo thứ tự, lần thứ hai được báo là ngay sau và được nói lại sau
 lời đồng ý của lần đầu.
 
+### Bước `run` của một kỹ năng (`do.run`, #8158)
+
+Một `do.task` gửi script của nó qua agent của đèn: trên lamp-c0a4 một bản
+tin buổi sáng chỉ chạy `scripts/main.py` mất 43 s và 53 s, phần lớn là để
+agent khởi động. Bước `run` chạy script của chính kỹ năng mà không cần agent.
+
+```toml
+version = "1.0.0"
+grants = ["speak"]
+tool = "daily_brief"
+[permissions]
+speak = true
+[[do]]
+run = "scripts/main.py"
+```
+
+- **Cái khởi động nó không đổi**: giọng nói cho lời nói (tên kỹ năng và
+  `asks`, rồi `use_skill` của model), `lamp-skills` trên bus cho mọi thứ
+  khác, với giờ yên lặng, ngân sách và thời gian chờ của nó.
+- **Bước** (`lamp_skills::task::TaskStep::run_step`): `run = "..."` viết
+  đúng như vậy, một mình trong bảng `[[do]]`, một bước mỗi kỹ năng (một kỹ
+  năng có bước `run` hoặc `do.task`, không bao giờ cả hai), một file `.py`
+  thường trong `scripts/` của chính kỹ năng (cùng quy tắc với `run` của
+  task, không bao giờ là link). Nó được nạp như một task không có lời riêng
+  (`task::RUN_WORDS`, "run its own script", là điều mà lời đọc lại để chủ
+  nhân đồng ý nêu ra), nên mọi cổng của `do.task` vẫn giữ: công tắc, chỉ
+  loại đầu tiên, `grants` bên cạnh, lời đồng ý của chủ nhân cho các quyền
+  đó và SHA-256 của thư mục (được hỏi thành tiếng khi chưa có), kỹ năng
+  tắt, tạm dừng hay đã gỡ, một lần một lúc mỗi kỹ năng, 20 lần mỗi kỹ năng
+  và 100 lần tổng trong 24 giờ.
+- **Bàn giao**: dòng của task với `"op": "skill_run"` (`task::HandOver::line`),
+  trên socket của lamp-tasks, chờ tối đa 60 s (`task::RUN_STEP_MOST`).
+  Nó không bao giờ được tính là một bàn giao đang chạy (`HANDING`), nên
+  không chờ sau task của agent, cũng không giữ task đó lại; lamp-tasks chạy
+  một bước `run` một lúc, bên cạnh task của agent
+  ([tasks_vi.md](tasks_vi.md), "Bước `run` của một kỹ năng").
+- **Thành công**: script thoát với mã 0 trong vòng 30 s, và lamp-control đã
+  nói trọn ít nhất một dòng `lamp.say` của lần chạy (`{"ok":true,"said":N}`).
+  Một script không chờ câu nói của nó (`wait=True`) mà thoát ngay có thể bị
+  bỏ câu nói cùng kết nối, và khi đó là thất bại.
+- **Thất bại** (`task::run_outcome`): không bao giờ chạy lại cho lần kích
+  hoạt đó. Nếu được khởi động bằng lời của người dùng (giọng nói đánh dấu
+  lần chạy là được hỏi, chạy ngay hoặc model gọi tool của nó), đèn nói một
+  câu cố định, "<tên đọc lên> couldn't finish this time."
+  (`task::run_failed_line`), ở mức ưu tiên nói của kỹ năng; nếu do một
+  trigger khởi động, đèn không nói gì. Nhật ký luôn ghi lý do, không bao
+  giờ ghi đầu ra của script.
+- **Không được cấp**: `net` (hàng rào của nó chỉ có `lo`) và khóa
+  (`secrets`): kỹ năng cần một trong hai dùng `do.task`; lamp-tasks từ chối
+  bước `run` có một trong hai, bằng lời.
+- **Thời gian** (từng chặng, từ trigger đến script): luồng của lần kích
+  hoạt tạo luồng bàn giao; thư mục được băm (vài file của kỹ năng); hỏi
+  lamp-control lời đồng ý (một dòng socket cục bộ); ghi sổ; một dòng tới
+  lamp-tasks; tạo token (một dòng socket cục bộ tới lamp-control); dựng
+  hàng rào (`unshare`, vài mount) và khởi động `python3`. Không agent, không
+  Harness, không mạng. Ở mức unit, với hàng rào thay thế, cả lần chạy một
+  script mất vài chục mili giây (`skill_run::tests`); trên đèn, mục tiêu là
+  vài giây từ trigger đến tiếng đầu tiên, chưa đo.
+
 ### Câu nói của một kỹ năng lõi qua agent của đèn (`LAMP_CORE_VIA_AGENT`, thử nghiệm, tắt)
 
 Dạng ở giữa của một lần tạo bằng giọng nói, cho các kỹ năng lõi nói một câu
