@@ -1393,15 +1393,17 @@ impl Door {
                 let notes = self.notes.as_ref().expect("notes on");
                 // A skill's run (#7245, #7775): its notes are its skill's,
                 // shared by every run of it (a run's client is new each
-                // run), so its next run reads them back. A paired computer,
-                // or no live run, keeps its own client.
-                // The session's own client still takes the rate and the reply.
+                // run), so its next run reads them back. A paired computer
+                // keeps its own client; a run past its time (not yet swept)
+                // is refused, never kept under its own run's client (#7799's
+                // P3). The session's own client still takes the rate and
+                // the reply.
                 let kept_as = if session.run_socket {
-                    self.runs
-                        .of_client(&client, now_us)
-                        .map_or(client.clone(), |run| {
-                            crate::runs::skill_notes_client(&run.skill)
-                        })
+                    let Some(run) = self.runs.of_client(&client, now_us) else {
+                        let error = Error::new(ErrorCode::NoGrant, "the run has ended");
+                        return reply_refused(Some(re), error);
+                    };
+                    crate::runs::skill_notes_client(&run.skill)
                 } else {
                     client.clone()
                 };
@@ -4541,6 +4543,32 @@ mod tests {
             .unwrap_or_default();
         let checkup = crate::runs::skill_notes_client("lamp-checkup");
         assert_eq!(names, [format!("{checkup}.json")]);
+        // A run past its time, not yet swept, is refused: nothing kept
+        // under its own client (#7799's P3).
+        let token = "U".repeat(43);
+        door.mint_run(
+            &token,
+            "task-late",
+            "lamp-checkup",
+            [Grant::Notes].into(),
+            Some(60_000),
+            0,
+        )
+        .unwrap();
+        let (mut session, _) = door.open_run();
+        let hello = json!({"id": 1, "op": "hello", "client": crate::runs::HELLO_CLIENT,
+            "sig": crate::runs::hello_sig(), "token": token})
+        .to_string();
+        assert_eq!(
+            reply(&door.handle(&mut session, &hello, &mut fake, S, 1))["ok"],
+            true
+        );
+        let late = door.handle(&mut session, get, &mut fake, 120 * S, 1);
+        assert!(
+            format!("{late:?}").contains("the run has ended"),
+            "{late:?}"
+        );
+        assert_eq!(std::fs::read_dir(&folder).unwrap().count(), 1);
         // A paired computer's notes are its own, not a skill's.
         let computer = Computer::new(1);
         let (paired_door, mut session, mut fake) = paired(&computer, &[Grant::Notes]);
