@@ -2209,6 +2209,9 @@ struct Shared {
     /// Whether words name one of the skills made on the lamp, by its name
     /// ([`Engine::knowing_made_names`]).
     made_named: Option<MadeNamed>,
+    /// Whether a made skill, by its name, is among those the matcher reads
+    /// ([`Engine::knowing_made_read`]), for the made-skill miss line.
+    made_read: Option<MadeNamed>,
     /// A called skill's own ask phrases: a line that holds one that asks to
     /// play is an ask for its recording ([`Engine::playing_for_skill_asks`]).
     skill_asks: Option<SkillAsks>,
@@ -5388,6 +5391,7 @@ impl Engine {
                 read_back_asked: None,
                 skill_named: None,
                 made_named: None,
+                made_read: None,
                 skill_asks: None,
                 named_agent: None,
                 named_agent_takes_line: false,
@@ -7462,6 +7466,18 @@ impl Engine {
     pub fn knowing_made_names(mut self, named: MadeNamed) -> Self {
         if let Some(shared) = Arc::get_mut(&mut self.shared) {
             shared.made_named = Some(named);
+        }
+        self
+    }
+
+    /// With [`Self::calling_skills_named`]: whether a made skill (its name)
+    /// is among those the matcher reads (`read`,
+    /// `crate::skill_named::Heard::reads_made`), counted on a line that
+    /// named no skill while one was made in this conversation (#8022).
+    /// Before any turn only.
+    pub fn knowing_made_read(mut self, read: MadeNamed) -> Self {
+        if let Some(shared) = Arc::get_mut(&mut self.shared) {
+            shared.made_read = Some(read);
         }
         self
     }
@@ -18856,15 +18872,15 @@ async fn answer(
         }
         // Whether the matcher knew a skill made in this conversation, for a
         // line that named none (#8022: "apple file" twice, no line at all):
-        // the made skills it reads ([`MadeNamed`]) hold its name or not.
-        // No word of the line, and no skill's name.
+        // the made skills it reads ([`Engine::knowing_made_read`]) hold it
+        // or not, whatever its name's length (lamp-52e6, 12:11: a one-word
+        // "applefile" read as 0, its name never counted as the lamp's
+        // words are). No word of the line, and no skill's name.
         if heard && skill_named.is_none() && !made_here.is_empty() {
-            let read = shared.made_named.as_ref().map_or(0, |named| {
-                made_here
-                    .iter()
-                    .filter(|made| named(&crate::skill_named::spoken(made)))
-                    .count()
-            });
+            let read = shared
+                .made_read
+                .as_ref()
+                .map_or(0, |read| made_here.iter().filter(|made| read(made.as_str())).count());
             // The matcher's input shape, no word of it: its own words past
             // those said around an ask, and how far the nearest made name is.
             let line = skill_words.as_str();

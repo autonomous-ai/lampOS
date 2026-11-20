@@ -921,11 +921,14 @@ impl Heard {
     }
 
     /// Whether the made skill `made` (its name, no [`MADE`]) is among the
-    /// made skills [`Self::heard`] reads, for the made-skill miss line's
-    /// count (`second_provider`, #8022): read as the lamp's words are for a
-    /// name that alone would run it ([`Self::names_made`]).
+    /// made skills [`Self::heard`] reads (the tools file's `made_asks`),
+    /// for the made-skill miss line's count (`second_provider`, #8022):
+    /// listed is read, a one-word name too. Not [`Self::names_made`], which
+    /// counts only a name that alone would run it: on lamp-52e6 at 12:11 a
+    /// kept "applefile" read as 0, as if never loaded.
     pub fn reads_made(&self, made: &str) -> bool {
-        self.names_made(&spoken(made))
+        crate::made_skill::asks_on()
+            && crate::tools::made_skill_asks(&self.settings).contains_key(made)
     }
 
     /// What the functions are read from: each skills folder's tools file
