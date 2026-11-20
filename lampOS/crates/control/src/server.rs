@@ -53,9 +53,11 @@ pub const FRAME_MAX: usize = 64 * 1024;
 pub const POSE_FRAME_MAX: usize = 256 * 1024;
 
 /// The largest frame a door's WebSocket reads: [`POSE_FRAME_MAX`] on a
-/// door that takes a `pose`, else [`FRAME_MAX`].
-pub fn transport_max(takes_pose: bool) -> usize {
-    if takes_pose {
+/// door that takes a `pose` while poses are on (`LAMP_NPU=on`), else
+/// [`FRAME_MAX`]: with the switch off every door stays at 64 KiB
+/// (Fourteen's P3 on #7972).
+pub fn transport_max(takes_pose: bool, poses_on: bool) -> usize {
+    if takes_pose && poses_on {
         POSE_FRAME_MAX
     } else {
         FRAME_MAX
@@ -259,6 +261,9 @@ pub struct Shared {
     /// Whether a new pairing glows once on the ring (`LAMP_CONTROL_PAIR_CUE`):
     /// off unless the owner's unit sets it.
     pair_cue: std::sync::atomic::AtomicBool,
+    /// Whether `pose` is on (`LAMP_NPU=on`): off, no door reads a frame
+    /// over [`FRAME_MAX`].
+    poses: std::sync::atomic::AtomicBool,
     /// Whether a cue is being shown right now: the one slot a cue takes, so a
     /// second pairing while one runs drops its cue and never queues it.
     cue_busy: std::sync::atomic::AtomicBool,
@@ -440,6 +445,7 @@ impl Shared {
             changes: Mutex::new(None),
             remote: std::sync::atomic::AtomicBool::new(false),
             pair_cue: std::sync::atomic::AtomicBool::new(false),
+            poses: std::sync::atomic::AtomicBool::new(false),
             cue_busy: std::sync::atomic::AtomicBool::new(false),
             listening: std::sync::atomic::AtomicBool::new(false),
             close_reasons: Mutex::new(HashMap::new()),
@@ -457,6 +463,16 @@ impl Shared {
     /// Lets a new pairing glow once on the ring (`LAMP_CONTROL_PAIR_CUE=on`).
     pub fn set_pair_cue(&self, on: bool) {
         self.pair_cue.store(on, Ordering::Relaxed);
+    }
+
+    /// Lets the local and app doors read a `pose`'s larger frame
+    /// (`LAMP_NPU=on`); off, every door reads [`FRAME_MAX`] at most.
+    pub fn set_poses(&self, on: bool) {
+        self.poses.store(on, Ordering::Relaxed);
+    }
+
+    fn poses(&self) -> bool {
+        self.poses.load(Ordering::Relaxed)
     }
 
     /// Shows the pairing cue, off the connection's task: never waited for, so a
@@ -689,6 +705,7 @@ impl Shared {
                 changes: Mutex::new(None),
                 remote: std::sync::atomic::AtomicBool::new(false),
                 pair_cue: std::sync::atomic::AtomicBool::new(false),
+                poses: std::sync::atomic::AtomicBool::new(false),
                 cue_busy: std::sync::atomic::AtomicBool::new(false),
                 listening: std::sync::atomic::AtomicBool::new(false),
                 close_reasons: Mutex::new(HashMap::new()),
@@ -1272,8 +1289,9 @@ pub async fn serve(listener: TcpListener, tls: tokio_rustls::TlsAcceptor, shared
             let within = shared.limits.lock().expect("limits").handshake;
             let opened = tokio::time::timeout(within, async {
                 let stream = tls.accept(stream).await.ok()?;
-                // The remote door never takes a pose (local only): 64 KiB.
-                let most = transport_max(!remote);
+                // The remote door never takes a pose (local only): 64 KiB;
+                // nor any door with poses off.
+                let most = transport_max(!remote, shared.poses());
                 let config = WebSocketConfig::default()
                     .max_message_size(Some(most))
                     .max_frame_size(Some(most));
@@ -1518,10 +1536,11 @@ pub async fn serve_app_as(
         let (shared, held) = (shared.clone(), held.clone());
         tokio::spawn(async move {
             let within = shared.limits.lock().expect("limits").handshake;
-            // An app on the lamp may ask a pose.
+            // An app on the lamp may ask a pose, when poses are on.
+            let most = transport_max(true, shared.poses());
             let config = WebSocketConfig::default()
-                .max_message_size(Some(POSE_FRAME_MAX))
-                .max_frame_size(Some(POSE_FRAME_MAX));
+                .max_message_size(Some(most))
+                .max_frame_size(Some(most));
             let opened = tokio::time::timeout(
                 within,
                 tokio_tungstenite::accept_hdr_async_with_config(stream, only_v1, Some(config)),
@@ -1592,7 +1611,7 @@ async fn connection<S>(
     // The doors that take a pose's larger frame: the lamp's own network's,
     // and an app's on the lamp; never the remote door, the local agent's or
     // a run's.
-    let takes_pose = !remote && local.is_none() && !run;
+    let takes_pose = !remote && local.is_none() && !run && shared.poses();
     shared.open.lock().expect("open").insert(
         id,
         Open {
@@ -2535,8 +2554,8 @@ mod tests {
     /// at most (Heron's P2 on #7972).
     #[test]
     fn only_a_pose_after_hello_on_a_local_door_passes_64_kib() {
-        assert_eq!(transport_max(false), 64 * 1024);
-        assert_eq!(transport_max(true), 256 * 1024);
+        assert_eq!(transport_max(false, true), 64 * 1024);
+        assert_eq!(transport_max(true, true), 256 * 1024);
         let pose = json!({"id": 1, "op": "pose", "jpeg": "A".repeat(100 * 1024)}).to_string();
         let other =
             json!({"id": 1, "op": "notes.set", "key": "k", "value": "A".repeat(100 * 1024)})

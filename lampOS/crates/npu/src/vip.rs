@@ -294,9 +294,12 @@ impl VipNet {
         })
     }
 
-    fn open(api: Arc<Api>, model: &Path) -> Result<Self, String> {
+    /// The model at `model` as a net: a driver call that fails (no memory,
+    /// busy) is [`LoadError::Transient`], a model this build can't read is
+    /// [`LoadError::Failed`].
+    fn open(api: Arc<Api>, model: &Path) -> Result<Self, LoadError> {
         let path = CString::new(model.as_os_str().as_encoded_bytes())
-            .map_err(|_| "the model's path holds a NUL".to_owned())?;
+            .map_err(|_| LoadError::Failed("the model's path holds a NUL".to_owned()))?;
         let mut network: Handle = std::ptr::null_mut();
         // SAFETY: a NUL-terminated path, read by the library while it loads.
         let made = ok(
@@ -308,7 +311,7 @@ impl VipNet {
         if let Err(why) = made {
             // SAFETY: undoes the caller's `vip_init`; no net holds it.
             unsafe { (api.destroy)() };
-            return Err(why);
+            return Err(LoadError::Transient(why));
         }
         let mut net = Self {
             api: api.clone(),
@@ -335,34 +338,42 @@ impl VipNet {
             ok(
                 (api.query_network)(network, NETWORK_INPUTS, (&raw mut inputs).cast()),
                 "query inputs",
-            )?;
+            )
+            .map_err(LoadError::Transient)?;
             ok(
                 (api.query_network)(network, NETWORK_OUTPUTS, (&raw mut outputs).cast()),
                 "query outputs",
-            )?;
+            )
+            .map_err(LoadError::Transient)?;
         }
         if inputs != 1 {
-            return Err(format!("the model has {inputs} inputs: one frame is taken"));
+            return Err(LoadError::Failed(format!(
+                "the model has {inputs} inputs: one frame is taken"
+            )));
         }
         if outputs == 0 || outputs > MOST_OUTPUTS {
-            return Err(format!("the model has {outputs} outputs"));
+            return Err(LoadError::Failed(format!(
+                "the model has {outputs} outputs"
+            )));
         }
-        net.input = Self::buffer(&api, network, 0, true)?;
+        net.input = Self::buffer(&api, network, 0, true).map_err(LoadError::Failed)?;
         for index in 0..outputs {
-            let buffer = Self::buffer(&api, network, index, false)?;
+            let buffer = Self::buffer(&api, network, index, false).map_err(LoadError::Failed)?;
             net.outputs.push(buffer);
         }
-        net.shape = frame_shape(&net.input.dims, net.input.format)?;
+        net.shape = frame_shape(&net.input.dims, net.input.format).map_err(LoadError::Failed)?;
         // SAFETY: the network and the buffers made above.
         unsafe {
-            ok((api.prepare_network)(network), "prepare")?;
+            ok((api.prepare_network)(network), "prepare").map_err(LoadError::Transient)?;
             net.prepared = true;
-            ok((api.set_input)(network, 0, net.input.handle), "set input")?;
+            ok((api.set_input)(network, 0, net.input.handle), "set input")
+                .map_err(LoadError::Transient)?;
             for (index, buffer) in net.outputs.iter().enumerate() {
                 ok(
                     (api.set_output)(network, index as u32, buffer.handle),
                     "set output",
-                )?;
+                )
+                .map_err(LoadError::Transient)?;
             }
         }
         Ok(net)
@@ -512,14 +523,14 @@ impl Backend for Vip {
         }
         let api = Arc::new(Api::open(&self.library).map_err(LoadError::Unsupported)?);
         // SAFETY: no arguments; undone by `vip_destroy` in the net's `Drop`,
-        // or below when the net is not made.
-        ok(unsafe { (api.init)() }, "init").map_err(LoadError::Unsupported)?;
-        match VipNet::open(api, model) {
-            Ok(net) => Ok(Box::new(net)),
-            // A net half made was dropped inside `open`, which destroyed
-            // what it had made and called `vip_destroy`.
-            Err(why) => Err(LoadError::Failed(why)),
-        }
+        // or below when the net is not made. A failed init (the driver
+        // busy or short of memory) is tried again after a wait, never
+        // taken as no NPU (Fourteen's P3 on #7972).
+        ok(unsafe { (api.init)() }, "init").map_err(LoadError::Transient)?;
+        // A net half made was dropped inside `open`, which destroyed what
+        // it had made and called `vip_destroy`.
+        let net = VipNet::open(api, model)?;
+        Ok(Box::new(net))
     }
 }
 

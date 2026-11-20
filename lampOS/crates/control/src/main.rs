@@ -306,6 +306,7 @@ fn serve(arguments: &[String], admin: PathBuf) -> Result<(), String> {
         eprintln!("lamp-control: poses go to {socket}");
         PathBuf::from(socket)
     });
+    let poses = npu.is_some();
     let actions = option(arguments, "--actions-socket").map(PathBuf::from);
     let bus = match option(arguments, "--bus-root") {
         Some(root) => Some(lamp_bus::Bus::new(root).map_err(|e| format!("bus: {e}"))?),
@@ -579,6 +580,7 @@ fn serve(arguments: &[String], admin: PathBuf) -> Result<(), String> {
     shared.set_remote(remote);
     let pair_cue = std::env::var(PAIR_CUE_ENVIRONMENT).as_deref() == Ok("on");
     shared.set_pair_cue(pair_cue);
+    shared.set_poses(poses);
     eprintln!(
         "lamp-control: {}",
         if pair_cue {
