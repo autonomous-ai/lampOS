@@ -477,7 +477,10 @@ macro_rules! run_lines {
             "  # Nobody answers a skill's run: Hermes asks no approval in it, its hardline list still holds (#6684).\n",
             "  HERMES_YOLO_MODE=1\n",
             "  export HERMES_YOLO_MODE\n",
-            "fi\n"
+            "fi\n",
+            "# lamp-tasks' kept session (#8151), started by Harness in its own folder: nobody answers it either, so Hermes asks\n",
+            "# no approval in it; its hardline list still holds. Only lampos reaches that folder (0700 under its home).\n",
+            "[ \"$P\" != /var/lib/lampos-tasks/harnesses/lamp-tasks/one-session ] || { HERMES_YOLO_MODE=1; export HERMES_YOLO_MODE; }\n"
         )
     };
 }
@@ -615,6 +618,8 @@ pub const AGENT_ENV: &str = r#"  T=$(cat /var/lib/lampos-cloud/hermes-token 2>/d
   LAMP_HERMES_TOKEN=$T HERMES_HOME=/var/lib/lampos-hermes/.hermes
   export LAMP_HERMES_TOKEN HERMES_HOME
   unset T HERMES_YOLO_MODE
+  # lamp-tasks' kept session (#8151), in its own folder: nobody answers it either; its hardline list still holds.
+  [ "${P-}" != /var/lib/lampos-tasks/harnesses/lamp-tasks/one-session ] || { HERMES_YOLO_MODE=1; export HERMES_YOLO_MODE; }
 "#;
 /// Hermes's own lines in a skill's run only (#6684): nobody answers a
 /// skill's run, so Hermes asks no approval in it; its hardline list still

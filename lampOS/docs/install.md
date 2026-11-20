@@ -2024,7 +2024,17 @@ As root, on a lamp with the base image (`crates/update/src/install.rs`):
      `HermesRunner` gives them. Any other folder: these lines change
      nothing. `HERMES_YOLO_MODE` is unset for every start and set to 1
      only in a run (#6684): nobody is there to answer Hermes's approval
-     prompt, and its hardline list still holds. With the switch off, the
+     prompt, and its hardline list still holds (Hermes's own
+     `tools/approval.py` `_floor_block`, `detect_hardline_command` in
+     `tools/approval_detection.py`, checked before any YOLO bypass in
+     `check_dangerous_command`, v0.21.5). It is set to 1 too in
+     lamp-tasks' kept session (#8151): a start whose folder (`pwd -P`) is
+     exactly `/var/lib/lampos-tasks/harnesses/lamp-tasks/one-session`,
+     where only Harness starts it for lamp-tasks (that folder is
+     `lampos`'s, 0700 under its home), since nobody answers there either.
+     `HERMES_NONINTERACTIVE=1` (#7781), which lamp-tasks gives every
+     Harness command and Harness's env file, passes through every wrapper
+     and namespace unchanged. With the switch off, the
      wrapper has no run lines, and its own `unset T HERMES_YOLO_MODE`
      drops the variable for every start. With `LAMP_SKILL_DEFAULT_AGENT=on`
      as well, `/usr/local/bin/hermes` is not this wrapper but the one run
@@ -2924,7 +2934,8 @@ yet on a lamp.
     forwarder token read from lamp-cloud's file (none ends it) and given
     as `LAMP_HERMES_TOKEN` with `HERMES_HOME=/var/lib/lampos-hermes/.hermes`
     and `HERMES_YOLO_MODE` unset, and in a run `HERMES_YOLO_MODE=1`
-    (#6684). And, only for an agent that takes a skill's run with no
+    (#6684), as in lamp-tasks' kept session's folder
+    `/var/lib/lampos-tasks/harnesses/lamp-tasks/one-session` (#8151). And, only for an agent that takes a skill's run with no
     Harness (#6685 PR 3), `agent_task() { … }` (`Agent::task`): given the
     run's task file as `$1`, it turns it into the agent's own arguments
     and ends in `agent_start` with them. Hermes's

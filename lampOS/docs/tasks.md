@@ -2560,6 +2560,19 @@ The stable feed, any other, and a line not read (systemctl failed) keep the
 hold exactly as below. One predicate decides it for both lamp-tasks and
 lamp-update (`lamp_msgs::harness_hold`, `crates/msgs/src/harness_hold.rs`).
 
+**Hermes asks nothing at its first start (#7781).** Every Hermes Harness
+starts is given `HERMES_NONINTERACTIVE=1`: Hermes's first start otherwise
+asks its first-run telemetry question, which no one can answer in a pane,
+so the kept session stays `starting`, `show` says state unknown, `ensure`
+names no `engineSession` and every `harness reply` is `ENGINE_NOT_READY`
+(lamp-c0a4, #8151). The line is in `harness-hold.env` whenever lamp-tasks
+writes it, held or lifted (the lifted file without the hold's line; the
+daemon loads it with dotenv, never over a value it has), in every Harness
+command's environment (`hold::with_data_dir`), and in the launcher's lines
+(`export HERMES_NONINTERACTIVE=1` just before `export ADAPTER_DATA_DIR=…`,
+written alike by lamp-tasks and `lamp-update harness-install`). The lamp's
+Hermes wrappers keep the environment they are given, so it reaches Hermes.
+
 **The pinned launcher (#5493).** The environment above reaches only the
 Harness commands lamp-tasks runs. A `harness logout` run by hand over ssh,
 without them, restarted the held daemon from its own environment, and the
@@ -5348,6 +5361,13 @@ in and signed out, and on 0.6.60, signed in (#7507's ROW).
       never for a session of the live kept pane (that one's own close
       deletes it).
     - Hermes's `MEMORY.md` and skills are not sessions and are not touched.
+  - **No approvals asked.** Nobody answers the kept session, so the
+    lamp's Hermes wrappers set `HERMES_YOLO_MODE=1` for a start in its
+    folder `/var/lib/lampos-tasks/harnesses/lamp-tasks/one-session`, as
+    for a skill's run (#6684); Hermes's hardline list still holds
+    (install.md, "Hermes on the lamp"). `HERMES_NONINTERACTIVE=1` (#7781,
+    "Hermes asks nothing at its first start") keeps its first start from
+    asking anything.
   - **Skill runs and makes** still run per run (above, and `MakeHermes`).
     A known gap: Hermes's wrapper reads each run's token file once, at its
     own start, in that run's namespace, so a kept Hermes started once

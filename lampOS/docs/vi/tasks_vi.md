@@ -2601,6 +2601,12 @@ khi đăng xuất, và với 0.6.60 khi đăng nhập (ROW của #7507).
       đóng của chính nó sẽ xoá).
     - `MEMORY.md` và kỹ năng của Hermes không phải phiên và không bị đụng
       tới.
+  - **Không hỏi phê duyệt.** Không ai trả lời phiên được giữ, nên các
+    wrapper Hermes của đèn đặt `HERMES_YOLO_MODE=1` cho lần khởi động trong
+    thư mục của nó `/var/lib/lampos-tasks/harnesses/lamp-tasks/one-session`,
+    như với lần chạy kỹ năng (#6684); danh sách hardline của Hermes vẫn giữ
+    (install.md, "Hermes on the lamp"). `HERMES_NONINTERACTIVE=1` (#7781)
+    giữ cho lần khởi động đầu không hỏi gì.
   - **Lần chạy kỹ năng và make** vẫn chạy riêng từng lần (ở trên, và
     `MakeHermes`). Một khoảng hở đã biết: wrapper của Hermes đọc file token
     của mỗi lần chạy một lần duy nhất, lúc chính nó khởi động, trong
@@ -3665,6 +3671,19 @@ gì về: `harness: home moved to XDG (<sign>): lampOS paths need
 ~/.harness`, dấu hiệu là một trong `.local/state/harness/bridge.json`,
 `.local/share/harness/.harness-root`, `.harness/runtime is a link` hoặc
 `.harness/cli is a link`.
+
+**Hermes không hỏi gì ở lần khởi động đầu (#7781).** Mọi Hermes mà Harness
+khởi động đều được cho `HERMES_NONINTERACTIVE=1`: nếu không, lần khởi động đầu
+của Hermes hỏi câu telemetry lần đầu, mà trong pane không ai trả lời được, nên
+phiên được giữ cứ ở `starting`, `show` báo trạng thái không rõ, `ensure` không
+nêu `engineSession` và mọi `harness reply` đều là `ENGINE_NOT_READY`
+(lamp-c0a4, #8151). Dòng này nằm trong `harness-hold.env` mỗi khi lamp-tasks
+ghi file, giữ hay đã gỡ (file đã gỡ không có dòng giữ; daemon nạp nó bằng
+dotenv, không đè giá trị đã có), trong môi trường của mọi lệnh Harness
+(`hold::with_data_dir`), và trong các dòng của launcher (`export
+HERMES_NONINTERACTIVE=1` ngay trước `export ADAPTER_DATA_DIR=…`, lamp-tasks và
+`lamp-update harness-install` ghi như nhau). Các wrapper Hermes của đèn giữ
+nguyên môi trường được cho, nên biến này tới được Hermes.
 
 ## Cài đặt của OpenClaw trên đèn (#6226)
 

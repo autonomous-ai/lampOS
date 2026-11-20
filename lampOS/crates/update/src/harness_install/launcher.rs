@@ -21,8 +21,8 @@
 //! both.
 use crate::install::{HARNESS_HOME, Runner};
 use lamp_msgs::harness_hold::{
-    DATA_DIR, HARNESS_DATA, HarnessHold, REFUSE_UPDATE, harness_hold, home_moved_line,
-    with_data_line,
+    DATA_DIR, HARNESS_DATA, HERMES_NONINTERACTIVE, HarnessHold, NONINTERACTIVE_ON, REFUSE_UPDATE,
+    harness_hold, home_moved_line, with_data_line,
 };
 use rustix::{
     fs::{self as rfs, AtFlags, Mode, OFlags},
@@ -118,6 +118,7 @@ fn shaped(text: &str, env_file: Option<&str>, data: &str) -> Option<String> {
         if line_text.starts_with(&format!("export {DISABLE}="))
             || line_text.starts_with(&format!("export {ENV_FILE}="))
             || line_text.starts_with(&format!("export {DATA_DIR}="))
+            || line_text.starts_with(&format!("export {HERMES_NONINTERACTIVE}="))
             || line_text == REFUSE_UPDATE
         {
             continue;
@@ -130,6 +131,9 @@ fn shaped(text: &str, env_file: Option<&str>, data: &str) -> Option<String> {
         pinned.push_str(REFUSE_UPDATE);
         pinned.push('\n');
     }
+    pinned.push_str(&format!(
+        "export {HERMES_NONINTERACTIVE}={NONINTERACTIVE_ON}\n"
+    ));
     pinned.push_str(&format!("export {DATA_DIR}={data}\n"));
     for line in &lines[exec..] {
         pinned.push_str(line);
