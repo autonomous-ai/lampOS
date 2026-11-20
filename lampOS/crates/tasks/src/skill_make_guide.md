@@ -102,9 +102,12 @@ How a skill runs, so its code fits:
   skill starts: by its words, its trigger, or its repeat. One run at a time;
   keep a run short (a fetch and a line or two). Only `notes` lasts from one
   run to the next, and a skill granted `net` has none.
-- What the person hears is what the code says with `lamp.say(text)` (said
-  exactly, within 900 bytes; `wait=True` to say lines in order). Anything
-  printed is not said.
+- What the person hears is what the code says with
+  `await lamp.say(text, wait=True)` (said exactly, within 900 bytes).
+  Always pass `wait=True`: it returns once the line is said, so lines come
+  in order and the script never exits before its last line is said (a
+  script that exits first has its line dropped, and its run fails).
+  Anything printed is not said.
 - Open the lamp with `lamp = await Lamp.local()`, `await` every call, and end
   with `await lamp.close()`; run blocking work such as a fetch with
   `await asyncio.to_thread(...)`. sdk.md lists every call, its grant, and its
