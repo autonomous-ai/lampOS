@@ -6618,6 +6618,8 @@ fn conversation_with_gate_inner(
     // What the line the lamp began itself is, for `lamp/did`
     // (`LAMP_DID_VOICE`, #7757): told at its first audio queued, never before.
     let mut did_voice_line: Option<(u64, crate::did_voice::Moment)> = None;
+    // The publishing thread starts here, not at the first audio queued.
+    crate::did_voice::ready();
     // The eyes' faces, for the person an own line is for (#2287's
     // follow-up): read every 100 ms off the audio path, only with either
     // switch; passing ids and booleans, nothing kept past 30 s.
@@ -8929,6 +8931,8 @@ fn conversation_with_gate_inner(
                             // reminder) is told as its first audio is queued.
                             if let Some(moment) = did_voice_moment(current, did_voice_line) {
                                 crate::did_voice::told(moment);
+                                // Once for a line: a go-on of it is not told again.
+                                did_voice_line.take();
                             }
                             // It answers: a wake by name it followed is kept.
                             if let Some(controls) = controls.as_mut() {
