@@ -2331,14 +2331,20 @@ impl OneSession {
     /// built yet, openharness#4393): OpenClaw's by the Gateway, Hermes's by
     /// Hermes's own `sessions delete` (#8151), with any left from before
     /// ([`OneSession::delete_pending`]). Any other engine keeps none here.
-    fn delete_conversation(&self, agent: &str, engine: EngineKind, keys: Vec<String>) {
+    fn delete_conversation(
+        &self,
+        agent: &str,
+        engine: EngineKind,
+        keys: Vec<String>,
+        started: Option<(String, f64)>,
+    ) {
         let store = match engine {
             EngineKind::Openclaw => "OpenClaw",
             EngineKind::Hermes => "Hermes",
             _ => return,
         };
         if engine == EngineKind::Hermes {
-            let started_in = keys.is_empty().then(|| self.started_in(agent)).flatten();
+            let started_in = keys.is_empty().then_some(started).flatten();
             if keys.is_empty() && started_in.is_none() {
                 eprintln!(
                     "tasks: one session: {}'s Hermes conversation: nothing to delete: no engine session",
@@ -2420,8 +2426,9 @@ impl OneSession {
     /// session ([`OneSession::delete_conversation`]).
     fn kept_closed(&self, agent: &str, engine: EngineKind) {
         let key = self.conversation_key(agent, engine);
+        let started = self.started_in(agent);
         self.closed_by_us(agent, engine, false);
-        self.delete_conversation(agent, engine, key);
+        self.delete_conversation(agent, engine, key, started);
     }
 
     /// Harness says the kept session is not ours (`NAME_TAKEN`,
@@ -2579,7 +2586,8 @@ impl OneSession {
                     keys
                 }
             };
-            self.delete_conversation(&agent, kind, keys);
+            let started = self.started_in(&agent);
+            self.delete_conversation(&agent, kind, keys, started);
         }
         self.forget_record();
         eprintln!("tasks: one session: dropped {} ({why})", short(&agent));
@@ -2854,11 +2862,12 @@ impl OneSession {
         } else {
             self.recorded_sessions(agent)
         };
+        let started = self.started_in(agent);
         if self.kept().is_some_and(|(kept, _, _)| kept == agent) {
             self.forget_record();
         }
         if delete {
-            self.delete_conversation(agent, engine, keys);
+            self.delete_conversation(agent, engine, keys, started);
         }
     }
 
@@ -4038,7 +4047,8 @@ impl OneSession {
                 .filter(|key| Some(key) != ensured.engine_session.as_ref())
                 .collect();
             if keys.len() == named || !keys.is_empty() {
-                self.delete_conversation(&old, engine, keys);
+                let started = self.started_in(&old);
+                self.delete_conversation(&old, engine, keys, started);
             }
         }
         // Kept at once: the record says the kept session, so a sign-out

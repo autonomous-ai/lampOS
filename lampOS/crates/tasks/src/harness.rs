@@ -92,6 +92,8 @@ const ENVIRONMENT: &[&str] = &[
     // The update hold (`LAMP_HARNESS_HOLD_UPDATES`, crate::hold, #5229).
     crate::hold::DISABLE,
     crate::hold::ENV_FILE,
+    // Every Hermes a Harness command starts asks nothing (#7781).
+    crate::hold::HERMES_NONINTERACTIVE,
     // Where Harness finds the lamp's own Hermes' sessions
     // (`LAMP_HERMES_ON_LAMP`, crate::hold::HERMES_HOME, #5978).
     crate::hold::HERMES_HOME,

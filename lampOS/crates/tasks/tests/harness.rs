@@ -284,8 +284,10 @@ fn launch_uses_exact_argv_auto_mode_null_stdin_and_stable_generic_identity() {
     );
     for call in calls {
         let environment = call["environment"].as_object().unwrap();
-        // HOME, PATH, ADAPTER_DATA_DIR (#7906) and the two marks.
-        assert_eq!(environment.len(), 6);
+        // HOME, PATH, ADAPTER_DATA_DIR (#7906), HERMES_NONINTERACTIVE
+        // (#7781) and the two marks.
+        assert_eq!(environment.len(), 7);
+        assert_eq!(environment["HERMES_NONINTERACTIVE"], "1");
         assert_eq!(environment["AI_AGENT"], "lampos");
         assert_eq!(environment["HARNESS_AGENT_SESSION"], "stable-session_123");
         for forbidden in [
@@ -316,7 +318,7 @@ fn as_the_person_the_call_carries_no_agent_mark_and_is_otherwise_the_same() {
     assert_eq!(calls[1]["args"][0], "new");
     for call in calls {
         let environment = call["environment"].as_object().unwrap();
-        assert_eq!(environment.len(), 4, "{environment:?}");
+        assert_eq!(environment.len(), 5, "{environment:?}");
         assert!(!environment.contains_key("AI_AGENT"));
         assert!(!environment.contains_key("HARNESS_AGENT_SESSION"));
     }
@@ -2666,6 +2668,7 @@ fn a_held_lamps_whole_environment_is_taken() {
         lamp_tasks::hold::HERMES_HOME,
         lamp_tasks::hold::OPENCLAW_STATE_DIR,
         lamp_tasks::hold::SHELL,
+        lamp_tasks::hold::HERMES_NONINTERACTIVE,
     ] {
         assert!(config.environment.contains_key(name), "{name}");
     }

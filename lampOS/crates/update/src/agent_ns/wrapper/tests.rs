@@ -896,12 +896,18 @@ fn hermes_in_the_kept_session_folder_has_approvals_off() {
     let older = wrapper_text("hermes").unwrap();
     for text in [one_path, older] {
         let lamp = lamp_of("hermes", &text);
+        // The older wrapper finds Hermes's program on `PATH`.
+        let bin = lamp.top.join("bin2");
+        fs::create_dir_all(&bin).unwrap();
+        fs::write(bin.join("hermes"), "#!/bin/sh\nexit 0\n").unwrap();
+        fs::set_permissions(bin.join("hermes"), fs::Permissions::from_mode(0o755)).unwrap();
+        let path = format!("{}:/usr/bin:/bin", bin.display());
         let kept = lamp.top.join("project").join("one-session");
         let near = lamp.top.join("project").join("one-session-2");
         fs::create_dir_all(&kept).unwrap();
         fs::create_dir_all(&near).unwrap();
         let given = [("HERMES_YOLO_MODE", "0"), ("HERMES_NONINTERACTIVE", "1")];
-        let out = lamp.run_in(&kept, &given, "/usr/bin:/bin");
+        let out = lamp.run_in(&kept, &given, &path);
         assert!(out.status.success(), "{out:?}");
         let env = lamp.read("env").unwrap();
         assert!(
@@ -917,7 +923,7 @@ fn hermes_in_the_kept_session_folder_has_approvals_off() {
             env.lines().any(|line| line == "HERMES_ACCEPT_HOOKS=1"),
             "{env}"
         );
-        let out = lamp.run_in(&near, &given, "/usr/bin:/bin");
+        let out = lamp.run_in(&near, &given, &path);
         assert!(out.status.success(), "{out:?}");
         let env = lamp.read("env").unwrap();
         assert!(!env.contains("HERMES_YOLO_MODE"), "{env}");
