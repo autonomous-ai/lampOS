@@ -3735,7 +3735,7 @@ lamp-setup (cắt còn
 qua wrapper, nhập vào namespace của gateway như lamp-tasks; không có
 gateway nào chạy (như lúc cài lần đầu) thì không có lock nào để va chạm,
 nên chạy trong `openclaw-ns` riêng như trước. Lần kiểm tra của lamp-tasks
-chọn cùng cách đó từ cùng `MainPID` (`openclaw_install::gateway_runs` và
+chọn cùng cách đó từ cùng `MainPID` (`openclaw_install::gateway_is_running` và
 `main_pid_argv`, lần reset cũng dùng; #8060). `GATEWAY_WAITS`,
 `NO_GATEWAY`, `NODE_NOT_READY`, `GATEWAY_CAME_UP` và `gateway_not_there`
 giờ nằm ở
