@@ -5759,18 +5759,42 @@ mod one_kept_tests {
             .to_owned();
         assert!(held.contains('\u{2026}'), "cut");
     }
+
+    /// #8059: on their yes only the model's own `forget` call runs the held
+    /// one-face forget (`second_provider::Taken::Agrees`), so the held note
+    /// tells it to make that call on a yes, and never not to. Nor does it
+    /// give a cause the person can't fix: their face was in view.
+    #[test]
+    fn the_one_face_question_tells_the_model_to_call_forget_on_their_yes() {
+        let held = one_face_forget_asks("bike lock code")["held"]
+            .as_str()
+            .unwrap()
+            .to_owned();
+        assert!(
+            held.contains("If they say yes within 30 seconds, call forget then"),
+            "{held}"
+        );
+        assert!(held.contains("only that call runs it"), "{held}");
+        assert!(!held.contains("Do not call forget"), "{held}");
+        assert!(!held.contains("couldn't see"), "{held}");
+    }
 }
 
 /// What the model is told of a named forget on a one-face line held for the
 /// person's yes ([`ONE_FACE_FORGET_YES_FOR`], #5627): ask once about
 /// `subject`, their own words for it, in their language, and stop. Never
 /// the kept text: the speaker was not seen (the Reviewer-lead's P2 on
-/// #6673).
+/// #6673). On their yes the model calls `forget`, naming nothing else, and
+/// only that call runs the held forget (`second_provider::Taken::Agrees`,
+/// the first builder's ruling on leg (e) of #7960's ROW). It was told "do
+/// not call forget again for their yes", so a yes ran nothing (#8059;
+/// lamp-06c1, 2 of 2). Nor does it say the lamp couldn't see who was
+/// asking: their face was in view.
 pub fn one_face_forget_asks(subject: &str) -> Value {
     json!({
         "forgotten": false,
         "held": format!(
-            "Not done yet: I couldn't see who was asking, so this waits for their yes. Ask them once, in a few words and in the language they spoke, whether you should forget what you kept about {} (for example \"Shall I forget what you kept about your bike lock code?\" or \"Mình có nên quên điều đã giữ về mã khóa xe của bạn không?\"), and then stop. Do not say what was kept, its details, or anything you know about it. Only their yes within 30 seconds runs it; a no or nothing keeps it. Do not call forget again for their yes, and do not say it is forgotten.",
+            "Not done yet: this waits for their yes. Ask them once, in a few words and in the language they spoke, whether you should forget what you kept about {} (for example \"Shall I forget what you kept about your bike lock code?\" or \"Mình có nên quên điều đã giữ về mã khóa xe của bạn không?\"), and then stop. Do not say what was kept, its details, or anything you know about it. If they say yes within 30 seconds, call forget then, naming nothing else: only that call runs it. A no or nothing keeps it. Do not say it is forgotten until that forget has run.",
             cut_at_a_word(subject, WHAT_WENT_BYTES)
         )
     })
