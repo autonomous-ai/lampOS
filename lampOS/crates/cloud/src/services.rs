@@ -15,6 +15,14 @@
 //!
 //! The fetched connector goes into the admin socket's line and nowhere
 //! else: never a reply, an error, a journal line or a `Debug`.
+//!
+//! Apple Health (`apple_health`) has no link and no token: with
+//! `LAMP_APPLE_HEALTH=on` too, the app sends its daily summaries itself as
+//! [`HEALTH_KIND`], checked here (`lamp_services::health::fit`) and handed
+//! to the admin socket as `{"op":"set_local"}`, which checks and keeps them;
+//! `"data": null` disconnects it, a remove, taken switch on or not, so a
+//! summary kept while it was on never outlives it. No value of it is in a
+//! reply, an error or a journal line.
 use crate::account::Account;
 use crate::settings::Outcome;
 use serde_json::{Map, Value, json};
@@ -35,9 +43,11 @@ pub const ADMIN_SOCKET: &str = "/run/lampos-services/admin.sock";
 /// The services this lamp knows, by V1's codes. Figma is `figma-api` as
 /// the backend lists it for lamps, and `figma` as V1's helper named it.
 /// `gmail-app` is a Lamp 2's Google sign-in for Gmail, send only; `gmail`
-/// its app password. The last five are MCP services: V1's four, then
-/// Notion, whose app sign-in gives a token only its MCP server takes.
-pub const CODES: [&str; 16] = [
+/// its app password. Then five MCP services: V1's four, then Notion, whose
+/// app sign-in gives a token only its MCP server takes. Last Apple Health,
+/// whose data the app sends itself ([`HEALTH_KIND`]): never a
+/// `connector.set`, only its remove.
+pub const CODES: [&str; 17] = [
     "gmail",
     "gmail-app",
     "google_calendar",
@@ -54,6 +64,7 @@ pub const CODES: [&str; 16] = [
     "hubspot",
     "amplitude",
     "notion",
+    lamp_services::health::CODE,
 ];
 
 /// A service linked: `connector.set.<code>`, its connector fetched.
@@ -62,6 +73,15 @@ pub const SET_PREFIX: &str = "connector.set.";
 pub const REMOVE_PREFIX: &str = "connector.remove.";
 /// The services linked now, by code and account, nothing secret.
 pub const LIST_KIND: &str = "services.list";
+/// The app's Apple Health summaries (`{"as_of", "tz", "days": [...]}`, or
+/// `null` to disconnect), with `LAMP_APPLE_HEALTH=on` ([`HEALTH_ENVIRONMENT`]).
+pub const HEALTH_KIND: &str = lamp_services::health::KIND;
+/// `on`, beside `LAMP_SERVICES` and `LAMP_CLOUD`, takes [`HEALTH_KIND`]'s
+/// summaries; its disconnect is taken whatever it says.
+pub const HEALTH_ENVIRONMENT: &str = lamp_services::health::ENVIRONMENT;
+/// What a `connector.set.apple_health` is told: it has no link.
+pub const HEALTH_NO_LINK: &str =
+    "Apple Health takes no link: the app sends its summaries as health.summary";
 /// The word in `system.info`'s `can` that says `connector.set.<code>` and
 /// `connector.remove.<code>` are taken (they are many, so not each listed).
 pub const CAN: &str = "services";
@@ -292,6 +312,164 @@ pub fn checked(kind: &str, code: &str, connector: &Value) -> Result<(), String> 
     Ok(())
 }
 
+/// What Lamp's voice kept in memory of Apple Health reads (each a dated
+/// thing of the owner's, `lamp_msgs::health_fact`), removed on memory's
+/// narrow socket `memory` with `{"op": "forget_apple_health"}` (#7900): the
+/// app's unlink, a remove and a sign-out take them with the summary. No
+/// socket given (a dev lamp), nothing is asked. An error when memory
+/// doesn't answer or refuses: the unlink then owes it ([`forget_or_owe`])
+/// and [`forget_health_until_taken`] asks again until memory takes it; a
+/// retry removes nothing twice.
+pub fn forget_health_facts(memory: Option<&Path>) -> Result<(), String> {
+    let Some(socket) = memory else {
+        return Ok(());
+    };
+    let answer = crate::photos::exchange(
+        socket,
+        &json!({"op": lamp_msgs::health_fact::FORGET_OP}),
+        crate::faces::DEADLINE,
+    );
+    match answer {
+        Some(answer) if answer["ok"] == true => Ok(()),
+        _ => Err(HEALTH_FACTS_KEPT.to_owned()),
+    }
+}
+
+/// What the app is told when Apple Health's summary went but what Lamp
+/// remembered of it could not be removed and could not be owed either
+/// ([`ForgetOwed::owe`] never fails, so only [`forget_health_facts`] says it).
+pub const HEALTH_FACTS_KEPT: &str = "Apple Health was unlinked, but what Lamp remembered from it could not be removed just now; try again";
+
+/// The file under lamp-cloud's state folder that says a forget of Apple
+/// Health's kept facts is owed, so a restart still tries it.
+pub const FORGET_OWED_FILE: &str = "apple-health-forget.json";
+/// The first wait before an owed forget is tried again.
+pub const FORGET_FIRST: Duration = Duration::from_secs(5);
+/// The longest wait between tries: each failure doubles it, up to this.
+pub const FORGET_MOST: Duration = Duration::from_secs(300);
+
+/// A forget of Apple Health's kept facts that memory didn't take when the
+/// person unlinked (#7900): kept in [`FORGET_OWED_FILE`] when there is a
+/// state folder and tried again by [`forget_health_until_taken`] until
+/// memory takes it, so a Disconnect always finishes without a second tap.
+#[derive(Debug, Default)]
+pub struct ForgetOwed {
+    file: Option<PathBuf>,
+    /// 0 when nothing is owed; otherwise bumped by each new owe, so a
+    /// forget that began before a newer owe doesn't pay it.
+    owed: Mutex<u64>,
+    wake: tokio::sync::Notify,
+}
+
+impl ForgetOwed {
+    /// Kept in `file` when given: a forget owed before a restart is owed again.
+    pub fn open(file: Option<PathBuf>) -> Self {
+        let owed = u64::from(file.as_deref().is_some_and(Path::exists));
+        Self {
+            file,
+            owed: Mutex::new(owed),
+            wake: tokio::sync::Notify::new(),
+        }
+    }
+
+    /// The owe now, 0 when nothing is owed.
+    pub fn owed(&self) -> u64 {
+        self.owed.lock().map_or(0, |owed| *owed)
+    }
+
+    /// A forget memory didn't take: owed, kept on disk when it can be (in
+    /// memory otherwise, until a restart), and the retry woken.
+    pub fn owe(&self) {
+        if let Ok(mut owed) = self.owed.lock() {
+            *owed = owed.wrapping_add(1).max(1);
+        }
+        if let Some(file) = &self.file {
+            let _ = write_owed(file);
+        }
+        self.wake.notify_one();
+    }
+
+    /// Memory took a forget asked when the owe was `seen`: paid unless a
+    /// newer owe came meanwhile.
+    pub fn paid(&self, seen: u64) {
+        let Ok(mut owed) = self.owed.lock() else {
+            return;
+        };
+        if *owed == seen {
+            *owed = 0;
+            if let Some(file) = &self.file {
+                let _ = std::fs::remove_file(file);
+            }
+        }
+    }
+}
+
+/// The owed mark, mode 0600, written whole: it holds no value, only when.
+fn write_owed(path: &Path) -> std::io::Result<()> {
+    use std::os::unix::fs::OpenOptionsExt;
+    let temporary = path.with_extension("tmp");
+    let mut file = std::fs::OpenOptions::new()
+        .write(true)
+        .create(true)
+        .truncate(true)
+        .mode(0o600)
+        .open(&temporary)?;
+    file.write_all(
+        json!({"since_s": crate::signed_out::now_s()})
+            .to_string()
+            .as_bytes(),
+    )?;
+    file.sync_all()?;
+    std::fs::rename(&temporary, path)
+}
+
+/// [`forget_health_facts`], and when memory doesn't take it, owed in
+/// `owed` for [`forget_health_until_taken`]: the unlink is done either way.
+/// A forget taken now pays any older owe too, as it removes them all.
+pub fn forget_or_owe(memory: Option<&Path>, owed: &ForgetOwed) {
+    let seen = owed.owed();
+    match forget_health_facts(memory) {
+        Ok(()) if seen != 0 => owed.paid(seen),
+        Ok(()) => {}
+        Err(_) => owed.owe(),
+    }
+}
+
+/// Tries an owed forget again (`services.forget_owed`) until memory takes
+/// it: at once at start when one was kept, then after [`FORGET_FIRST`],
+/// doubling to [`FORGET_MOST`]; woken at once by a new owe. Never returns.
+pub async fn forget_health_until_taken(services: Arc<Services>, say: &mut impl FnMut(&str)) {
+    let owed = services.forget_owed.clone();
+    let mut wait = FORGET_FIRST;
+    loop {
+        let seen = owed.owed();
+        if seen == 0 {
+            owed.wake.notified().await;
+            wait = FORGET_FIRST;
+            continue;
+        }
+        let memory = services.memory.clone();
+        let taken = tokio::task::spawn_blocking(move || forget_health_facts(memory.as_deref()))
+            .await
+            .unwrap_or_else(|_| Err(HEALTH_FACTS_KEPT.to_owned()));
+        if taken.is_ok() {
+            owed.paid(seen);
+            say("apple health: the owed forget was taken by memory");
+            wait = FORGET_FIRST;
+            continue;
+        }
+        say(&format!(
+            "apple health: memory did not take the owed forget, tried again in {}s",
+            wait.as_secs()
+        ));
+        tokio::select! {
+            () = tokio::time::sleep(wait) => {}
+            () = owed.wake.notified() => {}
+        }
+        wait = (wait * 2).min(FORGET_MOST);
+    }
+}
+
 /// The admin socket: `line` out, one JSON line back within `wait`. An
 /// `"ok": true` reply as it is; `"ok": false` its plain `error`.
 pub fn ask(socket: &Path, line: &Value, wait: Duration) -> Result<Value, String> {
@@ -325,6 +503,15 @@ pub struct Services {
     /// Requests under way, at most [`MOST_AT_ONCE`].
     under_way: Arc<AtomicUsize>,
     done: Arc<Mutex<Vec<Outcome>>>,
+    /// `LAMP_APPLE_HEALTH=on`: [`HEALTH_KIND`]'s summaries are taken.
+    pub health: bool,
+    /// Memory's narrow socket (`LAMP_MEMORY_FORGET_SOCKET`), when given:
+    /// Apple Health's unlink removes what the voice kept of it there too
+    /// ([`forget_health_facts`]).
+    pub memory: Option<PathBuf>,
+    /// A forget memory didn't take, tried again in the background
+    /// ([`forget_health_until_taken`]).
+    pub forget_owed: Arc<ForgetOwed>,
 }
 
 impl std::fmt::Debug for Services {
@@ -337,12 +524,51 @@ impl std::fmt::Debug for Services {
 
 impl Services {
     pub fn new(socket: impl Into<PathBuf>, fetch: Arc<dyn Fetch>) -> Arc<Self> {
+        Self::with_health(socket, fetch, false)
+    }
+
+    /// [`Self::new`], taking Apple Health's summaries when `health`
+    /// (`LAMP_APPLE_HEALTH=on`).
+    pub fn with_health(
+        socket: impl Into<PathBuf>,
+        fetch: Arc<dyn Fetch>,
+        health: bool,
+    ) -> Arc<Self> {
         Arc::new(Self {
             socket: socket.into(),
             fetch,
             under_way: Arc::default(),
             done: Arc::default(),
+            health,
+            memory: None,
+            forget_owed: Arc::default(),
         })
+    }
+
+    /// [`Self::with_health`], with memory's narrow socket ([`Self::memory`]).
+    pub fn with_memory(
+        socket: impl Into<PathBuf>,
+        fetch: Arc<dyn Fetch>,
+        health: bool,
+        memory: Option<PathBuf>,
+    ) -> Arc<Self> {
+        let mut services = Self::with_health(socket, fetch, health);
+        Arc::get_mut(&mut services).expect("just made").memory = memory;
+        services
+    }
+
+    /// [`Self::with_memory`], an owed forget kept in `owed` across restarts.
+    pub fn with_forget_owed(
+        socket: impl Into<PathBuf>,
+        fetch: Arc<dyn Fetch>,
+        health: bool,
+        memory: Option<PathBuf>,
+        owed: Option<PathBuf>,
+    ) -> Arc<Self> {
+        let mut services = Self::with_memory(socket, fetch, health, memory);
+        Arc::get_mut(&mut services).expect("just made").forget_owed =
+            Arc::new(ForgetOwed::open(owed));
+        services
     }
 
     /// The product's: [`ADMIN_SOCKET`] and the backend, with the switch;
@@ -352,7 +578,20 @@ impl Services {
             return None;
         }
         let backend = Backend::of(account, key)?;
-        Some(Self::new(ADMIN_SOCKET, Arc::new(backend)))
+        let health = std::env::var(HEALTH_ENVIRONMENT).ok().as_deref() == Some("on");
+        let memory = std::env::var(crate::faces::MEMORY_ENVIRONMENT)
+            .ok()
+            .map(PathBuf::from)
+            .filter(|path| path.is_absolute());
+        let owed = std::env::var_os("STATE_DIRECTORY")
+            .map(|dir| PathBuf::from(dir).join(FORGET_OWED_FILE));
+        Some(Self::with_forget_owed(
+            ADMIN_SOCKET,
+            Arc::new(backend),
+            health,
+            memory,
+            owed,
+        ))
     }
 
     /// Whether `lamp-services` is here to ask: `can` names [`CAN`] and
@@ -369,6 +608,62 @@ impl Services {
         if !known(code) {
             return Err(NOT_KNOWN.to_owned());
         }
+        if asked == Asked::Set && code == lamp_services::health::CODE {
+            return Err(HEALTH_NO_LINK.to_owned());
+        }
+        let code = code.to_owned();
+        let fetch = self.fetch.clone();
+        let memory = self.memory.clone();
+        let owed = self.forget_owed.clone();
+        self.spawn(kind, move |socket, kind| match asked {
+            Asked::Set => set(&*fetch, socket, kind, &code),
+            Asked::Remove => {
+                ask(socket, &json!({"op": "remove", "code": code}), ADMIN_WAIT)?;
+                if code == lamp_services::health::CODE {
+                    forget_or_owe(memory.as_deref(), &owed);
+                }
+                Ok(Some(json!({"connector": code})))
+            }
+        })
+    }
+
+    /// Takes [`HEALTH_KIND`] (the app's Apple Health summaries): checked
+    /// now (`lamp_services::health::fit`), a refusal said at once, and the
+    /// checked summary handed to the admin socket's `set_local` on a thread
+    /// of its own, its result kept for [`Self::take`]: `{"connector",
+    /// "days"}`. `null` disconnects it, a remove, whatever
+    /// [`Self::health`] says: `{"connector", "cleared": true}`. Off, a
+    /// summary is "not on this lamp".
+    pub fn start_health(&self, data: &Value) -> Result<(), String> {
+        let code = lamp_services::health::CODE;
+        if data.is_null() {
+            let memory = self.memory.clone();
+            let owed = self.forget_owed.clone();
+            return self.spawn(HEALTH_KIND, move |socket, _| {
+                ask(socket, &json!({"op": "remove", "code": code}), ADMIN_WAIT)?;
+                forget_or_owe(memory.as_deref(), &owed);
+                Ok(Some(json!({"connector": code, "cleared": true})))
+            });
+        }
+        if !self.health {
+            return Err(crate::wire::not_here(HEALTH_KIND));
+        }
+        let summary = lamp_services::health::fit(data, lamp_services::now_secs())?;
+        let days = summary.days.len();
+        let line = json!({"op": "set_local", "code": code, "data": summary});
+        self.spawn(HEALTH_KIND, move |socket, _| {
+            ask(socket, &line, ADMIN_WAIT).map(|_| Some(json!({"connector": code, "days": days})))
+        })
+    }
+
+    /// `job` on a thread of its own, with the admin socket and `kind`, its
+    /// result kept for [`Self::take`]; [`BUSY`] at once past
+    /// [`MOST_AT_ONCE`].
+    fn spawn(
+        &self,
+        kind: &str,
+        job: impl FnOnce(&Path, &str) -> Result<Option<Value>, String> + Send + 'static,
+    ) -> Result<(), String> {
         if self
             .under_way
             .fetch_update(Ordering::AcqRel, Ordering::Acquire, |n| {
@@ -378,15 +673,11 @@ impl Services {
         {
             return Err(BUSY.to_owned());
         }
-        let (kind, code) = (kind.to_owned(), code.to_owned());
-        let (socket, fetch) = (self.socket.clone(), self.fetch.clone());
+        let kind = kind.to_owned();
+        let socket = self.socket.clone();
         let (under_way, done) = (self.under_way.clone(), self.done.clone());
         std::thread::spawn(move || {
-            let result = match asked {
-                Asked::Set => set(&*fetch, &socket, &kind, &code),
-                Asked::Remove => ask(&socket, &json!({"op": "remove", "code": code}), ADMIN_WAIT)
-                    .map(|_| Some(json!({"connector": code}))),
-            };
+            let result = job(&socket, &kind);
             under_way.fetch_sub(1, Ordering::AcqRel);
             if let Ok(mut done) = done.lock() {
                 done.push(Outcome {
@@ -425,9 +716,13 @@ impl Services {
         Ok(json!({ "connected": connected }))
     }
 
-    /// Every token wiped: the lamp left its account.
+    /// Every token wiped: the lamp left its account. What the voice kept
+    /// of Apple Health goes with its summary ([`forget_or_owe`]): memory
+    /// not answering owes it to [`forget_health_until_taken`].
     pub fn wipe(&self) -> Result<(), String> {
-        ask(&self.socket, &json!({"op": "wipe"}), ADMIN_WAIT).map(|_| ())
+        ask(&self.socket, &json!({"op": "wipe"}), ADMIN_WAIT)?;
+        forget_or_owe(self.memory.as_deref(), &self.forget_owed);
+        Ok(())
     }
 
     /// Results handed to the broker and lost with the connection before it
@@ -589,6 +884,27 @@ pub mod tests {
         )
     }
 
+    /// [`services`], taking Apple Health's summaries when `health`.
+    pub fn health_services(socket: PathBuf, health: bool) -> Arc<Services> {
+        Services::with_health(
+            socket,
+            Arc::new(FakeFetch {
+                answer: Err("never fetched".into()),
+                asked: Mutex::default(),
+            }),
+            health,
+        )
+    }
+
+    /// The app's Apple Health summary as it sends it now, in UTC, with
+    /// `steps` for today.
+    pub fn health_data(steps: u32) -> Value {
+        let as_of = lamp_services::reads::rfc3339(lamp_services::now_secs());
+        json!({"as_of": as_of, "tz": "UTC", "days": [
+            {"date": &as_of[..10], "steps": steps, "resting_hr": 58,
+             "workouts": [{"type": "running", "start": "06:55", "min": 32, "km": 5.1}]}]})
+    }
+
     /// The results within a few seconds, at least `count` of them.
     pub fn results(services: &Services, count: usize) -> Vec<Outcome> {
         let by = Instant::now() + Duration::from_secs(5);
@@ -598,6 +914,257 @@ pub mod tests {
             std::thread::sleep(Duration::from_millis(10));
         }
         all
+    }
+
+    /// #7900: Apple Health's disconnect, its remove and a sign-out's wipe
+    /// take what the voice kept of it in memory too, on memory's narrow
+    /// socket; memory not answering is told to the app as not done.
+    #[test]
+    fn unlinking_apple_health_removes_the_kept_facts_in_memory_too() {
+        let memory = admin(r#"{"ok":true,"removed":2}"#);
+        let admin = admin(r#"{"ok":true}"#);
+        let fetch = || -> Arc<dyn Fetch> {
+            Arc::new(FakeFetch {
+                answer: Err("never fetched".into()),
+                asked: Mutex::default(),
+            })
+        };
+        let services = Services::with_memory(admin.socket(), fetch(), true, Some(memory.socket()));
+        services.start_health(&Value::Null).unwrap();
+        assert_eq!(
+            results(&services, 1)[0].result,
+            Ok(Some(json!({"connector": "apple_health", "cleared": true})))
+        );
+        services.start("connector.remove.apple_health").unwrap();
+        assert_eq!(
+            results(&services, 1)[0].result,
+            Ok(Some(json!({"connector": "apple_health"})))
+        );
+        assert_eq!(services.wipe(), Ok(()));
+        // Another service's remove leaves memory alone.
+        services.start("connector.remove.gmail").unwrap();
+        assert!(results(&services, 1)[0].result.is_ok());
+        let asked: Vec<Value> = memory
+            .lines
+            .lock()
+            .unwrap()
+            .iter()
+            .map(|line| serde_json::from_str(line.trim()).unwrap())
+            .collect();
+        assert_eq!(asked, vec![json!({"op": "forget_apple_health"}); 3]);
+        // Memory gone: the unlink is done all the same, the forget owed.
+        let gone = Services::with_memory(
+            admin.socket(),
+            fetch(),
+            true,
+            Some(memory.dir.path().join("none.sock")),
+        );
+        gone.start_health(&Value::Null).unwrap();
+        assert_eq!(
+            results(&gone, 1)[0].result,
+            Ok(Some(json!({"connector": "apple_health", "cleared": true})))
+        );
+        assert_ne!(gone.forget_owed.owed(), 0);
+        assert_eq!(
+            forget_health_facts(Some(&memory.dir.path().join("none.sock"))),
+            Err(HEALTH_FACTS_KEPT.to_owned())
+        );
+        assert_eq!(forget_health_facts(None), Ok(()));
+    }
+
+    /// A fake memory at `path`, from now on: each line kept, `reply` sent.
+    fn listen_at(path: &Path, reply: &'static str) -> Arc<Mutex<Vec<String>>> {
+        let listener = UnixListener::bind(path).unwrap();
+        let lines = Arc::new(Mutex::new(Vec::new()));
+        let kept = lines.clone();
+        std::thread::spawn(move || {
+            for stream in listener.incoming() {
+                let Ok(mut stream) = stream else { return };
+                let mut line = String::new();
+                let _ = BufReader::new(&stream).read_line(&mut line);
+                kept.lock().unwrap().push(line);
+                let _ = stream.write_all(format!("{reply}\n").as_bytes());
+            }
+        });
+        lines
+    }
+
+    /// #7900: memory down at the Disconnect, then up: the facts are gone
+    /// with no second tap, the forget owed on disk meanwhile and retried in
+    /// the background; a restart with the owe kept tries it at once.
+    #[test]
+    fn a_disconnect_memory_missed_is_retried_until_memory_takes_it() {
+        let admin = admin(r#"{"ok":true}"#);
+        let state = tempfile::tempdir().unwrap();
+        let owed_file = state.path().join(FORGET_OWED_FILE);
+        let memory_socket = state.path().join("memory.sock");
+        let make = || {
+            Services::with_forget_owed(
+                admin.socket(),
+                Arc::new(FakeFetch {
+                    answer: Err("never fetched".into()),
+                    asked: Mutex::default(),
+                }),
+                true,
+                Some(memory_socket.clone()),
+                Some(owed_file.clone()),
+            )
+        };
+        let services = make();
+        services.start_health(&Value::Null).unwrap();
+        assert_eq!(
+            results(&services, 1)[0].result,
+            Ok(Some(json!({"connector": "apple_health", "cleared": true})))
+        );
+        assert!(owed_file.exists(), "owed on disk");
+        let runtime = tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+            .unwrap();
+        let said = Arc::new(Mutex::new(Vec::<String>::new()));
+        let wait_for = |lines: Arc<Mutex<Vec<String>>>, owed: Arc<ForgetOwed>| async move {
+            for _ in 0..1500 {
+                if !lines.lock().unwrap().is_empty() && owed.owed() == 0 {
+                    return lines.lock().unwrap().clone();
+                }
+                tokio::time::sleep(Duration::from_millis(10)).await;
+            }
+            panic!("never forgotten");
+        };
+        let kept = said.clone();
+        let asked = services.clone();
+        let memory = runtime.block_on(async {
+            let retrying = async move {
+                let mut say = |line: &str| kept.lock().unwrap().push(line.to_owned());
+                forget_health_until_taken(asked, &mut say).await;
+            };
+            let checked = async {
+                // Memory still down: tried, not taken, still owed.
+                tokio::time::sleep(Duration::from_millis(100)).await;
+                assert_ne!(services.forget_owed.owed(), 0);
+                let lines = listen_at(&memory_socket, r#"{"ok":true,"removed":3}"#);
+                wait_for(lines, services.forget_owed.clone()).await
+            };
+            tokio::select! {
+                () = retrying => unreachable!(),
+                lines = checked => lines,
+            }
+        });
+        assert_eq!(
+            serde_json::from_str::<Value>(memory[0].trim()).unwrap(),
+            json!({"op": "forget_apple_health"})
+        );
+        assert!(!owed_file.exists(), "paid");
+        assert!(
+            said.lock()
+                .unwrap()
+                .iter()
+                .any(|line| line.contains("taken"))
+        );
+
+        // A restart with the owe kept: tried at once, with no new unlink.
+        write_owed(&owed_file).unwrap();
+        let _ = std::fs::remove_file(&memory_socket);
+        let lines = listen_at(&memory_socket, r#"{"ok":true,"removed":0}"#);
+        let restarted = make();
+        assert_ne!(restarted.forget_owed.owed(), 0);
+        let asked = restarted.clone();
+        let mut quiet = |_: &str| {};
+        let memory = runtime.block_on(async {
+            tokio::select! {
+                () = forget_health_until_taken(asked, &mut quiet) => unreachable!(),
+                lines = wait_for(lines, restarted.forget_owed.clone()) => lines,
+            }
+        });
+        assert_eq!(memory.len(), 1);
+        assert!(!owed_file.exists());
+    }
+
+    /// An owe newer than the forget under way isn't paid by it, and the
+    /// backoff stays within its bounds.
+    #[test]
+    fn a_newer_owe_is_not_paid_by_an_older_forget() {
+        let owed = ForgetOwed::open(None);
+        assert_eq!(owed.owed(), 0);
+        owed.owe();
+        let seen = owed.owed();
+        owed.owe();
+        owed.paid(seen);
+        assert_ne!(owed.owed(), 0);
+        owed.paid(owed.owed());
+        assert_eq!(owed.owed(), 0);
+        assert!(FORGET_FIRST < FORGET_MOST && FORGET_MOST <= Duration::from_secs(600));
+    }
+
+    /// Apple Health's summary: checked here, a refusal at once and by its
+    /// field; the checked summary handed on as `set_local`, `null` as a
+    /// remove whatever the switch says; with it off, a summary is not on
+    /// this lamp. Never a `connector.set`, and no value in any result.
+    #[test]
+    fn a_health_summary_is_checked_here_and_kept_by_lamp_services() {
+        let admin = admin(r#"{"ok":true,"connector":"apple_health","days":1}"#);
+        let on = health_services(admin.socket(), true);
+        let data = health_data(84_217);
+        on.start_health(&data).unwrap();
+        let done = results(&on, 1);
+        assert_eq!(done[0].kind, HEALTH_KIND);
+        assert_eq!(
+            done[0].result,
+            Ok(Some(json!({"connector": "apple_health", "days": 1})))
+        );
+        let sent: Value = serde_json::from_str(admin.lines.lock().unwrap()[0].trim()).unwrap();
+        assert_eq!(
+            sent,
+            json!({"op": "set_local", "code": "apple_health", "data": data})
+        );
+        // Refused at once, by its field; nothing handed on.
+        let mut bad = health_data(84_217);
+        bad["days"][0]["spo2"] = json!(97);
+        let why = on.start_health(&bad).unwrap_err();
+        assert_eq!(why, "data.days[0] has a field it doesn't take: spo2");
+        bad = health_data(84_217);
+        bad["days"][0]["steps"] = json!(999_999);
+        assert!(on.start_health(&bad).unwrap_err().contains("steps"));
+        assert!(on.start_health(&json!({"as_of": "x"})).is_err());
+        assert!(
+            on.start_health(&json!("x".repeat(20_000)))
+                .unwrap_err()
+                .contains("over 16384")
+        );
+        assert_eq!(admin.lines.lock().unwrap().len(), 1);
+        // A disconnect is a remove, switch on or off.
+        let off = health_services(admin.socket(), false);
+        for services in [&on, &off] {
+            services.start_health(&Value::Null).unwrap();
+            assert_eq!(
+                results(services, 1)[0].result,
+                Ok(Some(json!({"connector": "apple_health", "cleared": true})))
+            );
+        }
+        let lines = admin.lines.lock().unwrap().clone();
+        for line in &lines[1..] {
+            let sent: Value = serde_json::from_str(line.trim()).unwrap();
+            assert_eq!(sent, json!({"op": "remove", "code": "apple_health"}));
+        }
+        // Off, a summary is not on this lamp, and nothing is asked.
+        assert_eq!(
+            off.start_health(&health_data(1)).unwrap_err(),
+            "not on this lamp: health.summary"
+        );
+        assert_eq!(admin.lines.lock().unwrap().len(), 3);
+        // Never linked as a token is; its remove is a service's remove.
+        assert_eq!(
+            on.start("connector.set.apple_health").unwrap_err(),
+            HEALTH_NO_LINK
+        );
+        on.start("connector.remove.apple_health").unwrap();
+        assert_eq!(
+            results(&on, 1)[0].result,
+            Ok(Some(json!({"connector": "apple_health"})))
+        );
+        // No value in a result, its journal line or a Debug.
+        let everything = format!("{done:?} {} {on:?}", done[0].journal());
+        assert!(!everything.contains("84217"), "{everything}");
     }
 
     #[test]

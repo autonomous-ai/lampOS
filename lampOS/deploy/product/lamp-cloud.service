@@ -123,6 +123,9 @@ Environment=LAMP_APP_ENGINES=on
 # The app's connectors (Queue #4710): a link set or removed through lamp-services' admin socket. Reads, and
 # sends, which lamp-services.service sets on (LAMP_SERVICES_WRITE=on); the same line there and in lamp-voice.service.
 Environment=LAMP_SERVICES=on
+# The app's Apple Health summaries (health.summary, docs/cloud.md): checked here, kept by lamp-services; the same
+# line there. On in the product by the owner's decision (19 Nov).
+Environment=LAMP_APPLE_HEALTH=on
 # A skill that needs a connector not linked, told to the app so it opens that Connect (#6059, the owner's ask):
 # skills.list rows carry needs_link, from lamp-services' admin list, and an install or an app make that lands one
 # sends skills.needs_link on the account channel, codes and names only.
@@ -148,7 +151,8 @@ Environment=LAMP_PHOTO_FACES=on
 Environment=LAMP_EYES_PHOTO_DIR=/run/lampos-photos
 Environment=LAMP_EYES_WHO_SOCKET=/run/lampos-eyes/who.sock
 # Memory's narrow socket (A8, #6852; cloud.md "The faces it knows"): face.remove forgets the person's memories
-# too, never reading them. Asked only with LAMP_FACES_PAGE=on; lamp-memory.service opens it for this group.
+# too, never reading them (with LAMP_FACES_PAGE=on), and Apple Health's unlink, remove or sign-out forgets its kept
+# facts (#7900, retried until memory takes it). lamp-memory.service opens it for this group.
 Environment=LAMP_MEMORY_FORGET_SOCKET=/run/lampos-memory/forget.sock
 # The owner's dev monitor from the app (#5883, #6401; cloud.md "The dev monitor"): monitor.set/get/link in `can`, so the
 # app shows its switch. The monitor itself stays off until the owner turns it on in the app. On for every lamp: the lead's call (16 Nov).

@@ -360,9 +360,11 @@ socket is refused before the eyes forget anything.
   which memory's user is in (A8, #6852). The main socket stays
   0600. A line on it must be exactly
   `{"op":"forget_person","person":ID}`, those two keys and an id of the
-  shape above; it is re-encoded before the store sees it
-  (`protocol::narrow`). Anything else (`recall`, `search`, `kept`, `status`,
-  `forget_all`, an extra key, non-JSON) is
+  shape above, or exactly `{"op":"forget_apple_health"}`, that one key
+  alone (the app's unlink of Apple Health, below); it is re-encoded before
+  the store sees it (`protocol::narrow`). Anything else (`recall`,
+  `search`, `kept`, `status`, `forget_all`, an extra key, such as a
+  `forget_apple_health` with a `person`, non-JSON) is
   `{"ok":false,"error":"not_allowed",...}`, and a bad id `bad_person`,
   without the store being asked anything. Both sockets are served by the
   one loop, a request at a time.
@@ -375,7 +377,22 @@ socket is refused before the eyes forget anything.
 - **Tests:** `tests/forget_person.rs` (a real Days server and the legacy
   store: nothing left for the person or their rules scope, another person's
   and the room's unchanged; the narrow socket's refusals, modes and bus
-  telling), and the protocols' `forget_person` unit tests.
+  telling), and the protocols' `forget_person` unit tests;
+  `protocol::tests::the_narrow_check_lets_through_one_forget_person_and_nothing_else`
+  (also `forget_apple_health` alone, and refused with any other key).
+- **Apple Health's kept facts** (#7900): the voice keeps what an Apple
+  Health read found as a dated kept thing of the owner's, worded "From
+  Apple Health, read on YYYY-MM-DD: …." (`lamp_msgs::health_fact`,
+  [services.md](services.md), "Apple Health"), with
+  `remember_apple_health`, which marks it as Apple Health's
+  ([Requests](#requests)). The app's unlink of Apple Health makes
+  lamp-cloud send `{"op":"forget_apple_health"}` on the narrow socket,
+  which removes all of them, by their mark. Disconnecting removes what
+  Lamp kept from Apple Health; what you talked about stays in your
+  conversations until you ask Lamp to forget it. A thing the person asks Lamp to remember about their health after a read is theirs like anything else they told it, and goes with "forget that", not with Disconnect. A forget
+  memory doesn't take at the unlink is retried by lamp-cloud until it does
+  (cloud.md). The owner's own "forget
+  everything" takes them with the rest of their scope.
 
 ### The owner's face and typed name (#7501, `LAMP_OWNER_LINK`)
 
@@ -559,6 +576,35 @@ result, or `"ok":false`, an `"error"` (`bad_json`, `bad_request`, `unknown_op`,
   only. It takes only an id of `lamp_msgs::known::is_person_id`'s shape
   (`p-` and 16 hex digits, maybe `-N`); the room, an `r-` scope, `null` or
   any other id is `bad_person` ([Forgetting a person](#forgetting-a-person)).
+- `{"op":"remember_apple_health","person":ID,"at_unix_ms":N,"text":"..."}`
+  (not a default request: the Days store only, the legacy store refuses it
+  as an unknown op; `Days::remember_apple_health`,
+  `lamp_msgs::health_fact::REMEMBER_OP`) keeps what an Apple Health read
+  found as a kept thing of one known person's (`p-` id only, else
+  `bad_request`), marked in the `apple_health` table, and answers
+  `{"ok":true,"id":N}`. The mark, never the words, is how such a fact is
+  found: a person's own kept line in the same words is theirs (`once`
+  never finds a marked fact). One a person a local day: in the same
+  transaction it removes their marked fact of that day, and any past the
+  age limit, with what was made from them. A marked fact lasts 14 local
+  days (`health_fact::KEPT_DAYS`: read on the 1st, gone on the 15th, at
+  the next request's maintenance), and it does not count toward the 200
+  kept things (`KEPT_ENTRIES`, the `full` refusal). It is linked to no
+  exchange, so removing it takes nothing that was said.
+- `{"op":"forget_apple_health"}` (not a default request: the Days store
+  only, the legacy store refuses it as an unknown op;
+  `Days::forget_apple_health`) removes every person's marked Apple Health
+  facts, each as a non-selective `forget {id}` of it would, with what was
+  made from it: `{"ok":true,"removed":N}`. Nothing else goes: no exchange
+  (none is linked to a fact) and no nightly mark, so a person's own kept
+  line in the same words and what they talked about stay until they ask
+  Lamp to forget it. The narrow socket lets it through (the app's unlink
+  of Apple Health). Tests (`days_protocol::tests`):
+  `forget_apple_health_takes_the_marked_facts_and_nothing_else`,
+  `forget_person_takes_their_marked_apple_health_facts`,
+  `an_apple_health_fact_is_replaced_by_the_same_days_next_read`,
+  `an_apple_health_fact_is_gone_after_fourteen_days`,
+  `apple_health_facts_are_not_counted_in_the_kept_lists_room`.
 - `status`: `people`, each `{person, exchanges, kept, bytes, oldest_day,
   newest_day, skipped_lines}`, everyone's unless one is named.
 
@@ -1559,7 +1605,7 @@ How it is wired (`crates/memory/src/tiers.rs`, `tiers_log.rs`):
   the bench give one.
 - **The night's two ops** (main socket only, and only with the switch set;
   Days alone refuses them as any unknown op; the narrow socket takes
-  `forget_person` only):
+  `forget_person` and `forget_apple_health` only):
   - `{"op":"tiers_sleep_take"}` → `{"ok":true,"job":null}`,
     `{"ok":true,"job":null,"busy":true}`, or
     `{"ok":true,"job":{"id":"<16 hex>","system":"<the tiered store's

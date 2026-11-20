@@ -602,6 +602,9 @@ pub fn ended(
     if !on() || !crate::services::is_tool(name) || name == crate::services::CONNECTED {
         return;
     }
+    if is_health(args) {
+        return;
+    }
     let Some(person) = whose(owner) else {
         return;
     };
@@ -638,10 +641,16 @@ pub fn ended(
     save(record);
 }
 
+/// Whether a call's `args` name Apple Health: no record of it is ever
+/// kept, so none outlives a disconnect (the first builder's P3 on #7900).
+fn is_health(args: &Value) -> bool {
+    crate::services::names_health(args)
+}
+
 /// A read answered for `owner`: its query and what it found, `done`, or
 /// `no_result` when it found nothing; an answered error is `failed`.
 pub fn read(owner: &str, args: &Value, told: &Value) {
-    if !on() {
+    if !on() || is_health(args) {
         return;
     }
     if let Some(error) = told.get("error").and_then(Value::as_str) {

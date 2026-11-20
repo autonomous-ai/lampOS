@@ -12599,8 +12599,11 @@ light = { dim = 1 }
     /// first, in the catalog's order.
     #[test]
     fn the_service_grant_codes_are_the_catalogs() {
+        // A local service (Apple Health) is no grant: the owner's voice
+        // alone reads it.
         let codes: Vec<&str> = lamp_services::catalog::SERVICES
             .iter()
+            .filter(|service| !service.local)
             .map(|service| service.code)
             .collect();
         let firsts: Vec<&str> = codes

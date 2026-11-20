@@ -3,7 +3,7 @@
 A person links their own accounts in the app, as in V1: Gmail (and on a
 Lamp 2 a send-only Google sign-in for it), Google Calendar and Drive, Figma, GitHub, Linear, Asana, Ahrefs and a
 Facebook Page, V1's MCP services, Slack, monday.com, HubSpot and
-Amplitude, and Notion, through its own MCP server. The lamp keeps each link's token and uses it only when the lamp's
+Amplitude, and Notion, through its own MCP server; with `LAMP_APPLE_HEALTH=on`, Apple Health's daily summaries, which the phone app pushes itself with no sign-in or token ("Apple Health", below). The lamp keeps each link's token and uses it only when the lamp's
 owner asks out loud: it reads, and with a second switch it writes, each write
 read back in full and sent only on a spoken "send". Nobody else at the lamp
 (a guest, a stranger, the room) can use them. Vietnamese:
@@ -138,6 +138,7 @@ connected apps.
 | `LAMP_SKILL_READS=on` (on in the product's four units) | `lamp-services`, `lamp-skills` (and its `lamp-skills-manage@` helper) and `lamp-voice` | A made skill reaches no service: `lamp-services` refuses `lamp-skills` on its tools socket, a skill's `read` step does nothing at its run ("not made: LAMP_SKILL_READS is not on"), and the making model is told to answer a request for a skill naming a service with `cannot:` ("A made skill's read", below) |
 | `LAMP_SKILL_TASKS=on` (#6432; on in the product units) | `lamp-services`, `lamp-control` (and `lamp-tasks`, which runs the task) and `lamp-voice` | A skill's run reaches no service: lamp-control answers `service.read` and `service.write` `off`, `lamp-services` refuses the `lamp-control.service` cgroup on its tools socket and the voice's `run_write_waiting`, and the voice reads no run's write back ("A skill's run on the lamp's Hermes", below) |
 | `lamp-services --run-calls` (the linked-service memory plan, slice 4; in `lamp-services.service` since 19 Nov) | `lamp-services` | No skill run's calls are kept and the voice's `run_calls_since` is refused ("The last 64 calls across all runs kept", below) |
+| `LAMP_APPLE_HEALTH=on` (on in both product units by the owner's decision, 19 Nov; a drop-in with `off` turns it off) | `lamp-cloud` (with `LAMP_CLOUD=on` and `LAMP_SERVICES=on`) and `lamp-services`, each in its own unit | `lamp-cloud` answers the app's `health.summary` with a summary as "not on this lamp: health.summary" and lists it in no `can`; its disconnect (`"data": null`) is still taken, a remove. `lamp-services` keeps no summary (`set_local`: "Apple Health is off on this lamp"), lists none, and a read of `apple_health` is "The lamp can't link apple_health yet."; `tools.json` names no Apple Health. A summary kept while it was on stays on disk, unread, until a remove, a sign-out or a reset ("Apple Health", below) |
 | `LAMP_SERVICE_READ_IDS_KEPT=on` (tracker row C132; on in the product's lamp-voice unit, beside #6410) | `lamp-voice`'s second route, with `LAMP_SERVICES=on` | A calendar read keeps nothing: a move or cancel of an event from an earlier conversation reads in each request and is refused by the after-read rule there ("After a read", below) |
 
 A write, and a read said in full, also need the owner's face seen speaking
@@ -199,6 +200,7 @@ socket's group can't tell `lamp-cloud` from another `lampos` process:
   | Line | Answer |
   |---|---|
   | `{"op":"set","code":"gmail","connector":{...}}`, `connector` the `data` the backend's `get-message` returned | `{"ok":true,"connector":"gmail","scopes":[...]}` or `{"ok":false,"error":"<plain reason, no secret>"}` |
+  | `{"op":"set_local","code":"apple_health","data":{...}}`, `data` the app's `health.summary` summary as `lamp-cloud` checked it; a local service's code alone (`catalog::Service::local`), and only with `LAMP_APPLE_HEALTH=on` ("Apple Health", below) | `{"ok":true,"connector":"apple_health","days":N}` or `{"ok":false,"error":"<the field, never a value>"}` |
   | `{"op":"remove","code":"gmail"}` | `{"ok":true}` |
   | `{"op":"wipe"}` | `{"ok":true}` |
   | `{"op":"list"}` | `{"ok":true,"connected":[{"code":"gmail","account":"a@b.c","expired":false}]}` |
@@ -248,6 +250,13 @@ refused a link with no end by time: [Refresh](#refresh)). Its `Debug` shows `<hi
 of `credentials`; no refusal names a value. A credential of over 8,192 bytes,
 or one with a control character (a line break that could split a header), is
 refused at `set`.
+
+Apple Health's file, `apple_health.json`, is kept the same way, with the
+same modes, written beside and renamed over (`store::Store::keep_local`):
+`{"connector": "apple_health", "stored_at", "summary": {"as_of", "tz",
+"days"}}`, the summary as checked, never a token. `Store::load` never reads
+it as a link, `Store::keep` refuses to write a link under its code, and the
+same remove and wipe below delete it.
 
 Wiped:
 
@@ -307,6 +316,7 @@ refresh goes to the lamp's backend, never to Google).
 | `hubspot` | HubSpot | `mcp.hubspot.com` | as Slack | as Slack |
 | `amplitude` | Amplitude | `mcp.amplitude.com`, `mcp.eu.amplitude.com` | as Slack | as Slack |
 | `notion` | Notion | `mcp.notion.com` | as Slack | as Slack |
+| `apple_health` | Apple Health (with `LAMP_APPLE_HEALTH=on`) | none: local, no token, nothing fetched from the network; its answers are read aloud through Lamp's voice services, the chat model is given one short line of what was read, and that line is kept in the owner's memory | `sleep {date}`, `steps {date, days}`, `heart {date}`, `workouts {days}`, `week`, from the kept summary ("Apple Health", below) | none |
 
 Calendar has no `calendars` read: its link holds only `calendar.events`
 (#5385), and Google lists calendars only with a calendar or calendarlist
@@ -3015,7 +3025,9 @@ and the lamp's key ([cloud.md](cloud.md), "A person's linked services"):
 | `connector.set.<code>` | V1's "privacy" type: the message carries no token. It fetches `GET <base>/devices/get-message?kind=connector.set.<code>` with the lamp's key as the bearer and `X-Device-ID` (V1's `privacy_fetch.go`, 30 s, no redirect, at most 256 KB), takes the inner `data` of `{status: 1, data: {kind, data}}`, checks it names `connector` (this code) and `auth_type`, and hands it to `{"op":"set"}` | `starting` at once; then `success` with `{"connector", "scopes"}`, or `failure` with why |
 | `connector.remove.<code>` | `{"op":"remove"}`; nothing fetched | `starting`; then `success` with `{"connector"}`, or `failure` |
 | `services.list` | `{"op":"list"}`, inline, 5 s | `success` with `{"connected": [{"code", "account", "expired"}]}` |
-| `system.info`'s `can` | `services` (the `connector.*` kinds, too many to list) and `services.list`, only while the switch is on and `admin.sock` is there | |
+| `health.summary` (`{"as_of", "tz", "days": [...]}`, or `null`), with `LAMP_APPLE_HEALTH=on` too | checks the summary (`lamp_services::health::fit`) and hands the checked summary to `{"op":"set_local","code":"apple_health"}`; `null` (or no `data`) is `{"op":"remove","code":"apple_health"}`, taken with `LAMP_SERVICES=on` alone ("Apple Health", below) | `starting`; then `success` with `{"connector": "apple_health", "days": N}` (`null`: `{"connector": "apple_health", "cleared": true}`), or `failure`; a summary that doesn't fit is `failure` at once, naming the field |
+| `connector.set.apple_health` | refused at once, nothing fetched | `failure`, "Apple Health takes no link: the app sends its summaries as health.summary" |
+| `system.info`'s `can` | `services` (the `connector.*` kinds, too many to list) and `services.list`, only while the switch is on and `admin.sock` is there; `health.summary` also only with `LAMP_APPLE_HEALTH=on` | |
 
 Replies are V1's shape, `{"type":"data","kind":"connector.set.<code>",
 "status":"starting|success|failure","data":{...},"error":...}`. A `set` or
@@ -3023,7 +3035,7 @@ Replies are V1's shape, `{"type":"data","kind":"connector.set.<code>",
 "the lamp's services are busy: try again in a moment"), waited on 30 s (the
 Gmail check, an IMAP login or a profile read, is in it); its result goes out on the next tick and is said
 again if the connection is lost before the broker's ack. Failures in plain
-words: "not a service this lamp knows" (a code not among the 15, at once),
+words: "not a service this lamp knows" (a code not among the 17, at once),
 "the lamp's services are not running", "the lamp's services did not answer
 in time", "fetch privacy data: http <status>" / "backend rejected: …" /
 "backend response missing data block", "connector is required",
@@ -3031,6 +3043,264 @@ in time", "fetch privacy data: http <status>" / "backend rejected: …" /
 `lamp-services`' own reason. The fetched data goes into the admin line and
 nowhere else: never a reply, an error, a journal line (which says only the
 kind and its status) or a `Debug`.
+
+## Apple Health (`LAMP_APPLE_HEALTH`, on in the product)
+
+The phone app reads HealthKit and pushes daily summaries to the lamp; the
+voice answers "how did I sleep", "steps today" or "my runs this week" from
+them through `service_read`, for the owner's line as every linked
+service's read ("Who hears it", below). There is no sign-in, no token and
+no host: the catalog row `apple_health` is `local` (`catalog.rs`), and
+`lamp-services` never fetches it from the network.
+
+**Lamp's voice uses your health summary to talk with you, through its
+voice services, and remembers it for you.** The lamp builds a read's exact
+words and the speech service (ElevenLabs in the product) renders them; the
+chat model (DeepSeek in the product) is given one short line of what was
+read, and that line is kept in the owner's own memory ("What is said" and
+"What is remembered", below). In the private room anyone at the lamp who
+asks can hear the owner's health; the owner chooses that knowingly by
+linking it. The rules are one copy,
+`crates/services/src/health.rs`, read by `lamp-cloud`, `lamp-services` and
+the voice.
+
+**On in the product: `LAMP_APPLE_HEALTH=on`**, off unless set, in both `lamp-cloud.service` (beside
+`LAMP_CLOUD=on` and `LAMP_SERVICES=on`) and `lamp-services.service`; both
+product units set it, by the owner's decision (19 Nov). Off (a drop-in with
+`LAMP_APPLE_HEALTH=off`): the summary is refused, nothing is listed or
+read ("The switches", above).
+
+**The app's message**, on the account channel like every kind, so only the
+lamp's own signed-in account sends it (`online::commanded`, the gate
+`owner.place` has):
+
+```
+{"cmd":"data","kind":"health.summary","data":{
+  "as_of":"2026-11-18T07:30:00+07:00", "tz":"Asia/Ho_Chi_Minh",
+  "days":[{"date":"2026-11-18",
+    "steps":8421, "active_kcal":412, "resting_hr":58,
+    "sleep_min":412, "sleep_start":"23:48", "sleep_end":"06:40",
+    "workouts":[{"type":"running","start":"06:55","min":32,"km":5.1}]}]}}
+```
+
+Checked strictly, first by `lamp-cloud` and again by `lamp-services`
+(`health::fit`); a refusal names the field, never a value:
+
+- `data` at most 16,384 bytes as compact JSON (`DATA_MOST`), an object with
+  `as_of`, `tz` and `days` and no other field.
+- `as_of`: RFC 3339 with its offset (`Z` taken), at most 40 characters, and
+  no more than a day after the lamp's clock. `tz`: an IANA zone's name, at
+  most 64 characters of letters, digits, `/`, `_`, `+` and `-`.
+- `days`: 1 to 14 (`DAYS_MOST`), each `date` (`YYYY-MM-DD`, a real day)
+  once; kept oldest first. A day before the 14 ending today (in `tz`) is
+  dropped, not refused, at each push, and dropped from the file at each
+  read and at lamp-services' daily maintain too (`health::prune`,
+  `Services::maintain`, once at start then every 24 h, so a lamp whose
+  phone stopped pushing keeps no old days), so no day is kept past 14. Every other day field is optional, and `null` is
+  the same as absent: `steps` 0 to 200,000, `active_kcal` 0 to 20,000,
+  `resting_hr` 20 to 250, `sleep_min` 0 to 1,440 (the night that ended on
+  `date`), `sleep_start` and `sleep_end` `HH:MM` (00:00 to 23:59), all whole
+  numbers; `sleep_kind` `"in_bed"` alone (any other value refused), sent when
+  the night came from time in bed only (an iPhone with no Apple Watch), so
+  `sleep_min` is time in bed, and absent with asleep stages; `workouts` at
+  most 10 (`WORKOUTS_MOST`).
+- A workout: `type` required, one lowercase word (`a` to `z` and `_`, at most
+  40 letters, such as `running` or `traditional_strength_training`);
+  `start` `HH:MM`, `min` a whole number 0 to 1,440, `km` a number 0 to 1,000,
+  kept to two decimals; each optional.
+- Any field not named here is refused, at any level.
+
+`lamp-cloud` answers `starting` at once (a summary that doesn't fit is
+`failure` at once), then hands the checked summary to `lamp-services`
+(`{"op":"set_local","code":"apple_health","data":…}`), which checks it again
+and keeps it whole, replacing the last ("Where a token is kept", above):
+`success` with `{"connector":"apple_health","days":N}`. `"data": null` (or
+no `data`) disconnects it: `{"op":"remove"}`, `success` with
+`{"connector":"apple_health","cleared":true}`; it is taken with
+`LAMP_SERVICES=on` alone, the switch on or off, so a summary kept while it
+was on never outlives it (`owner.place.clear`'s rule). The app's
+`connector.remove.apple_health` does the same; `connector.set.apple_health`
+is refused. A sign-out's wipe and the factory reset take the file with the
+tokens. `services.list` and `services_connected` list `apple_health`, no
+account, never expired, while a summary is kept and the switch is on.
+
+**The reads** (`reads::local_read`, from the kept file alone). "Today" is the
+owner's date now in `tz` (the offset `as_of` was written with if the lamp
+doesn't know the zone).
+
+| `what` | Fields | Answer |
+|---|---|---|
+| `sleep` | `date` | The night that ended on `date` (`YYYY-MM-DD`, `today` or `yesterday`): `asleep` ("6 h 52 min"), `asleep_min`, `fell_asleep`, `woke`; a night with `sleep_kind` `in_bed` is `in_bed`, `in_bed_min` and `"sleep_kind": "in_bed"` instead, with a note to say it as time in bed ("about 7 hours in bed"), never as sleep. With no date, the latest night kept, told as not last night when it isn't today's |
+| `steps` | `date`, `days` | One day's steps (today by default, told as "so far"), or with `days` (1 to 14) the total and the daily average of the days ending today that have steps, and how many do |
+| `heart` | `date` | That day's resting heart rate (`resting_heart_rate_bpm`), by default the latest day that has one |
+| `workouts` | `days` | The latest workout, or with `days` those of the days ending today, newest first, at most 10: `type`, `started`, `minutes`, `km` |
+| `week` | none | Each day kept of the 7 ending today, and `week`: the days shared, workouts, steps' total and daily average, the nightly sleep and resting heart rate averages over the days that have them; nights in bed are `in_bed` and averaged apart (`in_bed_nightly_average`), never mixed with measured sleep |
+
+Every answer is quoted data from Apple Health with the summary's `as_of`
+and `tz` and a `note`, from which the lamp's fixed words say "as of 7:30
+am" ("What is said", below). A day or
+a value the phone didn't send is never guessed: the answer has nothing
+quoted, `"found": "none"` and a note saying what is missing. With no summary
+kept the read is refused, "Apple Health has no data on this lamp yet…"; a
+summary whose `as_of` is more than 48 hours old (`STALE_AFTER_S`) gives no
+value at all, only `"stale": true` and that it is out of date. In
+`tools.json` (with the switch) its kinds are on `what` ("apple_health: sleep,
+steps, heart, workouts, week") and its fields are `date` and `days`. The
+read's description says, as its second sentence (`tools::HEALTH_READS`):
+"The person's own sleep, steps, heart rate and workouts ("How did I sleep
+last night?", "How many steps today?", "Tối qua tôi ngủ thế nào?") are read
+from apple_health with this, never from recall or memory." On a lamp on 19
+Nov with Apple Health linked, "How did I sleep last night?" called `recall`
+and never this read; only "What does Apple Health say about my sleep last
+night?" read it. Second, so the voice's cut after its own rule keeps it.
+With it the description would pass its 1,024 bytes when every service is
+named, so its "what, by service: …" list is told on `what`'s own
+description instead; with the switch off the description, and `what`, are
+as before, and none of this is in `tools.json`.
+
+**Who hears it** (the product owner's decision through the lead, the first
+builder's c7003138011 on #7900). There is no face check. One predicate
+decides whose turn it is, `lamp_voice::services::health_owner_turn`, which
+is `owner_of` as for every linked service's read. In the private room
+(`LAMP_PRIVATE_ROOM`, on in the product) whoever speaks at the lamp is
+answered as the owner, so **anyone at the lamp who asks can hear the
+owner's health**; the owner chooses that knowingly by linking it. Outside
+the private room, a line not the owner's is told `OWNER_ONLY`, as any
+linked service's read is, and `lamp-services` is not asked
+(`lamp_voice::services::health_read`, before every other gate of a read,
+the agent's hand-off among them). On the Live route, whose model speaks
+every answer, a read is "I can't read Apple Health on this voice." and
+nothing is read.
+
+A made skill's read is refused at the door (`spoken::not_readable`, "read
+only to its owner at the lamp, never by a skill"), and so is a skill's run
+(`LOCAL_OWNER_ONLY`); `apple_health-read` and `apple_health-write` are no
+grant a skill can declare (`SERVICE_CODES`, `SERVICE_GRANTS` and
+`SERVICE_GRANT_CODES` leave it out, and the control schema's
+`service_grant` with them); it is never written ("Apple Health is read
+only: the lamp never writes to it"), and the agent's MCP server never lists
+it (`mcp_server::granted` skips a local service whatever a grant says).
+
+**What is said** (the first builder's P2 on #7900). On the second route
+`lamp_services::health::said` builds the answer's exact words from the
+read's answer, in English or, for a Vietnamese owner
+(`LAMP_LANGUAGE_FILE`), Vietnamese, and the read's result carries them
+(`lamp_says_exactly`). The round says them as they are
+(`Queue::push_verbatim`, no tags or rewrites). A round of only health reads
+ends there, with no second round; beside other calls the next round is
+told "Lamp has said this Apple Health answer aloud itself, in fixed words:
+don't repeat it now." with the short line of what was read
+(`what_was_read`, the note `HEALTH_TOLD`), or, for a read that found
+nothing to give, no value at all. The words, for each read:
+
+- `sleep`: "Apple Health, as of 7:30 am: you slept 6 hours and 52 minutes
+  last night, from 11:48 pm to 6:40 am." ("you were in bed for …" for a
+  night in bed); "Theo Apple Health lúc 7 giờ 30, đêm qua bạn ngủ 6 tiếng
+  52 phút, từ 23 giờ 48 đến 6 giờ 40." ("… bạn nằm trên giường …").
+- `steps`: "… you have 8,421 steps so far today." or "… you walked 8,421
+  steps yesterday."; with `days`, "… you walked 31,421 steps over the last 7
+  days, about 7,855 a day." and, when some days are missing, "Only 4 of
+  those days were shared."; "… hôm nay đến giờ bạn đã đi 8421 bước.", "… 7
+  ngày qua bạn đi tổng cộng 31421 bước, khoảng 7855 bước mỗi ngày."
+- `heart`: "… your resting heart rate today was 58 beats a minute."; "…
+  nhịp tim lúc nghỉ hôm nay của bạn là 58 nhịp mỗi phút."
+- `workouts`: "… your latest workout was running today for 32 minutes, 5.1
+  kilometres."; with `days`, "… you did 2 workouts in the last 7 days: …;
+  and …" (at most 3 named, then "N more"); "… 7 ngày qua bạn có 1 buổi tập:
+  chạy bộ hôm nay trong 32 phút, 5,1 ki-lô-mét."
+- `week`: "… over the last 7 days you walked 8,421 steps, about 8,421 a
+  day; slept about 6 hours and 52 minutes a night; had a resting heart rate
+  around 58 beats a minute; and did 1 workout."; "… 7 ngày qua bạn đi 8421
+  bước, khoảng 8421 bước mỗi ngày; ngủ khoảng 6 tiếng 52 phút mỗi đêm; nhịp
+  tim lúc nghỉ trung bình 58 nhịp mỗi phút; và có 1 buổi tập."
+- Nothing for it: "Your phone hasn't shared any steps for that with Lamp."
+  ("Điện thoại chưa chia sẻ số bước nào cho lúc đó với Lamp."); none kept:
+  "Lamp has no Apple Health data yet. You can share it from the Lamp app on
+  your phone."; stale: "The Apple Health data on Lamp is more than two days
+  old, so I won't read it. Opening the Lamp app on your phone shares it
+  again."; any other failure: "I couldn't read Apple Health just now."
+
+The as-of time is said in the owner's zone: "as of 7:30 am", "as of
+yesterday at 9:10 pm". These words are rendered by the speech service, so
+the values do leave the lamp for it, read aloud through Lamp's voice
+services.
+
+**What the chat model is told.** One short English line of what was read
+(`lamp_services::health::model_line`, under the key `what_was_read`), such
+as "slept 6 h 52 m last night", "8,421 steps so far today" or "over the
+last 7 days: about 7,855 steps a day; slept about 7 h 7 m a night; resting
+heart rate around 58 bpm; 2 workouts". It never names a workout's type or
+time, never gives a clock time and never lists the days one by one. There
+is none for an error, a stale summary or an answer with nothing found. The
+same line is told beside the owner's next lines for 5 minutes
+(`services::health_note_for`, `HEALTH_NOTE_FOR`), so Lamp can go on using
+it in the talk. It is kept in the voice's process alone, never on disk, and
+let go at the owner's "forget everything", when a read finds no data, and
+when Apple Health is unlinked in the app: while the line is told, the voice
+asks `lamp-services` `services_connected` every 2 seconds on a thread of its
+own (`services::health_watch`, `HEALTH_WATCH_EVERY`, never on a line's
+path), and once Apple Health is not in the list the line is no longer told
+(an answer with no list changes nothing).
+
+**What is remembered.** The same line is kept in the owner's own memory as
+a dated kept thing in the owner's person scope (`remember::keep_health_fact`),
+with memory's own request for it,
+`{"op":"remember_apple_health","person","at_unix_ms","text"}`
+(`lamp_msgs::health_fact::REMEMBER_OP`, `Days::remember_apple_health`).
+Its words are `lamp_msgs::health_fact::text`: "From Apple Health, read on
+YYYY-MM-DD: <line>.", but memory marks it as Apple Health's (its
+`apple_health` table) and never finds it by those words, so a person's own
+kept line in the same words is theirs and stays. Memory keeps one a person
+a local day: the next read that day replaces it in the same transaction. It
+is gone after 14 local days (`health_fact::KEPT_DAYS`: read on the 1st, gone
+on the 15th), and it does not count toward the 200 kept things a person may
+keep (`KEPT_ENTRIES`). It is linked to no exchange of the conversation, so
+removing it takes nothing that was said. It is kept on the Days memory only
+(an older memory refuses the op and nothing is kept), only for a `p-`
+person id (so the private room's "the-owner" on a lamp with no owner name or
+face keeps nothing), and the same text twice in a row is sent once. It is
+removed by:
+
+- The owner's "forget everything": memory's forget of their person scope
+  (`forget_person`) takes the kept facts, and `apple_health.json` goes too,
+  through `lamp-services`' own call `apple_health_forget` on the tools
+  socket (the voice's alone, never a model's, a made skill's or a run's),
+  on the same mark and rule as their voice print; the answer says
+  `"apple_health": "forgotten too"`.
+- The app's unlink: `health.summary` with `null`,
+  `connector.remove.apple_health` and a sign-out's wipe. `lamp-cloud`
+  (`services::forget_health_facts`) sends `{"op":"forget_apple_health"}`
+  on memory's narrow forget socket (`LAMP_MEMORY_FORGET_SOCKET`,
+  `/run/lampos-memory/forget.sock`, set in `lamp-cloud.service`), which
+  forgets every person's kept Apple Health facts, by their mark.
+  Disconnecting removes what Lamp kept from Apple Health; what you talked
+  about stays in your conversations until you ask Lamp to forget it.
+  A thing the person asks Lamp to remember about their health after a read is theirs like anything else they told it, and goes with "forget that", not with Disconnect.
+  If memory doesn't answer or refuses, the unlink is still done and the
+  forget owed: lamp-cloud retries it in the background, kept across a
+  restart, until memory takes it (cloud.md, "Apple Health's summaries").
+  With no socket given, nothing is asked.
+- A reset: the reset plan wipes `/var/lib/lampos-memory` and
+  `/var/lib/lampos-services` whole.
+
+**Privacy.** No health value is in a journal line, a reply's error or a
+`Debug` (`Summary`'s shows its number of days): `lamp-services` says
+"health.summary stored, N days", `lamp-cloud` the kind and its status, and a
+read's line "the voice's service_read of apple_health steps: found 1"; the
+voice says that the words were fixed and whether the model was given a
+line, never them. The lamp's spoken words are shown as they are in the
+transcript and the session records
+(`/var/lib/lampOS/voice/sessions/*/metadata/events-*.jsonl`). The thread
+keeps only "(read from a linked service; not kept)" for a read's exchange
+(`PRIVATE_SAID`, `thread.private_for`), as for any linked service's read. No device upload
+path carries the voice's session records, the thread file or memory: the
+only log shipping is os-server's and bootstrap's GELF relay
+(`system/lib/logger/logger.go`), the web log viewer is local and
+allowlisted (`system/server/logs.go`), and `lamp-records` has no network
+code. No service record (`LAMP_SERVICE_RECORDS`) is kept of an Apple Health
+read at all, answered, failed or refused, so none outlives a disconnect. A
+brief read (`services::brief`, someone else maybe in view on another
+service's read) cuts a read's `week` totals with its items.
 
 ## The voice's three functions
 
@@ -3401,7 +3671,7 @@ Linked accounts: Notion, Gmail. They are yours to use for the owner: read from
 one with service_read, and send, post or create with service_write, when
 they ask. Asked about one, use it, or say plainly what you can do with it;
 never say it is the app's job or that you don't know it. A service the
-lamp can link (Gmail, Google Calendar, Google Drive, Figma, GitHub, Linear, Asana, Ahrefs, Facebook Page, Slack, monday.com, HubSpot, Amplitude, Notion) but not in this list isn't linked to this lamp yet. It
+lamp can link (Gmail, Google Calendar, Google Drive, Figma, GitHub, Linear, Asana, Ahrefs, Facebook Page, Slack, monday.com, HubSpot, Amplitude, Notion, Apple Health) but not in this list isn't linked to this lamp yet. It
 can be linked in the app: open this lamp, then Settings, then Linked
 accounts. Any other service the lamp can't link yet: say so. The services
 it can link are in the app: open this lamp, then Settings, then Linked
@@ -3484,6 +3754,53 @@ still refused (`OWNER_ONLY`).
   `get-message` and refresh, and each service's own API.
 
 ## Tests
+
+Apple Health (`health::tests`, `store::tests`, `serve::tests`,
+`tools::tests` and `lamp-cloud`'s `services::tests` and `online::tests`):
+the contract kept whole; every field out of range, of the wrong type or
+unknown refused by its field, never its value; over 16 KB, 15 days, 11
+workouts and a date twice refused; the file 0600 in the 0700 folder, never a
+link, gone with a remove, the app's `null` and a wipe; each read with its
+`as_of`, a missing night or day said missing, none kept and a stale summary
+giving no value; a made skill, a skill's run and a write refused; the switch
+off in both programs (nothing kept, listed, read or offered, the disconnect
+still taken); a day past the 14 dropped at a push and from the file at a
+read; the voice's call `apple_health_forget` removing the file, a skill's or
+a run's refused; each read's fixed words in English and Vietnamese
+(`health::tests::each_read_is_said_in_fixed_words`); the model's line
+short, with no workout name, no time and no raw days
+(`health::tests::the_models_line_is_short_with_no_workout_names_times_or_raw_days`);
+`mcp_server::granted` never listing it. The voice (`services::tests`,
+`service_records::tests`, `second_provider::tests::health_said`,
+`made_skill::tests`): a read answered for whoever asks in the private room
+(`services::tests::a_health_read_is_answered_for_whoever_asks_in_the_private_room`);
+the read said in fixed words and the model given the short line
+(`the_read_is_fixed_words_and_the_model_gets_the_short_line`); the owner's
+read kept once as a dated fact of theirs
+(`the_owners_read_is_kept_once_as_a_dated_fact_of_theirs`); a read said in
+fixed words with no model round
+(`health_said::a_health_read_is_said_in_fixed_words_with_no_model_round`)
+and, beside another call, round 2 told the short line
+(`health_said::beside_another_call_round_two_is_told_the_short_line`); a
+brief read's `week` cut; no service record; the owner's "forget
+everything" asking `apple_health_forget`, anyone else's not; and Apple
+Health in no grant list (`lamp-control`'s and `lamp-tasks`' catalog tests
+skip the local service); the note told beside the lines ends when Apple
+Health is no longer linked (`the_read_is_fixed_words_and_the_model_gets_the_short_line`).
+Memory: `forget_apple_health` takes the marked facts and nothing else, a
+person's own line in the same words and their earlier talk staying
+(`days_protocol::tests::forget_apple_health_takes_the_marked_facts_and_nothing_else`);
+one fact a day, the next read's replacing it
+(`an_apple_health_fact_is_replaced_by_the_same_days_next_read`); gone after
+14 days (`an_apple_health_fact_is_gone_after_fourteen_days`); not counted
+in the 200 (`apple_health_facts_are_not_counted_in_the_kept_lists_room`),
+and the narrow socket lets through one forget of a person or
+`forget_apple_health` alone and nothing else
+(`protocol::tests::the_narrow_check_lets_through_one_forget_person_and_nothing_else`).
+`lamp-cloud`: unlinking Apple Health removes the kept facts in memory too
+(`services::tests::unlinking_apple_health_removes_the_kept_facts_in_memory_too`).
+`lamp-msgs`: a kept fact's words
+(`health_fact::tests::a_kept_fact_is_worded_with_its_read_day`).
 
 `cargo test -p lamp-services`: the store root-only (0700/0600) and written
 whole, a code never a path, remove and wipe; no secret in a `Debug` or a

@@ -132,6 +132,9 @@ pub mod known;
 /// What a Store app or a paired computer tells Lamp's memory: a kept fact
 /// marked with its source, and a live context line never kept (#7415).
 pub mod app_fact;
+/// The owner's kept Apple Health facts: their wording and memory's removal
+/// of them (#7900).
+pub mod health_fact;
 
 /// The owner's approximate place from the app, rounded, and its file
 /// (#4333, `docs/owner-place.md`).

@@ -1727,7 +1727,355 @@ pub fn brief(told: &mut Value) {
             _ => json!("an item"),
         };
     }
+    // A read's totals over its items (Apple Health's week) go with them
+    // (the first builder's P2 on #7900).
+    if let Some(told) = told.as_object_mut() {
+        told.remove("week");
+    }
     told["others_here"] = json!(BRIEF_NOTE);
+}
+
+/// The key of a health read's answer that carries the fixed words Lamp says
+/// itself (`lamp_services::health::said`): the second route says them
+/// verbatim, and the chat model is given the short line of what was read
+/// in their place ([`HEALTH_FOR_MODEL`], [`take_health_line`]).
+pub const HEALTH_SAY: &str = "lamp_says_exactly";
+/// The key of a health read's answer that carries the one short line of
+/// what was read (`lamp_services::health::model_line`: no workout name or
+/// time, no raw days) for the chat model. Lamp's voice uses the owner's
+/// health summary to talk with whoever asks at the lamp, through its voice
+/// services, and remembers it for the owner: the owner's choice in linking
+/// it (the product owner's answer through the lead, the first builder's
+/// c7003138011 on #7900).
+pub const HEALTH_FOR_MODEL: &str = "what_was_read";
+/// What the chat model is told of a health read, beside [`HEALTH_FOR_MODEL`].
+pub const HEALTH_TOLD: &str = "Lamp has said this Apple Health answer aloud itself, in fixed words: don't repeat it now. what_was_read is what it read, for you to use in this talk (for example, to go easy after a short night). Never guess any other health value.";
+/// What the chat model is told of a health read that found nothing to give.
+pub const HEALTH_TOLD_NOTHING: &str = "Lamp has said this Apple Health answer aloud itself, in fixed words. Don't repeat it, add to it, or guess any health value.";
+/// How long the last health read is told beside the next lines
+/// ([`health_note_for`]): a conversation's while, in this process alone.
+pub const HEALTH_NOTE_FOR: std::time::Duration = std::time::Duration::from_secs(5 * 60);
+
+/// Whether `args` name Apple Health as their `service`, by its code or its
+/// name as lamp-services takes either (`apple_health`, "Apple Health").
+pub fn names_health(args: &Value) -> bool {
+    args.get("service")
+        .and_then(Value::as_str)
+        .is_some_and(|asked| {
+            let plain: String = asked
+                .trim()
+                .chars()
+                .map(|c| match c {
+                    ' ' | '-' => '_',
+                    c => c.to_ascii_lowercase(),
+                })
+                .collect();
+            plain == lamp_services::health::CODE
+        })
+}
+
+/// Whether `call` is a read of Apple Health ([`names_health`]).
+pub fn is_health_read(call: &ToolCall) -> bool {
+    call.name == READ && names_health(&call.args)
+}
+
+/// The owner's language for a health answer: Vietnamese, else English.
+fn health_spoken() -> lamp_services::health::Spoken {
+    match crate::language::from_environment() {
+        Some(crate::language::Language::Vietnamese) => lamp_services::health::Spoken::Vietnamese,
+        _ => lamp_services::health::Spoken::English,
+    }
+}
+
+/// The one place that decides whose Apple Health turn request `request` is
+/// (`lease`, its memory scope): the owner's memory id, or `None` when the
+/// line is not taken as the owner's. As every linked service's read
+/// ([`owner_of`]): in the private room (`LAMP_PRIVATE_ROOM`, on in the
+/// product) whoever speaks at the lamp is answered as the owner, with no
+/// face check; the owner chose that in linking Apple Health (the product
+/// owner's answer through the lead, the first builder's c7003138011 on
+/// #7900, which lifted the known-face gate of P1). Everything of Apple
+/// Health in the voice asks this alone: the read ([`health_read`]), the
+/// owner's kept fact (`remember::keep_health_fact`) and the line told
+/// beside the next lines ([`health_note_for`]).
+pub(crate) fn health_owner_turn(lease: Option<&crate::memory_scope::ScopeLease>) -> Option<String> {
+    owner_of(lease)
+}
+
+/// The last Apple Health read for the model: whose, its short line and
+/// when. In this process alone, never on disk; let go after
+/// [`HEALTH_NOTE_FOR`], at the owner's "forget everything", when a read
+/// finds no data, and when Apple Health is unlinked in the app
+/// ([`health_watch`]).
+static HEALTH_HEARD: std::sync::Mutex<Option<(String, String, Instant)>> =
+    std::sync::Mutex::new(None);
+
+/// Keep `line` as `owner`'s last read ([`HEALTH_HEARD`]); `None` lets it go.
+fn health_heard(read: Option<(&str, &str)>) {
+    if read.is_none() {
+        crate::remember::health_facts_let_go();
+    }
+    if let Ok(mut heard) = HEALTH_HEARD.lock() {
+        *heard = read.map(|(owner, line)| (owner.to_owned(), line.to_owned(), Instant::now()));
+    }
+}
+
+/// How often [`health_watch`] asks `lamp-services` whether Apple Health is
+/// still linked while a read is told beside the lines.
+pub const HEALTH_WATCH_EVERY: std::time::Duration = std::time::Duration::from_secs(2);
+
+/// Whether a [`health_watch`] thread is running: one at a time.
+static HEALTH_WATCHING: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+
+/// From [`CONNECTED`]'s answer: whether Apple Health is among the services
+/// linked; `None` without a list (busy, refused, no socket), which changes
+/// nothing.
+fn health_linked(told: &Value) -> Option<bool> {
+    if told.get("ok").and_then(Value::as_bool) != Some(true) {
+        return None;
+    }
+    let connected = told.get("result")?.get("connected")?.as_array()?;
+    Some(connected.iter().any(|link| {
+        link.get("service").and_then(Value::as_str) == Some(lamp_services::health::CODE)
+    }))
+}
+
+/// Whether a read is told beside the lines now ([`HEALTH_NOTE_FOR`]).
+fn health_told() -> bool {
+    HEALTH_HEARD.lock().is_ok_and(|heard| {
+        heard
+            .as_ref()
+            .is_some_and(|(_, _, at)| at.elapsed() <= HEALTH_NOTE_FOR)
+    })
+}
+
+/// One look of [`health_watch`]: `lamp-services` asked once whether Apple
+/// Health is still linked; unlinked, the read told beside the lines and the
+/// kept facts' memo are let go at once ([`health_heard`] `None`). Whether
+/// to look again: a read is still told, and Apple Health was not found
+/// unlinked.
+fn health_watch_once(folder: &Path) -> bool {
+    if !health_told() {
+        return false;
+    }
+    let answer = crate::tools::exchange(
+        &folder.join(crate::tools::CALL_SOCKET),
+        &json!({"op":"call","name":CONNECTED}),
+        LINKED_DEADLINE,
+    );
+    if answer.as_ref().and_then(health_linked) == Some(false) {
+        eprintln!(
+            "lamp-voice: Apple Health was unlinked: its last read is no longer told beside the lines"
+        );
+        health_heard(None);
+        return false;
+    }
+    true
+}
+
+/// While the last read is told beside the lines ([`health_note_for`]),
+/// `lamp-services` is asked every [`HEALTH_WATCH_EVERY`] whether Apple
+/// Health is still linked, so the app's unlink ends it within that, not
+/// after [`HEALTH_NOTE_FOR`] (the first builder's ruling on #7900, 19 Nov
+/// 15:46; Friday's P3). On a thread of its own, one at a time, never on a
+/// line's path; it ends with the note.
+fn health_watch(folder: &Path) {
+    use std::sync::atomic::Ordering;
+    if cfg!(test) || HEALTH_WATCHING.swap(true, Ordering::SeqCst) {
+        return;
+    }
+    let folder = folder.to_owned();
+    let started = std::thread::Builder::new()
+        .name("health-watch".into())
+        .spawn(move || {
+            loop {
+                std::thread::sleep(HEALTH_WATCH_EVERY);
+                if health_watch_once(&folder) {
+                    continue;
+                }
+                HEALTH_WATCHING.store(false, Ordering::SeqCst);
+                // A read told just as this one ended, which found it
+                // still watching, is watched on here.
+                if !health_told() || HEALTH_WATCHING.swap(true, Ordering::SeqCst) {
+                    break;
+                }
+            }
+        });
+    if started.is_err() {
+        HEALTH_WATCHING.store(false, Ordering::SeqCst);
+    }
+}
+
+/// What the model is told beside request `request`'s words of the last
+/// Apple Health read, within [`HEALTH_NOTE_FOR`], when the line is taken
+/// as the same owner's ([`health_owner_turn`]): so Lamp can go on using it
+/// in the talk.
+pub fn health_note_for(
+    request: u64,
+    lease: Option<&crate::memory_scope::ScopeLease>,
+) -> Option<String> {
+    let (owner, line) = {
+        let heard = HEALTH_HEARD.lock().ok()?;
+        let (owner, line, at) = heard.as_ref()?;
+        if at.elapsed() > HEALTH_NOTE_FOR {
+            return None;
+        }
+        (owner.clone(), line.clone())
+    };
+    (health_owner_turn(lease)? == owner).then(|| {
+        eprintln!(
+            "lamp-voice: request {request}: the line is told what Apple Health read a moment ago"
+        );
+        format!(
+            "(What Lamp read from the owner's Apple Health a moment ago: {line}. Use it to talk with them if it helps; never guess any other health value.)"
+        )
+    })
+}
+
+/// An Apple Health read ([`is_health_read`]) in `owner`'s turn (from
+/// [`health_owner_turn`]; `None`, a line not taken as the owner's, is told
+/// [`OWNER_ONLY`] as any linked service's read is, and nothing is asked of
+/// lamp-services). On the second route (`second_route`) the answer is the
+/// fixed words `lamp_services::health::said` builds, under [`HEALTH_SAY`],
+/// said verbatim; the model is given one short line of what was read
+/// ([`HEALTH_FOR_MODEL`]), told again beside the next lines a while
+/// ([`health_note_for`]), and the line is kept in the owner's own memory as
+/// a dated fact (`remember::keep_health_fact`). The Live route, whose model
+/// would speak the whole answer, reads nothing. No service record is kept.
+fn health_read(
+    folder: &Path,
+    call: &ToolCall,
+    request: u64,
+    (owner, second_route): (Option<&str>, bool),
+    spoken: lamp_services::health::Spoken,
+) -> (Value, bool) {
+    use lamp_services::health;
+    let Some(owner) = owner else {
+        eprintln!(
+            "lamp-voice: request {request}: an Apple Health read on a line not the owner's: nothing read"
+        );
+        return (json!({ "error": OWNER_ONLY }), true);
+    };
+    if !second_route {
+        eprintln!(
+            "lamp-voice: request {request}: an Apple Health read on the Live route: nothing read, its model would say the whole answer"
+        );
+        return (json!({ "error": health::not_on_this_voice(spoken) }), true);
+    }
+    let (answer, answered) = ask(folder, call, DEADLINE);
+    let what = call.args.get("what").and_then(Value::as_str).unwrap_or("");
+    let now = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map_or(0, |since| since.as_secs() as i64);
+    let line = health::said(what, &call.args, &answer, now, spoken);
+    let for_model = health::model_line(what, &call.args, &answer, now);
+    eprintln!(
+        "lamp-voice: request {request}: an Apple Health read: said in fixed words; {}",
+        if for_model.is_some() {
+            "the model is given one short line of it, kept in the owner's memory"
+        } else {
+            "nothing found, the model is given no value"
+        }
+    );
+    read_answered(request);
+    if let Ok(mut thread) = crate::thread::THREAD.lock() {
+        thread.private_for(request);
+    }
+    let mut told = json!({"ok": true, HEALTH_SAY: line});
+    match &for_model {
+        Some((short, date)) => {
+            told[HEALTH_FOR_MODEL] = json!(short);
+            health_heard(Some((owner, short)));
+            health_watch(folder);
+            crate::remember::keep_health_fact(owner, &lamp_msgs::health_fact::text(date, short));
+        }
+        None if answer.get("error").and_then(Value::as_str) == Some(health::NO_DATA) => {
+            health_heard(None);
+        }
+        None => {}
+    }
+    (told, answered)
+}
+
+/// A health read's fixed words ([`HEALTH_SAY`]) taken out of `told`, which
+/// is left as what the chat model is told: [`HEALTH_TOLD`] with the short
+/// line of what was read ([`HEALTH_FOR_MODEL`]), or [`HEALTH_TOLD_NOTHING`]
+/// when it found none. `None` for any other answer.
+pub fn take_health_line(told: &mut Value) -> Option<String> {
+    let line = told.get(HEALTH_SAY)?.as_str()?.to_owned();
+    *told = match told.get(HEALTH_FOR_MODEL).and_then(Value::as_str) {
+        Some(read) => json!({"ok": true, "said_aloud": true, "note": HEALTH_TOLD,
+            HEALTH_FOR_MODEL: read}),
+        None => json!({"ok": true, "said_aloud": true, "note": HEALTH_TOLD_NOTHING}),
+    };
+    Some(line)
+}
+
+/// `lamp-services`' tools folder, kept by the first route of a call
+/// (`tools::route`), for the owner's "forget everything", whose route is
+/// the memory's ([`health_forget_with_everything`]).
+static FOLDER_IN_USE: std::sync::OnceLock<PathBuf> = std::sync::OnceLock::new();
+
+/// Keep `folder` as `lamp-services`' tools folder ([`FOLDER_IN_USE`]).
+pub(crate) fn keep_folder(folder: &Path) {
+    let _ = FOLDER_IN_USE.set(folder.to_owned());
+}
+
+/// The owner's "forget everything about me", marked by the second route's
+/// guard: Apple Health's kept summary goes too, through lamp-services'
+/// own call (`lamp_services::health::FORGET_CALL`), as their voice print
+/// does (`owner_voice::forget_with_everything`); the answer says so.
+/// Another person's forget, an unmarked one, or one whose memory was not
+/// emptied, leaves it.
+pub fn health_forget_with_everything(
+    told: (Value, bool),
+    lease: &crate::memory_scope::ScopeLease,
+) -> (Value, bool) {
+    if !lease.everything_marked() {
+        return told;
+    }
+    let Some(folder) = FOLDER_IN_USE.get() else {
+        return told;
+    };
+    health_forget_if(
+        folder,
+        told,
+        lease.admitted_person(),
+        &crate::person::owner_ids(),
+    )
+}
+
+/// [`health_forget_with_everything`] once its mark is judged.
+pub(crate) fn health_forget_if(
+    folder: &Path,
+    mut told: (Value, bool),
+    admitted: Option<&str>,
+    owners: &[String],
+) -> (Value, bool) {
+    let emptied =
+        told.0["forgotten"] == true || told.0["note"] == json!("I was keeping nothing of them.");
+    let theirs = admitted.is_some_and(|admitted| owners.iter().any(|owner| owner == admitted));
+    if !emptied || !theirs {
+        return told;
+    }
+    let call = ToolCall {
+        id: "apple-health-forget".into(),
+        name: lamp_services::health::FORGET_CALL.into(),
+        args: json!({}),
+    };
+    let (answer, answered) = ask(folder, &call, DEADLINE);
+    health_heard(None);
+    if answered && answer["forgotten"] == true {
+        eprintln!("lamp-voice: Apple Health's summary removed with everything about the owner");
+        told.0["apple_health"] = json!("forgotten too");
+    } else {
+        eprintln!(
+            "lamp-voice: Apple Health's summary could not be removed with everything about the owner"
+        );
+        told.0["everything"] = json!(false);
+        told.0["apple_health"] = json!("kept: it could not be removed");
+    }
+    told
 }
 
 /// The owner's memory id when `lease` is theirs ([`Turn::owner`]).
@@ -2187,6 +2535,18 @@ pub fn run(
     // The second route's attempt id, never anyone else's to read (#5853).
     let (call, attempt) = take_attempt(call);
     let call = &call;
+    // An Apple Health read: answered for the owner's line as every linked
+    // service's read, in the lamp's fixed words ([`health_read`]).
+    if is_health_read(call) {
+        let owner = health_owner_turn(lease);
+        return health_read(
+            folder,
+            call,
+            request,
+            (owner.as_deref(), judge().is_some()),
+            health_spoken(),
+        );
+    }
     let now = Instant::now();
     let private_room = crate::person::private_room();
     let owner = owner_of(lease);
@@ -4787,6 +5147,292 @@ mod tests {
             "ann",
         );
         assert_eq!(told["note"], DATA_NOTE);
+    }
+
+    /// A tools folder whose socket answers every line with `result` and
+    /// keeps the lines it was sent.
+    /// The tests that read Apple Health share the last read
+    /// ([`HEALTH_HEARD`]): one at a time.
+    static HEALTH_READS: std::sync::Mutex<()> = std::sync::Mutex::new(());
+
+    fn health_folder(
+        name: &str,
+        result: Value,
+    ) -> (PathBuf, std::sync::Arc<std::sync::Mutex<Vec<Value>>>) {
+        use std::io::{BufRead, BufReader, Write};
+        let folder = std::env::temp_dir().join(format!("health-{name}-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&folder);
+        std::fs::create_dir_all(&folder).unwrap();
+        let listener =
+            std::os::unix::net::UnixListener::bind(folder.join(crate::tools::CALL_SOCKET)).unwrap();
+        let asked = std::sync::Arc::new(std::sync::Mutex::new(Vec::new()));
+        let kept = asked.clone();
+        std::thread::spawn(move || {
+            for stream in listener.incoming() {
+                let Ok(mut stream) = stream else { return };
+                let mut line = String::new();
+                BufReader::new(stream.try_clone().unwrap())
+                    .read_line(&mut line)
+                    .unwrap();
+                kept.lock()
+                    .unwrap()
+                    .push(serde_json::from_str::<Value>(&line).unwrap());
+                writeln!(stream, "{}", json!({"ok": true, "result": result})).unwrap();
+            }
+        });
+        (folder, asked)
+    }
+
+    fn health_call() -> ToolCall {
+        ToolCall {
+            id: "h".into(),
+            name: READ.into(),
+            args: json!({"service": "Apple Health", "what": "steps"}),
+        }
+    }
+
+    fn health_answer() -> Value {
+        json!({"source": "Apple Health", "as_of": "2026-11-18T07:30:00+07:00",
+            "tz": "Asia/Ho_Chi_Minh", "quoted": [{"date": "2026-11-18", "steps": 8421}]})
+    }
+
+    /// #7900, the first builder's c7003138011 (the product owner through
+    /// the lead): no face check. In the private room the owner's question
+    /// and a second person's are both answered, as any linked service's
+    /// read; outside it a line not the owner's is told [`OWNER_ONLY`] and
+    /// lamp-services is never asked.
+    #[test]
+    fn a_health_read_is_answered_for_whoever_asks_in_the_private_room() {
+        let _one = HEALTH_READS
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        assert!(is_health_read(&health_call()));
+        assert!(!is_health_read(&ToolCall {
+            id: "g".into(),
+            name: READ.into(),
+            args: json!({"service": "gmail", "what": "recent"}),
+        }));
+        let (folder, asked) = health_folder("anyone", health_answer());
+        crate::services::judging_voices(std::sync::Arc::new(|_| None));
+        crate::person::set_private_room_for_test(Some(true));
+        // The owner, then a second person: no face known to either.
+        let owner = run(&folder, &health_call(), 7_900_001, true, None);
+        let guest = run(&folder, &health_call(), 7_900_002, true, None);
+        crate::person::set_private_room_for_test(Some(false));
+        let outside = run(&folder, &health_call(), 7_900_003, true, None);
+        crate::person::set_private_room_for_test(None);
+        for (told, answered) in [&owner, &guest] {
+            assert!(answered);
+            assert!(
+                told[HEALTH_SAY].as_str().unwrap().contains("8,421 steps"),
+                "{told}"
+            );
+            assert!(
+                told[HEALTH_FOR_MODEL]
+                    .as_str()
+                    .unwrap()
+                    .contains("8,421 steps"),
+                "{told}"
+            );
+        }
+        assert_eq!(asked.lock().unwrap().len(), 2);
+        assert_eq!(outside.0["error"], OWNER_ONLY);
+    }
+
+    /// The read is the lamp's fixed words under [`HEALTH_SAY`]; the model
+    /// is given the short line of it ([`take_health_line`]), told again
+    /// beside the owner's next lines ([`health_note_for`]); the Live route
+    /// reads nothing.
+    #[test]
+    fn the_read_is_fixed_words_and_the_model_gets_the_short_line() {
+        use lamp_services::health::Spoken;
+        let _one = HEALTH_READS
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        let (folder, asked) = health_folder("seen", health_answer());
+        let (mut told, answered) = health_read(
+            &folder,
+            &health_call(),
+            7_900_004,
+            (Some("the-owner"), true),
+            Spoken::English,
+        );
+        assert!(answered);
+        let line = told[HEALTH_SAY].as_str().unwrap().to_owned();
+        assert!(line.starts_with("Apple Health, as of "), "{line}");
+        assert_eq!(asked.lock().unwrap().len(), 1);
+        assert_eq!(take_health_line(&mut told), Some(line.clone()));
+        assert!(told.get(HEALTH_SAY).is_none(), "{told}");
+        assert!(!told.to_string().contains(&line), "{told}");
+        assert!(
+            told[HEALTH_FOR_MODEL]
+                .as_str()
+                .unwrap()
+                .contains("8,421 steps"),
+            "{told}"
+        );
+        assert_eq!(told["note"], HEALTH_TOLD);
+        // The owner's next line (the private room's, with no owner kept in
+        // a test: "the-owner") is told it; a line not the owner's isn't.
+        crate::person::set_private_room_for_test(Some(true));
+        let note = health_note_for(7_900_005, None);
+        crate::person::set_private_room_for_test(Some(false));
+        let not_theirs = health_note_for(7_900_006, None);
+        crate::person::set_private_room_for_test(None);
+        assert!(note.as_deref().unwrap().contains("8,421 steps"), "{note:?}");
+        assert_eq!(not_theirs, None);
+        // The ruling on #7900 (19 Nov 15:46): the note ends on the app's
+        // unlink, not after its five minutes. Still linked, or no list
+        // (the read's own folder answers none), it goes on.
+        let (linked, _) = health_folder(
+            "linked",
+            json!({"connected": [{"service": "apple_health", "name": "Apple Health"}]}),
+        );
+        assert!(health_watch_once(&linked));
+        assert!(health_watch_once(&folder));
+        crate::person::set_private_room_for_test(Some(true));
+        assert!(health_note_for(7_900_008, None).is_some());
+        let (unlinked, _) = health_folder(
+            "unlinked",
+            json!({"connected": [{"service": "gmail", "name": "Gmail"}]}),
+        );
+        assert!(!health_watch_once(&unlinked));
+        assert_eq!(health_note_for(7_900_009, None), None);
+        crate::person::set_private_room_for_test(None);
+        assert!(!health_watch_once(&linked));
+        // Live: nothing asked, no value.
+        let (told, _) = health_read(
+            &folder,
+            &health_call(),
+            7_900_007,
+            (Some("p-0123456789abcdef"), false),
+            Spoken::Vietnamese,
+        );
+        assert_eq!(
+            told["error"],
+            lamp_services::health::not_on_this_voice(Spoken::Vietnamese)
+        );
+        // The read, and the watch's one look on the same folder.
+        assert_eq!(asked.lock().unwrap().len(), 2);
+        // Any other answer carries no line.
+        assert_eq!(take_health_line(&mut json!({"quoted": []})), None);
+    }
+
+    /// The first builder's P3 on #7900: a health read's exchange keeps only
+    /// [`crate::thread::PRIVATE_SAID`] for the lamp's words, those said
+    /// before the read answered and after it, so no value reaches the
+    /// thread's file, a later turn or the running summary.
+    #[test]
+    fn a_health_reads_exchange_keeps_only_private_said() {
+        use lamp_services::health::Spoken;
+        let _one = HEALTH_READS
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        let request = 7_900_010;
+        let now = Instant::now();
+        let before = "Looking at Apple Health, 47,911 so far.";
+        let after = "Apple Health, as of 7:30 am: 47,912 steps so far today.";
+        crate::thread::THREAD
+            .lock()
+            .unwrap()
+            .lamp(request, before, now);
+        let (folder, _) = health_folder("private", health_answer());
+        let (told, answered) = health_read(
+            &folder,
+            &health_call(),
+            request,
+            (Some("the-owner"), true),
+            Spoken::English,
+        );
+        assert!(answered && told.get(HEALTH_SAY).is_some(), "{told}");
+        let mut thread = crate::thread::THREAD.lock().unwrap();
+        thread.lamp(request, after, now);
+        let recent = thread.recent(now, crate::thread::REMEMBERED_FOR, 64);
+        drop(thread);
+        let told_again = format!("{recent:?}");
+        assert!(
+            !told_again.contains("47,91"),
+            "a health read's words kept: {told_again}"
+        );
+        assert!(
+            recent
+                .iter()
+                .any(|exchange| exchange.lamp == crate::thread::PRIVATE_SAID),
+            "{told_again}"
+        );
+        crate::remember::health_facts_let_go();
+    }
+
+    /// The owner's read is kept in their own memory as a dated fact with
+    /// memory's own marked request (`health_fact::REMEMBER_OP`, never a
+    /// plain `remember` with the conversation's exchanges as its sources),
+    /// in their scope, once in a row; the next read's line is kept again
+    /// (memory replaces the day's fact), and so is the first after it.
+    /// "the-owner" (no face or name kept) and any other text keep nothing.
+    #[test]
+    fn the_owners_read_is_kept_once_as_a_dated_fact_of_theirs() {
+        let owner = "p-00000000000079a0";
+        let fact = lamp_msgs::health_fact::text("2026-11-18", "8,421 steps so far today");
+        let later = lamp_msgs::health_fact::text("2026-11-18", "9,102 steps so far today");
+        let line = crate::remember::health_fact_job(owner, &fact, 7).unwrap();
+        assert_eq!(
+            line,
+            json!({"op": lamp_msgs::health_fact::REMEMBER_OP, "person": owner,
+                "at_unix_ms": 7, "text": fact})
+        );
+        assert!(line.get("source_ids").is_none(), "{line}");
+        assert_eq!(crate::remember::health_fact_job(owner, &fact, 8), None);
+        assert!(crate::remember::health_fact_job(owner, &later, 9).is_some());
+        assert!(crate::remember::health_fact_job(owner, &fact, 10).is_some());
+        assert_eq!(
+            crate::remember::health_fact_job("the-owner", &fact, 11),
+            None
+        );
+        assert_eq!(
+            crate::remember::health_fact_job("p-00000000000079a1", "takes coffee black", 12),
+            None
+        );
+        crate::remember::health_facts_let_go();
+        assert!(crate::remember::health_fact_job(owner, &fact, 13).is_some());
+    }
+
+    /// The first builder's P2 on #7900: with others maybe here a read's
+    /// week totals go with its items.
+    #[test]
+    fn a_brief_read_cuts_its_week_totals_too() {
+        let mut told = json!({"source": "Apple Health", "quoted": [{"date": "d", "steps": 8421}],
+            "week": {"steps_total": 31_421, "resting_heart_rate_average_bpm": 58}});
+        brief(&mut told);
+        let said = told.to_string();
+        assert!(!said.contains("31421") && !said.contains("58"), "{said}");
+        assert!(!said.contains("8421"), "{said}");
+    }
+
+    /// The owner's "forget everything" removes Apple Health's summary
+    /// through lamp-services; anyone else's, or one that emptied nothing,
+    /// asks nothing.
+    #[test]
+    fn the_owners_forget_everything_removes_apple_health() {
+        let (folder, asked) = health_folder("forget", json!({"forgotten": true}));
+        let owners = vec!["p-ann".to_owned()];
+        let emptied = || (json!({"forgotten": true}), true);
+        let other = health_forget_if(&folder, emptied(), Some("p-bob"), &owners);
+        assert_eq!(other, emptied());
+        let nothing = health_forget_if(
+            &folder,
+            (json!({"forgotten": false}), true),
+            Some("p-ann"),
+            &owners,
+        );
+        assert_eq!(nothing.0, json!({"forgotten": false}));
+        assert!(asked.lock().unwrap().is_empty());
+        let (told, _) = health_forget_if(&folder, emptied(), Some("p-ann"), &owners);
+        assert_eq!(told["apple_health"], "forgotten too");
+        let asked = asked.lock().unwrap().clone();
+        assert_eq!(
+            asked,
+            vec![json!({"op": "call", "name": lamp_services::health::FORGET_CALL, "args": {}})]
+        );
     }
 
     #[test]

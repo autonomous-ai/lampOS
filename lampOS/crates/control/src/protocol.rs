@@ -2045,7 +2045,12 @@ mod tests {
     #[test]
     fn service_grants_are_the_catalogs_codes_read_and_write() {
         let mut folded: std::collections::BTreeSet<&str> = std::collections::BTreeSet::new();
-        for service in lamp_services::catalog::SERVICES {
+        // A local service (Apple Health) is read by the owner's voice
+        // alone and is no grant (the first builder's P3 on #7900).
+        for service in lamp_services::catalog::SERVICES
+            .iter()
+            .filter(|service| !service.local)
+        {
             folded.insert(
                 service_grant_code(service.code)
                     .unwrap_or_else(|| panic!("{} has no grant", service.code)),

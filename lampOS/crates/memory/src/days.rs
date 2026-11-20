@@ -485,6 +485,11 @@ impl Days {
             .map_or_else(|| "1970-01-01".into(), |d| d.to_string());
         let today =
             Day::at(self.now, &self.local).map_or_else(|| "1970-01-01".into(), |d| d.to_string());
+        // An Apple Health fact lasts `health_fact::KEPT_DAYS` local days,
+        // the day it was read the first (#7900).
+        let health = Day::at(self.now, &self.local)
+            .and_then(|today| today.before(lamp_msgs::health_fact::KEPT_DAYS))
+            .map_or_else(|| "1970-01-01".into(), |d| d.to_string());
         // An app's fact lasts `app_fact::KEPT_DAYS` local days, the day it
         // was kept the first (#7415).
         let app_facts = Day::at(self.now, &self.local)
@@ -497,6 +502,10 @@ impl Days {
         tx.execute(
             "INSERT OR IGNORE INTO doomed SELECT rid FROM app_facts WHERE kept_day<=?1",
             [&app_facts],
+        )?;
+        tx.execute(
+            "INSERT OR IGNORE INTO doomed SELECT e.rid FROM apple_health a JOIN entries e ON e.rid=a.rid WHERE e.day<=?1",
+            [&health],
         )?;
         // Nightly pass B's items close on their own end days, and an
         // episode, feeling or pattern after 90 unused days, never with
@@ -891,10 +900,11 @@ impl Days {
 
     /// Whether this person's kept list has room for one more. Only active
     /// kept things count: a replaced version (#2510) is history, not a slot;
-    /// nor is an app's fact (#7415), held to its source's own bounds.
+    /// nor is an app's fact (#7415), held to its source's own bounds, nor
+    /// an Apple Health fact (#7900), one a day for 14 days at most.
     fn kept_room(&self, person: &Person) -> Result<()> {
         let count: u64 = self.db.query_row(
-            "SELECT count(*) FROM entries WHERE person=? AND kind='kept' AND active=1 AND rid NOT IN (SELECT rid FROM app_facts)",
+            "SELECT count(*) FROM entries WHERE person=? AND kind='kept' AND active=1 AND rid NOT IN (SELECT rid FROM app_facts) AND rid NOT IN (SELECT rid FROM apple_health)",
             [person.as_str()],
             |r| r.get(0),
         )?;
@@ -909,11 +919,12 @@ impl Days {
 
     /// The id of this person's active kept thing with `text`, the same by
     /// [`once_text`]. Never an app's fact (#7415): a person's own line in
-    /// its words is their own, and stays when the app goes.
+    /// its words is their own, and stays when the app goes. Nor an Apple
+    /// Health fact (#7900), for the same reason.
     fn kept_already(&self, person: &Person, text: &str) -> Result<Option<u64>> {
         let wanted = once_text(person, text);
         let mut statement = self.db.prepare(
-            "SELECT id,text FROM entries WHERE person=? AND kind='kept' AND active=1 AND rid NOT IN (SELECT rid FROM app_facts) ORDER BY id",
+            "SELECT id,text FROM entries WHERE person=? AND kind='kept' AND active=1 AND rid NOT IN (SELECT rid FROM app_facts) AND rid NOT IN (SELECT rid FROM apple_health) ORDER BY id",
         )?;
         let mut rows = statement.query([person.as_str()])?;
         while let Some(row) = rows.next()? {
@@ -1419,6 +1430,101 @@ impl Days {
         if removed > 0 {
             self.forget_set_aside()?;
         }
+        Ok(removed)
+    }
+
+    /// What an Apple Health read found, kept as `person`'s (#7900,
+    /// `lamp_msgs::health_fact::REMEMBER_OP`): a kept thing marked in
+    /// `apple_health`, never found by its words. It replaces the person's
+    /// Apple Health fact of the same local day, and one past
+    /// `health_fact::KEPT_DAYS`, in the same transaction: removed with what
+    /// derives from them, as a forget of them would. Linked to no exchange,
+    /// so its forget takes nothing said (Friday's P2). Not counted in the
+    /// kept list's room ([`Self::kept_room`]). The new id.
+    pub fn remember_apple_health(&mut self, person: &Person, at: u64, text: &str) -> Result<u64> {
+        if !lamp_msgs::known::is_person_id(person.as_str()) {
+            return Err(bad(
+                "an Apple Health fact is kept for one person the eyes know",
+            ));
+        }
+        let Some(day) = Day::at(at, &self.local) else {
+            return Err(Error::new(
+                "bad_time",
+                "the timestamp is outside 1970 through 9999",
+            ));
+        };
+        let text = store::tidy(text, store::TEXT_BYTES);
+        if text.is_empty() {
+            return Err(Error::new("empty", "there is no text to remember"));
+        }
+        let expired = day
+            .before(lamp_msgs::health_fact::KEPT_DAYS)
+            .map_or_else(|| "1970-01-01".into(), |d| d.to_string());
+        let tx = self.db.transaction()?;
+        ensure_person(&tx, person)?;
+        tx.execute("DELETE FROM doomed", [])?;
+        tx.execute(
+            "INSERT INTO doomed SELECT e.rid FROM apple_health a JOIN entries e ON e.rid=a.rid WHERE e.person=?1 AND (e.day=?2 OR e.day<=?3)",
+            params![person.as_str(), day.to_string(), expired],
+        )?;
+        let replaced: u64 = tx.query_row("SELECT count(*) FROM doomed", [], |r| r.get(0))?;
+        if replaced > 0 {
+            descendants(&tx, None)?;
+            talk_with_doomed(&tx)?;
+            crate::nightly::with_doomed(&tx)?;
+            said_again_with_doomed(&tx)?;
+            erase(&tx)?;
+        }
+        let id = next_id(&tx, person)?;
+        insert_record(
+            &tx,
+            &Record {
+                id,
+                person: person.as_str().into(),
+                kind: "kept".into(),
+                at_unix_ms: at,
+                heard: String::new(),
+                said: String::new(),
+                text,
+                category: None,
+                source_ids: vec![],
+                supersedes: None,
+                active: true,
+            },
+            &self.local,
+            self.now,
+        )?;
+        tx.execute(
+            "INSERT INTO apple_health(rid) SELECT rid FROM entries WHERE person=?1 AND id=?2",
+            params![person.as_str(), id],
+        )?;
+        tx.commit()?;
+        Ok(id)
+    }
+
+    /// Every person's kept Apple Health facts, found by their mark in
+    /// `apple_health` ([`Self::remember_apple_health`]), never by their
+    /// words: a person's own kept line in the same words stays. Each goes
+    /// as a `forget {id}` of it would, with what was made from it; nothing
+    /// said goes, since none is linked to an exchange, and the night is not
+    /// marked: what was talked about stays until the person asks Lamp to
+    /// forget it (the first builder's ruling on #7900, 19 Nov 15:46). The
+    /// app's unlink of Apple Health. How many entries went.
+    pub fn forget_apple_health(&mut self) -> Result<u64> {
+        let tx = self.db.transaction()?;
+        tx.execute("DELETE FROM doomed", [])?;
+        tx.execute("INSERT INTO doomed SELECT rid FROM apple_health", [])?;
+        let found: u64 = tx.query_row("SELECT count(*) FROM doomed", [], |r| r.get(0))?;
+        if found == 0 {
+            return Ok(0);
+        }
+        descendants(&tx, None)?;
+        talk_with_doomed(&tx)?;
+        crate::nightly::with_doomed(&tx)?;
+        said_again_with_doomed(&tx)?;
+        let removed = erase(&tx)?;
+        tx.commit()?;
+        self.forget_set_aside()?;
         Ok(removed)
     }
 
@@ -2855,7 +2961,7 @@ impl Days {
             ("observation", MAX_OBSERVATIONS),
         ] {
             let after: u64 = tx.query_row(
-                "SELECT count(*) FROM entries WHERE kind=?2 AND (kind!='kept' OR active=1) AND coalesce(category,'')!='talk' AND rid NOT IN (SELECT rid FROM app_facts) AND (person=?1 OR rid IN (SELECT rid FROM adopting))",
+                "SELECT count(*) FROM entries WHERE kind=?2 AND (kind!='kept' OR active=1) AND coalesce(category,'')!='talk' AND rid NOT IN (SELECT rid FROM app_facts) AND rid NOT IN (SELECT rid FROM apple_health) AND (person=?1 OR rid IN (SELECT rid FROM adopting))",
                 params![to.as_str(), kind],
                 |r| r.get(0),
             )?;

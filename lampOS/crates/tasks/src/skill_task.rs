@@ -5983,7 +5983,9 @@ mod tests {
         assert!(codes.len() >= 10, "the catalog's codes were not found");
         let listed: std::collections::BTreeSet<&str> = SERVICE_GRANTS.iter().copied().collect();
         assert_eq!(listed.len(), SERVICE_GRANTS.len(), "a service listed twice");
-        codes.retain(|code| !code.is_empty());
+        // Apple Health, the one local service, is no grant: the owner's
+        // voice alone reads it (the first builder's P3 on #7900).
+        codes.retain(|code| !code.is_empty() && *code != "apple_health");
         assert_eq!(codes, listed);
     }
 

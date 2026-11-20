@@ -70,6 +70,12 @@ Environment=LAMP_SKILL_SECRETS=on
 # 2 min and sent once on the person's spoken yes, as any write. A drop-in setting LAMP_CALENDAR_EDITS=off leaves
 # create_event only.
 Environment=LAMP_CALENDAR_EDITS=on
+# The phone app's Apple Health daily summaries (docs/services.md "Apple Health"): kept here with no token,
+# read for whoever asks at the lamp in the private room (no face check, the owner's choice), in fixed
+# words, its short line given to the voice's model and remembered for the owner; never a skill's read; the same line in
+# lamp-cloud.service. On in the product by the owner's decision (19 Nov); a drop-in setting
+# LAMP_APPLE_HEALTH=off turns it off.
+Environment=LAMP_APPLE_HEALTH=on
 # --run-calls: the last 64 calls across all skill runs, no content, for the voice's run_calls_since, which
 # LAMP_SERVICE_RECORDS_AGENT in lamp-voice.service keeps as the run's person's linked records (services.md, "The last
 # 64 calls across all runs kept"). On in the product by the product owner's rule of 18 Nov (#6811).

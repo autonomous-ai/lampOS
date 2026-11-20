@@ -6,7 +6,8 @@
 //!
 //! - **Which services**: every one in [`catalog::SERVICES`] with a read of
 //!   a fixed shape, and none that [`reads::never_read`] refuses
-//!   (`gmail-app`, which only sends). The MCP services and Ahrefs have only
+//!   (`gmail-app`, which only sends), nor a local one (Apple Health, read
+//!   only to its owner at the lamp). The MCP services and Ahrefs have only
 //!   free-form reads, so none yet.
 //! - **Never a whole text**: a read that gives one item's whole text (a
 //!   mail, a file's text, a page's blocks, comments) is never a skill's
@@ -95,6 +96,12 @@ pub fn not_readable(code: &str) -> Option<String> {
     if service.mcp.is_some() {
         return Some(format!(
             "{code:?} is read only through its own tools, which a made skill can't read yet"
+        ));
+    }
+    // Apple Health's summaries are said only to their owner at the lamp.
+    if service.local {
+        return Some(format!(
+            "{code:?} is read only to its owner at the lamp, never by a skill"
         ));
     }
     if service.reads.is_empty() {
@@ -359,6 +366,12 @@ mod tests {
             );
         }
         assert!(not_readable("ahrefs").unwrap().contains("free-form"));
+        assert!(
+            not_readable("apple_health")
+                .unwrap()
+                .contains("its owner at the lamp")
+        );
+        assert!(skill_read_refused("apple_health", "steps").is_some());
         // Every whole text names a read the service has.
         for (code, what) in WHOLE_TEXTS {
             let line = reads::WHATS.iter().find(|(c, _)| c == code).unwrap().1;

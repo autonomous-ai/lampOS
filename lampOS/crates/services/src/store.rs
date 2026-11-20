@@ -2,6 +2,11 @@
 //! service, root's, 0600, in a 0700 folder, each written whole (beside,
 //! synced, renamed). Only this program reads or writes it.
 //!
+//! A local service's file (`catalog::Service::local`, Apple Health's) is
+//! kept the same way, in the same folder, and goes with the same remove
+//! and wipe: it holds the data the phone app pushed, never a token, and
+//! [`Store::load`] never reads it as a link ([`Store::keep_local`]).
+//!
 //! A token is in its file and the request to its own service, nowhere else:
 //! [`Entry`]'s `Debug` hides every secret, and nothing here says one in an
 //! error.
@@ -153,8 +158,12 @@ impl Entry {
     /// The entry the app's `connector.set.<code>` data makes, or why not,
     /// in words that never hold the data's values.
     pub fn from_set(code: &str, data: &Value, now: i64) -> Result<Entry, &'static str> {
-        if catalog::service(code).is_none() {
-            return Err("the lamp doesn't know that service");
+        match catalog::service(code) {
+            None => return Err("the lamp doesn't know that service"),
+            Some(service) if service.local => {
+                return Err("that service takes no link: its data comes from the app");
+            }
+            Some(_) => {}
         }
         let data: SetData = serde_json::from_value(data.clone())
             .map_err(|_| "the connector's data is not in its shape")?;
@@ -295,12 +304,46 @@ impl Store {
 
     /// Keep an entry whole: written beside, 0600, synced, then renamed over.
     pub fn keep(&self, entry: &Entry) -> io::Result<()> {
+        if is_local(&entry.connector) {
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidInput,
+                "a local service keeps no link",
+            ));
+        }
+        let text = serde_json::to_vec(entry).map_err(io::Error::other)?;
+        self.write_whole(&entry.connector, &text)
+    }
+
+    /// Keep a local service's data (`record`, a JSON object naming `code`
+    /// as its `connector`) whole, as an entry is kept: 0600 in the 0700
+    /// folder, written beside, synced, then renamed over. Refused for any
+    /// code whose catalog row is not local.
+    pub fn keep_local(&self, code: &str, record: &Value) -> io::Result<()> {
+        if !is_local(code) || record.get("connector").and_then(Value::as_str) != Some(code) {
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidInput,
+                "not a local service's data",
+            ));
+        }
+        let text = serde_json::to_vec(record).map_err(io::Error::other)?;
+        self.write_whole(code, &text)
+    }
+
+    /// A local service's kept data, if it is there, reads, and names `code`.
+    pub fn load_local(&self, code: &str) -> Option<Value> {
+        if !is_local(code) {
+            return None;
+        }
+        let record: Value = serde_json::from_slice(&fs::read(self.path(code)?).ok()?).ok()?;
+        (record.get("connector").and_then(Value::as_str) == Some(code)).then_some(record)
+    }
+
+    fn write_whole(&self, code: &str, text: &[u8]) -> io::Result<()> {
         let path = self
-            .path(&entry.connector)
+            .path(code)
             .ok_or_else(|| io::Error::new(io::ErrorKind::InvalidInput, "unknown service"))?;
         self.folder()?;
-        let beside = self.0.join(format!(".{}.json.new", entry.connector));
-        let text = serde_json::to_vec(entry).map_err(io::Error::other)?;
+        let beside = self.0.join(format!(".{code}.json.new"));
         let mut file = fs::OpenOptions::new()
             .write(true)
             .create(true)
@@ -308,15 +351,19 @@ impl Store {
             .mode(0o600)
             .open(&beside)?;
         file.set_permissions(fs::Permissions::from_mode(0o600))?;
-        file.write_all(&text)?;
+        file.write_all(text)?;
         file.sync_all()?;
         drop(file);
         fs::rename(&beside, &path)?;
         sync(&self.0)
     }
 
-    /// The entry kept for `code`, if one is there and reads.
+    /// The entry kept for `code`, if one is there and reads; never a local
+    /// service's data, which is no link.
     pub fn load(&self, code: &str) -> Option<Entry> {
+        if is_local(code) {
+            return None;
+        }
         let entry: Entry = serde_json::from_slice(&fs::read(self.path(code)?).ok()?).ok()?;
         (entry.connector == code).then_some(entry)
     }
@@ -354,21 +401,34 @@ impl Store {
     }
 
     /// `[{"code","account","expired"}]` for each linked service, in the
-    /// catalog's order. Never a secret.
+    /// catalog's order; a local service with its data kept, with no
+    /// account, never expired. Never a secret, and never a local service's
+    /// data.
     pub fn list(&self, now: i64) -> Vec<Value> {
         catalog::SERVICES
             .iter()
-            .filter_map(|service| self.load(service.code))
-            .map(|entry| {
-                json!({
-                    "code": entry.connector,
-                    "account": entry.account(),
-                    "expired": entry.refused
-                        || (entry.expired(now) && entry.refresh_token.is_empty()),
+            .filter_map(|service| {
+                if service.local {
+                    return self
+                        .load_local(service.code)
+                        .map(|_| json!({"code": service.code, "account": "", "expired": false}));
+                }
+                self.load(service.code).map(|entry| {
+                    json!({
+                        "code": entry.connector,
+                        "account": entry.account(),
+                        "expired": entry.refused
+                            || (entry.expired(now) && entry.refresh_token.is_empty()),
+                    })
                 })
             })
             .collect()
     }
+}
+
+/// Whether `code`'s catalog row is a local service's.
+fn is_local(code: &str) -> bool {
+    catalog::service(code).is_some_and(|service| service.local)
 }
 
 fn sync(folder: &Path) -> io::Result<()> {
@@ -497,6 +557,62 @@ mod tests {
         assert!(store.0.is_dir());
         assert!(store.list(1).is_empty());
         Store(root.path().join("never")).wipe().unwrap();
+    }
+
+    #[test]
+    fn a_local_services_data_is_kept_as_a_token_is_and_goes_with_remove_and_wipe() {
+        let root = tempfile::tempdir().unwrap();
+        let store = Store(root.path().join("lampos-services"));
+        let summary = crate::health::fit(&crate::health::tests::contract(), 1_794_961_800).unwrap();
+        let record = crate::health::Kept::record(&summary, 1_794_961_800);
+        store.keep_local("apple_health", &record).unwrap();
+        let mode = |path: &Path| fs::metadata(path).unwrap().permissions().mode() & 0o777;
+        assert_eq!(mode(&store.0), 0o700);
+        assert_eq!(mode(&store.0.join("apple_health.json")), 0o600);
+        assert!(!store.0.join(".apple_health.json.new").exists());
+        assert_eq!(store.load_local("apple_health"), Some(record.clone()));
+        // Never a link: not loaded as one, never kept as one, never set.
+        assert!(store.load("apple_health").is_none());
+        let link = Entry {
+            connector: "apple_health".into(),
+            access_token: "t".into(),
+            ..Entry::default()
+        };
+        assert!(store.keep(&link).is_err());
+        let set = json!({"auth_type":"oauth","access_token":"t"});
+        assert!(Entry::from_set("apple_health", &set, 0).is_err());
+        // Only a local code takes local data, and only data naming it.
+        assert!(
+            store
+                .keep_local("gmail", &json!({"connector": "gmail"}))
+                .is_err()
+        );
+        assert!(
+            store
+                .keep_local("apple_health", &json!({"connector": "gmail"}))
+                .is_err()
+        );
+        assert!(store.load_local("gmail").is_none());
+        // Listed with no account, beside a link.
+        store
+            .keep(&Entry::from_set("gmail", &gmail_data(), 1).unwrap())
+            .unwrap();
+        assert_eq!(
+            store.list(1),
+            vec![
+                json!({"code":"gmail","account":"a@b.c","expired":false}),
+                json!({"code":"apple_health","account":"","expired":false}),
+            ]
+        );
+        // A remove takes it, and a wipe (sign-out, unpairing) takes it too.
+        store.remove("apple_health").unwrap();
+        assert!(!store.0.join("apple_health.json").exists());
+        assert!(store.load_local("apple_health").is_none());
+        store.keep_local("apple_health", &record).unwrap();
+        fs::write(store.0.join(".apple_health.json.new"), "x").unwrap();
+        store.wipe().unwrap();
+        assert_eq!(fs::read_dir(&store.0).unwrap().count(), 0);
+        assert!(store.list(1).is_empty());
     }
 
     #[test]

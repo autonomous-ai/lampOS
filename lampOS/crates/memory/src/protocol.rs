@@ -595,7 +595,8 @@ pub fn too_long() -> Answer {
 
 /// What the app's narrow socket lets through: `{"op":"forget_person",
 /// "person":ID}` with those two keys only and the id of one person the eyes
-/// know, re-encoded so nothing else in the line reaches the store. Anything
+/// know, or `{"op":"forget_apple_health"}` alone (the app's unlink of Apple
+/// Health, `lamp_msgs::health_fact`), re-encoded so nothing else in the line reaches the store. Anything
 /// else is the refusal to send back, and the store is never asked.
 pub fn narrow(line: &[u8]) -> Result<Vec<u8>, Answer> {
     let refused = |error: &'static str, message: &str| {
@@ -610,6 +611,17 @@ pub fn narrow(line: &[u8]) -> Result<Vec<u8>, Answer> {
     };
     let value: serde_json::Value = serde_json::from_slice(line)
         .map_err(|_| refused("not_allowed", "this socket takes forget_person only"))?;
+    // The app's unlink of Apple Health (#7900): every person's kept Apple
+    // Health facts, that one key alone (`lamp_msgs::health_fact::FORGET_OP`).
+    if value.as_object().is_some_and(|object| {
+        object.len() == 1
+            && object.get("op").and_then(serde_json::Value::as_str)
+                == Some(lamp_msgs::health_fact::FORGET_OP)
+    }) {
+        return Ok(serde_json::json!({"op": lamp_msgs::health_fact::FORGET_OP})
+            .to_string()
+            .into_bytes());
+    }
     let object = value
         .as_object()
         .filter(|object| {
@@ -784,7 +796,20 @@ mod tests {
             String::from_utf8(through).unwrap(),
             json!({"op":"forget_person","person":p1}).to_string()
         );
+        // The app's unlink of Apple Health, alone (#7900).
+        assert_eq!(
+            String::from_utf8(
+                narrow(br#"{"op":"forget_apple_health"}"#)
+                    .unwrap_or_else(|refused| panic!("{}", refused.line))
+            )
+            .unwrap(),
+            json!({"op":"forget_apple_health"}).to_string()
+        );
         for (line, error) in [
+            (
+                json!({"op":"forget_apple_health","person":p1}).to_string(),
+                "not_allowed",
+            ),
             (
                 json!({"op":"recall","person":p1}).to_string(),
                 "not_allowed",
