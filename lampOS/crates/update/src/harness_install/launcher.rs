@@ -20,7 +20,10 @@
 //! start. Which lamp that is, is decided in `lamp_msgs::harness_hold`, for
 //! both.
 use crate::install::{HARNESS_HOME, Runner};
-use lamp_msgs::harness_hold::{HarnessHold, REFUSE_UPDATE, harness_hold};
+use lamp_msgs::harness_hold::{
+    DATA_DIR, HARNESS_DATA, HarnessHold, REFUSE_UPDATE, harness_hold, home_moved_line,
+    with_data_line,
+};
 use rustix::{
     fs::{self as rfs, AtFlags, Mode, OFlags},
     io::Errno,
@@ -90,18 +93,21 @@ pub fn own_exec_start(run: &mut Runner) -> Option<String> {
 /// other line are kept as they are, so a launcher already pinned comes back
 /// byte for byte. `None` when there is no `exec` line. The same text as
 /// lamp-tasks' own.
-pub fn pinned_launcher(text: &str, env_file: &str) -> Option<String> {
-    shaped(text, Some(env_file))
+pub fn pinned_launcher(text: &str, env_file: &str, data: &str) -> Option<String> {
+    shaped(text, Some(env_file), data)
 }
 
 /// `text`, a Harness launcher, with the hold taken out (#6300): the same
 /// lines as [`pinned_launcher`] takes out, none put back. `None` when there
 /// is no `exec` line. The same text as lamp-tasks' own.
-pub fn unpinned_launcher(text: &str) -> Option<String> {
-    shaped(text, None)
+pub fn unpinned_launcher(text: &str, data: &str) -> Option<String> {
+    shaped(text, None, data)
 }
 
-fn shaped(text: &str, env_file: Option<&str>) -> Option<String> {
+/// In both shapes, `export ADAPTER_DATA_DIR=<data>` just before the `exec`
+/// line, any earlier one taken out (#7906), so every Harness command, by
+/// hand too, and a daemon it starts keep Harness's home in `~/.harness`.
+fn shaped(text: &str, env_file: Option<&str>, data: &str) -> Option<String> {
     let lines: Vec<&str> = text.split_inclusive('\n').collect();
     let exec = lines
         .iter()
@@ -111,6 +117,7 @@ fn shaped(text: &str, env_file: Option<&str>) -> Option<String> {
         let line_text = line.trim();
         if line_text.starts_with(&format!("export {DISABLE}="))
             || line_text.starts_with(&format!("export {ENV_FILE}="))
+            || line_text.starts_with(&format!("export {DATA_DIR}="))
             || line_text == REFUSE_UPDATE
         {
             continue;
@@ -123,6 +130,7 @@ fn shaped(text: &str, env_file: Option<&str>) -> Option<String> {
         pinned.push_str(REFUSE_UPDATE);
         pinned.push('\n');
     }
+    pinned.push_str(&format!("export {DATA_DIR}={data}\n"));
     for line in &lines[exec..] {
         pinned.push_str(line);
     }
@@ -227,7 +235,8 @@ fn write_shaped(launcher: &Path, env_file: Option<&str>) -> Result<Pinned, Strin
         return Err(said(&why));
     }
     drop(file);
-    let pinned = shaped(&text, env_file).ok_or_else(|| said(&"no exec line"))?;
+    let data = format!("{HARNESS_HOME}/{HARNESS_DATA}");
+    let pinned = shaped(&text, env_file, &data).ok_or_else(|| said(&"no exec line"))?;
     if pinned == text {
         return Ok(Pinned::Kept);
     }
@@ -289,13 +298,25 @@ fn write_next(dir: &OwnedFd, bytes: &[u8], was: &fs::Metadata) -> io::Result<()>
     if mode & 0o100 == 0 {
         mode = 0o755;
     }
-    match rfs::unlinkat(dir, NEXT, AtFlags::empty()) {
+    write_new(dir, NEXT, bytes, was, mode)
+}
+
+/// `name` in `dir`, made new (any name there unlinked first, never
+/// followed), holding `bytes`, with `was`'s owner and `mode`.
+fn write_new(
+    dir: &OwnedFd,
+    name: &str,
+    bytes: &[u8],
+    was: &fs::Metadata,
+    mode: u32,
+) -> io::Result<()> {
+    match rfs::unlinkat(dir, name, AtFlags::empty()) {
         Ok(()) | Err(Errno::NOENT) => {}
         Err(error) => return Err(error.into()),
     }
     let fd = rfs::openat(
         dir,
-        NEXT,
+        name,
         OFlags::WRONLY | OFlags::CREATE | OFlags::EXCL | OFlags::NOFOLLOW | OFlags::CLOEXEC,
         Mode::RUSR | Mode::WUSR,
     )?;
@@ -309,6 +330,84 @@ fn write_next(dir: &OwnedFd, bytes: &[u8], was: &fs::Metadata) -> io::Result<()>
     file.sync_all()
 }
 
+/// The temporary file `harness-hold.env` is written through, beside it.
+const HOLD_NEXT: &str = ".harness-hold.lampos-update";
+
+/// What [`data_line_in_hold_file`] did.
+#[derive(Debug, PartialEq, Eq)]
+pub enum HoldFile {
+    /// The line added or set: the file written.
+    Written,
+    /// The line already there, last: nothing written.
+    Kept,
+    /// No file there: nothing written, none made.
+    Missing,
+}
+
+/// `ADAPTER_DATA_DIR=<HARNESS_HOME>/.harness/cli/data` ensured in the
+/// `harness-hold.env` lamp-tasks wrote in `home` (#7906), every other line
+/// kept, with lamp-tasks' own line (`lamp_msgs::harness_hold::with_data_line`),
+/// so a daemon started from that file before the new lamp-tasks writes it
+/// again (a reboot right after an install of Harness 0.6.72) still skips
+/// the move of `~/.harness`. A missing file is not made: lamp-tasks writes
+/// it whole at its start. Root writing in a folder Harness's user owns, it
+/// is done as [`pin`] writes the launcher: nothing opened through a link,
+/// a plain file of one name owned by the folder's owner and under
+/// [`MAX_LAUNCHER`], written new beside it with its owner and mode (0600)
+/// and renamed over it.
+pub fn data_line_in_hold_file(home: &Path) -> Result<HoldFile, String> {
+    let at = home.join(HOLD_FILE);
+    let said = |error: &dyn std::fmt::Display| format!("{}: {error}", at.display());
+    let dir = rfs::open(
+        home,
+        OFlags::RDONLY | OFlags::DIRECTORY | OFlags::CLOEXEC,
+        Mode::empty(),
+    )
+    .map_err(|error| said(&io::Error::from(error)))?;
+    let file = match rfs::openat(
+        &dir,
+        HOLD_FILE,
+        OFlags::RDONLY | OFlags::NOFOLLOW | OFlags::NONBLOCK | OFlags::CLOEXEC,
+        Mode::empty(),
+    ) {
+        Ok(fd) => fs::File::from(fd),
+        Err(Errno::NOENT) => return Ok(HoldFile::Missing),
+        Err(Errno::LOOP) => return Err(said(&"a link, left as it is")),
+        Err(error) => return Err(said(&io::Error::from(error))),
+    };
+    let metadata = file.metadata().map_err(|error| said(&error))?;
+    if !metadata.is_file() {
+        return Err(said(&"not a plain file"));
+    }
+    let home_uid = rfs::fstat(&dir)
+        .map_err(|error| said(&io::Error::from(error)))?
+        .st_uid;
+    if let Some(why) = refused(metadata.nlink(), metadata.uid(), home_uid) {
+        return Err(said(&why));
+    }
+    let mut text = String::new();
+    let read = (&file)
+        .take(MAX_LAUNCHER + 1)
+        .read_to_string(&mut text)
+        .map_err(|error| said(&error))?;
+    if let Some(why) = too_big(read as u64) {
+        return Err(said(&why));
+    }
+    drop(file);
+    let data = format!("{HARNESS_HOME}/{HARNESS_DATA}");
+    let next = with_data_line(&text, &data);
+    if next == text {
+        return Ok(HoldFile::Kept);
+    }
+    let written = write_new(&dir, HOLD_NEXT, next.as_bytes(), &metadata, 0o600)
+        .and_then(|()| rfs::renameat(&dir, HOLD_NEXT, &dir, HOLD_FILE).map_err(io::Error::from));
+    if let Err(error) = written {
+        let _ = rfs::unlinkat(&dir, HOLD_NEXT, AtFlags::empty());
+        return Err(said(&error));
+    }
+    Ok(HoldFile::Written)
+}
+
 /// After an install: with the switch on in lamp-tasks' unit, Harness's
 /// launcher under `root` pinned to `<HARNESS_HOME>/harness-hold.env`, and
 /// one line said; on the canary (lamp-update follows the lamp-voice feed,
@@ -316,6 +415,22 @@ fn write_next(dir: &OwnedFd, bytes: &[u8], was: &fs::Metadata) -> io::Result<()>
 /// lamp-tasks' unit unreadable (taken as off), the launcher not looked at
 /// or written, and one line said.
 pub fn after_install(root: &Path, run: &mut Runner, say: &mut dyn FnMut(&str)) {
+    // Harness's home moved to the XDG folders after all (#7906): one fixed
+    // line; nothing is moved back.
+    if let Some(line) = home_moved_line(&root.join(HARNESS_HOME.trim_start_matches('/'))) {
+        say(&line);
+    }
+    // Harness's data folder in the env file lamp-tasks wrote (#7906), held
+    // or not, so a daemon started from it before lamp-tasks starts again
+    // keeps Harness's home in `~/.harness`.
+    let home = root.join(HARNESS_HOME.trim_start_matches('/'));
+    match data_line_in_hold_file(&home) {
+        Ok(HoldFile::Written) => say(&format!(
+            "{DATA_DIR} set in {HARNESS_HOME}/{HOLD_FILE} (Harness's home kept in ~/.harness)"
+        )),
+        Ok(HoldFile::Kept | HoldFile::Missing) => {}
+        Err(why) => say(&format!("{DATA_DIR} not set in {HOLD_FILE}: {why}")),
+    }
     match switch_on(run) {
         Ok(true) => {}
         Ok(false) => {
@@ -331,7 +446,6 @@ pub fn after_install(root: &Path, run: &mut Runner, say: &mut dyn FnMut(&str)) {
             return;
         }
     }
-    let home = root.join(HARNESS_HOME.trim_start_matches('/'));
     let launcher = home.join(LAUNCHER);
     let hold = harness_hold(Some("on"), own_exec_start(run).as_deref());
     if hold == HarnessHold::Lifted {

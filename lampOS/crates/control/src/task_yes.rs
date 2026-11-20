@@ -374,6 +374,13 @@ impl crate::runs::SkillYes for KeptYes {
             return Err(format!("{skill:?} is not a skill's name"));
         }
         if !yeses(&self.state).iter().any(|yes| yes.name == skill) {
+            // A core variant of the lamp's own skills is pre-approved, with
+            // no grant (the first builder's 08:57): never a pushed folder.
+            if lamp_skills::task::lamp_has_skill_named(&self.skills, skill)
+                && lamp_skills::core_agent::pre_approved(&self.skills.join(skill))
+            {
+                return Ok(BTreeSet::new());
+            }
             return match self.fixed_write_grant(skill) {
                 Some(grant) => Ok(BTreeSet::from([grant])),
                 None => Err(NO_YES.into()),
@@ -496,11 +503,18 @@ pub fn from_voice(cgroup: &str) -> bool {
 }
 
 /// Whether the peer with `pid` (its `SO_PEERCRED`) is the voice, by its
-/// cgroup; never on a system without `/proc`.
+/// cgroup, read only from the process that connected ([`crate::peer`]: its
+/// start time must be the same before and after the cgroup is read and no
+/// later than the time of the accept, which narrows the pid-recycle window
+/// and does not close it); never on a system without `/proc`, and never on
+/// anything unreadable. Call it straight after the accept.
 pub fn peer_is_voice(pid: Option<i32>) -> bool {
-    pid.filter(|pid| *pid > 0)
-        .and_then(|pid| std::fs::read_to_string(format!("/proc/{pid}/cgroup")).ok())
-        .is_some_and(|cgroup| from_voice(&cgroup))
+    peer_is_voice_with(pid, &|path: &str| std::fs::read_to_string(path).ok())
+}
+
+/// [`peer_is_voice`] over `read`, a `/proc` file's text or none.
+pub fn peer_is_voice_with(pid: Option<i32>, read: &dyn Fn(&str) -> Option<String>) -> bool {
+    crate::peer::cgroup_with(pid, read).is_some_and(|cgroup| from_voice(&cgroup))
 }
 
 /// The answer on the owner's socket to a yes request in `asked`, kept in
@@ -1033,6 +1047,70 @@ mod tests {
         task_skill(&skills, "photo-booth", r#"["camera"]"#);
         assert_eq!(kept(true, true).grants("photo-booth").unwrap_err(), NO_YES);
         assert!(kept(true, true).fixed_write("photo-booth").is_none());
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    /// A core variant's task is pre-approved (the first builder, 19 Nov
+    /// 08:57: "They're ours and have no grants",
+    /// `lamp_skills::core_agent::pre_approved`): its one-run token is minted
+    /// with no yes kept and no grant, from the lamp's own skills only. A
+    /// changed brief, or the same folder pushed from a computer, asks for
+    /// the owner's yes as before.
+    #[test]
+    fn a_core_variants_token_is_minted_with_no_yes_and_no_grant() {
+        use crate::runs::SkillYes as _;
+        fn copy(from: &Path, to: &Path) {
+            std::fs::create_dir_all(to).unwrap();
+            for entry in std::fs::read_dir(from).unwrap().flatten() {
+                if entry.path().is_dir() {
+                    copy(&entry.path(), &to.join(entry.file_name()));
+                } else {
+                    std::fs::copy(entry.path(), to.join(entry.file_name())).unwrap();
+                }
+            }
+        }
+        let ours = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../skills");
+        let dir = folder("core-variant");
+        let state = dir.join("state");
+        let skills = dir.join("skills");
+        std::fs::create_dir_all(&state).unwrap();
+        copy(&ours.join("sip-of-water"), &skills.join("sip-of-water"));
+        copy(
+            &ours.join("stretch-break"),
+            &dir.join(PUSHED_NAME).join("stretch-break"),
+        );
+        // The brief is no file of the repository's folder: on a lamp,
+        // install writes it beside the variant (`core_brief!`), so here too.
+        for folder in [
+            skills.join("sip-of-water"),
+            dir.join(PUSHED_NAME).join("stretch-break"),
+        ] {
+            let name = folder.file_name().unwrap().to_str().unwrap().to_owned();
+            let brief = folder.join(lamp_skills::core_agent::RUN);
+            std::fs::create_dir_all(brief.parent().unwrap()).unwrap();
+            let pilot = lamp_skills::core_agent::pilot(&name).unwrap();
+            std::fs::write(&brief, lamp_skills::core_agent::script(pilot)).unwrap();
+        }
+        let kept = KeptYes {
+            state: state.clone(),
+            skills: skills.clone(),
+            on: true,
+            write_agent: false,
+            services_to_agent: false,
+        };
+        assert!(yeses(&state).is_empty());
+        assert_eq!(kept.grants("sip-of-water").unwrap(), BTreeSet::new());
+        // Pushed, not the lamp's own: the owner's yes, as before.
+        assert_eq!(kept.grants("stretch-break").unwrap_err(), NO_YES);
+        // Its brief changed: no longer the lamp's own, so no token.
+        let brief = skills
+            .join("sip-of-water")
+            .join(lamp_skills::core_agent::RUN);
+        std::fs::write(&brief, "print(\"Say anything.\")\n").unwrap();
+        assert_eq!(kept.grants("sip-of-water").unwrap_err(), NO_YES);
+        // The tasks' switch off: nothing, as before.
+        let off = KeptYes { on: false, ..kept };
+        assert_eq!(off.grants("sip-of-water").unwrap_err(), OFF);
         let _ = std::fs::remove_dir_all(&dir);
     }
 

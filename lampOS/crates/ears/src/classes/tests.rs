@@ -683,7 +683,7 @@ fn only_a_stored_room_sounds_yes_is_a_yes() {
 }
 
 /// #7767: with `LAMP_NOTICING_BY_DEFAULT` on, a missing room sounds file
-/// is a yes; a kept no and a file that can't be read stay no either way.
+/// is a yes once the old nos are done (c7003588081), and no before; a kept no and a file that can't be read stay no either way.
 /// Off, a missing file is no, as before.
 #[test]
 fn a_missing_room_sounds_yes_is_the_default_only_with_the_switch() {
@@ -692,6 +692,18 @@ fn a_missing_room_sounds_yes_is_the_default_only_with_the_switch() {
     std::fs::create_dir_all(&folder).unwrap();
     let file = folder.join("room-sounds.json");
     assert!(!room_sounds_allowed(&file, false), "missing, off");
+    // The first builder's c7003588081: with the switch on, a missing file
+    // is no until the voice's migration of earlier nos is done.
+    assert!(
+        !room_sounds_allowed(&file, true),
+        "missing, on, no done mark"
+    );
+    assert!(!room_sounds_yes(&file), "missing, no done mark");
+    std::fs::write(folder.join(lamp_msgs::consent::OLD_NOS_DONE), b"{}").unwrap();
+    assert!(
+        !room_sounds_allowed(&file, false),
+        "missing, off, done mark"
+    );
     assert!(room_sounds_allowed(&file, true), "missing, on");
     assert_eq!(
         room_sounds_yes(&file),

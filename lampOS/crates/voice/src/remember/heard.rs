@@ -838,6 +838,28 @@ pub fn near_held_told(near: &[(String, String)]) -> Value {
     })
 }
 
+/// What the model is told of a `remember` with [`near_heard`] words when
+/// an unsure line is not kept (`doubted::UNSURE_ENVIRONMENT`, #7739):
+/// nothing kept, the person told so in one line that asks nothing
+/// (`doubted::NOT_CAUGHT_LINE`), never "is that ...?" or "did you say
+/// ...?", and never said kept or noted. Their words alone, not the
+/// model's. Only in place of [`NEAR_ENVIRONMENT`]'s ask: with that switch
+/// off a near spelling is kept as before (Twelve's P2 on #7966).
+pub fn near_not_kept_told(near: &[(String, String)]) -> Value {
+    let heard = near
+        .iter()
+        .map(|(heard, _)| format!("\"{heard}\""))
+        .collect::<Vec<_>>()
+        .join(" and ");
+    json!({
+        "remembered": false,
+        "note": format!(
+            "Not kept: they were heard saying {heard}, not your words, and the lamp may have misheard, so nothing is kept. Tell them so in a few words, with no question, for example \"{}\", and end your reply there: never ask \"is that ...?\" or \"did you say ...?\", or ask them to say it again, spell it or say more, and never say it is kept or noted.",
+            super::doubted::NOT_CAUGHT_LINE
+        ),
+    })
+}
+
 /// For a `remember` the voice runs for heard line `request`: the call with
 /// the heard words in place of the model's, and those words, when
 /// [`heard_instead`] keeps them. `heard` is false for a line not heard at
@@ -964,6 +986,27 @@ pub fn answered(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// #7739: a near spelling not kept is told whole: nothing kept, the
+    /// not-caught line, and the reply ends there with nothing asked (the
+    /// 06c1 ROW at ac50913437 heard "… could you spell or say it again?").
+    #[test]
+    fn a_near_spelling_not_kept_is_said_and_asks_nothing() {
+        let told = near_not_kept_told(&[("renunculus".into(), "ranunculus".into())]);
+        assert_eq!(told["remembered"], false);
+        let note = told["note"].as_str().unwrap();
+        assert!(
+            note.contains(super::super::doubted::NOT_CAUGHT_LINE),
+            "{note}"
+        );
+        assert!(note.contains("end your reply there"), "{note}");
+        assert!(
+            note.contains("say it again, spell it or say more"),
+            "{note}"
+        );
+        assert!(note.contains("never say it is kept"), "{note}");
+        assert!(!note.contains("ranunculus"), "{note}");
+    }
     use std::time::Duration;
 
     const TEA: &str = "please remember that my favourite tea is jasmine";

@@ -246,6 +246,19 @@ Louvre in May" is no call.
 line in a loud office), "Lamp, what did I just ask you?" came back as "Lampy,
 …" and was held as said to someone it calls by name.
 
+On both routes, a set-off word of three letters or more one letter from
+"Lamp" (a Levenshtein distance of 1 once repeated letters are taken once:
+"Lap", "Lamps", "Clamp", "Laam", "Limp", "Ramp";
+`attention::near_the_lamps_name`) is never someone else's name (#7698).
+"Lam" and a letter other than "p" ("Lama", "Lamy") is not taken so: it
+stays a person's name, said to someone else (the Reviewer-lead's P2 on
+#7999; "Lam" alone was already a stand-in for the lamp's name). On
+lamp-06c1 on 18 Nov (14072) the owner's "Lamp, what's my name?" and "Lamp,
+did you keep that?", seen speaking with their own face, came back so and
+were held six times as said to someone it calls by name. Such a word is
+not counted as the lamp's call either: the line is judged as any line
+without the name (`a_spelling_one_letter_from_lamp_is_no_ones_name`).
+
 "One" joins them with `LAMP_ONE_AS_LAMP=on` only (#4710; off by default,
 on in the product since 3 Nov, [switches.md](switches.md)). On lamp-3e83 on 2 Nov a tester's "Lamp, …"
 came back mostly as "One, …" ("One, how do I make a pour over coffee?",
@@ -1265,7 +1278,9 @@ came marked as a short sound let through is played only when what was heard
 is a short word said to the lamp, it was said close to the lamp (the room
 microphone, as for `--attention-near`), someone is turned to the lamp, the
 lamp began the turn itself, or it answers the lamp's own question (below);
-otherwise it is held. Off unless set; the rule is otherwise as above.
+otherwise it is held. A request whose words begin with the lamp's name set
+off ("Lamp, put it back.", `begins_with_the_name`) is not checked as a
+sound at all: the rule judges it as any line (#7834). Off unless set; the rule is otherwise as above.
 
 **An answer to the lamp's own question (17 October).** On lamp-4ace on
 2026-10-17 at 16:11, the lamp asked "Shall I start it?" and the person said

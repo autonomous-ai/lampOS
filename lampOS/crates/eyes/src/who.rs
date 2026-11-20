@@ -975,14 +975,20 @@ impl People {
     }
 
     /// How alike this print is to the nearest of anyone's kept prints,
-    /// whether or not it reaches [`SAME_PERSON`]; `None` with nobody kept. For the
-    /// journal's line on each check: a number, never a name.
-    pub fn best_likeness(&self, print: &[f32]) -> Option<f32> {
+    /// whether or not it reaches [`SAME_PERSON`], and when that person's
+    /// prints were added (their `added_unix_s`: the file keeps one time per
+    /// person, not per print); `None` with nobody kept. For the journal's
+    /// line on each check ([`recognition_line`]): numbers, never a name.
+    pub fn best_likeness(&self, print: &[f32]) -> Option<(f32, u64)> {
         self.people
             .iter()
-            .flat_map(|person| &person.prints)
-            .map(|kept| likeness(kept, print))
-            .reduce(f32::max)
+            .flat_map(|person| {
+                person
+                    .prints
+                    .iter()
+                    .map(|kept| (likeness(kept, print), person.added_unix_s))
+            })
+            .max_by(|a, b| a.0.total_cmp(&b.0))
     }
 
     /// How alike this print is to `name`'s own kept prints, at best; `None`
@@ -1171,6 +1177,48 @@ impl People {
         replace: bool,
         apart: bool,
     ) -> std::result::Result<Remembered, Refused> {
+        self.remember_one_checked(name, prints, now_unix_s, replace, apart, false)
+    }
+
+    /// [`Self::remember_one_replacing`] for a save the voice sent past its
+    /// face question only because the eyes' known file named a face at the
+    /// lamp (`known_only`, #7704): a capture recognised as nobody, under a
+    /// name nobody is kept under, is refused ([`Refused::NotKnown`]).
+    pub fn remember_one_known_only(
+        &mut self,
+        name: &str,
+        prints: Vec<Vec<f32>>,
+        now_unix_s: u64,
+        replace: bool,
+        apart: bool,
+    ) -> std::result::Result<Remembered, Refused> {
+        self.remember_one_checked(name, prints, now_unix_s, replace, apart, true)
+    }
+
+    fn remember_one_checked(
+        &mut self,
+        name: &str,
+        prints: Vec<Vec<f32>>,
+        now_unix_s: u64,
+        replace: bool,
+        apart: bool,
+        known_only: bool,
+    ) -> std::result::Result<Remembered, Refused> {
+        // Sent past the face question only because a face was known at the
+        // lamp (#7704): a face recognised as nobody, under a name nobody is
+        // kept under, is no one to keep here; their own name on their own
+        // face is.
+        if known_only {
+            let kept = plain_name(name).ok_or(Refused::NotAName)?;
+            if prints.iter().all(|print| self.who(print).is_none())
+                && !self
+                    .people
+                    .iter()
+                    .any(|person| same_name(&person.name, &kept))
+            {
+                return Err(Refused::NotKnown);
+            }
+        }
         let mut replaced = Vec::new();
         let name =
             self.remember_one_into(name, prints, now_unix_s, replace, apart, &mut replaced)?;
@@ -1628,8 +1676,9 @@ fn repair_file(path: &Path) -> io::Result<(PathBuf, File)> {
 /// `{"list":true}` or `{"who":true}`. With one name for one face
 /// (`LAMP_NAMES=checked`), `{"remember":"A","one_face":true}`, and
 /// `"replace":true` once the person said yes to the new name, or
-/// `"apart":true` once they said they are not the near one. Anything else
-/// is nothing.
+/// `"apart":true` once they said they are not the near one, or
+/// `"known_only":true` when the voice skipped its face question only
+/// because a face was known at the lamp (#7704). Anything else is nothing.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Ask {
     RememberSpeaker(crate::remember_speaker::Request),
@@ -1638,6 +1687,8 @@ pub enum Ask {
         name: String,
         replace: bool,
         apart: bool,
+        /// Kept only for a face the eyes know (#7704).
+        known_only: bool,
     },
     /// Add the one face in a photo in the eyes' photo folder (`--photo-dir`,
     /// [`crate::photo`]), unconfirmed until its person says yes: its file
@@ -1789,6 +1840,7 @@ pub fn ask_of(line: &[u8]) -> Option<Ask> {
         one_face: Option<bool>,
         replace: Option<bool>,
         apart: Option<bool>,
+        known_only: Option<bool>,
         photo: Option<String>,
     }
     let line: Line = serde_json::from_slice(line).ok()?;
@@ -1801,6 +1853,7 @@ pub fn ask_of(line: &[u8]) -> Option<Ask> {
             one_face: None,
             replace: None,
             apart: None,
+            known_only: None,
             photo: None,
         } => Some(Ask::Remember(name)),
         Line {
@@ -1811,11 +1864,13 @@ pub fn ask_of(line: &[u8]) -> Option<Ask> {
             one_face: Some(true),
             replace,
             apart,
+            known_only,
             photo: None,
         } => Some(Ask::RememberOne {
             name,
             replace: replace.unwrap_or(false),
             apart: apart.unwrap_or(false),
+            known_only: known_only.unwrap_or(false),
         }),
         Line {
             remember: None,
@@ -1825,6 +1880,7 @@ pub fn ask_of(line: &[u8]) -> Option<Ask> {
             one_face: None,
             replace: None,
             apart: None,
+            known_only: None,
             photo: None,
         } => Some(Ask::Forget(name)),
         Line {
@@ -1835,6 +1891,7 @@ pub fn ask_of(line: &[u8]) -> Option<Ask> {
             one_face: None,
             replace: None,
             apart: None,
+            known_only: None,
             photo: None,
         } => Some(Ask::List),
         Line {
@@ -1845,6 +1902,7 @@ pub fn ask_of(line: &[u8]) -> Option<Ask> {
             one_face: None,
             replace: None,
             apart: None,
+            known_only: None,
             photo: None,
         } => Some(Ask::Who),
         Line {
@@ -1855,6 +1913,7 @@ pub fn ask_of(line: &[u8]) -> Option<Ask> {
             one_face: None,
             replace: None,
             apart: None,
+            known_only: None,
             photo: Some(file),
         } => Some(Ask::RememberPhoto { name, file }),
         _ => None,
@@ -1865,6 +1924,46 @@ pub fn ask_of(line: &[u8]) -> Option<Ask> {
 /// lamp: people at it were 0.12 to 0.27 on lamp-4ace. Smaller faces are not
 /// recognised and not remembered.
 pub const NEAR_ENOUGH: f32 = 0.10;
+
+/// The journal's line on each check (#3126): the best likeness and how many
+/// seconds ago the closest person's prints were added (#7424), then of
+/// `face` (the largest in a picture filled to `filled` pixels): its height
+/// and width as shares of the picture's, its turn (the nose's offset from the
+/// eyes' middle over the eyes' span, 0 front-on, the sign the side; `none`
+/// with the eyes on one point) and its box's centre across the picture
+/// (#7424), then the near gate and the threshold. Numbers only, never a
+/// name or an id.
+pub fn recognition_line(
+    best: Option<(f32, u64)>,
+    face: &crate::faces::Face,
+    filled: (usize, usize),
+    now_unix_s: u64,
+) -> String {
+    let (best, age) = best.map_or_else(
+        || ("none".to_owned(), "none".to_owned()),
+        |(how, added)| {
+            (
+                format!("{how:.3}"),
+                format!("{} s", now_unix_s.saturating_sub(added)),
+            )
+        },
+    );
+    let wide = filled.0.max(1) as f32;
+    let tall = filled.1.max(1) as f32;
+    let [left_eye, right_eye, nose, ..] = face.marks;
+    let span = right_eye.0 - left_eye.0;
+    let turn = if span.abs() > f32::EPSILON {
+        format!("{:.2}", (nose.0 - (left_eye.0 + right_eye.0) / 2.0) / span)
+    } else {
+        "none".to_owned()
+    };
+    format!(
+        "recognition best {best} height {:.3} width {:.3} turn {turn} across {:.3} prints age {age} (near at {NEAR_ENOUGH}, same at {SAME_PERSON})",
+        face.height / tall,
+        face.width / wide,
+        (face.x + face.width / 2.0) / wide,
+    )
+}
 
 /// Whether a look found anyone at the lamp: a face at least [`NEAR_ENOUGH`]
 /// of the picture's height `tall`. A far or flicker face is no one to
@@ -2380,6 +2479,8 @@ pub struct Taking {
     /// Asked after the person said they are not the near one
     /// ([`Refused::NearTo`]): no near-name check.
     pub apart: bool,
+    /// Kept only for a face the eyes know ([`Refused::NotKnown`], #7704).
+    pub known_only: bool,
     prints: Vec<Vec<f32>>,
     started_us: u64,
     saw_any: bool,
@@ -2438,6 +2539,8 @@ pub enum Refused {
     NotLikeThem,
     /// The store refused it: full, or the file could not be written.
     Store(String),
+    /// Asked `known_only` (#7704), the face is known as nobody.
+    NotKnown,
 }
 
 /// Why a face could not be remembered.
@@ -2465,6 +2568,7 @@ impl Taking {
             speaker: None,
             one_face: None,
             apart: false,
+            known_only: false,
             prints: Vec::new(),
             started_us: now_us,
             saw_any: false,
@@ -5058,6 +5162,54 @@ mod tests {
     }
 
     #[test]
+    fn the_recognition_line_says_the_face_width_turn_place_and_how_old_the_matched_prints_are() {
+        // A face 40 by 48 in a 320 by 240 picture, centred 120 px across,
+        // its nose 4 px right of its eyes' middle (20 px apart).
+        let face = |nose: f32| crate::faces::Face {
+            score: 0.9,
+            x: 100.0,
+            y: 50.0,
+            width: 40.0,
+            height: 48.0,
+            marks: [
+                (110.0, 60.0),
+                (130.0, 60.0),
+                (nose, 70.0),
+                (112.0, 85.0),
+                (128.0, 85.0),
+            ],
+        };
+        let mut people = People::open(file("recognition-line")).unwrap();
+        // Nobody kept: no likeness, no age.
+        assert_eq!(
+            recognition_line(
+                people.best_likeness(&print(0.3)),
+                &face(124.0),
+                (320, 240),
+                500
+            ),
+            "recognition best none height 0.200 width 0.125 turn 0.20 across 0.375 prints age none (near at 0.1, same at 0.363)"
+        );
+        people.remember("Bea", vec![print(0.3)], 100).unwrap();
+        people.remember("Cy", vec![print(1.7)], 400).unwrap();
+        // The age is of the closest person's prints (Bea's, 400 s), not
+        // the newest kept (Cy's, 100 s); turned the other way, the sign
+        // says so.
+        let (how, _) = people.best_likeness(&print(0.3)).unwrap();
+        assert_eq!(
+            recognition_line(
+                people.best_likeness(&print(0.3)),
+                &face(116.0),
+                (320, 240),
+                500
+            ),
+            format!(
+                "recognition best {how:.3} height 0.200 width 0.125 turn -0.20 across 0.375 prints age 400 s (near at 0.1, same at 0.363)"
+            )
+        );
+    }
+
+    #[test]
     fn nobody_is_known_until_asked_and_a_forgotten_face_is_gone_from_the_file() {
         let path = file("forget");
         let mut people = People::open(path.clone()).unwrap();
@@ -5071,8 +5223,8 @@ mod tests {
         assert_eq!(name, "A");
         assert!(how > 0.99);
         // The journal's number: the best likeness, matched or not.
-        assert_eq!(people.best_likeness(&print(0.3)), Some(how));
-        let far = people.best_likeness(&print(1.7)).unwrap();
+        assert_eq!(people.best_likeness(&print(0.3)), Some((how, 1)));
+        let (far, _) = people.best_likeness(&print(1.7)).unwrap();
         assert!(far < SAME_PERSON, "{far}");
         // Someone else is nobody.
         assert_eq!(people.who(&print(1.7)), None);
@@ -5533,6 +5685,42 @@ mod tests {
         assert_eq!(people.names().len(), 3);
     }
 
+    /// #7704: the voice skipped its face question only because the eyes'
+    /// known file named a face at the lamp, and that file can still name
+    /// Ada for up to 3 s after a stranger steps in. Asked `known_only`, a
+    /// capture recognised as nobody is refused ([`Refused::NotKnown`]) and
+    /// nobody is kept; a known face is still told by the name it is known
+    /// by, and its own name on its own face is still kept in place. Without
+    /// `known_only`, the stranger is kept as before.
+    #[test]
+    fn a_save_for_a_known_face_only_refuses_a_face_known_as_nobody() {
+        let mut people = People::open(file("known-only")).unwrap();
+        people
+            .remember("Ada", vec![print(0.3), print(0.31)], 1)
+            .unwrap();
+        assert_eq!(
+            people.remember_one_known_only("Walter", vec![print(2.9)], 2, false, false),
+            Err(Refused::NotKnown)
+        );
+        assert_eq!(people.names(), vec!["Ada".to_owned()]);
+        assert_eq!(
+            people.remember_one_known_only("Jay", vec![print(0.3)], 3, false, false),
+            Err(Refused::KnownAs("Ada".into()))
+        );
+        assert_eq!(
+            people
+                .remember_one_known_only("Ada", vec![print(0.31)], 4, false, false)
+                .map(|kept| kept.name),
+            Ok("Ada".into())
+        );
+        assert_eq!(people.names(), vec!["Ada".to_owned()]);
+        assert_eq!(
+            people.remember_one("Walter", vec![print(2.9)], 5, false, false),
+            Ok("Walter".into())
+        );
+        assert_eq!(people.names(), vec!["Ada".to_owned(), "Walter".to_owned()]);
+    }
+
     /// Reviewer-three's P1 on #5149: a remembering says exactly whom a
     /// `replace` forgot, so the voice moves the setup owner only on a
     /// rename of the owner's own face. Nobody for a plain remembering, the
@@ -5624,7 +5812,8 @@ mod tests {
             Some(Ask::RememberOne {
                 name: "A".into(),
                 replace: false,
-                apart: false
+                apart: false,
+                known_only: false
             })
         );
         assert_eq!(
@@ -5632,7 +5821,8 @@ mod tests {
             Some(Ask::RememberOne {
                 name: "A".into(),
                 replace: true,
-                apart: false
+                apart: false,
+                known_only: false
             })
         );
         assert_eq!(
@@ -5640,9 +5830,20 @@ mod tests {
             Some(Ask::RememberOne {
                 name: "A".into(),
                 replace: false,
-                apart: true
+                apart: true,
+                known_only: false
             })
         );
+        assert_eq!(
+            ask_of(br#"{"remember":"A","one_face":true,"known_only":true}"#),
+            Some(Ask::RememberOne {
+                name: "A".into(),
+                replace: false,
+                apart: false,
+                known_only: true
+            })
+        );
+        assert_eq!(ask_of(br#"{"remember":"A","known_only":true}"#), None);
         assert_eq!(ask_of(br#"{"remember":"A","apart":true}"#), None);
         assert_eq!(ask_of(br#"{"remember":"A","replace":true}"#), None);
         assert_eq!(ask_of(br#"{"forget":"A","one_face":true}"#), None);

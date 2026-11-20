@@ -347,6 +347,13 @@ end came marked `sound` as one to check, and plays its answer only when:
 - or someone is turned to the lamp (the eyes are read for it whatever the
   room);
 - or the lamp began the turn itself;
+- or what was heard begins with the lamp's name set off ("Lamp, put it
+  back.", "Hey Lamp, stop.", `attention::begins_with_the_name`). Such a
+  line is not judged as a sound at all: the rule judges it as any line
+  (#7834: on lamp-9adf on 19 Nov "Lamp, put it back." played from a
+  speaker was held 2 times in 5 as a short sound). The name later in a
+  line ("…the lamp is on sale") or not set off ("Lamp is broken") is no
+  such sign;
 - or what was heard has a word in it, the lamp's own last line was a
   question, and a conversation is going on: the person's answer to it
   (lamp-4ace, 17 October 16:11, "Yes. Please start it." heard as "bien";
@@ -363,7 +370,10 @@ is not a sound at all. Tests: `a_short_sound_is_answered_only_when_something_sho
 (the worker's own loop against the scripted service: "¿Qué?" held, "Yes."
 answered, and both answered without the switch),
 `the_checked_value_lets_sounds_through_and_has_the_worker_check_them` and
-`a_short_word_is_one_said_to_the_lamp_whole` (`not_speech.rs`).
+`a_short_word_is_one_said_to_the_lamp_whole` (`not_speech.rs`),
+`a_short_sound_begun_with_the_lamps_name_is_never_held_as_one`
+(`attention.rs`: "Lamp, put it back.", "Lamp, stop.", "Lamp, lights off."
+let out, "Put it back." held).
 
 **On the second voice** (when Gemini is down, [second-voice.md](second-voice.md)),
 the worker takes the same flag and checks a marked sound too (the reviewer
@@ -371,7 +381,22 @@ on #818, 20:11). That route has no ears and no eyes, so only the heard words
 can show the sound was said to the lamp: one not heard, whole, as a short
 word ends quietly after its words, and its chat is never asked. A sound said
 close or facing the lamp but not heard as a short word is held there, where
-the Live route would answer it. One with a word in it, right after the
+the Live route would answer it. A line begun with the lamp's name set off
+(`second_provider::name_at_start`) is never held as a short sound there
+either, with or without `LAMP_ENDPOINT_PAUSE_JOIN` (#7834: lamp-9adf runs
+the product's unit, where that switch is off, and held "Lamp, put it back."
+so 2 times in 5; test
+`a_short_sound_begun_with_the_lamps_name_is_answered_when_sounds_are_checked`
+in `second_provider/tests.rs`). Nor is one in which lamp-name heard the
+name at its own bar, 0.9, or more, whatever its words came back as, if
+it began clear of the lamp's voice and its 1.5 s echo tail
+(`own_echo::TAIL_US`; lamp-name runs without `--not-while-speaking` in the
+product, and on lamp-4ace heard the lamp's own reply at 0.990, #7994): the
+rule judges it as any line, and a line of one or two words, not a
+question, with nothing written for the name, is still not answered on the
+hearing alone (#7891: on lamp-52e6 on 19 Nov "Lamp?", heard at 0.917, its
+word back not the name, was held; #7918; tests in
+`second_provider/tests/short_sound_name.rs`). One with a word in it, right after the
 lamp's own question in a conversation going on, is judged as a line there
 too: the worker reads the same thread (`worker::lamp_just_asked`). So is
 one with a word in it said while the lamp waits for a yes or no of its own
@@ -592,8 +617,7 @@ one is chosen) and kept in the thread as the lamp's:
   lamp-06c1 on 3 Nov, 7 of 15 stories had one over the lamp's answer), so
   the question can answer the lamp's own voice; a later echo fix from
   duplex makes those asks fewer.
-  With `LAMP_CUT_IN_WORDLESS_RESUMES=on` too (off in the product for the
-  candidate since 6 Nov, after #5430's lamp check came back FAIL, partial), a busy room's first such cut says "Anyway," and
+  With `LAMP_CUT_IN_WORDLESS_RESUMES=on` too (on in the product, #7413), a busy room's first such cut says "Anyway," and
   goes on from the sentence it cut, another within a minute says "Oops,
   cut off again. Anyway," and goes on, and a third says "It's a bit noisy
   here, so I'll pause. Just say 'Lamp' when you want me to go on."

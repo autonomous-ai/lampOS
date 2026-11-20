@@ -426,6 +426,10 @@ pub struct PaneSeen {
     /// `told.taken` is true. Words typed while earlier ones are untaken
     /// are queued by Harness behind them, which mixes two tasks' answers.
     pub taken: bool,
+    /// `show` names the pane's agent "Terminal": its engine exited and
+    /// Harness keeps the pane as a plain shell (#6835 gap 1, #7906's sign
+    /// 2), which `wait` reads idle.
+    pub shell: bool,
 }
 
 /// Whether `show`'s answer says the last words typed were taken
@@ -474,6 +478,12 @@ pub struct Ensured {
     /// The engine's own session (`engineSession`; OpenClaw's
     /// `agent:main:harness-<id>`), when Harness names one.
     pub engine_session: Option<String>,
+    /// `confirmed` (openharness#4484, proposed): `false` for a resume
+    /// Harness could not confirm; `None` when Harness does not say.
+    pub confirmed: Option<bool>,
+    /// `whyCode` (openharness#4484, proposed), e.g. `ENGINE_SESSION_GONE`
+    /// for a `new` that replaced a dead conversation; `None` when absent.
+    pub why_code: Option<String>,
 }
 
 /// How a `harness reply` with the program's token went (openharness#4393):
@@ -501,6 +511,14 @@ pub enum Took {
 /// gateway coming up) took 26-34 s on lamp-c0a4; a later one takes a few
 /// seconds, so the longer hold costs nothing there.
 pub const REPLY_KEPT_HELD: Duration = Duration::from_secs(60);
+/// #8001: the first kept reply of a hand-over is held this long. A refusal
+/// then (`ENGINE_NOT_READY`, nothing typed) is looked at at once for a
+/// frozen engine (`show` reads it `idle` yet it is deaf, or `working`
+/// with its Gateway record still); with neither sign, the reply is tried
+/// again with the rest of [`REPLY_KEPT_HELD`], so a slow but healthy
+/// hand-over waits as long as before. Healthy kept hand-overs on lamp-c0a4 (stable, 20 Nov): 8.4 s
+/// at first use, then 3.0-4.0 s.
+pub const REPLY_KEPT_FIRST_HELD: Duration = Duration::from_secs(10);
 /// How long an acknowledged `harness reply` is given: past
 /// [`REPLY_KEPT_HELD`], so Harness answers `TIMEOUT` itself first.
 pub const REPLY_KEPT_TIMEOUT: Duration = Duration::from_secs(75);
@@ -738,6 +756,201 @@ pub fn openclaw_record(db: &Path, agent_id: &str) -> Result<bool, String> {
             rusqlite::params![prefix, prefix.len() as i64],
             |row| row.get::<_, bool>(0),
         )
+        .map_err(|error| format!("read: {}", error_kind(&error)))
+}
+
+/// #7906: whether the Gateway's record at `db` holds the session `key`
+/// exactly (a kept session's `engineSession`, which may not be
+/// `agent:main:harness-<its agent id>`): a run status, or a transcript row
+/// with a role. Read only; `Err` when it can't be read, which a caller
+/// takes as unknown, never as gone.
+pub fn openclaw_holds_key(db: &Path, key: &str) -> Result<bool, String> {
+    use rusqlite::{Connection, OpenFlags};
+    if key.is_empty() {
+        return Err("no key".into());
+    }
+    let connection = Connection::open_with_flags(
+        db,
+        OpenFlags::SQLITE_OPEN_READ_ONLY | OpenFlags::SQLITE_OPEN_NO_MUTEX,
+    )
+    .map_err(|error| format!("open: {}", error_kind(&error)))?;
+    connection
+        .busy_timeout(Duration::from_secs(1))
+        .map_err(|error| format!("busy timeout: {}", error_kind(&error)))?;
+    connection
+        .query_row(
+            "SELECT EXISTS(SELECT 1 FROM session_nodes n WHERE n.session_key = ?1 AND n.status IS NOT NULL) \
+             OR EXISTS(SELECT 1 FROM transcript_events t WHERE t.message_role IS NOT NULL AND t.session_id IN \
+               (SELECT w.session_id FROM session_windows w WHERE w.session_key = ?1 \
+                UNION SELECT n.current_session_id FROM session_nodes n WHERE n.session_key = ?1))",
+            rusqlite::params![key],
+            |row| row.get::<_, bool>(0),
+        )
+        .map_err(|error| format!("read: {}", error_kind(&error)))
+}
+
+/// How big a session's live conversation is in the Gateway's record
+/// ([`openclaw_session_size`], #7906): its `user` and `assistant`
+/// transcript rows (every row on a schema with no `message_role`), and
+/// every row's stored bytes.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct SessionSize {
+    pub messages: u64,
+    pub bytes: u64,
+}
+
+/// The size of the session of Harness's `agent_id` (its key `key`, or
+/// `agent:main:harness-<id8>...` as [`openclaw_record`] matches) in the
+/// Gateway's record at `db`: the rows of the node's current session id
+/// (`session_nodes.current_session_id`), its `user` and `assistant` rows
+/// counted, and every row's bytes summed
+/// (`event_utf8_bytes`, else the stored text's or blob's length, whichever
+/// columns this schema has). No node: zero, a session not written yet.
+/// Read only, one open and three short reads over the
+/// `(session_id, seq)` key; `Err` with why when it can't be read.
+pub fn openclaw_session_size(db: &Path, key: &str, agent_id: &str) -> Result<SessionSize, String> {
+    use rusqlite::{Connection, OpenFlags, OptionalExtension};
+    let id8: String = agent_id.chars().take(8).collect();
+    if id8.len() < 8 {
+        return Err("agent id too short".into());
+    }
+    let prefix = format!("agent:main:harness-{id8}");
+    let connection = Connection::open_with_flags(
+        db,
+        OpenFlags::SQLITE_OPEN_READ_ONLY | OpenFlags::SQLITE_OPEN_NO_MUTEX,
+    )
+    .map_err(|error| format!("open: {}", error_kind(&error)))?;
+    connection
+        .busy_timeout(Duration::from_millis(200))
+        .map_err(|error| format!("busy timeout: {}", error_kind(&error)))?;
+    let session: Option<String> = connection
+        .query_row(
+            "SELECT current_session_id FROM session_nodes \
+             WHERE session_key = ?1 OR substr(session_key, 1, ?3) = ?2 \
+             ORDER BY session_key = ?1 DESC LIMIT 1",
+            rusqlite::params![key, prefix, prefix.len() as i64],
+            |row| row.get(0),
+        )
+        .optional()
+        .map_err(|error| format!("read node: {}", error_kind(&error)))?
+        .flatten();
+    let Some(session) = session else {
+        return Ok(SessionSize::default());
+    };
+    let mut columns = Vec::new();
+    {
+        let mut info = connection
+            .prepare("SELECT name FROM pragma_table_info('transcript_events')")
+            .map_err(|error| format!("read columns: {}", error_kind(&error)))?;
+        let names = info
+            .query_map([], |row| row.get::<_, String>(0))
+            .and_then(|rows| rows.collect::<Result<Vec<_>, _>>())
+            .map_err(|error| format!("read columns: {}", error_kind(&error)))?;
+        columns.extend(names);
+    }
+    let has = |name: &str| columns.iter().any(|column| column == name);
+    if !has("session_id") {
+        return Err("read: no transcript_events.session_id".into());
+    }
+    // Only the user's and the assistant's rows are messages: a long make's
+    // tool results never push the next make into a fresh session; their
+    // bytes still count toward the token bound.
+    let messages = if has("message_role") {
+        "COUNT(CASE WHEN message_role IN ('user', 'assistant') THEN 1 END)"
+    } else {
+        "COUNT(*)"
+    };
+    let lengths: Vec<&str> = [
+        ("event_utf8_bytes", "event_utf8_bytes"),
+        ("event_json", "length(CAST(event_json AS BLOB))"),
+        ("event_zstd", "length(event_zstd)"),
+    ]
+    .into_iter()
+    .filter(|(column, _)| has(column))
+    .map(|(_, expression)| expression)
+    .collect();
+    let bytes = match lengths.as_slice() {
+        [] => "0".to_owned(),
+        [one] => format!("COALESCE(SUM({one}), 0)"),
+        many => format!("COALESCE(SUM(COALESCE({}, 0)), 0)", many.join(", ")),
+    };
+    connection
+        .query_row(
+            &format!("SELECT {messages}, {bytes} FROM transcript_events WHERE session_id = ?1"),
+            rusqlite::params![session],
+            |row| {
+                Ok(SessionSize {
+                    messages: row.get::<_, i64>(0)?.max(0) as u64,
+                    bytes: row.get::<_, i64>(1)?.max(0) as u64,
+                })
+            },
+        )
+        .map_err(|error| format!("read: {}", error_kind(&error)))
+}
+
+/// #7906 sign 4: where the Gateway's record is in one session's turn
+/// ([`openclaw_turn_at`]).
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct TurnRecord {
+    /// The node's current session id.
+    pub session: String,
+    /// That id's highest transcript `seq` (-1 with no event yet): it moves
+    /// at each message, tool call and result the Gateway writes.
+    pub seq: i64,
+    /// `session_nodes.status` (`running`, `done`, `killed`, `failed`,
+    /// `timeout`), as Harness reads it to close a turn.
+    pub status: Option<String>,
+    /// The role of the last row with one (`user`, `assistant`,
+    /// `toolResult`).
+    pub last_role: Option<String>,
+}
+
+/// #7906 sign 4: where the Gateway's record at `db` is in the session
+/// `key` (a kept session's `engineSession`, matched exactly as
+/// [`openclaw_holds_key`] does). `None` when it holds no node for it; read
+/// only, `Err` when it can't be read.
+pub fn openclaw_turn_at(db: &Path, key: &str) -> Result<Option<TurnRecord>, String> {
+    use rusqlite::{Connection, OpenFlags, OptionalExtension};
+    if key.is_empty() {
+        return Err("no key".into());
+    }
+    let connection = Connection::open_with_flags(
+        db,
+        OpenFlags::SQLITE_OPEN_READ_ONLY | OpenFlags::SQLITE_OPEN_NO_MUTEX,
+    )
+    .map_err(|error| format!("open: {}", error_kind(&error)))?;
+    connection
+        .busy_timeout(Duration::from_secs(1))
+        .map_err(|error| format!("busy timeout: {}", error_kind(&error)))?;
+    connection
+        .query_row(
+            "SELECT n.current_session_id, n.status, \
+               COALESCE((SELECT MAX(t.seq) FROM transcript_events t \
+                 WHERE t.session_id = n.current_session_id), -1), \
+               (SELECT t.message_role FROM transcript_events t WHERE t.session_id = n.current_session_id \
+                 AND t.message_role IS NOT NULL ORDER BY t.seq DESC LIMIT 1) \
+             FROM session_nodes n WHERE n.session_key = ?1 LIMIT 1",
+            rusqlite::params![key],
+            |row| {
+                Ok((
+                    row.get::<_, Option<String>>(0)?,
+                    row.get::<_, Option<String>>(1)?,
+                    row.get::<_, i64>(2)?,
+                    row.get::<_, Option<String>>(3)?,
+                ))
+            },
+        )
+        .optional()
+        .map(|row| {
+            row.and_then(|(session, status, seq, last_role)| {
+                Some(TurnRecord {
+                    session: session?,
+                    seq,
+                    status,
+                    last_role,
+                })
+            })
+        })
         .map_err(|error| format!("read: {}", error_kind(&error)))
 }
 
@@ -1196,7 +1409,7 @@ impl Cli {
     /// service user's runtime folder and bus looked up now ([`with_user_bus`]).
     pub fn child_environment(&self) -> BTreeMap<String, OsString> {
         with_user_bus(
-            self.config.environment.clone(),
+            crate::hold::with_data_dir(self.config.environment.clone()),
             &self.config.user_runtime_root,
             rustix::process::geteuid().as_raw(),
             &|place: &Path| place.exists(),
@@ -2200,6 +2413,13 @@ impl Cli {
     /// to be waited after, never typed again; `cancelled: true` typed
     /// nothing; one that says neither may have been typed.
     pub fn reply_kept(&self, name: &str, token: &Path, words: &str) -> Took {
+        self.reply_kept_held(name, token, words, REPLY_KEPT_HELD)
+    }
+
+    /// [`Cli::reply_kept`] with Harness's hold `held` (`--timeout <s>s`,
+    /// whole seconds, at least 1): [`REPLY_KEPT_FIRST_HELD`] for a
+    /// hand-over's first try (#8001), the rest of [`REPLY_KEPT_HELD`] after.
+    pub fn reply_kept_held(&self, name: &str, token: &Path, words: &str, held: Duration) -> Took {
         if !self::token(name, 64) {
             return Took::NotSent("invalid_name".into());
         }
@@ -2221,12 +2441,15 @@ impl Cli {
                 "--program-token-file".into(),
                 token.into(),
                 "--timeout".into(),
-                format!("{}s", REPLY_KEPT_HELD.as_secs()).into(),
+                format!("{}s", held.as_secs().max(1)).into(),
                 "--json".into(),
                 "--".into(),
                 words.as_ref().into(),
             ],
-            REPLY_KEPT_TIMEOUT.max(self.config.launch_timeout),
+            // Past Harness's own hold, as [`REPLY_KEPT_TIMEOUT`] is past
+            // [`REPLY_KEPT_HELD`].
+            (held + REPLY_KEPT_TIMEOUT.saturating_sub(REPLY_KEPT_HELD))
+                .max(self.config.launch_timeout),
         );
         match reply {
             Ok(reply) if reply.success => match taken_input(&reply.stdout) {
@@ -2360,6 +2583,14 @@ impl Cli {
             .map_err(|error| format!("close_{}", error.code))?;
         if reply.success || gone(&reply.stdout) {
             return Ok(());
+        }
+        // #7906, seen on lamp-c0a4: Harness checkpoints a close first and
+        // refuses it once the Gateway's conversation is already deleted
+        // ("Could not read the saved conversation. The session has not been
+        // closed."): named, so the caller forgets the record and goes
+        // `--fresh` instead of trying the close for ever.
+        if conversation_unreadable(&reply.stdout) || conversation_unreadable(&reply.stderr) {
+            return Err(CLOSE_CONVERSATION_GONE.into());
         }
         Err(program_refusal(&reply.stdout, reply.code, "close_failed"))
     }
@@ -3084,6 +3315,30 @@ impl Cli {
         }
     }
 
+    /// #7906: whether OpenClaw's own record still holds the session `key`
+    /// exactly ([`openclaw_holds_key`], read where `OPENCLAW_STATE_DIR` in
+    /// Harness's environment says); `None` when it can't be read.
+    pub fn openclaw_holds(&self, key: &str) -> Option<bool> {
+        let state = self
+            .config
+            .environment
+            .get(crate::hold::OPENCLAW_STATE_DIR)?;
+        openclaw_holds_key(&openclaw_record_path(Path::new(state)), key).ok()
+    }
+
+    /// #7906 sign 4: where the Gateway's record is in the session `key`'s
+    /// turn ([`openclaw_turn_at`]); `None` when it can't be read or holds
+    /// no node for it.
+    pub fn openclaw_turn(&self, key: &str) -> Option<TurnRecord> {
+        let state = self
+            .config
+            .environment
+            .get(crate::hold::OPENCLAW_STATE_DIR)?;
+        openclaw_turn_at(&openclaw_record_path(Path::new(state)), key)
+            .ok()
+            .flatten()
+    }
+
     /// Whether the Gateway's own record says the prompt of `agent_id`'s
     /// harness may be under way ([`openclaw_record`], read where
     /// `OPENCLAW_STATE_DIR` in Harness's environment says): `Some` with
@@ -3548,6 +3803,7 @@ impl Cli {
         let seen = parse_reading(&reply.stdout, agent_id).map_err(str::to_string)?;
         Ok(PaneSeen {
             taken: told_taken(&reply.stdout),
+            shell: shown_agent(&reply.stdout, agent_id).as_deref() == Some(SHELL_AGENT),
             seen,
         })
     }
@@ -6012,6 +6268,10 @@ fn shown_row(bytes: &[u8], id: &str, kept: &Value) -> Option<Value> {
     Some(serde_json::json!({"id": id, "name": name, "state": state}))
 }
 
+/// The agent `show` names a pane whose engine exited and that Harness
+/// keeps as a plain shell ([`PaneSeen::shell`]).
+pub const SHELL_AGENT: &str = "Terminal";
+
 /// The `agent` of `harness show <id> --json`'s answer of `id`: plain
 /// letters, digits, spaces and `-`, at most 32; `None` for another id, a
 /// refusal, or none.
@@ -6036,6 +6296,17 @@ pub fn shown_agent(bytes: &[u8], id: &str) -> Option<String> {
 /// Whether a refused `harness show` says the session is no longer there:
 /// `UNKNOWN_HARNESS` (no harness of that name or id) or `GONE` (no longer
 /// on its machine), Harness 0.6.12's `target`.
+/// What [`Cli::close_kept`] answers when Harness refused the close as the
+/// session's saved conversation can't be read (its Gateway key deleted).
+pub const CLOSE_CONVERSATION_GONE: &str = "conversation_gone";
+
+/// Whether Harness's answer says the saved conversation can't be read.
+fn conversation_unreadable(bytes: &[u8]) -> bool {
+    String::from_utf8_lossy(bytes)
+        .to_ascii_lowercase()
+        .contains("could not read the saved conversation")
+}
+
 fn gone(bytes: &[u8]) -> bool {
     let reply = serde_json::from_slice::<Value>(bytes).unwrap_or_default();
     matches!(
@@ -6587,7 +6858,58 @@ fn parse_ensured(bytes: &[u8], name: &str) -> Option<Ensured> {
                     })
             })
             .map(str::to_owned),
+        confirmed: reply["confirmed"].as_bool(),
+        why_code: reply["whyCode"]
+            .as_str()
+            .filter(|code| token(code, 64))
+            .map(str::to_owned),
     })
+}
+
+#[cfg(test)]
+mod ensured_tests {
+    use super::*;
+
+    const ID: &str = "00000001-1111-4111-8111-111111111111";
+
+    fn parsed(extra: Value) -> Ensured {
+        let mut reply = serde_json::json!({
+            "result": "resumed", "id": ID, "name": "lamp-one-openclaw", "state": "starting",
+        });
+        for (key, value) in extra.as_object().unwrap() {
+            reply[key] = value.clone();
+        }
+        parse_ensured(reply.to_string().as_bytes(), "lamp-one-openclaw").unwrap()
+    }
+
+    /// openharness#4484's proposed fields, each read when present and
+    /// `None` (today's behaviour) when absent.
+    #[test]
+    fn ensure_reads_4484s_fields_when_present_and_none_when_absent() {
+        let today = parsed(serde_json::json!({}));
+        assert_eq!((today.confirmed, today.why_code.as_deref()), (None, None));
+        assert_eq!(today.state, "starting");
+        assert_eq!(
+            parsed(serde_json::json!({"state": "stopped"})).state,
+            "stopped"
+        );
+        assert_eq!(
+            parsed(serde_json::json!({"confirmed": false})).confirmed,
+            Some(false)
+        );
+        assert_eq!(
+            parsed(serde_json::json!({"confirmed": true})).confirmed,
+            Some(true)
+        );
+        assert_eq!(
+            parsed(serde_json::json!({"result": "new", "whyCode": "ENGINE_SESSION_GONE"}))
+                .why_code
+                .as_deref(),
+            Some("ENGINE_SESSION_GONE")
+        );
+        // Not a plain code: dropped, never journaled as it is.
+        assert_eq!(parsed(serde_json::json!({"whyCode": "a b"})).why_code, None);
+    }
 }
 
 /// Words for the kept session that start with a plain word: OpenClaw's

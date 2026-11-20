@@ -81,6 +81,7 @@ impl Store {
             near_call: path.join("near-call.json"),
             room_sounds: path.join("room-sounds.json"),
             room_sounds_group: None,
+            noticing_by_default: false,
         }
     }
     /// The whole voice process stopped and started again: its storage
@@ -1286,6 +1287,7 @@ fn persisted_samples_are_validated_on_load() {
         near_call: path.join("near-call.json"),
         room_sounds: path.join("room-sounds.json"),
         room_sounds_group: None,
+        noticing_by_default: false,
     })
     .unwrap();
     let client = owner.client();

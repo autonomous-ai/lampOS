@@ -116,12 +116,17 @@ once per computer".
    `sound`, `skills`, `air`, `device`: not `camera`, `microphone` or `notes`, which the app does not offer; see the GUIDE's "Granting camera, microphone and notes today"). The app shows the 8-digit code and the command to copy,
    `lamp pair 12345678` (older apps also show the lamp's 64-hex pin, for `--pin`). The code lasts 5 minutes, and a new one voids the
    old one.
-3. **Install the SDK** on your computer, from a checkout of this repository:
+3. **Install the SDK** on your computer, from a checkout of this repository.
+   **Python 3.10 or newer.** A Mac's own `python3` is often 3.9 (macOS ships
+   3.9.6), and pip refuses the SDK there ("requires a different Python").
+   Check with `python3 --version`; if it says 3.9, install a newer one
+   (python.org, or `brew install python@3.12`) and make the venv with it,
+   `python3.12 -m venv …`, as below.
 
    ```sh
    git clone --branch lamp-voice https://github.com/autonomous-ai/lampOS.git && cd lampOS
-   python3 -m venv ~/lampos-venv && . ~/lampos-venv/bin/activate
-   pip install ./lampOS/sdk/python
+   python3.12 -m venv ~/lampos-venv && . ~/lampos-venv/bin/activate   # any Python 3.10+
+   pip install './lampOS/sdk/python[check]'   # [check]: `lamp skill check` needs it
    ```
 
 4. **Pair**, on the same network as the lamp (gap 4):

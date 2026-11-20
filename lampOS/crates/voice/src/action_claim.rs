@@ -214,6 +214,22 @@ pub fn skill_on() -> bool {
     std::env::var(SKILL_ENVIRONMENT).ok().as_deref() == Some("on")
 }
 
+/// Where the second worker reads the switch for a wellbeing nudge said
+/// stopped, snoozed or turned off with no call that did it ([`nudge_claim`],
+/// #7878). `on` only, off by default, and it does nothing without
+/// [`ENVIRONMENT`].
+pub const NUDGE_ENVIRONMENT: &str = "LAMP_NUDGE_CLAIM_CHECKED";
+
+/// Whether [`NUDGE_ENVIRONMENT`] is on in this process's environment.
+pub fn nudge_on() -> bool {
+    std::env::var(NUDGE_ENVIRONMENT).ok().as_deref() == Some("on")
+}
+
+/// The one function the core wellbeing skills stop by, as their `[stop]`
+/// names it (`skills/sip-of-water/skill.toml` and its kin: snooze until
+/// tomorrow morning, off until asked again, or on again).
+pub const NUDGE_TOOL: &str = "wellbeing_nudges";
+
 /// The executive's own lines after a light or volume call
 /// (`lamp_actions::short_say` and `already_say`): a test holds this equal
 /// to `lamp_actions::SAID_LINES` (the voice links lamp-actions only in its
@@ -343,6 +359,13 @@ pub enum Claim {
     /// ([`skill_claim`]: "Planet fact is on again."): it stands only when
     /// that skill is on now ([`skill_stands`], #7683).
     SkillOn,
+    /// A wellbeing nudge said stopped, snoozed or turned off in the model's
+    /// words ([`nudge_claim`]: "I've turned off the water nudge for
+    /// today."): only a [`NUDGE_TOOL`] that ran in the turn ([`nudge_in`])
+    /// makes it, never a call by its name (#7878: on lamp-06c1 at 14432, 19
+    /// Nov 10:38, "stop the water nudges for today" got no call and that
+    /// line, and the nudge came again).
+    NudgeOff,
 }
 
 impl Claim {
@@ -379,7 +402,8 @@ impl Claim {
             | Self::UnplugReady
             | Self::SkillRemoved
             | Self::SkillOff
-            | Self::SkillOn => false,
+            | Self::SkillOn
+            | Self::NudgeOff => false,
         }
     }
 
@@ -400,6 +424,7 @@ impl Claim {
             Self::SkillRemoved => "a skill they made removed",
             Self::SkillOff => "a skill they made turned off",
             Self::SkillOn => "a skill they made turned on",
+            Self::NudgeOff => "a wellbeing nudge stopped, snoozed or turned off",
         }
     }
 
@@ -420,6 +445,7 @@ impl Claim {
             Self::SkillRemoved => "skill removed",
             Self::SkillOff => "skill off",
             Self::SkillOn => "skill on",
+            Self::NudgeOff => "nudge off",
         }
     }
 }
@@ -1117,6 +1143,44 @@ pub fn claim_made_on(
     }
 }
 
+/// [`claim_made_on`], and with `nudge` ([`NUDGE_ENVIRONMENT`]) a wellbeing
+/// nudge said stopped, snoozed or turned off ([`nudge_claim`], #7878). A
+/// nudge named is judged as one first, so the nudges' own snooze is never
+/// read as a reminder's. Without `nudge` this is [`claim_made_on`] exactly.
+pub fn claim_checked_on(
+    reply: &str,
+    ended: bool,
+    turns: (bool, bool, bool),
+    (made, asked): (&[MadeSkill], bool),
+    nudge: bool,
+) -> Option<Option<Claim>> {
+    let mut text = normalised(reply);
+    if ended {
+        text.truncate(text.trim_end().len());
+    }
+    // A nudge named is judged as one first: "I've snoozed the water nudge."
+    // is the nudges' own snooze, which a `wellbeing_nudges` backs, never a
+    // reminder's ([`Claim::Snoozed`]).
+    let nudged = if nudge {
+        nudge_claim(&text, ended)
+    } else {
+        Some(None)
+    };
+    if let Some(Some(kind)) = nudged {
+        return Some(Some(kind));
+    }
+    let found = claim_made_on(reply, ended, turns, made, asked);
+    if !nudge || matches!(found, Some(Some(kind)) if kind != Claim::AnyCall) {
+        return found;
+    }
+    match (found, nudged) {
+        (_, Some(Some(kind))) => Some(Some(kind)),
+        (Some(Some(any)), _) => Some(Some(any)),
+        (Some(None), Some(None)) => Some(None),
+        _ => None,
+    }
+}
+
 /// [`stands`], and the claims judged by outcome by the turn's kept
 /// `statuses` (`after_forget::status`): a forget said done
 /// ([`Claim::Forgot`]) only when a forget removed something ([`forgot_in`]),
@@ -1148,6 +1212,11 @@ pub fn stands_on<'a>(
                 .count();
             makes > queued_makes_in(statuses) && stands(kind, reply, read, calls)
         }
+        // A true state told, asked as a question ("Is the water nudge still
+        // off?"), stands as `SkillOff`'s does; otherwise a stop that ran in
+        // the turn backs it, never a turn back on (Twelve's P2 and P3 on
+        // #7917).
+        Claim::NudgeOff => read || nudge_stopped(calls, statuses),
         _ => stands(kind, reply, read, calls),
     }
 }
@@ -1214,6 +1283,93 @@ pub fn unplug_in(statuses: &[serde_json::Value]) -> bool {
 pub fn stayed_in(statuses: &[serde_json::Value]) -> bool {
     ran_in(statuses, &[STAY_TOOL])
 }
+
+/// The wellbeing nudges' function a call of `name` with `args` runs:
+/// [`NUDGE_TOOL`], by its own name or through `use_skill` naming it.
+pub fn nudge_tool(name: &str, args: &serde_json::Value) -> Option<&'static str> {
+    let named = if name == crate::use_skill::NAME {
+        args["skill"].as_str()?
+    } else {
+        name
+    };
+    (named == NUDGE_TOOL).then_some(NUDGE_TOOL)
+}
+
+/// Whether the turn stopped a wellbeing nudge: a [`NUDGE_TOOL`] call that
+/// isn't `how: "on"` among `calls`, and one that ran ([`nudge_in`]).
+fn nudge_stopped<'a>(
+    calls: impl IntoIterator<Item = (&'a str, &'a serde_json::Value)>,
+    statuses: &[serde_json::Value],
+) -> bool {
+    nudge_in(statuses)
+        && calls
+            .into_iter()
+            .any(|(name, args)| nudge_tool(name, args).is_some() && args["how"] != "on")
+}
+
+/// Whether a [`NUDGE_TOOL`] ran in the turn, by the outcomes the turn keeps
+/// of its calls (`after_forget::status`, kept under [`nudge_tool`]'s name):
+/// no error and no `ok` false.
+pub fn nudge_in(statuses: &[serde_json::Value]) -> bool {
+    ran_in(statuses, &[NUDGE_TOOL])
+}
+
+/// The word runs of a wellbeing nudge said stopped, snoozed or turned off
+/// ([`Claim::NudgeOff`], #7878), each with "nudge" or "nudges" in it, so a
+/// reminder they set ("I've cancelled your water reminder", Reminders' own
+/// claim) is never read as one. Up to three words name it ("the water
+/// nudge", "your stand-up nudges"). Structure only: the lamp calls these
+/// hints nudges in its own skills.
+const NUDGE_RUNS: [(&str, Claim); 8] = [
+    // "I've turned off the water nudge for today."
+    (
+        "i've|i turned|switched off ?the|your|those|that|these * nudge|nudges",
+        Claim::NudgeOff,
+    ),
+    // "I've snoozed the water nudge until tomorrow.", "I stopped the nudges."
+    (
+        "i've|i snoozed|stopped|paused|muted|silenced|disabled ?the|your|those|that|these * nudge|nudges",
+        Claim::NudgeOff,
+    ),
+    // "I've turned the water nudge off."
+    (
+        "i've|i turned|switched ?the|your|those|that|these * nudge|nudges off",
+        Claim::NudgeOff,
+    ),
+    // "The water nudge is off for today.", "Your nudges are snoozed.",
+    // "Water nudges are off now.", "All the nudges are off." (Jarvis's
+    // lamp-06c1 lines, 19 Nov 19:11 and 19:18: no determiner, or "all").
+    (
+        "* nudge|nudges is|are off|snoozed|stopped|paused",
+        Claim::NudgeOff,
+    ),
+    // "Your nudges have been snoozed.", "The water nudge has been turned
+    // off.": "been" only with the stop after it, so "Your water nudges have
+    // been coming every half hour." is no claim (Twelve's HOLD on #7917).
+    (
+        "the|your|those|that|these * nudge|nudges has|have been off|snoozed|stopped|paused|turned|switched",
+        Claim::NudgeOff,
+    ),
+    // "Water nudge off for today.", "Water nudges snoozed."
+    ("* nudge|nudges off|snoozed|stopped|paused", Claim::NudgeOff),
+    // "No more water nudges today."
+    ("no more * nudge|nudges", Claim::NudgeOff),
+    // "Good — no water nudge for a while." (Jarvis's 19:22 line, after "I
+    // just had water"): "no … nudge" with how long after it, never "no" alone.
+    ("no * nudge|nudges for|until|today|tonight", Claim::NudgeOff),
+];
+
+/// Whether `text` (already [`normalised`]) opens, bare or after one of
+/// [`LEAD_INS`], with a wellbeing nudge said stopped, snoozed or turned off
+/// ([`NUDGE_RUNS`], #7878). As [`claim`] says it.
+pub fn nudge_claim(text: &str, ended: bool) -> Option<Option<Claim>> {
+    runs_claim(&NUDGE_RUNS, text, ended, true, false, &NUDGE_LEADS)
+}
+
+/// The words a nudge's claim may also open after, with a mark ("Good — no
+/// water nudge for a while.", Jarvis's lamp-06c1 line, 19 Nov 19:22): the
+/// nudge runs only, beside [`LEAD_INS`].
+const NUDGE_LEADS: [&str; 3] = ["good", "great", "nice"];
 
 fn ran_in(statuses: &[serde_json::Value], tools: &[&str]) -> bool {
     statuses.iter().any(|status| {
@@ -5055,5 +5211,104 @@ pub(crate) mod tests {
             claim_as("Hello. The light will stay on until", false, true),
             None
         );
+    }
+
+    /// #7878: a wellbeing nudge said stopped, snoozed or turned off is a
+    /// claim in each of its shapes, bare or after a lead-in; an offer, a
+    /// question, how the nudge works, or a reminder they set is not.
+    #[test]
+    fn a_nudge_said_off_is_a_claim_and_an_offer_or_a_reminder_is_not() {
+        let kind = |reply: &str| {
+            claim_checked_on(reply, true, (false, false, false), (&[], false), true).flatten()
+        };
+        for reply in [
+            "I've turned off the water nudge for today.",
+            "Okay, I've snoozed the water nudge until tomorrow morning.",
+            "I stopped the nudges.",
+            "I've turned the stand-up nudge off.",
+            "The water nudge is off for today.",
+            "Your nudges are snoozed until tomorrow.",
+            "Got it, no more water nudges today.",
+            "Water nudge off for today.",
+            "Your nudges have been snoozed until tomorrow.",
+            "Water nudges are off now. The rest stay as they are.",
+            "All the nudges are off \u{2014} none until you turn them back on.",
+            "Good \u{2014} no water nudge for a while.",
+            "The water nudge has been turned off.",
+        ] {
+            assert_eq!(kind(reply), Some(Claim::NudgeOff), "{reply}");
+        }
+        for reply in [
+            "Do you want me to turn off the water nudge for today?",
+            "The water nudge comes after about half an hour at the desk.",
+            "I can snooze the water nudge until tomorrow if you like.",
+            "I've cancelled your water reminder.",
+            "Your water nudges have been coming about every half hour.",
+            "The stand-up nudge has been on since this morning.",
+            "Sure.",
+        ] {
+            assert_ne!(kind(reply), Some(Claim::NudgeOff), "{reply}");
+        }
+        // Off, nothing about a nudge is a claim.
+        assert_eq!(
+            claim_checked_on(
+                "I've turned off the water nudge for today.",
+                true,
+                (false, false, false),
+                (&[], false),
+                false
+            )
+            .flatten(),
+            None
+        );
+    }
+
+    /// Only a `wellbeing_nudges` that ran backs it, by its own name or
+    /// through `use_skill`; its refusal, or another call, never does.
+    #[test]
+    fn a_nudge_off_stands_only_beside_a_wellbeing_nudges_that_ran() {
+        let status = |tool: &str, outcome: serde_json::Value| serde_json::json!({"tool": tool, "outcome": outcome});
+        let ran = [status(NUDGE_TOOL, serde_json::json!({"ok": true}))];
+        let refused = [status(NUDGE_TOOL, serde_json::json!({"error": true}))];
+        let other = [status("other_call", serde_json::json!({"ok": true}))];
+        let reply = "I've turned off the water nudge for today.";
+        let off = serde_json::json!({"how": "off"});
+        let on = serde_json::json!({"how": "on"});
+        let stands = |args: &serde_json::Value, statuses: &[serde_json::Value]| {
+            stands_on(
+                Claim::NudgeOff,
+                reply,
+                false,
+                [(NUDGE_TOOL, args)],
+                statuses,
+            )
+        };
+        assert!(stands(&off, &ran));
+        assert!(!stands(&off, &refused));
+        assert!(!stands(&off, &other));
+        assert!(!stands(&off, &[]));
+        // A turn back on backs no claim of off (Twelve's P3 on #7917).
+        assert!(!stands(&on, &ran));
+        // Asked as a question, a true state stands with no call (his P2).
+        assert!(stands_on(
+            Claim::NudgeOff,
+            reply,
+            true,
+            std::iter::empty(),
+            &[]
+        ));
+        assert!(!Claim::NudgeOff.made_by(NUDGE_TOOL));
+        assert_eq!(
+            nudge_tool(NUDGE_TOOL, &serde_json::Value::Null),
+            Some(NUDGE_TOOL)
+        );
+        assert_eq!(
+            nudge_tool(
+                crate::use_skill::NAME,
+                &serde_json::json!({"skill": NUDGE_TOOL})
+            ),
+            Some(NUDGE_TOOL)
+        );
+        assert_eq!(nudge_tool("set_timer", &serde_json::Value::Null), None);
     }
 }

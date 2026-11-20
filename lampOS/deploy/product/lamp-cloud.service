@@ -109,6 +109,10 @@ Environment=LAMP_UPLOAD_TO_AGENT=on
 Environment=LAMP_SKILL_SECRETS=on
 # A skill's task reaches the public web (80/443) with its owner's spoken yes (#7200).
 Environment=LAMP_TASK_NET=on
+# The model forwarder keeps the relay's day used and the agent's chat tokens in day-used.json, for lamp-skills' bound
+# on skills' runs (#7342, docs/cloud.md; the first builder's DEFAULT-ON, #7814); it never refuses for it. The same
+# line in lamp-skills, where `on` keeps half the day for the voice.
+Environment=LAMP_SKILL_RUNS_VOICE_SHARE=on
 Environment=LAMP_APP_UPDATE=on
 # The lamp's agents for the app (#6240): `engines` in update.status and engines.install for a missing Hermes,
 # on in the product by the owner's rule of 11 Nov; `off` here takes it away.

@@ -284,7 +284,8 @@ fn launch_uses_exact_argv_auto_mode_null_stdin_and_stable_generic_identity() {
     );
     for call in calls {
         let environment = call["environment"].as_object().unwrap();
-        assert_eq!(environment.len(), 5);
+        // HOME, PATH, ADAPTER_DATA_DIR (#7906) and the two marks.
+        assert_eq!(environment.len(), 6);
         assert_eq!(environment["AI_AGENT"], "lampos");
         assert_eq!(environment["HARNESS_AGENT_SESSION"], "stable-session_123");
         for forbidden in [
@@ -315,7 +316,7 @@ fn as_the_person_the_call_carries_no_agent_mark_and_is_otherwise_the_same() {
     assert_eq!(calls[1]["args"][0], "new");
     for call in calls {
         let environment = call["environment"].as_object().unwrap();
-        assert_eq!(environment.len(), 3, "{environment:?}");
+        assert_eq!(environment.len(), 4, "{environment:?}");
         assert!(!environment.contains_key("AI_AGENT"));
         assert!(!environment.contains_key("HARNESS_AGENT_SESSION"));
     }
@@ -515,6 +516,61 @@ fn openclaw_user_row(agent: &str) -> String {
          INSERT INTO session_windows VALUES ('w1', 'agent:main:harness-{agent}');\n\
          INSERT INTO transcript_events VALUES ('w1', 0, NULL), ('w1', 1, 'user');"
     )
+}
+
+/// #7906 sign 3, on the Gateway's own record (a fixture database with
+/// OpenClaw 2026.11.2's tables): a session it holds is held, one deleted
+/// (no rows) is not, and a record that isn't there can't be read. One
+/// look is a read-only SQLite read, well under 50 ms.
+#[test]
+fn the_kept_sessions_gateway_record_says_held_or_gone() {
+    // Read by the kept session's own key, exactly (#7906).
+    let key = format!("agent:main:harness-{AGENT}");
+    let (rig, _) = openclaw_rig(Duration::from_secs(10), Some(&openclaw_user_row(AGENT)));
+    let began = std::time::Instant::now();
+    assert_eq!(rig.cli().openclaw_holds(&key), Some(true));
+    let took = began.elapsed();
+    assert!(took < Duration::from_millis(50), "{took:?}");
+    let (rig, _) = openclaw_rig(Duration::from_secs(10), Some(""));
+    assert_eq!(rig.cli().openclaw_holds(&key), Some(false));
+    let (rig, _) = openclaw_rig(Duration::from_secs(10), None);
+    assert_eq!(rig.cli().openclaw_holds(&key), None);
+}
+
+/// #7906 sign 4: where the record is in the session's turn: its current
+/// id, highest `seq` (which moves with each event), status and the last
+/// row's role; none for no node. Matched by the session key exactly.
+#[test]
+fn the_kept_sessions_gateway_record_says_where_its_turn_is() {
+    use lamp_tasks::harness::TurnRecord;
+    let key = format!("agent:main:harness-{AGENT}");
+    let (rig, _) = openclaw_rig(Duration::from_secs(10), Some(&openclaw_user_row(AGENT)));
+    assert_eq!(
+        rig.cli().openclaw_turn(&key),
+        Some(TurnRecord {
+            session: "w1".into(),
+            seq: 1,
+            status: None,
+            last_role: Some("user".into()),
+        })
+    );
+    let rows = format!(
+        "{}\nUPDATE session_nodes SET status = 'running';\n\
+         INSERT INTO transcript_events VALUES ('w1', 2, 'assistant'), ('w1', 3, NULL), ('w0', 9, 'user');",
+        openclaw_user_row(AGENT)
+    );
+    let (rig, _) = openclaw_rig(Duration::from_secs(10), Some(&rows));
+    assert_eq!(
+        rig.cli().openclaw_turn(&key),
+        Some(TurnRecord {
+            session: "w1".into(),
+            seq: 3,
+            status: Some("running".into()),
+            last_role: Some("assistant".into()),
+        })
+    );
+    let (rig, _) = openclaw_rig(Duration::from_secs(10), Some(""));
+    assert_eq!(rig.cli().openclaw_turn(&key), None);
 }
 
 /// #7277 (a): idle with no ask after `new` is no proof; a tool used within
@@ -6099,6 +6155,30 @@ fn a_runtime_folder_made_after_the_start_reaches_the_next_harness_call() {
     assert_eq!(after["HOME"], before["HOME"]);
 }
 
+/// #7906: every Harness call lamp-tasks makes, and so any daemon it
+/// starts, is given `ADAPTER_DATA_DIR` at Harness's own default under its
+/// `HOME`, exactly, so Harness 0.6.72's XDG move is `skipped-override` and
+/// Harness's home stays `~/.harness`; one already set is replaced by it.
+#[test]
+fn every_harness_call_keeps_harnesss_home_in_dot_harness() {
+    let rig = Rig::new();
+    let cli = Cli::new(rig.config.clone(), "stable".into()).unwrap();
+    let given = cli.child_environment();
+    assert_eq!(
+        given["ADAPTER_DATA_DIR"],
+        OsString::from(format!("{}/.harness/cli/data", rig.root.path().display()))
+    );
+    let mut config = rig.config.clone();
+    config
+        .environment
+        .insert("ADAPTER_DATA_DIR".into(), "/set/elsewhere".into());
+    let cli = Cli::new(config, "stable".into()).unwrap();
+    assert_eq!(
+        cli.child_environment()["ADAPTER_DATA_DIR"],
+        given["ADAPTER_DATA_DIR"]
+    );
+}
+
 /// One `harness watch --json` line as openharness prints it.
 fn watched_line(event: &str, id: &str) -> String {
     json!({"event":event,"at":"2026-11-04T09:00:00.000Z","name":"lamp-task-1","id":id,"agent":"claude","state":"idle"}).to_string()
@@ -7480,6 +7560,7 @@ fn skill_run(deadline: Duration) -> SkillRun {
         answer: Default::default(),
         net: false,
         tells: false,
+        cancel: Default::default(),
     }
 }
 
@@ -9184,6 +9265,36 @@ fn a_keyed_net_run_by_the_one_run_path_gives_its_keys_through_the_wrapper_alone(
         &run,
         "the lamp's Hermes isn't on lamp-update's one run path yet",
     );
+}
+
+/// A run with a fresh home of its own and no way out (a live ask held off
+/// the network, `skill_make::AskRunner`) finds that home only by its
+/// agent's task entry, named in the wrapper's `LAMP_NS_HOME`: Harness
+/// passes the wrapper none of lamp-tasks' variables, so through Harness it
+/// would see the agent's lasting home. Refused before Harness is asked, no
+/// token file written.
+#[test]
+fn a_fresh_home_run_with_no_way_out_never_goes_through_harness() {
+    let rig = Rig::new();
+    skill_ok_plan(&rig, "stopped");
+    let harness = one_path_runner(
+        &rig,
+        EngineKind::Hermes,
+        &[("hermes", ONE_PATH_HERMES)],
+        Some(&ns_with_net_runs()),
+    );
+    let folder = rig.root.path().join("work/make-task-1");
+    fs::create_dir_all(folder.join("home")).unwrap();
+    let mut run = skill_run(Duration::from_secs(20));
+    run.start_in = Some(folder);
+    let said = harness.run(&run, &|| {}).unwrap_err();
+    assert!(said.contains("never through Harness"), "{said}");
+    assert!(rig.calls().iter().all(|call| call["args"][0] != "new"));
+    assert!(
+        !rig.root.path().join("runs/task-1").exists(),
+        "no token file"
+    );
+    nothing_left(&rig);
 }
 
 /// A Gateway probe for a skill's run: ready from look `ready_from` (never
@@ -10901,7 +11012,9 @@ fn the_kept_session_verbs_pass_the_token_path_never_its_text() {
             agent_id: AGENT.into(),
             state: "idle".into(),
             why: None,
-            engine_session: Some("s".into())
+            engine_session: Some("s".into()),
+            confirmed: None,
+            why_code: None,
         })
     );
     assert_eq!(
@@ -10912,12 +11025,23 @@ fn the_kept_session_verbs_pass_the_token_path_never_its_text() {
         cli.reply_kept("lamp-one-openclaw", &token, "x"),
         Took::NotIdle
     );
+    // #8001: a hand-over's first try held short (10 s), then the rest of the 60 s.
     assert_eq!(
-        cli.reply_kept("lamp-one-openclaw", &token, "x"),
+        cli.reply_kept_held(
+            "lamp-one-openclaw",
+            &token,
+            "x",
+            lamp_tasks::harness::REPLY_KEPT_FIRST_HELD
+        ),
         Took::EngineNotReady
     );
     assert_eq!(
-        cli.reply_kept("lamp-one-openclaw", &token, "x"),
+        cli.reply_kept_held(
+            "lamp-one-openclaw",
+            &token,
+            "x",
+            lamp_tasks::harness::REPLY_KEPT_HELD - lamp_tasks::harness::REPLY_KEPT_FIRST_HELD
+        ),
         Took::Timeout
     );
     // Typed though timed out: that input, never typed again.
@@ -10978,6 +11102,27 @@ fn the_kept_session_verbs_pass_the_token_path_never_its_text() {
     let held = last_reply["args"].as_array().unwrap();
     let at = held.iter().position(|arg| arg == "--timeout").unwrap();
     assert_eq!(held[at + 1], "60s");
+    let holds: Vec<String> = calls
+        .iter()
+        .filter(|call| call["args"][0] == "reply")
+        .map(|call| {
+            let args = call["args"].as_array().unwrap();
+            let at = args.iter().position(|arg| arg == "--timeout").unwrap();
+            args[at + 1].as_str().unwrap().to_owned()
+        })
+        .collect();
+    let first = lamp_tasks::harness::REPLY_KEPT_FIRST_HELD;
+    let rest = lamp_tasks::harness::REPLY_KEPT_HELD - first;
+    let (first, rest) = (
+        format!("{}s", first.as_secs()),
+        format!("{}s", rest.as_secs()),
+    );
+    assert_eq!(
+        holds,
+        ["60s", "60s", &first, &rest, "60s", "60s", "60s", "60s"],
+        "#8001: the short hold, then the rest"
+    );
+    assert_eq!((first.as_str(), rest.as_str()), ("10s", "50s"));
     let closes: Vec<Vec<Value>> = calls
         .iter()
         .filter(|call| call["args"][0] == "close")
@@ -11084,6 +11229,7 @@ fn voice_asks(
         default_engine: Box::new(move || default),
         tokens: tokens.clone(),
         asking: AtomicBool::new(false),
+        news: Default::default(),
     }
 }
 

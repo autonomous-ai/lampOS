@@ -350,6 +350,26 @@ Two of the voice's start-up failures, found on lamp-52e6 and lamp-4ace on
   plug:device_speaker is busy at start; waiting up to 20 s for it, as the
   microphone waits for its own`, then, once open, `the speaker was busy for
   9.2 s at start; opened on try 185`. Its holder is not looked up.
+- **A worker slow to say ready on a loaded cold boot.** On lamp-c0a4 on
+  2026-11-18 (stable 14008, about 07:17) the voice exited twice within
+  about 67 s of a cold boot with `worker readiness timed out`: a worker
+  missed `WORKER_STARTUP_TIMEOUT`, 3 s from its spawn to its ready, while
+  the board was heavily loaded (1-minute load 7.9 at 31 s; containerd
+  35.7 s and lircd 13 s in `systemd-analyze blame`) (#7224). The timeout
+  names the role and how long it waited (`worker readiness timed out
+  (capture after 3012 ms)`). With `LAMP_VOICE_YOUNG_BOOT_GRACE=on` (off
+  unless set, read by the process that spawns the worker), a worker
+  spawned while the system has been up less than 2 min
+  (`YOUNG_BOOT`, on `CLOCK_BOOTTIME`) has 10 s for its first ready
+  (`YOUNG_BOOT_STARTUP_TIMEOUT`) instead of 3 s; a role already ready
+  once in that process, or started later, has 3 s. Ready still gates the
+  start, so nothing is said to be ready before the worker can take input,
+  and no unit is ordered after slow ones, which would delay every boot. A
+  speaker busy at start gets its 20 s on top of its own bound, so 20 s
+  plus 10 s with the grace. The journal says once per worker given it
+  `lamp-voice: capture was given the young-boot grace (system up 31 s):
+  readiness bound 10 s`. Off, the bound and the journal are as before.
+  Off Linux there is no boot clock read, so no start is young.
 - **The privacy worker's lease lapsing in the muted wait after boot.** On
   lamp-06c1 on 2026-10-30, a cold boot, run 1: `onboarding skill loaded`
   at 15.82, `schedule-consumer: due reminders available` at 15.89, then
@@ -781,6 +801,38 @@ Two of the voice's start-up failures, found on lamp-52e6 and lamp-4ace on
   drain while frames come 30 ms late, on time, cuts nothing (before: the
   next pass cut it as `capture_gap`); the margin check is true only
   for a held turn whose lease ends within 40 ms. Not yet tried on a lamp.
+
+- **A reopen raced the speaker's re-prime after a held turn's cut.** On
+  lamp-c0a4 at 22:31:06 on 18 Nov, on stable 14732's code, a turn held
+  about 3 min for a make had its capture frames stop for 63 ms; it was cut
+  40 ms before its lease lapsed, the speaker's authority lapsed and a fresh
+  one came at once, and about 400 ms later the voice exited 1 on `capture
+  frame preceded certified running reference clock`, then came back muted
+  by the restart guard (#7224, fault 4). From the code: the cut revokes
+  both audio workers; capture reopens under the fresh authority with its
+  sequence from 1, and the speaker re-primes on it, clearing the clock's
+  start until `ClockStarted`; a reopen, unlike the first start, did not
+  wait for it. With `LAMP_VOICE_UNSTARTED_FRAME_DROP=on` (on in the
+  product unit) capture holds a reopened microphone's frames back until the
+  clock has started, up to 500 ms and then dropped and counted until it
+  comes; a clock still not started 800 ms after the reopen is recovered
+  by one fresh reopen, and 800 ms more without it ends capture with the
+  old error (exit, systemd restart), never silence for good, the
+  recovery's `ClockNotStarted` gap moving the coordinator's 1.5 s
+  retention heartbeat so both steps come first; and the
+  coordinator ends the voice on that check only at the boot
+  barrier; mid-run the frame is a gap's dropped frame, said once per
+  reopen. Unit tests: in the harness the held turn's cut then a reopen
+  whose first frame has no clock start goes on with the switch, the reply
+  cut once as `capture_gap` and the frame counted in the gap, and ends
+  with the exit off; a boot's first frame before the clock still ends the
+  voice with it on; a clock starting 1.2 s after a reopen goes on with
+  it (off, the heartbeat ends it as before), and one that never starts
+  ends in capture's fault, not the heartbeat; the worker's hold, its 500
+  ms bound, the recovery
+  then the exit for a clock that never starts, and the coordinator's
+  once-per-reopen line each on their own. Not yet tried on a
+  lamp.
 
 - **The voice's processes stalled together on a page read back from the
   card.** On lamp-06c1 at 21:30:02 on 6 Nov, during an SD log flush,

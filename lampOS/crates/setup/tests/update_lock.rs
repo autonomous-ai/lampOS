@@ -313,11 +313,13 @@ fn control_waits_only_for_the_update_lock() {
 const S_1: Duration = Duration::from_secs(1);
 
 /// Off with the drop-in there: lamp-update's lock taken, the drop-in
-/// removed, reload and stop under it, and only then the reply (returned
-/// once they ran); a stop that fails is said, never claimed closed. Off
+/// removed, reload and restart under it (a restart, not a stop: lamp-control
+/// comes back with the door shut and goes on serving the voice's yes records,
+/// skill runs and apps), and only then the reply (returned once they ran); a
+/// restart that fails is said, never claimed closed. Off
 /// with none there is answered as any change, with no systemctl.
 #[test]
-fn off_holds_the_update_lock_and_stops_before_the_reply() {
+fn off_holds_the_update_lock_and_restarts_before_the_reply() {
     let root = Root::new();
     let config = root.config();
     let (folder, records) = records_folder("ctl-off");
@@ -360,7 +362,7 @@ fn off_holds_the_update_lock_and_stops_before_the_reply() {
         units.calls,
         vec![
             ("daemon-reload".to_owned(), true),
-            ("stop lamp-control.service".to_owned(), true)
+            ("restart lamp-control.service".to_owned(), true)
         ]
     );
     assert_eq!(reply, json!({"done": {"on": false, "closed": true}}));
@@ -369,7 +371,7 @@ fn off_holds_the_update_lock_and_stops_before_the_reply() {
     assert!(!config.control_dropin.exists());
     // Let go once answered.
     drop(records.lock().unwrap());
-    // A stop that fails: still answered, saying the door may stay open.
+    // A restart that fails: still answered, saying the door may stay open.
     answer(r#"{"control": true}"#, &config, true);
     let mut failing = Units {
         records: &records,
@@ -434,7 +436,7 @@ fn off_while_an_update_holds_the_lock_refuses_and_keeps_the_drop_in() {
 /// restart (the developer door stays, so the unit runs on) under it, and
 /// only then the reply; a restart that fails is said, never claimed closed;
 /// an update holding the lock refuses it and keeps the drop-in; with
-/// developer access off as well the unit is stopped. Developer access off
+/// developer access off as well the unit is restarted too. Developer access off
 /// takes the agent's drop-in with it.
 #[test]
 fn the_agent_off_is_closed_before_the_reply_and_developer_off_takes_it_too() {
@@ -509,7 +511,7 @@ fn the_agent_off_is_closed_before_the_reply_and_developer_off_takes_it_too() {
         "a failed restart is said"
     );
     assert!(!config.agent_dropin.exists());
-    // Developer access off takes the agent's drop-in with it, and stops.
+    // Developer access off takes the agent's drop-in with it, and restarts.
     answer(r#"{"local_agent": true}"#, &config, true);
     let mut units = Units {
         records: &records,
@@ -527,8 +529,8 @@ fn the_agent_off_is_closed_before_the_reply_and_developer_off_takes_it_too() {
     .unwrap();
     assert_eq!(reply, json!({"done": {"on": false, "closed": true}}));
     assert!(!config.control_dropin.exists() && !config.agent_dropin.exists());
-    assert_eq!(units.calls[1].0, "stop lamp-control.service");
-    // A leftover agent drop-in with developer access off: off stops, never restarts.
+    assert_eq!(units.calls[1].0, "restart lamp-control.service");
+    // A leftover agent drop-in with developer access off: off restarts too.
     fs::write(&config.agent_dropin, "x").unwrap();
     let mut units = Units {
         records: &records,
@@ -537,10 +539,10 @@ fn the_agent_off_is_closed_before_the_reply_and_developer_off_takes_it_too() {
     };
     drop(records.lock().ok());
     change::close_before_answer(off, &config, true, &records, &mut ears, &mut units).unwrap();
-    assert_eq!(units.calls[1].0, "stop lamp-control.service");
+    assert_eq!(units.calls[1].0, "restart lamp-control.service");
     assert!(!config.agent_dropin.exists());
     // Developer off with only the agent's drop-in left (no developer one):
-    // cleared, and the unit stopped.
+    // cleared, and the unit restarted.
     fs::write(&config.agent_dropin, "x").unwrap();
     let mut units = Units {
         records: &records,
@@ -559,10 +561,10 @@ fn the_agent_off_is_closed_before_the_reply_and_developer_off_takes_it_too() {
     .unwrap();
     assert_eq!(reply, json!({"done": {"on": false, "closed": true}}));
     assert!(!config.agent_dropin.exists());
-    assert_eq!(units.calls[1].0, "stop lamp-control.service");
+    assert_eq!(units.calls[1].0, "restart lamp-control.service");
     // A removal that fails (the agent's drop-in is a folder here) does not
     // leave the door open: the developer drop-in is still removed, the unit
-    // stopped, and the failure answered in words; the retry is on this path.
+    // stopped (never restarted), and the failure answered in words; the retry is on this path.
     answer(r#"{"control": true}"#, &config, true);
     fs::create_dir_all(config.agent_dropin.join("inside")).unwrap();
     let mut units = Units {
@@ -591,6 +593,8 @@ fn the_agent_off_is_closed_before_the_reply_and_developer_off_takes_it_too() {
         !config.control_dropin.exists(),
         "the developer drop-in went"
     );
+    // A drop-in that could not be removed: the unit is STOPPED, never
+    // restarted, or it would start with the door open again at once.
     assert_eq!(units.calls[1].0, "stop lamp-control.service");
     // The words say the unit was stopped but comes back while a drop-in is there.
     assert!(

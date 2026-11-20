@@ -252,6 +252,9 @@ pub struct Pose {
     retreat: Retreat,
     job: Option<Job>,
     next_due_us: u64,
+    /// Between two frames: [`EVERY_US`], or a minute on a hot board
+    /// ([`crate::heat::Pace`]).
+    every_us: u64,
     next_said_us: u64,
     /// When the gate was last open in this sitting.
     open_at_us: Option<u64>,
@@ -282,6 +285,7 @@ impl Pose {
             retreat: Retreat::default(),
             job: None,
             next_due_us: 0,
+            every_us: EVERY_US,
             next_said_us: 0,
             open_at_us: None,
             open: false,
@@ -292,6 +296,24 @@ impl Pose {
             answers: Vec::new(),
             recent: None,
         }
+    }
+
+    /// Space the frames `every_us` apart ([`crate::heat::Pace`]): the
+    /// next one too, counted from the last one sent. A request under way
+    /// runs as it is.
+    pub fn set_every_us(&mut self, every_us: u64) {
+        if self.next_due_us > 0 {
+            self.next_due_us = self
+                .next_due_us
+                .saturating_sub(self.every_us)
+                .saturating_add(every_us);
+        }
+        self.every_us = every_us;
+    }
+
+    /// Between two frames, now.
+    pub fn every_us(&self) -> u64 {
+        self.every_us
     }
 
     /// The journal's notes since the last call, oldest first.
@@ -308,12 +330,13 @@ impl Pose {
     }
 
     /// The newest answer's shoulders as a share of the width, when its
-    /// frame went under [`EVERY_US`] ago: what a held sitting beginning
-    /// now begins with ([`crate::hold`]), as the 30 s rate lets no new
-    /// frame go yet. Forgotten with the window.
+    /// frame went under the frames' spacing ago ([`EVERY_US`], a minute on
+    /// a hot board): what a held sitting beginning now begins with
+    /// ([`crate::hold`]), as the rate lets no new frame go yet. Forgotten
+    /// with the window.
     pub fn recent_answer(&self, now_us: u64) -> Option<Option<f32>> {
         self.recent
-            .filter(|(sent_us, _)| now_us.saturating_sub(*sent_us) < EVERY_US)
+            .filter(|(sent_us, _)| now_us.saturating_sub(*sent_us) < self.every_us)
             .map(|(_, share)| share)
     }
 
@@ -557,7 +580,7 @@ impl Sink for Pose {
                 drop(frame_b64);
                 let _ = tell.send(outcome);
             });
-        self.next_due_us = now_us.saturating_add(EVERY_US);
+        self.next_due_us = now_us.saturating_add(self.every_us);
         match spawned {
             Ok(_) => {
                 self.counts.sent = self.counts.sent.saturating_add(1);

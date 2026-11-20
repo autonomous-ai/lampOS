@@ -238,6 +238,32 @@ impl Lamp {
     }
 }
 
+/// An answer line with each store's history epoch (the 8 hex characters
+/// a forget's turn ids start with, random to each store, #7771) said as
+/// `EPOCH`: two stores' answers are otherwise the same.
+fn epochless(line: &str) -> String {
+    let bytes = line.as_bytes();
+    let mut out = String::with_capacity(line.len());
+    let mut at = 0;
+    while at < line.len() {
+        let epoch = bytes[at] == b'"'
+            && bytes.len() > at + 9
+            && bytes[at + 1..at + 9]
+                .iter()
+                .all(|b| matches!(b, b'0'..=b'9' | b'a'..=b'f'))
+            && bytes[at + 9] == b'.';
+        if epoch {
+            out.push_str("\"EPOCH");
+            at += 9;
+        } else {
+            let c = line[at..].chars().next().unwrap();
+            out.push(c);
+            at += c.len_utf8();
+        }
+    }
+    out
+}
+
 fn script() -> Vec<Value> {
     vec![
         json!({"op":"append","person":P1,"at_unix_ms":NOON,"heard":"my sister Mai lives in Hue","said":"Hue is lovely"}),
@@ -270,7 +296,7 @@ fn shadow_answers_are_the_days_answers_byte_for_byte() {
         let line = request.to_string();
         let a = days.answer(line.as_bytes(), NOON);
         let b = lamp.tiered.answer(line.as_bytes(), NOON);
-        assert_eq!(a.line, b.line, "{line}");
+        assert_eq!(epochless(&a.line), epochless(&b.line), "{line}");
         assert_eq!(a.log, b.log, "{line}");
         assert_eq!(
             (a.wrote, a.storage_fault, a.forgot),
@@ -915,7 +941,7 @@ fn a_tiered_store_that_cannot_open_leaves_days_answering() {
         let line = request.to_string();
         let a = days.answer(line.as_bytes(), NOON);
         let b = lamp.tiered.answer(line.as_bytes(), NOON);
-        assert_eq!(a.line, b.line, "{line}");
+        assert_eq!(epochless(&a.line), epochless(&b.line), "{line}");
     }
     let tally = lamp.tally();
     assert!(tally.failures > 0, "{tally:?}");

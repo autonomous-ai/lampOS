@@ -114,6 +114,13 @@ pub const NOT_ASKED_TO_FORGET: &str = "Nothing was forgotten: a forget runs when
 pub const NOT_ASKED_TO_FORGET_EVERYTHING: &str = "Nothing was forgotten: they asked to forget one thing, not everything about them. Use forget for that thing, or ask which thing they mean; do not call forget_everything for these words.";
 /// How long a forget held for a person's yes waits for it.
 pub const HELD_FORGET_FOR: std::time::Duration = std::time::Duration::from_secs(60);
+/// How long past its window ([`HELD_FORGET_FOR`], or
+/// [`ONE_FACE_FORGET_YES_FOR`] for a one-face forget) a held forget still
+/// takes the next line, as a late answer the model may be told did not
+/// count. Past it the hold is let go silently and the line is a plain line,
+/// so an ask an hour later is a new ask, never a late yes (the first
+/// builder on #7490).
+pub const HELD_FORGET_GRACE: std::time::Duration = std::time::Duration::from_secs(15);
 /// What the model is told of a forget run on the person's yes in the turn
 /// it is asked again: it ran already.
 pub const HELD_FORGET_RAN: &str =
@@ -225,16 +232,49 @@ pub fn unseen_yes_told(name: &str) -> String {
 /// spoken was dropped, the model told nothing, and it could answer "Done,
 /// I've forgotten it."): as [`unseen_yes_told`], the yes did not count,
 /// nothing was forgotten and it is still kept, and they may say it facing
-/// the lamp.
+/// the lamp. Every held forget's yes dropped as too late or as theirs in a
+/// later session is told this too (#7478).
 pub fn unknown_yes_told(name: &str) -> String {
+    unknown_told(name, THAT_YES)
+}
+
+/// What a dropped answer is called in its note: a yes, or the spelling a
+/// face forget was held through (the P3 on #7490: a spelling is no yes).
+pub const THAT_YES: &str = "that yes";
+/// See [`THAT_YES`].
+pub const THAT_SPELLING: &str = "that spelling";
+
+/// [`unknown_yes_told`] for the dropped answer `said` ([`THAT_YES`],
+/// [`THAT_SPELLING`]).
+pub fn unknown_told(name: &str, said: &str) -> String {
     let (what, example) = forget_told_what(name);
     format!(
-        "(For you to know: that yes did not count, so nothing was forgotten and {what} is still kept. If they want it, ask them once, in a few words, to say it facing you, for example \"{example}\". Do not explain why, and do not call {name} now.)"
+        "(For you to know: {said} did not count, so nothing was forgotten and {what} is still kept. If they want it, ask them once, in a few words, to say it facing you, for example \"{example}\". Do not explain why, and do not call {name} now.)"
+    )
+}
+
+/// What the model is told when a held forget's answer `said` comes too late
+/// from no one known on the line (the P3 on #7490): as [`unknown_told`],
+/// but naming neither the kind of thing held nor its call, since nothing
+/// says the line is the person's it belongs to.
+pub fn unknown_late_told(said: &str) -> String {
+    format!(
+        "(For you to know: {said} did not count, so nothing was forgotten and it is still kept. If they want it, ask them once, in a few words, to say it facing you, for example \"Yes, forget that.\" Do not explain why, do not say what was asked about, and do not run it now.)"
+    )
+}
+
+/// What the model is told when a held forget's yes is dropped as another
+/// known person's (#7478): it was not theirs to give and nothing was
+/// forgotten. It never says what was held, since the yes is not the
+/// person's it belongs to.
+pub fn not_theirs_told(said: &str) -> String {
+    format!(
+        "(For you to know: {said} was not theirs to give, so nothing was forgotten. Do not say anything was forgotten, do not say what was asked about, and do not run it now.)"
     )
 }
 
 /// What a dropped yes's forget `name` keeps, and an example of saying it
-/// ([`unseen_yes_told`], [`unknown_yes_told`]).
+/// ([`unseen_yes_told`], [`unknown_told`]).
 fn forget_told_what(name: &str) -> (&'static str, &'static str) {
     match name {
         crate::known_faces::FORGET => ("their face", "Yes, forget my face."),
@@ -493,6 +533,163 @@ pub const KEEP_CLAIMED_UNKEPT: &str = "(For you to know: you were about to say y
 /// What the lamp says when, asked again, the model still says it kept
 /// something with no `remember` call.
 pub const NOT_KEPT_LINE: &str = "I didn't keep that. Tell me again and I'll remember it.";
+
+/// Where the second worker reads the switch for a keep claimed in any
+/// sentence of a reply (#7878). `on` only, off unless set: while no
+/// `remember` of the turn has run, a reply is said sentence by sentence,
+/// each held only until it is complete and judged ([`unclaimed_sentences`],
+/// [`claims_a_change`]), not only by its opening; a sentence that claims a
+/// keep or replace is held, with the rest, to the round's end. On
+/// lamp-e82d at 14432, 19 Nov 09:52, "Actually, I moved my car. It's on
+/// Level B1, spot 7 now." got no call and "Got it — your car is on Level
+/// B1, spot 7 now. That replaces wherever it was before.": its opening
+/// claims nothing, so all of it was said, and nothing was kept. No word of
+/// the person's line is read (the first builder's 13:44 ruling on #7924).
+pub const WHOLE_ENVIRONMENT: &str = "LAMP_KEEP_CLAIM_WHOLE";
+
+/// Whether [`WHOLE_ENVIRONMENT`] is on in this process's environment.
+pub fn whole_on() -> bool {
+    std::env::var(WHOLE_ENVIRONMENT).ok().as_deref() == Some("on")
+}
+
+/// What a sentence may open with that says something was kept, replaced or
+/// updated, past a lead-in ("Okay,", "Got it —"): the replace and update
+/// claims [`keep_claim`] doesn't read ("That replaces wherever it was
+/// before.", "I've updated that.", "Updated.").
+const CHANGE_CLAIMS: [&str; 12] = [
+    "that replaces",
+    "this replaces",
+    "that'll replace",
+    "that will replace",
+    "that's replaced",
+    "that has replaced",
+    "i've updated that",
+    "i've updated it",
+    "i have updated that",
+    "i've replaced it",
+    "i've replaced that",
+    "i've changed it",
+];
+
+/// How far `held`, a reply's text so far, may be said now (#7878, the
+/// first builder's 13:44 ruling): the byte length of its leading complete
+/// sentences that claim no keep or replace ([`claims_a_change`]). It stops
+/// at the first sentence that does (held, with all after it, to the
+/// round's end) and at a sentence not finished yet (held until it is). The
+/// bound is one sentence: nothing waits longer than its own sentence.
+pub fn unclaimed_sentences(held: &str) -> usize {
+    let mut said = 0;
+    for sentence in held.split_inclusive(['.', '!', '?']) {
+        if !sentence.trim_end().ends_with(['.', '!', '?']) || claims_a_change(sentence) {
+            break;
+        }
+        said += sentence.len();
+    }
+    said
+}
+
+/// The lead-ins a sentence's change claim may follow ([`CHANGE_CLAIMS`]).
+const CHANGE_LEADS: [&str; 9] = [
+    "okay",
+    "ok",
+    "got it",
+    "sure",
+    "alright",
+    "all right",
+    "done",
+    "so",
+    "and",
+];
+
+/// Whether any sentence of the whole `reply` claims a keep: one of today's
+/// keep claims ([`keep_claim`], hard or soft) or a replace or update said
+/// done ([`CHANGE_CLAIMS`]), at the sentence's start or after a lead-in
+/// ([`CHANGE_LEADS`]), never in a sentence asked as a question (#7878).
+/// Structure only, as [`keep_claim`] reads a reply.
+pub fn claims_a_change(reply: &str) -> bool {
+    change_claim(reply).is_some()
+}
+
+/// The keeps said in the person's own words after "I'll remember", which
+/// [`keep_claim`] leaves to an object word ("that", "it"): "I'll remember
+/// you're vegetarian.", "I'll remember your car is on B1." (V2's must-fix
+/// (3) on #7924). Never "I'll remember to …", a promise to remind, nor in a
+/// sentence that names a face or waits on a condition ([`change_claim`]).
+const KEEP_SAID: [&str; 4] = [
+    "i'll remember you",
+    "i will remember you",
+    "i'll remember your",
+    "i will remember your",
+];
+
+/// What a sentence of a reply says was done to the person's things
+/// ([`change_claim`]).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Change {
+    /// A keep said in memory's own words (a hard [`keep_claim`], or
+    /// [`KEEP_SAID`]): only a `remember` makes it true, whatever else ran.
+    Keep,
+    /// A replace or update said done ([`CHANGE_CLAIMS`]) or a soft keep:
+    /// another call that ran may be what it means ("I've updated that"
+    /// beside a reminder moved), so it counts only with no call at all.
+    Replace,
+}
+
+/// The strongest change any sentence of `reply` says done, never in a
+/// sentence asked as a question: a [`Change::Keep`] over a
+/// [`Change::Replace`] (#7878, #7924).
+pub fn change_claim(reply: &str) -> Option<Change> {
+    let text = reply
+        .replace('\u{2019}', "'")
+        .replace(['\u{2014}', '\u{2013}'], ",");
+    let mut found = None;
+    for sentence in text
+        .split_inclusive(['.', '!', '?'])
+        .map(str::trim)
+        .filter(|sentence| !sentence.is_empty() && !sentence.ends_with('?'))
+    {
+        match keep_claim(sentence) {
+            Some(KeepClaim::Hard | KeepClaim::Face) => return Some(Change::Keep),
+            Some(KeepClaim::Soft) => found = Some(Change::Replace),
+            None => {}
+        }
+        let mut rest = sentence.to_lowercase();
+        for _ in 0..2 {
+            let Some(lead) = CHANGE_LEADS.iter().find(|lead| {
+                rest.strip_prefix(**lead).is_some_and(|after| {
+                    after.starts_with(|c: char| !c.is_alphanumeric() && c != '\'')
+                })
+            }) else {
+                break;
+            };
+            rest = rest[lead.len()..]
+                .trim_start_matches(|c: char| !c.is_alphanumeric())
+                .to_owned();
+        }
+        let opens = |claim: &&str| {
+            rest.strip_prefix(*claim).is_some_and(|after| {
+                after.is_empty() || after.starts_with(|c: char| !c.is_alphanumeric())
+            })
+        };
+        // Never a face's sentence (the face reading decides those) nor a
+        // promise with a condition ("I'll remember your face once you tell
+        // me your name."): Friday's P2 on #7924.
+        let words: Vec<&str> = rest
+            .split(|c: char| !(c.is_alphanumeric() || c == '\''))
+            .filter(|word| !word.is_empty())
+            .collect();
+        let offer = words
+            .iter()
+            .any(|word| matches!(*word, "face" | "once" | "when" | "if" | "after" | "soon"));
+        if !offer && KEEP_SAID.iter().any(opens) {
+            return Some(Change::Keep);
+        }
+        if CHANGE_CLAIMS.iter().any(opens) {
+            found = Some(Change::Replace);
+        }
+    }
+    found
+}
 
 /// What the model is told of a reply that said it saved, or was saving,
 /// their face with no `remember_my_face` call ([`KeepClaim::Face`], #5141
@@ -2083,9 +2280,10 @@ pub(crate) fn face_and_memory(mut face: Value, memory: &Value) -> Value {
             let state = match value.as_str() {
                 Some("cleared") => "cleared",
                 Some("kept") => "kept",
+                Some(CONSENT_KEPT_AS_NO) => CONSENT_KEPT_AS_NO,
                 _ => "uncertain",
             };
-            partial |= state != "cleared";
+            partial |= state != "cleared" && state != CONSENT_KEPT_AS_NO;
             face[field] = json!(state);
         }
     }
@@ -2569,11 +2767,28 @@ fn forget_said_result(answer: Option<&Value>) -> &'static str {
     }
 }
 
+/// A household consent's cleanup state when `forget_everything` leaves a
+/// person's kept no in place (`LAMP_NOTICING_BY_DEFAULT` on, #7767; Twelve's
+/// P3 4 on #7928): the model may say the no was kept, and it is no failed
+/// step, so `everything` stays as it is.
+pub(crate) const CONSENT_KEPT_AS_NO: &str = "kept as a no";
+
+/// What a forget that left `key`'s file at `path` in place tells: a kept
+/// no is [`CONSENT_KEPT_AS_NO`]; a file that can't be read holds no yes to
+/// take back (off either way), so it is `cleared`, as before.
+fn consent_kept_state(path: &std::path::Path, key: &str) -> &'static str {
+    if lamp_msgs::consent::kept_no(path, key) {
+        CONSENT_KEPT_AS_NO
+    } else {
+        "cleared"
+    }
+}
+
 /// Fixed step names and states only: no path, person id, error text or memory.
 /// A later successful step must never upgrade an earlier partial result.
 fn note_forget_cleanup(told: &mut Value, field: &str, state: &str) {
     told[field] = json!(state);
-    if state != "cleared" {
+    if state != "cleared" && state != CONSENT_KEPT_AS_NO {
         told["everything"] = json!(false);
     }
 }
@@ -3334,7 +3549,10 @@ fn recall_v2_request(
 
 /// [`tools`] with the rules switched on or off.
 pub fn tools_with(rules: bool) -> Vec<Tool> {
-    let tools = tools_for(rules, forget_all_on(), forget_about_on());
+    let tools = unsure_described(
+        tools_for(rules, forget_all_on(), forget_about_on()),
+        doubted::unsure_not_kept_on(),
+    );
     let tools = if replaces_on() {
         replaces_described(tools)
     } else {
@@ -3419,6 +3637,32 @@ pub const REMEMBER_DESCRIBED: &str = "Call this when someone asks you to remembe
                           words, and call it once they say it again; never keep a word you doubt. Then say back \
                           in a few words what you kept, so they can put you right if you misheard; \
                           never also ask whether to keep it.";
+
+/// [`REMEMBER_DESCRIBED`] when an unsure line is not kept
+/// ([`doubted::UNSURE_ENVIRONMENT`], #7739): a doubted key word is neither
+/// kept nor asked about. Shorter than it, for the link's 1,024 bytes.
+pub const REMEMBER_DESCRIBED_UNSURE: &str = "Call this when someone asks you to remember something or keep it in mind for later. \
+                          Give what to keep as one short sentence that will still make sense weeks from now, \
+                          with their own words for names and numbers. If you are not sure you heard a key word \
+                          right (a name, a number), do not call this: say only \"I didn't catch that well enough \
+                          to keep it.\" and end there; never ask them to repeat, spell or say more. Else say back \
+                          in a few words what you kept, so they can put you right if you misheard; \
+                          never also ask whether to keep it.";
+
+/// `remember` with [`REMEMBER_DESCRIBED_UNSURE`] in place of
+/// [`REMEMBER_DESCRIBED`] when `unsure` ([`doubted::UNSURE_ENVIRONMENT`]);
+/// every other function, and every function when off, as it is.
+fn unsure_described(mut tools: Vec<Tool>, unsure: bool) -> Vec<Tool> {
+    if !unsure {
+        return tools;
+    }
+    for tool in tools.iter_mut().filter(|tool| tool.name == REMEMBER) {
+        tool.description =
+            tool.description
+                .replacen(REMEMBER_DESCRIBED, REMEMBER_DESCRIBED_UNSURE, 1);
+    }
+    tools
+}
 
 fn tools_for(rules: bool, forget_all: bool, forget_about: bool) -> Vec<Tool> {
     let mut tools = vec![
@@ -10581,8 +10825,18 @@ impl DaysClient {
                 if let Ok(mut context) = self.context.lock() {
                     context.last_done = None;
                 }
+                // As every forget: nothing is posted to the account's
+                // history while the memory answers (`LAMP_HISTORY_SEND`,
+                // Twelve's P2 on #7957); what it removed is named in its
+                // answers (`history_send::forget_seen`), then posts go on.
+                crate::history_send::forgetting(person);
                 let (told, answered) =
                     self.forget_about(&call.args["about"], person, until, lease, heard_named(call));
+                crate::history_send::forget_answered(
+                    person,
+                    false,
+                    Some(&json!({"ok":true,"exchanges":{}})),
+                );
                 // A forget done, for a yes alone soon after it (Bug C).
                 if told["forgotten"] == true
                     && let Ok(mut context) = self.context.lock()
@@ -10886,6 +11140,10 @@ impl DaysClient {
                 {
                     crate::service_records::unsent(person);
                 }
+                // Nothing is posted to the account's history until the
+                // memory answers the forget (`LAMP_HISTORY_SEND`, #7771):
+                // what it removed is then never posted.
+                crate::history_send::forgetting(person);
                 self.hand_ons.forgotten.fetch_add(1, Ordering::AcqRel);
                 self.hand_ons.settle(
                     deadline
@@ -10893,7 +11151,11 @@ impl DaysClient {
                         .min(FORGET_SETTLE),
                 );
             }
+            let forgetting = matches!(call.name.as_str(), FORGET | FORGET_EVERYTHING);
             if deadline.checked_sub(started.elapsed()).is_none() {
+                if forgetting {
+                    crate::history_send::forget_answered(person, false, None);
+                }
                 return settled((gone(), false));
             }
             // In what is left of the call's time, a resend without a
@@ -10908,6 +11170,13 @@ impl DaysClient {
                     })
                 },
             );
+            if forgetting {
+                crate::history_send::forget_answered(
+                    person,
+                    call.name == FORGET_EVERYTHING,
+                    answer.as_ref(),
+                );
+            }
             let Some(answer) = answer else {
                 return lost((gone(), false));
             };
@@ -11049,15 +11318,27 @@ impl DaysClient {
             }
             // And the household's yes to music and laughter, and to how a
             // face seems: "a forget or the reset wipes it" (the lead on
-            // #2110), whoever asked.
+            // #2110), whoever asked. With `LAMP_NOTICING_BY_DEFAULT` on
+            // (#7767) only a kept yes goes: a kept no stays, so the forget
+            // never turns either on ([`crate::seen_yes::forget_takes`]).
             if call.name == FORGET_EVERYTHING {
-                for (field, consent) in [
-                    ("sound_consent_result", self.room_sounds.clone()),
+                let by_default = lamp_msgs::consent::noticing_by_default();
+                for (field, key, consent) in [
+                    (
+                        "sound_consent_result",
+                        lamp_msgs::consent::ROOM_SOUNDS,
+                        self.room_sounds.clone(),
+                    ),
                     (
                         "face_expression_consent_result",
+                        lamp_msgs::consent::FACE_EXPRESSIONS,
                         crate::onboarding::face_expressions_beside(&self.room_sounds),
                     ),
                 ] {
+                    if !crate::seen_yes::forget_takes(&consent, key, by_default) {
+                        note_forget_cleanup(&mut told, field, consent_kept_state(&consent, key));
+                        continue;
+                    }
                     let state = match std::fs::remove_file(&consent) {
                         Ok(()) => {
                             eprintln!(
@@ -13943,6 +14224,9 @@ fn go_on_as(
     current: &Mutex<Current>,
 ) {
     let new = |old: u64| moved.iter().find(|(was, _)| *was == old).map(|(_, id)| *id);
+    // The moved lines go to the account's history as `to`'s, under their
+    // new ids (`LAMP_HISTORY_SEND`, #7771).
+    crate::history_send::moved(to, moved);
     conversation.sources = conversation
         .sources
         .iter()
@@ -14217,6 +14501,12 @@ fn days_writer(
         .map(|early| early.lines);
     let mut end = |conversation: &mut Conversation| {
         let ended = std::mem::take(conversation);
+        // The room's lines of an ended conversation can no longer move to
+        // someone's scope: they go to the account's history as the room's
+        // (`LAMP_HISTORY_SEND`, #7771).
+        if ended.person.is_none() {
+            crate::history_send::settled(&ended.sources);
+        }
         if let Ok(mut current) = current.lock() {
             *current = Current::default();
         }
@@ -14515,7 +14805,10 @@ fn days_writer(
                         .and_then(|mut context| context.inhibit(Stopped::SourceGone));
                     say(said);
                     // Lines made before the stop are not written after it,
-                    // as after a forget said here.
+                    // as after a forget said here; their and the room's
+                    // unsent turns wait for the next start, when the memory
+                    // no longer holds what went.
+                    crate::history_send::forget_answered(person.as_deref(), false, None);
                     hand_ons.forgotten.fetch_add(1, Ordering::AcqRel);
                     end(&mut conversation);
                     hand_ons.done.fetch_add(1, Ordering::AcqRel);
@@ -14528,6 +14821,18 @@ fn days_writer(
                 conversation.person = person;
                 report(id.is_some());
                 if let Some(id) = id {
+                    // What the memory wrote, under its own id, to the
+                    // account's history with `LAMP_HISTORY_SEND` (#7771):
+                    // queued, never waited on. A reply in a request a
+                    // linked service's read answered in goes as the
+                    // thread's placeholder, never the read.
+                    crate::history_send::offered(
+                        conversation.person.as_deref(),
+                        id,
+                        at_unix_ms,
+                        (&heard, &said),
+                        crate::services::after_read(request) || said == crate::thread::PRIVATE_SAID,
+                    );
                     if conversation.full() {
                         let mut piece = conversation.close_piece();
                         let closed = OVERFLOW_CLOSED.fetch_add(1, Ordering::Relaxed) + 1;
@@ -14727,7 +15032,12 @@ fn legacy_exchange(
 ) -> Option<Value> {
     match lease {
         Some(_) => bounded_exchange_scoped(socket, line, budget, lease),
-        None => crate::tools::exchange(socket, line, budget),
+        None => {
+            let answer = crate::tools::exchange(socket, line, budget)?;
+            // `LAMP_HISTORY_FORGET` (#7771), as [`exchange_guarded`].
+            crate::history_forget::answered(socket, line, &answer);
+            Some(answer)
+        }
     }
 }
 
@@ -14902,6 +15212,10 @@ fn exchange_guarded(
                 if let Some(end) = chunk[..n].iter().position(|byte| *byte == b'\n') {
                     answer.extend_from_slice(&chunk[..=end]);
                     let value = serde_json::from_slice(&answer).ok()?;
+                    // What a forget removed reaches the account's history
+                    // too, whether or not this caller still wants the answer
+                    // (`LAMP_HISTORY_FORGET`, #7771).
+                    crate::history_forget::answered(socket, line, &value);
                     if !current() {
                         return None;
                     }
@@ -15064,6 +15378,13 @@ fn unconnected() -> Option<UnixStream> {
 /// the switch census reads it as one (reviewer-two on #3059, 23:17).
 #[cfg(test)]
 pub(crate) use tests::event_memory;
+
+/// The Days writer run over a fake memory, for `history_send`'s tests.
+#[cfg(test)]
+pub(crate) use tests::{
+    forget_about_for_history_test, forget_for_history_test, go_on_for_history_test,
+    write_for_history_test,
+};
 
 #[cfg(test)]
 #[path = "remember_no_wait.rs"]
@@ -21330,6 +21651,44 @@ mod tests {
     /// about a kept thing near misheard words, after its own, which still
     /// says never to forget something else; every other function is as it
     /// was, with each forget switch off or on.
+    /// #7739: with an unsure line not kept, `remember` says never to ask
+    /// about a doubted word, in no more bytes than before; every other
+    /// function is as it was, so "forget everything" still asks them to
+    /// confirm. Off, every function is as it was.
+    #[test]
+    fn an_unsure_word_is_neither_kept_nor_asked_about_in_remember_alone() {
+        assert!(REMEMBER_DESCRIBED_UNSURE.len() <= REMEMBER_DESCRIBED.len());
+        assert!(REMEMBER_DESCRIBED.contains("ask them"));
+        assert!(!REMEMBER_DESCRIBED_UNSURE.contains("ask them, in a few words"));
+        // The 06c1 ROW at ac50913437: "… keep it — could you spell or say
+        // it again?". The line is given whole, and every follow-up ask is
+        // named as never.
+        assert!(REMEMBER_DESCRIBED_UNSURE.contains(doubted::NOT_CAUGHT_LINE));
+        assert!(REMEMBER_DESCRIBED_UNSURE.contains("and end there"));
+        assert!(REMEMBER_DESCRIBED_UNSURE.contains("never ask them to repeat, spell or say more"));
+        for (forget_all, forget_about) in
+            [(false, false), (true, false), (false, true), (true, true)]
+        {
+            let before = tools_for(true, forget_all, forget_about);
+            assert_eq!(unsure_described(before.clone(), false).len(), before.len());
+            for (was, now) in before.iter().zip(&unsure_described(before.clone(), false)) {
+                assert_eq!(was.description, now.description);
+            }
+            let after = unsure_described(before.clone(), true);
+            assert_eq!(before.len(), after.len());
+            for (was, now) in before.iter().zip(&after) {
+                if was.name == REMEMBER {
+                    assert_eq!(now.description, REMEMBER_DESCRIBED_UNSURE);
+                } else {
+                    assert_eq!(was.description, now.description, "{}", was.name);
+                }
+                if was.name == FORGET_EVERYTHING {
+                    assert!(now.description.contains("to confirm"));
+                }
+            }
+        }
+    }
+
     #[test]
     fn asking_about_a_misheard_forget_adds_to_forget_alone() {
         for (forget_all, forget_about) in
@@ -26286,6 +26645,209 @@ mod tests {
             took[CALLS - 1]
         );
         assert!(at(95) < HITS_WITHIN, "{:?}", at(95));
+    }
+
+    /// A fake memory for `history_send`'s tests on a socket of its own,
+    /// answering with `answer` until told to stop, however many requests.
+    fn history_memory(
+        answer: fn(&Value) -> Value,
+    ) -> (
+        PathBuf,
+        std::sync::Arc<std::sync::atomic::AtomicBool>,
+        std::thread::JoinHandle<()>,
+    ) {
+        static CALLS: AtomicU64 = AtomicU64::new(0);
+        let socket = std::env::temp_dir().join(format!(
+            "lamp-remember-history-{}-{}.sock",
+            std::process::id(),
+            CALLS.fetch_add(1, Ordering::Relaxed)
+        ));
+        let _ = std::fs::remove_file(&socket);
+        let listener = UnixListener::bind(&socket).unwrap();
+        listener.set_nonblocking(true).unwrap();
+        let stop = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
+        let stopped = std::sync::Arc::clone(&stop);
+        let served = std::thread::spawn(move || {
+            loop {
+                match listener.accept() {
+                    Ok((stream, _)) => {
+                        stream.set_nonblocking(false).unwrap();
+                        let mut line = String::new();
+                        if BufReader::new(stream.try_clone().unwrap())
+                            .read_line(&mut line)
+                            .is_ok()
+                            && let Ok(request) = serde_json::from_str::<Value>(&line)
+                        {
+                            let _ =
+                                (&stream).write_all(format!("{}\n", answer(&request)).as_bytes());
+                        }
+                    }
+                    Err(_) if stopped.load(Ordering::Acquire) => return,
+                    Err(_) => std::thread::sleep(Duration::from_millis(2)),
+                }
+            }
+        });
+        (socket, stop, served)
+    }
+
+    /// The Days writer on this thread over a fake memory, given `lines`
+    /// (whose scope, what was heard), as requests 1, 2, ...: the memory
+    /// writes a line heard as "kept N …" with id N ("kept …": 17), answers
+    /// one heard as "gone …" as a forgotten source's, and refuses any other;
+    /// then a session close, and the writer ends (its conversation with it).
+    /// Each call has a socket of its own, served until the writer is done,
+    /// however many requests it makes.
+    pub(crate) fn write_for_history_test(lines: &[(Option<&str>, &str)]) {
+        fn answer(request: &Value) -> Value {
+            let heard = request["heard"].as_str().unwrap_or("");
+            match request["op"].as_str() {
+                Some("append_linked") if heard.starts_with("kept") => {
+                    let id = heard
+                        .split(' ')
+                        .nth(1)
+                        .and_then(|n| n.parse::<u64>().ok())
+                        .unwrap_or(17);
+                    json!({"ok":true,"id":id})
+                }
+                Some("append_linked") if heard.starts_with("gone") => {
+                    json!({"ok":false,"error":"bad_request","message":SOURCE_GONE})
+                }
+                Some("append_linked") => json!({"ok":false,"error":"full"}),
+                _ => json!({"ok":true}),
+            }
+        }
+        let (socket, stop, served) = history_memory(answer);
+        let (send, receive) = sync_channel(lines.len() + 2);
+        let now = Instant::now();
+        for (n, (person, heard)) in lines.iter().enumerate() {
+            send.send(DaysJob::Exchange {
+                request: n as u64 + 1,
+                at_unix_ms: NOW,
+                finished: now,
+                heard: (*heard).to_owned(),
+                said: "answer".into(),
+                sources: vec![],
+                rules: vec![],
+                person: person.map(str::to_owned),
+                forgotten: 0,
+                observe_forgets: 0,
+                keeper: None,
+            })
+            .unwrap();
+        }
+        send.send(DaysJob::Close("barrier".into(), None)).unwrap();
+        drop(send);
+        days_writer(
+            &socket,
+            "voice-test",
+            &receive,
+            Duration::from_secs(45),
+            &AtomicU64::new(0),
+            &Mutex::new(Current::default()),
+            &HandOns::default(),
+            None,
+        );
+        stop.store(true, Ordering::Release);
+        served.join().unwrap();
+        let _ = std::fs::remove_file(socket);
+    }
+
+    /// `person`'s keep then their bare "forget that", through the voice's
+    /// tools with a fake memory: the forget removes the keep (id 5) and
+    /// names the exchange it removed by its turn id, `{"<person>":
+    /// ["0a1b2c3d.<person>:17"]}` (the forget half's answer, #7982). Whether the account's history held its sends
+    /// while the memory answered the forget is
+    /// [`crate::history_send::HELD_AT_FORGET`].
+    pub(crate) fn forget_for_history_test(person: &'static str) {
+        fn answer(request: &Value) -> Value {
+            match request["op"].as_str() {
+                Some("remember") => json!({"ok":true,"id":5}),
+                Some("forget") => {
+                    crate::history_send::probe_forget();
+                    let person = request["person"].as_str().unwrap_or("everyone");
+                    let turn = lamp_msgs::history_turn_id("0a1b2c3d", person, 17);
+                    json!({"ok":true,"removed":1,"exchanges":{person:[turn]}})
+                }
+                _ => json!({"ok":false,"error":"unexpected","message":"m"}),
+            }
+        }
+        let (socket, served) = memory("history-forget", 2, answer);
+        let client = DaysClient::new(socket.clone()).unwrap();
+        client.replaces.store(true, Ordering::Release);
+        client.forget_just_kept.store(true, Ordering::Release);
+        let run = |call: &ToolCall| {
+            client.run_at(call, Duration::from_secs(3), NOW, Some(&EAST), Some(person))
+        };
+        let keep = call(REMEMBER, json!({"text": "my umbrella is in the car"}));
+        let bare = named_forget_with(
+            &call(FORGET, json!({})),
+            Some("Lamp, forget that."),
+            Some(person),
+            &Carry::default(),
+        )
+        .expect("a bare forget is marked");
+        assert!(run(&keep).1);
+        let (told, answered) = run(&bare);
+        assert!(answered && told["forgotten"] == true, "{told}");
+        served.join().unwrap();
+        drop(client);
+        let _ = std::fs::remove_file(&socket);
+    }
+
+    /// `person`'s "forget what I said about coffee", through the voice's
+    /// tools with a fake memory: nothing kept is about it, and the
+    /// exchanges forget removes `removed` (its turn id under epoch
+    /// 0a1b2c3d, the forget half's answer).
+    pub(crate) fn forget_about_for_history_test(person: &'static str, removed: u64) {
+        static REMOVED: AtomicU64 = AtomicU64::new(0);
+        REMOVED.store(removed, Ordering::SeqCst);
+        fn answer(request: &Value) -> Value {
+            match request["op"].as_str() {
+                Some("exchanges_forget") => {
+                    crate::history_send::probe_forget();
+                    let person = request["person"].as_str().unwrap_or("everyone");
+                    let turn = lamp_msgs::history_turn_id(
+                        "0a1b2c3d",
+                        person,
+                        REMOVED.load(Ordering::SeqCst),
+                    );
+                    json!({"ok":true,"removed":1,"exchanges":{person:[turn]}})
+                }
+                Some("kept") | Some("search") => json!({"ok":true,"entries":[]}),
+                _ => json!({"ok":true,"removed":0}),
+            }
+        }
+        let (socket, stop, served) = history_memory(answer);
+        let client = DaysClient::new(socket.clone()).unwrap();
+        client.forget_about.store(true, Ordering::Release);
+        let (told, answered) = client.run_at(
+            &call(FORGET, json!({"about":"coffee"})),
+            Duration::from_secs(3),
+            NOW,
+            Some(&EAST),
+            Some(person),
+        );
+        assert!(answered, "{told}");
+        drop(client);
+        stop.store(true, Ordering::Release);
+        served.join().unwrap();
+        let _ = std::fs::remove_file(&socket);
+    }
+
+    /// The room's conversation of exchanges 5 and 6 goes on as `to`'s,
+    /// with `moved` (old id, new id), as the writer's adopt does.
+    pub(crate) fn go_on_for_history_test(to: &str, moved: &[(u64, u64)]) {
+        let mut conversation = Conversation {
+            sources: vec![5, 6],
+            ..Conversation::default()
+        };
+        go_on_as(
+            &mut conversation,
+            to,
+            moved,
+            &Mutex::new(DaysContext::default()),
+            &Mutex::new(Current::default()),
+        );
     }
 
     pub(super) fn memory(
@@ -32781,6 +33343,47 @@ mod tests {
             }
         }
 
+        /// Twelve's P3 4 on #7928 (#7767): with `LAMP_NOTICING_BY_DEFAULT`
+        /// on, a household consent the forget leaves as a kept no is told
+        /// as `"kept as a no"`, never `"cleared"`, and is no failed step: it
+        /// leaves `everything` as it is, through the face adapter too.
+        #[test]
+        fn a_forget_that_keeps_a_no_says_so() {
+            let folder = std::env::temp_dir().join(format!(
+                "remember-kept-no-{}",
+                crate::process::boot_text(crate::process::new_boot().unwrap())
+            ));
+            std::fs::create_dir_all(&folder).unwrap();
+            let face = crate::onboarding::face_expressions_beside(&folder.join("room-sounds.json"));
+            let key = lamp_msgs::consent::FACE_EXPRESSIONS;
+            std::fs::write(
+                &face,
+                lamp_msgs::consent::no_bytes(key, 5, lamp_msgs::consent::BY_VOICE),
+            )
+            .unwrap();
+            assert!(!crate::seen_yes::forget_takes(&face, key, true));
+            assert_eq!(consent_kept_state(&face, key), CONSENT_KEPT_AS_NO);
+            let mut told = json!({"forgotten": true, "everything": true});
+            note_forget_cleanup(
+                &mut told,
+                "face_expression_consent_result",
+                consent_kept_state(&face, key),
+            );
+            assert_eq!(told["face_expression_consent_result"], "kept as a no");
+            assert_eq!(told["everything"], true);
+            // A file that can't be read holds no yes to take: cleared.
+            std::fs::write(&face, b"not json").unwrap();
+            assert_eq!(consent_kept_state(&face, key), "cleared");
+            // The face adapter carries it, and it is no partial cleanup.
+            let carried = face_and_memory(
+                json!({"face_forgotten": true}),
+                &json!({"forgotten": true, "face_expression_consent_result": "kept as a no"}),
+            );
+            assert_eq!(carried["face_expression_consent_result"], "kept as a no");
+            assert_eq!(carried["memory"], "forgotten too");
+            let _ = std::fs::remove_dir_all(folder);
+        }
+
         #[test]
         fn forget_cleanup_reports_each_consent_failure_and_still_clears_the_other() {
             for (name, failed) in [
@@ -33034,5 +33637,84 @@ mod chapter_tests {
                 "chapter":"A new library job.","about":CHAPTER_ABOUT,"theirs":true})
         );
         assert!(chapters_found(&json!({"ok":false,"error":"bad_person"})).is_empty());
+    }
+
+    /// #7878: a keep, replace or update said done in any sentence is a
+    /// claim; a restatement, a question or a reply about something else is
+    /// not.
+    #[test]
+    fn a_change_claimed_in_any_sentence_is_read_whole() {
+        for reply in [
+            "Got it \u{2014} your car is on Level B1, spot 7 now. That replaces wherever it was before.",
+            "Okay, your car is on B1. I've updated that.",
+            "Okay, I've updated that: B1, spot 7.",
+            "Sure. I'll remember that.",
+            "Okay. I'll remember you're vegetarian.",
+            "Spot 7 on B1. Kept.",
+        ] {
+            assert!(claims_a_change(reply), "{reply}");
+        }
+        for reply in [
+            "Your car is on Level B1, spot 7 now. Good to know where to look.",
+            "Got it \u{2014} your car is on Level B1, spot 7 now.",
+            "Should I remember that your car is on B1?",
+            "Updates come every night.",
+            "I'll remember to remind you at five.",
+            "Done, I've updated your light.",
+            "Okay, it replaces your old one.",
+            "Updated forecast: rain at noon.",
+            "That replacement part sounds expensive.",
+        ] {
+            assert!(!claims_a_change(reply), "{reply}");
+        }
+    }
+
+    /// #7924: each complete sentence that claims nothing may be said; the
+    /// first that claims a keep or replace, and an unfinished one, are held.
+    #[test]
+    fn sentences_are_said_until_one_claims_a_keep() {
+        let e82d = "Got it \u{2014} your car is on Level B1, spot 7 now. That replaces wherever it was before.";
+        let first = "Got it \u{2014} your car is on Level B1, spot 7 now.";
+        assert_eq!(unclaimed_sentences(e82d), first.len());
+        assert_eq!(unclaimed_sentences("Got it"), 0);
+        assert_eq!(
+            unclaimed_sentences("Once upon a time, a lamp. It glowed"),
+            "Once upon a time, a lamp.".len()
+        );
+        assert_eq!(unclaimed_sentences("Kept: your car is on B1."), 0);
+        let story = "Here's one. A lamp lit a room. The end.";
+        assert_eq!(unclaimed_sentences(story), story.len());
+    }
+
+    /// V2's must-fix (3) on #7924: a keep in memory's own words is a
+    /// [`Change::Keep`], which counts beside any call; a replace or update
+    /// is a [`Change::Replace`], which counts only with none.
+    #[test]
+    fn a_keep_said_is_a_keep_and_an_update_is_a_replace() {
+        assert_eq!(
+            change_claim("Okay. I'll remember you're vegetarian."),
+            Some(Change::Keep)
+        );
+        assert_eq!(
+            change_claim("Your reminder is at 3. Kept."),
+            Some(Change::Keep)
+        );
+        assert_eq!(
+            change_claim("Got it. That replaces wherever it was before."),
+            Some(Change::Replace)
+        );
+        assert_eq!(
+            change_claim("Okay, I've updated that."),
+            Some(Change::Replace)
+        );
+        assert_eq!(change_claim("I'll remember to remind you at five."), None);
+        assert_eq!(
+            change_claim("I'll remember your face once you tell me your name."),
+            None
+        );
+        assert_eq!(
+            change_claim("I'll remember your spot once you say yes."),
+            None
+        );
     }
 }

@@ -35,7 +35,9 @@ fn helper(socket: &Path, lines: usize) -> std::thread::JoinHandle<Vec<Value>> {
     })
 }
 
-/// A skill on the lamp named `name` on the resting trigger, lighting.
+/// A skill on the lamp named `name` doing what the made test skill does
+/// (`made_clash::same_thing`, #7938): on the resting trigger in its very
+/// window, lighting (its pace and its light's colour its own).
 fn installed(keeping: &Keeping, name: &str) {
     let folder = keeping.installed.join(name);
     fs::create_dir_all(&folder).unwrap();
@@ -43,7 +45,8 @@ fn installed(keeping: &Keeping, name: &str) {
         folder.join("skill.toml"),
         format!(
             "kind = \"installable\"\nversion = \"1.0.0\"\n\n[trigger]\n{RESTING}cooldown = \
-             \"1h\"\n\n[[do]]\nlight = {{ colour = \"blue\" }}\n"
+             \"1h\"\nduring = {{ from = \"22:00\", to = \"22:30\" }}\n\n[[do]]\nlight = {{ \
+             colour = \"blue\" }}\n"
         ),
     )
     .unwrap();
@@ -1070,4 +1073,150 @@ fn a_words_clash_with_their_own_skill_replaces_it_and_any_other_says_why() {
     assert_eq!(made_skill::plain_reason(why), made_skill::NOT_MADE_TRY);
     made_skill::set_asks_here(None);
     set_here(None);
+}
+
+/// What a voice make of a daily brief came back as on lamp-9adf (#7938):
+/// a greeting at 08:00 that says a line and lights.
+const BRIEF_TOML: &str = r#"kind = "installable"
+version = "1.0.0"
+needs = ["light"]
+
+[permissions]
+topics = ["clock/local"]
+light = true
+speak = true
+
+[trigger]
+topic = "clock/local"
+field = "known"
+equals = true
+rearm = "ends"
+during = { from = "08:00", to = "08:01" }
+
+[ask]
+policy = "nudge"
+
+[[do]]
+say = { text = "Here is your daily brief." }
+
+[[do]]
+light = { dim = 1 }
+"#;
+
+const BRIEF_CARD: &str = "---\nname: daily-brief\ndescription: Says the daily brief at 8 am.\n---\n\n# Daily brief\n\nAt eight it says the brief.\n";
+
+const BRIEF: &str = "make a skill called daily brief: when I say daily brief, tell me today's \
+                     weather in one short sentence";
+
+/// A skill on the lamp named `name`, each day at `at` (`HH:MM`, a
+/// minute's window, as made skills keep a time), its `[[do]]` `steps`.
+fn installed_daily(keeping: &Keeping, name: &str, at: &str, steps: &str) {
+    let folder = keeping.installed.join(name);
+    fs::create_dir_all(&folder).unwrap();
+    let (hour, minute) = at.split_once(':').unwrap();
+    let to = format!("{hour}:{:02}", minute.parse::<u8>().unwrap() + 1);
+    fs::write(
+        folder.join("skill.toml"),
+        format!(
+            "kind = \"installable\"\nversion = \"1.0.0\"\n\n[trigger]\ntopic = \
+             \"clock/local\"\nfield = \"known\"\nequals = true\nrearm = \"ends\"\nduring = {{ \
+             from = \"{at}\", to = \"{to}\" }}\n\n{steps}"
+        ),
+    )
+    .unwrap();
+}
+
+const SAYS_AND_LIGHTS: &str =
+    "[[do]]\nsay = { text = \"Good morning.\" }\n\n[[do]]\nlight = { dim = 1 }\n";
+
+const WATER: &str =
+    "[[do]]\nsay = { text = \"Time for some water.\" }\n\n[[do]]\nlight = { dim = 1 }\n";
+
+/// The daily brief made as on lamp-9adf, beside `others` (name, time,
+/// steps), by the owner, with a manage helper answering `helped` asks:
+/// what the model is told, and what the helper was asked.
+fn brief_made_beside(
+    case: &str,
+    others: &[(&str, &str, &str)],
+    helped: usize,
+) -> (Value, Vec<Value>) {
+    set_here(Some(true));
+    set_owner_here(Some(true));
+    let (root, keeping) = keeping(case);
+    set_state_here(Some(root.join("state")));
+    for (name, at, steps) in others {
+        installed_daily(&keeping, name, at, steps);
+    }
+    let answer = format!("```skill.toml\n{BRIEF_TOML}```\n\n```SKILL.md\n{BRIEF_CARD}```\n");
+    let (url, served) = service(vec![(200, answer)]);
+    let asked = helper(&keeping.manage, helped);
+    let told = make_with(3, Some(BRIEF), BRIEF, &keeping, chat_at(url), NOW, || None);
+    assert_eq!(served.join().unwrap(), 1);
+    // Made and on, before the helper is waited on.
+    assert_eq!(told["on"], true, "{told}");
+    // Whatever is "replaced" stays on the lamp: turned off, never deleted.
+    for (name, ..) in others {
+        assert!(keeping.installed.join(name).is_dir(), "{name} deleted");
+    }
+    let _ = take_said_line();
+    set_state_here(None);
+    set_owner_here(None);
+    set_here(None);
+    let _ = fs::remove_dir_all(&root);
+    (told, asked.join().unwrap())
+}
+
+/// #7938, lamp-9adf, 19 Nov: a daily brief made beside the person's good
+/// morning, good morning 3 and water reminder "replaced" all three, since
+/// each is on the lamp's clock and lights: a shared time source and a
+/// shared light were taken as the same skill. Beside skills doing
+/// something else (another time, or its very minute with other steps), a
+/// make replaces none of them and is said as a plain make.
+#[test]
+fn a_make_beside_unrelated_skills_replaces_none_of_them() {
+    let nods = "[[do]]\nbody = { gesture = \"nod\" }\n\n[[do]]\nlight = { dim = 1 }\n";
+    let (told, asked) = brief_made_beside(
+        "no-asks-unrelated",
+        &[
+            ("good-morning", "07:00", SAYS_AND_LIGHTS),
+            ("good-morning-3", "07:30", SAYS_AND_LIGHTS),
+            ("water-reminder", "10:00", WATER),
+            ("stretch-nod", "08:00", nods),
+        ],
+        1,
+    );
+    assert_eq!(told["on"], true, "{told}");
+    assert!(told.get("replaced").is_none(), "{told}");
+    assert_eq!(
+        quoted(told["next"].as_str().unwrap()),
+        "Made daily brief. Say 'remove it' to undo.",
+        "{told}"
+    );
+    // Only the put-on was asked of the helper: none of the others off.
+    assert_eq!(asked.len(), 1, "{asked:?}");
+    assert!(asked[0]["install_made"].is_string(), "{asked:?}");
+}
+
+/// #7938: a make that does what one on the lamp does (the same trigger at
+/// the same time, the same kinds of steps) replaces that one alone, turned
+/// off and never deleted; the unrelated ones beside it stay on.
+#[test]
+fn a_make_that_duplicates_one_replaces_only_that_one() {
+    let (told, asked) = brief_made_beside(
+        "no-asks-duplicate",
+        &[
+            ("good-morning", "07:00", SAYS_AND_LIGHTS),
+            ("morning-brief", "08:00", SAYS_AND_LIGHTS),
+            ("water-reminder", "10:00", WATER),
+        ],
+        2,
+    );
+    assert_eq!(told["on"], true, "{told}");
+    assert_eq!(told["replaced"], json!(["morning-brief"]), "{told}");
+    assert_eq!(
+        quoted(told["next"].as_str().unwrap()),
+        "Made daily brief and replaced your old morning brief. Say 'keep the old one' to undo."
+    );
+    assert!(asked[0]["install_made"].is_string(), "{asked:?}");
+    assert_eq!(asked[1], json!({ "off": "morning-brief" }));
 }

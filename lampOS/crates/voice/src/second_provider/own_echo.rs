@@ -239,10 +239,13 @@ fn own_in_order(heard: &[&str], answer: &[String]) -> Vec<bool> {
 /// Whether `line` began while the lamp's answer `said` could be heard, or
 /// within [`TAIL_US`] after its words would have played to their end.
 fn began_within(line: &Line<'_>, said: &Said<'_>) -> bool {
-    line.over_the_lamps_voice
-        || line.began_us != 0
-            && said.until_us != 0
-            && line.began_us <= said.until_us.saturating_add(TAIL_US)
+    line.over_the_lamps_voice || in_the_tail(line.began_us, said.until_us)
+}
+
+/// Whether a line begun at `began_us` began before [`TAIL_US`] had passed
+/// since the lamp's words would have played to their end at `until_us`.
+pub(super) fn in_the_tail(began_us: u64, until_us: u64) -> bool {
+    began_us != 0 && until_us != 0 && began_us <= until_us.saturating_add(TAIL_US)
 }
 
 /// Whether `line` began within the lamp's answer `said` or its tail

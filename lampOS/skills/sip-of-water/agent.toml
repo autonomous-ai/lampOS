@@ -1,0 +1,25 @@
+# Sip of water's line through the lamp's agent: a pilot, read only with
+# LAMP_CORE_VIA_AGENT=on in lamp-skills and its manage helper (docs/skills.md,
+# "A core skill's line through the lamp's agent"); off, nothing reads it.
+# It stands in for skill.toml's grants, [[do]] and [[present.do]] alone: the
+# trigger, the [[while]] guards, most_a_day, [active], [quiet], cooldown,
+# rearm and wait are skill.toml's own, never copied here. Every [[do]] but
+# the task is skill.toml's, word for word (lamp-skills checks it): the say is
+# the fallback, said at once when the agent's line has not come within 10 s.
+grants = []
+
+[[do]]
+task = { task = "One short, friendly line suggesting a sip of water; no lecture, nothing about health.", run = "scripts/agent.py" }
+
+[[do]]
+body = { look_at = "face" }
+light = { colour = "blue", level = 2, for = "6s", pattern = { kind = "breathe", period = "6s" } }
+say = "{sitting} They have sat at the desk for about half an hour. Suggest a sip of water in one short, warm line, the way a friend would: no lecture, nothing about health."
+
+[[present.do]]
+task = { task = "One short, friendly line suggesting a sip of water; no lecture, nothing about health.", run = "scripts/agent.py" }
+
+[[present.do]]
+body = { look_at = "face" }
+light = { colour = "blue", level = 2, for = "6s", pattern = { kind = "breathe", period = "6s" } }
+say = "{sitting} They have been at the desk a while. Suggest a sip of water in one short, warm line, the way a friend would: no lecture, nothing about health."

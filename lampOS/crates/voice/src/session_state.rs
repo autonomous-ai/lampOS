@@ -101,6 +101,10 @@ pub(crate) struct SessionState {
     /// voice's own, or after a mute or a sleep. Said on the voice's health
     /// until the next capture start.
     pub(crate) mic_at_start: Option<crate::wire::OpenWaited>,
+    /// When capture's reopen hold last closed the microphone for a clock
+    /// that had not started (#7224, `ClockNotStarted`), as read; taken by
+    /// the loop with `LAMP_VOICE_UNSTARTED_FRAME_DROP=on`.
+    pub(crate) clock_recovery_at_us: Option<u64>,
 }
 impl SessionState {
     pub(crate) fn finite() -> Self {

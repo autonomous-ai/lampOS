@@ -137,7 +137,7 @@ connected apps.
 | `LAMP_SKILL_WRITES=on` (#6066; on in the product's four units since 11 Nov) | `lamp-services`, `lamp-skills` (and its `lamp-skills-manage@` helper) and `lamp-voice` | A made skill writes to no service: a skill with a `write` step or a `"write"` permission does not load, `lamp-services` refuses `skill_write` and `skill_write_approve`, and the voice makes none ("I can't do that yet: sending or writing on its own") nor takes a yes ("A made skill's write", below) |
 | `LAMP_SKILL_READS=on` (on in the product's four units) | `lamp-services`, `lamp-skills` (and its `lamp-skills-manage@` helper) and `lamp-voice` | A made skill reaches no service: `lamp-services` refuses `lamp-skills` on its tools socket, a skill's `read` step does nothing at its run ("not made: LAMP_SKILL_READS is not on"), and the making model is told to answer a request for a skill naming a service with `cannot:` ("A made skill's read", below) |
 | `LAMP_SKILL_TASKS=on` (#6432; on in the product units) | `lamp-services`, `lamp-control` (and `lamp-tasks`, which runs the task) and `lamp-voice` | A skill's run reaches no service: lamp-control answers `service.read` and `service.write` `off`, `lamp-services` refuses the `lamp-control.service` cgroup on its tools socket and the voice's `run_write_waiting`, and the voice reads no run's write back ("A skill's run on the lamp's Hermes", below) |
-| `lamp-services --run-calls` (the linked-service memory plan, slice 4; in no product unit) | `lamp-services` | No skill run's calls are kept and the voice's `run_calls_since` is refused ("The last 64 calls across all runs kept", below) |
+| `lamp-services --run-calls` (the linked-service memory plan, slice 4; in `lamp-services.service` since 19 Nov) | `lamp-services` | No skill run's calls are kept and the voice's `run_calls_since` is refused ("The last 64 calls across all runs kept", below) |
 | `LAMP_SERVICE_READ_IDS_KEPT=on` (tracker row C132; on in the product's lamp-voice unit, beside #6410) | `lamp-voice`'s second route, with `LAMP_SERVICES=on` | A calendar read keeps nothing: a move or cancel of an event from an earlier conversation reads in each request and is refused by the after-read rule there ("After a read", below) |
 
 A write, and a read said in full, also need the owner's face seen speaking
@@ -1995,7 +1995,14 @@ minutes from when it came due, so a read queued behind another skips the
 day when its hour runs out ("skipped: another read under way"), never
 starting a fresh hour. Without it, two skills' reads held at their gates
 together (Morning agenda and Morning mail behind a visitor) would say their
-lines in turn, one's between the other's. A
+lines in turn, one's between the other's. A skill task's told answer
+(what its agent found, `service_read::tell_answer`) that its owner asked
+by voice now is not a read and has none of this gate (#7894,
+docs/skills.md): it is said as soon as its run ended, held only while the
+lamp is private or paused, and takes the turn only from a read under way,
+with no minute's gap; it gives the turn back as it ends, so a scheduled
+read still waits its minute after it. One asked by anyone else keeps this
+gate after one short line, and one nobody asked keeps it whole. A
 read runs once a local day per skill (kept in `lamp-skills`' memory, so a
 restart of `lamp-skills` forgets it and can allow another read that day).
 While its run waits for the gate, and after it came
@@ -2037,7 +2044,8 @@ apart stopped a read before a word. Anything else closes it at once.
 error>", never a title, sender or subject.
 
 **Not linked at the run** (`LAMP_SKILL_LINK_NOTE=on` in `lamp-skills`,
-with its `--state-dir`; off, [switches.md](switches.md)). A read refused
+with its `--state-dir`; on in the product unit, off unless set,
+[switches.md](switches.md)). A read refused
 because the service isn't linked (`NOT_LINKED`; never "couldn't be
 reached" or another refusal) is said once, as exact words through the say
 socket after the gate is judged again: "Gmail isn't linked to this lamp
@@ -2583,10 +2591,11 @@ token ever leaves root's store: neither lamp-control nor the run holds one.
   switch off ignores it, no "sent" without done); in lamp-control, `session::tests` (the switch off, no grant, the
   wrong kind, a paired computer, a granted read) and `protocol::tests`.
 
-### The last 64 calls across all runs kept (`--run-calls`, slice 4 of the linked-service memory plan, off)
+### The last 64 calls across all runs kept (`--run-calls`, slice 4 of the linked-service memory plan, on in the product)
 
 The ring the voice writes memory's `agent` records from (slice 5, below).
-No product unit passes the flag.
+The product unit passes the flag since 19 Nov, by the product owner's rule of 18
+Nov that everything is on by default (https://github.com/autonomous-ai/lampOS/issues/6811#issuecomment-6977525471).
 
 - **What is kept** (`run_calls.rs`). With `--run-calls`, each `service_read`
   and `service_write` a skill's run makes through lamp-control
@@ -2643,7 +2652,7 @@ No product unit passes the flag.
   path asked as a skill; the owner gets the ring); in lamp-control,
   `services::tests` and `session::tests` (the run's id on the line).
 
-### A skill run's calls in its person's memory (`LAMP_SERVICE_RECORDS_AGENT`, slice 5 of the linked-service memory plan, off)
+### A skill run's calls in its person's memory (`LAMP_SERVICE_RECORDS_AGENT`, slice 5 of the linked-service memory plan, on in the product)
 
 The voice's side of the ring above: each call of a skill's run, read or
 write, kept as one `agent` record in the Days memory of the person the voice

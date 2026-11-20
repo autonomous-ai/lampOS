@@ -252,6 +252,12 @@ pub struct NewsWords {
     /// failure. A skill without it says the built-in words.
     #[serde(default = "failed_not_ready")]
     pub failed_not_ready: String,
+    /// ...or was ended as the lamp's kept session got stuck and was
+    /// restarted under it (lamp-tasks' `one_session_stuck`, #7906 sign 5):
+    /// told at once in [`STUCK_LINE`]'s words. A skill without it says the
+    /// built-in words.
+    #[serde(default = "failed_stuck")]
+    pub failed_stuck: String,
     /// A hand-over that went into an earlier session of the person's, by
     /// its name (lamp-tasks' `serve --reply-named`, #5535): `{asked}`,
     /// `{who}` and `{session}`, so a wrong one is heard at once. A skill
@@ -374,6 +380,18 @@ fn failed_not_ready() -> String {
     )
 }
 
+/// What the person hears when the lamp's agent got stuck under their ask
+/// and is being restarted (#7906 sign 5): the ask ended, the next one goes
+/// to the restarted session.
+pub const STUCK_LINE: &str = "I can't handle that right now; please ask me again in a few minutes.";
+
+/// [`NewsWords::failed_stuck`]'s words, built in.
+fn failed_stuck() -> String {
+    format!(
+        "The work the person asked you to hand over, \"{{asked}}\", was not handed to {{who}}: the lamp's agent got stuck and is being restarted, so nothing was done. Tell them in these words, and nothing more: \"{STUCK_LINE}\""
+    )
+}
+
 /// [`NewsWords::joined_reopened`]'s words, built in.
 fn joined_reopened() -> String {
     "It was closed, and you reopened it for this with its earlier conversation: begin with \"I reopened that session\".".into()
@@ -441,6 +459,7 @@ impl NewsWords {
             failed_closed: failed_closed(),
             failed_closed_soon: failed_closed_soon(),
             failed_not_ready: failed_not_ready(),
+            failed_stuck: failed_stuck(),
             joined: joined(),
             joined_asked: joined_asked(),
             joined_reopened: joined_reopened(),
@@ -538,6 +557,7 @@ impl NewsWords {
                     &self.failed_not_ready,
                     &["asked", "who"],
                 ),
+                ("failed_stuck", &self.failed_stuck, &["asked", "who"]),
                 ("joined_reopened", &self.joined_reopened, &[]),
                 ("joined_fresh", &self.joined_fresh, &[]),
                 ("joined", &self.joined, &["asked", "session", "who"]),
@@ -629,6 +649,7 @@ impl NewsWords {
                 ("failed_closed", note(&self.failed_closed, &[])),
                 ("failed_closed_soon", note(&self.failed_closed_soon, &[])),
                 ("failed_not_ready", note(&self.failed_not_ready, &[])),
+                ("failed_stuck", note(&self.failed_stuck, &[])),
                 ("answered", note(&self.answered, &done)),
                 ("answered_cut", note(&self.answered_cut, &done)),
                 (
@@ -834,6 +855,7 @@ mod tests {
                     "failed_closed = ",
                     "failed_closed_soon = ",
                     "failed_not_ready = ",
+                    "failed_stuck = ",
                     "joined_reopened = ",
                     "joined_fresh = ",
                     "answered = ",
@@ -859,6 +881,7 @@ mod tests {
         assert_eq!(read.failed_closed, failed_closed());
         assert_eq!(read.failed_closed_soon, failed_closed_soon());
         assert_eq!(read.failed_not_ready, failed_not_ready());
+        assert_eq!(read.failed_stuck, failed_stuck());
         assert_eq!(read.joined_reopened, joined_reopened());
         assert_eq!(read.joined_fresh, joined_fresh());
         assert_eq!(NewsWords::in_dir(&skills()).failed_closed, failed_closed());
@@ -867,6 +890,7 @@ mod tests {
         assert_eq!(installed.failed_signed_out, failed_signed_out());
         assert_eq!(installed.failed_no_prompt, failed_no_prompt());
         assert_eq!(installed.failed_not_ready, failed_not_ready());
+        assert_eq!(installed.failed_stuck, failed_stuck());
         assert_eq!(read.answered, answered());
         assert_eq!(read.answered_cut, answered_cut());
         let installed = NewsWords::in_dir(&skills());

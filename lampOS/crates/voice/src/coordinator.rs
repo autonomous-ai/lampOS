@@ -1561,11 +1561,19 @@ impl Reply {
         // played whole, with no gap in its playback.
         // A computer's stream is `spoken` when its last chunk played out;
         // a gap in a stream's sound is its computer's, not a cut.
+        // A long exact line's pieces (#7892) are `spoken` once the last
+        // played out and none went unrendered: a gap while a piece renders
+        // is no cut. One cut short, a piece not rendered, is never said
+        // whole, however the rest played (Fourteen's HOLD on #7897).
+        let fed_whole = self.notice.fed_whole() != Some(false);
         let sound = (matches!(
             self.notice.origin(),
             SpeechOrigin::SkillSound | SpeechOrigin::ExactLine
         ) && self.playback_gaps == 0
-            || self.notice.origin() == SpeechOrigin::ComputerStream)
+            || self.notice.origin() == SpeechOrigin::ComputerStream
+            || self.notice.origin() == SpeechOrigin::ExactLine
+                && self.notice.fed_whole() == Some(true))
+            && fed_whole
             && self.settled(speaker_pending)
             && self.notice.retired();
         // A reminder that played through gaps and counts as said
@@ -1575,10 +1583,11 @@ impl Reply {
         // (#6749 D: a skill task's ask said whole was answered `dropped`
         // for its gaps, so lamp-skills counted it unsaid and asked again
         // 10 min later). Only a cut, a failed answer or no audio drops it.
-        let played_whole = sound
-            || self.heard_whole(speaker_pending, snapshot)
-            || self.said_through_gaps(speaker_pending, snapshot)
-            || self.reminder.is_none() && self.heard_through(speaker_pending, snapshot);
+        let played_whole = fed_whole
+            && (sound
+                || self.heard_whole(speaker_pending, snapshot)
+                || self.said_through_gaps(speaker_pending, snapshot)
+                || self.reminder.is_none() && self.heard_through(speaker_pending, snapshot));
         // complete_reminder runs first. Read its resulting settlement, not the
         // pre-completion eligibility that successful completion consumes.
         let reminder_complete = self
@@ -5889,6 +5898,9 @@ thread_local! {
     static TEST_PRIVACY_GAP_RIDE: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
     /// A loop test's `LAMP_PRIVACY_RIDES_STALL=on` (#5611), as `TEST_FULL_LOOK`.
     static TEST_PRIVACY_RIDES_STALL: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
+    /// A loop test's `LAMP_VOICE_UNSTARTED_FRAME_DROP=on` (#7224), as
+    /// `TEST_FULL_LOOK`.
+    static TEST_UNSTARTED_FRAME_DROP: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
     /// A loop test's stall inside a pass (#5633): at the first time, on the
     /// scenario clock, the pass after its top is held this many
     /// microseconds with nothing read, as a page fault in running code is.
@@ -6511,6 +6523,14 @@ fn conversation_with_gate_inner(
     let mut capture_epoch = None;
     let mut last_capture = None;
     let mut capture_gap = CaptureGap::default();
+    // Frames before the speaker's clock has started again, taken as a gap's
+    // with LAMP_VOICE_UNSTARTED_FRAME_DROP=on (#7224).
+    #[cfg(test)]
+    let unstarted_on = crate::unstarted_frames::from_environment()
+        || TEST_UNSTARTED_FRAME_DROP.with(std::cell::Cell::get);
+    #[cfg(not(test))]
+    let unstarted_on = crate::unstarted_frames::from_environment();
+    let mut unstarted_frames = crate::unstarted_frames::UnstartedFrames::new(unstarted_on);
     // The epoch a stall closed: its frames still in flight are dropped.
     let mut closed_epoch = None;
     // A gap cut into someone's utterance: it is abandoned as a hand Stop
@@ -6598,6 +6618,8 @@ fn conversation_with_gate_inner(
     // What the line the lamp began itself is, for `lamp/did`
     // (`LAMP_DID_VOICE`, #7757): told at its first audio queued, never before.
     let mut did_voice_line: Option<(u64, crate::did_voice::Moment)> = None;
+    // The publishing thread starts here, not at the first audio queued.
+    crate::did_voice::ready();
     // The eyes' faces, for the person an own line is for (#2287's
     // follow-up): read every 100 ms off the audio path, only with either
     // switch; passing ids and booleans, nothing kept past 30 s.
@@ -6909,6 +6931,9 @@ fn conversation_with_gate_inner(
     } else {
         None
     };
+    // Task news worded by the lamp's agent (`LAMP_CORE_VIA_AGENT`'s `news`):
+    // nothing is asked of it with the switch off.
+    let mut news_wordings = crate::news_agent::Wordings::from_environment();
     // A skill run's held write, read back for a spoken yes (#6432,
     // `LAMP_SKILL_TASKS=on`): none with the switch off.
     let mut run_writes = if lifetime.continuous() {
@@ -6916,6 +6941,16 @@ fn conversation_with_gate_inner(
     } else {
         None
     };
+    // A long make's news, told to its person at the lamp (#6811,
+    // `LAMP_MAKE_MAY_RUN_ON=on`): none with the switch off.
+    let mut long_makes = if lifetime.continuous() {
+        crate::long_make::Tells::from_environment()
+    } else {
+        None
+    };
+    // The turn telling a long make's news, and its key: acted on only once
+    // that turn was heard through (`crate::long_make::heard`).
+    let mut long_make_turn: Option<(u64, String)> = None;
     // The lamp's agent's answer to a full read is said only while the
     // owner is seen alone, looked at by the say client here
     // (`LAMP_SERVICES_TO_AGENT`, `agent_asks`).
@@ -8896,6 +8931,8 @@ fn conversation_with_gate_inner(
                             // reminder) is told as its first audio is queued.
                             if let Some(moment) = did_voice_moment(current, did_voice_line) {
                                 crate::did_voice::told(moment);
+                                // Once for a line: a go-on of it is not told again.
+                                did_voice_line.take();
                             }
                             // It answers: a wake by name it followed is kept.
                             if let Some(controls) = controls.as_mut() {
@@ -9680,7 +9717,7 @@ fn conversation_with_gate_inner(
                 capture_gap.dropped += 1;
                 continue;
             }
-            if let Some(gone) = validate_capture_frame(
+            let closed = match check_capture_frame(
                 &mut rig.capture.channels.control,
                 &mut capture_epoch,
                 snapshot.microphone_generation(),
@@ -9688,6 +9725,36 @@ fn conversation_with_gate_inner(
                 rig.noise_suppression,
                 trace,
             )? {
+                CheckedFrame::Valid(closed) => {
+                    unstarted_frames.passed();
+                    closed
+                }
+                // With LAMP_VOICE_UNSTARTED_FRAME_DROP=on (#7224), a frame
+                // before the speaker's clock has started again (a reopen
+                // racing a re-prime) ends the voice only at the boot
+                // barrier; mid-run it is a gap's dropped frame, said once
+                // per reopen. Off, the voice ends as before.
+                CheckedFrame::Unstarted(closed) => {
+                    match unstarted_frames.failed(frame.epoch) {
+                        crate::unstarted_frames::Unstarted::Exit => {
+                            return Err(unstarted_clock_error());
+                        }
+                        crate::unstarted_frames::Unstarted::Drop(line) => {
+                            if let Some(line) = line {
+                                eprintln!("{line}");
+                            }
+                        }
+                    }
+                    if let Some(gone) = closed {
+                        closed_epoch = Some(gone);
+                        capture_gap.closed = true;
+                        gap_cut_utterance = true;
+                    }
+                    capture_gap.dropped += 1;
+                    continue;
+                }
+            };
+            if let Some(gone) = closed {
                 // Closed and maybe already reopened: either way this pass
                 // takes no frame across the cut.
                 closed_epoch = Some(gone);
@@ -11856,6 +11923,16 @@ fn conversation_with_gate_inner(
         lease_end_drained = last_capture.is_some()
             && !gap_cancelled
             && held_turn_lease_ending(owner.snapshot(now())?);
+        // Capture's reopen hold closed the microphone for a clock that had
+        // not started (#7224): with the switch, the heartbeat counts from
+        // that recovery, as from a ridden privacy gap's reopen, so the
+        // hold's two steps have their bound; its second ends capture
+        // within 0.8 s of the recovery's reopen, so this moves once a hold.
+        if let Some(at) = trace.clock_recovery_at_us.take()
+            && unstarted_on
+        {
+            frames_from_us = frames_from_us.max(at);
+        }
         if retention_expired(last_capture, frames_from_us, monotonic_us()) {
             return Err(io::Error::other("microphone retention heartbeat expired").into());
         }
@@ -12064,6 +12141,21 @@ fn conversation_with_gate_inner(
                     walk.invitation_finished(current.owner.boot(), turn, delivery, monotonic_us());
                 }
                 onboarding_invitation_turn = None;
+            }
+            // A long make's news (#6811): its skill goes on, and it is
+            // marked told, only once its turn was heard through; cut or
+            // talked over, it stays off and is told again next time.
+            if let Some((told_in, key)) = long_make_turn.take() {
+                if crate::long_make::heard_through(
+                    told_in == turn,
+                    current.heard_through(&speaker_pending, snapshot),
+                ) {
+                    crate::long_make::heard_here(key);
+                } else {
+                    eprintln!(
+                        "lamp-voice: a long make's news was not heard through: it stays untold, its skill off (#6811)"
+                    );
+                }
             }
             let told_news = current.news.clone();
             let heard = current.heard_news(&speaker_pending, snapshot);
@@ -14111,6 +14203,66 @@ fn conversation_with_gate_inner(
             )?;
             last_publish = monotonic_us();
         }
+        // A long make's news (#6811): "ready and on" in one line, or that
+        // it wasn't finished or put on, said only to its person at the
+        // lamp, as the lamp's own turn: their face seen alone (the line
+        // names the skill), no conversation going on (15 s with nothing said
+        // by or to the lamp), never in the quiet hours, never to an empty
+        // room; else it waits, for days if need be
+        // (`crate::long_make::may_tell`). News is looked for first, so the
+        // faces are read only when there is some.
+        let long_make_now = (std::time::Instant::now(), crate::app_make::now_unix_ms());
+        if let Some(tells) = long_makes.as_mut()
+            && !reminder_waiting
+            && tells.has_news(long_make_now.0, long_make_now.1)
+            && !room.busy()
+            && reply.is_none()
+            && provider_queue.is_empty()
+            && !admission.owns_stream()
+            && !submission_draining
+            && snapshot.listening_ready(now())
+            && crate::long_make::may_tell(
+                crate::services::owner_sees_alone_now(),
+                crate::task_news::quiet_for_news(
+                    false,
+                    clock,
+                    last_turn_us,
+                    last_spoke_us,
+                    last_speech_us,
+                    reminder_quiet(
+                        clock,
+                        reminder_cycle_started_us,
+                        last_speech_us,
+                        last_capture,
+                    ),
+                ),
+                crate::run_write_yes::quiet_hours_now(),
+                presence
+                    .as_ref()
+                    .is_some_and(|presence| presence.present(clock)),
+            )
+            && let Some(provider_session) = unasked_session(&cloud, unasked_paused)
+            && let Some(note) = tells.next(long_make_now.0, long_make_now.1)
+        {
+            eprintln!("lamp-voice: telling a long make's news to its person at the lamp (#6811)");
+            snapshot = commit_written_turn(
+                owner,
+                reply,
+                &mut provider_queue,
+                &note,
+                false,
+                crate::long_make::BASIS,
+                provider_session,
+                rig.playout_start_now(),
+                trace,
+                |state| rig.publish(state),
+            )?;
+            long_make_turn = reply
+                .as_ref()
+                .zip(crate::long_make::key_of(&note))
+                .map(|(current, key)| (current.owner.turn(), key.to_owned()));
+            last_publish = monotonic_us();
+        }
         // News whose turn was cut short since the last tick: with
         // `LAMP_TASK_NEWS_RETELL=on`, told once more at the next quiet
         // pause (#4342).
@@ -14130,12 +14282,31 @@ fn conversation_with_gate_inner(
                 news.begun(request, vec![key]);
             }
         }
+        // With `LAMP_CORE_VIA_AGENT`'s `news` (the first builder's 09:26):
+        // the news first in line is handed to the lamp's agent to word as
+        // soon as it is, and held at most 10 s for its line
+        // (`news_agent::Wordings::step`). Never begun mid-conversation (a
+        // turn open, or one in the last 15 s; the first builder's 09:57), and
+        // a person's ask that comes while it runs cancels it in lamp-tasks
+        // (`lamp_tasks::voice_ask`). Off, nothing is asked here.
+        let news_step = match task_news.as_mut() {
+            Some(news) if crate::news_agent::on() => {
+                let talking = crate::news_agent::in_conversation(
+                    reply.is_some() || admission.owns_stream(),
+                    clock,
+                    last_turn_us,
+                );
+                news_wordings.step(news.waiting(), Instant::now(), !talking)
+            }
+            _ => crate::news_agent::Step::Tell,
+        };
         // News told once more waits for no conversation going on (15 s with
         // nothing said by or to the lamp), whatever the pause switch says:
         // the person speaking always wins (#4342).
         if let Some(news) = task_news.as_mut()
             && !reminder_waiting
             && news.waiting().is_some()
+            && news_step != crate::news_agent::Step::Wait
             && crate::task_news::quiet_for_news(
                 (news.sign_in_first() || news_at_pause) && !news.retelling_first(),
                 clock,
@@ -14196,11 +14367,17 @@ fn conversation_with_gate_inner(
                     "retold":news.retold(&told.key),
                     "at_pause":news_at_pause || crate::sign_in::is_news(&told.key),"since_turn_ms":clock.saturating_sub(last_turn_us) / 1_000}),
             )?;
+            // The agent's line, only for the very news and note it worded;
+            // otherwise the note, as before.
+            let agent_turn = news_wordings.take_line(&told);
+            if let Some(journal) = crate::news_agent::journal(&news_step, agent_turn.is_some()) {
+                eprintln!("lamp-voice: {journal}");
+            }
             snapshot = commit_written_turn(
                 owner,
                 reply,
                 &mut provider_queue,
-                &told.note,
+                agent_turn.as_deref().unwrap_or(&told.note),
                 false,
                 "lamp_tells_news",
                 provider_session,
@@ -15213,7 +15390,12 @@ fn play_exact_line(
     let (snapshot, _) = speaker_tone::commit_sound_turn(
         owner,
         reply,
-        NoticeDelivery::sound(SpeechOrigin::ExactLine, samples),
+        // A long line's pieces play from their feed as they are rendered
+        // (#7892); any other line from its samples, as before.
+        match ticket.pieces() {
+            Some(feed) => NoticeDelivery::fed(SpeechOrigin::ExactLine, feed),
+            None => NoticeDelivery::sound(SpeechOrigin::ExactLine, samples),
+        },
         "exact_line",
         "a computer's exact words: nothing heard, nothing sent to the provider",
         0,
@@ -17466,6 +17648,18 @@ fn drain_capture_control(
                 json!({"kind":"echo_reference_reset","at_us":monotonic_us(),"details":event}),
             )?,
             WorkerEvent::CaptureGap { epoch: gone, .. } if *epoch == Some(gone) => {
+                // When the worker closed the microphone, on the same clock as
+                // its frames' reads, never this drain's own time: a late
+                // drain must not drop a frame read after the reopen.
+                if let WorkerEvent::CaptureGap {
+                    reason,
+                    closed_at_us,
+                    ..
+                } = &event
+                    && reason == crate::unstarted_frames::CLOCK_NOT_STARTED
+                {
+                    trace.clock_recovery_at_us = Some(*closed_at_us);
+                }
                 record(
                     trace,
                     json!({"kind":"capture_gap_closed","at_us":monotonic_us(),"details":event}),
@@ -17557,6 +17751,7 @@ impl CaptureGap {
     }
 }
 
+#[cfg(test)]
 fn validate_capture_frame(
     channel: &mut Channel,
     epoch: &mut Option<u64>,
@@ -17565,6 +17760,43 @@ fn validate_capture_frame(
     expected_noise_suppression: NoiseSuppression,
     trace: &mut SessionState,
 ) -> Result<Option<u64>> {
+    match check_capture_frame(
+        channel,
+        epoch,
+        privacy_generation,
+        frame,
+        expected_noise_suppression,
+        trace,
+    )? {
+        CheckedFrame::Valid(closed) => Ok(closed),
+        CheckedFrame::Unstarted(_) => Err(unstarted_clock_error()),
+    }
+}
+
+fn unstarted_clock_error() -> Box<dyn std::error::Error + Send + Sync> {
+    io::Error::other("capture frame preceded certified running reference clock").into()
+}
+
+/// A capture frame's check, with the one failure the coordinator may take
+/// as a gap kept apart (#7224).
+#[derive(Debug, PartialEq)]
+enum CheckedFrame {
+    /// Passed; the epoch the control drain found closed, if any.
+    Valid(Option<u64>),
+    /// Failed only the reference clock's start: before its playback epoch,
+    /// or a microphone epoch's first frame with no clock start. The epoch
+    /// found closed, as for `Valid`.
+    Unstarted(Option<u64>),
+}
+
+fn check_capture_frame(
+    channel: &mut Channel,
+    epoch: &mut Option<u64>,
+    privacy_generation: u64,
+    frame: &MicrophoneFrame,
+    expected_noise_suppression: NoiseSuppression,
+    trace: &mut SessionState,
+) -> Result<CheckedFrame> {
     // The worker sends its start report before its first frame, but the two
     // sockets may become readable between our control drain and data receive.
     // Re-read control after receiving the frame instead of discarding its words.
@@ -17574,20 +17806,16 @@ fn validate_capture_frame(
     if epoch.is_none() || Some(frame.epoch) != *epoch {
         closed = drain_capture_control(channel, epoch, expected_noise_suppression, trace)?;
         if closed == Some(frame.epoch) {
-            return Ok(closed);
+            return Ok(CheckedFrame::Valid(closed));
         }
     }
     if Some(frame.epoch) != *epoch || frame.privacy_generation != privacy_generation {
         return Err(io::Error::other("microphone lineage changed during test").into());
     }
-    if frame.timing.reference.playback_epoch == 0
-        || (frame.frame_sequence == 1 && frame.timing.reference.clock_started_at_us.is_none())
-    {
-        return Err(
-            io::Error::other("capture frame preceded certified running reference clock").into(),
-        );
+    if crate::unstarted_frames::unstarted(frame.frame_sequence, &frame.timing.reference) {
+        return Ok(CheckedFrame::Unstarted(closed));
     }
-    Ok(closed)
+    Ok(CheckedFrame::Valid(closed))
 }
 
 /// A change of trust in the capture worker's echo reference. It is a status,
@@ -18915,6 +19143,63 @@ mod tests {
             Some(1)
         );
         assert_eq!(epoch, Some(2));
+    }
+
+    /// Heron's P3 on #8011 (#7224): the heartbeat moves to when capture
+    /// closed the microphone for a clock that had not started, as its
+    /// `ClockNotStarted` gap says, not to when a late drain read it, so a
+    /// frame read after the close and before the drain is still taken.
+    #[test]
+    fn a_clock_recovery_moves_the_heartbeat_to_its_own_close_not_the_drain() {
+        let dir = SessionDirectory::create().unwrap();
+        let (mut parent, mut capture) = pair(&dir, "capture");
+        let mut epoch = Some(3);
+        let mut trace = SessionState::default();
+        let closed_at_us = monotonic_us();
+        capture
+            .control
+            .send(WorkerEvent::CaptureGap {
+                epoch: 3,
+                reason: crate::unstarted_frames::CLOCK_NOT_STARTED.to_owned(),
+                closed_at_us,
+            })
+            .unwrap();
+        let read_at_us = closed_at_us + 1;
+        std::thread::sleep(Duration::from_millis(30));
+        assert_eq!(
+            drain_capture_control(
+                &mut parent.control,
+                &mut epoch,
+                NoiseSuppression::On,
+                &mut trace
+            )
+            .unwrap(),
+            Some(3)
+        );
+        let from_us = trace.clock_recovery_at_us.take().unwrap();
+        assert_eq!(from_us, closed_at_us);
+        let drained_at = monotonic_us();
+        assert!(drained_at > read_at_us + 20_000, "the drain came late");
+        let ride = crate::privacy_gap::GapRide::new(false);
+        assert!(ride.takes_frame(read_at_us, from_us, drained_at));
+        // Another gap's reason moves nothing.
+        capture
+            .control
+            .send(WorkerEvent::CaptureGap {
+                epoch: 4,
+                reason: "AuthorityExpired".to_owned(),
+                closed_at_us,
+            })
+            .unwrap();
+        let mut epoch = Some(4);
+        drain_capture_control(
+            &mut parent.control,
+            &mut epoch,
+            NoiseSuppression::On,
+            &mut trace,
+        )
+        .unwrap();
+        assert_eq!(trace.clock_recovery_at_us, None);
     }
 
     fn ready_link(revision: u64, session: u64) -> ProviderLink {

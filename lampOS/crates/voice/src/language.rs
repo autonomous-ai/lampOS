@@ -389,8 +389,7 @@ const FIXED_LINES: &[(&str, [&str; 4])] = &[
         ],
     ),
     // Before the rest of an answer a wordless cut ended, picked up again in a
-    // busy room (`LAMP_CUT_IN_WORDLESS_RESUMES`, off in the product until its
-    // lamp check passes, #5430).
+    // busy room (`LAMP_CUT_IN_WORDLESS_RESUMES`, on in the product, #7413).
     (
         crate::cut_in_wordless::BRIDGE,
         ["Dù sao thì,", "それでね、", "总之，", "아무튼,"],
@@ -488,6 +487,17 @@ const FIXED_LINES: &[(&str, [&str; 4])] = &[
             "わかった。",
             "好的，明白了。",
             "알겠어요.",
+        ],
+    ),
+    // What the second route says when a keep it said back is taken back
+    // for doubt (`LAMP_MEMORY_UNSURE_NOT_KEPT`, #7739).
+    (
+        crate::remember::doubted::TAKEN_BACK_LINE,
+        [
+            "Xin lỗi, rốt cuộc mình chưa lưu điều đó.",
+            "ごめんね、やっぱりそれは覚えておかなかったよ。",
+            "抱歉，我最后还是没有记下这个。",
+            "미안해요, 결국 그건 기억해 두지 않았어요.",
         ],
     ),
     // What the second route says for a line that only asks to keep, every
@@ -700,6 +710,15 @@ const FIXED_LINES: &[(&str, [&str; 4])] = &[
             "んー。もっとして。",
             "嗯……再来一点嘛。",
             "음. 더 해 주세요.",
+        ],
+    ),
+    (
+        crate::long_make::RUN_ON_LINE,
+        [
+            "Cái này hơi lâu một chút. Xong mình sẽ báo bạn nhé.",
+            "これは少し時間がかかりそう。できたら知らせるね。",
+            "这个要花点时间。好了我会告诉你。",
+            "이건 시간이 좀 걸려요. 다 되면 알려 드릴게요.",
         ],
     ),
     (

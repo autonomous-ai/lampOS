@@ -32,7 +32,8 @@
 //!   each burst's start, its frames handed (count and bytes), and its end:
 //!   answered (how many kinds were counted and the server's time per
 //!   frame), busy or failed (and how long the bursts are held back), or
-//!   aborted. At most one burst a minute, so at most four lines a minute.
+//!   aborted. At most one burst a minute (every 15 s at fastest, with
+//!   [`FAST_ENVIRONMENT`] on and the cloud's `seen_clip`), so at most four lines a minute (twelve).
 //!   No picture, no id, no name, and no label: the surest label and its
 //!   confidence and each kind counted by name only with the diagnostics
 //!   switch [`crate::JOURNAL_LABELS`] `on`, since a forget or the opt-in
@@ -58,8 +59,28 @@ use std::time::{Duration, Instant};
 pub const FRAMES: u32 = 8;
 /// Between two frames asked of the camera in a burst.
 pub const SPACING_US: u64 = 1_200_000;
-/// From one burst's start to the next's.
+/// From one burst's start to the next's, by default. A burst under way
+/// holds the next back until it ends, so two never overlap and none is
+/// queued.
 pub const EVERY_US: u64 = 60_000_000;
+/// The fastest a burst may go, and only with [`FAST_ENVIRONMENT`] on (the
+/// owner's call of 19 Nov on #7401, for the seen reactions): the cloud's
+/// `seen_clip` picks the period within it and [`EVERY_US`] ([`crate::clip`]).
+pub const FAST_EVERY_US: u64 = 15_000_000;
+/// The switch that lets the cloud's `seen_clip` go faster than [`EVERY_US`],
+/// down to [`FAST_EVERY_US`]: `on` exactly ([`crate::switched_on`]); dark,
+/// no unit sets it. Anything else and it is every [`EVERY_US`].
+pub const FAST_ENVIRONMENT: &str = "LAMP_SEEN_BURST_15S";
+
+/// The fastest burst period the switch's value allows: [`FAST_EVERY_US`]
+/// for `on` exactly, else [`EVERY_US`].
+pub fn fastest_us(value: Option<&str>) -> u64 {
+    if crate::switched_on(value) {
+        FAST_EVERY_US
+    } else {
+        EVERY_US
+    }
+}
 /// The smallest frame taken, and the size every frame is sent at.
 pub const LEAST_SIZE: (u32, u32) = crate::scale::SENT;
 
@@ -235,6 +256,10 @@ pub struct Activity {
     pace: Pace,
     running: Option<Running>,
     next_us: u64,
+    /// From one burst's start to the next's: [`EVERY_US`] (or
+    /// [`FAST_EVERY_US`] with its switch, [`every_us`]), or longer on a warm
+    /// or hot board ([`crate::heat::Pace`]).
+    every_us: u64,
     retreat: Retreat,
     last_failure: Option<Failure>,
     wiped: Arc<AtomicU64>,
@@ -254,12 +279,36 @@ impl Activity {
             pace,
             running: None,
             next_us: 0,
+            every_us: EVERY_US,
             retreat: Retreat::default(),
             last_failure: None,
             wiped: Arc::new(AtomicU64::new(0)),
             counts: Counts::default(),
             notes: Vec::new(),
         }
+    }
+
+    /// Space the bursts `every_us` apart, start to start
+    /// ([`crate::heat::Pace`]): the next one too, counted from the last
+    /// one's start. A burst under way finishes as it is.
+    pub fn set_every_us(&mut self, every_us: u64) {
+        if self.next_us > 0 {
+            self.next_us = self
+                .next_us
+                .saturating_sub(self.every_us)
+                .saturating_add(every_us);
+        }
+        self.every_us = every_us;
+    }
+
+    /// From one burst's start to the next's, now.
+    pub fn every_us(&self) -> u64 {
+        self.every_us
+    }
+
+    /// The same, a burst every `every_us` ([`every_us`]).
+    pub fn every(self, every_us: u64) -> Self {
+        Self { every_us, ..self }
     }
 
     /// The journal's notes since the last call, oldest first.
@@ -371,7 +420,7 @@ impl Activity {
     }
 
     fn start(&mut self, now_us: u64) -> bool {
-        self.next_us = now_us.saturating_add(EVERY_US);
+        self.next_us = now_us.saturating_add(self.every_us);
         self.counts.bursts = self.counts.bursts.saturating_add(1);
         match Burst::start(self.endpoint.clone(), self.pace) {
             Ok(burst) => {

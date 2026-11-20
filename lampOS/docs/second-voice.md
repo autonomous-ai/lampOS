@@ -233,7 +233,7 @@ each line plays exactly as before.
 | The second route's down lines, and a look that never began | `second_provider::DOWN_LINE` ("Sorry, my thoughts are slow just now. Ask me again in a moment."), `DOWN_LINE_AGAIN`, `DOWN_LINE_CANNOT`, `DOWN_LINE_LIMIT` ("I've hit my usage limit."); `COULD_NOT_LOOK` ("I couldn't get a good look.") | the down lines rendered by this route's voice after a turn and kept in memory (`LAMP_SECOND_DOWN_LINE`, on in the product); the look's said as the turn's text (`LAMP_SECOND_LOOK`, on) | rendered and said in the owner's words (`DownLine`'s language, read at start; `language::fixed_in`) |
 | The second route's answer to a stop said over it, or within 3 s after it | `spoken_stop::LINE` ("Okay, I'll stop there.") | rendered by this route's voice as its worker starts, played at once as the lamp's words and kept in the thread (`LAMP_SPOKEN_STOP_ENDS`, on; `FixedClips`, #4710); `ProviderOutput::StopAnswered` tells the coordinator first, so a reminder's ring the line cut is held, not rung once more (`LAMP_RING_STOP_ENDS_IT`, schedule.md) | the owner's words, rendered ahead and kept in the thread (`language::fixed_in`); the stop itself is still heard by its English words (`spoken_stop::is_stop_request`) |
 | The second route's question after a cut-in that ended its answer with no words | `cut_in_wordless::LINE` ("Um, excuse me, did anyone say something?") | rendered ahead as the stop line, quiet room only (`LAMP_CUT_IN_WORDLESS_ASKS`, on in the product by the memory owner's call, 4 Nov; the lamp's own echo can still be asked, #4710, #4938) | the owner's words, rendered ahead (`language::fixed_in`) |
-| The second route's lines when a wordless cut-in is picked up again | `cut_in_wordless::BRIDGE` ("Anyway,"), `AGAIN` ("Oops, cut off again. Anyway,"), `PAUSE` ("It's a bit noisy here, so I'll pause. Just say 'Lamp' when you want me to go on.") | rendered ahead as the stop line; the first two then the cut answer's rest (`LAMP_CUT_IN_WORDLESS_RESUMES`, on in the product by the memory owner's call, 5 Nov) | the owner's words, rendered ahead (`language::fixed_in`); the rest in the answer's own words |
+| The second route's lines when a wordless cut-in is picked up again | `cut_in_wordless::BRIDGE` ("Anyway,"), `AGAIN` ("Oops, cut off again. Anyway,"), `PAUSE` ("It's a bit noisy here, so I'll pause. Just say 'Lamp' when you want me to go on.") | rendered ahead as the stop line; the first two then the cut answer's rest (`LAMP_CUT_IN_WORDLESS_RESUMES`, the memory owner's call, 5 Nov; on in the product, #7413) | the owner's words, rendered ahead (`language::fixed_in`); the rest in the answer's own words |
 | The second route's line when a line by name gets no words twice | `second_provider::NO_WORDS_LINE` ("Sorry, I lost my words there. Could you ask me again?") | said as the turn's text (`LAMP_NO_WORDS_AGAIN`, off in the product) | the owner's words (`language::fixed_in`) |
 | The second route's line when a reply claims again an action no call made | `action_claim::NOT_DONE_LINE` ("Sorry, I didn't do that. Could you ask me again?") | said as the turn's text (`LAMP_ACTION_CLAIM_CHECKED`, on in the product, #5215) | the owner's words (`language::fixed_in`) |
 | The second route's line when an answer to the lamp's own question gets no words | `second_provider::ANSWER_AGAIN_LINE` ("Sorry, could you say that again?") | said as the turn's text (`LAMP_ANSWER_ASK_AGAIN`, off in the product) | the owner's words (`language::fixed_in`) |
@@ -2416,8 +2416,9 @@ order is kept. A written turn is the same from the chat on.
   forget drops them. They are not written to the thread file (an older
   build would set the file aside, #1505): after a restart, earlier
   exchanges are words only. A skill's call through `use_skill` is kept
-  with its `skill`, `choice` and `flag` only (`SKILL_KEPT_FIELDS`: a
-  skill's name, a word from its own list, a yes-or-no), and only when it
+  with its `skill`, `choice`, `flag` and `kind` only (`SKILL_KEPT_FIELDS`:
+  a skill's name, a word from its own list, a yes-or-no, a word from its
+  kinds, #6543), and only when it
   has no other field, its result told "(done earlier: the skill ran then.
   The rest of its result was not kept. A new ask for it needs its own
   call.)" (`SKILL_RAN_EARLIER`; #7076: on lamp-52e6 on 14 Nov a second
@@ -2592,8 +2593,7 @@ order is kept. A written turn is the same from the chat on.
     lamp's answer: answered …", then "first answer audio … its fixed
     line".
   - **A wordless cut-in picked up again** (`LAMP_CUT_IN_WORDLESS_RESUMES`,
-    the memory owner's call on 5 Nov; off in the product since 6 Nov until
-    its busy-room path passes on a lamp, #5430): the same cut-in, counted
+    the memory owner's call on 5 Nov; on in the product, #7413): the same cut-in, counted
     in a run, each within `cut_in_wordless::AGAIN_AFTER` (60 s) of the last
     (`cut_in_wordless::Cuts`). The first in a quiet room still asks
     `cut_in_wordless::LINE`; the first in a busy room says `BRIDGE`
@@ -4221,7 +4221,14 @@ after a take-over, but now for every turn:
   (`KEEP_CLAIMED_UNKEPT`); alone, the model is told once and asked again,
   and a second such reply, or one in the last round, is said as
   `NOT_KEPT_LINE` ("I didn't keep that. Tell me again and I'll remember
-  it."). Not held after any call of the same request but a `recall` ran
+  it."). With `LAMP_KEEP_CLAIM_WHOLE=on` (#7878, off unless set), while no
+  `remember` of the turn has run, a reply whose opening claims no keep is
+  said sentence by sentence (`remember::unclaimed_sentences`), and a later
+  sentence that says a keep or replace done (`remember::claims_a_change`:
+  "That replaces wherever it was before.") is held, with the rest, to the
+  round's end. With no call at all in the round it is a claim on this same
+  path; beside any call, its words are that call's. First audio waits only
+  for the first sentence to end (switches.md). Not held after any call of the same request but a `recall` ran
   unrefused, so a reminder set in round 1 may be confirmed in round 2,
   "Got it, I've saved that for five." (reviewer-three's and the
   reviewer-lead's P2 on #3628). A cut answer's finished rounds carried into
@@ -5378,7 +5385,10 @@ after a take-over, but now for every turn:
       and reminder deletion results retain only fixed success, kept or
       uncertain states. The same sanitizer carries `room_memory_result`,
       `sound_consent_result` and `face_expression_consent_result` only as
-      `cleared`, `kept` or `uncertain`; any other value becomes `uncertain`,
+      `cleared`, `kept` or `uncertain` (the two consents also as
+      `kept as a no`, a kept no a forget leaves with
+      `LAMP_NOTICING_BY_DEFAULT` on, #7767, which is no incomplete step);
+      any other value becomes `uncertain`,
       with no raw payload copied. An absent field stays unreported and is
       never assumed successful.
       For room cleanup, the producer reports `cleared` only for a
@@ -5549,6 +5559,26 @@ after a take-over, but now for every turn:
     name said close to it", "said to the lamp from close to it", "its
     words calling it", "a conversation going on" and "its hearing at the
     line's start" that held (`Attention::second_signs`), never the words.
+  - **A short line without the name is not answered on its sound**
+    (#7891, the first builder at 11:16). On lamp-74ff on 19 Nov, in a
+    meeting, "Yeah." (heard as the name at 0.939, "the name said close to
+    it") and "Okay." (0.973, "its hearing at the line's start") were
+    answered, where real "Hey Lamp" calls score 0.90 to 1.00, so no bar
+    parts them. With `LAMP_NAME_SECOND_SIGN=on`, out of a conversation
+    (`Signs::going_on`), a line of one or two words, not a question (no
+    `?`), none of its words the lamp's name or one written for it
+    (`attention::written_for_the_name`: "lamp", "lamb", `STAND_INS`,
+    `STAND_ALONE_INS`), and words the rule does not read as a call
+    (`attention::called`, `called_by_name`, the owner's language's forms
+    too), while the lamp's own question is not open (a bare "Yes." to it
+    answers the lamp), counts the hearing for nothing, whatever its second
+    sign (`attention::short_line_without_the_name`); the journal says `its
+    name, heard only in the room's sound (began N ms into the line),
+    counts for nothing on a line of one or two words, not a question, with
+    no word written for the name and no conversation going on; the model
+    is not told it was heard (LAMP_NAME_SECOND_SIGN, #7891)`. "Lamp?",
+    "Hey Lamp.", "Hey, Lynn.", "Lamp, put it back.", "Okay?", a longer
+    line and a line in a conversation's window are weighed as before.
 - **A hearing of the name stays with its own line**
   (`LAMP_NAME_STAYS_IN_ITS_LINE=on`, on in the product unit). On lamp-4ace on
   2026-10-26 at 06:21 (build 6919, the busy scene played) `lamp-name` heard
@@ -5953,11 +5983,18 @@ after a take-over, but now for every turn:
   talk past someone at the lamp reads busy, with or without
   `LAMP_NAME_OR_FOLLOW_UP`. The 22 Oct rule that a lone voice with nobody in
   view never makes the room busy stands: here a face is in view and its
-  mouth reads still while the voice talks. With no mouths read
-  (`LAMP_EYES_SPEAKING` off, or any face turned to the lamp never read
-  through the line, judged per face) the face is a sign as before: fail
-  open, so a person alone at a lamp whose eyes can't read mouths is still
-  answered, and a still face beside it does not speak for an unread one.
+  mouth reads still while the voice talks. A face turned to the lamp whose
+  mouth the eyes judged but never read speaking (`unknown` in every look of
+  the line) is not seen speaking either
+  (`speaking_faces::turned_never_seen_speaking`; #7891, lamp-74ff, 19 Nov
+  11:04, request 65: "Is it after all?" in a meeting, "speaking in 0,
+  unread in 8", was played as `someone is turned to the lamp`, the face the
+  second sign for a name heard in the room's sound). With no speaking
+  judged at all (`LAMP_EYES_SPEAKING` off, or a face turned to the lamp
+  with no `speaking` through the line, judged per face) the face is a sign
+  as before: fail open, so a person alone at a lamp whose eyes can't read
+  mouths is still answered, and a still face beside it does not speak for
+  an unjudged one.
   With `LAMP_TURNED_SPEAKING` on too, this rule decides alone. A line carried by `LAMP_SAME_SPEAKER_CARRIES`
   goes on as the conversation, before the face is read, and stays carried.
   Risk: the owner turned to the lamp and asking, whose mouth the eyes read
@@ -6005,14 +6042,32 @@ after a take-over, but now for every turn:
   went unread in 1085 of 1125 looks); or
   when a face turned to the lamp is facing it
   (head pitch from 20 degrees up to 25 degrees down, `said_to_me::PITCH_DEG`
-  as the eyes' `facing` window, and not looking away: the newest `pitch`
-  and `looking` of the one turned face read speaking, both from that face in
-  one look, with `LAMP_EYES_PITCH_GAZE` (a bystander turned to the lamp says
-  nothing; two speaking faces give none),
-  `SpeakingFaces::turned_pose_between`; unknown blocks nothing) and is seen
-  speaking it (one `yes` in a look of the line,
-  `SpeakingFaces::seen_speaking_between`; a mouth never read is not seen
-  speaking), with 3 words or more, a question or an ask; or, out of the
+  as the eyes' `facing` window, and not looking away: the median `pitch`
+  and the most-read `looking` of the one turned face read speaking over the
+  line's looks, each look's from that face, with `LAMP_EYES_PITCH_GAZE` (a
+  bystander turned to the lamp says nothing; two speaking faces give none),
+  `SpeakingFaces::turned_pose_between`; not the newest look alone, #7891:
+  head down to a phone at 40 degrees in three looks and 10 in the last was
+  read facing; the eyes' lost marks stay a pitch here, outside the window;
+  unknown blocks nothing) and is seen speaking it (one `yes` in a look of
+  the line, `SpeakingFaces::seen_speaking_between`; a mouth never read is
+  not seen speaking) while facing in at least 2 looks
+  (`said_to_me::FACING_LOOKS`, `SpeakingFaces::turned_speaking_facing_looks`;
+  #7891, lamp-74ff, 19 Nov 11:16, request 151: meeting talk across the
+  table, no name and no window, was let through on one look), with 3 words
+  or more, a question or an ask, and no second voice in the room since the
+  lamp last spoke (the end of its last words) and within 180 s
+  (`room_told::BUSY_ENDS_AFTER_US`; `said_to_me::Line::second_voice`, from
+  `Heeding::second_voice_at`): an earlier line of more than 2 words that a
+  face in view was read silent through with none read speaking (a voice
+  with no mouth: a call's far side, a video, someone off camera; a lip
+  smack heard as "Mm." is the face's own), or one two faces were seen
+  speaking (a meeting across the lamp). Faces and looks only: product
+  prints go to services (`LAMP_SAME_VOICE_FOR=services`), so no voice print
+  is read; a mouth unread is no evidence. Facing then means nothing, as in
+  a meeting or on a call with a screen (the first builder at 11:20 on
+  #7891); the name in the words, the window, a yes awaited and a bare yes
+  to the lamp's waiting question pass as before; or, out of the
   window, when the lamp still waits on its question
   (`said_to_me::Line::question_waits`: the thread's question asked no more
   than 120 s before, `said_to_me::QUESTION_WAITS`, the lamp's own wait for
@@ -6032,11 +6087,18 @@ after a take-over, but now for every turn:
   and the journal says `request N: not said to the lamp, held: <reason>`
   (`not facing (pitch)`, `looking away`, `not facing in a conversation
   (pitch)`, `looking away in a conversation`, `no face seen speaking it`,
-  `a short line`), followed by `; pitch <degrees>|unread, looking
-  true|false|unread, <n> looks` (#7721). A line let through, in the window
+  `a short line`, `seen speaking facing in fewer than 2 looks`, `a second
+  voice in the room`), followed by `; pitch <degrees>|unread, looking
+  true|false|unread, <n> looks` (#7721; `<n>` the looks that gave the pose,
+  out of the window too, where it was 0 or 1 before #7891), and out of the
+  window `, seen speaking facing in <m>`, and when the lamp's newest words
+  before the line asked a question, `, the lamp asked <s> s before` (the
+  seconds since that exchange began, `Thread::lamp_asked_ago`, for a
+  replay's `asked_s`, #7698). A line let through, in the window
   or out of it, has its own line, `request N: said to me: let through:
   <verdict>: <W> words, in the window|out of the window; pitch …, looking
-  …, <n> looks (LAMP_SAID_TO_ME)`; a short line (`said_to_me::SHORT_WORDS`
+  …, <n> looks[, seen speaking facing in <m>][, the lamp asked <s> s
+  before] (LAMP_SAID_TO_ME)`; a short line (`said_to_me::SHORT_WORDS`
   words or fewer) standing in the window adds which input let it,
   `request N: said to me: a short line stands in the window by
   named|yes awaited|lamp_asked|seen_speaking|read_silent false
@@ -6044,7 +6106,12 @@ after a take-over, but now for every turn:
   addressed still lets a line out.
   `LAMP_TURNED_FACE_SPEAKS` holds a subset of it. Risk: someone at the lamp
   whose mouth the eyes cannot read, or who says one word that is no
-  question, needs its name.
+  question, needs its name; out of the window someone whose mouth is read
+  speaking in only one look, or whose mouth the eyes read still through a
+  line of their own, needs its name for the next 180 s or until the lamp
+  speaks. Open (#7891, #7721): in the window a line whose looks are all lost
+  marks or give no pitch still passes as `the speaker's pose unread`, until
+  the head-down lines of the row are counted.
 - **Who spoke a line, from the looks its mouth was read**
   (`LAMP_SPEAKING_READ_LOOKS=on`, #7442, #7419). A face is a line's speaker
   when it read `yes` in at least half of the line's looks
@@ -6458,10 +6525,11 @@ stands), and eyes that can't be reached at all name nobody, as before. Without a
   and the model told to ask "Shall I forget what you kept about …?" with
   the subject in their words, never the kept text (the Reviewer-lead's P2
   on #6673). Their
-  plain yes on a later line within 30 s, the same session's same person
+  yes on a later line within 30 s, the same session's same person
   (`keep_asker`), seen saying it or in the private room on a one-face line,
-  (`known_faces::plain_agreement_to_forget`: "Yes, forget it.", "Ừ, quên
-  đi.", or "Forget it." alone as that answer) runs that forget by id, in
+  judged by the model with no yes word list (its `forget` on that line,
+  naming nothing else, `agree_held_forget`; the first builder's ruling on
+  leg (e) of #7960's ROW) runs that forget by id, exactly as held, in
   their scope only; a line narrowed since forgets nothing and keeps it
   (`remember::AGREED_FORGET_NOT_NOW`) (`OneFaceForgetYes`,
   `ScopeLease::mark_forget_agreed`, which both runners and the memory route
@@ -8363,7 +8431,22 @@ Reported by the builders:
   to the lamp; otherwise it ends after its words, unanswered (#800,
   [not-speech.md](not-speech.md#a-room-sound-let-through-and-answered-800)).
   Being close to the lamp or facing it cannot be seen here, so it does not
-  count as it does on the Live route.
+  count as it does on the Live route. A hearing of the name does: a short
+  sound in whose window (from 1.5 s before its first sound to its end)
+  lamp-name heard the name at its own bar, 0.9 (`called::LEAST_SCORE`,
+  `lamp-name --least`), or more, and begun clear of the lamp's voice and
+  its echo tail (not over its voice, nor within 1.5 s,
+  `own_echo::TAIL_US`, after its words played to their end), is no short sound, its words come back as
+  another word, and the rule judges it as any line, where a line of one or
+  two words, not a question, with nothing written for the name, is still
+  not answered on the hearing alone (#7918). The journal says "a short
+  sound, but lamp-name heard the name in it at 0.917: judged as a line
+  (#7891)" (lamp-52e6, 19 Nov: "Lamp?", its word back not the name, was
+  held so). One begun over the lamp's voice or in its tail stays held:
+  in the product lamp-name runs without `--not-while-speaking`, and on
+  lamp-4ace it heard the lamp's own reply at 0.990 (#7994). The hearings are read as `LAMP_NAME_WORDLESS_BAR`'s are
+  (`second_provider::wordless_call`), on, switch or not, whenever the
+  worker has a bus. Tests in `second_provider/tests/short_sound_name.rs`.
 - **The rule for whom it answers, without one sign:** a tap on the head is
   not given to it, so a line in a busy room that only that would let
   through on the Live route is held here. Like the Live route, it does not

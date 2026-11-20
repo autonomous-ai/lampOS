@@ -667,7 +667,35 @@ The record, for lamp-ears (`onboarding/storage.rs`, `room_sounds`):
   any progress write or start whose `room_sounds` outcome is not `done`,
   unless it is the owner's yes from the app that still stands (below).
   It is never written back from the progress, so once removed it stays
-  gone until a new yes.
+  gone until a new yes. With `LAMP_NOTICING_BY_DEFAULT=on` (#7767,
+  [switches.md](switches.md)), where a missing file is on, a kept no
+  (`{"room_sounds":"no",...}`, `lamp_msgs::consent::no_bytes`: the voice's
+  stop, the app's off or the walk's own) is left in place by every start
+  and progress write, a redo too, and a "no" (`skipped`) at the lamp keeps
+  one (`"by":"voice"`, at the "no"'s time) where the write would remove
+  the file; only a yes or the factory reset replaces it. A no given
+  before the switch was on removed the file then, so at each lamp-voice
+  start with the switch on, until done, `keep_old_nos` keeps a no
+  (`"by":"voice"`) for each step whose progress holds the "no"
+  (`skipped`), at the "no"'s time (now when it is 0), and for seen
+  activity when the app's mark (`seen-activity-mark.json`, raised by an
+  app's yes or off, the lamp's stop and a forget) stands beside no yes
+  file, at the mark's time. Each is written whole in the yes's mode and
+  group, under the mark's lock (a lock not taken writes nothing), never
+  over a file already there. Then the done mark
+  `noticing-old-nos.done` (`lamp_msgs::consent::OLD_NOS_DONE`) is written
+  in the consent folder, only after every no is kept, so a failed one is
+  tried again at the next start and a later yes is never turned back into
+  a no; one journal line names the keys, no words. **Until the done mark
+  is there, every reader (the ears, the eyes, lamp-seen, skills' face
+  reads) reads a missing file as no** (`consent::read_or`), so a
+  migration that never ran or failed half way leaves the lamp off (the
+  first builder's c7003588081 on #7767). Once it is there, a "no" in the
+  walk and the voice's stop keep a no even with the switch off, and a
+  start off leaves a kept no, so on, off, on still reads it as no; the
+  app's off with the switch off still removes the file (slice 6). Off on a
+  lamp never switched on (no done mark), all of it is as above, byte for
+  byte, and nothing is written.
 - Shape: `{"version":1,"room_sounds":"yes","at_unix_s":<when the yes was kept>,"by":"voice"}`
   (keys in that file sorted, as `lamp_msgs::consent::bytes` writes them;
   files from before `by` have none and are the voice's).

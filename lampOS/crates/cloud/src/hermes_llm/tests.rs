@@ -563,6 +563,101 @@ async fn without_the_meter_nothing_is_kept() {
     assert_eq!(std::fs::read_dir(dir.path()).unwrap().count(), 0);
 }
 
+/// #7342 through both processes' code (#8012, Twelve's, the first builder's
+/// and Heron's ask): the relay's `X-Usage-Day-Used` through this forwarder's
+/// real meter into `day-used.json`, then lamp-skills' bound on a run
+/// (`task::would_refuse`, `task::begin`) reading that file, with the share
+/// the product's lamp-skills unit sets. Under the voice's share a run goes
+/// on; at or over it the run is refused, in words the lamp can say; with
+/// the header absent it is let through.
+#[tokio::test]
+async fn the_relays_day_used_through_the_meter_holds_a_skills_run_to_the_voices_share() {
+    use lamp_skills::{relay_share, task};
+    let unit = include_str!("../../../../deploy/product/lamp-skills.service");
+    let value = unit
+        .lines()
+        .find_map(|line| {
+            line.strip_prefix("Environment=")?
+                .strip_prefix(relay_share::SWITCH)?
+                .strip_prefix('=')
+        })
+        .expect("the product's lamp-skills sets the switch");
+    let share = relay_share::share_from(Some(value)).expect("the product's switch is on");
+    assert_eq!(share, 0.5, "`on` keeps half the day for the voice");
+
+    let dir = tempfile::tempdir().unwrap();
+    let cloud = dir.path().join("cloud");
+    let state = dir.path().join("skills");
+    std::fs::create_dir_all(&cloud).unwrap();
+    std::fs::create_dir_all(&state).unwrap();
+    let base = metered_relay(vec![
+        (200, None, "application/json", WHOLE),
+        (200, Some("0.400"), "text/event-stream", STREAMED),
+        (200, Some("0.500"), "application/json", WHOLE),
+        (200, Some("0.800"), "application/json", WHOLE),
+        (200, None, "application/json", WHOLE),
+    ])
+    .await;
+    let address = metered_forwarder(&base, Some(&cloud)).await;
+    task::set_on_here(Some(true));
+    relay_share::set_here(Some(share), Some(&cloud));
+    // One chat through the forwarder, and the bound as lamp-skills reads it
+    // just after.
+    let skills = state.as_path();
+    let chat_then_bound = |at: &'static str| async move {
+        let (status, _, _) = ask(address, &chat(Some(TOKEN), ASKED)).await;
+        assert_eq!(status, 200, "{at}");
+        let now = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_millis() as u64;
+        (now, task::would_refuse("gold-price", Some(skills), now))
+    };
+    let plain = "the lamp has used {used}% of its thinking for today, and the last 50% is kept \
+                 for talking, so skills' runs wait until its day starts again";
+
+    // The header absent: not known, so the run is let through.
+    let (_, refused) = chat_then_bound("absent").await;
+    assert_eq!(relay_share::read(&cloud).unwrap().used, None);
+    assert_eq!(refused, None, "no header lets the run through");
+
+    // Under the share: 40% used leaves 60%, so the run goes on, and is
+    // counted as it begins.
+    let (now_under, refused) = chat_then_bound("under").await;
+    assert_eq!(relay_share::read(&cloud).unwrap().used, Some(0.4));
+    assert_eq!(refused, None, "under the share the run goes on");
+    drop(task::begin("gold-price", Some(&state), now_under).unwrap());
+    let counted = std::fs::read(state.join(task::RUNS_FILE)).unwrap();
+
+    // At the share and over it: refused before it is handed over, said
+    // plainly, and not counted.
+    for (at, used) in [("at", "50"), ("over", "80")] {
+        let (now, refused) = chat_then_bound(at).await;
+        let refused = refused.unwrap_or_else(|| panic!("{at} the share the run is refused"));
+        let told = refused
+            .strip_prefix(task::NOT_HANDED)
+            .unwrap_or_else(|| panic!("{refused}"));
+        assert_eq!(told, plain.replace("{used}", used), "{at}");
+        assert_eq!(
+            task::begin("gold-price", Some(&state), now).unwrap_err(),
+            refused,
+            "{at}"
+        );
+        assert_eq!(
+            std::fs::read(state.join(task::RUNS_FILE)).unwrap(),
+            counted,
+            "{at}"
+        );
+    }
+
+    // The header absent again, after a day used past the share: let through.
+    let (_, refused) = chat_then_bound("absent again").await;
+    assert_eq!(relay_share::read(&cloud).unwrap().used, None);
+    assert_eq!(refused, None, "no header lets the run through");
+    relay_share::set_here(None, None);
+    task::set_on_here(None);
+}
+
 #[test]
 fn a_streams_usage_is_found_across_its_pieces_and_a_chats_line_is_numbers() {
     let mut usage = Usage::new("text/event-stream");

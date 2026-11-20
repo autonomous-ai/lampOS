@@ -125,6 +125,11 @@ pub(crate) fn set_one_face_for_test(on: bool) {
 /// switch is on.
 pub const QUIET_NOTE: &str = "When the person you know at the lamp plainly tells you something lasting about their own life (a plan or a date, where they keep something), keep it quietly: call remember for it beside your answer, in their own words, without asking first, and do not say you kept it. Never keep health, money, or other people's private matters unless they clearly ask you to remember them. Never offer to keep something and never ask whether you should; if one word of it is really unclear, ask about that word once, and never again about the same thing.";
 
+/// [`QUIET_NOTE`] when an unsure line is not kept
+/// (`remember::doubted::UNSURE_ENVIRONMENT`, #7739): a word really unclear
+/// keeps nothing and is never asked about.
+pub const QUIET_NOTE_UNSURE: &str = "When the person you know at the lamp plainly tells you something lasting about their own life (a plan or a date, where they keep something), keep it quietly: call remember for it beside your answer, in their own words, without asking first, and do not say you kept it. Never keep health, money, or other people's private matters unless they clearly ask you to remember them. Never offer to keep something and never ask whether you should; if one word of it is really unclear, keep nothing of it and ask nothing about it.";
+
 /// Said when every sentence of a reply was an offer left out and nothing
 /// of it is left to say: never silence (Thirteen's P2 on #5053).
 pub const GOT_IT: &str = "Got it.";
@@ -235,7 +240,18 @@ pub fn own_seen_in(
 /// switch on, the scope a known person's own and the line seen said by them
 /// ([`own_seen`]); `None` otherwise.
 pub fn note_for(lease: Option<&crate::memory_scope::ScopeLease>, request: u64) -> Option<String> {
-    (on() && own_seen(lease, request).is_some()).then(|| QUIET_NOTE.to_owned())
+    (on() && own_seen(lease, request).is_some())
+        .then(|| quiet_note(crate::remember::doubted::unsure_not_kept_on()).to_owned())
+}
+
+/// [`QUIET_NOTE`], or with an unsure line not kept
+/// (`remember::doubted::UNSURE_ENVIRONMENT`, #7739) [`QUIET_NOTE_UNSURE`].
+pub fn quiet_note(unsure_not_kept: bool) -> &'static str {
+    if unsure_not_kept {
+        QUIET_NOTE_UNSURE
+    } else {
+        QUIET_NOTE
+    }
 }
 
 /// What the model is told for a quiet keep whose sentence had words the
@@ -1353,6 +1369,19 @@ mod tests {
             sentences("\u{306f}\u{3044}\u{3002}\u{3044}\u{3044}\u{ff1f}").len(),
             2
         );
+    }
+
+    /// #7739: with an unsure line not kept, a word really unclear keeps
+    /// nothing and is never asked about; the rest of the words as they are.
+    #[test]
+    fn an_unclear_word_is_not_asked_about_with_unsure_not_kept() {
+        assert_eq!(quiet_note(false), QUIET_NOTE);
+        assert!(QUIET_NOTE.contains("ask about that word once"));
+        let unsure = quiet_note(true);
+        assert!(!unsure.contains("ask about that word"));
+        assert!(unsure.contains("keep nothing of it and ask nothing about it"));
+        let shared = "Never offer to keep something and never ask whether you should; ";
+        assert_eq!(QUIET_NOTE.split(shared).next(), unsure.split(shared).next());
     }
 
     /// The Reviewer-lead's P1: the words never keep health, money or other

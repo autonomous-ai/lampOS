@@ -383,8 +383,13 @@ impl NoticeDelivery {
     /// A computer's stream: played from `feed` in chunks as the sound comes,
     /// the last one at its close.
     pub(super) fn stream(feed: Arc<crate::speaker_stream::Feed>) -> Self {
+        Self::fed(SpeechOrigin::ComputerStream, feed)
+    }
+    /// Sound of `origin` played from `feed` as it comes: a computer's
+    /// stream, or a long exact line's pieces (#7892).
+    pub(super) fn fed(origin: SpeechOrigin, feed: Arc<crate::speaker_stream::Feed>) -> Self {
         Self::Selected {
-            origin: SpeechOrigin::ComputerStream,
+            origin,
             recording: Arc::new(Recording {
                 info: None,
                 samples: Box::default(),
@@ -395,6 +400,16 @@ impl NoticeDelivery {
             final_acceptance: None,
             gaps: 0,
             feed: Some(feed),
+        }
+    }
+    /// For sound played from a feed: whether all of it came (none of a
+    /// long exact line's pieces went unrendered). None for a recording.
+    pub(super) fn fed_whole(&self) -> Option<bool> {
+        match self {
+            Self::Selected {
+                feed: Some(feed), ..
+            } => Some(!feed.short()),
+            _ => None,
         }
     }
     /// Whether all of it was played: its final sample retired.

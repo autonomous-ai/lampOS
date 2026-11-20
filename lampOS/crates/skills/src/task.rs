@@ -57,7 +57,11 @@
 //!   write's) ends with it in lamp-tasks' answer
 //!   (`lamp_tasks::skill_task::tells_answer`), which is said to the owner
 //!   sentence by sentence as exact words, never a turn for the model,
-//!   behind a read's gate and turn (`crate::service_read::tell`). Nothing
+//!   as soon as the run ended, with no read's gate, held only while the
+//!   lamp is private or paused (`crate::service_read::tell`, #7894), when
+//!   its owner asked it by voice now (`asked_by_owner`); asked by anyone
+//!   else, one short line at once and the read's gate; a run nobody asked
+//!   keeps the read's gate. Nothing
 //!   else of a run is told; the journal says only how many sentences were
 //!   said.
 //! - **Off**, a `do.task` loads and hands nothing over, and the journal
@@ -79,7 +83,7 @@ use std::{
 /// The switch, here, in the manage helper and in the voice. `on` only.
 pub const ENVIRONMENT: &str = lamp_voice::skill_task_yes::ENVIRONMENT;
 
-#[cfg(test)]
+#[cfg(any(test, feature = "share-fixture"))]
 thread_local! {
     /// The switch as a test of this thread sets it.
     static ON_HERE: std::cell::Cell<Option<bool>> = const { std::cell::Cell::new(None) };
@@ -87,15 +91,16 @@ thread_local! {
 
 /// Whether a skill's tasks are on in this process.
 pub fn on() -> bool {
-    #[cfg(test)]
+    #[cfg(any(test, feature = "share-fixture"))]
     if let Some(on) = ON_HERE.with(std::cell::Cell::get) {
         return on;
     }
     std::env::var(ENVIRONMENT).ok().as_deref() == Some("on")
 }
 
-/// The switch for this test's thread alone.
-#[cfg(test)]
+/// The switch for this test's thread alone (another crate's test too,
+/// with the `share-fixture` feature).
+#[cfg(any(test, feature = "share-fixture"))]
 pub fn set_on_here(on: Option<bool>) {
     ON_HERE.with(|here| here.set(on));
 }
@@ -716,6 +721,36 @@ pub fn take_asked_by_voice(skill: &str) -> Option<u64> {
         .remove(skill)
 }
 
+/// The skills whose last run marked as asked by voice ([`asked_by_voice`])
+/// was asked by their owner (#7894, V2's 12:47 on #7902): a run now, which
+/// the voice runs only for the owner's own line (`lamp_voice::made_run`,
+/// `services::owner_hears`: the person scope naming the owner, seen saying
+/// it alone), or any ask in the private room (`LAMP_PRIVATE_ROOM`, where
+/// whoever speaks is the owner). Its told answer is then said at once.
+static ASKED_BY_OWNER: Mutex<BTreeSet<String>> = Mutex::new(BTreeSet::new());
+
+/// Whether `skill`'s run just marked asked by voice was its owner's
+/// (`owners`), kept with that mark ([`ASKED_BY_OWNER`]).
+pub fn asked_by_owner(skill: &str, owners: bool) {
+    let mut asked = ASKED_BY_OWNER
+        .lock()
+        .unwrap_or_else(|poison| poison.into_inner());
+    if owners {
+        asked.insert(skill.to_owned());
+    } else {
+        asked.remove(skill);
+    }
+}
+
+/// Whether `skill`'s last run asked by voice was its owner's, taken once
+/// with [`take_asked_by_voice`] by that run's hand-over.
+pub fn take_asked_by_owner(skill: &str) -> bool {
+    ASKED_BY_OWNER
+        .lock()
+        .unwrap_or_else(|poison| poison.into_inner())
+        .remove(skill)
+}
+
 /// A skill's task under way: the skill is free for its next when it ends
 /// ([`Drop`]).
 #[derive(Debug)]
@@ -966,7 +1001,13 @@ pub fn hand(
         Ok(sha256) => sha256,
         Err(why) => return format!("do.task: not handed over: its folder can't be read: {why}"),
     };
-    if let Some(why) = yes_refuses(place.control, skill, &sha256, grants) {
+    // A core variant's task is pre-approved (`crate::core_agent::pre_approved`,
+    // the first builder's 08:57): no yes is asked, aloud or of lamp-control.
+    let pre_approved = grants.is_empty() && crate::core_agent::pre_approved(folder);
+    if let Some(why) = (!pre_approved)
+        .then(|| yes_refuses(place.control, skill, &sha256, grants))
+        .flatten()
+    {
         // No yes for the folder as it is (#6071's V2): the lamp asks for
         // it itself, once a folder, never lamp-control's no answer.
         if why == WAITING || why == CHANGED {

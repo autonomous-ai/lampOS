@@ -889,7 +889,8 @@ ID>`. It receives only explicitly allowed ordinary provisioning variables:
 `LOGNAME`, `XDG_CONFIG_HOME`, `XDG_DATA_HOME`, `XDG_CACHE_HOME`,
 `XDG_RUNTIME_DIR`, `DBUS_SESSION_BUS_ADDRESS`, `ADAPTER_DATA_DIR`,
 `HARNESS_AUTH_DIR`, `PORT`. `HOME` is absolute and every PATH entry is
-absolute. A system unit gives its process no `XDG_RUNTIME_DIR` or user bus,
+absolute. `ADAPTER_DATA_DIR` is always set to
+`<HOME>/.harness/cli/data`, any value lamp-tasks has replaced (#7906, "Harness's home kept in `~/.harness`"). A system unit gives its process no `XDG_RUNTIME_DIR` or user bus,
 yet Harness 0.5.42's `harness start` runs `systemctl --user start
 harnessd.service`, which then fails ("Failed to connect to bus: No medium
 found"; after a sign-in from the app on lamp-c0a4, 5 Nov, #5385). So each one
@@ -1799,11 +1800,18 @@ The product unit's test is `the_tasks_part_starts_with_no_targets_and_learns_the
     from a start or a sign-in until the first targets look has settled
     (the targets file read and the sign-in answered; signed in, the
     machines answered too; at most 180 s, `STARTING_AT_MOST`), the
-    `targets` answer says `"lamp":"starting"`. A hand-over then refused as
+    `targets` answer says `"lamp":"starting"`. The answer that settles it
+    (the sign-in's, or signed in the machines') makes the targets be
+    looked at at once, so it ends within seconds of the start, not at the
+    next look a minute later (#7988: lamp-52e6 said starting for 60 s
+    after a restart whose machines changed nothing). The targets file kept
+    from before is read at the first look, so its targets, the lamp's own
+    among them, take hand-overs all along. A hand-over then refused as
     no target is told "I'm still getting ready. Give me a minute and ask me
     again." (`Missing::Starting`), not that it needs setting up; after
     that, as before. Tests:
-    `engine::tests::the_targets_say_the_lamp_is_starting_before_the_first_look_only`
+    `engine::tests::the_targets_say_the_lamp_is_starting_before_the_first_look_only`,
+    `a_restart_with_its_targets_settles_when_the_machines_answer_not_at_the_next_look`
     and the installing test above.
   - **Hermes' home.** Hermes keeps its settings in
     `HERMES_HOME=/var/lib/lampos-hermes/.hermes`, outside `lampos`'s home,
@@ -2623,6 +2631,56 @@ The version is the one to compare with the build's pin (install.md, "The
 build's own pin"), which `lamp-update harness-install` also compares right
 after the install.
 
+### Harness's home kept in `~/.harness` (#7906)
+
+Harness 0.6.72 (openharness#4469) moves `~/.harness` into the XDG folders
+on Linux at a daemon start (`harness start`, `-f`, `--if-down`, or
+`__harnessd` with no daemon running): `runtime` to
+`${XDG_STATE_HOME:-~/.local/state}/harness/`, `cli` and every other entry
+(`lampos-upgrade-from` among them) to `${XDG_DATA_HOME:-~/.local/share}/harness/`,
+with a per-entry link bridge that goes later. lampOS reads
+`.harness/runtime/current-grid`, `.harness/cli/data` and
+`.harness/lampos-upgrade-from` under Harness's home
+(`/var/lib/lampos-tasks`), so the move is kept off with Harness's own
+opt-out: it is `skipped-override` when any name in `OVERRIDE_NAMES`
+(`cli/src/homeMove/conditions.ts`, v0.6.72_cli) points inside
+`~/.harness`, read from the daemon's environment and from its
+`HARNESS_ENV_FILE`. lampOS gives `ADAPTER_DATA_DIR=/var/lib/lampos-tasks/.harness/cli/data`,
+Harness's own default (`harnessPath('cli') + '/data'`, `config/env.ts`)
+spelled exactly, so nothing moves and the daemon's socket name and pane
+tags, which hash it, stay as they were:
+
+- every Harness command lamp-tasks runs (its client's environment, from
+  its `HOME`; one already set is replaced, so every writer gives the
+  one value Harness hashes), and so the daemon a `harness start`
+  spawns or the user unit it rewrites (`ADAPTER_DATA_DIR` is in
+  `lib/platformDaemon.ts` `CARRIED_ENV`);
+- `harness-hold.env`, the `HARNESS_ENV_FILE` lamp-tasks writes (held or
+  lifted), so a daemon started from the unit reads it too, always with the
+  default. `lamp-update harness-install`, after an install
+  or a move, also puts the line in a `harness-hold.env` already there (the
+  same line, `lamp_msgs::harness_hold::with_data_line`: any earlier one
+  taken out, every other line kept; written as root without following a
+  link, its owner and 0600 kept; a missing file is not made), so a reboot
+  between Harness 0.6.72's install and the new lamp-tasks' start does not
+  start the daemon without it;
+- Harness's launcher (`.local/bin/harness`), `export ADAPTER_DATA_DIR=…`
+  just before its `exec` line, held or lifted (the canary), from lamp-tasks
+  at its start and `lamp-update harness-install` after an install, so a
+  command run by hand has it;
+- every Harness run of `lamp-update` (`harness service install`, `stop`,
+  `version`, the installer, the kept-copy scripts);
+- `~/.harness` itself, made by `lampos` (`mkdir -p -m 0700`) before
+  Harness's installer runs, pinned or not, so on a fresh lamp the installer
+  finds it and does not pick the XDG folders (and write `.harness-root`).
+
+Should the home have moved anyway, lamp-tasks at its start and
+`lamp-update harness-install` after an install say one line, and move
+nothing back: `harness: home moved to XDG (<sign>): lampOS paths need
+~/.harness`, the sign one of `.local/state/harness/bridge.json`,
+`.local/share/harness/.harness-root`, `.harness/runtime is a link` or
+`.harness/cli is a link`.
+
 ### Signing in by a spoken code (`--sign-in-by-code`, #1676)
 
 `lamp-tasks serve --sign-in-by-code`, off unless set; the product's
@@ -2845,7 +2903,24 @@ them) (`crates/tasks/src/openclaw_config.rs`):
     this by its messaging channel. A Harness turn on the gateway comes in
     on OpenClaw's own `webchat` channel. Other channels are kept;
   - `agents.defaults.elevatedDefault`: `"full"`;
-  - `agents.defaults.sandbox.mode`: `"off"`.
+  - `agents.defaults.sandbox.mode`: `"off"`;
+  - `tools.deny`: `ask_user`, `secrets` and `suggest_task` added (#7906),
+    a person's own entries kept, matched without regard to case as
+    OpenClaw does. These are the tools that, when the model calls them,
+    show a prompt in the OpenClaw pane and wait for a person: `ask_user`'s
+    choice (up to 900 s by default), `secrets`' masked credential prompt,
+    and `suggest_task`'s offer in a Gateway-backed TUI (OpenClaw 2026.11.2
+    docs `tools/ask-user.md`, `tools/secrets.md`,
+    `gateway/config-tools/tool-policy.md`). Harness reads such a pane as
+    `needs-input`, and the one-session thread then ends the task and
+    deletes the kept conversation. Denying them only takes tools away:
+    without `ask_user` the agent goes on with its best judgment, as it does
+    after OpenClaw's own `no_answer`. Exec needs nothing more: with
+    `mode: "full"` and no `security`/`ask` in the host approvals document
+    (lamp-update only adds allow-list entries there), OpenClaw resolves the
+    host side to `full`/`off` too, so no command asks. With the switch
+    `off`, these three are taken out of `tools.deny` again, and the list
+    with it when nothing else is in it.
 
   The merge runs at every lamp-tasks start, so a lamp that has the old file
   gets these keys on its next start or update. Its model, workspace,
@@ -2976,7 +3051,12 @@ for each run, and is answered once the run ends
   linked service as a task for the lamp's agent"), at most about 400
   characters of it (`MOST_TOLD_CHARS`, the first builder on #7591), cut at
   the last sentence end inside, then "There's more; ask me if you want
-  it." Nothing tracks whether the run's own script already spoke through
+  it." A line past about 10 s of speech is rendered by the voice in pieces
+  cut at sentence, then clause, then word boundaries, and played whole, the
+  first piece as soon as it is rendered and each next one rendered while the
+  one before it plays, so none passes the speech cache's 20 s and is dropped
+  (#7892;
+  docs/speaking-first.md). Nothing tracks whether the run's own script already spoke through
   lamp-control's `say`; the agent is asked to leave its answer empty (a
   dash, or an empty `answer.md`) when it did (Heron's P3 on #7591). On
   lamp-9adf, 17 Nov (build 13929,
@@ -3514,12 +3594,14 @@ whose script runs `curl https://example.com` gets a failure (no name
 resolves, no route), while the same run's model call is answered and its
 `control.sock` call works with its token.
 
-### Skills' runs and the voice's share of the day (#7342, `LAMP_SKILL_RUNS_VOICE_SHARE`, off)
+### Skills' runs and the voice's share of the day (#7342, `LAMP_SKILL_RUNS_VOICE_SHARE`, on in the product)
 
 A skill's run is an agent session. Its chats go through lamp-cloud's model
 forwarder on the voice's key, so they spend the same daily allowance the
 voice talks on. With up to 100 runs a day (#7151), skills must never leave
-the lamp unable to answer. The switch is off unless set, in no product unit.
+the lamp unable to answer. The switch is off unless set; the product's
+`lamp-skills.service` and `lamp-cloud.service` set it `on` (half the day for
+the voice) since 19 Nov, the first builder's DEFAULT-ON on #7814.
 
 - **The meter:** the relay's `X-Usage-Day-Used` header, from 0 to 1, on each
   HTTP answer of a metered route. It is counted the way the relay counts,
@@ -3829,7 +3911,11 @@ The owner's rulings of 17 Nov: a linked service's live read, and an ask the
 second route's model can't do, go to the lamp's agent, the lamp's default
 (Hermes or OpenClaw, ~17:55), never pinned to Hermes. The make socket takes
 a second kind of line from lamp-voice, `{"op":"voice_ask","ask","grants",
-"within_ms"}` (`lamp_tasks::voice_ask`), answered as a make is
+"within_ms","news"}` (`lamp_tasks::voice_ask`; `news`, false unless given,
+marks the lamp's own ask for task news's line, which a person's ask that
+comes while it runs cancels at once: its run ended as at its deadline, told
+`cancelled`, and the person's ask run, never told busy; `MOST_CONNECTIONS`
+is 3 for it), answered as a make is
 (`started`, then `answer` or a refusal), with its own one place beside a
 make's. The agent is picked at each ask as a make with `"one_path":true`
 picks it (`skill_make::MakeGateway`, `HarnessRunner::make_agent`), with no
@@ -3869,9 +3955,29 @@ config with `mcp_servers.lamp-services`. On Hermes, either way a fresh folder an
 of its own, the person's words in its rules file (never its arguments), its
 answer read from `answer.md`, whitespace folded and at most 3,000 bytes,
 the folder removed and the token ended however it ends, at most 120 s.
-On a lamp whose makes take the one run path (`LAMP_MAKE_AGENT_ONE_PATH`),
-an ask with a grant has no held-off runner and is refused `not_held_off`,
-and the voice says its fixed failure line: it fails closed.
+With lamp-update's one run path (`LAMP_SKILL_DEFAULT_AGENT=on`), whose
+wrapper holds off the network only a run in its own `skill-<run id>`
+folder, the held make's runner would be refused
+(`NOT_HELD_OFF_ONE_PATH`, lamp-9adf, 20 Nov), so an ask with a grant goes
+through `skill_make::AskRunner` instead: Hermes's wrapper started by
+lamp-tasks itself by its task entry (`HarnessRunner::run_task_entry`, as a
+skill's run with no Harness), in its own `skill-<run id>` folder (the
+wrapper reads its token file, gives `--net` and the run no way out), its
+fresh home the ask's own `make-<run id>/home`, named to the wrapper by
+`LAMP_NS_HOME` as a make's is. Never through Harness, which passes the
+wrapper none of lamp-tasks' variables: a run with a fresh home and no way
+out is refused there. Before any token is minted, the wrapper must take a
+run by its task entry and a make's home, and the agent namespace must show
+that home with the lasting one hidden (`HarnessRunner::takes_fresh_tasks`),
+or the ask is refused `no_namespace` and nothing starts. The path adds two
+small file reads, a folder, the token file and the task file before the
+start: no Harness launch, so a read starts as quickly as before. With the
+switch off, an ask with a grant runs on the held make's runner as before.
+A hard ask keeps the make's runner: un-held (the default) it starts as
+before; with `LAMP_MAKE_AGENT_NET=held` it has no token, which the one run
+path's wrapper needs for a run in its own folder (lamp-control mints an ask
+only for a linked service's read), so there it still fails closed, told
+`not_held_off` (as `NOT_HELD_OFF_ONE_PATH` now is), never `run_failed`.
 Off, the line is refused `off` and makes are as before
 ([services.md](services.md), "Reads through the lamp's agent";
 [switches.md](switches.md)).
@@ -5108,7 +5214,8 @@ in and signed out, and on 0.6.60, signed in (#7507's ROW).
   (`pane_turn`), and it ends the same way, with no reply and no ensure of
   its own. The opens' own backoff (5 s doubled, `OPEN_RETRY_FIRST`; 60 s
   doubled for `ENGINE_NOT_READY`) is unchanged. The turn's end is `harness wait lamp-one-openclaw --after
-  <inputId>` (0 idle, then `show` for the answer; 3 an ask; 4 gone).
+  <inputId>` (0 idle, then `show` for the answer; 3 an ask; 4 gone). A
+  kept session gone or stuck is replaced as below (#7906, signs 1-4).
 - **Signed-in replies, acknowledged.** With a Harness that acknowledges replies, every reply into a session of the person's (the one pane of `harness new`, `--reply-named`, a resumed session, a first message) counts as handed over only on `taken` with its `inputId`; a `TIMEOUT` with `cancelled: true` is typed again (a first message's is not: any answer but `taken` leaves it uncertain, `type_first_message`), one with `cancelled: false` and an `inputId` is typed and never sent again, and the one pane's turn ends with `harness wait --after <inputId>`. An older Harness's answers read as before.
 - **Rotation and removal.** OpenClaw's kept session is not rotated by
   count (its gateway compacts the session itself, `agents.defaults.compaction`);
@@ -5122,14 +5229,46 @@ in and signed out, and on 0.6.60, signed in (#7507's ROW).
   at its deadline left the kept session `working`, and every later make was
   told `NOT_IDLE` until the gateway restarted); a sign-out or an engine
   switch removes the token file too. One not closed is tried again at the
-  next look, and no pane is opened meanwhile. A factory reset wipes the
+  next look, and no pane is opened meanwhile; a cancelled or stuck turn's
+  close that fails again stays that turn's, so the close that finally
+  succeeds keeps the token (no new token, no `NAME_TAKEN`). A factory reset wipes the
   store folder, token included.
+- **A fresh session near the context's limit (#7906).** This revises
+  #7246's "no fresh start": on lamp-52e6 a make overflowed the kept session
+  (`context_length_exceeded`, 127014 of 128000 tokens, 175 messages), and
+  OpenClaw's own compaction then dropped the make's task (`loss=summary-tail`)
+  until the 600 s deadline. Harness shows no token count, and the pane's own
+  count (`Pane.tokens`, 4 characters a token of words typed and read) misses
+  tool output and starts at zero after a restart, so before each turn,
+  once, lamp-tasks reads the session's size in OpenClaw's own record
+  (`harness::openclaw_session_size`: the node's current session in
+  `<OPENCLAW_STATE_DIR>/agents/main/agent/openclaw-agent.sqlite`, opened
+  read-only; only its `user` and `assistant` rows counted as messages,
+  never a `toolResult`, so one long make does not send the next into a
+  fresh session and lose its recall, every row counted on a schema with no
+  `message_role`; every row's stored bytes summed and taken at 4 bytes a
+  token, the main guard). A make goes into a fresh session once the old
+  one holds 76,800 tokens (`MAKE_FRESH_TOKENS`, 60% of 128k, leaving about
+  51k for the make's guide, the examples it reads, its tool output and its
+  draft) or more than 100 messages (`MAKE_FRESH_MESSAGES`; 52e6's ran about
+  725 tokens a message, so about 57%); any other task once it holds
+  108,800 tokens (`TASK_FRESH_TOKENS`, 85%) or more than 150 messages
+  (`one_session::near_context_limit`). The fresh start is the rotation's
+  own: the pane let go, `ensure --fresh`, and the old `engineSession`
+  deleted with `sessions.delete`; a spoken task's is opened by the
+  one-session thread, as at a rotation. At most one per turn, and a small
+  session is kept. The record unreadable (no file, another schema, busy past
+  200 ms), the pane's own count is weighed against the same token bound. The
+  read is one local SQLite open and three short queries over the
+  `(session_id, seq)` key: about 2 ms warm and at most 15 ms cold in a debug
+  build on a Mac, well under 50 ms. Journal: `<id> is near its context (<n>
+  messages, ~<t> tokens) before a make: a fresh session (read in <ms> ms)`.
 - **Forget, and a long idle: dropped, and a new one opened.** The owner's
   "forget everything" (`ForgetSessions`, #6274) drops the kept session as
   a sign-out does, once nothing holds it: `harness close`, then
   `sessions.delete` of its `engineSession`, then its token file removed,
   so the next task recalls nothing (`one_session::forgotten`). A kept
-  session left with no task for 2 h (`KEPT_IDLE_MAX`, from its open or its
+  session left with no task for 7 days (`KEPT_IDLE_MAX`, from its open or its
   last turn) is dropped the same way, since OpenClaw's is never rotated by
   count. Either way the keep-open loop opens a new one (a new agent id and
   token, so a new OpenClaw session) in the same look, right after the
@@ -5137,9 +5276,263 @@ in and signed out, and on 0.6.60, signed in (#7507's ROW).
   is asked for or under way (a forget, a sign-out) waits for it in the
   queue, then goes into the new session, never the old one
   (`OneSession::enter`). Journal: `the kept session dropped (the
-  owner asked to forget); a new one opens` (or `(no task for 120 min)`),
+  owner asked to forget); a new one opens` (or `(no task for 10080 min)`),
   `dropped the kept session <id> (…); its conversation forgotten`, then
   `kept session new <id> (openclaw, …) in <ms> ms`.
+- **A kept session gone or stuck: closed and replaced, never resumed for
+  ever (#7906).** `harness ensure` finds the kept session by its name and
+  token, not by the id in `one-session.json`. So once lamp-tasks has closed
+  it itself (a deadline, a cancel, an ask no one answered, a stuck sign) and
+  deleted its OpenClaw conversation, a token file with no kept record makes
+  the next `ensure` `--fresh`. The token is kept, since a new token on the
+  same name could be refused `NAME_TAKEN`. Before this, on lamp-52e6 a
+  make's 600 s deadline closed and deleted the session, and every later
+  `ensure` resumed it (`kept session resumed <id> (openclaw, starting)`).
+  Its engine exited ("No session found"), and every task waited until busy.
+  A kept record whose conversation OpenClaw's own record no longer holds
+  is also forgotten before `ensure`, which is then `--fresh`: Harness
+  resumes a closed session with no Gateway check. The record is read
+  (`openclaw_holds_key`, read only) by the record's own session key
+  (`engineSession`) exactly, never by `agent:main:harness-<agent id>`; a
+  record that can't be read is unknown, never gone.
+  Five signs are acted on:
+  - **Sign 1, still `starting`.** At an open that found a session (`live`
+    or `resumed`, never `new`), one `show` is made. If `show` itself reads
+    `starting` 120 s (`OPEN_IDLE_WITHIN`) from the open's start, it is
+    stuck. During a task's hand-over, replies refused `NOT_IDLE` or
+    `ENGINE_NOT_READY` for 120 s lead to one `show`, and a session `show`
+    reads `starting` is stuck. `installing` (an OTA's OpenClaw install),
+    `offline`, `unknown` and a `show` not read (a parse error, a daemon
+    timeout) never count: they are looked at again (10 s later at a
+    hand-over), and past the open's bound the session is kept as it is.
+    `ensure`'s own `state` is not a sign (today Harness says `starting` of
+    every answer but `live`).
+  - **Sign 2, a plain shell.** `show` names the agent `Terminal` (its
+    engine exited, and `wait` reads it idle), or Harness no longer has the
+    session. The shell is never typed into, adopted or answered from.
+  - **Sign 3, the Gateway no longer holds it.** Before `ensure` (the kept
+    record) and before a task is handed to the kept session, OpenClaw's own
+    record (`openclaw_holds_key`, the same exact-key read as above, no CLI
+    start) says it no longer holds the session's conversation. A session
+    whose open already read it held, or that `ensure` made new, is not read
+    again before its first turn: one read per open.
+  - **Sign 4, a turn not moving.** Read every 5 s beside the turn's
+    `wait` (`TURN_WATCH`, `harness::openclaw_turn_at`, the same key): the
+    record not past the hand-over 60 s after Harness's `taken`
+    (`TURN_START_WITHIN`, 4a); the session `running` with its highest
+    `seq` unmoved for 10 min with its last row the `user`'s or a
+    `toolResult` (`TOOL_RESULT_STALL`, 4b, which also bounds a `NOT_IDLE`
+    hand-over: the Gateway writes the assistant's row only once a whole
+    message is done, so a long first message, a make writing a long
+    SKILL.md, a slow model, long thinking or 429 retries show no move for
+    minutes; `TURN_STALL`, 3 min, is only the floor it is never below and
+    the base tests shorten both from); or the turn open while the
+    session's status is `killed`, `failed` or `timeout` (`DEAD_STATUSES`;
+    never `done`, none or another) for 15 s (`DEAD_WORKING`). A turn that
+    ended idle keeps its answer even if a verdict came at the same moment.
+    The watcher sleeps until its next read or the wait's end, looking at
+    the run's cancel every 100 ms. A tool call still
+    unanswered (a long exec) is never cut and is left to the run's
+    deadline; `show`'s tools, `ps`'s `lastActive` and pane text are never
+    read for it.
+  - **Sign 5, replies refused `ENGINE_NOT_READY` in a row.** Seen on
+    lamp-c0a4 (19 Nov): the kept session's OpenClaw process frozen,
+    `show` still `idle`, so no turn was taken and signs 1 and 4 never
+    started; each `harness reply` was refused `ENGINE_NOT_READY` after
+    Harness's own ~62 s wait, past a spoken task's 5 s bound, and the task
+    was put back until it expired. Now 2 refusals in a row
+    (`KEPT_NOT_READY_REFUSALS`) of the kept session's replies, with no
+    reply taken and no turn answered between, spanning at least 60 s from
+    the first to the last (`KEPT_NOT_READY_FOR`), make it gone or stuck.
+    A refusal more than 120 s (twice the bound) after the one before starts
+    the count again at 1, so an old refusal whose task was given up never
+    joins one hours later.
+    The count is kept across put-backs and is looked at before the run's
+    end, so a refusal that took the whole bound still counts. A session
+    `ensure` made new is in its first words' window for 120 s
+    (`OPEN_IDLE_WITHIN`): its refusals are not counted. One refusal, then
+    a reply taken, never replaces anything. Its process is
+    frozen, not dead, so a plain resume alone finds it `live` again
+    (lamp-c0a4 J3, 19 Nov: `ensure` said `live`, `working`, and the task
+    sat refused until it expired). So `OneSession::restart_or_replace`:
+    (a) once, if the Gateway still holds its key, the session is closed
+    `--now` first, its record and OpenClaw conversation kept (no
+    `sessions.delete`), and the next plain `ensure` starts a new process
+    on the same conversation, its memory kept. A close refused goes
+    straight to (b), as does one refused because its conversation is
+    already gone (`CLOSE_CONVERSATION_GONE`: nothing to resume). This
+    mark of the close lasts 120 s (twice the bound), so a task given up
+    after the resume never leaves a later healthy busy turn counted.
+    After that resume, an `ensure` that says `live` with
+    the same agent (the frozen process outlived its close) is (b)
+    `--fresh` at once. A `resumed` after that close is a new process
+    warming up: the count starts again, so one warm-up refusal never jumps
+    to `--fresh` and loses the memory the resume kept. Until a reply is
+    taken a `NOT_IDLE` refusal counts too: nothing of ours runs in that
+    new process, so `working` there is the frozen one's, not a turn to
+    wait out. Refused over the bound again, it is (b) `--fresh`, never
+    another resume. A skill run's waiting task never ran, so it is typed
+    into the new session and told once. A spoken task waiting when sign 5
+    closes the session (its (a) close, or its (b) `--fresh`) ends at once,
+    `not_sent` `one_session_stuck` (`STUCK_ENDED`), never put back: a
+    put-back past the store's confirm bound (`CONFIRM_MS`, 120 s from the
+    task's prepare) expired it unheard, so it sat until lamp-voice's 480 s
+    bound (lamp-c0a4, 19 Nov 21:47-21:55). The waiting task ends with a
+    short "ask me again" line, told once by Task news (`failed_stuck`:
+    "I can't handle that right now; please ask me again in a few
+    minutes."); the close and the reopen go on as above, and the next one
+    goes to the reopened session.
+    Beside #7895's bound: an `ENGINE_NOT_READY` refusal never spends one
+    of a spoken task's `STARTING_RESUMES_MOST` (3) tries, which count only
+    `NOT_RUNNING`, a `TIMEOUT` with nothing taken and a failed open. So a
+    frozen session's refusals put the task back `busy` until sign 5 ends
+    it (`one_session_stuck`), and only a session ensured again that still never takes the
+    words spends the tries and ends it `one_session_not_started`.
+    **Found in seconds, and while idle (#8001).** The ~61 s wait was
+    lamp-tasks' own `--timeout 60s`, not Harness's, and a refused reply
+    typed nothing. So a hand-over's first reply into a kept OpenClaw
+    session is held 10 s (`REPLY_KEPT_FIRST_HELD`). Refused then with
+    `ENGINE_NOT_READY` (nothing typed), one `show` is read at once and two
+    signs are looked at, each needing a frozen engine, never a slow one
+    (healthy accepts on lamp-c0a4: p50 4.5 s, 10-37 s in the tail; on
+    stable, 20 Nov, 8.4 s at first use, then 3.0-4.0 s). A `TIMEOUT` (a
+    ready engine that did not take the words yet) is neither, and asks no
+    `show`. **(D) idle but deaf.** Live on lamp-c0a4 (20 Nov): a SIGSTOP
+    of the kept OpenClaw TUI is undone by SIGCONT within 50 ms; the TUI
+    then stays alive (`/proc` state `S`, never `T`) but deaf: every
+    `harness reply` is refused `ENGINE_NOT_READY` with nothing typed while
+    `harness show` says `state=idle`. D holds when all of these are true:
+    `show` reads it `idle`; lamp-tasks holds no other turn on the pane
+    (the holder is this turn, no spoken task closing it, no close due);
+    the pane is past its start window (`OPEN_IDLE_WITHIN`, 120 s since it
+    was opened by any `ensure`, the window the idle look uses); and the
+    Gateway record is readable, whatever its last row: an idle session
+    after a finished turn always ends with the assistant's reply (the
+    ROW on lamp-c0a4, 20 Nov, journaled `deaf=no (the last row is the
+    assistant's)` while that was a guard), and `show` idle already says
+    no tool call is running. **(W)** `show` reads it `working`
+    though no turn of ours is in it, and the Gateway record's session and
+    last seq are the same as just before the reply (a lost Gateway link,
+    the TUI still running); never with the assistant's row last. Every
+    such check is journaled once with its outcome (`one session: <id8>
+    first reply refused ENGINE_NOT_READY; show <state>; deaf=<yes|no>
+    (<reason>)`). Either holds: a waiting spoken task ends
+    `one_session_stuck` after the 10 s hold alone, before any close, and
+    sign 5's ladder (`OneSession::restart_or_replace`) runs once on the
+    one-session thread (`OneSession::restart_if_due`, at its next step,
+    within 2 s), since a `close --now` of a frozen TUI can take its whole
+    60 s; no words go into the session while that close is due: a spoken
+    task finds no fresh pane, and a skill run entering first does that
+    close itself (`ensure`) before any words, once, its conversation kept.
+    A skill run's own sign 5 runs the ladder itself, as before. Neither holds: the reply
+    is tried again at once with the rest, 50 s, and that short refusal is
+    not counted, so a slow but healthy hand-over waits as long as before
+    and the two-refusal rule above still applies (it is what caught a
+    deaf idle TUI before D, in ~134 s). A session `ensure` made
+    new, within its first words' window (`OPEN_IDLE_WITHIN`), is held the
+    whole 60 s and never looked at. The healthy path pays nothing: the 10 s
+    hold costs only on a refusal, then one `show` and one read-only
+    record read.
+    While the session is open and no turn is held, an idle look runs every
+    30 s (`KEEP_OPEN_WHILE_OPEN`) on the one-session thread: W with the
+    record unmoved over at least 2 looks after the one that first read it
+    (`IDLE_UNMOVED_LOOKS`) and for at least ~600 s (`TOOL_RESULT_STALL`,
+    sign 4b's bound), whatever the last row (the user's or a tool's result
+    is a slow model, long thinking or 429 retries; the assistant's a tool
+    call or long exec, also after its answer was told and the hold let
+    go), closes and reopens it as sign 5 does, its conversation kept, journaled
+    once (`<id8> found stopped while idle (#8001): <why>; closed, its
+    conversation kept, and reopened for the next ask`); the next ask goes
+    straight to the reopened session. At most one W close until a turn is taken on
+    the session, so a misread `working` never spends the plain resume and
+    then the conversation. Never while a turn is held (the look
+    holds the pane while it closes), and not within a new session's window.
+    Each look costs one `show` and one read-only record read. A deaf idle
+    TUI with no ask is not looked for: it is found at the next ask (D).
+    Targets: an ask on a deaf pane to its ask-again line in about 12-13 s
+    (the 10 s hold, one `show`, one record read, the end), target at most
+    15 s (was ~134 s); an idle lost link within ~630 s (600 s unmoved,
+    plus up to one look).
+
+  Every sign calls `OneSession::replace_kept`, the one path for every
+  sign (signs 3 and 4 through `OneSession::kept_gone`). It does a `close --now`, `sessions.delete` and the record removed,
+  then lets the session go. The next open is `ensure --fresh` (a pane of
+  `harness new` gets a plain `new`), and the waiting task, or the next
+  one, goes on there. A failed close is tried `--now` again at the next
+  look and keeps the token. A close Harness refuses because the session's
+  saved conversation can't be read ("Could not read the saved
+  conversation", its Gateway key already deleted: Harness checkpoints
+  before it closes) counts as closed (`CLOSE_CONVERSATION_GONE`): the
+  record is forgotten and the next open is `--fresh`, never a close tried
+  for ever. Every path closes first and deletes the conversation after.
+  Retries are bounded by the replacements in a
+  row with no answer between: the first is at once; from the second
+  (`REPLACE_MOST`, 2) the next open waits 5 s, then 10 s, doubled at each
+  more, at most 300 s. A turn answered starts the count again. A cancelled
+  turn's close that failed keeps the token too.
+  Fields of openharness#4484 (proposed; each absent is today's behaviour):
+  `ensure`'s `state: "stopped"` is replaced at once, with no `show`;
+  `confirmed: false` (a resume Harness could not confirm) is replaced when
+  `show` gives no verdict by the bound; `result: "new"` with any `whyCode`
+  (`ENGINE_SESSION_GONE`, `HARNESS_GONE`, `ENGINE_EXITED`, or one not
+  known yet: Harness replaced the session itself) is kept and recorded
+  over the old one, with no extra close or `--fresh`, journaled with its
+  code. `ensure` is given 120 s (`ENSURE_TIMEOUT`), past the ~60 s one
+  `ensure` can take (the Gateway call, the resume, its settle and
+  `AGENT_BUSY` retries); a healthy one is not slowed. A fresh OpenClaw
+  session's first words refused `ENGINE_NOT_READY` (~35 s seen) are tried
+  again every 5 s within the open's 120 s, and a task's refused reply is
+  tried again within its own bound: neither is a sign. A healthy session costs one `show` per open and nothing
+  per turn. The worst case from a jam to a fresh session is about 120 s
+  plus one `ensure`. Journal: `<id> is
+  gone or stuck (<why>); closed, forgotten and replaced with a fresh
+  session (#7906)`.
+- **The lightest reopen first, and the task not lost (#7906, the
+  owner's rule).** `OneSession::revive_or_replace` is a ladder:
+  - **(a)** A kept session whose engine or pane died (a plain shell,
+    `stopped`, gone) while OpenClaw's record still holds its conversation
+    (or the record can't be read) is let go with no close and no delete.
+    The next `ensure` is a plain resume, which keeps its memory. This is
+    tried once until a turn is answered.
+  - **(b)** Died again after that resume (or, sign 5, refused again), a conversation OpenClaw no
+    longer holds, our own deadline close, or still `starting`: a fresh
+    conversation (`replace_kept`, then `ensure --fresh`, the same name and
+    token).
+  - **(c)** From the second replacement in a row, the backoff above. The
+    resume is once per kept session (its name and token, never its agent
+    id, so one that comes back with a new id is the same) until a turn is
+    answered, and counts as a reopen in a row: after it, the backoff starts
+    at the third reopen, so (a) then (b) is not slowed but nothing loops
+    without one.
+
+  A skill run whose session dies under its turn (`wait` reads a plain
+  shell idle), or whose handed-over turn is not moving (sign 4, replaced
+  at once with no resume: a plain resume would find the same stuck turn),
+  while `show` counts no tool run yet is put back once: its
+  words are typed again into the reopened session. Its turn still holds
+  the queue, so the tasks behind it keep their order, and its run's token
+  is kept. A turn that had already run a tool is never replayed. It ends
+  with "...after the task had started work, so it was not run again; ask
+  again". A second death ends it with its one line. A spoken task is never
+  typed again here: it is put back by the store as before (#7919's bound),
+  so there is no double put-back. Journal: `<id> died (<why>); OpenClaw
+  still holds its conversation, so a plain resume first (#7906)`, and
+  `<task>: its session died (<why>); its words typed again once into the
+  reopened one (#7906)`.
+
+  **Told once (the owner's "never stuck without the person knowing").**
+  A skill run whose session was replaced (or resumed, ladder (a)) while
+  its task waited at the hand-over or was in flight, and that then went on
+  in the new session, has `Turn::restarted`; its answer is told with
+  `RESTARTED_LINE` ("The agent got stuck, so I restarted it and did your
+  request.") once in front of it, on the path its answer is told by
+  already. One line per task however many replacements. A run given up (a
+  tool had run, or a second death) is told its own failed line only. A
+  replacement with no task waiting (the one-session thread's open, a
+  background make start) tells nothing. A spoken task gets no such line:
+  it is told only #7919's `one_session_not_started` failure through Task
+  news, never both. The line is heard with the answer, not at the moment
+  of the replacement.
 
 ### The limit accepted for Monday: a running skill's grants inside the gateway
 

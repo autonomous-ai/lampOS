@@ -30,6 +30,7 @@ pub(super) fn supervise(
         near_call: PathBuf::from(lamp_near_call::FILE),
         room_sounds: crate::onboarding::ROOM_SOUNDS_PATH.into(),
         room_sounds_group: room_sounds_group(),
+        noticing_by_default: lamp_msgs::consent::noticing_by_default(),
     });
     supervise_with_installed_skill(
         trace,
@@ -306,6 +307,7 @@ mod tests {
             near_call: checkpoint.with_file_name("near-call.json"),
             room_sounds: checkpoint.with_file_name("room-sounds.json"),
             room_sounds_group: None,
+            noticing_by_default: false,
             checkpoint: checkpoint.to_path_buf(),
         }
     }

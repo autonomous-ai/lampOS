@@ -791,11 +791,17 @@ this room" until someone asks to be recognised.
 - **The score, in the journal.** Each check with a face in view, outside a
   remembering, says one line, at most every two seconds (with
   `LAMP_FACE_REFOUND=on`, also at a forced check above):
-  `recognition best 0.341 height 0.152 (near at 0.1, same at 0.363)`, the
-  best cosine against anyone's kept prints (`none` with nobody remembered
-  or no face near enough), the largest face's height as a share of the
-  picture's, the near gate and the threshold. No name, no id: only numbers,
-  always on (#3126).
+  `recognition best 0.341 height 0.152 width 0.114 turn -0.18 across 0.712 prints age 86400 s (near at 0.1, same at 0.363)`,
+  the best cosine against anyone's kept prints (`none` with nobody remembered
+  or no face near enough), the largest face's height and width as shares of
+  the picture's (the near face the print was read from, whenever there is a
+  best), its turn (the nose's offset from the eyes' middle over the
+  eyes' span: 0 front-on, about ±0.5 well turned, the sign the side; `none`
+  with the eyes on one point), its box's centre across the picture (0 the
+  left edge, 1 the right), how many seconds ago the closest person's prints were
+  added (their `added_unix_s`: people.json keeps one time per person, not
+  per print; `none` with the best), the near gate and the threshold. No
+  name, no id: only numbers, always on (#3126; width, turn, across and age #7424).
 - **Kept.** `--people FILE` (on lamp-4ace `/var/lib/lampos-eyes/people.json`,
   in a directory of mode 0700 and a file of mode 0600). Per person: the
   name, up to five prints and when they were added; with
@@ -1717,6 +1723,26 @@ With the switch:
   is asked first as before. Off, a new face is kept
   on the call as before
   (`known_faces::tests::a_new_face_is_kept_only_on_a_yes_to_keeping_it`).
+- **A known face only, when the known file let the save past the face
+  question** (`LAMP_FACE_SAVE_KNOWN_ONLY=on`, lamp-voice; off unless set,
+  in no product unit; #7704). The known file stays up to its 3 s after a
+  known face leaves, so a stranger who steps in and gives a name in that
+  gap was saved as a new person with no face question. With the switch,
+  that save alone (the face question skipped only because the known file
+  named a face; never with `LAMP_FACE_NO_ASK`) is sent with
+  `"known_only":true`. The eyes refuse a capture recognised as nobody,
+  under a name nobody is kept under, with `{"error":"not_known"}` before
+  the new-person save (`who::People::remember_one_known_only`,
+  `Refused::NotKnown`; the journal says "asked for a known face only, it is
+  known as nobody"), and the voice tells it as the face question
+  (`ASK_FACE_FIRST`), nothing kept. A known face is still answered "known
+  as" and the rename held (#7653), and their own name on their own face is
+  still kept in place
+  (`a_save_for_a_known_face_only_refuses_a_face_known_as_nobody`,
+  `with_known_only_a_face_the_eyes_do_not_know_is_asked_the_face_question`).
+  `known_only` is sent only when true: eyes from before it refuse a field
+  they don't know, so voice and eyes ship in one build. Off, the line is
+  as before.
 - **A new face with nothing asked** (`LAMP_FACE_NO_ASK=on`, with names
   checked; off unless set; the first builder 18:50, 18 Nov, from the
   product owner). A face is kept unasked **only with speaking-face proof**

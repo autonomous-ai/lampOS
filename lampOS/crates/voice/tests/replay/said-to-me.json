@@ -75,7 +75,7 @@
 ,
 {
   "case": "7442b-P2-1-r18",
-  "source": "out-7442b-1117-1414 journal-P2-1 request 18, eyes-P2-1.txt; row-7442b P2: into a phone, head down, in the conversation's window (#7726 holds it from its own journal's pose). NOTE: expect 'answered' pins the bug's behaviour as the kit's 0.25 s eyes sample shows it (its pitch reads miss the head-down looks lamp-voice saw); a fix that holds this line is not a regression: update expect with it",
+  "source": "out-7442b-1117-1414 journal-P2-1 request 18, eyes-P2-1.txt; row-7442b P2: into a phone, head down, in the conversation's window. Stays 'answered' with #7726 on lamp-voice (#7964): the lone face read silent in every look of the kit's 0.25 s sample is no speaker, so the speaker's pose is unread (speaking_faces.rs, Look's speaker); the lamp's own every-frame looks (build voice-7442b, before #7726) may differ, which only a row shows. A fix that holds this line from this sample is not a regression: update expect with it",
   "line_s": [
     -0.94,
     1.46
@@ -98,7 +98,7 @@
 ,
 {
   "case": "7442b-P1-1-r16",
-  "source": "out-7442b-1117-1414 journal-P1-1 request 16, eyes-P1-1.txt; row-7442b P1: into a phone, head down, in the conversation's window (#7726 holds it from its own journal's pose). NOTE: expect 'answered' pins the bug's behaviour as the kit's 0.25 s eyes sample shows it (its pitch reads miss the head-down looks lamp-voice saw); a fix that holds this line is not a regression: update expect with it",
+  "source": "out-7442b-1117-1414 journal-P1-1 request 16, eyes-P1-1.txt; row-7442b P1: into a phone, head down, in the conversation's window. Stays 'answered' with #7726 on lamp-voice (#7964): the lone face read silent in every look of the kit's 0.25 s sample is no speaker, so the speaker's pose is unread (speaking_faces.rs, Look's speaker); the lamp's own every-frame looks (build voice-7442b, before #7726) may differ, which only a row shows. A fix that holds this line from this sample is not a regression: update expect with it",
   "line_s": [
     1.68,
     4.08
@@ -254,6 +254,57 @@
   "expect": "answered",
   "eyes": [
     "S 0.00 1 0.0 -12.2 22.7 y - unknown thinking"
+  ]
+}
+,
+{
+  "case": "7442a-Q4-1-r35",
+  "source": "out-7442a-1117-1230 journal-Q4-1 request 35, eyes-Q4-1.txt; row-7442a Q4: turned to the lamp, facing and seen speaking (step PASS, a counter-case)",
+  "line_s": [
+    8.38,
+    9.98
+  ],
+  "words": 4,
+  "turned": true,
+  "expect": "answered",
+  "eyes": [
+    "S 8.04 1 0.0 31.5 13.5 y - no resting",
+    "S 8.29 1 0.0 31.6 10.2 y - unknown resting",
+    "S 8.54 1 0.0 31.6 10.2 y - unknown resting",
+    "S 8.80 1 0.0 34.5 10.2 y - yes listening",
+    "S 9.05 1 0.0 24.2 7.5 y - yes listening",
+    "S 9.30 1 0.1 20.9 15.0 y - yes listening",
+    "S 9.55 1 0.1 16.5 10.5 y - yes listening",
+    "S 9.80 1 0.1 25.5 9.9 y - yes thinking",
+    "S 10.06 1 0.1 37.0 6.8 y - unknown thinking",
+    "S 10.31 1 0.1 49.5 5.4 y - unknown thinking"
+  ]
+}
+,
+{
+  "case": "7442a-Q5-1-r37",
+  "source": "out-7442a-1117-1230 journal-Q5-1 request 37, eyes-Q5-1.txt; row-7442a Q5: in the conversation's window, facing (step PASS, a counter-case)",
+  "line_s": [
+    7.19,
+    9.19
+  ],
+  "words": 5,
+  "going_on": true,
+  "turned": true,
+  "expect": "answered",
+  "eyes": [
+    "S 6.80 1 0.0 6.6 18.3 y - no resting",
+    "S 7.06 1 0.0 6.6 18.3 y - no listening",
+    "S 7.31 1 0.0 10.6 8.4 y - no listening",
+    "S 7.56 1 0.0 2.3 12.9 y - no listening",
+    "S 7.81 1 0.0 7.3 18.3 y - no listening",
+    "S 8.07 1 0.0 7.1 18.8 y - no listening",
+    "S 8.32 1 0.0 5.0 18.5 y - unknown listening",
+    "S 8.57 1 0.0 4.2 17.8 y - unknown listening",
+    "S 8.82 1 0.0 8.4 19.7 y - unknown listening",
+    "S 9.08 1 0.0 15.3 14.1 y - unknown thinking",
+    "S 9.33 1 0.0 15.3 14.1 y - unknown thinking",
+    "S 9.58 1 0.0 4.8 18.2 y - unknown thinking"
   ]
 }
 ]

@@ -98,6 +98,20 @@ enum Act {
     CaptureReopen,
     /// The same with a 50 ms close, as an XRun the worker reopens at once.
     CaptureXRun,
+    /// `CaptureReopen` racing the speaker's re-prime on the same fresh
+    /// authority (#7224): the reopened epoch counts from 1 again, and its
+    /// first frames were cancelled against a clock not yet started.
+    CaptureReopenUnclocked,
+    /// As the capture worker with `LAMP_VOICE_UNSTARTED_FRAME_DROP=on`
+    /// (#7224): a 400 ms stall's reopen whose speaker clock starts only
+    /// this long after it (`None`: never). Capture holds every frame back;
+    /// 800 ms after the reopen it closes the microphone as
+    /// `ClockNotStarted` and reopens it, and 800 ms after that it ends
+    /// with the old error, unless the clock has come.
+    CaptureClockLate(Option<u64>),
+    /// The next three frames carry no clock start, with no reopen: fired
+    /// before the first frame, the boot's first frame precedes the start.
+    CaptureUnclocked,
     /// The provider peer closes its channels: the provider is gone.
     ProviderGone,
     /// Stop-only stall: the speaker consumes control messages but installs no
@@ -634,6 +648,14 @@ impl CaptureSchedule {
     }
 }
 
+/// The reopen hold's timeline (`Act::CaptureClockLate`).
+struct ClockLate {
+    reopen_at: u64,
+    clock_at: Option<u64>,
+    reopened: bool,
+    recovered: bool,
+}
+
 /// State owned either by one real-time thread or by the synchronous pump.
 struct Peers {
     script: Script,
@@ -657,6 +679,15 @@ struct Peers {
     capture_lag_us: u64,
     capture_epoch: u64,
     capture_reopen: bool,
+    /// The next reopen is `Act::CaptureReopenUnclocked`'s.
+    capture_reopen_unclocked: bool,
+    /// What the schedule's sequence is ahead of the epoch's own, which
+    /// counts from 1 at a reopen as the worker's does.
+    capture_sequence_base: u64,
+    /// Frames still to send with no clock start.
+    capture_unclocked: u64,
+    /// `Act::CaptureClockLate`'s timeline, on the scenario clock.
+    clock_late: Option<ClockLate>,
     camera: Option<BootId>,
     camera_started: bool,
     camera_silent: bool,
@@ -713,6 +744,31 @@ impl Peers {
                 }
             }
             Act::CaptureSilent => self.capture_silent = true,
+            Act::CaptureClockLate(clock_ms) => {
+                let at = monotonic_us();
+                let reopen_at = at + 400_000;
+                self.clock_late = Some(ClockLate {
+                    reopen_at,
+                    clock_at: clock_ms.map(|ms| reopen_at + ms * 1_000),
+                    reopened: false,
+                    recovered: false,
+                });
+                self.capture_stalled_until =
+                    Some(crate::scenario_clock::instant() + Duration::from_secs(60));
+                let epoch = self.capture_epoch;
+                if let Some(capture) = self.peers.iter_mut().find(|p| p.role == "capture") {
+                    capture
+                        .channels
+                        .control
+                        .send(WorkerEvent::CaptureGap {
+                            epoch,
+                            reason: "AuthorityExpired".to_owned(),
+                            closed_at_us: at,
+                        })
+                        .unwrap();
+                }
+            }
+            Act::CaptureUnclocked => self.capture_unclocked = 3,
             Act::CaptureLag => self.capture_lag_us = 30_000,
             Act::CaptureStall => {
                 // The device keeps its own 10 ms schedule (CaptureSchedule);
@@ -720,8 +776,9 @@ impl Peers {
                 self.capture_stalled_until =
                     Some(crate::scenario_clock::instant() + Duration::from_millis(500));
             }
-            Act::CaptureReopen | Act::CaptureXRun => {
+            Act::CaptureReopen | Act::CaptureXRun | Act::CaptureReopenUnclocked => {
                 let ms = if act == Act::CaptureXRun { 50 } else { 400 };
+                self.capture_reopen_unclocked = act == Act::CaptureReopenUnclocked;
                 self.capture_stalled_until =
                     Some(crate::scenario_clock::instant() + Duration::from_millis(ms));
                 // A closed microphone reads nothing: frames start again at
@@ -927,6 +984,9 @@ impl Peers {
             }
         }
         note_held(&self.seen, role, self.peers[index].snapshot);
+        if role == "capture" {
+            self.tick_clock_late(index);
+        }
         match role {
             "capture"
                 if self.capture.is_some()
@@ -938,6 +998,11 @@ impl Peers {
                 if std::mem::take(&mut self.capture_reopen) {
                     self.capture_epoch += 1;
                     self.send_capture_started(index);
+                    if std::mem::take(&mut self.capture_reopen_unclocked) {
+                        self.capture_sequence_base =
+                            self.capture.as_ref().unwrap().next_sequence - 1;
+                        self.capture_unclocked = 3;
+                    }
                 }
                 // Frames follow a fixed 10 ms schedule, like a capture device.
                 for _ in 0..64 {
@@ -965,6 +1030,7 @@ impl Peers {
                             .max(attempted_at_us - at);
                     }
                     let speech = self.speech(frame);
+                    let unclocked = self.capture_unclocked > 0;
                     let peer = &mut self.peers[index];
                     let sent = peer.channels.data.send(MicrophoneFrame {
                         raw: None,
@@ -972,7 +1038,7 @@ impl Peers {
                         epoch: self.capture_epoch,
                         dsp_epoch: 1,
                         privacy_generation: peer.snapshot.unwrap().microphone_generation(),
-                        frame_sequence: frame,
+                        frame_sequence: frame - self.capture_sequence_base,
                         read_completed_at_us: at,
                         probability: if speech { 0.99 } else { 0.0 },
                         echo: None,
@@ -990,11 +1056,14 @@ impl Peers {
                             aec_queue_delay_ms: 0,
                             reference: ReferenceTiming {
                                 playback_epoch: 1,
-                                clock_started_at_us: Some(at),
+                                clock_started_at_us: (!unclocked).then_some(at),
                                 ..ReferenceTiming::default()
                             },
                         },
                     });
+                    if sent.is_ok() && unclocked {
+                        self.capture_unclocked -= 1;
+                    }
                     if sent.is_err() {
                         // A full socket (the catch-up after a stall can fill
                         // it) loses no block: the device still holds it, and
@@ -1041,6 +1110,62 @@ impl Peers {
             _ => {}
         }
         Ok(())
+    }
+
+    /// `Act::CaptureClockLate`, as the worker's reopen hold runs it.
+    fn tick_clock_late(&mut self, index: usize) {
+        let Some(late) = self.clock_late.as_mut() else {
+            return;
+        };
+        let now = monotonic_us();
+        let gap = |peers: &mut Vec<Peer>, epoch: u64, reason: &str| {
+            peers[index]
+                .channels
+                .control
+                .send(WorkerEvent::CaptureGap {
+                    epoch,
+                    reason: reason.to_owned(),
+                    closed_at_us: now,
+                })
+                .unwrap();
+        };
+        if now < late.reopen_at {
+            return;
+        }
+        if !late.reopened {
+            late.reopened = true;
+            self.capture_epoch += 1;
+            self.send_capture_started(index);
+            return;
+        }
+        if late.clock_at.is_some_and(|at| now >= at) {
+            // The clock has come: the hold lets the reopened epoch's frames
+            // through, counting from 1, read from now on.
+            self.clock_late = None;
+            self.capture_stalled_until = None;
+            let schedule = self.capture.as_mut().unwrap();
+            schedule.skip_to(now);
+            self.capture_sequence_base = schedule.next_sequence - 1;
+            return;
+        }
+        let bound = crate::unstarted_frames::RECOVER_US;
+        if !late.recovered && now >= late.reopen_at + bound {
+            late.recovered = true;
+            late.reopen_at = now;
+            let epoch = self.capture_epoch;
+            gap(
+                &mut self.peers,
+                epoch,
+                crate::unstarted_frames::CLOCK_NOT_STARTED,
+            );
+            self.capture_epoch += 1;
+            self.send_capture_started(index);
+        } else if late.recovered && now >= late.reopen_at + bound {
+            self.clock_late = None;
+            let _ = self.peers[index].channels.control.send(WorkerEvent::Fault {
+                code: crate::unstarted_frames::UNSTARTED_ERROR.to_owned(),
+            });
+        }
     }
 
     fn tick_provider(&mut self, index: usize) {
@@ -1577,6 +1702,10 @@ fn run_in(script: Script, trace: &mut SessionState) -> Run {
         capture_lag_us: 0,
         capture_epoch: 1,
         capture_reopen: false,
+        capture_reopen_unclocked: false,
+        capture_sequence_base: 0,
+        capture_unclocked: 0,
+        clock_late: None,
         camera: camera_boot,
         camera_started: false,
         camera_silent: false,
@@ -2133,6 +2262,134 @@ fn a_held_turn_is_not_cut_by_a_slow_pass_while_frames_come_on_time() {
         .filter(|(_, at, ..)| *at < muted_at)
         .collect();
     assert!(lapsed.is_empty(), "{lapsed:?}");
+}
+
+/// lamp-c0a4, 18 Nov 22:31:06 (#7224, fault 4): a held turn's capture
+/// frames stopped, it was cut 40 ms before its lease lapsed, the speaker
+/// re-primed on the fresh authority while capture reopened under it, and
+/// the reopened epoch's first frame came before the clock had started
+/// again: the voice exited 1 on "capture frame preceded certified running
+/// reference clock". With `LAMP_VOICE_UNSTARTED_FRAME_DROP=on` that frame
+/// is a gap's dropped frame, the reply is cut once and the voice goes on;
+/// off, it still ends there.
+#[test]
+fn a_held_turn_cut_then_a_reopen_before_the_clock_restarts_goes_on_with_the_switch() {
+    let _one = one_session();
+    for on in [true, false] {
+        TEST_UNSTARTED_FRAME_DROP.with(|drop| drop.set(on));
+        let run = run(Script {
+            actions: vec![
+                (When::Accepted(3), Act::CaptureReopenUnclocked),
+                (When::Block(400), Act::Mute),
+            ],
+            ..Script::question(Answer::Hold(40))
+        });
+        TEST_UNSTARTED_FRAME_DROP.with(|drop| drop.set(false));
+        if !on {
+            assert!(
+                run.result.as_ref().is_err_and(|error| error
+                    .to_string()
+                    .contains("capture frame preceded certified running reference clock")),
+                "off: {:?}",
+                run.result
+            );
+            continue;
+        }
+        run.assert_invariants();
+        assert!(is_mute(&run.result), "{:?}", run.result);
+        let cancels = run.events("hand_control_cancel");
+        assert_eq!(cancels.len(), 1, "{cancels:?}");
+        assert_eq!(cancels[0]["reason"], "capture_gap");
+        let gaps = run.events("capture_gap");
+        assert_eq!(gaps.len(), 1, "{gaps:?}");
+        assert!(gaps[0]["dropped_frames"].as_u64().unwrap() >= 1, "{gaps:?}");
+    }
+}
+
+/// #7224, Heron's P2 on #8011: the coordinator's 1.5 s retention heartbeat
+/// counted from the last kept frame came before the reopen hold's two
+/// steps. A held turn's capture stalls 400 ms and reopens, and the
+/// speaker's clock starts 1.2 s after the reopen, 1.6 s after the last kept
+/// frame: with the switch the recovery's `ClockNotStarted` moves the
+/// heartbeat, so the voice goes on and hears again; off, the heartbeat
+/// ends it as today.
+#[test]
+fn a_reprime_taking_1_2_s_after_a_reopen_goes_on_with_the_switch() {
+    let _one = one_session();
+    for on in [true, false] {
+        TEST_UNSTARTED_FRAME_DROP.with(|drop| drop.set(on));
+        let run = run(Script {
+            actions: vec![
+                (When::Accepted(3), Act::CaptureClockLate(Some(1_200))),
+                (When::Block(500), Act::Mute),
+            ],
+            ..Script::question(Answer::Hold(40))
+        });
+        TEST_UNSTARTED_FRAME_DROP.with(|drop| drop.set(false));
+        if !on {
+            assert!(
+                run.result.as_ref().is_err_and(|error| error
+                    .to_string()
+                    .contains("microphone retention heartbeat expired")),
+                "off: {:?}",
+                run.result
+            );
+            continue;
+        }
+        assert!(is_mute(&run.result), "{:?}", run.result);
+        let reasons: Vec<_> = run
+            .events("capture_gap_closed")
+            .iter()
+            .map(|event| event["details"]["reason"].as_str().unwrap().to_owned())
+            .collect();
+        assert_eq!(reasons, ["AuthorityExpired", "ClockNotStarted"]);
+        let cancels = run.events("hand_control_cancel");
+        assert_eq!(cancels.len(), 1, "{cancels:?}");
+    }
+}
+
+/// The same with a clock that never starts: the hold's second step, the
+/// capture worker's fault with the old error, ends the voice, never the
+/// heartbeat and never silence for good.
+#[test]
+fn a_clock_that_never_starts_after_a_reopen_ends_in_the_holds_exit() {
+    let _one = one_session();
+    TEST_UNSTARTED_FRAME_DROP.with(|drop| drop.set(true));
+    let run = run(Script {
+        actions: vec![
+            (When::Accepted(3), Act::CaptureClockLate(None)),
+            (When::Block(800), Act::Mute),
+        ],
+        ..Script::question(Answer::Hold(40))
+    });
+    TEST_UNSTARTED_FRAME_DROP.with(|drop| drop.set(false));
+    assert!(
+        run.result.as_ref().is_err_and(|error| error
+            .to_string()
+            .contains(crate::unstarted_frames::UNSTARTED_ERROR)),
+        "{:?}",
+        run.result
+    );
+    assert_eq!(run.events("capture_gap_closed").len(), 2);
+}
+
+/// #7224, fault 4: the boot's barrier is unchanged with the switch on.
+/// A first frame before the speaker's clock has ever started still ends
+/// the voice: nothing has been certified yet.
+#[test]
+fn a_boots_first_frame_before_the_clock_still_ends_the_voice_with_the_switch() {
+    let _one = one_session();
+    TEST_UNSTARTED_FRAME_DROP.with(|drop| drop.set(true));
+    let run =
+        run(Script::question(Answer::Complete(12)).then(When::Block(0), Act::CaptureUnclocked));
+    TEST_UNSTARTED_FRAME_DROP.with(|drop| drop.set(false));
+    assert!(
+        run.result.as_ref().is_err_and(|error| error
+            .to_string()
+            .contains("capture frame preceded certified running reference clock")),
+        "{:?}",
+        run.result
+    );
 }
 
 /// lamp-e82d, 4 Nov 11:44 (#4332): the privacy slide closed just after a
@@ -3161,6 +3418,7 @@ fn held_onboarding_storage_at(near_call: bool) -> (SessionState, HeldOnboardingS
             near_call: directory.join("near-call.json"),
             room_sounds: directory.join("room-sounds.json"),
             room_sounds_group: None,
+            noticing_by_default: false,
         },
         Box::new(move |tag| {
             if tag.revision == 2 {

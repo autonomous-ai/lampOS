@@ -19,6 +19,10 @@ struct Servo {
     keeps_force: bool,
     /// Its own lower and upper position limits (registers 9 and 11).
     range: (u16, u16),
+    /// Its own maximum acceleration (register 85, EEPROM): a write of a
+    /// higher acceleration reads back as this, as the STS3215s capped at 50
+    /// do (#7946). 254 on most.
+    max_acceleration: u8,
 }
 
 /// Something that happens to one servo at a given time.
@@ -183,6 +187,7 @@ fn folded(cancel_at: Duration) -> (Lamp, Clock) {
         force: 1_000,
         keeps_force: true,
         range: (0, 4_095),
+        max_acceleration: 254,
     };
     let time = Rc::new(Cell::new(Duration::ZERO));
     (
@@ -425,6 +430,7 @@ impl Lamp {
                 12 => servo.range.1.to_le_bytes()[1],
                 40 => servo.torque,
                 41 => servo.acceleration,
+                85 => servo.max_acceleration,
                 42 => servo.goal.to_le_bytes()[0],
                 43 => servo.goal.to_le_bytes()[1],
                 46 => servo.speed.to_le_bytes()[0],
@@ -562,7 +568,7 @@ impl Lamp {
                     }
                     let servo = &mut self.servos[usize::from(id) - 1];
                     match (address, data.as_slice()) {
-                        (41, [value]) => servo.acceleration = *value,
+                        (41, [value]) => servo.acceleration = (*value).min(servo.max_acceleration),
                         (46, [low, high]) => servo.speed = u16::from_le_bytes([*low, *high]),
                         // A goal by itself: only ever to the shoulder or the
                         // elbow, or to a joint the body takes hold of.
@@ -691,6 +697,87 @@ fn the_three_writes_are_exactly_these_bytes() {
     assert_eq!(
         hex(&acceleration_write(Joint::BaseYaw, 50)),
         "ffff01040329329c"
+    );
+}
+
+/// #7946: lamp-5ee8's base yaw (and many of the 200-lamp round's) holds a
+/// maximum acceleration of 50 in its EEPROM, so the 50 asked by the folded
+/// limits' own servo cap is no problem, and 60 asked reads back as 50 and
+/// used to stop the start. Now each joint runs at the lower of what is
+/// asked and its own cap: the write asked is the cap, and the start goes on.
+#[test]
+fn a_servo_capped_at_50_runs_at_its_cap_and_the_start_goes_on() {
+    let (mut lamp, mut clock) = folded(Duration::from_secs(8));
+    lamp.servos[0].max_acceleration = 50;
+    let limits = Limits {
+        servo_acceleration: 60,
+        ..Limits::FOLDED
+    };
+    let news = script(&clock.time);
+    let report = run(&mut lamp, &mut clock, limits, None, news, |_| {});
+    assert_eq!(report.stop, Stop::Cancelled, "{report:?}");
+    assert!(report.moved);
+    // The capped base yaw is asked its cap; the wrist roll its 60.
+    assert!(
+        lamp.registers.contains(&(1, 41, vec![50])),
+        "{:?}",
+        lamp.registers
+    );
+    assert!(
+        lamp.registers.contains(&(4, 41, vec![60])),
+        "{:?}",
+        lamp.registers
+    );
+    assert!(
+        !lamp.registers.contains(&(1, 41, vec![60])),
+        "{:?}",
+        lamp.registers
+    );
+    assert_eq!(lamp.servos[0].acceleration, 50);
+}
+
+/// Without the fix the same lamp stopped before moving, the read back
+/// naming the cap, as lamp-5ee8's did (`profile read back as …`): the test
+/// above is the one that fails on lamp-voice before #7946. Here, a servo with
+/// the usual cap runs at the 60 asked, and nothing is said.
+#[test]
+fn a_servo_with_the_usual_cap_runs_at_what_is_asked() {
+    let (mut lamp, mut clock) = folded(Duration::from_secs(8));
+    let limits = Limits {
+        servo_acceleration: 60,
+        ..Limits::FOLDED
+    };
+    let news = script(&clock.time);
+    let report = run(&mut lamp, &mut clock, limits, None, news, |_| {});
+    assert_eq!(report.stop, Stop::Cancelled, "{report:?}");
+    assert!(
+        lamp.registers.contains(&(1, 41, vec![60])),
+        "{:?}",
+        lamp.registers
+    );
+}
+
+/// The caps' rule by itself: the lower of asked and the cap, the known low
+/// cap when nothing could be read, never higher, and only a lower one said.
+#[test]
+fn each_joint_runs_at_the_lower_of_asked_and_its_cap() {
+    let joints = [Joint::BaseYaw, Joint::WristRoll];
+    let mut said = Vec::new();
+    let mut say = |line: String| said.push(line);
+    let each = accelerations(60, &joints, Ok(vec![50, 254]), &mut say);
+    assert_eq!(each[Joint::BaseYaw.index()], 50);
+    assert_eq!(each[Joint::WristRoll.index()], 60);
+    let each = accelerations(60, &joints, Err("no answer".into()), &mut say);
+    assert_eq!(each[Joint::BaseYaw.index()], 50);
+    assert_eq!(each[Joint::WristRoll.index()], 50);
+    let each = accelerations(40, &joints, Err("no answer".into()), &mut say);
+    assert_eq!(each[Joint::BaseYaw.index()], 40, "never higher than asked");
+    let each = accelerations(60, &joints, Ok(vec![0, 254]), &mut say);
+    assert_eq!(each[Joint::BaseYaw.index()], 50, "a cap of 0 is no reading");
+    assert_eq!(said.len(), 3, "{said:?}");
+    assert!(
+        said[0].contains("base yaw") || said[0].contains("BaseYaw") || said[0].contains("50"),
+        "{said:?}"
     );
 }
 
@@ -20936,6 +21023,65 @@ fn an_energy_level_turns_faster_and_waits_for_the_lamp_to_settle() {
     assert!(fastest(&said_late) <= 6);
 }
 
+/// #7749: `LEVEL_PATIENCE` is 2 s. A held look 480 counts round from 1 s
+/// at 100 counts a second (above 1, under level 2's 425), level 2 sent at
+/// 1.2 s: the old level is kept until 2 s after the send, while the head
+/// still turns, and level 2 is taken by one step after.
+#[test]
+fn a_new_energy_level_waits_level_patience_for_a_head_turning_under_its_pace() {
+    let (mut lamp, mut clock) = folded(Duration::from_secs(8));
+    let time = clock.time.clone();
+    let seen = clock.time.clone();
+    let mut yaw = Vec::new();
+    let limits = Limits {
+        yaw: 500.0,
+        ..Limits::folded_with(Tuning {
+            reach: [150, 15, 1, 250],
+            speed: 100,
+            servo_speed: 1_000,
+            servo_acceleration: 60,
+        })
+        .unwrap()
+    };
+    let send = Duration::from_millis(1_200);
+    let patience = Duration::from_secs(2);
+    let report = run_alive(
+        &mut lamp,
+        &mut clock,
+        limits,
+        Some(HOME),
+        None,
+        None,
+        || Some((Mood::Resting, 0)),
+        move || {
+            let now = time.get();
+            Asked {
+                held: true,
+                aim: (now >= Duration::from_secs(1)).then_some([-480.0, 0.0]),
+                energy: if now >= send { 2 } else { 1 },
+                ..Asked::default()
+            }
+        },
+        |glimpse| yaw.push((seen.get(), glimpse.goals[2])),
+    );
+    assert_eq!(report.stop, Stop::Cancelled, "{report:?}");
+    let taken = report
+        .energy_levels
+        .iter()
+        .find(|(_, level)| *level == 2)
+        .map(|(at, _)| *at - send);
+    assert!(
+        taken.is_some_and(|after| (patience..=patience + TICK).contains(&after)),
+        "taken {taken:?} after the send"
+    );
+    // Still turning when it was taken: the head was never still for it.
+    assert!(
+        Duration::from_secs(1) + landed(&yaw) > send + taken.unwrap(),
+        "landed {:?}",
+        landed(&yaw)
+    );
+}
+
 /// `LAMP_BODY_ENERGY` (#6893): off, a step of the follower is the one it
 /// always was, to the bit; on, its acceleration changes by at most `JERK`
 /// times `acceleration` a second, and it still arrives and settles.
@@ -21905,4 +22051,186 @@ fn a_lamp_folded_hot_stays_down_until_cool_and_then_a_new_line() {
         stood_within(&seen, 340, 355),
         "on: cool, a new line stands it"
     );
+}
+
+/// #7749: the level asked at `at`, alternating 5 and 2 every 7 s.
+fn level_every_seven(at: Duration) -> u8 {
+    if (at.as_secs() / 7).is_multiple_of(2) {
+        5
+    } else {
+        2
+    }
+}
+
+/// #7749: someone there, a new level sent every 7 s for 8 min, shifts at
+/// rest playing: each send is taken within 5 s, a shift found playing
+/// eased to rest for it; and no shift begins while a level waits.
+#[test]
+fn a_new_energy_level_ends_a_shift_at_rest_and_is_taken_within_five_seconds() {
+    let (report, shifts, folding, _, _) = at_rest_with(
+        true,
+        true,
+        8,
+        |at| Asked {
+            present: true,
+            energy: level_every_seven(at),
+            ..Asked::default()
+        },
+        None,
+        None,
+    );
+    assert_eq!(folding, None);
+    let sends: Vec<Duration> = (2..68).map(|k| Duration::from_secs(7 * k)).collect();
+    // Some sends found a shift playing, so the shift's end is what is tried.
+    assert!(
+        sends
+            .iter()
+            .any(|send| shifts.iter().any(|(from, to, _)| from < send && send < to)),
+        "{shifts:?}"
+    );
+    for send in sends {
+        let wanted = level_every_seven(send);
+        let taken = report
+            .energy_levels
+            .iter()
+            .find(|(at, level)| *at >= send && *level == wanted)
+            .map(|(at, _)| *at);
+        assert!(
+            taken.is_some_and(|at| at - send <= Duration::from_secs(5)),
+            "sent {send:?}: taken {taken:?}, {shifts:?}"
+        );
+        let taken = taken.unwrap();
+        assert!(
+            !shifts
+                .iter()
+                .any(|(from, _, _)| send <= *from && *from < taken),
+            "sent {send:?}, taken {taken:?}: a shift began while it waited, {shifts:?}"
+        );
+    }
+}
+
+/// #7749: a nod asked at 1 s and a new level sent at 1.3 s: the nod plays
+/// to its end step for step as with no level sent, and the level is taken
+/// only after it.
+#[test]
+fn a_new_energy_level_never_cuts_a_gesture_asked_of_it() {
+    let nod = |later: u8| {
+        let (mut lamp, mut clock) = folded(Duration::from_secs(14));
+        // An arm that moves, or it never stands to nod (as `skill_run`).
+        lamp.arm_moves = true;
+        lamp.overload_clears = 1;
+        let time = clock.time.clone();
+        let seen = clock.time.clone();
+        let asked_once = std::cell::Cell::new(false);
+        let mut gestures = Vec::new();
+        let report = run_alive(
+            &mut lamp,
+            &mut clock,
+            gesture_limits(),
+            Some(HOME),
+            Some(standing(100, 60)),
+            None,
+            || Some((Mood::Speaking, 60)),
+            move || {
+                let now = time.get();
+                let ask = now >= Duration::from_secs(1) && !asked_once.replace(true);
+                Asked {
+                    gesture: ask.then_some(&crate::clips::NOD),
+                    energy: if now >= Duration::from_millis(1_300) {
+                        later
+                    } else {
+                        1
+                    },
+                    ..Asked::default()
+                }
+            },
+            |glimpse| gestures.push((seen.get(), glimpse.gesture)),
+        );
+        let nodding: Vec<Duration> = gestures
+            .iter()
+            .filter(|(_, name)| *name == Some("nod"))
+            .map(|(at, _)| *at)
+            .collect();
+        (report, nodding)
+    };
+    let (_, alone) = nod(1);
+    let (report, sent) = nod(3);
+    assert!(!alone.is_empty());
+    assert_eq!(sent, alone);
+    let taken = report
+        .energy_levels
+        .iter()
+        .find(|(_, level)| *level == 3)
+        .map(|(at, _)| *at);
+    assert!(
+        taken.is_some_and(|at| at > *sent.last().unwrap()),
+        "{taken:?} {sent:?}"
+    );
+}
+
+/// #7749 (the first builder's 02:14): a shift at rest eased out for a new
+/// level only slows. From a hold and mid-motion, `settle` (its arm at the
+/// 1.2 sag of `LAMP_BODY_PRESENCE`) and `look_up`: no joint moves more a
+/// step than the clip's own pace or the speed it had, and it is home
+/// within 4 s, so with energy_in's 1 s read a level lands within 5 s.
+#[test]
+fn a_shift_eased_out_for_a_new_level_never_speeds_up() {
+    let step_us = TICK.as_micros() as u64;
+    for clip in [&crate::clips::SETTLE, &crate::clips::LOOK_UP] {
+        let scale = |offsets: [f32; 5]| -> [f32; 5] {
+            std::array::from_fn(|index| {
+                if clip.name == "settle" && index >= 3 {
+                    offsets[index] * 1.2
+                } else {
+                    offsets[index]
+                }
+            })
+        };
+        let pace = clip.pace(TICK);
+        let ticks = clip.duration_us() / step_us;
+        let peak = (0..ticks)
+            .max_by_key(|&k| {
+                let at = clip.at(k * step_us).unwrap();
+                at.iter().map(|value| value.abs() as u32).sum::<u32>()
+            })
+            .unwrap();
+        // Held at its peak (still), and a sixth of the way through (moving).
+        for k in [peak, ticks / 6] {
+            let from = scale(clip.at(k * step_us).unwrap());
+            let speed: [f32; 5] = if k == peak {
+                [0.0; 5]
+            } else {
+                let next = scale(clip.at((k + 1) * step_us).unwrap());
+                std::array::from_fn(|index| next[index] - from[index])
+            };
+            assert!(
+                k == peak || speed.iter().any(|v| *v != 0.0),
+                "{}",
+                clip.name
+            );
+            let cap: [f32; 5] = std::array::from_fn(|index| pace[index].max(speed[index].abs()));
+            let mut at = from;
+            let mut steps = 0u32;
+            loop {
+                steps += 1;
+                let before = at;
+                let done = ease_out_step(&mut at, steps, from, speed, cap);
+                for index in 0..5 {
+                    let moved = (at[index] - before[index]).abs();
+                    assert!(
+                        moved <= cap[index].max(EASE_LEAST) + 1e-3
+                            || (done && before[index].abs() < 0.5),
+                        "{} from step {k}: joint {index} moved {moved} at step {steps}, cap {}",
+                        clip.name,
+                        cap[index]
+                    );
+                }
+                if done {
+                    break;
+                }
+                assert!(steps < 200, "{} from step {k}: not home in 4 s", clip.name);
+            }
+            assert_eq!(at, [0.0; 5]);
+        }
+    }
 }

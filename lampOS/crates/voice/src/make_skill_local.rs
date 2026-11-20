@@ -24,7 +24,7 @@
 //! Hermes, the one engine with a namespace runner for a make today
 //! ([`crate::make_skill_agent`]): DeepSeek
 //! then gets one try and no repairs, and the agent gets them.
-use crate::made_skill::{self, Keeping, Made, Refused};
+use crate::made_skill::{self, Keeping, Made, REMINDER_INSTEAD, REMINDER_IS_TIMER, Refused};
 use crate::second_provider::net::{self, Chat, ChatEvent, Message};
 use serde_json::{Value, json};
 use std::{sync::Arc, time::Duration};
@@ -38,6 +38,10 @@ pub const AGENT_FIRST_ENVIRONMENT: &str = "LAMP_MAKE_AGENT_FIRST";
 /// refused (the owner, 10 Nov: "re-run it yourself until it works"; one,
 /// before: lamp-74ff's "come back to my desk" failed its one repair).
 pub const MOST_REPAIRS: usize = 3;
+/// What a DeepSeek repair of a make judged a quick reaction is refused as
+/// when it is none ([`made_skill::quick_reaction`]): never kept and never
+/// said, as the middle form takes its place.
+const NOT_A_REACTION: &str = "a repaired draft that is no quick reaction";
 /// The longest a make goes on: no repair is begun once one more round
 /// ([`ROUND_WITHIN`]) would end past it. 120 s, the longest a make with
 /// one repair could take before (two answers, each asked once more).
@@ -488,9 +492,8 @@ fn system_net(reads: bool, agent: bool, net: bool) -> String {
         "You write skills for a lamp. Answer exactly as the request says, with {blocks} \
          and nothing else. Use only the keys and values the request names, written as \
          in this example, which the lamp's check takes:\n\n{EXAMPLE}\n\nThe example shows \
-         the form only: never answer with it. A reminder at a time or every so often is the \
-         lamp's own timer, not a skill; a skill runs at a time only each day or on named \
-         days of the week, by the clock trigger below. A skill made on this lamp may do whatever the lamp can do: make what \
+         the form only: never answer with it. {NAMED_TOLD} {REMINDER_IS_TIMER}, by the clock trigger \
+         below. A skill made on this lamp may do whatever the lamp can do: make what \
          the request asks with the light, the head, a few exact words it says, its hum, \
          {own}or {may_also}, on one of the triggers below. {more} {blink} To speak, a skill has speak = \
          true in [permissions], {cooldown}, and one [[do]] step say = {{ text = \
@@ -509,9 +512,8 @@ fn system_net(reads: bool, agent: bool, net: bool) -> String {
          person, beginning \"{cant_yet}\" and naming what in plain words (\"{cant_yet} \
          {cant_example}.\"), never a rule, ending with \
          what to ask instead when there is one; \
-         for a reminder at a time or every so often: \"Ask me for a reminder instead, like 'remind \
-         me every hour to stand up'.\"{check_steps} {found_out} Never stand something \
-         else in for it, and add no time of day the request didn't name. When a part of the \
+         for a reminder at a time or every so often: \"{REMINDER_INSTEAD}\"{check_steps} {found_out} Never \
+         stand something else in for it, and add no time of day the request didn't name. When a part of the \
          request can't be done with these (dimming slowly, over a minute), make the rest and \
          add one line after the blocks: {left_out} what was left out, in a few words.\n\n\
          {services}{code}{steps}{said}"
@@ -883,12 +885,44 @@ fn own_accounts_now() -> Vec<(String, String)> {
 /// own argument alone, with none.
 pub const REQUEST: &str = "request";
 
+/// The `make_skill` argument for the name the person gave a new skill
+/// as they asked for it (#7911): read from their words by the voice's
+/// model, which judges what they said, and made the skill's name in code
+/// on every make path ([`made_skill::given_name`]): DeepSeek's answer,
+/// the lamp's agent's, and a task for the agent only asked for
+/// (`make_no_cannot::made`).
+pub const GIVEN_NAME: &str = "given_name";
+
+/// What the make's model is told of its skill's name (#7911): the name the
+/// request gives the skill, when it gives one. The voice's model gives it
+/// as [`GIVEN_NAME`] too, and code makes it the name
+/// ([`made_skill::given_name`]); told here as well for a call that left
+/// it out but kept it in the request's words (#7926's row on lamp-9adf:
+/// "make a skill called rain check" was kept as `morning-rain-check`).
+pub const NAMED_TOLD: &str = "Its SKILL.md name is the name the request gives the skill when it \
+     gives one, in lowercase words joined by -.";
+
 /// Whether a `make_skill` call's whole `args` ask for a new skill: they
 /// name its [`REQUEST`], as a streamed call whose first argument is
-/// [`REQUEST`] does (`ChatEvent::Argued`). Neither weighs its words or
-/// what else it carries, since the stream decides before those come.
+/// [`REQUEST`] does ([`new_make_argument`], `ChatEvent::Argued`). Neither
+/// weighs its words or what else it carries, since the stream decides
+/// before those come. A [`GIVEN_NAME`] alone, or beside a remove, is none.
 pub fn asks_a_new_make(args: &Value) -> bool {
     args.get(REQUEST).is_some()
+}
+
+/// What a streamed `make_skill` call's first argument, `name`, decides:
+/// a new make for its [`REQUEST`], none for any other, and nothing yet
+/// (`None`) for its [`GIVEN_NAME`]. The schema's keys sort, so that one
+/// streams first in any call that carries it, a remove's too (Heron's
+/// HOLD on #7926): the whole calls decide then, by their `request`
+/// ([`asks_a_new_make`]), so a named make still has its opening (Twelve's
+/// HOLD on #7926).
+pub fn new_make_argument(name: &str) -> Option<bool> {
+    if name == GIVEN_NAME {
+        return None;
+    }
+    Some(name == REQUEST)
 }
 
 /// The function the model is given with the switch: the lamp makes it
@@ -985,9 +1019,8 @@ pub const CODE_AT_ONCE_TOLD: &str = " A made skill may carry its own Python scri
 
 /// What the `request` parameter's description adds with a made skill's
 /// code on (#6749 B): an ask its own script answers, passed whole.
-const CODE_REQUEST_TOLD: &str = " A made skill's own script may check what the lamp reads and \
-     act on it (\"make a skill that checks the processor temperature and sets the light\"): \
-     pass such an ask whole.";
+const CODE_REQUEST_TOLD: &str = " A made skill's script may check what the lamp reads and act \
+     on it (\"one that checks the processor temperature and sets the light\"): pass it whole.";
 
 /// What [`tool`]'s description adds for a remove (#6960): on lamp-c0a4
 /// "delete the skill called moon fact" went to `lamp_help` and "remove the
@@ -1042,15 +1075,29 @@ fn parameters(writes: bool, code: bool) -> Value {
     parameters_with(writes, false, code)
 }
 
+/// The most bytes `make_skill`'s parameters come to with every switch the
+/// product's `lamp-voice` unit sets on (#8002): short of the link's 4,096
+/// ([`lamp_gemini::MAX_TOOL_JSON_BYTES`]) by the room one more parameter
+/// needs, about 336 bytes for #7765's `remake_old` and `put_back`. Each
+/// description is said in as few words as keep its meaning.
+pub const PRODUCT_MOST_PARAMETERS_BYTES: usize = 3_750;
+
 /// [`parameters`], and with a skill's tasks on (#6305) the same
-/// `approve_id` and `read_back` for a skill's task.
+/// `approve_id` and `read_back` for a skill's task. A parameter given
+/// "alone" is the call's one argument, with no request: said in that one
+/// word (#8002), so with every switch the product's unit sets on these
+/// stay within [`PRODUCT_MOST_PARAMETERS_BYTES`].
 fn parameters_with(writes: bool, tasks: bool, code: bool) -> Value {
     let mut parameters = json!({
         "type": "object",
         "properties": {
             "request": {
                 "type": "string",
-                "description": "What this skill should do and when, in the person's own words for this ask, nothing else: never a time, step or trigger of an earlier skill or turn. Never call it for an ask they take back in the same line."
+                "description": "What this skill should do and when, in the person's own words for this ask alone: never a time, step or trigger of an earlier skill or turn. Never call it for an ask they take back in the same line."
+            },
+            GIVEN_NAME: {
+                "type": "string",
+                "description": "Its name if they give one, alone (\"evening rate\"); else left out."
             }
         },
         "required": []
@@ -1059,7 +1106,7 @@ fn parameters_with(writes: bool, tasks: bool, code: bool) -> Value {
     // lamp (#6593, [`crate::made_clash`]): its id and the choice, alone.
     parameters["properties"][crate::made_clash::CLASH_ID] = json!({
         "type": "string",
-        "description": "Only when a skill you just made clashes with one or more on the lamp and the person then chooses: its clash_id, given with choice alone, with no request."
+        "description": "Only when a skill you just made clashes with any on the lamp and they then choose: its clash_id, with choice alone."
     });
     // A made skill removed by voice (#6960, [`crate::made_remove`]): the
     // name as heard, matched in code to the person's own made skills.
@@ -1072,28 +1119,35 @@ fn parameters_with(writes: bool, tasks: bool, code: bool) -> Value {
     // never a remove, which is then told as for good alone.
     if made_skill::off_said_on() {
         parameters["properties"][crate::made_remove::REMOVE]["description"] = json!(
-            "Only when the person asks to delete or remove a skill for good, never to turn one off, pause or stop it: its name as they said it, given alone with no request."
+            "Only when they ask to delete or remove a skill for good, never to turn one off, pause or stop it: its name as they said it, alone."
         );
         parameters["properties"][crate::made_turn::TURN_OFF] = json!({
             "type": "string",
-            "description": "Only when the person asks to turn off, pause or stop a skill they made or added (by voice, in the app or from a file), which keeps it to turn back on: its name as they said it, given alone with no request. Never remove for this. Even one that starts only when they say its words is turned off this way. Call it at once. Ask nothing first."
+            "description": "Only when they ask to turn off, pause or stop a skill they made or added (even from a file), kept to turn back on: its name as they said it, alone. Never remove for this, even one that starts only when they say its words. Call it at once. Ask nothing first."
         });
         parameters["properties"][crate::made_turn::TURN_ON] = json!({
             "type": "string",
-            "description": "Only when the person asks to turn a skill they made or added (by voice, in the app or from a file) back on, or to resume it: its name as they said it, given alone with no request. To use or run one that is off, call run instead: it turns it on itself."
+            "description": "Only when they ask to turn back on or resume a skill they made or added (even from a file): its name as they said it, alone. To use or run one that is off, call run: it turns it on."
         });
     }
     // The skills the person made, listed by voice ([`crate::made_list`]):
     // how many, and the newest by name to the owner.
     parameters["properties"][crate::made_list::LIST] = json!({
         "type": "boolean",
-        "description": "Only when the person asks which skills they made, or you made for them, or how many: true, given alone with no request. Never answer that from the conversation."
+        "description": "Only when they ask which or how many skills they made, or you made for them: true, alone. Never answer from the conversation."
     });
+    // And whether a skill still being made is ready (#6811,
+    // `LAMP_MAKE_MAY_RUN_ON`): the long make's state told with the list.
+    if crate::long_make::on() {
+        parameters["properties"][crate::made_list::LIST]["description"] = json!(
+            "Only when the person asks which skills they made, or you made for them, or how many, or whether a skill they asked for is ready yet: true, given alone with no request. Never answer that from the conversation."
+        );
+    }
     // A made skill run now by voice ([`crate::made_run`]): the name as
     // heard, matched in code to the person's own made skills, as a remove's.
     parameters["properties"][crate::made_run::RUN] = json!({
         "type": "string",
-        "description": "Only when the person asks to run, start or do a skill they made, now: its name as they said it, given alone with no request. Never to hear what it sends or uses."
+        "description": "Only when they ask to run, start or do a skill they made, now: its name as they said it, alone. Never to hear what it sends or uses."
     });
     // What was just done to a skill they made, undone (`LAMP_MAKE_NO_ASKS`,
     // [`crate::make_no_asks::undo`]): the model judges the words.
@@ -1104,7 +1158,7 @@ fn parameters_with(writes: bool, tasks: bool, code: bool) -> Value {
         parameters["properties"][crate::make_no_asks::UNDO] = json!({
             "type": "string",
             "description": format!(
-                "Only when the person asks to undo what you just did to a skill they made (\"remove it\" right after you made one, \"keep the old one\" after one replaced theirs, \"put it back\" after one was removed): \"last\", or the skill's name as they said it, given alone with no request.{}",
+                "Only when they ask to undo what you just did to a skill they made (\"remove it\" after you made one, \"keep the old one\" after one replaced theirs): \"last\", or its name as they said it, alone.{}",
                 crate::make_no_asks::UNDO_RESTORE_TOLD
             )
         });
@@ -1120,7 +1174,7 @@ fn parameters_with(writes: bool, tasks: bool, code: bool) -> Value {
     parameters["properties"][crate::made_clash::CHOICE] = json!({
         "type": "string",
         "enum": crate::made_clash::CHOICES,
-        "description": "With clash_id only: replace the other skill or skills, keep them all (they may take turns), or cancel, as the person chose in any words."
+        "description": "With clash_id only: replace the other skill(s), keep all (they may take turns) or cancel, as they chose."
     });
     // The undo of a skill turned on in place of a make (#7747).
     crate::make_core_offer::with_parameters(&mut parameters);
@@ -1136,20 +1190,20 @@ fn parameters_with(writes: bool, tasks: bool, code: bool) -> Value {
     if writes || tasks || code {
         parameters["properties"][crate::skill_write_yes::APPROVE_ID] = json!({
             "type": "string",
-            "description": "Only when a skill you just made or read back waits for the person's yes and they then agree, in any words, or a note asks their answer by it: its approve_id, given alone with no request."
+            "description": "Only when a skill you just made or read back waits for their yes and they agree in any words, or a note asks their answer by it: its approve_id, alone."
         });
         // What the person answered (#6835 gap 2): a call made in code's
         // turn may be a no or unclear, never only a yes.
         parameters["properties"][crate::skill_write_yes::ANSWER] = json!({
             "type": "string",
             "enum": crate::skill_write_yes::ANSWERS,
-            "description": "With approve_id only: what the person's words answered the say-back, in any words: yes when they agree, no when they decline or wait, unclear when you can't tell, new_ask when their line answers nothing asked but asks something new (another skill named, another thing asked), which you then answer; a line naming the skill asked about answers it, never new_ask. Left out: yes for a made skill's writes or code, unclear for a skill's task."
+            "description": "With approve_id only: their answer to the say-back: yes if they agree, no if they decline or wait, unclear if you can't tell, new_ask if they ask something new instead (another skill or thing), which you then answer; one naming the skill asked about is never new_ask. Left out: yes for a made skill's writes or code, unclear for a skill's task."
         });
         // The skill the person's line names (#7545): a yes is taken only
         // for the skill waiting, matched in code.
         parameters["properties"][crate::skill_write_yes::NAMED] = json!({
             "type": "string",
-            "description": "With approve_id only: the skill their line names, or none if it names no skill. When it is the skill asked about, copy that skill's name exactly as the note gives it. A yes counts only for the skill asked about."
+            "description": "With approve_id only: the skill their line names, or none. If it is the skill asked about, copy its name exactly as the note gives it. A yes counts only for that skill."
         });
         parameters["required"] = json!([]);
     }
@@ -1158,12 +1212,12 @@ fn parameters_with(writes: bool, tasks: bool, code: bool) -> Value {
             (true, false) => "what a skill they made sends, or to hear it read back",
             (false, _) => "what a skill on the lamp uses",
             (true, true) => {
-                "what a skill they made sends, what a skill on the lamp uses, or to hear one read back"
+                "what a skill they made sends or a skill on the lamp uses, or to hear one read back"
             }
         };
         parameters["properties"][READ_BACK] = json!({
             "type": "string",
-            "description": format!("Only when the person asks {asked}: its name, given alone with no request.")
+            "description": format!("Only when they ask {asked}: its name, alone.")
         });
         parameters["required"] = json!([]);
     }
@@ -1500,6 +1554,12 @@ fn make_with_by(
     linked: impl FnOnce() -> Option<Vec<String>>,
     agent: Option<&crate::make_skill_agent::Agent>,
 ) -> Value {
+    // A long make running on (`LAMP_MAKE_MAY_RUN_ON`, #6811): one at a
+    // time, so a second ask is told it is still making, nothing made.
+    let run_on = made_in != 0 && crate::long_make::on();
+    if run_on && let Some(told) = crate::long_make::still_making(&keeping.directory, now_unix_ms) {
+        return told;
+    }
     // One ask makes one skill: a call for an ask made or being made a
     // moment ago, carried into the next line after its turn was cut, makes
     // nothing again ([`OneAsk`]). By voice only: `made_in` 0 is no
@@ -1521,6 +1581,10 @@ fn make_with_by(
             });
         }
     };
+    // It may be let run on by its turn from here until it settles.
+    if run_on {
+        crate::long_make::begin(made_in, &keeping.directory);
+    }
     let made = make_kept_heard(
         request,
         heard,
@@ -1541,10 +1605,41 @@ fn make_with_by(
             made_skill::forget_unput(&keeping.directory, &made.sha256);
         }
         MADE_LINE.with(|kept| kept.replace(None));
+        // Let run on first (Heron's HOLD on #7774): it settles here, and
+        // its `making` mark goes untold, so no later make hears "still
+        // making" and nothing is told of it when its time would run out.
+        if run_on && let Some(directory) = crate::long_make::settle(made_in) {
+            crate::long_make::dropped(&directory, crate::app_make::now_unix_ms().max(now_unix_ms));
+        }
         eprintln!(
             "lamp-voice: a skill made here was declined while it was made: not put on, not kept, nothing said"
         );
         return json!({ "dropped": true, "next": WONT_MAKE_NEXT });
+    }
+    // A make given the long make's time whose turn was cut before its
+    // minute goes the same way (El's P2 on #7774): never on, nor said
+    // through the say service, with no gate.
+    if run_on && turn_cut() {
+        crate::long_make::cut(made_in, crate::app_make::now_unix_ms().max(now_unix_ms));
+    }
+    // Let run on past a minute (#6811): kept off until its person hears it
+    // is ready, or nothing kept and that told; never put on here, and no
+    // line for this turn, which has ended.
+    if run_on && let Some(directory) = crate::long_make::settle(made_in) {
+        let ended_ms = crate::app_make::now_unix_ms().max(now_unix_ms);
+        match &made {
+            Ok(made) => crate::long_make::settled(
+                &directory,
+                Ok((made.name.as_str(), made.sha256.as_str())),
+                ended_ms,
+            ),
+            Err(Refused(why, _)) => crate::long_make::settled(
+                &directory,
+                Err(why == made_skill::AGENT_LATE_TRY),
+                ended_ms,
+            ),
+        }
+        return crate::long_make::let_go_told();
     }
     // An ask by voice that made nothing, for the opt-in health report's
     // counts: one atomic add here, written later (`crate::made_counts`).
@@ -1733,7 +1828,11 @@ fn made_no_asks(
             Ok(first) => first,
             Err(why) => return Some(words_refused(keeping, made, &why)),
         };
-        let others: Vec<String> = crate::made_clash::found(keeping, made)
+        // Only a skill doing the same thing is replaced (#7938: on
+        // lamp-9adf a daily brief at 08:00 replaced a good morning, a good
+        // morning 3 and a water reminder, each on the lamp's clock at its
+        // own time and lighting); one that only clashes goes on beside it.
+        let others: Vec<String> = crate::made_clash::same_found(keeping, made)
             .into_iter()
             .map(|clash| clash.name)
             .filter(|name| !words.iter().any(|(skill, _)| skill == name))
@@ -2313,7 +2412,7 @@ pub(crate) fn asks_of(
 /// code), put on, and its task kept for exactly the grants said
 /// (`skill_task_yes`, #6305); and what must be heard whole before the yes,
 /// what its code may use ([`made_skill::code_said`]).
-fn code_asks(made: &Made) -> crate::skill_write_yes::Asks {
+pub(crate) fn code_asks(made: &Made) -> crate::skill_write_yes::Asks {
     crate::skill_write_yes::Asks {
         skill: made.name.clone(),
         sha256: made.sha256.clone(),
@@ -3311,10 +3410,12 @@ fn made_and_journaled_by(
         .with(std::cell::RefCell::take)
         .unwrap_or_else(|| heard.map(str::to_owned));
     let judge_ask = |question: &str| judged(Arc::clone(&chat), question.to_owned());
+    let given = GIVEN.with(std::cell::RefCell::take);
     let asked = made_skill::Asked {
         request,
         own: own_accounts_now(),
         heard,
+        named: given.as_deref(),
         judge: own_line
             .as_deref()
             .filter(|_| made_skill::unrelated_on())
@@ -3322,6 +3423,7 @@ fn made_and_journaled_by(
                 line,
                 ask: &judge_ask,
             }),
+        made_with: made_skill::MadeWith::DeepSeek,
     };
     // Whether the last answer was the model's own `cannot:`: its reason is
     // never journaled ([`kept_line`]).
@@ -3337,7 +3439,10 @@ fn made_and_journaled_by(
     // with no linked service ([`web_task_for_agent`]) needs the internet,
     // as its `internet:` line does. Never the agent's own answers.
     let web_task_held = std::cell::Cell::new(false);
-    let kept = |answer: Result<String, String>| {
+    // Each answer kept as made by its engine (`asked`'s `made_with`,
+    // [`made_skill::MADE_WITH`]): DeepSeek's by [`kept`], the agent's by
+    // `agent_kept` below.
+    let kept_by = |answer: Result<String, String>, asked: &made_skill::Asked<'_>| {
         models_cannot.set(matches!(&answer, Ok(text) if made_skill::says_cannot(text)));
         needs_net.set(
             net && matches!(&answer, Ok(text) if crate::make_no_cannot::says_needs_net(text)
@@ -3356,7 +3461,7 @@ fn made_and_journaled_by(
                     Some(EXAMPLE_GIVEN_BACK.into()),
                 ))
             }
-            Ok(text) => made_skill::keep_asked(&text, false, from, keeping, &asked),
+            Ok(text) => made_skill::keep_asked(&text, false, from, keeping, asked),
 
             Err(why) => {
                 eprintln!("lamp-voice: a skill made here: the model didn't answer: {why}");
@@ -3364,6 +3469,7 @@ fn made_and_journaled_by(
             }
         }
     };
+    let kept = |answer: Result<String, String>| kept_by(answer, &asked);
     // With the switch and an agent on the lamp, DeepSeek gets one try and
     // no repairs; what it doesn't make goes to the agent, which gets the
     // repairs. Without either, DeepSeek's repairs stay as they are; for
@@ -3381,6 +3487,15 @@ fn made_and_journaled_by(
     // failed (lamp-tasks down, restarting, slow or refusing) is not known
     // to be no agent: DeepSeek makes it alone, as before. Off, as before.
     let missing = matches!(seen, Some((agent, (None, true))) if agent.one_path);
+    // The agent's answers kept as its own (#6811, [`made_skill::MADE_WITH`],
+    // written with `LAMP_MAKE_REACTIONS_ONLY_DEEPSEEK` on alone).
+    let agent_asked = made_skill::Asked {
+        made_with: engine.map_or(made_skill::MadeWith::DeepSeek, |(_, engine)| {
+            made_skill::MadeWith::of_engine(engine)
+        }),
+        ..asked.clone()
+    };
+    let agent_kept = |answer: Result<String, String>| kept_by(answer, &agent_asked);
     let unknown = matches!(seen, Some((agent, (None, false))) if agent.one_path);
     if missing {
         eprintln!(
@@ -3406,6 +3521,14 @@ fn made_and_journaled_by(
     // 10 Nov: "re-run it yourself until it works"), each begun only while
     // one more round, two answers at worst, still fits [`MAKE_WITHIN`],
     // the time `skipped` (a hand-over the agent didn't take) not counted.
+    // With `LAMP_MAKE_REACTIONS_ONLY_DEEPSEEK` on and a make judged a quick
+    // reaction (`held_to_reaction`), every DeepSeek repair is held to
+    // [`made_skill::quick_reaction`] as its first draft is, before it is
+    // kept (the Reviewer-lead's P2 on #7764): one that is no quick reaction
+    // is never kept, and `repaired_not_reaction` sends the make to the
+    // middle form. Never set on any other make.
+    let held_to_reaction = std::cell::Cell::new(false);
+    let repaired_not_reaction = std::cell::Cell::new(None::<String>);
     let deepseek_repaired = |made: Result<Made, Refused>, skipped: Duration| {
         let (made, before) = repaired(
             made,
@@ -3413,7 +3536,17 @@ fn made_and_journaled_by(
             "",
             MOST_REPAIRS,
             || round_fits(began.elapsed().saturating_sub(skipped)),
-            |repair| kept(ask(Arc::clone(&chat), repair)),
+            |repair| {
+                let answer = ask(Arc::clone(&chat), repair);
+                if held_to_reaction.get()
+                    && let Ok(text) = &answer
+                    && let Some(why) = made_skill::not_a_reaction(text)
+                {
+                    repaired_not_reaction.set(Some(why));
+                    return Err(Refused(NOT_A_REACTION.to_owned(), None));
+                }
+                kept(answer)
+            },
         );
         refused_before.set(before);
         made
@@ -3436,6 +3569,35 @@ fn made_and_journaled_by(
             })
         })
         .flatten();
+    // A make the agent was handed first, as it stands after it: judged not
+    // what was asked (#7621) asked again; else the internet's task and the
+    // model's cannot as any make's.
+    let agents_made = |made: Result<Made, Refused>| {
+        if matches!(&made, Err(Refused(why, _)) if why == made_skill::UNRELATED) {
+            let line = kept_line(&made, false, began.elapsed().as_millis());
+            return (made, line);
+        }
+        let made = net_made(
+            made,
+            &needs_net,
+            request,
+            &chat,
+            began,
+            &kept,
+            (from, keeping, asked.named),
+        );
+        let made = no_cannot(
+            made,
+            &models_cannot,
+            request,
+            &chat,
+            began,
+            &kept,
+            (from, keeping, asked.named),
+        );
+        let line = kept_line(&made, models_cannot.get(), began.elapsed().as_millis());
+        (plain_unless_cannot(made, models_cannot.get()), line)
+    };
     if missing && let Some(service) = service {
         eprintln!(
             "lamp-voice: a skill made here: it asks for a linked service ({service}): no agent \
@@ -3464,47 +3626,109 @@ fn made_and_journaled_by(
             Before::NotAsked(Box::new(|| kept(ask(Arc::clone(&chat), brief.clone())))),
             request,
             &brief,
-            agent,
-            engine,
-            &kept,
+            (agent, engine),
+            &agent_kept,
             &models_cannot,
             &deepseek_repaired,
         );
-        // Judged not what was asked (#7621): asked again as it stands.
-        if matches!(&made, Err(Refused(why, _)) if why == made_skill::UNRELATED) {
-            let line = kept_line(&made, false, began.elapsed().as_millis());
-            return (made, line);
-        }
-        let made = net_made(
-            made,
-            &needs_net,
-            request,
-            &chat,
-            began,
-            &kept,
-            (from, keeping),
-        );
-        let made = no_cannot(
-            made,
-            &models_cannot,
-            request,
-            &chat,
-            began,
-            &kept,
-            (from, keeping),
-        );
-        let line = kept_line(&made, models_cannot.get(), began.elapsed().as_millis());
-        return (plain_unless_cannot(made, models_cannot.get()), line);
+        return agents_made(made);
     }
     // On a lamp whose agent writes a web make as code (#7742): DeepSeek is
     // told a task for the agent is only for a linked service, and its
     // answer as one for the web is held as needing the internet.
     let net_code = engine.is_some_and(|(_, engine)| net_code_by(engine));
-    web_task_held.set(net_code);
-    let mut made = kept(match net_code {
+    let first_ask = || match net_code {
         true => ask_net_code(Arc::clone(&chat), brief.clone()),
         false => ask(Arc::clone(&chat), brief.clone()),
-    });
+    };
+    // With `LAMP_MAKE_REACTIONS_ONLY_DEEPSEEK` on (#6811, the first
+    // builder's ruling and the wider route he said yes to at 16:34), and an
+    // agent on the lamp or surely none: only a quick reaction is
+    // DeepSeek's. The owner's "do it like V1" on #7764: the make's first
+    // call is DeepSeek's judgement of the request's meaning
+    // ([`reaction_judged`]), never a draft. Judged one, DeepSeek drafts it,
+    // and a draft that is no quick reaction ([`made_skill::quick_reaction`]:
+    // started by the person's own act, with only the light, a gesture, its
+    // exact words or its hum, never the model's marker said) is never
+    // kept. Judged none, unsure or with no answer, no draft is asked for.
+    // Either way the first builder's 19:50 ruling (the middle form): the
+    // lamp writes it itself, as one task for its agent ([`agent_task`]):
+    // the trigger its own model picks in one more call (or the words that
+    // ask for it), one `do.task` whose words are the person's request,
+    // done by the agent when it fires, and sip-of-water's guards
+    // (`make_no_cannot::skill_text`); no say and no other step a model
+    // wrote. Not made, it is said so plainly and nothing is kept. A
+    // `cannot:` (a one-off reminder among them, the lamp's own timer's),
+    // the internet's line or what can't be read keeps its own route. With
+    // no agent on the lamp (`missing`), told so; an agent not known, no
+    // judgement: DeepSeek's as before.
+    let routed = made_skill::reactions_on() && (engine.is_some() || missing);
+    let judged_none = routed && reaction_judged(Arc::clone(&chat), request) != Some(true);
+    let first = (!judged_none).then(first_ask);
+    // A draft's name, for a long make's lines before the agent's is known
+    // (`LAMP_MAKE_MAY_RUN_ON`, #6811); judged none, there is no draft.
+    if crate::long_make::on()
+        && let Some(Ok(text)) = &first
+        && let Some(name) = made_skill::files(text)
+            .ok()
+            .and_then(|files| made_skill::card_name(&files.card))
+    {
+        crate::long_make::hint(crate::make_skill_agent::made_for(), &name);
+    }
+    let route = if judged_none {
+        Some("judged not a quick reaction".to_owned())
+    } else {
+        routed
+            .then(|| {
+                first
+                    .as_ref()?
+                    .as_ref()
+                    .ok()
+                    .and_then(|text| made_skill::not_a_reaction(text))
+                    .map(|why| format!("drafted, not a quick reaction ({why})"))
+            })
+            .flatten()
+    };
+    // The middle form, for a make judged none or drafted (or repaired) as
+    // no quick reaction: one task for the agent, or told it has none.
+    let middle_form = |why: &str| {
+        if let Some((_, engine)) = engine {
+            eprintln!(
+                "lamp-voice: a skill made here: {why}: to the agent ({engine}), its trigger and \
+                 one task of the request; no DeepSeek draft kept"
+            );
+            let made = agent_task(
+                request,
+                &chat,
+                began,
+                &agent_kept,
+                (from, keeping, asked.named),
+            );
+            let line = kept_line(&made, false, began.elapsed().as_millis());
+            return (plain_unless_cannot(made, false), line);
+        }
+        eprintln!(
+            "lamp-voice: a skill made here: {why}: no agent on the lamp to make it: told so, \
+             no DeepSeek draft kept"
+        );
+        let made = Err(Refused(made_skill::AGENT_MISSING.to_owned(), None));
+        let line = kept_line(&made, false, began.elapsed().as_millis());
+        (plain_unless_cannot(made, false), line)
+    };
+    if let Some(why) = route {
+        return middle_form(&why);
+    }
+    // Judged a quick reaction: its repairs are held to it too.
+    held_to_reaction.set(routed);
+    let repaired_away = || {
+        repaired_not_reaction
+            .take()
+            .map(|why| format!("repaired, not a quick reaction ({why})"))
+    };
+    // Never left unasked here: a route with no draft returned above.
+    let first = first.unwrap_or_else(first_ask);
+    web_task_held.set(net_code);
+    let mut made = kept(first);
     web_task_held.set(false);
     // Judged not what was asked (#7621): no repair, no agent, asked again.
     if matches!(&made, Err(Refused(why, _)) if why == made_skill::UNRELATED) {
@@ -3513,6 +3737,9 @@ fn made_and_journaled_by(
     }
     if engine.is_none() {
         made = deepseek_repaired(made, Duration::ZERO);
+        if let Some(why) = repaired_away() {
+            return middle_form(&why);
+        }
     }
     let made = match engine {
         // What only the internet tells (`LAMP_TASK_NET` on): never handed
@@ -3530,9 +3757,8 @@ fn made_and_journaled_by(
                 Before::Asked(Box::new(made)),
                 request,
                 &brief,
-                agent,
-                engine,
-                &kept,
+                (agent, engine),
+                &agent_kept,
                 &models_cannot,
                 &deepseek_repaired,
             )
@@ -3579,9 +3805,8 @@ fn made_and_journaled_by(
                 Before::Asked(Box::new(made)),
                 request,
                 &brief,
-                agent,
-                engine,
-                &kept,
+                (agent, engine),
+                &agent_kept,
                 &models_cannot,
                 &deepseek_repaired,
             )
@@ -3606,6 +3831,10 @@ fn made_and_journaled_by(
         }
         None => made,
     };
+    // DeepSeek's repairs for a make the agent didn't take (the app's).
+    if let Some(why) = repaired_away() {
+        return middle_form(&why);
+    }
     let made = net_made(
         made,
         &needs_net,
@@ -3613,7 +3842,7 @@ fn made_and_journaled_by(
         &chat,
         began,
         &kept,
-        (from, keeping),
+        (from, keeping, asked.named),
     );
     let made = no_cannot(
         made,
@@ -3622,7 +3851,7 @@ fn made_and_journaled_by(
         &chat,
         began,
         &kept,
-        (from, keeping),
+        (from, keeping, asked.named),
     );
     let line = kept_line(&made, models_cannot.get(), began.elapsed().as_millis());
     // A repair's answer cut or never come (a product lamp, 11 Nov, from the
@@ -3686,7 +3915,7 @@ fn no_cannot(
     chat: &Arc<impl Fn() -> Result<Chat, String> + Send + Sync + 'static>,
     began: std::time::Instant,
     kept: &impl Fn(Result<String, String>) -> Result<Made, Refused>,
-    (from, keeping): (&str, &Keeping),
+    (from, keeping, named): (&str, &Keeping, Option<&str>),
 ) -> Result<Made, Refused> {
     if !crate::make_no_cannot::on() {
         return made;
@@ -3724,7 +3953,7 @@ fn no_cannot(
          ({})",
         crate::make_no_cannot::ENVIRONMENT
     );
-    let made = agent_task(request, chat, began, kept, (from, keeping));
+    let made = agent_task(request, chat, began, kept, (from, keeping, named));
     models_cannot.set(false);
     made
 }
@@ -3745,7 +3974,7 @@ fn net_made(
     chat: &Arc<impl Fn() -> Result<Chat, String> + Send + Sync + 'static>,
     began: std::time::Instant,
     kept: &impl Fn(Result<String, String>) -> Result<Made, Refused>,
-    (from, keeping): (&str, &Keeping),
+    (from, keeping, named): (&str, &Keeping, Option<&str>),
 ) -> Result<Made, Refused> {
     if !needs_net.replace(false) || made.is_ok() {
         return made;
@@ -3755,7 +3984,7 @@ fn net_made(
          lamp's agent ({})",
         crate::skill_task_yes::NET_ENVIRONMENT
     );
-    agent_task(request, chat, began, kept, (from, keeping))
+    agent_task(request, chat, began, kept, (from, keeping, named))
 }
 
 /// The make of `request` as one task for the lamp's agent
@@ -3769,7 +3998,7 @@ fn agent_task(
     chat: &Arc<impl Fn() -> Result<Chat, String> + Send + Sync + 'static>,
     began: std::time::Instant,
     kept: &impl Fn(Result<String, String>) -> Result<Made, Refused>,
-    (from, keeping): (&str, &Keeping),
+    (from, keeping, named): (&str, &Keeping, Option<&str>),
 ) -> Result<Made, Refused> {
     crate::make_no_cannot::made(
         request,
@@ -3786,6 +4015,7 @@ fn agent_task(
         // Only a hint: the model decides by naming the grant (the lead's
         // rule; the first builder on #7261).
         crate::make_skill_agent::service_hint(request),
+        named,
     )
 }
 
@@ -3920,13 +4150,17 @@ fn handed_to_agent(
     deepseek: Before<'_>,
     request: &str,
     brief: &str,
-    agent: &crate::make_skill_agent::Agent,
-    engine: &str,
+    (agent, engine): (&crate::make_skill_agent::Agent, &str),
     kept: &impl Fn(Result<String, String>) -> Result<Made, Refused>,
     models_cannot: &std::cell::Cell<bool>,
     deepseek_repaired: &impl Fn(Result<Made, Refused>, Duration) -> Result<Made, Refused>,
 ) -> Result<Made, Refused> {
     let began = std::time::Instant::now();
+    // Given the long make's time (`LAMP_MAKE_MAY_RUN_ON`): its outcome goes
+    // through the long make's gate if its turn is cut (El's P2 on #7774).
+    if agent.may_run_on {
+        crate::long_make::to_agent(crate::make_skill_agent::made_for());
+    }
     // The person's own addresses never go in the agent's rules file: each
     // stands there as a placeholder, put back in its answer before the
     // checks (the Reviewer-lead on #6439).
@@ -4001,6 +4235,14 @@ fn handed_to_agent(
             // `cannot:` is still DeepSeek's (`models_cannot`); said as the
             // agent's own failure ([`agent_side`]), after DeepSeek's repairs
             // for the app's.
+            // One let run on (#6811): nothing kept, never DeepSeek's after
+            // it, and the agent's own failure said plainly.
+            if crate::long_make::is_let_go(crate::make_skill_agent::made_for()) {
+                return Err(Refused(
+                    crate::make_skill_agent::not_made_try(&why).to_owned(),
+                    None,
+                ));
+            }
             return agent_side(untaken(deepseek), &why, models_cannot);
         }
     };
@@ -4208,6 +4450,54 @@ fn judged(
     chat: Arc<impl Fn() -> Result<Chat, String> + Send + Sync + 'static>,
     question: String,
 ) -> made_skill::Judged {
+    judge_text(chat, JUDGE_SYSTEM, question, JUDGE_WITHIN)
+        .map(|text| made_skill::Judged::read(&text))
+        .unwrap_or_else(|judged| judged)
+}
+
+/// The longest DeepSeek's judgement of whether a make is a quick reaction
+/// is waited for ([`made_skill::REACTION_JUDGE`], the owner's "do it like
+/// V1" on #7764): about a second is usual; past it, the make goes to the
+/// lamp's agent, as for an unsure judgement.
+pub const REACTION_JUDGE_WITHIN: Duration = Duration::from_millis(4_000);
+
+/// DeepSeek's judgement of whether `request` is a quick reaction
+/// ([`made_skill::REACTION_JUDGE`]), from the make's own chat within
+/// [`REACTION_JUDGE_WITHIN`]: `None` when unsure, late or failed. Its
+/// reason is never read; the journal has its time and its outcome alone.
+fn reaction_judged(
+    chat: Arc<impl Fn() -> Result<Chat, String> + Send + Sync + 'static>,
+    request: &str,
+) -> Option<bool> {
+    let began = std::time::Instant::now();
+    let judged = judge_text(
+        chat,
+        made_skill::REACTION_JUDGE,
+        made_skill::reaction_brief(request),
+        REACTION_JUDGE_WITHIN,
+    )
+    .ok()
+    .and_then(|text| made_skill::reaction_judged(&text));
+    eprintln!(
+        "lamp-voice: a skill made here: judged in {} ms: {}",
+        began.elapsed().as_millis(),
+        match judged {
+            Some(true) => "a quick reaction",
+            Some(false) => "not a quick reaction",
+            None => "unsure or no answer",
+        }
+    );
+    judged
+}
+
+/// The answer to `question` under `system` from the make's own chat, on a
+/// thread of its own, within `within`: its text, or a timeout or an error.
+fn judge_text(
+    chat: Arc<impl Fn() -> Result<Chat, String> + Send + Sync + 'static>,
+    system: &'static str,
+    question: String,
+    within: Duration,
+) -> Result<String, made_skill::Judged> {
     use made_skill::Judged;
     // Its answer by a channel, waited on for its bound and a little more:
     // never a join, which a DNS lookup hung on tokio's blocking pool holds
@@ -4217,52 +4507,95 @@ fn judged(
     let answer = std::thread::Builder::new()
         .name("lamp-voice-make-judge".into())
         .spawn(move || {
-            let _ = sent.send(judge_once(chat, question));
+            let _ = sent.send(judge_once(chat, system, question, within));
         });
     match answer {
         Ok(_) => answered
-            .recv_timeout(JUDGE_WITHIN + Duration::from_millis(100))
-            .unwrap_or(Err(Judged::Timeout))
-            .unwrap_or_else(|judged| judged),
-        Err(_) => Judged::Failed,
+            .recv_timeout(within + Duration::from_millis(100))
+            .unwrap_or(Err(Judged::Timeout)),
+        Err(_) => Err(Judged::Failed),
     }
 }
 
-/// One judge call within [`JUDGE_WITHIN`], on its own runtime ([`judged`]).
+/// One judge call within `within`, on its own runtime ([`judge_text`]).
 fn judge_once(
     chat: Arc<impl Fn() -> Result<Chat, String> + Send + Sync + 'static>,
+    system: &str,
     question: String,
-) -> Result<made_skill::Judged, made_skill::Judged> {
+    within: Duration,
+) -> Result<String, made_skill::Judged> {
     use made_skill::Judged;
-    {
-        {
-            let runtime = tokio::runtime::Builder::new_current_thread()
-                .enable_all()
-                .build()
-                .map_err(|_| Judged::Failed)?;
-            let chat = chat().map_err(|_| Judged::Failed)?;
-            runtime.block_on(async {
-                tokio::time::timeout(JUDGE_WITHIN, async {
-                    let mut stream = chat
-                        .send(&[Message::system(JUDGE_SYSTEM), Message::user(&question)])
-                        .await
-                        .map_err(|_| Judged::Failed)?;
-                    let mut text = String::new();
-                    while let Some(event) = stream.next().await.map_err(|_| Judged::Failed)? {
-                        if let ChatEvent::Text(words) = event {
-                            text.push_str(&words);
-                            if text.len() > JUDGE_MOST_BYTES {
-                                break;
-                            }
-                        }
-                    }
-                    Ok(Judged::read(&text))
-                })
+    let runtime = tokio::runtime::Builder::new_current_thread()
+        .enable_all()
+        .build()
+        .map_err(|_| Judged::Failed)?;
+    let chat = chat().map_err(|_| Judged::Failed)?;
+    runtime.block_on(async {
+        tokio::time::timeout(within, async {
+            let mut stream = chat
+                .send(&[Message::system(system), Message::user(&question)])
                 .await
-                .unwrap_or(Err(Judged::Timeout))
-            })
-        }
+                .map_err(|_| Judged::Failed)?;
+            let mut text = String::new();
+            while let Some(event) = stream.next().await.map_err(|_| Judged::Failed)? {
+                if let ChatEvent::Text(words) = event {
+                    text.push_str(&words);
+                    if text.len() > JUDGE_MOST_BYTES {
+                        break;
+                    }
+                }
+            }
+            Ok(text)
+        })
+        .await
+        .unwrap_or(Err(Judged::Timeout))
+    })
+}
+
+thread_local! {
+    /// The name the person gave the skill, as the voice's model read it
+    /// ([`GIVEN_NAME`], [`GivenName`]), for the make on this thread.
+    static GIVEN: std::cell::RefCell<Option<String>> = const { std::cell::RefCell::new(None) };
+}
+
+/// The name the person gave a voice make ([`GIVEN_NAME`]), held while it
+/// runs, then cleared, so no later make on this thread takes it.
+struct GivenName;
+
+impl GivenName {
+    fn set(name: Option<String>) -> Self {
+        GIVEN.with(|given| given.replace(name));
+        Self
     }
+}
+
+impl Drop for GivenName {
+    fn drop(&mut self) {
+        GIVEN.with(|given| given.replace(None));
+    }
+}
+
+/// The name the person gave a make [`answer`] makes (#7911): the call's
+/// `args`' [`GIVEN_NAME`]; for an undo's (`undone`), which makes the
+/// first ask again, the one given in that ask
+/// ([`crate::make_core_offer::Turned::given`]), never the undo call's.
+/// Trimmed; none when blank.
+fn given_of(args: &Value, undone: Option<&crate::make_core_offer::Turned>) -> Option<String> {
+    let given = match undone {
+        Some(done) => done.given.as_deref(),
+        None => args[GIVEN_NAME].as_str(),
+    };
+    given
+        .map(str::trim)
+        .filter(|name| !name.is_empty())
+        .map(str::to_owned)
+}
+
+/// [`answer`]'s `make`, run with the name the person gave it held for it
+/// ([`GivenName`], [`given_of`]): the made skill's on every make path.
+fn named_make<T>(given: Option<String>, make: impl FnOnce() -> T) -> T {
+    let _given = GivenName::set(given);
+    make()
 }
 
 thread_local! {
@@ -4639,7 +4972,7 @@ pub fn answer(
     let undone = if crate::make_core_offer::on() && call.args[crate::make_core_offer::UNDO] == true
     {
         match crate::make_core_offer::undone_here(request) {
-            Ok(first_ask) => Some(first_ask),
+            Ok(done) => Some(done),
             Err(told) => return told,
         }
     } else {
@@ -4679,9 +5012,10 @@ pub fn answer(
     {
         return turned;
     }
-    let request_words = undone
-        .as_deref()
-        .unwrap_or_else(|| call.args["request"].as_str().unwrap_or_default());
+    let request_words = undone.as_ref().map_or_else(
+        || call.args["request"].as_str().unwrap_or_default(),
+        |done| done.request.as_str(),
+    );
     // Whose ask it was, asked only for a make with code of its own
     // (`LAMP_MAKE_NO_ASKS`): the line's owner read now, the lease's, or
     // the one kept at the ask of a make that waited its turn (#7679).
@@ -4693,7 +5027,20 @@ pub fn answer(
             }));
         });
     }
-    let told = make_in(request, request_words, &keeping, own_chat, now_unix_ms);
+    // Whether the call gave the skill a name (#7926's row: none was kept
+    // on lamp-9adf, so whether the model gave one is journaled).
+    let given = given_of(&call.args, undone.as_ref());
+    eprintln!(
+        "lamp-voice: request {request}: a make {}",
+        if given.is_some() {
+            "with a name its person gave (given_name)"
+        } else {
+            "with no given_name"
+        }
+    );
+    let told = named_make(given, || {
+        make_in(request, request_words, &keeping, own_chat, now_unix_ms)
+    });
     MAKE_OWNER.with(|asked| asked.borrow_mut().take());
     // The skill made, kept as made in this conversation (#7660).
     keep_just_made(&told, request, lease);
@@ -5290,10 +5637,12 @@ light = { dim = 1 }
                     };
                     let body = std::str::from_utf8(&body).expect("authenticated chat body is UTF-8");
                     sent.push(body.to_owned());
-                    // A make's brief, or its judge's question (#7621).
+                    // A make's brief, its judge's question (#7621), or the
+                    // judgement of a quick reaction (#7764).
                     assert!(
                         body.contains(made_skill::BRIEF_HEAD)
-                            || body.contains("Does the made skill do what was asked?"),
+                            || body.contains("Does the made skill do what was asked?")
+                            || body.contains("You judge, for a desk lamp"),
                         "{body}"
                     );
                     assert!(!body.contains("\"tools\""), "{body}");
@@ -7101,6 +7450,8 @@ light = { dim = 1 }
             own,
             heard: Some(WRITE_EXAMPLE_ASKED),
             judge: None,
+            made_with: made_skill::MadeWith::DeepSeek,
+            named: None,
         };
         let made = made_skill::keep_asked(&answer, false, FROM, &keeping, &asked).unwrap();
         assert_eq!(made.uses.writes, ["gmail"]);
@@ -7594,6 +7945,132 @@ printf 'tar of %s' \"$name\" > \"$3/$name-1.0.0.tar\"\n",
         assert_eq!(tasks.hand_overs(), 2);
         assert_eq!(made_skill::entries(&keeping.directory).len(), 1);
         let _ = std::fs::remove_dir_all(&root);
+    }
+
+    /// #7926's row on lamp-9adf (build bede187d81): "make a skill called
+    /// rain check …", DeepSeek refused, the agent's answer kept long after
+    /// the turn. Here its turn is gone before the agent answers, and the
+    /// answer comes late: the name the person gave still holds, the make
+    /// and its keep being on the one thread the name is held on.
+    #[test]
+    fn a_name_in_the_requests_words_is_the_makers_to_keep_too() {
+        // #7926's row: with no `given_name` in the call, the make's model
+        // and the agent (the same system prompt) are told to name the skill
+        // as the request does; so is the model choosing a task's name.
+        assert!(system().contains(NAMED_TOLD), "{}", system());
+        for agent in [false, true] {
+            assert!(system_for(true, agent).contains(NAMED_TOLD));
+        }
+        assert!(
+            crate::make_no_cannot::system()
+                .contains("the name the request gives the skill when it gives one"),
+            "{}",
+            crate::make_no_cannot::system()
+        );
+    }
+
+    #[test]
+    fn an_agent_make_kept_after_its_turn_ended_keeps_the_given_name() {
+        let (root, kept_in) = keeping("given-name-late-agent");
+        let late = good().replace("name: evening-dim", "name: morning-rain-check");
+        let tasks = crate::make_skill_agent::tests::stub(
+            Some("hermes"),
+            std::sync::Arc::new(move |_: &str| {
+                std::thread::sleep(Duration::from_millis(300));
+                Some(late.clone())
+            }),
+        );
+        let (url, served) = service(vec![(200, faces())]);
+        let agent = tasks.agent();
+        let turn = std::sync::Arc::new(());
+        set_turn(std::sync::Arc::downgrade(&turn));
+        drop(turn);
+        assert!(turn_cut());
+        let told = {
+            let _given = GivenName::set(Some("rain check".into()));
+            made_by(&kept_in, url, Some(&agent), NOW)
+        };
+        TURN.with(|kept| kept.borrow_mut().take());
+        assert_eq!(told["made"], "rain-check", "{told}");
+        assert_eq!((served.join().unwrap(), tasks.hand_overs()), (1, 1));
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    /// #7911 (lamp-9adf, 19 Nov 12:46): "make a skill called evening rate"
+    /// was kept as `nightly-dollar-rate`. The name the voice's model reads
+    /// from the ask (`given_name`) is the made skill's, as the person said
+    /// it, whether DeepSeek's answer is kept or the agent's; with none
+    /// given, the make's own name stands, on both paths.
+    #[test]
+    fn a_name_the_person_gave_is_the_made_skills_by_deepseek_and_by_the_agent() {
+        let nightly =
+            |answer: String| answer.replace("name: evening-dim", "name: nightly-dollar-rate");
+        for (case, given, made) in [
+            ("given", Some("evening rate"), "evening-rate"),
+            ("none", None, "nightly-dollar-rate"),
+        ] {
+            // DeepSeek's answer kept, no agent on the lamp; then DeepSeek's
+            // refused and the agent's kept.
+            for by_agent in [false, true] {
+                let (root, kept_in) = keeping(&format!("given-name-{case}-{by_agent}"));
+                let tasks = agent_answering(vec![Some(nightly(good()))]);
+                let first = if by_agent { faces() } else { nightly(good()) };
+                let (url, served) = service(vec![(200, first)]);
+                let agent = tasks.agent();
+                let _given = GivenName::set(given.map(str::to_owned));
+                let told = made_by(&kept_in, url, by_agent.then_some(&agent), NOW);
+                assert_eq!(told["made"], made, "{case} {by_agent}: {told}");
+                assert_eq!(
+                    (served.join().unwrap(), tasks.hand_overs()),
+                    (1, usize::from(by_agent)),
+                    "{case} {by_agent}"
+                );
+                let _ = std::fs::remove_dir_all(&root);
+            }
+        }
+        // The voice's model is asked for it, and only for a new make.
+        let parameters = parameters(false, false);
+        let told = parameters["properties"][GIVEN_NAME]["description"]
+            .as_str()
+            .unwrap();
+        assert_eq!(parameters["required"], json!([]));
+        assert!(told.contains("else left out"), "{told}");
+        // The name alone in its example, never "called …" (Twelve's P3).
+        assert!(told.contains("(\"evening rate\")"), "{told}");
+        assert!(!told.contains("\"called"), "{told}");
+    }
+
+    /// #7911 (Twelve's and Heron's P3s on #7926): `answer` holds the
+    /// call's `given_name` for its make, trimmed, none for a blank one or
+    /// none given; an undo's make ("make my own instead") the name given
+    /// in its first ask, never the undo call's; cleared once it is done.
+    #[test]
+    fn answer_holds_the_calls_given_name_for_its_make_and_an_undos_first() {
+        let held = |args: Value, undone: Option<&crate::make_core_offer::Turned>| {
+            named_make(given_of(&args, undone), || {
+                GIVEN.with(|given| given.borrow().clone())
+            })
+        };
+        let undone = |given: Option<&str>| crate::make_core_offer::Turned {
+            name: "sip-of-water".into(),
+            request: "remind me to drink water".into(),
+            given: given.map(str::to_owned),
+            at: std::time::Instant::now(),
+        };
+        assert_eq!(
+            held(json!({REQUEST: "hum", GIVEN_NAME: " evening rate "}), None).as_deref(),
+            Some("evening rate")
+        );
+        assert_eq!(held(json!({REQUEST: "hum", GIVEN_NAME: "  "}), None), None);
+        assert_eq!(held(json!({REQUEST: "hum"}), None), None);
+        let first = undone(Some("water time"));
+        let undo = json!({crate::make_core_offer::UNDO: true, GIVEN_NAME: "other"});
+        assert_eq!(
+            held(undo.clone(), Some(&first)).as_deref(),
+            Some("water time")
+        );
+        assert_eq!(held(undo, Some(&undone(None))), None);
+        assert_eq!(GIVEN.with(|given| given.borrow().clone()), None);
     }
 
     /// The rules of each make handed to the agent, and whether each asked
@@ -9538,9 +10015,9 @@ printf 'tar of %s' \"$name\" > \"$3/$name-1.0.0.tar\"\n",
         let parameters = off.parameters.clone().unwrap();
         assert_eq!(
             parameters["properties"]["request"]["description"],
-            "What this skill should do and when, in the person's own words for this ask, \
-             nothing else: never a time, step or trigger of an earlier skill or turn. Never \
-             call it for an ask they take back in the same line."
+            "What this skill should do and when, in the person's own words for this ask \
+             alone: never a time, step or trigger of an earlier skill or turn. Never call it \
+             for an ask they take back in the same line."
         );
         made_skill::set_scripts_here(Some(true));
         let on = tool();
@@ -9624,6 +10101,60 @@ printf 'tar of %s' \"$name\" > \"$3/$name-1.0.0.tar\"\n",
         crate::skill_task_yes::set_on_here(None);
         made_skill::set_writes_here(None);
         made_skill::set_scripts_here(None);
+    }
+
+    /// #8002's ARM64 row: with every switch the product's `lamp-voice`
+    /// unit sets on that shapes `make_skill` (writes, tasks, code, the
+    /// turn-off, the make at once, the core offer's undo and the repeat
+    /// told on the request), the link takes it whole: its description
+    /// within 1,024 bytes and its parameters within
+    /// [`PRODUCT_MOST_PARAMETERS_BYTES`], short of
+    /// [`lamp_gemini::MAX_TOOL_JSON_BYTES`] by a later parameter's room.
+    /// Before, they came to 4,490 bytes (3,942 on lamp-voice, the core
+    /// offer's undo and the repeat's words adding 548) and the product
+    /// lamp's chat requests left `make_skill` out; 4,174 in the product's
+    /// whole environment once lamp-voice gave the name and the remove at
+    /// once (`lamp-update`'s `functions` test measures that one too).
+    #[test]
+    fn make_skill_is_within_the_link_with_the_products_switches_on() {
+        made_skill::set_writes_here(Some(true));
+        made_skill::set_scripts_here(Some(true));
+        made_skill::set_off_said_here(Some(true));
+        crate::skill_task_yes::set_on_here(Some(true));
+        crate::make_no_asks::set_here(Some(true));
+        crate::make_core_offer::set_on_here(Some(true));
+        crate::skill_recurring::set_on_here(Some(true));
+        let all = tool();
+        let parameters = all.parameters.as_ref().unwrap();
+        for part in [
+            crate::made_turn::TURN_OFF,
+            crate::make_no_asks::UNDO,
+            crate::make_core_offer::UNDO,
+            crate::skill_write_yes::APPROVE_ID,
+            READ_BACK,
+        ] {
+            assert!(parameters["properties"][part].is_object(), "{part}");
+        }
+        let request = parameters["properties"]["request"]["description"]
+            .as_str()
+            .unwrap();
+        assert!(
+            request.ends_with(crate::skill_recurring::REQUEST_TOLD),
+            "{request}"
+        );
+        assert!(all.description.len() <= 1_024, "{}", all.description.len());
+        let bytes = parameters.to_string().len();
+        assert!(bytes <= PRODUCT_MOST_PARAMETERS_BYTES, "{bytes}");
+        assert!(all.validate().is_ok());
+        let (kept, left_out) = crate::tools::admitted(vec![all]);
+        assert_eq!((kept.len(), left_out), (1, Vec::<String>::new()));
+        crate::skill_recurring::set_on_here(None);
+        crate::make_core_offer::set_on_here(None);
+        crate::make_no_asks::set_here(None);
+        crate::skill_task_yes::set_on_here(None);
+        made_skill::set_off_said_here(None);
+        made_skill::set_scripts_here(None);
+        made_skill::set_writes_here(None);
     }
 
     /// #6749 E: the making model is told the lamp's real calls for its
@@ -11446,5 +11977,1802 @@ printf 'tar of %s' \"$name\" > \"$3/$name-1.0.0.tar\"\n",
         assert_eq!(system(), system_net(made_skill::reads_on(), false, true));
         assert!(whole("internet: the price".to_owned(), true).is_ok());
         net_make_here(None);
+    }
+
+    /// A make's answer of `toml` and a card named `name`, as a model
+    /// writes it, for the quick-reaction route's tests (#6811).
+    fn route_answer(toml: &str, name: &str) -> String {
+        format!(
+            "```skill.toml\n{toml}```\n\n```SKILL.md\n---\nname: {name}\ndescription: A test \
+             skill.\n---\n\n# Test\n\nA test skill.\n```\n"
+        )
+    }
+
+    /// A made skill with a say on `trigger`, the lamp's voice granted.
+    fn say_on(topic: &str, trigger: &str) -> String {
+        format!(
+            "kind = \"installable\"\nversion = \"1.0.0\"\nneeds = [\"voice\"]\n\n\
+             [permissions]\nspeak = true\ntopics = [\"{topic}\"]\n\n[trigger]\n{trigger}\
+             cooldown = \"1h\"\n\n[ask]\npolicy = \"nudge\"\n\n[[do]]\nsay = {{ text = \"Time \
+             for a sip of water.\" }}\n"
+        )
+    }
+
+    /// Someone at the desk half an hour, then a line: DeepSeek's draft
+    /// with no guards.
+    fn presence_say() -> String {
+        say_on(
+            "room/presence",
+            "topic = \"room/presence\"\nfield = \"someone\"\nequals = true\nfor = \"30m\"\n\
+             rearm = \"ends\"\n",
+        )
+    }
+
+    /// A pat on the head, a nod: a quick reaction.
+    fn pat_nod() -> String {
+        "kind = \"installable\"\nversion = \"1.0.0\"\nneeds = [\"body\"]\n\n[permissions]\n\
+         body = true\ntopics = [\"controls/pet\"]\n\n[trigger]\ntopic = \"controls/pet\"\n\
+         field = \"ended\"\nequals = false\nrearm = \"ends\"\n\n[ask]\npolicy = \"nudge\"\n\n\
+         [[do]]\nbody = { gesture = \"nod\" }\n"
+            .to_owned()
+    }
+
+    /// The made index's `made_with` of the skill `name`, if it has one.
+    fn made_with_of(keeping: &Keeping, name: &str) -> Option<String> {
+        made_skill::entries(&keeping.directory)
+            .iter()
+            .find(|entry| entry["name"] == name)
+            .and_then(|entry| entry[made_skill::MADE_WITH].as_str().map(str::to_owned))
+    }
+
+    /// [`keeping`], its pack stand-in also copying the `skill.toml` it
+    /// packs to `last-skill.toml` in the test's folder, so a test reads
+    /// what was kept.
+    fn keeping_copied(name: &str) -> (PathBuf, Keeping, PathBuf) {
+        let (root, keeping) = keeping(name);
+        let copy = root.join("last-skill.toml");
+        std::fs::write(
+            &keeping.program,
+            format!(
+                "#!/bin/sh\nname=$(basename \"$4\")\ncp \"$4/skill.toml\" \"{}\"\n\
+                 printf 'tar of %s' \"$name\" > \"$3/$name-1.0.0.tar\"\n",
+                copy.display()
+            ),
+        )
+        .unwrap();
+        (root, keeping, copy)
+    }
+
+    /// The kept `skill.toml` at `copy`: one step, a task whose words are
+    /// `words`, run by `run`, and no say anywhere.
+    fn one_task_of(copy: &Path, words: &str, run: &str) -> toml::Table {
+        let text = std::fs::read_to_string(copy).unwrap();
+        let table: toml::Table = toml::from_str(&text).unwrap();
+        let steps = table["do"].as_array().unwrap();
+        assert_eq!(steps.len(), 1, "{text}");
+        assert_eq!(steps[0]["task"]["task"].as_str(), Some(words), "{text}");
+        assert_eq!(steps[0]["task"]["run"].as_str(), Some(run), "{text}");
+        assert!(!text.contains("say"), "no say step at all: {text}");
+        table
+    }
+
+    /// The one more call's answer: `name`, `grants` and a trigger on
+    /// `topic` with `trigger`'s keys.
+    fn trigger_answer(name: &str, grants: &str, topic: &str, trigger: &str) -> String {
+        format!(
+            "name: {name}\ngrants: {grants}\n```skill.toml\n[permissions]\n\
+             topics = [\"{topic}\"]\n\n[trigger]\ntopic = \"{topic}\"\n{trigger}```\n"
+        )
+    }
+
+    /// The judgement's answer ([`made_skill::REACTION_JUDGE`]).
+    fn judgement(reaction: bool) -> (u16, String) {
+        (
+            200,
+            format!("{{\"quick_reaction\": {reaction}, \"reason\": \"PRIVATE-REASON-7\"}}"),
+        )
+    }
+
+    /// Whether `sent` is the judgement's call, asking of `request` alone.
+    fn is_judgement(sent: &str, request: &str) -> bool {
+        sent.contains("You judge, for a desk lamp, what kind of skill")
+            && sent.contains(&format!("Request: {request}"))
+            && !sent.contains(made_skill::BRIEF_HEAD)
+    }
+
+    /// The first builder's 19:50 ruling on #6811 (the middle form) and the
+    /// owner's "do it like V1" on #7764, with
+    /// `LAMP_MAKE_REACTIONS_ONLY_DEEPSEEK` on: the make's first call is
+    /// DeepSeek's judgement of the request's meaning. Judged no quick
+    /// reaction, no draft is ever asked for: the lamp writes the skill
+    /// itself, the trigger its own model picks in one more call and one
+    /// task step whose words are the person's request, done by the lamp's
+    /// agent when it fires; no say, no other step, sip-of-water's guards in
+    /// `[[while]]` but on the lamp's clock, `made_with` the agent's. The
+    /// agent is never asked to write it.
+    #[test]
+    fn with_the_switch_a_make_judged_no_reaction_is_its_trigger_and_one_task_never_drafted() {
+        made_skill::set_reactions_here(Some(true));
+        net_make_here(Some(true));
+        let (root, keeping, copy) = keeping_copied("reactions-middle");
+        const BTC: &str = "tell me the BTC price at 9";
+        const SIP: &str = "after I've sat a long while, suggest a sip of water";
+        let nine = "field = \"known\"\nequals = true\nrearm = \"ends\"\n\
+                    during = { from = \"09:00\", to = \"09:01\" }\n";
+        let sat = "field = \"someone\"\nequals = true\nfor = \"30m\"\nrearm = \"leaves\"\n";
+        for (at, (request, answer, name, topic)) in [
+            (
+                BTC,
+                trigger_answer("btc-price", "net, speak", "clock/local", nine),
+                "btc-price",
+                "clock/local",
+            ),
+            (
+                SIP,
+                trigger_answer("sip-at-desk", "speak", "room/presence", sat),
+                "sip-at-desk",
+                "room/presence",
+            ),
+        ]
+        .into_iter()
+        .enumerate()
+        {
+            let tasks = agent_answering(vec![]);
+            let (url, served) = service_sent(vec![judgement(false), (200, answer)]);
+            let told = make_with_by(
+                0,
+                None,
+                request,
+                &keeping,
+                chat_at(url),
+                NOW + at as u64,
+                || None,
+                Some(&tasks.agent()),
+            );
+            let sent = served.join().unwrap();
+            assert_eq!((sent.len(), tasks.hand_overs()), (2, 0), "{told}");
+            assert!(is_judgement(&sent[0], request), "{}", sent[0]);
+            assert!(
+                sent[1].contains("You choose, for a lamp, when a skill runs and what it needs"),
+                "never DeepSeek's draft: {}",
+                sent[1]
+            );
+            assert_eq!(told["made"], name, "{told}");
+            assert_eq!(told["code_waits_for_yes"], true, "{told}");
+            assert!(!told.to_string().contains("PRIVATE-REASON-7"), "{told}");
+            let table = one_task_of(&copy, request, crate::make_no_cannot::RUN);
+            assert_eq!(table["trigger"]["topic"].as_str(), Some(topic));
+            // Never a guard on the lamp's clock: 9:00's run is never spent
+            // waiting (the first builder, 19 Nov 01:29 and 02:41).
+            if topic == "clock/local" {
+                assert!(table.get("while").is_none(), "{table:?}");
+                assert_eq!(made_with_of(&keeping, name).as_deref(), Some("hermes"));
+                continue;
+            }
+            let guards = table["while"].as_array().unwrap();
+            assert_eq!(guards.len(), 3, "sip-of-water's guards: {table:?}");
+            let topics = table["permissions"]["topics"].as_array().unwrap();
+            for guard in ["voice/state", "room/activity"] {
+                assert!(
+                    topics.iter().any(|t| t.as_str() == Some(guard)),
+                    "{table:?}"
+                );
+            }
+            assert_eq!(made_with_of(&keeping, name).as_deref(), Some("hermes"));
+        }
+        net_make_here(None);
+        made_skill::set_reactions_here(None);
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    /// lamp-9adf, 18 Nov: "Lamp, make a skill that reminds me to stretch
+    /// when I've been sitting a long while." was made on someone getting
+    /// up. With `LAMP_MAKE_REACTIONS_ONLY_DEEPSEEK` on, the one more call
+    /// is told sip-of-water's sitting with a whole answer for it, and a
+    /// model answering so keeps sip-of-water's `for`, once-a-sitting `rearm`
+    /// and `cooldown` in the kept `skill.toml`, on the desk's presence. "When
+    /// I come back to my desk" keeps its arrival, never the desk left.
+    #[test]
+    fn with_the_switch_a_long_sitting_is_sip_of_waters_and_a_coming_back_an_arrival() {
+        made_skill::set_reactions_here(Some(true));
+        net_make_here(Some(true));
+        let (root, keeping, copy) = keeping_copied("reactions-sitting");
+        let shipped: toml::Table =
+            toml::from_str(include_str!("../../../skills/sip-of-water/skill.toml")).unwrap();
+        let sip = shipped["trigger"].as_table().unwrap();
+        const STRETCH: &str =
+            "Lamp, make a skill that reminds me to stretch when I've been sitting a long while.";
+        const BACK: &str = "Lamp, make a skill that tells me the news when I come back to my desk.";
+        let sat = format!(
+            "field = \"someone\"\nequals = true\nfor = \"{}\"\nrearm = \"{}\"\n\
+             cooldown = \"{}\"\n",
+            sip["for"].as_str().unwrap(),
+            sip["rearm"].as_str().unwrap(),
+            sip["cooldown"].as_str().unwrap(),
+        );
+        let back = "field = \"someone\"\nequals = true\nwhen = \"appears\"\n\
+                    absent_for = \"5m\"\n";
+        for (at, (request, answer, name)) in [
+            (
+                STRETCH,
+                trigger_answer("stretch-break", "speak", "room/presence", &sat),
+                "stretch-break",
+            ),
+            (
+                BACK,
+                trigger_answer("desk-news", "net, speak", "room/presence", back),
+                "desk-news",
+            ),
+        ]
+        .into_iter()
+        .enumerate()
+        {
+            let tasks = agent_answering(vec![]);
+            let (url, served) = service_sent(vec![judgement(false), (200, answer)]);
+            let told = make_with_by(
+                0,
+                None,
+                request,
+                &keeping,
+                chat_at(url),
+                NOW + at as u64,
+                || None,
+                Some(&tasks.agent()),
+            );
+            let sent = served.join().unwrap();
+            assert_eq!((sent.len(), tasks.hand_overs()), (2, 0), "{told}");
+            assert!(
+                sent[1].contains("sip-of-water") && sent[1].contains("stretch"),
+                "the sitting told, with its example: {}",
+                sent[1]
+            );
+            assert_eq!(told["made"], name, "{told}");
+            let words = crate::make_no_cannot::task_words(request);
+            let table = one_task_of(&copy, &words, crate::make_no_cannot::RUN);
+            let trigger = table["trigger"].as_table().unwrap();
+            assert_eq!(
+                trigger["topic"].as_str(),
+                Some("room/presence"),
+                "{table:?}"
+            );
+            assert_eq!(trigger["field"].as_str(), Some("someone"), "{table:?}");
+            assert_eq!(trigger["equals"].as_bool(), Some(true), "{table:?}");
+            if request == STRETCH {
+                for key in ["for", "rearm", "cooldown"] {
+                    assert_eq!(trigger.get(key), sip.get(key), "{key}: {table:?}");
+                }
+                assert!(!trigger.contains_key("when"), "{table:?}");
+            } else {
+                assert_eq!(trigger["when"].as_str(), Some("appears"), "{table:?}");
+                assert!(!trigger.contains_key("for"), "{table:?}");
+            }
+            assert_eq!(table["while"].as_array().map(Vec::len), Some(3));
+        }
+        net_make_here(None);
+        made_skill::set_reactions_here(None);
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    /// The owner's "do it like V1": a judgement with no answer, or one that
+    /// isn't sure, sends the make straight to the agent's middle form,
+    /// never to a DeepSeek draft.
+    #[test]
+    fn with_the_switch_a_failed_judgement_goes_to_the_agent() {
+        made_skill::set_reactions_here(Some(true));
+        net_make_here(Some(true));
+        let (root, keeping, copy) = keeping_copied("reactions-unsure");
+        const SIP: &str = "after I've sat a long while, suggest a sip of water";
+        let sat = "field = \"someone\"\nequals = true\nfor = \"30m\"\nrearm = \"leaves\"\n";
+        for (at, judgement) in [
+            (200, "maybe, it depends".to_owned()),
+            (200, "{\"quick_reaction\": \"unsure\"}".to_owned()),
+        ]
+        .into_iter()
+        .enumerate()
+        {
+            let tasks = agent_answering(vec![]);
+            let name = format!("sip-at-desk-{at}");
+            let (url, served) = service_sent(vec![
+                judgement,
+                (200, trigger_answer(&name, "speak", "room/presence", sat)),
+            ]);
+            let told = make_with_by(
+                0,
+                None,
+                SIP,
+                &keeping,
+                chat_at(url),
+                NOW + at as u64,
+                || None,
+                Some(&tasks.agent()),
+            );
+            let sent = served.join().unwrap();
+            assert_eq!((sent.len(), tasks.hand_overs()), (2, 0), "{told}");
+            assert!(is_judgement(&sent[0], SIP), "{}", sent[0]);
+            assert_eq!(told["made"], name.as_str(), "{told}");
+            one_task_of(&copy, SIP, crate::make_no_cannot::RUN);
+        }
+        net_make_here(None);
+        made_skill::set_reactions_here(None);
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    /// The 19:50 ruling and "do it like V1": judged a quick reaction,
+    /// DeepSeek drafts it, and its draft stays as it is, reflex steps
+    /// alone, `made_with: deepseek`, the agent never asked: "when I pat
+    /// you, glow", a pat that nods, a phrase that glows.
+    #[test]
+    fn with_the_switch_a_quick_reaction_is_judged_one_and_drafted_with_reflex_steps() {
+        made_skill::set_reactions_here(Some(true));
+        net_make_here(Some(true));
+        made_skill::set_asks_here(Some(true));
+        let (root, keeping, copy) = keeping_copied("reactions-route");
+        let glow = "kind = \"installable\"\nversion = \"1.0.0\"\nneeds = [\"light\"]\n\n\
+                    [permissions]\nlight = true\ntopics = [\"controls/pet\"]\n\n[trigger]\n\
+                    topic = \"controls/pet\"\nfield = \"ended\"\nequals = false\n\
+                    rearm = \"ends\"\n\n[ask]\npolicy = \"nudge\"\n\n[[do]]\n\
+                    light = { colour = \"green\", level = 3 }\n"
+            .to_owned();
+        let phrase = "asks = [\"green light please\"]\nkind = \"installable\"\n\
+                      version = \"1.0.0\"\nneeds = [\"light\"]\n\n[permissions]\nlight = true\n\n\
+                      [[do]]\nlight = { colour = \"green\", level = 3 }\n"
+            .to_owned();
+        for (at, (request, draft, name, kind)) in [
+            ("when I pat you, glow", glow, "pat-glow", "light"),
+            ("when I pat you, nod", pat_nod(), "pat-nod", "body"),
+            ("green light please", phrase, "green-phrase", "light"),
+        ]
+        .into_iter()
+        .enumerate()
+        {
+            let tasks = agent_answering(vec![]);
+            let (url, served) =
+                service_sent(vec![judgement(true), (200, route_answer(&draft, name))]);
+            let told = make_with_by(
+                0,
+                None,
+                request,
+                &keeping,
+                chat_at(url),
+                NOW + at as u64,
+                || None,
+                Some(&tasks.agent()),
+            );
+            let sent = served.join().unwrap();
+            assert_eq!(told["made"], name, "{told}");
+            assert_eq!((sent.len(), tasks.hand_overs()), (2, 0), "{told}");
+            assert!(is_judgement(&sent[0], request), "{}", sent[0]);
+            assert!(
+                sent[1].contains(made_skill::BRIEF_HEAD),
+                "drafted: {}",
+                sent[1]
+            );
+            assert_eq!(made_with_of(&keeping, name).as_deref(), Some("deepseek"));
+            let text = std::fs::read_to_string(&copy).unwrap();
+            let table: toml::Table = toml::from_str(&text).unwrap();
+            let steps = table["do"].as_array().unwrap();
+            assert!(
+                steps
+                    .iter()
+                    .all(|step| step.as_table().unwrap().keys().all(|key| key == kind)),
+                "{text}"
+            );
+            assert!(!table.contains_key("while") && !table.contains_key("grants"));
+        }
+        made_skill::set_asks_here(None);
+        net_make_here(None);
+        made_skill::set_reactions_here(None);
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    /// lamp-9adf, 18 Nov: "tell me the price of Zorbo coin" was kept as a
+    /// say of DeepSeek's `internet:` line. Judged a quick reaction all the
+    /// same, its draft is held to [`made_skill::quick_reaction`] and is no
+    /// quick reaction: the request becomes one task for the lamp's agent,
+    /// asked for by its words, granted `net`, never a say. So is a draft
+    /// on someone at the desk: a true judgement never lets a draft that
+    /// isn't one stand.
+    #[test]
+    fn with_the_switch_a_true_judgement_whose_draft_is_no_reaction_goes_to_the_agent() {
+        made_skill::set_reactions_here(Some(true));
+        net_make_here(Some(true));
+        made_skill::set_asks_here(Some(true));
+        let (root, keeping, copy) = keeping_copied("reactions-zorbo");
+        let helper = manage_helper(&keeping.manage);
+        const ZORBO: &str = "tell me the price of Zorbo coin";
+        let draft = "kind = \"installable\"\nversion = \"1.0.0\"\n\
+                     permissions = { speak = true }\n\
+                     asks = [\"tell me the price of Zorbo coin\"]\n\
+                     [ask]\npolicy = \"nudge\"\n[[do]]\n\
+                     say = { text = \"internet: current price of Zorbo coin\" }\n";
+        let tasks = agent_answering(vec![]);
+        let (url, served) = service_sent(vec![
+            judgement(true),
+            (200, route_answer(draft, "zorbo-coin-price")),
+            (
+                200,
+                "name: zorbo-coin-price\ngrants: net, speak\nasks: tell me the price of Zorbo coin"
+                    .to_owned(),
+            ),
+        ]);
+        let told = make_with_by(
+            0,
+            None,
+            ZORBO,
+            &keeping,
+            chat_at(url),
+            NOW,
+            || None,
+            Some(&tasks.agent()),
+        );
+        let sent = served.join().unwrap();
+        assert_eq!((sent.len(), tasks.hand_overs()), (3, 0), "{told}");
+        assert!(helper.join().unwrap()["install_made"].is_string());
+        assert_eq!(told["made"], "zorbo-coin-price", "{told}");
+        let table = one_task_of(&copy, ZORBO, crate::upload_agent::INSTRUCTIONS);
+        assert_eq!(
+            table["grants"],
+            toml::Value::Array(vec!["net".into(), "speak".into()])
+        );
+        // A draft on someone at the desk, judged a reaction: the agent's.
+        const SIP: &str = "after I've sat a long while, suggest a sip of water";
+        let sat = "field = \"someone\"\nequals = true\nfor = \"30m\"\nrearm = \"leaves\"\n";
+        let (url, served) = service_sent(vec![
+            judgement(true),
+            (200, route_answer(&presence_say(), "deepseek-draft")),
+            (
+                200,
+                trigger_answer("sip-at-desk", "speak", "room/presence", sat),
+            ),
+        ]);
+        let told = make_with_by(
+            0,
+            None,
+            SIP,
+            &keeping,
+            chat_at(url),
+            NOW + 1,
+            || None,
+            Some(&tasks.agent()),
+        );
+        assert_eq!(served.join().unwrap().len(), 3, "{told}");
+        assert_eq!(told["made"], "sip-at-desk", "{told}");
+        one_task_of(&copy, SIP, crate::make_no_cannot::RUN);
+        assert!(made_with_of(&keeping, "deepseek-draft").is_none());
+        made_skill::set_asks_here(None);
+        net_make_here(None);
+        made_skill::set_reactions_here(None);
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    /// The 19:50 ruling: a make judged no quick reaction, on a lamp whose
+    /// skills can't hand tasks to its agent, keeps nothing and says so
+    /// plainly, never a DeepSeek draft, the agent never asked to write it.
+    /// With no agent known, no judgement: DeepSeek's as before.
+    #[test]
+    fn with_the_switch_a_make_not_a_reaction_keeps_nothing_when_tasks_are_off() {
+        made_skill::set_reactions_here(Some(true));
+        let (root, keeping) = keeping("reactions-failed");
+        let tasks = agent_answering(vec![]);
+        let (url, served) = service(vec![judgement(false)]);
+        let told = made_by(&keeping, url, Some(&tasks.agent()), NOW);
+        assert!(told.get("made").is_none(), "{told}");
+        assert!(
+            told["error"]
+                .as_str()
+                .is_some_and(|error| error.contains("can't hand tasks to it yet")),
+            "{told}"
+        );
+        assert_eq!(served.join().unwrap(), 1);
+        assert_eq!(tasks.hand_overs(), 0);
+        assert!(made_skill::entries(&keeping.directory).is_empty());
+        // No agent known on the lamp (no lamp target, the one path off):
+        // the route has no agent to send it to, so DeepSeek's, as before.
+        let none = crate::make_skill_agent::tests::stub(None, std::sync::Arc::new(|_: &str| None));
+        let (url, served) = service(vec![(200, route_answer(&presence_say(), "sip-at-desk"))]);
+        let told = made_by(&keeping, url, Some(&none.agent()), NOW + 1);
+        assert_eq!(served.join().unwrap(), 1);
+        assert_eq!(none.hand_overs(), 0);
+        assert_eq!(
+            told["made"], "sip-at-desk",
+            "no agent known: DeepSeek's, as before"
+        );
+        made_skill::set_reactions_here(None);
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    /// #6811, the switch off: a draft on someone at the desk is DeepSeek's
+    /// as before, no judgement, the agent never asked and no `made_with`
+    /// written.
+    #[test]
+    fn with_the_switch_off_a_presence_draft_is_deepseeks_as_before() {
+        made_skill::set_reactions_here(Some(false));
+        let (root, keeping) = keeping("reactions-off");
+        let tasks = agent_answering(vec![]);
+        let (url, served) = service(vec![(200, route_answer(&presence_say(), "sip-at-desk"))]);
+        let told = made_by(&keeping, url, Some(&tasks.agent()), NOW);
+        assert_eq!(told["made"], "sip-at-desk", "{told}");
+        assert_eq!(served.join().unwrap(), 1);
+        assert_eq!(tasks.hand_overs(), 0);
+        assert_eq!(made_with_of(&keeping, "sip-at-desk"), None);
+        made_skill::set_reactions_here(None);
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    /// The first builder at 16:34 on #6811: a one-off reminder is never a
+    /// make. Should the make be called for one, it is judged the lamp's own
+    /// timer's ([`made_skill::REACTION_JUDGE`]), and DeepSeek's answer is
+    /// that timer's `cannot:`, which the route never hands to the agent.
+    #[test]
+    fn with_the_switch_a_one_off_reminder_never_reaches_the_agents_make() {
+        made_skill::set_reactions_here(Some(true));
+        let (root, keeping) = keeping("reactions-reminder");
+        let tasks = agent_answering(vec![]);
+        let (url, served) = service(vec![
+            judgement(true),
+            (
+                200,
+                "cannot: I can't do that yet: a reminder at a time. Ask me for a reminder \
+                 instead, like 'remind me every hour to stand up'."
+                    .to_owned(),
+            ),
+        ]);
+        let told = make_with_by(
+            0,
+            None,
+            "remind me at 3 to call Mum",
+            &keeping,
+            chat_at(url),
+            NOW,
+            || None,
+            Some(&tasks.agent()),
+        );
+        assert!(told.get("made").is_none(), "{told}");
+        assert_eq!(served.join().unwrap(), 2);
+        assert_eq!(tasks.hand_overs(), 0);
+        made_skill::set_reactions_here(None);
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    /// The Reviewer-lead's P2 on #7764: a one-off reminder judged no quick
+    /// reaction (false, unsure or late) comes to the middle form, whose one
+    /// more call refuses a reminder as the make's own brief does; its
+    /// `cannot:` is said with the lamp's own line and no daily task is
+    /// ever kept. The agent is never asked.
+    #[test]
+    fn with_the_switch_a_reminder_judged_none_never_keeps_a_daily_task() {
+        made_skill::set_reactions_here(Some(true));
+        net_make_here(Some(true));
+        let (root, keeping) = keeping("reactions-reminder-middle");
+        const MOM: &str = "remind me at 9 to call mom";
+        let tasks = agent_answering(vec![]);
+        let (url, served) = service_sent(vec![
+            judgement(false),
+            (
+                200,
+                format!(
+                    "cannot: I can't do that yet: a reminder at nine. {}",
+                    made_skill::REMINDER_INSTEAD
+                ),
+            ),
+        ]);
+        let told = make_with_by(
+            0,
+            None,
+            MOM,
+            &keeping,
+            chat_at(url),
+            NOW,
+            || None,
+            Some(&tasks.agent()),
+        );
+        let sent = served.join().unwrap();
+        assert_eq!((sent.len(), tasks.hand_overs()), (2, 0), "{told}");
+        assert!(is_judgement(&sent[0], MOM), "{}", sent[0]);
+        assert!(
+            sent[1].contains("You choose, for a lamp, when a skill runs")
+                && sent[1].contains(made_skill::REMINDER_IS_TIMER)
+                && sent[1].contains(made_skill::REMINDER_INSTEAD),
+            "the middle form refuses a reminder: {}",
+            sent[1]
+        );
+        assert!(told.get("made").is_none(), "{told}");
+        assert!(
+            told["error"].as_str().is_some_and(
+                |error| error.contains(&crate::make_no_cannot::Uncovered::Reminder.line())
+            ),
+            "{told}"
+        );
+        assert!(made_skill::entries(&keeping.directory).is_empty());
+        net_make_here(None);
+        made_skill::set_reactions_here(None);
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    /// The Reviewer-lead's P2 on #7764: judged a quick reaction, a first
+    /// draft that can't be read gets DeepSeek's repairs, each held to
+    /// [`made_skill::quick_reaction`] as the first draft is: a repair on
+    /// someone at the desk is never kept. With no agent on the lamp, told
+    /// so; for the app's make the agent didn't take, the middle form.
+    #[test]
+    fn with_the_switch_a_repaired_draft_that_is_no_reaction_is_never_kept() {
+        made_skill::set_reactions_here(Some(true));
+        net_make_here(Some(true));
+        let (root, keeping, copy) = keeping_copied("reactions-repaired");
+        const SIP: &str = "after I've sat a long while, suggest a sip of water";
+        // Fenced, but no TOML the check can read: refused with its lines.
+        let unread = (200, route_answer("[[do]\nsay = = sip\n", "sip-unread"));
+        let repair = (200, route_answer(&presence_say(), "deepseek-draft"));
+        // No agent on the lamp (the one path, no `lamp` target).
+        let none = crate::make_skill_agent::tests::stub(None, std::sync::Arc::new(|_: &str| None));
+        let on = crate::make_skill_agent::Agent {
+            one_path: true,
+            ..none.agent()
+        };
+        let (url, served) = service_sent(vec![judgement(true), unread.clone(), repair.clone()]);
+        let told = make_with_by(
+            0,
+            None,
+            SIP,
+            &keeping,
+            chat_at(url),
+            NOW,
+            || None,
+            Some(&on),
+        );
+        assert_eq!(served.join().unwrap().len(), 3, "{told}");
+        assert!(told.get("made").is_none(), "{told}");
+        assert_eq!(
+            told["error"],
+            format!("the skill couldn't be made: {}", made_skill::AGENT_MISSING)
+        );
+        assert!(made_skill::entries(&keeping.directory).is_empty());
+        // The app's make, the agent making none: DeepSeek's repairs, then
+        // the middle form.
+        let tasks = crate::make_skill_agent::tests::stub(
+            Some("hermes"),
+            std::sync::Arc::new(|_: &str| None),
+        );
+        let app = crate::make_skill_agent::Agent {
+            repairs_if_untaken: true,
+            ..tasks.agent()
+        };
+        let sat = "field = \"someone\"\nequals = true\nfor = \"30m\"\nrearm = \"leaves\"\n";
+        let (url, served) = service_sent(vec![
+            judgement(true),
+            unread,
+            repair,
+            (
+                200,
+                trigger_answer("sip-at-desk", "speak", "room/presence", sat),
+            ),
+        ]);
+        let told = make_with_by(
+            0,
+            None,
+            SIP,
+            &keeping,
+            chat_at(url),
+            NOW + 1,
+            || None,
+            Some(&app),
+        );
+        let sent = served.join().unwrap();
+        assert_eq!(sent.len(), 4, "{told}");
+        assert!(
+            sent[3].contains("You choose, for a lamp, when a skill runs"),
+            "{}",
+            sent[3]
+        );
+        assert_eq!(told["made"], "sip-at-desk", "{told}");
+        one_task_of(&copy, SIP, crate::make_no_cannot::RUN);
+        assert!(made_with_of(&keeping, "deepseek-draft").is_none());
+        net_make_here(None);
+        made_skill::set_reactions_here(None);
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    /// A voice make of `request` (the voice's request), judged a quick
+    /// reaction, its DeepSeek draft `deepseek-draft` not kept and so handed
+    /// to the agent (someone at the desk), the agent answering each make with `answer` after the voice let it
+    /// run on (`LAMP_MAKE_MAY_RUN_ON`, as the turn does a minute after the
+    /// waiting line). What the make's call was told.
+    fn let_run_on(
+        keeping: &Keeping,
+        request: u64,
+        agent: impl FnOnce(&crate::make_skill_agent::tests::StubTasks) -> crate::make_skill_agent::Agent,
+        answer: Option<String>,
+    ) -> Value {
+        made_skill::set_reactions_here(Some(true));
+        let tasks = crate::make_skill_agent::tests::stub(
+            Some("hermes"),
+            Arc::new(move |_: &str| {
+                crate::long_make::let_go(request, NOW + 65_000);
+                answer.clone()
+            }),
+        );
+        let (url, served) = service(vec![
+            judgement(true),
+            (200, route_answer("not = [toml", "deepseek-draft")),
+        ]);
+        crate::make_skill_agent::set_made_for(request);
+        let told = make_with_by(
+            request,
+            Some(REQUEST),
+            REQUEST,
+            keeping,
+            chat_at(url),
+            NOW,
+            || None,
+            Some(&agent(&tasks)),
+        );
+        crate::make_skill_agent::set_made_for(0);
+        assert_eq!(served.join().unwrap(), 2);
+        made_skill::set_reactions_here(None);
+        told
+    }
+
+    /// The sip-of-water skill the agent makes from the template.
+    fn guarded_sip() -> String {
+        route_answer(
+            &made_skill::behaviour_template_toml()
+                .replace("One short, warm line.", "Time for a sip of water."),
+            "sip-at-desk",
+        )
+    }
+
+    /// The first builder's ruling on #6811 (18 Nov 17:23), with
+    /// `LAMP_MAKE_MAY_RUN_ON` on: a make let run on that the agent then
+    /// makes is kept but off, `ready_untold` for the app, never put on and
+    /// no line for the turn that ended. Its "ready" is told only with its
+    /// person's face seen alone, not mid-conversation, not at night and not
+    /// to an empty room; then it is said ready and on in one line with its
+    /// undo, and goes on once that line was heard through. Told once.
+    #[test]
+    fn a_make_let_run_on_stays_off_until_its_person_is_told_then_goes_on() {
+        crate::long_make::set_on_here(Some(true));
+        let (root, keeping) = keeping("run-on-made");
+        let request = 6_811_200;
+        let told = let_run_on(
+            &keeping,
+            request,
+            |tasks| tasks.agent().running_on(true),
+            Some(guarded_sip()),
+        );
+        assert_eq!(told, crate::long_make::let_go_told());
+        assert_eq!(take_said_line(), None, "no line for the turn that ended");
+        let entry = made_skill::entries(&keeping.directory)
+            .into_iter()
+            .find(|entry| entry["name"] == "sip-at-desk")
+            .unwrap();
+        assert_ne!(entry["on"], true, "{entry}");
+        assert_eq!(entry[crate::long_make::READY_UNTOLD], true);
+        assert!(made_with_of(&keeping, "deepseek-draft").is_none());
+        let sha256 = entry["sha256"].as_str().unwrap().to_owned();
+        assert_eq!(
+            crate::long_make::read(&keeping.directory, NOW + 70_000),
+            Some(crate::long_make::State::Made {
+                name: "sip-at-desk".into(),
+                sha256: sha256.clone()
+            })
+        );
+        // The coordinator's gates: each one not met tells nothing.
+        let mut tells = crate::long_make::Tells::at(keeping.directory.clone());
+        let at = std::time::Instant::now();
+        for (seen, quiet, night, there) in [
+            (false, true, false, true),
+            (true, false, false, true),
+            (true, true, true, true),
+            (true, true, false, false),
+        ] {
+            assert!(!crate::long_make::may_tell(seen, quiet, night, there));
+        }
+        assert!(!any_on(&keeping.directory));
+        assert!(crate::long_make::may_tell(true, true, false, true));
+        let note = tells.next(at, NOW + 80_000).unwrap();
+        let key = crate::long_make::key_of(&note).unwrap().to_owned();
+        let said = crate::long_make::told(&keeping, 6_811_201, note, (NOW + 80_000, at), || None);
+        // One line with its undo, never read back (the first builder, 18
+        // Nov 18:41).
+        assert!(
+            said.contains("Your sip at desk skill is ready and on. Say 'remove it' to undo.)"),
+            "{said}"
+        );
+        assert!(!said.contains("I made"), "never read back: {said}");
+        // Its turn cut before the read-back was played: still off and
+        // untold, so told again next time.
+        assert!(!crate::long_make::heard_through(true, false));
+        assert!(!crate::long_make::heard_through(false, true));
+        assert!(!any_on(&keeping.directory));
+        assert_eq!(
+            made_skill::entries(&keeping.directory)[0][crate::long_make::READY_UNTOLD],
+            true
+        );
+        assert_eq!(tells.next(at + Duration::from_secs(1), NOW + 81_000), None);
+        let again = tells
+            .next(at + Duration::from_secs(150), NOW + 230_000)
+            .unwrap();
+        assert_eq!(crate::long_make::key_of(&again), Some(key.as_str()));
+        let said = crate::long_make::told(&keeping, 6_811_202, again, (NOW + 230_000, at), || None);
+        assert!(
+            said.contains("Your sip at desk skill is ready and on."),
+            "{said}"
+        );
+        // Heard through: on, and told once.
+        assert!(crate::long_make::heard_through(true, true));
+        let asked = manage_helper(&keeping.manage);
+        crate::long_make::heard(&keeping, &key, NOW + 240_000, |made| {
+            made_skill::put_on(&keeping, made)
+        });
+        assert_eq!(asked.join().unwrap()["install_made"], sha256);
+        assert!(any_on(&keeping.directory));
+        let entry = made_skill::entries(&keeping.directory)
+            .into_iter()
+            .find(|entry| entry["name"] == "sip-at-desk")
+            .unwrap();
+        assert!(entry.get(crate::long_make::READY_UNTOLD).is_none());
+        assert_eq!(
+            crate::long_make::read(&keeping.directory, NOW + 90_000),
+            None
+        );
+        assert_eq!(
+            tells.next(at + Duration::from_secs(600), NOW + 90_000),
+            None
+        );
+        crate::long_make::set_on_here(None);
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    /// #6811: a long make told ready that clashes with a skill on the lamp
+    /// is asked the clash's question, as a finished make is, and not put on
+    /// even once heard; one that reads a service not linked yet carries the
+    /// link ask, as a finished make's line does.
+    #[test]
+    fn a_long_make_told_ready_asks_its_clash_and_its_link() {
+        crate::long_make::set_on_here(Some(true));
+        let (root, keeping) = keeping("run-on-clash");
+        // The sip with a glow, and another skill on the lamp glowing at
+        // the same moment.
+        let glowing = format!(
+            "{}\n[[do]]\nlight = {{ colour = \"blue\", level = 3 }}\n",
+            made_skill::behaviour_template_toml()
+                .replace("One short, warm line.", "Time for a sip of water.")
+                .replace("needs = [\"voice\"]", "needs = [\"voice\", \"light\"]")
+                .replace("speak = true", "speak = true\nlight = true")
+        );
+        let told = let_run_on(
+            &keeping,
+            6_811_260,
+            |tasks| tasks.agent().running_on(true),
+            Some(route_answer(&glowing, "sip-at-desk")),
+        );
+        assert_eq!(told, crate::long_make::let_go_told());
+        let other = keeping.installed.join("other-sip");
+        std::fs::create_dir_all(&other).unwrap();
+        std::fs::write(other.join("skill.toml"), &glowing).unwrap();
+        let mut tells = crate::long_make::Tells::at(keeping.directory.clone());
+        let at = std::time::Instant::now();
+        let note = tells.next(at, NOW + 80_000).unwrap();
+        let key = crate::long_make::key_of(&note).unwrap().to_owned();
+        let said = crate::long_make::told(&keeping, 6_811_261, note, (NOW + 80_000, at), || None);
+        assert!(said.contains("Your sip at desk skill is ready."), "{said}");
+        assert!(said.contains("other sip"), "{said}");
+        assert!(said.contains("or cancel"), "{said}");
+        assert!(said.contains(crate::made_clash::CLASH_ID), "{said}");
+        crate::long_make::heard(&keeping, &key, NOW + 90_000, |_| {
+            panic!("a clash waits for the person's choice")
+        });
+        assert!(!any_on(&keeping.directory));
+        assert_eq!(
+            crate::long_make::read(&keeping.directory, NOW + 90_000),
+            None
+        );
+        crate::made_clash::tests::forget_waiting();
+        // A kept skill reading Gmail, not linked: the link ask goes with it.
+        let package = keeping.directory.join("mail-read-1.0.0.tar");
+        std::fs::write(&package, "tar").unwrap();
+        let sha256 = "cd".repeat(32);
+        let mut entries = made_skill::entries(&keeping.directory);
+        entries.push(json!({
+            "name": "mail-read", "version": "1.0.0", "sha256": sha256,
+            "description": "Reads your new mail at nine.", "package": "mail-read-1.0.0.tar",
+            "uses": {"reads": ["gmail"], "speak": true},
+        }));
+        std::fs::write(
+            keeping.directory.join(made_skill::INDEX),
+            serde_json::to_vec(&entries).unwrap(),
+        )
+        .unwrap();
+        crate::long_make::begin(6_811_262, &keeping.directory);
+        assert!(crate::long_make::let_go(6_811_262, NOW));
+        crate::long_make::settle(6_811_262);
+        crate::long_make::settled(&keeping.directory, Ok(("mail-read", &sha256)), NOW + 1);
+        let note = tells
+            .next(at + Duration::from_secs(300), NOW + 100_000)
+            .unwrap();
+        let said = crate::long_make::told(&keeping, 6_811_263, note, (NOW + 100_000, at), || {
+            Some(Vec::new())
+        });
+        assert!(
+            said.contains("Your mail read skill is ready and on."),
+            "{said}"
+        );
+        assert!(said.contains("Gmail"), "the link ask: {said}");
+        crate::long_make::set_on_here(None);
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    /// #6811: a make let run on that fails (the agent's answer never
+    /// kept), runs out, or is cut by a restart keeps nothing, never
+    /// DeepSeek's draft, and is told once, plainly.
+    #[test]
+    fn a_make_let_run_on_that_fails_runs_out_or_restarts_keeps_nothing_and_says_so_once() {
+        crate::long_make::set_on_here(Some(true));
+        let (root, keeping) = keeping("run-on-failed");
+        let told_once = |request: u64, why: crate::long_make::NotFinished| {
+            assert!(matches!(
+                crate::long_make::read(&keeping.directory, NOW + 70_000),
+                Some(crate::long_make::State::NotMade { why: kept, .. }) if kept == why
+            ));
+            let mut tells = crate::long_make::Tells::at(keeping.directory.clone());
+            let note = tells.next(std::time::Instant::now(), NOW + 80_000).unwrap();
+            let said = crate::long_make::told(
+                &keeping,
+                request,
+                note.clone(),
+                (NOW + 80_000, std::time::Instant::now()),
+                || None,
+            );
+            assert!(said.contains("I couldn't finish your"), "{said}");
+            crate::long_make::heard(
+                &keeping,
+                crate::long_make::key_of(&note).unwrap(),
+                NOW + 80_000,
+                |_| panic!("nothing is put on"),
+            );
+            let again = crate::long_make::told(
+                &keeping,
+                request + 1,
+                note,
+                (NOW + 80_000, std::time::Instant::now()),
+                || None,
+            );
+            assert!(!again.contains("couldn't finish"), "told once: {again}");
+            assert!(!any_on(&keeping.directory));
+            assert!(
+                made_skill::entries(&keeping.directory)
+                    .iter()
+                    .all(|entry| entry.get(crate::long_make::READY_UNTOLD).is_none())
+            );
+            assert!(made_with_of(&keeping, "deepseek-draft").is_none());
+        };
+        // Failed: the agent's answers never kept.
+        let told = let_run_on(
+            &keeping,
+            6_811_210,
+            |tasks| tasks.agent().running_on(true),
+            Some("nothing a skill is made of".into()),
+        );
+        assert_eq!(told, crate::long_make::let_go_told());
+        told_once(6_811_211, crate::long_make::NotFinished::Failed);
+        // Ran out: no answer within its time.
+        let told = let_run_on(&keeping, 6_811_220, |tasks| tasks.agent(), None);
+        assert_eq!(told, crate::long_make::let_go_told());
+        told_once(6_811_221, crate::long_make::NotFinished::RanOut);
+        // A restart while it ran.
+        crate::long_make::begin(6_811_230, &keeping.directory);
+        assert!(crate::long_make::let_go(6_811_230, NOW));
+        crate::long_make::after_start(&keeping.directory, NOW + 70_000);
+        told_once(6_811_231, crate::long_make::NotFinished::Restart);
+        crate::long_make::settle(6_811_230);
+        crate::long_make::set_on_here(None);
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    /// Heron's HOLD on #7774: a make let run on, then declined while it
+    /// was made ("never mind", through its making note), keeps nothing and
+    /// leaves no `making` mark: a new make is never told the lamp is still
+    /// making it, and nothing is told of it later, not even when its 10
+    /// minutes would have run out.
+    #[test]
+    fn a_make_let_run_on_then_declined_leaves_no_mark_and_is_never_told() {
+        crate::long_make::set_on_here(Some(true));
+        let (root, keeping) = keeping("run-on-declined");
+        let request = 6_811_260;
+        made_skill::set_reactions_here(Some(true));
+        let directory = keeping.directory.clone();
+        let answer = guarded_sip();
+        let tasks = crate::make_skill_agent::tests::stub(
+            Some("hermes"),
+            Arc::new(move |_: &str| {
+                assert!(crate::long_make::let_go(request, NOW + 65_000));
+                // The person's no comes after the turn let it go.
+                let id = ASKS
+                    .lock()
+                    .unwrap()
+                    .iter()
+                    .find(|ask| ask.directory == directory && ask.made.is_none())
+                    .map(|ask| ask.id)
+                    .unwrap();
+                let answered =
+                    making_answered(&format!("{MAKING_ID}{id}"), request + 1, Some("no"));
+                assert!(matches!(answered, Making::Told(_)), "{answered:?}");
+                Some(answer.clone())
+            }),
+        );
+        let (url, served) = service(vec![
+            judgement(true),
+            (200, route_answer("not = [toml", "deepseek-draft")),
+        ]);
+        crate::make_skill_agent::set_made_for(request);
+        let told = make_with_by(
+            request,
+            Some(REQUEST),
+            REQUEST,
+            &keeping,
+            chat_at(url),
+            NOW,
+            || None,
+            Some(&tasks.agent().running_on(true)),
+        );
+        crate::make_skill_agent::set_made_for(0);
+        assert_eq!(served.join().unwrap(), 2);
+        made_skill::set_reactions_here(None);
+        assert_eq!(told["dropped"], true, "{told}");
+        assert!(!any_on(&keeping.directory));
+        assert!(made_skill::entries(&keeping.directory).is_empty());
+        assert!(!crate::long_make::is_let_go(request));
+        // A new make, or "is it ready?", hears no "still making".
+        assert_eq!(
+            crate::long_make::read(&keeping.directory, NOW + 70_000),
+            None
+        );
+        assert!(crate::long_make::still_making(&keeping.directory, NOW + 70_000).is_none());
+        // Nothing told of it, now or once its time would have run out.
+        let mut tells = crate::long_make::Tells::at(keeping.directory.clone());
+        assert_eq!(tells.next(std::time::Instant::now(), NOW + 80_000), None);
+        let later = NOW + 12 * 60_000;
+        assert_eq!(crate::long_make::read(&keeping.directory, later), None);
+        assert_eq!(tells.next(std::time::Instant::now(), later), None);
+        crate::long_make::set_on_here(None);
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    /// #6811: while one runs on, a second make ask is told the lamp is
+    /// still making it, nothing made and DeepSeek never asked.
+    #[test]
+    fn a_second_make_ask_while_one_runs_on_is_told_its_still_making() {
+        crate::long_make::set_on_here(Some(true));
+        let (root, keeping) = keeping("run-on-second");
+        crate::long_make::begin(6_811_240, &keeping.directory);
+        crate::long_make::hint(6_811_240, "water-reminder");
+        assert!(crate::long_make::let_go(6_811_240, NOW));
+        let told = make_with_by(
+            6_811_241,
+            Some(REQUEST),
+            REQUEST,
+            &keeping,
+            || Err("DeepSeek is never asked".into()),
+            NOW + 1_000,
+            || None,
+            None,
+        );
+        assert_eq!(
+            told["next"],
+            "Say only this, in the language of the conversation, and nothing else: I'm still making your water reminder skill."
+        );
+        assert!(made_skill::entries(&keeping.directory).is_empty());
+        crate::long_make::settle(6_811_240);
+        crate::long_make::set_on_here(None);
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    /// #6811, the switch off: nothing is let run on; the agent's skill is
+    /// kept and put on at once, as before.
+    #[test]
+    fn with_the_run_on_switch_off_a_make_is_as_before() {
+        crate::long_make::set_on_here(Some(false));
+        let (root, keeping) = keeping("run-on-off");
+        let asked = manage_helper(&keeping.manage);
+        let told = let_run_on(
+            &keeping,
+            6_811_250,
+            |tasks| tasks.agent().running_on(false),
+            Some(guarded_sip()),
+        );
+        assert_eq!(told["made"], "sip-at-desk", "{told}");
+        assert_eq!(told["on"], true, "{told}");
+        assert!(asked.join().unwrap()["install_made"].is_string());
+        assert_eq!(crate::long_make::read(&keeping.directory, NOW), None);
+        crate::long_make::set_on_here(None);
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    /// A kept skill `name` of SHA-256 `sha256` using `uses`, off, as a
+    /// long make that settled made keeps it; its mark settled made.
+    fn kept_long(keeping: &Keeping, request: u64, name: &str, sha256: &str, uses: Value) {
+        let package = format!("{name}-1.0.0.tar");
+        std::fs::create_dir_all(&keeping.directory).unwrap();
+        std::fs::write(keeping.directory.join(&package), "tar").unwrap();
+        let mut entries = made_skill::entries(&keeping.directory);
+        entries.push(json!({
+            "name": name, "version": "1.0.0", "sha256": sha256,
+            "description": "Glows at the desk.", "package": package, "uses": uses,
+        }));
+        std::fs::write(
+            keeping.directory.join(made_skill::INDEX),
+            serde_json::to_vec(&entries).unwrap(),
+        )
+        .unwrap();
+        crate::long_make::begin(request, &keeping.directory);
+        assert!(crate::long_make::let_go(request, NOW));
+        crate::long_make::settle(request);
+        crate::long_make::settled(&keeping.directory, Ok((name, sha256)), NOW + 1);
+    }
+
+    /// The kept skill `sha256`'s index entry.
+    fn entry_of(keeping: &Keeping, sha256: &str) -> Value {
+        made_skill::entries(&keeping.directory)
+            .into_iter()
+            .find(|entry| entry["sha256"] == sha256)
+            .unwrap()
+    }
+
+    /// El's P2 on #7774: a make given the long make's time whose turn was
+    /// cut before its minute is never put on nor said through the say
+    /// service with no gate: kept off, `ready_untold`, and told as a long
+    /// make is.
+    #[test]
+    fn a_long_make_cut_before_its_minute_goes_through_the_gate() {
+        crate::long_make::set_on_here(Some(true));
+        let (root, keeping) = keeping("run-on-cut");
+        let request = 6_811_320;
+        // The turn waiting on it is cut already.
+        set_turn(std::sync::Arc::downgrade(&std::sync::Arc::new(())));
+        made_skill::set_reactions_here(Some(true));
+        let answer = guarded_sip();
+        let tasks = crate::make_skill_agent::tests::stub(
+            Some("hermes"),
+            Arc::new(move |_: &str| Some(answer.clone())),
+        );
+        let (url, served) = service(vec![
+            judgement(true),
+            (200, route_answer("not = [toml", "deepseek-draft")),
+        ]);
+        crate::make_skill_agent::set_made_for(request);
+        let told = make_with_by(
+            request,
+            Some(REQUEST),
+            REQUEST,
+            &keeping,
+            chat_at(url),
+            NOW,
+            || None,
+            Some(&tasks.agent().running_on(true)),
+        );
+        crate::make_skill_agent::set_made_for(0);
+        assert_eq!(served.join().unwrap(), 2);
+        made_skill::set_reactions_here(None);
+        assert_eq!(told, crate::long_make::let_go_told());
+        assert_eq!(take_said_line(), None, "nothing said with no gate");
+        assert!(!any_on(&keeping.directory));
+        let entry = made_skill::entries(&keeping.directory)
+            .into_iter()
+            .find(|entry| entry["name"] == "sip-at-desk")
+            .unwrap();
+        assert_eq!(entry[crate::long_make::READY_UNTOLD], true);
+        assert!(matches!(
+            crate::long_make::read(&keeping.directory, NOW + 70_000),
+            Some(crate::long_make::State::Made { .. })
+        ));
+        crate::long_make::set_on_here(None);
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    /// Twelve's P1 on #7774: the power off mid-make and the lamp back past
+    /// its ten minutes. The run-out mark is kept once, its key fixed, so its
+    /// "couldn't finish" is told once and then cleared, never offered on.
+    #[test]
+    fn a_long_make_run_out_across_a_restart_is_told_once_then_cleared() {
+        crate::long_make::set_on_here(Some(true));
+        let (root, keeping) = keeping("run-on-restart-late");
+        crate::long_make::begin(6_811_270, &keeping.directory);
+        crate::long_make::hint(6_811_270, "water-reminder");
+        assert!(crate::long_make::let_go(6_811_270, NOW));
+        crate::long_make::settle(6_811_270);
+        // Back an hour later.
+        let back = NOW + 3_600_000;
+        crate::long_make::after_start(&keeping.directory, back);
+        let mut tells = crate::long_make::Tells::at(keeping.directory.clone());
+        let at = std::time::Instant::now();
+        assert!(tells.has_news(at, back + 15_000));
+        let note = tells.next(at, back + 15_000).unwrap();
+        let key = crate::long_make::key_of(&note).unwrap().to_owned();
+        assert_eq!(key, format!("not_made {back}"), "its key fixed");
+        let said = crate::long_make::told(
+            &keeping,
+            6_811_271,
+            note.clone(),
+            (back + 30_000, at),
+            || None,
+        );
+        assert!(
+            said.contains("I couldn't finish your water reminder skill."),
+            "{said}"
+        );
+        crate::long_make::heard(&keeping, &key, back + 45_000, |_| {
+            panic!("nothing is put on")
+        });
+        assert!(!keeping.directory.join(crate::long_make::FILE).exists());
+        assert!(
+            !keeping
+                .directory
+                .join(crate::long_make::OFFERS_FILE)
+                .exists(),
+            "no stale count left"
+        );
+        assert!(!tells.has_news(at + Duration::from_secs(600), back + 900_000));
+        let again =
+            crate::long_make::told(&keeping, 6_811_272, note, (back + 900_000, at), || None);
+        assert!(!again.contains("couldn't finish"), "told once: {again}");
+        crate::long_make::set_on_here(None);
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    /// Twelve's P1 on #7774: A made and not told yet, then B let run on:
+    /// A's mark stays, A is told and goes on, then B's news; and the same
+    /// with A failed. Nothing is lost.
+    #[test]
+    fn a_second_long_make_never_takes_an_untold_firsts_place() {
+        crate::long_make::set_on_here(Some(true));
+        let (root, keeping) = keeping("run-on-two");
+        let first = "ab".repeat(32);
+        kept_long(
+            &keeping,
+            6_811_280,
+            "sip-at-desk",
+            &first,
+            json!({"speak": true}),
+        );
+        crate::long_make::begin(6_811_281, &keeping.directory);
+        crate::long_make::hint(6_811_281, "water-reminder");
+        assert!(crate::long_make::let_go(6_811_281, NOW + 5_000));
+        assert_eq!(
+            crate::long_make::marks(&keeping.directory, NOW + 6_000).len(),
+            2
+        );
+        crate::long_make::settle(6_811_281);
+        crate::long_make::settled(&keeping.directory, Err(false), NOW + 7_000);
+        let mut tells = crate::long_make::Tells::at(keeping.directory.clone());
+        let at = std::time::Instant::now();
+        let note = tells.next(at, NOW + 8_000).unwrap();
+        let key = crate::long_make::key_of(&note).unwrap().to_owned();
+        assert_eq!(key, format!("ready {first}"));
+        let said = crate::long_make::told(&keeping, 6_811_282, note, (NOW + 8_000, at), || None);
+        assert!(
+            said.contains("Your sip at desk skill is ready and on."),
+            "{said}"
+        );
+        crate::long_make::heard(&keeping, &key, NOW + 9_000, |made| {
+            made_skill::mark(&keeping.directory, &made.sha256, "on", Some(json!(true)));
+            Ok(())
+        });
+        let entry = entry_of(&keeping, &first);
+        assert_eq!(entry["on"], true);
+        assert!(entry.get(crate::long_make::READY_UNTOLD).is_none());
+        let note = tells
+            .next(at + Duration::from_secs(5), NOW + 10_000)
+            .unwrap();
+        let said = crate::long_make::told(
+            &keeping,
+            6_811_283,
+            note.clone(),
+            (NOW + 10_000, at),
+            || None,
+        );
+        assert!(
+            said.contains("I couldn't finish your water reminder skill."),
+            "{said}"
+        );
+        crate::long_make::heard(
+            &keeping,
+            crate::long_make::key_of(&note).unwrap(),
+            NOW + 11_000,
+            |_| panic!("nothing is put on"),
+        );
+        assert_eq!(
+            crate::long_make::read(&keeping.directory, NOW + 12_000),
+            None
+        );
+        // A failed, then B made: A's "couldn't finish" first, then B.
+        crate::long_make::begin(6_811_284, &keeping.directory);
+        assert!(crate::long_make::let_go(6_811_284, NOW + 20_000));
+        crate::long_make::settle(6_811_284);
+        crate::long_make::settled(&keeping.directory, Err(true), NOW + 21_000);
+        let second = "cd".repeat(32);
+        kept_long(
+            &keeping,
+            6_811_285,
+            "desk-glow",
+            &second,
+            json!({"speak": true}),
+        );
+        let keys: Vec<String> = crate::long_make::marks(&keeping.directory, NOW + 22_000)
+            .iter()
+            .map(|state| match state {
+                crate::long_make::State::NotMade { .. } => "not_made".to_owned(),
+                crate::long_make::State::Made { name, .. } => name.clone(),
+                other => panic!("{other:?}"),
+            })
+            .collect();
+        assert_eq!(keys, ["not_made", "desk-glow"]);
+        assert_eq!(
+            entry_of(&keeping, &second)[crate::long_make::READY_UNTOLD],
+            true
+        );
+        crate::long_make::set_on_here(None);
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    /// Twelve's P2 on #7774 and the first builder's 18:41 rule: a long make
+    /// with code of its own is said ready and on in one line, no read-back
+    /// and no yes asked, and goes on once heard through by its yes's path;
+    /// with `LAMP_MADE_SCRIPTS` off it is never said on, and stays off.
+    #[test]
+    fn a_long_make_with_code_is_said_on_in_one_line_with_no_yes_and_never_on_while_off() {
+        crate::long_make::set_on_here(Some(true));
+        let (root, keeping) = keeping("run-on-code");
+        let code = json!({"code": true, "grants": ["light"], "light": true});
+        let glow = "ef".repeat(32);
+        made_skill::set_scripts_here(Some(true));
+        made_skill::set_code_at_once_here(Some(true));
+        kept_long(&keeping, 6_811_290, "desk-glow", &glow, code.clone());
+        let mut tells = crate::long_make::Tells::at(keeping.directory.clone());
+        let at = std::time::Instant::now();
+        let note = tells.next(at, NOW + 5_000).unwrap();
+        let key = crate::long_make::key_of(&note).unwrap().to_owned();
+        let said = crate::long_make::told(&keeping, 6_811_291, note, (NOW + 5_000, at), || None);
+        assert!(
+            said.contains("Your desk glow skill is ready and on."),
+            "{said}"
+        );
+        assert!(said.contains("Say 'remove it' to undo."), "{said}");
+        assert!(!said.contains("approve_id"), "no yes asked: {said}");
+        assert!(!said.contains("I made"), "never read back: {said}");
+        let mut put = false;
+        crate::long_make::heard(&keeping, &key, NOW + 6_000, |made| {
+            assert!(made.uses.code);
+            // Put on first, its mark still there (Twelve's P3 on #7774): a
+            // crash here leaves it told again, never lost.
+            assert!(crate::long_make::read(&keeping.directory, NOW + 6_000).is_some());
+            put = true;
+            made_skill::mark(&keeping.directory, &made.sha256, "on", Some(json!(true)));
+            Ok(())
+        });
+        assert!(put, "on once heard, with no yes");
+        assert_eq!(entry_of(&keeping, &glow)["on"], true);
+        // `LAMP_MADE_SCRIPTS` off: said off and why, never put on.
+        made_skill::set_scripts_here(Some(false));
+        let off = "12".repeat(32);
+        kept_long(&keeping, 6_811_292, "desk-pulse", &off, code);
+        let note = tells
+            .next(at + Duration::from_secs(5), NOW + 7_000)
+            .unwrap();
+        let key = crate::long_make::key_of(&note).unwrap().to_owned();
+        let said = crate::long_make::told(&keeping, 6_811_293, note, (NOW + 7_000, at), || None);
+        assert!(
+            said.contains(
+                "Your desk pulse skill is ready. I made it but couldn't put it on: this lamp doesn't run a skill's own code."
+            ),
+            "{said}"
+        );
+        assert!(!said.contains("and on"), "{said}");
+        crate::long_make::heard(&keeping, &key, NOW + 8_000, |_| {
+            panic!("never on with the lamp running no skill's code")
+        });
+        assert_ne!(entry_of(&keeping, &off)["on"], true);
+        made_skill::set_code_at_once_here(None);
+        made_skill::set_scripts_here(None);
+        crate::long_make::set_on_here(None);
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    /// Twelve's 19:40 and 20:26 P2s on #7774: a long make of a skill with
+    /// code that sends keeps its yes as a finished make's does, the switch
+    /// to put code on at once or not: told ready and said back as an app
+    /// make's is, its yes awaited; never "on", never put on and no task yes
+    /// recorded with nobody's yes. Its person's yes, after the say-back was
+    /// heard whole, puts exactly that package on, never stranded off.
+    #[test]
+    fn a_long_make_that_sends_is_told_ready_and_stays_off_with_no_yes_recorded() {
+        use crate::skill_write_yes as yes;
+        crate::long_make::set_on_here(Some(true));
+        let (root, keeping) = keeping("run-on-sends");
+        made_skill::set_scripts_here(Some(true));
+        made_skill::set_code_at_once_here(Some(true));
+        let btc = "78".repeat(32);
+        kept_long(
+            &keeping,
+            6_811_330,
+            "btc-price",
+            &btc,
+            json!({"code": true, "grants": ["speak"], "messages": true, "speak": true}),
+        );
+        // Its description says what its code may use, as a kept one's does.
+        let grants = ["speak".to_owned()];
+        made_skill::mark(
+            &keeping.directory,
+            &btc,
+            "description",
+            Some(json!(format!(
+                "Texts you the price each morning.{}",
+                made_skill::code_said_as(&grants, false)
+            ))),
+        );
+        let made = made_skill::kept_by_sha256(&keeping.directory, &btc).unwrap();
+        let mut tells = crate::long_make::Tells::at(keeping.directory.clone());
+        let at = std::time::Instant::now();
+        let note = tells.next(at, NOW + 5_000).unwrap();
+        let key = crate::long_make::key_of(&note).unwrap().to_owned();
+        let request = 6_811_331;
+        let said = crate::long_make::told(&keeping, request, note, (NOW + 5_000, at), || None);
+        let line = format!(
+            "Your btc price skill is ready. {}",
+            made_skill::on_line(&made)
+        );
+        assert!(said.contains(&yes::say_whole(&line)), "{said}");
+        assert!(
+            said.contains(made_skill::code_said_as(&grants, false).trim()),
+            "what its code may use: {said}"
+        );
+        assert!(!said.contains("and on"), "{said}");
+        let id = said.rsplit('"').nth(1).unwrap().to_owned();
+        assert!(
+            said.ends_with(&format!("{})", yes::then_wait(&id))),
+            "{said}"
+        );
+        crate::long_make::heard(&keeping, &key, NOW + 6_000, |_| {
+            panic!("a send keeps its yes: never put on, its task's yes never recorded")
+        });
+        assert_ne!(entry_of(&keeping, &btc)["on"], true);
+        assert_eq!(
+            crate::long_make::read(&keeping.directory, NOW + 7_000),
+            None
+        );
+        // Its say-back heard whole, then their yes: exactly that package on.
+        yes::lamp_said(request, &line);
+        let asked = manage_helper(&keeping.manage);
+        crate::skill_task_yes::set_on_here(Some(true));
+        let folder = "cd".repeat(32);
+        let agreed = yes::approve(&id, request + 1, true, true, at, |asks| {
+            assert!(asks.code, "{asks:?}");
+            assert_eq!(asks.sha256, btc);
+            code_approve(
+                &keeping,
+                asks,
+                |name| Ok(Some(task_asks(name, &folder, &btc, &["speak"]))),
+                |_| Ok(json!({ "approved": 1 })),
+            )
+        });
+        assert_eq!(agreed["approved"], true, "{agreed}");
+        assert_eq!(asked.join().unwrap()["install_made"], btc.as_str());
+        assert_eq!(entry_of(&keeping, &btc)["on"], true);
+        crate::skill_task_yes::set_on_here(None);
+        made_skill::set_code_at_once_here(None);
+        made_skill::set_scripts_here(None);
+        crate::long_make::set_on_here(None);
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    /// Twelve's 19:40 P3 on #7774: a mark that a skill couldn't be put on,
+    /// its skill removed in the app since, goes quietly, as a made one's.
+    #[test]
+    fn a_not_on_mark_for_a_skill_removed_in_the_app_goes_quietly() {
+        crate::long_make::set_on_here(Some(true));
+        let (root, keeping) = keeping("run-on-not-on-gone");
+        let sip = "9a".repeat(32);
+        kept_long(
+            &keeping,
+            6_811_340,
+            "sip-at-desk",
+            &sip,
+            json!({"speak": true}),
+        );
+        let mut tells = crate::long_make::Tells::at(keeping.directory.clone());
+        let at = std::time::Instant::now();
+        let note = tells.next(at, NOW + 5_000).unwrap();
+        let key = crate::long_make::key_of(&note).unwrap().to_owned();
+        crate::long_make::heard(&keeping, &key, NOW + 6_000, |_| Err("the check".into()));
+        assert!(matches!(
+            crate::long_make::read(&keeping.directory, NOW + 7_000),
+            Some(crate::long_make::State::NotOn { .. })
+        ));
+        // Removed in the app.
+        std::fs::write(keeping.directory.join(made_skill::INDEX), b"[]").unwrap();
+        assert!(!tells.has_news(at + Duration::from_secs(5), NOW + 8_000));
+        assert_eq!(
+            crate::long_make::read(&keeping.directory, NOW + 9_000),
+            None
+        );
+        crate::long_make::set_on_here(None);
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    /// Twelve's P2 on #7774: told ready and heard, but the lamp couldn't
+    /// put it on. It stays off and `ready_untold`, and its person is told
+    /// why at the next moment, once.
+    #[test]
+    fn a_long_make_not_put_on_once_heard_is_told_why() {
+        crate::long_make::set_on_here(Some(true));
+        let (root, keeping) = keeping("run-on-not-on");
+        let sip = "34".repeat(32);
+        kept_long(
+            &keeping,
+            6_811_300,
+            "sip-at-desk",
+            &sip,
+            json!({"speak": true}),
+        );
+        let mut tells = crate::long_make::Tells::at(keeping.directory.clone());
+        let at = std::time::Instant::now();
+        let note = tells.next(at, NOW + 5_000).unwrap();
+        let key = crate::long_make::key_of(&note).unwrap().to_owned();
+        crate::long_make::told(&keeping, 6_811_301, note, (NOW + 5_000, at), || None);
+        crate::long_make::heard(&keeping, &key, NOW + 6_000, |_| {
+            Err("the lamp has as many skills on as it holds".into())
+        });
+        let entry = entry_of(&keeping, &sip);
+        assert_ne!(entry["on"], true);
+        assert_eq!(entry[crate::long_make::READY_UNTOLD], true);
+        let note = tells
+            .next(at + Duration::from_secs(5), NOW + 7_000)
+            .unwrap();
+        let key = crate::long_make::key_of(&note).unwrap().to_owned();
+        let said = crate::long_make::told(&keeping, 6_811_302, note, (NOW + 7_000, at), || None);
+        assert!(
+            said.contains(
+                "I couldn't turn your sip at desk skill on: the lamp has as many skills on as it holds."
+            ),
+            "{said}"
+        );
+        assert!(!said.contains("and on"), "{said}");
+        crate::long_make::heard(&keeping, &key, NOW + 8_000, |_| {
+            panic!("told why, not tried again")
+        });
+        assert!(
+            entry_of(&keeping, &sip)
+                .get(crate::long_make::READY_UNTOLD)
+                .is_none()
+        );
+        assert_eq!(
+            crate::long_make::read(&keeping.directory, NOW + 9_000),
+            None
+        );
+        crate::long_make::set_on_here(None);
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    /// Twelve's P3 on #7774: one put on already (its turn cut after the
+    /// clash's choice, or on by another way) is said on once more, nothing
+    /// asked again and nothing put on.
+    #[test]
+    fn a_long_make_on_already_is_told_with_nothing_asked_again() {
+        crate::long_make::set_on_here(Some(true));
+        let (root, keeping) = keeping("run-on-on-already");
+        let sip = "56".repeat(32);
+        kept_long(
+            &keeping,
+            6_811_310,
+            "sip-at-desk",
+            &sip,
+            json!({"speak": true}),
+        );
+        made_skill::mark(&keeping.directory, &sip, "on", Some(json!(true)));
+        let mut tells = crate::long_make::Tells::at(keeping.directory.clone());
+        let at = std::time::Instant::now();
+        let note = tells.next(at, NOW + 5_000).unwrap();
+        let key = crate::long_make::key_of(&note).unwrap().to_owned();
+        let said = crate::long_make::told(&keeping, 6_811_311, note, (NOW + 5_000, at), || None);
+        assert!(
+            said.contains("Your sip at desk skill is ready and on."),
+            "{said}"
+        );
+        crate::long_make::heard(&keeping, &key, NOW + 6_000, |_| panic!("on already"));
+        assert!(
+            entry_of(&keeping, &sip)
+                .get(crate::long_make::READY_UNTOLD)
+                .is_none()
+        );
+        crate::long_make::set_on_here(None);
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    /// The offers counted for the telling `key` in `keeping`'s folder.
+    fn offers_of(keeping: &Keeping, key: &str) -> u64 {
+        std::fs::read(keeping.directory.join(crate::long_make::OFFERS_FILE))
+            .ok()
+            .and_then(|bytes| serde_json::from_slice::<Value>(&bytes).ok())
+            .and_then(|offers| offers[key].as_u64())
+            .unwrap_or(0)
+    }
+
+    /// Heron's P2 on #7774: two long makes with code that keeps its yes,
+    /// told back to back. The second says nothing while the first's yes is
+    /// awaited, its mark kept and its offer given back, so the first's wait
+    /// is never replaced and the first never stranded off; the second is
+    /// told once that wait lapses.
+    #[test]
+    fn a_second_code_make_waits_for_the_firsts_yes_before_it_is_told() {
+        use crate::skill_write_yes as yes;
+        crate::long_make::set_on_here(Some(true));
+        let (root, keeping) = keeping("run-on-two-yeses");
+        made_skill::set_scripts_here(Some(true));
+        made_skill::set_code_at_once_here(Some(true));
+        let sends = json!({"code": true, "grants": ["speak"], "messages": true, "speak": true});
+        let btc = "a1".repeat(32);
+        let eth = "b2".repeat(32);
+        kept_long(&keeping, 6_811_350, "btc-price", &btc, sends.clone());
+        kept_long(&keeping, 6_811_351, "eth-price", &eth, sends);
+        let mut tells = crate::long_make::Tells::at(keeping.directory.clone());
+        let at = std::time::Instant::now();
+        let note = tells.next(at, NOW + 5_000).unwrap();
+        let first = crate::long_make::key_of(&note).unwrap().to_owned();
+        assert_eq!(first, format!("ready {btc}"));
+        let said = crate::long_make::told(&keeping, 6_811_352, note, (NOW + 5_000, at), || None);
+        let id = said.rsplit('"').nth(1).unwrap().to_owned();
+        assert!(yes::waits(&id), "{said}");
+        crate::long_make::heard(&keeping, &first, NOW + 6_000, |_| {
+            panic!("a send keeps its yes")
+        });
+        // 15 s later, the second's chance: nothing said, its mark kept.
+        let later = at + Duration::from_secs(15);
+        let note = tells.next(later, NOW + 20_000).unwrap();
+        let second = crate::long_make::key_of(&note).unwrap().to_owned();
+        assert_eq!(second, format!("ready {eth}"));
+        let said =
+            crate::long_make::told(&keeping, 6_811_353, note, (NOW + 20_000, later), || None);
+        assert_eq!(said, "(Nobody has spoken. Say nothing, and call nothing.)");
+        assert!(yes::waits(&id), "the first's yes is still awaited");
+        assert_eq!(offers_of(&keeping, &second), 0, "its offer given back");
+        assert!(
+            crate::long_make::marks(&keeping.directory, NOW + 21_000)
+                .iter()
+                .any(|state| matches!(state, crate::long_make::State::Made { sha256, .. } if *sha256 == eth))
+        );
+        assert_eq!(
+            entry_of(&keeping, &eth)[crate::long_make::READY_UNTOLD],
+            true
+        );
+        // The first's yes lapsed: the second is told, its yes awaited.
+        let lapsed = later + yes::YES_WITHIN + Duration::from_secs(10);
+        let note = tells.next(lapsed, NOW + 140_000).unwrap();
+        assert_eq!(crate::long_make::key_of(&note), Some(second.as_str()));
+        let said =
+            crate::long_make::told(&keeping, 6_811_354, note, (NOW + 140_000, lapsed), || None);
+        assert!(said.contains("Your eth price skill is ready."), "{said}");
+        let id = said.rsplit('"').nth(1).unwrap().to_owned();
+        assert!(yes::waits(&id), "{said}");
+        yes::clear_for_test();
+        made_skill::set_code_at_once_here(None);
+        made_skill::set_scripts_here(None);
+        crate::long_make::set_on_here(None);
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    /// Heron's P2 on #7774: a quick make's say-back still awaits its yes;
+    /// a long make's news isn't told over it, and is told once it's gone.
+    #[test]
+    fn a_long_make_is_not_told_over_a_quick_makes_awaited_yes() {
+        use crate::skill_write_yes as yes;
+        crate::long_make::set_on_here(Some(true));
+        let (root, keeping) = keeping("run-on-over-a-yes");
+        let sip = "c3".repeat(32);
+        kept_long(
+            &keeping,
+            6_811_360,
+            "sip-at-desk",
+            &sip,
+            json!({"speak": true}),
+        );
+        // A quick make with code, read back and its yes awaited.
+        let quick = made_skill::kept_by_sha256(&keeping.directory, &sip).unwrap();
+        let at = std::time::Instant::now();
+        let id = yes::wait_for_yes_noted(
+            yes::Asks {
+                skill: "desk-glow".to_owned(),
+                sha256: "d4".repeat(32),
+                ..code_asks(&quick)
+            },
+            6_811_361,
+            at,
+        );
+        let mut tells = crate::long_make::Tells::at(keeping.directory.clone());
+        let note = tells.next(at, NOW + 5_000).unwrap();
+        let key = crate::long_make::key_of(&note).unwrap().to_owned();
+        let said = crate::long_make::told(&keeping, 6_811_362, note, (NOW + 5_000, at), || None);
+        assert_eq!(said, "(Nobody has spoken. Say nothing, and call nothing.)");
+        assert!(yes::waits(&id));
+        assert_eq!(offers_of(&keeping, &key), 0);
+        assert!(crate::long_make::read(&keeping.directory, NOW + 6_000).is_some());
+        // Its yes answered (the wait gone): the news is told.
+        assert!(yes::drop_wait(&id));
+        let again = at + Duration::from_secs(130);
+        let note = tells.next(again, NOW + 140_000).unwrap();
+        let said =
+            crate::long_make::told(&keeping, 6_811_363, note, (NOW + 140_000, again), || None);
+        assert!(
+            said.contains("Your sip at desk skill is ready and on."),
+            "{said}"
+        );
+        crate::long_make::set_on_here(None);
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    /// Heron's P2 on #7774: a clash's choice still asked; a long make's
+    /// news isn't told over it (a second clash ask would let the first
+    /// one's made skill go), and is told once it's answered.
+    #[test]
+    fn a_long_make_is_not_told_over_an_open_clash_ask() {
+        crate::long_make::set_on_here(Some(true));
+        let (root, keeping) = keeping("run-on-over-a-clash");
+        let glowing = format!(
+            "{}\n[[do]]\nlight = {{ colour = \"blue\", level = 3 }}\n",
+            made_skill::behaviour_template_toml()
+                .replace("One short, warm line.", "Time for a sip of water.")
+                .replace("needs = [\"voice\"]", "needs = [\"voice\", \"light\"]")
+                .replace("speak = true", "speak = true\nlight = true")
+        );
+        let told = let_run_on(
+            &keeping,
+            6_811_370,
+            |tasks| tasks.agent().running_on(true),
+            Some(route_answer(&glowing, "sip-at-desk")),
+        );
+        assert_eq!(told, crate::long_make::let_go_told());
+        let other = keeping.installed.join("other-sip");
+        std::fs::create_dir_all(&other).unwrap();
+        std::fs::write(other.join("skill.toml"), &glowing).unwrap();
+        let mut tells = crate::long_make::Tells::at(keeping.directory.clone());
+        let at = std::time::Instant::now();
+        let note = tells.next(at, NOW + 80_000).unwrap();
+        let first = crate::long_make::key_of(&note).unwrap().to_owned();
+        let said = crate::long_make::told(&keeping, 6_811_371, note, (NOW + 80_000, at), || None);
+        assert!(said.contains(crate::made_clash::CLASH_ID), "{said}");
+        crate::long_make::heard(&keeping, &first, NOW + 81_000, |_| {
+            panic!("a clash waits for the person's choice")
+        });
+        // A plain long make ready while the clash's choice is asked.
+        let glow = "e5".repeat(32);
+        kept_long(
+            &keeping,
+            6_811_372,
+            "desk-glow",
+            &glow,
+            json!({"speak": true}),
+        );
+        let later = at + Duration::from_secs(15);
+        let note = tells.next(later, NOW + 95_000).unwrap();
+        let key = crate::long_make::key_of(&note).unwrap().to_owned();
+        assert_eq!(key, format!("ready {glow}"));
+        let said =
+            crate::long_make::told(&keeping, 6_811_373, note, (NOW + 95_000, later), || None);
+        assert_eq!(said, "(Nobody has spoken. Say nothing, and call nothing.)");
+        assert!(
+            crate::made_clash::awaited(later),
+            "the clash's ask still open"
+        );
+        assert_eq!(offers_of(&keeping, &key), 0);
+        // The choice made (the ask gone): the news is told.
+        crate::made_clash::tests::forget_waiting();
+        let again = at + Duration::from_secs(140);
+        let note = tells.next(again, NOW + 220_000).unwrap();
+        let said =
+            crate::long_make::told(&keeping, 6_811_374, note, (NOW + 220_000, again), || None);
+        assert!(
+            said.contains("Your desk glow skill is ready and on."),
+            "{said}"
+        );
+        crate::long_make::set_on_here(None);
+        let _ = std::fs::remove_dir_all(&root);
     }
 }

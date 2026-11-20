@@ -262,6 +262,9 @@ pub enum Uncovered {
     Missing(String),
     /// No time and no moment named for it to run.
     NoWhen,
+    /// A reminder, the lamp's own timer: the model's `cannot:` with the
+    /// make's own refusal of one ([`reminder_rule`]).
+    Reminder,
     /// A request longer than its read-back ([`task_cut`]) whose model's
     /// own words for it ([`task_kept`]) left out what it names twice: the
     /// agent is told only what the person heard, never the request cut
@@ -283,6 +286,7 @@ impl Uncovered {
             Self::Other => "other",
             Self::Missing(_) => "missing",
             Self::NoWhen => "no_when",
+            Self::Reminder => "reminder",
             Self::TooLong => "too_long",
         }
     }
@@ -328,6 +332,10 @@ impl Uncovered {
                 "{CANT_MAKE_YET} it needs {what}, which no skill on this lamp can be given yet."
             ),
             Self::NoWhen => no_when(),
+            Self::Reminder => format!(
+                "{CANT_MAKE_YET} a reminder is my own timer, not a skill. {}",
+                made_skill::REMINDER_INSTEAD
+            ),
             Self::TooLong => format!(
                 "{CANT_MAKE_YET} it's too long for me to read back to you whole, so ask for it in \
                  fewer words."
@@ -405,6 +413,39 @@ during = { from = \"08:00\", to = \"08:01\" }
 /// The request [`EXAMPLE`] is for.
 const EXAMPLE_ASKED: &str = "every morning at eight, tell me a joke";
 
+/// The sitting the lamp's own sip-of-water fires on, told the one more
+/// call with `LAMP_MAKE_REACTIONS_ONLY_DEEPSEEK` on (lamp-9adf, 18 Nov:
+/// "remind me to stretch when I've been sitting a long while" was made on
+/// someone getting up): sip-of-water's `for`, its once-a-sitting `rearm`
+/// and its `cooldown`, on the desk's presence, the one sitting a made
+/// trigger can say (`made_skill`'s check takes no `near` or `gap` on the
+/// faces). The model judges by meaning which one a request is.
+const SITTING: &str = " Someone has sat at the desk a long while, as the lamp's own \
+sip-of-water fires: \"room/presence\", \"someone\", equals true, for = \"30m\" (or the while the \
+request names), rearm = \"leaves\" (once a sitting, again only after they have left), \
+cooldown = \"45m\"; a long sitting is never a getting up, which runs only as they stand. \
+Someone coming back to the desk is an arrival, never the desk left.";
+
+/// One whole answer for a long sitting ([`SITTING`]), shown to the model
+/// with `LAMP_MAKE_REACTIONS_ONLY_DEEPSEEK` on: sip-of-water's sitting.
+const SAT_EXAMPLE: &str = "name: shoulder-roll
+grants: speak
+```skill.toml
+[permissions]
+topics = [\"room/presence\"]
+
+[trigger]
+topic = \"room/presence\"
+field = \"someone\"
+equals = true
+for = \"30m\"
+rearm = \"leaves\"
+cooldown = \"45m\"
+```";
+
+/// The request [`SAT_EXAMPLE`] is for.
+const SAT_EXAMPLE_ASKED: &str = "when I've sat at my desk a long while, remind me to stretch";
+
 /// One whole answer for a task only asked for, shown to the model.
 const ASKED_EXAMPLE: &str = "name: desk-photo
 grants: camera, speak
@@ -416,29 +457,60 @@ const ASKED_EXAMPLE_ASKED: &str =
 
 /// What the lamp's own model is told for the one more call: it picks the
 /// name, the fewest grants and when the task runs, never the task or code.
+/// With `LAMP_MAKE_REACTIONS_ONLY_DEEPSEEK` on (`made_skill::reactions_on`),
+/// where a make judged no quick reaction comes here first, it also refuses
+/// a reminder as the make's own brief does ([`reminder_rule`], the
+/// Reviewer-lead's P2 on #7764), and is told sip-of-water's sitting beside
+/// the triggers ([`SITTING`]) with a whole answer for it ([`SAT_EXAMPLE`]);
+/// off, as before.
 pub fn system() -> String {
+    let (reminder, sitting, sat_example) = if made_skill::reactions_on() {
+        (
+            reminder_rule(),
+            SITTING,
+            format!("\nAnd for \"{SAT_EXAMPLE_ASKED}\":\n\n{SAT_EXAMPLE}\n"),
+        )
+    } else {
+        (String::new(), "", String::new())
+    };
     format!(
         "You choose, for a lamp, when a skill runs and what it needs. The lamp's agent, an AI \
          agent on the lamp, does the person's request itself as one task each time the skill \
          runs, with only the grants the skill names; the lamp reads the skill back to the person \
          and runs it only once they agree. You never write the task or any code: only its name, \
          its grants and when it runs. Answer exactly in this form and nothing else: a line \
-         name: and a short name, lowercase words joined by -; a line grants: and the fewest \
+         name: and a short name, lowercase words joined by -, the name the request gives the \
+         skill when it gives one; a line grants: and the fewest \
          grants the task needs, joined by commas, or none; then, when the request names a time \
          or a moment for it to run, one fenced block named skill.toml holding only \
          [permissions] with topics = its trigger's topics, and one [trigger] table (never \
          [[trigger]]); else, when it runs only when the person asks for it or says something \
          to the lamp (\"when I say send my test note\"), no block but a line asks: and the \
          few words they will say, as they said them or, when they named none, a short phrase \
-         for the task, several joined by |. When it runs: {triggers} Add no time of day the \
+         for the task, several joined by |. When it runs: {triggers}{sitting} Add no time of day the \
          request didn't name. The grants, each only when the task needs it: {grants}. speak \
          whenever the agent tells the person anything aloud. When the task needs something \
          none of these grants gives, answer only this one line: needs: and what, in a few plain \
-         words (\"needs: paying for things\"). A whole answer, \
+         words (\"needs: paying for things\").{reminder} A whole answer, \
          for \"{EXAMPLE_ASKED}\":\n\n{EXAMPLE}\n\nAnd for \"{ASKED_EXAMPLE_ASKED}\":\n\n\
-         {ASKED_EXAMPLE}\n",
+         {ASKED_EXAMPLE}\n{sat_example}",
         triggers = made_skill::TRIGGER_MEANINGS,
         grants = grants_told(),
+    )
+}
+
+/// The make's own refusal of a reminder ([`made_skill::REMINDER_IS_TIMER`],
+/// its `cannot:` ending [`made_skill::REMINDER_INSTEAD`]), told the one
+/// more call: a one-off reminder judged no quick reaction, or not judged in
+/// time, is refused ([`Uncovered::Reminder`]), never kept as a daily task.
+fn reminder_rule() -> String {
+    format!(
+        " {}. A request for one is answered with only this one line: {} then one short \
+         sentence said to the person, beginning \"{}\" and naming it, ending \"{}\"",
+        made_skill::REMINDER_IS_TIMER,
+        made_skill::CANNOT,
+        made_skill::CANT_YET,
+        made_skill::REMINDER_INSTEAD,
     )
 }
 
@@ -542,6 +614,14 @@ pub fn read(answer: &str) -> Result<Answer, String> {
         if let Some(rest) = after_head(trimmed, "needs:") {
             return Ok(Answer::Uncovered(missing(rest)));
         }
+        // Only the make's own refusal of a reminder ([`reminder_rule`]):
+        // any other `cannot:` is not the form, never said.
+        if let Some(rest) = after_head(trimmed, made_skill::CANNOT) {
+            if made_skill::briefs_reminder_refusal(rest) {
+                return Ok(Answer::Uncovered(Uncovered::Reminder));
+            }
+            return Err(NOT_THE_FORM.to_owned());
+        }
         if let Some(rest) = after_head(trimmed, "asks:") {
             for said in rest.split('|').filter_map(phrase) {
                 if !asks
@@ -602,6 +682,27 @@ fn phrase(text: &str) -> Option<String> {
         .collect();
     let text = text.trim();
     (!text.is_empty() && text.chars().count() <= 80).then(|| text.to_owned())
+}
+
+/// A task's name: the one the person gave (`named`, #7911,
+/// [`made_skill::given_name`]) when it is one a made skill may have
+/// ([`name_kept`]), else the model's own `name`, as before.
+fn name_given(name: String, named: Option<&str>) -> String {
+    match named.and_then(|said| made_skill::given_name(said, MOST_NAME_CHARS)) {
+        Some(given) if name_kept(&given) == given => {
+            if given != name {
+                eprintln!(
+                    "lamp-voice: a task only asked for takes the name its person gave: {given}, not {name}"
+                );
+            }
+            given
+        }
+        Some(_) => {
+            eprintln!("lamp-voice: a task's given name is no skill's name: {name} stands");
+            name
+        }
+        None => name,
+    }
 }
 
 /// A name as a made skill may have it: lowercase ASCII letters, digits and
@@ -1086,17 +1187,42 @@ fn task_plain(request: &str) -> String {
 
 /// The whole task skill, as a model's answer: its `skill.toml` (the grants,
 /// the trigger's `block`, `[ask]` a nudge, one `do.task` of `words` running
-/// [`RUN`]), its `SKILL.md` named `name`, and [`RUN`] as [`SCRIPT`].
+/// [`RUN`]), its `SKILL.md` named `name`, and [`RUN`] as [`SCRIPT`]. With
+/// `LAMP_MAKE_REACTIONS_ONLY_DEEPSEEK` on (`made_skill::reactions_on`, the
+/// first builder's 19:50 ruling on #6811), sip-of-water's guards
+/// (`made_skill::template_guards`) after the trigger: never in the middle
+/// of a conversation or with the head down. Off, as before. Never on a
+/// clock (`made_skill::CLOCK_TOPIC`): its one minute's run is never spent
+/// waiting on a guard ("tell me the BTC price at 9" with the owner head
+/// down at 9 still runs; Twelve's P1 on #7764, the first builder's 01:29
+/// and 02:41).
 pub fn skill_text(name: &str, grants: &[String], block: &str, words: &str) -> String {
     let grants: Vec<String> = grants.iter().map(|grant| format!("\"{grant}\"")).collect();
+    let guards = if made_skill::reactions_on() && !on_the_clock(block) {
+        format!("{}\n\n", made_skill::template_guards())
+    } else {
+        String::new()
+    };
     format!(
         "```skill.toml\nkind = \"installable\"\nversion = \"1.0.0\"\ngrants = [{grants}]\n\n\
-         {block}\n\n[ask]\npolicy = \"nudge\"\n\n[[do]]\ntask = {{ task = \"{words}\", run = \
+         {block}\n\n{guards}[ask]\npolicy = \"nudge\"\n\n[[do]]\ntask = {{ task = \"{words}\", run = \
          \"{RUN}\" }}\n```\n\n```SKILL.md\n---\nname: {name}\ndescription: The lamp's agent \
          does a task you asked for.\n---\n\n# {name}\n\nThe lamp's agent does this task: \
          {words}\n```\n\n```{RUN}\n{SCRIPT}```\n",
         grants = grants.join(", "),
     )
+}
+
+/// Whether `block`'s `[trigger]` is the lamp's own clock
+/// (`made_skill::CLOCK_TOPIC`).
+pub fn on_the_clock(block: &str) -> bool {
+    toml::from_str::<toml::Table>(block).is_ok_and(|table| {
+        table
+            .get("trigger")
+            .and_then(|trigger| trigger.get("topic"))
+            .and_then(toml::Value::as_str)
+            == Some(made_skill::CLOCK_TOPIC)
+    })
 }
 
 /// A task skill only asked for, in the form of an agent skill added from a
@@ -1159,6 +1285,7 @@ pub fn made(
     kept: &impl Fn(Result<String, String>) -> Result<Made, Refused>,
     kept_asked: impl Fn(&made_skill::Files, &str) -> Result<Made, Refused>,
     hint: Option<&str>,
+    named: Option<&str>,
 ) -> Result<Made, Refused> {
     if !made_skill::scripts_on() || !crate::skill_task_yes::on() {
         return Err(Uncovered::TasksOff.refused());
@@ -1207,6 +1334,8 @@ pub fn made(
                 if !crate::upload_agent::on() {
                     return Err(Uncovered::NoWhen.refused());
                 }
+                // The name the person gave it, its tool's too (#7911).
+                let name = name_given(name, named);
                 // Its instructions carry the words read back alone: a
                 // request longer than them is worded by the model and
                 // checked, never cut unheard.
@@ -1326,6 +1455,86 @@ mod tests {
             Some("yes"),
         ] {
             assert!(!on_with(value), "{value:?}");
+        }
+    }
+
+    /// The Reviewer-lead's P2 on #7764: with only quick reactions made by
+    /// DeepSeek, the one more call refuses a reminder as the make's own
+    /// brief does, and only that `cannot:` is read, as the lamp's own line;
+    /// any other is not the form. Off, the prompt is as before.
+    #[test]
+    fn with_reactions_on_a_reminder_is_refused_as_the_brief_does() {
+        made_skill::set_reactions_here(Some(false));
+        assert!(!system().contains(made_skill::REMINDER_IS_TIMER));
+        made_skill::set_reactions_here(Some(true));
+        let told = system();
+        assert!(
+            told.contains(made_skill::REMINDER_IS_TIMER)
+                && told.contains(made_skill::REMINDER_INSTEAD)
+                && told.contains(made_skill::CANT_YET),
+            "{told}"
+        );
+        made_skill::set_reactions_here(None);
+        let reminder = format!(
+            "cannot: I can't do that yet: a reminder at nine. {}",
+            made_skill::REMINDER_INSTEAD
+        );
+        assert_eq!(read(&reminder), Ok(Answer::Uncovered(Uncovered::Reminder)));
+        assert_eq!(Uncovered::Reminder.class(), "reminder");
+        assert!(said_as_is(&Uncovered::Reminder.line()));
+        assert_eq!(
+            read("cannot: I can't do that yet: checking the weather."),
+            Err(NOT_THE_FORM.to_owned())
+        );
+    }
+
+    /// sip-of-water's own `[trigger]`, as the lamp ships it.
+    fn sip_of_waters_trigger() -> toml::Table {
+        let shipped: toml::Table =
+            toml::from_str(include_str!("../../../skills/sip-of-water/skill.toml")).unwrap();
+        shipped["trigger"].as_table().unwrap().clone()
+    }
+
+    /// lamp-9adf, 18 Nov: "remind me to stretch when I've been sitting a
+    /// long while" was made on someone getting up. With
+    /// `LAMP_MAKE_REACTIONS_ONLY_DEEPSEEK` on, the one more call is told the
+    /// sitting as sip-of-water fires on it, its `for`, its once-a-sitting
+    /// `rearm` and its `cooldown`, with a whole answer for a sat-a-while
+    /// ask, beside the arrival and the leaving; the model still judges by
+    /// meaning. Off, the prompt is as before.
+    #[test]
+    fn with_reactions_on_the_prompt_carries_sip_of_waters_sitting() {
+        made_skill::set_reactions_here(Some(false));
+        let before = system();
+        assert!(!before.contains(SAT_EXAMPLE), "{before}");
+        assert!(!before.contains("sip-of-water"), "{before}");
+        made_skill::set_reactions_here(Some(true));
+        let told = system();
+        made_skill::set_reactions_here(None);
+        assert!(told.contains(SAT_EXAMPLE), "{told}");
+        assert!(told.contains(SAT_EXAMPLE_ASKED), "{told}");
+        assert!(told.contains(made_skill::TRIGGER_MEANINGS), "{told}");
+        let sip = sip_of_waters_trigger();
+        for key in ["for", "rearm", "cooldown"] {
+            let line = format!("{key} = \"{}\"", sip[key].as_str().unwrap());
+            assert!(told.contains(&line), "{line}: {told}");
+        }
+        // The example is an answer the lamp keeps, its trigger
+        // sip-of-water's sitting on the desk's presence.
+        let Ok(Answer::Skill {
+            when: When::Trigger(block),
+            ..
+        }) = read(SAT_EXAMPLE)
+        else {
+            panic!("{SAT_EXAMPLE}")
+        };
+        let block: toml::Table = toml::from_str(&block_kept(&block).unwrap()).unwrap();
+        let trigger = block["trigger"].as_table().unwrap();
+        assert_eq!(trigger["topic"].as_str(), Some("room/presence"));
+        assert_eq!(trigger["field"].as_str(), Some("someone"));
+        assert_eq!(trigger["equals"].as_bool(), Some(true));
+        for key in ["for", "rearm", "cooldown"] {
+            assert_eq!(trigger.get(key), sip.get(key), "{key}");
         }
     }
 
@@ -1537,14 +1746,14 @@ mod tests {
             Err(Refused::new("kept here"))
         };
         assert_eq!(
-            made(&long, |_| answer(), || true, &kept, kept_asked, None),
+            made(&long, |_| answer(), || true, &kept, kept_asked, None, None),
             Err(Uncovered::TooLong.refused())
         );
         assert!(made_files.borrow().is_empty());
         let short = "when I say desk report, tell me how tidy my desk is.";
         assert!(!task_cut(short));
         assert_eq!(
-            made(short, |_| answer(), || true, &kept, kept_asked, None),
+            made(short, |_| answer(), || true, &kept, kept_asked, None, None),
             Err(Refused::new("kept here"))
         );
         let scripts = made_files.borrow();
@@ -1560,6 +1769,61 @@ mod tests {
             ),
             "{instructions}"
         );
+        crate::upload_agent::set_on_here(None);
+        crate::skill_task_yes::set_on_here(None);
+        made_skill::set_scripts_here(None);
+        set_on_here(None);
+    }
+
+    /// #7911 (Twelve's HOLD on #7926, item 2): a task only asked for takes
+    /// the name the person gave ("make a skill called dollar check that
+    /// tells me the rate when I ask"), its card's and its voice tool's;
+    /// with none given, or one no made skill may have, the model's name
+    /// stands, as before.
+    #[test]
+    fn a_task_only_asked_for_takes_the_name_the_person_gave() {
+        set_on_here(Some(true));
+        made_skill::set_scripts_here(Some(true));
+        crate::skill_task_yes::set_on_here(Some(true));
+        crate::upload_agent::set_on_here(Some(true));
+        let request = "when I ask for the dollar check, tell me the dollar to dong rate.";
+        let answer = || Ok("name: rate-teller\ngrants: speak\nasks: dollar check".into());
+        let kept = |_: Result<String, String>| -> Result<Made, Refused> { unreachable!() };
+        for (named, name) in [
+            (Some("Dollar check"), "dollar-check"),
+            (None, "rate-teller"),
+            (Some("tỷ giá"), "rate-teller"),
+            (Some("ab"), "rate-teller"),
+        ] {
+            let made_files = std::cell::RefCell::new(Vec::new());
+            let kept_asked = |files: &made_skill::Files, _: &str| {
+                made_files.borrow_mut().push(files.clone());
+                Err(Refused::new("kept here"))
+            };
+            assert_eq!(
+                made(
+                    request,
+                    |_| answer(),
+                    || true,
+                    &kept,
+                    kept_asked,
+                    None,
+                    named
+                ),
+                Err(Refused::new("kept here"))
+            );
+            let files = made_files.borrow();
+            let [files] = files.as_slice() else {
+                panic!("{named:?}: {files:?}")
+            };
+            let tool = format!("tool = \"{}\"", name.replace('-', "_"));
+            assert!(files.toml.contains(&tool), "{named:?}: {}", files.toml);
+            assert!(
+                files.card.starts_with(&format!("---\nname: {name}\n")),
+                "{named:?}: {}",
+                files.card
+            );
+        }
         crate::upload_agent::set_on_here(None);
         crate::skill_task_yes::set_on_here(None);
         made_skill::set_scripts_here(None);
@@ -1857,6 +2121,7 @@ mod tests {
             &kept,
             kept_asked,
             None,
+            None,
         );
         let words = texts
             .into_inner()
@@ -1915,6 +2180,7 @@ mod tests {
                 || true,
                 &kept,
                 kept_asked,
+                None,
                 None
             ),
             Err(Refused::new("kept here"))
@@ -2041,5 +2307,57 @@ mod tests {
         ] {
             assert!(system.contains(part), "{part}");
         }
+    }
+
+    /// The first builder's 19:50 ruling on #6811 (the middle form): with
+    /// `LAMP_MAKE_REACTIONS_ONLY_DEEPSEEK` on, a task the lamp writes on a
+    /// trigger carries sip-of-water's three guards and still only its one
+    /// task step, no say; its cap takes it. Never on the lamp's clock
+    /// (Twelve's P1 on #7764, the first builder's 19 Nov 01:29 and 02:41):
+    /// "tell me the BTC price at 9" runs at 9 whatever the room does. Off,
+    /// as before, byte for byte.
+    #[test]
+    fn with_the_reactions_switch_a_task_on_a_trigger_keeps_the_guards_but_never_on_a_clock() {
+        crate::skill_task_yes::set_net_here(Some(true));
+        made_skill::set_scripts_here(Some(true));
+        crate::skill_task_yes::set_on_here(Some(true));
+        crate::upload_agent::set_on_here(Some(true));
+        set_on_here(Some(false));
+        let clock = EXAMPLE.split_once("```skill.toml\n").unwrap().1;
+        let clock = block_kept(clock.trim_end_matches("```")).unwrap();
+        assert!(on_the_clock(&clock), "{clock}");
+        let words = task_words("tell me the BTC price at 9");
+        let kept = covered(&grants(&["net", "speak"]), false).unwrap();
+        made_skill::set_reactions_here(Some(true));
+        let timed = skill_text("btc-price", &kept, &clock, &words);
+        assert!(!timed.contains("[[while]]"), "{timed}");
+        made_skill::set_reactions_here(Some(false));
+        assert_eq!(skill_text("btc-price", &kept, &clock, &words), timed);
+        let block = "[permissions]\ntopics = [\"room/presence\"]\n\n[trigger]\n\
+                     topic = \"room/presence\"\nfield = \"someone\"\nequals = true\n\
+                     for = \"30m\"\nrearm = \"leaves\"";
+        assert!(!on_the_clock(block));
+        let before = skill_text("btc-price", &kept, block, &words);
+        assert!(!before.contains("[[while]]"), "{before}");
+        made_skill::set_reactions_here(Some(true));
+        let text = skill_text("btc-price", &kept, block, &words);
+        let files = made_skill::files(&text).unwrap();
+        let table: toml::Table = toml::from_str(&files.toml).unwrap();
+        assert_eq!(table["while"].as_array().map(Vec::len), Some(3), "{text}");
+        let steps = table["do"].as_array().unwrap();
+        assert_eq!(steps.len(), 1);
+        assert_eq!(steps[0]["task"]["task"].as_str(), Some(words.as_str()));
+        assert!(!files.toml.contains("say"), "{text}");
+        let guards = format!("{}\n\n", made_skill::template_guards());
+        assert_eq!(text.replace(&guards, ""), before, "only the guards added");
+        let paced = made_skill::paced(&files.toml);
+        let capped = made_skill::capped(&paced);
+        assert!(capped.is_ok(), "{capped:?}");
+        made_skill::set_reactions_here(None);
+        crate::skill_task_yes::set_net_here(None);
+        made_skill::set_scripts_here(None);
+        crate::skill_task_yes::set_on_here(None);
+        crate::upload_agent::set_on_here(None);
+        set_on_here(None);
     }
 }

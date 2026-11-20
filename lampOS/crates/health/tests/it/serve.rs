@@ -709,6 +709,15 @@ fn the_boards_heat_is_published_with_each_reading_and_a_change_is_said_once() {
         let message = heats.recv(WAIT).unwrap().expect("the board's heat");
         assert_eq!(message.header.source, "health");
         assert_eq!(message.header.expires_ms, Some(15_000));
+        // Stamped on the boot clock readers age it by (Twelve's HOLD on
+        // #7927), not on lamp-health's own start: else a lamp-health
+        // started more than 15 s after boot reads as expired, so ok.
+        let now = lamp_bus::monotonic_us();
+        assert!(
+            message.header.at_us <= now && now - message.header.at_us < 5_000_000,
+            "at_us {} against the boot clock's {now}",
+            message.header.at_us
+        );
         let heat: BoardHeat = message.parse().unwrap();
         heat.check().unwrap();
         heat

@@ -229,6 +229,74 @@ the app (lamp-cloud's `faces.rs`) and one asked by voice
   memory doesn't make), and each protocol's
   `only_a_forget_all_that_was_done_says_whose`.
 
+## Forgets reach the account's history (`LAMP_HISTORY_FORGET`)
+
+With `LAMP_HISTORY_FORGET=on` (off unless set, in no unit; #7771), what a
+forget removes on the lamp is deleted from the conversation history the
+account keeps too (the lamp's cloud API, `POST …/history/turns/delete`).
+- **What memory says:** with `--memory-days`, the answer to `forget`,
+  `forget_last`, `forget_all`, `forget_said` and `exchanges_forget` names the
+  exchanges it removed, by scope, each by its turn id on the account:
+  `"exchanges":{"p-…":["0a1b2c3d.p-…:4","0a1b2c3d.p-…:6"],
+  "everyone":["0a1b2c3d.everyone:3"]}`. Ids only, never words. A known person's `forget_all`
+  leaves their own out (the voice deletes that person's whole history), so
+  it names only the room's lines it took with them; the room's own
+  `forget_all` names its ids. Every removed id is told: at most 100 in the
+  answer, which then says `"exchanges_more":true`, and the rest paged by
+  `{"op":"forgot_exchanges"}` (900 a page, `"more"` while some remain;
+  kept in RAM until the next forget). Nothing removed, no field. The legacy
+  store names none.
+- **The turn id** is `<epoch>.<scope>:<id>`, made only by
+  `lamp_msgs::history_turn_id`. The epoch is the store's own, 8 hex
+  characters in its `settings` (`history_epoch`, in the 0600 database),
+  minted when the store is made (or first opened by a build with epochs)
+  and again by a forget everything of every person (`forget_all` with
+  `"person":null`). A reset makes a new store, so a new epoch. Exchange ids
+  start again at 1 in a new store; the epoch keeps a turn id given after a
+  wipe from ever naming a turn deleted before it (the account keeps the ids
+  it deleted). What a wipe removed is told under the old epoch.
+  `{"op":"history_epoch"}` answers `{"ok":true,"epoch":…}`, for the turn's
+  save to make the same id.
+- **For the save** (`LAMP_HISTORY_SEND`, [memory-days.md](memory-days.md)):
+  `{"op":"history_issued"}` answers the epoch and each scope's last id given,
+  `{"ok":true,"epoch":…,"issued":{"<scope>":<id>}}`, never a word;
+  `{"op":"exchanges_after","person":…,"after":N,"limit":L}` answers that
+  scope's exchanges after id N, oldest first (at most L, 20 by default and
+  100 at most, about 48 KiB of text), as `{"ok":true,"exchanges":[{"id",
+  "at_unix_ms","heard","said"}],"more":bool}`, for a restart to send what was
+  handed to the sender and never taken.
+- **What the voice queues** (the second route's worker, `history_forget`):
+  for a known person's forget everything, `{"all":true,"person":<their p-
+  id>}`; for every other forget, `{"ids":[…]}` of the turn ids named, as
+  memory told them (one not of that form, or of another scope, is let
+  go). The person key is memory's own scope id: a known
+  person's `p-` id, `""` for the room's. A forget never deletes more of the
+  account's history than the lamp forgot: a whole-history delete is a known
+  person's forget everything only, and never sent without a person. Only
+  memory's forgets and their pages are read (the list shared in
+  `lamp_msgs::MEMORY_FORGETS_TELLING_EXCHANGES`). A forget of every
+  person's memory, or a page that can't be read, is journalled as not
+  reached.
+- **Never on the reply's way:** "forgotten" follows the lamp's own delete, as
+  before. The queue is a file in the voice's state folder
+  (`/var/lib/lampOS/voice/history-forget.json`, 0600), kept across a
+  restart, at most 20,000 ids (past it, the known person with the most
+  waiting is coalesced into their whole history, never the room's, whose
+  newest past it are let go; each journalled as a count). It is sent in the
+  background with the lamp's key in `x-api-key`, 100 ids a call, and only
+  to the lamp's own cloud API (`https://campaign-api.autonomous.ai`); with
+  any other base, nothing is sent and the forgets wait on the lamp.
+- **Done or kept:** a 2xx answer is done (`deleted` and `missing`, `missing`
+  meaning already gone; `deleted_count`; `{"enabled":false}`, the account
+  keeps no history). A 400 is let go. No answer, 5xx and any other status
+  keep the call, tried again after 5 s, doubling to 15 minutes. The journal
+  says counts only.
+- **Not covered yet:** the app's removal of a person (`forget_person`, asked
+  by lamp-cloud) and a forget on the Live route.
+- **Tests:** `history_forget`'s and `second_provider::net::history`'s (a
+  fake server), and `days_protocol`'s
+  `a_forget_names_the_exchanges_it_removed_by_scope_and_id`.
+
 ## Forgetting a person
 
 The app's removal of a person (lamp-cloud's `face.remove` with `entirely`,
@@ -852,7 +920,7 @@ it is held as a forget by that thing's id (`second_provider::ask_once_forget`,
 subject in their own words, in their language ("Shall I forget what you
 kept about your bike lock code?"). The kept text is never told to the model
 or said: the speaker was not seen (the Reviewer-lead's P2 on #6673).
-Only a plain yes on a later line within 30 s
+Only their yes on a later line within 30 s
 (`remember::ONE_FACE_FORGET_YES_FOR`), from the same session's same person,
 with their face seen saying it, or in the private room
 (`LAMP_PRIVATE_ROOM`) on a line theirs by their face alone in view, runs
@@ -862,23 +930,59 @@ never `forget_last`). The held forget carries the subject's words
 about those words go too (`exchanges_forget`,
 `remember::agreed_forget_exchanges`), by the same match as a forget about
 and in their scope alone, never another's or the room's, so recall no longer
-tells the talk about it (C128; lamp-06c1, build 13523). The yes may say the forget too
-(`known_faces::plain_agreement_to_forget`, Thirteen's P2 on #6673): "Yes,
-forget it.", "Sure, go ahead and forget it.", "Ừ, quên đi.", and the forget
-said back alone, "Forget it." or "Quên đi.", which is only ever read as the
-answer to that question, by that person, within its 30 s. A yes after its
+tells the talk about it (C128; lamp-06c1, build 13523). **Whether the line
+is their yes is the model's to judge, with no yes word list** (the owner's
+13 Nov rule; the first builder's ruling on leg (e) of #7960's ROW, where
+"Lamp, yes." heard as "Loan. Yes." was refused by the old list and the
+forget was lost): the model's `forget` on that line, naming nothing else
+(no other `source_id`, and the line naming no thing of its own,
+`remember::named_subject`), is the yes, and the held forget runs in its
+place exactly as held, by its kept id and words, never the model's raw
+call (`second_provider::agree_held_forget`, `Taken::Agrees`). A line the
+model answers with no `forget` runs nothing and the thing stays kept; a
+`forget` naming another thing is that other forget, and the held one is
+kept. A yes after its
 30 s is journaled "too late", whoever the line is by then; one not theirs
 says why after "not the same person": "no one known on the line", "theirs,
 in a later session" or "another person" (`second_provider::not_theirs`, ids
 never said; Thirteen's row on #5627, a yes 42 s after the hold read as
 another person's). A yes in time from no one known on the line (no face in
 view, an unknown face, a line carried in their conversation going on) is
-dropped and kept, and, as for an unseen yes, the model is told once that it
+dropped and kept, and, as for an unseen yes, the model is told that it
 did not count, that nothing was forgotten and it is still kept, and that it
 may ask them once to say it facing the lamp (`remember::unknown_yes_told`,
 #7454: on lamp-06c1 the model was told nothing and could say it was
-forgotten). Any no, keep,
-wait, "đừng" or a question is no yes. If the line is no longer theirs when
+forgotten). The same note is told for every held forget whose yes is
+dropped as too late, from no one known or as theirs in a later session:
+a one-face forget's next line after its 30 s, a held forget that is not
+one-face, and a face forget held through their spelling (#7478). A yes
+dropped as another known person's is told only that it was not theirs to
+give and nothing was forgotten, with nothing of what was held, since the
+yes is not the person's it belongs to (`remember::not_theirs_told`); a
+late yes is judged by whose it is too, so a late yes from another person
+is told that note. **On a one-face forget's line, and on the spelling a
+face forget was held through, any line takes the hold, so these notes (and
+an unseen yes's) are told only when the model's round on that line calls
+the held forget, naming nothing else**: the same door as `Taken::Agrees`
+(`second_provider::told_on_forget`, `Taken::OnForget`, the Reviewer-lead's
+P2 on #7490). The note is that call's answer and the call runs nothing. A
+line the model answers with no `forget` ("Good morning." an hour later,
+another person's unrelated line, a question from someone unknown within
+the 30 s) is told nothing, and the hold is gone as before. A held forget
+that is not one-face still needs a plain yes first, and its note is told
+before round 1. A dropped spelling is told as a spelling, never as a yes
+(`remember::THAT_SPELLING`), and a late line from no one known names
+neither the kind of thing held nor its call (`remember::unknown_late_told`;
+the P3s on #7490). On a spelling, too late is judged before whose it is,
+as on a one-face line. A held keep's dropped yes is not told. **A hold has
+a clock of its own:** past its window (30 s one-face, `HELD_FORGET_FOR`
+60 s otherwise) plus `remember::HELD_FORGET_GRACE` (15 s), the next line
+lets it go silently, journaled with its call name and the seconds only:
+nothing runs, the thing stays kept, nothing is told, and the line goes as a
+plain line. So "forget my bike lock code" an hour after an unanswered
+question is a new ask, held and asked or run as any forget, never a late
+yes (the first builder on #7490). Only a line within the window plus the
+grace can be told one of the notes above. If the line is no longer theirs when
 the forget runs (another face or voice came in), nothing is forgotten and
 the model is told it is still kept; it never runs in the room's scope
 (`remember::AGREED_FORGET_NOT_NOW`, Thirteen's P3). A no, any other line,
@@ -2010,6 +2114,43 @@ passed. Tests: the notes' exact texts in `remember::tests`.
     `remember::heard::tests::a_near_spelling_of_a_heard_word_is_asked_about`,
     `remember::heard::tests::an_inflection_or_british_spelling_is_heard_not_near`,
     `second_provider::tests::held_forget::a_keep_with_a_near_spelling_of_a_heard_word_waits_for_their_yes`.
+  - **With `LAMP_MEMORY_UNSURE_NOT_KEPT`: an unsure line is simply not
+    kept, and nothing is asked** (#7739; off unless set, the second route
+    only; on in the product). The product owner's no-asks rule of 18 Nov:
+    "An unsure line is simply not acted on, with no 'did you say…?'". The
+    doubt is the model's own, never a word list judging the person: its
+    round's words doubt what was heard, or its sentence has a near spelling
+    of a heard word. A `remember` its own round doubts is not run, and the
+    model is told nothing is kept, to tell them so in a few words with no
+    question ("I didn't catch that well enough to keep it.",
+    `doubted::NOT_CAUGHT_LINE`) and end the reply there, never to ask
+    ("did you say …?", to say it again, spell it or say more: the 06c1 ROW
+    at `ac50913437` heard "… could you spell or say it again?" after the
+    line) and never to say it was kept (`doubted::NOT_KEPT_NO_ASK`): the
+    person must hear it wasn't kept, so they can say it again (Twelve's P1
+    on #7966). A keep the round right after it doubts is forgotten by its
+    id, with `LAMP_MEMORY_DOUBT_UNDOES`, and never held for a yes, so the
+    eyes are not needed and a later "yes" keeps nothing. That keep was
+    already said back, so the person is told plainly: if that round called
+    more, the model is told `doubted::UNDONE_NO_ASK_NOTE` (say so, as
+    "Sorry, I didn't keep that after all."); if not, the lamp says
+    `doubted::TAKEN_BACK_LINE` itself, in the owner's language. With
+    `LAMP_MEMORY_ASK_NEAR_HEARD` on, a keep with a near spelling of a heard
+    word, as above, is not run and nothing is asked
+    (`heard::near_not_kept_told`, which says the same line); with it off
+    (the product), a near spelling ("Ngoc" for a heard "Ngok") is kept as
+    before (Twelve's P2). `remember`'s description
+    (`REMEMBER_DESCRIBED_UNSURE`) says not to keep a doubted word and to
+    say, with no question, that it wasn't caught well enough to keep;
+    `LAMP_KEEP_QUIETLY`'s note (`keep_quietly::QUIET_NOTE_UNSURE`) says a
+    doubted word is neither kept nor asked about. A clear keep is kept as
+    before. The "sure?" before "forget everything"
+    stays. The journal says not kept or taken back, with counts only.
+    Tests:
+    `second_provider::tests::held_forget::an_unsure_line_is_not_kept_and_nothing_is_asked`,
+    `remember::doubted::tests::an_unsure_keep_is_told_not_kept_and_to_ask_nothing`,
+    `remember::tests::an_unsure_word_is_neither_kept_nor_asked_about_in_remember_alone`,
+    `keep_quietly::tests::an_unclear_word_is_not_asked_about_with_unsure_not_kept`.
   - **The lamp's name heard as another word is no name** (#3504 finding
     N4). On lamp-06c1 the name was written "Ramon", "Edeland", "Elan" and
     "Hey, mom"; the lamp called the person by it, and "Edeland, my dog is
@@ -2593,7 +2734,10 @@ passed. Tests: the notes' exact texts in `remember::tests`.
     `room_sounds` and `face_expression_consent_result` for the neighbouring
     face-expression consent file. Each is `cleared` when `remove_file`
     succeeds or returns `NotFound` (already absent), and `uncertain` for
-    any other error. These fields carry fixed states only, never paths,
+    any other error. With `LAMP_NOTICING_BY_DEFAULT=on` (#7767) the forget
+    removes only a kept yes: a kept no stays and is `kept as a no`, which
+    is no failed step and leaves `everything` as it is; any other file it
+    leaves holds no yes and is `cleared`. These fields carry fixed states only, never paths,
     error text, person ids or remembered words.
   - A room or consent cleanup result other than `cleared` sets
     `everything: false`; a later successful cleanup does not restore it
@@ -4126,7 +4270,8 @@ then use that person's scope:
   `everything: false` and the fixed `room_memory_result`,
   `sound_consent_result` and `face_expression_consent_result` outcomes when
   the internal forget reports them. Only `cleared`, `kept` and `uncertain`
-  survive; unknown values become `uncertain`, never copied private text.
+  survive (and `kept as a no` for the two consents, #7767, which is no
+  partial cleanup); unknown values become `uncertain`, never copied private text.
   A non-cleared or malformed outcome prevents a complete-deletion claim,
   even when primary memory was already empty. A successful memory receipt
   cannot upgrade a partial face result or a note about old face records
@@ -4339,6 +4484,7 @@ then use that person's scope:
   a record counts only when it says "now" or that the old name is gone
   ("Your face is known as Sam now, and the old name is gone."). The full
   matcher is in second-voice.md.
+- **A keep claimed in a later sentence** (`LAMP_KEEP_CLAIM_WHOLE=on`, #7878, off unless set): while no `remember` has run, a reply is said sentence by sentence, and a later sentence that says a keep or replace done ("Got it — your car is on Level B1, spot 7 now. That replaces wherever it was before." on lamp-e82d, 19 Nov, with nothing kept) is held; with no call in the round it is a claim, as those above are. Its rules are its row in `switches.md`.
 
 - **Nothing personal kept while nobody is known** (the owner's question 1,
   option (b); `LAMP_MEMORY_PERSONAL_NEEDS_FACE=on`, off unless set; both
