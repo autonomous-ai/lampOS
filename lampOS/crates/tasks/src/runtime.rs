@@ -7999,10 +7999,11 @@ mod tests {
         assert_eq!(config["tools"]["exec"]["mode"], "full");
         assert_eq!(config["tools"]["exec"].get("security"), None);
         assert_eq!(config["tools"]["exec"].get("ask"), None);
-        // #7906: no tool that waits for a person in the pane.
+        // #7906: no tool that waits for a person in the pane; #8108: no
+        // skill of the agent's own written or patched.
         assert_eq!(
             config["tools"]["deny"],
-            json!(crate::openclaw_config::NO_ASK_TOOLS)
+            json!(["ask_user", "secrets", "suggest_task", "skill_workshop"])
         );
         assert_eq!(
             set_up_openclaw(&state, &home, true, true),

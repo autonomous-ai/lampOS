@@ -4525,6 +4525,16 @@ là phần của một coder khác trong #6226; thiết kế:
     qua kênh riêng `webchat` của OpenClaw. Các kênh khác được giữ;
   - `agents.defaults.elevatedDefault`: `"full"`;
   - `agents.defaults.sandbox.mode`: `"off"`;
+  - `tools.deny`: thêm `skill_workshop` (#8108). Đây là công cụ riêng của
+    OpenClaw để viết và sửa các skill agent tự học trong
+    `<agentDir>/workshop-skills/` (tài liệu OpenClaw 2026.11.2
+    `tools/skill-workshop.md`). Trên lamp-c0a4 nó đã tự viết một skill
+    `lamp-skill-make` từ hướng dẫn tạo skill và sửa nó năm lần trong một
+    buổi chiều, rồi một lần chạy skill định sửa nó. Khi bị chặn, agent làm
+    theo các skill và hướng dẫn tạo skill của lamp, không bao giờ giữ một
+    bản đã sửa, và bước tự xem lại để học skill trong nền cũng tắt
+    (`tools/self-learning.md`: chặn `skill_workshop` là đưa agent ra khỏi
+    việc tự học). Các skill nó đã học trước đó vẫn để nguyên;
   - `tools.deny`: thêm `ask_user`, `secrets` và `suggest_task` (#7906), giữ
     các mục riêng của người dùng, so khớp không phân biệt hoa thường như
     OpenClaw. Đây là các công cụ mà khi model gọi sẽ hiện một lời hỏi trong
