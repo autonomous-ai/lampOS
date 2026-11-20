@@ -2926,6 +2926,9 @@ fn second_route_worker_environment(
         // Read by the speech-to-text stream in this worker (#2527): without
         // it here the worker never saw the switch (lamp-c0a4's A/B).
         crate::second_provider::net::QUIET_HELD_ENVIRONMENT,
+        // The language speech to text hears in, read by the stream in this
+        // worker (#8114).
+        crate::second_provider::net::HEARD_LANGUAGE_ENVIRONMENT,
         crate::second_provider::FIRST_WORDS_ENVIRONMENT,
         crate::second_provider::CHAT_WARM_ENVIRONMENT,
         crate::second_provider::net::CHAT_KEPT_ENVIRONMENT,
@@ -4521,6 +4524,7 @@ mod tests {
                     || name == crate::second_provider::PREPARED_ENVIRONMENT
                     || name == crate::second_provider::STT_WARM_ENVIRONMENT
                     || name == crate::second_provider::net::QUIET_HELD_ENVIRONMENT
+                    || name == crate::second_provider::net::HEARD_LANGUAGE_ENVIRONMENT
                     || name == crate::second_provider::CHAT_WARM_ENVIRONMENT
                     || name == crate::second_provider::net::CHAT_KEPT_ENVIRONMENT
                     || name == crate::day_tally::SWITCH
@@ -4950,6 +4954,7 @@ mod tests {
                     "LAMP_SKILL_YES_CARRY=on",
                     "LAMP_SPEAKING_READ_LOOKS=on",
                     "LAMP_STOP_WORDS_KEYTERM=on",
+                    "LAMP_STT_HEARD_LANGUAGE=on",
                     "LAMP_TASKS_NAMED_ASK=on",
                     "LAMP_TASKS_TOLD=/var/lib/lampOS/voice/tasks-told",
                     "LAMP_TOLD_WHEN_ASKED=on",

@@ -25,7 +25,10 @@ pub use chat::{
 pub use gemini_tts::{GeminiSpeech, GeminiTts};
 pub(crate) use public::{DOH_ENVIRONMENT, get_public_json_within};
 pub use sentences::Sentences;
-pub use stt::{Early, QUIET_HELD_ENVIRONMENT, Replies, SttStream, check as stt_check};
+pub use stt::{
+    Early, HEARD_LANGUAGE_ENVIRONMENT, QUIET_HELD_ENVIRONMENT, Replies, SttStream,
+    check as stt_check,
+};
 pub use tts::{
     PACKET_SAMPLES, TTS_SAMPLE_RATE, Tts, TtsStream, Turn, default_model, voice_name, voice_told,
 };
