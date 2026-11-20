@@ -2325,18 +2325,29 @@ they made or added (even from a file), kept to turn back on ... Never
 remove for this, even one that starts only when they say its words. Call it
 at once. Ask nothing first.", tham số `turn_on` nói điều tương tự cho việc bật lại, và tham số
 `remove` nói "delete
-or remove a skill for good, never to turn one off, pause, stop or change it".
+or remove a skill for good, never to turn one off, pause or stop it".
 Lời gọi mang một yêu cầu tắt được đọc trước việc gỡ, nên tắt không bao giờ
 thành gỡ. **Đổi không bao giờ là gỡ** (#7975, lamp-9adf, 19/11: "change
 rain check to seven thirty" bị gọi thành một lệnh gỡ, và kỹ năng mất), và
 **đổi là đổi chính kỹ năng đó, tại chỗ** (#8008, lamp-9adf, 20/11 01:30 và
 01:33: mỗi lần đổi lại tạo một kỹ năng mới, `morning-umbrella-reminder-2`
-và `-3`, và cả ba cùng chạy; phán quyết của first builder lúc 01:38). Tham
-số `change` của `make_skill` ("To change a skill they made: its name, with
-request as the change. Never a new one or a remove. Unsure which: ask.")
-nêu tên kỹ năng như đã nghe, đi cùng `request` là điều cần đổi theo lời
-người dùng; một câu có phải là xin đổi hay không là do mô hình phán đoán
-(quy tắc 13/11), phần còn lại do `crate::made_change` làm:
+và `-3`, và cả ba cùng chạy; phán quyết của first builder lúc 01:38).
+`change_skill`, một hàm riêng bên cạnh `make_skill`, được đưa ra và định
+tuyến ở đúng nơi có `make_skill` ("Change a skill the person made, when
+they ask to change it (its time, its words, what it does): changed in
+place, never made as a new skill and never removed. In the same breath,
+before the call, say in a few words that you'll change it. Then say
+exactly the line you are told."), nêu tên kỹ năng như đã nghe (`name`:
+"The skill to change, as they named it. Unsure which: ask."), đi cùng
+`request` là điều cần đổi theo lời người dùng; một câu có phải là xin đổi
+hay không là do mô hình phán đoán (quy tắc 13/11). Nó được chạy như lời
+gọi `make_skill` có `change` (`made_change::as_make`): luồng stream của
+tuyến thứ hai đọc nó như vậy (`name` đứng đầu là của một lần đổi, nên
+không nói câu mở đầu của lần tạo), nên một lần đổi giữ câu mở đầu được
+giữ lại, hàng đợi và câu được nói của lần tạo, và nó được trả lại trong
+lịch sử của mô hình đúng là lời gọi `change_skill` mô hình đã gọi
+(`as_asked`); lời gọi của Live được đọc như vậy ở tuyến của nó. Phần còn
+lại do `crate::made_change` làm:
 - **Kỹ năng nào**: chỉ yêu cầu của chủ đèn, được kiểm tra trước, nên khách
   không nghe tên kỹ năng nào của chủ (P2 1 của Twelve). Sau đó kỹ năng
   người dùng đã tạo được tìm theo tên đó như lệnh gỡ tìm
@@ -2378,12 +2389,15 @@ người dùng; một câu có phải là xin đổi hay không là do mô hình
   `make_no_asks` và ở mỗi lần đổi); "forget everything" của chủ đèn xoá nó
   cùng phần giữ của `make_no_asks`, và lệnh gỡ mang nó đi cùng kỹ năng.
 
-Để tham số của `make_skill` nằm trong 4.096 byte khi bật mọi công tắc,
-`choice` nói "replace the others, keep them all, or cancel, as the person
-chose", `answer` bỏ các ví dụ về một yêu cầu mới (ghi chú lúc chờ vẫn giữ
-chúng) và câu cuối, còn `named` bỏ câu cuối (giá trị mặc định và quy tắc
-một kỹ năng, cả hai đều do mã giữ). Test:
-`a_change_is_never_a_remove`, và trong `made_change`:
+Một lần đổi không thêm gì vào tham số của `make_skill`, mà sản phẩm giữ
+trong `PRODUCT_MOST_PARAMETERS_BYTES` (3.750 trong 4.096 của liên kết,
+#8002; 3.737 khi các công tắc của sản phẩm bật, như trước #8008): tham số
+của hàm riêng của nó là 233 byte và mô tả 277 byte, tự nằm trong giới hạn
+của liên kết, và các hàm riêng của sản phẩm là 51 (55 với 4 hàm của
+tuyến, trong 64 của `second_provider::MAX_TOOLS`). Test:
+`a_change_is_never_a_remove`,
+`a_change_skill_call_is_read_as_make_skills_and_given_back_as_made`,
+`a_change_skill_call_runs_as_make_skills_change`, và trong `made_change`:
 `a_change_remakes_the_named_skill_in_place_never_a_second`,
 `a_change_keeps_off_and_put_it_back_restores_the_old_version`,
 `a_changed_skills_old_version_goes_after_a_week`,

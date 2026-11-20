@@ -301,7 +301,8 @@ would take a Live session past its 32, and its marks, called only after its look
 other installable skills, which their owner puts on; and Laugh glance,
 parked (#1669). A test
 fails on a folder in `lampOS/skills/` that is in neither list. With them a
-product lamp has 50 functions of its own: the voice's own 32 (with
+product lamp has 51 functions of its own: the voice's own 33 (with
+`make_skill`'s `change_skill` beside it since #8008, and
 `LAMP_REPORTS=on`, #2862, `reports_stop` and `reports_state` among them,
 `LAMP_SERVICES=on`'s `services_connected`, `service_read` and `service_write`,
 and `LAMP_MEMORY_ROLE=on`'s `set_role` and `end_role` since 9 Nov, and

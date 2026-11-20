@@ -4,9 +4,11 @@
 //! such line was made as a new skill, `morning-umbrella-reminder-2` and
 //! `-3`, so three umbrella skills fired; before #8008 one was removed.
 //!
-//! - **The model judges the meaning.** `make_skill`'s [`CHANGE`] is the
-//!   name of the skill to change as the person said it, given with its
-//!   `request`, the change in their words; no word list is read here.
+//! - **The model judges the meaning.** [`FUNCTION`], `change_skill`, a
+//!   function of its own beside `make_skill`, names the skill to change as
+//!   the person said it, with its `request`, the change in their words; no
+//!   word list is read here. It is run as `make_skill`'s call with
+//!   [`CHANGE`] ([`as_make`]), so `make_skill`'s parameters gain nothing.
 //! - **Which skill** ([`changed`]): their made skill found by that name as a
 //!   remove finds one (`made_remove::found`). When it can't be told which
 //!   (several as near, or none by that name while they made some), the
@@ -35,8 +37,81 @@ use std::io;
 use std::path::Path;
 use std::time::Duration;
 
-/// The `make_skill` argument naming the skill a make changes, as heard.
+/// The `make_skill` argument naming the skill a make changes, as heard:
+/// [`FUNCTION`]'s call is run as `make_skill`'s with it ([`as_make`]).
 pub const CHANGE: &str = "change";
+
+/// The function the model changes a made skill by: its own, beside
+/// `make_skill`, so its words are held to the link's 4,096 bytes on their
+/// own and add nothing to `make_skill`'s parameters, which the product
+/// holds to `make_skill_local::PRODUCT_MOST_PARAMETERS_BYTES`. Offered
+/// and routed wherever `make_skill` is.
+pub const FUNCTION: &str = "change_skill";
+
+/// [`FUNCTION`]'s argument naming the skill to change, as heard.
+pub const NAME: &str = "name";
+
+/// [`FUNCTION`]'s argument carrying the change, in their words.
+pub const REQUEST: &str = "request";
+
+/// [`FUNCTION`], offered with `make_skill`.
+pub fn tool() -> lamp_gemini::Tool {
+    lamp_gemini::Tool {
+        name: FUNCTION.into(),
+        description: "Change a skill the person made, when they ask to change it (its time, \
+                      its words, what it does): changed in place, never made as a new skill \
+                      and never removed. In the same breath, before the call, say in a few \
+                      words that you'll change it. Then say exactly the line you are told."
+            .into(),
+        parameters: Some(json!({
+            "type": "object",
+            "properties": {
+                NAME: {
+                    "type": "string",
+                    "description": "The skill to change, as they named it. Unsure which: ask."
+                },
+                REQUEST: {
+                    "type": "string",
+                    "description": "The change, in their words."
+                }
+            },
+            "required": [NAME, REQUEST]
+        })),
+        silent: false,
+    }
+}
+
+/// [`FUNCTION`]'s call (`name`, `args`) as the `make_skill` call it is
+/// run as: the skill named as [`CHANGE`], the change as its `request`.
+/// None for any other call. Every route reads a change as `make_skill`'s,
+/// so a change keeps a make's held opening, queue and said line.
+pub fn as_make(name: &str, args: &Value) -> Option<Value> {
+    (name == FUNCTION).then(|| {
+        json!({
+            CHANGE: args[NAME].as_str().unwrap_or_default(),
+            "request": args[REQUEST].as_str().unwrap_or_default(),
+        })
+    })
+}
+
+/// The [`FUNCTION`] call a `make_skill` call (`name`, `args`) read by
+/// [`as_make`] was, as the model made it: given back so in its history.
+/// None for any other call: `make_skill` itself has no [`CHANGE`].
+pub fn as_asked(name: &str, args: &Value) -> Option<(String, Value)> {
+    let change = args.get(CHANGE)?;
+    (name == made_skill::MAKE).then(|| {
+        (
+            FUNCTION.to_owned(),
+            json!({ NAME: change, REQUEST: args["request"] }),
+        )
+    })
+}
+
+/// The `make_skill` argument [`FUNCTION`]'s argument `argument` is read
+/// as ([`as_make`]): its name first is a change's, never a new make's.
+pub fn as_make_argument(argument: &str) -> &str {
+    if argument == NAME { CHANGE } else { argument }
+}
 
 /// How long a changed skill's old version is kept to be put back.
 pub const UNDO_FOR: Duration = Duration::from_secs(7 * 86_400);

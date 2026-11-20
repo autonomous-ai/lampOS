@@ -1115,21 +1115,19 @@ fn parameters_with(writes: bool, tasks: bool, code: bool) -> Value {
         "description": "Only when the person asks to delete or remove a skill: its name as they said it, given alone with no request."
     });
     // A spoken change to a skill the person made ([`crate::made_change`],
-    // #7975, #8008): its name as heard, with the change as `request`;
-    // re-made in place, never a new skill and never a remove. The model
-    // judges whether a line asks a change.
-    parameters["properties"][crate::made_change::CHANGE] = json!({
-        "type": "string",
-        "description": "To change a skill they made: its name, with request as the change. Never a new one or a remove. Unsure which: ask."
-    });
+    // #7975, #8008) is its own function, `change_skill`, run as this one's
+    // call with `change` ([`crate::made_change::as_make`]): never a
+    // parameter here, so these stay within
+    // [`PRODUCT_MOST_PARAMETERS_BYTES`].
     // A skill the person made or added turned off and back on by voice
     // (#7445, #7594, [`crate::made_turn`], `LAMP_MADE_SKILL_OFF_SAID`):
     // never a remove, which is then told as for good alone. Nor is a
     // change (#7975, lamp-9adf, 19 Nov: "change rain check to seven
-    // thirty" removed it): that is `change`.
+    // thirty" removed it): that is `change_skill`, whose words say it is
+    // never a remove.
     if made_skill::off_said_on() {
         parameters["properties"][crate::made_remove::REMOVE]["description"] = json!(
-            "Only when they ask to delete or remove a skill for good, never to turn one off, pause, stop or change it: its name as they said it, alone."
+            "Only when they ask to delete or remove a skill for good, never to turn one off, pause or stop it: its name as they said it, alone."
         );
         parameters["properties"][crate::made_turn::TURN_OFF] = json!({
             "type": "string",
@@ -9639,7 +9637,11 @@ printf 'tar of %s' \"$name\" > \"$3/$name-1.0.0.tar\"\n",
                 tasks: tasks.clone(),
                 ..Settings::default()
             };
-            for name in [made_skill::MAKE, "put_on_made_skill"] {
+            for name in [
+                made_skill::MAKE,
+                crate::made_change::FUNCTION,
+                "put_on_made_skill",
+            ] {
                 assert_eq!(route(&off, name), Route::Nobody, "{name}");
                 assert!(declared(&off).iter().all(|tool| tool.name != name));
             }
@@ -9648,14 +9650,19 @@ printf 'tar of %s' \"$name\" > \"$3/$name-1.0.0.tar\"\n",
                 tasks,
                 ..Settings::default()
             };
-            assert_eq!(route(&on, made_skill::MAKE), Route::MakeLocal(None));
-            assert_eq!(
-                declared(&on)
-                    .iter()
-                    .filter(|tool| tool.name == made_skill::MAKE)
-                    .count(),
-                1
-            );
+            // A change's own function, offered and routed exactly where
+            // `make_skill` is (#8008).
+            for name in [made_skill::MAKE, crate::made_change::FUNCTION] {
+                assert_eq!(route(&on, name), Route::MakeLocal(None), "{name}");
+                assert_eq!(
+                    declared(&on)
+                        .iter()
+                        .filter(|tool| tool.name == name)
+                        .count(),
+                    1,
+                    "{name}"
+                );
+            }
             assert_eq!(route(&on, "put_on_made_skill"), Route::Nobody);
             assert!(
                 declared(&on)
