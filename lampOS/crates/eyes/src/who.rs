@@ -5088,22 +5088,49 @@ mod tests {
     }
 
     #[test]
-    fn the_recognition_line_says_the_face_width_and_how_old_the_matched_prints_are() {
+    fn the_recognition_line_says_the_face_width_turn_place_and_how_old_the_matched_prints_are() {
+        // A face 40 by 48 in a 320 by 240 picture, centred 120 px across,
+        // its nose 4 px right of its eyes' middle (20 px apart).
+        let face = |nose: f32| crate::faces::Face {
+            score: 0.9,
+            x: 100.0,
+            y: 50.0,
+            width: 40.0,
+            height: 48.0,
+            marks: [
+                (110.0, 60.0),
+                (130.0, 60.0),
+                (nose, 70.0),
+                (112.0, 85.0),
+                (128.0, 85.0),
+            ],
+        };
         let mut people = People::open(file("recognition-line")).unwrap();
         // Nobody kept: no likeness, no age.
         assert_eq!(
-            recognition_line(people.best_likeness(&print(0.3)), 0.152, 0.114, 500),
-            "recognition best none height 0.152 width 0.114 prints age none (near at 0.1, same at 0.363)"
+            recognition_line(
+                people.best_likeness(&print(0.3)),
+                &face(124.0),
+                (320, 240),
+                500
+            ),
+            "recognition best none height 0.200 width 0.125 turn 0.20 across 0.375 prints age none (near at 0.1, same at 0.363)"
         );
         people.remember("Bea", vec![print(0.3)], 100).unwrap();
         people.remember("Cy", vec![print(1.7)], 400).unwrap();
         // The age is of the closest person's prints (Bea's, 400 s), not
-        // the newest kept (Cy's, 100 s).
+        // the newest kept (Cy's, 100 s); turned the other way, the sign
+        // says so.
         let (how, _) = people.best_likeness(&print(0.3)).unwrap();
         assert_eq!(
-            recognition_line(people.best_likeness(&print(0.3)), 0.152, 0.114, 500),
+            recognition_line(
+                people.best_likeness(&print(0.3)),
+                &face(116.0),
+                (320, 240),
+                500
+            ),
             format!(
-                "recognition best {how:.3} height 0.152 width 0.114 prints age 400 s (near at 0.1, same at 0.363)"
+                "recognition best {how:.3} height 0.200 width 0.125 turn -0.20 across 0.375 prints age 400 s (near at 0.1, same at 0.363)"
             )
         );
     }
