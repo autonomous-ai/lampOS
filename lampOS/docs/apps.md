@@ -12,7 +12,7 @@ lamp. It is in English only ([the docs rule](../AGENTS.md)).
 3a, `app_yes.rs`) and the app socket with `phrases.set` (pieces 3b-1 and 3b-2a, `app_socket.rs`, [control.md](control.md)). The app socket's `app.trigger` and its 3 s hold are built too
 (piece 3b-2b, `app_triggers.rs`). Designed and not yet built: lamp-cloud's `apps.*` kinds
 (piece 4), the installer (`lamp-apps-manage`, eighth's). Everything behind
-the one switch **`LAMP_STORE_APPS`**, off unless set. A lamp that has the
+the one switch **`LAMP_STORE_APPS`**, off unless set and `on` in the product's control, cloud and apps units (#7956). A lamp that has the
 format probe refuses an app package in words ("format 2 is not one this lamp
 reads (1)"); an older lamp refuses it with its parser's "unknown field". Either
 way nothing is installed.
