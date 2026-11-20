@@ -445,6 +445,52 @@ mod tests {
         })
     }
 
+    /// The most `clip` asks the base (base yaw) to change its speed from
+    /// one step to the next, counts a second a second: its largest second
+    /// difference over the step's time squared.
+    fn base_bend(clip: &Clip) -> f32 {
+        let step_s = f32::from(clip.step_ms) / 1_000.0;
+        clip.frames
+            .windows(3)
+            .map(|three| {
+                let bend =
+                    i32::from(three[2][2]) - 2 * i32::from(three[1][2]) + i32::from(three[0][2]);
+                bend.unsigned_abs() as f32 / (step_s * step_s)
+            })
+            .fold(0.0, f32::max)
+    }
+
+    /// #8153 follow-up, row-8155b on lamp-52e6 (out-8155b-1121-0322,
+    /// L5-talk, 1795206564): 'curious' at level 5 rang the base, its
+    /// position every 80 ms 91, 115, 81, 182, 168, 87, 82, 108, 107, 73,
+    /// with every commanded step under the servo's 1,000 c/s. The base
+    /// carries the lamp's weight; x1.6 the size at x1.5 the pace asks it to
+    /// change speed 1.6 x 1.5^2 = 3.6 times as hard as level 1 does
+    /// ('curious' about 11,200 c/s^2 against 3,200), and the jump in the
+    /// trace sits where the clip's base speeds up most (frames 24 to 27).
+    /// The bar: no level asks the base of any built-in clip to change speed
+    /// harder than level 1 already asks of it somewhere (the most over
+    /// `clips::ALL`, 'headshake', about 7,700 c/s^2), which every lamp
+    /// plays today.
+    #[test]
+    fn no_level_bends_the_base_harder_than_level_one_does() {
+        let bar = crate::clips::ALL
+            .iter()
+            .map(|clip| base_bend(clip))
+            .fold(0.0, f32::max);
+        assert!((7_600.0..7_800.0).contains(&bar), "{bar}");
+        for level in 2..=5 {
+            for clip in crate::clips::ALL {
+                let bend = base_bend(livelier(clip, level));
+                assert!(
+                    bend <= bar + 0.5,
+                    "{} at level {level}: {bend} c/s^2 against {bar}",
+                    clip.name
+                );
+            }
+        }
+    }
+
     /// #8153: level 1 plays every clip as recorded, the very clip; the clip
     /// size and pace lie evenly from x1 at level 1 to x1.6 and x1.5 at 5.
     #[test]
