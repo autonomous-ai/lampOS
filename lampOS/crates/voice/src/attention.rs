@@ -1978,7 +1978,10 @@ pub struct Attention {
     /// The request whose line `LAMP_NAME_NEAR` ruled not the name: a near
     /// hearing at its start, its first word, set off, not the name
     /// ([`Self::near_not_the_name`]).
-    near_not_the_name_of: Option<u64>,
+    near_not_the_name_of: Option<(u64, f32)>,
+    /// Whether the room was told busy for the line in hand
+    /// ([`Self::set_room_busy`]).
+    room_busy: bool,
     /// A line `said_to_me` held as not said to the lamp is no reply to the
     /// lamp's news (`LAMP_NEWS_REPLY_HEEDS_HELD=on`,
     /// [`Self::heed_held_in_news_reply`], #8383).
@@ -2353,8 +2356,10 @@ impl Attention {
             && words.len() == 1
             && !written_for_the_name(&words[0])
             && !crate::second_provider::sounds_like_the_name(&words[0]);
-        let ruled_out =
-            self.near_not_the_name_of == Some(self.request) && !called_by_real_name(&self.heard);
+        let ruled_out = self
+            .near_not_the_name_of
+            .is_some_and(|(of, _)| of == self.request)
+            && !called_by_real_name(&self.heard);
         self.name_near_dropped = weighed && self.sign_tied && (ruled_out || one_word_unlike);
         // `LAMP_NAME_FACE_OR_WORDS`: under a sure hearing only a face turned
         // to the lamp or its words calling it count, busy room or not; the
@@ -2419,10 +2424,16 @@ impl Attention {
     }
 
     /// `LAMP_NAME_NEAR` ruled `request`'s line not the name: lamp-name heard
-    /// the name near by its start, but its first word, set off, is not the
-    /// name (`second_provider::named_near`).
-    pub fn near_not_the_name(&mut self, request: u64) {
-        self.near_not_the_name_of = Some(request);
+    /// the name near by its start, at `score`, but its first word, set off,
+    /// is not the name (`second_provider::named_near`).
+    pub fn near_not_the_name(&mut self, request: u64, score: f32) {
+        self.near_not_the_name_of = Some((request, score));
+    }
+
+    /// Whether the room is busy for the line about to be weighed
+    /// ([`Self::weigh_the_name`]), as the worker's verdict of the room has it.
+    pub fn set_room_busy(&mut self, busy: bool) {
+        self.room_busy = busy;
     }
 
     /// `LAMP_NEWS_REPLY_HEEDS_HELD=on` (#8383): a line `said_to_me` held
@@ -7844,7 +7855,8 @@ mod tests {
                 attention.ask_a_second_sign_of_the_name(true);
                 attention.tie_the_second_sign(tied);
                 if let Some(request) = ruled {
-                    attention.near_not_the_name(request);
+                    attention.set_room_busy(true);
+                    attention.near_not_the_name(request, 1.0);
                 }
                 attention.began_at(4, 1, began);
                 attention.name_heard_scored(began + into_us, 0.96);
