@@ -339,3 +339,68 @@ fn without_the_owners_seen_more_yes_no_seen_reaction_makes_a_call() {
         assert!(said.is_empty() && called.is_empty(), "{name}: {called:?}");
     }
 }
+
+/// [`play_on`] seen-drink alone, drinks seen at `sightings` in a talk from
+/// 9 to `talk_end` minutes past the drink's `wait` from 10, `minutes` long
+/// in all; what it said, each `chance dropped` line at its minute, and the
+/// minute the wait from 10 runs out.
+#[allow(clippy::type_complexity)]
+fn drink_past_its_wait(
+    sightings: impl Fn(u64) -> Vec<u64>,
+    talk_end: u64,
+    minutes: u64,
+) -> (Vec<(u64, String)>, Vec<(u64, String)>, u64, u64) {
+    let skills = seen(&["seen-drink"]);
+    let wait_us = skills[0].triggers[0].wait_us;
+    assert_eq!(wait_us % 60_000_000, 0, "a wait of whole minutes");
+    let expires = 10 + wait_us / 60_000_000;
+    let talks = [(9, expires + talk_end)];
+    let sightings: Vec<(u64, &str)> = sightings(expires)
+        .into_iter()
+        .map(|minute| (minute, "drank"))
+        .collect();
+    let sitting = Sitting {
+        talks: &talks,
+        ..Sitting::of(expires + minutes, &sightings)
+    };
+    let mut engine = Engine::new(skills, true);
+    let _yes = seen_more_yes(&mut engine, &["seen-drink"]);
+    let mut drops = Vec::new();
+    let said = play_on(&mut engine, &sitting, |_, at, runs| {
+        for run in runs {
+            for event in &run.events {
+                if event.why.contains("chance dropped") {
+                    drops.push((at / 60_000_000, event.why.clone()));
+                }
+            }
+        }
+    });
+    (said, drops, expires, wait_us / 1_000_000)
+}
+
+#[test]
+fn a_rise_kept_past_its_wait_says_its_chance_dropped_once_and_nothing_else() {
+    // Seen at 10 in a talk that outlasts the drink's `wait`: the rise kept
+    // for it is let go at the half-minute its wait runs out, and that says
+    // its "chance dropped" line once; nothing is said, in the talk or after.
+    let (said, drops, expires, wait_s) = drink_past_its_wait(|_| vec![10], 3, 6);
+    assert!(said.is_empty(), "{said:?}");
+    assert_eq!(drops.len(), 1, "{drops:?}");
+    assert_eq!(drops[0].0, expires, "{drops:?}");
+    assert!(
+        drops[0]
+            .1
+            .contains(&format!("did not hold within its wait of {wait_s} s")),
+        "{drops:?}"
+    );
+}
+
+#[test]
+fn a_new_rise_after_a_kept_rise_dropped_past_its_wait_still_has_its_line() {
+    // The line says the drop and takes nothing: a second drink in the same
+    // sitting, after the talk, has its remark, as before the line.
+    let (said, drops, expires, _) = drink_past_its_wait(|expires| vec![10, expires + 5], 3, 8);
+    assert_eq!(named(&said), [(expires + 5, "seen-drink")]);
+    assert_eq!(drops.len(), 1, "{drops:?}");
+    assert_eq!(drops[0].0, expires, "{drops:?}");
+}
