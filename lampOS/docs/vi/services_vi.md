@@ -1411,11 +1411,14 @@ Calendar được nêu trong mô tả của `event_id`.
   trên #8005, sau lamp-9adf ngày 20/11, khi lần lưu của chính đèn đã thất
   bại và "bản nháp đó" trỏ tới một bản chủ nhân viết trong Gmail, và lần
   xoá nó được một tiếng "có" xác nhận). Mỗi lần lưu đã xác nhận giữ tài
-  khoản và UID của nó trong Drafts ở `lamp_drafts::FILE`,
+  khoản, UID của nó trong Drafts và `UIDVALIDITY` của Drafts (cả hai từ
+  `APPENDUID`, `mail::DraftUid`) ở `lamp_drafts::FILE`,
   `gmail-lamp-drafts.json` trong thư mục store (0600; còn sau khi khởi động
   lại, và một lần xoá sạch lấy nó đi), không bao giờ một chữ của thư; một
-  lần đổi thay nó bằng UID của bản nháp mới (không có khi Gmail không nêu),
-  và một lần xoá, hoặc một bản nháp thấy đã mất, lấy nó đi; giữ tối đa 100
+  lần đổi thay nó bằng chỗ của bản nháp mới (không có khi Gmail không nêu),
+  và một lần xoá, một bản nháp thấy đã mất hoặc thấy không phải của đèn lúc
+  "có" (xem dưới), hoặc gỡ liên kết Gmail (`remove`), lấy nó đi; một mục
+  được giữ mà không có validity thì đọc là không có; giữ tối đa 100
   (`lamp_drafts::KEPT_MOST`), bỏ cái cũ nhất trước, và một tệp không đọc
   được thì không sở hữu gì. `update_draft` và `delete_draft` chỉ nhận một
   UID được giữ ở đó cho tài khoản đang liên kết, kiểm trước khi bất cứ gì
@@ -1470,9 +1473,17 @@ Calendar được nêu trong mô tả của `event_id`.
 - **Qua IMAP, chỉ Drafts** (`mail::edit_draft_over`, một ngân sách 15 s như
   lần lưu): `LOGIN`, `CAPABILITY`, `LIST "" "*"` tìm hộp thư gắn cờ
   `\Drafts` (nếu không thì `[Gmail]/Drafts`), `SELECT` nó (hộp thư duy nhất
-  từng được mở để thay đổi), `UID SEARCH UID <uid>` (không có:
-  `writes::DRAFT_GONE` sau "not saved: " hoặc "not deleted: ", không gì thay
-  đổi). Một lần sửa rồi `APPEND` toàn bộ bản nháp mới vào Drafts như
+  từng được mở để thay đổi), mà `[UIDVALIDITY n]` của nó phải đúng cái bản
+  nháp được lưu trong đó (cái khác, hoặc không nói: Drafts đã được đánh số
+  lại, nên UID có thể chỉ một bản nháp khác), `UID SEARCH UID <uid>` (không
+  có: `writes::DRAFT_GONE` sau "not saved: " hoặc "not deleted: ", không gì
+  thay đổi), rồi `UID FETCH <uid> (UID BODY.PEEK[HEADER.FIELDS
+  (MESSAGE-ID)])`, mà Message-ID của nó phải kết thúc bằng `@lamp.local>`,
+  tên miền của mọi Message-ID đèn viết (`mail::LAMP_MESSAGE_DOMAIN`). Drafts
+  bị đánh số lại hoặc một Message-ID khác là
+  `mail::Failure::NotLampsDraft`: không gì thay đổi, mục đó bị bỏ, và câu
+  trả lời là `writes::NOT_LAMPS_DRAFT` sau "not saved: " hoặc "not
+  deleted: ". Một lần sửa rồi `APPEND` toàn bộ bản nháp mới vào Drafts như
   `save_draft`; rồi chỉ UID cũ được đánh dấu `UID STORE <uid> +FLAGS.SILENT
   (\Deleted)` và xoá hẳn bằng `UID EXPUNGE <uid>` khi máy chủ có UIDPLUS;
   không có thì một `EXPUNGE` thường, và chỉ khi `UID SEARCH DELETED` không

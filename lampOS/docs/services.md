@@ -1337,11 +1337,14 @@ Calendar's edits are given in `event_id`'s.
 - **Only a draft the lamp saved itself** (the first builder's rule on
   #8005, after lamp-9adf on 20 Nov, where the lamp's own save had failed and
   "that draft" resolved to one the owner wrote in Gmail, whose delete a
-  spoken yes then confirmed). Every confirmed save keeps its account and its
-  UID in Drafts in `lamp_drafts::FILE`, `gmail-lamp-drafts.json` in the
+  spoken yes then confirmed). Every confirmed save keeps its account, its
+  UID in Drafts and Drafts' `UIDVALIDITY` (both from `APPENDUID`,
+  `mail::DraftUid`) in `lamp_drafts::FILE`, `gmail-lamp-drafts.json` in the
   store folder (0600; it survives a restart, and a wipe takes it), never a
-  word of the mail; a change replaces it by the new draft's UID (none when
-  Gmail names none), and a delete, or a draft found gone, takes it away; at
+  word of the mail; a change replaces it by the new draft's (none when
+  Gmail names none), and a delete, a draft found gone or found not the
+  lamp's at the yes (below), or unlinking Gmail (`remove`), takes it away; an
+  entry kept without its validity reads as none; at
   most 100 are kept (`lamp_drafts::KEPT_MOST`), the oldest dropped first,
   and a file that can't be read owns nothing. `update_draft` and
   `delete_draft` take only a UID kept there for the linked account, checked
@@ -1396,9 +1399,16 @@ Calendar's edits are given in `event_id`'s.
 - **Over IMAP, Drafts alone** (`mail::edit_draft_over`, one 15 s budget as
   a save's): `LOGIN`, `CAPABILITY`, `LIST "" "*"` for the mailbox flagged
   `\Drafts` (else `[Gmail]/Drafts`), `SELECT` of it (the one mailbox ever
-  opened to be changed), `UID SEARCH UID <uid>` (not there:
+  opened to be changed), whose `[UIDVALIDITY n]` must be the one the draft
+  was saved in (another, or none said: Drafts was renumbered, so the UID may
+  name another draft), `UID SEARCH UID <uid>` (not there:
   `writes::DRAFT_GONE` after "not saved: " or "not deleted: ", nothing
-  changed). An update then `APPEND`s the whole new draft to Drafts as
+  changed), then `UID FETCH <uid> (UID BODY.PEEK[HEADER.FIELDS
+  (MESSAGE-ID)])`, whose Message-ID must end in `@lamp.local>`, the domain
+  of every Message-ID the lamp writes (`mail::LAMP_MESSAGE_DOMAIN`). A
+  renumbered Drafts or another Message-ID is `mail::Failure::NotLampsDraft`:
+  nothing is changed, the entry is dropped, and the answer is
+  `writes::NOT_LAMPS_DRAFT` after "not saved: " or "not deleted: ". An update then `APPEND`s the whole new draft to Drafts as
   `save_draft` does; then the old UID alone is marked `UID STORE <uid>
   +FLAGS.SILENT (\Deleted)` and expunged with `UID EXPUNGE <uid>` when the
   server offers UIDPLUS; without it, a plain `EXPUNGE`, and only when `UID
