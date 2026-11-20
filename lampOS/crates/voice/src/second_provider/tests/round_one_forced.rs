@@ -51,29 +51,29 @@ fn round_one_says_its_force_and_the_make_ask_never_its_words() {
     let made = chat(true);
     assert_eq!(
         line(&made, ONE),
-        "lamp-voice second: request 7: round 1: task_offered=y make_offered=y forced=make_skill make_ask=y sentences=1"
+        "lamp-voice second: request 7: round 1: task_offered=y make_offered=y forced=make_skill make_ask=y sentences=1 ask_in=1 opening=name"
     );
     assert_eq!(
         line(&made, TWO),
-        "lamp-voice second: request 7: round 1: task_offered=y make_offered=y forced=none make_ask=n sentences=2"
+        "lamp-voice second: request 7: round 1: task_offered=y make_offered=y forced=none make_ask=n sentences=2 ask_in=1 opening=name"
     );
     // Without make_skill declared (`LAMP_MAKE_SKILL` off) nothing is
     // forced, though the line asks to make one.
     assert_eq!(
         line(&chat(false), ONE),
-        "lamp-voice second: request 7: round 1: task_offered=y make_offered=n forced=none make_ask=y sentences=1"
+        "lamp-voice second: request 7: round 1: task_offered=y make_offered=n forced=none make_ask=y sentences=1 ask_in=1 opening=name"
     );
     // Services that cannot say what was offered or forced say `?`.
     let messages = [Message::user(ONE)];
     assert_eq!(
         crate::second_provider::round_one_line(7, &messages, |_| None, None),
-        "lamp-voice second: request 7: round 1: task_offered=? make_offered=? forced=? make_ask=y sentences=1"
+        "lamp-voice second: request 7: round 1: task_offered=? make_offered=? forced=? make_ask=y sentences=1 ask_in=1 opening=name"
     );
     // A round whose last message is no person's line has no ask to read.
     let noted = [Message::user(ONE), Message::system("(A note.)")];
     assert!(
         crate::second_provider::round_one_line(7, &noted, |_| Some(true), Some(None))
-            .ends_with("forced=none make_ask=? sentences=?")
+            .ends_with("forced=none make_ask=? sentences=? ask_in=? opening=?")
     );
     for said in [ONE, TWO] {
         let journalled = line(&made, said);
@@ -98,18 +98,18 @@ fn a_make_past_the_lamps_name_heard_as_another_word_is_forced_on_a_named_line_al
     crate::tools::make_skill_asked::heard_named(LYNN, true);
     assert_eq!(
         line(&made, LYNN),
-        "lamp-voice second: request 7: round 1: task_offered=y make_offered=y forced=make_skill make_ask=y sentences=1"
+        "lamp-voice second: request 7: round 1: task_offered=y make_offered=y forced=make_skill make_ask=y sentences=1 ask_in=1 opening=misheard"
     );
     crate::tools::make_skill_asked::heard_named(ANNA, false);
     assert_eq!(
         line(&made, ANNA),
-        "lamp-voice second: request 7: round 1: task_offered=y make_offered=y forced=none make_ask=n sentences=1"
+        "lamp-voice second: request 7: round 1: task_offered=y make_offered=y forced=none make_ask=n sentences=1 ask_in=none opening=none"
     );
     // The same words heard again with no name heard are not forced.
     crate::tools::make_skill_asked::heard_named(LYNN, false);
     let again = line(&made, LYNN);
     assert!(
-        again.ends_with("forced=none make_ask=n sentences=1"),
+        again.ends_with("forced=none make_ask=n sentences=1 ask_in=none opening=none"),
         "{again}"
     );
 }
@@ -127,6 +127,39 @@ fn a_make_after_the_lamps_own_name_set_off_by_a_stop_is_forced() {
     crate::tools::make_skill_asked::heard_named(LAMP_STOP, true);
     assert_eq!(
         line(&made, LAMP_STOP),
-        "lamp-voice second: request 7: round 1: task_offered=y make_offered=y forced=make_skill make_ask=y sentences=2"
+        "lamp-voice second: request 7: round 1: task_offered=y make_offered=y forced=make_skill make_ask=y sentences=2 ask_in=2 opening=name"
     );
+}
+
+/// #8022 case 2: round 1's line says which sentence alone asks to make a
+/// skill (`ask_in`, 1-based, sentence 1 read past the lamp's name) and how
+/// the line opens (`opening`: the lamp's own name set off, its name heard
+/// as another word on a line that names it, or neither), so a missed force
+/// shows its shape: never a word.
+#[test]
+fn round_one_says_which_sentence_asks_and_how_the_line_opens() {
+    let made = chat(true);
+    let split = "Hey Lamp, make me a skill that when I say apple file. Has an agent write three apple facts into a file for me.";
+    assert_eq!(
+        line(&made, split),
+        "lamp-voice second: request 7: round 1: task_offered=y make_offered=y forced=none make_ask=n sentences=2 ask_in=1 opening=name"
+    );
+    assert_eq!(
+        line(&made, "Hey Lamp. Make me a skill that hums at noon."),
+        "lamp-voice second: request 7: round 1: task_offered=y make_offered=y forced=make_skill make_ask=y sentences=2 ask_in=2 opening=name"
+    );
+    let misheard = "Hey, Lynn, make me a skill that hums at noon.";
+    crate::tools::make_skill_asked::heard_named(misheard, true);
+    assert_eq!(
+        line(&made, misheard),
+        "lamp-voice second: request 7: round 1: task_offered=y make_offered=y forced=make_skill make_ask=y sentences=1 ask_in=1 opening=misheard"
+    );
+    assert_eq!(
+        line(&made, "What skills did you make?"),
+        "lamp-voice second: request 7: round 1: task_offered=y make_offered=y forced=none make_ask=n sentences=1 ask_in=none opening=none"
+    );
+    for word in ["Lynn", "hums", "noon", "apple"] {
+        assert!(!line(&made, split).contains(word), "{word:?}");
+        assert!(!line(&made, misheard).contains(word), "{word:?}");
+    }
 }
