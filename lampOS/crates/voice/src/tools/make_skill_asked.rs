@@ -181,12 +181,7 @@ pub fn asks_to_make(said: &str) -> bool {
     if crate::remember::asked::withdrawn(said) {
         return false;
     }
-    let said = said.replace('\u{2019}', "'");
-    let sentences: Vec<Vec<String>> = said
-        .split_inclusive(['.', '!', '?', ';'])
-        .map(lower_words)
-        .filter(|words| !words.is_empty())
-        .collect();
+    let sentences = sentences(said);
     let [words] = sentences.as_slice() else {
         return false;
     };
@@ -194,6 +189,22 @@ pub fn asks_to_make(said: &str) -> bool {
         return false;
     }
     ask_ends(words).is_some_and(|end| words.len() > end)
+}
+
+/// The sentences of `said`, each as its words: a `.`, `!`, `?` or `;` ends
+/// one (a `:` does not), and one with no words is none.
+fn sentences(said: &str) -> Vec<Vec<String>> {
+    said.replace('\u{2019}', "'")
+        .split_inclusive(['.', '!', '?', ';'])
+        .map(lower_words)
+        .filter(|words| !words.is_empty())
+        .collect()
+}
+
+/// How many sentences `said` has, as [`asks_to_make`] counts them, for
+/// round 1's journal line (#8022): a count, never a word.
+pub fn sentence_count(said: &str) -> usize {
+    sentences(said).len()
 }
 
 /// The force the second route's chat is given with the switch on

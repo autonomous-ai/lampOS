@@ -14637,8 +14637,21 @@ fn round_one_line(
     offered: impl Fn(&str) -> Option<bool>,
     forced: Option<Option<&str>>,
 ) -> String {
-    let _ = (request, messages, offered, forced);
-    String::new()
+    let yes = |on: bool| if on { "y" } else { "n" };
+    let offered = |name: &str| offered(name).map_or("?", yes);
+    let said = messages
+        .last()
+        .filter(|message| message.role == "user")
+        .and_then(Message::words);
+    let sentences = said.map(crate::tools::make_skill_asked::sentence_count);
+    format!(
+        "lamp-voice second: request {request}: round 1: task_offered={} make_offered={} forced={} make_ask={} sentences={}",
+        offered(crate::agent_tasks::START),
+        offered(crate::made_skill::MAKE),
+        forced.map_or("?", |forced| forced.unwrap_or("none")),
+        said.map_or("?", |said| yes(crate::tools::make_skill_asked::asks_to_make(said))),
+        sentences.map_or("?".to_owned(), |count| count.to_string()),
+    )
 }
 
 /// A fault's category as a decision's error code (`voice/decision`,
@@ -15407,6 +15420,10 @@ impl Services for LettingGo {
     }
     fn declares(&self, messages: &[Message], without: &[&str], name: &str) -> Option<bool> {
         self.0.declares(messages, without, name)
+    }
+    fn forced(&self, messages: &[Message], without: &[&str]) -> Option<Option<&'static str>> {
+        self.0
+            .forced(&forgotten_notes_let_go(messages.to_vec()), without)
     }
     fn measured(&self, messages: &[Message], told: ChatTold) -> Option<(usize, usize)> {
         self.0
@@ -19020,6 +19037,23 @@ async fn answer(
                 && limit_ring(shared, request, timer).await?
             {
                 return Ok(());
+            }
+            // What round 1 was offered and forced, on the messages it is
+            // asked as round 1's prompt log reads them, and whether the
+            // line asks to make a skill: never a word (#8022 case 2).
+            if round == 1 && by_words.is_none() && !quoted {
+                let asked = prepared
+                    .as_ref()
+                    .map_or(&messages, |prepared| &prepared.messages);
+                let without = withheld(scope.as_ref());
+                let services = shared.services.as_ref();
+                let line = round_one_line(
+                    request,
+                    asked,
+                    |name| services.declares(asked, without, name),
+                    services.forced(asked, without),
+                );
+                eprintln!("{line}");
             }
             let mut stream = match prepared.take() {
                 // The skill the heard words named: its call alone, at once.

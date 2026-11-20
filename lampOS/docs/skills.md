@@ -4070,6 +4070,28 @@ gone ([switches.md](switches.md)). What happens:
      before a keep ask, a schedule ask and a skill ask. The start says it
      once: "a line that plainly asks the lamp to make a skill must call
      make_skill in its first round (LAMP_MAKE_SKILL_ASKED)".
+   - **Round 1 says what it was forced to call** (#8022 case 2: on
+     lamp-52e6 on 20 Nov a 23-word make ask went to `start_agent_task`
+     twice of two, and nothing in the journal said whether the force had
+     fired). Every round 1 the chat is asked (not a skill called in code by
+     its name, not a quoted line) says, on the messages it is asked:
+     `lamp-voice second: request N: round 1: task_offered=y make_offered=y
+     forced=make_skill make_ask=y sentences=1`. `task_offered` and
+     `make_offered` are whether `start_agent_task` and `make_skill` were
+     given; `forced` the function its `tool_choice` named (`none` for
+     none); `make_ask` whether `asks_to_make` matched the person's line,
+     and `sentences` how many sentences it counts in it. `?` where the
+     services can't say, or where the last message is no person's line.
+     Names, `y`/`n` and a count only, never a word. Host test:
+     `round_one_forced::round_one_says_its_force_and_the_make_ask_never_its_words`.
+   - **A make is never a task** (#8022 case 2, the first builder's yes at
+     11:05): while `make_skill` is declared, `start_agent_task`'s
+     description ends "An ask to make a skill, even one whose work an agent
+     does, is make_skill's, never this." (`agent_tasks::MAKE_TOLD`), only
+     when the two still fit the link's 1,024 bytes; one that would not is
+     left as it was. Without `make_skill` it is never said. The model still
+     judges; no word is matched. Host test:
+     `a_make_is_told_make_skills_only_while_make_skill_is_declared`.
    - **Parsed before it is said back** (#6749 E,
      `made_skill::scripts_parse`): each `.py` it wrote goes, on stdin
      alone, to `/usr/bin/python3 -I -c 'import ast,sys;

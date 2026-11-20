@@ -8536,7 +8536,9 @@ mod tests {
         assert!(told.validate().is_ok(), "{}", told.description.len());
         let plain = start(false);
         assert!(
-            !plain.description.contains(crate::agent_tasks::MAKE_TOLD.trim()),
+            !plain
+                .description
+                .contains(crate::agent_tasks::MAKE_TOLD.trim()),
             "{}",
             plain.description
         );
