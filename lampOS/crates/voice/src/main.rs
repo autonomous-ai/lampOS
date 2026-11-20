@@ -49,7 +49,9 @@ fn main() {
     if relayed {
         lamp_voice::log_relay::finish(std::time::Duration::from_millis(500));
     }
-    if result.is_err() {
+    // A stop (SIGTERM) met at any of the run's checks is the service being
+    // stopped, not a fault: exit 0, as the main loop's own stop does.
+    if !lamp_voice::exits_clean(&result) {
         std::process::exit(1);
     }
 }
