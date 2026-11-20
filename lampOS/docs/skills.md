@@ -8949,8 +8949,10 @@ grants, its code, or the lamp's own steps (the light, the head, a say).
    no word of the line and no skill's name; the words read are those past
    the lamp's name, as the matcher reads them. With
    `LAMP_SKILL_KEYTERM=on`, speech to text also listens for each made
-   skill's name as said and its asks (`key_terms::made_terms`, the same
-   `made_asks`, read every 2 s), so the words come back as said; the
+   skill's name as said, never its asks, which may hold most of a long
+   make's own words (`key_terms::made_terms`, the same `made_asks`, read
+   every 2 s, at most 16, after every other term), so the words come back
+   as said; the
    match stays exact (#8022: on lamp-52e6 a clean "Hey Lamp, apple file."
    was written as two other words). A run that speaks
    its own words (lamp-skills' `says`, `made_run::speaks_itself`) ends the
