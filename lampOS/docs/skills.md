@@ -7384,14 +7384,36 @@ the same code for both writers.
   no watch and is read exactly as before: refused as no daily time, or,
   with `LAMP_MADE_SKILL_LOOSE` on as the product runs, kept said in
   general words ("When its moment comes, …", `plainly_as`), never "Every
-  2 hours". The brief every
-  agent task runs (`make_no_cannot::SCRIPT`, `scripts/agent.py`) now ends
-  "…, or nothing at all when the task is only for when something holds and
-  it doesn't now", so a watch is silent until it holds. With
-  `LAMP_MADE_SKILL_LOOSE` on, as the product runs, no `most_a_day` or
+  2 hours" (`a_clock_trigger_limited_or_held_is_no_watch`: one with
+  `during`, `days`, `rearm`, `for`, `when`, `absent_for` or `wait` is
+  never said "Every 90 minutes"). The brief every agent task runs
+  (`make_no_cannot::SCRIPT`, `scripts/agent.py`) now ends "…, or, when the
+  task is only for when something holds and it doesn't now, answer only a
+  dash (-)", which says nothing. **Told once until it stops holding
+  (#8089, a reader's P2 on its HOLD):** lamp-skills reads a run's answer
+  as words, silent (a lone dash or none) or failed (`task::ran`), and for
+  a watch's run nobody asked by voice now
+  (`lamp_voice::made_skill::is_clock_watch` of its `skill.toml`) keeps a
+  told mark per skill and folder sha256 in `--state-dir`'s
+  `task-watch-told.json` (`task::watch_tells`): the first holding run is
+  told and marked; while marked, a holding run says nothing (journal `its
+  watch still holds, told already: not said again`); a silent run clears
+  it, so it is told again only once it stopped holding and holds again; a
+  failed run changes nothing; a watch made again starts unmarked. The
+  state is the lamp's, not the agent's, which keeps none between runs.
+  **A no-net refusal once a day:** on a lamp whose agent can't reach the
+  internet, `NO_NET_SAID` is said at most once per skill in any 24 hours
+  for a run nobody asked by voice (`task::refusal_said_today`, kept in
+  `task-refusals-said.json`); a run asked by voice now is always answered.
+  With `LAMP_MADE_SKILL_LOOSE` on, as the product runs, no `most_a_day` or
   `[budget]` caps it, and its 90-minute floor keeps it within
   `task::PER_SKILL` all day (lamp-skills'
-  `a_made_watch_fits_the_task_runs_a_day` holds the two together). Tests:
+  `a_made_watch_fits_the_task_runs_a_day` holds the two together). All
+  skills' task runs share `task::ALL_SKILLS`, 100 in any 24 hours: about
+  six watches at 16 a day fill it beside nothing else, and a run past it is
+  not handed over, with only a journal line. Tests:
+  `a_watch_tells_once_until_it_stops_holding`,
+  `a_no_net_refusal_is_said_once_a_day_unless_asked_by_voice`,
   `with_reactions_on_a_watch_on_outside_data_is_told_on_the_clock`,
   `a_reminder_after_a_trigger_on_what_no_topic_carries_is_asked_again_as_a_watch`,
   `a_reminder_with_no_watch_before_it_is_still_the_lamps_timer`,

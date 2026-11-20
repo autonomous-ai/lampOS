@@ -141,11 +141,15 @@ pub const RUN: &str = "scripts/agent.py";
 
 /// [`RUN`]'s text: a task only for when something holds (a watch on
 /// outside data on the lamp's clock, [`WATCH`], #8079: "if Bitcoin goes
-/// under ninety thousand dollars, tell me") is told only when it holds,
-/// never at each run.
+/// under ninety thousand dollars, tell me") is answered with a lone dash
+/// while it doesn't hold, which lamp-skills says nothing of and reads as
+/// "not holding" (`lamp_skills::task::Ran::Silent`); it then tells a
+/// holding watch once until a run finds it not holding again
+/// (`lamp_skills::task::watch_tells`, #8089).
 pub const SCRIPT: &str = "print(\"This skill's task is for the lamp's agent to do itself, with its \
 own tools and only the skill's grants; then tell the owner in a sentence or two what it found or \
-did, or nothing at all when the task is only for when something holds and it doesn't now.\")\n";
+did, or, when the task is only for when something holds and it doesn't now, answer only a dash \
+(-).\")\n";
 
 /// What the make is refused as when the lamp's agent answered `cannot:`
 /// with the switch on: never its words, and always made a task
@@ -448,17 +452,17 @@ const SAT_EXAMPLE_ASKED: &str = "when I've sat at my desk a long while, remind m
 /// timer): what only the internet tells, with no topic of the lamp's, runs
 /// on the lamp's clock every while (`made_skill::clock_watch`, a cooldown
 /// of at least `made_skill::LEAST_WATCH_SECS`, 90 minutes: 16 runs a day
-/// stay under lamp-skills' 20 task runs per skill in 24 hours), its one task granted `net`
-/// checking the condition and speaking only when it holds; never a
-/// reminder. The model judges by meaning which a request is, as for the
+/// stay under lamp-skills' 20 task runs per skill in 24 hours), its one
+/// task granted `net` checking the condition, told once while it holds
+/// (`lamp_skills::task::watch_tells`, #8089); never a reminder. The model judges by meaning which a request is, as for the
 /// sitting ([`SITTING`]); the lamp holds no list of words.
 const WATCH: &str = " A watch on something only the internet tells, with no topic of the \
 lamp's (a price, the weather, a web page, a count on a service), to tell the person when it \
 holds, runs on the lamp's clock every while: \"clock/local\", \"known\", equals true, \
 cooldown = \"90m\" (or less often when the request asks, never under 90m), no rearm, during or \
-days; net among its grants, the task checks it each time and speaks only when it holds. A watch \
-is never a reminder: only a time or a while the request names for the person to be told \
-something is.";
+days; net among its grants, the task checks it each time and speaks only when it holds, and the \
+lamp tells it once until it stops holding. A watch is never a reminder: only a time or a while \
+the request names for the person to be told something is.";
 
 /// One whole answer for a watch on outside data ([`WATCH`]), shown to the
 /// model with the watch taught ([`watch_taught`]).
@@ -2695,13 +2699,13 @@ equals = true
         let steps = table["do"].as_array().unwrap();
         assert_eq!(steps.len(), 1, "{clock}");
         assert_eq!(steps[0]["task"]["run"].as_str(), Some(RUN));
-        // Its run is the lamp's own brief, which tells the agent to speak
-        // only when what it checks holds.
+        // Its run is the lamp's own brief, which tells the agent to answer
+        // a lone dash while what it checks doesn't hold (#8089).
         assert_eq!(files.scripts[0].1, SCRIPT, "{:?}", files.scripts);
         assert!(
             SCRIPT.contains(
-                "or nothing at all when the task is only for when something holds and it \
-                 doesn't now"
+                "when the task is only for when something holds and it doesn't now, answer only \
+                 a dash (-)"
             ),
             "{SCRIPT}"
         );

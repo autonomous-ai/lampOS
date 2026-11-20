@@ -6233,6 +6233,8 @@ fn hand_task(
         let refused = std::cell::Cell::new(None);
         let not_ready = std::cell::Cell::new(None);
         let stopped = std::cell::Cell::new(false);
+        // How its run ended, for a clock watch's told mark (#8089).
+        let ran = std::cell::Cell::new(None);
         let tried = lamp_skills::task_sure::Tried::default();
         let send = |socket: &Path, line: &str| {
             // Asked stopped while it waited in line or for its yes
@@ -6285,7 +6287,15 @@ fn hand_task(
                 )
             );
             found.set(lamp_skills::task::told(&answer));
-            refused.set(lamp_skills::task::refusal_said(&answer));
+            ran.set(Some(lamp_skills::task::ran(&answer)));
+            // Once a day for a run nobody asked by voice now (#8089).
+            refused.set(lamp_skills::task::refusal_said_today(
+                state.as_deref(),
+                &skill,
+                &answer,
+                asked_now(asked_at, unix_ms()),
+                unix_ms(),
+            ));
             not_ready.set(lamp_skills::task::not_ready_line(
                 &answer,
                 asked.is_some(),
@@ -6300,6 +6310,7 @@ fn hand_task(
             refused.set(None);
             not_ready.set(None);
             stopped.set(false);
+            ran.set(None);
             tried.once(|| {
                 lamp_skills::task::hand(
                     &skill,
@@ -6385,7 +6396,7 @@ fn hand_task(
             _ => tried.failed(),
         };
         let state = state.as_deref();
-        let found = found.take();
+        let found = watch_found(&skill, &folder, state, found.take(), ran.take(), asked_at);
         tell_its_run(
             &skill,
             found,
@@ -6527,6 +6538,42 @@ fn hand_over_run_once(
         Ok(answer)
     };
     exchange().map_err(|error| Unrun::Unknown(format!("lamp-tasks' answer never came: {error}")))
+}
+
+/// What a run's agent `found` that is said: all of it, but for a clock
+/// watch's run nobody asked by voice now (`asked_at`, [`asked_now`]) once
+/// its condition was told and still holds (#8089,
+/// `lamp_skills::task::watch_tells`, its mark in `state`): a watch made by
+/// voice on the lamp's clock (`lamp_voice::made_skill::is_clock_watch` of
+/// its `skill.toml` in `folder`) tells once until it stops holding.
+fn watch_found(
+    skill: &str,
+    folder: &Path,
+    state: Option<&Path>,
+    found: Option<Vec<String>>,
+    ran: Option<lamp_skills::task::Ran>,
+    asked_at: Option<u64>,
+) -> Option<Vec<String>> {
+    let (Some(state), Some(ran)) = (state, ran) else {
+        return found;
+    };
+    if asked_now(asked_at, unix_ms())
+        || !std::fs::read_to_string(folder.join("skill.toml"))
+            .is_ok_and(|text| lamp_voice::made_skill::is_clock_watch(&text))
+    {
+        return found;
+    }
+    let sha256 = lamp_skills::task::folder_sha256(folder).unwrap_or_default();
+    if lamp_skills::task::watch_tells(state, skill, &sha256, ran) {
+        eprintln!("lamp-skills: skill:{skill}: do.task: its watch holds: told once");
+        return found;
+    }
+    if found.is_some() {
+        eprintln!(
+            "lamp-skills: skill:{skill}: do.task: its watch still holds, told already: not said again"
+        );
+    }
+    None
 }
 
 /// Whether a run's told line (what its agent found, or its #7200
