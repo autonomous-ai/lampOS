@@ -2512,6 +2512,22 @@ khi đăng xuất, và với 0.6.60 khi đăng nhập (ROW của #7507).
   hiệu 1). Một reply bị từ chối `NOT_IDLE` ("is starting") giữ tác vụ trong
   hàng đợi và gõ nó khi phiên rảnh. Một dòng trạng thái bận giờ đọc là
   `working`; dấu hiệu W vẫn cần hai lần nhìn và bản ghi đứng yên 600 s.
+- **Harness 0.6.77 cho OpenClaw (openharness#4509, có trong bản ghim 0.6.78, #8138).**
+  Một tin nhắn OpenClaw từ chối khi lịch sử của nó đang lỗi được xoá (chỉ
+  khi đó là chữ Harness tự gõ) và gửi lại một lần sau `/session`. `held`
+  nói lý do bằng một câu (`namedState`): thiết bị đang chờ được duyệt,
+  Gateway từ chối đăng nhập, hoặc không có Gateway nào chạy. `wait` và
+  `watch` báo `starting`, `failed` và `held` ngay (khoảng 3 s, trước đây
+  một lần chạy kết thúc không có lượt mới mất 33 s, tới 60 s). Một lần khởi
+  chạy được xác nhận trong khoảng 0.3-0.6 s, và việc daemon Harness khởi
+  động lại giữa lúc gõ tác vụ đầu tiên và lúc OpenClaw xác nhận không còn
+  làm mất nó. 0.6.76 và 0.6.78 không đổi gì cho OpenClaw.
+- **Cài hoặc cập nhật OpenClaw (#8138, lamp-update).** lamp-update dừng
+  lamp-tasks trước khi khởi động lại gateway của OpenClaw, chờ tới khi
+  gateway trả lời `health` (tối đa 40 lần gọi, cách nhau 3 s), rồi mới
+  khởi động lại lamp-tasks, để phiên được giữ mở trên một gateway nhận
+  được nó; một lần khởi động lại thất bại cũng khởi động lại lamp-tasks
+  (install.md, "The install's restart order").
 - **Reply khi đã đăng nhập, có xác nhận.** Với Harness có xác nhận reply, mọi
   reply vào một phiên của người dùng (pane duy nhất của `harness new`,
   `--reply-named`, một phiên resumed, một tin nhắn đầu tiên) chỉ được tính là
