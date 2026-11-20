@@ -2510,7 +2510,13 @@ As root, on a lamp with the base image (`crates/update/src/install.rs`):
      the wrapper as `lampos`, on loopback `ws://127.0.0.1:18789`, with the
      token in `/var/lib/lampos-openclaw/gateway-token` (0600 `lampos`),
      made once by lamp-update at the install. One Gateway serves every
-     pane. Its unit is written by a round only, never by the one-shot:
+     pane. With `LAMP_OPENCLAW_GATEWAY_BY_DEFAULT=on` (#8105, off until
+     its row) it runs only while OpenClaw is the lamp's default agent, as
+     lamp-tasks says it on its app socket: `serve` asks every 10 s and
+     each round once, enables and starts it for `openclaw`, disables and
+     stops it for another engine, and leaves it as it is while lamp-tasks
+     says nothing, a round runs, or this one-shot is at work (docs/switches.md,
+     its row). Its unit is written by a round only, never by the one-shot:
      a one-shot that finds an earlier build's unit (a lamp-update ahead
      of its units) changes nothing and takes nothing out, journals
      "OpenClaw's install waits: lamp-openclaw-gateway.service is not
