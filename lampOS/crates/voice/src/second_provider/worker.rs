@@ -28533,6 +28533,47 @@ mod tests {
         assert_eq!(judged(false, 25_000_000, 0.97, true), None, "ruled, off");
     }
 
+    /// A regression from #8093, seen at gate 1111 (lamp-52e6, build 15164,
+    /// request 19, the clip "Hey Lamp, make the light blue."; the journal's
+    /// fixed lines, no words kept): 6 words in the window, 0 looks,
+    /// lamp-name near at 1.00 by the line's start, its first word, set off,
+    /// written as one that doesn't sound like the name, so `LAMP_NAME_NEAR`
+    /// ruled the line not the name and `LAMP_NAME_SIGN_TIED` dropped its
+    /// hearing; the line was played as "the text shows it was called", but
+    /// the model was not told the lamp's name was heard and called
+    /// `not_for_me`. With `LAMP_NAME_FACE_OR_WORDS=on` (#8136) the model is
+    /// still told when the line's words call the lamp or a sure hearing
+    /// began at its start; an unsure hearing on words that don't call it is
+    /// not told. Off, as on 15164.
+    #[test]
+    fn a_line_its_words_call_is_told_the_name_whatever_name_near_ruled() {
+        use crate::room_told::Room;
+        let line = (10_000_000, 12_690_000);
+        let noted = |on: bool, heard: &str, score: f32| {
+            let mut heeding = room_name_heeding(true);
+            heeding.telling_the_name(true, false);
+            heeding.attention.tie_the_second_sign(true);
+            heeding.attention.need_a_face_or_words(on);
+            heeding.attention.near_not_the_name(19);
+            let names = vec![(line.0 + 891_000, score)];
+            heeding.heed_signs(
+                19,
+                line,
+                heard,
+                room_name_signs(Room::Quiet, true, None, false, names),
+            );
+            heeding.name_note_for(19)
+        };
+        let told = Some(crate::called::note(false));
+        let call = "Hey Man, make the light blue.";
+        assert_eq!(noted(true, call, 1.0), told, "request 19");
+        assert_eq!(noted(true, call, 0.95), told, "its words, unsure");
+        let plain = "Yes, make the light blue.";
+        assert_eq!(noted(true, plain, 1.0), told, "a sure hearing at the start");
+        assert_eq!(noted(true, plain, 0.95), None, "unsure, no call");
+        assert_eq!(noted(false, call, 1.0), None, "off, as on 15164");
+    }
+
     /// #4226, `LAMP_NAME_START_USUAL=on`: a line whose sound began 0.3 s
     /// before its usual start by the soft start's lead, the name heard
     /// 1.5 s into its sound (1.2 s from its usual start), is a call at its
