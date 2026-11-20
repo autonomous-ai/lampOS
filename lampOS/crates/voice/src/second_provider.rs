@@ -567,6 +567,14 @@ pub(crate) const WRITE_KEPT_FIELDS: [&str; 3] = ["service", "action", "send_id"]
 /// The only fields a kept `use_skill` call may have ([`kept_args`]).
 pub(crate) const SKILL_KEPT_FIELDS: [&str; 4] = ["skill", "choice", "flag", "kind"];
 
+/// A kept `confirm_agent_task`, as told in a later turn's history
+/// ([`kept_result`]): the task was handed over then, and a later bare "how
+/// far is it?" or "is it done?" is about it. On c0a4 (ROW c0a4-5, L4s en)
+/// a yes taken in code kept nothing, and the next turn's "how far is it?"
+/// got `calls=none` and "How far is what?" (#7930). Read at call time:
+/// `check_agent_task` with no task answers the newest work.
+pub(crate) const TASK_HANDED_OVER: &str = "(done earlier: the task was handed over then and runs on its own. A bare \"how far is it\", \"is it done\" or \"how's it going\" after it is about it: call check_agent_task, which with no task answers the newest work.)";
+
 /// A kept skill's call, as told in a later turn's history ([`kept_result`]):
 /// it ran then, and a new ask for it is a call of its own (#7076).
 pub(crate) const SKILL_RAN_EARLIER: &str = "(done earlier: the skill ran then. The rest of its result was not kept. A new ask for it needs its own call.)";
@@ -655,6 +663,12 @@ pub(crate) fn failed_then_note(names: &[&str]) -> String {
 pub(crate) fn kept_result(name: &str, told: &serde_json::Value) -> Option<&'static str> {
     if name == crate::use_skill::NAME {
         return Some(SKILL_RAN_EARLIER);
+    }
+    // A task handed over, by the model's confirm or by the yes taken in
+    // code, is told as running, for a bare "how far is it?" later (#7930).
+    if name == crate::agent_tasks::CONFIRM {
+        return (told.get("handing_over") == Some(&serde_json::Value::Bool(true)))
+            .then_some(TASK_HANDED_OVER);
     }
     if name != crate::services::WRITE {
         return None;
@@ -1774,6 +1788,11 @@ pub type TaskDeclined = Arc<dyn Fn(u64, &str) -> Option<String> + Send + Sync>;
 /// linked record), the task started in code and the note it gets, or
 /// nothing. Blocking: it asks the tasks part.
 pub type TaskYes = Arc<dyn Fn(u64, &str, Option<&str>) -> Option<String> + Send + Sync>;
+/// The note for a turn while the work this voice handed over last is still
+/// open (`crate::agent_tasks::open_work_note`, #7930), with its request.
+/// Blocking: it asks the tasks part, asked only while work was handed over
+/// (`crate::agent_tasks::work_handed`).
+pub type OpenWorkNote = Arc<dyn Fn(u64) -> Option<String> + Send + Sync>;
 /// A heard line that is a whole spoken trigger of a running app (#7415 piece
 /// 6, `crate::app_triggers`): with its request and words, whether the app
 /// took it. Blocking: it waits up to `app_triggers::HOLD` for the app.
@@ -2199,6 +2218,9 @@ struct Shared {
     /// With the tasks part: a heard whole plain yes starts the task waiting
     /// in code, before the chat round (#7027).
     task_yes: Option<TaskYes>,
+    /// With the tasks part: the note that work handed over is still open
+    /// (#7930).
+    open_work: Option<OpenWorkNote>,
     /// With `LAMP_APP_TRIGGERS=on`: a line that says an installed app's
     /// trigger is taken by that app, and the request ends here (#7415).
     app_line: Option<AppLine>,
@@ -5275,6 +5297,7 @@ impl Engine {
                 task_waiting: None,
                 task_declined: None,
                 task_yes: None,
+                open_work: None,
                 app_line: None,
                 spelled_name: None,
                 air: None,
@@ -7503,6 +7526,19 @@ impl Engine {
     pub fn taking_a_task_yes(mut self, yes: TaskYes) -> Self {
         if let Some(shared) = Arc::get_mut(&mut self.shared) {
             shared.task_yes = Some(yes);
+        }
+        self
+    }
+
+    /// While the work this voice handed over last is still open, a spoken
+    /// request is told so in one line (`note`, with the tasks part, #7930):
+    /// on c0a4 (ROW c0a4-6) "Hey Lamp, how far is it?" right after a
+    /// hand-over got "How far is what?" and no call. Asked off the
+    /// runtime's thread only while work was handed over. Before any turn
+    /// only.
+    pub fn noting_open_work(mut self, note: OpenWorkNote) -> Self {
+        if let Some(shared) = Arc::get_mut(&mut self.shared) {
+            shared.open_work = Some(note);
         }
         self
     }
@@ -11994,7 +12030,32 @@ async fn spoken(
         if let Some(did) = &shared.did {
             did(Did::Worked(monotonic_us()));
         }
+        // Kept as the model's own confirm is kept, told as handed over, so
+        // a later turn's history shows the task started (#7930).
+        if let Some(keep) = &shared.keeps_calls {
+            keep(
+                request,
+                crate::agent_tasks::CONFIRM,
+                &serde_json::Value::Object(serde_json::Map::new()),
+                Some(TASK_HANDED_OVER),
+            );
+        }
     }
+    // Work handed over and still open (#7930): read from the tasks part
+    // off the runtime's thread, only while work was handed over, never on
+    // a line code took above.
+    let open_work = match &shared.open_work {
+        Some(note)
+            if declined.is_none() && taken.is_none() && crate::agent_tasks::work_handed() =>
+        {
+            let note = note.clone();
+            tokio::task::spawn_blocking(move || note(request))
+                .await
+                .ok()
+                .flatten()
+        }
+        _ => None,
+    };
     let waiting = declined
         .or(taken)
         .or_else(|| {
@@ -12009,7 +12070,8 @@ async fn spoken(
         .or_else(|| {
             let owner = crate::services::owner_of(scope.as_ref());
             crate::services::waiting_note(request, owner.as_deref(), Instant::now())
-        });
+        })
+        .or(open_work);
     // At setup, a line that spells their name: the read-back to say, the
     // name as a word, never its letters (#5580 row 2).
     let spelled = shared.spelled_name.as_ref().and_then(|note| note(&text));
