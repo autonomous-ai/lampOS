@@ -35,7 +35,8 @@ fn seen(names: &[&str]) -> Vec<Skill> {
 
 /// A sitting from `starts` (local, in seconds of the day; 10:00 unless
 /// said) to play: every 30 s as lamp-seen says it, each kind of
-/// `sightings` (minute, `drank`, `ate`, `tired` or `celebrate`) newly seen
+/// `sightings` (minute, `drank`, `ate`, `tired` (a yawn), `stretch` or
+/// `celebrate`) newly seen
 /// at its minute, the face moving a fifth of the picture each time; the
 /// voice listening through each of `talks` (from, to minutes) and resting
 /// otherwise; the privacy slide closed through each of `closed` (from, to
@@ -75,6 +76,7 @@ fn play_on(
     engine.clock(0, 0, sitting.starts * 1_000);
     engine.observe("voice/state", 0, br#"{"state":"resting"}"#, None);
     let (mut drank, mut ate, mut tired, mut celebrated) = (0, 0, 0, 0);
+    let (mut yawned, mut stretched) = (0, 0);
     let mut said = Vec::new();
     for half in 0..=sitting.minutes * 2 {
         let at = half * 30_000_000;
@@ -109,7 +111,9 @@ fn play_on(
                 match *kind {
                     "drank" => drank += 1,
                     "ate" => ate += 1,
-                    "tired" => tired += 1,
+                    // Tiredness is the two together, each apart too (#8123).
+                    "tired" => (tired, yawned) = (tired + 1, yawned + 1),
+                    "stretch" => (tired, stretched) = (tired + 1, stretched + 1),
                     "celebrate" => celebrated += 1,
                     other => panic!("{other}"),
                 }
@@ -121,7 +125,7 @@ fn play_on(
             left + 0.3
         );
         let doing = format!(
-            r#"{{"tired_s_ago":0,"tired_seen":{tired},"drank_seen":{drank},"ate_seen":{ate},"desk_work_s_ago":0,"desk_work":"computer","desk_s":0,"celebrate_seen":{celebrated}}}"#,
+            r#"{{"tired_s_ago":0,"tired_seen":{tired},"drank_seen":{drank},"ate_seen":{ate},"desk_work_s_ago":0,"desk_work":"computer","desk_s":0,"celebrate_seen":{celebrated},"yawn_seen":{yawned},"yawn_s_ago":0,"stretch_seen":{stretched},"stretch_s_ago":0}}"#,
         );
         runs.extend(engine.observe("humans/faces/tracked", at, faces.as_bytes(), None));
         runs.extend(engine.observe(
@@ -193,31 +197,35 @@ fn the_seen_reactions_ship_with_a_rest_a_short_wait_and_one_function_to_stop_the
         assert_eq!(skill.budget, None, "{name}: no group's hour or gap");
         assert!(skill.rest.is_none(), "{name}: no rest after lines ignored");
         assert_eq!(skill.most_a_day, None, "{name}: no day's most");
-        assert_eq!(skill.triggers.len(), 1, "{name}: one trigger, one line");
-        let trigger = &skill.triggers[0];
-        // One remark a meal, which ends after 30 minutes with none seen
-        // (the owner, 01:5x on #7668); a drink rests 15 minutes (the owner,
-        // 02:1x, the first builder's yes 02:14); tired and celebrating 20.
-        let (cooldown, still) = match name.as_str() {
-            "seen-eat" => (0, Some(30)),
-            "seen-drink" => (15, None),
-            _ => (20, None),
-        };
-        assert_eq!(
-            trigger.cooldown_us,
-            cooldown * 60_000_000,
-            "{name}: the per-kind rest"
-        );
-        assert_eq!(
-            trigger.rearm_line.as_ref().map(|line| line.for_us),
-            still.map(|minutes| minutes * 60_000_000),
-            "{name}: the meal or stretch"
-        );
-        assert_eq!(
-            trigger.wait_us,
-            3 * 60_000_000,
-            "{name}: a kept rise, 3 minutes"
-        );
+        // Seen tired has a trigger and a line for a yawn and for a
+        // stretch (#8123); the others one.
+        let triggers = if name == "seen-tired" { 2 } else { 1 };
+        assert_eq!(skill.triggers.len(), triggers, "{name}: a trigger a line");
+        for trigger in &skill.triggers {
+            // One remark a meal, which ends after 30 minutes with none seen
+            // (the owner, 01:5x on #7668); a drink rests 15 minutes (the owner,
+            // 02:1x, the first builder's yes 02:14); tired and celebrating 20.
+            let (cooldown, still) = match name.as_str() {
+                "seen-eat" => (0, Some(30)),
+                "seen-drink" => (15, None),
+                _ => (20, None),
+            };
+            assert_eq!(
+                trigger.cooldown_us,
+                cooldown * 60_000_000,
+                "{name}: the per-kind rest"
+            );
+            assert_eq!(
+                trigger.rearm_line.as_ref().map(|line| line.for_us),
+                still.map(|minutes| minutes * 60_000_000),
+                "{name}: the meal or stretch"
+            );
+            assert_eq!(
+                trigger.wait_us,
+                3 * 60_000_000,
+                "{name}: a kept rise, 3 minutes"
+            );
+        }
         let stop = skill.stop.as_ref().unwrap();
         assert_eq!(
             (stop.tool.as_str(), stop.group.as_deref()),
@@ -309,6 +317,39 @@ fn a_kind_rests_twenty_minutes_from_its_line_and_another_kind_may_come_sooner() 
             (31, "seen-drink")
         ]
     );
+}
+
+/// A yawn is told as a yawn and a stretch as a stretch, never one for the
+/// other (#8123: on lamp-06c1 a yawn was told as "Big stretch"); each has
+/// its own 20 minutes' rest, so a stretch may follow a yawn sooner.
+#[test]
+fn a_yawn_and_a_stretch_are_each_told_as_what_was_seen() {
+    let sightings = [
+        (10, "tired"),
+        (12, "stretch"),
+        (14, "tired"),
+        (16, "stretch"),
+    ];
+    let (said, called) = play_calls(seen(&SEEN), &Sitting::of(20, &sightings), true);
+    assert_eq!(named(&said), [(10, "seen-tired"), (12, "seen-tired")]);
+    let notes: Vec<(u64, &str)> = called
+        .iter()
+        .filter_map(|(minute, _, call)| match call {
+            Call::Say(note) => Some((*minute, note.as_str())),
+            _ => None,
+        })
+        .collect();
+    assert_eq!(notes.len(), 2, "{notes:?}");
+    let (yawn, stretch) = (notes[0].1, notes[1].1);
+    assert!(
+        yawn.contains("saw them yawn") && !yawn.contains("saw them stretch"),
+        "{yawn}"
+    );
+    assert!(
+        stretch.contains("saw them stretch") && !stretch.contains("saw them yawn"),
+        "{stretch}"
+    );
+    assert!(!yawn.contains("yawn or stretch") && !stretch.contains("yawn or stretch"));
 }
 
 #[test]

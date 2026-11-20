@@ -1,0 +1,3 @@
+# 14:00, tiredness seen at 10 minutes only from a yawn and a stretch together (tired_seen up, neither yawn_seen nor stretch_seen): nothing, as it cannot tell which.
+clock = "14:00"
+none = true

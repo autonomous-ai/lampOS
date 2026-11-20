@@ -6286,7 +6286,12 @@ mỗi lần thấy là một phản ứng, cùng các phán quyết của first 
 bật (#7401, 19:05 và 19:10). Mỗi kỹ
 năng đọc `humans/doing_more` (quyền dùng `seen_more` của chủ đèn,
 `LAMP_SEEN_MORE_DOINGS=on`) và phản ứng khi bộ đếm của nó tăng một:
-`drank_seen`, `ate_seen`, `tired_seen` hoặc `celebrate_seen` (`rise = { by =
+`drank_seen`, `ate_seen`, `yawn_seen` hoặc `stretch_seen` (`seen-tired` có hai
+trigger, `yawn` và `stretch`, mỗi trigger một câu riêng qua `do.on`, nên
+một cái ngáp được kể là ngáp, một lần vươn vai được kể là vươn vai, không
+bao giờ lẫn cái này thành cái kia, #8123: trên lamp-06c1 một cái ngáp đã
+bị kể thành "Big stretch"; sự mệt mà lamp-seen chỉ đếm được từ cả hai gộp
+lại không làm tăng bộ đếm nào, nên đèn không nói gì) hoặc `celebrate_seen` (`rise = { by =
 1, within = "45s" }`, một giá trị 30 s của lamp-seen và một khoảng dư,
 `rearm = "leaves"` với uống, mệt và ăn mừng: một lần tăng, một phản ứng; `rearm = { still = D }`
 với ăn, xem dưới (chỉ trên trigger có `rise`, 1m đến 1h: lại chỉ khi
@@ -6302,7 +6307,9 @@ mỗi bữa ăn (`rearm = { still = "30m" }`, không có cooldown, 01:5x): bữa
 thúc sau 30 phút không thấy ăn, và lần thấy ăn sau đó là một bữa mới.
 `seen-drink` không được nói lại trong 15 phút kể từ câu gần nhất đã được nghe
 (`cooldown = "15m"`, owner 02:1x, first builder đồng ý 02:14), còn
-`seen-tired` và `seen-celebrate` trong 20 phút (`cooldown = "20m"`). Loại khác có thể đến sớm hơn, và một câu không ai nghe
+`seen-tired` và `seen-celebrate` trong 20 phút (`cooldown = "20m"`; với
+`seen-tired` là cho từng trigger, nên một lần vươn vai có thể đến sớm hơn sau
+một cái ngáp; kiểm thử `a_yawn_and_a_stretch_are_each_told_as_what_was_seen`). Loại khác có thể đến sớm hơn, và một câu không ai nghe
 thấy trả lại những gì nó đã dùng, cooldown hoặc bữa ăn của nó (`Engine::unsaid` trả lại
 mọi thứ lần chạy đã dùng, như một lần ghi chưa gửi, `Engine::unwritten`).
 Bị giữ lại khi đèn đang nói hoặc đang nghe (`[[while]]` `voice/state` là
@@ -6385,7 +6392,8 @@ had 2 drinks this sitting; …" (`lamp_skills::Count`, `note_count`).
   này.
 - **Dành cho số đếm.** Chỗ trống dành cho một số đếm mà người nghe được nói
   lại như số đếm: các bộ đếm theo lần ngồi của lamp-seen trên
-  `humans/doing_more` (`drank_seen`, `ate_seen`, `tired_seen`). Có thể nêu bất
+  `humans/doing_more` (`drank_seen`, `ate_seen`, `tired_seen`, `yawn_seen`,
+  `stretch_seen`). Có thể nêu bất
   kỳ trường số nào của chủ đề kỹ năng đọc, nhưng ghi chú không bao giờ nói số
   về khuôn mặt, sự hiện diện hay khoảng cách (`humans/faces/tracked`,
   `humans/presence`, độ gần), những số chỉ dùng để chọn bước; kỹ năng được

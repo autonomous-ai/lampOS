@@ -1,7 +1,8 @@
-# Seen: tired. When lamp-seen newly sees tiredness at the desk (a yawn, or a
-# stretch of an arm or a leg), the lamp turns to the person and says one
-# light line, as V1's wellbeing skill named a yawn (#6543). Never a
-# diagnosis and never "you look tired": the line says what was seen. One of four seen
+# Seen: tired. When lamp-seen newly sees a yawn, or a stretch of an arm or
+# a leg, at the desk, the lamp turns to the person and says one light line,
+# as V1's wellbeing skill named a yawn (#6543). Never a diagnosis and never
+# "you look tired": the line names only what was seen, a yawn as a yawn and
+# a stretch as a stretch (#8123: a yawn was told as "Big stretch"). One of four seen
 # reactions (seen-celebrate, seen-drink, seen-eat, seen-tired), each its own
 # skill so its off is its own kind's. Written to lamp-skills' schema
 # (docs/skills.md, "The schema, as lamp-skills reads it").
@@ -22,10 +23,17 @@
 # `humans/familiar` says which face is the owner's (B1), that is the
 # owner's rule here, with no face rule of its own.
 #
-# The count: `tired_seen` counts tiredness newly seen this sitting, one move
-# caught by two clips in a row once. A note is fixed words with no slot for
-# a reading, so the line carries no number. No "say nothing" outcome (B2):
-# the guards below are the silence.
+# The counts: `yawn_seen` and `stretch_seen` count a yawn and a stretch newly
+# seen this sitting, apart (#8123), one move caught by two clips in a row
+# once, and a yawn while stretching in one burst as the surer of the two
+# only. Two triggers, one a count, each with its own line (`do.on`), so a
+# note never has to choose: one skill, so its off, its stop kind and its
+# place in the product are as before. Each trigger keeps its own rest, so a
+# stretch may follow a yawn sooner, as another kind may. Tiredness that
+# lamp-seen counted only from the two together (`tired_seen` up, neither
+# count) is said as neither: no line. A note is fixed words with no slot
+# for a reading, so the line carries no number. No "say nothing" outcome
+# (B2): the guards below are the silence.
 needs = ["eyes", "body", "voice"]
 # A product skill (#6543, the owner's call at c6957458843: the four seen
 # reactions ship as product skills, on for every lamp whose owner said
@@ -46,18 +54,30 @@ speak = true
 topics = ["humans/doing_more", "voice/state", "voice/privacy", "expression/state", "humans/faces/tracked"]
 body = true
 
-# Tiredness newly seen: `tired_seen` went up by one since lamp-seen's last word
-# (said at once when it rises, else every 30 s: `within` one
-# of them and a margin). The count begins
-# again at 0 each sitting, so a new sitting is no yawn.
-[trigger]
+# A yawn newly seen: `yawn_seen` went up by one since lamp-seen's last word
+# (said at once when it rises, else every 30 s: `within` one of them and a
+# margin). The count begins again at 0 each sitting, so a new sitting is no
+# yawn.
+[[trigger]]
+name = "yawn"
 topic = "humans/doing_more"
-field = "tired_seen"
+field = "yawn_seen"
 above = 0
 rise = { by = 1, within = "45s" }
 rearm = "leaves"          # one rise, one reaction
 cooldown = "20m"          # the per-kind rest: not again within 20 minutes of its last line heard
 wait = "3m"               # a rise mid-turn is kept, said once the turn ends, dropped 3 minutes after it was seen
+
+# A stretch of an arm or a leg newly seen, the same way.
+[[trigger]]
+name = "stretch"
+topic = "humans/doing_more"
+field = "stretch_seen"
+above = 0
+rise = { by = 1, within = "45s" }
+rearm = "leaves"
+cooldown = "20m"
+wait = "3m"
 
 [[while]]                 # never while the lamp talks or listens
 topic = "voice/state"
@@ -89,4 +109,11 @@ policy = "nudge"
 
 [[do]]
 body = { look_at = "face" }
-say = "You just saw them yawn or stretch at the desk. Say one short, light line about it, the way a friend would, at most twenty words; you may ask lightly if it has been a long day. Say only what you saw: never that they look tired, no feeling named, no diagnosis, nothing about sleep or bed, their health, body or looks, and never mention a camera."
+
+[[do]]
+on = "yawn"
+say = "You just saw them yawn at the desk. Say one short, light line about the yawn, the way a friend would, at most twenty words; you may ask lightly if it has been a long day. Name only the yawn, never a stretch. Never say they look tired, name a feeling or diagnose; nothing about sleep, bed, health, body or looks, and never mention a camera."
+
+[[do]]
+on = "stretch"
+say = "You just saw them stretch at the desk. Say one short, light line about the stretch, the way a friend would, at most twenty words; you may ask lightly if it has been a long day. Name only the stretch, never a yawn. Never say they look tired, name a feeling or diagnose; nothing about sleep, bed, health, body or looks, and never mention a camera."
