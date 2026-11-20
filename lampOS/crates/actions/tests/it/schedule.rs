@@ -1164,9 +1164,10 @@ fn an_older_schedule_is_listed_without_set_times() {
     assert_eq!(script.finish().len(), 1);
 }
 
-/// `list_reminders`' description names questions about reminders as its
-/// own, not recall's, says how the set time reads, and never lists unasked
-/// (rule 8); it stays within a function's 1,024 bytes.
+/// `list_reminders`' description names questions about reminders, in any
+/// wording or language and even heard a word short, as answered only after
+/// it, not recall (#7987), says how the set time reads, and never lists
+/// unasked (rule 8); it stays within a function's 1,024 bytes.
 #[test]
 fn list_reminders_is_described_for_questions_about_reminders() {
     let listing = catalog()
@@ -1181,9 +1182,9 @@ fn list_reminders_is_described_for_questions_about_reminders() {
     );
     for words in [
         "not recall",
-        "when they set it",
-        "never say you do not remember a reminder before calling this",
-        "set_day and set_clock",
+        "in any wording or language, even one that sounds a word short",
+        "is answered only after calling this in that turn",
+        "set_day/set_clock",
         "say you don't know when",
         "Never list reminders unasked",
     ] {
