@@ -5214,8 +5214,31 @@ in and signed out, and on 0.6.60, signed in (#7507's ROW).
   (`pane_turn`), and it ends the same way, with no reply and no ensure of
   its own. The opens' own backoff (5 s doubled, `OPEN_RETRY_FIRST`; 60 s
   doubled for `ENGINE_NOT_READY`) is unchanged. The turn's end is `harness wait lamp-one-openclaw --after
-  <inputId>` (0 idle, then `show` for the answer; 3 an ask; 4 gone). A
+  <inputId>` (0 idle, then `show` for the answer; 3 an ask; 4 gone; 1
+  with a `failed` row, Harness 0.6.74's failed launch). A
   kept session gone or stuck is replaced as below (#7906, signs 1-4).
+- **A failed launch, at once (#8062: Harness 0.6.74's openharness#4499, carried by the 0.6.75 pin).**
+  `harness wait` exits 1 when a launch on this machine failed (for example
+  `OPENCLAW_NO_TOKEN`, or `first_task_not_taken` after 3 min), its row
+  `failed` with a `failure: {error, detail}`. lamp-tasks reads it as that
+  `failed` row (`parse_wait` keeps `failure.error` on the row; `wait
+  --after` journals it) only when one of the rows waited on says
+  `failed`; any other exit 1 is still `wait_failed`. A turn's `wait
+  --after` (or a pane's `wait`) that says `failed` takes the ladder in the
+  same turn, as an engine that died: a plain resume keeping the
+  conversation while OpenClaw still holds it, else a fresh session
+  (`replace_kept`), the task's words typed again once when no tool had
+  run. The first words of a new kept session that come back `failed` do
+  the same within the open's bound. Before 0.6.74 `wait` said `failed`
+  with exit 4. A harness that never started still exits 4.
+- **`starting` from `show` (Harness 0.6.74's openharness#4499, carried by 0.6.75).** `show`, `ps`, `wait` and
+  `watch` say `starting` until the first task is taken (an OpenClaw with
+  no Gateway session bound, up to 60 s). lamp-tasks reads it as not yet a
+  verdict: replaced only once still `starting` 120 s from the open
+  (`OPEN_IDLE_WITHIN`, sign 1). A reply refused `NOT_IDLE` ("is starting")
+  keeps the task queued and typed once the session is idle. A busy status
+  line now reads `working`; sign W still needs two looks and the record
+  unmoved for 600 s.
 - **Signed-in replies, acknowledged.** With a Harness that acknowledges replies, every reply into a session of the person's (the one pane of `harness new`, `--reply-named`, a resumed session, a first message) counts as handed over only on `taken` with its `inputId`; a `TIMEOUT` with `cancelled: true` is typed again (a first message's is not: any answer but `taken` leaves it uncertain, `type_first_message`), one with `cancelled: false` and an `inputId` is typed and never sent again, and the one pane's turn ends with `harness wait --after <inputId>`. An older Harness's answers read as before.
 - **Rotation and removal.** OpenClaw's kept session is not rotated by
   count (its gateway compacts the session itself, `agents.defaults.compaction`);

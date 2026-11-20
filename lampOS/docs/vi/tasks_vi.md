@@ -2487,8 +2487,30 @@ khi đăng xuất, và với 0.6.60 khi đăng nhập (ROW của #7507).
   nhân đôi, `OPEN_RETRY_FIRST`; 60 s nhân đôi cho `ENGINE_NOT_READY`) không
   đổi. Kết thúc của
   lượt là `harness wait lamp-one-openclaw --after <inputId>` (0 rảnh, rồi
-  `show` lấy câu trả lời; 3 có câu hỏi; 4 đã mất). Phiên được giữ đã mất
+  `show` lấy câu trả lời; 3 có câu hỏi; 4 đã mất; 1 kèm một dòng `failed`,
+  lần khởi chạy thất bại của Harness 0.6.74). Phiên được giữ đã mất
   hoặc bị kẹt thì được thay như bên dưới (#7906, dấu hiệu 1-4).
+- **Khởi chạy thất bại, xử lý ngay (#8062: openharness#4499 của Harness 0.6.74, có trong bản ghim 0.6.75).**
+  `harness wait` thoát mã 1 khi một lần khởi chạy trên máy này thất bại (ví
+  dụ `OPENCLAW_NO_TOKEN`, hoặc `first_task_not_taken` sau 3 phút), dòng của
+  nó là `failed` kèm `failure: {error, detail}`. lamp-tasks đọc nó là dòng
+  `failed` đó (`parse_wait` giữ `failure.error` trên dòng; `wait --after`
+  ghi nó vào journal) chỉ khi một trong các dòng đang chờ nói `failed`; mọi
+  exit 1 khác vẫn là `wait_failed`. Một `wait --after` của lượt (hoặc `wait`
+  của một pane) nói `failed` thì đi theo thang phục hồi ngay trong lượt đó,
+  như một engine đã chết: resume thường, giữ cuộc hội thoại khi OpenClaw vẫn
+  còn giữ nó, nếu không thì một phiên mới (`replace_kept`), lời của tác vụ
+  được gõ lại một lần khi chưa có tool nào chạy. Lời đầu tiên của một phiên
+  giữ mới mà trả về `failed` cũng vậy, trong giới hạn của lần mở. Trước
+  0.6.74 `wait` nói `failed` với exit 4. Một harness chưa từng khởi động vẫn
+  thoát mã 4.
+- **`starting` từ `show` (openharness#4499 của Harness 0.6.74, có trong 0.6.75).** `show`, `ps`, `wait` và `watch`
+  nói `starting` cho đến khi tác vụ đầu tiên được nhận (một OpenClaw chưa
+  gắn phiên Gateway, tới 60 s). lamp-tasks coi đó chưa phải kết luận: chỉ
+  thay khi vẫn `starting` sau 120 s kể từ lần mở (`OPEN_IDLE_WITHIN`, dấu
+  hiệu 1). Một reply bị từ chối `NOT_IDLE` ("is starting") giữ tác vụ trong
+  hàng đợi và gõ nó khi phiên rảnh. Một dòng trạng thái bận giờ đọc là
+  `working`; dấu hiệu W vẫn cần hai lần nhìn và bản ghi đứng yên 600 s.
 - **Reply khi đã đăng nhập, có xác nhận.** Với Harness có xác nhận reply, mọi
   reply vào một phiên của người dùng (pane duy nhất của `harness new`,
   `--reply-named`, một phiên resumed, một tin nhắn đầu tiên) chỉ được tính là

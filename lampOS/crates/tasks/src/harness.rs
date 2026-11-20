@@ -560,6 +560,9 @@ pub struct Listed {
 pub struct Ended {
     pub agent_id: String,
     pub state: String,
+    /// Why its launch failed, a `failed` row's `failure.error` (Harness
+    /// 0.6.74, openharness#4499: `wait` exits 1 then); `None` otherwise.
+    pub failure: Option<String>,
 }
 
 /// How long one `harness wait` is held before it is started again, and how
@@ -2474,8 +2477,9 @@ impl Cli {
 
     /// `harness wait <name> --program-token-file <token> --after <input>
     /// --timeout <s> --json` (openharness#4393): held until the first idle
-    /// after that input was taken. `idle` (exit 0), `needs-input` (3) or
-    /// `gone` (4); `None` when Harness's own hold passed (124). Never takes
+    /// after that input was taken. `idle` (exit 0), `needs-input` (3),
+    /// `gone` (4) or `failed` (1 with a `failed` row: its launch failed,
+    /// Harness 0.6.74); `None` when Harness's own hold passed (124). Never takes
     /// the operation lock; `cancel` ends it early, as `cancelled`.
     pub fn wait_kept(
         &self,
@@ -2505,13 +2509,7 @@ impl Cli {
                 Some(cancel),
             )
             .map_err(|error| error.code.to_string())?;
-        match reply.code {
-            Some(0) => Ok(Some("idle".into())),
-            Some(3) => Ok(Some("needs-input".into())),
-            Some(4) => Ok(Some("gone".into())),
-            Some(124) => Ok(None),
-            _ => Err(program_refusal(&reply.stdout, reply.code, "wait_failed")),
-        }
+        kept_wait_state(reply.code, &reply.stdout)
     }
 
     /// `harness wait --machine <id> <agent> --after <input> --timeout <s>
@@ -2545,13 +2543,7 @@ impl Cli {
                 Some(cancel),
             )
             .map_err(|error| error.code.to_string())?;
-        match reply.code {
-            Some(0) => Ok(Some("idle".into())),
-            Some(3) => Ok(Some("needs-input".into())),
-            Some(4) => Ok(Some("gone".into())),
-            Some(124) => Ok(None),
-            _ => Err(program_refusal(&reply.stdout, reply.code, "wait_failed")),
-        }
+        kept_wait_state(reply.code, &reply.stdout)
     }
 
     /// `harness close <name> --program-token-file <token> --json`
@@ -7505,13 +7497,75 @@ struct WaitReply {
 struct WaitRow {
     id: String,
     state: String,
+    #[serde(default)]
+    failure: Option<WaitFailure>,
+}
+#[derive(Deserialize)]
+struct WaitFailure {
+    #[serde(default)]
+    error: Option<String>,
+}
+
+/// A `failed` row's `failure.error` as read here: a plain code
+/// (`OPENCLAW_NO_TOKEN`, `first_task_not_taken`), else `?`.
+fn failure_code(failure: Option<&WaitFailure>) -> Option<String> {
+    let error = failure?.error.as_deref()?;
+    Some(if token(error, 64) { error } else { "?" }.to_owned())
+}
+
+/// `harness wait <one> --after … --json` (the kept session's turn end,
+/// [`Cli::wait_kept`], [`Cli::wait_after`]) by its exit, as
+/// [`parse_wait`] reads it. Exit 1 (Harness 0.6.74, openharness#4499: a
+/// launch on this machine that failed, `OPENCLAW_NO_TOKEN`,
+/// `first_task_not_taken`, …) is `failed` only when its JSON lists a
+/// `failed` row; any other exit 1 is not read, as before.
+fn kept_wait_state(code: Option<i32>, stdout: &[u8]) -> Result<Option<String>, String> {
+    match code {
+        Some(0) => Ok(Some("idle".into())),
+        Some(3) => Ok(Some("needs-input".into())),
+        Some(4) => Ok(Some("gone".into())),
+        Some(124) => Ok(None),
+        Some(1) => match launch_failed(stdout) {
+            Some(error) => {
+                eprintln!(
+                    "tasks: harness wait --after: its launch failed ({})",
+                    error.as_deref().unwrap_or("no reason given")
+                );
+                Ok(Some("failed".into()))
+            }
+            None => Err(program_refusal(stdout, code, "wait_failed")),
+        },
+        _ => Err(program_refusal(stdout, code, "wait_failed")),
+    }
+}
+
+/// Exit 1's `{"harnesses":[{"state":"failed","failure":{…}}]}`: `Some`
+/// with its `failure.error` (when given) once a row says `failed`;
+/// `None` for any other answer.
+fn launch_failed(stdout: &[u8]) -> Option<Option<String>> {
+    if stdout.len() > STDOUT_LIMIT {
+        return None;
+    }
+    let reply: WaitReply = serde_json::from_slice(stdout).ok()?;
+    if reply.harnesses.len() > MOST_LISTED {
+        return None;
+    }
+    reply
+        .harnesses
+        .iter()
+        .find(|row| row.state == "failed")
+        .map(|row| failure_code(row.failure.as_ref()))
 }
 
 /// What `harness wait --any --json` says (Harness 0.4.17), by its exit:
 /// 0 an agent is idle, 3 one waits for the person, 4 one stopped or is
 /// gone, each with `harnesses` listing those that ended (`id`, `state`);
 /// 124 the time passed with none, which is no agent. Rows for agents not
-/// waited on, and `timeout` rows, are passed over. Anything else fails.
+/// waited on, and `timeout` rows, are passed over. Since Harness 0.6.74
+/// (openharness#4499) exit 1 says a launch on this machine failed, its row
+/// `failed` with `failure: {error, detail}`: read as that `failed` row,
+/// its `failure.error` kept, only when one of ours is `failed`; any other
+/// exit 1, and anything else, fails.
 pub fn parse_wait(
     code: Option<i32>,
     bytes: &[u8],
@@ -7519,7 +7573,7 @@ pub fn parse_wait(
 ) -> Result<Vec<Ended>, &'static str> {
     match code {
         Some(124) => return Ok(Vec::new()),
-        Some(0 | 3 | 4) => {}
+        Some(0 | 1 | 3 | 4) => {}
         _ => return Err("wait_failed"),
     }
     let reply: WaitReply = serde_json::from_slice(bytes).map_err(|_| "wait_invalid_reply")?;
@@ -7534,14 +7588,22 @@ pub fn parse_wait(
         if row.state == "timeout" || !agents.contains(&row.id) {
             continue;
         }
+        let failure = (row.state == "failed")
+            .then(|| failure_code(row.failure.as_ref()))
+            .flatten();
         ended.push(Ended {
             state: state_of(&row.id, row.state, None),
             agent_id: row.id,
+            failure,
         });
     }
     // An exit that says one ended, with none of ours listed, is not read.
     if ended.is_empty() {
         return Err("wait_invalid_reply");
+    }
+    // Exit 1 is a failed launch's: read only with one of ours `failed`.
+    if code == Some(1) && !ended.iter().any(|ended| ended.state == "failed") {
+        return Err("wait_failed");
     }
     Ok(ended)
 }

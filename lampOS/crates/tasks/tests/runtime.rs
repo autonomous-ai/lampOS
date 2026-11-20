@@ -1659,6 +1659,7 @@ fn a_held_wait_that_comes_back_reads_the_agent_at_once_and_keeps_its_idle_answer
     *s.counts.wait_ends.lock().unwrap() = Some(vec![Ended {
         agent_id: AGENT.into(),
         state: "idle".into(),
+        failure: None,
     }]);
     let kept = s.wait(&prepared["id"], |v| v["task"]["observations"] == json!(1));
     assert_eq!(s.counts.reads.load(Ordering::SeqCst), 1, "{kept}");
