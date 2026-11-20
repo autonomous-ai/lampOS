@@ -4414,6 +4414,7 @@ pub fn serve(
         // And a heard whole plain yes to it starts it in code, before the
         // chat round (#7027).
         let yes_place = place.clone();
+        let work_place = place.clone();
         engine = engine.declining_a_task_waiting(Arc::new(move |request, words: &str| {
             crate::agent_tasks::declined(&place, request, words)
         }));
@@ -4422,6 +4423,16 @@ pub fn serve(
                 crate::agent_tasks::yes_taken(&yes_place, request, words, person)
             },
         ));
+        // And while work it handed over is open, each turn is told so in
+        // one line (#7930).
+        engine = engine.noting_open_work(Arc::new(move |request| {
+            crate::agent_tasks::open_work_note(
+                &work_place,
+                &crate::task_news::told_file(),
+                crate::agent_tasks::OPEN_WORK_DEADLINE,
+                request,
+            )
+        }));
     }
     // The last hour of what the lamp did, and why (#7757, LAMP_DID_KEEP, off):
     // kept in memory for the look-up; nothing is read or kept off.
@@ -24763,6 +24774,67 @@ mod tests {
         _: usize,
     ) -> (String, Option<crate::thread::NoteVersion>) {
         (String::new(), None)
+    }
+
+    /// c0a4 ROW c0a4-6 (#7930), rebuilt on the Mac: the ask, its read-back
+    /// with `start_agent_task` (never kept: its arguments are the person's
+    /// words), the model's own `confirm_agent_task` on "Yes, please.", then
+    /// "Hey Lamp, how far is it?". The history the second route sends for
+    /// that last line (`LAMP_HISTORY_KEEPS_CALLS`, `LAMP_HISTORY_SAID_ONCE`
+    /// on, as in the product) carries the hand-over as a kept confirm told
+    /// [`crate::second_provider::TASK_HANDED_OVER`], right before the
+    /// lamp's words.
+    #[test]
+    fn the_history_after_a_hand_over_carries_the_kept_confirm() {
+        let _one = crate::provider_worker::tests::one_thread();
+        let now = Instant::now();
+        {
+            let mut thread = crate::thread::THREAD.lock().unwrap();
+            thread.forget();
+            thread.person(
+                "ask the agent on the lamp to research the best houseplants for a dark bedroom.",
+                true,
+                now,
+            );
+            thread.lamp(
+                4,
+                "OpenClaw here on the lamp will research the best houseplants for a dark bedroom. Shall I start it?",
+                now,
+            );
+            thread.person("Yes, please.", true, now);
+            thread.called_told(
+                6,
+                crate::agent_tasks::CONFIRM,
+                &serde_json::json!({}),
+                crate::second_provider::kept_result(
+                    crate::agent_tasks::CONFIRM,
+                    &serde_json::json!({"handing_over": true, "work_id": "70", "label": "Research the best houseplants for a dark bedroom"}),
+                ),
+            );
+            thread.lamp(
+                6,
+                "Handing it to OpenClaw now. I'll tell you when it's done.",
+                now,
+            );
+        }
+        let _ = thread_and_history_summed(0, None, None, None, false, true, no_summary);
+        let history: Vec<Message> = crate::thread::THREAD
+            .lock()
+            .unwrap()
+            .recent_after_note(
+                None,
+                Instant::now(),
+                HISTORY_WITHIN,
+                HISTORY_EXCHANGES,
+                None,
+            )
+            .into_iter()
+            .flat_map(|exchange| messages_told(exchange, true))
+            .collect();
+        let told = history_text(&history);
+        assert!(told.contains(crate::agent_tasks::CONFIRM), "{told}");
+        assert!(told.contains("handed over then"), "{told}");
+        crate::thread::THREAD.lock().unwrap().forget();
     }
 
     /// `LAMP_HISTORY_SAID_ONCE` off (#6218): the thread's text is the
