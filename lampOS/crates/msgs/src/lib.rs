@@ -129,6 +129,10 @@ pub use speaker_state::*;
 /// The memory's id for a person the eyes know, and the `known` file (#2176).
 pub mod known;
 
+/// What a Store app or a paired computer tells Lamp's memory: a kept fact
+/// marked with its source, and a live context line never kept (#7415).
+pub mod app_fact;
+
 /// The owner's approximate place from the app, rounded, and its file
 /// (#4333, `docs/owner-place.md`).
 pub mod owner_place;

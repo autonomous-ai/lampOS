@@ -209,3 +209,13 @@ offered while 16 are already waiting is not sent. When the owner stops, updates 
 `SIGTERM` and the connection closes with a close frame that says why; no event
 comes first. Errors are the door's codes; with `LAMP_STORE_APPS` off every op
 is refused `off`.
+
+### What an app tells Lamp's memory (`apps.remember`, `apps.context`, designed)
+
+Agreed on #7415 (the first builder's yes of 19 Nov 16:45): an app with the
+`remember` grant keeps a fact for the lamp's known person, marked with the app
+as its source, and sets a live context line that is never kept. The memory's
+side is built ([memory-days.md](memory-days.md), "An app's facts and context
+lines"; `lamp_msgs::app_fact`); the two ops at this socket, the grant and
+their writer are not built yet, and come behind their own switch, refused
+while the physical privacy switch is on.
