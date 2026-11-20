@@ -5776,6 +5776,21 @@ after a take-over, but now for every turn:
       with its room and face rule). The journal says `its words call the
       lamp: the model is still told its name was heard
       (LAMP_NAME_FACE_OR_WORDS, #8136)`. It changes no verdict.
+    - **A counted hearing told in a busy room** (lamp-52e6, 20 Nov 19:5x,
+      build 15177 with #8137, request 41: a five-word "Hey Lamp, …" with 0
+      faces, lamp-name at 0.979, counted by `its words calling it, its
+      hearing at the line's start`, played as `the text shows it was
+      called`, but the name note's room rule, `LAMP_NAME_NOTE_BUSY=face`,
+      withheld the note, `the lamp's name was heard in a busy room and
+      nobody is turned to the lamp; the model is not told`, and no tool was
+      called): when the verdict's own text check calls the lamp
+      (`called_in_text`, `Attention::told_by_its_words`), the model is told
+      in a busy room with nobody turned too (`Heeding::note_the_name`). The
+      journal says `the lamp's name was heard in a busy room and nobody is
+      turned to the lamp, but its words call the lamp: the model is told
+      (LAMP_NAME_FACE_OR_WORDS, #8136)`. A busy room where only the room's
+      sound carries the name, its words not calling the lamp, is still not
+      told. It changes no verdict.
     Not in it: the wordless cut-in calling a room with two voices "a quiet
     room" (`LAMP_CUT_IN_WORDLESS_RESUMES`, shape 7's second half), and a
     short line standing in a conversation's window by a hearing under the
