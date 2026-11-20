@@ -2315,7 +2315,7 @@ một byte (`crates/tasks/src/one_session.rs`).
   store đã đọc. Bộ đếm bắt đầu từ 0 khi pane được mở hoặc nhận lại. Ở lượt
   kế tiếp sau khi vượt một trong hai ngưỡng, pane cũ bị đóng `--now`, cuộc
   hội thoại của nó bị xoá khỏi kho riêng của engine (của OpenClaw bằng
-  `sessions.delete`, của Hermes khỏi `state.db`) và id đã giữ bị quên, rồi một
+  `sessions.delete`, của Hermes bằng `hermes sessions delete`) và id đã giữ bị quên, rồi một
   pane mới được mở, không bao giờ nhận lại pane cũ. Trong một pane, nén
   ngữ cảnh là việc của engine.
 - **Theo từng lần chạy, như trước.** Thư mục `skill-<run id>`, claim của
@@ -2371,16 +2371,17 @@ Lời trong pane được giữ ở các nơi sau trên đèn, đều thuộc `l
 | Thư mục của pane, nơi chạy `harness new` | `/var/lib/lampos-tasks/harnesses/lamp-tasks/one-session` | thư mục 0700 (lamp-tasks tạo); `/var/lib/lampos-tasks` là 0700 (`StateDirectoryMode=0700`) |
 | Bản ghi của Harness về pane (registry, bản ghi agent đã dừng) | `/var/lib/lampos-tasks/.harness/cli/data/registry.json`, `.../cli/data/stopped-agents/` | trong home Harness 0700 |
 | Chính cuộc hội thoại (phiên OpenClaw `agent:main:harness-<agent id>`) | `/var/lib/lampos-openclaw/state/agents/main/agent/openclaw-agent.sqlite` (bản OpenClaw cũ: `state/agents/main/sessions/*.jsonl`) | `/var/lib/lampos-openclaw` và `state` 0700 (lamp-update tạo); OpenClaw ghi không có `UMask=`, nên chính các thư mục 0700 chặn người dùng khác |
-| Với pane Hermes (#8151; session id của Hermes là `session` trong `one-session.json`) | `/var/lib/lampos-hermes/.hermes/state.db` (+ `-wal`, `-shm`), `sessions/` | `/var/lib/lampos-hermes` 0700 |
+| Với pane Hermes (#8151; session id của Hermes là `session`, mọi id nó từng được nêu là `sessions`, id nào xoá lỗi là `hermes_pending`, trong `one-session.json`) | `/var/lib/lampos-hermes/.hermes/state.db` (+ `-wal`, `-shm`), `sessions/` | `/var/lib/lampos-hermes` 0700 |
 
 Khi nào bị xoá:
 
 - **Đổi engine mặc định: xoá.** Khi engine mặc định đổi, hoặc
   machine id của đèn đổi, luồng `one-session` đóng pane `--now`, xoá cuộc
   hội thoại của nó (của OpenClaw qua gateway,
-  `openclaw gateway call sessions.delete` kèm transcript; của Hermes khỏi
-  `state.db` của chính Hermes, `delete_hermes_session`, bên dưới), và xoá
-  `one-session.json` (`OneSession::drop_pane`). `close` của Harness giữ
+  `openclaw gateway call sessions.delete` kèm transcript; của Hermes bằng
+  `hermes sessions delete` của chính Hermes, `HermesDelete`, bên dưới), và
+  xoá `one-session.json` (`OneSession::drop_pane`; một lần xoá Hermes bị
+  lỗi vẫn ở lại trong đó là `hermes_pending`). `close` của Harness giữ
   nguyên kho của engine, nên lamp-tasks tự xoá phiên. Chỉ tính khi thật
   sự đổi: máy và engine cũ lẫn mới đều đã biết và khác nhau. Một lần đọc
   mà một trong hai chưa biết (Harness chưa thiết lập, danh sách máy lỗi)
@@ -2547,7 +2548,9 @@ khi đăng xuất, và với 0.6.60 khi đăng nhập (ROW của #7507).
     cảnh, và Harness đi theo. Id được lấy từ mỗi lần `ensure`
     (`engineSession`) và từ `show` của một lượt khi Harness nêu id ở đó
     (`show` của Harness 0.6.78 không nêu), ghi vào `one-session.json` là
-    `session`, không bao giờ giữ từ một lần mở cũ hơn.
+    `session`, không bao giờ giữ từ một lần mở cũ hơn. Mọi id pane từng
+    được nêu cũng được liệt kê ở đó, là `sessions` (64 id mới nhất), để
+    lần xoá tới được từng id.
   - **Xoay vòng.** 40 lượt hoặc 250k token ước tính (`ROTATE_TURNS`,
     `ROTATE_TOKENS`) là giới hạn an toàn: `ensure --fresh`, cuộc hội thoại
     cũ bị xoá. Kiểm tra kích thước trong bản ghi SQLite của OpenClaw
@@ -2561,23 +2564,46 @@ khi đăng xuất, và với 0.6.60 khi đăng nhập (ROW của #7507).
     hội thoại, rồi mới thay.
   - **Xoá hội thoại.** Quên hết, đăng xuất, đổi engine, đóng khi rảnh
     (`KEPT_IDLE_MAX`), xoay vòng, huỷ và thay phiên kẹt đều đóng nó như
-    của OpenClaw, rồi xoá nó khỏi kho riêng của Hermes
-    (`delete_hermes_session`, trong `/var/lib/lampos-hermes/.hermes`, của
-    `lampos`): trong một giao dịch SQLite trên `state.db`, phiên đó, các
-    phiên trước nó trên chuỗi `parent_session_id` và mọi phiên sinh ra từ
-    bất kỳ phiên nào trong số đó (phần tiếp của một lần nén, một nhánh, một
-    uỷ quyền), nên id đọc trước một lần nén vẫn tới được phiên Hermes đã
-    chuyển sang; các dòng của mọi bảng thường có cột `session_id`
-    (`messages`, có trigger giữ chỉ mục tìm kiếm của Hermes, và các dòng
-    usage), rồi các dòng `sessions`; rồi transcript của từng phiên trong
-    `sessions/` (`<id>.json`, `<id>.jsonl`, `session_<id>.json`,
-    `request_dump_<id>_*.json`). Tối đa 10.000 phiên
-    (`HERMES_DELETE_MOST`); nhiều hơn thì không xoá gì. Nó không bao giờ
-    tạo kho. Lần xoá lỗi được ghi journal (`<id>'s Hermes session not
-    deleted: <why>`). `MEMORY.md` và kỹ năng của Hermes không phải phiên
-    và không bị đụng tới.
+    của OpenClaw, rồi xoá nó bằng CLI riêng của Hermes (`HermesDelete`):
+    lamp-tasks không bao giờ ghi vào kho của Hermes.
+    - **Những phiên nào.** Mọi id pane từng được nêu (`sessions` trong
+      `one-session.json`), các phiên trước mỗi id trên chuỗi
+      `parent_session_id` và mọi phiên sinh ra từ bất kỳ phiên nào trong số
+      đó (phần tiếp của một lần nén, một nhánh, một uỷ quyền), đọc từ
+      `/var/lib/lampos-hermes/.hermes/state.db` mở chỉ đọc (busy timeout
+      5 s), nên id đọc trước một lần nén vẫn tới được phiên Hermes đã
+      chuyển sang. Kho có bảng `sessions` thiếu `id` hoặc
+      `parent_session_id`, kho không đọc được, hoặc hơn 1.000 phiên
+      (`HERMES_DELETE_MOST`): chỉ các id đã ghi lại, có ghi journal
+      (`Hermes's store not read (<why>); only its recorded sessions are
+      deleted`). Không có `state.db`: không có gì để xoá, và Hermes không
+      được khởi động (CLI của nó sẽ tạo kho).
+    - **Cách xoá.** `hermes sessions delete <id> --yes`, mỗi phiên một lần
+      gọi, phiên con trước phiên cha (Hermes xoá tin nhắn, các uỷ quyền,
+      system prompt không còn dùng và transcript của phiên, nhưng chỉ tách
+      phiên nén hoặc phiên nhánh sinh ra từ nó), mỗi lần tối đa 20 s và cả
+      lượt tối đa 60 s. Nó chạy dưới user riêng của lamp-tasks (`lampos`)
+      qua wrapper của đèn `/usr/local/bin/hermes` (cách duy nhất Hermes của
+      đèn được khởi động: namespace của nó, file token forwarder nó tự đọc),
+      trong `/var/lib/lampos-hermes`, với môi trường chỉ có `PATH`,
+      `HERMES_HOME=/var/lib/lampos-hermes/.hermes` và `LAMP_NS_NET=run`
+      (không mạng). Thoát 0, hoặc `No session '<id>'` của Hermes (đã mất),
+      là xong. Id không phải ký tự thường (`A-Z a-z 0-9 _ - . :`, không bắt
+      đầu bằng `.` hoặc `-`, tối đa 128) không bao giờ được chuyển đi.
+    - **Bị từ chối.** Hermes từ chối phiên đang giữa lượt hoặc đang nén;
+      mỗi id bị từ chối được thử thêm một lần sau 2 s, khi pane đã đóng.
+      Vẫn bị từ chối (hoặc không có file token forwarder, hoặc quá giờ): nó
+      được ghi journal và giữ trong `one-session.json` là `hermes_pending`,
+      tồn tại qua cả việc gỡ bản ghi, và được thử lại ở lần khởi động kế
+      tiếp của lamp-tasks và cùng lần đóng kế tiếp.
+    - `MEMORY.md` và kỹ năng của Hermes không phải phiên và không bị đụng
+      tới.
   - **Lần chạy kỹ năng và make** vẫn chạy riêng từng lần (ở trên, và
-    `MakeHermes`).
+    `MakeHermes`). Một khoảng hở đã biết: wrapper của Hermes đọc file token
+    của mỗi lần chạy một lần duy nhất, lúc chính nó khởi động, trong
+    namespace của lần chạy đó, nên một Hermes được giữ đã khởi động không
+    nhận được token của lần chạy sau; cho tới khi làm được, lần chạy kỹ năng
+    Hermes giữ pane riêng (`skill_runs_share`).
 - **Xoay vòng và gỡ bỏ.** Phiên giữ lại của OpenClaw không bị xoay theo
   số lượt (gateway của nó tự nén phiên, `agents.defaults.compaction`); khi có
   xoay vòng thì là `ensure --fresh`. Huỷ, câu hỏi không ai trả lời, đăng xuất
@@ -2627,7 +2653,8 @@ khi đăng xuất, và với 0.6.60 khi đăng nhập (ROW của #7507).
   đèn (`ForgetSessions`, #6274) gỡ phiên được giữ như khi đăng xuất, khi
   không còn gì giữ nó: `harness close`, rồi xoá cuộc hội thoại (của
   OpenClaw bằng `sessions.delete` với `engineSession` của nó; của Hermes
-  khỏi `state.db` theo session id, #8151), rồi xoá file token, để việc tiếp theo không nhớ
+  bằng `hermes sessions delete` với từng session id nó từng được nêu,
+  #8151), rồi xoá file token, để việc tiếp theo không nhớ
   gì (`one_session::forgotten`). Phiên được giữ không có việc nào trong 7 ngày
   (`KEPT_IDLE_MAX`, tính từ lúc mở hoặc lượt cuối) cũng bị gỡ cùng cách, vì
   phiên của OpenClaw không bao giờ bị xoay theo số lượt (phiên Hermes cũng

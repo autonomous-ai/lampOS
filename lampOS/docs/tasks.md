@@ -5073,7 +5073,7 @@ exactly, the default when unset), every task and run is its own
   spoken tasks' answers the store read. The counts start at 0 when a pane
   is opened or adopted. At the next turn past either bound the old pane
   is closed `--now`, its conversation is deleted from its engine's own
-  store (OpenClaw's by `sessions.delete`, Hermes's from its `state.db`)
+  store (OpenClaw's by `sessions.delete`, Hermes's by `hermes sessions delete`)
   and its kept id forgotten, and a new one is opened,
   never adopted back. Within a pane, compaction is the engine's own.
 - **Per run, as before.** A skill run's folder `skill-<run id>`, its
@@ -5129,7 +5129,7 @@ The pane's words are kept in these places on the lamp, all owned by
 | The pane's folder, where `harness new` is started | `/var/lib/lampos-tasks/harnesses/lamp-tasks/one-session` | folder 0700 (lamp-tasks creates it); `/var/lib/lampos-tasks` is 0700 (`StateDirectoryMode=0700`) |
 | Harness's records of the pane (registry, stopped-agent record) | `/var/lib/lampos-tasks/.harness/cli/data/registry.json`, `.../cli/data/stopped-agents/` | inside the 0700 Harness home |
 | The conversation itself (OpenClaw session `agent:main:harness-<agent id>`) | `/var/lib/lampos-openclaw/state/agents/main/agent/openclaw-agent.sqlite` (older OpenClaw releases: `state/agents/main/sessions/*.jsonl`) | `/var/lib/lampos-openclaw` and `state` 0700 (lamp-update creates them); OpenClaw writes with no `UMask=`, so the 0700 folders keep other users out |
-| With a Hermes pane (#8151; Hermes session id as `session` in `one-session.json`) | `/var/lib/lampos-hermes/.hermes/state.db` (+ `-wal`, `-shm`), `sessions/` | `/var/lib/lampos-hermes` 0700 |
+| With a Hermes pane (#8151; Hermes session id as `session`, every one it was named as `sessions`, any whose delete failed as `hermes_pending`, in `one-session.json`) | `/var/lib/lampos-hermes/.hermes/state.db` (+ `-wal`, `-shm`), `sessions/` | `/var/lib/lampos-hermes` 0700 |
 
 When it is removed:
 
@@ -5137,8 +5137,9 @@ When it is removed:
   or the lamp's machine id changes, the `one-session` thread closes the
   pane `--now`, deletes its conversation (OpenClaw's through the gateway,
   `openclaw gateway call sessions.delete` with its transcript; Hermes's
-  from Hermes's own `state.db`, `delete_hermes_session`, below), and
-  deletes `one-session.json` (`OneSession::drop_pane`). Harness's
+  by Hermes's own `hermes sessions delete`, `HermesDelete`, below), and
+  deletes `one-session.json` (`OneSession::drop_pane`; a Hermes delete
+  that failed stays in it as `hermes_pending`). Harness's
   `close` keeps the engine's own store, which is why lamp-tasks deletes
   the session itself. Only a real move counts: the old and the new machine
   and engine both known and different. A read with either unknown
@@ -5295,7 +5296,9 @@ in and signed out, and on 0.6.60, signed in (#7507's ROW).
     compresses its context, and Harness follows it. The id is taken from
     every `ensure` (`engineSession`) and from a turn's `show` when Harness
     names one there (Harness 0.6.78's `show` names none), written to
-    `one-session.json` as `session`, never kept from an older open.
+    `one-session.json` as `session`, never kept from an older open. Every
+    id the pane was named is listed there too, as `sessions` (the newest
+    64), so a delete reaches each one.
   - **Rotation.** 40 turns or 250k estimated tokens (`ROTATE_TURNS`,
     `ROTATE_TOKENS`) is its safety bound: `ensure --fresh`, the rotated
     conversation deleted. OpenClaw's size check in its own SQLite record
@@ -5308,23 +5311,45 @@ in and signed out, and on 0.6.60, signed in (#7507's ROW).
     resumed plainly once, its conversation kept, then replaced.
   - **Its conversation deleted.** A forget-all, a sign-out, an engine
     switch, the idle close (`KEPT_IDLE_MAX`), a rotation, a cancel and a
-    stuck replacement close it as OpenClaw's, then delete it from Hermes's
-    own store (`delete_hermes_session`, in
-    `/var/lib/lampos-hermes/.hermes`, `lampos`'s): in one SQLite
-    transaction on `state.db`, the session, the sessions before it on its
-    `parent_session_id` chain and every session made from any of them (a
-    compression's continuation, a branch, a delegation), so an id read
-    before a compression still reaches the session Hermes moved to; the
-    rows of every ordinary table with a `session_id` column (`messages`,
-    whose triggers keep Hermes's search index, and its usage rows), then
-    the `sessions` rows; then each one's transcripts in `sessions/`
-    (`<id>.json`, `<id>.jsonl`, `session_<id>.json`,
-    `request_dump_<id>_*.json`). At most 10,000 sessions
-    (`HERMES_DELETE_MOST`); more deletes nothing. The store is never made
-    by it. A delete that fails is journaled (`<id>'s Hermes session not
-    deleted: <why>`). Hermes's `MEMORY.md` and skills are not sessions and
-    are not touched.
+    stuck replacement close it as OpenClaw's, then delete it with Hermes's
+    own CLI (`HermesDelete`): lamp-tasks never writes Hermes's store.
+    - **Which sessions.** Every id the pane was named (`sessions` in
+      `one-session.json`), the sessions before each on its
+      `parent_session_id` chain and every session made from any of them (a
+      compression's continuation, a branch, a delegation), read from
+      `/var/lib/lampos-hermes/.hermes/state.db` opened read-only (5 s busy
+      timeout), so an id read before a compression still reaches the
+      session Hermes moved to. A store whose `sessions` table lacks `id` or
+      `parent_session_id`, one that can't be read, or more than 1,000
+      sessions (`HERMES_DELETE_MOST`): only the recorded ids, journaled
+      (`Hermes's store not read (<why>); only its recorded sessions are
+      deleted`). No `state.db`: nothing to delete, and Hermes is not
+      started (its CLI would make the store).
+    - **How.** `hermes sessions delete <id> --yes`, one call per session,
+      children before their parents (Hermes deletes a session's messages,
+      delegations, unused system prompt and transcripts, but only detaches
+      a compression's or branch's session made from it), each bounded to
+      20 s and all to 60 s. It runs as lamp-tasks' own user (`lampos`)
+      through the lamp's wrapper `/usr/local/bin/hermes` (the one way the
+      lamp's Hermes is started: its namespace, the forwarder token file it
+      reads itself), in `/var/lib/lampos-hermes`, with only `PATH`,
+      `HERMES_HOME=/var/lib/lampos-hermes/.hermes` and `LAMP_NS_NET=run` (no
+      network) in its environment. An exit 0, or Hermes's `No session
+      '<id>'` (already gone), is done. An id that is not plain characters
+      (`A-Z a-z 0-9 _ - . :`, not starting with `.` or `-`, at most 128) is
+      never passed on.
+    - **A refusal.** Hermes refuses a session mid-turn or being compressed;
+      each refused id is tried once more 2 s later, the pane closed by
+      then. Still refused (or no forwarder token, or no answer in time): it
+      is journaled and kept in `one-session.json` as `hermes_pending`,
+      which outlives the record's removal, and tried again at lamp-tasks'
+      next start and with the next close.
+    - Hermes's `MEMORY.md` and skills are not sessions and are not touched.
   - **Skill runs and makes** still run per run (above, and `MakeHermes`).
+    A known gap: Hermes's wrapper reads each run's token file once, at its
+    own start, in that run's namespace, so a kept Hermes started once
+    can't take a later run's token; until it can, a Hermes skill run keeps
+    its own pane (`skill_runs_share`).
 - **Rotation and removal.** OpenClaw's kept session is not rotated by
   count (its gateway compacts the session itself, `agents.defaults.compaction`);
   a rotation, where one is due, is `ensure --fresh`. A cancel, an ask no one
@@ -5375,8 +5400,8 @@ in and signed out, and on 0.6.60, signed in (#7507's ROW).
   "forget everything" (`ForgetSessions`, #6274) drops the kept session as
   a sign-out does, once nothing holds it: `harness close`, then its
   conversation deleted (OpenClaw's by `sessions.delete` of its
-  `engineSession`; Hermes's from its `state.db` by its session id,
-  #8151), then its token file removed,
+  `engineSession`; Hermes's by `hermes sessions delete` of each session
+  id it was named, #8151), then its token file removed,
   so the next task recalls nothing (`one_session::forgotten`). A kept
   session left with no task for 7 days (`KEPT_IDLE_MAX`, from its open or its
   last turn) is dropped the same way, since OpenClaw's is never rotated by
