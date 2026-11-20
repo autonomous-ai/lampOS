@@ -87,7 +87,7 @@ fn round_one_says_its_force_and_the_make_ask_never_its_words() {
 /// played the make ask, and its first word, set off, was the lamp's name
 /// heard as another word (`wake_heard_as`): round 1 said `forced=none
 /// make_ask=n sentences=1`. On a line that names the lamp, the force reads
-/// the make past that word ([`past_the_name`]), as the made-skill matcher
+/// the make past that word ([`past_the_name_heard_as`]), as the made-skill matcher
 /// does; said to a person, the line names nothing and is not forced.
 const LYNN: &str = "Hey, Lynn, make me a skill that, when I say apple file, has an agent write three apple facts into a file for me.";
 const ANNA: &str = "Hey, Anna, make me a skill that, when I say apple file, has an agent write three apple facts into a file for me.";
@@ -107,9 +107,6 @@ fn a_make_past_the_lamps_name_heard_as_another_word_is_forced_on_a_named_line_al
     );
     // The same words heard again with no name heard are not forced.
     crate::tools::make_skill_asked::heard_named(LYNN, false);
-    assert!(
-        line(&made, LYNN).ends_with("forced=none make_ask=n sentences=1"),
-        "{}",
-        line(&made, LYNN)
-    );
+    let again = line(&made, LYNN);
+    assert!(again.ends_with("forced=none make_ask=n sentences=1"), "{again}");
 }

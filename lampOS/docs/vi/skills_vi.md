@@ -840,11 +840,30 @@ sau:
      forced=make_skill make_ask=y sentences=1`. `task_offered` và
      `make_offered` là `start_agent_task` và `make_skill` có được đưa hay
      không; `forced` là hàm mà `tool_choice` chỉ tên (`none` nếu không có);
-     `make_ask` là `asks_to_make` có khớp dòng của người nói hay không, và
-     `sentences` là số câu nó đếm được trong dòng. `?` khi services không
+     `make_ask` là dòng của người nói có yêu cầu tạo kỹ năng hay không,
+     theo đúng cách lệnh ép đọc (`make_skill_asked::make_asked`, xem dưới),
+     và `sentences` là số câu nó đếm được trong dòng. `?` khi services không
      cho biết được, hoặc khi message cuối không phải dòng của người nói.
      Chỉ có tên, `y`/`n` và một con số, không bao giờ có từ nào của dòng.
      Test: `round_one_forced::round_one_says_its_force_and_the_make_ask_never_its_words`.
+   - **Sau tên đèn bị nghe thành từ khác** (#8022 case 2, nguyên nhân
+     thứ ba: ROW của kit-8101 trên lamp-52e6, 20/11 14:38, phát yêu cầu
+     tạo kỹ năng; speech to text viết tên đèn thành một từ khác, tách bằng
+     dấu câu, và vòng 1 ghi `forced=none make_ask=n sentences=1`). Trên
+     một dòng gọi đèn (`named`: tên có trong lời, ghi chú của bộ dò tên,
+     hoặc đèn được đánh thức bằng tên ngay trước đó), lệnh ép còn đọc phần
+     dòng sau từ đó: `second_provider::past_the_name_heard_as`, phần còn
+     lại sau từ của `wake_heard_as`, cũng là cách đọc mà bộ so khớp kỹ
+     năng tự tạo (mục 6 của "Bắt đầu bằng chính lời của người dùng") dùng,
+     nên hai bên không thể lệch nhau. Lệnh ép chỉ thấy các message, nên
+     `named` của dòng được giữ cho nó theo chính lời của dòng
+     (`make_skill_asked::heard_named`, tối đa 16, ghi ở nơi dòng được trả
+     lời và nơi chat của nó bắt đầu trên lời sớm);
+     `make_skill_asked::make_asked` là thứ lệnh ép và `make_ask` của vòng
+     1 đọc. Một dòng không nói với đèn ("Hey, Anna, make me a skill that
+     …" nói với một người) được đọc như đã nói và không bị ép. Test:
+     `round_one_forced::a_make_past_the_lamps_name_heard_as_another_word_is_forced_on_a_named_line_alone`,
+     `wake_not_name::past_the_name_is_the_line_past_the_misheard_name_on_a_named_line`.
    - **Tạo kỹ năng không bao giờ là một task** (#8022 case 2, first builder
      đồng ý lúc 11:05): khi `make_skill` được khai báo, mô tả của
      `start_agent_task` kết thúc bằng "Making a skill is make_skill's, never this."
@@ -4716,7 +4735,13 @@ chính đèn (đèn, đầu, một câu nói). "When I say send my test note, em
    so khớp, cách viết đúng được ưu tiên trước (`skill_named::spelled_as`;
    row của #7916 trên lamp-9adf, 19/11: speech to text trả "Um, daily
    brief." về thành "Daily briefs."); "tell me about
-   your daily brief idea" có từ khác nên là của model. Câu phủ định, câu
+   your daily brief idea" có từ khác nên là của model. Một câu gọi đèn
+   bằng tên bị nghe thành từ khác ("Hey, Lynn. Mail check.") cũng được so
+   khớp bỏ qua từ đó, trên một dòng gọi đèn
+   (`second_provider::past_the_name_heard_as`, lệnh ép của
+   `LAMP_MAKE_SKILL_ASKED` cũng đọc nó; ROW của kit-8043 cho #8022,
+   lamp-52e6, 20/11 09:14: câu như vậy bị `calls=none`). Test:
+   `skill_named_words::a_made_skill_runs_past_the_lamps_name_heard_as_another_word`. Câu phủ định, câu
    hỏi, cụm hai kỹ năng cùng có, một phần của tên, hay khi đang giữ một
    lời đồng ý: không bắt đầu gì. Sau khi lời cuối của đèn hỏi điều gì đó
    (`remarks::lamp_asked`), câu là của model, được báo kỹ năng mà câu cũng

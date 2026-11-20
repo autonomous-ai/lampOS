@@ -3132,8 +3132,10 @@ lamp-c0a4) thì không đổi gì: OpenClaw vẫn là engine của đèn, và ph
   "Making a skill is make_skill's, never this." (`agent_tasks::MAKE_TOLD`, thêm trong
   `tools::core_tools`), chỉ khi cả hai vẫn vừa 1.024 byte của link; mô tả
   nào không vừa thì giữ nguyên. Không có `make_skill` thì câu này không
-  bao giờ được nói. Xem [skills_vi.md](skills_vi.md), "Tạo kỹ năng không
-  bao giờ là một task".
+  bao giờ được nói. Một yêu cầu tạo kỹ năng mà từ đầu tiên là tên đèn bị
+  nghe thành từ khác được ép gọi `make_skill` trên một dòng gọi đèn, bỏ
+  qua từ đó. Xem [skills_vi.md](skills_vi.md), "Tạo kỹ năng không bao giờ
+  là một task" và "Sau tên đèn bị nghe thành từ khác".
 - **Các engine của đèn, có nêu hay không, và lựa chọn trong app (#6492).**
   Không có gì trên đèn được dựng riêng cho từng engine: Harness có nhiều
   engine, Hermes và OpenClaw chỉ là hai trong số đó. Các engine của đèn là
