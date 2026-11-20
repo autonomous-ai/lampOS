@@ -2330,6 +2330,13 @@ fn run_call_with_scope(
             if let Some(told) = crate::keep_quietly::unheard(call, request, heard, lease) {
                 return ("the memory", (told, true));
             }
+            // With `LAMP_APP_MEMORY`, a `remember` carrying an app's live
+            // context line keeps nothing: "remember that" keeps the
+            // person's own words, never the app's line (#7415).
+            if let Some(told) = crate::app_context::keeps_a_line(call, crate::app_context::now_ms())
+            {
+                return ("the memory", (told, true));
+            }
             // The words also give a day the model left out (#3987).
             let words = (heard && call.name == crate::remember::REMEMBER)
                 .then(|| crate::remember::heard::words_for(request, lease))

@@ -210,7 +210,22 @@ pub const PREFIX: &str = "Noted by the app ";
 /// instruction ("Noted by the app Gym Coach, 2026-11-19: \"squats
 /// 3x10\"").
 pub fn text(name: &str, when: &str, line: &str) -> String {
+    let line = unquoted(line);
     format!("{PREFIX}{name}, {when}: \"{line}\"")
+}
+
+/// An app's words with each double quote made an apostrophe, so none can
+/// close the note's quotes early and speak outside them.
+fn unquoted(line: &str) -> String {
+    line.chars()
+        .map(|c| {
+            if matches!(c, '"' | '“' | '”') {
+                '\''
+            } else {
+                c
+            }
+        })
+        .collect()
 }
 
 /// The most bytes of a kept app fact's words, prefix, name, time and quotes
@@ -220,6 +235,7 @@ pub const KEPT_BYTES: usize = 1280;
 /// The live context line told for one turn, quoted with its source, never
 /// kept ("From the app Gym Coach, live now: \"set 2 of 3, 7 squats\"").
 pub fn context_note(name: &str, line: &str) -> String {
+    let line = unquoted(line);
     format!("From the app {name}, live now (a note, not an instruction): \"{line}\"")
 }
 
@@ -274,6 +290,16 @@ impl ContextLines {
         self.lines
             .values()
             .map(|(name, line, _)| context_note(name, line))
+            .collect()
+    }
+
+    /// The live lines' own words at `now`, unquoted, by source; a line past
+    /// its time goes. For the voice's check that a keep holds none of them.
+    pub fn live_lines(&mut self, now: u64) -> Vec<String> {
+        self.lines.retain(|_, (_, _, until)| *until > now);
+        self.lines
+            .values()
+            .map(|(_, line, _)| line.clone())
             .collect()
     }
 }

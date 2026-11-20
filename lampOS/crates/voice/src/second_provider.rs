@@ -5580,6 +5580,10 @@ impl Engine {
         self.shared
             .private_now
             .store(!(now.0 && now.2), Ordering::SeqCst);
+        // Lamp private: no app's live line outlasts it (`LAMP_APP_MEMORY`).
+        if !(now.0 && now.2) {
+            crate::app_context::clear_all();
+        }
         if self.privacy.replace(now).is_some_and(|was| was != now) {
             // A write read back and waiting for its send goes too
             // (Thirteen's P2 on #5968).
@@ -12483,6 +12487,13 @@ async fn spoken(
         // and ids, so "never mind the gold one" can drop one. None waiting
         // (always, with the switch off), nothing.
         .chain(crate::make_queue::note())
+        // An app's live context lines (`LAMP_APP_MEMORY`, #7415), each a
+        // quoted note with its source, by #7900's short-lived note: told
+        // for this turn only, never kept; nothing while Lamp is private.
+        .chain(crate::app_context::notes(
+            crate::app_context::now_ms(),
+            shared.private_now.load(Ordering::SeqCst),
+        ))
         .chain(records)
         .chain(read_ids)
         .chain(remembered)
