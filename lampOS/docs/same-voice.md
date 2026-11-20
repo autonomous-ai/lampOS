@@ -736,8 +736,11 @@ prints for the services alone:
   owner's), never written and never sent. It is dropped once its line can
   no longer be joined: when its request ends, its answer said
   (`Voices::request_ended`, from `Did::Said`), one still to come dropped as
-  it comes, or when the line after the one that cut it begins, so at most
-  the newest two lines' are held. The journal says each such ask
+  it comes; when the line after the one that cut it begins, so at most the
+  newest two lines' are held; and, answered or not, followed or not, once
+  `CHAIN_MOST_FOR` (20 s, the longest a chain of cut lines keeps a piece)
+  has passed since it came, checked every second on a thread of its own
+  (`Voices::forget_old_join_prints`, the Reviewer-lead's P2 on #8147). The journal says each such ask
   (`asked for its voice print for the join alone`), beside the child's
   time for every print (`its voice print came N ms after it was asked`),
   for the cost on a lamp.

@@ -4979,6 +4979,9 @@ pub fn serve(
                 heeding.printing_for_the_join_too();
             }
         }
+        if joins && printing == Printing::ForServices {
+            forgetting_old_join_prints(&heeding);
+        }
         // What is linked, told to the owner's line, asked again as each line
         // begins (#5523), with or without the services' prints.
         if let Some(linked) = linked_told
@@ -8432,6 +8435,39 @@ fn confirming_where(printing: Printing, confirms: Option<f32>) -> Option<f32> {
 /// recorded and "no other voice" would always hold).
 fn voice_shows_another(printing: Printing, confirms: Option<f32>) -> bool {
     printing == Printing::ForEverything && confirms.is_none()
+}
+
+/// Every second, the prints made for the join alone on `heeding` that came
+/// `CHAIN_MOST_FOR` ago or more are dropped
+/// (`Voices::forget_old_join_prints`, #8003), on a thread of its own that
+/// ends with the rule.
+fn forgetting_old_join_prints(heeding: &Arc<Mutex<Heeding>>) {
+    let kept = Arc::downgrade(heeding);
+    let started = std::thread::Builder::new()
+        .name("second-join-prints".into())
+        .spawn(move || {
+            loop {
+                std::thread::sleep(Duration::from_secs(1));
+                let Some(heeding) = kept.upgrade() else {
+                    return;
+                };
+                if let Ok(mut heeding) = heeding.lock()
+                    && let Some(voices) = heeding.kept_voices()
+                {
+                    voices.forget_old_join_prints();
+                }
+            }
+        });
+    if let Err(why) = started {
+        eprintln!(
+            "lamp-voice second: prints for the join alone cannot be timed out: {why}; none are made (LAMP_JOIN_CUT_WORDS)"
+        );
+        if let Ok(mut heeding) = heeding.lock()
+            && let Some(voices) = heeding.for_services.take()
+        {
+            heeding.for_services = Some(voices.printing_for_the_join_too(false));
+        }
+    }
 }
 
 /// The services' prints on `heeding`, made only while `linked` says a
