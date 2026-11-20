@@ -48,7 +48,9 @@ from markers import parse_marker, quoted, names_commit, writers_from_args, is_wr
 # VOIDED and VOIDS too; FAILOVER is no verdict.
 FAILED = re.compile(r"\b(?:FAIL|VOID)(?:ED|S)?\b")
 PASSED = re.compile(r"\bPASS\b")
-NO_ROW = re.compile(r"(?i)\bno row needed\b")
+# 20 Nov (#8066): a "no row needed" inside inline quotes ("…", “…”, '…', `…`) is mentioned, not said, and never
+# counts. The Reviewer-lead's READ-OK said: I'd rather not call it "no row needed", and the bot took it as a reader's.
+NO_ROW = re.compile(r"(?i)(?<![\"“‘'`])\bno row needed\b(?![\"”’'`])")
 LAMP = re.compile(r"(?<![\w-])lamp-(?=[0-9a-f]{0,3}[0-9])[0-9a-f]{4}(?![\w-])")
 BUILD = re.compile(r"\b(?i:build|installed|on)[ \t]+[*`]*\d{5}(?!\w)|\bbuild[ \t]+`?[0-9a-f]{7,40}\b")
 FENCE_OPEN = re.compile(r" {0,3}(`{3,}|~{3,})")
