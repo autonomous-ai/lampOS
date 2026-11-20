@@ -1786,6 +1786,10 @@ fn worker_command(
             role,
             var(crate::keep_quietly::ENVIRONMENT).as_deref(),
         ))
+        .envs(app_memory_worker_environment(
+            role,
+            var(crate::app_context::ENVIRONMENT).as_deref(),
+        ))
         .envs(memory_remember_once_worker_environment(
             role,
             var(crate::remember::REMEMBER_ONCE_ENVIRONMENT).as_deref(),
@@ -2563,6 +2567,17 @@ fn keep_quietly_worker_environment(
 ) -> Option<(&'static str, &'static str)> {
     (role == "second" && value == Some(std::ffi::OsStr::new("on")))
         .then_some((crate::keep_quietly::ENVIRONMENT, "on"))
+}
+
+// An app's live context lines (`LAMP_APP_MEMORY`, #7415), the same narrow
+// way: the exact `on`, to the second route alone, whose spoken turns tell
+// them and whose `remember` refuses one that carries a line.
+fn app_memory_worker_environment(
+    role: &str,
+    value: Option<&std::ffi::OsStr>,
+) -> Option<(&'static str, &'static str)> {
+    (role == "second" && value == Some(std::ffi::OsStr::new("on")))
+        .then_some((crate::app_context::ENVIRONMENT, "on"))
 }
 
 // The private room (`person::private_room`), to the two routes that run the
@@ -4205,6 +4220,12 @@ mod tests {
                     (
                         keep_quietly_worker_environment,
                         "LAMP_KEEP_QUIETLY",
+                        ["second"].as_slice(),
+                    ),
+                    // An app's live context lines: the second route alone.
+                    (
+                        app_memory_worker_environment,
+                        "LAMP_APP_MEMORY",
                         ["second"].as_slice(),
                     ),
                     // A remember of what is kept already (#2176).

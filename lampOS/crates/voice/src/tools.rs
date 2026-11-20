@@ -2153,6 +2153,8 @@ pub(crate) fn forget_confirmation_voice(
         return;
     }
     if name == crate::remember::FORGET_EVERYTHING {
+        // An app's live context lines go too (`LAMP_APP_MEMORY`, #7415).
+        crate::app_context::forget_with_everything(name, told);
         if let Some(lease) = lease
             && lease.everything_marked()
             && (told["forgotten"] == true || told["note"] == "I was keeping nothing of them.")
@@ -2733,6 +2735,10 @@ fn run_call_with_scope(
                 && told.get("error").is_none()
             {
                 crate::made_skill::forget_all_notes_soon();
+            }
+            // And every app's live context line (`LAMP_APP_MEMORY`, #7415).
+            if heard {
+                crate::app_context::forget_with_everything(&model.name, &told);
             }
             ("the memory", (told, answered))
         }
