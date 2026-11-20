@@ -273,6 +273,24 @@ fn net_not_agent_task_told() -> String {
     )
 }
 
+/// What DeepSeek is told of a linked-service skill's script: the one-line
+/// hand-over to the lamp's agent ([`AGENT_SERVICES_EXAMPLE`]).
+const STUB_SCRIPT_TOLD: &str = "and one ```scripts/main.py block that is exactly the example's one line, which holds no token.";
+
+/// What the lamp's agent is told in its place (#8157): its scripts are
+/// written whole at the make.
+const AGENTS_SCRIPT_TOLD: &str = "and its scripts written now, whole, never the example's one \
+     line: scripts/main.py reads the service itself with await lamp.service_read(service, args) \
+     and prints what you sum up at each run, with any helper script beside it; a script never \
+     holds a token.";
+
+/// The making rules as the lamp's agent is given them (#8157): DeepSeek's,
+/// a linked-service skill's one-line script told as the agent's whole
+/// scripts ([`AGENTS_SCRIPT_TOLD`]).
+fn agents_own_scripts(system: &str) -> String {
+    system.replacen(STUB_SCRIPT_TOLD, AGENTS_SCRIPT_TOLD, 1)
+}
+
 /// [`AGENT_SERVICES_EXAMPLE`]'s script: it only says the task is the
 /// lamp's agent's. Tests only: the lib reads the example whole.
 #[cfg(test)]
@@ -4201,6 +4219,9 @@ fn handed_to_agent(
         system
     };
     let _net_code = net_code.then(made_skill::NetCode::on);
+    // #8157: the lamp's agent writes a linked-service skill's scripts
+    // whole at the make, never the one-line hand-over DeepSeek writes.
+    let system = agents_own_scripts(&system);
     // Its `internet:` line taken as the prompt it was given says.
     let net = crate::make_no_cannot::net_by_agent();
     // The waiting line with the first hand-over only, and never when the
@@ -12594,8 +12615,8 @@ printf 'tar of %s' \"$name\" > \"$3/$name-1.0.0.tar\"\n",
     }
 
     /// #6811, the switch off: a draft on someone at the desk is DeepSeek's
-    /// as before, no judgement, the agent never asked and no `made_with`
-    /// written.
+    /// as before, no judgement, the agent never asked; `made_with` is
+    /// written all the same (#8157: always the engine that wrote it).
     #[test]
     fn with_the_switch_off_a_presence_draft_is_deepseeks_as_before() {
         made_skill::set_reactions_here(Some(false));
@@ -12606,7 +12627,10 @@ printf 'tar of %s' \"$name\" > \"$3/$name-1.0.0.tar\"\n",
         assert_eq!(told["made"], "sip-at-desk", "{told}");
         assert_eq!(served.join().unwrap(), 1);
         assert_eq!(tasks.hand_overs(), 0);
-        assert_eq!(made_with_of(&keeping, "sip-at-desk"), None);
+        assert_eq!(
+            made_with_of(&keeping, "sip-at-desk").as_deref(),
+            Some("deepseek")
+        );
         made_skill::set_reactions_here(None);
         let _ = std::fs::remove_dir_all(&root);
     }
@@ -13886,5 +13910,16 @@ printf 'tar of %s' \"$name\" > \"$3/$name-1.0.0.tar\"\n",
         );
         crate::long_make::set_on_here(None);
         let _ = std::fs::remove_dir_all(&root);
+    }
+
+    /// #8157: the agent is never told to write the one-line hand-over
+    /// script for a linked service; DeepSeek still is.
+    #[test]
+    fn the_agent_is_told_to_write_a_services_scripts_whole() {
+        let told = agent_services();
+        assert!(told.contains(STUB_SCRIPT_TOLD), "DeepSeek's rules name it");
+        let agents = agents_own_scripts(&told);
+        assert!(!agents.contains(STUB_SCRIPT_TOLD));
+        assert!(agents.contains("lamp.service_read"), "{agents}");
     }
 }

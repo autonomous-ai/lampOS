@@ -620,6 +620,94 @@ pub fn set_tasks_dir(directory: PathBuf) {
     let _ = TASKS.set(directory);
 }
 
+/// #8157: the tasks part's folder a made skill's tried run is asked in:
+/// the second route's worker's (`--tasks-dir`), else the coordinator's
+/// `LAMP_TASKS_DIR` (the app's MAKE IT), absolute only; none, and nothing
+/// is tried (tests, a lamp with no tasks part).
+pub fn try_tasks_dir() -> Option<PathBuf> {
+    TASKS.get().cloned().or_else(|| {
+        std::env::var(agent_tasks::ENVIRONMENT)
+            .ok()
+            .map(PathBuf::from)
+            .filter(|dir| dir.is_absolute())
+    })
+}
+
+/// The longest a made skill's tried run is waited for: lamp-tasks runs up
+/// to 4 scripts of 30 s each (`lamp_tasks::make_try`), and a margin.
+pub const TRY_WITHIN: Duration = Duration::from_secs(4 * 30 + 30);
+
+/// A made skill's tried run (#8157), as lamp-tasks answered it.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum Tried {
+    /// Each script ran and passed; a `run` step's said `said` lines.
+    Passed { said: u32 },
+    /// The skill has no script: nothing to try.
+    Nothing,
+    /// A script failed its try: lamp-tasks' words, for a repair.
+    Failed(String),
+    /// The try couldn't be made (an older lamp-tasks, its fence, its
+    /// token): why. The skill is kept as before, journaled.
+    NotTried(String),
+}
+
+/// [`Tried`] of lamp-tasks' `answer` to a try's line.
+pub fn tried_of(answer: &Value) -> Tried {
+    if answer["ok"] != true {
+        return Tried::NotTried(code(answer));
+    }
+    match (answer["tried"].as_bool(), answer["passed"].as_bool()) {
+        (Some(false), _) => Tried::Nothing,
+        (Some(true), Some(true)) => Tried::Passed {
+            said: answer["said"]
+                .as_u64()
+                .and_then(|said| u32::try_from(said).ok())
+                .unwrap_or(0),
+        },
+        (Some(true), Some(false)) => Tried::Failed(
+            answer["why"]
+                .as_str()
+                .unwrap_or("it failed when tried")
+                .to_owned(),
+        ),
+        _ => Tried::NotTried("lamp-tasks' answer can't be read".into()),
+    }
+}
+
+/// A made skill `name` with its `files` (path in its folder to text) tried
+/// once by lamp-tasks in `tasks` (#8157, `"op":"make_try"` on its make
+/// socket), whichever agent made it.
+pub fn try_made(
+    tasks: &std::path::Path,
+    name: &str,
+    files: &std::collections::BTreeMap<String, String>,
+) -> Tried {
+    let asked = || -> Result<Value, String> {
+        let mut stream = UnixStream::connect(tasks.join(MAKE_SOCKET_NAME))
+            .map_err(|error| format!("lamp-tasks can't be reached: {error}"))?;
+        stream
+            .set_write_timeout(Some(SEND_WITHIN))
+            .and_then(|()| stream.set_read_timeout(Some(TRY_WITHIN)))
+            .and_then(|()| {
+                writeln!(
+                    stream,
+                    "{}",
+                    json!({"op": "make_try", "name": name, "files": files})
+                )
+            })
+            .map_err(|error| format!("the try was not sent: {error}"))?;
+        let mut text = String::new();
+        BufReader::new(std::io::Read::take(stream, MOST_ANSWER_BYTES as u64))
+            .read_line(&mut text)
+            .map_err(|error| format!("lamp-tasks' answer: {error}"))?;
+        serde_json::from_str(&text).map_err(|_| "lamp-tasks' answer can't be read".to_owned())
+    };
+    match asked() {
+        Ok(answer) => tried_of(&answer),
+        Err(why) => Tried::NotTried(why),
+    }
+}
+
 /// The lamp's agent, reached through the tasks part.
 #[derive(Clone, Debug)]
 pub struct Agent {
@@ -1823,5 +1911,62 @@ pub(crate) mod tests {
         for off in [None, Some(""), Some("off"), Some("ON"), Some("1")] {
             assert!(!on_with(off), "{off:?}");
         }
+    }
+
+    /// #8157: lamp-tasks' answer to a made skill's try, read as it is.
+    #[test]
+    fn a_tried_runs_answer_is_read_as_passed_failed_nothing_or_not_tried() {
+        assert_eq!(
+            tried_of(&json!({"ok": true, "tried": true, "passed": true, "said": 2})),
+            Tried::Passed { said: 2 }
+        );
+        assert_eq!(
+            tried_of(&json!({"ok": true, "tried": false})),
+            Tried::Nothing
+        );
+        assert_eq!(
+            tried_of(&json!({"ok": true, "tried": true, "passed": false, "why": "x exited 1"})),
+            Tried::Failed("x exited 1".into())
+        );
+        assert_eq!(
+            tried_of(&json!({"ok": false, "error": "not_tried", "message": "no token"})),
+            Tried::NotTried("not_tried".into())
+        );
+        // An older lamp-tasks that reads it as no make's line.
+        assert!(matches!(
+            tried_of(&json!({"ok": false, "error": "bad_request"})),
+            Tried::NotTried(_)
+        ));
+    }
+
+    /// #8157: the try goes on the make socket as one line with the skill's
+    /// files, whichever agent made it; no socket, it is not tried.
+    #[test]
+    fn a_made_skill_is_sent_whole_to_be_tried() {
+        let dir = std::env::temp_dir().join(format!("voice-try-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        let mut files = std::collections::BTreeMap::new();
+        files.insert("skill.toml".to_owned(), "asks = [\"x\"]\n".to_owned());
+        files.insert("scripts/main.py".to_owned(), "print(1)\n".to_owned());
+        assert!(matches!(try_made(&dir, "x", &files), Tried::NotTried(_)));
+        let listener = UnixListener::bind(dir.join(MAKE_SOCKET_NAME)).unwrap();
+        let served = std::thread::spawn(move || {
+            let (mut stream, _) = listener.accept().unwrap();
+            let mut line = String::new();
+            BufReader::new(&stream).read_line(&mut line).unwrap();
+            writeln!(
+                stream,
+                r#"{{"ok":true,"tried":true,"passed":true,"said":1}}"#
+            )
+            .unwrap();
+            serde_json::from_str::<Value>(&line).unwrap()
+        });
+        assert_eq!(try_made(&dir, "x", &files), Tried::Passed { said: 1 });
+        let line = served.join().unwrap();
+        assert_eq!(line["op"], "make_try");
+        assert_eq!(line["name"], "x");
+        assert_eq!(line["files"]["scripts/main.py"], "print(1)\n");
+        let _ = std::fs::remove_dir_all(&dir);
     }
 }

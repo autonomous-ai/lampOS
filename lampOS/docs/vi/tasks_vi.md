@@ -1252,6 +1252,60 @@ trên `PATH` đăng nhập của `lampos` (lần tìm thất bại thì giữ l�
 vẫn đúng qua nhiều vòng chỉ được ghi log một lần. Lần chạy của kỹ năng vẫn
 chỉ tới Hermes (`HarnessRunner`, ở trên).
 
+### Lần chạy thử của kỹ năng được tạo (`make_try`, #8157)
+
+Trước khi voice giữ một kỹ năng có code nó đã tạo, dù agent nào tạo, nó nhờ
+lamp-tasks chạy thử một lần ([skills_vi.md](skills_vi.md), "Một kỹ năng được
+tạo một lần và trọn vẹn"); `lamp_tasks::make_try`.
+
+- **Dòng lệnh**, trên socket tạo kỹ năng, chỉ từ lamp-voice như một lần tạo:
+  `{"op":"make_try","name","files"}`, các tệp theo đường dẫn trong thư mục
+  kỹ năng (`skill.toml`, `SKILL.md`, `scripts/...`), tối đa 64. Mỗi lần một
+  lần thử (lần khác bị từ chối `busy`), bên cạnh chỗ của lần tạo.
+- **Thử gì** (`make_try::plan`): script của bước `run`; hoặc, với bước `task`
+  và không có bước `run`, mỗi tệp `.py` trong `scripts/` (của task và các
+  script trợ giúp), tối đa 4. Không có bước script: `{"ok":true,"tried":false}`.
+- **Cách làm**: tệp của kỹ năng được ghi vào thư mục `make-try-*` trong thư
+  mục làm việc của lần tạo (được dọn cùng các thư mục tạo khi khởi động), một
+  token được tạo trên socket admin của lamp-control cho đúng quyền của bản
+  nháp (`{"mint":{"try":[...],"run"}}`, `Tokens::mint_try`; `net` là socket
+  egress riêng của lần chạy, như lần chạy kỹ năng, chỉ khi `LAMP_TASK_NET`
+  bật), và lamp-tasks tự khởi động thành `lamp-tasks make-try-fence`
+  (`make_try::fence_main`) với grant ở stdin: nó trở thành cùng hàng rào mà
+  lần chạy của agent gateway nhận từ launcher skill-start
+  (`skill_start::exec_fence`, `gateway::FENCE_TEXT`; fd 4 là nơi bỏ đi thay
+  cho socket của launcher). Không agent nào tham gia. Mỗi script chạy một
+  lần, tối đa 30 s (`TRY_WITHIN`), rồi bị dừng; đầu ra giữ tối đa 8 KiB.
+- **Đánh giá** (`make_try::judged`): thoát 0 đúng hạn; script của bước `run`
+  đã nói ít nhất một câu (`said` trong câu trả lời `end` của lamp-control,
+  `Tokens::end_said`; lamp-control cũ không báo thì không bị tính là lỗi);
+  script của task có in ra gì đó. Trả lời
+  `{"ok":true,"tried":true,"passed":true,"said":N}` hoặc
+  `{"ok":true,"tried":true,"passed":false,"why"}` (lời này về lần sửa của
+  voice); lần thử không khởi động được (không token, không hàng rào) bị từ
+  chối `not_tried`.
+- **Không gửi gì**: lamp-control đánh dấu token là chạy thử; lệnh
+  `service.write` của nó được trả lời `{"result":{"sent":false,"tried":true}}`
+  và không bao giờ tới lamp-services, dù dịch vụ liên kết bật hay tắt; lệnh
+  đọc chạy thật.
+- **Số câu đã nói** (cũng cho bước `run` của #8158): lamp-control đếm mỗi
+  `say` mà loa đã nhận cho client của một lần chạy (`runs::Run::said`) và
+  trả lời `{"end":{"run"}}` trên socket admin bằng `{"ended":true,"said":N}`.
+
+Kiểm thử: `a_run_step_tries_its_script_and_a_task_each_of_its_scripts`,
+`a_try_passes_only_on_exit_0_in_time_and_for_a_run_step_a_say`,
+`a_tried_run_is_answered_and_its_folder_removed`,
+`a_silent_run_step_fails_its_try_with_words_for_the_repair`,
+`a_skill_that_sends_is_tried_with_its_own_grants`,
+`the_fence_launch_mints_a_tried_token_and_reads_its_says`,
+`a_fence_that_runs_past_its_limit_is_ended`; của lamp-control
+`a_tried_runs_write_is_stubbed_and_its_read_is_live`,
+`a_tried_runs_write_is_stubbed_with_services_off`,
+`a_runs_says_are_counted_to_its_end`,
+`a_runs_says_are_counted_and_a_tried_run_is_marked`,
+`a_tried_runs_grants_are_the_drafts_own` và
+`a_tried_run_is_minted_the_drafts_grants_and_its_end_tells_its_says`.
+
 ### Một yêu cầu nói trực tiếp trên socket tạo kỹ năng (`voice_ask`, tắt trừ khi bật)
 
 Quyết định của chủ đèn ngày 17/11: một lần đọc dịch vụ đã liên kết, và một
