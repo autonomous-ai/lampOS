@@ -853,7 +853,10 @@ sau:
      một dòng gọi đèn (`named`: tên có trong lời, ghi chú của bộ dò tên,
      hoặc đèn được đánh thức bằng tên ngay trước đó), lệnh ép còn đọc phần
      dòng sau từ đó: `second_provider::past_the_name_heard_as`, phần còn
-     lại sau từ của `wake_heard_as`, cũng là cách đọc mà bộ so khớp kỹ
+     lại sau từ của `wake_heard_as`, hoặc sau chính tên đèn được tách bằng
+     dấu chấm hay dấu phẩy (`name_call_rest`: "Hey Lamp." rồi mới tới lời
+     tạo kỹ năng, thành hai câu, ba lần trên ba ở ROW thứ hai của kit-8101,
+     15:54), cũng là cách đọc mà bộ so khớp kỹ
      năng tự tạo (mục 6 của "Bắt đầu bằng chính lời của người dùng") dùng,
      nên hai bên không thể lệch nhau. Lệnh ép chỉ thấy các message, nên
      `named` của dòng được giữ cho nó theo chính lời của dòng
