@@ -3656,13 +3656,25 @@ là phần của một coder khác trong #6226; thiết kế:
 lần merge mà OpenClaw 2026.11.2 từ chối, 78/CONFIG, đã làm gateway của
 lamp-52e6 chết): văn bản đã đổi được ghi vào một file mới 0600 cạnh
 `openclaw.json`, và `config validate --json` của chính OpenClaw chạy trên
-file đó qua wrapper `/usr/local/bin/openclaw` của lamp-update
-(`openclaw_config::validate`), trỏ tới file đó bằng `OPENCLAW_CONFIG_PATH`,
-không bao giờ file đang dùng, nhập vào namespace của gateway đang chạy như
-mọi lần gọi khác của wrapper (không bao giờ `LAMP_OPENCLAW_GATEWAY=on`:
-OpenClaw 2026.11.2 từ chối lần kiểm tra trong namespace riêng khi gateway
-của nó đang chạy, `GatewayLockNamespaceError`, ROW FAIL của #7268 trên
-lamp-52e6), trong môi trường riêng của OpenClaw, tối đa 60 s. Chỉ status 0 mới rename nó vào chỗ
+file đó (`openclaw_config::validate`), trỏ tới file đó bằng
+`OPENCLAW_CONFIG_PATH`, không bao giờ file đang dùng, trong môi trường
+riêng của OpenClaw, tối đa 60 s. Khi `lamp-openclaw-gateway.service` có
+`MainPID` (gateway đang chạy), nó chạy qua wrapper `/usr/local/bin/openclaw`
+của lamp-update, nhập vào namespace của gateway đang chạy như mọi lần gọi
+khác của wrapper (không bao giờ `LAMP_OPENCLAW_GATEWAY=on`: OpenClaw
+2026.11.2 từ chối lần kiểm tra trong namespace riêng khi gateway của nó
+đang chạy, `GatewayLockNamespaceError`, ROW FAIL của #7268 trên
+lamp-52e6). Không có gateway nào chạy (`MainPID` 0) thì không có lock nào
+để va chạm, và nó chạy trong `openclaw-ns` riêng với một
+`LAMP_HERMES_TOKEN` thay thế, đúng lệnh mà khối `gateway` của lamp-update
+và lần reset của lamp-setup chạy khi không có gateway
+(`openclaw_install::own_namespace_validate_argv`: `validate_argv` bỏ
+`runuser`, vì lamp-tasks đã là `lampos`; #8060). Nhờ vậy một config mà
+OpenClaw từ chối đã nằm sẵn trong `openclaw.json`, khiến gateway không
+khởi động được (Restart=on-failure, rồi "Start request repeated too
+quickly"), sẽ được thay ở lần ghi kế tiếp của lamp-tasks bằng văn bản đã
+merge mà OpenClaw chấp nhận; văn bản đã merge bị OpenClaw từ chối thì vẫn
+không ghi gì. Chỉ status 0 mới rename nó vào chỗ
 (`hermes_config::replace_checked`). Bị từ chối (hoặc quá 60 s) thì file mới
 bị xóa, `openclaw.json` giữ nguyên từng byte, và dòng nhật ký nói
 "OpenClaw's settings not written: ... OpenClaw's own config check refused
@@ -3670,15 +3682,16 @@ it (status 1): <lời của OpenClaw>". Không có wrapper ở
 `/usr/local/bin/openclaw` (OpenClaw chưa cài) thì văn bản được ghi như
 trước, kèm dòng nhật ký "written unchecked". Wrapper không chạy được
 OpenClaw (không có token của forwarder, không có Node) thì từ chối, nên
-không ghi gì cho tới lần lamp-tasks khởi động sau. Không có gateway đang chạy
-thì wrapper cũng đóng an toàn, và lamp-tasks có thể khởi động trước gateway
-(lúc boot, hoặc một lần cập nhật khởi động lại cả hai: HOLD của #7268), nên
-riêng lần từ chối đó ("is not running in its own namespaces" của wrapper,
-hoặc "'node': No such file or directory" từ một gateway vừa khởi động) được
-thử lại sau 5, 10, 20, 40 s rồi 60 s bốn lần, tổng 5 phút 15 s
+không ghi gì cho tới lần lamp-tasks khởi động sau. lamp-tasks có thể khởi
+động cùng lúc với gateway (lúc boot, hoặc một lần cập nhật khởi động lại cả
+hai: HOLD của #7268), nên riêng trường hợp gateway mà lần kiểm tra chưa nhập
+vào được ("is not running in its own namespaces" của wrapper dù có
+`MainPID`, hoặc "'node': No such file or directory" từ một gateway vừa khởi
+động), hoặc gateway vừa lên giữa lúc kiểm tra trong `openclaw-ns` riêng
+(`GatewayLockNamespaceError`, #8060), được thử lại sau 5, 10, 20, 40 s rồi 60 s bốn lần, tổng 5 phút 15 s
 (`openclaw_config::GATEWAY_WAITS`), mỗi lần chờ một dòng nhật ký
 "OpenClaw's settings wait for its gateway to check them; tried again in N
-s"; không ghi gì trước khi gateway kiểm tra nó. Lần kiểm tra bị một signal
+s"; không ghi gì trước khi OpenClaw kiểm tra nó. Lần kiểm tra bị một signal
 kết thúc trước khi OpenClaw trả lời ("status killed": trên lamp-52e6,
 lamp-tasks và gateway khởi động lại cùng lúc và lần kiểm tra đua với lúc
 gateway tự khởi động, FINDING của #7268), hoặc bị kill vì quá giới hạn 60 s
@@ -3701,14 +3714,17 @@ lamp-setup (cắt còn
 `lamp-openclaw-gateway.service` có `MainPID` (gateway đang chạy) thì chạy
 qua wrapper, nhập vào namespace của gateway như lamp-tasks; không có
 gateway nào chạy (như lúc cài lần đầu) thì không có lock nào để va chạm,
-nên chạy trong `openclaw-ns` riêng như trước. `GATEWAY_WAITS`,
-`NO_GATEWAY`, `NODE_NOT_READY` và `gateway_not_there` giờ nằm ở
+nên chạy trong `openclaw-ns` riêng như trước. Lần kiểm tra của lamp-tasks
+chọn cùng cách đó từ cùng `MainPID` (`openclaw_install::gateway_runs` và
+`main_pid_argv`, lần reset cũng dùng; #8060). `GATEWAY_WAITS`,
+`NO_GATEWAY`, `NODE_NOT_READY`, `GATEWAY_CAME_UP` và `gateway_not_there`
+giờ nằm ở
 `lamp_checked_replace` (lamp-tasks vẫn xuất lại chúng trong
 `openclaw_config`, lamp-update xuất lại `NODE_NOT_READY` trong
 `openclaw_install`, và một test ghim `NO_GATEWAY` vào dòng không có gateway
 của wrapper), và one-shot của lamp-update cũng dùng cùng lịch chờ đó:
-chỉ lần từ chối vì gateway chưa có ở đó để kiểm tra mới được thử lại, văn
-bản bị OpenClaw từ chối thì không.
+chỉ lần từ chối vì gateway chưa có ở đó để kiểm tra, hoặc vừa lên giữa lúc
+kiểm tra, mới được thử lại, văn bản bị OpenClaw từ chối thì không.
 Cả ba chỗ ghi `openclaw.json` (`write_checked` của lamp-tasks,
 `gateway_config` của lamp-update, lần cắt khi reset của lamp-setup) giữ
 một lock từ trước lúc đọc tới sau lúc rename (P2 của Seventh trên #7872):
