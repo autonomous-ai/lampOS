@@ -3180,6 +3180,83 @@ fn a_task_whose_session_died_before_any_tool_is_put_back_and_answered() {
     assert_eq!(*told.lock().unwrap(), 1, "one replacement, one line");
 }
 
+/// #8062 (e), Harness 0.6.74: the turn's `wait --after` exits 1, its row
+/// `failed` (a launch that failed, [`crate::harness::Cli::wait_kept`]
+/// reads it `failed`). The ladder at once, in the same turn: OpenClaw
+/// still holds the conversation, so a plain resume first (no close, no
+/// delete, no `--fresh`), the words typed again once, answered there.
+/// Before #8062 the turn ended "the run ended as Harness says failed", the
+/// task lost and the session replaced only at a later look.
+#[test]
+fn a_wait_saying_the_launch_failed_takes_the_ladder_at_once_and_answers() {
+    let dir = tempfile::tempdir().unwrap();
+    let deleted = Arc::new(Mutex::new(0));
+    let seen = deleted.clone();
+    let (one, fake) = kept_on(dir.path());
+    let one = one.with_session_delete(Box::new(move |_| {
+        *seen.lock().unwrap() += 1;
+        Ok(())
+    }));
+    one.open_if_due(&fake, &place());
+    *fake.held.lock().unwrap() = Some(vec![format!("agent:main:kept-{}", agent_of(1))]);
+    *fake.tools.lock().unwrap() = Some(0);
+    let turn = one.enter("task-1", Kind::Skill, far(), &|| false).unwrap();
+    assert!(matches!(
+        turn.send(&fake, &place(), "Run the skill.", far(), &|| false),
+        Sent::Typed(_)
+    ));
+    fake.waits.lock().unwrap().push_back("failed".into());
+    let began = Instant::now();
+    let ended = turn.wait_end(&fake, MACHINE, &AtomicBool::new(false), &|| {});
+    assert_eq!(
+        ended,
+        Ended::Answered("answer to New task task-1:".into()),
+        "{:?}",
+        fake.calls()
+    );
+    assert!(began.elapsed() < Duration::from_secs(2), "at once");
+    assert_eq!(one.agent(), Some(agent_of(1)), "the same session, resumed");
+    assert_eq!(fake.count("close-kept"), 0);
+    assert_eq!(*deleted.lock().unwrap(), 0, "its conversation kept");
+    assert!(!fake.calls().iter().any(|call| call.ends_with("--fresh")));
+    assert_eq!(
+        fake.count("reply-kept"),
+        3,
+        "first words, the task, once again"
+    );
+}
+
+/// #8062 (e, d): the same failed launch, the Gateway no longer holding
+/// its conversation: the last resort, a fresh session (`replace_kept`:
+/// closed `--now`, `ensure --fresh`), the task answered there.
+#[test]
+fn a_failed_launch_with_its_conversation_gone_is_replaced_fresh_and_answered() {
+    let dir = tempfile::tempdir().unwrap();
+    let (one, fake) = kept_on(dir.path());
+    one.open_if_due(&fake, &place());
+    *fake.held.lock().unwrap() = Some(vec![]);
+    *fake.tools.lock().unwrap() = Some(0);
+    let turn = one.enter("task-1", Kind::Skill, far(), &|| false).unwrap();
+    assert!(matches!(
+        turn.send(&fake, &place(), "Run the skill.", far(), &|| false),
+        Sent::Typed(_)
+    ));
+    fake.waits.lock().unwrap().push_back("failed".into());
+    let ended = turn.wait_end(&fake, MACHINE, &AtomicBool::new(false), &|| {});
+    assert_eq!(
+        ended,
+        Ended::Answered("answer to New task task-1:".into()),
+        "{:?}",
+        fake.calls()
+    );
+    assert_eq!(one.agent(), Some(agent_of(2)), "{:?}", fake.calls());
+    assert!(
+        fake.calls()
+            .contains(&"close-kept lamp-one-openclaw --now".to_string())
+    );
+    assert_eq!(fresh_ensures(&fake), 1);
+}
+
 /// #7906: a turn that had already run a tool is never replayed blindly:
 /// it ends saying it was interrupted after it started, and the session is
 /// reopened for the next task.
