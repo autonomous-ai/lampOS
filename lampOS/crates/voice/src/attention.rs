@@ -7657,7 +7657,10 @@ mod tests {
             );
         }
         for word in ["Lamp?", "Lump?", "Lamb."] {
-            assert!(!weighed(true, None, (word, 200_000, false), true).0, "{word}");
+            assert!(
+                !weighed(true, None, (word, 200_000, false), true).0,
+                "{word}"
+            );
         }
         // The control: a real call at the line's start, said close.
         assert_eq!(
