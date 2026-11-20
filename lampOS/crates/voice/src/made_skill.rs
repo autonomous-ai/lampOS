@@ -440,8 +440,10 @@ pub fn set_english_here(english: Option<bool>) {
 /// DeepSeek; his 19:50 ruling, the middle form; the owner's "do it like V1"
 /// on #7764): `on` only, off unless set, in no product unit. On, a voice
 /// or app make is first judged a quick reaction or not by DeepSeek
-/// ([`REACTION_JUDGE`]); only one judged so is drafted, and a draft that
-/// is no quick reaction ([`quick_reaction`]) is never kept. Any other is
+/// ([`REACTION_JUDGE`]: what the lamp does with its own parts alone, on a
+/// trigger, with nothing to fetch, write, look up or decide); only one
+/// judged so is drafted, and a draft that is no quick reaction
+/// ([`quick_reaction`]) is never kept. Any other is
 /// written by the lamp as one task for its agent, on the trigger its own
 /// model picks, with sip-of-water's guards ([`template_guards`],
 /// `crate::make_skill_local`, `crate::make_no_cannot::skill_text`); a `[[while]]` on
@@ -486,10 +488,6 @@ pub const BEHAVIOUR_TOPICS: [&str; 4] = [
     lamp_msgs::HumanDoing::TOPIC,
 ];
 
-/// The topics a person's own hand on the lamp says: a touch, a pat, a
-/// gesture, the button (`controls/*`).
-const CONTROLS_PREFIX: &str = "controls/";
-
 /// The step kinds a quick reaction may have: the light, a gesture, its
 /// exact words and its hum.
 const REACTION_STEPS: [&str; 4] = ["light", "body", "say", "cue"];
@@ -505,26 +503,30 @@ pub const GUARD_TOPICS: [&str; 2] = [lamp_msgs::VoiceState::TOPIC, ACTIVITY_TOPI
 /// Whether a made skill's `skill.toml` is a quick reaction, the only make
 /// DeepSeek keeps with [`reactions_on`] (#6811): structural, by its start
 /// and its step kinds alone, never a word. Both must hold:
-/// - its start is the person's own act: words they say (`asks`, or a
-///   `[said]` start), a hand on the lamp (a `[trigger]` on `controls/*`:
-///   a touch, a pat, a gesture, the button), or nothing at all, run only
-///   when asked (no `[trigger]`);
+/// - its start is the lamp's own: words the person says (`asks`, or a
+///   `[said]` start), nothing at all, run only when asked (no
+///   `[trigger]`), or a `[trigger]` on a topic the lamp has
+///   ([`lamp_has`]): a hand on the lamp, someone arriving or leaving, the
+///   lamp's clock, any other of its senses (the owner, 20 Nov: "make sure
+///   the quick reaction is DeepSeek's, and everything else goes to the
+///   agent": a wave on arrival is one);
 /// - its steps are only the light, a gesture, its exact words or its hum
 ///   ([`REACTION_STEPS`]), with no `task`, no `[[while]]` and no code.
 ///
-/// A clock, presence, person or any other sensor trigger, a guard, or a
-/// step of any other kind (a read, a write, a task) is not: the lamp's
-/// agent makes it. What can't be read is no reaction either.
+/// A trigger on a topic the lamp hasn't, a guard, or a step of any other
+/// kind (a read, a write, a task) is not: the lamp's agent makes it. What
+/// can't be read is no reaction either. Whether the request means one is
+/// DeepSeek's judgement first ([`REACTION_JUDGE`]).
 pub fn quick_reaction(toml: &str) -> bool {
     let Ok(table) = toml::from_str::<toml::Table>(toml) else {
         return false;
     };
-    let started_by_person = match table.get("trigger") {
+    let started_by_lamp = match table.get("trigger") {
         None => true,
         Some(trigger) => trigger
             .get("topic")
             .and_then(toml::Value::as_str)
-            .is_some_and(|topic| topic.starts_with(CONTROLS_PREFIX)),
+            .is_some_and(lamp_has),
     };
     let reaction_steps = table
         .get("do")
@@ -542,7 +544,7 @@ pub fn quick_reaction(toml: &str) -> bool {
                     })
                 })
         });
-    started_by_person
+    started_by_lamp
         && reaction_steps
         && !table.contains_key("while")
         && !table.contains_key("grants")
@@ -556,14 +558,18 @@ pub fn quick_reaction(toml: &str) -> bool {
 /// to [`quick_reaction`]; judged none, unsure or no answer, the make goes
 /// straight to the lamp's agent ([`reaction_judged`]).
 pub const REACTION_JUDGE: &str = "You judge, for a desk lamp, what kind of skill a person \
-asks it to make, by what the request means, in any language. A quick reaction is one the person \
-starts themselves, by saying a phrase, touching or patting the lamp or pressing its button, and \
-that only changes the lamp's light, moves its body, says fixed words or hums. Anything else is \
-not one: a skill that needs the internet, a sensor or the camera, a time of day, reading or \
-sending anything, remembering, or thinking about what to say or do. A one-off reminder or timer \
-is the lamp's own timer, never a skill: judge it a quick reaction, so the lamp tells the person \
-so. Answer only one line of JSON and nothing else: {\"quick_reaction\": true or false, \
-\"reason\": \"a few words\"}.";
+asks it to make, by what the request means, in any language. A quick reaction is what the lamp \
+does with its own parts alone: its light or a colour, its hum or a chime, a body move (a nod, a \
+wave, a look), or a fixed short line it says, on a trigger: someone arriving or coming back to \
+the desk, someone leaving, a pat or a touch, a time of day, a phrase the person says, or anything \
+else the lamp itself senses; with nothing to fetch, write, look up or decide. Anything else is \
+not one, and goes to the lamp's agent: a skill that needs data, the internet, a file or a \
+service, that reads, sends or remembers anything, whose words are chosen each time or say \
+something that changes, or that does several steps one after another. A nudge for the person \
+to do something, like to stretch after a long sitting, is worded for them each time: not one. \
+A one-off reminder or timer is the lamp's own timer, never a skill: judge it a quick reaction, \
+so the lamp tells the person so. Answer only one line of JSON and nothing else: \
+{\"quick_reaction\": true or false, \"reason\": \"a few words\"}.";
 
 /// The judgement's request ([`REACTION_JUDGE`]): the person's words alone.
 pub fn reaction_brief(request: &str) -> String {
@@ -19918,12 +19924,15 @@ task = { task = "take a photo and send it to the app", run = "scripts/main.py" }
     }
 
     /// The scope asked after the first builder's ruling on #6811 (his yes
-    /// at 16:34): only a quick reaction stays DeepSeek's, by its start and
-    /// its step kinds alone. A phrase that turns the light on and a pat
-    /// that nods are; a say at 8 am, one on someone at the desk, a guard, a
-    /// task or a read beside a pat are not.
+    /// at 16:34), widened by the owner's 20 Nov "make sure the quick
+    /// reaction is DeepSeek's, and everything else goes to the agent": only
+    /// a quick reaction stays DeepSeek's, by its start and its step kinds
+    /// alone. A phrase that turns the light on, a pat that nods, a wave on
+    /// someone arriving, a fixed say at 8 am and a glow on stuffy air are;
+    /// a guard, a task, a read, nothing done, or a topic the lamp hasn't
+    /// are not.
     #[test]
-    fn a_quick_reaction_is_a_persons_act_with_only_light_body_or_words() {
+    fn a_quick_reaction_is_the_lamps_own_start_with_only_light_body_or_words() {
         let phrase = "asks = [\"lights please\"]\n";
         let pet = "topic = \"controls/pet\"\nfield = \"ended\"\nequals = false\nrearm = \"ends\"";
         let touch =
@@ -19935,19 +19944,28 @@ task = { task = "take a photo and send it to the app", run = "scripts/main.py" }
         let light = "light = { colour = \"green\", level = 3 }";
         let nod = "body = { gesture = \"nod\" }";
         let say = "say = { text = \"Good morning!\" }";
+        let arrival = "topic = \"room/presence\"\nfield = \"someone\"\nequals = true\n\
+                       when = \"appears\"\nabsent_for = \"5m\"";
+        let air = "topic = \"air/state\"\nfield = \"co2_ppm\"\nabove = 1200";
         // DeepSeek's: phrase to light, pat to nod, touch to a say and a
-        // hum, a run only when asked.
+        // hum, a run only when asked; and on the lamp's own senses and
+        // clock (the owner, 20 Nov): a wave on arrival, a say at 8 am, a
+        // say on someone at the desk, a glow on stuffy air.
         for made in [
             reaction_of(phrase, None, &[light]),
             reaction_of("", Some(pet), &[nod]),
             reaction_of("", Some(touch), &[say, "cue = \"hum\""]),
             reaction_of("", None, &[light, nod]),
+            reaction_of("", Some(arrival), &["body = { gesture = \"greeting\" }"]),
+            reaction_of("", Some(eight), &[say]),
+            reaction_of("", Some(presence), &[say]),
+            reaction_of("", Some(air), &[light]),
         ] {
             assert!(quick_reaction(&made), "{made}");
             assert_eq!(not_a_reaction(&answer(&made, CARD)), None, "{made}");
         }
-        // The agent's: the clock, someone at the desk, any other sensor, a
-        // guard, a task, a read, nothing it does, or what can't be read.
+        // The agent's: a guard, a task, a read, nothing it does, a topic
+        // the lamp hasn't, or what can't be read.
         let guarded = format!(
             "{}\n[[while]]\ntopic = \"voice/state\"\nfield = \"state\"\nequals = \"resting\"\n",
             reaction_of("", Some(pet), &[nod])
@@ -19963,15 +19981,13 @@ task = { task = "take a photo and send it to the app", run = "scripts/main.py" }
             &["read = { service = \"gmail\", what = \"recent\" }"],
         );
         for (made, why) in [
-            (reaction_of("", Some(eight), &[say]), "on clock/local"),
-            (reaction_of("", Some(presence), &[say]), "on room/presence"),
             (
                 reaction_of(
                     "",
-                    Some("topic = \"air/state\"\nfield = \"co2_ppm\"\nabove = 1200"),
+                    Some("topic = \"weather/now\"\nfield = \"rain\""),
                     &[light],
                 ),
-                "on air/state",
+                "not a quick reaction",
             ),
             (guarded, "on controls/pet"),
             (task, "on controls/pet"),
@@ -20032,6 +20048,41 @@ task = { task = "take a photo and send it to the app", run = "scripts/main.py" }
             "the internet: what a place",
         );
         assert!(quick_reaction(&inside), "{inside}");
+    }
+
+    /// The owner, 20 Nov: "make sure the quick reaction is DeepSeek's, and
+    /// everything else goes to the agent". The judge is told what one is
+    /// by meaning, never a word list: what the lamp does with its own parts
+    /// alone (light, a hum, a body move, a fixed short line), on any of its
+    /// triggers (an arrival, a leaving, a pat, a time, a phrase), with
+    /// nothing to fetch, write, look up or decide; and what goes to the
+    /// agent (data, the web, a file, a service, words chosen each time,
+    /// several steps). A time of day or a sense is no longer told as the
+    /// agent's.
+    #[test]
+    fn the_reaction_judge_defines_a_quick_reaction_by_the_lamps_own_parts() {
+        let judge = REACTION_JUDGE;
+        for part in [
+            "what the lamp does with its own parts alone",
+            "its light or a colour",
+            "its hum or a chime",
+            "a body move (a nod, a wave, a look)",
+            "a fixed short line it says",
+            "on a trigger: someone arriving or coming back to the desk, someone leaving, a pat \
+             or a touch, a time of day, a phrase the person says",
+            "with nothing to fetch, write, look up or decide",
+            "goes to the lamp's agent: a skill that needs data, the internet, a file or a \
+             service",
+            "whose words are chosen each time",
+            "several steps one after another",
+            "{\"quick_reaction\": true or false",
+        ] {
+            assert!(judge.contains(part), "{part}: {judge}");
+        }
+        assert!(
+            !judge.contains("a sensor or the camera, a time of day"),
+            "{judge}"
+        );
     }
 
     /// The owner's "do it like V1" on #7764: the first call's judgement

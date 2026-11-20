@@ -6591,7 +6591,20 @@ the same code for both writers.
   a known service's `-read` or `-write`, linked or not: one not linked is
   made all the same, and the make's link note (`made_skill::needs_link`)
   asks for it to be linked; the run's own grant check holds it until then.
-  The model is offered only those grants.
+  The model is offered only those grants. One it names that the lamp
+  doesn't know, neither a known service's nor one that watches or listens
+  (lamp-9adf, 20 Nov: "when I say apple file, have an agent write three
+  apple facts into a file" was answered `file-write` and refused as "a
+  service the lamp can't link yet"), is left out of the task, never a
+  refusal: the agent writes its own files in its own sandbox, and the
+  run's own grant check still bounds what it may do on the lamp (`notes`
+  is a skill's own small notes on the lamp, not the agent's files). The
+  journal says `a skill made here: 1 grant(s) the lamp doesn't know left
+  out of the task for the lamp's agent (LAMP_MAKE_NO_CANNOT)`
+  (`make_no_cannot::tests::with_the_switch_a_grant_the_lamp_doesnt_know_is_left_out_never_refused`).
+  The privacy refusals stand beside it: what watches or listens on a
+  trigger, the internet beside a private grant, and a known service with
+  `LAMP_AGENT_SERVICES` off.
   - **The brief's own refusals stay refusals** (sim-2's P2 on #7261,
     #6439's rule; the owner: "if something can't be done, say exactly
     why"), all but a send's (`made_skill::briefs_send_refusal`), which the
@@ -6663,7 +6676,8 @@ the same code for both writers.
     - A service with `LAMP_AGENT_SERVICES` off (`services_off`): "I can't
       make that one yet: it needs your linked services, and skills on this
       lamp can't use them yet."
-    - A service the lamp doesn't know (`service_unknown`): "I can't make
+    - A service the lamp doesn't know (`service_unknown`), only with
+      `LAMP_MAKE_NO_CANNOT` off (on, it is left out, above): "I can't make
       that one yet: it needs a service the lamp can't link yet."
     - `LAMP_MADE_SCRIPTS` or `LAMP_SKILL_TASKS` off (`tasks_off`): "I can't
       make that one yet: it needs the lamp's agent, and skills on this lamp
@@ -6861,15 +6875,29 @@ the same code for both writers.
   "reason": "..."}`; its reason is never read or journaled), waited for at
   most 4 s (`REACTION_JUDGE_WITHIN`; about a second is usual), its time
   and outcome journaled: `a skill made here: judged in 840 ms: not a quick
-  reaction`. A quick reaction is a phrase, a touch, a pat or the button that
-  only uses the light, the body, exact words or the hum, and needs no
-  internet, sensor, time, read, write or thinking; a one-off reminder is
-  judged one, as the lamp's own timer answers it. Judged one, DeepSeek
+  reaction`. A quick reaction (the owner, 20 Nov: "make sure the quick
+  reaction is DeepSeek's, and everything else goes to the agent") is what
+  the lamp does with its own parts alone: its light or a colour, its hum or
+  a chime, a body move (a nod, a wave, a look) or a fixed short line, on a
+  trigger (someone arriving or coming back to the desk, someone leaving, a
+  pat or a touch, a time of day, a phrase, or anything else the lamp
+  senses), with nothing to fetch, write, look up or decide. Anything else
+  goes to the agent: data, the internet, a file or a service, a read, a
+  send or a memory, words chosen each time or saying what changes, several
+  steps one after another, and a nudge worded for the person each time
+  (to stretch after a long sitting). A one-off reminder is judged one, as
+  the lamp's own timer answers it. So "whenever I come back to the desk,
+  wave at me" and "glow pink when I pat your head" are DeepSeek's; the
+  gold price at seven, the apple file and the stretch are the agent's
+  (`made_skill::tests::the_reaction_judge_defines_a_quick_reaction_by_the_lamps_own_parts`,
+  `make_skill_local::tests::with_the_owners_lines_a_quick_reaction_is_deepseeks_and_all_else_the_agents`).
+  Judged one, DeepSeek
   drafts as before, and its draft is kept only when it is a quick reaction
   (`made_skill::quick_reaction`, by its start and its step kinds alone,
-  never a word): started by the person's own act (words they name,
-  `asks` or a `[said]` start; a `[trigger]` on `controls/*`, a touch, a pat
-  or the button; or no trigger, run only when asked), with only `light`,
+  never a word): started by the lamp's own (words the person names,
+  `asks` or a `[said]` start; no trigger, run only when asked; or a
+  `[trigger]` on a topic the lamp has: a touch, a pat or the button,
+  someone arriving or leaving, the lamp's clock, any other of its senses), with only `light`,
   `body`, a `say` of exact words (never the model's `internet:` or
   `cannot:` marker) or the hum, and no `task`, no `[[while]]` and no
   `grants`. Judged none, unsure, late or failed, no draft is asked for; a
@@ -6921,7 +6949,17 @@ the same code for both writers.
   the talk ends, within 10 minutes)", and takes a `wait` only on such a
   sitting, with its `for` and `rearm`), never a getting up; coming
   back to the desk stays an arrival. The model judges which by meaning;
-  off, its prompt is as before. Its grants are
+  off, its prompt is as before. It is also told to begin its answer with
+  `runs:` and the time or moment the request names (`runs: someone comes
+  back to the desk`), or `runs: asked` when it runs only when the person
+  says words (`make_no_cannot::RUNS`, each example beginning with its
+  own): a moment named with `asks:` is asked again once, told
+  `make_no_cannot::runs_repair`, so the person's own moment is kept
+  (lamp-9adf, 20 Nov: "Lamp, make a skill: when I come back to the desk,
+  wave at me" was answered `asks:` and made only asked for, its arrival
+  lost); answered so again, it is made as asked, never a third round for
+  it (`make_no_cannot::moment_named`,
+  `a_moment_named_but_answered_asks_is_asked_again_for_its_trigger`). Its grants are
   `make_no_cannot`'s (`net` only with `LAMP_TASK_NET`), it needs skills'
   tasks on (`LAMP_MADE_SCRIPTS`, `LAMP_SKILL_TASKS`; asked for by its
   words, `LAMP_UPLOAD_TO_AGENT`), it is said back as a task for the

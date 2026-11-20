@@ -40,9 +40,12 @@
 //!   `crate::skill_task_yes::GRANTS` and, with `LAMP_AGENT_SERVICES` on, a
 //!   known service's `-read` or `-write`, linked or not (one not linked is
 //!   made all the same, and the make's link note asks for it to be linked).
+//!   A grant the lamp doesn't know (neither a known service's nor one that
+//!   watches or listens, like a `file-write` for the agent's own files) is
+//!   left out of the task, never a refusal: the agent works in its own
+//!   sandbox, and the run's own grant check still bounds it on the lamp.
 //!   One no grant covers (the internet while `LAMP_TASK_NET` is off; on,
-//!   `net` is kept whenever it runs, the owner's ruling of 17 Nov; one the
-//!   lamp doesn't know; anything else) is
+//!   `net` is kept whenever it runs, the owner's ruling of 17 Nov) is
 //!   told its reason in plain words ([`Uncovered::line`]), never the bare
 //!   "I couldn't make that one.", and only its reason's class is
 //!   journaled ([`Uncovered::class`]), never the person's words.
@@ -511,6 +514,27 @@ wait = \"10m\"
 /// The request [`SAT_EXAMPLE`] is for.
 const SAT_EXAMPLE_ASKED: &str = "when I've sat at my desk a long while, remind me to stretch";
 
+/// What the one more call is told with `LAMP_MAKE_REACTIONS_ONLY_DEEPSEEK`
+/// on (lamp-9adf, 20 Nov: "when I come back to the desk, wave at me" was
+/// answered `asks:` and made a skill only asked for, its arrival lost):
+/// first a line naming when it runs, the moment the request names or
+/// [`RUNS_ASKED`], so the model judges that by the request's meaning
+/// before it picks the form; a moment named with `asks:` is asked again
+/// once for its trigger ([`moment_named`]).
+const RUNS: &str = " Begin your answer with a line runs: and, in a few plain words, the time \
+or the moment the request names for it to run (\"someone comes back to the desk\", \"every \
+morning at eight\"), or asked when it runs only when the person asks for it or says words to the \
+lamp; a time or a moment named is always its fenced block, never asks:.";
+
+/// The `runs:` of a task only asked for ([`RUNS`]).
+const RUNS_ASKED: &str = "asked";
+
+/// How [`EXAMPLE`], [`ASKED_EXAMPLE`] and [`SAT_EXAMPLE`] begin with
+/// [`RUNS`] told.
+const EXAMPLE_RUNS: &str = "runs: every morning at eight\n";
+const ASKED_EXAMPLE_RUNS: &str = "runs: asked\n";
+const SAT_EXAMPLE_RUNS: &str = "runs: someone has sat at the desk a long while\n";
+
 /// One whole answer for a task only asked for, shown to the model.
 const ASKED_EXAMPLE: &str = "name: desk-photo
 grants: camera, speak
@@ -529,14 +553,21 @@ const ASKED_EXAMPLE_ASKED: &str =
 /// the triggers ([`SITTING`]) with a whole answer for it ([`SAT_EXAMPLE`]);
 /// off, as before.
 pub fn system() -> String {
-    let (reminder, sitting, sat_example) = if made_skill::reactions_on() {
+    let reactions = made_skill::reactions_on();
+    let (reminder, sitting, sat_example) = if reactions {
         (
             reminder_rule(),
             SITTING,
-            format!("\nAnd for \"{SAT_EXAMPLE_ASKED}\":\n\n{SAT_EXAMPLE}\n"),
+            format!("\nAnd for \"{SAT_EXAMPLE_ASKED}\":\n\n{SAT_EXAMPLE_RUNS}{SAT_EXAMPLE}\n"),
         )
     } else {
         (String::new(), "", String::new())
+    };
+    // When it runs, named first ([`RUNS`]), with the switch alone.
+    let (runs, example_runs, asked_runs) = if reactions {
+        (RUNS, EXAMPLE_RUNS, ASKED_EXAMPLE_RUNS)
+    } else {
+        ("", "", "")
     };
     format!(
         "You choose, for a lamp, when a skill runs and what it needs. The lamp's agent, an AI \
@@ -552,13 +583,13 @@ pub fn system() -> String {
          [[trigger]]); else, when it runs only when the person asks for it or says something \
          to the lamp (\"when I say send my test note\"), no block but a line asks: and the \
          few words they will say, as they said them or, when they named none, a short phrase \
-         for the task, several joined by |. When it runs: {triggers}{sitting} Add no time of day the \
+         for the task, several joined by |.{runs} When it runs: {triggers}{sitting} Add no time of day the \
          request didn't name. The grants, each only when the task needs it: {grants}. speak \
          whenever the agent tells the person anything aloud. When the task needs something \
          none of these grants gives, answer only this one line: needs: and what, in a few plain \
          words (\"needs: paying for things\").{reminder} A whole answer, \
-         for \"{EXAMPLE_ASKED}\":\n\n{EXAMPLE}\n\nAnd for \"{ASKED_EXAMPLE_ASKED}\":\n\n\
-         {ASKED_EXAMPLE}\n{sat_example}",
+         for \"{EXAMPLE_ASKED}\":\n\n{example_runs}{EXAMPLE}\n\nAnd for \
+         \"{ASKED_EXAMPLE_ASKED}\":\n\n{asked_runs}{ASKED_EXAMPLE}\n{sat_example}",
         triggers = made_skill::TRIGGER_MEANINGS,
         grants = grants_told(),
     )
@@ -727,6 +758,39 @@ pub fn read(answer: &str) -> Result<Answer, String> {
     }
 }
 
+/// The time or moment `answer`'s first `runs:` line outside a fenced block
+/// names ([`RUNS`]), with `LAMP_MAKE_REACTIONS_ONLY_DEEPSEEK` on: plain, at
+/// most a phrase's length; none for [`RUNS_ASKED`], none named, or the
+/// switch off.
+pub fn moment_named(answer: &str) -> Option<String> {
+    if !made_skill::reactions_on() {
+        return None;
+    }
+    let mut fenced = false;
+    let runs = answer.lines().find_map(|line| {
+        let trimmed = line.trim();
+        if trimmed.starts_with("```") {
+            fenced = !fenced;
+            return None;
+        }
+        (!fenced).then(|| after_head(trimmed, "runs:")).flatten()
+    })?;
+    let stops = ['.', '!', '?', ',', ';', ':'];
+    let moment = phrase(task_plain(runs).trim().trim_end_matches(stops))?;
+    let moment = moment.trim_end_matches(stops).trim().to_owned();
+    (!moment.is_empty() && !moment.eq_ignore_ascii_case(RUNS_ASKED)).then_some(moment)
+}
+
+/// What a repair is told of an answer whose `runs:` line names `moment`
+/// but that answered `asks:` ([`moment_named`]).
+fn runs_repair(moment: &str) -> String {
+    format!(
+        "Your runs: line names when it runs ({moment}), so answer one fenced skill.toml block \
+         with [permissions] topics and its one [trigger] for that moment, never asks:; or, only \
+         when it runs only when the person says words to the lamp, runs: asked and asks:."
+    )
+}
+
 /// What follows `head` at the start of `line`, in any case.
 fn after_head<'a>(line: &'a str, head: &str) -> Option<&'a str> {
     line.get(..head.len())
@@ -818,9 +882,13 @@ pub fn block_kept(block: &str) -> Result<String, String> {
 /// `LAMP_AGENT_SERVICES` on a known service's, linked or not:
 /// one not linked is made all the same, and the make's link note
 /// (`made_skill::needs_link`) asks for it to be linked; the run's own grant
-/// check holds it until then. Else what no grant covers.
+/// check holds it until then. With the switch on, one the lamp doesn't know
+/// (neither a known service's nor one that watches or listens) is left
+/// out, never a refusal: the agent works in its own sandbox. Else what no
+/// grant covers.
 pub fn covered(asked: &[String], only_asked: bool) -> Result<Vec<String>, Uncovered> {
     let mut grants: Vec<String> = Vec::new();
+    let mut dropped = 0usize;
     for grant in asked {
         let grant = grant.trim().to_lowercase();
         if grants.contains(&grant) {
@@ -865,10 +933,28 @@ pub fn covered(asked: &[String], only_asked: bool) -> Result<Vec<String>, Uncove
             grants.push(grant);
             continue;
         }
+        // A grant the lamp doesn't know, neither a linked service's nor
+        // one that watches or listens (a `file-write`: the agent's own
+        // files, in its own workspace), with the switch on: never a
+        // refusal (the owner, 16 Nov: "every task must be doable"). It is
+        // left out, so the task holds only grants the lamp gives; the
+        // agent does the rest in its own sandbox, and the run's own grant
+        // check still bounds what it may do on the lamp (lamp-9adf, 20
+        // Nov: "have an agent write three apple facts into a file").
+        if on() {
+            dropped += 1;
+            continue;
+        }
         if grant.ends_with("-read") || grant.ends_with("-write") {
             return Err(Uncovered::ServiceUnknown);
         }
         return Err(Uncovered::Other);
+    }
+    if dropped > 0 {
+        eprintln!(
+            "lamp-voice: a skill made here: {dropped} grant(s) the lamp doesn't know left out of \
+             the task for the lamp's agent ({ENVIRONMENT})"
+        );
     }
     // Never the internet beside a private grant: no such skill loads, so
     // none is said back or asks a yes (Heron's P1 on #7590).
@@ -1378,6 +1464,8 @@ pub fn made(
     // Whether this round's task words, and an earlier round's, left out
     // what a long request names ([`task_kept`]).
     let (mut task_missed, mut task_asked_again) = (false, false);
+    // Whether an answer that named a moment but `asks:` was asked again.
+    let mut runs_asked_again = false;
     for round in 0..=most {
         if !fits() {
             eprintln!(
@@ -1403,37 +1491,54 @@ pub fn made(
                 grants,
                 when: When::Asked(asks),
             }) => {
-                // What no grant covers first: that is the reason, whenever
-                // it runs.
-                let grants = match covered(&grants, true) {
-                    Ok(grants) => grants,
-                    Err(uncovered) => return Err(uncovered.refused()),
-                };
-                if !crate::upload_agent::on() {
-                    return Err(Uncovered::NoWhen.refused());
-                }
-                // The name the person gave it, its tool's too (#7911).
-                let name = name_given(name, named);
-                // Its instructions carry the words read back alone: a
-                // request longer than them is worded by the model and
-                // checked, never cut unheard.
-                match task_kept(request, &answer, &name) {
-                    Err(lines) => {
-                        task_missed = true;
-                        lines
+                // A time or a moment named first ([`RUNS`]) but answered
+                // `asks:`: asked again once for its trigger, so the
+                // person's own moment is kept (lamp-9adf, 20 Nov: "when I
+                // come back to the desk, wave at me" made only asked for);
+                // answered so again, or no round left, made as asked.
+                let moment =
+                    moment_named(&answer).filter(|_| !runs_asked_again && round < most && fits());
+                if let Some(moment) = moment {
+                    runs_asked_again = true;
+                    eprintln!(
+                        "lamp-voice: a skill made here: the model named a time or moment for the \
+                         agent's task but answered with asks: asked again for its trigger"
+                    );
+                    runs_repair(&moment)
+                } else {
+                    // What no grant covers first: that is the reason, whenever
+                    // it runs.
+                    let grants = match covered(&grants, true) {
+                        Ok(grants) => grants,
+                        Err(uncovered) => return Err(uncovered.refused()),
+                    };
+                    if !crate::upload_agent::on() {
+                        return Err(Uncovered::NoWhen.refused());
                     }
-                    Ok(words) => {
-                        let made = kept_asked(&asked_files(&name, &asks, &grants, &words), &words);
-                        if made.is_ok() {
-                            eprintln!(
-                                "lamp-voice: a skill made here: the model's cannot made one task \
-                                 for the lamp's agent, only asked for ({} grant(s), {} \
-                                 phrase(s))",
-                                grants.len(),
-                                asks.len()
-                            );
+                    // The name the person gave it, its tool's too (#7911).
+                    let name = name_given(name, named);
+                    // Its instructions carry the words read back alone: a
+                    // request longer than them is worded by the model and
+                    // checked, never cut unheard.
+                    match task_kept(request, &answer, &name) {
+                        Err(lines) => {
+                            task_missed = true;
+                            lines
                         }
-                        return made;
+                        Ok(words) => {
+                            let made =
+                                kept_asked(&asked_files(&name, &asks, &grants, &words), &words);
+                            if made.is_ok() {
+                                eprintln!(
+                                    "lamp-voice: a skill made here: the model's cannot made one task \
+                                     for the lamp's agent, only asked for ({} grant(s), {} \
+                                     phrase(s))",
+                                    grants.len(),
+                                    asks.len()
+                                );
+                            }
+                            return made;
+                        }
                     }
                 }
             }
@@ -1811,6 +1916,209 @@ mod tests {
         assert_eq!(covered(&grants(&["net"]), true), Err(Uncovered::NetOff));
         crate::skill_task_yes::set_net_here(None);
         made_skill::set_agent_services_here(None);
+    }
+
+    /// lamp-9adf, 20 Nov: "have an agent write three apple facts into a
+    /// file" was refused as needing "a service the lamp can't link yet",
+    /// the model having named `file-write`. With the switch on, a grant the
+    /// lamp doesn't know, neither a known service's nor one that watches or
+    /// listens, is left out of the task, never a refusal: the agent writes
+    /// in its own sandbox. The privacy refusals stand: what watches or
+    /// listens on a trigger, the internet beside a private grant, and a
+    /// known service with its switch off. Off, as before.
+    #[test]
+    fn with_the_switch_a_grant_the_lamp_doesnt_know_is_left_out_never_refused() {
+        set_on_here(Some(true));
+        for (asked, kept) in [
+            (&["file-write", "speak"][..], &["speak"][..]),
+            (&["files-write"][..], &[][..]),
+            (&["zoom-read", "light"][..], &["light"][..]),
+            (&["skills", "weather", "body"][..], &["body"][..]),
+        ] {
+            for only_asked in [false, true] {
+                assert_eq!(
+                    covered(&grants(asked), only_asked),
+                    Ok(grants(kept)),
+                    "{asked:?}"
+                );
+            }
+        }
+        // The privacy rules stay refusals, beside a grant left out too.
+        assert_eq!(
+            covered(&grants(&["file-write", "camera"]), false),
+            Err(Uncovered::Sensing)
+        );
+        assert_eq!(
+            covered(&grants(&["file-write", "microphone"]), false),
+            Err(Uncovered::Listening)
+        );
+        made_skill::set_agent_services_here(Some(false));
+        assert_eq!(
+            covered(&grants(&["file-write", "gmail-read"]), true),
+            Err(Uncovered::ServicesOff)
+        );
+        made_skill::set_agent_services_here(Some(true));
+        crate::skill_task_yes::set_net_here(Some(true));
+        assert_eq!(
+            covered(&grants(&["file-write", "net", "camera"]), true),
+            Err(Uncovered::NetPrivate)
+        );
+        crate::skill_task_yes::set_net_here(Some(false));
+        assert_eq!(
+            covered(&grants(&["file-write", "net"]), true),
+            Err(Uncovered::NetOff)
+        );
+        crate::skill_task_yes::set_net_here(None);
+        // Off, as before.
+        set_on_here(Some(false));
+        assert_eq!(
+            covered(&grants(&["file-write"]), true),
+            Err(Uncovered::ServiceUnknown)
+        );
+        assert_eq!(covered(&grants(&["skills"]), true), Err(Uncovered::Other));
+        made_skill::set_agent_services_here(None);
+        set_on_here(None);
+    }
+
+    /// The journal's apple file, through [`made`]: the one more call names
+    /// `file-write`; the task is made only asked for, by its phrase, with
+    /// only `speak`, and the person never hears "I can't make that".
+    #[test]
+    fn a_task_whose_model_names_a_file_grant_is_made_without_it() {
+        all_on(Some(true));
+        const APPLE: &str = "Lamp, make a skill: when I say apple file, have an agent write \
+                             three apple facts into a file.";
+        let kept = |_: Result<String, String>| -> Result<Made, Refused> { unreachable!() };
+        let made_files = std::cell::RefCell::new(Vec::new());
+        let kept_asked = |files: &made_skill::Files, _: &str| {
+            made_files.borrow_mut().push(files.clone());
+            Err(Refused::new("kept here"))
+        };
+        let answer = "name: apple-file\ngrants: file-write, speak\nasks: apple file";
+        assert_eq!(
+            made(
+                APPLE,
+                |_| Ok(answer.to_owned()),
+                || true,
+                &kept,
+                kept_asked,
+                None,
+                None
+            ),
+            Err(Refused::new("kept here"))
+        );
+        let files = made_files.into_inner();
+        let [files] = files.as_slice() else {
+            panic!("{files:?}")
+        };
+        assert!(
+            files.toml.contains("grants = [\"speak\"]\n"),
+            "{}",
+            files.toml
+        );
+        assert!(!files.toml.contains("file-write"), "{}", files.toml);
+        assert!(files.card.contains("apple file"), "{}", files.card);
+        all_on(None);
+    }
+
+    /// An arrival block, as the one more call answers it.
+    const ARRIVAL: &str = "name: wave-on-arrival\ngrants: body\n```skill.toml\n[permissions]\n\
+                           topics = [\"room/presence\"]\n\n[trigger]\ntopic = \
+                           \"room/presence\"\nfield = \"someone\"\nequals = true\n\
+                           when = \"appears\"\nabsent_for = \"5m\"\n```\n";
+
+    /// lamp-9adf, 20 Nov: "when I come back to the desk, wave at me", judged
+    /// no quick reaction, was answered `asks:` by the one more call and made
+    /// only asked for, its arrival lost. With
+    /// `LAMP_MAKE_REACTIONS_ONLY_DEEPSEEK` on, the model names when it runs
+    /// first ([`RUNS`]); a moment named with `asks:` is asked again once,
+    /// told so, and its arrival block kept. `runs: asked` is made as asked
+    /// at once; asked again and still `asks:`, made as asked, never a third
+    /// round for it. Off, a `runs:` line is never read.
+    #[test]
+    fn a_moment_named_but_answered_asks_is_asked_again_for_its_trigger() {
+        all_on(Some(true));
+        made_skill::set_reactions_here(Some(true));
+        const WAVE: &str = "Lamp, make a skill: when I come back to the desk, wave at me.";
+        let asks = "runs: someone comes back to the desk\nname: wave-on-arrival\ngrants: \
+                    body\nasks: wave at me";
+        let run = |answers: Vec<String>| {
+            let answers = std::cell::RefCell::new(answers.into_iter());
+            let briefs = std::cell::RefCell::new(Vec::new());
+            let texts = std::cell::RefCell::new(Vec::new());
+            let asked = std::cell::RefCell::new(0);
+            let kept = |text: Result<String, String>| -> Result<Made, Refused> {
+                texts.borrow_mut().push(text.unwrap());
+                Err(Refused::new("kept here"))
+            };
+            let kept_asked = |_: &made_skill::Files, _: &str| {
+                *asked.borrow_mut() += 1;
+                Err(Refused::new("kept asked"))
+            };
+            let made = made(
+                WAVE,
+                |brief| {
+                    briefs.borrow_mut().push(brief.to_owned());
+                    Ok(answers.borrow_mut().next().unwrap())
+                },
+                || true,
+                &kept,
+                kept_asked,
+                None,
+                None,
+            );
+            (
+                made,
+                briefs.into_inner(),
+                texts.into_inner(),
+                asked.into_inner(),
+            )
+        };
+        let (result, briefs, texts, asked) = run(vec![asks.to_owned(), ARRIVAL.to_owned()]);
+        assert_eq!(result, Err(Refused::new("kept here")));
+        assert_eq!((briefs.len(), asked), (2, 0), "{briefs:?}");
+        assert!(
+            briefs[1].contains(&runs_repair("someone comes back to the desk")),
+            "{}",
+            briefs[1]
+        );
+        let [text] = texts.as_slice() else {
+            panic!("{texts:?}")
+        };
+        let files = made_skill::files(text).unwrap();
+        let table: toml::Table = toml::from_str(&files.toml).unwrap();
+        assert_eq!(table["trigger"]["topic"].as_str(), Some("room/presence"));
+        assert_eq!(table["trigger"]["when"].as_str(), Some("appears"));
+        assert_eq!(table["grants"].as_array().map(Vec::len), Some(1));
+        // `runs: asked`: made as asked at once.
+        let asked_at_once = "runs: asked\nname: wave-on-arrival\ngrants: body\nasks: wave at me";
+        let (result, briefs, texts, asked) = run(vec![asked_at_once.to_owned()]);
+        assert_eq!(result, Err(Refused::new("kept asked")));
+        assert_eq!((briefs.len(), texts.len(), asked), (1, 0, 1));
+        // Asked again and `asks:` again: made as asked, no third round.
+        let (result, briefs, _, asked) = run(vec![asks.to_owned(), asks.to_owned()]);
+        assert_eq!(result, Err(Refused::new("kept asked")));
+        assert_eq!((briefs.len(), asked), (2, 1));
+        // Off, never read.
+        made_skill::set_reactions_here(Some(false));
+        assert_eq!(moment_named(asks), None);
+        let (result, briefs, _, asked) = run(vec![asks.to_owned()]);
+        assert_eq!(result, Err(Refused::new("kept asked")));
+        assert_eq!((briefs.len(), asked), (1, 1));
+        made_skill::set_reactions_here(Some(true));
+        for (answer, moment) in [
+            ("runs: Asked.\nasks: x", None),
+            ("runs:\nasks: x", None),
+            ("```skill.toml\nruns: at nine\n```\nasks: x", None),
+            (
+                "RUNS: \"every morning at eight\".\nasks: x",
+                Some("every morning at eight"),
+            ),
+        ] {
+            assert_eq!(moment_named(answer).as_deref(), moment, "{answer}");
+        }
+        made_skill::set_reactions_here(None);
+        all_on(None);
     }
 
     /// El's P1 on #7261: a task only asked for tells the agent exactly the
@@ -2404,6 +2712,25 @@ mod tests {
             EXAMPLE,
         ] {
             assert!(system.contains(part), "{part}");
+        }
+        // When it runs named first, with the reactions switch alone; each
+        // example then begins with its own, read as before.
+        made_skill::set_reactions_here(Some(false));
+        let before = self::system();
+        assert!(!before.contains(RUNS), "{before}");
+        assert!(!before.contains("runs: asked"), "{before}");
+        made_skill::set_reactions_here(Some(true));
+        let told = self::system();
+        made_skill::set_reactions_here(None);
+        assert!(told.contains(RUNS), "{told}");
+        for (runs, example) in [
+            (EXAMPLE_RUNS, EXAMPLE),
+            (ASKED_EXAMPLE_RUNS, ASKED_EXAMPLE),
+            (SAT_EXAMPLE_RUNS, SAT_EXAMPLE),
+        ] {
+            let whole = format!("{runs}{example}");
+            assert!(told.contains(&whole), "{whole}");
+            assert_eq!(read(&whole), read(example));
         }
     }
 
