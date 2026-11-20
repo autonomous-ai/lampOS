@@ -242,10 +242,15 @@ account keeps too (the lamp's cloud API, `POST …/history/turns/delete`).
   leaves their own out (the voice deletes that person's whole history), so
   it names only the room's lines it took with them; the room's own
   `forget_all` names its ids. Every removed id is told: at most 100 in the
-  answer, which then says `"exchanges_more":true`, and the rest paged by
-  `{"op":"forgot_exchanges"}` (900 a page, `"more"` while some remain;
-  kept in RAM until the next forget). Nothing removed, no field. The legacy
-  store names none.
+  answer, which then says `"exchanges_more":true` and
+  `"exchanges_token":"<16 hex>"`, and the rest paged by
+  `{"op":"forgot_exchanges","token":…}` (900 a page, `"more"` while some
+  remain). Each forget's rest is kept in RAM under its own token until paged
+  out, so a forget between never replaces another's; at most 8 wait (the
+  oldest is let go past it). A token not kept (no token, paged out, let go,
+  or from before the memory restarted: tokens are each open store's own
+  random base and a count) is refused `rest_gone`, never answered with another forget's
+  ids. Nothing removed, no field. The legacy store names none.
 - **The turn id** is `<epoch>.<scope>:<id>`, made only by
   `lamp_msgs::history_turn_id`. The epoch is the store's own, 8 hex
   characters in its `settings` (`history_epoch`, in the 0600 database),
@@ -275,10 +280,24 @@ account keeps too (the lamp's cloud API, `POST …/history/turns/delete`).
   person's forget everything only, and never sent without a person. Only
   memory's forgets and their pages are read (the list shared in
   `lamp_msgs::MEMORY_FORGETS_TELLING_EXCHANGES`). A forget of every
-  person's memory, or a page that can't be read, is journalled as not
-  reached.
+  person's memory, or a page that can't be read or is refused (`rest_gone`),
+  is journalled as not reached.
 - **Never on the reply's way:** "forgotten" follows the lamp's own delete, as
-  before. The queue is a file in the voice's state folder
+  before. On the voice's way the answer's ids are only held from the save
+  (`history_send::deleting`, in memory) and the answer handed to one worker
+  thread (`history_forget::Worker::hand`, at most 256 waiting, never
+  blocking; past it, journalled as not reached; a worker that has stopped is
+  journalled as stopped and started again once). The worker, in the order
+  the forgets were answered, writes the queue (fsync) and reads the rest's
+  pages by its token, each page's ids held from the save too, so neither
+  the SD card nor a page read is paid before the reply or its deadline. On
+  a clean stop (`lamp-voice`'s `main`, after its run) the worker is given
+  at most 2 s (`DRAIN_WITHIN`) to write what it holds, pages cut short and
+  journalled as not reached; what it still holds is journalled as a count.
+  A crash between the reply and the worker's write (one fsync, or longer
+  behind an earlier big forget's pages) loses that forget's account delete,
+  never a post: the save's hold runs before the reply. The queue is a file
+  in the voice's state folder
   (`/var/lib/lampOS/voice/history-forget.json`, 0600), kept across a
   restart, at most 20,000 ids (past it, the known person with the most
   waiting is coalesced into their whole history, never the room's, whose
@@ -293,9 +312,15 @@ account keeps too (the lamp's cloud API, `POST …/history/turns/delete`).
   says counts only.
 - **Not covered yet:** the app's removal of a person (`forget_person`, asked
   by lamp-cloud) and a forget on the Live route.
-- **Tests:** `history_forget`'s and `second_provider::net::history`'s (a
-  fake server), and `days_protocol`'s
-  `a_forget_names_the_exchanges_it_removed_by_scope_and_id`.
+- **Tests:** `history_forget`'s (among them
+  `two_forgets_in_a_row_each_send_their_own_rest`,
+  `a_stale_rest_is_never_sent_for_another_forget`,
+  `the_forget_turn_does_no_disk_or_page_on_the_voice_path`,
+  `a_stopped_worker_is_started_again`,
+  `a_clean_stop_drains_what_the_worker_holds`) and
+  `second_provider::net::history`'s (a fake server), and `days_protocol`'s
+  `a_forget_names_the_exchanges_it_removed_by_scope_and_id` and
+  `each_forgets_rest_is_kept_under_its_own_token`.
 
 ## Forgetting a person
 

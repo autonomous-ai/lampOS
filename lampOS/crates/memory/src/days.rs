@@ -222,9 +222,16 @@ pub struct Days {
     /// to delete the same turns. Never on disk; taken by the request's
     /// answer ([`Self::take_forgot`]).
     forgot: Vec<Forgot>,
-    /// What the last forget's answer had no room for, paged by
-    /// `forgot_exchanges` ([`Self::forgot_page`]). Never on disk.
-    forgot_rest: std::collections::VecDeque<Forgot>,
+    /// What each recent forget's answer had no room for, under the token
+    /// its answer gave, paged by `forgot_exchanges` with that token
+    /// ([`Self::forgot_page`]): a forget between never replaces another's
+    /// rest (the first builder's P2 on #7935). The oldest goes past
+    /// [`FORGOT_RESTS_KEPT`]. Never on disk.
+    forgot_rests: std::collections::VecDeque<(String, std::collections::VecDeque<Forgot>)>,
+    /// This open store's random base for those tokens, read on its first
+    /// rest, and how many it has given.
+    forgot_rest_base: Option<u64>,
+    forgot_rests_made: u64,
     /// This store's epoch for the account's history ids
     /// ([`lamp_msgs::history_turn_id`], #7771), kept in `settings`.
     epoch: String,
@@ -301,7 +308,9 @@ impl Days {
             records_forgot_about: std::collections::VecDeque::new(),
             records_forgot_addresses: std::collections::VecDeque::new(),
             forgot: Vec::new(),
-            forgot_rest: std::collections::VecDeque::new(),
+            forgot_rests: std::collections::VecDeque::new(),
+            forgot_rest_base: None,
+            forgot_rests_made: 0,
             epoch: String::new(),
             taste_rules: false,
             _held: held,
@@ -1591,18 +1600,47 @@ impl Days {
         std::mem::take(&mut self.forgot)
     }
 
-    /// The ids a forget's answer had no room for, kept for paging in place
-    /// of any earlier forget's.
-    pub fn keep_forgot_rest(&mut self, rest: Vec<Forgot>) {
-        self.forgot_rest = rest.into();
+    /// The ids a forget's answer had no room for, kept for paging beside
+    /// every other forget's, under the token returned (`None` for no
+    /// rest, and nothing kept). The token is this open store's own random
+    /// base and a count, so one given before a restart (or a reopen), or by
+    /// another store, never names a rest kept after.
+    pub fn keep_forgot_rest(&mut self, rest: Vec<Forgot>) -> Option<String> {
+        if rest.is_empty() {
+            return None;
+        }
+        let base = *self.forgot_rest_base.get_or_insert_with(forgot_rest_base);
+        self.forgot_rests_made += 1;
+        let token = format!("{:016x}", base.wrapping_add(self.forgot_rests_made));
+        while self.forgot_rests.len() >= FORGOT_RESTS_KEPT {
+            if let Some((_, gone)) = self.forgot_rests.pop_front() {
+                eprintln!(
+                    "lamp-memory days: {} exchange ids of an older forget were never paged; let go",
+                    gone.len()
+                );
+            }
+        }
+        self.forgot_rests.push_back((token.clone(), rest.into()));
+        Some(token)
     }
 
-    /// The next `most` of what [`Self::keep_forgot_rest`] kept, and
-    /// whether more remain.
-    pub fn forgot_page(&mut self, most: usize) -> (Vec<Forgot>, bool) {
-        let take = self.forgot_rest.len().min(most);
-        let page = self.forgot_rest.drain(..take).collect();
-        (page, !self.forgot_rest.is_empty())
+    /// The next `most` of what [`Self::keep_forgot_rest`] kept under
+    /// `token`, and whether more remain; `None` for a token not kept (never
+    /// given, let go, paged out, or from before a restart). The last page
+    /// lets the rest go.
+    pub fn forgot_page(&mut self, token: &str, most: usize) -> Option<(Vec<Forgot>, bool)> {
+        let at = self
+            .forgot_rests
+            .iter()
+            .position(|(kept, _)| kept == token)?;
+        let rest = &mut self.forgot_rests[at].1;
+        let take = rest.len().min(most);
+        let page = rest.drain(..take).collect();
+        let more = !rest.is_empty();
+        if !more {
+            self.forgot_rests.remove(at);
+        }
+        Some((page, more))
     }
 
     /// Everything kept for one person and every rule in their rules scope
@@ -3935,6 +3973,25 @@ pub struct Forgot {
 
 /// The settings key of the store's epoch (#7771).
 const HISTORY_EPOCH: &str = "history_epoch";
+
+/// The most forgets whose rest waits to be paged at once
+/// ([`Days::keep_forgot_rest`]): far past one voice's forgets in flight.
+pub const FORGOT_RESTS_KEPT: usize = 8;
+
+/// A new random base for an open store's [`Days::keep_forgot_rest`]
+/// tokens (the clock and the process id if `/dev/urandom` can't be read).
+fn forgot_rest_base() -> u64 {
+    let mut bytes = [0u8; 8];
+    match File::open("/dev/urandom").and_then(|mut f| io::Read::read_exact(&mut f, &mut bytes)) {
+        Ok(()) => u64::from_be_bytes(bytes),
+        Err(_) => {
+            let nanos = std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .map_or(0, |d| d.as_nanos() as u64);
+            nanos ^ (u64::from(std::process::id()) << 32)
+        }
+    }
+}
 
 /// The store's epoch, minted when there is none: a new store, or one made
 /// before epochs (no turn was saved under it: both of #7771's switches
