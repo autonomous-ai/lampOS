@@ -462,19 +462,20 @@ async fn told_not_the_name(heard: &str, near: Option<f32>, turned: bool) -> Vec<
     told.lock().unwrap().clone()
 }
 
-/// #8092 (lamp-74ff, build 14967, 20 Nov): request 4's and request 5's
-/// lines, lamp-name near at 0.86 and 1.00 by the line's start, their first
-/// word, set off, not the name: `LAMP_NAME_NEAR` ruled each not the name,
-/// and the rule is told so before it judges the line, so the hearing
-/// counts by no second sign there (`LAMP_NAME_SIGN_TIED`). A word of the
-/// name's shape with no face turned is ruled so too. Not told: a first
-/// word taken as the name, the name itself, and a line with no near
-/// hearing.
+/// #8092 (lamp-74ff, build 14967, 20 Nov): request 4's line, lamp-name
+/// near at 0.86 by the line's start, and request 5's words heard near
+/// under [`crate::attention::SURE_SCORE`] (at 1.00 it is the next
+/// test's), their first word, set off, not the name: `LAMP_NAME_NEAR`
+/// ruled each not the name, and the rule is told so before it judges the
+/// line, so the hearing counts by no second sign there
+/// (`LAMP_NAME_SIGN_TIED`). A word of the name's shape with no face turned
+/// is ruled so too. Not told: a first word taken as the name, the name
+/// itself, and a line with no near hearing.
 #[tokio::test]
 async fn a_line_name_near_rules_not_the_name_is_told_to_the_rule() {
     assert_eq!(told_not_the_name("Really?", Some(0.86), false).await, [1]);
     assert_eq!(
-        told_not_the_name("Yes, it is.", Some(1.0), false).await,
+        told_not_the_name("Yes, it is.", Some(0.998), false).await,
         [1]
     );
     assert_eq!(
@@ -574,5 +575,73 @@ fn french_openings_heard_for_the_name() {
         "",
     ] {
         assert_eq!(opening(not), None, "{not}");
+    }
+}
+
+/// The first builder's 14:29 ruling on #8092: `LAMP_NAME_NEAR`'s "not the
+/// name" never throws away a sure hearing at the line's start. A hearing
+/// of [`crate::attention::SURE_SCORE`] or more, near by the line's start,
+/// is not ruled not the name though its first word, set off, doesn't sound
+/// like it, so the rule weighs it as any hearing at the line's start
+/// (`LAMP_NAME_SIGN_TIED`). 13:55 on lamp-52e6, request 16: a real call,
+/// near at 1.00, its hearing 1250 ms into the line, now a call. The
+/// meeting stays held: 10:55's request 4 (0.86, its hearing 15 s deep) and
+/// a line under the sure score whose first word is unlike the name. Named
+/// for the first builder: 10:55's request 5 (three words, near at 1.00,
+/// its hearing 1155 ms in) has 13:55's numbers, so out of the window it is
+/// now a call too. Off, the rule weighs each line as before, told or not.
+#[tokio::test]
+async fn with_the_sign_tied_a_sure_hearing_at_the_start_outlives_not_the_name() {
+    // Whether the rule drops the name heard in the room's sound for the
+    // line, told what `LAMP_NAME_NEAR` ruled, out of a conversation.
+    let dropped = |tied: bool, told: &[u64], heard: &str, into_us: u64, score: f32| {
+        let began = 10_000_000;
+        let mut attention = crate::attention::Attention::default();
+        attention.ask_a_second_sign_of_the_name(true);
+        attention.tie_the_second_sign(tied);
+        for request in told {
+            attention.near_not_the_name(*request);
+        }
+        attention.began_at(1, 1, began);
+        attention.name_heard_scored(began + into_us, score);
+        attention.heard(heard);
+        attention.weigh_the_name(None, false)
+    };
+    let call_1355 = "Hey Mom, ask me a question.";
+    let told = told_not_the_name(call_1355, Some(1.0), false).await;
+    assert!(told.is_empty(), "13:55, told {told:?}");
+    assert!(!dropped(true, &told, call_1355, 1_250_000, 1.0), "13:55");
+    // At the sure score itself too.
+    let sure = Some(crate::attention::SURE_SCORE);
+    assert!(told_not_the_name(call_1355, sure, false).await.is_empty());
+    // 10:55's request 5: the same numbers, so a call out of the window.
+    let request_5 = "Yes, it is.";
+    let told = told_not_the_name(request_5, Some(1.0), false).await;
+    assert!(told.is_empty(), "10:55 request 5, told {told:?}");
+    assert!(
+        !dropped(true, &told, request_5, 1_155_000, 1.0),
+        "10:55 request 5"
+    );
+    // 10:55's request 4: near at 0.86, its hearing 15 s deep: held.
+    let told = told_not_the_name("Really?", Some(0.86), false).await;
+    assert_eq!(told, [1]);
+    assert!(
+        dropped(true, &told, "Really?", 15_194_000, 0.86),
+        "10:55 request 4"
+    );
+    // Under the sure score, its first word unlike the name: held.
+    let told = told_not_the_name(request_5, Some(0.998), false).await;
+    assert_eq!(told, [1]);
+    assert!(dropped(true, &told, request_5, 200_000, 0.998), "0.998");
+    // Off: as before, the ruling counts for nothing.
+    for (heard, into_us, score) in [
+        (call_1355, 1_250_000, 1.0),
+        (request_5, 1_155_000, 1.0),
+        (request_5, 200_000, 0.998),
+    ] {
+        assert!(
+            !dropped(false, &[1], heard, into_us, score),
+            "{heard} {score}, off"
+        );
     }
 }
