@@ -22,9 +22,6 @@ async def main():
     except Exception:
         await lamp.say("I couldn't reach the sunset time just now.", wait=True)
     await lamp.close()
-    # Seen by the lamp's agent that ran it, which then ends with a dash, so
-    # the time is heard once.
-    print("Said aloud through the lamp.")
 
 
 asyncio.run(main())

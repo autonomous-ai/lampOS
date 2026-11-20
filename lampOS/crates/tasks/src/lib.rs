@@ -9,6 +9,7 @@ pub mod gateway;
 pub mod harness;
 pub mod hermes_config;
 pub mod hold;
+pub mod make_try;
 pub mod net_bridge;
 pub mod now;
 pub mod one_session;

@@ -3,5 +3,6 @@ kind = "installable"
 version = "1.0.0"
 grants = ["light", "speak"]
 
+# The script does the whole job and says its own line: no agent at run.
 [[do]]
-task = { task = "lead three slow breaths with the light and the voice", run = "scripts/main.py" }
+run = "scripts/main.py"

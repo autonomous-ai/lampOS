@@ -281,6 +281,13 @@ fn main() {
         println!("{line}");
         std::process::exit(status);
     }
+    // `lamp-tasks make-try-fence` (#8157): a made skill's tried run,
+    // started by lamp-tasks itself; the grant on stdin, then the fence.
+    if args.first().map(String::as_str) == Some(lamp_tasks::make_try::FENCE_ARG) {
+        let (status, why) = lamp_tasks::make_try::fence_main();
+        eprintln!("lamp-tasks make-try-fence: {why}");
+        std::process::exit(status);
+    }
     // `lamp-tasks net-relay ...` (#6306): inside a skill run's own network
     // namespace, started by its namespace script before Hermes; the run's
     // model calls on 127.0.0.1:7741 piped to lamp-tasks' bridge socket.
