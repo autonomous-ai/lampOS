@@ -50,6 +50,22 @@ what the lamp says as it calls. With `LAMP_USE_SKILL_SUMMARY=on` the voice
 lists it in place of the description (#6218, skills.md, "Tools for the
 model"); a longer one is left out with a journal line, and the skill loads as without it.
 
+**A made skill's `SKILL.md`** (#8157; made by the lamp's agent with
+code of its own, never a built-in, Store or pushed skill's) has three more
+sections, each a `## ` heading with lines under it, which the voice checks
+before it keeps it ([skills.md](skills.md), "A made skill is made once and
+whole"):
+- `## Uses`: each script or lamp-services tool it uses, and its arguments;
+- `## Result`: where each script's result is (what it prints, a file);
+- `## Answer`: what is said aloud, in one to three plain sentences: a
+  script says it with `lamp.say` and the agent answers a lone `-`, or the
+  agent's final answer is only the spoken summary.
+
+Its code is in one of two step kinds: `run = "scripts/main.py"`, a script
+that does the whole job and says its own lines, run with no agent (the key
+is #8158's), or `task = { task, run }` when each start needs the agent to
+sum up.
+
 Other front-matter lines and the body are for people.
 
 **`moves/NAME.json`** is a recorded move, held to the body's own check

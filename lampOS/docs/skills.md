@@ -7482,6 +7482,64 @@ the same code for both writers.
   runs; and how long its answer takes
   there.
 
+##### A made skill is made once and whole (#8157)
+
+Whichever agent the lamp runs (OpenClaw or Hermes; nothing here names or
+forces one), a skill it makes is made whole, with everything a run needs:
+
+- **The guide** (`lamp_tasks::skill_make::GUIDE`,
+  `crates/tasks/src/skill_make_guide.md`) teaches two step kinds, chosen at
+  the make: a `run` step, written exactly `run = "scripts/main.py"`, whose
+  script does the whole job and says its success line and its failure line
+  with `lamp.say` (lamp-skills runs it with no agent; the key's schema and
+  runtime are #8158's), and a `task` step only when each start needs the
+  agent to sum up or reason, its helper scripts written at the make too.
+  Scripts are written at the make, never at a run. A linked service is read
+  by the script itself (`lamp.service_read`) or by the lamp's own `read`
+  step: the one-line hand-over script is no longer taught to the agent (the
+  rules it is given say so too, `make_skill_local::agents_own_scripts`;
+  DeepSeek's are as before). The agent writes only the draft it was given,
+  never the lamp's own skills or any other. The examples
+  (`crates/tasks/src/make_examples/`) show `run` steps (`coin-flip`,
+  `breathing-coach`, `exchange-rate`, `sun-times`) and a `task` with a
+  helper that reads the calendar (`agenda-count`).
+- **Its `SKILL.md`** has a `when` line and, for a skill with code, three
+  sections, each a `## ` heading with lines under it: `## Uses` (each
+  script or lamp-services tool and its arguments), `## Result` (where each
+  result is) and `## Answer` (what is said aloud, in one to three plain
+  sentences). The voice holds a skill the lamp's agent made with code to
+  them (`made_skill::sections_held`, refused as `made_skill::NO_SECTIONS`
+  with lines for a repair); never a built-in, Store, pushed or added
+  skill's, nor one DeepSeek made.
+- **A tried run before it is kept.** Once the voice's check has packed it,
+  a made skill with code is sent whole to lamp-tasks
+  (`make_skill_agent::try_made`, `"op":"make_try"`; [tasks.md](tasks.md),
+  "A made skill's tried run") and kept only when its try passed: each
+  script exits 0 within 30 s, a `run` step's said at least one line with
+  `lamp.say`, a `task` step's printed something. Nothing changes in the
+  world at the try: lamp-control answers a tried run's linked service write
+  as if done and never sends it; its reads are live. A failed try is
+  refused as `made_skill::NOT_TRIED_PASSED` with lamp-tasks' words, which
+  go back to the agent as one of its repairs (at most two), then the make
+  is told failed and nothing is kept. A passed try adds
+  `made_skill::TRIED_SAID` ("I tried it once and it worked.") to its
+  read-back; the person's yes is asked as before. A try that can't be made
+  at all (an older lamp-tasks, no tasks part) is journaled and the skill
+  kept as before. Not for a skill added from a file.
+- **Who wrote it** is always on its card and in its `made.json` entry:
+  `made_with: openclaw`, `hermes` (the engine the tasks part named for the
+  make) or `deepseek` (the lamp's own model), whatever
+  `LAMP_MAKE_REACTIONS_ONLY_DEEPSEEK` says; `made_by` stays who asked
+  (`voice`, `app`).
+
+Tests: `a_made_skill_always_says_the_engine_that_wrote_it`,
+`an_agents_skill_with_code_says_its_uses_result_and_answer`,
+`a_tried_run_is_told_or_goes_to_a_repair`,
+`a_tried_runs_answer_is_read_as_passed_failed_nothing_or_not_tried`,
+`a_made_skill_is_sent_whole_to_be_tried`,
+`the_agent_is_told_to_write_a_services_scripts_whole`, and lamp-tasks' and
+lamp-control's below.
+
 ##### A make while another is made waits its turn (`LAMP_MAKE_QUEUE=on`, off)
 
 On lamp-9adf (stock 14083, #7679) a person made one skill, then 47 s later
