@@ -162,6 +162,12 @@ pub const PRODUCT: &[(&str, &str)] = &[
         "lamp-peek.service",
         include_str!("../../../deploy/product/lamp-peek.service"),
     ),
+    // The lamp plays a URL (#7415, docs/control.md): exits 0 at once unless
+    // LAMP_PLAY_URL=on, which no product unit sets.
+    (
+        "lamp-play.service",
+        include_str!("../../../deploy/product/lamp-play.service"),
+    ),
     (
         "lamp-skills.service",
         include_str!("../../../deploy/product/lamp-skills.service"),
@@ -344,6 +350,7 @@ pub const EXIT_NOTE_UNITS: &[&str] = &[
     "lamp-name.service",
     "lamp-npu.service",
     "lamp-peek.service",
+    "lamp-play.service",
     "lamp-policy.service",
     "lamp-records.service",
     "lamp-region.service",

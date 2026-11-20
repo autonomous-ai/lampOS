@@ -134,6 +134,7 @@ pub const UNITS: &[&str] = &[
     "lamp-name.service",
     "lamp-npu.service",
     "lamp-peek.service",
+    "lamp-play.service",
     "lamp-policy.service",
     "lamp-records.service",
     "lamp-region.service",
