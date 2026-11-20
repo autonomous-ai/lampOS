@@ -2897,7 +2897,13 @@ them) (`crates/tasks/src/openclaw_config.rs`):
 - `agents.defaults.workspace`: the lamp's own work folder
   (`/var/lib/lampos-tasks/harnesses/lamp-tasks/lamp`, `LAMP_PROJECT` under
   `lampos`'s home), where the lamp's skills keys point and the guidance
-  (`AGENTS.md`) is written, as for Hermes.
+  (`AGENTS.md`) is written, as for Hermes. Its last section, "Your last
+  answer" (#7930), asks the agent for a last answer that says what it
+  found or did first, in short plain sentences, never only "done" or
+  "saved", saying what a file it wrote holds and where, within about 800
+  characters and no markdown: only about the first 1,200 characters reach
+  the voice (`the_guidance_asks_for_a_last_answer_that_says_what_was_found`,
+  `hermes_config.rs`).
 - **V1's tool grants (`LAMP_OPENCLAW_V1_TOOLS`, on, #7245).** The owner's
   decision: "follow V1, so skills get made: whatever V1 gave, we give." The
   design source is the platform's `runtimes/openclaw/service_setup.go`,
