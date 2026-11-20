@@ -1694,6 +1694,23 @@ fn the_product_keeps_nothing_personal_while_nobody_is_known() {
     }
 }
 
+/// #7224, fault 4 (the first builder, 23:14): a capture reopen racing the
+/// speaker's re-prime mid-run is dropped as a gap, never the voice's exit,
+/// in the product from landing.
+#[test]
+fn the_product_voice_drops_frames_before_a_restarted_clock() {
+    let voice = install::PRODUCT
+        .iter()
+        .find(|(unit, _)| *unit == "lamp-voice.service")
+        .unwrap()
+        .1;
+    let service = section(voice, "Service");
+    assert!(
+        service.contains(&"Environment=LAMP_VOICE_UNSTARTED_FRAME_DROP=on"),
+        "the voice lacks LAMP_VOICE_UNSTARTED_FRAME_DROP=on"
+    );
+}
+
 /// The tiered store beside Days stays off in the product (`LAMP_MEMORY_TIERS`,
 /// #4746): until its played test over days and two reads, no product file
 /// sets it, so lamp-memory serves Days alone.
@@ -1906,6 +1923,29 @@ fn the_product_takes_back_a_doubted_keep() {
     assert!(
         service.contains(&"Environment=LAMP_MEMORY_DOUBT_UNDOES=on"),
         "the voice lacks LAMP_MEMORY_DOUBT_UNDOES"
+    );
+}
+
+/// An unsure line is simply not kept, and nothing is asked, in the
+/// product (`LAMP_MEMORY_UNSURE_NOT_KEPT`, #7739): the product owner's
+/// no-asks rule of 18 Nov. The near word's ask stays out of it.
+#[test]
+fn the_product_keeps_no_unsure_line_and_asks_nothing() {
+    let voice = install::PRODUCT
+        .iter()
+        .find(|(unit, _)| *unit == "lamp-voice.service")
+        .unwrap()
+        .1;
+    let service = section(voice, "Service");
+    assert!(
+        service.contains(&"Environment=LAMP_MEMORY_UNSURE_NOT_KEPT=on"),
+        "the voice lacks LAMP_MEMORY_UNSURE_NOT_KEPT"
+    );
+    assert!(
+        !service
+            .iter()
+            .any(|line| line.starts_with("Environment=LAMP_MEMORY_ASK_NEAR_HEARD")),
+        "the voice asks about a near word"
     );
 }
 
@@ -2535,7 +2575,7 @@ fn the_product_hands_a_make_deepseek_cant_keep_to_the_lamps_agent() {
 /// said on (`LAMP_MADE_NOT_ON_TOLD`, #7270) in lamp-voice alone; and a
 /// skill's task made sure of (`LAMP_SKILL_TASK_SURE`, #7239) in lamp-skills
 /// alone. A `cannot:` made a task for the lamp's agent
-/// (`LAMP_MAKE_NO_CANNOT`, #7234) stays off until its own row.
+/// (`LAMP_MAKE_NO_CANNOT`, #7234) is on with the make flow's five below.
 #[test]
 fn the_product_turns_the_skill_flows_three_switches_on_where_they_are_read() {
     let switches: [(&str, &[&str]); 3] = [
@@ -2586,6 +2626,87 @@ fn the_product_turns_the_skill_flows_three_switches_on_where_they_are_read() {
             assert!(
                 install::PRODUCT.iter().any(|(unit, _)| unit == owner),
                 "{owner} is not a product unit"
+            );
+        }
+    }
+}
+
+/// The make flow's five switches (the first builder's DEFAULT-ON, 19 Nov
+/// 21:42, on #7814), each `on` once in lamp-voice, whose part reads it, and
+/// in no other unit: a make the lamp can't build itself made a task for its
+/// agent (`LAMP_MAKE_NO_CANNOT`, #7234), made code that only lights, speaks
+/// or moves on at once (`LAMP_MADE_CODE_ON_AT_ONCE`), a skill the lamp has
+/// but is off turned on for a make asking for it (`LAMP_MAKE_CORE_OFFER`),
+/// "make a skill" listened for (`LAMP_SKILL_KEYTERM`) with a thing to do on
+/// a repeat told as a skill, never a reminder
+/// (`LAMP_SKILL_RECURRING_TOLD`). Each beside the companions its row
+/// names, on in the same unit. A skill written in the app
+/// (`LAMP_SKILL_WRITTEN`) follows #7977, the written-note size bound.
+#[test]
+fn the_product_turns_the_make_flows_five_switches_on_where_they_are_read() {
+    let voice: &[&str] = &["lamp-voice.service"];
+    let switches: [(&str, &[&str]); 5] = [
+        (lamp_voice::make_no_cannot::ENVIRONMENT, voice),
+        (lamp_voice::made_skill::CODE_AT_ONCE_ENVIRONMENT, voice),
+        (lamp_voice::make_core_offer::ENVIRONMENT, voice),
+        (
+            lamp_voice::second_provider::net::key_terms::SKILL_ENVIRONMENT,
+            voice,
+        ),
+        (lamp_voice::skill_recurring::ENVIRONMENT, voice),
+    ];
+    assert_eq!(
+        switches.map(|(name, _)| name),
+        [
+            "LAMP_MAKE_NO_CANNOT",
+            "LAMP_MADE_CODE_ON_AT_ONCE",
+            "LAMP_MAKE_CORE_OFFER",
+            "LAMP_SKILL_KEYTERM",
+            "LAMP_SKILL_RECURRING_TOLD",
+        ]
+    );
+    for (name, owners) in switches {
+        let line = format!("Environment={name}=on");
+        for (unit, text) in install::PRODUCT {
+            let on = section(text, "Service")
+                .iter()
+                .filter(|set| **set == line)
+                .count();
+            let mentioned = text
+                .lines()
+                .filter(|set| !set.starts_with('#') && set.contains(name))
+                .count();
+            assert_eq!(on, usize::from(owners.contains(unit)), "{unit}: {line}");
+            assert_eq!(mentioned, on, "{unit}: {name}");
+        }
+        for owner in owners {
+            assert!(
+                install::PRODUCT.iter().any(|(unit, _)| unit == owner),
+                "{owner} is not a product unit"
+            );
+        }
+    }
+    // The companions each row names, on in the unit that reads it.
+    let companions: [(&str, &[&str]); 1] = [(
+        "lamp-voice.service",
+        &[
+            "Environment=LAMP_MAKE_SKILL=on",
+            "Environment=LAMP_MADE_SCRIPTS=on",
+            "Environment=LAMP_SKILL_TASKS=on",
+        ],
+    )];
+    for (owner, lines) in companions {
+        let text = install::PRODUCT
+            .iter()
+            .find(|(unit, _)| *unit == owner)
+            .unwrap()
+            .1;
+        let service = section(text, "Service");
+        for line in lines {
+            assert_eq!(
+                service.iter().filter(|set| *set == line).count(),
+                1,
+                "{owner} lacks {line}"
             );
         }
     }
@@ -2757,6 +2878,47 @@ fn the_product_lets_a_skills_task_reach_the_public_web() {
     }
 }
 
+/// A skill the owner asks for by voice at night is told within its run
+/// (#7180; lamp-9adf, 16 Nov 02:28: its answer waited behind quiet hours and
+/// was skipped): `LAMP_TOLD_WHEN_ASKED` on, once, in the two units whose part
+/// reads it (lamp-skills' told answer, lamp-voice's second route and say
+/// service), each beside the skill task switch it rides on, and in no other.
+#[test]
+fn the_product_tells_a_skill_asked_for_by_voice_in_quiet_hours() {
+    let readers = ["lamp-skills.service", "lamp-voice.service"];
+    for (unit, text) in install::PRODUCT {
+        let service = section(text, "Service");
+        let wanted = usize::from(readers.contains(unit));
+        assert_eq!(
+            service
+                .iter()
+                .filter(|line| line.contains("LAMP_TOLD_WHEN_ASKED"))
+                .count(),
+            wanted,
+            "{unit}"
+        );
+        if wanted == 0 {
+            continue;
+        }
+        for line in [
+            "Environment=LAMP_TOLD_WHEN_ASKED=on",
+            "Environment=LAMP_SKILL_TASKS=on",
+        ] {
+            assert_eq!(
+                service.iter().filter(|set| **set == line).count(),
+                1,
+                "{unit} lacks {line}"
+            );
+        }
+    }
+    for unit in readers {
+        assert!(
+            install::PRODUCT.iter().any(|(name, _)| *name == unit),
+            "{unit} is not a product unit"
+        );
+    }
+}
+
 /// A gateway agent's (OpenClaw's) run granted `net` (#7742): its own
 /// egress socket, relayed in its skill-start fence alone, with
 /// `LAMP_TASK_NET_GATEWAY=on` once in the three units whose part reads it,
@@ -2788,6 +2950,51 @@ fn the_product_lets_a_gateway_agents_task_reach_the_public_web() {
             assert!(service.contains(&net.as_str()), "{unit} lacks {net}");
         }
     }
+}
+
+/// A skill's read whose service isn't linked says once where to link it
+/// (#5518; the bundled Morning mail, Morning agenda and Tomorrow's plan
+/// otherwise say nothing, every day): `LAMP_SKILL_LINK_NOTE` on, once, in
+/// lamp-skills alone, the one unit whose part reads it, beside
+/// `LAMP_SKILL_READS` and with the `--state-dir` it keeps its note in.
+#[test]
+fn the_product_tells_once_that_a_skills_read_service_is_not_linked() {
+    let reader = "lamp-skills.service";
+    for (unit, text) in install::PRODUCT {
+        let service = section(text, "Service");
+        let wanted = usize::from(*unit == reader);
+        assert_eq!(
+            service
+                .iter()
+                .filter(|line| line.contains("LAMP_SKILL_LINK_NOTE"))
+                .count(),
+            wanted,
+            "{unit}"
+        );
+        if wanted == 0 {
+            continue;
+        }
+        for line in [
+            "Environment=LAMP_SKILL_LINK_NOTE=on",
+            "Environment=LAMP_SKILL_READS=on",
+        ] {
+            assert_eq!(
+                service.iter().filter(|set| **set == line).count(),
+                1,
+                "{unit} lacks {line}"
+            );
+        }
+        assert!(
+            service
+                .iter()
+                .any(|line| line.starts_with("ExecStart=") && line.contains(" --state-dir ")),
+            "{unit} runs without --state-dir"
+        );
+    }
+    assert!(
+        install::PRODUCT.iter().any(|(name, _)| *name == reader),
+        "{reader} is not a product unit"
+    );
 }
 
 /// An uploaded skill's keys go in through the app and reach only its run
@@ -2872,13 +3079,11 @@ fn the_product_answers_a_stop_and_asks_after_a_wordless_cut_in() {
         service.contains(&"Environment=LAMP_CUT_IN_WORDLESS_ASKS=on"),
         "the voice lacks LAMP_CUT_IN_WORDLESS_ASKS"
     );
-    // Off for the candidate (the PM, 6 Nov): its lamp check came back FAIL,
-    // partial (#5430), so a busy room's cut is asked, as on stable.
+    // On in the product (#7413): a busy room's wordless cut goes on from the
+    // sentence it cut.
     assert!(
-        !service
-            .iter()
-            .any(|line| line.contains("LAMP_CUT_IN_WORDLESS_RESUMES")),
-        "the voice sets LAMP_CUT_IN_WORDLESS_RESUMES"
+        service.contains(&"Environment=LAMP_CUT_IN_WORDLESS_RESUMES=on"),
+        "the voice lacks LAMP_CUT_IN_WORDLESS_RESUMES"
     );
 }
 
@@ -4344,6 +4549,24 @@ fn a_blank_lamp_runs_every_product_skill_as_the_skill() {
                 ours.splice(0..0, install::OFF_LINE.bytes());
             }
             assert_eq!(fs::read(lamp.on(&path)).unwrap(), ours, "{path}");
+            installed.push(path);
+        }
+        // A core pilot's brief beside its variant, lamp-skills' own words,
+        // which no folder of the repository carries (#7862).
+        if folder.join(lamp_skills::core_agent::OVERLAY).is_file() {
+            let path = format!(
+                "/var/lib/lampOS/skills/{skill}/{}",
+                lamp_skills::core_agent::RUN
+            );
+            assert!(
+                !folder.join(lamp_skills::core_agent::RUN).exists(),
+                "{skill}"
+            );
+            assert_eq!(
+                fs::read_to_string(lamp.on(&path)).unwrap(),
+                lamp_skills::core_agent::script(lamp_skills::core_agent::pilot(skill).unwrap()),
+                "{path}"
+            );
             installed.push(path);
         }
     }
@@ -6605,7 +6828,7 @@ fn harness_off_runs_uninstall_stop_status_then_the_linger_then_pgrep() {
     let mut lamp = Lamp::with_harness();
     lamp.install().unwrap();
     lamp.harness_off().unwrap();
-    let harness = "runuser -u lampos -- env HOME=/var/lib/lampos-tasks XDG_RUNTIME_DIR=/run/user/999 /usr/local/bin/harness";
+    let harness = "runuser -u lampos -- env HOME=/var/lib/lampos-tasks XDG_RUNTIME_DIR=/run/user/999 ADAPTER_DATA_DIR=/var/lib/lampos-tasks/.harness/cli/data /usr/local/bin/harness";
     assert_eq!(
         lamp.host.steps,
         [
@@ -7223,8 +7446,9 @@ fn harness_on_installs_with_harnesss_own_installer_then_sets_it_at_boot() {
         [
             "id -u lampos".to_owned(),
             "install -d -o lampos -g lampos -m 0700 /var/lib/lampos-tasks".to_owned(),
+            "runuser -u lampos -- mkdir -p -m 0700 /var/lib/lampos-tasks/.harness".to_owned(),
             format!(
-                "runuser -u lampos -- env HOME=/var/lib/lampos-tasks XDG_RUNTIME_DIR=/run/user/999 PATH=/usr/local/bin:/usr/bin:/bin SHELL=/bin/sh sh -c curl -fsSL --proto =https --tlsv1.2 {} | sh",
+                "runuser -u lampos -- env HOME=/var/lib/lampos-tasks XDG_RUNTIME_DIR=/run/user/999 ADAPTER_DATA_DIR=/var/lib/lampos-tasks/.harness/cli/data PATH=/usr/local/bin:/usr/bin:/bin SHELL=/bin/sh sh -c curl -fsSL --proto =https --tlsv1.2 {} | sh",
                 install::HARNESS_INSTALLER
             ),
             "test -x /var/lib/lampos-tasks/.local/bin/harness".to_owned(),
@@ -7497,7 +7721,7 @@ fn harness_on_stops_at_a_failing_step_and_leaves_no_link() {
 fn harness_at_boot_gives_lamposs_manager_its_home_first() {
     let mut lamp = Lamp::with_harness();
     lamp.install().unwrap();
-    let harness = "runuser -u lampos -- env HOME=/var/lib/lampos-tasks XDG_RUNTIME_DIR=/run/user/999 /usr/local/bin/harness";
+    let harness = "runuser -u lampos -- env HOME=/var/lib/lampos-tasks XDG_RUNTIME_DIR=/run/user/999 ADAPTER_DATA_DIR=/var/lib/lampos-tasks/.harness/cli/data /usr/local/bin/harness";
     assert_eq!(
         lamp.host.boot_steps,
         [

@@ -8,6 +8,7 @@ mod doc;
 mod doing;
 mod expression;
 mod expression_rest;
+mod heat;
 mod logging;
 mod presence;
 mod privacy;

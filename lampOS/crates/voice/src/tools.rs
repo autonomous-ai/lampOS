@@ -979,6 +979,13 @@ fn core_tools_within(settings: &Settings, bound: usize) -> Vec<Tool> {
     }
     if settings.who.is_some() {
         tools.extend(crate::known_faces::tools_for(face_switches(settings)));
+        // The model's decline of "What should I call you?" (#7876).
+        if crate::onboarding::learn_later::worker_on(
+            settings.names_checked,
+            settings.remember_speaker,
+        ) {
+            tools.push(crate::onboarding::learn_later::tool());
+        }
         // A face added from a photo, asked about at the lamp (#1968).
         if settings.photo_faces {
             tools.extend(crate::photo_faces::tools());
@@ -1300,6 +1307,11 @@ fn face_switches(settings: &Settings) -> crate::known_faces::FaceSwitches {
         // A new face past setup kept with nothing asked (`LAMP_FACE_NO_ASK`,
         // the first builder 18:50): only with names checked.
         face_no_ask: settings.names_checked && crate::known_faces::face_no_ask_on(),
+        // A new face's save past the face question on a known file kept
+        // only for a face the eyes know (`LAMP_FACE_SAVE_KNOWN_ONLY`,
+        // #7704): only with names checked.
+        face_save_known_only: settings.names_checked
+            && crate::known_faces::face_save_known_only_on(),
     }
 }
 
@@ -1358,7 +1370,10 @@ pub fn route(settings: &Settings, name: &str) -> Route {
     if crate::agent_tasks::is_tool(name) {
         return settings.tasks.clone().map_or(Route::Nobody, Route::Tasks);
     }
-    if crate::known_faces::is_tool(name) || crate::photo_faces::is_tool(name) {
+    if crate::known_faces::is_tool(name)
+        || crate::photo_faces::is_tool(name)
+        || name == crate::onboarding::learn_later::DECLINED
+    {
         return settings.who.clone().map_or(Route::Nobody, |socket| {
             Route::Faces(socket, face_switches(settings), settings.onboarding.clone())
         });
@@ -2061,7 +2076,8 @@ fn run_spoken_call_inner(
         if let Some(told) = crate::upload_agent::first_run(&call.name, request, heard, lease) {
             return ("the agent skill's yes", ToolAnswer::plain(told), true);
         }
-        let (answer, answered) = ask_with_context(directory, call, ASK_DEADLINE, context);
+        let call = stop_as_heard(directory, call, request, heard);
+        let (answer, answered) = ask_with_context(directory, &call, ASK_DEADLINE, context);
         ("the executive", answer, answered)
     } else {
         let (whom, (mut told, answered)) = run_call_with_scope(route, call, request, heard, lease);
@@ -2655,6 +2671,14 @@ fn run_call_with_scope(
                 }
                 _ => (told, answered),
             };
+            // And the makes they asked for that still wait their turn
+            // (`LAMP_MAKE_QUEUE`, #7679), on the same mark and rule.
+            let (told, answered) = match lease {
+                Some(lease) if heard && model.name == crate::remember::FORGET_EVERYTHING => {
+                    crate::make_queue::forget_with_everything((told, answered), lease)
+                }
+                _ => (told, answered),
+            };
             // And the name typed at setup, on the same mark and rule (#4461),
             // after the place, which finds the owner by that name.
             let (told, answered) = match lease {
@@ -2697,7 +2721,14 @@ fn run_call_with_scope(
             }
             ("the memory", (told, answered))
         }
-        Route::Executive(directory) => ("the executive", ask(directory, call, deadline)),
+        Route::Executive(directory) => (
+            "the executive",
+            ask(
+                directory,
+                &stop_as_heard(directory, call, request, heard),
+                deadline,
+            ),
+        ),
         // A session of theirs, named, only for the lamp's owner, heard, as
         // the services hold it (#6274); a look stops with the request.
         Route::Tasks(place) => (
@@ -2736,7 +2767,7 @@ fn run_call_with_scope(
                 crate::service_records::reminder_rows::after_call(
                     &call.name,
                     &call.args,
-                    Some(&caller),
+                    Some(&schedule_whose::record_caller(lease, &call.name, &caller)),
                     &told,
                     crate::service_records::unix_ms(),
                 );
@@ -2759,7 +2790,17 @@ fn run_call_with_scope(
         // A yes to being named is taken only from the line's own admitted
         // scope, the named person's (#1997): none, revoked or narrowed to
         // the room is nobody's.
+        Route::Faces(_, _, onboarding) if call.name == crate::onboarding::learn_later::DECLINED => {
+            (
+                "the walk",
+                crate::onboarding::learn_later::declined(call, onboarding.as_deref()),
+            )
+        }
         Route::Faces(socket, switches, onboarding) => 'faces: {
+            // A name given to "What should I call you?" (#7876): answered.
+            if call.name == crate::known_faces::REMEMBER {
+                crate::onboarding::learn_later::remembered(onboarding.as_deref());
+            }
             // The owner's "I'm <the typed name>" from their own face kept
             // under another name links that face as the owner in place of a
             // rename (`LAMP_OWNER_LINK`, #7501); anything else goes on.
@@ -3018,6 +3059,28 @@ fn run_call_with_scope(
 pub fn ask(directory: &Path, call: &ToolCall, deadline: Duration) -> (Value, bool) {
     let (answer, answered) = ask_with_context(directory, call, deadline, None);
     (answer.told, answered)
+}
+
+/// `call` as the person's own words for `request` scope it, when it is a
+/// shared stop's snooze, off or on offering kinds in `directory`'s tools
+/// file ([`crate::stop_scope`], #7473: the owner's call, the lamp reads the
+/// words); otherwise as it is. Nothing is read for any other call.
+fn stop_as_heard(directory: &Path, call: &ToolCall, request: u64, heard: bool) -> ToolCall {
+    if !heard || !crate::stop_scope::may_be_stop(call) {
+        return call.clone();
+    }
+    let words = crate::stop_scope::heard_words(request, heard);
+    match crate::stop_scope::scoped(
+        call,
+        &catalog(&directory.join(CATALOG_FILE)),
+        words.as_deref(),
+    ) {
+        Some((scoped, line)) => {
+            eprintln!("lamp-voice: {} for request {request}: {line}", call.name);
+            scoped
+        }
+        None => call.clone(),
+    }
 }
 
 fn ask_with_context(
@@ -3567,6 +3630,7 @@ mod tests {
             rename_yes: false,
             name_learn_fix: false,
             face_no_ask: false,
+            face_save_known_only: false,
         };
         let route = Route::Faces(socket.clone(), on, None);
         let call = |name: &str| ToolCall {
@@ -4326,6 +4390,40 @@ mod tests {
             json!({"op":"call","name":"set_timer","args":{"text":"Tea","seconds":60}})
         );
         std::fs::remove_dir_all(dir).unwrap();
+    }
+
+    /// #7473, the owner's call: a shared stop offering kinds goes to the
+    /// skills with the scope the person's own words set, over the model's
+    /// `kind`; a line nobody spoke goes as the model made it.
+    #[test]
+    fn a_shared_stop_goes_with_the_scope_the_words_set() {
+        let tools = json!({"tools":[{
+            "name":"wellbeing_nudges",
+            "description":"When someone asks you to stop a wellbeing nudge.",
+            "parameters":{"type":"object","properties":{
+                "all":{"type":"boolean"},
+                "how":{"type":"string","enum":["snooze","off","on"]},
+                "kind":{"type":"string","enum":["eyes","water"]}}}}]});
+        let call = ToolCall {
+            id: "provider-call-1".into(),
+            name: "wellbeing_nudges".into(),
+            args: json!({"how":"off","kind":"eyes"}),
+        };
+        for (heard, sent) in [
+            (true, json!({"how":"off","kind":["water","eyes"]})),
+            (false, json!({"how":"off","kind":"eyes"})),
+        ] {
+            let dir = schedule_directory("stop-scope");
+            std::fs::write(dir.join(CATALOG_FILE), tools.to_string()).unwrap();
+            let served = executive(&dir, b"{\"ok\":true,\"result\":{}}\n", Duration::ZERO);
+            crate::stop_scope::set_heard_here(Some(Some("Stop the water and eye nudges.")));
+            let (_, (_, answered)) =
+                run_call_with_scope(&Route::Executive(dir.clone()), &call, 9, heard, None);
+            crate::stop_scope::set_heard_here(None);
+            assert!(answered);
+            assert_eq!(served.join().unwrap()["args"], sent, "heard {heard}");
+            std::fs::remove_dir_all(dir).unwrap();
+        }
     }
 
     /// #7335's row: with `LAMP_SKILL_STATE_TOLD`, `make_skill`'s list of

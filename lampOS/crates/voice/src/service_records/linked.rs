@@ -23,8 +23,10 @@
 //! - **Off.** With `LAMP_SERVICE_RECORDS` off nothing is kept
 //!   ([`Put::Off`]). Each writer comes with its own switch: Harness task
 //!   rows (`LAMP_SERVICE_RECORDS_TASKS`, [`super::task_rows`]); reminder
-//!   rows (`LAMP_SERVICE_RECORDS_REMINDERS`, [`super::reminder_rows`]);
-//!   agent rows (`LAMP_SERVICE_RECORDS_AGENT`, [`super::agent_rows`]).
+//!   rows (`LAMP_SERVICE_RECORDS_REMINDERS`, [`super::reminder_rows`]); a
+//!   paired computer's daily notes count (`LAMP_SERVICE_RECORDS_SDK`,
+//!   [`super::sdk_counts`]); agent rows (`LAMP_SERVICE_RECORDS_AGENT`,
+//!   [`super::agent_rows`]).
 use super::{Status, tidy};
 use serde_json::{Value, json};
 use std::collections::VecDeque;
@@ -33,6 +35,8 @@ use std::time::Duration;
 
 /// The most linked changes waiting to be written.
 pub const LINKED_MOST: usize = 16;
+/// The most linked records the voice holds for the records note.
+pub const RECENT_MOST: usize = 16;
 /// The most bytes of a summary, as the memory keeps it.
 pub const SUMMARY_BYTES: usize = 160;
 /// The most bytes of a `source_ref`, as JSON.
@@ -51,6 +55,8 @@ pub enum Kind {
     Task,
     Agent,
     Reminder,
+    /// A paired computer's daily notes count ([`super::sdk_counts`]).
+    Sdk,
 }
 
 impl Kind {
@@ -59,6 +65,7 @@ impl Kind {
             Self::Task => "task",
             Self::Agent => "agent",
             Self::Reminder => "reminder",
+            Self::Sdk => "sdk",
         }
     }
 }
@@ -121,6 +128,11 @@ pub enum Put {
 #[derive(Default)]
 pub struct Outbox {
     waiting: VecDeque<Linked>,
+    /// The latest change of each linked record put or listed lately,
+    /// oldest first, at most [`RECENT_MOST`]: what the records note tells
+    /// (`told`, `LAMP_SERVICE_RECORDS_LINKED_TOLD`, slice 8). RAM only;
+    /// a forget takes from it as from `waiting`.
+    recent: VecDeque<Linked>,
     /// Whether the memory did not answer the last write.
     down: bool,
 }
@@ -244,7 +256,8 @@ pub fn put(mut change: Linked) -> Put {
             .iter_mut()
             .find(|waiting| waiting.key == change.key && waiting.person == change.person)
         {
-            *waiting = change;
+            *waiting = change.clone();
+            keep_recent(&mut outbox.recent, change);
             return None;
         }
         let gone = if outbox.waiting.len() >= LINKED_MOST {
@@ -252,7 +265,8 @@ pub fn put(mut change: Linked) -> Put {
         } else {
             None
         };
-        outbox.waiting.push_back(change);
+        outbox.waiting.push_back(change.clone());
+        keep_recent(&mut outbox.recent, change);
         gone
     });
     start_saver();
@@ -267,6 +281,84 @@ pub fn put(mut change: Linked) -> Put {
             );
             Put::DroppedOldest
         }
+    }
+}
+
+/// `change` held as its record's latest, in place of an older one of the
+/// same person and key; past [`RECENT_MOST`], the oldest goes.
+fn keep_recent(recent: &mut VecDeque<Linked>, change: Linked) {
+    recent.retain(|held| held.key != change.key || held.person != change.person);
+    recent.push_back(change);
+    while recent.len() > RECENT_MOST {
+        recent.pop_front();
+    }
+}
+
+/// `person`'s linked records held for the records note, oldest first.
+pub fn recent_of(person: &str) -> Vec<Linked> {
+    kept::outbox(|outbox| {
+        outbox
+            .recent
+            .iter()
+            .filter(|held| held.person == person)
+            .cloned()
+            .collect()
+    })
+}
+
+/// A linked record the memory listed after a start (`told::merge`): held
+/// for the note unless one of its key is held already. Never written.
+pub fn listed(change: Linked) {
+    kept::outbox(|outbox| {
+        if !outbox
+            .recent
+            .iter()
+            .any(|held| held.key == change.key && held.person == change.person)
+        {
+            outbox.recent.push_front(change);
+            while outbox.recent.len() > RECENT_MOST {
+                outbox.recent.pop_front();
+            }
+        }
+    });
+}
+
+impl Linked {
+    /// A record as the memory lists it, for `person`: none unless of a
+    /// linked kind.
+    pub fn from_listed(person: &str, item: &Value) -> Option<Self> {
+        let kind = match item["source_kind"].as_str()? {
+            "task" => Kind::Task,
+            "agent" => Kind::Agent,
+            "reminder" => Kind::Reminder,
+            _ => return None,
+        };
+        let status = match item["status"].as_str()? {
+            "prepared" => Status::Prepared,
+            "done" => Status::Done,
+            "cancelled" => Status::Cancelled,
+            "refused" => Status::Refused,
+            "failed" => Status::Failed,
+            "timed_out" => Status::TimedOut,
+            "no_result" => Status::NoResult,
+            _ => return None,
+        };
+        let text = |key: &str| item[key].as_str().unwrap_or_default().to_owned();
+        let at = |key: &str| item[key].as_u64().unwrap_or(0);
+        Some(Self {
+            person: person.to_owned(),
+            key: item["key"].as_str()?.to_owned(),
+            kind,
+            service: text("service"),
+            action: text("action"),
+            status,
+            source_ref: item.get("source_ref").cloned().unwrap_or_else(|| json!({})),
+            summary: text("summary"),
+            deed_ms: at("deed_unix_ms"),
+            asked_ms: at("asked_unix_ms"),
+            changed_ms: at("changed_unix_ms"),
+            links: Vec::new(),
+        })
     }
 }
 
@@ -289,10 +381,14 @@ pub fn unsent(person: Option<&str>) {
         outbox
             .waiting
             .retain(|change| person.is_some_and(|person| change.person != person));
+        outbox
+            .recent
+            .retain(|change| person.is_some_and(|person| change.person != person));
     });
     super::task_rows::forgot(person);
     super::reminder_rows::forgot(person);
     super::agent_rows::forgot(person);
+    super::sdk_counts::forgot(person, super::unix_ms());
 }
 
 /// A forget about a thing of `person`'s is about to be sent, or was
@@ -302,14 +398,16 @@ pub fn unsent_about(person: &str, matches: impl Fn(&str) -> bool) {
     super::task_rows::forgot_about(person, &matches);
     super::reminder_rows::forgot_about(person, &matches);
     super::agent_rows::forgot_about(person, &matches);
+    let theirs = |change: &Linked| {
+        change.person == person
+            && matches(&format!(
+                "{} {} {}",
+                change.service, change.action, change.summary
+            ))
+    };
     kept::outbox(|outbox| {
-        outbox.waiting.retain(|change| {
-            change.person != person
-                || !matches(&format!(
-                    "{} {} {}",
-                    change.service, change.action, change.summary
-                ))
-        });
+        outbox.waiting.retain(|change| !theirs(change));
+        outbox.recent.retain(|change| !theirs(change));
     });
 }
 

@@ -102,6 +102,8 @@ mod chat;
 pub use chat::*;
 mod presence;
 pub use presence::*;
+mod heat;
+pub use heat::*;
 mod account;
 pub use account::*;
 mod energy;
@@ -579,8 +581,10 @@ impl Faces {
 
     /// A message on `topic` as skills may see it (#7442, the Reviewer-lead's
     /// P2 on #7450): on [`Self::TOPIC`], each face's `pitch` and `looking`
-    /// are taken out unless the face-expressions yes is kept at `yes_file`
-    /// ([`consent::read`]: missing or unreadable is no yes). Where a face
+    /// are taken out unless the face-expressions yes is allowed at
+    /// `yes_file` ([`consent::allowed`]: a kept no or a file that can't be
+    /// read is no yes; a missing file is `by_default`, which callers take
+    /// from [`consent::noticing_by_default`], #7767). Where a face
     /// looks is for the lamp's own parts (the voice's said-to-me rule); a
     /// skill can send what it reads off the lamp. Any other topic, a payload
     /// with neither field, or not JSON, is passed as it came.
@@ -588,6 +592,7 @@ impl Faces {
         topic: &str,
         payload: &'a [u8],
         yes_file: &std::path::Path,
+        by_default: bool,
     ) -> std::borrow::Cow<'a, [u8]> {
         use std::borrow::Cow;
         if topic != Self::TOPIC {
@@ -606,7 +611,7 @@ impl Faces {
         {
             had |= face.remove("pitch").is_some() | face.remove("looking").is_some();
         }
-        if !had || consent::read(yes_file, consent::FACE_EXPRESSIONS).yes {
+        if !had || consent::allowed(yes_file, consent::FACE_EXPRESSIONS, by_default) {
             return Cow::Borrowed(payload);
         }
         Cow::Owned(serde_json::to_vec(&value).unwrap_or_default())
@@ -1198,6 +1203,55 @@ impl VoiceTone {
     pub fn declaration() -> Declaration {
         Declaration::new(Self::TYPE, Self::VERSION, Kind::Event)
     }
+}
+
+/// The memory requests whose answer names the exchanges they removed,
+/// `"exchanges":{"<scope>":[turn ids]}` (#7771), each by
+/// [`history_turn_id`], for the voice to delete the same turns from the
+/// account's history. No other answer's `exchanges` is read.
+pub const MEMORY_FORGETS_TELLING_EXCHANGES: [&str; 5] = [
+    "forget",
+    "forget_last",
+    "forget_all",
+    "forget_said",
+    "exchanges_forget",
+];
+
+/// The memory request that pages the rest of the exchanges the last forget
+/// removed, when its answer said `"exchanges_more":true` (#7771).
+pub const MEMORY_FORGOT_EXCHANGES_OP: &str = "forgot_exchanges";
+
+/// The memory request that answers its store's epoch,
+/// `{"ok":true,"epoch":"<8 hex>"}` (#7771): for [`history_turn_id`].
+pub const MEMORY_HISTORY_EPOCH_OP: &str = "history_epoch";
+
+/// A memory exchange's id on the account's history (#7771):
+/// `<epoch>.<scope>:<id>`. The epoch is the memory store's own, 8 hex
+/// characters minted when the store is made and again when it is wiped
+/// whole, so an exchange id the memory gives again after a wipe (ids
+/// start at 1 in a new store) never names a turn deleted before it. The
+/// scope is a known person's `p-` id or `everyone`. The only maker of the
+/// id: the memory's forget answers, and the voice's save of a turn, call
+/// it.
+pub fn history_turn_id(epoch: &str, scope: &str, id: u64) -> String {
+    format!("{epoch}.{scope}:{id}")
+}
+
+/// A memory store's epoch as [`history_turn_id`] takes it: 8 lowercase
+/// hex characters.
+pub fn is_history_epoch(epoch: &str) -> bool {
+    epoch.len() == 8
+        && epoch
+            .bytes()
+            .all(|b| matches!(b, b'0'..=b'9' | b'a'..=b'f'))
+}
+
+/// The scope of a [`history_turn_id`], when `turn` is one: a well-formed
+/// epoch, a scope and a number.
+pub fn history_turn_scope(turn: &str) -> Option<&str> {
+    let (epoch, rest) = turn.split_once('.')?;
+    let (scope, id) = rest.rsplit_once(':')?;
+    (is_history_epoch(epoch) && !scope.is_empty() && id.parse::<u64>().is_ok()).then_some(scope)
 }
 
 /// Memory has forgotten everything it kept under a person, asked by the
@@ -2712,6 +2766,7 @@ pub fn declaration_of(topic: &str) -> Option<Declaration> {
         .chain(app_trigger_topics())
         .chain(chat_topics())
         .chain(presence_topics())
+        .chain(heat_topics())
         .chain(reports_topics())
         .chain(account_topics())
         .chain(energy_topics())
@@ -2734,6 +2789,28 @@ mod tests {
     use super::*;
     use serde::de::DeserializeOwned;
     use serde_json::{Value, json};
+
+    /// #7771: a turn id is `<epoch>.<scope>:<id>`, and only such an id
+    /// gives its scope.
+    #[test]
+    fn a_history_turn_id_carries_the_epoch_scope_and_id() {
+        let turn = history_turn_id("0a1b2c3d", "p-0123456789abcdef", 12);
+        assert_eq!(turn, "0a1b2c3d.p-0123456789abcdef:12");
+        assert_eq!(history_turn_scope(&turn), Some("p-0123456789abcdef"));
+        assert_eq!(
+            history_turn_scope(&history_turn_id("ffffffff", "everyone", 7)),
+            Some("everyone")
+        );
+        for bad in [
+            "everyone:7",
+            "0A1B2C3D.everyone:7",
+            "0a1b2c.everyone:7",
+            "0a1b2c3d.:7",
+            "0a1b2c3d.everyone:x",
+        ] {
+            assert_eq!(history_turn_scope(bad), None, "{bad}");
+        }
+    }
 
     /// `value` is written as exactly `text`, reads back as itself, and
     /// reads the same with a field no version yet knows beside the others.
@@ -2956,7 +3033,7 @@ mod tests {
         let yes = consent::file_in(&folder, consent::FACE_EXPRESSIONS).unwrap();
         let gaze = br#"{"faces":[{"id":"f1","xmin":0.2,"ymin":0.2,"xmax":0.4,"ymax":0.5,"confidence":0.9,"facing":true,"pitch":0.6,"looking":false}]}"#;
         let seen = |payload: &[u8]| {
-            serde_json::from_slice::<Faces>(&Faces::for_skills(Faces::TOPIC, payload, &yes))
+            serde_json::from_slice::<Faces>(&Faces::for_skills(Faces::TOPIC, payload, &yes, false))
                 .unwrap()
                 .faces
                 .remove(0)
@@ -2976,15 +3053,52 @@ mod tests {
         )
         .unwrap();
         assert!(matches!(
-            Faces::for_skills(Faces::TOPIC, gaze, &yes),
+            Faces::for_skills(Faces::TOPIC, gaze, &yes, false),
             std::borrow::Cow::Borrowed(_)
         ));
         let face = seen(gaze);
         assert_eq!((face.pitch, face.looking), (Some(0.6), Some(false)));
         std::fs::remove_file(&yes).unwrap();
         let plain = br#"{"faces":[{"id":"f1","pitch":0.6}]}"#;
-        assert_eq!(&*Faces::for_skills("room/activity", plain, &yes), plain);
-        assert_eq!(&*Faces::for_skills(Faces::TOPIC, b"[1]", &yes), b"[1]");
+        assert_eq!(
+            &*Faces::for_skills("room/activity", plain, &yes, false),
+            plain
+        );
+        assert_eq!(
+            &*Faces::for_skills(Faces::TOPIC, b"[1]", &yes, false),
+            b"[1]"
+        );
+        std::fs::remove_dir_all(&folder).unwrap();
+    }
+
+    /// #7767: with `LAMP_NOTICING_BY_DEFAULT` on, a missing face-expressions
+    /// file lets skills see where a face looks; a kept no or a file that
+    /// can't be read still takes both out. Off, a missing file takes them
+    /// out, as before.
+    #[test]
+    fn skills_see_where_a_face_looks_by_default_only_with_the_switch() {
+        let folder = std::env::temp_dir().join(format!("msgs-gaze-default-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&folder);
+        std::fs::create_dir_all(&folder).unwrap();
+        let yes = consent::file_in(&folder, consent::FACE_EXPRESSIONS).unwrap();
+        let gaze = br#"{"faces":[{"id":"f1","pitch":0.6,"looking":false}]}"#;
+        let passes = |by_default| {
+            matches!(
+                Faces::for_skills(Faces::TOPIC, gaze, &yes, by_default),
+                std::borrow::Cow::Borrowed(_)
+            )
+        };
+        assert!(!passes(false), "missing, off");
+        assert!(!passes(true), "missing, on, before the old nos are done");
+        std::fs::write(folder.join(consent::OLD_NOS_DONE), b"{}").unwrap();
+        assert!(!passes(false), "missing, off");
+        assert!(passes(true), "missing, on");
+        let no = consent::no_bytes(consent::FACE_EXPRESSIONS, 1, consent::BY_VOICE);
+        for text in [no.as_slice(), b"not json"] {
+            std::fs::write(&yes, text).unwrap();
+            assert!(!passes(true), "{}", String::from_utf8_lossy(text));
+            assert!(!passes(false), "{}", String::from_utf8_lossy(text));
+        }
         std::fs::remove_dir_all(&folder).unwrap();
     }
 

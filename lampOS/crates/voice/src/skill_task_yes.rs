@@ -451,8 +451,20 @@ pub fn read_back(
     if !asking.heard {
         return Some(json!({ "error": READ_BACK_NOT_ASKED }));
     }
+    // As [`crate::made_skill::name_asked`] writes it, then as written
+    // ([`crate::made_skill::names_written`]): a skill named `my-day` is
+    // never only `day` (#7874). One ask of the helper when the first finds.
     let asked = crate::made_skill::name_asked(name);
-    let found = match asks(&asked) {
+    let mut found = asks(&asked);
+    for written in crate::made_skill::names_written(name) {
+        if !matches!(found, Ok(None)) {
+            break;
+        }
+        if written != asked {
+            found = asks(&written);
+        }
+    }
+    let found = match found {
         Ok(None) => match pushed_named(pushed, &asked) {
             Some(named) if named != asked => asks(&named),
             _ => Ok(None),
@@ -1142,6 +1154,26 @@ mod tests {
         assert_eq!(pushed_named(&dev, "half-pushed"), None);
         assert_eq!(pushed_named(&dev, ".yes.json"), None);
         let _ = std::fs::remove_dir_all(&dev);
+    }
+
+    /// #7874: a skill named `my-day` is read back as "my day", never
+    /// looked up only as `day`; `desk-check` asked as "my desk check skill"
+    /// is still found.
+    #[test]
+    fn a_skill_named_my_something_is_read_back() {
+        let now = Instant::now();
+        for (said, name) in [("my day", "my-day"), ("my desk check skill", "desk-check")] {
+            let mut asked = Vec::new();
+            let told = read_back(
+                said,
+                asking(45),
+                nowhere(),
+                helper(&["my-day", "desk-check"], &mut asked),
+                now,
+            );
+            assert!(told.is_some(), "{said}");
+            assert_eq!(asked.last().map(String::as_str), Some(name), "{said}");
+        }
     }
 
     /// Two pushed skills alike but for number words or dashes, neither

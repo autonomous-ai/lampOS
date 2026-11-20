@@ -24,8 +24,22 @@ pub fn on() -> bool {
 /// What the model is told for a `remember` not kept, in a refused one's
 /// shape (`{"remembered": false, "note": …}`): that it wasn't kept, and how
 /// to have it kept (say who they are or show their face, then say it again),
-/// short and friendly. Nothing is held for later, so it promises no later keep.
-pub const NOT_KEPT: &str = "This wasn't kept: nobody known is speaking. If they want it kept, they can tell you who they are, or let the lamp see their face, and say it again. Say so in a few friendly words, not as a refusal. Never say it was kept or will be kept later.";
+/// short and friendly, asking nothing and never "Got it" (#7877). Nothing
+/// is held for later, so it promises no later keep.
+pub const NOT_KEPT: &str = "This wasn't kept: nobody known is speaking. If they want it kept, they can tell you who they are, or let the lamp see their face, and say it again. Say so in a few friendly words, not as a refusal. Never say it was kept or will be kept later, never \"Got it\" or \"Noted\", and ask nothing.";
+
+/// What the second route says itself for a line that only asks to keep,
+/// every `remember` of it refused with [`NOT_KEPT`] (#7877: on lamp-e82d,
+/// 19 Nov, such keeps were left to the model's words, which may say "Got
+/// it"). One true line, for a face the lamp doesn't know and for a known
+/// person not seen saying it alike: it asks nothing and never says it kept.
+pub const REFUSED_LINE: &str = "I'm not sure who's talking, so I can't keep that.";
+
+/// Whether `told` is a `remember` refused with [`NOT_KEPT`]
+/// ([`withheld_as`]).
+pub fn refused(told: &Value) -> bool {
+    told["remembered"] == false && told["note"] == NOT_KEPT
+}
 
 /// With `LAMP_FACE_NO_ASK` and the face save not speaker-bound
 /// ([`NoAsk::Quiet`], the first builder 21:13): their own name given while

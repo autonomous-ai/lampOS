@@ -38,6 +38,10 @@ const CUT: &str = "cut: ";
 /// unplugging you" (#4595): `app`, `plug`, or `none` with
 /// `prepare_to_unplug` offered.
 const UNPLUG: &str = "unplug: ";
+/// Each declared function's parameters, by name and their bytes as the
+/// link counts them (#8002: with the make flow's switches on, the product's
+/// `make_skill` came to 4,174 bytes and the link left it out).
+const PARAMETER_BYTES: &str = "parameter bytes: ";
 /// `lamp-services`' tools folder in the catalogs' folder: on a lamp it is
 /// `lamp_voice::services::FOLDER`, and the product's `LAMP_SERVICES=on`
 /// tells its three functions (#7433: without it this run counted three
@@ -129,7 +133,17 @@ fn the_product_voice_s_functions_in_a_process_of_their_own() {
     if let Some(socket) = &settings.memory {
         lamp_voice::remember::start(socket.clone(), None);
     }
-    let (kept, left_out) = lamp_voice::tools::admitted(lamp_voice::tools::declared(&settings));
+    let declared = lamp_voice::tools::declared(&settings);
+    for tool in &declared {
+        if let Some(parameters) = &tool.parameters {
+            println!(
+                "{PARAMETER_BYTES}{} {}",
+                tool.name,
+                parameters.to_string().len()
+            );
+        }
+    }
+    let (kept, left_out) = lamp_voice::tools::admitted(declared);
     for tool in kept {
         println!("{DECLARED}{}", tool.name);
     }
@@ -200,6 +214,7 @@ struct Product {
     reached: Vec<String>,
     cut: Vec<String>,
     unplug: Vec<String>,
+    parameter_bytes: Vec<String>,
 }
 
 fn product_with(extra: &[(&str, &str)]) -> Product {
@@ -295,7 +310,30 @@ fn product_with(extra: &[(&str, &str)]) -> Product {
         reached: found(REACHED),
         cut: found(CUT),
         unplug: found(UNPLUG),
+        parameter_bytes: found(PARAMETER_BYTES),
     }
+}
+
+/// #8002: with the product voice unit's environment (the make flow's five
+/// switches on), `make_skill`'s parameters stay within
+/// `lamp_voice::make_skill_local::PRODUCT_MOST_PARAMETERS_BYTES`, short of
+/// the link's 4,096 by the room a later parameter needs.
+#[test]
+fn a_product_lamp_s_make_skill_parameters_leave_room_within_the_link() {
+    let Product {
+        parameter_bytes, ..
+    } = product_with(&[]);
+    let named = format!("{} ", lamp_voice::made_skill::MAKE);
+    let bytes: usize = parameter_bytes
+        .iter()
+        .find_map(|line| line.strip_prefix(&named))
+        .unwrap_or_else(|| panic!("no make_skill: {parameter_bytes:?}"))
+        .parse()
+        .unwrap();
+    assert!(
+        bytes <= lamp_voice::make_skill_local::PRODUCT_MOST_PARAMETERS_BYTES,
+        "{bytes}"
+    );
 }
 
 /// Every function the actions part and the product skills offer reaches a

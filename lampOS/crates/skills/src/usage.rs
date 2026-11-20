@@ -13,6 +13,11 @@
 //! report, and makes a day's counts from two readings. When the person
 //! says no to reports, the manage helper deletes it ([`forget`], asked by
 //! `lamp-cloud`): the count begins again from nothing.
+//!
+//! Both writers hold [`LOCK`], a file of its own in the folder, never the
+//! folder itself: the daily journal (`daily::Journal`, `daily.json` in the
+//! same folder) holds the folder's lock for as long as `lamp-skills` runs,
+//! so a writer waiting for the folder would wait for ever.
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, HashMap};
 use std::fs;
@@ -21,10 +26,17 @@ use std::os::unix::fs::OpenOptionsExt;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 /// The totals' file, in the part's `--state-dir`.
 pub const RUNS_FILE: &str = "runs.json";
+/// What every writer of [`RUNS_FILE`] holds across its read and write:
+/// beside it, 0600, made by `lamp-skills` (its user, the folder's owner).
+pub const LOCK: &str = ".runs.lock";
+/// The longest a flush waits for [`LOCK`]: then what was counted is
+/// counted again at the next flush. The manage helper's own wait, so no
+/// writer holds it longer than the helper waits for it.
+const FLUSH_LOCK_WAIT: Duration = crate::package::ASKED_LOCK_WAIT;
 /// The most often what was counted is written.
 pub const FLUSH_EVERY: Duration = Duration::from_secs(60);
 /// The most Store packages kept by SHA-256 in the file; past
@@ -211,9 +223,12 @@ impl Counting {
             return Ok(());
         }
         let written = (|| {
-            // The folder held across the read and the write, so a
+            // [`LOCK`] held across the read and the write, so a
             // [`forget`] between them is never undone.
-            let _held = held(path)?;
+            let folder = path.parent().unwrap_or(Path::new("."));
+            let _held = held(folder, FLUSH_LOCK_WAIT, true)?.ok_or_else(|| {
+                io::Error::new(io::ErrorKind::NotFound, "the runs' lock is not there")
+            })?;
             // A file that can't be read is begun again: lamp-cloud reads a
             // smaller total as a new beginning.
             let mut totals = read(path).unwrap_or_default();
@@ -242,8 +257,16 @@ impl Counting {
     }
 
     /// [`Self::flush`] into `state`'s [`RUNS_FILE`] every [`FLUSH_EVERY`],
-    /// on a thread of its own, for as long as the part runs.
+    /// on a thread of its own, for as long as the part runs. [`LOCK`] is
+    /// made here, before any flush, by the folder's owner, so the manage
+    /// helper (root, which can't give a file it made away) finds it.
     pub fn keep_in(&self, state: &Path) -> io::Result<()> {
+        fs::OpenOptions::new()
+            .write(true)
+            .create(true)
+            .truncate(false)
+            .mode(0o600)
+            .open(state.join(LOCK))?;
         let counting = self.clone();
         let path: PathBuf = state.join(RUNS_FILE);
         std::thread::Builder::new()
@@ -266,24 +289,58 @@ impl Counting {
     }
 }
 
-/// `path`'s folder, locked: what every writer of [`RUNS_FILE`] holds
+/// `folder`'s [`LOCK`], locked: what every writer of [`RUNS_FILE`] holds
 /// across its read and write (`lamp-skills` as its user, the manage helper
-/// as root), released when the file returned is dropped.
-fn held(path: &Path) -> io::Result<fs::File> {
-    let folder = fs::File::open(path.parent().unwrap_or(Path::new(".")))?;
-    folder.lock()?;
-    Ok(folder)
+/// as root), released when the file returned is dropped. Made (0600) only
+/// with `make`, by `lamp-skills`; without it, one not there is `None`.
+/// Another holder past `wait`: an error of kind `WouldBlock`, never a wait
+/// without end.
+fn held(folder: &Path, wait: Duration, make: bool) -> io::Result<Option<fs::File>> {
+    let lock = match fs::OpenOptions::new()
+        .write(true)
+        .create(make)
+        .truncate(false)
+        .mode(0o600)
+        .open(folder.join(LOCK))
+    {
+        Ok(lock) => lock,
+        Err(error) if !make && error.kind() == io::ErrorKind::NotFound => return Ok(None),
+        Err(error) => return Err(error),
+    };
+    let until = Instant::now() + wait;
+    loop {
+        match lock.try_lock() {
+            Ok(()) => return Ok(Some(lock)),
+            Err(fs::TryLockError::WouldBlock) if Instant::now() < until => {
+                std::thread::sleep(Duration::from_millis(50));
+            }
+            Err(fs::TryLockError::WouldBlock) => {
+                return Err(io::Error::new(
+                    io::ErrorKind::WouldBlock,
+                    format!(
+                        "{}: held by another run for {} ms",
+                        folder.join(LOCK).display(),
+                        wait.as_millis()
+                    ),
+                ));
+            }
+            Err(fs::TryLockError::Error(error)) => return Err(error),
+        }
+    }
 }
 
 /// The person said no to reports: `state`'s [`RUNS_FILE`] deleted, under
-/// the folder's lock, by the manage helper (`lamp-cloud` asks it, as it
-/// cannot write `lamp-skills`' state). Runs counted in the running part's
-/// memory and not yet written (at most [`FLUSH_EVERY`]'s) begin the next
-/// file; none is ever sent without a yes, and a yes's first reading only
-/// begins the count.
-pub fn forget(state: &Path) -> io::Result<()> {
+/// [`LOCK`] waited for at most `wait` (then `WouldBlock`, nothing deleted),
+/// by the manage helper (`lamp-cloud` asks it, as it cannot write
+/// `lamp-skills`' state). No [`LOCK`] yet: no `lamp-skills` has begun
+/// counting since this version came (it makes the lock at its start, a
+/// minute before its first write), so the file is deleted without it. Runs
+/// counted in the running part's memory and not yet written (at most
+/// [`FLUSH_EVERY`]'s) begin the next file; none is ever sent without a
+/// yes, and a yes's first reading only begins the count.
+pub fn forget(state: &Path, wait: Duration) -> io::Result<()> {
     let path = state.join(RUNS_FILE);
-    let _held = held(&path)?;
+    let _held = held(state, wait, false)?;
     match fs::remove_file(&path) {
         Err(error) if error.kind() != io::ErrorKind::NotFound => Err(error),
         _ => Ok(()),
@@ -363,14 +420,73 @@ mod tests {
             .fetch_add(7, Ordering::Relaxed);
         counting.flush(&path).unwrap();
         assert_eq!(read(&path).unwrap().core, 7);
-        forget(&dir).unwrap();
+        forget(&dir, Duration::from_secs(1)).unwrap();
         assert!(!path.exists());
-        forget(&dir).unwrap();
+        forget(&dir, Duration::from_secs(1)).unwrap();
         counting
             .counter(Source::Core)
             .fetch_add(1, Ordering::Relaxed);
         counting.flush(&path).unwrap();
         assert_eq!(read(&path).unwrap().core, 1);
+    }
+
+    /// The daily journal holds the state folder's own lock for as long as
+    /// `lamp-skills` runs: a flush and a no still go through at once, and
+    /// the no deletes the totals (the manage helper killed at 60 s, its
+    /// socket filled by `lamp-cloud`'s asks every 10 s, before).
+    #[test]
+    fn the_daily_journal_holding_the_folder_never_holds_up_a_flush_or_a_no() {
+        use std::os::unix::fs::PermissionsExt;
+        let dir = place("journal");
+        fs::set_permissions(&dir, fs::Permissions::from_mode(0o700)).unwrap();
+        let path = dir.join(RUNS_FILE);
+        let counting = Counting::default();
+        counting
+            .counter(Source::Core)
+            .fetch_add(3, Ordering::Relaxed);
+        let journal = crate::daily::Journal::open(dir.join("daily.json")).unwrap();
+        let (told, heard) = std::sync::mpsc::channel();
+        let (place, file) = (dir.clone(), path.clone());
+        std::thread::spawn(move || {
+            let flushed = counting.flush(&file).map(|()| read(&file).map(|t| t.core));
+            let _ = told.send((flushed, forget(&place, crate::package::ASKED_LOCK_WAIT)));
+        });
+        let (flushed, forgot) = heard
+            .recv_timeout(Duration::from_secs(6))
+            .expect("a flush and a no wait for the journal's folder lock");
+        assert_eq!(flushed.unwrap(), Some(3));
+        forgot.unwrap();
+        assert!(!path.exists());
+        drop(journal);
+    }
+
+    /// Another holder of [`LOCK`] past the wait: the no is refused,
+    /// `WouldBlock`, in time, with nothing deleted; given back, it goes on.
+    #[test]
+    fn a_no_waits_for_the_runs_lock_only_so_long() {
+        let dir = place("held");
+        let path = dir.join(RUNS_FILE);
+        fs::write(&path, r#"{"version":1,"core":4}"#).unwrap();
+        let other = fs::OpenOptions::new()
+            .write(true)
+            .create(true)
+            .truncate(false)
+            .open(dir.join(".runs.lock"))
+            .unwrap();
+        other.try_lock().unwrap();
+        let (told, heard) = std::sync::mpsc::channel();
+        let place = dir.clone();
+        std::thread::spawn(move || {
+            let _ = told.send(forget(&place, Duration::from_millis(300)));
+        });
+        let forgot = heard
+            .recv_timeout(Duration::from_secs(6))
+            .expect("a no waits without end for the runs' lock");
+        assert_eq!(forgot.unwrap_err().kind(), io::ErrorKind::WouldBlock);
+        assert!(path.exists());
+        drop(other);
+        forget(&dir, Duration::from_secs(1)).unwrap();
+        assert!(!path.exists());
     }
 
     #[test]

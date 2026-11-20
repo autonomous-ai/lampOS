@@ -1360,3 +1360,119 @@ fn body_head_complete_bundle_preserves_literal_factory_calibration() {
         assert!(!pins.legacy_head);
     }
 }
+
+/// #7946: the factory's acceleration drop-in, the installed lamp-body's own
+/// command with only its `--servo-acceleration` changed.
+fn acceleration_drop_in(lamp: &Lamp, acceleration: &str) -> String {
+    let unit = lamp.read("/etc/systemd/system/lamp-body.service");
+    let command = unit
+        .lines()
+        .filter_map(|line| line.strip_prefix("ExecStart="))
+        .next_back()
+        .unwrap();
+    assert!(command.contains("--servo-acceleration 60"), "{command}");
+    format!(
+        "[Service]\nExecStart=\nExecStart={}\n",
+        command.replace(
+            "--servo-acceleration 60",
+            &format!("--servo-acceleration {acceleration}")
+        )
+    )
+}
+
+const DROP_IN: &str = "etc/systemd/system/lamp-body.service.d/zz-acceleration-50.conf";
+
+/// #7946 (lamp-5ee8, 18 Nov): a head-touch lamp with the factory's
+/// `zz-acceleration-50.conf` was refused every round ("head touch mode has a
+/// local override"). Now that drop-in is no mode override: the round
+/// switches, moves it aside into the records' `aside/` folder (never
+/// deletes it), and the build's own lamp-body unit runs.
+#[test]
+fn the_factorys_acceleration_drop_in_is_admitted_and_moved_aside() {
+    let mut lamp = old_product(true);
+    publish_readers(&mut lamp, true, true, true);
+    let drop_in = acceleration_drop_in(&lamp, "50");
+    fs::create_dir_all(lamp.root.join("etc/systemd/system/lamp-body.service.d")).unwrap();
+    fs::write(lamp.root.join(DROP_IN), &drop_in).unwrap();
+    assert_eq!(lamp.round(), Outcome::Switched(2), "{:?}", lamp.said);
+    assert!(!lamp.root.join(DROP_IN).exists());
+    let kept = lamp.records().join("aside/zz-acceleration-50.conf");
+    assert_eq!(fs::read_to_string(kept).unwrap(), drop_in);
+    assert!(
+        lamp.said
+            .iter()
+            .any(|line| line.contains("is moved aside to")),
+        "{:?}",
+        lamp.said
+    );
+    assert!(head_body(&lamp));
+}
+
+/// Anything else in such a drop-in, or another option changed, is still a
+/// mode override, refused before anything is written, as before.
+#[test]
+fn any_other_change_in_a_body_drop_in_is_still_refused() {
+    for change in ["extra", "speed", "unit", "run"] {
+        let mut lamp = old_product(true);
+        publish_readers(&mut lamp, true, true, true);
+        let mut drop_in = acceleration_drop_in(&lamp, "50");
+        let mut place = DROP_IN.to_owned();
+        match change {
+            "extra" => drop_in.push_str("Environment=OTHER=x\n"),
+            "speed" => drop_in = drop_in.replace("--speed 120", "--speed 999"),
+            // Another section beside it (sim-2's P3 on #7950).
+            "unit" => drop_in = format!("[Unit]\nDescription=x\n{drop_in}"),
+            // Anywhere but lamp-body's own folder under /etc, where the
+            // round moves it from (sim-2's P2 on #7950).
+            _ => place = DROP_IN.replace("etc/systemd", "run/systemd"),
+        }
+        let path = lamp.root.join(&place);
+        fs::create_dir_all(path.parent().unwrap()).unwrap();
+        fs::write(&path, &drop_in).unwrap();
+        refused_without_writes(&mut lamp);
+        assert_eq!(fs::read_to_string(&path).unwrap(), drop_in, "{change}");
+    }
+}
+
+/// A build put back puts the drop-in back where it was, with its text: the
+/// old lamp-body needs it (#7946, the first builder's "never deleted, so it
+/// can be put back"). Its copy stays in `aside/`.
+#[test]
+fn a_build_put_back_puts_the_acceleration_drop_in_back() {
+    let mut lamp = Lamp::new();
+    let unit = lamp.read("/etc/systemd/system/lamp-body.service");
+    let command = unit
+        .lines()
+        .filter_map(|line| line.strip_prefix("ExecStart="))
+        .next_back()
+        .unwrap()
+        .to_owned();
+    let drop_in = format!("[Service]\nExecStart=\nExecStart={command}\n");
+    fs::create_dir_all(lamp.root.join("etc/systemd/system/lamp-body.service.d")).unwrap();
+    fs::write(lamp.root.join(DROP_IN), &drop_in).unwrap();
+    lamp.publish(
+        2,
+        &[
+            ("lamp-voice", "voice 2, which crashes"),
+            ("lamp-turn-end", "turn-end 1"),
+            ("lamp-body", "body 2"),
+            ("lamp-controls", "controls 1"),
+        ],
+        &[],
+    );
+    let outcome = lamp.round();
+    assert!(matches!(outcome, Outcome::RolledBack { .. }), "{outcome:?}");
+    assert_eq!(lamp.read(&format!("/{DROP_IN}")), drop_in);
+    assert!(
+        lamp.records()
+            .join("aside/zz-acceleration-50.conf")
+            .exists()
+    );
+    assert!(
+        lamp.said
+            .iter()
+            .any(|line| line.contains("is put back where it was")),
+        "{:?}",
+        lamp.said
+    );
+}

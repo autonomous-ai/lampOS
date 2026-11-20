@@ -33,10 +33,15 @@ In 11450: skill push (from 11091), `joints` for `roll`, `shoulder` and `elbow` (
 It isn't on PyPI yet. From a checkout of this repository's `lamp-voice`
 branch (the default branch, `main`, has no SDK):
 
+**Python 3.10 or newer** (`requires-python = ">=3.10"`). A Mac's own
+`python3` is often 3.9.6, and pip refuses the SDK there ("requires a
+different Python"). Check `python3 --version`; on 3.9, install a newer one
+(python.org, or `brew install python@3.12`) and make the venv with it.
+
 ```sh
 git clone --branch lamp-voice https://github.com/autonomous-ai/lampOS.git && cd lampOS
-python3 -m venv ~/lampos-venv && . ~/lampos-venv/bin/activate
-pip install ./lampOS/sdk/python             # or -e, to work on it; '.[find]' to find lamps by mDNS
+python3.12 -m venv ~/lampos-venv && . ~/lampos-venv/bin/activate   # any Python 3.10+
+pip install './lampOS/sdk/python[check]'    # [check] for `lamp skill check`; or -e; '[check,find]' to find lamps by mDNS
 ```
 
 Without a clone: `pip install "git+https://github.com/autonomous-ai/lampOS@lamp-voice#subdirectory=lampOS/sdk/python"`.
@@ -249,6 +254,23 @@ await Lamp.keep_connected(setup)
 test it.
 
 **On the lamp itself**, a skill's script connects as its run with `await Lamp.connect()` (with no pairing and no `host`, a `LAMP_CONTROL_TOKEN` that is set and not empty makes it `Lamp.local(token)`; a pairing wins) or `await Lamp.local(token)` (the token from `LAMP_CONTROL_TOKEN`, the socket `LAMP_CONTROL_SOCKET`, default `/run/lampos-control/control.sock`): the same `Lamp`, with exactly the grants the owner said yes to for that skill; `lamp.run` is the run's id and `lamp.skill` the skill it runs for. No pairing: the one-run token is the way in, and a wrong or ended one is refused `no_grant`. It is not the local agent's socket (docs/control.md, "The control socket"). The fake lamp serves it with `FakeLamp(local=True)`, `fake.mint_token(grants, run)` and `fake.end_run(run)`.
+
+**One difference between a paired computer and an installed app: phrases.**
+On a paired computer a program registers its phrases with
+`await lamp.on("phrase.heard", handler, phrases=[...])`. An installed app's
+socket refuses `phrases=` and takes `await lamp.listen_for([...], handler)`
+instead. Every other call in this README is the same on both. Code meant to
+run both ways picks by `lamp.app`, which is set only on an app's connection:
+
+```python
+async def heard(event):
+    print("heard", event["phrase"])
+
+if lamp.app:   # an installed app (Lamp.connect_app)
+    await lamp.listen_for(["start studying"], heard)
+else:          # a paired computer (Lamp.connect / Lamp.local)
+    await lamp.on("phrase.heard", heard, phrases=["start studying"])
+```
 
 **An app installed from the Store** (#7415) connects with `await Lamp.connect_app()`: the socket is the one `LAMP_APP_SOCKET` names in the app's own environment (default `/run/lampos-apps/apps.sock`), there is no pairing, key or token (the lamp knows the app by its cgroup), and the grants are the installed manifest's, never the app's word; `lamp.app` and `lamp.app_version` are its name and version. `await lamp.listen_for([...], handler)` replaces its phrases whole (each told only as `phrase.heard`, never what was said); the manifest's own triggers arrive unasked as `app.trigger` (`lamp.on("app.trigger", ...)`, with a `turn` to `await lamp.took(turn)`); `await lamp.settings()` and the event `app.settings` carry the owner's values; `await lamp.panel(title, lines)` sets the panel, one a minute. When the owner stops, removes or updates the app, its connection closes with the reason (`lamp.close_reason`), no event first. The fake lamp serves all of it with `FakeLamp(app=True, app_name=..., app_grants=..., app_settings=...)` and `fake.app_path`, and `fake.hear_phrase(phrase)`, `fake.trigger(name, phrase, turn)`, `fake.set_app_setting(**changed)` and `fake.stop_app(why)`.
 

@@ -1269,6 +1269,39 @@ mod tests {
         );
         assert!(answer_told(None, None, ms(9)).ends_with("; no usage given"));
     }
+
+    /// The day's tally replayed from the journal (#7664) reads this line's
+    /// tokens back as the live tally counts them, in every form it takes.
+    #[test]
+    fn the_replayed_tally_reads_an_answers_line_back() {
+        use crate::day_tally::{Model, replay};
+        let ms = std::time::Duration::from_millis;
+        let day = replay::day_named("2026-11-18").unwrap();
+        let counted = |usage: Option<Value>| {
+            let line = format!(
+                "2026-11-18T10:00:00+0700 lamp-52e6 lamp-voice[7]: lamp-voice second: {}",
+                answer_told(usage.as_ref(), Some(ms(5)), ms(9))
+            );
+            replay::replayed([line.as_str()], day).all()
+        };
+        let model = |prompt, cached, completion, uncounted| Model {
+            answers: 1,
+            uncounted,
+            prompt_tokens: prompt,
+            cached_tokens: cached,
+            completion_tokens: completion,
+        };
+        let deepseek = json!({"prompt_tokens": 8123, "completion_tokens": 42, "prompt_cache_hit_tokens": 7936, "prompt_cache_miss_tokens": 187});
+        assert_eq!(counted(Some(deepseek)), model(8123, 7936, 42, 0));
+        let openai = json!({"prompt_tokens": 900, "completion_tokens": 5, "prompt_tokens_details": {"cached_tokens": 768}});
+        assert_eq!(counted(Some(openai)), model(900, 768, 5, 0));
+        assert_eq!(
+            counted(Some(json!({"prompt_tokens": 900}))),
+            model(900, 0, 0, 0)
+        );
+        assert_eq!(counted(Some(json!({}))), model(0, 0, 0, 1));
+        assert_eq!(counted(None), model(0, 0, 0, 1));
+    }
     use tokio::io::{AsyncReadExt, AsyncWriteExt};
 
     /// Feed recorded bytes cut at every `|`.

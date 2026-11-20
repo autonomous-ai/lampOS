@@ -171,6 +171,11 @@ pub const ERROR_HOLDS: Duration = Duration::from_secs(60);
 pub const ERROR_AGAIN: Duration = Duration::from_secs(60 * 60);
 /// How often the exit notes are looked at.
 pub const NOTES_EVERY: Duration = Duration::from_secs(10);
+/// After a no, the parts' skill counts are asked deleted at once; each ask
+/// not done doubles the wait for the next, from [`NOTES_EVERY`] to at most
+/// this (#7967: asked every 10 s, the manage socket filled). So once the
+/// helper can answer done, the counts are forgotten within this.
+pub const FORGET_MOST: Duration = Duration::from_secs(10 * 60);
 /// How long a send waits while the voice is in a turn.
 pub const VOICE_WAIT: Duration = Duration::from_secs(60);
 /// The most crash reports in an hour and in a day, across every unit.
@@ -894,7 +899,9 @@ fn unknown_field<'a>(
 
 /// The person's choice: `lamp-cloud`'s own record when there is one, else
 /// setup's, else no. Only a JSON `true` is a yes, and setup's only for a
-/// wording no newer than [`ASKED`]. Read at each send, never kept.
+/// wording no newer than [`ASKED`]. Read at each send, never kept. With
+/// `LAMP_NOTICING_BY_DEFAULT=on` (#7767, `lamp_msgs::consent`'s one place
+/// for it), [`read_consent_or`]'s default.
 ///
 /// One release forward (#2052), for privacy: a record this build can't
 /// read, a field it doesn't know or a `by` it doesn't know reads as **no**,
@@ -902,6 +909,15 @@ fn unknown_field<'a>(
 /// sharing on here. Such a record is left as it is (a roll forward reads it
 /// again); the line that says so comes back beside the choice.
 fn read_consent(places: &Places) -> (Consent, Option<String>) {
+    read_consent_or(places, lamp_msgs::consent::noticing_by_default())
+}
+
+/// [`read_consent`] with the default given (#7767), `lamp_msgs::consent`'s
+/// rule for a `share` boolean: neither record there (both not found) is
+/// `by_default`'s answer, a yes nobody gave (no `by`, no time); a kept
+/// `false`, a later wording, a record that can't be read and a newer
+/// build's field are still no. With `by_default` false, as before.
+fn read_consent_or(places: &Places, by_default: bool) -> (Consent, Option<String>) {
     match read_choice(&places.own) {
         Choice::Absent => {}
         Choice::Unreadable(why) => {
@@ -943,7 +959,13 @@ fn read_consent(places: &Places) -> (Consent, Option<String>) {
         }
     }
     match read_choice(&places.setup) {
-        Choice::Absent => (Consent::default(), None),
+        Choice::Absent => (
+            Consent {
+                share: by_default,
+                ..Consent::default()
+            },
+            None,
+        ),
         Choice::Unreadable(why) => (
             Consent::default(),
             Some(format!(
@@ -2027,6 +2049,10 @@ pub struct Timing {
     pub next_health: Instant,
     pub next_notes: Instant,
     pub next_state: Instant,
+    /// The parts' skill counts asked deleted next, and the wait after
+    /// that ask if it is not done ([`FORGET_MOST`]).
+    pub next_forget: Instant,
+    pub forget_wait: Duration,
     /// A health waiting on the voice's turn, since.
     pub waiting_since: Option<Instant>,
 }
@@ -2038,6 +2064,8 @@ impl Timing {
             next_health: now + FIRST_HEALTH,
             next_notes: now,
             next_state: now,
+            next_forget: now,
+            forget_wait: NOTES_EVERY,
             waiting_since: None,
         }
     }
@@ -2072,17 +2100,23 @@ pub fn step(
         put |= stopped;
         timing.next_state = now;
     }
-    if now >= timing.next_notes {
-        timing.next_notes = now + NOTES_EVERY;
-        // After a no, the parts' skill counts deleted: asked again each
-        // round until done.
-        if shared.with(|reports| reports.kept.forget_skill_counts) && sources.forget_skill_counts()
-        {
+    // After a no, the parts' skill counts deleted: asked again until done,
+    // each wait twice the last up to [`FORGET_MOST`]. One ask at a time:
+    // `step` waits for its answer (`crate::skills::ASK_TIMEOUT`, 5 s).
+    if now >= timing.next_forget && shared.with(|reports| reports.kept.forget_skill_counts) {
+        if sources.forget_skill_counts() {
             shared.with(|reports| {
                 reports.kept.forget_skill_counts = false;
                 reports.keep();
             });
+            timing.forget_wait = NOTES_EVERY;
+        } else {
+            timing.forget_wait = (timing.forget_wait * 2).min(FORGET_MOST);
         }
+        timing.next_forget = now + timing.forget_wait;
+    }
+    if now >= timing.next_notes {
+        timing.next_notes = now + NOTES_EVERY;
         put |= shared.with(|reports| {
             let mut put = false;
             for note in reports.new_notes() {
@@ -2887,6 +2921,45 @@ pub(crate) mod tests {
             fs::copy(places.queue.join(name), target.join("queue").join(name)).unwrap();
         }
         fs::copy(&note, target.join("exits").join(note.file_name().unwrap())).unwrap();
+        let _ = fs::remove_dir_all(places.own.parent().unwrap());
+    }
+
+    /// #7767: with `LAMP_NOTICING_BY_DEFAULT` on, no record at all is a
+    /// yes nobody gave; setup's or the lamp's own `false` stays no, and a
+    /// record that can't be read stays off, either way. Off, no record is
+    /// no, as before.
+    #[test]
+    fn no_reports_record_is_the_default_only_with_the_switch() {
+        let places = places("default");
+        let share = |by_default| read_consent_or(&places, by_default).0.share;
+        assert!(!share(false), "none, off");
+        assert!(share(true), "none, on");
+        let none = read_consent_or(&places, true).0;
+        assert_eq!((none.by, none.since, none.held), (None, None, false));
+        assert_eq!(
+            read_consent(&places).0.share,
+            lamp_msgs::consent::noticing_by_default()
+        );
+        // Setup's no, then setup's unreadable answer.
+        for text in [
+            r#"{"share":false,"asked":1,"at":"2026-11-18T00:00:00Z"}"#,
+            "not json",
+            r#"{"share":"yes"}"#,
+        ] {
+            fs::write(&places.setup, text).unwrap();
+            assert!(!share(true), "setup {text}");
+            assert!(!share(false), "setup {text}");
+        }
+        // The lamp's own no wins over setup's yes and over the default.
+        fs::remove_file(&places.setup).unwrap();
+        fs::write(
+            &places.own,
+            r#"{"share":false,"at":"2026-11-18T00:00:00Z","by":"voice","held":false}"#,
+        )
+        .unwrap();
+        assert!(!share(true), "own no");
+        fs::write(&places.own, "not json").unwrap();
+        assert!(!share(true), "own unreadable");
         let _ = fs::remove_dir_all(places.own.parent().unwrap());
     }
 
@@ -3888,6 +3961,148 @@ pub(crate) mod tests {
             bus.told.last().map(|s| (s.by, s.held)),
             Some((Some(lamp_msgs::ReportsBy::Voice), false))
         );
+    }
+
+    /// A driver's sources with nothing on the bus, whose forget is `forget`
+    /// at each second it is asked.
+    struct Forgets<F: FnMut(u64) -> bool> {
+        start: Instant,
+        now: Instant,
+        asked: Vec<u64>,
+        forget: F,
+    }
+
+    impl<F: FnMut(u64) -> bool> Sources for Forgets<F> {
+        fn seen(&mut self) -> Seen {
+            Seen::default()
+        }
+        fn voice_resting(&mut self) -> bool {
+            true
+        }
+        fn requests(&mut self) -> Vec<lamp_msgs::ReportsRequest> {
+            Vec::new()
+        }
+        fn tell(&mut self, _: &lamp_msgs::ReportsState) {}
+        fn forget_skill_counts(&mut self) -> bool {
+            let at = (self.now - self.start).as_secs();
+            self.asked.push(at);
+            (self.forget)(at)
+        }
+    }
+
+    /// `step` once a second over `seconds`, with `then` before each.
+    fn drive<F: FnMut(u64) -> bool>(
+        shared: &Shared,
+        sources: &mut Forgets<F>,
+        timing: &mut Timing,
+        seconds: std::ops::Range<u64>,
+        mut then: impl FnMut(u64, &Shared),
+    ) {
+        for second in seconds {
+            then(second, shared);
+            let now = sources.start + Duration::from_secs(second);
+            sources.now = now;
+            step(shared, sources, timing, None, now, NOW + second);
+        }
+    }
+
+    /// #7967: a forget the manage helper does not finish is asked at once,
+    /// then after 20 s, 40 s, 80 s and so on, never more than 10 minutes
+    /// apart, so `lamp-cloud` never stacks asks on the helper's socket, and
+    /// once the helper can answer the counts are forgotten within 10
+    /// minutes. Done, it is not asked again; a later no starts again from
+    /// 20 s.
+    #[test]
+    fn a_forget_not_done_is_asked_again_later_each_time() {
+        let shared = Shared::new(Reports::open(places("forget-later")));
+        shared.with(|reports| reports.kept.forget_skill_counts = true);
+        let start = Instant::now();
+        let mut timing = Timing::new(start);
+        // Busy until 3000 s, done after; busy again from 3100 s.
+        let busy_from = std::cell::Cell::new(u64::MAX);
+        let mut helper = Forgets {
+            start,
+            now: start,
+            asked: Vec::new(),
+            forget: |at| (3_000..busy_from.get()).contains(&at),
+        };
+        drive(
+            &shared,
+            &mut helper,
+            &mut timing,
+            0..3_170,
+            |second, shared| {
+                if second == 3_050 {
+                    assert!(!shared.with(|reports| reports.kept.forget_skill_counts));
+                }
+                if second == 3_100 {
+                    busy_from.set(3_100);
+                    shared.with(|reports| reports.kept.forget_skill_counts = true);
+                }
+            },
+        );
+        assert_eq!(
+            helper.asked,
+            [
+                0, 20, 60, 140, 300, 620, 1_220, 1_820, 2_420, 3_020, 3_100, 3_120, 3_160
+            ]
+        );
+        // The cap, pinned: never more than 10 minutes between two asks.
+        let gaps: Vec<u64> = helper.asked.windows(2).map(|two| two[1] - two[0]).collect();
+        assert_eq!(gaps.iter().max(), Some(&600));
+        assert_eq!(FORGET_MOST, Duration::from_secs(600));
+    }
+
+    /// #7967: `lamp-cloud` holds at most one of the manage socket's
+    /// connections at a time, and none between its asks, so the socket's
+    /// other three, and the voice's skill runs on them, are left free while
+    /// the forget is asked again. The helper here never answers, as one
+    /// waiting on a held lock did.
+    #[test]
+    fn the_forget_holds_one_manage_connection_at_most_and_none_between_asks() {
+        use std::io::Read;
+        use std::sync::atomic::{AtomicUsize, Ordering};
+        let root = places("forget-socket").own.parent().unwrap().to_path_buf();
+        let socket = root.join("manage.sock");
+        let listener = std::os::unix::net::UnixListener::bind(&socket).unwrap();
+        let (open, most) = (Arc::new(AtomicUsize::new(0)), Arc::new(AtomicUsize::new(0)));
+        {
+            let (open, most) = (open.clone(), most.clone());
+            std::thread::spawn(move || {
+                for mut stream in listener.incoming().flatten() {
+                    let now = open.fetch_add(1, Ordering::SeqCst) + 1;
+                    most.fetch_max(now, Ordering::SeqCst);
+                    let open = open.clone();
+                    // Read to the asker's close, never answering.
+                    std::thread::spawn(move || {
+                        let _ = stream.read_to_end(&mut Vec::new());
+                        open.fetch_sub(1, Ordering::SeqCst);
+                    });
+                }
+            });
+        }
+        let shared = Shared::new(Reports::open(places("forget-socket-reports")));
+        shared.with(|reports| reports.kept.forget_skill_counts = true);
+        let start = Instant::now();
+        let mut timing = Timing::new(start);
+        let mut helper = Forgets {
+            start,
+            now: start,
+            asked: Vec::new(),
+            forget: |_| crate::skills::forget_counts(&socket),
+        };
+        // Each unanswered ask waits its 5 s: 30 s here is two asks.
+        drive(&shared, &mut helper, &mut timing, 0..30, |_, _| {
+            // Between asks, none of the socket's connections is lamp-cloud's.
+            let until = Instant::now() + Duration::from_secs(1);
+            while open.load(Ordering::SeqCst) > 0 && Instant::now() < until {
+                std::thread::sleep(Duration::from_millis(10));
+            }
+            assert_eq!(open.load(Ordering::SeqCst), 0);
+        });
+        assert_eq!(helper.asked, [0, 20]);
+        assert_eq!(most.load(Ordering::SeqCst), 1);
+        let _ = fs::remove_dir_all(&root);
     }
 
     /// A yes as the app would give it, over any choice kept before.

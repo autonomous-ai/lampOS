@@ -288,3 +288,95 @@ fn a_hermes_stage_has_room_for_the_most_it_may_be_frozen() {
         RESTART_WITHIN
     );
 }
+
+/// #7879 (the first builder, 10:42): a hot board pauses OpenClaw's install
+/// as someone talking does, and a board no longer hot resumes it; each is
+/// one act, never repeated.
+#[test]
+fn a_hot_board_pauses_it_and_a_cool_one_resumes_it() {
+    let mut watch = Watch::default();
+    assert_eq!(
+        watch.look_with_heat(0, Ok(()), false, &read("a")),
+        Act::Nothing
+    );
+    assert_eq!(
+        watch.look_with_heat(100, Ok(()), true, &read("a")),
+        Act::Pause
+    );
+    assert!(watch.frozen());
+    assert_eq!(
+        watch.look_with_heat(200, Ok(()), true, &read("a")),
+        Act::Nothing
+    );
+    assert_eq!(
+        watch.look_with_heat(MIN, Ok(()), true, &read("a")),
+        Act::Nothing
+    );
+    assert_eq!(
+        watch.look_with_heat(MIN + 100, Ok(()), false, &read("a")),
+        Act::Resume
+    );
+    assert!(!watch.frozen());
+    assert_eq!(
+        watch.look_with_heat(MIN + 200, Ok(()), false, &read("a")),
+        Act::Nothing
+    );
+    // `look` is the watch with no heat: never paused for it.
+    assert_eq!(watch.look(MIN + 300, Ok(()), &read("a")), Act::Nothing);
+}
+
+/// Talk and heat together: talk freezes first; once the voice rests on a
+/// hot board the pause for heat is said once; it goes on only when both
+/// let it, and someone talking during a heat pause says nothing more.
+#[test]
+fn talk_and_heat_together_hold_it_until_both_let_go() {
+    let mut watch = Watch::default();
+    assert!(matches!(
+        watch.look_with_heat(0, NOT_QUIET(), true, &read("a")),
+        Act::Freeze(_)
+    ));
+    assert_eq!(
+        watch.look_with_heat(100, Ok(()), true, &read("a")),
+        Act::Pause
+    );
+    assert_eq!(
+        watch.look_with_heat(200, NOT_QUIET(), true, &read("a")),
+        Act::Nothing
+    );
+    assert_eq!(
+        watch.look_with_heat(300, NOT_QUIET(), false, &read("a")),
+        Act::Nothing
+    );
+    assert_eq!(
+        watch.look_with_heat(400, Ok(()), false, &read("a")),
+        Act::Resume
+    );
+    // Talk alone after it thaws as before.
+    assert!(matches!(
+        watch.look_with_heat(500, NOT_QUIET(), false, &read("a")),
+        Act::Freeze(_)
+    ));
+    assert_eq!(
+        watch.look_with_heat(600, Ok(()), false, &read("a")),
+        Act::Thaw
+    );
+}
+
+/// A heat pause counts toward [`MOST_FROZEN`], as talk does: the one-shot's
+/// hour counts on while it is frozen, so a board hot for 40 min stops it,
+/// tried again in a later round.
+#[test]
+fn hot_too_long_stops_it() {
+    let mut watch = Watch::default();
+    assert_eq!(
+        watch.look_with_heat(0, Ok(()), true, &read("a")),
+        Act::Pause
+    );
+    match watch.look_with_heat(40 * MIN, Ok(()), true, &read("a")) {
+        Act::Stop { error, why } => {
+            assert_eq!(error, "interrupted");
+            assert!(why.contains("the board hot"), "{why}");
+        }
+        other => panic!("{other:?}"),
+    }
+}

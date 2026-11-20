@@ -36,7 +36,8 @@ shares, the author's own, carrying their public key (`lamp-skills pack
 --key-file KEY --author`; skills.md, "A shared package"). A folder with a `run.py`, or any script,
 is refused: script skills are a later format, except the `scripts/` of a skill whose `[[do]]` has a
 `task = { task, run }` (format 2, with its top-level `grants`; skills.md, "A skill's task"): `lamp
-skill check` holds that as the lamp does, and a push may carry it.
+skill check` holds that as the lamp does, and a push may carry it. `lamp-skills pack` refuses a
+task whose words are empty, longer than 120 characters or not plain (#7874).
 
 **`SKILL.md`** starts with front matter between two `---` lines. Two keys
 are read and both are required:
@@ -111,7 +112,7 @@ outside ASCII can pass the schema and still be too long on the lamp.
 | `[budget]` | `{ group, per_hour 1–6, gap, give_back_unsaid }` | runs an hour shared by every skill of the group; `gap` (1 m to 1 h), the least time between two of them; `give_back_unsaid`, a run that said nothing gives its place back (#5207) |
 | `[rest]` | `{ after_ignored 1–5, within }` | rests until the next morning after runs nobody noticed |
 | `[present]` | `enabled`, `trigger`, `while`, `most_a_day`, `active`, `quiet`, `budget`, `rest`, `ask`, `do` | with `LAMP_NUDGES_PRESENT=on`, each key stands in for the file's own, whole; read, checked and ignored without it (#5207) |
-| `[stop]` | `{ tool, about, when? }` | a function the model calls to snooze it or turn it off; `when`, at most 200 bytes, as `SKILL.md`'s (#6218) |
+| `[stop]` | `{ tool, about, when?, group?, kind? }` | a function the model calls to snooze it or turn it off; `when`, at most 200 bytes, as `SKILL.md`'s (#6218); `group`, in a skill with no `[budget]`, shares the function with the skills under the skills folder naming the same group, with no limit (#7401); `kind`, a lowercase letter then lowercase letters, digits and single hyphens between them, at most 32 bytes: the word a shared stop function's `kind` names this skill by, beside its name (#6543) |
 | `[search]` | `{ looks 1–8, give_up, found, note, walk, looked }` | a search a person asked for, its looks and what the model is told past the last (look-for-things) |
 | `[history]` | `{ topic = "room/presence", within, words }` | the room's presence over the last hours, for the model (who-was-here) |
 | `[watch]` | `{ every, asked_within, if_heard, most, mark, words }` | a watch the skill's tool turns on and off, with a faint `mark` light while on (guard-mode). Needs `light`, `messages` and `known_faces`; no trigger and no steps |

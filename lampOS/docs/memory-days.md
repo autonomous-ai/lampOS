@@ -737,17 +737,22 @@ new fields yet, and a put that names none of them behaves as before.
 
   | Column | Type | Default | Bound |
   |---|---|---|---|
-  | `source_kind` | `TEXT NOT NULL`, `CHECK` in `voice`, `task`, `agent`, `reminder` | `'voice'` | one of the four |
+  | `source_kind` | `TEXT NOT NULL`, `CHECK` in `voice`, `task`, `agent`, `reminder`, `sdk` | `'voice'` | one of the five |
   | `source_ref` | `TEXT NOT NULL`, a JSON object | `'{}'` | at most 512 bytes |
   | `summary` | `TEXT NOT NULL` | `''` | at most 160 bytes |
   | `deed_unix_ms` | `INTEGER`, null on an older row | null | a time in ms |
 
   Plus the index `service_records_kind(person, source_kind, changed_unix_ms)`.
+  A table that opened on slice 1 has the `source_kind` `CHECK` without
+  `sdk`; the same transaction rebuilds it once (`allow_sdk`: a new table
+  from the stored `sql` with `sdk` added, every row copied, the old one
+  dropped, the new one renamed, its indexes and triggers made again), the
+  rows counted before and after, any difference failing the open.
 - **`service_record`** takes four more optional fields: `source_kind`,
   `source_ref`, `summary` and `deed_unix_ms`. With none of them (an older
   voice), the record is `voice`, as every record before. An unknown kind is
   refused `bad_kind`, and so is a put that would change a kept record's
-  kind. A linked kind (`task`, `agent`, `reminder`) must give `source_ref`
+  kind. A linked kind (`task`, `agent`, `reminder`, `sdk`) must give `source_ref`
   on every put; a `voice` record may. `source_ref` is
   `{service, id, session?, computer?}`: an object of those fields only,
   each a text without control characters, `service` and `id` not empty, at
@@ -875,8 +880,19 @@ queues each change as a `service_record` with `source_kind`, `source_ref`,
 switch: Harness task rows (`LAMP_SERVICE_RECORDS_TASKS`, slice 3,
 [tasks.md](tasks.md)); reminder rows (`LAMP_SERVICE_RECORDS_REMINDERS`,
 [schedule.md](schedule.md)); a skill run's calls
-(`LAMP_SERVICE_RECORDS_AGENT`, slice 5, [services.md](services.md)). With
+(`LAMP_SERVICE_RECORDS_AGENT`, slice 5, [services.md](services.md));
+`LAMP_SERVICE_RECORDS_SDK` below. With
 `LAMP_SERVICE_RECORDS` off nothing is kept.
+
+The agent's rows (`LAMP_SERVICE_RECORDS_AGENT`, with lamp-services'
+`--run-calls`) and the told caps (`LAMP_SERVICE_RECORDS_LINKED_TOLD`) are on
+in the product since 19 Nov (`lamp-voice.service`), by the product owner's
+rule of 18 Nov that everything is on by default
+(https://github.com/autonomous-ai/lampOS/issues/6811#issuecomment-6977525471), with their
+own legs owed (#7960's ROW passed the connector legs beside them). The task, reminder and sdk rows and the source tool
+stay off until their own ROWs; `linked.sock` (`LAMP_MEMORY_LINKED_SOCKET`)
+stays off: nothing writes to it yet, and the installer doesn't make
+`lampos-linked`.
 
 - **Its own bound.** At most 16 changes wait, apart from the connector
   records' 32, so a burst of task or reminder news never pushes out a
@@ -910,6 +926,42 @@ switch: Harness task rows (`LAMP_SERVICE_RECORDS_TASKS`, slice 3,
   is never written (slice 3).
 - **Rollback.** Only the task rows call it, behind their own switch, so an
   older voice differs in having no `linked_dropped` fact and no task rows.
+
+### Linked records told: the caps (slice 8, the voice's `LAMP_SERVICE_RECORDS_LINKED_TOLD`, on in the product)
+
+With `LAMP_SERVICE_RECORDS_LINKED_TOLD=on` beside `LAMP_SERVICE_RECORDS_TOLD`
+and `LAMP_SERVICE_RECORDS` (the second route only,
+`process::service_records_linked_told_worker_environment`; `lamp-voice`
+`service_records::told::linked_on`), the linked records are told apart from
+the connector records, each kind bounded:
+
+- **The standing note.** The connector records as before, then at most 2
+  linked lines changed in the last 24 h, latest first, each tagged by kind
+  with its key: "[task] Book the dentist · done · today 15:40 · key
+  t-s1-7", with the rule "Lines tagged [task], [agent] or [reminder] are
+  work handed on for the owner, with its one-line summary only: never add
+  to it." and, in full with `record_source` offered, "For more of one, call
+  record_source with its key." The linked lines are never dropped for the
+  note's 1,900 bytes; the connector lines go first. They come from what the
+  linked outbox put (its last 16, RAM only) and, after a start, from the
+  memory's list of the owner's records, which never puts a linked record
+  in the connector records' ledger.
+- **Recall.** The memory is asked for 10 records about the words, not 5,
+  with `linked_most` 3: past the 3 best linked records it skips the linked
+  ones, so however many later linked records match, they never take a
+  connector record's place in the 10. Of those, every connector record
+  found is told first, up to 5, and linked ones fill
+  the room left, at most 3, so a linked record never pushes a connector one
+  out. Each in the memory's order; a linked one is told by its line, kind,
+  status, when and key.
+- **Someone else here.** Not in full (the told records' gate), a linked
+  line and a recall's linked record say only the kind, the status and when,
+  never the summary or the key, with `BRIEF`.
+- **Forgets.** A forget everything, of the person, or about a thing its
+  summary matches, takes the linked lines held, as it takes the waiting
+  changes.
+- **Off.** Nothing changes: no linked line, a recall asks 5 and tells what
+  it finds as before, and the memory's list is merged as before.
 
 ### Find the source: `record_source` (slice 7, the voice's `LAMP_SERVICE_RECORDS_SOURCE`, off)
 
@@ -971,6 +1023,54 @@ each record's `key` while it is on.
   (`deny_unknown_fields`): the call is `timed_out`. Off (either switch),
   the tool is not offered and nobody runs it.
 
+### A paired computer's daily notes count (`sdk`, `LAMP_SERVICE_RECORDS_SDK`, off)
+
+Tracker row C157 (the memory owner's call and the first builder's yes, 17
+Nov on #6811): one linked record a day for each developer computer the
+owner paired from the app, "The paired computer Dev laptop changed its
+notes 4 times on 2026-11-17". A count only: never a note's key, a key's
+name or a value.
+
+- **The memory's side.** `sdk` is a fifth source kind. An `sdk` record is
+  a count and nothing else: service `sdk`, action `notes_changed`, status
+  `done`, no `detail`, `reason`, `result_id`, `links` or `replaced_by`;
+  anything else is refused `bad_detail`, so no key or value of a
+  computer's notes can be stored under it. Unlike other final records, a
+  later put of the same key (the day's higher count) updates its summary,
+  `source_ref`, deed and changed time in place; its status stays `done`.
+  It is held to the per-kind cap (2,000) and the deed-time forget rule, and
+  forget everything, forgetting the person and a forget about a thing its
+  summary matches remove it as any row.
+- **The count.** lamp-control counts each kept `notes.set` or
+  `notes.delete` (a delete of a key not there is not one) of each computer
+  in 15-minute buckets, in memory only, the last 25 hours, a count and the
+  time of the last change (`notes::Notes::changes_since`); a revoke clears
+  them. Its owner's socket answers `{"note_changes": {"since_unix_ms": N}}`
+  to the voice alone (by its cgroup), with `{"computers": [{client, name,
+  changes, last_unix_ms}]}`, only for computers its side file marks as
+  paired from the owner's app (`paired-by.json`, control.md, "Notes").
+- **Who.** A pairing the side file marks `app`, for that pairing's
+  `paired_at`, is the owner's; a keeper's `lamp-control code`, a stale mark,
+  the local agent or no side file gives no count. The row is kept under the
+  owner's memory id (`person::owner_ids`, the first `p-` id); with no known
+  owner nothing is kept.
+- **The voice's side** (`service_records::sdk_counts`, the second route).
+  Every 5 minutes, a thread of its own asks lamp-control (1 s each way) and
+  puts, through the linked outbox, a row for each computer whose count went
+  above the one it last put: key `s-<client>-<YYYYMMDD>` (the lamp's local
+  day), `source_ref` `{service: "sdk", id: <client>, computer: <its name,
+  control characters dropped, at most 64 bytes>}`, deed the last change
+  counted. It counts from the later of the local midnight, the voice's start
+  and the owner's last forget everything, so a count never reaches back past
+  a forget; a restart of either part starts the day again (it may count low,
+  never high).
+- **Off.** Unless `LAMP_SERVICE_RECORDS_SDK=on` beside
+  `LAMP_SERVICE_RECORDS=on`, nothing is asked, kept or written.
+- **Rollback.** An older lamp-control answers the op with an `error`, and
+  nothing is kept. A memory migrated by a build with the four-kind `CHECK`
+  (slice 1 before this change, never in the product) keeps that `CHECK`, so
+  it refuses an `sdk` row and nothing is kept.
+
 ## Service contacts (`service_contact`, the voice's `LAMP_SERVICE_CONTACTS`)
 
 The voice's `LAMP_SERVICE_CONTACTS` (off by default, on in the product by the owner's call of 11 Nov, https://github.com/autonomous-ai/lampOS/pull/6312#issuecomment-6789879064, beside
@@ -1007,6 +1107,98 @@ until forgotten: no expiry, tidy or nightly pass reads this table;
 most 2,000 a person, the one changed longest ago going first past it. An
 older memory answers `unknown_op`, so the voice sends them only with its
 switch on.
+
+## The account's history (the voice's `LAMP_HISTORY_SEND`, #7771, off)
+
+The product owner's decision of 18 Nov: a person's conversations with the lamp
+are kept on our server too. With `LAMP_HISTORY_SEND=on` (the second route only,
+passed to that worker alone; a Live route turn is never saved) the voice saves
+each exchange the Days memory wrote to the account's history store (Backend3,
+19 Nov): `POST <base>/history/turns` with the lamp's key in `x-api-key`, the
+body `{"turns":[{"id","at","person","heard","said"}]}`.
+
+- **What is sent:** only an exchange `append_linked` answered with its id, in a
+  known person's scope (`p-…`) or the room's: the line as heard, the lamp's
+  reply, when (`at`, UTC), and whose scope it is in. `person` is the known
+  person's memory id, or empty for the room's. No audio, picture, kept thing,
+  observation or rule. What the memory keeps out is never written and so never
+  sent: a keep or forget turn, a carried line, one held by a face's gap, one
+  made before a forget, one whose source was forgotten.
+- **A linked service's read** (mail, calendar, a page): the thread keeps only
+  `(read from a linked service; not kept)` as the reply for the memory, and a
+  turn in a request a service read answered in is saved with that placeholder
+  too, never what was read.
+- **The id** is `<epoch>.<scope>:<exchange id>` (`lamp_msgs::history_turn_id`,
+  the one maker of it, which the memory's forget answers use too):
+  `0a1b2c3d.p-0123456789abcdef:12`, or `0a1b2c3d.everyone:7` for the room's.
+  `<epoch>` is the Days store's epoch (`{"op":"history_epoch"}`), 8 lowercase
+  hex digits made when the database is made and made anew when it is wiped
+  whole or reset, so a wiped or reset lamp's new turns are neither taken as
+  already saved nor refused by an old tombstone. The voice reads it at start
+  and again after every forget; when it changed, the turns not yet sent wait
+  for the next start and the marks start again under the new epoch. The store
+  takes a resend of an id as a no-op, so a retry is safe.
+- **The memory's two ops for it:** `{"op":"history_issued"}` answers
+  `{"ok":true,"epoch":"<8 hex>","issued":{"<scope>":<last id>}}`, each scope's
+  last id given (`next_id - 1`), never a word. `{"op":"exchanges_after",
+  "person":…,"after":N,"limit":L}` answers that scope's exchanges after id N,
+  oldest first, as `{"ok":true,"exchanges":[{"id","at_unix_ms","heard","said"}],
+  "more":bool}`: at most L (20 by default, 100 at most), stopping once about
+  48 KiB of text is given, one always.
+- **The room's lines wait** for their conversation's end: with
+  `LAMP_MEMORY_FOLLOWS_FACE` a room line may move to the caller's scope under a
+  new id (`adopt`) until then. A moved line is sent as its person's under its new
+  id; the rest go as the room's when the conversation ends. A line held 30
+  minutes waits for the next start.
+- **A forget** said on the lamp holds every post, the first included, until the
+  memory answers it (at most 15 s). The exchanges its answer names removed
+  (`exchanges`, by scope, as turn ids: the forget half's answer) are let go and kept as
+  forgotten (the last 4,096), so a save naming one is dropped before any POST,
+  a retry or a start's catch-up included: the lamp's own guard beside the
+  server's tombstone. A forget everything forgets every id offered in that
+  scope so far. When the answer names no ids (or none comes), the forgetting
+  person's and the room's unsent turns wait for the next start, when the memory
+  no longer holds what went. Other people's unsent turns are never let go.
+  Every memory answer the voice reads with `exchanges` turn ids (all five
+  forget ops, `history_forget::answered`) goes to `history_send::deleting`, so
+  those ids are never posted, whatever `LAMP_HISTORY_FORGET`. A forget about a
+  thing holds and lifts the posts as every other forget. A source forgotten
+  outside the voice is taken as an unnamed forget of that person's.
+- **Nothing lost at a restart, and no words on disk:** only ids are kept, in
+  `/var/lib/lampOS/voice/history-marks.json` (0600,
+  `{"epoch","marks":{scope:id},"offered":{scope:id}}`, written whole off the
+  turn's path): a mark per scope, the last id the server took with none before
+  it unsent, and the last id handed to the sender in each scope, written before
+  the post that carries it. At start the sending thread asks the memory
+  `history_issued` (until it answers; nothing is posted before), sends what the
+  memory kept after each mark up to what was handed over, by `exchanges_after`,
+  under the same ids, and then moves every mark to the memory's newest id. The
+  memory stays the one copy of the words. So on every start, not only the
+  first, nothing kept while no sender ran is ever sent: the switch off, the
+  Live route, or the voice down. An epoch unlike the marks' (the first start,
+  or a reset) starts the marks at what the memory holds now.
+- **Where:** only the lamp's own cloud API, the relay host the route's
+  `llm_base_url` names (`https://campaign-api.autonomous.ai/api/v1/ai`, with or
+  without `/v1`; `history_send::url`). With a direct provider's base, plain
+  HTTP or another host, nothing starts and nothing is sent. With no key (signed
+  out) nothing starts, journalled once; a sign-in after the worker started
+  starts it at the worker's next start.
+- **Never on the turn's path:** the memory's writer thread, already off the
+  reply, hands each turn over under a short lock with no I/O. A thread of its
+  own sends them in order, at most 20 a call, each text cut to 8 KB at a
+  character's end; a failed call (no answer, 408, 429 or 5xx) is tried again with
+  the same ids, 6 tries in all, the wait doubling from 2 s to 60 s, and then
+  waits for the next start. A 2xx `{"enabled":false}` (the store's switch off)
+  or another refusal is not tried again. At most 200 turns wait (past it the
+  oldest waits for the next start) and 64 room lines are held. The journal has
+  counts only, never a word, an id or a key.
+- **Privacy:** what was said before the privacy switch closed may still be sent
+  while it is closed; nothing new is said to the lamp then.
+- **Off in every unit:** by the first builder's rulings (#7935, and 17:09 on
+  #7957), the save goes on in the product only after the forget half
+  (`LAMP_HISTORY_FORGET`) is on, with its row. The setup sentence the issue
+  first asked for was dropped by the product owner (18 Nov): the notice is in
+  the privacy policy.
 
 ## Storage and migration
 

@@ -525,6 +525,29 @@ pub const NOT_PRODUCT_SKILLS: &[(&str, &str)] = &[
         "an installable skill from the Skills Store: tomorrow's Google Calendar read once an \
          evening, which needs its owner's calendar linked",
     ),
+    // The seen reactions (#6543): off until the owner's day-long row at
+    // lamp-06c1, at most one wrong remark in a working day, through the lead.
+    (
+        "seen-celebrate",
+        "off until the owner's day-long row at lamp-06c1 (#6543): a warm line when lamp-seen sees \
+         celebrating, with `LAMP_SEEN_MORE_DOINGS=on` and the owner's `seen_more` use",
+    ),
+    (
+        "seen-drink",
+        "off until the owner's day-long row at lamp-06c1 (#6543): a light line when lamp-seen \
+         newly sees a drink, with `LAMP_SEEN_MORE_DOINGS=on` and the owner's `seen_more` use",
+    ),
+    (
+        "seen-eat",
+        "off until the owner's day-long row at lamp-06c1 (#6543): a light line when lamp-seen \
+         newly sees eating, with `LAMP_SEEN_MORE_DOINGS=on` and the owner's `seen_more` use",
+    ),
+    (
+        "seen-tired",
+        "off until the owner's day-long row at lamp-06c1 (#6543): a light line when lamp-seen \
+         newly sees a yawn or stretch, with `LAMP_SEEN_MORE_DOINGS=on` and the owner's \
+         `seen_more` use",
+    ),
     (
         "quiet-focus",
         "an installable skill, not yet tried on a lamp: one warm word when they look up after 45 \
@@ -545,6 +568,24 @@ macro_rules! skill_file {
         (
             concat!("/var/lib/lampOS/skills/", $skill, "/", $file),
             include_str!(concat!("../../../skills/", $skill, "/", $file)),
+        )
+    };
+}
+/// A core pilot's brief (`LAMP_CORE_VIA_AGENT`), written beside its
+/// `agent.toml` from lamp-skills' own copy in its source
+/// (`crates/skills/src/core_agent/briefs`, pinned to
+/// `lamp_skills::core_agent::script` there): no skill folder of the
+/// repository carries a script (the SDK's check, #7862), and the bundle
+/// writes the same ([`crate::product_skills::make`]).
+macro_rules! core_brief {
+    ($skill:literal) => {
+        (
+            concat!("/var/lib/lampOS/skills/", $skill, "/scripts/agent.py"),
+            include_str!(concat!(
+                "../../skills/src/core_agent/briefs/",
+                $skill,
+                ".py"
+            )),
         )
     };
 }
@@ -598,8 +639,12 @@ pub const SETTINGS: &[(&str, &str)] = &[
     skill_file!("onboarding", "SKILL.md"),
     skill_file!("stretch-break", "skill.toml"),
     skill_file!("stretch-break", "SKILL.md"),
+    skill_file!("stretch-break", "agent.toml"),
+    core_brief!("stretch-break"),
     skill_file!("stuffy-air", "skill.toml"),
     skill_file!("stuffy-air", "SKILL.md"),
+    skill_file!("stuffy-air", "agent.toml"),
+    core_brief!("stuffy-air"),
     skill_file!("dance", "skill.toml"),
     skill_file!("dance", "SKILL.md"),
     skill_file!("bedtime-morning", "skill.toml"),
@@ -622,16 +667,28 @@ pub const SETTINGS: &[(&str, &str)] = &[
     skill_file!("watch-you-leave", "moves/watch-right.json"),
     skill_file!("sip-of-water", "skill.toml"),
     skill_file!("sip-of-water", "SKILL.md"),
+    skill_file!("sip-of-water", "agent.toml"),
+    core_brief!("sip-of-water"),
     skill_file!("rest-your-eyes", "skill.toml"),
     skill_file!("rest-your-eyes", "SKILL.md"),
+    skill_file!("rest-your-eyes", "agent.toml"),
+    core_brief!("rest-your-eyes"),
     skill_file!("stand-up", "skill.toml"),
     skill_file!("stand-up", "SKILL.md"),
+    skill_file!("stand-up", "agent.toml"),
+    core_brief!("stand-up"),
     skill_file!("wind-down", "skill.toml"),
     skill_file!("wind-down", "SKILL.md"),
+    skill_file!("wind-down", "agent.toml"),
+    core_brief!("wind-down"),
     skill_file!("comfort-break", "skill.toml"),
     skill_file!("comfort-break", "SKILL.md"),
+    skill_file!("comfort-break", "agent.toml"),
+    core_brief!("comfort-break"),
     skill_file!("sit-back", "skill.toml"),
     skill_file!("sit-back", "SKILL.md"),
+    skill_file!("sit-back", "agent.toml"),
+    core_brief!("sit-back"),
     skill_file!("head-pat", "skill.toml"),
     skill_file!("head-pat", "SKILL.md"),
     skill_file!("head-pat", "README.md"),
@@ -1484,17 +1541,45 @@ impl Host for System {
     }
 }
 
-/// The Harness CLI as `user`, with `home` as its `HOME` and the user's
-/// own runtime folder (`/run/user/<uid>`), which its per-user service needs.
+/// `ADAPTER_DATA_DIR=<home>/.harness/cli/data`, Harness's own default
+/// exactly (#7906): given to every Harness run here, so Harness 0.6.72's
+/// move of `~/.harness` into the XDG folders (openharness#4469) is
+/// `skipped-override` (`homeMove/conditions.ts` `OVERRIDE_NAMES`) and the
+/// home lampOS reads stays where it is.
+pub(crate) fn harness_data(home: &str) -> String {
+    use lamp_msgs::harness_hold::{DATA_DIR, HARNESS_DATA};
+    format!("{DATA_DIR}={home}/{HARNESS_DATA}")
+}
+
+/// The Harness CLI as `user`, with `home` as its `HOME`, the user's own
+/// runtime folder (`/run/user/<uid>`), which its per-user service needs,
+/// and Harness's data folder ([`harness_data`]).
 pub(crate) fn harness_argv(user: &str, home: &str, uid: &str, args: &[&str]) -> Vec<String> {
     let mut argv: Vec<String> = ["runuser", "-u", user, "--", "env"]
         .map(str::to_owned)
         .into();
     argv.push(format!("HOME={home}"));
     argv.push(format!("XDG_RUNTIME_DIR=/run/user/{uid}"));
+    argv.push(harness_data(home));
     argv.push(HARNESS.to_owned());
     argv.extend(args.iter().map(|arg| (*arg).to_owned()));
     argv
+}
+
+/// `<home>/.harness` made by `user` (`mkdir -p -m 0700`), before Harness's
+/// installer runs (#7906).
+pub(crate) fn harness_dir(user: &str, home: &str) -> Vec<String> {
+    vec![
+        "runuser".to_owned(),
+        "-u".to_owned(),
+        user.to_owned(),
+        "--".to_owned(),
+        "mkdir".to_owned(),
+        "-p".to_owned(),
+        "-m".to_owned(),
+        "0700".to_owned(),
+        format!("{home}/.harness"),
+    ]
 }
 
 /// `user`'s id, from `id -u`, through `run`.
@@ -1534,8 +1619,8 @@ pub const HERMES_STAGE_WITHIN: Duration =
 /// Every step through it gets [`RESTART_WITHIN`], but Harness's installer,
 /// which fetches, gets [`INSTALLER_WITHIN`], and a stage of Hermes's,
 /// which may be frozen too, [`HERMES_STAGE_WITHIN`]; each of OpenClaw's
-/// long steps (#6226, [`crate::openclaw_install::runs_long_step`]) its
-/// own hard [`crate::openclaw_install::STEP_WITHIN`].
+/// long steps (#6226, [`crate::openclaw_install::runs_long_step`]), which
+/// may be frozen too, [`crate::openclaw_install::LONG_STEP_WITHIN`].
 pub fn output_of(argv: &[String]) -> Result<String, String> {
     output_of_within(argv, bound_of(argv))
 }
@@ -1543,7 +1628,7 @@ pub fn output_of(argv: &[String]) -> Result<String, String> {
 /// How long [`output_of`] waits for `argv`.
 pub fn bound_of(argv: &[String]) -> Duration {
     if crate::openclaw_install::runs_long_step(argv) {
-        crate::openclaw_install::STEP_WITHIN
+        crate::openclaw_install::LONG_STEP_WITHIN
     } else if runs_hermes_stage(argv) {
         HERMES_STAGE_WITHIN
     } else if runs_installer(argv) {
@@ -1742,6 +1827,11 @@ pub fn harness_on_pinned_with(
 ) -> Result<(), String> {
     let uid = uid_of(run, user)?;
     run(&["install", "-d", "-o", user, "-g", user, "-m", "0700", home].map(str::to_owned))?;
+    // `~/.harness` there before the installer runs (#7906): on a fresh lamp
+    // Harness's installer otherwise picks the XDG folders and writes
+    // `.harness-root` there. Made by `user` itself (never followed as root),
+    // 0700 as its home; one already there is left as it is.
+    run(&harness_dir(user, home))?;
     let mut installer: Vec<String> = ["runuser", "-u", user, "--", "env"]
         .map(str::to_owned)
         .into();
@@ -1751,6 +1841,7 @@ pub fn harness_on_pinned_with(
     installer.extend([
         format!("HOME={home}"),
         format!("XDG_RUNTIME_DIR=/run/user/{uid}"),
+        harness_data(home),
         "PATH=/usr/local/bin:/usr/bin:/bin".to_owned(),
         "SHELL=/bin/sh".to_owned(),
     ]);

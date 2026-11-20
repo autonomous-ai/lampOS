@@ -85,26 +85,21 @@ pub const ROOM_SOUNDS_FILE: &str = "/var/lib/lampOS/consent/room-sounds.json";
 /// redo of setup stops it within this, not at the next start (Third's P2 on
 /// #2109).
 pub const YES_EVERY_US: u64 = 2_000_000;
-const ROOM_SOUNDS_MOST_BYTES: u64 = 4096;
 
-/// Whether `path` holds a yes: a JSON object whose `room_sounds` is exactly
-/// `"yes"`. Missing, unreadable, over 4096 bytes, not JSON, or anything
-/// else is no; `version` and other fields are not read.
+/// Whether `path` holds a yes to room sounds (#7767), by
+/// `lamp_msgs::consent`'s one rule with `LAMP_NOTICING_BY_DEFAULT`'s default
+/// (`consent::noticing_by_default`): a JSON object whose `room_sounds` is
+/// exactly `"yes"` is a yes; exactly `"no"`, unreadable, over 4096 bytes,
+/// not JSON, or anything else is no; `version` and other fields are not
+/// read. A missing file is no with the switch off, and a yes with it on.
 pub fn room_sounds_yes(path: &Path) -> bool {
-    let Ok(file) = std::fs::File::open(path) else {
-        return false;
-    };
-    let mut text = String::new();
-    if file
-        .take(ROOM_SOUNDS_MOST_BYTES + 1)
-        .read_to_string(&mut text)
-        .is_err()
-        || text.len() as u64 > ROOM_SOUNDS_MOST_BYTES
-    {
-        return false;
-    }
-    serde_json::from_str::<serde_json::Value>(&text)
-        .is_ok_and(|value| value.get("room_sounds").and_then(|v| v.as_str()) == Some("yes"))
+    room_sounds_allowed(path, lamp_msgs::consent::noticing_by_default())
+}
+
+/// [`room_sounds_yes`] with the default given: a missing file is
+/// `by_default`.
+pub fn room_sounds_allowed(path: &Path, by_default: bool) -> bool {
+    lamp_msgs::consent::allowed(path, lamp_msgs::consent::ROOM_SOUNDS, by_default)
 }
 
 /// Our own conversion of Google's `yamnet.h5` (#6232,

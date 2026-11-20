@@ -38,6 +38,8 @@ Environment=LAMP_BODY_POSE_ASK=on
 # A made skill reads a linked service to its owner alone (#5288, #5303): a skill's read step, said behind its
 # gate (the owner's face alone, no voice, not private), through lamp-services' tools socket. Played on lamp-9adf 5 Nov.
 Environment=LAMP_SKILL_READS=on
+# #5518, docs/services.md; 16 Nov
+Environment=LAMP_SKILL_LINK_NOTE=on
 # The private room (the owner's call, 6 Nov), as in lamp-voice.service: a made skill's read runs no ownership check,
 # so it needs no owner's name or known face, but still one face alone in view: two faces hold it, a second face
 # mid-read stops it. No voice heard, not private, not paused and not in quiet hours still hold it, and a voice heard
@@ -50,6 +52,8 @@ Environment=LAMP_SKILL_TASKS=on
 Environment=LAMP_SKILLS_TASKS_SOCKET=/run/lampos-tasks/skill-task.sock
 # #7239, docs/skills.md; owner, 16 Nov
 Environment=LAMP_SKILL_TASK_SURE=on
+# #7180, docs/skills.md; first builder, 16 Nov
+Environment=LAMP_TOLD_WHEN_ASKED=on
 # A skill made here is the person's own (#6059, docs/skills.md "A made skill loosened"): a made say's cooldown
 # as asked, at least a minute. The same line in lamp-voice and lamp-skills-manage@.
 Environment=LAMP_MADE_SKILL_LOOSE=on

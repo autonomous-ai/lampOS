@@ -333,12 +333,27 @@ and none of the skills' own (`crate::use_skill`):
       skills are …");
     - a word not in its choice ("dance's choice is one of calm, upbeat,
       jazz.");
-    - any other key ("use_skill takes skill, choice and flag, not mood: …");
+    - any other key ("use_skill takes skill, choice and flag, not mood: …";
+      "skill, choice, flag and kind" for a shared stop that takes a kind,
+      #6543);
     - a choice or a yes for a skill that takes none ("check_my_work takes no
       choice."). An empty choice or a "no" there is nothing.
   - **As a skill's call in every other way:** it waits for the Policy's hold,
     it never runs on a reply, its answer may ask for a look, and the request
     counts as one in which the lamp acted.
+  - **A shared stop's scope, from the person's words** (#7473, the owner's
+    call): a shared stop offering kinds (`wellbeing_nudges`) called with
+    `snooze`, `off` or `on` for a line a person said, through `use_skill` or
+    by its own name, goes to the skills' socket with the `kind` or `all` that
+    turn's own words set (`stop_scope`, its word map in `KIND_WORDS`), over
+    the model's, only when they give a clear scope (a kind's word right after
+    "about", "about my" or "for my", the nudges in general, or a kind's
+    word right before "nudge", "reminder" or "one"); anything
+    else, "it" and "that one" among it, leaves the model's. English only
+    for now. Read only for
+    such a call, from the skills' tools file, with no model call; the
+    journal says "the heard words set kind=… all=… (the model sent …)".
+    The rules and the word map are in [skills.md](skills.md), row `[stop]`.
 - **A plain ask that must call its skill** (`LAMP_SKILL_ASKED=on`, the
   second route, on in the product unit; #5744, #5745): a line that is only
   "movie light", "reading light", "night light", "light show", "party

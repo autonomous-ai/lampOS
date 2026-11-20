@@ -58,7 +58,12 @@ flowchart LR
   partner's cloud by itself. The app links the lamp to the owner's account
   with the partner, with a consent screen in the grants' words. Until then,
   the same program runs on a computer on the lamp's network (section 3), with
-  no change to its code.
+  no change to its code but one: its own phrases. A paired computer registers
+  them with `lamp.on("phrase.heard", handler, phrases=[...])`; an installed
+  app's socket refuses that and takes `lamp.listen_for([...], handler)`.
+  Code for both picks by `lamp.app`, set only on an app's connection
+  (`sdk/python/README.md`, "One difference between a paired computer and an
+  installed app").
 - **The SDK's own repository (planned, no date):** today you clone this
   repository and install from its `lampOS/sdk/` folders. The SDKs (Python,
   JavaScript, MCP) are planned to move to a repository of their own, with
@@ -140,10 +145,14 @@ repository's `lamp-voice` branch (the default branch, `main`, has none). When
 the SDK moves to its own repository (planned), only these install lines change;
 `import lampos`, `import { Lamp } from 'lampos'` and `lamp-mcp` stay as they are.
 
+Python 3.10 or newer: a Mac's own `python3` is often 3.9.6, which pip
+refuses ("requires a different Python"); install a newer one (python.org,
+or `brew install python@3.12`) and make the venv with it.
+
 ```sh
 git clone --branch lamp-voice https://github.com/autonomous-ai/lampOS.git && cd lampOS
-python3 -m venv ~/lampos-venv && . ~/lampos-venv/bin/activate
-pip install ./lampOS/sdk/python                     # add ./lampOS/sdk/mcp for lamp-mcp
+python3.12 -m venv ~/lampos-venv && . ~/lampos-venv/bin/activate   # any Python 3.10+
+pip install './lampOS/sdk/python[check]'            # [check] for `lamp skill check`; add ./lampOS/sdk/mcp for lamp-mcp
 ```
 
 ```sh

@@ -44,6 +44,12 @@ fn found(dir: &Path) -> Option<BTreeSet<String>> {
                 format!("{prefix}/{name}")
             };
             let meta = fs::symlink_metadata(entry.path()).ok()?;
+            // Python's own byte-code cache, made by a root run that imported the SDK, is never the build's
+            // and never counts against it: otherwise every round would ask for the SDK again (the
+            // Reviewer-lead's P3 on #7899). A write replaces the whole folder, cache and all.
+            if meta.is_dir() && entry.file_name() == "__pycache__" {
+                continue;
+            }
             if meta.is_dir() {
                 folders.push((entry.path(), path));
             } else if meta.is_file() {
@@ -191,6 +197,11 @@ mod tests {
         std::os::unix::fs::symlink("/etc/passwd", dir.join("lampos/link")).unwrap();
         assert!(!present(&root));
         write(&root).unwrap();
+        assert!(present(&root));
+        // Python's byte-code cache beside the SDK's files, from a root run that imported it, is no
+        // difference (#7899): the SDK is still this build's.
+        fs::create_dir_all(dir.join("lampos/__pycache__")).unwrap();
+        fs::write(dir.join("lampos/__pycache__/client.cpython-311.pyc"), "pyc").unwrap();
         assert!(present(&root));
         // Written again with a leftover staging folder in the way.
         fs::create_dir_all(dir.with_file_name("sdk-python.new/stale")).unwrap();

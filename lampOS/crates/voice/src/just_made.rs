@@ -185,6 +185,13 @@ fn shared<R>(each: impl FnOnce(&mut Conversations) -> R) -> R {
     each(&mut kept)
 }
 
+/// Tests: how many things were made or turned in `person`'s conversation,
+/// on this test's thread.
+#[cfg(test)]
+pub(crate) fn kept_for_test(person: &str) -> usize {
+    with(|kept| kept.of(person, Instant::now()).len())
+}
+
 /// This process's conversations ([`shared`]; a test's own thread's in a
 /// test, so parallel tests never share them).
 fn with<R>(each: impl FnOnce(&mut Conversations) -> R) -> R {
@@ -389,10 +396,17 @@ pub fn kept_from_turn(told: Value, person: Option<&str>, now: Instant) -> Value 
 /// [`kept_from_make`] on the lamp, the line's memory scope `lease`: with
 /// the switch on.
 pub fn after_make(told: &Value, request: u64, lease: Option<&crate::memory_scope::ScopeLease>) {
+    after_make_by(told, request, || crate::services::owner_of(lease));
+}
+
+/// [`after_make`] with the line's owner read by `owner`: a make that
+/// waited its turn (`LAMP_MAKE_QUEUE`, #7679) has no lease when it runs,
+/// and gives the owner read at its ask.
+pub fn after_make_by(told: &Value, request: u64, owner: impl FnOnce() -> Option<String>) {
     if !made_skill::off_said_on() || made_by(told).is_none() {
         return;
     }
-    let person = crate::services::owner_of(lease);
+    let person = owner();
     if person.is_some() {
         eprintln!("lamp-voice: request {request}: a skill made in the owner's conversation, kept");
     }

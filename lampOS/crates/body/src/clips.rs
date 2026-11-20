@@ -26,6 +26,21 @@ pub struct Clip {
 }
 
 impl Clip {
+    /// The most each joint moves in `tick`, at the clip's own pace: its
+    /// largest step from one frame to the next, spread over its frame
+    /// time (#7749: an ease out of it is never faster).
+    pub fn pace(&self, tick: std::time::Duration) -> [f32; 5] {
+        let share = tick.as_secs_f32() * 1_000.0 / f32::from(self.step_ms.max(1));
+        let mut pace = [0.0f32; 5];
+        for pair in self.frames.windows(2) {
+            for (index, most) in pace.iter_mut().enumerate() {
+                let moved = f32::from((pair[1][index] - pair[0][index]).unsigned_abs()) * share;
+                *most = most.max(moved);
+            }
+        }
+        pace
+    }
+
     pub fn duration_us(&self) -> u64 {
         (self.frames.len().saturating_sub(1) as u64) * u64::from(self.step_ms) * 1_000
     }

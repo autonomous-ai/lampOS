@@ -149,11 +149,14 @@ async function readLimits() {
 }
 if (bodyGrant) {
   readLimits();
-  setInterval(readLimits, 5_000).unref();
+  // The limits are read again every 5 s while a page is open (a new page asks at once, below): nobody is looking with none.
+  setInterval(() => { if (pages.size > 0) readLimits(); }, 5_000).unref();
 }
 console.log(bodyGrant ? `body.state subscribed on ${options.fake ? 'a simulated body' : 'the paired lamp'}` : 'no body grant: the twin draws the lamp at rest and its body rows are drawn off');
 
-// One lease at a time, taken at the first drag and given back 3 s after the last.
+// One lease at a time, taken at the first drag and given back HOLD_MS after the last (the lease is taken for 30 s; the lamp's own pose
+// comes back when it is given back, so a pose set with a slider stays this long). A `let_go` message gives it back at once.
+const HOLD_MS = 25_000;
 let lease = null;
 let letGo = null;
 // The page's STOP (`stop_all`): from then on no ask goes to the lamp until a page says `resume`.
@@ -178,7 +181,8 @@ async function drag(joint, deg, final = false) {
     }
     if (halted) return; // a STOP came while the lease was being taken: nothing goes out under it
     clearTimeout(letGo);
-    letGo = setTimeout(release, 3_000);
+    letGo = setTimeout(release, HOLD_MS);
+    tell({ type: 'holding', ms: HOLD_MS });
     let target = Math.max(-180, Math.min(180, deg));
     if (reachMapNow()) {
       const checked = restrict(reachMapNow(), lastRaw?.joints, joint, target, { shrink: reachShrink });
@@ -230,7 +234,7 @@ async function stopAll() {
     const asked = Object.fromEntries(Object.entries(here).map(([name, deg]) => [name, Number(deg.toFixed(1))]));
     let error = await bound('hold', lamp.joints(lease, 300, asked));
     // `lamp.stop()` may have ended the lease with the follow it ends: take it again once, so the hold is not lost to that.
-    if (error && /no_lease|lease/.test(error)) {
+    if (error && /no_lease/.test(error)) {
       try { lease = lamp.lease('body'); await lease.take(); error = await bound('hold', lamp.joints(lease, 300, asked)); } catch (again) { lease = null; error = `body lease: ${again?.message ?? again}`; }
     }
     if (error && lease && asked.pitch !== undefined) { error = await bound('hold', lamp.joints(lease, 300, { pitch: asked.pitch })); if (!error) held = 'only the head is held (the lamp refused the arm\'s hold)'; }
@@ -254,6 +258,7 @@ async function release() {
   if (!held) return;
   try {
     await held.release();
+    tell({ type: 'holding', ms: 0 });
     tell({ type: 'said', text: 'the body given back' });
   } catch (error) {
     if (!(error instanceof LampError)) throw error;
@@ -461,6 +466,7 @@ server.on('upgrade', (request, socket, head) => {
 });
 wss.on('connection', (page) => {
   pages.add(page);
+  readLimits();
   // A frame over the cap (or a broken one) closes that page's socket; it must not end the twin.
   page.on('error', () => page.terminate());
   if (last) page.send(JSON.stringify({ type: 'state', state: last }));

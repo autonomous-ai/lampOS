@@ -988,6 +988,56 @@ fn a_run_with_its_egress_socket_is_named_its_way_out_and_one_without_is_not() {
     );
 }
 
+/// A run lamp-tasks starts itself in its own folder with a fresh home of
+/// its own and no way out (a live ask with a linked service's read,
+/// `lamp_tasks::skill_make::AskRunner`): its home named by the caller's
+/// `LAMP_NS_HOME`, as a make's is, becomes Hermes's make's home
+/// (`LAMP_NS_MAKE`, `HERMES_HOME` under it), the run still held (`--net`,
+/// `LAMP_NS_NET=run`, its token from its file) and given no way out.
+#[test]
+fn a_run_given_its_fresh_home_by_its_caller_is_held_with_no_way_out() {
+    let folder = tempfile::tempdir().unwrap();
+    let top = fs::canonicalize(folder.path()).unwrap();
+    let place = top.join("hermes-home");
+    let program = place.join(".local/bin/hermes");
+    fs::create_dir_all(program.parent().unwrap()).unwrap();
+    fs::write(&program, "#!/bin/sh\nexit 0\n").unwrap();
+    fs::set_permissions(&program, fs::Permissions::from_mode(0o755)).unwrap();
+    let forwarder = top.join("hermes-token");
+    fs::write(&forwarder, "tok_forwarder\n").unwrap();
+    let text = one_path_text(&hermes_install::agent())
+        .unwrap()
+        .replace(hermes_install::TOKEN, forwarder.to_str().unwrap())
+        .replace(hermes_install::PLACE, place.to_str().unwrap());
+    let lamp = lamp_of("hermes", &text);
+    let home = lamp.top.join("project/lamp/make-run-1/home");
+    fs::create_dir_all(&home).unwrap();
+    let file = lamp.token_file("run-1");
+    let out = lamp.run_in(
+        &lamp.folder("run-1"),
+        &[("LAMP_NS_HOME", home.to_str().unwrap())],
+        "/usr/bin:/bin",
+    );
+    assert!(out.status.success(), "{out:?}");
+    assert!(!file.exists(), "its token file is read and deleted");
+    let env = lamp.read("env").unwrap();
+    let lines: Vec<&str> = env.lines().collect();
+    for line in [
+        "LAMP_NS_NET=run".to_owned(),
+        format!("LAMP_NS_MAKE={}", home.display()),
+        format!("HERMES_HOME={}/.hermes", home.display()),
+    ] {
+        assert!(lines.contains(&line.as_str()), "{line}: {env}");
+    }
+    assert!(!env.contains("LAMP_NS_EGRESS"), "{env}");
+    assert!(
+        lamp.read("argv")
+            .unwrap()
+            .lines()
+            .any(|line| line == "--net")
+    );
+}
+
 /// A skill's run on the one run path given its keys (lamp-tasks'
 /// `LAMP_SKILL_SECRETS`): its keys file in its own folder, found by its
 /// run id, is read once and deleted before the agent starts, so the keys

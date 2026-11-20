@@ -8,7 +8,9 @@
 //! present only while the yes stands (Fourteen's design on #6543). It is a
 //! yes only when [`KEY`] is exactly `"yes"`; missing, unreadable, over
 //! `lamp_msgs::consent::MOST_BYTES` (4096), not JSON or anything else is
-//! no. It is read with `lamp_msgs::consent::read`, the same rule lamp-ears
+//! no. With `LAMP_NOTICING_BY_DEFAULT=on` (#7767, off unless set, in no
+//! unit) a missing file is a yes nobody gave and a kept `"no"` stays no. It
+//! is read with `lamp_msgs::consent::read_or`, the same rule lamp-ears
 //! keeps for `room-sounds.json`, and read again every [`READ_EVERY`], as
 //! lamp-ears asks its yes again every 2 s: once the file is gone, the gate
 //! closes at the next read.
@@ -115,6 +117,9 @@ pub trait Store {
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct File {
     pub path: PathBuf,
+    /// What a missing file reads as (#7767): `LAMP_NOTICING_BY_DEFAULT`
+    /// ([`consent::noticing_by_default`]), read once when made.
+    pub by_default: bool,
 }
 
 impl File {
@@ -127,7 +132,13 @@ impl File {
     pub fn in_folder(folder: &Path) -> Self {
         Self {
             path: folder.join(FILE),
+            by_default: consent::noticing_by_default(),
         }
+    }
+
+    /// The same file, with a missing one read as `by_default`.
+    pub fn by_default(self, by_default: bool) -> Self {
+        Self { by_default, ..self }
     }
 
     /// Whether the file is gone (not there at all, as against there and
@@ -141,8 +152,13 @@ impl File {
 }
 
 impl Reader for File {
+    /// `lamp_msgs::consent`'s one rule ([`consent::read_or`], as
+    /// [`consent::allowed`] reads it): a kept `"no"` is no, a missing file
+    /// is [`File::by_default`]'s, a yes nobody gave
+    /// ([`consent::BY_DEFAULT`], with no time), and a file that can't be
+    /// read is no.
     fn read(&self) -> Kept {
-        consent::read(&self.path, KEY)
+        consent::read_or(&self.path, KEY, self.by_default)
     }
 }
 
@@ -246,7 +262,11 @@ impl Store for Record {
 /// slow that removal is: a yes whose `at_unix_s` is not later than the
 /// forget is refused, until the file is gone ([`OptIn::gone`]) or replaced
 /// by a later yes. A yes with no time cannot be shown to be later, so it
-/// stays off while the latch holds.
+/// stays off while the latch holds. The latch holds only an explicit yes
+/// (#7767): the default's (no file at all, with `LAMP_NOTICING_BY_DEFAULT`
+/// on, read as [`consent::Kept::by_default`], never from a file's text) is
+/// no yes a forget takes back, since a forget never turns noticing off when
+/// nobody turned it on.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct OptIn {
     /// When the last forget came, in Unix seconds, if one has since start
@@ -275,6 +295,9 @@ impl OptIn {
         if !kept.yes {
             return false;
         }
+        if kept.by_default {
+            return true;
+        }
         match self.forgot_at_unix_s {
             None => true,
             Some(forgot) => kept.at_unix_s.is_some_and(|given| given > forgot),
@@ -294,10 +317,43 @@ mod tests {
         folder
     }
 
+    /// #7767: off, a missing file is no, as before; with
+    /// `LAMP_NOTICING_BY_DEFAULT` on it is a yes nobody gave, with no time; a
+    /// kept no and a file that can't be read stay no either way.
+    #[test]
+    fn a_missing_opt_in_is_the_default_only_with_the_switch() {
+        let folder = folder("default");
+        let latch = OptIn::default();
+        let off = File::in_folder(&folder).by_default(false);
+        let on = File::in_folder(&folder).by_default(true);
+        assert_eq!(off.read(), Kept::default(), "missing, off");
+        // The first builder's c7003588081: with the switch on, a missing
+        // file is no until the voice's migration of earlier nos is done.
+        assert!(!latch.on(&on.read()), "missing, on, no done mark");
+        std::fs::write(folder.join(consent::OLD_NOS_DONE), b"{}").unwrap();
+        assert_eq!(off.read(), Kept::default(), "missing, off, done mark");
+        let kept = on.read();
+        assert!(latch.on(&kept), "missing, on");
+        assert_eq!(kept.by.as_deref(), Some(consent::BY_DEFAULT));
+        assert_eq!(kept.at_unix_s, None);
+        for text in [
+            consent::no_bytes(KEY, 9, consent::BY_VOICE),
+            b"not json".to_vec(),
+        ] {
+            std::fs::write(&on.path, &text).unwrap();
+            assert!(!latch.on(&on.read()), "{}", String::from_utf8_lossy(&text));
+            assert!(!latch.on(&off.read()), "{}", String::from_utf8_lossy(&text));
+        }
+        std::fs::remove_file(&on.path).unwrap();
+        std::fs::create_dir(&on.path).unwrap();
+        assert!(!latch.on(&on.read()), "unreadable");
+        let _ = std::fs::remove_dir_all(folder);
+    }
+
     #[test]
     fn off_unless_a_kept_yes() {
         let folder = folder("off");
-        let file = File::in_folder(&folder);
+        let file = File::in_folder(&folder).by_default(false);
         let latch = OptIn::default();
         assert!(!latch.on(&file.read()), "missing");
         assert!(file.gone());
@@ -362,7 +418,7 @@ mod tests {
     #[test]
     fn reading_never_writes_the_consent_folder() {
         let folder = folder("ro");
-        let file = File::in_folder(&folder);
+        let file = File::in_folder(&folder).by_default(false);
         std::fs::write(&file.path, consent::bytes(KEY, 7, consent::BY_APP)).unwrap();
         let before = std::fs::read(&file.path).unwrap();
         let mut latch = OptIn::default();
@@ -425,6 +481,7 @@ mod tests {
             yes: true,
             by: None,
             at_unix_s: at,
+            ..Kept::default()
         };
         // A record kept before posture: the plain line.
         std::fs::write(
@@ -483,7 +540,7 @@ mod tests {
     #[test]
     fn a_record_left_after_the_yes_was_removed_turns_nothing_on() {
         let folder = folder("left");
-        let file = File::in_folder(&folder);
+        let file = File::in_folder(&folder).by_default(false);
         let record = Record::in_folder(&folder);
         record
             .set_said(Said::On {
@@ -502,6 +559,7 @@ mod tests {
             yes: true,
             by: Some("app".into()),
             at_unix_s: at,
+            ..Kept::default()
         };
         let mut latch = OptIn::default();
         assert!(latch.on(&yes_at(Some(100))));
@@ -518,5 +576,78 @@ mod tests {
         latch.gone();
         assert!(latch.on(&yes_at(Some(120))));
         assert!(latch.on(&yes_at(None)));
+    }
+
+    /// The first builder's c7003588081 on #7767: with the switch on, a lamp
+    /// whose app mark stands beside no seen-activity yes (a stop, an app's
+    /// off or a forget from before the default) never reads the default:
+    /// before the voice's migration the missing file is no, and after it
+    /// the no it keeps (`"by":"voice"`) is no, so no desk picture is asked.
+    #[test]
+    fn with_the_switch_on_a_mark_beside_no_yes_sends_no_desk_picture() {
+        use crate::gate::{Closed, Inputs, may_request};
+        let folder = folder("old-no");
+        std::fs::write(
+            consent::mark_in(&folder),
+            br#"{"version":1,"after_unix_ms":5000}"#,
+        )
+        .unwrap();
+        let on = File::in_folder(&folder).by_default(true);
+        let latch = OptIn::default();
+        let asks = |kept: &Kept| {
+            may_request(&Inputs {
+                opted_in: latch.on(kept),
+                said_on: true,
+                privacy_open: Some(true),
+                someone: Some(true),
+                faces: Some(1),
+                asleep: Some(false),
+            })
+        };
+        assert!(on.gone());
+        assert_eq!(
+            asks(&on.read()),
+            Err(Closed::NoOptIn),
+            "before the migration"
+        );
+        // The voice's migration: the no kept, then its done mark.
+        std::fs::write(&on.path, consent::no_bytes(KEY, 5, consent::BY_VOICE)).unwrap();
+        std::fs::write(folder.join(consent::OLD_NOS_DONE), b"{}").unwrap();
+        assert_eq!(
+            asks(&on.read()),
+            Err(Closed::NoOptIn),
+            "after the migration"
+        );
+        let _ = std::fs::remove_dir_all(folder);
+    }
+
+    /// #7767: the latch holds only an explicit yes. With
+    /// `LAMP_NOTICING_BY_DEFAULT` on, a missing file (the default's yes) is
+    /// on through a forget, since a forget never turns noticing off that
+    /// nobody turned on; a kept yes, the voice's or the app's, is held as
+    /// before, and a kept no stays no. Off, a missing file is no either way.
+    #[test]
+    fn a_forget_holds_only_an_explicit_yes() {
+        let folder = folder("forget-default");
+        std::fs::write(folder.join(consent::OLD_NOS_DONE), b"{}").unwrap();
+        let on = File::in_folder(&folder).by_default(true);
+        let off = File::in_folder(&folder).by_default(false);
+        let mut latch = OptIn::default();
+        latch.forgot(200);
+        assert!(latch.on(&on.read()), "the default, after a forget");
+        assert!(!latch.on(&off.read()), "missing, off");
+        std::fs::write(&on.path, consent::bytes(KEY, 100, consent::BY_VOICE)).unwrap();
+        assert!(!latch.on(&on.read()), "a kept yes before the forget");
+        std::fs::write(&on.path, consent::no_bytes(KEY, 300, consent::BY_VOICE)).unwrap();
+        assert!(!latch.on(&on.read()), "a kept no");
+        // A yes with no time from a file is no default's.
+        std::fs::write(&on.path, br#"{"seen_activity":"yes","by":"app"}"#).unwrap();
+        assert!(!latch.on(&on.read()), "a kept yes with no time");
+        // Nor one whose text says the default's `by` (Twelve's P3 3 on
+        // #7928): only a missing file is, either way the switch is.
+        std::fs::write(&on.path, br#"{"seen_activity":"yes","by":"default"}"#).unwrap();
+        assert!(!latch.on(&on.read()), "a file saying by default, on");
+        assert!(!latch.on(&off.read()), "a file saying by default, off");
+        let _ = std::fs::remove_dir_all(folder);
     }
 }

@@ -33,7 +33,9 @@
 //!   written and answered, then, once no update is at work (no quiet: its
 //!   restart makes no sound), `systemctl daemon-reload` and a restart of
 //!   [`CONTROL_UNIT`] ([`restart_control_when_unlocked`]). Off: the door is
-//!   closed before the answer ([`close_before_answer`]);
+//!   closed before the answer ([`close_before_answer`]): the drop-in goes and
+//!   lamp-control is restarted, not stopped, so it comes back with the door
+//!   shut and still serves the voice's yes records, skill runs and apps;
 //! - the owner's dev monitor (`monitor.set`, #5883, `docs/peek.md`):
 //!   lamp-peek's drop-in ([`MONITOR_DROPIN`], `LAMP_PEEK=monitor`), as
 //!   developer access: on is written, answered, then [`PEEK_UNIT`] is
@@ -72,7 +74,10 @@
 //!   after it. A `request_id` more than a day past the lamp's now
 //!   ([`lamp_msgs::consent::REQUEST_AHEAD_MOST_MS`]) is no send time: a yes
 //!   is refused, an off raises the mark only to the lamp's now. `lamp-cloud`
-//!   sends it only with `LAMP_SEEN_ACTIVITY=on`.
+//!   sends it only with `LAMP_SEEN_ACTIVITY=on`. With
+//!   `LAMP_NOTICING_BY_DEFAULT=on` (#7767, `lamp_msgs::consent`), where a
+//!   missing file is on, an off keeps a no (`"by":"app"`) in place of the
+//!   removal, under the same lock and mark ([`apply_or`]).
 use crate::serve::{Config, Files, Save, write_private};
 use lamp_update::quiet::{Heard, QUIET, Quiet};
 use serde_json::{Value, json};
@@ -374,6 +379,12 @@ fn remove(path: &Path) -> io::Result<()> {
 
 /// Make `change` with setup's writers on the files `config` names.
 pub fn apply(change: &Change, config: &Config) -> io::Result<Done> {
+    apply_or(change, config, lamp_msgs::consent::noticing_by_default())
+}
+
+/// [`apply`] with `LAMP_NOTICING_BY_DEFAULT` given (#7767): `by_default`
+/// changes only the desk noticing switch, whose off then keeps a no.
+pub fn apply_or(change: &Change, config: &Config, by_default: bool) -> io::Result<Done> {
     let mut files = Files(config);
     match change {
         Change::PersonName(Some(name)) => {
@@ -630,7 +641,7 @@ pub fn apply(change: &Change, config: &Config) -> io::Result<Done> {
             let path = lamp_msgs::consent::file_in(&config.consent, key)
                 .ok_or_else(|| io::Error::other("no such yes"))?;
             let lock = lamp_msgs::consent::lock_mark(&config.consent)?;
-            let before = lamp_msgs::consent::read(&path, key).yes;
+            let before = lamp_msgs::consent::read_or(&path, key, by_default).yes;
             if *yes {
                 if let Some(why) = desk_refused(*id, lock.read()) {
                     return Err(io::Error::other(Refused(why)));
@@ -640,7 +651,11 @@ pub fn apply(change: &Change, config: &Config) -> io::Result<Done> {
                     keep_yes(&path, key)?;
                 }
             } else {
-                remove(&path)?;
+                if by_default {
+                    keep_no(&path, key)?;
+                } else {
+                    remove(&path)?;
+                }
                 let id = if lamp_msgs::consent::too_far_ahead(*id) {
                     lamp_msgs::consent::now_unix_ms()
                 } else {
@@ -723,6 +738,23 @@ fn keep_line(path: &Path, line: Option<&str>) -> io::Result<bool> {
 /// folder's group (`lampos` on a lamp, which the eyes and the ears are in),
 /// or 0600 where the folder's group is root's, as the voice keeps its own.
 fn keep_yes(path: &Path, key: &str) -> io::Result<()> {
+    keep_answer(path, |at| {
+        lamp_msgs::consent::bytes(key, at, lamp_msgs::consent::BY_APP)
+    })
+}
+
+/// A no from the app kept at `path` as [`keep_yes`] keeps a yes (#7767):
+/// `{"version":1,KEY:"no","at_unix_s":N,"by":"app"}`, so that with
+/// `LAMP_NOTICING_BY_DEFAULT` on the off is never read as the default.
+fn keep_no(path: &Path, key: &str) -> io::Result<()> {
+    keep_answer(path, |at| {
+        lamp_msgs::consent::no_bytes(key, at, lamp_msgs::consent::BY_APP)
+    })
+}
+
+/// `bytes(now)` kept at `path`, whole: written beside it and renamed into
+/// place, in the mode and group [`keep_yes`] names.
+fn keep_answer(path: &Path, bytes: impl FnOnce(u64) -> Vec<u8>) -> io::Result<()> {
     use std::os::unix::fs::{MetadataExt, PermissionsExt};
     let folder = path
         .parent()
@@ -731,7 +763,7 @@ fn keep_yes(path: &Path, key: &str) -> io::Result<()> {
     let at = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
         .map_or(0, |since| since.as_secs());
-    let bytes = lamp_msgs::consent::bytes(key, at, lamp_msgs::consent::BY_APP);
+    let bytes = bytes(at);
     let next = path.with_extension("change-next");
     let _ = fs::remove_file(&next);
     let result = (|| {
@@ -1194,10 +1226,12 @@ impl Ears for Clock {
 /// before the app is told. lamp-update's lock first, at most
 /// [`CLOSE_LOCK_MOST`], else refused with nothing changed; then, holding it,
 /// the drop-in removed (developer off also the agent's), `daemon-reload` and
-/// `stop` of its unit (a `restart` for the agent off beside developer access
-/// still on, so the agent's socket goes and the developer door stays), and
-/// only then the reply, which this returns for the caller to write. A stop
-/// that failed is said, never claimed closed. `None` when `line` is not such
+/// `restart` of its unit (lamp-control: with the drop-in gone it starts with
+/// the door shut and serves only the owner's side, so no computer can reach
+/// the lamp and the voice's yes records, skill runs and apps keep working;
+/// lamp-peek, for the dev monitor, is stopped), and only then the reply,
+/// which this returns for the caller to write. A restart or stop that failed
+/// is said, never claimed closed. `None` when `line` is not such
 /// a request: it is answered by [`answer`] as any other.
 pub fn close_before_answer(
     line: &str,
@@ -1233,7 +1267,12 @@ pub fn close_before_answer(
                     CONTROL_UNIT,
                     "lamp-control",
                     CLOSE_MAY_STAY_OPEN,
-                    false,
+                    // A restart, never a stop: with the drop-in gone the unit
+                    // starts again with the door shut (no `LAMP_CONTROL=on`:
+                    // nothing listens on the network), and goes on serving
+                    // what the product needs of it (the voice's yes records,
+                    // lamp-tasks' mints, the run socket, the apps' socket).
+                    true,
                 )
             }
             Ok(Change::LocalAgent(false)) if there(&config.agent_dropin) => (
@@ -1242,7 +1281,9 @@ pub fn close_before_answer(
                 CONTROL_UNIT,
                 "lamp-control",
                 CLOSE_MAY_STAY_OPEN,
-                there(&config.control_dropin),
+                // Always restarted, as developer access off is: what the
+                // product needs of lamp-control goes on without the door.
+                true,
             ),
             Ok(Change::Monitor(false)) if there(&config.monitor_dropin) => (
                 vec![config.monitor_dropin.as_path()],
@@ -1269,7 +1310,11 @@ pub fn close_before_answer(
             failed.get_or_insert(error.kind());
         }
     }
-    let (verb, did) = if restart {
+    // A restart only when every removal worked: a drop-in left in place
+    // would start lamp-control with the door open again at once (Heron on
+    // #7998), so then it is stopped, as before, and stays down until its
+    // next start.
+    let (verb, did) = if restart && failed.is_none() {
         ("restart", "restarted")
     } else {
         ("stop", "stopped")

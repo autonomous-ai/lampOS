@@ -1,0 +1,19 @@
+# Stretch break's line through the lamp's agent: a pilot, read only with
+# LAMP_CORE_VIA_AGENT=on in lamp-skills and its manage helper (docs/skills.md,
+# "A core skill's line through the lamp's agent"); off, nothing reads it.
+# It stands in for skill.toml's grants and [[do]] alone: the trigger, the
+# [[while]] guards, cooldown, rearm, wait and [present] are skill.toml's own,
+# never copied here. Every [[do]] but the task is skill.toml's, word for word
+# (lamp-skills checks it): the say is the fallback, said at once when the
+# agent's line has not come within 10 s.
+grants = []
+
+[[do]]
+task = { task = "One short, playful line, as an invitation to take a break, as the lamp stretches too; never a lecture.", run = "scripts/agent.py" }
+
+[[do]]
+body = { look_at = "face" }
+
+[[do]]
+body = { gesture = "stretching" }
+say = "{sitting} They have been sitting a while. In one short, playful line, suggest a quick stretch, as the lamp stretches too."

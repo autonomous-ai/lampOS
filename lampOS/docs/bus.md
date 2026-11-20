@@ -702,6 +702,7 @@ switched and off unless set. The task's number is the same one
 | Topic | Kind | Published by | Intended reader |
 |---|---|---|---|
 | `skills/events` | event, no period, no lifespan | `lamp-skills` | People and the lamp's app: what each physical skill did and why ([skills.md](skills.md)); `lamp-peek`'s timeline, skill and stage only ([peek.md](peek.md)) |
+| `skills/tasks` | event, no period, no lifespan | `lamp-tasks` (with `--progress`), `lamp-skills` | `lamp-peek`'s Tasks and Timeline (#7873): each skill's `do.task` run, its engine and end, and its answer held for its gate, then told or dropped ([msgs.md](msgs.md) `SkillTask`, [peek.md](peek.md)) |
 
 The [`SkillEvent` message](msgs.md#the-skills-contract) says one stage of a
 run: triggered, asked, answered (with whether it was allowed) and done,

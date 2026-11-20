@@ -94,7 +94,7 @@ differs. Folders are what the unit makes or names.
 | tasks | `lamp-tasks serve` | orangepi | `/var/lib/lampos-tasks/` (0700); `/run/lampos-tasks/` (0700) | `targets.json` in its state folder (none at first: the product unit's `--set-up-later --targets-from-machines claude` writes it from the person's machines once Harness is signed in); the Harness program in the user's home | `request.sock`, `voice.sock` |
 | mood | `lamp-mood serve --zone system` (off unless `LAMP_MOOD=on`, `mood.md`) | lampos | none | the lamp's zone, `/etc/localtime` | the bus (`mood/state`) |
 | addons | `lamp-addons serve` (off unless `LAMP_ADDONS=on`, `addons.md`) | lampos | none | none | the bus (`addon/proposal` and the lamp's state in, `light/request` out) |
-| services | `lamp-services --store /var/lib/lampos-services --run /run/lampos-services` (on in the product unit, `LAMP_SERVICES=on`, with writes, `LAMP_SERVICES_WRITE=on`, since 4 Nov, and Google Calendar's moves and cancels, `LAMP_CALENDAR_EDITS=on`, since 11 Nov; `services.md`) | root, group lampos, no capability | `/var/lib/lampos-services/` (0700, its `StateDirectory`; the reset plan wipes it); `/run/lampos-services/` (0750) | setup's `backend.json` and the voice's key, through `LoadCredential=`, for a token's refresh | `admin.sock` (`lamp-cloud` only), `tools/` with `tools.json` and `call.sock` (the voice only) |
+| services | `lamp-services --store /var/lib/lampos-services --run /run/lampos-services --run-calls` (on in the product unit, `LAMP_SERVICES=on`, with writes, `LAMP_SERVICES_WRITE=on`, since 4 Nov, and Google Calendar's moves and cancels, `LAMP_CALENDAR_EDITS=on`, since 11 Nov; `services.md`) | root, group lampos, no capability | `/var/lib/lampos-services/` (0700, its `StateDirectory`; the reset plan wipes it); `/run/lampos-services/` (0750) | setup's `backend.json` and the voice's key, through `LoadCredential=`, for a token's refresh | `admin.sock` (`lamp-cloud` only), `tools/` with `tools.json` and `call.sock` (the voice only) |
 | control | `lamp-control serve` (off unless `LAMP_CONTROL=on`, `control.md`) | lampos | `/var/lib/lampos-control/` (0700, its `StateDirectory`: certificate, key, paired computers); `/run/lampos-control/` (0700, the admin socket) | none | TCP 7731 (WebSocket over TLS, paired computers only); `admin.sock`; the body's `mood.sock`, the voice's `say.sock`, the bus |
 | peek | `lamp-peek` (the owner's dev monitor, #5883: off unless `LAMP_PEEK=monitor`, which the app's `monitor.set` writes as a drop-in; outside `lampos.target`, `lamp-peek.service` is `WantedBy=multi-user.target` once setup's marker exists, `peek.md`) | lampos | `/run/lampos-peek/` (0700, the admin socket) | none | TCP 80 to the local network only, while on; `admin.sock`; reads the bus |
 | seen | `lamp-seen frame-link`, then `lamp-seen serve` (off unless `LAMP_SEEN_ACTIVITY=on`, which the unit sets, `seen.md`); in the target before the eyes | lampos | `/var/lib/lampos-seen/` (0700, its `StateDirectory`, passed as `--state-folder`: the line said back; the reset plan wipes it); `/run/lampos-seen/` (0700, kept until the lamp restarts: the frame link's boots, `frame-link.env`, which the eyes read by `--frame-link-boots`, and `eyes-visits.env`) | setup's `backend.json` and the voice's key, through `LoadCredential=`; the opt-in, `/var/lib/lampOS/consent/seen-activity.json`, read only (the reset plan removes it) | the bus (`humans/doing`, `humans/doing_seen`, `humans/posture`, `light/mark`); the voice's `say.sock`; the eyes' frame link; the perception service, with the switch and the opt-in |
@@ -1214,8 +1214,11 @@ As root, on a lamp with the base image (`crates/update/src/install.rs`):
    running takes it; one not running is left alone); runs `loginctl
    enable-linger lampos` (a user manager for `lampos` from boot, with no
    login, started with that `HOME`); then the Harness CLI's own `harness
-   service install` as `lampos` with `HOME=/var/lib/lampos-tasks` and its
-   `XDG_RUNTIME_DIR`.
+   service install` as `lampos` with `HOME=/var/lib/lampos-tasks`, its
+   `XDG_RUNTIME_DIR` and `ADAPTER_DATA_DIR=/var/lib/lampos-tasks/.harness/cli/data`
+   (every Harness run of lamp-update has it, so Harness 0.6.72's move of
+   `~/.harness` into the XDG folders is skipped, #7906; tasks.md,
+   "Harness's home kept in `~/.harness`").
    - **Why the drop-in** (#1676): `lampos` is created with no home
      (`/nonexistent`), and a user manager looks for user units under its
      `HOME`. Without the drop-in, Harness wrote its unit under
@@ -1239,8 +1242,11 @@ As root, on a lamp with the base image (`crates/update/src/install.rs`):
    lampOS is installed on (it refuses without `/var/lib/lampos-update`),
    with no Harness at `/usr/local/bin/harness`, these steps, in order:
    `id -u lampos`; `/var/lib/lampos-tasks` made `lampos`'s own (0700);
+   `/var/lib/lampos-tasks/.harness` made by `lampos` (`runuser -u lampos --
+   mkdir -p -m 0700`, #7906: a fresh lamp's installer otherwise picks the
+   XDG folders);
    Harness's installer as `lampos` with `HOME=/var/lib/lampos-tasks`,
-   `XDG_RUNTIME_DIR`, `PATH=/usr/local/bin:/usr/bin:/bin` and
+   `XDG_RUNTIME_DIR`, `ADAPTER_DATA_DIR` (#7906), `PATH=/usr/local/bin:/usr/bin:/bin` and
    `SHELL=/bin/sh`: `curl -fsSL --proto =https --tlsv1.2
    https://cdn.autonomous.ai/harness/cli/install.sh | sh`, the address its
    header names. Then `test -x` of the launcher it writes,
@@ -1360,9 +1366,9 @@ As root, on a lamp with the base image (`crates/update/src/install.rs`):
      never rewrites `lamp-update.service`, so a pin or switch written there
      would reach only a lamp installed after it. Instead the pinned Harness
      manifest itself is compiled into lamp-update (`product::MANIFEST`, from
-     `deploy/harness/cli-0.6.60.metadata.json`, a byte-for-byte copy of
+     `deploy/harness/cli-0.6.72.metadata.json`, a byte-for-byte copy of
      Harness's CDN manifest `https://storage.googleapis.com/s3-autonomous-upgrade-3/harness/cli/metadata.json`
-     when it named 0.6.60; 0.5.98 or newer is needed for Hermes on the lamp, openharness#3807, #5978). The signed manifest names lamp-update by its
+     when it named 0.6.72; 0.5.98 or newer is needed for Hermes on the lamp, openharness#3807, #5978). The signed manifest names lamp-update by its
      SHA-256, so the build's Ed25519 signature covers the pin (#3693's
      decision (a): a sha256 pin in our signed manifest is enough, as Harness
      signs nothing). Nothing is fetched or hosted for it: the one-shot checks
@@ -1377,7 +1383,7 @@ As root, on a lamp with the base image (`crates/update/src/install.rs`):
      never reads it again from its server.
      After the install, `harness
      version` is compared with the manifest's `cli.version` and journaled:
-     `Harness 0.6.60 is the pinned version`, or `Harness says version …, not
+     `Harness 0.6.72 is the pinned version`, or `Harness says version …, not
      the pinned …`. Another version, or none, is recorded `failed` with
      `version`, not `installed`, so the app can tell it apart. Harness is
      still there and lamp-tasks is still started again. While Harness is
@@ -1553,8 +1559,10 @@ As root, on a lamp with the base image (`crates/update/src/install.rs`):
          had."; it is journaled whether `harness version` says the older
          one again, and the kept copy is removed only when it does. A copy
          not kept installs nothing (also `upgrade`). Either
-         way the launcher is pinned again (with the hold on) and lamp-tasks
-         started again. A failed move is tried again by a round with
+         way the launcher is pinned again (with the hold on),
+         `ADAPTER_DATA_DIR` put in a `harness-hold.env` already there (held
+         or not, #7906; tasks.md, "Harness's home kept in `~/.harness`"),
+         as after a first install, and lamp-tasks started again. A failed move is tried again by a round with
          another pin at once, or with the same pin after 24 h
          (`UPGRADE_RETRY_AFTER`). If the copy cannot be put back and
          Harness is then missing, the next round installs it as on a lamp
@@ -1689,6 +1697,26 @@ As root, on a lamp with the base image (`crates/update/src/install.rs`):
        frozen). A freeze or thaw systemd refuses stops it too, so the
        one-shot is never left frozen; and a `serve` that starts thaws it
        first, in case one ended mid-freeze;
+     - the board hot, OpenClaw's install only and only with
+       `LAMP_HEAT_BACKOFF=on` exactly in `lamp-update.service`'s
+       environment (#7879; dark, in no unit): the watch reads
+       lamp-health's kept `board/heat` at most once a second, never
+       waiting, and while it says `hot` on OpenClaw's turn (not Hermes's)
+       the one-shot is frozen as for talk, journaled `OpenClaw's install
+       pauses while the board is hot (board/heat)`; it goes on when the
+       board is no longer hot and the voice is quiet, journaled `OpenClaw's
+       install goes on: the board is no longer hot and the voice is quiet`.
+       Warm, an expired, future-dated or invalid value, and no bus are
+       not hot. The app shows the install `frozen` during a heat pause,
+       as it does for talk (the watch's `frozen` flag, #6240). Talk
+       during a heat pause says nothing more; a pause that
+       ends as the turn passes to Hermes's install says so (`the pause for a
+       hot board ends: the turn passed to Hermes's install, …`). A heat
+       pause counts toward `MOST_FROZEN` as talk does, and each of
+       OpenClaw's long steps (fetch, unpack, `npm ci`) is bounded by
+       `LONG_STEP_WITHIN`, its 20 min running and `MOST_FROZEN`, so a step
+       frozen past 20 min is not taken for `timeout` on the thaw
+       (`crates/update/src/heat.rs`);
      - the privacy reading lost: once a fresh lease with the slide read
        (or a lamp with no slide) was seen on `voice/privacy`, its newest
        lease older than 250 ms (`LOST_AFTER`, its life being 50 ms), one
@@ -1742,7 +1770,10 @@ As root, on a lamp with the base image (`crates/update/src/install.rs`):
      writes them to `/usr/local/lib/lampos/sdk-python` (root's, files 0644:
      the namespace leaves `/usr` as it is, so a run reads it and cannot change
      it). The folder holding anything but exactly this build's files counts
-     as Hermes missing, so a newer build has it written again; a skill's run
+     as Hermes missing, so a newer build has it written again. Every lamp,
+     whatever its agent, also gets it from lamp-update's own round through
+     the writer's one-shot unit (#7415, `docs/updates.md`, "The writer's
+     one-shot unit"); a skill's run
      has it on `PYTHONPATH` (`docs/tasks.md`). Hermes's own launcher replaces
      the `PYTHONPATH` it is started with, so the same one-shot also writes
      `/usr/local/lib/lampos/hermes-run-env.sh` (root's, 0644, never run),
@@ -2485,6 +2516,19 @@ As root, on a lamp with the base image (`crates/update/src/install.rs`):
      "OpenClaw's install waits: lamp-openclaw-gateway.service is not
      this build's yet; …", and leaves a working OpenClaw and its gateway
      as they are; the next round writes the unit and asks again (#7135).
+     After writing the unit or finding it as written, each round checks
+     what systemd loaded (#7879): `systemctl show -p
+     DropInPaths,NeedDaemonReload,CPUQuotaPerSecUSec,ActiveState`. A
+     reload still owed (`NeedDaemonReload=yes`, as after a `daemon-reload`
+     that failed, which the next round's same bytes never tried again) or
+     a CPU cap not read back as `1s` (`CPUQuota=100%`) reloads systemd
+     again and, with the gateway running, `systemctl try-restart`s it so
+     the cap applies, with one journal line naming the check. A drop-in
+     is not lamp-update's: one journal line names it, and it is left as it
+     is, with no reload or restart, as neither would take it out. Any
+     check still failing is found again by the next round. There is no
+     switch of its own: it only makes systemd run lamp-update's own unit
+     as its text says.
    - **The forwarder token:** the wrapper exports `LAMP_HERMES_TOKEN` from
      lamp-cloud's `/var/lib/lampos-cloud/hermes-token`, as Hermes's does,
      for the `lampos` provider's `apiKey` (`${LAMP_HERMES_TOKEN}`).

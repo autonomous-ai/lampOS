@@ -468,6 +468,38 @@ async fn a_bare_make_skill_call_has_the_lamps_opening_said_first_once() {
     );
 }
 
+/// #7679 (`LAMP_MAKE_QUEUE`): a bare make asked while another is under way
+/// waits its turn, so the lamp's "I'll make it now" is never said before
+/// it: the one line is the model's "I'll make the gold one next". Idle
+/// again, the opening is said as before.
+#[tokio::test]
+async fn a_bare_make_while_another_is_made_says_no_opening_only_its_next_line() {
+    let opening = format!("said:{}", crate::make_skill_agent::MAKE_OPENING);
+    let next = || vec![text("I'll make the gold one next."), Ok(ChatEvent::Done)];
+    let plain = || vec![Message::user("And another: check the gold price at six.")];
+    let fast = (false, false, Duration::ZERO);
+    crate::make_queue::clear_for_test();
+    assert!(matches!(
+        crate::make_queue::admit(
+            7_679_100,
+            crate::make_queue::Asker::default(),
+            "bitcoin price".into(),
+            Instant::now(),
+            Box::new(|| crate::tools::ToolAnswer::plain(json!({}))),
+        ),
+        crate::make_queue::Admitted::Run
+    ));
+    assert_eq!(
+        a_make_turn(7_679_101, plain(), fast, vec![a_bare_make(), next()]).await,
+        ["said:I'll make the gold one next."]
+    );
+    crate::make_queue::clear_for_test();
+    assert_eq!(
+        a_make_turn(7_679_102, plain(), fast, vec![a_bare_make(), next()]).await,
+        [opening, "said:I'll make the gold one next.".into()]
+    );
+}
+
 /// The model's own opening before its call is said once, and the lamp's
 /// never beside it; a round with no call says no opening, nor does a
 /// `make_skill` call that makes nothing new (a remove, a run, a yes: the
@@ -632,6 +664,88 @@ async fn the_stream_and_the_whole_calls_agree_on_a_new_make() {
             vec!["said:Done.".into()]
         };
         assert_eq!(said, expected, "{first:?} {args}");
+    }
+}
+
+/// #7911 (Twelve's HOLD on #7926): the schema lists `given_name` before
+/// `request`, so a named make may stream it first. It is a new make's
+/// argument too: the opening is said once, as for a `request` first,
+/// on the stream and on the whole calls alike.
+#[tokio::test]
+async fn a_make_whose_first_argument_is_its_given_name_is_opened() {
+    let opening = format!("said:{}", crate::make_skill_agent::MAKE_OPENING);
+    let plain = || {
+        vec![Message::user(
+            "Make a skill called evening rate that hums at noon.",
+        )]
+    };
+    let next = || vec![text("Done."), Ok(ChatEvent::Done)];
+    let fast = (false, false, Duration::ZERO);
+    let named = json!({
+        crate::make_skill_local::GIVEN_NAME: "evening rate",
+        "request": "hum at noon"
+    });
+    for (at, first) in [Some(crate::make_skill_local::GIVEN_NAME), None]
+        .into_iter()
+        .enumerate()
+    {
+        let said = a_make_turn(
+            7_911_730 + at as u64,
+            plain(),
+            fast,
+            vec![a_streamed_call(first, named.clone()), next()],
+        )
+        .await;
+        assert_eq!(
+            said,
+            vec![opening.clone(), "said:Done.".into()],
+            "{first:?}"
+        );
+    }
+    // `given_name` first decides nothing: the next argument does.
+    assert_eq!(
+        crate::make_skill_local::new_make_argument(crate::make_skill_local::GIVEN_NAME),
+        None
+    );
+    assert_eq!(
+        crate::make_skill_local::new_make_argument(crate::make_skill_local::REQUEST),
+        Some(true)
+    );
+    assert_eq!(
+        crate::make_skill_local::new_make_argument(crate::made_remove::REMOVE),
+        Some(false)
+    );
+}
+
+/// #7911 (Heron's HOLD on #7926): `given_name` sorts first in the schema,
+/// so it streams first in any call that carries it. A remove with it, or
+/// it alone with no `request`, is no new make: nothing is said first, on
+/// the stream and on the whole calls alike.
+#[tokio::test]
+async fn a_given_name_without_a_request_opens_no_make() {
+    let plain = || vec![Message::user("Remove the one called evening rate.")];
+    let next = || vec![text("Done."), Ok(ChatEvent::Done)];
+    let fast = (false, false, Duration::ZERO);
+    let given = crate::make_skill_local::GIVEN_NAME;
+    let removed = json!({given: "evening rate", crate::made_remove::REMOVE: "evening rate"});
+    let alone = json!({given: "evening rate"});
+    for (at, (first, args)) in [
+        (Some(given), removed.clone()),
+        (None, removed),
+        (Some(given), alone.clone()),
+        (None, alone),
+    ]
+    .into_iter()
+    .enumerate()
+    {
+        let said = a_make_turn(
+            7_911_740 + at as u64,
+            plain(),
+            fast,
+            vec![a_streamed_call(first, args.clone()), next()],
+        )
+        .await;
+        assert_eq!(said, vec!["said:Done.".to_owned()], "{first:?} {args}");
     }
 }
 

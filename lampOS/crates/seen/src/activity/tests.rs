@@ -633,3 +633,74 @@ fn an_answer_with_nothing_counted_names_nothing_off() {
         "burst answered: top using computer 0.40; counted none; server 447 ms a frame, at most 600; 8 of 8 frames, 56 bytes, 9000 ms in all"
     );
 }
+
+/// On a hot board (#7879) the next burst is four minutes after this one
+/// began, the frames within it still [`SPACING_US`] apart; back to ok, a
+/// minute again, counted from the same start.
+#[test]
+fn a_hot_board_spaces_the_next_burst_and_ok_brings_it_back() {
+    use crate::heat::Pace;
+    use lamp_msgs::HeatLevel;
+    let mock = Mock::start(vec![Script::Answer(vec![Reply::Labels(vec![]); 8])]);
+    let mut activity = Activity::new(mock.endpoint(), pace());
+    activity.set_every_us(Pace::at(HeatLevel::Hot, true).burst_every_us);
+    assert!(activity.ready(0), "the first burst is due at once");
+    burst(&mut activity, 0, 8);
+    finish(&mut activity, 10 * S);
+    assert!(!activity.ready(EVERY_US));
+    assert!(!activity.ready(4 * EVERY_US - 1));
+    assert!(activity.ready(4 * EVERY_US));
+    activity.set_every_us(Pace::at(HeatLevel::Warm, true).burst_every_us);
+    assert!(!activity.ready(2 * EVERY_US - 1));
+    assert!(activity.ready(2 * EVERY_US));
+    activity.set_every_us(Pace::at(HeatLevel::Ok, true).burst_every_us);
+    assert!(activity.ready(EVERY_US));
+}
+
+/// A stop (the gate closing on a forget, the privacy, sleep) aborts a
+/// burst under way on a hot board as at ok.
+#[test]
+fn a_stop_still_aborts_the_burst_on_a_hot_board() {
+    use crate::heat::Pace;
+    use lamp_msgs::HeatLevel;
+    let mock = Mock::start(vec![Script::Answer(vec![Reply::Labels(vec![(
+        "drinking", 0.9,
+    )])])]);
+    let mut activity = Activity::new(mock.endpoint(), pace());
+    activity.set_every_us(Pace::at(HeatLevel::Hot, true).burst_every_us);
+    burst(&mut activity, 0, 3);
+    mock.wait("a frame", |seen| !seen.frames.is_empty());
+    activity.stopped();
+    assert!(!activity.sending());
+    mock.wait("the socket closed", |seen| seen.closed == 1);
+    wait_wiped(&activity, 3);
+    assert_eq!(activity.counts().aborted, 1);
+    assert!(
+        !activity.ready(4 * EVERY_US - 1),
+        "the next burst in its turn"
+    );
+}
+
+/// #7401: a burst a minute by default; as fast as every 15 s only with
+/// `LAMP_SEEN_BURST_15S=on` exactly, which no unit sets.
+#[test]
+fn a_burst_a_minute_unless_the_switch_allows_fifteen_seconds() {
+    assert_eq!(fastest_us(None), 60_000_000, "off: 60 s");
+    for value in ["", "ON", "1", "true", " on"] {
+        assert_eq!(fastest_us(Some(value)), EVERY_US, "{value:?}");
+    }
+    assert_eq!(fastest_us(Some("on")), 15_000_000, "on: 15 s");
+    assert_eq!(FAST_EVERY_US, 15_000_000);
+    assert_eq!(FAST_ENVIRONMENT, "LAMP_SEEN_BURST_15S");
+    // The next burst after one that started at 0 and answered, at each
+    // rate.
+    for (every, label) in [(EVERY_US, "off"), (FAST_EVERY_US, "on")] {
+        let mock = Mock::start(vec![Script::Answer(vec![Reply::Labels(vec![]); 8])]);
+        let mut activity = Activity::new(mock.endpoint(), pace()).every(every);
+        assert!(activity.ready(0), "{label}: due at once");
+        burst(&mut activity, 0, 8);
+        assert_eq!(finish(&mut activity, 10 * S).outcome, Outcome::Answered);
+        assert!(!activity.ready(every - 1), "{label}");
+        assert!(activity.ready(every), "{label}");
+    }
+}

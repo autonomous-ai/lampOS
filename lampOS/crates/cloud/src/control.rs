@@ -173,9 +173,14 @@ fn code(door: &Door, data: &Value, say: &mut dyn FnMut(&str)) -> Result<Option<V
         None => Vec::new(),
         Some(_) => return Err(BAD_GRANTS.to_owned()),
     };
-    // The lamp says the start of its pin aloud for the owner to match
-    // (the spoken pin check, #5299).
-    let asked = json!({"code": {"grants": grants, "say_pin": true}});
+    // The spoken pin check (#5299) is the app's choice: the lamp says the
+    // start of its pin aloud only when the app asked for it, and not when
+    // `say_pin` is absent or not a boolean.
+    let say_pin = data
+        .get("say_pin")
+        .and_then(Value::as_bool)
+        .unwrap_or(false);
+    let asked = json!({"code": {"grants": grants, "say_pin": say_pin}});
     let issued = ask(&door.socket, &asked, "control.code", say)?;
     if let Some(error) = issued.get("error").and_then(Value::as_str) {
         // lamp-control's own words name the grant; the app is told plainly.
@@ -575,6 +580,32 @@ mod tests {
         json!({"grants": ["body", "light"], "seal_to": seal_to, "request_id": request_id})
     }
 
+    /// The spoken pin check is the app's choice: `say_pin: true` reaches
+    /// lamp-control as asked, and a non-boolean is no yes.
+    #[test]
+    fn the_apps_say_pin_reaches_lamp_control_and_only_true_says_the_pin() {
+        let seal_to = URL_SAFE_NO_PAD.encode(crate::seal::public_of(&APP_KEY));
+        for (sent, wanted) in [
+            (json!(true), true),
+            (json!(false), false),
+            (json!("true"), false),
+            (json!(1), false),
+        ] {
+            let dir = folder("say-pin");
+            let (door, asked) = admin(&dir, issues);
+            let mut data = asked_with(&seal_to, "r-8");
+            data["say_pin"] = sent;
+            let answered = answer_saying(&door, "control.code", &data, &mut |_| {})
+                .unwrap()
+                .unwrap();
+            assert_eq!(
+                asked.recv().unwrap(),
+                json!({"code": {"grants": ["body", "light"], "say_pin": wanted}})
+            );
+            assert_eq!(answered["pin_said"], wanted);
+        }
+    }
+
     /// The app's key, sealed to: the code and pin open only with it, under
     /// this lamp's id and the app's request id; nothing the lamp said or
     /// wrote holds either.
@@ -592,13 +623,13 @@ mod tests {
         )
         .unwrap()
         .unwrap();
-        // The lamp is asked to say its pin check aloud, and the app is told
-        // it did.
+        // The app did not ask for the spoken check: the lamp is told not to
+        // say the pin, and the app is told it did not.
         assert_eq!(
             asked.recv().unwrap(),
-            json!({"code": {"grants": ["body", "light"], "say_pin": true}})
+            json!({"code": {"grants": ["body", "light"], "say_pin": false}})
         );
-        assert_eq!(answered["pin_said"], true);
+        assert_eq!(answered["pin_said"], false);
         assert_eq!(answered["sealed"]["v"], 1);
         assert_eq!(answered["until_unix_ms"], 1_800_000_300_000u64);
         assert_eq!(

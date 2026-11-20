@@ -421,7 +421,10 @@ pub fn execute(
     manifest.transcript_hash = Some(cache_hash.clone());
     manifest.config["repetition"] = json!(run.repetition);
     manifest.config["adapter_sha256"] = json!(adapter.executable_sha256);
-    manifest.config["partial_current_product"] = json!(run.arm == "lampos_today_partial");
+    manifest.config["partial_current_product"] = json!(matches!(
+        run.arm.as_str(),
+        "lampos_today_partial" | crate::partial::NEXT
+    ));
     manifest.config["fixture_profile"] = json!(fixture_pin.profile);
     let ledger = Arc::new(Mutex::new(Ledger::create(&output, &manifest)?));
     save_source(&output, &source)?;

@@ -21,6 +21,12 @@
 //!   the owner let go stays on the lamp.
 //!
 //! The journal says counts and sizes, never a key or a value.
+//!
+//! - **Changes counted** ([`Notes::changes_since`], tracker row C157): each
+//!   kept `notes.set` or `notes.delete` adds one to its computer's count in
+//!   a [`BUCKET_MS`] bucket, in memory only, the last [`BUCKETS_KEPT`]; a
+//!   count and the time of the last change, never which key. A revoke clears
+//!   them; a restart starts them at none.
 
 use std::collections::{BTreeMap, HashMap, HashSet};
 use std::io::Write as _;
@@ -47,6 +53,11 @@ pub const TOTAL_MOST_BYTES: usize = 256 * 1024;
 pub const SKILL_PREFIX: &str = "n_";
 /// The file's own format version.
 const FILE_VERSION: u64 = 1;
+/// A changes count's bucket: 15 minutes, so a local midnight in any zone
+/// starts one.
+pub const BUCKET_MS: u64 = 15 * 60 * 1_000;
+/// The buckets each computer keeps: 25 hours, more than a day.
+pub const BUCKETS_KEPT: u64 = 100;
 
 /// What a write did at the door: nothing to wait for, or the disk write to
 /// run off the door's lock (two fsyncs took 11 to 15 ms on lamp-75c9, 10 Nov:
@@ -86,6 +97,26 @@ struct Inner {
     /// How many times each computer was forgotten: a write that finds it
     /// changed was let go while it ran, and keeps nothing.
     epoch: HashMap<String, u64>,
+    /// Each computer's kept changes: (bucket start, count, last change),
+    /// oldest first, at most [`BUCKETS_KEPT`] buckets back.
+    changes: HashMap<String, Vec<(u64, u64, u64)>>,
+}
+
+impl Inner {
+    /// One kept change of `client`'s notes at `now_ms`.
+    fn count_change(&mut self, client: &str, now_ms: u64) {
+        let start = now_ms - now_ms % BUCKET_MS;
+        let buckets = self.changes.entry(client.to_owned()).or_default();
+        let oldest = start.saturating_sub((BUCKETS_KEPT - 1) * BUCKET_MS);
+        buckets.retain(|(bucket, _, _)| *bucket >= oldest);
+        match buckets.last_mut() {
+            Some((bucket, count, last)) if *bucket == start => {
+                *count += 1;
+                *last = (*last).max(now_ms);
+            }
+            _ => buckets.push((start, 1, now_ms)),
+        }
+    }
 }
 
 /// The computers' notes: where they're kept, and what is read of them.
@@ -101,6 +132,11 @@ impl Notes {
             folder,
             inner: Arc::default(),
         }
+    }
+
+    /// The folder the notes are kept in.
+    pub fn folder(&self) -> &Path {
+        &self.folder
     }
 
     /// Where `client`'s notes are kept, whether or not any are.
@@ -197,12 +233,30 @@ impl Notes {
         }))
     }
 
+    /// How many changes of `client`'s notes were kept in the buckets that
+    /// start at or after `since_ms` (a bucket `since_ms` falls inside is
+    /// left out, so a count never reaches before it), and when the last of
+    /// them was: `(0, None)` with none. Counts only, never a key.
+    pub fn changes_since(&self, client: &str, since_ms: u64) -> (u64, Option<u64>) {
+        let inner = self.inner.lock().expect("notes");
+        let Some(buckets) = inner.changes.get(client) else {
+            return (0, None);
+        };
+        buckets
+            .iter()
+            .filter(|(bucket, _, _)| *bucket >= since_ms)
+            .fold((0, None), |(count, last), (_, n, at)| {
+                (count + n, Some(last.map_or(*at, |last: u64| last.max(*at))))
+            })
+    }
+
     /// `client` revoked: every note of it deleted, in memory and on disk, and
     /// a write being kept for it keeps nothing. Said in the journal if a file
     /// can't be removed.
     pub fn forget(&self, client: &str) {
         let mut inner = self.inner.lock().expect("notes");
         inner.kept.remove(client);
+        inner.changes.remove(client);
         *inner.epoch.entry(client.to_owned()).or_default() += 1;
         remove_files(&self.folder, client);
     }
@@ -292,6 +346,7 @@ impl Notes {
                 ));
             }
             written?;
+            inner.count_change(&client, wall_ms());
             inner.kept.insert(client, after);
             Ok(answer)
         })))
@@ -313,6 +368,15 @@ impl Drop for Writing {
             .unwrap_or_else(|poisoned| poisoned.into_inner());
         inner.writing.remove(&self.client);
     }
+}
+
+/// The wall clock, in Unix milliseconds.
+fn wall_ms() -> u64 {
+    std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map_or(0, |since| {
+            u64::try_from(since.as_millis()).unwrap_or(u64::MAX)
+        })
 }
 
 fn busy() -> Error {
@@ -545,6 +609,51 @@ mod tests {
         assert!(notes.del(A, "mood").unwrap());
         assert!(!notes.del(A, "mood").unwrap());
         assert_eq!(notes.get(A, "mood").unwrap(), None);
+    }
+
+    /// Each kept set or delete counts one change of its computer's, a
+    /// delete of a key not there none; a revoke clears the count (C157).
+    #[test]
+    fn kept_changes_are_counted_a_computer_and_a_revoke_clears_them() {
+        let dir = Dir::new("counted");
+        let notes = Notes::new(dir.0.clone());
+        assert_eq!(notes.changes_since(A, 0), (0, None));
+        notes.put(A, "mood", &json!(1)).unwrap();
+        notes.put(A, "mood", &json!(2)).unwrap();
+        assert!(notes.del(A, "mood").unwrap());
+        assert!(!notes.del(A, "mood").unwrap());
+        notes.put(B, "x", &json!(1)).unwrap();
+        let (count, last) = notes.changes_since(A, 0);
+        assert_eq!(count, 3);
+        assert!(last.is_some());
+        assert_eq!(notes.changes_since(B, 0).0, 1);
+        notes.forget(A);
+        assert_eq!(notes.changes_since(A, 0), (0, None));
+        assert_eq!(notes.changes_since(B, 0).0, 1);
+    }
+
+    /// The buckets: a count since a time leaves out the bucket it falls
+    /// inside, and buckets past [`BUCKETS_KEPT`] are let go.
+    #[test]
+    fn changes_are_counted_in_buckets_and_old_ones_go() {
+        let notes = Notes::new(PathBuf::from("/nonexistent"));
+        let day = 1_791_849_600_000; // a midnight UTC, a bucket's start
+        {
+            let mut inner = notes.inner.lock().unwrap();
+            inner.count_change(A, day - 60_000);
+            inner.count_change(A, day + 1_000);
+            inner.count_change(A, day + 2_000);
+            inner.count_change(A, day + BUCKET_MS + 5);
+        }
+        assert_eq!(notes.changes_since(A, day), (3, Some(day + BUCKET_MS + 5)));
+        assert_eq!(notes.changes_since(A, day + 1).0, 1);
+        assert_eq!(notes.changes_since(A, day - BUCKET_MS).0, 4);
+        notes
+            .inner
+            .lock()
+            .unwrap()
+            .count_change(A, day + BUCKETS_KEPT * BUCKET_MS);
+        assert_eq!(notes.changes_since(A, 0).0, 2);
     }
 
     #[test]

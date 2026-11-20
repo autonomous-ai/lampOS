@@ -86,6 +86,8 @@ Environment=LAMP_BUS=on
 Environment=LAMP_PRIVACY_CONTROLS=on
 # LAMP_PRIVACY_RIDES_STALL: its why and rules are its row in docs/switches.md (#5611, #5224).
 Environment=LAMP_PRIVACY_RIDES_STALL=on
+# LAMP_VOICE_UNSTARTED_FRAME_DROP: its why and rules are its row in docs/switches.md (#7224).
+Environment=LAMP_VOICE_UNSTARTED_FRAME_DROP=on
 Environment=LAMP_BUS_ROOT=/run/lampos-bus
 Environment=LAMP_BUS_AUDIO=on
 Environment=LAMP_ATTENTION=busy-near
@@ -186,9 +188,9 @@ Environment=LAMP_SAID_AS_HEARD=on
 # Known gap, accepted: the lamp's own echo can commit as a cut-in with 0 words and be asked (7 of 15 stories on
 # lamp-06c1, 3 Nov, #4938); a later echo fix from duplex makes those asks fewer.
 Environment=LAMP_CUT_IN_WORDLESS_ASKS=on
-# LAMP_CUT_IN_WORDLESS_RESUMES (a busy room's cut goes on from the sentence it cut) is off for the candidate
-# (the PM, 6 Nov): its lamp check on lamp-06c1 came back FAIL, partial, with the busy room and the second and third
-# cuts never reached (#5430). It comes back on once that path passes on a lamp.
+# LAMP_CUT_IN_WORDLESS_RESUMES: #7413; a busy room's wordless cut goes on from the sentence it cut, a second says
+# "Oops, cut off again", a third pauses. Needs LAMP_CUT_IN_WORDLESS_ASKS above. Its rules are its row in docs/switches.md.
+Environment=LAMP_CUT_IN_WORDLESS_RESUMES=on
 Environment=LAMP_SECOND_SAID_ONCE=on
 # A light, volume or timer turn answered at once with the acting part's own result, a single ask ending there, in
 # English only (#2135, #4700): on lamp-4ace on 31 Oct (d06603109f) off and on alternating, timers and reminders 2.06-2.20 s
@@ -460,6 +462,16 @@ Environment=LAMP_MADE_SKILL_ASKS=on
 Environment=LAMP_MADE_SKILL_SAID=on
 # #7445, docs/skills.md "Turned off and on by voice": a turn-off by voice is never a remove
 Environment=LAMP_MADE_SKILL_OFF_SAID=on
+# The make flow's five switches (the first builder's DEFAULT-ON, 19 Nov 21:42, on #7814; docs/switches.md): a make
+# the lamp can't build itself goes to its agent as a task, or is told why not (#7234); made code that only lights,
+# speaks or moves goes on at once; an ask for a skill the lamp has but is off turns that one on; "make a skill" is
+# listened for, and a thing to do on a repeat is a skill to make, never a reminder. Passed to the second route as
+# each row says. LAMP_SKILL_WRITTEN follows #7977 (the written-note size bound) in its own pull request.
+Environment=LAMP_MAKE_NO_CANNOT=on
+Environment=LAMP_MADE_CODE_ON_AT_ONCE=on
+Environment=LAMP_MAKE_CORE_OFFER=on
+Environment=LAMP_SKILL_KEYTERM=on
+Environment=LAMP_SKILL_RECURRING_TOLD=on
 # A due reminder is timed by the Reminders skill (lampOS/skills/reminders): the voice keeps its words and
 # its acknowledgement, and says it itself when no ask has come within 10 s, so none is lost (#939).
 Environment=LAMP_SCHEDULE_SPEAK=skill
@@ -487,6 +499,8 @@ Environment=LAMP_SKILL_ASKED=on
 # code as round 1, for a non-core skill that takes no choice or yes-or-no (#6772, #6782, docs/skills.md; lamp-52e6
 # at 12587, 13 Nov: "photo booth" got "I don't have a camera" over the skill it was offered); the second route alone.
 Environment=LAMP_SKILL_NAMED=on
+# #7180, docs/skills.md; first builder, 16 Nov
+Environment=LAMP_TOLD_WHEN_ASKED=on
 # And a line that plainly asks the lamp to make a skill, saying what it does, calls make_skill (lamp-52e6, 13 Nov,
 # build 12635: a make of a skill that checks the processor temperature was answered "I can't" with no call, #6835).
 Environment=LAMP_MAKE_SKILL_ASKED=on
@@ -597,6 +611,10 @@ Environment=LAMP_MEMORY_RECALL_V2=on
 # ranunculus?". A round asking whether a kept word was another keeps the asked word on their yes. Needs
 # LAMP_MEMORY_FORGET_ALL and LAMP_EYES_SPEAKING, both on here.
 Environment=LAMP_MEMORY_DOUBT_UNDOES=on
+# An unsure line is simply not kept, and nothing is asked (#7739): the product owner's no-asks rule of 18 Nov. A keep
+# whose words the model doubts, or with a near spelling of a heard word, keeps nothing and asks no "did you say ...?";
+# a doubted keep is taken back and never held for a yes. "Forget everything" still asks "sure?". Its row is owed.
+Environment=LAMP_MEMORY_UNSURE_NOT_KEPT=on
 # Tiers' ideas in Days (the memory owner's 3 Nov plan, P1 to P4; docs/memory-days.md). The session note keeps the
 # person's tastes and kept facts first (PROFILE): the memory owner's call on 5 Nov, off for the candidate on 6 Nov
 # (#5464), back on after its played check passed on lamp-06c1 with ElevenLabs voices on 6 Nov (PASS bd98421414,
@@ -625,6 +643,16 @@ Environment=LAMP_MEMORY_ROLE=on
 Environment=LAMP_SERVICE_RECORDS=on
 # LAMP_SERVICE_RECORDS_TOLD: its why and rules are its row in docs/switches.md (#6453, #6404).
 Environment=LAMP_SERVICE_RECORDS_TOLD=on
+# LAMP_SERVICE_RECORDS_REMINDERS: its why and rules are its row in docs/switches.md. A reminder set by voice is
+# its creator's linked record; in the private room, the line's known person, else the owner (#7960's ROW).
+Environment=LAMP_SERVICE_RECORDS_REMINDERS=on
+# The linked records (the linked-service memory plan, slices 5 and 8): a skill run's calls kept in the Days memory of
+# the person its held write is read back to, through the linked outbox, and two linked lines in the told note. Their
+# whys and rules are their rows in docs/switches.md. On in the product by the product owner's rule of 18 Nov, everything
+# on by default (#6811), beside #7960's ROW on lamp-06c1. The agent's rows need lamp-services' --run-calls
+# (lamp-services.service). Task, reminder, source and sdk rows stay off until their own ROWs (#7960).
+Environment=LAMP_SERVICE_RECORDS_AGENT=on
+Environment=LAMP_SERVICE_RECORDS_LINKED_TOLD=on
 Environment=LAMP_SERVICE_CONTACTS=on
 Environment=LAMP_SERVICE_REDO=on
 # LAMP_SERVICE_READ_IDS_KEPT: its why and rules are its row in docs/switches.md (#6546).

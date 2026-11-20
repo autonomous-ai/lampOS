@@ -534,6 +534,35 @@ const FAST_STREAM_ENVIRONMENT: &str = "LAMP_EYES_FAST_STREAM";
 /// the path lamp-control reads by default (`lamp-control --frames-socket`).
 const FAST_STREAM_SOCKET: &str = "/run/lampos-eyes/frames.sock";
 
+/// With `LAMP_REMEMBER_SPEAKER` (B3472), the voice and the eyes both set:
+/// a remember asked the other way is refused before any other check. On, a
+/// plain `remember`/`remember_one` is `speaker_required`, so no face is
+/// kept that is not bound to its speaker; off, a speaker-bound one is
+/// `not_understood`. Anything else is `None`.
+#[cfg(any(target_os = "linux", test))]
+fn speaker_refusal(ask: &lamp_eyes::who::Ask, remember_speaker: bool) -> Option<&'static str> {
+    use lamp_eyes::who::Ask;
+    match ask {
+        Ask::RememberSpeaker(_) if !remember_speaker => Some("not_understood"),
+        Ask::Remember(_) | Ask::RememberOne { .. } if remember_speaker => Some("speaker_required"),
+        _ => None,
+    }
+}
+
+/// Whether a frame's near print may be stored as the speaker's anchor
+/// (`LAMP_REMEMBER_SPEAKER`): exactly one face is near, and that face's
+/// passing id (`f3`) is one talking now. A second near face, or a near face
+/// not talking, anchors nothing.
+#[cfg(any(target_os = "linux", test))]
+fn anchors_the_speaker(heights: &[f32], near_id: Option<&str>, talking: &[u32]) -> bool {
+    heights
+        .iter()
+        .filter(|height| **height >= lamp_eyes::who::NEAR_ENOUGH)
+        .count()
+        == 1
+        && near_id.is_some_and(|near| talking.iter().any(|id| near == format!("f{id}")))
+}
+
 /// The frames socket the eyes serve: `--frames-socket` when given, else the
 /// default path with `LAMP_EYES_FAST_STREAM=on`, else none. The eyes' own
 /// cost is nil (9 Nov, lamp-75c9: CPU and look time unchanged with a 640x480
@@ -892,6 +921,14 @@ fn run(arguments: Arguments) -> Result<(), Box<dyn std::error::Error + Send + Sy
                     "lamp-eyes: did not remember a face: its name is someone's whose face it isn't"
                 );
                 serde_json::json!({"error": "not_like_them"})
+            }
+            // Asked to keep only a face it knows (#7704): the voice asks
+            // the face question.
+            Err(who::Refused::NotKnown) => {
+                eprintln!(
+                    "lamp-eyes: did not remember a face: asked for a known face only, it is known as nobody"
+                );
+                serde_json::json!({"error": "not_known"})
             }
             Err(who::Refused::NotAName) => serde_json::json!({"error": "not_a_name"}),
             Err(who::Refused::Store(error)) => {
@@ -1584,7 +1621,11 @@ fn run(arguments: Arguments) -> Result<(), Box<dyn std::error::Error + Send + Sy
                     b'\n',
                     &mut line,
                 );
-                let reply = match ask_of(line.trim_ascii()) {
+                let ask = ask_of(line.trim_ascii());
+                let refused = ask
+                    .as_ref()
+                    .and_then(|ask| speaker_refusal(ask, who.remember_speaker));
+                let reply = match ask {
                     Some(Ask::Who) => match who
                         .known
                         .as_ref()
@@ -1880,12 +1921,7 @@ fn run(arguments: Arguments) -> Result<(), Box<dyn std::error::Error + Send + Sy
                             }
                         },
                     },
-                    Some(Ask::RememberSpeaker(_)) if !who.remember_speaker => {
-                        serde_json::json!({"error": "not_understood"})
-                    }
-                    Some(Ask::Remember(_) | Ask::RememberOne { .. }) if who.remember_speaker => {
-                        serde_json::json!({"error": "speaker_required"})
-                    }
+                    Some(_) if refused.is_some() => serde_json::json!({"error": refused}),
                     Some(Ask::RememberSpeaker(_)) if who.taking.is_some() => {
                         serde_json::json!({"error": "busy"})
                     }
@@ -1928,6 +1964,7 @@ fn run(arguments: Arguments) -> Result<(), Box<dyn std::error::Error + Send + Sy
                         name,
                         replace,
                         apart,
+                        known_only,
                     }) => match plain_name(&name) {
                         Some(name) => {
                             eprintln!(
@@ -1937,6 +1974,7 @@ fn run(arguments: Arguments) -> Result<(), Box<dyn std::error::Error + Send + Sy
                             let mut taking = Taking::new(name, lamp_ipc::monotonic_us());
                             taking.one_face = Some(replace);
                             taking.apart = apart;
+                            taking.known_only = known_only;
                             who.taking = Some((taking, stream));
                             continue;
                         }
@@ -2012,6 +2050,13 @@ fn run(arguments: Arguments) -> Result<(), Box<dyn std::error::Error + Send + Sy
                             .remember(&taking.name, prints, now_unix_s)
                             .map(who::Remembered::plain)
                             .map_err(|error| who::Refused::Store(error.to_string())),
+                        Some(replace) if taking.known_only => who.people.remember_one_known_only(
+                            &taking.name,
+                            prints,
+                            now_unix_s,
+                            replace,
+                            taking.apart,
+                        ),
                         Some(replace) => who.people.remember_one_replacing(
                             &taking.name,
                             prints,
@@ -2936,10 +2981,9 @@ fn run(arguments: Arguments) -> Result<(), Box<dyn std::error::Error + Send + Sy
                             // inference or disk write for enrollment evidence.
                             // The passing id alone does not mean it spoke.
                             if who.remember_speaker
-                                && heights.iter().filter(|h| **h >= NEAR_ENOUGH).count() == 1
                                 && let (Some(face), Some(print), Some(bus)) =
                                     (near_face.as_deref(), print.as_deref(), bus_out.as_ref())
-                                && bus.talking().iter().any(|id| near_id.as_deref() == Some(format!("f{id}").as_str()))
+                                && anchors_the_speaker(&heights, near_id.as_deref(), bus.talking())
                             {
                                 who.speaker_anchors.observe(face, print, frame_us,
                                     lamp_ipc::monotonic_us(), frame_hold, permit.held());
@@ -3452,6 +3496,54 @@ fn run(arguments: Arguments) -> Result<(), Box<dyn std::error::Error + Send + Sy
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// Heron's P3 on #7622: the eyes' own refusal of a remember not bound to
+    /// its speaker, and of a speaker-bound one with the switch off.
+    #[test]
+    fn a_plain_remember_is_speaker_required_with_the_switch_on() {
+        use lamp_eyes::who::{Ask, ask_of};
+        let plain = Ask::Remember("Kesh".into());
+        let one = Ask::RememberOne {
+            name: "Kesh".into(),
+            replace: false,
+            apart: false,
+            known_only: false,
+        };
+        for ask in [&plain, &one] {
+            assert_eq!(speaker_refusal(ask, true), Some("speaker_required"));
+            assert_eq!(speaker_refusal(ask, false), None);
+        }
+        let speaker = ask_of(
+            br#"{"remember_speaker":{"name":"Kesh","face":"b/f1","began_us":1,"ended_us":2,"replace":false,"apart":false}}"#,
+        )
+        .expect("a speaker-bound remember");
+        assert!(matches!(speaker, Ask::RememberSpeaker(_)));
+        assert_eq!(speaker_refusal(&speaker, true), None);
+        assert_eq!(speaker_refusal(&speaker, false), Some("not_understood"));
+        assert_eq!(speaker_refusal(&Ask::List, true), None);
+    }
+
+    /// Heron's P3 on #7622: an anchor is stored only when exactly one face
+    /// is near and it is the one talking.
+    #[test]
+    fn only_the_one_near_face_talking_anchors_the_speaker() {
+        use lamp_eyes::who::NEAR_ENOUGH;
+        let near = NEAR_ENOUGH + 0.05;
+        let far = NEAR_ENOUGH / 2.0;
+        assert!(anchors_the_speaker(&[near], Some("f3"), &[3]));
+        assert!(anchors_the_speaker(&[near, far], Some("f3"), &[3, 4]));
+        // A second near face, even both talking.
+        assert!(!anchors_the_speaker(&[near, near], Some("f3"), &[3]));
+        assert!(!anchors_the_speaker(&[near, near], Some("f3"), &[3, 4]));
+        // The near face is not the one talking.
+        assert!(!anchors_the_speaker(&[near], Some("f3"), &[4]));
+        assert!(!anchors_the_speaker(&[near], Some("f3"), &[]));
+        assert!(!anchors_the_speaker(&[near], None, &[3]));
+        // No near face at all.
+        assert!(!anchors_the_speaker(&[far], Some("f3"), &[3]));
+        // An id that only starts the same is another face.
+        assert!(!anchors_the_speaker(&[near], Some("f31"), &[3]));
+    }
 
     fn args(values: &[&str]) -> Vec<OsString> {
         values.iter().map(OsString::from).collect()

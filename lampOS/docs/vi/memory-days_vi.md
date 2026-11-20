@@ -289,6 +289,32 @@ thấy thì không giữ gì, như trước, nên lời "có" về cách viết 
 ý ghi nhớ. Trước đây lamp giữ "They said: … renunculus" trong khi nói
 "ranunculus", và không hỏi.
 
+Với `LAMP_MEMORY_UNSURE_NOT_KEPT=on` (#7739; tắt nếu không đặt, chỉ đường thứ
+hai; bật trong bản sản phẩm), câu lamp không chắc đã nghe đúng thì không được
+giữ, và lamp không hỏi gì. Đây là quy tắc "không hỏi" của chủ sản phẩm ngày
+18/11: "An unsure line is simply not acted on, with no 'did you say…?'". Sự
+nghi ngờ đến từ chính mô hình, không từ danh sách từ nào phán xét lời người
+nói: lời của vòng trả lời nghi ngờ điều đã nghe, hoặc câu của mô hình có cách
+viết gần với một từ đã nghe. Một `remember` mà chính vòng của nó nghi ngờ thì
+không chạy, và mô hình được báo là không giữ gì, phải nói ngắn gọn cho người
+đó biết, không kèm câu hỏi ("I didn't catch that well enough to keep it."), và
+dừng câu trả lời ở đó, không hỏi gì (không "did you say …?", không bảo nói lại,
+đánh vần hay nói thêm) và không bao giờ nói là
+đã giữ: người nói phải nghe được là chưa lưu, để nói lại (P1 của Twelve trên
+#7966). Một lần giữ mà vòng ngay sau nghi ngờ thì bị quên theo id (cần
+`LAMP_MEMORY_DOUBT_UNDOES`) và không chờ lời "có" nào, nên không cần mắt, và
+một lời "có" sau đó không giữ gì. Vì lần giữ ấy đã được nói lại, lamp nói rõ
+là rốt cuộc chưa lưu: mô hình được báo nếu vòng đó còn gọi lệnh khác, nếu không
+lamp tự nói câu "Sorry, I didn't keep that after all." bằng ngôn ngữ của chủ.
+Với `LAMP_MEMORY_ASK_NEAR_HEARD` bật, lần giữ có từ viết gần từ đã nghe như
+trên thì không chạy và không hỏi gì, chỉ nói câu ấy; khi công tắc đó tắt (bản
+sản phẩm), cách viết gần ("Ngoc" cho "Ngok" nghe được) vẫn được giữ như trước
+(P2 của Twelve). Mô tả của `remember` nói không giữ từ còn nghi ngờ và nói,
+không kèm câu hỏi, là chưa nghe đủ rõ để lưu; ghi chú của `LAMP_KEEP_QUIETLY`
+nói từ còn nghi ngờ thì không giữ và không hỏi. Lần giữ rõ ràng vẫn được giữ
+như trước. Câu hỏi "chắc chưa?" trước "forget everything" vẫn còn. Nhật ký
+chỉ ghi số đếm.
+
 Câu có gọi `remember` hay `forget` không vào nhật ký: nó bị đánh dấu ở ngoài
 (`remember::keep_out`) trước khi lệnh chạy. Với
 `LAMP_REFUSED_KEEP_KEEPS_EXCHANGE=on` (chỉ đường thứ hai; tắt nếu không đặt),
@@ -476,17 +502,21 @@ trường mới, và một lần ghi không nêu trường nào hoạt động n
 
   | Cột | Kiểu | Mặc định | Giới hạn |
   |---|---|---|---|
-  | `source_kind` | `TEXT NOT NULL`, `CHECK` trong `voice`, `task`, `agent`, `reminder` | `'voice'` | một trong bốn |
+  | `source_kind` | `TEXT NOT NULL`, `CHECK` trong `voice`, `task`, `agent`, `reminder`, `sdk` | `'voice'` | một trong năm |
   | `source_ref` | `TEXT NOT NULL`, một object JSON | `'{}'` | tối đa 512 byte |
   | `summary` | `TEXT NOT NULL` | `''` | tối đa 160 byte |
   | `deed_unix_ms` | `INTEGER`, null ở bản ghi cũ | null | thời điểm tính bằng ms |
 
   Cùng chỉ mục `service_records_kind(person, source_kind, changed_unix_ms)`.
+  Bảng đã mở ở lát 1 có `CHECK` của `source_kind` chưa có `sdk`; cùng giao
+  dịch đó dựng lại bảng một lần (`allow_sdk`: bảng mới từ `sql` đã lưu có
+  thêm `sdk`, chép mọi dòng, xóa bảng cũ, đổi tên bảng mới, tạo lại chỉ mục
+  và trigger), đếm số dòng trước và sau, lệch là lần mở thất bại.
 - **`service_record`** nhận thêm bốn trường tùy chọn: `source_kind`,
   `source_ref`, `summary` và `deed_unix_ms`. Không có trường nào (voice cũ)
   thì bản ghi là `voice`, như mọi bản ghi trước đây. Loại không biết bị từ
   chối `bad_kind`, lần ghi đổi loại của một bản ghi đã giữ cũng vậy. Loại
-  liên kết (`task`, `agent`, `reminder`) phải gửi `source_ref` ở mọi lần
+  liên kết (`task`, `agent`, `reminder`, `sdk`) phải gửi `source_ref` ở mọi lần
   ghi; bản ghi `voice` thì tùy. `source_ref` là
   `{service, id, session?, computer?}`: object chỉ gồm các trường đó, mỗi
   trường là chữ không có ký tự điều khiển, `service` và `id` không rỗng, tối
@@ -611,8 +641,18 @@ mỗi thay đổi thành một `service_record` có `source_kind`, `source_ref`,
 riêng: dòng việc Harness (`LAMP_SERVICE_RECORDS_TASKS`, lát 3,
 [tasks_vi.md](tasks_vi.md)); dòng lời nhắc (`LAMP_SERVICE_RECORDS_REMINDERS`,
 [schedule.md](../schedule.md)); các lệnh gọi của lượt chạy kỹ năng
-(`LAMP_SERVICE_RECORDS_AGENT`, phần 5, [services_vi.md](services_vi.md)). Khi
+(`LAMP_SERVICE_RECORDS_AGENT`, phần 5, [services_vi.md](services_vi.md));
+`LAMP_SERVICE_RECORDS_SDK` bên dưới. Khi
 `LAMP_SERVICE_RECORDS` tắt thì không giữ gì.
+
+Các dòng của agent (`LAMP_SERVICE_RECORDS_AGENT`, cùng `--run-calls` của
+lamp-services) và giới hạn kể (`LAMP_SERVICE_RECORDS_LINKED_TOLD`) bật trong
+sản phẩm từ 19/11 (`lamp-voice.service`), theo quy tắc của chủ sản phẩm ngày
+18/11 là mọi thứ bật mặc định
+(https://github.com/autonomous-ai/lampOS/issues/6811#issuecomment-6977525471), các bước riêng của chúng
+còn nợ (ROW của #7960 đạt các bước bản ghi kết nối bên cạnh). Dòng việc, dòng lời nhắc, dòng sdk và công cụ tìm nguồn
+vẫn tắt cho tới ROW riêng; `linked.sock` (`LAMP_MEMORY_LINKED_SOCKET`) vẫn
+tắt: chưa có gì ghi vào nó, và trình cài đặt chưa tạo nhóm `lampos-linked`.
 
 - **Giới hạn riêng.** Tối đa 16 thay đổi chờ, tách khỏi 32 của bản ghi
   connector, để một loạt tin việc hay lời nhắc không bao giờ đẩy mất bản ghi
@@ -646,6 +686,41 @@ riêng: dòng việc Harness (`LAMP_SERVICE_RECORDS_TASKS`, lát 3,
 - **Quay về bản cũ.** Chỉ dòng việc gọi tới, sau công tắc riêng của nó, nên
   voice cũ chỉ khác ở chỗ không có dữ kiện `linked_dropped` và không có
   dòng việc.
+
+### Kể bản ghi liên kết: giới hạn (lát 8, `LAMP_SERVICE_RECORDS_LINKED_TOLD` của voice, bật trong sản phẩm)
+
+Khi `LAMP_SERVICE_RECORDS_LINKED_TOLD=on` cùng `LAMP_SERVICE_RECORDS_TOLD`
+và `LAMP_SERVICE_RECORDS` (chỉ tuyến thứ hai,
+`process::service_records_linked_told_worker_environment`; `lamp-voice`
+`service_records::told::linked_on`), bản ghi liên kết được kể tách khỏi bản
+ghi connector, mỗi loại có giới hạn riêng:
+
+- **Ghi chú thường trực.** Bản ghi connector như trước, rồi tối đa 2 dòng
+  liên kết thay đổi trong 24 giờ qua, mới nhất trước, mỗi dòng gắn nhãn
+  loại kèm khóa: "[task] Book the dentist · done · today 15:40 · key
+  t-s1-7", với quy tắc "Lines tagged [task], [agent] or [reminder] are work
+  handed on for the owner, with its one-line summary only: never add to
+  it." và, khi kể đầy đủ có cấp `record_source`, "For more of one, call
+  record_source with its key." Dòng liên kết không bao giờ bị bỏ vì giới hạn
+  1.900 byte của ghi chú; dòng connector bị bỏ trước. Chúng lấy từ những gì
+  hộp chờ liên kết đã đưa vào (16 cái gần nhất, chỉ trong RAM) và, sau khi
+  khởi động, từ danh sách bản ghi của chủ mà memory trả về, danh sách này
+  không bao giờ đưa bản ghi liên kết vào sổ của bản ghi connector.
+- **Recall.** Hỏi memory 10 bản ghi theo các từ, không phải 5, kèm
+  `linked_most` 3: sau 3 bản ghi liên kết khớp nhất, memory bỏ qua bản ghi
+  liên kết, nên dù bao nhiêu bản ghi liên kết mới hơn cũng khớp, chúng không
+  bao giờ chiếm chỗ của bản ghi connector trong 10. Trong số đó, mọi bản ghi
+  connector tìm thấy được kể trước, tối đa 5, bản ghi liên kết lấp chỗ còn
+  lại, tối đa 3, nên bản ghi liên kết không bao giờ đẩy mất bản ghi
+  connector. Giữ thứ tự của memory; bản ghi liên kết được kể bằng dòng của
+  nó, loại, trạng thái, thời điểm và khóa.
+- **Có người khác.** Không đầy đủ (cổng của bản ghi được kể), dòng liên kết
+  và bản ghi liên kết của recall chỉ nói loại, trạng thái và thời điểm, không
+  tóm tắt hay khóa, kèm `BRIEF`.
+- **Quên.** Quên tất cả, quên người, hay quên về một điều khớp với tóm tắt
+  đều lấy đi các dòng liên kết đang giữ, như với các thay đổi đang chờ.
+- **Tắt.** Không đổi gì: không có dòng liên kết, recall hỏi 5 và kể những gì
+  tìm thấy như trước, danh sách của memory được gộp như trước.
 
 ### Tìm nguồn: `record_source` (lát 7, `LAMP_SERVICE_RECORDS_SOURCE` của voice, tắt)
 
@@ -703,6 +778,54 @@ ghi ("kể thêm đi", "nó nói gì?"), nó lấy thứ bản ghi trỏ tới t
   là `timed_out`. Tắt (công tắc nào cũng vậy) thì không cấp công cụ và
   không ai chạy.
 
+### Số lần đổi ghi chú mỗi ngày của một máy tính đã ghép đôi (`sdk`, `LAMP_SERVICE_RECORDS_SDK`, tắt)
+
+Dòng tracker C157 (quyết định của chủ bộ nhớ và cái gật đầu của builder
+đầu tiên, 17/11 trên #6811): mỗi ngày một bản ghi liên kết cho mỗi máy tính
+lập trình mà chủ nhân ghép đôi từ app, "The paired computer Dev laptop
+changed its notes 4 times on 2026-11-17". Chỉ là con số: không bao giờ có
+khóa của ghi chú, tên khóa hay giá trị.
+
+- **Phía bộ nhớ.** `sdk` là loại nguồn thứ năm. Bản ghi `sdk` chỉ là một
+  con số: service `sdk`, action `notes_changed`, trạng thái `done`, không
+  có `detail`, `reason`, `result_id`, `links` hay `replaced_by`; khác đi
+  thì bị từ chối `bad_detail`, nên không khóa hay giá trị ghi chú nào của
+  máy tính có thể được lưu vào đó. Khác các bản ghi đã chốt, lần ghi sau
+  cùng khóa (con số cao hơn trong ngày) cập nhật tại chỗ tóm tắt,
+  `source_ref`, thời điểm việc làm và thời điểm đổi; trạng thái vẫn là
+  `done`. Nó chịu giới hạn theo loại (2.000) và quy tắc quên theo thời điểm
+  việc làm; quên hết, quên người và quên về một điều khớp với tóm tắt đều
+  xóa nó như mọi dòng.
+- **Con số.** lamp-control đếm mỗi `notes.set` hay `notes.delete` đã giữ
+  (xóa một khóa không có thì không tính) của từng máy tính theo ô 15 phút,
+  chỉ trong bộ nhớ, 25 giờ gần nhất, gồm số lần và thời điểm lần đổi cuối
+  (`notes::Notes::changes_since`); thu hồi máy tính thì xóa chúng. Socket
+  của chủ nhân trả lời `{"note_changes": {"since_unix_ms": N}}` cho riêng
+  voice (theo cgroup), bằng `{"computers": [{client, name, changes,
+  last_unix_ms}]}`, chỉ cho các máy tính mà tệp phụ đánh dấu là ghép đôi từ
+  app của chủ nhân (`paired-by.json`, control.md, "Notes").
+- **Của ai.** Lần ghép đôi được tệp phụ đánh dấu `app`, đúng `paired_at` của
+  lần ghép đó, là của chủ nhân; mã `lamp-control code` của người giữ máy,
+  dấu đã cũ, agent cục bộ hay không có tệp phụ thì không có con số nào. Dòng
+  được giữ dưới id bộ nhớ của chủ nhân (`person::owner_ids`, id `p-` đầu
+  tiên); không biết chủ nhân thì không giữ gì.
+- **Phía voice** (`service_records::sdk_counts`, tuyến thứ hai). Cứ 5 phút
+  một luồng riêng hỏi lamp-control (mỗi chiều tối đa 1 giây) và đưa qua hộp
+  chờ liên kết một dòng cho mỗi máy tính có con số cao hơn lần đưa trước:
+  khóa `s-<client>-<YYYYMMDD>` (ngày địa phương của đèn), `source_ref`
+  `{service: "sdk", id: <client>, computer: <tên máy, bỏ ký tự điều khiển,
+  tối đa 64 byte>}`, thời điểm việc làm là lần đổi cuối được đếm. Nó đếm từ
+  mốc muộn nhất trong nửa đêm địa phương, lúc voice khởi động và lần quên
+  hết gần nhất của chủ nhân, nên con số không bao giờ tính lùi qua một lần
+  quên; khởi động lại một trong hai phần thì đếm lại từ đầu ngày (có thể
+  đếm thiếu, không bao giờ đếm thừa).
+- **Tắt.** Trừ khi `LAMP_SERVICE_RECORDS_SDK=on` cùng
+  `LAMP_SERVICE_RECORDS=on`, không hỏi, không giữ và không ghi gì.
+- **Quay về bản cũ.** lamp-control cũ trả lời op bằng `error`, và không giữ
+  gì. Bộ nhớ đã được migrate bởi bản có `CHECK` bốn loại (lát 1 trước thay
+  đổi này, chưa từng có trong sản phẩm) giữ `CHECK` đó, nên từ chối dòng
+  `sdk` và không giữ gì.
+
 ## Danh bạ dịch vụ (`service_contact`, `LAMP_SERVICE_CONTACTS` của voice)
 
 Công tắc `LAMP_SERVICE_CONTACTS` của voice (mặc định tắt, bật trong sản
@@ -733,6 +856,99 @@ bị quên: không hết hạn, tidy hay nightly không đọc bảng này; `for
 `forget_person` xóa chúng (đếm trong `removed`). Tối đa 2.000 liên hệ một
 người, liên hệ thay đổi lâu nhất bị bỏ trước khi vượt quá. Memory cũ trả
 `unknown_op`, nên voice chỉ gửi chúng khi công tắc của nó bật.
+
+## Lịch sử trên tài khoản (`LAMP_HISTORY_SEND` của voice, #7771, tắt)
+
+Quyết định của chủ sản phẩm ngày 18/11: các cuộc trò chuyện của một người với
+lamp cũng được giữ trên máy chủ của chúng ta. Với `LAMP_HISTORY_SEND=on` (chỉ
+tuyến thứ hai, chỉ truyền cho worker đó; lượt của tuyến Live không bao giờ được
+lưu), voice lưu mỗi lượt trao đổi mà bộ nhớ Days đã ghi vào kho lịch sử của tài
+khoản (Backend3, 19/11): `POST <base>/history/turns` với khóa của lamp trong
+`x-api-key`, thân `{"turns":[{"id","at","person","heard","said"}]}`.
+
+- **Gửi gì:** chỉ một lượt mà `append_linked` đã trả lời kèm id, trong phạm vi
+  của một người đã biết (`p-…`) hoặc của phòng: câu nghe được, câu trả lời của
+  lamp, lúc nào (`at`, UTC), và nó thuộc phạm vi của ai. `person` là id bộ nhớ
+  của người đã biết, hoặc rỗng cho phòng. Không có âm thanh, hình ảnh, điều đã
+  giữ, quan sát hay quy tắc. Những gì bộ nhớ không ghi thì không bao giờ được
+  gửi: lượt giữ hay quên, câu được mang theo, câu bị giữ vì khoảng trống của
+  khuôn mặt, câu làm trước một lệnh quên, câu có nguồn đã bị quên.
+- **Một lần đọc dịch vụ liên kết** (thư, lịch, một trang): luồng hội thoại chỉ
+  giữ `(read from a linked service; not kept)` làm câu trả lời cho bộ nhớ, và
+  một lượt trong yêu cầu có lần đọc dịch vụ cũng được lưu với chỗ giữ chỗ đó,
+  không bao giờ là nội dung đã đọc.
+- **Id** là `<epoch>.<scope>:<exchange id>` (`lamp_msgs::history_turn_id`, hàm
+  duy nhất tạo ra nó, mà câu trả lời quên của bộ nhớ cũng dùng):
+  `0a1b2c3d.p-0123456789abcdef:12`, hoặc `0a1b2c3d.everyone:7` cho phòng.
+  `<epoch>` là epoch của kho Days (`{"op":"history_epoch"}`), 8 chữ số hex viết
+  thường, tạo khi cơ sở dữ liệu được tạo và tạo lại khi kho bị xóa sạch hay đặt
+  lại, nên các lượt mới của lamp đã xóa sạch hay đặt lại không bị coi là đã lưu,
+  cũng không bị một tombstone cũ từ chối. Voice đọc nó khi khởi động và đọc lại
+  sau mỗi lệnh quên; khi nó đổi, các lượt chưa gửi chờ lần khởi động sau và các
+  mốc bắt đầu lại dưới epoch mới. Kho coi việc gửi lại một id là không làm gì,
+  nên thử lại luôn an toàn.
+- **Hai lệnh của bộ nhớ cho việc này:** `{"op":"history_issued"}` trả lời
+  `{"ok":true,"epoch":"<8 hex>","issued":{"<scope>":<id cuối>}}`, id cuối đã cấp
+  của mỗi phạm vi (`next_id - 1`), không bao giờ có lời. `{"op":"exchanges_after",
+  "person":…,"after":N,"limit":L}` trả lời các lượt của phạm vi đó sau id N, cũ
+  nhất trước, dạng `{"ok":true,"exchanges":[{"id","at_unix_ms","heard","said"}],
+  "more":bool}`: tối đa L (mặc định 20, nhiều nhất 100), dừng khi đã đưa khoảng
+  48 KiB chữ, luôn ít nhất một.
+- **Câu của phòng chờ** đến khi cuộc trò chuyện kết thúc: với
+  `LAMP_MEMORY_FOLLOWS_FACE`, một câu của phòng có thể chuyển sang phạm vi của
+  người gọi với id mới (`adopt`) cho đến lúc đó. Câu đã chuyển được gửi là của
+  người đó với id mới; phần còn lại được gửi là của phòng khi cuộc trò chuyện kết
+  thúc. Câu bị giữ 30 phút thì chờ lần khởi động sau.
+- **Một lệnh quên** nói trên lamp giữ lại mọi lần POST, kể cả lần đầu, cho đến
+  khi bộ nhớ trả lời nó (tối đa 15 giây). Các lượt mà câu trả lời nêu là đã xóa
+  (`exchanges`, theo phạm vi, dạng turn id: câu trả lời của phần quên) được bỏ và ghi nhớ là đã
+  quên (4.096 cái gần nhất), nên một lần lưu nêu một id như vậy bị bỏ trước mọi
+  POST, kể cả lần thử lại hay phần gửi bù khi khởi động: hàng rào riêng của lamp,
+  bên cạnh tombstone của máy chủ. Quên hết thì quên mọi id đã đưa trong phạm vi
+  đó đến lúc ấy. Khi câu trả lời không nêu id nào (hoặc không có câu trả lời),
+  các lượt chưa gửi của người quên và của phòng chờ lần khởi động sau, khi bộ nhớ
+  không còn giữ những gì đã đi. Lượt chưa gửi của người khác không bao giờ bị
+  bỏ. Mọi câu trả lời của bộ nhớ mà voice đọc có turn id trong `exchanges` (cả
+  năm lệnh quên, `history_forget::answered`) đều đến `history_send::deleting`,
+  nên các id đó không bao giờ được POST, dù `LAMP_HISTORY_FORGET` thế nào. Một
+  lệnh quên về một điều cũng giữ lại rồi thả các lần POST như mọi lệnh quên
+  khác. Một nguồn bị quên bên ngoài voice được coi như một lệnh quên không nêu
+  id của người đó.
+- **Không mất gì khi khởi động lại, và không có lời nào trên đĩa:** chỉ có id
+  được giữ, trong `/var/lib/lampOS/voice/history-marks.json` (0600,
+  `{"epoch","marks":{scope:id},"offered":{scope:id}}`, ghi nguyên tệp, ngoài
+  đường của lượt nói): một mốc cho mỗi phạm vi, id cuối máy chủ đã nhận mà không
+  còn id nào trước nó chưa gửi, và id cuối đã trao cho luồng gửi trong mỗi phạm
+  vi, ghi trước lần POST mang nó. Khi khởi động, luồng gửi hỏi bộ nhớ
+  `history_issued` (đến khi nó trả lời; không POST gì trước đó), gửi những gì bộ
+  nhớ đã giữ sau mỗi mốc cho đến id đã trao, bằng `exchanges_after`, với cùng
+  các id, rồi dời mọi mốc lên id mới nhất của bộ nhớ. Bộ nhớ vẫn là bản duy nhất
+  của lời. Vì vậy ở mọi lần khởi động, không chỉ lần đầu, những gì được giữ
+  trong lúc không có luồng gửi nào chạy không bao giờ được gửi: công tắc tắt,
+  tuyến Live, hay voice không chạy. Một epoch khác với epoch của các mốc (lần
+  khởi động đầu, hoặc sau đặt lại) bắt đầu các mốc ở những gì bộ nhớ đang giữ.
+- **Gửi đến đâu:** chỉ API đám mây của chính lamp, máy chủ relay mà
+  `llm_base_url` của tuyến nêu (`https://campaign-api.autonomous.ai/api/v1/ai`,
+  có hoặc không có `/v1`; `history_send::url`). Với base của một nhà cung cấp
+  trực tiếp, HTTP thường hay máy chủ khác, không có gì khởi động và không có gì
+  được gửi. Không có khóa (đã đăng xuất) thì không khởi động, ghi nhật ký một
+  lần; đăng nhập sau khi worker đã chạy thì bắt đầu ở lần worker khởi động sau.
+- **Không bao giờ nằm trên đường của lượt nói:** luồng ghi của bộ nhớ, vốn đã
+  tách khỏi câu trả lời, trao mỗi lượt dưới một khóa ngắn, không I/O. Một luồng
+  riêng gửi chúng theo thứ tự, tối đa 20 lượt mỗi lần gọi, mỗi đoạn chữ cắt còn
+  8 KB ở cuối một ký tự; một lần gọi lỗi (không trả lời, 408, 429 hay 5xx) được
+  thử lại với cùng các id, tổng cộng 6 lần, thời gian chờ gấp đôi từ 2 giây đến
+  60 giây, rồi chờ lần khởi động sau. Một 2xx `{"enabled":false}` (công tắc của
+  kho tắt) hay một lời từ chối khác thì không thử lại. Tối đa 200 lượt chờ (quá
+  thì lượt cũ nhất chờ lần khởi động sau) và 64 câu của phòng được giữ. Nhật ký
+  chỉ có số đếm, không bao giờ có lời, id hay khóa.
+- **Quyền riêng tư:** những gì đã nói trước khi công tắc riêng tư đóng vẫn có
+  thể được gửi trong lúc nó đóng; khi đó không có lời mới nào nói với lamp.
+- **Tắt trong mọi unit:** theo các phán quyết của người xây dựng đầu tiên
+  (#7935, và 17:09 trên #7957), phần lưu chỉ bật trong sản phẩm sau khi phần quên
+  (`LAMP_HISTORY_FORGET`) đã bật, cùng hàng kiểm tra của nó. Câu thông báo trong
+  phần cài đặt mà issue ban đầu yêu cầu đã được chủ sản phẩm bỏ (18/11): thông
+  báo nằm trong chính sách quyền riêng tư.
 
 ## Vai được giao (`role`, `LAMP_MEMORY_ROLE`)
 
@@ -1258,16 +1474,20 @@ xoá; lệnh được giữ như một lệnh quên theo id của điều ấy
 báo hỏi một lần, chỉ nêu chủ đề bằng chính lời của họ, bằng ngôn ngữ của họ
 («Mình có nên quên điều đã giữ về mã khóa xe của bạn không?»). Nội dung đã giữ
 không bao giờ được báo cho mô hình hay nói ra: người nói không được nhìn thấy
-(P2 của Reviewer-lead trên #6673). Chỉ một lời «có» rõ ràng ở câu sau trong vòng 30 giây
+(P2 của Reviewer-lead trên #6673). Chỉ lời «có» của họ ở câu sau trong vòng 30 giây
 (`remember::ONE_FACE_FORGET_YES_FOR`), của cùng người trong cùng phiên, khi
 thấy mặt họ nói, hoặc trong phòng riêng (`LAMP_PRIVATE_ROOM`) trên một câu là
 của họ vì mặt họ một mình trong khung, mới chạy đúng lệnh quên theo id ấy
 trong phạm vi của họ (`ScopeLease::mark_forget_agreed`, không bao giờ
-`forget_last`). Lời «có» cũng có thể nói luôn việc quên
-(`known_faces::plain_agreement_to_forget`, P2 của Thirteen trên #6673): «Yes,
-forget it.», «Ừ, quên đi.», «Vâng, quên đi ạ.», và cả việc quên nói lại một
-mình, «Forget it.» hay «Quên đi.», vốn chỉ được đọc như câu trả lời cho câu hỏi
-ấy, của người ấy, trong 30 giây ấy. Một lời «có» sau 30 giây ấy được ghi
+`forget_last`). **Câu ấy có phải lời «có» hay không do mô hình phán đoán, không
+có danh sách từ «có»** (quy tắc ngày 13/11 của chủ sản phẩm; phán quyết của
+first builder về bước (e) trong ROW của #7960, khi «Lamp, yes.» bị nghe thành
+«Loan. Yes.» và lệnh quên bị mất): lệnh `forget` của mô hình trên câu ấy, không
+nêu thứ gì khác, là lời «có», và lệnh quên đang giữ chạy thay nó đúng như đã
+giữ, theo id và lời đã giữ, không bao giờ theo lệnh gốc của mô hình
+(`second_provider::agree_held_forget`). Câu mà mô hình không gọi `forget` thì
+không chạy gì và điều ấy vẫn được giữ; một `forget` nêu thứ khác là lệnh quên
+khác ấy. Một lời «có» sau 30 giây ấy được ghi
 journal là "too late", dù lúc đó câu là của ai; một lời không phải của họ ghi
 lý do sau "not the same person": "no one known on the line" (không ai được
 nhận ra trên câu), "theirs, in a later session" (của họ, ở phiên sau) hoặc
@@ -1276,10 +1496,42 @@ ghi id; hàng của Thirteen trên #5627, một lời «có» 42 giây sau khi g
 là của người khác). Một lời «có» kịp lúc mà không ai được nhận ra trên câu
 (không có mặt trong khung, một khuôn mặt lạ, một câu được mang theo trong cuộc
 trò chuyện đang diễn ra của họ) bị bỏ và điều ấy vẫn được giữ; như với lời
-«có» không thấy miệng, mô hình được báo một lần rằng lời ấy không tính, không
+«có» không thấy miệng, mô hình được báo rằng lời ấy không tính, không
 gì bị quên và điều ấy vẫn được giữ, và nó có thể hỏi họ một lần nói lại khi
 nhìn vào đèn (`remember::unknown_yes_told`, #7454: trên lamp-06c1 mô hình
-không được báo gì và có thể nói là đã quên). Bất kỳ lời «không», «giữ», «khoan»,
+không được báo gì và có thể nói là đã quên). Cùng lời báo ấy được nói cho mọi lệnh
+quên đang giữ mà lời «có» bị bỏ vì quá muộn, vì không ai được nhận ra hoặc vì
+là của họ ở phiên sau: câu kế tiếp của một lệnh quên một khuôn mặt sau 30 giây,
+một lệnh quên đang giữ không phải một khuôn mặt, và một lệnh quên khuôn mặt được
+giữ qua lần đánh vần của họ (#7478). Một lời «có» bị bỏ vì là của một người quen
+khác chỉ được báo rằng lời ấy không phải của họ để đồng ý và không gì bị quên,
+không nói gì về điều đang giữ, vì lời «có» không phải của người sở hữu nó
+(`remember::not_theirs_told`); một lời «có» muộn cũng được xét là của ai, nên
+lời «có» muộn của người khác được báo lời ấy. **Trên câu của một lệnh quên một
+khuôn mặt, và trên lần đánh vần mà một lệnh quên khuôn mặt được giữ qua, câu nào
+cũng lấy lệnh giữ, nên các lời báo này (và lời báo của một lời «có» không thấy
+miệng) chỉ được nói khi lượt của mô hình trên câu ấy gọi lệnh quên đang giữ,
+không nêu thứ gì khác**: cùng cửa với `Taken::Agrees`
+(`second_provider::told_on_forget`, `Taken::OnForget`, P2 của Reviewer-lead
+trên #7490). Lời báo là câu trả lời cho lệnh gọi ấy và lệnh gọi không chạy gì.
+Câu mà mô hình trả lời không có `forget` («Chào buổi sáng.» một giờ sau, một
+câu không liên quan của người khác, một câu hỏi của người lạ trong 30 giây)
+không được báo gì, và lệnh giữ mất như trước. Một lệnh quên đang giữ không
+phải một khuôn mặt vẫn cần một lời «có» rõ ràng trước, và lời báo của nó được
+nói trước vòng 1. Một lần đánh vần bị bỏ được báo là lần đánh vần, không bao giờ
+là lời «có» (`remember::THAT_SPELLING`), và một câu muộn của người không ai
+nhận ra không nêu loại điều đang giữ hay lệnh gọi của nó
+(`remember::unknown_late_told`; các P3 trên #7490). Với lần đánh vần, quá muộn
+cũng được xét trước là của ai, như trên câu một khuôn mặt. Lời «có» bị bỏ của
+một lệnh giữ thì không được báo. **Lệnh giữ có đồng hồ riêng:** quá thời hạn
+của nó (30 giây với một khuôn mặt, `HELD_FORGET_FOR` 60 giây với loại khác)
+cộng `remember::HELD_FORGET_GRACE` (15 giây), câu kế tiếp bỏ nó một cách lặng
+lẽ, journal chỉ ghi tên lệnh gọi và số giây: không gì chạy, điều ấy vẫn được
+giữ, không báo gì, và câu ấy đi như một câu thường. Nên «quên mã khóa xe đạp
+của tôi» một giờ sau một câu hỏi không được trả lời là một yêu cầu mới, được
+giữ và hỏi hoặc chạy như mọi lệnh quên, không bao giờ là một lời «có» muộn
+(người xây dựng đầu tiên trên #7490). Chỉ câu trong thời hạn cộng thời gian ân
+hạn ấy mới có thể được báo một trong các lời báo trên. Bất kỳ lời «không», «giữ», «khoan»,
 «đừng» hay một câu hỏi đều không phải lời «có». Nếu lúc lệnh quên chạy câu
 không còn là của họ (một khuôn mặt hay giọng khác xuất hiện), không gì bị quên
 và mô hình được báo điều ấy vẫn được giữ; nó không bao giờ chạy trong phạm vi

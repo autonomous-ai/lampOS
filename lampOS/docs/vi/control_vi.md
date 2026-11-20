@@ -137,3 +137,17 @@ về, với quyền `-read` qua Harness), nơi giữ giờ yên lặng và mở 
 lúc hỏi ([tasks.md](../tasks.md)). Lời `hello` của run nói khung giờ trong
 `limits` (`quiet_hours`: `{"from": "22:00", "to": "07:00"}`). Máy tính đã ghép đôi vẫn theo
 `--quiet-hours` (mặc định tắt). Ghi vào journal lúc khởi động.
+
+## Số lần đổi ghi chú cho bộ nhớ của chủ nhân (C157)
+
+lamp-control đếm mỗi `notes.set` hay `notes.delete` đã giữ của từng máy tính
+(ô 15 phút, 25 giờ gần nhất, chỉ trong bộ nhớ, chỉ con số và thời điểm lần đổi
+cuối, không bao giờ là khóa nào); thu hồi máy tính thì xóa con số. Socket của
+chủ nhân trả lời `{"note_changes": {"since_unix_ms": N}}` cho riêng voice, chỉ
+cho các máy tính mà tệp phụ `<state-dir>/paired-by.json` đánh dấu là ghép đôi
+từ app của chủ nhân: `{"v": 1, "clients": {"c_…": {"by": "app", "paired_at":
+<giây Unix>}}}`, tệp thường (không phải link), tối đa 64 KiB, 0600. Chỉ
+`"by": "app"` được tính, và chỉ khi `paired_at` trùng với của máy tính trong
+`clients.json`; mã `lamp-control code` của người giữ máy là `"keeper"` hoặc
+không có trong tệp. Bản dựng này chỉ đọc tệp; phía ghép đôi ghi nó. Chi tiết ở
+[control.md](../control.md), "Notes", và memory-days.md.

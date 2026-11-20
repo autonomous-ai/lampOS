@@ -556,6 +556,12 @@ pub(crate) fn read_told(request: u64) {
     }
 }
 
+/// Tests: a linked service's read answered in `request`, on this thread.
+#[cfg(test)]
+pub(crate) fn read_answered_for_test(request: u64) {
+    read_answered(request);
+}
+
 fn read_answered(request: u64) {
     kept::read_in(|reads| {
         if !reads.contains(&request) {

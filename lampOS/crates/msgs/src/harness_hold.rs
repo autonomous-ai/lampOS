@@ -77,6 +77,71 @@ pub fn harness_hold(switch: Option<&str>, lamp_update_exec_start: Option<&str>) 
     }
 }
 
+/// The variable that keeps Harness's home in `~/.harness` (#7906):
+/// Harness 0.6.72 (openharness#4469) moves `~/.harness` into the XDG
+/// folders at a daemon start unless a name in its `OVERRIDE_NAMES`
+/// (`cli/src/homeMove/conditions.ts`) points inside it (`skipped-override`).
+pub const DATA_DIR: &str = "ADAPTER_DATA_DIR";
+/// Its value under Harness's home, Harness's own default
+/// (`harnessPath('cli') + '/data'`, `cli/src/config/env.ts`).
+pub const HARNESS_DATA: &str = ".harness/cli/data";
+
+/// `ADAPTER_DATA_DIR=<data>` and its newline: the one line `harness-hold.env`
+/// carries for Harness's data folder (#7906), written alike by lamp-tasks
+/// (crates/tasks/src/hold.rs) and lamp-update after an install or a move
+/// (crates/update/src/harness_install/launcher.rs).
+pub fn data_line(data: &str) -> String {
+    format!("{DATA_DIR}={data}\n")
+}
+
+/// `text`, an env file's words, with [`data_line`] of `data` last (#7906):
+/// any earlier `ADAPTER_DATA_DIR=` line taken out, every other line kept
+/// as it is, a last line with no newline given one.
+pub fn with_data_line(text: &str, data: &str) -> String {
+    let mut kept = String::new();
+    for line in text.split_inclusive('\n') {
+        if line.starts_with(&format!("{DATA_DIR}=")) {
+            continue;
+        }
+        kept.push_str(line);
+        if !line.ends_with('\n') {
+            kept.push('\n');
+        }
+    }
+    kept.push_str(&data_line(data));
+    kept
+}
+
+/// Which sign says Harness's home under `home` was moved to the XDG
+/// folders after all (#7906): Harness's bridge record, its data root's
+/// marker, or an entry of `~/.harness` left as a link. `None` when none is
+/// there. Nothing is moved back.
+pub fn home_moved(home: &std::path::Path) -> Option<&'static str> {
+    if home.join(".local/state/harness/bridge.json").exists() {
+        return Some(".local/state/harness/bridge.json");
+    }
+    if home.join(".local/share/harness/.harness-root").exists() {
+        return Some(".local/share/harness/.harness-root");
+    }
+    let link = |entry: &str| {
+        std::fs::symlink_metadata(home.join(".harness").join(entry))
+            .is_ok_and(|meta| meta.file_type().is_symlink())
+    };
+    if link("runtime") {
+        return Some(".harness/runtime is a link");
+    }
+    if link("cli") {
+        return Some(".harness/cli is a link");
+    }
+    None
+}
+
+/// The one fixed line said when [`home_moved`] finds a sign.
+pub fn home_moved_line(home: &std::path::Path) -> Option<String> {
+    home_moved(home)
+        .map(|sign| format!("harness: home moved to XDG ({sign}): lampOS paths need ~/.harness"))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -134,5 +199,50 @@ mod tests {
                 assert_eq!(harness_hold(switch, exec.as_deref()), HarnessHold::Off);
             }
         }
+    }
+
+    /// #7906: the env file's data line put last, once, every other line kept.
+    #[test]
+    fn the_data_line_is_put_last_once_and_other_lines_are_kept() {
+        let data = "/var/lib/lampos-tasks/.harness/cli/data";
+        let line = format!("ADAPTER_DATA_DIR={data}\n");
+        assert_eq!(data_line(data), line);
+        assert_eq!(with_data_line("", data), line);
+        let held = "ADAPTER_UPDATE_DISABLE=true\nHERMES_HOME=/h\n";
+        assert_eq!(with_data_line(held, data), format!("{held}{line}"));
+        assert_eq!(
+            with_data_line("ADAPTER_DATA_DIR=/old\nSHELL=/bin/sh", data),
+            format!("SHELL=/bin/sh\n{line}")
+        );
+        let done = with_data_line(held, data);
+        assert_eq!(with_data_line(&done, data), done);
+    }
+
+    #[test]
+    fn each_sign_of_a_moved_home_is_said_and_none_without() {
+        let home = std::env::temp_dir().join(format!("lampos-home-moved-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&home);
+        let at = home.as_path();
+        std::fs::create_dir_all(at.join(".harness/cli/data")).unwrap();
+        std::fs::create_dir_all(at.join(".harness/runtime")).unwrap();
+        assert_eq!(home_moved(at), None);
+        assert_eq!(home_moved_line(at), None);
+        std::fs::remove_dir_all(at.join(".harness/cli")).unwrap();
+        std::os::unix::fs::symlink(at.join(".local/share/harness/cli"), at.join(".harness/cli"))
+            .unwrap();
+        assert_eq!(home_moved(at), Some(".harness/cli is a link"));
+        std::fs::remove_dir(at.join(".harness/runtime")).unwrap();
+        std::os::unix::fs::symlink("/elsewhere", at.join(".harness/runtime")).unwrap();
+        assert_eq!(home_moved(at), Some(".harness/runtime is a link"));
+        std::fs::create_dir_all(at.join(".local/share/harness")).unwrap();
+        std::fs::write(at.join(".local/share/harness/.harness-root"), b"").unwrap();
+        assert_eq!(home_moved(at), Some(".local/share/harness/.harness-root"));
+        std::fs::create_dir_all(at.join(".local/state/harness")).unwrap();
+        std::fs::write(at.join(".local/state/harness/bridge.json"), b"{}").unwrap();
+        assert_eq!(
+            home_moved_line(at).unwrap(),
+            "harness: home moved to XDG (.local/state/harness/bridge.json): lampOS paths need ~/.harness"
+        );
+        std::fs::remove_dir_all(&home).unwrap();
     }
 }

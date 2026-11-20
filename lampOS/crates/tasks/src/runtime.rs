@@ -774,6 +774,11 @@ fn pane_turn(
     let next_is_spoken = queued
         .first()
         .is_some_and(|launch| crate::one_session::for_the_pane(one, launch).is_some());
+    // One that found the pane not up past its bound (#7895) does not wait
+    // for the pane: handed over next, to end `one_session_not_started`.
+    let spent = queued
+        .first()
+        .is_some_and(|launch| one.not_up_spent(&launch.name));
     one.set_spoken_queue(
         launching
             .map(str::to_owned)
@@ -786,7 +791,10 @@ fn pane_turn(
             )
             .collect(),
     );
-    next_is_spoken && (launching.is_some() || backing_off || !one.free() || !one.has_fresh_pane())
+    next_is_spoken
+        && (launching.is_some()
+            || backing_off
+            || (!spent && (!one.free() || !one.has_fresh_pane())))
 }
 
 /// [`place_wait`]'s answer for the next launch.
@@ -2349,6 +2357,11 @@ fn owner<C: Clock>(
                         && let Some(wanted) = later.from_machines
                     {
                         machines_answered = true;
+                        // Settled by this answer, looked at at once, not at
+                        // the next look a minute later (#7988).
+                        if starting_since.is_some() {
+                            targets_due = Instant::now();
+                        }
                         let said = match read {
                             Ok(listed) => {
                                 let chosen = if engines_on {
@@ -2574,6 +2587,12 @@ fn owner<C: Clock>(
                                     not_among_said = false;
                                 }
                                 found.sign_in_read(sign_in);
+                                // Settled by this answer (signed out, or no
+                                // machines to wait for), looked at at once,
+                                // not a minute later (#7988).
+                                if starting_since.is_some() {
+                                    targets_due = Instant::now();
+                                }
                             }
                             // Kept as it was: one failed read says nothing
                             // about the account; failing for
@@ -4969,6 +4988,13 @@ pub fn serve<C: Clock>(
         {
             eprintln!("{line}");
         }
+        // Harness's home moved to the XDG folders after all (#7906): said
+        // once at the start, in one fixed line; nothing is moved back.
+        if let Some(line) = std::env::var_os("HOME")
+            .and_then(|home| lamp_msgs::harness_hold::home_moved_line(Path::new(&home)))
+        {
+            eprintln!("{line}");
+        }
         if absent {
             return Ok(Production::Absent);
         }
@@ -5254,6 +5280,13 @@ pub fn serve_with_adapter<C: Clock, A: Adapter>(
         bus.publisher_declared(Diagnostic::TOPIC, &Diagnostic::declaration(), "tasks")?;
     // Without `--progress` the topic is not touched at all.
     let mut status_out = if config.progress {
+        // A skill's runs beside it (#7873): `tasks/status` lists only the
+        // tasks in the store, which a skill's run never enters.
+        crate::skill_task::tell_runs_on(bus.publisher_declared(
+            lamp_msgs::SkillTask::TOPIC,
+            &lamp_msgs::SkillTask::declaration(),
+            "tasks",
+        )?);
         Some(bus.publisher_declared(TaskStatus::TOPIC, &TaskStatus::declaration(), "tasks")?)
     } else {
         None
@@ -7078,6 +7111,11 @@ mod tests {
         assert_eq!(config["tools"]["exec"]["mode"], "full");
         assert_eq!(config["tools"]["exec"].get("security"), None);
         assert_eq!(config["tools"]["exec"].get("ask"), None);
+        // #7906: no tool that waits for a person in the pane.
+        assert_eq!(
+            config["tools"]["deny"],
+            json!(crate::openclaw_config::NO_ASK_TOOLS)
+        );
         assert_eq!(
             set_up_openclaw(&state, &home, true, true),
             "tasks: OpenClaw's settings for the lamp's DeepSeek: config unchanged"
@@ -7313,6 +7351,7 @@ mod tests {
                     tools: 0,
                 },
                 taken: !self.untaken.load(Ordering::Acquire),
+                shell: false,
             })
         }
         fn close_now(&self, _: &str, _: &str) -> Result<Closed, String> {
@@ -7481,6 +7520,11 @@ mod tests {
             code: "not_ready".into(),
         };
         assert!(!put_back(&not_ready, second));
+        // Its resumes spent (#7895): finished once, never put back.
+        let not_started = LaunchOutcome::NotSent {
+            code: crate::one_session::NOT_STARTED.into(),
+        };
+        assert!(!put_back(&not_started, second));
     }
 
     const PANE_MACHINE: &str = "0123456789abcdef0123456789abcdef";
@@ -7677,25 +7721,49 @@ mod tests {
     /// The Reviewer-lead's #3 on #7258 (#7246): a spoken task never closes
     /// or opens a pane on the worker. OpenClaw's one pane is never rotated
     /// by count (openharness#4393: its gateway compacts the session), so
-    /// past the rotation's token bound the spoken task is still typed into
-    /// the same pane, with no close and no new.
+    /// below its context's limit the spoken task is still typed into the
+    /// same pane, with no close and no new. Near the limit (#7906,
+    /// `near_context_limit`, here by the pane's own count) the spoken task
+    /// is put back `busy`, still with no close or new on the worker, and the
+    /// one-session thread opens the fresh one.
     #[test]
     fn past_the_token_bound_the_spoken_path_neither_closes_nor_opens() {
         let one = lamp_one();
         let pane = Pane::default();
         one.open_if_due(&pane, &pane_place());
         assert_eq!(pane.opens.load(Ordering::Acquire), 1);
-        // Past the rotation's token bound.
-        one.count_answer(&"x".repeat(4 * crate::one_session::ROTATE_TOKENS as usize));
+        // Below the context's limit.
+        one.count_answer(&"x".repeat(4 * (crate::one_session::TASK_FRESH_TOKENS as usize - 1_000)));
         let spoken = spoken_to_the_lamp("task-1");
         assert!(!pane_turn(&one, &[&spoken], None, false), "not held");
         assert!(matches!(
             crate::one_session::spoken_launch(&one, &pane, &spoken),
             Some(LaunchOutcome::Joined { .. })
         ));
+        one.release("task-1");
         one.open_if_due(&pane, &pane_place());
         assert_eq!(pane.opens.load(Ordering::Acquire), 1, "no new");
         assert_eq!(pane.closes.load(Ordering::Acquire), 0, "no close");
+        // Near it: put back, nothing closed or opened on the worker.
+        one.count_answer(&"x".repeat(4 * 2_000));
+        let spoken = spoken_to_the_lamp("task-2");
+        let outcome = crate::one_session::spoken_launch(&one, &pane, &spoken);
+        assert_eq!(
+            outcome,
+            Some(LaunchOutcome::NotSent {
+                code: "busy".into()
+            })
+        );
+        assert_eq!(
+            pane.opens.load(Ordering::Acquire),
+            1,
+            "no new on the worker"
+        );
+        assert_eq!(
+            pane.closes.load(Ordering::Acquire),
+            0,
+            "no close on the worker"
+        );
     }
 
     /// Heron's H4 on #7258 (#7246): a spoken task whose words are never

@@ -32,6 +32,10 @@ pub struct Turn {
     /// or outside its bounds. The answer is recorded empty and its question
     /// scores 0 with audit (evaluation policy `invalid_output`); no retry.
     pub malformed: bool,
+    /// The answer call failed in transit (connection, headers, stream or an
+    /// unavailable relay): recorded empty, its question scores 0 with audit
+    /// (evaluation policy `failed_call`); no retry.
+    pub failed_call: bool,
 }
 /// The registered answer shape, or None for a reply the policy records as
 /// malformed: no text, only whitespace, not the JSON object, or out of bounds.
@@ -219,10 +223,31 @@ impl Answerer<'_> {
             };
             call.validate()?;
             let request_hash = call.request_hash()?;
-            let reply = self.worker.call(
+            let reply = match self.worker.call(
                 &call,
                 Instant::now() + Duration::from_millis(crate::protocol::MODEL_MS),
-            )?;
+            ) {
+                Ok(reply) => reply,
+                Err(crate::Error::Transport(reason)) => {
+                    log(
+                        "answer_failed_call",
+                        json!({"probe":query.probe_id,"at_unix_ms":query.at_unix_ms,"round":round,"request_hash":request_hash,"reason":reason}),
+                    )?;
+                    return Ok(Turn {
+                        answer: Answer {
+                            answer: String::new(),
+                            evidence_ids: Vec::new(),
+                            abstain: false,
+                        },
+                        forget_effect: combined,
+                        model_rounds: round + 1,
+                        tools_executed: executed,
+                        malformed: false,
+                        failed_call: true,
+                    });
+                }
+                Err(error) => return Err(error),
+            };
             log(
                 "answer_reply",
                 json!({"probe":query.probe_id,"at_unix_ms":query.at_unix_ms,"round":round,"request_hash":request_hash,"reply":reply}),
@@ -251,6 +276,7 @@ impl Answerer<'_> {
                     model_rounds: round + 1,
                     tools_executed: executed,
                     malformed,
+                    failed_call: false,
                 });
             }
             // Validate the whole offered batch before any of its side effects.

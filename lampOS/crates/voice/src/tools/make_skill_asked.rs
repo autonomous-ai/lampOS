@@ -271,6 +271,30 @@ mod tests {
         }
     }
 
+    /// #7939: "make a skill called tech news: tell me one short tech
+    /// headline" (lamp-9adf, 19 Nov) and its rephrasings are asks to make; a
+    /// plain headline ask is not. This gate reads them as asks, so a miss
+    /// on that lamp was not this gate's wording (the cause is found first).
+    #[test]
+    fn a_named_make_is_an_ask_and_a_plain_headline_ask_is_not() {
+        for said in [
+            "Lamp, make a skill called tech news: tell me one short tech headline.",
+            "Make a skill called tech news: tell me one short tech headline",
+            "Can you make a skill that tells me one short tech headline?",
+            "I want a skill called tech news that tells me a tech headline.",
+            "Lamp, make me a new skill called tech news: read one tech headline.",
+        ] {
+            assert!(asks_to_make(said), "{said}");
+        }
+        for said in [
+            "Tell me a tech headline.",
+            "Lamp, tell me one short tech headline.",
+            "What is the tech news?",
+        ] {
+            assert!(!asks_to_make(said), "{said}");
+        }
+    }
+
     /// The force names `make_skill` for such a line alone, and never for a
     /// round that ends with a call's result.
     #[test]

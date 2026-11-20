@@ -101,6 +101,10 @@ slider is a joint's degrees from its home, the same `body.state`,
 panel sets each joint's zero and direction against the real lamp, for
 lamp.model.json.
 
+On a real lamp (`examples/twin/try.js --real`) the shoulder's and the elbow's slider range is what the body takes, from its fold to its
+stand (`get('body')`: `stands`, `folded_counts`, `stand_counts`), not the servos' span: a holder's pose above the stand is cut to the stand
+today, so the page draws it "not yet" and says the cut on every step. Letting the arm go above the stand is #7513, part 4.
+
 ## Check a lamp against the fake: conformance
 
 `conformance/conformance.js` runs the same thirteen steps (state, light, gestures,

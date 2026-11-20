@@ -35,7 +35,10 @@
 //!
 //! - **The line** ([`MakeLine`]): `{"op":"skill_make","rules","within_ms"}`,
 //!   the system prompt and the brief as one text, and how long the run may
-//!   take, checked whole ([`MakeLine::parse`]); with `"guide":true` too
+//!   take (at most [`MOST_WITHIN`], 10 minutes since #7245; up to [`RUN_ON_MOST_WITHIN`], 10
+//!   minutes, for a make marked `"may_run_on":true`, lamp-voice's
+//!   `LAMP_MAKE_MAY_RUN_ON`, #6811), checked whole ([`MakeLine::parse`]);
+//!   with `"guide":true` too
 //!   (lamp-voice's `LAMP_MAKE_AGENT_GUIDE`), the lamp's skill-creator guide
 //!   is given ([`GUIDE_FILE`]).
 //! - **The guide** ([`GUIDE`], only when the line asks for it): a lamp
@@ -108,6 +111,10 @@ pub const LEAST_WITHIN: Duration = Duration::from_secs(1);
 // #7245: a gateway agent's make may take up to 10 minutes (the first
 // builder's call on #6811, 18 Nov 17:23, the owner's yes).
 pub const MOST_WITHIN: Duration = Duration::from_secs(10 * 60);
+/// The most a make marked "may run on" may be given (`"may_run_on":true`,
+/// lamp-voice's `LAMP_MAKE_MAY_RUN_ON`, #6811): ten minutes, the same as
+/// [`MOST_WITHIN`] since #7245.
+pub const RUN_ON_MOST_WITHIN: Duration = Duration::from_secs(600);
 /// The rules' file in a make's folder.
 pub const RULES_FILE: &str = "rules.md";
 /// The one file the run writes in a make's folder.
@@ -120,8 +127,9 @@ pub const NO_ANSWER: &str = "the lamp's Hermes wrote no answer";
 pub const BUSY: &str = "a skill is already being made on this lamp; one is made at a time";
 /// How long a connection has to send its line, and to take each answer.
 pub const LINE_WAIT: Duration = Duration::from_secs(5);
-/// The most connections read or answered at once.
-pub const MOST_CONNECTIONS: usize = 2;
+/// The most connections read or answered at once: a make, the lamp's own
+/// news ask and a person's ask that cancels it (`crate::voice_ask`).
+pub const MOST_CONNECTIONS: usize = 3;
 /// How often the socket is looked at while no one connects.
 const ACCEPT_TICK: Duration = Duration::from_millis(20);
 
@@ -152,6 +160,12 @@ pub struct MakeLine {
     /// [`NOT_READY_LINE`] instead (Harness hasn't looked yet).
     #[serde(default)]
     pub engine: Option<String>,
+    /// #6811: lamp-voice's `LAMP_MAKE_MAY_RUN_ON` on, so the voice let the
+    /// person go after a minute and the make may run on: its `within_ms`
+    /// may be up to [`RUN_ON_MOST_WITHIN`]. Only when the line says `true`;
+    /// without it, [`MOST_WITHIN`] as before.
+    #[serde(default)]
+    pub may_run_on: bool,
 }
 
 /// The line's `switches` when given: an object, never `null`.
@@ -234,7 +248,12 @@ impl MakeLine {
         if make.rules.contains('\0') {
             return Err(("bad_request", "the rules have a NUL".into()));
         }
-        if !(LEAST_WITHIN..=MOST_WITHIN).contains(&make.within()) {
+        let most = if make.may_run_on {
+            RUN_ON_MOST_WITHIN
+        } else {
+            MOST_WITHIN
+        };
+        if !(LEAST_WITHIN..=most).contains(&make.within()) {
             return Err(("bad_request", "within_ms is out of its bounds".into()));
         }
         // The switches are for the guide's check alone: without the guide
@@ -297,9 +316,11 @@ pub const EXAMPLES_FOLDER: &str = "examples";
 /// keeps a note, a say again every 30 minutes while someone stays, and a
 /// reminder set in the lamp's schedule, and a script that leads breaths
 /// with the light and the voice, and a reminder every 30 minutes started
-/// by words. lamp-skills' `tests/it/make_check.rs` packs each with the
+/// by words; a linked-service read started by words (the one-line stub,
+/// the `task` the work for the lamp's agent), and a `net` script that
+/// fetches one public value and says it. lamp-skills' `tests/it/make_check.rs` packs each with the
 /// real `lamp-skills pack`, so none can be one the check refuses.
-pub const MAKE_EXAMPLES: [(&str, &str); 19] = [
+pub const MAKE_EXAMPLES: [(&str, &str); 25] = [
     (
         "desk-light/skill.toml",
         include_str!("make_examples/desk-light/skill.toml"),
@@ -375,6 +396,30 @@ pub const MAKE_EXAMPLES: [(&str, &str); 19] = [
     (
         "water-breaks/SKILL.md",
         include_str!("make_examples/water-breaks/SKILL.md"),
+    ),
+    (
+        "agenda-count/skill.toml",
+        include_str!("make_examples/agenda-count/skill.toml"),
+    ),
+    (
+        "agenda-count/SKILL.md",
+        include_str!("make_examples/agenda-count/SKILL.md"),
+    ),
+    (
+        "agenda-count/scripts/main.py",
+        include_str!("make_examples/agenda-count/scripts/main.py"),
+    ),
+    (
+        "sun-times/skill.toml",
+        include_str!("make_examples/sun-times/skill.toml"),
+    ),
+    (
+        "sun-times/SKILL.md",
+        include_str!("make_examples/sun-times/SKILL.md"),
+    ),
+    (
+        "sun-times/scripts/main.py",
+        include_str!("make_examples/sun-times/scripts/main.py"),
     ),
 ];
 
@@ -676,6 +721,7 @@ pub fn make_run_with(
         answer: Default::default(),
         net: false,
         tells: false,
+        cancel: Default::default(),
     }
 }
 
@@ -1792,6 +1838,78 @@ impl Runner for NetRunner {
     }
 }
 
+/// The runner a live ask held off the network goes through
+/// (`crate::voice_ask`, an ask with a linked service's read). With
+/// lamp-update's one run path (`one_path`'s
+/// [`crate::skill_task::HarnessRunner::default_agent`]), the lamp's Hermes
+/// by its wrapper's task entry, as a skill's run with no Harness
+/// ([`crate::skill_task::HarnessRunner::run_task_entry`]): in the run's own
+/// `skill-<run id>` folder, which the wrapper holds off the network (`--net`,
+/// its one-run token read from its file), with the ask's folder
+/// `make-<run id>/home` as its fresh home, named to the wrapper as a make's
+/// is (`LAMP_NS_HOME`), and no egress socket: the one run path holds only a
+/// run started in its own folder, so `make` would be refused
+/// [`NOT_HELD_OFF_ONE_PATH`] there. Never through Harness, which passes the
+/// wrapper none of lamp-tasks' variables. Without the one run path, `make`
+/// ([`lamp_runner`] held), as before.
+pub struct AskRunner {
+    pub make: MakeHermes,
+    pub one_path: Option<Arc<crate::skill_task::HarnessRunner>>,
+    /// lamp-tasks' `HOME`, the wrapper's `HOME` as it is started.
+    pub home: PathBuf,
+}
+
+impl AskRunner {
+    /// The lamp's: [`lamp_runner`] held, and the one run path's runner
+    /// ([`crate::skill_task::HarnessRunner::lamp`]) on `harness`.
+    pub fn lamp(home: &Path, harness: crate::skill_task::SkillHarnessSlot) -> Self {
+        Self {
+            make: lamp_runner(home, true),
+            one_path: Some(Arc::new(crate::skill_task::HarnessRunner::lamp(
+                home, harness,
+            ))),
+            home: home.to_path_buf(),
+        }
+    }
+
+    fn by_one_path(&self) -> Option<&crate::skill_task::HarnessRunner> {
+        self.one_path
+            .as_deref()
+            .filter(|harness| harness.default_agent)
+    }
+}
+
+impl Runner for AskRunner {
+    /// By the one run path, the lamp's Hermes wrapper takes a run by its
+    /// task entry in a fresh home of its own
+    /// ([`crate::skill_task::HarnessRunner::takes_fresh_tasks`]); else the
+    /// held make's checks.
+    fn ready(&self) -> Result<(), String> {
+        match self.by_one_path() {
+            Some(harness) => harness.takes_fresh_tasks(crate::harness::EngineKind::Hermes),
+            None => self.make.ready(),
+        }
+    }
+
+    fn stop_on(&self, stop: Arc<AtomicBool>) {
+        if let Some(harness) = &self.one_path {
+            Runner::stop_on(harness.as_ref(), stop);
+        }
+    }
+
+    fn run(&self, run: &SkillRun, end_token: &dyn Fn()) -> Result<u64, String> {
+        match self.by_one_path() {
+            Some(harness) => harness.run_task_entry(
+                crate::harness::EngineKind::Hermes,
+                &self.home,
+                run,
+                end_token,
+            ),
+            None => self.make.run(run, end_token),
+        }
+    }
+}
+
 fn lamp_runner_with(home: &Path, held: bool, egress: Option<crate::egress::Grant>) -> MakeHermes {
     let mut hermes = crate::skill_task::HermesRunner::lamp(home);
     if !held {
@@ -1846,7 +1964,7 @@ impl MakeHandOvers {
             }
         );
         let runner: Arc<MakeHermes> = Arc::new(lamp_runner(home, held));
-        let gateway = Arc::new(MakeGateway::lamp(home, harness));
+        let gateway = Arc::new(MakeGateway::lamp(home, harness.clone()));
         let switches = crate::voice_ask::Switches::of_env();
         // A live ask on the lamp's default agent, picked as a make on the
         // one run path picks it: the lamp's Hermes on the same runner as a
@@ -1860,13 +1978,14 @@ impl MakeHandOvers {
             Arc::new(crate::voice_ask::Asks {
                 switches,
                 open: runner.clone(),
-                held: Arc::new(lamp_runner(home, true)),
+                held: Arc::new(AskRunner::lamp(home, harness.clone())),
                 agent: Some(gateway.clone()),
                 default_engine: Box::new(move || {
                     default_engine.get().and_then(|engine| engine())
                 }),
                 tokens: Arc::new(crate::skill_task::ControlTokens::default()),
                 asking: AtomicBool::new(false),
+                news: Default::default(),
             })
         });
         Self {
@@ -1895,6 +2014,10 @@ impl MakeHandOvers {
         // lamp-tasks stops (#7245).
         if let Some(gateway) = &self.one_path {
             gateway.stop_on(stop.clone());
+        }
+        // A held ask's run on the one run path ends as lamp-tasks stops.
+        if let Some(asks) = &self.asks {
+            asks.held.stop_on(stop.clone());
         }
         let (listener, binding) = crate::runtime::bind(&self.socket)?;
         let served = std::thread::Builder::new()
@@ -2515,6 +2638,24 @@ mod tests {
         assert!(GUIDE.contains(&format!(
             "{CHECK_PROGRAM} pack --out {CHECK_OUT} draft/NAME"
         )));
+        // #7874: how a made skill runs, and the `task` words' rule.
+        let flat = GUIDE.split_whitespace().collect::<Vec<_>>().join(" ");
+        for told in [
+            "## How a made skill runs",
+            "`Run <skill-start> <run id>`",
+            "The agent sees only what the script prints.",
+            "the agent answers only a dash",
+            "`Said aloud through the lamp.`",
+            "one plain sentence a person understands, at most 120 characters",
+            "print(\"The lamp's agent does this task with its lamp-services tools.\")",
+            "`services_connected`, `service_read`, `service_write`",
+            "granted `net` and `speak`",
+            "`HTTPS_PROXY`",
+            "examples/agenda-count",
+            "examples/exchange-rate, sun-times",
+        ] {
+            assert!(flat.contains(told), "{told}");
+        }
         // Anything but a boolean is no make's line.
         let refused = answer(
             &guided(json!("yes")),
@@ -3703,5 +3844,43 @@ mod tests {
             );
         }
         assert!(GATEWAY_CAN.len() <= 540, "{}", GATEWAY_CAN.len());
+    }
+
+    /// #6811 (the first builder, 18 Nov 17:23): a make marked "may run on"
+    /// may be given up to ten minutes, as every other make may since #7245
+    /// (a gateway agent's make); the mark is only `true` or `false`, and
+    /// past ten minutes either is refused.
+    #[test]
+    fn a_make_marked_may_run_on_is_given_up_to_ten_minutes() {
+        let parsed = |within_ms: u64, extra: &str| {
+            MakeLine::parse(
+                format!(r#"{{"op":"skill_make","rules":"R","within_ms":{within_ms}{extra}}}"#)
+                    .as_bytes(),
+            )
+            .map(|make| (make.may_run_on, make.within()))
+        };
+        let past = 300_000;
+        assert_eq!(parsed(past, ""), Ok((false, Duration::from_millis(past))));
+        assert_eq!(
+            parsed(past, r#","may_run_on":false"#),
+            Ok((false, Duration::from_millis(past)))
+        );
+        assert!(
+            parsed(600_001, "").is_err(),
+            "not marked: MOST_WITHIN at most"
+        );
+        assert_eq!(
+            parsed(past, r#","may_run_on":true"#),
+            Ok((true, Duration::from_millis(past)))
+        );
+        assert_eq!(
+            parsed(600_000, r#","may_run_on":true"#),
+            Ok((true, RUN_ON_MOST_WITHIN))
+        );
+        assert!(parsed(600_001, r#","may_run_on":true"#).is_err());
+        assert_eq!(parsed(600_000, ""), Ok((false, MOST_WITHIN)));
+        assert!(parsed(2_000, r#","may_run_on":"yes""#).is_err());
+        assert_eq!(RUN_ON_MOST_WITHIN, Duration::from_secs(600));
+        assert_eq!(MOST_WITHIN, Duration::from_secs(600));
     }
 }

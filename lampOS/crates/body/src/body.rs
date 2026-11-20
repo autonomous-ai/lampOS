@@ -414,6 +414,9 @@ const LEAN_SECONDS: f32 = 1.5;
 /// cubic does, never faster than `GESTURE_STEP`, so it neither snaps back
 /// nor stops dead.
 const EASE_OUT: Duration = Duration::from_millis(700);
+/// How long a new energy level waits for a still head before it is taken
+/// under one no faster than its pace (#7749: taken within 5 s of the send).
+const LEVEL_PATIENCE: Duration = Duration::from_secs(2);
 /// A skill's or idle gesture paused as listening began picks up again where
 /// it was if the voice goes back to resting within this, with no answer
 /// (#2602: the line was music, a cough, or not said to the lamp). A longer
@@ -760,6 +763,50 @@ fn held_at(held: Duration, from: [f32; 5], speed: [f32; 5]) -> ([f32; 5], Durati
         EASE_OUT.mul_f32(along),
     )
 }
+/// The least an ease out moves a joint a step, so that one its clip never
+/// moved (a pace of nothing) still comes home: 5 counts a second.
+const EASE_LEAST: f32 = 0.1;
+
+/// An ease out under way: steps since it began, the offsets then, how far
+/// they moved in the step before, and each joint's pace, counts a step.
+type EaseOut = (u32, [f32; 5], [f32; 5], [f32; 5]);
+
+/// One step of an ease out (`easing_out`): from offsets `from`, moving
+/// `speed` a step, back to nothing over `EASE_OUT` or longer, `steps` steps
+/// in. No joint moves more a step than `pace` (#7749: a hand's yield passes
+/// `GESTURE_STEP`; a shift at rest its clip's own pace or the speed it had,
+/// whichever is more, so it only slows and never snaps back). The ease is
+/// stretched so its curve's peak, 1.5 times the offset over the span, keeps
+/// under that; and it ends only once every joint is home. True once over.
+fn ease_out_step(
+    now_at: &mut [f32; 5],
+    steps: u32,
+    from: [f32; 5],
+    speed: [f32; 5],
+    pace: [f32; 5],
+) -> bool {
+    let least = EASE_OUT.as_secs_f32() / TICK.as_secs_f32();
+    let span = (0..5).fold(least, |span, index| {
+        span.max(1.5 * from[index].abs() / pace[index].max(EASE_LEAST))
+    });
+    let t = (steps as f32 / span).min(1.0);
+    // Hermite: from `from` at the speed it had to nothing at rest.
+    let (stays, carries) = (
+        2.0 * t * t * t - 3.0 * t * t + 1.0,
+        t * t * t - 2.0 * t * t + t,
+    );
+    for (index, at) in now_at.iter_mut().enumerate() {
+        let wanted = from[index] * stays + speed[index] * span * carries;
+        let most = pace[index].max(EASE_LEAST);
+        *at += (wanted - *at).clamp(-most, most);
+    }
+    if t >= 1.0 && now_at.iter().all(|at| at.abs() < 0.5) {
+        *now_at = [0.0; 5];
+        return true;
+    }
+    false
+}
+
 /// While a gesture plays, and for half a second after, a joint of the head
 /// may be this far from its goal and read this load before the gesture is
 /// dropped; the shoulder and the elbow may be this far from theirs. A quick
@@ -1966,6 +2013,10 @@ pub struct BodyReport {
     pub expression_steps: u64,
     /// Times it shifted by itself while standing at rest.
     pub idles: u32,
+    /// Each energy level taken and when (#7749), for the tests: the
+    /// journal says it as `energy level N`.
+    #[serde(skip)]
+    pub energy_levels: Vec<(Duration, u8)>,
     /// Under `Limits::look_at_name`, calls taken.
     pub calls: u32,
     /// Under `--overload release`, each time it let go.
@@ -2095,6 +2146,57 @@ fn checksum(body: &[u8]) -> u8 {
 
 /// The only single-servo writes there are: acceleration (register 41, one
 /// byte) and goal speed (register 46, two bytes).
+/// The servo's own maximum acceleration, kept in its EEPROM (#7946): 254 on
+/// most, 50 on the STS3215s some lamps shipped with.
+const ACCELERATION_CAP_REGISTER: u8 = 85;
+
+/// The lower of the two caps known on shipped lamps (#7946): what a joint
+/// runs at, at most, when its own cap can't be read. Slower is the safe side.
+const ACCELERATION_CAP_KNOWN_LOW: u8 = 50;
+
+/// The acceleration each joint runs at (by `Joint::index`): `asked`, or the
+/// servo's own lower cap (`caps`, read from register 85, in `joints`' order),
+/// so a capped servo's read back of its cap is a pass, never a stop (#7946).
+/// With no caps read, the known low cap. A cap of 0 is no reading. Each
+/// joint run under `asked` is said, once a start, with its cap.
+fn accelerations(
+    asked: u8,
+    joints: &[Joint],
+    caps: Result<Vec<u8>, String>,
+    say: &mut dyn FnMut(String),
+) -> [u8; 5] {
+    let mut each = [asked; 5];
+    match caps {
+        Ok(caps) => {
+            for (joint, cap) in joints.iter().zip(caps) {
+                let cap = if cap == 0 {
+                    ACCELERATION_CAP_KNOWN_LOW
+                } else {
+                    cap
+                };
+                if cap < asked {
+                    each[joint.index()] = cap;
+                    say(format!(
+                        "{joint} holds a maximum acceleration of {cap} (register {ACCELERATION_CAP_REGISTER}), under the {asked} asked: it runs at {cap} (#7946)"
+                    ));
+                }
+            }
+        }
+        Err(detail) => {
+            let low = asked.min(ACCELERATION_CAP_KNOWN_LOW);
+            for joint in joints {
+                each[joint.index()] = low;
+            }
+            if low < asked {
+                say(format!(
+                    "the servos' maximum acceleration could not be read ({detail}): every joint runs at {low}, the lower known cap, under the {asked} asked (#7946)"
+                ));
+            }
+        }
+    }
+    each
+}
+
 fn acceleration_write(joint: Joint, value: u8) -> [u8; 8] {
     let mut packet = [0xff, 0xff, joint.id(), 4, 0x03, 41, value, 0];
     packet[7] = checksum(&packet[2..7]);
@@ -2894,6 +2996,29 @@ impl<P: PortIo, R: Runtime> Bus<'_, P, R> {
             Ok(())
         })?;
         Ok(limits)
+    }
+
+    /// The maximum acceleration each of `joints` holds in its own EEPROM
+    /// (register 85), in their order (#7946): a write of a higher
+    /// acceleration (register 41) reads back as this.
+    fn acceleration_caps(&mut self, joints: &[Joint]) -> Result<Vec<u8>, String> {
+        let window =
+            ReadWindow::new(ACCELERATION_CAP_REGISTER, 1).map_err(|error| error.to_string())?;
+        let request =
+            ReadOnlyRequest::sync_read(joints, window).map_err(|error| error.to_string())?;
+        let mut caps = vec![0u8; joints.len()];
+        self.read(&request, |reply| {
+            let index = joints
+                .iter()
+                .position(|joint| *joint == reply.joint())
+                .ok_or("a reply from a joint that was not asked")?;
+            let [cap] = reply.parameters() else {
+                return Err("an acceleration cap that is not one byte".into());
+            };
+            caps[index] = *cap;
+            Ok(())
+        })?;
+        Ok(caps)
     }
 
     /// The force limit each of `joints` holds, in their order.
@@ -5540,6 +5665,7 @@ fn run_on_dyn<P: PortIo, R: Runtime>(
         gestures_dropped: 0,
         expression_steps: 0,
         idles: 0,
+        energy_levels: Vec::new(),
         calls: 0,
         released: Vec::new(),
         tipping: Tipping::default(),
@@ -6489,6 +6615,25 @@ fn run_on_dyn<P: PortIo, R: Runtime>(
         return report;
     }
 
+    // Each servo's own maximum acceleration (#7946): a joint whose servo
+    // caps lower than asked runs at its cap, so its read back passes.
+    let capped: Vec<Joint> = COMMANDED
+        .iter()
+        .chain(
+            standing
+                .is_some()
+                .then_some(ARM.iter())
+                .into_iter()
+                .flatten(),
+        )
+        .copied()
+        .filter(|joint| !bus.left[joint.index()])
+        .collect();
+    let caps = bus.read_back(|bus| bus.acceleration_caps(&capped));
+    let acceleration_of = accelerations(limits.servo_acceleration, &capped, caps, &mut |line| {
+        eprintln!("lamp-body: {line}");
+    });
+
     // The servo's own speed bound, where it is not already the one wanted
     // (nothing to a joint left as it is).
     for (index, joint) in COMMANDED.iter().enumerate() {
@@ -6501,12 +6646,10 @@ fn run_on_dyn<P: PortIo, R: Runtime>(
             report.profile_writes += 1;
             outcome = bus.write_checked(*joint, &speed_write(*joint, limits.servo_speed));
         }
-        if outcome.is_ok() && acceleration != limits.servo_acceleration {
+        let wanted = acceleration_of[joint.index()];
+        if outcome.is_ok() && acceleration != wanted {
             report.profile_writes += 1;
-            outcome = bus.write_checked(
-                *joint,
-                &acceleration_write(*joint, limits.servo_acceleration),
-            );
+            outcome = bus.write_checked(*joint, &acceleration_write(*joint, wanted));
         }
         if let Err(detail) = outcome {
             report.stop = Stop::Bus {
@@ -6533,12 +6676,10 @@ fn run_on_dyn<P: PortIo, R: Runtime>(
                 report.profile_writes += 1;
                 outcome = bus.write_checked(*joint, &speed_write(*joint, arm_speed));
             }
-            if outcome.is_ok() && acceleration != limits.servo_acceleration {
+            let wanted = acceleration_of[joint.index()];
+            if outcome.is_ok() && acceleration != wanted {
                 report.profile_writes += 1;
-                outcome = bus.write_checked(
-                    *joint,
-                    &acceleration_write(*joint, limits.servo_acceleration),
-                );
+                outcome = bus.write_checked(*joint, &acceleration_write(*joint, wanted));
             }
             if let Err(detail) = outcome {
                 report.stop = Stop::Bus {
@@ -6549,8 +6690,9 @@ fn run_on_dyn<P: PortIo, R: Runtime>(
         }
         match bus.read_back(Bus::arm_profiles) {
             Ok(now)
-                if now.iter().all(|profile| {
-                    (profile.0, profile.1, profile.2) == (1, limits.servo_acceleration, arm_speed)
+                if now.iter().zip(ARM).all(|(profile, joint)| {
+                    (profile.0, profile.1, profile.2)
+                        == (1, acceleration_of[joint.index()], arm_speed)
                 }) => {}
             Ok(now) => {
                 report.stop = Stop::Bus {
@@ -6570,7 +6712,7 @@ fn run_on_dyn<P: PortIo, R: Runtime>(
         Ok(now)
             if now.iter().zip(COMMANDED).all(|(profile, joint)| {
                 bus.left[joint.index()]
-                    || *profile == (1, limits.servo_acceleration, limits.servo_speed)
+                    || *profile == (1, acceleration_of[joint.index()], limits.servo_speed)
             }) => {}
         Ok(now) => {
             report.stop = Stop::Bus {
@@ -6840,7 +6982,7 @@ fn run_on_dyn<P: PortIo, R: Runtime>(
     let mut yielding = false;
     // Such a gesture's ease back: steps since it ended, its offsets then and
     // how far they moved in the step before, counts a step.
-    let mut easing_out: Option<(u32, [f32; 5], [f32; 5])> = None;
+    let mut easing_out: Option<EaseOut> = None;
     let mut gesture_moved = [0.0f32; 5];
     // The gesture waiting stood a folded lamp up; and what to say of a
     // gesture asked from outside, on the next glimpse.
@@ -6884,6 +7026,8 @@ fn run_on_dyn<P: PortIo, R: Runtime>(
     let mut limits = limits;
     let stand_base = standing.map(|up| up.seconds);
     let mut energy = 1u8;
+    // A new level asked and since when (#7749), for `LEVEL_PATIENCE`.
+    let mut level_since: Option<(u8, Duration)> = None;
     let mut said_no_stand = false;
     // Expression's rest offsets of the head (pitch, roll) averaged over a
     // breath, the average a drift last left, and when one last did.
@@ -7108,10 +7252,70 @@ fn run_on_dyn<P: PortIo, R: Runtime>(
         // under a joint still moving: no gesture playing or waiting, the
         // pose's filter still and the arm up or down.
         let level = crate::energy::taken(asked_now.energy);
+        // #7749: a new level ends a shift at rest it finds playing, eased
+        // to rest as a hand's yield eases a gesture (`easing_out`, over
+        // `EASE_OUT`), so it is taken within seconds of the send. A gesture
+        // asked of it (`playing` not a shift) plays to its end first.
+        // Its ease only slows (the first builder's 02:14 on #7749): no joint
+        // faster than the clip's own pace or than it was moving.
+        if level != energy
+            && let Some((clip, _)) = playing.filter(|(clip, _)| idle::is_move(clip))
+        {
+            playing = None;
+            let pace = clip.pace(TICK);
+            easing_out = Some((
+                0,
+                gesture_now,
+                gesture_moved,
+                std::array::from_fn(|index| pace[index].max(gesture_moved[index].abs())),
+            ));
+            eprintln!(
+                "lamp-body: step {}: energy level {level} asked: the shift at rest eases to rest",
+                report.steps
+            );
+        }
+        // #7749: an unprompted gesture waiting (a shift, Expression's
+        // `lively`, anything asked at idle priority) is dropped on a new
+        // level rather than played first. A call's glance never is: it
+        // keeps the `pending_by` of whatever was asked before it.
+        if level != energy
+            && let Some((old, _)) = pending.filter(|(old, _)| {
+                idle::is_move(old) || (pending_by.0 == Priority::Idle && from_outside(old))
+            })
+        {
+            gesture_fates.push_told(
+                (old.name, "dropped: a new energy level"),
+                Told {
+                    source: pending_by.1,
+                    by: None,
+                },
+            );
+            pending = None;
+        }
+        // The head may be moving (a rest glance, the mood's pose, talk): the
+        // level waits for it to be still, so a joint turning keeps the pace
+        // it began with; but after `LEVEL_PATIENCE` only while a joint is
+        // faster than the new level lets it go, so the cap never drops under
+        // it (#7749: waiting for a head under 1 count a second, nothing
+        // playing or waiting, held levels 19-22 s on lamp-52e6 on
+        // 2026-11-19). The head's roll keeps level 1's pace whatever the
+        // level (`ROLL_SPEED`).
+        level_since = (level != energy).then_some(match level_since {
+            Some((was, since)) if was == level => (level, since),
+            _ => (level, now),
+        });
+        let next_speed = base.at(level).speed;
+        let patient = level_since.is_some_and(|(_, since)| now - since >= LEVEL_PATIENCE);
         if level != energy
             && playing.is_none()
+            && easing_out.is_none()
             && pending.is_none()
-            && velocity.iter().all(|speed| speed.abs() < 1.0)
+            && (velocity.iter().all(|speed| speed.abs() < 1.0)
+                || patient
+                    && velocity
+                        .iter()
+                        .enumerate()
+                        .all(|(index, speed)| index == 1 || speed.abs() <= next_speed))
             && stand_velocity == 0.0
         {
             energy = level;
@@ -7133,11 +7337,14 @@ fn run_on_dyn<P: PortIo, R: Runtime>(
                 up.seconds = crate::energy::stand_seconds(seconds, level);
             }
             idler.share = crate::energy::of(level).idle_share;
+            report.energy_levels.push((now, level));
             eprintln!(
                 "lamp-body: step {}: energy level {level}: {} counts a second",
                 report.steps, limits.speed
             );
         }
+        // Named here: `level` below is the mood's (the voice's), not this.
+        let level_waits = level != energy;
         // A person or a health check lets a seated lamp stand (#4501).
         if asked_now.unseat
             && let Some((joint, why)) = seated.take()
@@ -7457,7 +7664,7 @@ fn run_on_dyn<P: PortIo, R: Runtime>(
                 );
                 playing = None;
                 yielding = true;
-                easing_out = Some((0, gesture_now, gesture_moved));
+                easing_out = Some((0, gesture_now, gesture_moved, GESTURE_STEP));
             }
             // One still waiting goes too, so it never begins after the ease
             // out only to end a step later under the same hand.
@@ -7797,7 +8004,13 @@ fn run_on_dyn<P: PortIo, R: Runtime>(
         } else if playing.is_none() {
             match idle_due {
                 None => idle_due = Some(now + idler.gap()),
-                Some(due) if now >= due && settled && standing.is_some_and(|up| up.idle) => {
+                // #7749: none begins while a new energy level waits.
+                Some(due)
+                    if now >= due
+                        && settled
+                        && !level_waits
+                        && standing.is_some_and(|up| up.idle) =>
+                {
                     // An arm a hand holds is not swayed into the hand.
                     let arm_free = stalls[3..].iter().all(|stall| stall.hold.is_none());
                     let tilts = limits.stand_roll > limits.roll;
@@ -7920,7 +8133,7 @@ fn run_on_dyn<P: PortIo, R: Runtime>(
                         }
                         playing = None;
                         yielding = true;
-                        easing_out = Some((0, gesture_now, gesture_moved));
+                        easing_out = Some((0, gesture_now, gesture_moved, GESTURE_STEP));
                     }
                     if let Some((old, _)) = pending.filter(|(old, _)| from_outside(old)) {
                         gesture_fates.push_told(
@@ -8164,21 +8377,9 @@ fn run_on_dyn<P: PortIo, R: Runtime>(
         }
         let before = gesture_now;
         match easing_out.as_mut().filter(|_| playing.is_none()) {
-            Some((steps, from, speed)) => {
+            Some((steps, from, speed, pace)) => {
                 *steps += 1;
-                let span = EASE_OUT.as_secs_f32() / TICK.as_secs_f32();
-                let t = (*steps as f32 / span).min(1.0);
-                // Hermite: from `from` at the speed it had to nothing at rest.
-                let (stays, carries) = (
-                    2.0 * t * t * t - 3.0 * t * t + 1.0,
-                    t * t * t - 2.0 * t * t + t,
-                );
-                for (index, now_at) in gesture_now.iter_mut().enumerate() {
-                    let wanted = from[index] * stays + speed[index] * span * carries;
-                    *now_at += (wanted - *now_at).clamp(-GESTURE_STEP[index], GESTURE_STEP[index]);
-                }
-                if t >= 1.0 {
-                    gesture_now = [0.0; 5];
+                if ease_out_step(&mut gesture_now, *steps, *from, *speed, *pace) {
                     easing_out = None;
                 }
             }

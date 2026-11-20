@@ -1171,6 +1171,48 @@ impl People {
         replace: bool,
         apart: bool,
     ) -> std::result::Result<Remembered, Refused> {
+        self.remember_one_checked(name, prints, now_unix_s, replace, apart, false)
+    }
+
+    /// [`Self::remember_one_replacing`] for a save the voice sent past its
+    /// face question only because the eyes' known file named a face at the
+    /// lamp (`known_only`, #7704): a capture recognised as nobody, under a
+    /// name nobody is kept under, is refused ([`Refused::NotKnown`]).
+    pub fn remember_one_known_only(
+        &mut self,
+        name: &str,
+        prints: Vec<Vec<f32>>,
+        now_unix_s: u64,
+        replace: bool,
+        apart: bool,
+    ) -> std::result::Result<Remembered, Refused> {
+        self.remember_one_checked(name, prints, now_unix_s, replace, apart, true)
+    }
+
+    fn remember_one_checked(
+        &mut self,
+        name: &str,
+        prints: Vec<Vec<f32>>,
+        now_unix_s: u64,
+        replace: bool,
+        apart: bool,
+        known_only: bool,
+    ) -> std::result::Result<Remembered, Refused> {
+        // Sent past the face question only because a face was known at the
+        // lamp (#7704): a face recognised as nobody, under a name nobody is
+        // kept under, is no one to keep here; their own name on their own
+        // face is.
+        if known_only {
+            let kept = plain_name(name).ok_or(Refused::NotAName)?;
+            if prints.iter().all(|print| self.who(print).is_none())
+                && !self
+                    .people
+                    .iter()
+                    .any(|person| same_name(&person.name, &kept))
+            {
+                return Err(Refused::NotKnown);
+            }
+        }
         let mut replaced = Vec::new();
         let name =
             self.remember_one_into(name, prints, now_unix_s, replace, apart, &mut replaced)?;
@@ -1628,8 +1670,9 @@ fn repair_file(path: &Path) -> io::Result<(PathBuf, File)> {
 /// `{"list":true}` or `{"who":true}`. With one name for one face
 /// (`LAMP_NAMES=checked`), `{"remember":"A","one_face":true}`, and
 /// `"replace":true` once the person said yes to the new name, or
-/// `"apart":true` once they said they are not the near one. Anything else
-/// is nothing.
+/// `"apart":true` once they said they are not the near one, or
+/// `"known_only":true` when the voice skipped its face question only
+/// because a face was known at the lamp (#7704). Anything else is nothing.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Ask {
     RememberSpeaker(crate::remember_speaker::Request),
@@ -1638,6 +1681,8 @@ pub enum Ask {
         name: String,
         replace: bool,
         apart: bool,
+        /// Kept only for a face the eyes know (#7704).
+        known_only: bool,
     },
     /// Add the one face in a photo in the eyes' photo folder (`--photo-dir`,
     /// [`crate::photo`]), unconfirmed until its person says yes: its file
@@ -1789,6 +1834,7 @@ pub fn ask_of(line: &[u8]) -> Option<Ask> {
         one_face: Option<bool>,
         replace: Option<bool>,
         apart: Option<bool>,
+        known_only: Option<bool>,
         photo: Option<String>,
     }
     let line: Line = serde_json::from_slice(line).ok()?;
@@ -1801,6 +1847,7 @@ pub fn ask_of(line: &[u8]) -> Option<Ask> {
             one_face: None,
             replace: None,
             apart: None,
+            known_only: None,
             photo: None,
         } => Some(Ask::Remember(name)),
         Line {
@@ -1811,11 +1858,13 @@ pub fn ask_of(line: &[u8]) -> Option<Ask> {
             one_face: Some(true),
             replace,
             apart,
+            known_only,
             photo: None,
         } => Some(Ask::RememberOne {
             name,
             replace: replace.unwrap_or(false),
             apart: apart.unwrap_or(false),
+            known_only: known_only.unwrap_or(false),
         }),
         Line {
             remember: None,
@@ -1825,6 +1874,7 @@ pub fn ask_of(line: &[u8]) -> Option<Ask> {
             one_face: None,
             replace: None,
             apart: None,
+            known_only: None,
             photo: None,
         } => Some(Ask::Forget(name)),
         Line {
@@ -1835,6 +1885,7 @@ pub fn ask_of(line: &[u8]) -> Option<Ask> {
             one_face: None,
             replace: None,
             apart: None,
+            known_only: None,
             photo: None,
         } => Some(Ask::List),
         Line {
@@ -1845,6 +1896,7 @@ pub fn ask_of(line: &[u8]) -> Option<Ask> {
             one_face: None,
             replace: None,
             apart: None,
+            known_only: None,
             photo: None,
         } => Some(Ask::Who),
         Line {
@@ -1855,6 +1907,7 @@ pub fn ask_of(line: &[u8]) -> Option<Ask> {
             one_face: None,
             replace: None,
             apart: None,
+            known_only: None,
             photo: Some(file),
         } => Some(Ask::RememberPhoto { name, file }),
         _ => None,
@@ -2380,6 +2433,8 @@ pub struct Taking {
     /// Asked after the person said they are not the near one
     /// ([`Refused::NearTo`]): no near-name check.
     pub apart: bool,
+    /// Kept only for a face the eyes know ([`Refused::NotKnown`], #7704).
+    pub known_only: bool,
     prints: Vec<Vec<f32>>,
     started_us: u64,
     saw_any: bool,
@@ -2438,6 +2493,8 @@ pub enum Refused {
     NotLikeThem,
     /// The store refused it: full, or the file could not be written.
     Store(String),
+    /// Asked `known_only` (#7704), the face is known as nobody.
+    NotKnown,
 }
 
 /// Why a face could not be remembered.
@@ -2465,6 +2522,7 @@ impl Taking {
             speaker: None,
             one_face: None,
             apart: false,
+            known_only: false,
             prints: Vec::new(),
             started_us: now_us,
             saw_any: false,
@@ -5533,6 +5591,42 @@ mod tests {
         assert_eq!(people.names().len(), 3);
     }
 
+    /// #7704: the voice skipped its face question only because the eyes'
+    /// known file named a face at the lamp, and that file can still name
+    /// Ada for up to 3 s after a stranger steps in. Asked `known_only`, a
+    /// capture recognised as nobody is refused ([`Refused::NotKnown`]) and
+    /// nobody is kept; a known face is still told by the name it is known
+    /// by, and its own name on its own face is still kept in place. Without
+    /// `known_only`, the stranger is kept as before.
+    #[test]
+    fn a_save_for_a_known_face_only_refuses_a_face_known_as_nobody() {
+        let mut people = People::open(file("known-only")).unwrap();
+        people
+            .remember("Ada", vec![print(0.3), print(0.31)], 1)
+            .unwrap();
+        assert_eq!(
+            people.remember_one_known_only("Walter", vec![print(2.9)], 2, false, false),
+            Err(Refused::NotKnown)
+        );
+        assert_eq!(people.names(), vec!["Ada".to_owned()]);
+        assert_eq!(
+            people.remember_one_known_only("Jay", vec![print(0.3)], 3, false, false),
+            Err(Refused::KnownAs("Ada".into()))
+        );
+        assert_eq!(
+            people
+                .remember_one_known_only("Ada", vec![print(0.31)], 4, false, false)
+                .map(|kept| kept.name),
+            Ok("Ada".into())
+        );
+        assert_eq!(people.names(), vec!["Ada".to_owned()]);
+        assert_eq!(
+            people.remember_one("Walter", vec![print(2.9)], 5, false, false),
+            Ok("Walter".into())
+        );
+        assert_eq!(people.names(), vec!["Ada".to_owned(), "Walter".to_owned()]);
+    }
+
     /// Reviewer-three's P1 on #5149: a remembering says exactly whom a
     /// `replace` forgot, so the voice moves the setup owner only on a
     /// rename of the owner's own face. Nobody for a plain remembering, the
@@ -5624,7 +5718,8 @@ mod tests {
             Some(Ask::RememberOne {
                 name: "A".into(),
                 replace: false,
-                apart: false
+                apart: false,
+                known_only: false
             })
         );
         assert_eq!(
@@ -5632,7 +5727,8 @@ mod tests {
             Some(Ask::RememberOne {
                 name: "A".into(),
                 replace: true,
-                apart: false
+                apart: false,
+                known_only: false
             })
         );
         assert_eq!(
@@ -5640,9 +5736,20 @@ mod tests {
             Some(Ask::RememberOne {
                 name: "A".into(),
                 replace: false,
-                apart: true
+                apart: true,
+                known_only: false
             })
         );
+        assert_eq!(
+            ask_of(br#"{"remember":"A","one_face":true,"known_only":true}"#),
+            Some(Ask::RememberOne {
+                name: "A".into(),
+                replace: false,
+                apart: false,
+                known_only: true
+            })
+        );
+        assert_eq!(ask_of(br#"{"remember":"A","known_only":true}"#), None);
         assert_eq!(ask_of(br#"{"remember":"A","apart":true}"#), None);
         assert_eq!(ask_of(br#"{"remember":"A","replace":true}"#), None);
         assert_eq!(ask_of(br#"{"forget":"A","one_face":true}"#), None);

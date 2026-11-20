@@ -1561,3 +1561,63 @@ fn loosened_a_trigger_the_check_refuses_is_never_loosened() {
         assert!(tars(&keeping.directory).is_empty(), "on {on}");
     }
 }
+
+/// #6811, with `LAMP_MAKE_REACTIONS_ONLY_DEEPSEEK` on: the agent's
+/// template, sip-of-water's guards (voice/state and room/activity in
+/// `[[while]]`) beside two more topics, passes the voice's cap and the real
+/// checker, is kept with `made_with: hermes` on its card and in the index,
+/// and the manage helper's own re-check puts it on. A `[[while]]` on any
+/// other topic is still a part the voice can't say, and is not kept.
+#[test]
+fn a_guarded_nudge_made_by_the_agent_passes_both_caps_with_its_maker() {
+    lamp_voice::made_skill::set_reactions_here(Some(true));
+    let dir = tempfile::tempdir().unwrap();
+    let keeping = keeping(dir.path());
+    let skills = dir.path().join("skills");
+    fs::create_dir_all(&skills).unwrap();
+    let toml = lamp_voice::made_skill::behaviour_template_toml()
+        .replace("One short, warm line.", "Time for a sip of water.")
+        .replace(
+            "topics = [\"room/presence\", \"voice/state\", \"room/activity\"]",
+            "topics = [\"room/presence\", \"voice/state\", \"room/activity\", \
+             \"clock/local\", \"air/state\"]",
+        );
+    let asked = Asked {
+        request: "after I've sat a long while, suggest a sip of water",
+        made_with: lamp_voice::made_skill::MadeWith::Hermes,
+        ..Asked::default()
+    };
+    let made = keep_asked(
+        &answer(&toml, "sip-at-desk"),
+        false,
+        "local:7",
+        &keeping,
+        &asked,
+    )
+    .unwrap();
+    assert!(
+        made.description
+            .contains("never in the middle of a conversation or with your head down"),
+        "{}",
+        made.description
+    );
+    let index = lamp_voice::made_skill::entries(&keeping.directory);
+    assert_eq!(index[0][lamp_voice::made_skill::MADE_WITH], "hermes");
+    mark(&keeping, &made.sha256);
+    let wait = std::time::Duration::from_millis(500);
+    install_made(&skills, None, &keeping.directory, &made.sha256, wait).unwrap();
+    let card = fs::read_to_string(skills.join("sip-at-desk").join("SKILL.md")).unwrap();
+    assert!(card.contains("\nmade_with: hermes\n"), "{card}");
+    // Another topic in a [[while]] is no guard: never kept.
+    let other =
+        format!("{toml}\n[[while]]\ntopic = \"air/state\"\nfield = \"co2_ppm\"\nabove = 1200\n");
+    let refused = keep_asked(
+        &answer(&other, "sip-air"),
+        false,
+        "local:8",
+        &keeping,
+        &asked,
+    );
+    assert!(refused.is_err(), "{refused:?}");
+    lamp_voice::made_skill::set_reactions_here(None);
+}

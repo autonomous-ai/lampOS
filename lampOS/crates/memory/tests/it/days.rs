@@ -128,6 +128,16 @@ fn observe(
         .unwrap()[0]
 }
 
+/// A forget's answer without the exchange ids it names for the account's
+/// history (#7771, checked in `days_protocol`'s and `binary`'s tests):
+/// these tests read what it removed.
+fn counts(mut answer: Value) -> Value {
+    if let Some(answer) = answer.as_object_mut() {
+        answer.remove("exchanges");
+    }
+    answer
+}
+
 fn request(store: &mut Days, request: Value, now: u64) -> (Value, String) {
     let answer = days_protocol::answer(store, &serde_json::to_vec(&request).unwrap(), now);
     (serde_json::from_str(&answer.line).unwrap(), answer.log)
@@ -1566,7 +1576,7 @@ fn protocol_round_trip_records_links_prepares_and_applies_a_job_then_verifies_fo
     // that one was only shown stays (one step back, #2003). A forget with
     // no `selective` (an older voice's) is as before #3613.
     let (forgotten, _) = request(&mut store, json!({"op":"forget","id":fact}), NOW);
-    assert_eq!(forgotten, json!({"ok":true,"removed":2}));
+    assert_eq!(counts(forgotten), json!({"ok":true,"removed":2}));
     let (search, _) = request(&mut store, json!({"op":"search","query":"coffee"}), NOW);
     let found: Vec<u64> = search["entries"]
         .as_array()

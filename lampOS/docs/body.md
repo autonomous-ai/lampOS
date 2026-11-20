@@ -1377,7 +1377,17 @@ ROW on lamp-52e6 is to come (#7301).
 With `LAMP_BODY_ENERGY=on` (off unless exactly `on`; on in the product, set on Body, Expression, Skills and Voice together: lamp-52e6, row-6893h, 15 Nov, level 5 PASS, #6893) the body reads the character's
 energy level, 1 to 5, from `character/energy` (`{"level": 1..5, "chosen": bool}`) at most once a second
 (`energy_in.rs`). A level outside 1 to 5 or a message that does not read is not taken; a publisher gone
-keeps the last level, not 1. Off, the body never reads it and runs at level 1. Level 1 is today exactly:
+keeps the last level, not 1. A new level is taken once the lamp is settled: no gesture playing or
+waiting, the head still (every joint under 1 count a second, so a turn keeps the pace it began with) or,
+after `LEVEL_PATIENCE` 2 s of waiting, no head joint faster than the new level lets it go (a glance or
+talk moving the head slower then no longer holds it), the stand not rising or folding. A shift at rest found playing does not keep it waiting: it is
+eased to rest as a hand's yield eases a gesture (`easing_out`), but no joint faster than the clip's own
+pace or than it was moving, the ease stretched past 0.7 s as needed (`settle`'s 54-count sag about
+2.5 s, `look_up` about 1.3 s), so it only slows. A shift or an idle-priority gesture waiting (Expression's
+`lively`) is dropped, and no shift begins while a level waits, so the level is taken within 5 s of the
+send, energy_in's 1 s read included. A gesture asked of it (a skill, a
+nod while talking, a turn to a voice) is never cut for a level; the level waits for its end (#7749).
+Off, the body never reads it and runs at level 1. Level 1 is today exactly:
 the limits and the stand pace the unit gives (`Limits::at(1)` returns them unchanged, a test pins it
 against `deploy/product/lamp-body.service`). Levels 2 to 5 (`energy.rs` `TABLE`) only go livelier, never
 under what the unit gives:
@@ -1399,8 +1409,10 @@ The idle wait is only the wait between shifts at rest (`Idler::share`). The awak
 never sits down sooner (#7314, `at_every_level_the_lamp_folds_no_sooner_than_at_level_one`).
 
 A new level is taken only once the lamp is settled: no gesture playing or waiting, the pose's filter
-still (every joint under 1 count a second) and the arm not rising or folding, so a speed cap never drops
-under a joint still moving. On the host, a 480-count turn of the base lands in 1.12 s at level 5 and
+still (every joint under 1 count a second), or after `LEVEL_PATIENCE` 2 s no joint faster than the new
+level's pace, and the arm not rising or folding, so a speed cap never drops under a joint still moving.
+At the 2 s mark nothing is cut or eased: a turn still going speeds up to the new pace, slewed as any
+change of speed. On the host, a 480-count turn of the base lands in 1.12 s at level 5 and
 1.92 s at level 1. Every other bound (strain, load, tip, reach, the servo's own speed) is untouched.
 The same level also sets the head's roll standing, a lean toward a listener and the size of a nod
 while it speaks (`energy.rs` `TABLE`):
@@ -2761,7 +2773,7 @@ four rows, "Without it" is what `off` leaves.
 | `--reach UP,DOWN,ROLL,YAW` | farthest a goal may be from home, in counts | 45,15,30,40 | 180,25,100,250 |
 | `--speed N` | fastest the commanded pose moves, counts a second | 50 | 300 |
 | `--servo-speed N` | goal speed written to the three servos | 150 | 1,000 |
-| `--servo-acceleration N` | acceleration written to them | 50 | 150 |
+| `--servo-acceleration N` | acceleration written to them; each joint runs at the lower of this and its servo's own EEPROM cap (register 85, #7946), or of this and 50 when the cap can't be read, said once a start | 50 | 150 |
 | `--stand P,R,Y,S,E` with `--folded-arm S,E` | the pose it stands in and the arm's folded one, in counts | never stands | shoulder and elbow each at most 1,400 from folded |
 | `--stand-share N` | how much of the way up it goes, percent | 100 | 1 to 100 |
 | `--stand-seconds N` | fastest the whole way is travelled | 5 | 2 to 20 |

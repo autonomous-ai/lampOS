@@ -556,6 +556,75 @@ fn malformed_answer_replies_are_recorded_not_fatal() {
         assert_eq!(finish(worker), 1);
     }
 }
+/// A relay whose every call fails with the given error, as preliminary run 6's
+/// dropped connection did at full history's call 288 (2 Nov).
+struct Failing(fn() -> lamp_memory_bench::Error);
+impl Provider for Failing {
+    fn invoke(&mut self, _call: &Call, _deadline: Instant) -> Result<Reply> {
+        Err((self.0)())
+    }
+}
+fn failing(error: fn() -> lamp_memory_bench::Error) -> Worker {
+    let client = Client::new(
+        Failing(error),
+        Prices {
+            source: "offline".into(),
+            date: "2026-10-31".into(),
+            input_microusd_per_million: 1_000_000,
+            output_microusd_per_million: 1_000_000,
+        },
+        10_000_000,
+    )
+    .unwrap();
+    Worker::start(client).unwrap()
+}
+#[test]
+fn a_call_failed_in_transit_is_a_failed_question_but_a_refusal_ends_the_run() {
+    let dir = Directory::new();
+    let tail = respond(snapshot("model")) + &respond(recall(vec![]));
+    let mut worker =
+        failing(|| lamp_memory_bench::Error::Transport("chat connection or headers failed".into()));
+    let mut runner = setup(&dir, &mut worker, tail);
+    let mut recent = Conversation::default();
+    let mut logged = Vec::new();
+    let turn = Answerer {
+        runner: &mut runner,
+        worker: &mut worker,
+        recent: &mut recent,
+        timezone: "UTC",
+        mode: MemoryMode::Bounded,
+    }
+    .answer(&query(), |kind, _| {
+        logged.push(kind.to_string());
+        Ok(())
+    })
+    .unwrap();
+    assert!(turn.failed_call && !turn.malformed);
+    assert!(turn.answer.answer.is_empty() && !turn.answer.abstain);
+    assert!(logged.iter().any(|k| k == "answer_failed_call"));
+    // The reservation stays charged; the run's accounting is not stopped.
+    let account = worker
+        .finish(Instant::now() + Duration::from_secs(2))
+        .unwrap();
+    assert_eq!(account.receipts.len(), 1);
+    assert_eq!(account.receipts[0].outcome, "uncertain");
+    assert!(account.charged_microusd > 0);
+
+    let dir = Directory::new();
+    let tail = respond(snapshot("model")) + &respond(recall(vec![]));
+    let mut worker = failing(|| lamp_memory_bench::invalid("chat service refused request"));
+    let mut runner = setup(&dir, &mut worker, tail);
+    let mut recent = Conversation::default();
+    let refused = Answerer {
+        runner: &mut runner,
+        worker: &mut worker,
+        recent: &mut recent,
+        timezone: "UTC",
+        mode: MemoryMode::Bounded,
+    }
+    .answer(&query(), |_, _| Ok(()));
+    assert!(refused.is_err(), "a refused request still ends the run");
+}
 #[test]
 fn two_read_only_recalls_in_one_batch_both_reach_the_answer() {
     let dir = Directory::new();

@@ -86,12 +86,18 @@ pub const NOT_A_NAME: &str = "id must be the app's name";
 pub const NOT_INSTALLED: &str = "no app by that name is installed";
 /// The helper's socket isn't there or did not answer.
 pub const HELPER_UNREACHED: &str = "the lamp's app helper can't be reached now";
+/// The helper is at it still: it did not answer in [`HELPER_WAIT`]. Said as a
+/// plain sentence where a call has no "still going" answer; an install and a
+/// remove answer "still installing" / "still removing" instead.
+pub const HELPER_LATE: &str = "the lamp's app helper is still busy: look again in a moment";
 /// lamp-control's admin socket isn't there or did not answer.
 pub const CONTROL_UNREACHED: &str = "the lamp's control can't be reached now";
 
 /// What an app's state is, as the Apps page shows it.
 pub mod state {
     pub const INSTALLING: &str = "installing";
+    /// The page says "Removing...".
+    pub const REMOVING: &str = "removing";
     pub const RUNNING: &str = "running";
     pub const STOPPED: &str = "stopped";
     /// systemd gave up after the unit's restart limit: the owner starts it.
@@ -150,7 +156,15 @@ pub trait Backend: Send + Sync {
     fn stage(&self, path: &Path, bytes: &[u8]) -> Result<(), String>;
     /// The staged file gone (no error if it is not there).
     fn unstage(&self, path: &Path);
+    /// Staged files left more than `older` ago gone: what an install left for
+    /// a helper that was late. A backend with no folder does nothing.
+    fn unstage_older(&self, _older: Duration) {}
 }
+
+/// How long a staged package may stay: past the owner's yes (it expires at
+/// 10 minutes in lamp-control) the helper can no longer use it, and no install
+/// takes this long (a download is bounded at 2 minutes).
+pub const STAGED_FOR: Duration = Duration::from_secs(10 * 60);
 
 /// What the broker asks of: the backend, and nothing else.
 pub struct Apps {
@@ -336,7 +350,14 @@ impl Apps {
             self.backend
                 .control(&Wire::yes("remove", &name, &package, &[], false, false))?;
         refused(&recorded)?;
-        let answer = self.backend.helper(&Wire::remove(&name))?;
+        let answer = match self.backend.helper(&Wire::remove(&name)) {
+            // The helper waits for the app's processes to go: not yet is
+            // "removing" (the list says so), never a failure.
+            Err(late) if late == HELPER_LATE => {
+                return Ok(json!({ "id": name, "removed": false, "removing": true }));
+            }
+            other => other?,
+        };
         refused(&answer)?;
         Ok(json!({ "id": name, "removed": true }))
     }
@@ -385,8 +406,10 @@ impl Apps {
 
 /// The state the page shows: a mark first, then systemd's word.
 pub fn state_of(marks: &Marks, unit: &Unit) -> &'static str {
-    if marks.installing || marks.removing {
+    if marks.installing {
         state::INSTALLING
+    } else if marks.removing {
+        state::REMOVING
     } else if unit.active {
         state::RUNNING
     } else if unit.gave_up && !marks.stopped {
@@ -665,6 +688,8 @@ impl Drop for Looking {
 
 /// One look: the pushes it owes.
 pub fn look(backend: &dyn Backend, watching: &Mutex<Watch>, now: Instant) -> Vec<Outcome> {
+    // A late install's staged file does not stay past the owner's yes.
+    backend.unstage_older(STAGED_FOR);
     let mut names = backend.names();
     names.retain(|name| lamp_apps::name::app_name_ok(name));
     let mut pushes = Vec::new();
@@ -775,13 +800,34 @@ fn install_run(backend: &dyn Backend, asked: &Asked) -> Result<Value, String> {
             logs: false,
         };
         refused(&backend.control(&Wire::yes(op, &asked.id, &package, &grants, net, logs))?)?;
-        let answer = backend.helper(&Wire::install(&path))?;
+        let answer = match backend.helper(&Wire::install(&path)) {
+            // No answer in time is not a failure: the helper is at it, and
+            // the page shows "installing" by its mark. A helper that never
+            // answers is covered by lamp-control's yes expiring (10 min).
+            Err(late) if late == HELPER_LATE => {
+                return Ok((
+                    json!({"id": asked.id, "version": asked.version, "updated": updated, "installing": true}),
+                    true,
+                ));
+            }
+            other => other?,
+        };
         refused(&answer)?;
-        Ok(json!({"id": asked.id, "version": asked.version, "updated": updated}))
+        Ok((
+            json!({"id": asked.id, "version": asked.version, "updated": updated}),
+            false,
+        ))
     })();
-    // The helper never deletes it: lampos owns the folder.
-    backend.unstage(&path);
-    result
+    match result {
+        // The helper may still be reading the staged file: it stays, and the
+        // watcher clears it after `STAGED_FOR` (`unstage_older`).
+        Ok((answer, true)) => Ok(answer),
+        other => {
+            // The helper never deletes it: lampos owns the folder.
+            backend.unstage(&path);
+            other.map(|(answer, _)| answer)
+        }
+    }
 }
 
 /// The product's files, systemd and sockets.
@@ -807,6 +853,7 @@ pub fn ask(
     line: &Value,
     within: Duration,
     unreached: &str,
+    late: &str,
 ) -> Result<Value, String> {
     let io = |_: std::io::Error| unreached.to_owned();
     let mut stream = UnixStream::connect(socket).map_err(io)?;
@@ -818,7 +865,11 @@ pub fn ask(
     let mut reply = String::new();
     BufReader::new(stream.take(64 * 1024))
         .read_line(&mut reply)
-        .map_err(io)?;
+        .map_err(|error| match error.kind() {
+            // Connected and asked, and no answer in time: it is at it.
+            std::io::ErrorKind::WouldBlock | std::io::ErrorKind::TimedOut => late.to_owned(),
+            _ => unreached.to_owned(),
+        })?;
     serde_json::from_str(reply.trim()).map_err(|_| unreached.to_owned())
 }
 
@@ -945,11 +996,23 @@ impl Backend for Real {
     }
 
     fn helper(&self, line: &Value) -> Result<Value, String> {
-        ask(&self.helper, line, HELPER_WAIT, HELPER_UNREACHED)
+        ask(
+            &self.helper,
+            line,
+            HELPER_WAIT,
+            HELPER_UNREACHED,
+            HELPER_LATE,
+        )
     }
 
     fn control(&self, line: &Value) -> Result<Value, String> {
-        ask(&self.control, line, CONTROL_WAIT, CONTROL_UNREACHED)
+        ask(
+            &self.control,
+            line,
+            CONTROL_WAIT,
+            CONTROL_UNREACHED,
+            CONTROL_UNREACHED,
+        )
     }
 
     fn download(&self, url: &str, most: u64) -> Result<Vec<u8>, String> {
@@ -1019,6 +1082,29 @@ impl Backend for Real {
     fn unstage(&self, path: &Path) {
         let _ = std::fs::remove_file(path);
     }
+
+    fn unstage_older(&self, older: Duration) {
+        let Ok(entries) = std::fs::read_dir(&self.layout.staging) else {
+            return;
+        };
+        for entry in entries.flatten() {
+            let name = entry.file_name();
+            let name = name.to_string_lossy();
+            if !(name.ends_with(".tar") || name.ends_with(".part")) {
+                continue;
+            }
+            let aged = entry
+                .metadata()
+                .ok()
+                .filter(|meta| meta.is_file())
+                .and_then(|meta| meta.modified().ok())
+                .and_then(|at| at.elapsed().ok())
+                .is_some_and(|age| age > older);
+            if aged {
+                let _ = std::fs::remove_file(entry.path());
+            }
+        }
+    }
 }
 
 /// The package could not be fetched.
@@ -1041,6 +1127,8 @@ pub mod tests {
         pub helper_answer: Option<Value>,
         pub control_answer: Option<Value>,
         pub helper_down: bool,
+        /// The helper took the line and has not answered in its wait.
+        pub helper_late: bool,
         /// What `download` gives, the whole package.
         pub package: Option<Vec<u8>>,
     }
@@ -1106,6 +1194,9 @@ pub mod tests {
             if self.helper_down {
                 return Err(HELPER_UNREACHED.into());
             }
+            if self.helper_late {
+                return Err(HELPER_LATE.into());
+            }
             Ok(self.helper_answer.clone().unwrap_or(json!({"ok": true})))
         }
         fn download(&self, url: &str, _most: u64) -> Result<Vec<u8>, String> {
@@ -1127,6 +1218,12 @@ pub mod tests {
                 .lock()
                 .unwrap()
                 .push(format!("unstage {}", path.display()));
+        }
+        fn unstage_older(&self, older: Duration) {
+            self.lines
+                .lock()
+                .unwrap()
+                .push(format!("unstage_older {}", older.as_secs()));
         }
         fn control(&self, line: &Value) -> Result<Value, String> {
             self.lines.lock().unwrap().push(format!("control {line}"));
@@ -1207,7 +1304,15 @@ pub mod tests {
             removing: true,
             ..none
         };
-        assert_eq!(state_of(&removing, &unit(false, false)), "installing");
+        assert_eq!(state_of(&removing, &unit(false, false)), "removing");
+        assert_eq!(state_of(&removing, &unit(true, false)), "removing");
+        // Both marks (not a state the helper makes): installing is said.
+        let both = Marks {
+            installing: true,
+            removing: true,
+            ..none
+        };
+        assert_eq!(state_of(&both, &unit(false, false)), "installing");
     }
 
     #[test]
@@ -1487,6 +1592,106 @@ pub mod tests {
         assert!(lines[at("app_yes_record")].contains(r#""op":"install""#));
         assert!(lines[at("app_yes_record")].contains(r#""grants":["hear","speak"]"#));
         assert!(lines[at(r#"helper {"install""#)].contains(&format!("/staging/{sha}.tar")));
+    }
+
+    #[test]
+    fn a_helper_that_is_late_answers_still_installing_never_a_failure_and_the_staged_file_stays() {
+        let (bytes, sha) = package_of(json!({"name": "x1", "version": "1.0.0", "grants": []}));
+        let fake = Arc::new(Fake {
+            package: Some(bytes.clone()),
+            helper_late: true,
+            ..Default::default()
+        });
+        let done = install_run(&Shared(fake.clone()), &asked_for("x1", "1.0.0", &sha)).unwrap();
+        assert_eq!(
+            done,
+            json!({"id": "x1", "version": "1.0.0", "updated": false, "installing": true})
+        );
+        let lines = fake.lines.lock().unwrap().clone();
+        assert!(!lines.iter().any(|l| l.starts_with("unstage")), "{lines:?}");
+        // A helper that is not there is still a failure, and the file goes.
+        let down = Arc::new(Fake {
+            package: Some(bytes),
+            helper_down: true,
+            ..Default::default()
+        });
+        let error =
+            install_run(&Shared(down.clone()), &asked_for("x1", "1.0.0", &sha)).unwrap_err();
+        assert_eq!(error, HELPER_UNREACHED);
+        assert!(
+            down.lines
+                .lock()
+                .unwrap()
+                .iter()
+                .any(|l| l.starts_with("unstage"))
+        );
+    }
+
+    #[test]
+    fn a_remove_the_helper_has_not_finished_answers_removing_and_the_list_says_so() {
+        let mut fake = Fake::default();
+        let mut app = Fake::app("x1");
+        app.4 = Some(Package {
+            version: "1.0.0".into(),
+            sha256: "a".repeat(64),
+            grants: Vec::new(),
+            net: false,
+            logs: false,
+        });
+        fake.apps.push(app);
+        fake.helper_late = true;
+        let (apps, _) = apps(fake);
+        assert_eq!(
+            apps.answer(REMOVE_KIND, &json!({"id": "x1"})).unwrap(),
+            Some(json!({"id": "x1", "removed": false, "removing": true}))
+        );
+    }
+
+    #[test]
+    fn a_socket_that_takes_the_line_and_never_answers_is_late_not_unreached() {
+        let dir = std::env::temp_dir().join(format!("blue-late-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let socket = dir.join("s.sock");
+        let _ = std::fs::remove_file(&socket);
+        let listener = std::os::unix::net::UnixListener::bind(&socket).unwrap();
+        let keeper = std::thread::spawn(move || {
+            let held = listener.accept().unwrap();
+            std::thread::sleep(Duration::from_millis(600));
+            drop(held);
+        });
+        let late = ask(
+            &socket,
+            &json!({"x": 1}),
+            Duration::from_millis(150),
+            "unreached",
+            "late",
+        );
+        assert_eq!(late.unwrap_err(), "late");
+        keeper.join().unwrap();
+        let gone = ask(
+            &dir.join("none.sock"),
+            &json!({}),
+            Duration::from_millis(50),
+            "unreached",
+            "late",
+        );
+        assert_eq!(gone.unwrap_err(), "unreached");
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn settings_set_passes_lamp_controls_refusal_word_for_word_the_key_and_the_why() {
+        let mut fake = Fake::default();
+        fake.apps.push(Fake::app("x1"));
+        fake.control_answer = Some(json!({"refused": "volume: not a setting of this app"}));
+        let (apps, _) = apps(fake);
+        let error = apps
+            .answer(
+                SETTINGS_SET_KIND,
+                &json!({"id": "x1", "values": {"volume": 3}}),
+            )
+            .unwrap_err();
+        assert_eq!(error, "volume: not a setting of this app");
     }
 
     #[test]
@@ -1939,6 +2144,57 @@ pub mod tests {
         assert!(!real.package("x1").unwrap().logs);
         std::fs::write(current.join(RECORD_FILE), record(r#""logs":true,"#)).unwrap();
         assert!(real.package("x1").unwrap().logs);
+    }
+
+    #[test]
+    fn staged_files_older_than_the_yes_window_go_and_newer_ones_and_others_stay() {
+        let dir = tempfile::tempdir().unwrap();
+        let real = Real {
+            layout: lamp_apps::layout::Layout {
+                code: dir.path().to_owned(),
+                data: dir.path().to_owned(),
+                private: dir.path().to_owned(),
+                state: dir.path().to_owned(),
+                staging: dir.path().to_owned(),
+                lock_wait: Duration::from_secs(1),
+            },
+            helper: "/nowhere".into(),
+            control: "/nowhere".into(),
+        };
+        let old = std::time::SystemTime::now() - Duration::from_secs(11 * 60);
+        for (name, aged) in [
+            ("old.tar", true),
+            ("old.tar.part", true),
+            ("new.tar", false),
+            ("old.txt", true),
+        ] {
+            let path = dir.path().join(name);
+            std::fs::write(&path, b"x").unwrap();
+            if aged {
+                std::fs::File::options()
+                    .write(true)
+                    .open(&path)
+                    .unwrap()
+                    .set_modified(old)
+                    .unwrap();
+            }
+        }
+        real.unstage_older(STAGED_FOR);
+        let left = |name: &str| dir.path().join(name).exists();
+        assert!(!left("old.tar") && !left("old.tar.part"));
+        assert!(left("new.tar") && left("old.txt"));
+    }
+
+    #[test]
+    fn the_watcher_clears_stale_staged_files_each_look() {
+        let fake = Fake::default();
+        let watching = Mutex::new(Watch::default());
+        let _ = look(&fake, &watching, Instant::now());
+        let lines = fake.lines.lock().unwrap().clone();
+        assert!(
+            lines.contains(&format!("unstage_older {}", STAGED_FOR.as_secs())),
+            "{lines:?}"
+        );
     }
 
     #[test]

@@ -493,6 +493,39 @@ fn the_kept_answer_on_reports_is_read_as_kept() {
     assert!(!lamp_setup::serve::kept_share_reports(&path));
 }
 
+/// #7767: with `LAMP_NOTICING_BY_DEFAULT` on, no record is a yes; a kept no
+/// and a record that can't be read stay no either way. Off, no record is
+/// no, as before.
+#[test]
+fn no_kept_answer_on_reports_is_the_default_only_with_the_switch() {
+    let root = Root::new();
+    let path = root.config(false).reports;
+    assert!(
+        !lamp_setup::serve::kept_share_reports_or(&path, false),
+        "missing, off"
+    );
+    assert!(
+        lamp_setup::serve::kept_share_reports_or(&path, true),
+        "missing, on"
+    );
+    fs::create_dir_all(path.parent().unwrap()).unwrap();
+    for kept in [
+        lamp_setup::serve::reports_record(false, std::time::SystemTime::now()).to_string(),
+        "not json".to_owned(),
+        json!({"share": true, "asked": 2}).to_string(),
+    ] {
+        fs::write(&path, &kept).unwrap();
+        assert!(
+            !lamp_setup::serve::kept_share_reports_or(&path, true),
+            "{kept}"
+        );
+        assert!(
+            !lamp_setup::serve::kept_share_reports_or(&path, false),
+            "{kept}"
+        );
+    }
+}
+
 #[test]
 fn a_wrong_password_saves_nothing_and_names_the_reason() {
     let status = Arc::new(Mutex::new(Status::new("lamp-4ace".into())));

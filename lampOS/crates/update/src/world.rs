@@ -90,6 +90,19 @@ pub trait Systemd {
     fn thaw_harness_unit(&mut self) -> Result<(), String> {
         Err("this systemd cannot thaw the Harness unit".to_owned())
     }
+    /// `systemctl show` of [`crate::openclaw_install::LOADED`] for
+    /// OpenClaw's gateway, [`crate::openclaw_install::UNIT`], and only it
+    /// (#7879). A systemd that cannot say refuses: the loaded unit is then
+    /// not checked.
+    fn gateway_unit_properties(&mut self) -> Result<String, String> {
+        Err("this systemd cannot show OpenClaw's gateway unit".to_owned())
+    }
+    /// `systemctl try-restart` of [`crate::openclaw_install::UNIT`], and
+    /// only it (#7879): restarted only if it runs. A systemd that cannot
+    /// refuses.
+    fn try_restart_gateway(&mut self) -> Result<(), String> {
+        Err("this systemd cannot restart OpenClaw's gateway".to_owned())
+    }
     /// When [`crate::writer_swap::BACK_UNIT`]'s program last began, in Unix
     /// milliseconds to the second below (`ExecMainStartTimestamp`): none
     /// when it never began, or when systemd cannot say. A `failed` from a
@@ -243,6 +256,27 @@ impl Systemd for Systemctl {
         run(
             &["start", "--no-block", crate::harness_install::UNIT],
             JOURNAL_WITHIN,
+        )
+    }
+
+    fn gateway_unit_properties(&mut self) -> Result<String, String> {
+        use crate::openclaw_install::{LOADED, UNIT};
+        show_within(
+            Command::new("systemctl").args([
+                "show",
+                "--no-pager",
+                &format!("--property={LOADED}"),
+                "--",
+                UNIT,
+            ]),
+            JOURNAL_WITHIN,
+        )
+    }
+
+    fn try_restart_gateway(&mut self) -> Result<(), String> {
+        run(
+            &["try-restart", "--", crate::openclaw_install::UNIT],
+            self.restart_within,
         )
     }
 

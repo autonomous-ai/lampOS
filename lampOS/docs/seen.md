@@ -30,7 +30,36 @@ seventh line. The lead approved all seven, adding to the seventh that the
 lamp also says once when the opt-in is turned off.
 
 1. **The opt-in is off by default.** It is the owner's yes on that lamp,
-   given in the app or spoken.
+   given in the app or spoken. `LAMP_NOTICING_BY_DEFAULT=on` (#7767,
+   switches.md; off unless set, in no unit) turns a missing
+   `seen-activity.json` into a yes nobody gave (`"by":"default"`, no
+   time), by `lamp_msgs::consent::allowed`'s one rule, shared with face
+   expressions, room sounds and health reports: exactly `"yes"` is on,
+   exactly `"no"` stays off with the switch on, and a file that can't be
+   read is off. With it off, a missing file is no, as before. With it on,
+   the voice's stop and the app's desk off keep a no (`consent::no_bytes`)
+   where today they remove the file (#7767, slice 2): the voice's
+   `stop_looking_at_my_desk` writes `"no"` (`"by":"voice"`) for seen
+   activity and face expressions both, under the mark's lock with the mark
+   raised, and the app's `desk_noticing` off writes it (`"by":"app"`) for
+   seen activity alone, with the mark raised to its `request_id`, so a late
+   app yes still loses to it. Face reads have their own switch in the app
+   (`consent.set`'s `face_expressions`, a later slice), so the app's desk
+   off and on leave them as they are. The stop's answer counts face reads
+   too: with only faces on it says it stopped, in its own line
+   (`seen_yes::STOPPED_FACES`, since lamp-seen says back only seen
+   activity's change). `look_at_my_desk` ("start looking again") keeps the
+   owner's own spoken yes with no offer and no "turn it on in the app",
+   turning a no in either file back to a yes, and says it is on already
+   only when both were (`LOOKING_FACES` when only faces come back); the
+   model judges the phrase from the two descriptions, and no function is
+   added. A forget removes only a kept yes and keeps a no, so it never
+   turns noticing on, and lamp-seen's forget latch holds only an explicit
+   yes, never the default's: the default is only a missing file
+   (`consent::Kept::by_default`), never a file's text, `"by":"default"`
+   or not. The voice's start and setup's walk leave a kept no in place too
+   ([onboarding.md](onboarding.md), "Room sounds"). The reset still removes
+   the file, the no too, so the next setup starts at the default.
 2. **The ring shows its mark whenever a frame is going out.**
 3. **No frames** while the privacy slide is on, nobody is at the desk, or
    the lamp is asleep. Phase 0 also closed on a stranger in view; the
@@ -289,7 +318,22 @@ and behind the gate, so a frame reaches it only while the gate is clear
 that one too, aborts a burst under way.
 
 - **One burst a minute** (`activity::EVERY_US`), of **8 frames**
-  (`activity::FRAMES`, the server's clip). The sink wants a frame
+  (`activity::FRAMES`, the server's clip). With `LAMP_SEEN_BURST_15S=on`
+  (exactly; dark, no unit sets it), the cloud may ask for one as often as
+  every 15 s (`activity::FAST_EVERY_US`, the owner's call on #7401, 19 Nov,
+  for the seen reactions) through the `/ping` reply's `seen_clip`
+  (`clip.rs`): lamp-cloud keeps it as
+  `/var/lib/lampos-cloud/seen-clip.json`, `{"every_s": N, "until_unix_s":
+  T}` in whole seconds (cloud.md), and lamp-seen reads it again every 2 s
+  (`opt_in::READ_EVERY`). It is a minute whenever lamp-seen hasn't heard:
+  no file, one that can't be read or is over 4096 bytes, not exactly those
+  two whole numbers, `every_s` outside 15–60 s, or `until_unix_s` reached.
+  With the switch off it is a minute whatever the cloud says; the heat
+  pace multiplies the period in force ("The board's heat"). At 15 s,
+  against a minute, a seated lamp then sends the
+  perception server four times the bursts and spends about four times the
+  encode and TLS work. At either rate a burst under way holds the next back
+  until it ends, so two never overlap and none is queued. The sink wants a frame
   (`Sink::ready`) only while a burst is due or under way with frames left,
   so between bursts no frame is asked for and the ring is not asked for its
   mark (`Marked` asks the sink inside first). The taker asks for the
@@ -411,12 +455,16 @@ that one too, aborts a burst under way.
   - `humans/doing` (`HumanDoing`): `drank_s_ago`, `ate_s_ago`,
     `break_s_ago` (always present), `last` and `confidence`, every 30 s
     while a sitting lasts (not while it is kept through a short
-    closing), and at once after a burst that saw something.
+    closing), and at once, with `humans/doing_more`, in the tick of a
+    burst's answer that saw a kind of it or raised any count
+    (`drank_seen`, `ate_seen`, `tired_seen`, `celebrate_seen`; #7401: a
+    count up is a seen reaction right away, not up to 30 s later); the
+    30 s beat goes on from that saying.
     It goes out whether or not frames do (the opt-in off, the server busy,
     the slide shut, no account given), so a skill's `[[while]] above` on a
     timer runs on the clock as it would without this part;
   - `humans/doing_seen` (`DoingSeen`): once for each kind newly seen, not
-    seen in the burst before;
+    seen in the burst before that answered;
   - with `LAMP_SEEN_MORE_DOINGS=on` only, `humans/doing_more`
     (`HumanDoingMore`), with `humans/doing` and as often: `tired_s_ago`
     and `tired_seen` (V1's `tired` group, a yawn, and a stretch of an arm
@@ -427,15 +475,21 @@ that one too, aborts a burst under way.
     "writing" and "drawing" `writing`; the kind of the surest such label)
     and `desk_s`, this sitting's desk-work time in seconds: the time
     between two bursts in a row that both saw desk work, each gap counted
-    up to the burst period (60 s), so a missed burst (busy, failed,
+    up to a minute (the default burst period, at either rate), so a missed burst (busy, failed,
     paused) never counts the long gap it leaves, and a burst without desk
     work ends the run (0 before two such bursts; a number only, no
     picture or label kept),
-    and `celebrate_s_ago` (V1's `celebrate` group), and `drank_seen` and
+    and `celebrate_seen` (V1's `celebrate` group), how often celebrating
+    was newly seen this sitting, counted as `tired_seen` is (#7401: each
+    one seen is one count, for the seen reactions), and `drank_seen` and
     `ate_seen`, how many drinks and how much eating were newly seen this
     sitting: exactly the sightings `humans/doing_seen` says, so a count is
     only of what was seen (the first builder's fourth change on #6543),
-    for A comfort break's "after 2 drinks". Every field always
+    for A comfort break's "after 2 drinks". Each count is of a move newly
+    seen: one seen in two bursts in a row that answered is one, and a burst
+    that did not answer (busy, failed) is no burst between them, so one
+    sip, bite, yawn or cheer caught either side of it counts once
+    (`Sitting::took`, the owner's call on #7401). Every field always
     there, each timer counting from the desk arrival; the same sureness
     rule, the same bursts, no more pictures, wiped with the sitting. They
     never set `last` or say `humans/doing_seen`: desk work shows in almost
@@ -845,12 +899,52 @@ model sees a close person (`hold.rs`):
 Off, `serve` is as without it: the shoulders are read from each answer and
 dropped, and nothing else changes.
 
+## The board's heat (`LAMP_HEAT_BACKOFF`)
+
+Off unless `LAMP_HEAT_BACKOFF=on` exactly, read once at start, in no unit
+yet (#7879, slice 3; lamp-health says the level, health.md "The board's
+heat"). On, `lamp-seen` reads the kept `board/heat` at most once a second
+(`heat.rs`, `HeatIn`), as lamp-body reads `room/presence`: a non-blocking
+read of the kept value, with no subscriber name. A value past its 15 s, from
+the future or not valid is ok: full speed.
+
+| Board | Bursts, start to start | Posture frames |
+|---|---|---|
+| ok | 60 s (`activity::EVERY_US`) | every 30 s (`pose::EVERY_US`) |
+| warm | 120 s | every 30 s |
+| hot | 240 s | one a minute (never paused) |
+
+- **A held sitting keeps posture at 30 s** (`Pace::holding`, Heron's HOLD
+  on #7927): while a hold is open (`LAMP_SEEN_HOLDS_SITTING`, "Held
+  sitting"), posture frames come every 30 s at any level, since a hold ends
+  with no close answer after 45 s (`hold::FIRST_ANSWER_US`) and ends on
+  someone else after two far answers in a row (`hold::FAR_IN_ROW`). Bursts
+  keep the level's pace. The window and the swap are as at ok.
+
+- **Only the next one moves:** a change counts from the last burst's start
+  or the last posture frame sent, so a hot board that cools brings the next
+  burst back to a minute after the last.
+- **Unchanged at every level:** the frames 1.2 s apart within a burst
+  (`SPACING_US`, the server's clip), a burst under way (it finishes), the
+  opt-in read every 2 s, and the gate closing on a stop, a forget, the
+  privacy or sleep (`Sink::stopped`). So no yes or stop is ever missed.
+- **The journal:** one line per pace change, for example `lamp-seen: board
+  hot: bursts every 240 s, posture one a minute` and `lamp-seen: board ok:
+  bursts every 60 s`. lamp-health's hysteresis keeps these to one change in
+  10 to 60 s at most (hot after 10 s, or at once when the board is held back).
+- **Tests:** `heat::tests` (each level's pace, the switch off, the line, a
+  stale, future or invalid value read as ok, a held sitting's posture at
+  hot), `activity::tests` (the next
+  burst at 240 s on a hot board and back; a stop still aborts a burst at
+  hot), `pose::tests` (one frame a minute at hot, not paused; a closed gate
+  still stops the request).
+
 ## The journal
 
 With activity on, `lamp-seen`'s journal says each burst and each posture
 sample, and what the server answered: diagnostics only, never a picture, an
 id or a name. A burst a minute and a sample each 30 s keep it to a few
-lines a minute.
+lines a minute (about fourteen at the cloud's fastest `seen_clip`, 15 s, with `LAMP_SEEN_BURST_15S=on`).
 
 By default the lines say only counts and outcomes: no label, confidence,
 score, risk, bad or good flag, region or bad share. The journal is kept on

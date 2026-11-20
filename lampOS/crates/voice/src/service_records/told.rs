@@ -90,6 +90,106 @@ const SUBJECT_BYTES: usize = 48;
 /// The most bytes of a reason in a line.
 const REASON_BYTES: usize = 64;
 
+/// Linked records told (the linked-service memory plan, slice 8): only the
+/// exact value `on`, beside this file's switch and `LAMP_SERVICE_RECORDS`,
+/// on the second route.
+pub const LINKED_ENVIRONMENT: &str = "LAMP_SERVICE_RECORDS_LINKED_TOLD";
+/// The most linked lines in the note, beside the connector records'.
+pub const LINKED_SHOWN: usize = 2;
+/// A linked line is told only when its record changed within this: a day.
+pub const LINKED_WITHIN_MS: u64 = 86_400_000;
+/// The most linked records among a recall's [`RECALL_MOST`].
+pub const RECALL_LINKED_MOST: usize = 3;
+/// What a recall asks of the memory with linked records told, at most
+/// [`RECALL_LINKED_MOST`] of them linked (`linked_most`): room for
+/// [`RECALL_MOST`] connector records past the linked ones, however many
+/// later linked records match as well (Jarvis's P2 on #7572).
+pub const RECALL_ASKED: u64 = 2 * RECALL_MOST;
+/// Told with linked lines.
+pub const LINKED_RULE: &str = "Lines tagged [task], [agent] or [reminder] are work handed on for the owner, with its one-line summary only: never add to it.";
+/// Told with linked lines in full when `record_source` is offered.
+pub const LINKED_SOURCE_RULE: &str = "For more of one, call record_source with its key.";
+
+#[cfg(not(test))]
+mod linked_switch {
+    use std::sync::LazyLock;
+
+    pub fn on() -> bool {
+        static ON: LazyLock<bool> =
+            LazyLock::new(|| std::env::var(super::LINKED_ENVIRONMENT).as_deref() == Ok("on"));
+        *ON
+    }
+}
+
+#[cfg(test)]
+mod linked_switch {
+    use std::cell::Cell;
+
+    thread_local! {
+        pub static ON: Cell<bool> = const { Cell::new(false) };
+    }
+
+    pub fn on() -> bool {
+        ON.with(Cell::get)
+    }
+}
+
+/// Whether linked records are told ([`LINKED_ENVIRONMENT`]): only with
+/// records told.
+pub fn linked_on() -> bool {
+    linked_switch::on() && on()
+}
+
+/// Tests: linked records told on or off on this thread.
+#[cfg(test)]
+pub fn linked_on_for_test(on: bool) {
+    linked_switch::ON.with(|cell| cell.set(on));
+}
+
+/// Whether a record the memory listed is of a linked kind.
+fn is_linked(item: &Value) -> bool {
+    item["source_kind"]
+        .as_str()
+        .is_some_and(|kind| kind != "voice")
+}
+
+/// A linked record in one line. In full: "[task] Book the dentist · done ·
+/// today 15:40 · key t-s1-7". Not in full: its kind, status and when only.
+pub fn linked_line(
+    change: &super::linked::Linked,
+    now_ms: u64,
+    offset: i32,
+    in_full: bool,
+) -> String {
+    let changed = when(change.changed_ms, now_ms, offset);
+    let status = status_word(change.status);
+    if in_full {
+        format!(
+            "[{}] {} · {status} · {changed} · key {}",
+            change.kind.wire(),
+            super::tidy(&change.summary, super::linked::SUMMARY_BYTES),
+            change.key
+        )
+    } else {
+        format!("[{}] · {status} · {changed}", change.kind.wire())
+    }
+}
+
+/// `person`'s linked lines for the note: the latest [`LINKED_SHOWN`]
+/// changed within [`LINKED_WITHIN_MS`], latest first.
+fn linked_lines(person: &str, now_ms: u64, offset: i32, in_full: bool) -> Vec<String> {
+    let mut recent: Vec<_> = super::linked::recent_of(person)
+        .into_iter()
+        .filter(|change| now_ms.saturating_sub(change.changed_ms) <= LINKED_WITHIN_MS)
+        .collect();
+    recent.sort_by(|a, b| (b.changed_ms, &b.key).cmp(&(a.changed_ms, &a.key)));
+    recent
+        .iter()
+        .take(LINKED_SHOWN)
+        .map(|change| linked_line(change, now_ms, offset, in_full))
+        .collect()
+}
+
 #[cfg(not(test))]
 mod switch {
     use std::sync::LazyLock;
@@ -217,9 +317,9 @@ fn is_read(record: &Record) -> bool {
         || record.detail.get("what").is_some()
 }
 
-/// How it went, as a line says it, with its reason in full.
-fn status_said(record: &Record, in_full: bool) -> String {
-    let status = match record.status {
+/// A status as a line says it.
+fn status_word(status: Status) -> &'static str {
+    match status {
         Status::Prepared => "waiting for a send",
         Status::Done => "done",
         Status::Cancelled => "cancelled",
@@ -227,7 +327,12 @@ fn status_said(record: &Record, in_full: bool) -> String {
         Status::Failed => "failed",
         Status::TimedOut => "timed out",
         Status::NoResult => "no result",
-    };
+    }
+}
+
+/// How it went, as a line says it, with its reason in full.
+fn status_said(record: &Record, in_full: bool) -> String {
+    let status = status_word(record.status);
     let reason = super::tidy(&record.reason, REASON_BYTES);
     if in_full && !reason.is_empty() && !matches!(record.status, Status::Done | Status::NoResult) {
         format!("{status}: {reason}")
@@ -374,8 +479,22 @@ pub fn note_of(
     offset: i32,
     in_full: bool,
 ) -> Option<String> {
+    note_with(records, &[], person, now_ms, offset, in_full)
+}
+
+/// [`note_of`] with `linked` lines ([`linked_lines`]) after the records',
+/// and [`LINKED_RULE`]: never dropped for the bytes, the records' lines
+/// going first.
+pub fn note_with(
+    records: &[Record],
+    linked: &[String],
+    person: &str,
+    now_ms: u64,
+    offset: i32,
+    in_full: bool,
+) -> Option<String> {
     let chosen = chosen(records, person, now_ms);
-    if chosen.is_empty() {
+    if chosen.is_empty() && linked.is_empty() {
         return None;
     }
     let head = format!(
@@ -411,6 +530,18 @@ pub fn note_of(
                 all - lines.len()
             ));
         }
+        for line in linked {
+            note.push_str("\n- ");
+            note.push_str(line);
+        }
+        if !linked.is_empty() {
+            note.push('\n');
+            note.push_str(LINKED_RULE);
+            if in_full && super::source::on() {
+                note.push(' ');
+                note.push_str(LINKED_SOURCE_RULE);
+            }
+        }
         if marked {
             note.push('\n');
             note.push_str(&quoted);
@@ -438,7 +569,12 @@ pub fn note_now(owner: Option<&str>, in_full: bool, now_ms: u64, offset: i32) ->
     }
     let person = whose(Some(owner?))?;
     load_ahead(&person);
-    note_of(&super::held(), &person, now_ms, offset, in_full)
+    let linked = if linked_on() {
+        linked_lines(&person, now_ms, offset, in_full)
+    } else {
+        Vec::new()
+    };
+    note_with(&super::held(), &linked, &person, now_ms, offset, in_full)
 }
 
 /// The memory id the records of a line of `owner`'s (`services::owner_of`)
@@ -497,12 +633,29 @@ pub fn merge(person: &str, answer: &Value, now_ms: u64, forgets_before: u64) {
     if answer["ok"] != true {
         return;
     }
+    let linked = linked_on();
     let listed: Vec<Record> = answer["records"]
         .as_array()
         .into_iter()
         .flatten()
+        .filter(|item| !(linked && is_linked(item)))
         .filter_map(|item| from_memory(person, item))
         .collect();
+    // Linked records go to the note's own list, never the connector
+    // records' ledger (`LAMP_SERVICE_RECORDS_LINKED_TOLD`).
+    if linked {
+        let forgets = super::forgets();
+        let changes: Vec<super::linked::Linked> = answer["records"]
+            .as_array()
+            .into_iter()
+            .flatten()
+            .filter_map(|item| super::linked::Linked::from_listed(person, item))
+            .collect();
+        if forgets == forgets_before {
+            // The list is the latest first: the oldest is put in front last.
+            changes.into_iter().for_each(super::linked::listed);
+        }
+    }
     let changes: Vec<Record> = kept::ledger(|ledger| {
         let mut changes = Vec::new();
         // A forget ran since the list was asked: it may hold what was
@@ -550,7 +703,44 @@ pub fn merge(person: &str, answer: &Value, now_ms: u64, forgets_before: u64) {
 
 /// The memory's request for `person`'s records about a recall's words.
 pub fn about_request(person: &str, about: &str) -> Value {
+    if linked_on() {
+        return json!({
+            "op":"service_records","person":person,"about":about,
+            "limit":RECALL_ASKED,"linked_most":RECALL_LINKED_MOST,
+        });
+    }
     json!({"op":"service_records","person":person,"about":about,"limit":RECALL_MOST})
+}
+
+/// Of the records a recall found, the memory's best first, those told
+/// with linked records told: every connector record up to
+/// [`RECALL_MOST`], then the linked ones in the room left, at most
+/// [`RECALL_LINKED_MOST`], so a linked record never pushes a connector one
+/// out. In the memory's order.
+fn recall_chosen(items: &[Value]) -> Vec<&Value> {
+    let most = usize::try_from(RECALL_MOST).unwrap_or(usize::MAX);
+    let connector = items
+        .iter()
+        .filter(|item| !is_linked(item))
+        .count()
+        .min(most);
+    let mut linked_room = RECALL_LINKED_MOST.min(most - connector);
+    let mut connector_room = connector;
+    items
+        .iter()
+        .filter(|item| {
+            let room = if is_linked(item) {
+                &mut linked_room
+            } else {
+                &mut connector_room
+            };
+            if *room == 0 {
+                return false;
+            }
+            *room -= 1;
+            true
+        })
+        .collect()
 }
 
 /// What a recall is told of the records the memory found (`answer`), or
@@ -570,11 +760,35 @@ pub fn recall_told(
     if answer["ok"] != true {
         return None;
     }
-    let records: Vec<Value> = answer["records"]
-        .as_array()?
-        .iter()
-        .filter_map(|item| from_memory("", item))
+    let items = answer["records"].as_array()?;
+    let linked = linked_on();
+    let items: Vec<&Value> = if linked {
+        recall_chosen(items)
+    } else {
+        items.iter().collect()
+    };
+    let records: Vec<Value> = items
+        .into_iter()
+        .filter_map(|item| {
+            if linked && let Some(change) = super::linked::Linked::from_listed("", item) {
+                let mut told = json!({
+                    "summary": linked_line(&change, now_ms, offset, in_full),
+                    "kind": change.kind.wire(),
+                    "status": change.status.wire(),
+                    "changed": when(change.changed_ms, now_ms, offset),
+                });
+                if in_full {
+                    told["key"] = json!(change.key);
+                }
+                return Some(Err(told));
+            }
+            from_memory("", item).map(Ok)
+        })
         .map(|record| {
+            let record = match record {
+                Ok(record) => record,
+                Err(told) => return told,
+            };
             if !in_full {
                 return json!({
                     "summary": line(&record, now_ms, offset, false),
@@ -732,3 +946,6 @@ pub fn load_ahead(_person: &str) {}
 
 #[cfg(test)]
 mod tests;
+
+#[cfg(test)]
+mod linked_tests;

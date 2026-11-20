@@ -789,8 +789,26 @@ fn run() -> Result<()> {
             )?;
         }
         // probe-tools PROVIDER_CONFIG SECOND_CONFIG [RUNS] [--recall | --when | --nightly | --keep [--keep-said]]
+        // probe-tools PROVIDER_CONFIG SECOND_CONFIG --doubt [--wording new|old|off] [--times N]
         [command, provider_config, second_config, rest @ ..] if command == "probe-tools" => {
-            let usage = || io::Error::other("usage: probe-tools PROVIDER_CONFIG SECOND_CONFIG [RUNS of 1 to 20] [--recall | --when | --nightly | --keep [--keep-said]]");
+            let usage = || io::Error::other("usage: probe-tools PROVIDER_CONFIG SECOND_CONFIG [RUNS of 1 to 20] [--recall | --when | --nightly | --keep [--keep-said]], or --doubt [--wording new|old|off] [--times 1 to 20]");
+            if rest.first().is_some_and(|first| first == "--doubt") {
+                use lamp_voice::second_provider::probe::doubt::Wording;
+                let (mut runs, mut wordings) = (3, Wording::ALL.to_vec());
+                let mut options = rest[1..].iter();
+                while let Some(option) = options.next() {
+                    let value = options.next().ok_or_else(usage)?;
+                    match option.as_str() {
+                        "--times" => runs = value.parse().ok().filter(|runs| (1..=20).contains(runs)).ok_or_else(usage)?,
+                        "--wording" => wordings = vec![Wording::parse(value).ok_or_else(usage)?],
+                        _ => return Err(usage().into()),
+                    }
+                }
+                tokio::runtime::Builder::new_current_thread().enable_all().build()?.block_on(
+                    lamp_voice::second_provider::probe::doubt::run(Path::new(provider_config), Path::new(second_config), runs, &wordings),
+                )?;
+                return Ok(());
+            }
             let (rest, keep_said) = match rest {
                 [first @ .., last] if last == "--keep-said" => (first, true),
                 _ => (rest, false),

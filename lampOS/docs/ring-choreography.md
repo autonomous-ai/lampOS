@@ -384,6 +384,22 @@ while muted and there is nothing to pulse over. Switched on without the face
 says so once as the service starts, with the reason, rather than pulse
 nothing (`pulse_without_face`; the first builder on #1545).
 
+**The restart guard's mute (#7224, `LAMP_GUARD_SIGN=on`).** The guard's mute
+(#960) wakes as sleep does, with a tap or a hand kept a second on the head,
+but it looked like a mute the person chose, so nobody knew to tap. While the
+mute is the guard's (`HandControls::restored_after_fault`), the asleep face
+pulses once a minute: the whole ring swells in the offline breath's amber
+(`ring_face::OFFLINE_TINT`, its red at most the face's peak) and back, eased,
+over 4 s (`ring_asleep::guard_pixels`). The first comes 3 s after the wait's
+first look finds the guard's mute, once the face has come in
+(`GUARD_FIRST_AFTER`), and one each minute from then, with no half-hour
+bound: the mute holds until someone taps. The wait tells the painter on each
+look (`Owed::guard`); from the look where the mute is no longer the guard's,
+lifted or chosen by the person, it tells none, and the pulse stops. A
+person's own mute, a hand's sleep and a lamp asleep when the voice faulted
+(which comes back asleep, since no run arms the guard while muted) never
+show it. It needs `LAMP_RING_ASLEEP=on`; nothing is said aloud.
+
 **A tap on the head while muted (#711, First on #711, 17 Oct 10:18).** A
 tap still gets an answer, but nothing moves and nothing is heard: the ring
 shows the asleep face for about a second (`TAP_SHOWS`, 1 s). It comes at
