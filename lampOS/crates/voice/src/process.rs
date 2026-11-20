@@ -2958,6 +2958,8 @@ fn second_route_worker_environment(
         crate::pause_join::ENVIRONMENT,
         crate::second_provider::OPEN_NAME_ENVIRONMENT,
         crate::second_provider::NAME_CARRIES_ENVIRONMENT,
+        // A call's heard words past the name judged as words (#8073).
+        crate::second_provider::CALL_WORDS_OVER_WAIT_ENVIRONMENT,
         crate::second_provider::FIRST_SECONDS_QUIET_ENVIRONMENT,
         lamp_msgs::NameHeard::NEAR_ENVIRONMENT,
         // The name said as a sentence of its own, with the near hearing (#5277).
@@ -3446,6 +3448,7 @@ mod tests {
             crate::pause_join::ENVIRONMENT,
             crate::second_provider::OPEN_NAME_ENVIRONMENT,
             crate::second_provider::NAME_CARRIES_ENVIRONMENT,
+            crate::second_provider::CALL_WORDS_OVER_WAIT_ENVIRONMENT,
             crate::second_provider::FIRST_SECONDS_QUIET_ENVIRONMENT,
             lamp_msgs::NameHeard::NEAR_ENVIRONMENT,
             crate::second_provider::NAME_AS_A_SENTENCE_ENVIRONMENT,
@@ -4643,6 +4646,7 @@ mod tests {
                     || name == crate::pause_join::ENVIRONMENT
                     || name == crate::second_provider::OPEN_NAME_ENVIRONMENT
                     || name == crate::second_provider::NAME_CARRIES_ENVIRONMENT
+                    || name == crate::second_provider::CALL_WORDS_OVER_WAIT_ENVIRONMENT
                     || name == crate::second_provider::FIRST_SECONDS_QUIET_ENVIRONMENT
                     || name == lamp_msgs::NameHeard::NEAR_ENVIRONMENT
                     || name == crate::second_provider::NAME_AS_A_SENTENCE_ENVIRONMENT
@@ -4800,6 +4804,7 @@ mod tests {
                     "LAMP_BUSY_ENDS_SOONER=on",
                     "LAMP_BUSY_FOLLOW_UP_RENEWS=on",
                     "LAMP_BUSY_NO_FACE_RENEWS=on",
+                    "LAMP_CALL_WORDS_OVER_WAIT=on",
                     "LAMP_CARE_LINE=on",
                     "LAMP_CARE_LINES_FILE=/etc/lampOS/voice/care-lines.json",
                     "LAMP_CARE_REGION=VN",

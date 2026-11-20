@@ -2324,6 +2324,11 @@ struct Shared {
     /// A line that was only the lamp's name waits for the line after it,
     /// which is then said by it ([`Engine::carrying_the_name`]).
     name_carries: bool,
+    /// A line the coordinator ended as only the lamp's name (`Called`) is
+    /// a call only while its heard words are none or only the name
+    /// ([`call_stands`], `LAMP_CALL_WORDS_OVER_WAIT`, #8073,
+    /// [`Engine::judging_call_words`]).
+    call_words_over_wait: bool,
     /// Whether the lamp is asleep for the night and resting through sounds
     /// (`LAMP_REST_THROUGH_SOUNDS=on`, [`Engine::resting_through_sounds`]):
     /// its answer to its name alone is then held back.
@@ -5065,6 +5070,20 @@ fn name_alone(text: &str) -> bool {
         || crate::attention::only_the_name_as_written(text, crate::language::at_start())
 }
 
+/// Whether a line the coordinator ended as only the lamp's name (`Called`)
+/// is still only a call by its heard words (`LAMP_CALL_WORDS_OVER_WAIT`,
+/// #8073): none came back; they are the name alone ([`name_alone`], "Hey
+/// Lamp"), or the coordinator's reading of it
+/// ([`crate::attention::only_the_name`], "Hello Lamp?"); or one word, the
+/// name misheard ("Life.", asked as [`CALLED_WORDS`]). Words past the name
+/// ("Lamp, yes.", "Lamp. So") are no call: the line is judged by them.
+fn call_stands(text: &str) -> bool {
+    text.trim().is_empty()
+        || name_alone(text)
+        || crate::attention::only_the_name(text)
+        || past_a_greeting(text).len() <= 1
+}
+
 /// The most words a short line may have after the lamp's name and still
 /// wait for the line after it ([`name_first`]).
 const NAME_FIRST_MORE: usize = 3;
@@ -5367,6 +5386,7 @@ impl Engine {
                 pause_kept: Mutex::new(None),
                 pause_cut: Mutex::new(None),
                 name_carries: false,
+                call_words_over_wait: false,
                 night_rest: None,
                 name_waits: Mutex::new(None),
                 name_refused: Mutex::new(None),
@@ -6340,6 +6360,21 @@ impl Engine {
     pub fn carrying_the_name(mut self, on: bool) -> Self {
         if let Some(shared) = Arc::get_mut(&mut self.shared) {
             shared.name_carries = on;
+        }
+        self
+    }
+
+    /// A line the coordinator ended as only the lamp's name (`Called`, its
+    /// call's wait run out) stays a call only when its heard words are
+    /// none, or only the name ([`call_stands`]); with words past the name
+    /// it is judged by them, as a line begun with the name and no `Called`
+    /// is (`LAMP_CALL_WORDS_OVER_WAIT=on`, #8073: "Lamp, yes." to a held
+    /// forget, its comma under the call's 200 ms pause, was told the model
+    /// as a call and the yes lost). Every reading of the call on this route
+    /// reads that one verdict. Before any turn only.
+    pub fn judging_call_words(mut self, on: bool) -> Self {
+        if let Some(shared) = Arc::get_mut(&mut self.shared) {
+            shared.call_words_over_wait = on;
         }
         self
     }
@@ -9929,7 +9964,13 @@ async fn spoken(
                 (Err(_), _) => "its speech to text failed".to_owned(),
             }
         );
-        let _ = tell.send(back.map(|words| (words, true)));
+        // The call's verdict by its words (`LAMP_CALL_WORDS_OVER_WAIT`,
+        // #8073), as its own line's would be: words past the name are no
+        // call for the line they go to.
+        let _ = tell.send(back.map(|words| {
+            let called = !shared.call_words_over_wait || call_stands(&words);
+            (words, called)
+        }));
         return;
     }
     let text = match finished {
@@ -10774,6 +10815,21 @@ async fn spoken(
     // often does: asked as the name the coordinator heard, or it would go
     // unanswered as a sound (#1712).
     let called = marks.called.load(Ordering::Acquire);
+    // With `LAMP_CALL_WORDS_OVER_WAIT=on` (#8073), the coordinator's call
+    // stands only while the heard words are none or only the name
+    // ([`call_stands`]): words past the name are judged as they are, as a
+    // line begun with the name and no `Called` is. Read once here: every
+    // use of `called` below (the name's wait and carry, a night's hold,
+    // `CALLED_NOTE`, the say-back's and clash's name-only line) reads it.
+    let called = if called && shared.call_words_over_wait && !call_stands(&text) {
+        eprintln!(
+            "lamp-voice second: request {request}: the coordinator ended it as only the lamp's name, but its {} words go past the name: judged by its words, not as a call (LAMP_CALL_WORDS_OVER_WAIT)",
+            text.split_whitespace().count()
+        );
+        false
+    } else {
+        called
+    };
     // With `LAMP_NAME_WORDLESS_BAR=on` (#5385), only on a sure hearing: a
     // call heard under the bar with no words is no call, and is left as a
     // sound, as a line with no words and no call is.
@@ -13808,6 +13864,10 @@ pub const OPEN_NAME_ENVIRONMENT: &str = "LAMP_SECOND_OPEN_NAME";
 /// Where the worker reads [`Engine::carrying_the_name`]: `on`, and nothing
 /// else.
 pub const NAME_CARRIES_ENVIRONMENT: &str = "LAMP_SECOND_NAME_CARRIES";
+
+/// Where the worker reads [`Engine::judging_call_words`]: `on`, and nothing
+/// else.
+pub const CALL_WORDS_OVER_WAIT_ENVIRONMENT: &str = "LAMP_CALL_WORDS_OVER_WAIT";
 
 /// Where the worker reads whether, right after a start, a line's room not
 /// yet known only for want of history is taken as quiet for a join when the

@@ -4236,6 +4236,18 @@ pub fn serve(
         );
         engine = engine.carrying_the_name(true);
     }
+    // A line the coordinator ended as only the lamp's name is a call only
+    // while its heard words are none or only the name (#8073).
+    if std::env::var(crate::second_provider::CALL_WORDS_OVER_WAIT_ENVIRONMENT)
+        .ok()
+        .as_deref()
+        == Some("on")
+    {
+        eprintln!(
+            "lamp-voice second: a line the coordinator ended as only the lamp's name, with heard words past the name, is judged by its words, not as a call (LAMP_CALL_WORDS_OVER_WAIT)"
+        );
+        engine = engine.judging_call_words(true);
+    }
     // Asleep for the night and resting through sounds
     // (`LAMP_REST_THROUGH_SOUNDS=on`, #4285): the lamp's name alone is not
     // answered, so it only stirs. Read from Expression's newest state when
