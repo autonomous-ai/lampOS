@@ -2099,7 +2099,13 @@ const MOST_DESCRIPTION_BYTES: usize = 1_024;
 /// function is never refused for it. Only while `make_skill` is declared,
 /// so it never names a function that isn't offered.
 pub fn tell_make(tools: &mut [Tool]) {
-    let _ = (tools, MOST_DESCRIPTION_BYTES);
+    for tool in tools.iter_mut().filter(|tool| tool.name == START) {
+        if !tool.description.contains(MAKE_TOLD.trim())
+            && tool.description.len() + MAKE_TOLD.len() <= MOST_DESCRIPTION_BYTES
+        {
+            tool.description.push_str(MAKE_TOLD);
+        }
+    }
 }
 
 /// [`STATUS`]'s description: the one for "is Harness signed in?", "which

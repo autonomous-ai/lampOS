@@ -831,6 +831,28 @@ sau:
      trước yêu cầu ghi nhớ, yêu cầu hẹn giờ và yêu cầu kỹ năng. Lúc khởi
      động nói một lần: "a line that plainly asks the lamp to make a skill
      must call make_skill in its first round (LAMP_MAKE_SKILL_ASKED)".
+   - **Vòng 1 ghi nó bị ép gọi hàm nào** (#8022 case 2: trên lamp-52e6
+     ngày 20/11 một yêu cầu tạo kỹ năng 23 từ đi vào `start_agent_task` cả
+     hai lần, và journal không cho biết lệnh ép có chạy hay không). Mỗi vòng
+     1 mà chat được hỏi (không phải kỹ năng được code gọi theo tên, không
+     phải dòng trích dẫn) ghi, trên đúng các message nó được hỏi:
+     `lamp-voice second: request N: round 1: task_offered=y make_offered=y
+     forced=make_skill make_ask=y sentences=1`. `task_offered` và
+     `make_offered` là `start_agent_task` và `make_skill` có được đưa hay
+     không; `forced` là hàm mà `tool_choice` chỉ tên (`none` nếu không có);
+     `make_ask` là `asks_to_make` có khớp dòng của người nói hay không, và
+     `sentences` là số câu nó đếm được trong dòng. `?` khi services không
+     cho biết được, hoặc khi message cuối không phải dòng của người nói.
+     Chỉ có tên, `y`/`n` và một con số, không bao giờ có từ nào của dòng.
+     Test: `round_one_forced::round_one_says_its_force_and_the_make_ask_never_its_words`.
+   - **Tạo kỹ năng không bao giờ là một task** (#8022 case 2, first builder
+     đồng ý lúc 11:05): khi `make_skill` được khai báo, mô tả của
+     `start_agent_task` kết thúc bằng "An ask to make a skill, even one
+     whose work an agent does, is make_skill's, never this."
+     (`agent_tasks::MAKE_TOLD`), chỉ khi cả hai vẫn vừa 1.024 byte của
+     link; mô tả nào không vừa thì giữ nguyên. Không có `make_skill` thì câu
+     này không bao giờ được nói. Mô hình vẫn tự đánh giá; không khớp từ
+     nào. Test: `a_make_is_told_make_skills_only_while_make_skill_is_declared`.
    - **Được parse trước khi đọc lại** (#6749 E,
      `made_skill::scripts_parse`): mỗi tệp `.py` nó viết được đưa, chỉ qua
      stdin, cho `/usr/bin/python3 -I -c 'import ast,sys;
