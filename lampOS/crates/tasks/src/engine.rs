@@ -2356,7 +2356,8 @@ impl<P: Persistence> Engine<P> {
         }
         Ok(response)
     }
-    fn active(&self) -> bool {
+    /// Whether a launch, read or close is under way (a job holds a task).
+    pub fn active(&self) -> bool {
         self.state.tasks.iter().any(|t| {
             t.dispatch.state == DispatchState::Attempting
                 || t.read
@@ -2398,6 +2399,46 @@ impl<P: Persistence> Engine<P> {
             .iter()
             .find(|task| task.launch.name == name)
             .map(|task| task.id)
+    }
+
+    /// #8138 review (3): the spoken task launched as `name`, handed over
+    /// to the lamp's kept session that then broke under it, ended at once
+    /// `not_sent` with `code` (the voice tells it as a refusal before the
+    /// hand-over): never left to its watch's bounds, never typed again.
+    /// Only a task still handed over with no answer settled, and with no
+    /// job under way ([`Engine::active`]: `Ok(false)`, tried again).
+    /// Its reads of the broken turn are dropped with its agent id, as a
+    /// `not_sent` task has none.
+    pub fn end_broken(&mut self, name: &str, code: &str, now: &Clock) -> Result<bool, Error> {
+        self.clock(now)?;
+        if self.active() {
+            return Ok(false);
+        }
+        let Some(index) = self.state.tasks.iter().position(|task| {
+            task.launch.name == name
+                && task.dispatch.state == DispatchState::Accepted
+                && !task.observations.iter().any(|seen| settled(&seen.data))
+        }) else {
+            return Ok(true);
+        };
+        let mut next = self.state.clone();
+        let at = next_audit(&mut next, now)?;
+        let task = &mut next.tasks[index];
+        task.dispatch.state = DispatchState::NotSent;
+        task.dispatch.agent_id = None;
+        task.dispatch.joined = None;
+        task.dispatch.joined_on = None;
+        task.dispatch.code = Some(code.to_owned());
+        task.dispatch.finished = Some(at.clone());
+        task.read = None;
+        task.observations.clear();
+        task.watch_idle = None;
+        task.background_since = None;
+        task.close = None;
+        task.closable = false;
+        task.updated = at;
+        self.save(next)?;
+        Ok(true)
     }
 
     /// Whether the launch `name` ended with its answer: its agent's last
@@ -4524,6 +4565,68 @@ mod tests {
             .map(|w| w["id"].clone())
             .collect();
         assert_eq!(ids, [json!(later.to_string())]);
+    }
+
+    /// #8138 review (3): a spoken task handed over to the lamp's kept
+    /// session that broke under it is ended at once `not_sent` with its
+    /// code, a store the check takes, its agent and reads dropped; with a
+    /// job under way, not yet (`false`: kept and tried again); a task no
+    /// longer handed over is left as it is.
+    #[test]
+    fn a_handed_over_task_whose_session_broke_is_ended_not_sent_at_once() {
+        let (mut engine, _memory) = opened();
+        let id = queued(&mut engine, 0);
+        let other = queued(&mut engine, 0);
+        engine.begin_launch(&clock(0)).unwrap().unwrap();
+        engine
+            .finish_launch(
+                id,
+                LaunchOutcome::Joined {
+                    agent_id: AGENT.into(),
+                    session: None,
+                },
+                &clock(0),
+            )
+            .unwrap();
+        let name = engine.state.tasks[0].launch.name.clone();
+        // A job under way (the next launch): not yet.
+        engine.begin_launch(&clock(1)).unwrap().unwrap();
+        assert!(
+            !engine
+                .end_broken(&name, "one_session_stuck", &clock(1))
+                .unwrap()
+        );
+        assert_eq!(
+            engine.state.tasks[0].dispatch.state,
+            DispatchState::Accepted
+        );
+        engine
+            .finish_launch(
+                other,
+                LaunchOutcome::NotSent {
+                    code: "busy".into(),
+                },
+                &clock(2),
+            )
+            .unwrap();
+        assert!(
+            engine
+                .end_broken(&name, "one_session_stuck", &clock(4))
+                .unwrap()
+        );
+        let task = &engine.state.tasks[0];
+        assert_eq!(task.dispatch.state, DispatchState::NotSent);
+        assert_eq!(task.dispatch.code.as_deref(), Some("one_session_stuck"));
+        assert_eq!(task.dispatch.agent_id, None);
+        assert!(task.observations.is_empty() && task.read.is_none());
+        assert!(engine.state.check().is_ok(), "{:?}", engine.state.check());
+        // Ended once: a second call leaves it.
+        assert!(
+            engine
+                .end_broken(&name, "one_session_stuck", &clock(6))
+                .unwrap()
+        );
+        assert_eq!(engine.state.tasks[0].dispatch.state, DispatchState::NotSent);
     }
 
     /// `serve --route`: a task the router typed into a session the person

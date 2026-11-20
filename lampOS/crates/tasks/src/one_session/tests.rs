@@ -95,6 +95,9 @@ struct Fake {
     /// Every `ensure` makes a new session, as Harness does when it
     /// replaced the old one itself (openharness#4484's `new`).
     always_new: Mutex<bool>,
+    /// Each `watch` (#8138): its events, then how it ends; none scripted:
+    /// no `watch` here ([`WatchEnd::Missing`]).
+    watches: Mutex<VecDeque<(Vec<WatchEvent>, WatchEnd)>>,
 }
 
 fn agent_of(n: u32) -> String {
@@ -117,6 +120,22 @@ impl Fake {
 }
 
 impl PaneHarness for Fake {
+    fn watch_pane(
+        &self,
+        _machine: &str,
+        agent: &str,
+        _cancel: &AtomicBool,
+        on_event: &mut dyn FnMut(WatchEvent),
+    ) -> WatchEnd {
+        self.call(format!("watch {agent}"));
+        let Some((events, end)) = self.watches.lock().unwrap().pop_front() else {
+            return WatchEnd::Missing;
+        };
+        for event in events {
+            on_event(event);
+        }
+        end
+    }
     fn open(&self, launch: &Launch) -> LaunchOutcome {
         self.call(format!("new {}", launch.name));
         let mut failing = self.failing_opens.lock().unwrap();
@@ -1230,6 +1249,15 @@ fn a_sign_out_removes_the_pane_once_free() {
 impl PaneHarness for &Fake {
     fn open(&self, launch: &Launch) -> LaunchOutcome {
         (**self).open(launch)
+    }
+    fn watch_pane(
+        &self,
+        machine: &str,
+        agent: &str,
+        cancel: &AtomicBool,
+        on_event: &mut dyn FnMut(WatchEvent),
+    ) -> WatchEnd {
+        (**self).watch_pane(machine, agent, cancel, on_event)
     }
     fn type_into(&self, machine: &str, agent: &str, words: &str) -> Typed {
         (**self).type_into(machine, agent, words)
@@ -4417,6 +4445,8 @@ fn a_spoken_task_refused_once_ends_at_once_and_is_never_typed_again() {
     let dir = tempfile::tempdir().unwrap();
     let (one, fake) = kept_on(dir.path());
     one.open_if_due(&fake, &place());
+    // Past its first words' window (1 s here): no longer warming up.
+    thread::sleep(Duration::from_millis(1100));
     fake.takes.lock().unwrap().push_back(Took::EngineNotReady);
     let began = Instant::now();
     assert_eq!(
@@ -4432,7 +4462,9 @@ fn a_spoken_task_refused_once_ends_at_once_and_is_never_typed_again() {
         one.readiness().state(),
         (Readiness::Recovering, Some("engine_not_ready"))
     );
-    // The one-session thread replaces it fresh; nothing typed again.
+    // The one-session thread replaces it fresh; nothing typed again. The
+    // scripted refusal stands for the broken process, not the fresh one.
+    fake.takes.lock().unwrap().clear();
     let replies = fake.count("reply-kept");
     one.restart_if_due(&fake);
     one.open_if_due(&fake, &place());
@@ -4557,4 +4589,264 @@ fn failed_opens_are_tried_quickly_then_slowly_as_an_error() {
             );
         }
     }
+}
+
+/// #8138 review (2): `watch` says the state now first; an idle session's
+/// `done` (its last turn's) ends the watch at once. It is not started
+/// again until a hand-over (or [`WATCH_IDLE_REST`]); one that said more
+/// while a turn of ours runs is watched again at once.
+#[test]
+fn a_watch_that_only_says_the_idle_state_rests_until_a_hand_over() {
+    let dir = tempfile::tempdir().unwrap();
+    let (one, fake) = kept_on(dir.path());
+    one.open_if_due(&fake, &place());
+    let stop = AtomicBool::new(false);
+    let mut failures = (String::new(), 0);
+    fake.watches
+        .lock()
+        .unwrap()
+        .push_back((vec![WatchEvent::Done], WatchEnd::Settled));
+    assert_eq!(
+        one.watch_next(&|| Some(&fake), &stop, &mut failures),
+        (WatchRest::Idle, Some(agent_of(1)))
+    );
+    // A turn of ours: working, then its end, watched again at once.
+    let turn = one.enter("task-1", Kind::Skill, far(), &|| false).unwrap();
+    fake.watches.lock().unwrap().push_back((
+        vec![WatchEvent::Working, WatchEvent::Done],
+        WatchEnd::Settled,
+    ));
+    assert_eq!(
+        one.watch_next(&|| Some(&fake), &stop, &mut failures).0,
+        WatchRest::None
+    );
+    drop(turn);
+}
+
+/// #8138 review (2): the watch's first line (the state it was in already)
+/// never ends the spoken turn just handed over; a later `done` does.
+#[test]
+fn the_watchs_first_done_never_ends_a_spoken_turn() {
+    let dir = tempfile::tempdir().unwrap();
+    let (one, fake) = kept_on(dir.path());
+    one.open_if_due(&fake, &place());
+    assert!(matches!(
+        spoken_launch(&one, &fake, &spoken("lamp-1")),
+        Some(LaunchOutcome::Joined { .. })
+    ));
+    one.watched_event_at(&agent_of(1), WatchEvent::Done, true);
+    assert_eq!(one.take_turn_end(), None);
+    one.watched_event_at(&agent_of(1), WatchEvent::Done, false);
+    assert_eq!(one.take_turn_end().as_deref(), Some("lamp-1"));
+}
+
+/// #8138 review (4): a watch that keeps failing is given up after
+/// [`WATCH_TRIES`] failures of the same session, even with the session let
+/// go and ensured again (the same id) between them.
+#[test]
+fn a_watch_failing_again_and_again_is_given_up_at_its_bound() {
+    let dir = tempfile::tempdir().unwrap();
+    let (one, fake) = kept_on(dir.path());
+    one.open_if_due(&fake, &place());
+    let stop = AtomicBool::new(false);
+    let mut failures = (String::new(), 0);
+    for round in 1..=WATCH_TRIES {
+        fake.watches
+            .lock()
+            .unwrap()
+            .push_back((vec![], WatchEnd::Failed("daemon_gone".into())));
+        let (rest, watched) = one.watch_next(&|| Some(&fake), &stop, &mut failures);
+        assert_eq!(watched, Some(agent_of(1)), "{round}");
+        if round < WATCH_TRIES {
+            assert_eq!(rest, WatchRest::Retry);
+            // Let go: nothing to watch until the next look ensures it.
+            assert_eq!(
+                one.watch_next(&|| Some(&fake), &stop, &mut failures).0,
+                WatchRest::Guard
+            );
+            one.lock().next_open = None;
+            one.open_if_due(&fake, &place());
+        }
+    }
+    assert_eq!(one.lock().watch_given_up, Some(agent_of(1)));
+    assert_eq!(one.watched(), None);
+}
+
+/// #8138 review (3): a spoken task handed over whose session the watch
+/// reads `held` is ended at once (the store ends it `not_sent`), not read
+/// as a turn's end.
+#[test]
+fn a_spoken_task_whose_session_breaks_under_it_is_ended_at_once() {
+    let dir = tempfile::tempdir().unwrap();
+    let (one, fake) = kept_on(dir.path());
+    one.open_if_due(&fake, &place());
+    assert!(matches!(
+        spoken_launch(&one, &fake, &spoken("lamp-1")),
+        Some(LaunchOutcome::Joined { .. })
+    ));
+    one.watched_event(&agent_of(1), WatchEvent::Held);
+    assert_eq!(one.take_turn_broken().as_deref(), Some("lamp-1"));
+    assert_eq!(one.take_turn_end(), None);
+    // Kept when the store can't end it yet.
+    one.put_turn_broken("lamp-1".into());
+    assert_eq!(one.take_turn_broken().as_deref(), Some("lamp-1"));
+}
+
+/// #8138 review (3): the Gateway stopping while a spoken task is handed
+/// over ends that task at once too.
+#[test]
+fn a_spoken_task_is_ended_at_once_when_the_gateway_stops() {
+    let dir = tempfile::tempdir().unwrap();
+    let (one, fake) = kept_on(dir.path());
+    let up = Arc::new(AtomicBool::new(true));
+    let probe = up.clone();
+    let one = one.with_gateway_probe(Box::new(move || probe.load(Ordering::Acquire)));
+    one.open_if_due(&fake, &place());
+    assert!(matches!(
+        spoken_launch(&one, &fake, &spoken("lamp-1")),
+        Some(LaunchOutcome::Joined { .. })
+    ));
+    up.store(false, Ordering::Release);
+    let mut looks = Looks::default();
+    let start = Instant::now();
+    for look in 0..GATEWAY_DOWN_LOOKS {
+        one.gateway_look(&mut looks, start + GATEWAY_LOOK_DOWN * look);
+    }
+    assert_eq!(one.take_turn_broken().as_deref(), Some("lamp-1"));
+}
+
+/// #8138 review (5): a new session whose first words were not taken yet
+/// (warming up) reads `starting` until the watch reads it idle; a refusal
+/// meanwhile ends the task told, and the session is kept, not replaced.
+#[test]
+fn a_warming_session_reads_starting_and_is_never_replaced_for_its_refusal() {
+    use lamp_msgs::Readiness;
+    let dir = tempfile::tempdir().unwrap();
+    let (one, fake) = kept_on(dir.path());
+    // Its first words refused through the whole (1 s) window.
+    fake.takes
+        .lock()
+        .unwrap()
+        .extend(std::iter::repeat_n(Took::EngineNotReady, 1000));
+    one.open_if_due(&fake, &place());
+    assert_eq!(one.agent(), Some(agent_of(1)));
+    assert_eq!(
+        one.readiness().state(),
+        (Readiness::Starting, Some("session_starting"))
+    );
+    let turn = one.enter("task-1", Kind::Skill, far(), &|| false).unwrap();
+    assert!(matches!(
+        turn.send(&fake, &place(), "Run the skill.", far(), &|| false),
+        Sent::NotTyped(_)
+    ));
+    drop(turn);
+    one.restart_if_due(&fake);
+    assert_eq!(fake.count("close-kept"), 0, "{:?}", fake.calls());
+    assert_eq!(one.agent(), Some(agent_of(1)));
+    fake.takes.lock().unwrap().clear();
+    one.watched_event(&agent_of(1), WatchEvent::Idle);
+    assert_eq!(one.readiness().state(), (Readiness::Ready, None));
+}
+
+/// #8001, kept by #8138 review (5): a session `ensure` made new is in its
+/// first words' window: its replies are held the whole 60 s, never the
+/// short hold, never probed; its refusal ends the task, and the session
+/// is never closed for it, by the hand-over or the idle look.
+#[test]
+fn a_new_kept_sessions_refusals_are_never_counted_or_probed() {
+    let dir = tempfile::tempdir().unwrap();
+    // Its window 30 s here, past the whole test.
+    let one = OneSession::new(
+        Duration::from_secs(5),
+        Duration::from_millis(5),
+        Duration::from_secs(30),
+    )
+    .with_session_delete(Box::new(|_| Ok(())))
+    .with_state_file(dir.path().join(STATE_FILE))
+    .with_kept_session(dir.path().join(TOKEN_FILE))
+    .with_idle_look(Duration::ZERO);
+    let fake = Fake::default();
+    *fake.programs.lock().unwrap() = true;
+    one.open_if_due(&fake, &place());
+    *fake.seq.lock().unwrap() = Some(7);
+    let before = holds(&fake).len();
+    fake.takes.lock().unwrap().push_back(Took::EngineNotReady);
+    let turn = one.enter("task-1", Kind::Skill, far(), &|| false).unwrap();
+    assert!(matches!(
+        turn.send(&fake, &place(), "Run the skill.", far(), &|| false),
+        Sent::NotTyped(_)
+    ));
+    drop(turn);
+    assert_eq!(holds(&fake).split_off(before), [60]);
+    one.restart_if_due(&fake);
+    one.idle_look(&mut Looks::default(), Instant::now(), &|| Some(&fake));
+    assert_eq!(fake.count("close-kept"), 0, "{:?}", fake.calls());
+    assert_eq!(one.agent(), Some(agent_of(1)));
+}
+
+/// #8001, kept by #8138 review (5): `show` idle but the pane inside its
+/// start window (`ensure` made it new just now): a refusal is its warm-up,
+/// never a fault: the spoken task ends `not_sent` (not started), and the
+/// session is never closed.
+#[test]
+fn a_short_refusal_inside_the_start_window_is_not_deaf() {
+    let dir = tempfile::tempdir().unwrap();
+    let (one, fake) = spoken_idle(dir.path(), "user");
+    one.lock().pane.as_mut().unwrap().made_new = Some(Instant::now());
+    fake.takes.lock().unwrap().push_back(Took::EngineNotReady);
+    assert_eq!(
+        spoken_launch(&one, &fake, &spoken("lamp-1")),
+        Some(LaunchOutcome::NotSent {
+            code: NOT_STARTED.into()
+        })
+    );
+    one.restart_if_due(&fake);
+    assert_eq!(fake.count("close-kept"), 0, "{:?}", fake.calls());
+    assert_eq!(one.agent(), Some(agent_of(1)));
+}
+
+/// #8138 review (1): Harness taking no reply here (`reply_off`): the lamp's
+/// agent reads `ready`, its tasks let through the per-task way.
+#[test]
+fn reply_off_reads_ready_and_lets_lamp_tasks_through() {
+    use lamp_msgs::Readiness;
+    let dir = tempfile::tempdir().unwrap();
+    let (one, fake) = kept_on(dir.path());
+    one.open_if_due(&fake, &place());
+    fake.takes
+        .lock()
+        .unwrap()
+        .push_back(Took::NotSent("reply_off".into()));
+    let turn = one.enter("task-1", Kind::Skill, far(), &|| false).unwrap();
+    assert!(matches!(
+        turn.send(&fake, &place(), "Run.", far(), &|| false),
+        Sent::NoReply
+    ));
+    drop(turn);
+    one.drop_if_due(&fake);
+    assert_eq!(one.readiness().state(), (Readiness::Ready, None));
+    assert_eq!(one.agent.refusal("openclaw"), None);
+}
+
+/// #8138 review (8): Harness reading the kept session `installing` (an
+/// OTA installing OpenClaw): the lamp's agent `installing` until it reads
+/// otherwise.
+#[test]
+fn a_session_read_installing_makes_the_agent_installing() {
+    use lamp_msgs::Readiness;
+    let dir = tempfile::tempdir().unwrap();
+    let (one, fake) = kept_on(dir.path());
+    one.open_if_due(&fake, &place());
+    fake.states
+        .lock()
+        .unwrap()
+        .insert(agent_of(1), "installing".into());
+    one.pane_sign(&fake, MACHINE, &agent_of(1));
+    assert_eq!(
+        one.readiness().state(),
+        (Readiness::Installing, Some("installing"))
+    );
+    fake.states.lock().unwrap().remove(&agent_of(1));
+    one.pane_sign(&fake, MACHINE, &agent_of(1));
+    assert_eq!(one.readiness().state(), (Readiness::Ready, None));
 }

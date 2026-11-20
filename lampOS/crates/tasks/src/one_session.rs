@@ -549,6 +549,25 @@ pub const WATCH_TRIES: u32 = 3;
 /// How often the watch's guard looks whether the session it watches is
 /// still the one open, and how often the watcher looks for one to watch.
 const WATCH_GUARD: Duration = Duration::from_millis(200);
+/// #8138 review (2): `harness watch` says the state now first, so an idle
+/// session whose last turn ended says `done` at once and the watch ends.
+/// Then (no turn of ours on it, or nothing said but that first state) it
+/// is not watched again until a turn is handed over, or this long: one
+/// `watch` child per 30 s while idle, not one per 2-4 s.
+pub const WATCH_IDLE_REST: Duration = Duration::from_secs(30);
+
+/// How long the watcher rests after one `watch` ([`OneSession::watch_round`]).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum WatchRest {
+    /// Watched again now.
+    None,
+    /// Nothing to watch: looked again in [`WATCH_GUARD`].
+    Guard,
+    /// [`WATCH_RETRY`].
+    Retry,
+    /// [`WATCH_IDLE_REST`], or until the next hand-over.
+    Idle,
+}
 
 /// What a run refused with a full queue is told, answered as lamp-tasks'
 /// `busy` (so lamp-skills' retry, #7239, still applies).
@@ -812,6 +831,14 @@ struct Pane {
     /// When `ensure` made it new (#7906 sign 5): its first words may be
     /// refused `ENGINE_NOT_READY` within [`OPEN_IDLE_WITHIN`] of this.
     made_new: Option<Instant>,
+    /// #8138 review (5): known to take input (its first words taken, a
+    /// hand-over taken, `ensure`'s `confirmed`, the watch reading it idle,
+    /// or [`OPEN_IDLE_WITHIN`] passed since it was opened). Until then the
+    /// lamp's agent reads `starting`, so nothing is handed to a warming
+    /// session.
+    confirmed: bool,
+    /// When it was opened here, for [`Pane::confirmed`]'s last bound.
+    born: Instant,
 }
 impl Pane {
     fn new(agent: &str, place: &Place, kept: bool) -> Self {
@@ -828,6 +855,9 @@ impl Pane {
             checked_at_open: false,
             handed: None,
             made_new: None,
+            // A pane of the old way has no warm-up of its own to wait for.
+            confirmed: !kept,
+            born: Instant::now(),
         }
     }
 
@@ -934,6 +964,14 @@ struct Inner {
     /// Harness's `watch` read ended (`done`, `idle`), or that it read
     /// broken: the store reads it at once ([`OneSession::take_turn_end`]).
     turn_ended: Option<String>,
+    /// #8138 review (3): the spoken task holding the pane whose session a
+    /// fault broke under it (the watch read `held`, `failed` or `stopped`,
+    /// or the Gateway stopped answering): the store ends it at once
+    /// `not_sent` [`STUCK_ENDED`] ([`OneSession::take_turn_broken`]).
+    turn_broken: Option<String>,
+    /// Hand-overs taken so far: a new one wakes the watch from its idle
+    /// rest ([`WATCH_IDLE_REST`]).
+    handovers: u64,
     /// #8138: the kept session (its agent) whose `watch` failed
     /// [`WATCH_TRIES`] times in a row with no event: not watched again
     /// until another session or a daemon start; `show`'s look meanwhile.
@@ -1694,6 +1732,9 @@ impl OneSession {
             eprintln!(
                 "tasks: one session: Harness takes no reply here (reply_off); each task gets its own pane"
             );
+            // #8138 review (1): no kept session to wait for: the lamp's
+            // agent is ready, its tasks going the per-task way.
+            self.agent.update(|facts| facts.per_task = true);
             self.drop_when_free("Harness takes no reply here (reply_off)");
         }
     }
@@ -2398,6 +2439,7 @@ impl OneSession {
             let here = crate::skill_task::harness_sign_in();
             let signed_out = here == crate::skill_task::HarnessHere::SignedOut;
             self.lamp_known(key.as_ref(), here);
+            self.confirm_if_warmed();
             self.gateway_look(&mut looks, Instant::now());
             self.remove_if_due(&looks, key.as_ref(), signed_out, &*harness);
             if self.lock().restart_due.is_some()
@@ -2518,6 +2560,11 @@ impl OneSession {
             {
                 inner.restart_due = Some((agent, "OpenClaw's Gateway stopped answering".into()));
             }
+            // #8138 review (3): a spoken task handed over is ended at once,
+            // told, not left to the store's bounds.
+            if inner.held_spoken {
+                inner.turn_broken = inner.holder.clone();
+            }
         }
     }
 
@@ -2556,74 +2603,134 @@ impl OneSession {
         harness: Box<dyn Fn() -> Option<H> + Send>,
         stop: Arc<AtomicBool>,
     ) {
-        let mut failures = 0u32;
-        let rest = |for_: Duration| {
+        // Failures in a row, per watched session (#8138 review (4)): a
+        // session ensured again comes back with its id, so the bound trips.
+        let mut failures = (String::new(), 0u32);
+        let rest = |for_: Duration, agent: Option<&str>| {
             let until = Instant::now() + for_;
+            let handovers = self.lock().handovers;
             while Instant::now() < until && !stop.load(Ordering::Acquire) {
+                // The idle rest ends at the next hand-over, or when another
+                // session is open.
+                if let Some(agent) = agent
+                    && (self.lock().handovers != handovers
+                        || self.agent().as_deref() != Some(agent))
+                {
+                    return;
+                }
                 std::thread::sleep(Duration::from_millis(50));
             }
         };
         while !stop.load(Ordering::Acquire) {
-            let Some((agent, machine)) = self.watched() else {
-                self.watch_live.store(false, Ordering::Release);
-                failures = 0;
-                rest(WATCH_GUARD);
-                continue;
-            };
-            let Some(cli) = harness() else {
-                rest(WATCH_GUARD);
-                continue;
-            };
-            let cancel = AtomicBool::new(false);
-            let done = AtomicBool::new(false);
-            let mut heard = false;
-            let end = std::thread::scope(|scope| {
-                scope.spawn(|| {
-                    while !done.load(Ordering::Acquire) {
-                        if stop.load(Ordering::Acquire)
-                            || self.agent().as_deref() != Some(agent.as_str())
-                        {
-                            cancel.store(true, Ordering::Release);
-                            return;
-                        }
-                        std::thread::sleep(Duration::from_millis(20).min(WATCH_GUARD));
-                    }
-                });
-                let end = cli.watch_pane(&machine, &agent, &cancel, &mut |event| {
-                    heard = true;
-                    self.watch_live.store(true, Ordering::Release);
-                    self.watched_event(&agent, event);
-                });
-                done.store(true, Ordering::Release);
-                end
-            });
-            self.watch_live.store(false, Ordering::Release);
-            if heard {
-                failures = 0;
+            match self.watch_next(&*harness, &stop, &mut failures) {
+                (WatchRest::None, _) => {}
+                (WatchRest::Guard, _) => rest(WATCH_GUARD, None),
+                (WatchRest::Retry, _) => rest(WATCH_RETRY, None),
+                (WatchRest::Idle, agent) => rest(WATCH_IDLE_REST, agent.as_deref()),
             }
-            match end {
-                // Ended after `done` or at its own bound: watched again now.
-                WatchEnd::Settled | WatchEnd::Timeout | WatchEnd::Cancelled => {}
-                WatchEnd::Missing => {
-                    eprintln!(
-                        "tasks: one session: Harness has no watch here; show's look stays the fallback"
-                    );
-                    self.lock().watch_given_up = Some(agent);
-                }
-                WatchEnd::Stopped => {
-                    self.watched_event(&agent, WatchEvent::Stopped);
-                }
-                WatchEnd::Failed(code) => {
-                    failures = failures.saturating_add(1);
-                    if failures >= WATCH_TRIES {
-                        eprintln!(
-                            "tasks: one session: the kept session's watch failed {failures} times in a row ({code}); show's look stays the fallback"
-                        );
-                        self.lock().watch_given_up = Some(agent);
-                    } else {
-                        self.watch_lost(&agent, &code);
-                        rest(WATCH_RETRY);
+        }
+    }
+
+    /// One pass of [`OneSession::watch_kept`]: the session to watch, if
+    /// any, watched once; how long to rest after, and the session watched.
+    /// `failures` is kept across passes, whatever is open between: a
+    /// session let go after a failed watch and ensured again is the same
+    /// id, so its count goes on (#8138 review (4)).
+    fn watch_next<H: PaneHarness>(
+        &self,
+        harness: &dyn Fn() -> Option<H>,
+        stop: &AtomicBool,
+        failures: &mut (String, u32),
+    ) -> (WatchRest, Option<String>) {
+        let Some((agent, machine)) = self.watched() else {
+            self.watch_live.store(false, Ordering::Release);
+            return (WatchRest::Guard, None);
+        };
+        let Some(cli) = harness() else {
+            return (WatchRest::Guard, None);
+        };
+        let rest = self.watch_round(&cli, &agent, &machine, stop, failures);
+        (rest, Some(agent))
+    }
+
+    /// One `watch` of the kept session `agent` until it ends, and how long
+    /// to rest before the next ([`OneSession::watch_kept`]). `failures` is
+    /// the failures in a row of the session it names.
+    fn watch_round(
+        &self,
+        cli: &dyn PaneHarness,
+        agent: &str,
+        machine: &str,
+        stop: &AtomicBool,
+        failures: &mut (String, u32),
+    ) -> WatchRest {
+        if failures.0 != agent {
+            *failures = (agent.to_owned(), 0);
+        }
+        let cancel = AtomicBool::new(false);
+        let done = AtomicBool::new(false);
+        let mut heard = 0u32;
+        let end = std::thread::scope(|scope| {
+            scope.spawn(|| {
+                while !done.load(Ordering::Acquire) {
+                    if stop.load(Ordering::Acquire) || self.agent().as_deref() != Some(agent) {
+                        cancel.store(true, Ordering::Release);
+                        return;
                     }
+                    std::thread::sleep(Duration::from_millis(20).min(WATCH_GUARD));
+                }
+            });
+            let end = cli.watch_pane(machine, agent, &cancel, &mut |event| {
+                heard = heard.saturating_add(1);
+                self.watch_live.store(true, Ordering::Release);
+                // The first line is the state now, which may be an earlier
+                // turn's end: never this turn's (#8138 review (2)).
+                self.watched_event_at(agent, event, heard == 1);
+            });
+            done.store(true, Ordering::Release);
+            end
+        });
+        self.watch_live.store(false, Ordering::Release);
+        match end {
+            // Ended after `done`: no turn of ours on it, or nothing but the
+            // state it was in already: rested until a hand-over.
+            WatchEnd::Settled => {
+                failures.1 = 0;
+                if heard <= 1 || self.lock().holder.is_none() {
+                    WatchRest::Idle
+                } else {
+                    WatchRest::None
+                }
+            }
+            // At its own bound: watched again now.
+            WatchEnd::Timeout => {
+                failures.1 = 0;
+                WatchRest::None
+            }
+            WatchEnd::Cancelled => WatchRest::None,
+            WatchEnd::Missing => {
+                eprintln!(
+                    "tasks: one session: Harness has no watch here; show's look stays the fallback"
+                );
+                self.lock().watch_given_up = Some(agent.to_owned());
+                WatchRest::None
+            }
+            WatchEnd::Stopped => {
+                self.watched_event(agent, WatchEvent::Stopped);
+                WatchRest::Retry
+            }
+            WatchEnd::Failed(code) => {
+                failures.1 = failures.1.saturating_add(1);
+                if failures.1 >= WATCH_TRIES {
+                    eprintln!(
+                        "tasks: one session: the kept session's watch failed {} times in a row ({code}); show's look stays the fallback",
+                        failures.1
+                    );
+                    self.lock().watch_given_up = Some(agent.to_owned());
+                    WatchRest::None
+                } else {
+                    self.watch_lost(agent, &code);
+                    WatchRest::Retry
                 }
             }
         }
@@ -2638,6 +2745,12 @@ impl OneSession {
     /// its task ends told), and a fresh session replaces it once the pane
     /// is let go.
     pub fn watched_event(&self, agent: &str, event: WatchEvent) {
+        self.watched_event_at(agent, event, false);
+    }
+
+    /// [`OneSession::watched_event`], `first` the watch's first line: the
+    /// state the session was in already, never the end of a turn of ours.
+    fn watched_event_at(&self, agent: &str, event: WatchEvent, first: bool) {
         let (holder, spoken) = {
             let inner = self.lock();
             if inner.pane.as_ref().is_none_or(|pane| pane.agent != agent) {
@@ -2653,7 +2766,9 @@ impl OneSession {
                     .session_from(&[Session::Ready, Session::Working], Session::Working);
             }
             WatchEvent::Idle | WatchEvent::Done => {
-                if spoken {
+                // Idle: it takes input (#8138 review (5)).
+                self.confirm();
+                if spoken && !first {
                     self.lock().turn_ended = holder;
                 } else if holder.is_none() {
                     self.turn_over();
@@ -2668,8 +2783,10 @@ impl OneSession {
                     _ => "session_gone",
                 });
                 let mut inner = self.lock();
+                // #8138 review (3): the spoken task handed over is ended at
+                // once, told, before the recovery.
                 if spoken {
-                    inner.turn_ended = holder;
+                    inner.turn_broken = holder;
                 }
                 if inner.restart_due.is_none() {
                     inner.restart_due = Some((agent.to_owned(), why));
@@ -2707,6 +2824,22 @@ impl OneSession {
     /// ended or broken since the last call, for the store to read at once.
     pub fn take_turn_end(&self) -> Option<String> {
         self.lock().turn_ended.take()
+    }
+
+    /// #8138 review (3): the spoken task whose session broke under it
+    /// since the last call, for the store to end at once `not_sent`
+    /// [`STUCK_ENDED`].
+    pub fn take_turn_broken(&self) -> Option<String> {
+        self.lock().turn_broken.take()
+    }
+
+    /// A broken turn the store could not end yet (a job under way): kept
+    /// for the next call ([`OneSession::take_turn_broken`]).
+    pub fn put_turn_broken(&self, id: String) {
+        let mut inner = self.lock();
+        if inner.turn_broken.is_none() {
+            inner.turn_broken = Some(id);
+        }
     }
 
     /// A spoken turn's end the store could not read yet: kept for the
@@ -3129,7 +3262,9 @@ impl OneSession {
             crate::agent::Session::Opening,
         );
         let opened = self.open(harness, place, until, ended);
-        if opened.is_ok() {
+        // Ready once open and known to take input (#8138 review (5)): a
+        // session still warming stays `starting` until it is confirmed.
+        if opened.is_ok() && self.lock().pane.as_ref().is_none_or(|pane| pane.confirmed) {
             self.agent.session(crate::agent::Session::Ready);
         }
         opened
@@ -3422,10 +3557,16 @@ impl OneSession {
                 return Err(self.open_failed(&format!("harness ensure: {code}")));
             }
         };
+        self.saw_state(&ensured.state);
         let agent = ensured.agent_id.clone();
         let mut pane = Pane::new(&agent, place, true);
         pane.session = ensured.engine_session.clone();
         pane.checked_at_open = checked || ensured.result == "new";
+        // #8138 review (5): `ensure` confirmed it taking input, or it is a
+        // session already up that Harness did not say unconfirmed. A new
+        // one is confirmed by its first words taken.
+        pane.confirmed = ensured.confirmed == Some(true)
+            || (ensured.result != "new" && ensured.confirmed != Some(false));
         {
             let mut inner = self.lock();
             if ensured.result == "new" {
@@ -3569,7 +3710,10 @@ impl OneSession {
             took = harness.reply_kept(name, token, OPEN_PROMPT, REPLY_KEPT_HELD);
         }
         let input = match took {
-            Took::Taken(input) => input,
+            Took::Taken(input) => {
+                self.confirm();
+                input
+            }
             other => {
                 eprintln!(
                     "tasks: one session: the kept session's first words not taken: {other:?}"
@@ -3663,7 +3807,11 @@ impl OneSession {
 
     /// One `show` of the pane `agent` for #7906's signs 1 and 2.
     fn pane_sign(&self, harness: &dyn PaneHarness, machine: &str, agent: &str) -> Seen {
-        match harness.observe(machine, agent) {
+        let seen = harness.observe(machine, agent);
+        if let Ok(seen) = &seen {
+            self.saw_state(&seen.seen.state);
+        }
+        match seen {
             Err(code) if code == "gone" => Seen::Died("Harness no longer has it".into()),
             Ok(seen) if seen.shell => {
                 Seen::Died("its engine exited; the pane is a plain shell".into())
@@ -3680,6 +3828,15 @@ impl OneSession {
             // `unknown`, or a `show` not read (a parse error, a daemon
             // timeout): never a sign; looked at again.
             Ok(_) | Err(_) => Seen::Unknown,
+        }
+    }
+
+    /// #8138 review (8): Harness read the kept session `installing` (an
+    /// OTA installing OpenClaw) or not: the lamp's agent `installing` then.
+    fn saw_state(&self, state: &str) {
+        let installing = state == "installing";
+        if self.agent.facts().installing != installing {
+            self.agent.update(|facts| facts.installing = installing);
         }
     }
 
@@ -3944,6 +4101,52 @@ impl OneSession {
         });
     }
 
+    /// #8138 review (5): the pane open now is known to take input: the
+    /// lamp's agent `ready` from `starting`.
+    fn confirm(&self) {
+        let mut inner = self.lock();
+        let Some(pane) = inner.pane.as_mut().filter(|pane| !pane.confirmed) else {
+            return;
+        };
+        pane.confirmed = true;
+        drop(inner);
+        self.agent.session_from(
+            &[crate::agent::Session::Opening],
+            crate::agent::Session::Ready,
+        );
+    }
+
+    /// A pane open [`OneSession::open_idle_within`] (120 s) and still not
+    /// confirmed (no watch, an older Harness, no hand-over): taken as up,
+    /// so the lamp's agent never stays `starting` for good.
+    pub fn confirm_if_warmed(&self) {
+        let warmed =
+            self.lock().pane.as_ref().is_some_and(|pane| {
+                !pane.confirmed && pane.born.elapsed() >= self.open_idle_within
+            });
+        if warmed {
+            eprintln!(
+                "tasks: one session: the kept session was not confirmed taking input within {} s; taken as up",
+                self.open_idle_within.as_secs()
+            );
+            self.confirm();
+        }
+    }
+
+    /// #8138 review (5): whether the kept session `agent` is still warming
+    /// up: not confirmed yet, or `ensure` made it new within its first
+    /// words' window ([`OneSession::open_idle_within`]). A refusal then is
+    /// its warm-up, not a fault: the task ends, the session is kept.
+    fn warming(&self, agent: &str) -> bool {
+        self.lock().pane.as_ref().is_some_and(|pane| {
+            pane.agent == agent
+                && (!pane.confirmed
+                    || pane
+                        .made_new
+                        .is_some_and(|at| at.elapsed() < self.open_idle_within))
+        })
+    }
+
     /// #7906 sign 3, the seam before a turn is handed to the kept session
     /// `agent`: `Some` when OpenClaw's Gateway no longer holds its
     /// conversation by its own session key ([`PaneHarness::session_held`],
@@ -3970,7 +4173,9 @@ impl OneSession {
     /// The kept session `agent` took a turn now, the Gateway's record at
     /// `base` just before (#7906 sign 4's start bound).
     fn handed_over(&self, agent: &str, base: Option<(String, i64)>) {
+        self.confirm();
         let mut inner = self.lock();
+        inner.handovers = inner.handovers.wrapping_add(1);
         inner.not_ready_replies = None;
         inner.restarted = None;
         inner.idle_w_spent = false;
@@ -4259,6 +4464,13 @@ impl Turn<'_> {
                     // and the one-session thread replaces the session with
                     // a fresh one once this turn lets the pane go. The task
                     // is never typed again after the recovery.
+                    // #8138 review (5): refused by a session still warming
+                    // up: this task ends told, the session is kept.
+                    Took::EngineNotReady | Took::NotRunning | Took::Timeout
+                        if self.one.warming(&agent) =>
+                    {
+                        return self.refused_while_warming(&agent, &took);
+                    }
                     Took::EngineNotReady | Took::NotRunning | Took::Timeout => {
                         return self.refused_at_hand_over(&agent, &took);
                     }
@@ -4423,6 +4635,29 @@ impl Turn<'_> {
     /// task is told: [`STARTING_SPENT`] (`one_session_not_started`) when
     /// the session is not running or did not take the words,
     /// [`STUCK_CLOSED`] (`one_session_stuck`) when its engine refused them.
+    fn refused_while_warming(&self, agent: &str, took: &Took) -> Sent {
+        // Not confirmed taking input until it is again: `starting`.
+        if let Some(pane) = self
+            .one
+            .lock()
+            .pane
+            .as_mut()
+            .filter(|pane| pane.agent == agent)
+        {
+            pane.confirmed = false;
+        }
+        self.one.agent.session_from(
+            &[crate::agent::Session::Ready, crate::agent::Session::Working],
+            crate::agent::Session::Opening,
+        );
+        eprintln!(
+            "tasks: one session: {}: {} refused the hand-over while warming up ({took:?}); the task ends now, the session is kept (#8138)",
+            self.id,
+            short(agent)
+        );
+        self.fallback(STARTING_SPENT)
+    }
+
     fn refused_at_hand_over(&self, agent: &str, took: &Took) -> Sent {
         let (code, why, told) = match took {
             Took::EngineNotReady => (
