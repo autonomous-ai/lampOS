@@ -1420,8 +1420,18 @@ pub struct Engine<P: Persistence> {
     /// (#7019: [`crate::runtime::lamp_default`] is the build's order's
     /// first before a look, never the file's).
     lamp_default: Option<EngineKind>,
+    /// The lamp's own agent's readiness (#8138, [`crate::agent`]), with the
+    /// one session on: a `prepare` for the lamp's own default agent is
+    /// refused at once ([`crate::agent::NOT_READY`]) while it takes none.
+    agent: Option<std::sync::Arc<crate::agent::Agent>>,
 }
 impl<P: Persistence> Engine<P> {
+    /// The lamp's own agent's readiness that refuses its tasks at prepare
+    /// while it takes none (#8138).
+    pub fn set_agent(&mut self, agent: std::sync::Arc<crate::agent::Agent>) {
+        self.agent = Some(agent);
+    }
+
     /// The lamp's own engines now and its default (#6492), set by the part
     /// before each request: the default is kept only while it is in the
     /// order.
@@ -1647,6 +1657,7 @@ impl<P: Persistence> Engine<P> {
             starting: false,
             lamp_order: Vec::new(),
             lamp_default: None,
+            agent: None,
             kept_aside,
             set_aside,
             targets_newer: None,
@@ -2113,6 +2124,18 @@ impl<P: Persistence> Engine<P> {
                 {
                     return Err(err(code, message));
                 }
+                // The lamp's own agent not taking tasks now (#8138): refused
+                // at once, so the voice tells the person now, not after a
+                // hand-over that would wait in silence. A session the person
+                // named is another pane: not this agent's.
+                if let Some(state) = self
+                    .agent
+                    .as_ref()
+                    .filter(|_| lamp && session.is_none())
+                    .and_then(|agent| agent.refusal(target_value.engine.argument()))
+                {
+                    return Err(err(crate::agent::NOT_READY, crate::agent::message(state)));
+                }
                 let id = take(&mut next.next_task_id)?;
                 let launch = Launch {
                     name: task_label(&next.store_id, id),
@@ -2365,6 +2388,16 @@ impl<P: Persistence> Engine<P> {
             .observations
             .last()
             .map(|seen| seen.data.answer.as_str())
+    }
+
+    /// The task launched as `name`, by its id (#8138: a spoken turn's end
+    /// Harness's watch read, for its read at once).
+    pub fn task_of_launch(&self, name: &str) -> Option<u64> {
+        self.state
+            .tasks
+            .iter()
+            .find(|task| task.launch.name == name)
+            .map(|task| task.id)
     }
 
     /// Whether the launch `name` ended with its answer: its agent's last
@@ -4132,6 +4165,71 @@ mod tests {
             )
             .unwrap();
         (engine, id)
+    }
+
+    /// #8138: a task for the lamp's own agent is refused at prepare while
+    /// it takes none (`agent_not_ready`, its state in the message), taken
+    /// once it is ready; another target, or another engine, is never.
+    #[test]
+    fn a_lamp_task_is_refused_at_prepare_while_its_agent_is_not_ready() {
+        use crate::agent::{Agent, Session};
+        let targets = BTreeMap::from([
+            (
+                crate::runtime::LAMP_TARGET.to_owned(),
+                Target {
+                    machine_id: "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb".into(),
+                    project: "lamp-project".into(),
+                    engine: EngineKind::Openclaw,
+                },
+            ),
+            (
+                "mac".to_owned(),
+                Target {
+                    machine_id: "cccccccccccccccccccccccccccccccc".into(),
+                    project: "mac-project".into(),
+                    engine: EngineKind::Claude,
+                },
+            ),
+        ]);
+        let mut engine =
+            Engine::open(Memory::default(), targets, STORE, SESSION, &clock(0)).unwrap();
+        let agent = std::sync::Arc::new(Agent::default());
+        agent.update(|facts| {
+            facts.on = true;
+            facts.engine = Some("openclaw".into());
+            facts.harness = crate::agent::Harness::Here;
+            facts.session = Session::Recovering("engine_not_ready");
+        });
+        engine.set_agent(agent.clone());
+        let prepare = |engine: &Engine<Memory>, target: &str, id: &str| Request::Prepare {
+            guard: guard(engine, id),
+            text: "Turn the light blue.".into(),
+            target: target.into(),
+            session: None,
+            engine: None,
+        };
+        let refused = engine
+            .handle(&prepare(&engine, "lamp", "p1"), &clock(1), false)
+            .unwrap_err();
+        assert_eq!(refused.code, crate::agent::NOT_READY);
+        assert_eq!(
+            crate::agent::state_of_message(refused.message),
+            Some(lamp_msgs::Readiness::Recovering)
+        );
+        assert!(crate::readiness::EARLY_REFUSALS.contains(&refused.code));
+        // The person's other computer: unchanged.
+        assert!(
+            engine
+                .handle(&prepare(&engine, "mac", "p2"), &clock(2), false)
+                .is_ok()
+        );
+        // Ready again: taken.
+        agent.update(|facts| facts.session = Session::Ready);
+        assert!(
+            engine
+                .handle(&prepare(&engine, "lamp", "p3"), &clock(3), false)
+                .is_ok()
+        );
     }
 
     /// What `show` reads of a harness that has not begun its task.
