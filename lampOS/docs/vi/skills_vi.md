@@ -5880,7 +5880,16 @@ vụ lần chạy (#6432, #6306). Chi tiết đầy đủ ở
   của đèn; dưới, #7894) và được nói một lần, lần tới chủ đèn được thấy
   trong vòng 30 phút (`NEWS_WAIT`), nếu không thì bỏ (`skipped: <why>`);
   vào giờ yên lặng thì bỏ ngay (`skipped: quiet hours`), không bao giờ giữ
-  qua giờ yên lặng. Lần chạy ngay được yêu cầu bằng giọng nói mà câu trả
+  qua giờ yên lặng. **Lần thất bại của một skill được nói như tin tức tối
+  đa một lần trong sáu giờ** (`service_read::tell_failed_once`,
+  `FAILED_ONCE_WITHIN`, theo từng skill; first builder lúc 08:55 trên
+  #7588): một skill trigger hỏng mỗi mười phút chỉ báo chủ đèn một lần,
+  không phải mỗi lần (`not said: a failure of this skill was told within
+  six hours`). Câu chưa được nói (không ai được thấy trong nửa giờ, giờ yên
+  lặng) trả lại lượt của nó, nên lần sau vẫn được báo; lần thất bại của
+  skill khác được báo riêng; câu nói trong cuộc trò chuyện đã yêu cầu luôn
+  được nói và được tính là lần đó. Chỉ giữ trong bộ nhớ, nên khởi động lại
+  có thể báo thêm một lần. Lần chạy ngay được yêu cầu bằng giọng nói mà câu trả
   lời của nó, điều agent tìm thấy hay lần thất bại, sẵn sàng trong năm phút
   sau lời yêu cầu thì được bỏ giờ yên lặng thêm năm phút, khi
   `LAMP_TOLD_WHEN_ASKED` hoặc công tắc này bật (`quiet_ask`, `lift_quiet`):

@@ -6132,6 +6132,7 @@ fn hand_task(
             sure,
             state,
             &mut room,
+            &lamp_skills::service_read::FAILED_TOLD,
         );
     });
 }
@@ -6196,7 +6197,8 @@ fn lift_quiet(room: &mut LampRoom, asked: u64, ready: u64) -> Option<u64> {
 /// (`refused`). The failure is said in the conversation that asked for the
 /// run while it goes on, a run now its owner asked by voice at `asked_at`
 /// (`lamp_skills::task_sure::in_asking_conversation`), else as news
-/// (`lamp_skills::service_read::tell_failed`, #7363). `asked`: that ask
+/// (`lamp_skills::service_read::tell_failed_once`, #7363, at most once in
+/// six hours a skill as news). `asked`: that ask
 /// with `LAMP_TOLD_WHEN_ASKED` on; either lifts the quiet ([`quiet_ask`]). The
 /// journal's words, or none when nothing was told.
 #[allow(clippy::too_many_arguments)]
@@ -6211,6 +6213,7 @@ fn tell_its_run(
     sure: bool,
     state: Option<&Path>,
     room: &mut LampRoom,
+    failed_told: &lamp_skills::service_read::FailedTold,
 ) -> Option<String> {
     let asking = sure && lamp_skills::task_sure::in_asking_conversation(asked_at, unix_ms());
     let (lines, what, failed) = match (found, failed) {
@@ -6246,7 +6249,11 @@ fn tell_its_run(
         }
     }
     let told = match &failed {
-        Some(line) => lamp_skills::service_read::tell_failed(line, asking, room),
+        // At most once in six hours a skill, but always in the asking
+        // conversation (the first builder's 08:55 on #7588).
+        Some(line) => {
+            lamp_skills::service_read::tell_failed_once(failed_told, skill, line, asking, room)
+        }
         None => {
             lamp_skills::service_read::tell_answer(&lines, asker(asked_at, owners, unix_ms()), room)
         }
@@ -7170,6 +7177,9 @@ mod tests {
                 sure,
                 None,
                 room,
+                // A fresh limit a call: this test is of where the line
+                // goes, the limit is service_read's own tests'.
+                &lamp_skills::service_read::FailedTold::new(),
             );
             (told.unwrap(), began.elapsed())
         };
@@ -7298,6 +7308,7 @@ mod tests {
             true,
             None,
             &mut room,
+            &lamp_skills::service_read::FailedTold::new(),
         );
         assert_eq!(told.as_deref(), Some("said in the asking conversation"));
         let ask = voice.join().unwrap();
@@ -7379,6 +7390,7 @@ mod tests {
                 true,
                 None,
                 &mut room,
+                &lamp_skills::service_read::FailedTold::new(),
             );
             assert_eq!(
                 told.as_deref(),
