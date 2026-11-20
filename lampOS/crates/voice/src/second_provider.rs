@@ -14437,13 +14437,14 @@ fn round_one_line(
         .last()
         .filter(|message| message.role == "user")
         .and_then(Message::words);
+    let make_ask = said.map(crate::tools::make_skill_asked::asks_to_make);
     let sentences = said.map(crate::tools::make_skill_asked::sentence_count);
     format!(
         "lamp-voice second: request {request}: round 1: task_offered={} make_offered={} forced={} make_ask={} sentences={}",
         offered(crate::agent_tasks::START),
         offered(crate::made_skill::MAKE),
         forced.map_or("?", |forced| forced.unwrap_or("none")),
-        said.map_or("?", |said| yes(crate::tools::make_skill_asked::asks_to_make(said))),
+        make_ask.map_or("?", yes),
         sentences.map_or("?".to_owned(), |count| count.to_string()),
     )
 }
