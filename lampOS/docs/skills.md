@@ -8892,7 +8892,9 @@ grants, its code, or the lamp's own steps (the light, the head, a say).
    this conversation says how many of those the made skills the heard
    words are read for hold ("the heard words named no skill; 1 made in
    this conversation, 0 of them among the made skills the heard words are
-   read for"), with no word of the line and no skill's name. A run that speaks
+   read for; 2 word(s) of its own, nearest: name, 1 word(s) off"), with
+   no word of the line and no skill's name; the words read are those past
+   the lamp's name, as the matcher reads them. A run that speaks
    its own words (lamp-skills' `says`, `made_run::speaks_itself`) ends the
    turn there, with no round 2 and no line of the lamp's own, so the
    skill's say, at priority 8, is the first thing heard, about a second

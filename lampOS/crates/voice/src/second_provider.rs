@@ -19502,6 +19502,10 @@ async fn answer(
     let named_words = named_agent.is_some().then(|| said.clone());
     // The words alone, should the chat refuse the app's photo.
     let attached_words = attached.then(|| said.clone());
+    // The words the made-skill matcher reads past the lamp's name
+    // ([`past_the_name_heard_as`]), for its miss line's shape below.
+    let skill_words =
+        past_the_name_heard_as(&said, named).map_or_else(|| said.clone(), str::to_owned);
     let question = match picture {
         Some(jpeg) if attached => {
             Message::user_seeing(format!("{said}{}", crate::attachments::NOTE), &jpeg)
@@ -20044,8 +20048,17 @@ async fn answer(
                     .filter(|made| named(&crate::skill_named::spoken(made)))
                     .count()
             });
+            // The matcher's input shape, no word of it: its own words past
+            // those said around an ask, and how far the nearest made name is.
+            let line = skill_words.as_str();
+            let own = crate::skill_named::own_words_of(line);
+            let off = made_here
+                .iter()
+                .map(|made| crate::skill_named::words_off(line, &crate::skill_named::spoken(made)))
+                .min()
+                .unwrap_or_default();
             eprintln!(
-                "lamp-voice second: request {request}: the heard words named no skill; {} made in this conversation, {read} of them among the made skills the heard words are read for",
+                "lamp-voice second: request {request}: the heard words named no skill; {} made in this conversation, {read} of them among the made skills the heard words are read for; {own} word(s) of its own, nearest: name, {off} word(s) off",
                 made_here.len()
             );
         }
