@@ -1849,7 +1849,7 @@ With the switch:
   (`known_faces::tests::a_new_face_is_kept_only_on_a_yes_to_keeping_it`).
 - **A known face only, when the known file let the save past the face
   question** (`LAMP_FACE_SAVE_KNOWN_ONLY=on`, lamp-voice; off unless set,
-  in no product unit; #7704). The known file stays up to its 3 s after a
+  on in the product unit; #7704). The known file stays up to its 3 s after a
   known face leaves, so a stranger who steps in and gives a name in that
   gap was saved as a new person with no face question. With the switch,
   that save alone (the face question skipped only because the known file
