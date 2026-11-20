@@ -14,6 +14,7 @@ mod cut_to_a_person;
 mod day_shed_held;
 mod decline_silent;
 mod dont_know;
+mod forces_past_name;
 mod held_consent;
 mod held_forget;
 mod held_rename;
