@@ -1314,6 +1314,7 @@ fn serve(
             socket: options.tasks_socket.clone(),
             say: sockets.say.clone(),
             via_agent: HashSet::new(),
+            ahead: WordedAhead::at(options.state.as_deref(), &bus),
         }),
         looks: RefCell::new(HashMap::new()),
         watching: RefCell::new(Watching {
@@ -1416,6 +1417,10 @@ fn serve(
         // Pending Policy answers and queued runs must see loss of clock
         // trust before they can start scheduled output.
         sample_clock(&mut engine, &runner, clock::now_us());
+        // A core skill's lines worded ahead, refilled in idle time.
+        look_ahead(&runner, &|skill| {
+            engine.in_quiet_hours(skill, clock::now_us())
+        });
         while let Ok(event) = done.try_recv() {
             let skill = event.skill.clone();
             let unwritten = lamp_skills::service_write::waiting(&event.why);
@@ -2138,6 +2143,329 @@ struct Tasks {
     socket: Option<PathBuf>,
     say: PathBuf,
     via_agent: HashSet<String>,
+    ahead: WordedAhead,
+}
+
+/// The core skills' lines worded ahead (`LAMP_CORE_VIA_AGENT`,
+/// [`lamp_skills::worded_ahead`]): what is kept, and where (`--state-dir`);
+/// whether a refill is under way; when `voice/state` was last read, and
+/// last not resting; when a refill was last looked for; whether the board
+/// was warm then, for the journal's line when it changes; and memory's
+/// `memory/forgot`, which lets the kept lines go.
+#[derive(Default)]
+struct WordedAhead {
+    store: Arc<lamp_skills::worded_ahead::Store>,
+    refilling: Arc<std::sync::atomic::AtomicBool>,
+    read: Cell<Option<Instant>>,
+    talked: Cell<Option<Instant>>,
+    looked: Cell<Option<Instant>>,
+    warm: Cell<bool>,
+    forgot: RefCell<Option<Subscriber>>,
+}
+
+impl WordedAhead {
+    /// What `state`'s file keeps, if there is one; in this process alone
+    /// otherwise; `memory/forgot` heard on `bus`.
+    fn at(state: Option<&Path>, bus: &Bus) -> Self {
+        let file = state.map(|state| state.join(lamp_skills::worded_ahead::FILE));
+        let forgot = bus
+            .subscribe_typed(
+                lamp_msgs::MemoryForgot::TOPIC,
+                "skills_ahead",
+                lamp_msgs::MemoryForgot::TYPE,
+            )
+            .map_err(|error| {
+                eprintln!(
+                    "lamp-skills: worded ahead: memory/forgot not heard, so a forget leaves the kept lines: {error}"
+                )
+            })
+            .ok();
+        Self {
+            store: Arc::new(lamp_skills::worded_ahead::Store::at(file)),
+            forgot: RefCell::new(forgot),
+            ..Self::default()
+        }
+    }
+
+    /// What is kept now, written on a thread of its own, never the fire's
+    /// (Heron's P3 on #7903): the fire waits on no disk.
+    fn save_soon(&self) {
+        let store = self.store.clone();
+        std::thread::spawn(move || {
+            if let Err(why) = store.save() {
+                eprintln!("lamp-skills: {why}");
+            }
+        });
+    }
+}
+
+/// A core skill's fire's `calls`, its tasks `tasks` taken out: with the
+/// oldest fresh line its agent worded ahead for that task, it in the say's
+/// place, taken so it is said once; with none, as they are, its own line.
+fn said_ahead(skill: &str, tasks: &[Call], calls: Vec<Call>, ahead: &WordedAhead) -> Vec<Call> {
+    use lamp_skills::worded_ahead::{Kind, NONE_FRESH, said_line};
+    let now_ms = unix_ms();
+    let kind = tasks.iter().find_map(|call| match call {
+        Call::Task(step) => Kind::of(skill, &step.task),
+        _ => None,
+    });
+    // Only a line worded in the owner's language now (Twelve's P3 2 on
+    // #7903): the file is read, never written, on the fire's path.
+    let language = kind.as_ref().and_then(|_| language_now());
+    let line = kind.and_then(|kind| {
+        ahead
+            .store
+            .kept()
+            .take_in(&kind, now_ms, language.as_deref())
+    });
+    match line {
+        Some(line) => {
+            ahead.save_soon();
+            let ago_ms = now_ms.saturating_sub(line.worded_ms);
+            eprintln!(
+                "lamp-skills: skill:{skill}: {}",
+                said_line(Ok((&line, ago_ms)))
+            );
+            lamp_skills::core_agent::with_line(calls, &line.words)
+        }
+        None => {
+            eprintln!("lamp-skills: skill:{skill}: {}", said_line(Err(NONE_FRESH)));
+            calls
+        }
+    }
+}
+
+/// The newest value of `topic` and its age in ms, by its publisher's stamp.
+fn reading(bus: &Bus, topic: &str) -> Option<(serde_json::Value, u64)> {
+    let message = bus.latest(topic).ok()??;
+    let value = message.parse::<serde_json::Value>().ok()?;
+    Some((value, unix_ms().saturating_sub(message.header.at_unix_ms)))
+}
+
+/// A refill of a core skill's lines worded ahead begun, if one may begin
+/// now ([`lamp_skills::worded_ahead::Kept::next_refill`]): `voice/state`
+/// read at most once a second (it is said once a second), a refill looked
+/// for every [`lamp_skills::worded_ahead::LOOK_EVERY`], one at a time, on
+/// a thread of its own; `quiet` says whether a skill is in its quiet hours.
+fn look_ahead(runner: &Runner, quiet: &dyn Fn(&str) -> bool) {
+    use lamp_skills::worded_ahead::{self as worded, Kind, Now};
+    let tasks = runner.tasks.borrow();
+    if tasks.via_agent.is_empty() {
+        return;
+    }
+    let ahead = &tasks.ahead;
+    let now = clock::now();
+    let since = |at: &Cell<Option<Instant>>| at.get().map(|at| now.saturating_duration_since(at));
+    if since(&ahead.read).is_some_and(|since| since < Duration::from_secs(1)) {
+        return;
+    }
+    ahead.read.set(Some(now));
+    // "Forget everything" (memory's `memory/forgot`, any person's): the
+    // kept lines go with it.
+    if let Some(forgot) = ahead.forgot.borrow_mut().as_mut() {
+        let mut heard = false;
+        while receive(forgot, Duration::ZERO).is_some() {
+            heard = true;
+        }
+        if heard {
+            if ahead.store.clear() {
+                eprintln!(
+                    "lamp-skills: worded ahead: the kept lines let go: {}",
+                    worded::FORGOTTEN
+                );
+            }
+            ahead.save_soon();
+        }
+    }
+    // Worded in another language than the owner's now: let go, even while
+    // a refill runs (Twelve's P3 2 on #7903), written off this loop.
+    if ahead.store.in_language(language_now().as_deref()) {
+        eprintln!(
+            "lamp-skills: worded ahead: the kept lines let go: {}",
+            worded::LANGUAGE_CHANGED
+        );
+        ahead.save_soon();
+    }
+    // Not resting, or not known: a turn is open.
+    if said_lately::<VoiceState>(&runner.bus, VoiceState::TOPIC).map(|now| now.state)
+        != Some(Voice::Resting)
+    {
+        ahead.talked.set(Some(now));
+    }
+    if since(&ahead.looked).is_some_and(|since| since < worded::LOOK_EVERY)
+        || ahead.refilling.load(std::sync::atomic::Ordering::Acquire)
+    {
+        return;
+    }
+    ahead.looked.set(Some(now));
+    let heat = reading(&runner.bus, worded::BOARD_HEAT);
+    let state = reading(&runner.bus, lamp_msgs::BoardState::TOPIC);
+    let warm = worded::warm(
+        heat.as_ref().map(|(value, age)| (value, *age)),
+        state.as_ref().map(|(value, age)| (value, *age)),
+    );
+    if warm != ahead.warm.get() {
+        ahead.warm.set(warm);
+        eprintln!(
+            "lamp-skills: worded ahead: refills {}",
+            if warm {
+                "paused: the board is warm or hot"
+            } else {
+                "go on: the board is cool again"
+            }
+        );
+    }
+    let (Some(state_dir), Some(socket)) = (tasks.state.clone(), tasks.socket.clone()) else {
+        return;
+    };
+    if !lamp_skills::task::on() {
+        return;
+    }
+    let kinds = Kind::all_of(|name| tasks.via_agent.contains(name) && tasks.of.contains_key(name));
+    let now_ms = unix_ms();
+    let talking = since(&ahead.talked).is_some_and(|since| since < worded::IDLE_AFTER);
+    // Counted here, and written on the refill's own thread before it is
+    // handed over (Heron's HOLD and Twelve's P3 3 on #7903).
+    let begun = ahead.store.begin_refill(
+        &kinds,
+        &Now {
+            now_ms,
+            talking,
+            warm,
+            quiet,
+            allowance: worded::allowance(),
+        },
+    );
+    let Some((kind, today)) = begun else {
+        return;
+    };
+    let Some((folder, _)) = tasks.of.get(kind.pilot.name).cloned() else {
+        return;
+    };
+    ahead
+        .refilling
+        .store(true, std::sync::atomic::Ordering::Release);
+    let (store, refilling) = (ahead.store.clone(), ahead.refilling.clone());
+    std::thread::spawn(move || {
+        match store.write_count(kind.pilot.name, now_ms) {
+            Ok(()) => refill(kind, &folder, &state_dir, &socket, &store, now_ms, today),
+            Err(why) => eprintln!("lamp-skills: {why}"),
+        }
+        refilling.store(false, std::sync::atomic::Ordering::Release);
+    });
+}
+
+/// The owner's language file's text now (`LAMP_LANGUAGE_FILE`).
+fn language_now() -> Option<String> {
+    lamp_body::first_stand::language_text()
+}
+
+/// How long a refill lamp-tasks was busy for waits before the next look.
+const REFILL_BUSY_REST: Duration = Duration::from_secs(60);
+
+/// One refill of `kind`, counted at `at_ms`, `today` of the day's cap: its
+/// pre-approved `do.task` with its fixed brief handed to lamp-tasks marked
+/// `"ahead"` (so a person's ask cancels it), its line kept once checked,
+/// and one journal line of what came of it, its run time and lamp-tasks'
+/// CPU meanwhile.
+fn refill(
+    kind: lamp_skills::worded_ahead::Kind,
+    folder: &Path,
+    state: &Path,
+    socket: &Path,
+    store: &lamp_skills::worded_ahead::Store,
+    at_ms: u64,
+    today: usize,
+) {
+    use lamp_skills::worded_ahead as worded;
+    let skill = kind.pilot.name;
+    let journal = |outcome: Result<(), &str>, run: Duration, cpu_s: Option<f32>| {
+        eprintln!(
+            "lamp-skills: skill:{skill}: {}",
+            worded::refill_line(&kind, outcome, run, cpu_s, today)
+        );
+    };
+    if !lamp_skills::core_agent::pre_approved(folder) {
+        journal(
+            Err("its folder is not the lamp's own variant"),
+            Duration::ZERO,
+            None,
+        );
+        return;
+    }
+    let step = lamp_skills::task::TaskStep {
+        task: kind.task.task.into(),
+        words: kind.task.task.into(),
+        run: lamp_skills::core_agent::RUN.into(),
+        quiet: None,
+    };
+    let place = lamp_skills::task::Place {
+        state: Some(state),
+        control: Path::new(lamp_voice::skill_task_yes::CONTROL_SOCKET),
+        socket: Some(socket),
+    };
+    let cpu = worded::cpu_stat();
+    let before = cpu.and_then(worded::cpu_usec);
+    let language = language_now();
+    let cleared = store.cleared();
+    let began = Instant::now();
+    let answer = std::cell::RefCell::new(None);
+    let said = lamp_skills::task::hand(
+        skill,
+        &step,
+        folder,
+        &[],
+        place,
+        unix_ms(),
+        |socket, line| {
+            let sent = exchange_hand_over(socket, &worded::marked(line));
+            if let Ok(told) = &sent {
+                *answer.borrow_mut() = Some(told.clone());
+            }
+            sent
+        },
+        || "no yes is asked for the lamp's own refill".into(),
+    );
+    let run = began.elapsed();
+    let cpu_s = before
+        .zip(cpu.and_then(worded::cpu_usec))
+        .map(|(before, after)| after.saturating_sub(before) as f32 / 1_000_000.0);
+    worded::allowance().spent(run, cpu_s);
+    let mut kept = store.kept();
+    let outcome = match answer.into_inner() {
+        // Worded under another language than the owner's now: not kept.
+        Some(_) if language_now() != language => Err(worded::LANGUAGE_CHANGED.to_owned()),
+        // Let go meanwhile ("forget everything", a language change):
+        // nothing worded before it is kept (Twelve's P3 1 on #7903).
+        Some(_) if store.cleared() != cleared => Err(worded::LET_GO.to_owned()),
+        Some(answer) => kept
+            .refilled(&kind, &answer, at_ms, unix_ms())
+            .map_err(str::to_owned),
+        // Not handed over, or not taken: nothing ran, so it is given back.
+        None if said.starts_with(lamp_skills::task::NOT_HANDED)
+            || said.contains("did not take it") =>
+        {
+            kept.uncount_refill(skill, at_ms);
+            Err(format!("{}: {said}", worded::BUSY))
+        }
+        None => Err(said),
+    };
+    drop(kept);
+    if let Err(why) = store.save() {
+        eprintln!("lamp-skills: {why}");
+    }
+    let busy = outcome
+        .as_ref()
+        .is_err_and(|why| why.starts_with(worded::BUSY));
+    journal(
+        outcome.as_ref().map(|_| ()).map_err(String::as_str),
+        run,
+        cpu_s,
+    );
+    // Nothing ran: the next look waits a while, not every 5 s.
+    if busy {
+        std::thread::sleep(REFILL_BUSY_REST);
+    }
 }
 
 /// `addon/proposal`, written for the add-ons, and what they proposed lately.
@@ -2837,25 +3165,26 @@ fn start(
     let (tasks, calls): (Vec<Call>, Vec<Call>) = calls
         .into_iter()
         .partition(|call| matches!(call, Call::Task(_)));
-    let handed = !tasks.is_empty();
-    // A core skill's line through the lamp's agent (`LAMP_CORE_VIA_AGENT`):
-    // its say waits for its task's line on the run's own thread, at most
-    // `core_agent::FALLBACK_WITHIN`, then says it or its own at once.
-    let (line_to, line_from) = if handed
+    // A core skill's line worded ahead (`LAMP_CORE_VIA_AGENT`,
+    // `lamp_skills::worded_ahead`): its task is never handed over at the
+    // fire, nothing waits for an agent's run; the oldest fresh line its
+    // agent worded in idle time is said at once in its say's place, or its
+    // own line.
+    let (tasks, calls) = if !tasks.is_empty()
         && runner.tasks.borrow().via_agent.contains(&skill)
         && calls.iter().any(lamp_skills::core_agent::is_line)
     {
-        let (to, from) = mpsc::channel();
-        (Some(to), Some(from))
+        let calls = said_ahead(&skill, &tasks, calls, &runner.tasks.borrow().ahead);
+        (Vec::new(), calls)
     } else {
-        (None, None)
+        (tasks, calls)
     };
+    let handed = !tasks.is_empty();
     for call in tasks {
         let Call::Task(step) = call else { continue };
         let room = task_room(&skill, &step, runner);
-        hand_task(&skill, *step, &runner.tasks.borrow(), room, line_to.clone());
+        hand_task(&skill, *step, &runner.tasks.borrow(), room);
     }
-    drop(line_to);
     if handed && calls.is_empty() {
         let _ = made.send(());
         let _ = runner.finished.send(SkillEvent {
@@ -2954,18 +3283,6 @@ fn start(
         ended
     });
     std::thread::spawn(move || {
-        // The agent's line, or the skill's own at once (`LAMP_CORE_VIA_AGENT`).
-        let calls = match line_from {
-            Some(from) => {
-                let said = lamp_skills::core_agent::awaited(
-                    from,
-                    lamp_skills::core_agent::FALLBACK_WITHIN,
-                );
-                eprintln!("lamp-skills: skill:{skill}: {}", said.journal());
-                lamp_skills::core_agent::with_line(calls, &said)
-            }
-            None => calls,
-        };
         // A light relative to the person's, or never brighter than it, is
         // made from the light shown as the run began (#1672, #3691); with
         // that light off, or not known for a relative one, nothing is shown,
@@ -5953,13 +6270,7 @@ fn tasks_refused(skill: &str, calls: &[Call], tasks: &Tasks) -> Option<String> {
 /// one fixed line behind the same gate, and one refused `busy` waits its
 /// turn in the lamp's one line ([`lamp_skills::task_sure::LAMP`]), on this
 /// thread; off, as before.
-fn hand_task(
-    skill: &str,
-    step: lamp_skills::task::TaskStep,
-    tasks: &Tasks,
-    mut room: LampRoom,
-    line: Option<mpsc::Sender<lamp_skills::core_agent::Heard>>,
-) {
+fn hand_task(skill: &str, step: lamp_skills::task::TaskStep, tasks: &Tasks, mut room: LampRoom) {
     // This run's own: a run now asked by voice, never a trigger's after it.
     // Its quiet lifted and its not-ready line only with
     // `LAMP_TOLD_WHEN_ASKED` (#7180), as before; its failure answered in
@@ -6069,25 +6380,6 @@ fn hand_task(
             dropped.words()
         });
         eprintln!("lamp-skills: skill:{skill}: {said}");
-        // A core skill's line through the lamp's agent (`LAMP_CORE_VIA_AGENT`):
-        // its line, or nothing, goes to the fire's say, which says its own
-        // at once without one; nothing of a failed run is said here, and a
-        // line after the say's wait is dropped, never said late.
-        if let Some(line) = line {
-            let heard = lamp_skills::core_agent::heard(found.take());
-            let _ = (refused.take(), not_ready.take(), tried.failed());
-            let what = match &heard {
-                lamp_skills::core_agent::Heard::Line(_) => "its agent's line",
-                lamp_skills::core_agent::Heard::Nothing(why) => why,
-            };
-            match line.send(heard) {
-                Ok(()) => eprintln!("lamp-skills: skill:{skill}: do.task: {what}, to its say"),
-                Err(_) => eprintln!(
-                    "lamp-skills: skill:{skill}: do.task: {what} came after its own line was said: dropped"
-                ),
-            }
-            return;
-        }
         // A refusal the person must hear (a run granted the internet the
         // lamp's agent can't be given, #7200): said in plain words, the
         // same way as a told answer ([`asked_now`], #7894): at once to the
@@ -6340,8 +6632,18 @@ impl Drop for Handing {
 /// connected, nothing was taken; a line written and no answer read, the
 /// run may have begun.
 fn hand_over(socket: &Path, line: &str) -> Result<String, lamp_skills::service_write::Unrun> {
-    use lamp_skills::service_write::Unrun;
     let _handing = Handing::begin();
+    exchange_hand_over(socket, line)
+}
+
+/// [`hand_over`] not counted among the hand-overs a task waits its turn
+/// behind (`HANDING`): the lamp's own refill of a core skill's lines,
+/// which lamp-tasks cancels for any other task, so none waits for it.
+fn exchange_hand_over(
+    socket: &Path,
+    line: &str,
+) -> Result<String, lamp_skills::service_write::Unrun> {
+    use lamp_skills::service_write::Unrun;
     let stream = UnixStream::connect(socket)
         .map_err(|error| Unrun::NotTaken(format!("lamp-tasks couldn't be reached: {error}")))?;
     let exchange = || -> io::Result<String> {
@@ -8979,6 +9281,7 @@ mod tests {
             socket: None,
             say: root.path().join("say.sock"),
             via_agent: HashSet::new(),
+            ahead: WordedAhead::default(),
         };
         let task = || {
             Call::Task(Box::new(lamp_skills::task::TaskStep {
@@ -9030,16 +9333,37 @@ mod tests {
         assert!(!root.path().join(lamp_skills::task::RUNS_FILE).exists());
     }
 
-    /// `LAMP_CORE_VIA_AGENT`: a core skill's fire whose agent is down (its
-    /// tasks off here, no lamp-tasks) says its own line at once, well
-    /// inside the 10 s, and the fire's caller, the trigger's loop, is never
-    /// held while its say waits for the agent's line.
+    /// `LAMP_CORE_VIA_AGENT` (worded ahead): a fire with a fresh line its
+    /// agent worded ahead says it at once, as exact words in the say's
+    /// place, taken so it is said once; its task is never handed over, and
+    /// the trigger's loop is never held.
     #[test]
-    fn a_core_skills_line_with_its_agent_down_says_its_own_at_once() {
-        // The switch is read from this process's environment here.
-        if lamp_skills::task::on() {
-            return;
+    fn a_fire_says_a_kept_line_at_once() {
+        let (waited, asked, kept) = fire_a_core_skill(Some("Fancy a sip of water?"));
+        assert!(waited < Duration::from_millis(500), "at once: {waited:?}");
+        assert_eq!(asked["text"], "Fancy a sip of water?", "{asked}");
+        assert!(asked.get("note").is_none(), "exact words, no note: {asked}");
+        assert_eq!(kept.fresh_of("sip-of-water", unix_ms()), 0, "said once");
+    }
+
+    /// A stale or empty cache: the skill's own line at once, never a wait.
+    #[test]
+    fn a_stale_or_empty_cache_says_its_own_line_at_once() {
+        let note = "They have sat at the desk for about half an hour. Suggest a sip of water.";
+        for kept in [None, Some("stale")] {
+            let (waited, asked, _) = fire_a_core_skill(kept);
+            assert!(waited < Duration::from_millis(500), "at once: {waited:?}");
+            assert_eq!(asked["note"], note, "{asked}");
+            assert_eq!(asked["skill"], "sip-of-water");
         }
+    }
+
+    /// A pilot's fire, with `kept` its line worded ahead (`"stale"`: a day
+    /// and a minute old): how long its say took to be asked, what was
+    /// asked, and what is kept after.
+    fn fire_a_core_skill(
+        kept: Option<&str>,
+    ) -> (Duration, serde_json::Value, lamp_skills::worded_ahead::Kept) {
         let root = tempfile::Builder::new()
             .prefix("core-agent-")
             .tempdir_in("/tmp")
@@ -9076,6 +9400,26 @@ mod tests {
                 socket: None,
                 say: root.path().join("say.sock"),
                 via_agent: HashSet::from([skill.to_owned()]),
+                ahead: {
+                    let ahead = WordedAhead::default();
+                    let mut held = ahead.store.kept();
+                    let sip = lamp_skills::worded_ahead::Kind::of(
+                        skill,
+                        lamp_skills::core_agent::PILOTS[0].tasks[0].task,
+                    )
+                    .unwrap();
+                    match kept {
+                        Some("stale") => held.keep(
+                            &sip,
+                            "Old words.".into(),
+                            unix_ms() - lamp_skills::worded_ahead::FRESH_MS - 60_000,
+                        ),
+                        Some(line) => held.keep(&sip, line.into(), unix_ms()),
+                        None => {}
+                    }
+                    drop(held);
+                    ahead
+                },
             }),
             local_time: None,
             trust_clock: false,
@@ -9123,14 +9467,9 @@ mod tests {
             "the fire is never held"
         );
         let (at, line) = ask.recv_timeout(Duration::from_secs(5)).unwrap();
-        assert!(
-            at.duration_since(fired) < lamp_skills::core_agent::FALLBACK_WITHIN / 2,
-            "its own line at once: {:?}",
-            at.duration_since(fired)
-        );
         let asked: serde_json::Value = serde_json::from_str(&line).unwrap();
-        assert_eq!(asked["note"], note, "{asked}");
-        assert_eq!(asked["skill"], skill);
+        let kept = runner.tasks.borrow().ahead.store.kept().clone();
+        (at.duration_since(fired), asked, kept)
     }
 
     /// A run that is only a `do.task` the lamp would not hand over makes
@@ -9158,6 +9497,7 @@ mod tests {
             socket: None,
             say: root.path().join("say.sock"),
             via_agent: HashSet::new(),
+            ahead: WordedAhead::default(),
         };
         let task = || {
             Call::Task(Box::new(lamp_skills::task::TaskStep {

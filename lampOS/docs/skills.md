@@ -2204,17 +2204,25 @@ task = { task = "Take a photo and send it to my phone", run = "scripts/main.py" 
   alone, `lamp_control::task_yes::yes_for_token`) and its result as Task
   news are #6306's and #6304's. The journal keeps the outcome, never the task's words.
 
-### A core skill's line through the lamp's agent (`LAMP_CORE_VIA_AGENT`, a pilot, off)
+### A core skill's line through the lamp's agent (`LAMP_CORE_VIA_AGENT`, on in the product)
 
 The middle form of a voice make, for the core skills that say a
 model-worded line at each fire: lamp-skills keeps the trigger, the
 `[[while]]` guards, `most_a_day`, `[active]`, `[quiet]`, `cooldown`, `rearm`,
 `wait`, `[budget]`, `[rest]` and `[stop]` exactly, and only the fire's line
 becomes a `do.task` for the lamp's agent (Hermes or OpenClaw, through
-lamp-tasks). Off unless set, in lamp-skills, its manage helper and lamp-voice; set in
-no unit (the first builder's rulings, 19 Nov 05:42: behind a new switch,
-off; 06:05: quick reactions stay DeepSeek's, and every other model-worded
-core line goes to the agent, group by group). `LAMP_CORE_VIA_AGENT=on`
+lamp-tasks). Off unless set, in lamp-skills, its manage helper and lamp-voice
+(the first builder's rulings, 19 Nov 05:42: behind a new switch; 06:05:
+quick reactions stay DeepSeek's, and every other model-worded core line
+goes to the agent, group by group). **On in the product** since #7862's
+switch-on (the first builder's 10:45 and 10:47: worded ahead, the
+switch-on in its PR): `LAMP_CORE_VIA_AGENT=pilot,nudges,news` once in
+`lamp-skills.service`, `lamp-skills-manage@.service` and
+`lamp-voice.service`, and each core pilot's `agent.toml` and
+`scripts/agent.py` installed beside it (`install::SETTINGS`). Task news's
+wording also needs `LAMP_HARD_ASKS_TO_AGENT=on` in lamp-tasks, which the
+product doesn't set yet: until it does, the news ask is refused `off` and
+the note is told at once, as with the switch off. `LAMP_CORE_VIA_AGENT=on`
 turns on every group; a list turns on those it names
 (`LAMP_CORE_VIA_AGENT=pilot,nudges`, `core_agent::turns_on`), so each
 group goes on by its own switch-on. Off, nothing below is read: the skills
@@ -2302,8 +2310,8 @@ load and run byte for byte as before. `lamp_skills::core_agent`.
   whatever the switch). lamp-control mints its one-run token with no
   grant, and only for the lamp's own skills, never a pushed folder. Any
   other folder needs the owner's yes, as before. The day's 20 runs a skill
-  and one run at a time hold as for every `do.task`. Not yet in the
-  product's install: on a lamp the two files are copied beside the skill.
+  and one run at a time hold as for every `do.task`. The product's install
+  puts the two files beside each core pilot.
 - **The brief is never a file of the repository's skill folder** (#7862,
   train 1074): the SDK's check refuses a script in a skill ("a script;
   script skills are a later format", `lampos.skillcheck`) and holds every
@@ -2316,35 +2324,106 @@ load and run byte for byte as before. `lamp_skills::core_agent`.
   Store, which places no brief, so they keep their own line there. The SDK
   workflow runs on every change to `lampOS/skills/**`, so a skill's change
   meets the every-skill check on its own pull request.
-- **Each fire**: its `do.task` is handed to lamp-tasks on its own thread, as
-  every task is, and the fire's say waits for its line on the run's own
-  thread, never the trigger's loop.
-- **The fallback, never late or silent** (the first builder's 05:42):
-  the agent's line said within `core_agent::FALLBACK_WITHIN` (10 s) of the
-  fire, it is said in the say's place as exact words at the say's priority,
-  with the look, the light and the move the say brings. Otherwise the
-  skill's own say is said at once, exactly as with the switch off: past
-  10 s; the agent down, offline, not reached or refused; or an answer
-  of `-`, nothing, or more than one short line (two sentences, 200
-  characters, `core_agent::heard`). A line that comes after is dropped,
-  never said late, and a failed run says nothing of its own (no failed
-  line, no refusal): never something wrong.
-- **What a fire costs.** An agent run takes tens of seconds (lamp-tasks
-  measured 75 s on Hermes, `MEASURED_RUN_SECS`), so under the 10 s rule
-  the agent's line is heard only when its run is quick, and most fires say
-  the fallback; each fire still spends one of the skill's 20 runs a day,
-  and its run goes on in lamp-tasks after the fallback is said. The nudge
-  comes at most 10 s after its fire, never more.
-- **Its cases** (`lamp-skills test`): a case has no agent, so a fire's run
-  is the run with the agent down, its own say at once; each skill's own
-  `tests/` pass with the switch on as with it off, its hand-over not one of
-  the case's calls. Tests: `core_agent::tests` (the parsed tomls the same
-  but for the line, each fire hands the agent its task, off changes
-  nothing, the fallback slow past 10 s, down, `-` and empty) and
-  `a_core_skills_line_with_its_agent_down_says_its_own_at_once`.
-- **Journal**: `its line through the lamp's agent: said its agent's line
-  (N characters)` or `… said its own line at once: WHY`, never the agent's
-  words.
+- **Worded ahead, never waited for** (the first builder's yes of 19 Nov
+  10:45 on the Queue, `lamp_skills::worded_ahead`): a fire's `do.task` is
+  never handed over at the fire. lamp-skills keeps a few lines the agent
+  worded in idle time, and the fire's say takes the oldest fresh one at
+  once, said in the say's place as exact words at the say's priority, with
+  the look, the light and the move the say brings. With none fresh, the
+  skill's own say is said at once, exactly as with the switch off. No fire
+  ever waits for an agent's run, and none is ever later than today's.
+  Task news keeps its own 10 s path (above): its line needs the fire's
+  own content.
+- **What is kept** (`worded_ahead::Kept`, `worded-ahead.json` in
+  lamp-skills' `--state-dir`, readable by its owner alone, so a restart
+  keeps the lines and the day's count): at most 3 lines a skill
+  (`MOST_LINES`), each with when it was worded, fresh for 24 h
+  (`FRESH_MS`) and said once (`Kept::take`). A skill of two tasks (Sit
+  back, Meal check) keeps each task's lines on their own, 3 together.
+  Behind `worded_ahead::Store`: each write is of a copy taken under its own
+  lock, and none is made on the loop that fires skills (Twelve's P3 3 on
+  #7903): a take's, a forget's and a language change's on a thread of
+  their own, a refill's count on the refill's own thread before its
+  hand-over. Every kept line is let go, and the file written so, at
+  memory's "forget everything" (its `memory/forgot` event, any person's)
+  and when the owner's language changes (the `LAMP_LANGUAGE_FILE` text,
+  read once a second, a refill under way or not). A refill under way
+  keeps nothing worded before either (`Store::cleared`), and a fire says
+  a kept line only in the language it was worded in (`Kept::take_in`),
+  even before the next look. The day's count stays.
+- **When a refill runs** (`Kept::next_refill`, looked for every 5 s, one
+  at a time, on a thread of its own):
+  - the lamp idle: `voice/state` resting, and not otherwise for the last
+    15 s (`IDLE_AFTER`, task news's own quiet); a state not known counts
+    as a turn;
+  - out of the skill's own quiet hours (`Engine::in_quiet_hours`);
+  - the board not warm (`worded_ahead::warm`, the first builder's
+    condition 1): while `board/heat` (#7879) is on the lamp and fresh, it
+    alone decides, and `warm` or `hot` pauses refills; until then, any
+    `board/state` temperature over 84 °C (`WARM_C`) does. A hot lamp never
+    spends a core rewording a nudge, and the built-in line covers that
+    hour. The journal says `worded ahead: refills paused: the board is
+    warm or hot` and `... go on: the board is cool again` as it changes;
+  - at most 3 refills a skill in any 24 hours (`MOST_REFILLS_A_DAY`, a
+    hard cap, about 30 a day on a lamp; condition 2), counted and written
+    to the file as each begins, before it is handed over
+    (`Store::begin_refill` and `Store::write_count`, Heron's HOLD on
+    #7903: a crash or a restart
+    mid-run keeps the count; a count that can't be written begins
+    nothing), whatever comes of it, and given back only when lamp-tasks
+    never took it (busy, not reached: nothing ran; the next look then
+    waits a minute). A cancelled refill keeps its count, so the cap stays a
+    bound however often a person cuts in;
+  - the owner's daily allowance not spent (`worded_ahead::Allowance`, the
+    hook for #7664: refills come out of it first and stop once it is
+    spent, before anything a person asked for; until it lands,
+    `NoAllowanceYet`, the hard cap alone);
+  - the do.task switch on, a `--state-dir` and lamp-tasks' socket.
+- **The refill's run**: the skill's own pre-approved `do.task` with its
+  fixed brief (`core_agent::script`), the same line a fire's task would
+  hand over, marked `"ahead": true` (`worded_ahead::marked`). Nothing
+  private goes in: these nudges carry no content of a fire. lamp-tasks
+  cancels it at once for a person's live ask on the make socket, a
+  person's make or any other skill's task (`skill_task::Ahead`,
+  [tasks.md](tasks.md)): it is ended as at its deadline and told
+  `cancelled`, and the other runs once its place is let go (a Harness run
+  may still be told busy, see tasks.md). While a person's make runs, a
+  refill is refused busy (given back, the next look a minute later),
+  never begun beside it. It never runs in the kept
+  OpenClaw pane (`LAMP_TASKS_ONE_SESSION`), only in a short session of its
+  own, so a cancel never costs the person a cold session. A refill's
+  hand-over is not one a task waits its turn behind
+  (`LAMP_SKILL_TASK_SURE`), so nothing waits for it.
+- **Each line is checked** as before (`worded_ahead::checked`): one short
+  line (two sentences, 200 characters, `core_agent::heard`), never `-` or
+  empty, and never an answer for the owner alone.
+- **What it costs**: one agent run a line, in idle time; about 75 s on
+  Hermes (`MEASURED_RUN_SECS`), at most 3 a skill a day. Each refill
+  spends one of the skill's 20 runs a day. A refill's CPU is read from
+  lamp-tasks' cgroup (`cpu.stat`'s `usage_usec` before and after,
+  `worded_ahead::CPU_STATS`, the product's `lampos-parts.slice` path first): the Hermes run is lamp-tasks' child, so it is
+  counted there, with whatever else lamp-tasks did meanwhile (an upper
+  bound). A gateway agent's turn (OpenClaw) runs in its own service and is
+  not counted there.
+- **Journal** (never the agent's words; condition 3, so the row reports
+  each skill's agent-line rate, the refills a day and their CPU seconds):
+  - each fire: `worded ahead: said its agent's line (N characters, worded
+    H h ago)` or `worded ahead: said its own line: no fresh line of its
+    agent's kept`;
+  - each refill: `worded ahead: refill of KEY: its agent's line kept` (or
+    `nothing kept: WHY`) `; run S s, cpu C s` (or `cpu not read`) `,
+    refill N of 3 in 24 hours`. One whose WHY begins `lamp-tasks was busy`
+    ran nothing and is given back.
+- **Its cases** (`lamp-skills test`): a case has no agent, so each fire
+  says its own line; each skill's own `tests/` pass with the switch on as
+  with it off, its task not one of the case's calls. Tests:
+  `core_agent::tests`; `worded_ahead::tests` (the cache fills when idle,
+  stale or empty gives none, none mid-conversation or in quiet hours, the
+  heat pause, the daily cap, kept across a restart, the marked line, the
+  journal); `a_fire_says_a_kept_line_at_once` and
+  `a_stale_or_empty_cache_says_its_own_line_at_once`; in lamp-tasks
+  `a_refill_yields_its_place_to_a_skills_task` and
+  `a_persons_ask_cancels_the_lamps_refill`.
 
 ### Core and installable skills
 

@@ -2183,6 +2183,7 @@ mod tests {
             net: false,
             tells: false,
             cancel: Default::default(),
+            refill: false,
         }
     }
 

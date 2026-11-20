@@ -43,6 +43,7 @@ pub mod unplug;
 pub mod usage;
 pub mod visits;
 pub mod watch;
+pub mod worded_ahead;
 
 /// Whether the body plays `name` on its mood socket: one of the clips in its
 /// own table (`lamp_body::clips::ALL`), but `idle`, which is the body's own.
@@ -9046,6 +9047,18 @@ impl Engine {
 
     pub fn skills(&self) -> &[Skill] {
         &self.skills
+    }
+
+    /// Whether `name` is in its quiet hours at `now_us`: one with quiet
+    /// hours counts as in them while the local time isn't known, as its
+    /// trigger does.
+    pub fn in_quiet_hours(&self, name: &str, now_us: u64) -> bool {
+        let minute = self.local_minute(now_us);
+        self.skills
+            .iter()
+            .find(|skill| skill.name == name)
+            .and_then(|skill| skill.quiet)
+            .is_some_and(|quiet| minute.is_none_or(|minute| within(minute, quiet)))
     }
 
     /// Why `skill` may not see the camera's picture at this call, beyond

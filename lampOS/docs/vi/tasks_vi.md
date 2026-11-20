@@ -329,8 +329,30 @@ giao phần chậm hơn cho Hermes của chính đèn. lamp-skills gửi một d
 lần chạy, và được trả lời khi lần chạy kết thúc
 (`lamp_tasks::skill_task::answer`):
 
-- **Dòng gửi:** `{"op":"skill_task","skill","task","run","folder","sha256","grants"}`.
-  Cần đủ mọi trường và không nhận trường nào khác. `skill` là tên một kỹ năng
+- **Dòng gửi:** `{"op":"skill_task","skill","task","run","folder","sha256","grants"}`,
+  và `"ahead": true` cho lần nạp của chính đèn cho các câu soạn trước của một
+  kỹ năng lõi (`lamp_skills::worded_ahead`, [skills_vi.md](skills_vi.md)): nó
+  không giữ quyền nào, và khi lần chạy của nó giữ chỗ duy nhất, task của bất
+  kỳ kỹ năng nào khác, câu hỏi trực tiếp của một người trên make socket
+  (`voice_ask`) hay một lần tạo kỹ năng của một người, hủy nó ngay
+  (`skill_task::Ahead`, một chỗ cả hai socket dùng chung; lần chạy kết thúc
+  như ở hạn chót và được báo `cancelled`). Lệnh hủy của nó được giữ trước khi
+  nó lấy chỗ, nên không ai thấy chỗ bị giữ mà không có gì để hủy. Task lấy chỗ
+  trong 0,75 giây của lần hủy khi lần chạy nạp đã nhả chỗ: ngay với lần chạy
+  dừng ở lệnh hủy; lần chạy qua Harness trước hết đóng phiên và kết thúc
+  token, và một `harness new` đang chạy không bị cắt, nên ở đó vẫn có thể bị
+  báo bận (chưa đo trên đèn). Lần nạp đã giữ lệnh hủy nhưng không lấy được
+  chỗ (task khác đang giữ) bỏ lệnh hủy ngay, và task được báo bận lúc đó, nhật
+  ký không ghi lần hủy nào. Câu hỏi bằng giọng nói và lần tạo kỹ năng mỗi cái
+  có chỗ riêng, không bao giờ phải chờ: lần tạo lấy chỗ của nó và hủy lần nạp,
+  và khi một lần tạo giữ chỗ (`HandOvers::making`, cờ riêng của make socket,
+  được xem dưới khóa của chỗ nạp) thì lần nạp bị báo bận, không bao giờ bắt
+  đầu bên cạnh nó (HOLD của Twelve trên #7903 ở 7b6a94f93f). Lần nạp không bao giờ hủy gì, và không bao giờ chạy trong
+  pane được giữ của `LAMP_TASKS_ONE_SESSION` (`SkillRun::refill`): nó chạy
+  trong một phiên ngắn của riêng nó, theo cách mỗi lần chạy một phiên, nên
+  lệnh hủy chỉ đóng phiên đó, không bao giờ đóng phiên OpenClaw được giữ của
+  người dùng (HOLD của Twelve trên #7903).
+  Cần đủ mọi trường trừ `ahead` và không nhận trường nào khác. `skill` là tên một kỹ năng
   (`a-z`, `0-9`, `-`, `_`, tối đa 64), `folder` đúng là
   `/var/lib/lampOS/skills/<skill>` (các kỹ năng Hermes thấy ở chế độ chỉ đọc)
   hoặc, với kỹ năng do máy tính của chủ đèn đẩy lên,
@@ -1262,7 +1284,9 @@ Socket tạo kỹ năng nhận thêm một loại dòng từ lamp-voice,
 `news`, mặc định false, đánh dấu câu hỏi của chính đèn cho câu của task news,
 mà câu hỏi của một người đến khi nó đang chạy sẽ hủy ngay: lần chạy kết thúc
 như ở hạn chót, được báo `cancelled`, và câu hỏi của người đó được chạy, không
-bao giờ bị báo bận; `MOST_CONNECTIONS` là 3 cho điều đó),
+bao giờ bị báo bận; `MOST_CONNECTIONS` là 3 cho điều đó; câu hỏi của một
+người cũng hủy lần nạp của chính đèn cho các câu của kỹ năng lõi, `"ahead"`
+trên socket skill-task),
 được trả lời như một lần tạo (`started`, rồi `answer` hoặc một lời từ chối),
 với một chỗ riêng bên cạnh lần tạo. Tác tử được chọn ở mỗi yêu cầu như một
 lần tạo với `"one_path":true` (`skill_make::MakeGateway`,

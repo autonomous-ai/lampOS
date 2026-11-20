@@ -722,6 +722,7 @@ pub fn make_run_with(
         net: false,
         tells: false,
         cancel: Default::default(),
+        refill: false,
     }
 }
 
@@ -1943,9 +1944,33 @@ pub struct MakeHandOvers {
     /// taken only with one of its switches on; `None`, refused `off` as
     /// any line that is not a make's.
     pub asks: Option<Arc<crate::voice_ask::Asks>>,
+    /// The lamp's own refill of a core skill's lines, which a person's make
+    /// cancels as it takes its place ([`take_make_place`]).
+    pub ahead: crate::skill_task::Ahead,
+    /// The one make's place: held while a make runs, and shared with the
+    /// skill tasks' hand-over ([`crate::skill_task::HandOvers::making`]),
+    /// which refuses a refill meanwhile.
+    pub making: Arc<AtomicBool>,
 }
 
 impl MakeHandOvers {
+    /// These makes with their live asks cancelling the lamp's own refill
+    /// kept in `ahead`, the skill tasks' slot ([`crate::skill_task::Ahead`]).
+    pub fn with_ahead(mut self, ahead: crate::skill_task::Ahead) -> Self {
+        if let Some(asks) = self.asks.as_mut().and_then(Arc::get_mut) {
+            asks.ahead = ahead.clone();
+        }
+        self.ahead = ahead;
+        self
+    }
+
+    /// These makes holding `making` as their place, so the skill tasks'
+    /// hand-over refuses the lamp's own refill while one runs.
+    pub fn with_making(mut self, making: Arc<AtomicBool>) -> Self {
+        self.making = making;
+        self
+    }
+
     /// The lamp's: [`MAKE_SOCKET`], the lamp's Hermes in its namespace
     /// ([`lamp_runner`], the network as [`NET_SWITCH`] says) and its work
     /// folder, lamp-voice alone as caller.
@@ -1986,6 +2011,7 @@ impl MakeHandOvers {
                 tokens: Arc::new(crate::skill_task::ControlTokens::default()),
                 asking: AtomicBool::new(false),
                 news: Default::default(),
+                ahead: Default::default(),
             })
         });
         Self {
@@ -1995,6 +2021,8 @@ impl MakeHandOvers {
             one_path: Some(gateway),
             caller: caller_may,
             asks,
+            ahead: Default::default(),
+            making: Default::default(),
         }
     }
 
@@ -2030,8 +2058,8 @@ impl MakeHandOvers {
     }
 
     fn accept(self, listener: &std::os::unix::net::UnixListener, stop: &AtomicBool) {
+        let running = self.making.clone();
         let this = Arc::new(self);
-        let running = Arc::new(AtomicBool::new(false));
         let open = Arc::new(AtomicUsize::new(0));
         while !stop.load(Ordering::Acquire) {
             let stream = match listener.accept() {
@@ -2109,10 +2137,7 @@ impl MakeHandOvers {
             write_answer(stream, &answered);
             return;
         }
-        if running
-            .compare_exchange(false, true, Ordering::AcqRel, Ordering::Acquire)
-            .is_err()
-        {
+        if !take_make_place(running, &self.ahead) {
             eprintln!("[lamp-tasks] skill make: refused busy, one is being made");
             write_answer(stream, &refusal("busy", BUSY));
             return;
@@ -2132,6 +2157,27 @@ impl MakeHandOvers {
         eprintln!("{}", journal_line(&answered));
         write_answer(stream, &answered);
     }
+}
+
+/// The one make's place: taken, a person's make cancels the lamp's own
+/// refill of a core skill's lines (Heron's P3 on #7903), so the agent's
+/// CPU is the make's; refused busy, it cancels nothing. Taken before the
+/// slot is looked at, so a refill holding it after is refused instead
+/// (`skill_task::take_ahead_place` looks at `running` under the slot's
+/// lock).
+fn take_make_place(running: &AtomicBool, ahead: &crate::skill_task::Ahead) -> bool {
+    if running
+        .compare_exchange(false, true, Ordering::AcqRel, Ordering::Acquire)
+        .is_err()
+    {
+        return false;
+    }
+    if crate::skill_task::cancel_ahead(ahead) {
+        eprintln!(
+            "[lamp-tasks] skill make: the lamp's own refill is cancelled for a person's make"
+        );
+    }
+    true
 }
 
 /// The journal's line for a make's outcome: its code and, refused, the
@@ -2197,6 +2243,21 @@ mod tests {
     /// tells it: by the one run path the lamp's Harness runner, asked for a
     /// last chat answer fit to say; else the make's net runner, asked to
     /// write it to the run's own `answer.md`.
+    /// Heron's P3 on #7903: a person's make cancels the lamp's own refill as
+    /// it takes its place; a make refused busy cancels nothing.
+    #[test]
+    fn a_persons_make_cancels_the_lamps_refill() {
+        let ahead = crate::skill_task::Ahead::default();
+        let refill = Arc::new(AtomicBool::new(false));
+        *ahead.lock().unwrap() = Some(refill.clone());
+        let running = AtomicBool::new(true);
+        assert!(!take_make_place(&running, &ahead), "busy");
+        assert!(!refill.load(Ordering::Acquire));
+        running.store(false, Ordering::Release);
+        assert!(take_make_place(&running, &ahead));
+        assert!(refill.load(Ordering::Acquire));
+    }
+
     #[test]
     fn a_net_runner_keeps_an_answer_by_either_path() {
         let home = Path::new("/var/lib/lampos-tasks");
@@ -3404,6 +3465,8 @@ mod tests {
             one_path: None,
             caller: |_| true,
             asks: None,
+            ahead: Default::default(),
+            making: Default::default(),
         }
         .start(true, stop.clone())
         .unwrap()
@@ -3447,6 +3510,8 @@ mod tests {
             one_path: None,
             caller: |_| true,
             asks: None,
+            ahead: Default::default(),
+            making: Default::default(),
         }
         .start(true, stop.clone())
         .unwrap()
@@ -3472,6 +3537,8 @@ mod tests {
             one_path: None,
             caller: |_| true,
             asks: None,
+            ahead: Default::default(),
+            making: Default::default(),
         }
         .start(false, Arc::default())
         .unwrap();

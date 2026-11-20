@@ -52,7 +52,7 @@ use std::collections::BTreeSet;
 use std::io::{BufRead, BufReader, Write};
 use std::os::unix::net::UnixStream;
 use std::path::{Component, Path, PathBuf};
-use std::sync::atomic::{AtomicU8, AtomicU64, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU8, AtomicU64, Ordering};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 /// The switch, `on` exactly; off unless set. lamp-skills reads the same one
@@ -341,6 +341,41 @@ pub struct HandOver {
     /// kept for the record; lamp-tasks does not hash the folder again.
     pub sha256: String,
     pub grants: Vec<String>,
+    /// The lamp's own refill of a core skill's lines worded ahead
+    /// (`lamp_skills::worded_ahead`): its run is cancelled at once for a
+    /// person's ask or any other skill's task ([`Ahead`]). No grant.
+    #[serde(default)]
+    pub ahead: bool,
+}
+
+/// The cancel of the lamp's own refill run holding the one run's place, if
+/// one does ([`HandOver::ahead`]): shared by the skill tasks' hand-over
+/// ([`HandOvers::ahead`]) and the voice's live asks
+/// (`crate::voice_ask::Asks::ahead`), so a person's ask or another skill's
+/// task cancels it at once (the first builder's 09:57 and 10:45 on the
+/// Queue: a person's ask always wins).
+pub type Ahead = std::sync::Arc<std::sync::Mutex<Option<std::sync::Arc<AtomicBool>>>>;
+
+/// The refusal's code a cancelled refill's own connection is told.
+pub const CANCELLED_CODE: &str = crate::voice_ask::CANCELLED_CODE;
+/// What a cancelled refill's own connection is told.
+pub const AHEAD_CANCELLED: &str =
+    "the lamp's own refill was cancelled for a person's ask or another skill's task";
+
+/// The refill holding `ahead`'s place cancelled, if one does: whether one
+/// did.
+pub fn cancel_ahead(ahead: &Ahead) -> bool {
+    let held = ahead
+        .lock()
+        .unwrap_or_else(|poison| poison.into_inner())
+        .clone();
+    match held {
+        Some(cancel) => {
+            cancel.store(true, Ordering::Release);
+            true
+        }
+        None => false,
+    }
 }
 
 /// The line's `op`: `skill_task` only.
@@ -435,6 +470,9 @@ impl HandOver {
         }
         if private_beside_net(&self.grants).is_some() {
             return Err(NET_BESIDE_PRIVATE);
+        }
+        if self.ahead && !self.grants.is_empty() {
+            return Err("the lamp's own refill holds no grant");
         }
         Ok(())
     }
@@ -886,6 +924,11 @@ pub struct SkillRun {
     /// ask that comes while it runs (#7765's follow-up's make cancel,
     /// #7789, for an ask). Never set for any other run.
     pub cancel: std::sync::Arc<std::sync::atomic::AtomicBool>,
+    /// The lamp's own refill of a core skill's lines (`"ahead"`, #7903):
+    /// never typed into the kept pane of [`crate::one_session`], but run in
+    /// a short session of its own, so its cancel closes only that, never
+    /// the person's kept session (Twelve's HOLD on #7903).
+    pub refill: bool,
 }
 
 impl SkillRun {
@@ -999,6 +1042,7 @@ impl SkillRun {
             net: false,
             tells: false,
             cancel: Default::default(),
+            refill: false,
         }
     }
 
@@ -1230,6 +1274,9 @@ pub struct Agent<'a> {
     /// With `LAMP_SKILL_SECRETS` on, where a run's keys are asked
     /// ([`crate::skill_keys::Keys`]); none: no run is given a key.
     pub keys: Option<&'a dyn crate::skill_keys::Keys>,
+    /// The lamp's own refill's cancel ([`HandOver::ahead`]), given to its
+    /// run ([`SkillRun::cancel`]); none for every other run.
+    pub cancel: Option<std::sync::Arc<AtomicBool>>,
 }
 
 /// A run's keys asked for `hand` through `keys`: the set values, or the
@@ -1421,6 +1468,10 @@ pub fn answer_for(
             token,
         );
         made.net = keeps_net;
+        made.refill = hand.ahead;
+        if let Some(cancel) = &agent.cancel {
+            made.cancel = cancel.clone();
+        }
         // Its own folder and fresh home, removed however it ends, as a
         // make's: `make-<run id>`, by which the one run path's wrapper finds
         // it for a run granted `net` (#7200).
@@ -1476,6 +1527,14 @@ pub fn answer_for(
         }
         Ok((made, fresh))
     });
+    if agent
+        .cancel
+        .as_ref()
+        .is_some_and(|cancel| cancel.load(Ordering::Acquire))
+        && told["ok"] != true
+    {
+        return refusal(CANCELLED_CODE, AHEAD_CANCELLED);
+    }
     match told["message"].as_str() {
         Some(why)
             if fresh_home
@@ -3824,6 +3883,9 @@ impl Runner for HarnessRunner {
         // lamp-tasks is: Harness closes an idle pane an agent started after
         // 30 min, so as an agent each run keeps its own.
         // OpenClaw's only: a Hermes default keeps the per-run path.
+        // Never the lamp's own refill (Twelve's HOLD on #7903): a cancel
+        // closes the kept session it runs in, and the person who spoke
+        // would wait for a cold one.
         // A make (#7245, the owner 18 Nov 13:4x) is typed into the same
         // kept pane: its runner is built before the pane is, so it reads
         // the lamp's one session here; a fresh `new` per make spent 73 s
@@ -3834,6 +3896,7 @@ impl Runner for HarnessRunner {
                 .flatten()
         });
         if by_start
+            && !run.refill
             && harness.config.as_person
             && crate::one_session::shares(engine)
             && let Some(one) = &one_session
@@ -4472,6 +4535,14 @@ pub struct HandOvers {
     /// With `LAMP_SKILL_SECRETS` on, where a run's keys are asked
     /// ([`Agent::keys`]).
     pub keys: Option<std::sync::Arc<dyn crate::skill_keys::Keys + Send + Sync>>,
+    /// The lamp's own refill's cancel while it holds the one run's place,
+    /// shared with the voice's live asks ([`Ahead`]).
+    pub ahead: Ahead,
+    /// Whether a person's make holds its own place
+    /// ([`crate::skill_make::MakeHandOvers::making`]): while it does, a
+    /// refill is refused busy, never begun beside it (Twelve's HOLD on
+    /// #7903 at 7b6a94f93f).
+    pub making: std::sync::Arc<AtomicBool>,
 }
 
 /// What a second run is told while one runs.
@@ -4484,6 +4555,20 @@ pub const STOP_WAIT: Duration = Duration::from_secs(20);
 pub const BUSY: &str = "a skill's task is already running on this lamp; one runs at a time";
 
 impl HandOvers {
+    /// These hand-overs with the lamp's own refill's cancel kept in
+    /// `ahead`, the slot the voice's live asks share ([`Ahead`]).
+    pub fn with_ahead(mut self, ahead: Ahead) -> Self {
+        self.ahead = ahead;
+        self
+    }
+
+    /// These hand-overs refusing the lamp's own refill while a person's
+    /// make holds `making`, the make's place.
+    pub fn with_making(mut self, making: std::sync::Arc<AtomicBool>) -> Self {
+        self.making = making;
+        self
+    }
+
     /// The lamp's: [`HAND_OVER_SOCKET`], [`SKILLS`], lamp-control's tokens
     /// ([`ControlTokens`]), the lamp's Hermes started through Harness
     /// ([`HarnessRunner::lamp`], #6510 Part 1 step 2, with the Harness
@@ -4556,6 +4641,8 @@ impl HandOvers {
                 std::sync::Arc::new(crate::skill_keys::ServicesKeys::default())
                     as std::sync::Arc<dyn crate::skill_keys::Keys + Send + Sync>
             }),
+            ahead: Default::default(),
+            making: Default::default(),
         }
     }
 
@@ -4658,14 +4745,21 @@ impl HandOvers {
                 return;
             }
         };
-        if running
-            .compare_exchange(false, true, Ordering::AcqRel, Ordering::Acquire)
-            .is_err()
-        {
+        let ahead = serde_json::from_slice::<Value>(&line)
+            .is_ok_and(|line| line["ahead"] == Value::Bool(true));
+        let cancel = ahead.then(|| std::sync::Arc::new(AtomicBool::new(false)));
+        // A refill's cancel is kept before its place is taken
+        // ([`take_ahead_place`]), so a task never finds it holding the place
+        // with nothing to cancel.
+        let held = match &cancel {
+            Some(cancel) => take_ahead_place(running, &self.ahead, &self.making, cancel.clone()),
+            None => take_run_place(running, &self.ahead).then_some(None),
+        };
+        let Some(_held) = held else {
             eprintln!("[lamp-tasks] skill task: refused busy, one already runs");
             write_answer(stream, &refusal("busy", BUSY));
             return;
-        }
+        };
         let place = Place(running);
         let agent = Agent {
             net: self.net.as_deref().map(|net| net as &dyn Runner),
@@ -4676,6 +4770,7 @@ impl HandOvers {
                 .keys
                 .as_deref()
                 .map(|keys| keys as &dyn crate::skill_keys::Keys),
+            cancel,
         };
         let answered = answer_agent(
             &line,
@@ -4696,6 +4791,97 @@ impl HandOvers {
             ),
         }
         write_answer(stream, &answered);
+    }
+}
+
+/// The one run's place for a task not the lamp's own refill: free, or held
+/// by the lamp's own refill, which is cancelled at once and waited for at
+/// most [`crate::voice_ask::CANCEL_WAIT`].
+fn take_run_place(running: &AtomicBool, slot: &Ahead) -> bool {
+    let take = || {
+        running
+            .compare_exchange(false, true, Ordering::AcqRel, Ordering::Acquire)
+            .is_ok()
+    };
+    if take() {
+        return true;
+    }
+    // Nothing to cancel: a task holds it, or a refill let it go just now.
+    if !cancel_ahead(slot) {
+        return take();
+    }
+    let journal = || {
+        eprintln!("[lamp-tasks] skill task: the lamp's own refill is cancelled for a skill's task")
+    };
+    let until = std::time::Instant::now() + crate::voice_ask::CANCEL_WAIT;
+    loop {
+        if take() {
+            journal();
+            return true;
+        }
+        // Its hold gone with the place still taken: the refill never had
+        // the place (it lost its take to another task, Twelve's P3 5 on
+        // #7903), or ended and another took it. Busy at once, with no
+        // cancel journaled; a last look, in case the place came free.
+        if slot
+            .lock()
+            .unwrap_or_else(|poison| poison.into_inner())
+            .is_none()
+        {
+            return take();
+        }
+        if std::time::Instant::now() >= until {
+            journal();
+            return false;
+        }
+        std::thread::sleep(Duration::from_millis(5));
+    }
+}
+
+/// The one run's place for the lamp's own refill, its `cancel` kept in
+/// `slot` before the place is taken (Heron's P3 on #7903): a task that
+/// comes in between finds it to cancel, never `busy`. None: the place is
+/// held, another refill's cancel is kept, or a person's make holds
+/// `making` (looked at under the slot's lock, so a make that begins after
+/// finds the cancel: [`crate::skill_make`]'s `take_make_place`). A refill
+/// never cancels anything.
+fn take_ahead_place<'a>(
+    running: &AtomicBool,
+    slot: &'a Ahead,
+    making: &AtomicBool,
+    cancel: std::sync::Arc<AtomicBool>,
+) -> Option<Option<AheadHeld<'a>>> {
+    let held = AheadHeld::hold(slot, making, cancel)?;
+    running
+        .compare_exchange(false, true, Ordering::AcqRel, Ordering::Acquire)
+        .is_ok()
+        .then_some(Some(held))
+}
+
+/// The lamp's own refill's cancel, kept in [`Ahead`] while it holds the one
+/// run's place, and taken back however it ends.
+struct AheadHeld<'a>(&'a Ahead);
+
+impl<'a> AheadHeld<'a> {
+    /// `cancel` kept in `slot`, if no other refill's is and no make holds
+    /// `making`.
+    fn hold(
+        slot: &'a Ahead,
+        making: &AtomicBool,
+        cancel: std::sync::Arc<AtomicBool>,
+    ) -> Option<Self> {
+        let mut kept = slot.lock().unwrap_or_else(|poison| poison.into_inner());
+        if kept.is_some() || making.load(Ordering::Acquire) {
+            return None;
+        }
+        *kept = Some(cancel);
+        Some(Self(slot))
+    }
+}
+
+impl Drop for AheadHeld<'_> {
+    fn drop(&mut self) {
+        *self.0.lock().unwrap_or_else(|poison| poison.into_inner()) = None;
     }
 }
 
@@ -6060,6 +6246,8 @@ mod tests {
             held: None,
             work: None,
             keys: None,
+            ahead: Default::default(),
+            making: Default::default(),
         }
         .start(true, stop.clone())
         .unwrap()
@@ -6162,6 +6350,8 @@ mod tests {
             held: None,
             work: None,
             keys: None,
+            ahead: Default::default(),
+            making: Default::default(),
         }
         .start(false, std::sync::Arc::default())
         .unwrap();
@@ -6377,6 +6567,149 @@ mod tests {
             "{:?}",
             began.elapsed()
         );
+    }
+
+    /// The lamp's own refill (`"ahead": true`) holding the one run's place
+    /// yields to any other skill's task at once: cancelled, and its place
+    /// taken within the cancel's wait (this runner stops at its cancel; a
+    /// Harness run may take longer, docs/tasks.md). A refill never
+    /// cancels anything, and holds no grant.
+    #[test]
+    fn a_refill_yields_its_place_to_a_skills_task() {
+        let running = std::sync::Arc::new(AtomicBool::new(false));
+        let slot = Ahead::default();
+        let cancel = std::sync::Arc::new(AtomicBool::new(false));
+        let held = take_ahead_place(&running, &slot, &AtomicBool::new(false), cancel.clone())
+            .expect("free: the refill runs");
+        // Another refill: busy, and nothing cancelled.
+        let other = std::sync::Arc::new(AtomicBool::new(false));
+        assert!(take_ahead_place(&running, &slot, &AtomicBool::new(false), other).is_none());
+        assert!(!cancel.load(Ordering::Acquire));
+        // The refill's run ends once cancelled, as a runner's loop does.
+        let ends = {
+            let (running, cancel) = (running.clone(), cancel.clone());
+            std::thread::spawn(move || {
+                while !cancel.load(Ordering::Acquire) {
+                    std::thread::sleep(Duration::from_millis(2));
+                }
+                running.store(false, Ordering::Release);
+            })
+        };
+        let asked = std::time::Instant::now();
+        assert!(take_run_place(&running, &slot), "a skill's task runs");
+        assert!(cancel.load(Ordering::Acquire));
+        assert!(asked.elapsed() < crate::voice_ask::CANCEL_WAIT);
+        ends.join().unwrap();
+        drop(held);
+        assert!(slot.lock().unwrap().is_none(), "taken back as it ends");
+        // A skill's task holding the place: another is busy, as before, and
+        // a refill too.
+        assert!(!take_run_place(&running, &slot));
+        let late = std::sync::Arc::new(AtomicBool::new(false));
+        assert!(take_ahead_place(&running, &slot, &AtomicBool::new(false), late).is_none());
+        assert!(slot.lock().unwrap().is_none(), "its cancel never kept");
+        // The line: `ahead` is read, and holds no grant.
+        let ahead = HandOver::parse(
+            &line(|value| {
+                value["ahead"] = json!(true);
+                value["grants"] = json!([]);
+            }),
+            skills(),
+        )
+        .unwrap();
+        assert!(ahead.ahead);
+        assert!(!HandOver::parse(&line(|_| {}), skills()).unwrap().ahead);
+        let granted = HandOver::parse(&line(|value| value["ahead"] = json!(true)), skills());
+        assert_eq!(
+            granted.unwrap_err().1,
+            "the lamp's own refill holds no grant"
+        );
+    }
+
+    /// Heron's P3 on #7903: a task that comes while a refill is taking its
+    /// place always finds its cancel, never `busy`. A refill takes and lets
+    /// go its place over and over, ending at once when cancelled, while
+    /// tasks come: every one of them runs.
+    #[test]
+    fn a_task_while_a_refill_takes_its_place_cancels_it() {
+        let running = std::sync::Arc::new(AtomicBool::new(false));
+        let slot = Ahead::default();
+        let done = std::sync::Arc::new(AtomicBool::new(false));
+        let refills = {
+            let (running, slot, done) = (running.clone(), slot.clone(), done.clone());
+            std::thread::spawn(move || {
+                while !done.load(Ordering::Acquire) {
+                    let cancel = std::sync::Arc::new(AtomicBool::new(false));
+                    if let Some(held) =
+                        take_ahead_place(&running, &slot, &AtomicBool::new(false), cancel.clone())
+                    {
+                        // Its run, until cancelled or a moment passes.
+                        for _ in 0..50 {
+                            if cancel.load(Ordering::Acquire) {
+                                break;
+                            }
+                            std::hint::spin_loop();
+                        }
+                        // Its place let go before its cancel, as `one`'s
+                        // drops do.
+                        running.store(false, Ordering::Release);
+                        drop(held);
+                    }
+                    std::thread::sleep(Duration::from_micros(20));
+                }
+            })
+        };
+        for at in 0..2_000 {
+            assert!(take_run_place(&running, &slot), "task {at} told busy");
+            running.store(false, Ordering::Release);
+        }
+        done.store(true, Ordering::Release);
+        refills.join().unwrap();
+    }
+
+    /// Twelve's HOLD on #7903 at 7b6a94f93f: while a person's make holds
+    /// its place, the lamp's own refill is refused, never begun beside it;
+    /// once the make is done, it begins. A make that begins while a refill
+    /// holds its cancel finds it ([`crate::skill_make`]'s cancel).
+    #[test]
+    fn a_refill_is_refused_while_a_make_holds_its_place() {
+        let running = std::sync::Arc::new(AtomicBool::new(false));
+        let slot = Ahead::default();
+        let making = AtomicBool::new(true);
+        let cancel = std::sync::Arc::new(AtomicBool::new(false));
+        assert!(take_ahead_place(&running, &slot, &making, cancel.clone()).is_none());
+        assert!(!running.load(Ordering::Acquire), "the place never taken");
+        assert!(slot.lock().unwrap().is_none(), "its cancel never kept");
+        making.store(false, Ordering::Release);
+        let held = take_ahead_place(&running, &slot, &making, cancel.clone()).expect("no make");
+        assert!(cancel_ahead(&slot), "a make beginning now finds it");
+        assert!(cancel.load(Ordering::Acquire));
+        drop(held);
+    }
+
+    /// Twelve's P3 5 on #7903: a task that finds a refill's hold that never
+    /// got the place (another task has it) is told busy as the hold goes,
+    /// not after the cancel's whole wait.
+    #[test]
+    fn a_refill_that_never_had_the_place_keeps_no_task_waiting() {
+        let running = std::sync::Arc::new(AtomicBool::new(true));
+        let slot = Ahead::default();
+        *slot.lock().unwrap() = Some(std::sync::Arc::new(AtomicBool::new(false)));
+        let lets_go = {
+            let slot = slot.clone();
+            std::thread::spawn(move || {
+                std::thread::sleep(Duration::from_millis(20));
+                *slot.lock().unwrap() = None;
+            })
+        };
+        let asked = std::time::Instant::now();
+        assert!(!take_run_place(&running, &slot), "another task has it");
+        assert!(
+            asked.elapsed() < crate::voice_ask::CANCEL_WAIT / 2,
+            "{:?}",
+            asked.elapsed()
+        );
+        lets_go.join().unwrap();
     }
 
     /// A run cancelled (the lamp's own news ask, by a person's ask; the make
@@ -7771,6 +8104,7 @@ mod tests {
                 work: Some(work.path()),
                 services: false,
                 keys: None,
+                cancel: None,
             };
             let told = answer_agent(&with_net, true, skills(), &tokens, &held, &agent);
             match code {
@@ -7802,6 +8136,7 @@ mod tests {
             work: Some(work.path()),
             services: false,
             keys: None,
+            cancel: None,
         };
         let told = answer_agent(&agent_line, true, skills(), &tokens, &held, &agent);
         assert_eq!(told["ok"], true, "{told}");
@@ -7900,6 +8235,7 @@ mod tests {
             work: Some(work.path()),
             services: false,
             keys: None,
+            cancel: None,
         };
         let pair = line(|value| value["grants"] = json!(["camera", NET_GRANT]));
         let told = answer_agent(&pair, true, skills(), &tokens, &held, &agent);
@@ -7931,6 +8267,7 @@ mod tests {
             work: Some(work.path()),
             services: false,
             keys: None,
+            cancel: None,
         };
         let told = answer_agent(&with_net, true, skills(), &no_net_yes, &held, &agent);
         assert_eq!(told["error"], "no_token", "{told}");
@@ -7949,6 +8286,7 @@ mod tests {
             work: Some(work.path()),
             services: false,
             keys: None,
+            cancel: None,
         };
         let told = answer_agent(&with_net, true, skills(), &tokens, &held, &agent);
         assert_eq!(told, json!({"ok": true, "id": 0}), "{told}");
@@ -8058,6 +8396,7 @@ mod tests {
             work: Some(&work),
             services: false,
             keys: None,
+            cancel: None,
         };
         let sockets = || std::fs::read_dir(&egress).map_or(0, |dir| dir.count());
         let ran = || seen.with_extension("env").exists();
@@ -8170,6 +8509,7 @@ mod tests {
             work: Some(work.path()),
             services: false,
             keys: None,
+            cancel: None,
         };
         let told = answer_agent(&with_net, true, skills(), &tokens, &held, &agent);
         assert_eq!(told["ok"], true, "{told}");
@@ -8206,6 +8546,7 @@ mod tests {
             work: None,
             services: false,
             keys: None,
+            cancel: None,
         };
         let told = answer_agent(&with_net, true, skills(), &tokens, &held, &bare);
         assert_eq!(told["error"], "run_failed", "{told}");
@@ -8272,6 +8613,7 @@ mod tests {
             work: Some(work.path()),
             services: false,
             keys: None,
+            cancel: None,
         };
         let told = answer_agent(&agent_line, true, skills(), &tokens, &runner, &agent);
         assert_eq!(told["ok"], true, "{told}");
@@ -8312,6 +8654,7 @@ mod tests {
             work: Some(work.path()),
             services: false,
             keys: None,
+            cancel: None,
         };
         let told = answer_agent(&agent_line, true, skills(), &tokens, &runner, &bare);
         assert_eq!(told["message"], NO_FRESH_HOME, "{told}");
@@ -8336,6 +8679,7 @@ mod tests {
             work: Some(work.path()),
             services: false,
             keys: None,
+            cancel: None,
         };
         let told = answer_agent(&agent_line, true, skills(), &tokens, &runner, &lineless);
         assert_eq!(told["message"], NO_RUN_NAMESPACE, "{told}");
@@ -8399,6 +8743,7 @@ mod tests {
                 work: Some(work.path()),
                 services,
                 keys: None,
+                cancel: None,
             };
             let told = answer_agent(line, true, skills(), &tokens, &runner, &agent);
             assert_eq!(told["ok"], true, "{told}");
@@ -8500,6 +8845,7 @@ mod tests {
             work: Some(work.path()),
             services: false,
             keys: Some(&keys),
+            cancel: None,
         };
         let told = answer_agent(&agent_line, true, skills(), &tokens, &runner, &agent);
         assert_eq!(told["ok"], true, "{told}");
