@@ -3199,7 +3199,20 @@ cả hai người viết.
   như vậy được giữ, và được lamp-skills bật, với các quyền đó cùng `body`,
   `air`, `device` và `notes` ngoài quyền agent của một tệp
   (`upload_agent::ASKED_GRANTS`, `capped_card`, thẻ của nó ghi `agent:
-  asked`); model chỉ được đề nghị các quyền đó.
+  asked`); model chỉ được đề nghị các quyền đó. Một quyền model nêu mà
+  đèn không biết, không phải của một dịch vụ đã biết và không nhìn hay nghe
+  (lamp-9adf, 20/11: "when I say apple file, have an agent write three
+  apple facts into a file" được trả lời `file-write` và bị từ chối là "a
+  service the lamp can't link yet"), được bỏ ra khỏi task, không bao giờ là
+  lời từ chối: agent tự ghi tệp của mình trong sandbox riêng, và phép kiểm
+  tra quyền của lần chạy vẫn giới hạn những gì nó được làm trên đèn
+  (`notes` là ghi chú nhỏ của chính skill trên đèn, không phải tệp của
+  agent). Nhật ký ghi `a skill made here: 1 grant(s) the lamp doesn't know
+  left out of the task for the lamp's agent (LAMP_MAKE_NO_CANNOT)`
+  (`make_no_cannot::tests::with_the_switch_a_grant_the_lamp_doesnt_know_is_left_out_never_refused`).
+  Các lời từ chối vì riêng tư vẫn giữ: thứ nhìn hay nghe theo trigger,
+  internet bên cạnh một quyền riêng tư, và một dịch vụ đã biết khi
+  `LAMP_AGENT_SERVICES` tắt.
   - **Các câu từ chối của chính brief vẫn là từ chối** (P2 của sim-2 trên
     #7261, quy tắc của #6439; chủ sở hữu: "if something can't be done, say
     exactly why"), trừ câu về gửi (`made_skill::briefs_send_refusal`), mà
@@ -3286,8 +3299,9 @@ cả hai người viết.
     - Một dịch vụ khi `LAMP_AGENT_SERVICES` tắt (`services_off`): "I can't
       make that one yet: it needs your linked services, and skills on this
       lamp can't use them yet."
-    - Một dịch vụ đèn không biết (`service_unknown`): "I can't make that
-      one yet: it needs a service the lamp can't link yet."
+    - Một dịch vụ đèn không biết (`service_unknown`), chỉ khi
+      `LAMP_MAKE_NO_CANNOT` tắt (bật thì nó được bỏ ra, xem trên): "I
+      can't make that one yet: it needs a service the lamp can't link yet."
     - `LAMP_MADE_SCRIPTS` hoặc `LAMP_SKILL_TASKS` tắt (`tasks_off`): "I can't
       make that one yet: it needs the lamp's agent, and skills on this lamp
       can't hand tasks to it yet."
@@ -3483,15 +3497,30 @@ cả hai người viết.
   true|false, "reason": "..."}`; lý do không bao giờ được đọc hay ghi nhật
   ký), chờ tối đa 4 giây (`REACTION_JUDGE_WITHIN`; thường khoảng một giây),
   thời gian và kết quả được ghi: `a skill made here: judged in 840 ms: not a
-  quick reaction`. Phản ứng nhanh là một câu nói, chạm, vuốt đầu hoặc nút
-  bấm chỉ dùng đèn, thân, lời cố định hoặc tiếng ngân, không cần internet,
-  cảm biến, giờ, đọc, ghi hay suy nghĩ; nhắc việc một lần được đánh giá là
-  phản ứng nhanh, vì bộ hẹn giờ của đèn trả lời nó. Được đánh giá là phản
+  quick reaction`. Phản ứng nhanh (chủ sở hữu, 20/11: "make sure the
+  quick reaction is DeepSeek's, and everything else goes to the agent") là
+  việc đèn làm chỉ bằng các bộ phận của chính nó: ánh sáng hay một màu,
+  tiếng ngân hay tiếng chuông, một cử động thân (gật, vẫy, nhìn) hoặc một
+  câu ngắn cố định, theo một trigger (ai đó đến hay quay lại bàn, ai đó
+  rời đi, vuốt hay chạm, một giờ trong ngày, một câu nói, hay bất cứ điều
+  gì khác đèn cảm nhận), không có gì phải lấy về, ghi, tra cứu hay quyết
+  định. Mọi thứ khác thuộc về agent: dữ liệu, internet, một tệp hay một
+  dịch vụ, đọc, gửi hay ghi nhớ, lời được chọn mỗi lần hay nói điều thay
+  đổi, nhiều bước nối tiếp nhau, và một lời nhắc được viết cho người dùng
+  mỗi lần (giãn cơ sau khi ngồi lâu). Nhắc việc một lần được đánh giá là
+  phản ứng nhanh, vì bộ hẹn giờ của đèn trả lời nó. Vì vậy "whenever I come
+  back to the desk, wave at me" và "glow pink when I pat your head" thuộc
+  về DeepSeek; giá vàng lúc bảy giờ, tệp apple file và lời nhắc giãn cơ
+  thuộc về agent
+  (`made_skill::tests::the_reaction_judge_defines_a_quick_reaction_by_the_lamps_own_parts`,
+  `make_skill_local::tests::with_the_owners_lines_a_quick_reaction_is_deepseeks_and_all_else_the_agents`). Được đánh giá là phản
   ứng nhanh: DeepSeek viết bản nháp như trước, và bản nháp chỉ được giữ khi
   là phản ứng nhanh (`made_skill::quick_reaction`, chỉ theo cách bắt đầu
-  và loại bước, không bao giờ theo từ ngữ): do chính người dùng khởi động
-  (câu họ đặt, `asks` hoặc `[said]`; `[trigger]` trên `controls/*`: chạm,
-  vuốt đầu, nút bấm; hoặc không có trigger, chỉ chạy khi được gọi), chỉ có
+  và loại bước, không bao giờ theo từ ngữ): do chính đèn khởi động (câu
+  người dùng đặt, `asks` hoặc `[said]`; không có trigger, chỉ chạy khi
+  được gọi; hoặc `[trigger]` trên một topic đèn có: chạm, vuốt đầu, nút
+  bấm, ai đó đến hay rời đi, đồng hồ của đèn, bất kỳ giác quan nào khác của
+  nó), chỉ có
   `light`, `body`, một `say` đúng lời (không bao giờ là dấu `internet:`
   hay `cannot:` của mô hình) hoặc tiếng ngân, không `task`, không
   `[[while]]`, không `grants`. Được đánh giá không phải, không chắc, trễ
@@ -3543,7 +3572,17 @@ cả hai người viết.
   phút, thay vì mất lần ngồi đó; bước kiểm tra nói rõ "(if they're talking
   then, once the talk ends, within 10 minutes)" và chỉ nhận `wait` trên
   lần ngồi như vậy, có `for` và `rearm`), không bao giờ là đứng dậy; quay lại bàn vẫn là lúc đến. Mô hình chọn theo ý nghĩa; khi tắt,
-  prompt như trước. Quyền
+  prompt như trước. Nó cũng được dặn bắt đầu câu trả lời bằng `runs:` và
+  giờ hay thời điểm yêu cầu nêu (`runs: someone comes back to the desk`),
+  hoặc `runs: asked` khi nó chỉ chạy lúc người dùng nói (`make_no_cannot::RUNS`,
+  mỗi câu mẫu bắt đầu bằng dòng của nó): một thời điểm được nêu mà lại trả
+  lời `asks:` thì được hỏi lại một lần, kèm `make_no_cannot::runs_repair`,
+  để giữ đúng thời điểm của người dùng (lamp-9adf, 20/11: "Lamp, make a
+  skill: when I come back to the desk, wave at me" được trả lời `asks:` và
+  tạo thành chỉ gọi bằng lời, mất lúc đến); trả lời như vậy lần nữa thì
+  được tạo như chỉ gọi bằng lời, không bao giờ có vòng thứ ba cho nó
+  (`make_no_cannot::moment_named`,
+  `a_moment_named_but_answered_asks_is_asked_again_for_its_trigger`). Quyền
   của nó theo `make_no_cannot` (`net` chỉ khi có `LAMP_TASK_NET`), cần task
   của skill bật (`LAMP_MADE_SCRIPTS`, `LAMP_SKILL_TASKS`; gọi bằng lời thì
   `LAMP_UPLOAD_TO_AGENT`), được nói lại như một task cho agent và chờ câu
