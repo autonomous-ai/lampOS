@@ -16925,18 +16925,31 @@ fn lamp_turn_made_skills(messages: &[Message]) -> bool {
 /// matched for what it asks (the owner: the model judges meaning). So a
 /// question of them that names none and follows no kept call ("Which
 /// skill should I turn off?" alone) is not told apart here.
+///
+/// A skill made in this conversation (`made_here`,
+/// [`crate::just_made::made_here`]) is the exception the first builder
+/// ruled on #8022 (20 Nov 07:29): its own words or name are the person's
+/// trigger for it, a fact, so they run it in code past the lamp's
+/// question, its make's say-back or the lamp's answer to a first try
+/// naming it (lamp-52e6, 14951, 07:25: two "apple file" lines got
+/// `calls=none`). Only a held yes, or a remove or turn the lamp's last
+/// turn ran ([`lamp_turn_made_skills`]), still waits.
 fn lamp_awaits_answer_for(
     held: bool,
     messages: &[Message],
     named: Option<&(String, Value)>,
     heard: &str,
     made_named: Option<&MadeNamed>,
+    made_here: &[String],
 ) -> bool {
     if !lamp_awaits_answer(held, messages) {
         return false;
     }
     let made = named.filter(|(name, _)| name == crate::made_skill::MAKE);
     match (held, made, lamp_last_words(messages)) {
+        (false, Some((name, args)), _) if made_named_here(name, args, made_here) => {
+            lamp_turn_made_skills(messages)
+        }
         (false, Some((name, args)), Some(said)) => {
             crate::skill_named::asked_about(
                 said,
@@ -16947,6 +16960,13 @@ fn lamp_awaits_answer_for(
         }
         _ => true,
     }
+}
+
+/// Whether the call `name` with `args` runs a skill made in this
+/// conversation, one of `made_here` ([`lamp_awaits_answer_for`]).
+fn made_named_here(name: &str, args: &Value, made_here: &[String]) -> bool {
+    name == crate::made_skill::MAKE
+        && made_here.iter().any(|made| made == crate::skill_named::function_of(name, args))
 }
 
 /// Whether a yes of any kind is held for the person's next words: a keep or
@@ -19982,17 +20002,49 @@ async fn answer(
         }
         // A made skill's words or name run it past a question that is not
         // of the made skills ([`lamp_awaits_answer_for`], the lead's live
-        // test, 19 Nov; Heron's and Twelve's HOLD on #7916).
+        // test, 19 Nov; Heron's and Twelve's HOLD on #7916), and one made
+        // in this conversation past any question but a held yes or a remove
+        // or turn just run (#8022).
+        let made_here = if heard {
+            crate::just_made::made_here(scope.as_ref(), Instant::now())
+        } else {
+            Vec::new()
+        };
+        let named_made_here = skill_named
+            .as_ref()
+            .is_some_and(|(name, args)| made_named_here(name, args, &made_here));
         let awaits_named = lamp_awaits_answer_for(
             held,
             &messages,
             skill_named.as_ref(),
             named_said.as_deref().unwrap_or_default(),
             shared.made_named.as_ref(),
+            &made_here,
         );
         if awaits && !awaits_named {
+            let of = if named_made_here {
+                "it is the skill made in this conversation"
+            } else {
+                "not of the made skill the heard words named"
+            };
             eprintln!(
-                "lamp-voice second: request {request}: the lamp's last words asked something, but not of the made skill the heard words named: called in code"
+                "lamp-voice second: request {request}: the lamp's last words asked something, but {of}: called in code"
+            );
+        }
+        // Whether the matcher knew a skill made in this conversation, for a
+        // line that named none (#8022: "apple file" twice, no line at all):
+        // the made skills it reads ([`MadeNamed`]) hold its name or not.
+        // No word of the line, and no skill's name.
+        if heard && skill_named.is_none() && !made_here.is_empty() {
+            let read = shared.made_named.as_ref().map_or(0, |named| {
+                made_here
+                    .iter()
+                    .filter(|made| named(&crate::skill_named::spoken(made)))
+                    .count()
+            });
+            eprintln!(
+                "lamp-voice second: request {request}: the heard words named no skill; {} made in this conversation, {read} of them among the made skills the heard words are read for",
+                made_here.len()
             );
         }
         let awaits = awaits_named;
@@ -20003,6 +20055,8 @@ async fn answer(
             let function = crate::skill_named::function_of(name, args);
             let why = if held {
                 "a yes is held"
+            } else if named_made_here {
+                "made in this conversation, but the lamp's last turn removed or turned a made skill"
             } else {
                 "the lamp's last words asked something"
             };
