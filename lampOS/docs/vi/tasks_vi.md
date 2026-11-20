@@ -1005,9 +1005,23 @@ lamp-tasks tự chạy script: không agent, không Harness, không prompt
   có thể chạy nhiều phút; bước thứ hai bị từ chối `busy`.
 - **Token**: tạo từ lời đồng ý lamp-control giữ cho thư mục và các quyền của
   kỹ năng, y như của task (`skill_run::answer`); token nêu quyền khác với
-  dòng thì bị kết thúc ngay và không gì chạy. Dòng có quyền `net`, hoặc của
-  kỹ năng nêu khóa, bị từ chối trước khi có token
-  (`skill_run::NO_NET_HERE`, `NO_KEYS_HERE`): hãy dùng `do.task`.
+  dòng (trừ `net`, quyền của chính lamp-tasks) thì bị kết thúc ngay và không
+  gì chạy. Dòng của kỹ năng nêu khóa bị từ chối trước khi có token
+  (`skill_run::NO_KEYS_HERE`): hãy dùng `do.task`.
+- **`net`**: cùng đường và cùng lời đồng ý như task có `net`
+  (`Tokens::net_agreed`: lời đồng ý của chủ sở hữu nêu `net` cho thư mục như
+  hiện tại; không có thì `no_token`, `skill_run::NO_NET_YES`, trước khi có
+  token). Khi `LAMP_TASK_NET` bật, `DirectRunner::egress` tạo socket egress
+  riêng của lần chạy `skill-<run id>` (`egress::Grant::lamp`: chỉ web công
+  khai trên cổng 80 và 443), phục vụ đến hết giới hạn của lần chạy, và đặt
+  một descriptor `O_PATH` của nó lên fd 5 của hàng rào. Hàng rào là hàng rào
+  net của gateway (`gateway::FENCE_NET_EDITS`: bật `lo`, `resolv.conf` trỏ
+  `127.0.0.1`, `lamp-tasks net-relay --egress /proc/self/fd/5`, đóng fd 5
+  trước script, `HTTPS_PROXY`/`HTTP_PROXY` `http://127.0.0.1:3128`), với
+  chương trình của lamp-tasks được hiện lại một mình dưới `/opt` cho relay
+  (`skill_run::RELAY_EDITS`). Công tắc tắt, hoặc không phải Linux, thì lần
+  chạy có `net` bị từ chối trước khi hàng rào bắt đầu (`not_started`).
+  Socket bị xóa khi lần chạy kết thúc.
 - **Hàng rào** (`skill_run::DirectRunner`): `/usr/bin/unshare` với các đối số
   của lần chạy gateway (`gateway::fence_args`: user namespace với root được
   ánh xạ, mạng chỉ có `lo`, mount và PID namespace riêng, `--kill-child`) và
@@ -1027,7 +1041,17 @@ lamp-tasks tự chạy script: không agent, không Harness, không prompt
 - **Giới hạn**: 30 s từ lúc hàng rào bắt đầu (`skill_run::RUN_WITHIN`), cả
   nhóm tiến trình bị kill khi hết giờ; tối đa 64 KiB đầu ra
   (`skill_run::MOST_OUTPUT`), chỉ đếm rồi bỏ (không ghi nhật ký), quá thì bị
-  dừng.
+  dừng. Script có giới hạn của riêng nó, đặt trong hàng rào ngay trước khi
+  exec, sau relay (`skill_run::CAPS_EDIT`), nên script chạy mất kiểm soát
+  không bao giờ dùng cả ngân sách của lamp-tasks (`MemoryHigh`, `CPUQuota`
+  trên lamp-tasks.service): không file core (`ulimit -c 0`), 768 MiB không
+  gian địa chỉ (`ulimit -v`, `SCRIPT_MEMORY_KB`, giới hạn mỗi script mà #7520
+  cho script của agent gateway), 30 s thời gian CPU (`ulimit -t`,
+  `SCRIPT_CPU_SECS`: trung bình tối đa một nhân trong lần chạy, như
+  `CPUQuota=100%` của agent gateway) và độ nice 10 (`nice -n`,
+  `SCRIPT_NICE`, như `Nice=10` của agent gateway). lamp-tasks.service không
+  ủy quyền cgroup nào, nên đây là giới hạn của chính tiến trình, mà các tiến
+  trình con kế thừa.
 - **Câu trả lời**: khi script kết thúc, token được kết thúc bằng `end` của
   admin, mà câu trả lời giờ có `said`: số câu `say` của lần chạy mà giọng
   nói đã nói trọn (`Tokens::end_said`). Thoát 0 và `said` ít nhất 1 là
@@ -1036,7 +1060,9 @@ lamp-tasks tự chạy script: không agent, không Harness, không prompt
   `run_failed` kèm lý do; hàng rào không dựng được là `not_started`.
   `skills/tasks` báo kết thúc (`Ran` hoặc `Failed`, không engine).
 - **Thời gian**: nhật ký ghi lúc tạo token sau dòng bàn giao, lúc script
-  bắt đầu (`its script started N ms into its run`) và lúc kết thúc. Các
+  bắt đầu (`its script started N ms into its run`), cả hai cộng lại
+  (`skill run RUN: hand-over to script start N ms`, thứ ROW trên đèn đọc) và
+  lúc kết thúc. Các
   chặng chặn là tạo token (một dòng socket cục bộ), các mount của hàng rào
   và khởi động `python3`. Đã đo ở mức unit với hàng rào thay thế; chưa đo
   trên đèn.

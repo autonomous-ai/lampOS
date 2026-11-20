@@ -4096,15 +4096,24 @@ run = "scripts/main.py"
   (`task::run_failed_line`), ở mức ưu tiên nói của kỹ năng; nếu do một
   trigger khởi động, đèn không nói gì. Nhật ký luôn ghi lý do, không bao
   giờ ghi đầu ra của script.
-- **Không được cấp**: `net` (hàng rào của nó chỉ có `lo`) và khóa
-  (`secrets`): kỹ năng cần một trong hai dùng `do.task`; lamp-tasks từ chối
-  bước `run` có một trong hai, bằng lời.
+- **`net`**: được cấp như một task có `net` hôm nay, với cùng lời đồng ý
+  (lời đồng ý của chủ sở hữu nêu `net` cho thư mục như hiện tại,
+  `LAMP_TASK_NET` bật): socket egress riêng của lần chạy, chỉ web công khai
+  trên cổng 80 và 443, qua `HTTPS_PROXY` (`127.0.0.1:3128`) trong hàng rào
+  của nó ([tasks_vi.md](tasks_vi.md), "Bước `run` của một kỹ năng"). Không
+  có lời đồng ý đó thì bị từ chối trước khi chạy gì.
+- **Không được cấp**: khóa (`secrets`): kỹ năng cần khóa dùng `do.task`;
+  lamp-tasks từ chối bước `run` của kỹ năng đó, bằng lời.
+- **Giới hạn riêng**: script chạy với giới hạn bộ nhớ (768 MiB không gian
+  địa chỉ), thời gian CPU (30 s) và độ nice (10) của riêng nó, không bao giờ
+  dùng cả ngân sách của lamp-tasks.
 - **Thời gian** (từng chặng, từ trigger đến script): luồng của lần kích
   hoạt tạo luồng bàn giao; thư mục được băm (vài file của kỹ năng); hỏi
   lamp-control lời đồng ý (một dòng socket cục bộ); ghi sổ; một dòng tới
   lamp-tasks; tạo token (một dòng socket cục bộ tới lamp-control); dựng
   hàng rào (`unshare`, vài mount) và khởi động `python3`. Không agent, không
-  Harness, không mạng. Ở mức unit, với hàng rào thay thế, cả lần chạy một
+  Harness. Nhật ký của lamp-tasks ghi cả chặng bàn giao đến lúc script bắt
+  đầu (`skill run RUN: hand-over to script start N ms`). Ở mức unit, với hàng rào thay thế, cả lần chạy một
   script mất vài chục mili giây (`skill_run::tests`); trên đèn, mục tiêu là
   vài giây từ trigger đến tiếng đầu tiên, chưa đo.
 
