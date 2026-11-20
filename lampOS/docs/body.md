@@ -1456,14 +1456,53 @@ the voice, Expression and lamp-skills (each with `energy_in::EnergyIn`, the body
 | level | fill (answers with no cue) | fill gap, s | pause nod gap, s | `lively` cooldown | rearm |
 |---|---|---|---|---|---|
 | 1 | none | - | the catalogue's (4) | as written (music sway 30 min) | as written |
-| 2 | 10% | 60 | 3.75 | 20 min | as written |
-| 3 | 20% | 45 | 3.5 | 15 min | as written |
-| 4 | 30% | 30 | 3.25 | 10 min | none |
-| 5 | 40% | 20 | 3 | 6 min | none |
+| 2 | 25% | 40 | 3.75 | 20 min | as written |
+| 3 | 50% | 25 | 3.5 | 15 min | as written |
+| 4 | 75% | 15 | 3.25 | 10 min | none |
+| 5 | every one | 8 | 3 | 6 min | none |
 
 - **Fill.** The voice (`body_link::Cue::heard_lively`): an answer whose opening `cue_for` gives no
   gesture gets a nod, an acknowledge or a curious at the level's share, never within the gap of the
-  last fill and never the last fill again. A matched cue is sent as before at every level.
+  last fill and never the last fill again. A matched cue is sent as before at every level. At level
+  5 (#8153) every answer gets a clip, its own cue's or a fill, at least 8 s after the last fill:
+  with an answer every 25 to 45 s about 1.3 to 2.4 a minute, plus matched cues, against V1's 2.7 to
+  5.8 starts a minute by its code (an emotion clip per answer and `idle.csv` after each). At rest
+  nothing is added at any level: the shifts at rest as in the first table, no clip of its own, and
+  no V1-style return clip after a gesture (a lamp that fidgets alone reads as a machine).
+- **Clip size and pace (#8153).** A built-in clip (`clips::ALL`) asked of the body under the switch
+  is played at the level's `clip_size` and `clip_pace` (`energy::livelier`, from the level taken when
+  it is asked): each joint that many times as far, held to the gesture's reach (`GESTURE_REACH`,
+  220, 220, 250, 360 and 360 counts), and its frames that many times as quick, each step still
+  stretched under the servo's 1,000 counts a second (`Limits::clip_ceiling`, below). The reach and
+  the anti-tip check at play time see the clip as played. Level 1, a move from a file, a shift at
+  rest and the call's glance are played as they are, so level 1 is today exactly.
+
+  | level | clip size x | clip pace x |
+  |---|---|---|
+  | 1 | 1.0 | 1.0 |
+  | 2 | 1.15 | 1.125 |
+  | 3 | 1.3 | 1.25 |
+  | 4 | 1.45 | 1.375 |
+  | 5 | 1.6 | 1.5 |
+
+  Eight clips are held under that size so that, as at level 1, no frame on the deployed lamps'
+  stand comes within 85% of V1's 22 mm off the axis nor leans the lamp back past 16 mm
+  (`energy::CLIP_SIZE_CAP`, `cog::every_built_in_clip_at_level_five_passes_v1s_rule`): greeting 1.3,
+  shy 1.48, stretching 1.16, surprised 1.05, sleepy 1.12, excited 1.08, dance_groove 1.59 and
+  dance_hype 1.55. On the host at level 5 the clips' worst frame is 3.3 to 18.66 mm off the axis
+  (level 1: 3.1 to 17.99) and the farthest back 15.93 mm (dance_groove); the fastest joint of 15 of
+  the 21 clips reaches the servo's 1,000 counts a second (level 1: headshake alone), and each clip
+  takes about 0.7 of its level-1 time.
+
+  **Where V1 stays out of reach, and why.** V1 played its recordings at their recorded speed with
+  no servo ceiling: its emotion clips peak at a median of about 2,000 counts a second (excited's
+  elbow 1,579 in the stretch kept, 1,923 over the whole clip). Level 5 stops at the servo's 1,000,
+  the speed the servos are written to follow (`Tuning::SERVO_SPEED_CAP`), so V1's fastest flicks
+  come out slower and longer. Its size stops at the gesture's reach: happy's base yaw swung 697
+  counts in V1 and swings 240 at level 5, about a third, because the reach holds yaw to 250 either
+  way of the pose. Excited and surprised stay near their level-1 size because V1's own tip rule
+  (`cog`) leaves them no room at 1.6. Closing any of these needs a servo, reach or tip bound
+  raised, which #8153 does not do.
 - **Pause nod.** Expression's pause clip waits `pause_cooldown_us`: the catalogue's cooldown at level 1,
   else the level's gap, never longer than the catalogue's and never under 3 s.
 - **Music.** A skill trigger with `lively = true` (Music sway, [skills.md](skills.md)): its cooldown at
