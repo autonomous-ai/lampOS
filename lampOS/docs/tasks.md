@@ -5219,7 +5219,7 @@ in and signed out, and on 0.6.60, signed in (#7507's ROW).
   kept session gone or stuck is replaced as below (#7906, signs 1-4).
 - **A failed launch, at once (#8062: Harness 0.6.74's openharness#4499, carried by the 0.6.75 pin).**
   `harness wait` exits 1 when a launch on this machine failed (for example
-  `OPENCLAW_NO_TOKEN`, or `first_task_not_taken` after 3 min), its row
+  `OPENCLAW_NO_TOKEN`, or `FIRST_TASK_NOT_TAKEN` after 3 min), its row
   `failed` with a `failure: {error, detail}`. lamp-tasks reads it as that
   `failed` row (`parse_wait` keeps `failure.error` on the row; `wait
   --after` journals it) only when one of the rows waited on says

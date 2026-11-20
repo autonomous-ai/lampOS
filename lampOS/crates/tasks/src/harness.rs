@@ -7507,7 +7507,7 @@ struct WaitFailure {
 }
 
 /// A `failed` row's `failure.error` as read here: a plain code
-/// (`OPENCLAW_NO_TOKEN`, `first_task_not_taken`), else `?`.
+/// (`OPENCLAW_NO_TOKEN`, `FIRST_TASK_NOT_TAKEN`), else `?`.
 fn failure_code(failure: Option<&WaitFailure>) -> Option<String> {
     let error = failure?.error.as_deref()?;
     Some(if token(error, 64) { error } else { "?" }.to_owned())
@@ -7517,7 +7517,7 @@ fn failure_code(failure: Option<&WaitFailure>) -> Option<String> {
 /// [`Cli::wait_kept`], [`Cli::wait_after`]) by its exit, as
 /// [`parse_wait`] reads it. Exit 1 (Harness 0.6.74, openharness#4499: a
 /// launch on this machine that failed, `OPENCLAW_NO_TOKEN`,
-/// `first_task_not_taken`, …) is `failed` only when its JSON lists a
+/// `FIRST_TASK_NOT_TAKEN`, …) is `failed` only when its JSON lists a
 /// `failed` row; any other exit 1 is not read, as before.
 fn kept_wait_state(code: Option<i32>, stdout: &[u8]) -> Result<Option<String>, String> {
     match code {

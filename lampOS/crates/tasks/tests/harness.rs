@@ -5332,7 +5332,7 @@ fn a_wait_exit_1_with_a_failed_launch_reads_failed_with_its_reason() {
 }
 
 /// Harness 0.6.74: `wait --after` on the one pane exits 1 with a `failed`
-/// row when its launch failed (`first_task_not_taken`): `failed`, so the
+/// row when its launch failed (`FIRST_TASK_NOT_TAKEN`): `failed`, so the
 /// turn takes the ladder at once (before #8062: `wait_failed`, waited on
 /// again). Exit 1 with anything else stays `wait_failed`.
 #[test]
@@ -5341,7 +5341,7 @@ fn a_wait_after_exit_1_with_a_failed_launch_reads_failed() {
     rig.config.as_person = true;
     let failed = json!({"harnesses":[{
         "name":"lamp-one-openclaw","id":AGENT,"state":"failed",
-        "failure":{"error":"first_task_not_taken","detail":"its first task was not taken in 3 min"},
+        "failure":{"error":"FIRST_TASK_NOT_TAKEN","detail":"OpenClaw did not take the first task. Close it and start it again."},
         "next":[]
     }]});
     rig.plan(json!({
