@@ -492,9 +492,10 @@ mod kept {
     /// The newest requests a read answered in.
     static READ_IN: Mutex<VecDeque<u64>> = Mutex::new(VecDeque::new());
     pub fn pending<R>(f: impl FnOnce(&mut Option<Pending>) -> R) -> R {
-        f(&mut PENDING
+        let mut pending = PENDING
             .lock()
-            .unwrap_or_else(|poisoned| poisoned.into_inner()))
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        super::mirrored(&mut pending, f)
     }
     pub fn read_in<R>(f: impl FnOnce(&mut VecDeque<u64>) -> R) -> R {
         f(&mut READ_IN
@@ -514,11 +515,40 @@ mod kept {
         static READ_IN: RefCell<VecDeque<u64>> = const { RefCell::new(VecDeque::new()) };
     }
     pub fn pending<R>(f: impl FnOnce(&mut Option<Pending>) -> R) -> R {
-        PENDING.with(|cell| f(&mut cell.borrow_mut()))
+        PENDING.with(|cell| super::mirrored(&mut cell.borrow_mut(), f))
     }
     pub fn read_in<R>(f: impl FnOnce(&mut VecDeque<u64>) -> R) -> R {
         READ_IN.with(|cell| f(&mut cell.borrow_mut()))
     }
+}
+
+/// When the write waiting now began, if it still waits for the reply its
+/// uncut read-back asked for ([`answers_the_read_back`] but for the time).
+fn awaited_since(pending: &Option<Pending>) -> Option<Instant> {
+    pending
+        .as_ref()
+        .filter(|kept| {
+            kept.other.is_none() && !kept.service.is_empty() && !kept.cut && person_lines(kept) <= 1
+        })
+        .map(|kept| kept.at)
+}
+
+/// `f` run on the waiting write, and a change of the answer it awaits
+/// ([`awaited_since`]) told to the coordinator
+/// (`not_speech::ANSWER_AWAITED_FILE`, #6840): until its [`PENDING_FOR`]
+/// ends, or none.
+fn mirrored<R>(pending: &mut Option<Pending>, f: impl FnOnce(&mut Option<Pending>) -> R) -> R {
+    let before = awaited_since(pending);
+    let result = f(pending);
+    let after = awaited_since(pending);
+    if before != after {
+        let until = after.map(|at| {
+            let left = PENDING_FOR.saturating_sub(at.elapsed());
+            crate::app_make::now_unix_ms() + left.as_millis() as u64
+        });
+        crate::not_speech::awaited_told(crate::not_speech::Awaits::Write, until);
+    }
+    result
 }
 
 /// Tests: the SHA-256 a run's send names for `read_back`.
@@ -4189,6 +4219,49 @@ mod tests {
             .replace("ann@b.test", "ann at b dot test");
         assert!(read_back_said(READ_BACK, &spoken));
         assert!(!read_back_said(READ_BACK, ""));
+    }
+
+    /// #6840: while a write waits for the reply its read-back asked for,
+    /// the worker tells the coordinator, until its [`PENDING_FOR`] ends; the
+    /// file goes once the read-back is cut or the write is let go.
+    #[test]
+    fn the_worker_tells_an_answer_awaited_and_takes_it_back() {
+        let dir =
+            std::env::temp_dir().join(format!("lamp-services-awaited-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        let file = dir.join("answer-awaited.json");
+        crate::not_speech::set_answer_awaited_file_here(Some(file.clone()));
+        let now_ms = crate::app_make::now_unix_ms();
+        kept::pending(|kept| {
+            *kept = Some(Pending {
+                service: "calendar".to_owned(),
+                ..Pending::new("s1", 10, Instant::now(), READ_BACK, "ann")
+            })
+        });
+        assert!(awaits_an_answer());
+        assert!(crate::not_speech::answer_awaited_in(&file, now_ms));
+        let ends = PENDING_FOR.as_millis() as u64;
+        assert!(!crate::not_speech::answer_awaited_in(
+            &file,
+            now_ms + ends + 1_000
+        ));
+        // Cut: no answer awaited, and the file is gone.
+        lamp_cut(10);
+        assert!(!awaits_an_answer());
+        assert!(!file.exists());
+        // Waiting again, then let go.
+        kept::pending(|kept| {
+            *kept = Some(Pending {
+                service: "calendar".to_owned(),
+                ..Pending::new("s2", 11, Instant::now(), READ_BACK, "ann")
+            })
+        });
+        assert!(file.exists());
+        kept::pending(Option::take);
+        assert!(!file.exists());
+        crate::not_speech::set_answer_awaited_file_here(None);
+        let _ = std::fs::remove_dir_all(&dir);
     }
 
     #[test]

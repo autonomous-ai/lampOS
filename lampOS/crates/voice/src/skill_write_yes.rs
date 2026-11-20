@@ -531,8 +531,18 @@ fn code_wait(waiting: &Option<Waiting>) -> Option<(String, Instant)> {
 /// today's `not_kept`, never a yes awaited that isn't.
 fn mirrored<R>(waiting: &mut Option<Waiting>, f: impl FnOnce(&mut Option<Waiting>) -> R) -> R {
     let before = code_wait(waiting);
+    let since = waiting.as_ref().map(|waiting| waiting.at);
     let result = f(waiting);
     let after = code_wait(waiting);
+    // Any yes awaited, told to the coordinator (#6840).
+    let now_since = waiting.as_ref().map(|waiting| waiting.at);
+    if since != now_since {
+        let until = now_since.map(|at| {
+            let left = YES_WITHIN.saturating_sub(at.elapsed());
+            crate::app_make::now_unix_ms() + left.as_millis() as u64
+        });
+        crate::not_speech::awaited_told(crate::not_speech::Awaits::SkillYes, until);
+    }
     if before != after
         && let Some(path) = code_awaited_file()
     {
@@ -1799,6 +1809,25 @@ mod tests {
             code: false,
             remove: false,
         }
+    }
+
+    /// #6840: while a made skill's writes wait for the yes, the worker
+    /// tells the coordinator an answer is awaited; the file goes with the
+    /// wait.
+    #[test]
+    fn a_skills_yes_awaited_is_told_and_taken_back() {
+        let dir = std::env::temp_dir().join(format!("lamp-yes-awaited-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        let file = dir.join("answer-awaited.json");
+        crate::not_speech::set_answer_awaited_file_here(Some(file.clone()));
+        let now_ms = crate::app_make::now_unix_ms();
+        let id = wait_for_yes(asks("leaving-mail", &[mail()]), 4, Instant::now());
+        assert!(crate::not_speech::answer_awaited_in(&file, now_ms));
+        assert!(drop_wait(&id));
+        assert!(!file.exists());
+        crate::not_speech::set_answer_awaited_file_here(None);
+        let _ = std::fs::remove_dir_all(&dir);
     }
 
     /// A wait whose say-back the lamp said whole in the make's `request`.

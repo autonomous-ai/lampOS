@@ -1666,6 +1666,18 @@ cầu; ở mọi chỗ khác, ai nói cũng được.
   thay đổi. Trên lamp-9adf ngày 13/11
   câu "Yes." của chủ đèn cho một lần dời lịch trả về 0 chữ và lệnh ghi bị
   bỏ ở câu kế tiếp.
+- **Một cái "có" ngắn nói muộn không phải âm thanh** (#6840,
+  `LAMP_SHORT_YES_AWAITED=on`, tắt nếu không đặt). Cổng not-speech của
+  coordinator chạy ở một tiến trình khác và không biết có lệnh ghi đang chờ:
+  một câu "Yes." dưới 30 khối tiếng nói, từ 4 s trở lên sau khi phần đọc lại
+  kết thúc, trong một phòng đông, bị bỏ là một âm thanh trước khi nghe được
+  chữ nào (lamp-9adf, 13/11). Khi bật công tắc, trong lúc một lệnh ghi chờ
+  câu trả lời mà phần đọc lại của nó hỏi (`awaits_an_answer`), hoặc các lệnh
+  ghi của một skill được tạo chờ cái "có" (`skill_write_yes::awaited`),
+  worker giữ `/run/lampos-voice/answer-awaited.json` với lúc hết chờ
+  (`until_unix_ms`), ghi trọn vẹn và xoá khi không còn gì chờ, và một câu
+  ngắn nghe được khi tệp nói vậy được miễn khỏi cổng như một lần giành lượt
+  (`not_speech::excused`, docs/not-speech.md).
 - **Không lời nhắc, không câu huỷ của đèn.** Lời nhắc riêng của đèn "Say
   'send it' to send it." (`SAY_SEND_IT`, `nudge_waiting`; với một bản nháp
   "Say 'save it' to save the draft.", `SAY_SAVE_IT`) và câu riêng

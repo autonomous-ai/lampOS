@@ -1376,6 +1376,7 @@ fn worker_command(
         ))
         .envs(crate::stalls::passed_on())
         .envs(crate::code_lock::passed_on())
+        .envs(crate::not_speech::short_yes_awaited_passed_on())
         .envs(memory_days_worker_environment(
             role,
             var("LAMP_MEMORY_DAYS").as_deref(),
@@ -4726,6 +4727,7 @@ mod tests {
         let stalls: Vec<String> = crate::stalls::passed_on()
             .into_iter()
             .chain(crate::code_lock::passed_on())
+            .chain(crate::not_speech::short_yes_awaited_passed_on())
             .map(|(name, value)| format!("{name}={}", value.to_string_lossy()))
             .collect();
         // A failure says only the names it got, never their values: a
