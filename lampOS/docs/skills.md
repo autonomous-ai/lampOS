@@ -8406,7 +8406,20 @@ grants, its code, or the lamp's own steps (the light, the head, a say).
    an answer, no note. Told to the owner's line alone
    (`services::owner_hears`, as `made_run` names no skill to anyone else;
    sim-2's P2 on #7249): for another line nothing is told and no skill
-   named. Two Store skills sharing a phrase stay as before.
+   named. Two Store skills sharing a phrase stay as before. A short line
+   (at most 16 words, `skill_named::MOST_WORDS`) that names no skill is
+   journaled by its shape alone, never a word of it and never a skill's
+   name: `lamp-voice second: request {request}: the heard words named no
+   skill; {own} word(s) of its own, nearest skill name {off} word(s)
+   off`. `own` is its words past those said around an ask
+   (`skill_named::own_words_of`); `off` is how many words the nearest
+   installed skill's name as said, made skills' included, differs from
+   them by, either way (`skill_named::words_off`, through
+   `Heard::nearest_off` over the names the matcher keeps, no file read
+   again). A line meant as a skill's name that comes back with `off`
+   above 0 was likely written as other words by speech to text (#8022:
+   on lamp-52e6, 20 Nov 13:32, "Hey Lamp, run my mail check skill now."
+   got `calls=service_read` and no line of the matcher's).
 7. **An uploaded `SKILL.md`** (`upload_agent::files`,
    `LAMP_UPLOAD_TO_AGENT`): its trigger phrases are also its tool's
    `asks = [...]` (`upload_agent::asks_of`: lower case, the marks around
