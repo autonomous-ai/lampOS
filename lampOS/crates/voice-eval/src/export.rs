@@ -679,6 +679,7 @@ const BUS_TOPICS: &[&str] = &[
     "apps/call",
     "apps/called",
     "apps/context",
+    "apps/help",
     "apps/remember",
     "apps/remembered",
     "apps/took",

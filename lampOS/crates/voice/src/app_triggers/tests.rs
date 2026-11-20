@@ -514,3 +514,33 @@ fn start_app_stays_valid_with_many_long_triggers() {
         assert!(tool.description.contains(name.as_str().unwrap()));
     }
 }
+
+/// #7415 (the first builder's ruling, 7032733514): with `LAMP_APP_HELP` on,
+/// `start_app` says to start an app only when they ask to start it, not when
+/// they ask how it works; off, its description is as before, and with the
+/// most apps it still fits its 1,024 bytes.
+#[test]
+fn start_app_is_only_for_a_start_with_app_help_on() {
+    let apps = [running("gym-coach", &["start my workout"])];
+    let before = start_app_tool(&apps).unwrap();
+    assert_eq!(start_app_tool_with(&apps, false).unwrap(), before);
+    assert!(!before.description.contains(ONLY_ON_A_START));
+    let on = start_app_tool_with(&apps, true).unwrap();
+    assert!(
+        on.description.contains(ONLY_ON_A_START),
+        "{}",
+        on.description
+    );
+    assert!(on.validate().is_ok());
+    let many: Vec<AppsTriggers> = (0..32)
+        .map(|n| {
+            running(
+                &format!("app-number-{n:02}-long-name"),
+                &["start the very long first phrase of an app here and there"],
+            )
+        })
+        .collect();
+    let full = start_app_tool_with(&many, true).expect("some fit");
+    assert!(full.validate().is_ok(), "{} bytes", full.description.len());
+    assert!(full.description.contains(ONLY_ON_A_START));
+}
