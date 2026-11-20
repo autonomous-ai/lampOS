@@ -2686,6 +2686,8 @@ mod tests {
             "`## Answer`",
             "**Tried before it is kept**",
             "Nothing is sent at the try",
+            // #8180: a try reaches nothing and captures nothing.
+            "the try has no internet, camera or microphone",
             "never edit, patch or write the lamp's own skills",
         ] {
             assert!(flat.contains(told), "{told}");
