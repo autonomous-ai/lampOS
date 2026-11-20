@@ -264,8 +264,14 @@ pub type Offered = std::sync::Arc<dyn Fn(&str) -> bool + Send + Sync>;
 /// `use_skill` is forced with its `skill` pinned to it, and nothing when it
 /// is not offered (a skill turned off is never forced); without `use_skill`
 /// (`None`), the skill's own function, which the chat forces only when it
-/// is declared.
+/// is declared. Read past the lamp's name too
+/// (`second_provider::forced_past_the_name`).
 pub fn force(offered: Option<Offered>) -> Force {
+    crate::second_provider::forced_past_the_name(as_said(offered))
+}
+
+/// [`force`] on the line as said.
+fn as_said(offered: Option<Offered>) -> Force {
     std::sync::Arc::new(move |messages: &[Message]| {
         let last = messages.last().filter(|message| message.role == "user")?;
         let said = last.words()?;

@@ -366,7 +366,10 @@ and none of the skills' own (`crate::use_skill`):
   a question ("I like movie light", "do you like movie light?") is the
   model's: "I", "like", "do" and "you" alone are no request. Any other word,
   two asks, a skill not offered and a round after a call are asked as
-  before. On lamp-52e6 on 9 Nov (build 10883) both skills were offered with
+  before. The line is read past the lamp's name too
+  (`second_provider::forced_past_the_name`, #8022): "Hey, Lynn, movie
+  light." on a line that names the lamp, never "Hey, Anna, …" said to a
+  person. On lamp-52e6 on 9 Nov (build 10883) both skills were offered with
   lines naming those asks, and "Lamp, movie light." (2 of 2) and "Lamp,
   show me a light show." (3 of 3) were answered in words with no call;
   "reading light" and "light my book" did call. A line that is only a
@@ -460,7 +463,10 @@ greeting, the lamp's name, "please", "can you", "tell me" or a day
 sent with `tool_choice` naming `list_reminders`, when it is declared. Any
 other word (a set, a cancel, a delete, a move, a timer, "do you like
 reminders?"), `list_reminders` not declared and a round after a call are
-asked as before. On lamp-52e6 on 9 Nov (build 10972) "Lamp, what reminders
+asked as before. The line is read past the lamp's name too
+(`second_provider::forced_past_the_name`, #8022): "Hey, Lynn, what reminders
+do I have?" on a line that names the lamp, never "Hey, Anna, …" said to a
+person. On lamp-52e6 on 9 Nov (build 10972) "Lamp, what reminders
 do I have?" was answered in words with no call in 2 of 8 asks, memory
 telling nothing; the journal tagged those lines with
 `attention::about_its_work`, which takes any line with "reminder" in it and

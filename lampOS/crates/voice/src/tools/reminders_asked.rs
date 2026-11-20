@@ -80,8 +80,14 @@ pub fn asks_for_reminders(said: &str) -> bool {
 /// The force the second route's chat is given with the switch on
 /// (`second_provider::net::Chat::forcing`): a request whose last message is
 /// a person's plain question about their reminders must call
-/// [`LIST`], which the chat forces only when it is declared.
+/// [`LIST`], which the chat forces only when it is declared; read past the
+/// lamp's name too (`second_provider::forced_past_the_name`).
 pub(crate) fn force() -> Force {
+    crate::second_provider::forced_past_the_name(as_said())
+}
+
+/// [`force`] on the line as said.
+fn as_said() -> Force {
     std::sync::Arc::new(|messages: &[Message]| {
         let last = messages.last().filter(|message| message.role == "user")?;
         asks_for_reminders(last.words()?).then_some(Forced {
