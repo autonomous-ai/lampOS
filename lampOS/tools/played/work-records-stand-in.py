@@ -147,13 +147,15 @@ class Lamp:
             if part.startswith('LAMP_LAMP_ENGINE='):
                 engine = part.split('=', 1)[1]
         self.engine = engine
+        # As lamp-tasks: a record's step only with LAMP_TASKS_STEPS=on (off in the product, c0a4-16).
+        self.steps = 'LAMP_TASKS_STEPS=on' in unit_environment('lamp-tasks')
 
     def record(self, work_id, kind, words, began, queued, works):
         t = time.time() - began
         state = 'queued' if t < queued else 'working' if t < queued + works else 'done'
         tools = 0 if t < queued else min(int((t - queued) / 1.5) + 1, int(works / 1.5))
         done = state == 'done'
-        step = {'n': tools * 2, 'tool': ('web_search', 'web_fetch')[tools % 2]} if tools else None
+        step = {'n': tools * 2, 'tool': ('web_search', 'web_fetch')[tools % 2]} if tools and self.steps else None
         return {'id': work_id, 'kind': kind, 'who': 'OpenClaw', 'words': words[:300], 'state': state,
                 'started_ms': int(began * 1000), 'updated_ms': int(time.time() * 1000), 'elapsed_s': int(t),
                 'last_active_ms': None, 'tools': tools, 'step': step, 'done': done,
