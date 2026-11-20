@@ -1435,3 +1435,40 @@ async fn a_skill_made_in_this_conversation_runs_by_its_words_past_a_question() {
     crate::made_skill::set_off_said_here(None);
     crate::person::set_private_room_for_test(None);
 }
+
+/// #8022's kit-8043 ROW (lamp-52e6, 14976 + 64a8c6c0e4, 20 Nov 09:14): the
+/// clip "Hey Lamp, apple file." came back as 5 words whose first, set off,
+/// was the lamp's name heard as another word ("its first word, set off, is
+/// the lamp's name as heard, not a name"), and the line named no skill
+/// with apple-file among the made skills read. A line that calls the lamp
+/// by its name heard as another word is matched past that word too
+/// ([`past_the_name_heard_as`]), with the make in the history; a question
+/// so opened still runs nothing.
+#[tokio::test]
+async fn a_skill_made_here_runs_past_the_lamps_name_heard_as_another_word() {
+    crate::made_skill::set_off_said_here(Some(true));
+    crate::person::set_private_room_for_test(Some(true));
+    let made = || {
+        vec![
+            Message::user(
+                "Hey Lamp, make me a skill that, when I say apple file, has an agent write three \
+                 apple facts into a file for me.",
+            ),
+            Message::assistant("Made apple file. Say apple file to start it."),
+        ]
+    };
+    for line in ["Hey, Lynn. An apple file.", "Lynn, apple file."] {
+        let ran = made_ran_of(line, made(), &["made:apple-file"], APPLE).await;
+        assert_eq!(ran, [apple_run()], "{line}: run in code");
+    }
+    let ran = made_ran_of(
+        "Hey, Lynn. What time is it?",
+        made(),
+        &["made:apple-file"],
+        APPLE,
+    )
+    .await;
+    assert!(ran.is_empty(), "the control runs nothing: {ran:?}");
+    crate::made_skill::set_off_said_here(None);
+    crate::person::set_private_room_for_test(None);
+}
