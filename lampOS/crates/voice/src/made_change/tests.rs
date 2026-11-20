@@ -390,9 +390,11 @@ fn a_new_make_with_no_change_is_unchanged() {
     let _ = fs::remove_dir_all(&root);
 }
 
-/// The tool: `change` names the skill, with its request, never a new
-/// skill or a remove, and the model asks which when unsure; the remove is
-/// never for a change. Within the link's bounds with every switch on.
+/// The tool: `change_skill` names the skill, with its request, never a
+/// new skill or a remove, and the model asks which when unsure: its own
+/// function, within the link's bounds by itself, so `make_skill`'s
+/// parameters gain nothing (#8002's `PRODUCT_MOST_PARAMETERS_BYTES`).
+/// Run as `make_skill`'s call with `change`, and given back as made.
 #[test]
 fn the_tool_takes_a_change_within_the_bound() {
     crate::made_skill::set_off_said_here(Some(true));
@@ -400,34 +402,56 @@ fn the_tool_takes_a_change_within_the_bound() {
     crate::made_skill::set_writes_here(Some(true));
     crate::made_skill::set_scripts_here(Some(true));
     crate::skill_task_yes::set_on_here(Some(true));
-    let tool = crate::make_skill_local::tool();
-    let parameters = tool.parameters.unwrap();
-    let change = parameters["properties"][CHANGE]["description"]
+    let tool = tool();
+    assert_eq!(tool.name, FUNCTION);
+    for part in [
+        "Change a skill the person made",
+        "changed in place, never made as a new skill and never removed",
+        "say exactly the line you are told",
+    ] {
+        assert!(
+            tool.description.contains(part),
+            "{part}: {}",
+            tool.description
+        );
+    }
+    let parameters = tool.parameters.clone().unwrap();
+    let name = parameters["properties"][NAME]["description"]
         .as_str()
         .unwrap();
-    assert!(
-        change.starts_with("To change a skill they made"),
-        "{change}"
-    );
-    assert!(change.contains("with request as the change"), "{change}");
-    assert!(change.contains("Never a new one or a remove."), "{change}");
-    assert!(change.contains("Unsure which: ask."), "{change}");
-    let remove = parameters["properties"][crate::made_remove::REMOVE]["description"]
-        .as_str()
-        .unwrap();
-    assert!(remove.contains("stop or change it"), "{remove}");
-    assert!(!remove.contains("no change yet"), "{remove}");
+    assert!(name.contains("Unsure which: ask."), "{name}");
+    assert_eq!(parameters["required"], json!([NAME, REQUEST]));
     let bytes = parameters.to_string().len();
     eprintln!(
-        "make_skill: parameters {bytes} bytes, description {} bytes",
+        "change_skill: parameters {bytes} bytes, description {} bytes",
         tool.description.len()
     );
     assert!(bytes <= 4_096, "{bytes}");
-    assert!(
-        tool.description.len() <= 1_024,
-        "{}",
-        tool.description.len()
+    assert!(tool.description.len() <= 1_024);
+    assert!(tool.validate().is_ok());
+    let make = crate::make_skill_local::tool().parameters.unwrap();
+    assert!(make["properties"][CHANGE].is_null(), "{make}");
+    let remove = make["properties"][crate::made_remove::REMOVE]["description"]
+        .as_str()
+        .unwrap();
+    assert!(!remove.contains("no change yet"), "{remove}");
+    let asked = json!({NAME: "rain check", REQUEST: "at seven thirty"});
+    let made = as_make(FUNCTION, &asked).unwrap();
+    assert_eq!(
+        made,
+        json!({CHANGE: "rain check", "request": "at seven thirty"})
     );
+    assert_eq!(
+        as_asked(crate::made_skill::MAKE, &made),
+        Some((FUNCTION.to_owned(), asked))
+    );
+    assert_eq!(as_make(crate::made_skill::MAKE, &made), None);
+    assert_eq!(
+        as_asked(crate::made_skill::MAKE, &json!({"request": "a new one"})),
+        None
+    );
+    assert_eq!(as_make_argument(NAME), CHANGE);
+    assert_eq!(as_make_argument("request"), "request");
     crate::skill_task_yes::set_on_here(None);
     crate::made_skill::set_scripts_here(None);
     crate::made_skill::set_writes_here(None);

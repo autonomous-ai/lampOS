@@ -5587,18 +5587,28 @@ added (even from a file), kept to turn back on ... Never remove for this,
 even one that starts only when they say its words. Call it at once. Ask
 nothing first.",
 `turn_on`'s the same of back on, and `remove`'s says "delete or
-remove a skill for good, never to turn one off, pause, stop or change it".
+remove a skill for good, never to turn one off, pause or stop it".
 A call that carries a turn-off is read before the remove, so a turn-off
 never becomes a remove. **A change never removes** (#7975, lamp-9adf, 19
 Nov: "change rain check to seven thirty" was called as a remove, and the
 skill went), and **a change changes the skill in place** (#8008, lamp-9adf,
 20 Nov 01:30 and 01:33: each change was made as a new skill,
 `morning-umbrella-reminder-2` and `-3`, and three fired; the first
-builder's ruling, 01:38). `make_skill`'s `change` ("To change a skill they
-made: its name, with request as the change. Never a new one or a remove.
-Unsure which: ask.") names the skill as heard, given with `request`, the
-change in their words; whether a line asks a change is the model's to
-judge (the 13 Nov rule), and `crate::made_change` does the rest:
+builder's ruling, 01:38). `change_skill`, a function of its own beside
+`make_skill`, offered and routed wherever `make_skill` is ("Change a skill
+the person made, when they ask to change it (its time, its words, what it
+does): changed in place, never made as a new skill and never removed. In
+the same breath, before the call, say in a few words that you'll change
+it. Then say exactly the line you are told."), names the skill as heard
+(`name`: "The skill to change, as they named it. Unsure which: ask."),
+with `request`, the change in their words; whether a line asks a change
+is the model's to judge (the 13 Nov rule). It is run as `make_skill`'s
+call with `change` (`made_change::as_make`): the second route's stream
+reads it so (its `name` first a change's, so no make opening is said),
+so a change keeps a make's held opening, queue and said line, and it is
+given back in the model's history as the `change_skill` call it made
+(`as_asked`); Live's call is read so at its route. `crate::made_change`
+does the rest:
 - **Which skill**: only the owner's ask, read first, so a guest hears no
   skill of theirs named (Twelve's P2 1). Then the person's made skill
   found by that name as a remove finds one (`made_remove::found`). Several
@@ -5640,12 +5650,15 @@ judge (the 13 Nov rule), and `crate::made_change` does the rest:
   owner's "forget everything" clears it with `make_no_asks`' keep, and a
   remove takes it with the skill.
 
-To keep `make_skill`'s parameters within 4,096 bytes with every switch on,
-`choice` says "replace the others, keep them all, or cancel, as the person
-chose", `answer` loses its examples of a new ask (the note of a wait keeps
-them) and its last sentence, and `named` its last (the defaults and the
-one-skill rule, both held in code).
-Tests: `a_change_is_never_a_remove`, and in `made_change`'s
+A change adds nothing to `make_skill`'s parameters, which the product holds
+to `PRODUCT_MOST_PARAMETERS_BYTES` (3,750 of the link's 4,096, #8002; 3,737
+with the product's switches on, as before #8008): its own function's
+parameters are 233 bytes and its description 277, within the link's
+bounds by themselves, and the product's own functions are 51 (55 with
+the route's 4, within `second_provider::MAX_TOOLS`' 64).
+Tests: `a_change_is_never_a_remove`,
+`a_change_skill_call_is_read_as_make_skills_and_given_back_as_made`,
+`a_change_skill_call_runs_as_make_skills_change`, and in `made_change`'s
 `a_change_remakes_the_named_skill_in_place_never_a_second`,
 `a_change_keeps_off_and_put_it_back_restores_the_old_version`,
 `a_changed_skills_old_version_goes_after_a_week`,
