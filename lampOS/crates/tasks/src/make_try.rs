@@ -176,8 +176,8 @@ pub struct Ran {
     pub timed_out: bool,
     pub stdout: String,
     pub stderr: String,
-    /// The `say`s its run's parts took, from lamp-control; none when an
-    /// older lamp-control didn't say.
+    /// The `say`s of its run the voice said whole, from lamp-control; none
+    /// when an older lamp-control didn't say.
     pub said: Option<u32>,
 }
 

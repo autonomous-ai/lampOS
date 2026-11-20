@@ -2984,6 +2984,8 @@ async fn no_token_a_wrong_one_and_an_ended_one_are_refused() {
     assert_eq!(run_hello(&mut open, Some(&token)).await["ok"], true);
     let ended = admin(&lamp, json!({"end": {"run": "r2"}})).await;
     assert_eq!(ended["ended"], true, "{ended}");
+    // #8158: the end says how many of the run's says were said whole.
+    assert_eq!(ended["said"], 0, "{ended}");
     assert!(
         agent_next(&mut open).await.is_none(),
         "the run's connection closed with it"

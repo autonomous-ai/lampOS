@@ -3968,8 +3968,12 @@ made once and whole"); `lamp_tasks::make_try`.
   never reaches lamp-services, linked services on or not; its reads go on
   live.
 - **The say count** (for #8158's `run` step too): lamp-control counts each
-  `say` the speaker took for a run's client (`runs::Run::said`) and answers
-  an admin `{"end":{"run"}}` with `{"ended":true,"said":N}`.
+  of a run client's `say`s the voice said whole (`done` with
+  `how: finished`; one dropped for privacy or expiry, or a `sound`, is not
+  counted; `Parts::said_take`) and answers an admin `{"end":{"run"}}` with
+  `{"ended":BOOL,"said":N}`. A script's `lamp.say` waits for its line
+  (`wait=True`), or it may exit before the line is said and its say is
+  dropped.
 
 Tests: `a_run_step_tries_its_script_and_a_task_each_of_its_scripts`,
 `a_try_passes_only_on_exit_0_in_time_and_for_a_run_step_a_say`,

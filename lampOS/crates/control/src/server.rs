@@ -462,14 +462,16 @@ impl Shared {
     }
 
     /// Ends a run: its connections close, what it asked for that still goes
-    /// stops, as its `stop` would. How many `say`s the run's parts took
-    /// (#8157, [`crate::runs::Run::said`]); none when it wasn't going.
-    fn end_run_said(&self, run: &str, serial: Option<u64>, now: u64, why: &str) -> Option<u32> {
-        let ended = self.door.lock().expect("door").end_run(run, serial)?;
+    /// stops, as its `stop` would.
+    fn end_run(&self, run: &str, serial: Option<u64>, now: u64, why: &str) -> bool {
+        let ended = self.door.lock().expect("door").end_run(run, serial);
+        let Some(ended) = ended else {
+            return false;
+        };
         self.parts.lock().expect("parts").gone(&ended.client, now);
         self.close_client(&ended.client, crate::runs::CLOSED_ENDED);
         eprintln!("lamp-control: run {run} of skill {}: {why}", ended.skill);
-        Some(ended.said)
+        true
     }
 
     /// Ends every run whose time has come.
@@ -477,7 +479,11 @@ impl Shared {
         let now = self.now_us();
         let ended = self.door.lock().expect("door").sweep_runs(now);
         for run in ended {
-            self.parts.lock().expect("parts").gone(&run.client, now);
+            let mut parts = self.parts.lock().expect("parts");
+            parts.gone(&run.client, now);
+            // Its said count is nobody's now.
+            parts.said_take(&run.client);
+            drop(parts);
             self.close_client(&run.client, crate::runs::CLOSED_ENDED);
             eprintln!(
                 "lamp-control: run {} of skill {}: its time is up",
@@ -2428,12 +2434,20 @@ fn admin_answer(
     }
     if let Some(end) = asked.get("end") {
         return match end["run"].as_str() {
-            // How many `say`s the run's parts took, beside its end (#8157):
-            // a make's tried run, or a `run` step's (#8158), reads it.
-            Some(run) => match shared.end_run_said(run, None, now, "ended") {
-                Some(said) => json!({"ended": true, "said": said}),
-                None => json!({"ended": false}),
-            },
+            Some(run) => {
+                let ended = shared.end_run(run, None, now, "ended");
+                // How many of its `say`s the voice said whole (`done` with
+                // `how: finished`; one dropped, for privacy or expiry, is
+                // not): a make's tried run (#8157) and a `run` step (#8158)
+                // need one. Taken whether or not the run was still live, so
+                // no count outlives it.
+                let said = shared
+                    .parts
+                    .lock()
+                    .expect("parts")
+                    .said_take(&crate::runs::run_client(run));
+                json!({"ended": ended, "said": said})
+            }
             None => json!({"error": "end: a run, as text"}),
         };
     }
