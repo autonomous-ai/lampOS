@@ -1049,9 +1049,18 @@ lamp-tasks tự chạy script: không agent, không Harness, không prompt
   cho script của agent gateway), 30 s thời gian CPU (`ulimit -t`,
   `SCRIPT_CPU_SECS`: trung bình tối đa một nhân trong lần chạy, như
   `CPUQuota=100%` của agent gateway) và độ nice 10 (`nice -n`,
-  `SCRIPT_NICE`, như `Nice=10` của agent gateway). lamp-tasks.service không
-  ủy quyền cgroup nào, nên đây là giới hạn của chính tiến trình, mà các tiến
-  trình con kế thừa.
+  `SCRIPT_NICE`, như `Nice=10` của agent gateway), cho mỗi tiến trình. Cả
+  lần chạy giữ tối đa 64 tiến trình và luồng (`SCRIPT_PROCESSES`, #8180),
+  tính cả relay: `prlimit --nproc=64:64 --pid $$`, đặt trong user namespace
+  của hàng rào ngay trước khi namespace lồng của script được tạo, nên kernel
+  chỉ đếm trong namespace đó (Linux 5.14 trở lên), không bao giờ đếm tiến
+  trình của lamp-tasks hay `lampos` khác. Quá mức thì fork hay tạo luồng thất
+  bại và lần chạy kết thúc `run_failed`. Dùng `prlimit`, không dùng
+  `ulimit -u`: `/bin/sh` của đèn là dash, cờ của nó là `-p`.
+  lamp-tasks.service chạy bằng `lampos` và không ủy quyền cgroup, nên không
+  thể tạo scope tạm hay cgroup con (`memory.max`, `cpu.max`, `pids.max`) cho
+  một lần chạy khi không có root; giới hạn mỗi tiến trình nhân với giới hạn
+  số tiến trình, trong 30 s đồng hồ, là tổng của lần chạy.
 - **Câu trả lời**: khi script kết thúc, token được kết thúc bằng `end` của
   admin, mà câu trả lời giờ có `said`: số câu `say` của lần chạy mà giọng
   nói đã nói trọn (`Tokens::end_said`). Thoát 0 và `said` ít nhất 1 là
@@ -1349,13 +1358,21 @@ tạo một lần và trọn vẹn"); `lamp_tasks::make_try`.
 - **Cách làm**: tệp của kỹ năng được ghi vào thư mục `make-try-*` trong thư
   mục làm việc của lần tạo (được dọn cùng các thư mục tạo khi khởi động), một
   token được tạo trên socket admin của lamp-control cho đúng quyền của bản
-  nháp (`{"mint":{"try":[...],"run"}}`, `Tokens::mint_try`; `net` là socket
-  egress riêng của lần chạy, như lần chạy kỹ năng, chỉ khi `LAMP_TASK_NET`
-  bật), và lamp-tasks tự khởi động thành `lamp-tasks make-try-fence`
-  (`make_try::fence_main`) với grant ở stdin: nó trở thành cùng hàng rào mà
-  lần chạy của agent gateway nhận từ launcher skill-start
-  (`skill_start::exec_fence`, `gateway::FENCE_TEXT`; fd 4 là nơi bỏ đi thay
-  cho socket của launcher). Không agent nào tham gia. Mỗi script chạy một
+  nháp trừ `net`, `camera` và `microphone` (`{"mint":{"try":[...],"run"}}`,
+  `Tokens::mint_try`), và lamp-tasks tự khởi động thành
+  `lamp-tasks make-try-fence` (`make_try::fence_main`) với grant ở stdin: nó
+  trở thành hàng rào của bước run (`make_try::fence_args`, dựng bởi cùng
+  `skill_run::fence_args`, #8180): che toàn bộ `skill_run::HIDDEN`, trong đó
+  có `/run` và cùng với nó `admin.sock` của lamp-control, chỉ cho thấy lại
+  thư mục kỹ năng, thư mục lần chạy và `control.sock`, cùng các giới hạn của
+  bước run (`skill_run::CAPS_EDIT`, gồm giới hạn số tiến trình); fd 4 là nơi
+  bỏ đi thay cho socket của launcher. Không agent nào tham gia.
+- **Lần thử chạy thiếu gì** (`make_try::TRIED_WITHOUT`, #8180): `net` (không
+  bao giờ tạo socket egress, nên lệnh tải thất bại như khi ngoại tuyến và
+  không gì được gửi), `camera` và `microphone` (lamp-control cũng từ chối
+  tạo chúng cho lần thử). Câu trả lời nêu tên chúng (`"without":["net"]`),
+  và `why` của lần thử thất bại nói nó được thử khi thiếu chúng, để lần sửa
+  viết script nói câu báo lỗi rồi thoát 0, như vậy là đạt. Mỗi script chạy một
   lần, tối đa 30 s (`TRY_WITHIN`), rồi bị dừng; đầu ra giữ tối đa 8 KiB.
 - **Đánh giá** (`make_try::judged`): thoát 0 đúng hạn; script của bước `run`
   đã nói ít nhất một câu (`said` trong câu trả lời `end` của lamp-control,
@@ -1365,10 +1382,12 @@ tạo một lần và trọn vẹn"); `lamp_tasks::make_try`.
   `{"ok":true,"tried":true,"passed":false,"why"}` (lời này về lần sửa của
   voice); lần thử không khởi động được (không token, không hàng rào) bị từ
   chối `not_tried`.
-- **Không gửi gì**: lamp-control đánh dấu token là chạy thử; lệnh
+- **Không gửi, không giữ gì**: lamp-control đánh dấu token là chạy thử; lệnh
   `service.write` của nó được trả lời `{"result":{"sent":false,"tried":true}}`
-  và không bao giờ tới lamp-services, dù dịch vụ liên kết bật hay tắt; lệnh
-  đọc chạy thật.
+  và không bao giờ tới lamp-services, dù dịch vụ liên kết bật hay tắt; mọi
+  lệnh khác làm đổi trạng thái được giữ cũng được trả lời từ stub, lệnh thu
+  camera hay micro bị từ chối ([control_vi.md](control_vi.md), "Lần chạy thử
+  của một lần tạo"); lệnh đọc chạy thật.
 - **Số câu đã nói** (cũng cho bước `run` của #8158): lamp-control đếm mỗi
   `say` của client một lần chạy mà giọng đã nói trọn (`done` với
   `how: finished`; câu bị bỏ vì riêng tư hay hết hạn, hoặc một `sound`,
@@ -1383,7 +1402,13 @@ Kiểm thử: `a_run_step_tries_its_script_and_a_task_each_of_its_scripts`,
 `a_silent_run_step_fails_its_try_with_words_for_the_repair`,
 `a_skill_that_sends_is_tried_with_its_own_grants`,
 `the_fence_launch_mints_a_tried_token_and_reads_its_says`,
-`a_fence_that_runs_past_its_limit_is_ended`; của lamp-control
+`a_fence_that_runs_past_its_limit_is_ended`,
+`a_draft_granted_net_is_tried_with_no_way_out_and_told_so`,
+`a_tried_runs_fence_is_a_run_steps_with_no_admin_socket_and_its_caps`; của
+bước run trong lamp-tasks `a_run_steps_script_has_its_own_memory_and_cpu_caps`
+và, trên Linux,
+`a_script_past_its_process_cap_fails_its_run_while_another_task_answers`;
+của lamp-control
 `a_tried_runs_write_is_stubbed_and_its_read_is_live`,
 `a_tried_runs_write_is_stubbed_with_services_off`,
 `a_runs_says_are_counted_to_its_end`,

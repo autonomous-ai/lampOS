@@ -162,8 +162,9 @@ A skill does nothing that would surprise the person who asked for it.
   step's script, or each script of a `task` step. Each must exit 0 within
   30 s; a `run` step's must say at least one line with `lamp.say`, and a
   `task` step's must print something. Nothing is sent at the try: a write
-  answers as if done. So a script runs with no arguments, handles a failed
-  fetch or an unlinked service by saying so, and ends. A failed try comes
+  answers as if done, and the try has no internet, camera or microphone,
+  so a fetch fails as offline. So a script runs with no arguments, handles
+  a failed fetch or an unlinked service by saying so, and ends. A failed try comes
   back to you as a repair with its words.
 
 ## 2. Write a draft

@@ -1444,6 +1444,29 @@ pub(crate) fn exec_fence(
     stream: impl Into<OwnedFd>,
     egress: Option<OwnedFd>,
 ) -> io::Result<std::convert::Infallible> {
+    let hidden: Vec<&Path> = crate::gateway::HIDDEN.iter().map(Path::new).collect();
+    exec_fence_with(
+        grant,
+        stream,
+        egress,
+        crate::gateway::fence_args(
+            grant,
+            rustix::process::getuid().as_raw(),
+            rustix::process::getgid().as_raw(),
+            &hidden,
+        ),
+    )
+}
+
+/// [`exec_fence`] with the fence's own `unshare` arguments `args`: a
+/// make's tried run's are a run step's (`crate::make_try::fence_args`,
+/// #8180), which hide all of `crate::skill_run::HIDDEN` with its caps.
+pub(crate) fn exec_fence_with(
+    grant: &Grant,
+    stream: impl Into<OwnedFd>,
+    egress: Option<OwnedFd>,
+    args: Vec<std::ffi::OsString>,
+) -> io::Result<std::convert::Infallible> {
     let stream: OwnedFd = stream.into();
     use std::os::unix::process::CommandExt;
     let (reader, writer) = rustix::pipe::pipe()?;
@@ -1468,14 +1491,8 @@ pub(crate) fn exec_fence(
         .as_ref()
         .map(|egress| place(egress, EGRESS_FD))
         .transpose()?;
-    let hidden: Vec<&Path> = crate::gateway::HIDDEN.iter().map(Path::new).collect();
     let error = std::process::Command::new("unshare")
-        .args(crate::gateway::fence_args(
-            grant,
-            rustix::process::getuid().as_raw(),
-            rustix::process::getgid().as_raw(),
-            &hidden,
-        ))
+        .args(args)
         .env_clear()
         .env("PATH", crate::gateway::SCRIPT_PATH)
         .exec();
