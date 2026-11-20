@@ -412,6 +412,9 @@ and none of the skills' own (`crate::use_skill`):
   calls it"). Host tests: `a_plain_ask_to_make_a_skill_is_told_apart`,
   `the_force_names_make_skill_for_an_ask_and_nothing_else`,
   `the_played_make_sends_a_tool_choice_for_make_skill_when_declared`.
+  Round 1 says in the journal what it was offered and forced, and whether
+  the line asked to make a skill (`request N: round 1: task_offered=…
+  make_offered=… forced=… make_ask=… sentences=…`, #8022 case 2).
 - **A skill installed or removed** changes no function's name, so each skill
   `use_skill` reaches is counted as `use_skill:<skill>` against what the
   session was given, and the session is renewed for it as for any change.
