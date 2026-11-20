@@ -1294,7 +1294,7 @@ Không có quyền nào, nó chỉ được nhận với `LAMP_HARD_ASKS_TO_AGEN
 Hermes bằng runner của lần tạo (mạng như `LAMP_MAKE_AGENT_NET` nói); với một
 quyền `<code>-read` của một dịch vụ (chỉ đọc: `-write` hay quyền thứ hai bị
 từ chối `bad_request`) chỉ với `LAMP_SERVICES_TO_AGENT=on` và
-`LAMP_AGENT_SERVICES=on`, tách khỏi mạng, trên một token lamp-control cấp
+`LAMP_AGENT_SERVICES=on` (cả hai bật trong sản phẩm từ 19/11), tách khỏi mạng, trên một token lamp-control cấp
 cho đúng quyền đó, cấu hình home mới có `mcp_servers.lamp-services`. Trên
 Hermes, lời người nói nằm trong tệp quy tắc (không bao giờ trong đối số),
 câu trả lời đọc từ `answer.md`, gộp khoảng trắng và tối đa 3.000 byte, thư

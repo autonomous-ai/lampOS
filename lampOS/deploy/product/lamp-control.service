@@ -32,6 +32,10 @@ Environment=LAMP_SKILL_TASKS=on
 # by the run's token, so service.read and service.write reach only what the yes named. The same line in
 # lamp-tasks, lamp-skills, lamp-skills-manage@ and lamp-voice. On in the product (owner, 13 Nov).
 Environment=LAMP_AGENT_SERVICES=on
+# A live spoken ask's token (`{"mint":{"ask":["<code>-read"]}}`, as the skill `voice-ask`): one service's read
+# only, never a write, ended with the run (the owner's ruling, 17 Nov; the first builder's DEFAULT-ON, #7814).
+# The same line in lamp-voice and lamp-tasks.
+Environment=LAMP_SERVICES_TO_AGENT=on
 # A made skill's fixed write through the lamp's agent (#6824): a token minted for its one write grant, for a skill
 # whose only step is a fixed write (task_yes::KeptYes::fixed_write_grant), its call given that write by the run's
 # token (runs::FixedWrite), never the agent's words. The same line in lamp-skills, lamp-tasks and lamp-services.
