@@ -259,9 +259,13 @@ tuyến thứ hai (`second_provider/tests/task_yes_in_code.rs`)
 `a_yes_over_the_lamps_voice_is_not_taken_in_code`,
 `a_typed_yes_is_not_taken_in_code`. Chưa được phát thử trên đèn.
 
-### Giữ trong bộ nhớ của người dùng (bản ghi liên kết, lát 3, tắt trừ khi `LAMP_SERVICE_RECORDS_TASKS=on`)
+### Giữ trong bộ nhớ của người dùng (bản ghi liên kết, lát 3, `LAMP_SERVICE_RECORDS_TASKS`, bật trong sản phẩm)
 
-Cùng với `LAMP_SERVICE_RECORDS`, chỉ trên tuyến thứ hai, việc được giao trên
+Bật trong sản phẩm từ 20/11 (`lamp-voice.service`), theo quy tắc của chủ
+sản phẩm ngày 18/11 là mọi thứ bật mặc định
+(https://github.com/autonomous-ai/lampOS/issues/6811#issuecomment-6977525471); trong code
+tắt trừ khi `LAMP_SERVICE_RECORDS_TASKS=on`. Cùng với `LAMP_SERVICE_RECORDS`,
+chỉ trên tuyến thứ hai, việc được giao trên
 tiếng "có" nghe được của chủ đèn được giữ trong bộ nhớ Days của họ thành một
 bản ghi liên kết, qua hộp chờ liên kết của voice
 ([memory-days_vi.md](memory-days_vi.md)) (`lamp-voice`
@@ -311,7 +315,7 @@ Kiểm thử: trong `service_records::task_rows` là
 `followed_is_bounded_in_number_and_time`, `a_look_writes_what_settled`,
 `off_nothing_is_kept_or_followed`; và trong `agent_tasks` là
 `a_hand_over_on_the_owners_yes_is_their_task_row` cùng tiếng "có" nhận
-trong code. Chưa được phát thử trên đèn.
+trong code. Chưa được phát thử trên đèn: ROW của nó còn nợ trên lamp-06c1.
 
 ## Việc của một kỹ năng trên Hermes của đèn (#6306, PR 3 của #6071, tắt trừ khi `LAMP_SKILL_TASKS=on`, bật trong sản phẩm)
 

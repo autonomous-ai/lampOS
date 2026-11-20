@@ -889,8 +889,11 @@ The agent's rows (`LAMP_SERVICE_RECORDS_AGENT`, with lamp-services'
 in the product since 19 Nov (`lamp-voice.service`), by the product owner's
 rule of 18 Nov that everything is on by default
 (https://github.com/autonomous-ai/lampOS/issues/6811#issuecomment-6977525471), with their
-own legs owed (#7960's ROW passed the connector legs beside them). The task, reminder and sdk rows and the source tool
-stay off until their own ROWs; `linked.sock` (`LAMP_MEMORY_LINKED_SOCKET`)
+own legs owed (#7960's ROW passed the connector legs beside them). The
+reminder rows (`LAMP_SERVICE_RECORDS_REMINDERS`) are on too, and the Harness
+task rows (`LAMP_SERVICE_RECORDS_TASKS`) since 20 Nov by the same rule, their
+ROW owed on lamp-06c1. The sdk rows and the source tool stay off until their
+own ROWs; `linked.sock` (`LAMP_MEMORY_LINKED_SOCKET`)
 stays off: nothing writes to it yet, and the installer doesn't make
 `lampos-linked`.
 

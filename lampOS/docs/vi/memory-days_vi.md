@@ -650,8 +650,10 @@ lamp-services) và giới hạn kể (`LAMP_SERVICE_RECORDS_LINKED_TOLD`) bật 
 sản phẩm từ 19/11 (`lamp-voice.service`), theo quy tắc của chủ sản phẩm ngày
 18/11 là mọi thứ bật mặc định
 (https://github.com/autonomous-ai/lampOS/issues/6811#issuecomment-6977525471), các bước riêng của chúng
-còn nợ (ROW của #7960 đạt các bước bản ghi kết nối bên cạnh). Dòng việc, dòng lời nhắc, dòng sdk và công cụ tìm nguồn
-vẫn tắt cho tới ROW riêng; `linked.sock` (`LAMP_MEMORY_LINKED_SOCKET`) vẫn
+còn nợ (ROW của #7960 đạt các bước bản ghi kết nối bên cạnh). Dòng lời nhắc
+(`LAMP_SERVICE_RECORDS_REMINDERS`) cũng bật, và dòng việc Harness
+(`LAMP_SERVICE_RECORDS_TASKS`) bật từ 20/11 theo cùng quy tắc, ROW của nó còn
+nợ trên lamp-06c1. Dòng sdk và công cụ tìm nguồn vẫn tắt cho tới ROW riêng; `linked.sock` (`LAMP_MEMORY_LINKED_SOCKET`) vẫn
 tắt: chưa có gì ghi vào nó, và trình cài đặt chưa tạo nhóm `lampos-linked`.
 
 - **Giới hạn riêng.** Tối đa 16 thay đổi chờ, tách khỏi 32 của bản ghi
