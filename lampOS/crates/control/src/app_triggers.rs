@@ -6,9 +6,13 @@
 //!
 //! Only apps running now are told: an app with no socket up is never named,
 //! and a trigger of an app that is not running goes the model's way.
+//!
+//! Every installed app's `help`, started or not, is told on `apps/help`
+//! (every 5 s; [`helps_of`]), so the voice's read-only `app_help` can say
+//! how an app is used before it runs. Nothing is offered to an app for it.
 //! Everything here is behind `LAMP_STORE_APPS` like the app socket.
 use crate::server::Shared;
-use lamp_msgs::{AppTook, AppTrigger, AppTriggers, AppsTriggers};
+use lamp_msgs::{AppHelps, AppTook, AppTrigger, AppTriggers, AppsHelp, AppsTriggers};
 use std::path::Path;
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
@@ -40,6 +44,44 @@ pub fn list_of(apps: &Path, running: &[String]) -> AppTriggers {
             apps: vec![app.clone()],
         };
         if one.check().is_ok() && list.apps.len() < AppTriggers::MAX_APPS {
+            list.apps.push(app);
+        }
+    }
+    list
+}
+
+/// The help of every installed app under `apps` with one, each language
+/// tidied (`lamp_msgs::app_help::tidy`): an app whose help the voice's topic
+/// would not take is left out whole, and so is every app past the list's
+/// bounds ([`AppHelps::MAX_APPS`], [`AppHelps::MOST_LIST_BYTES`]).
+pub fn helps_of(apps: &Path) -> AppHelps {
+    let mut list = AppHelps { apps: Vec::new() };
+    let mut bytes = 16usize;
+    for name in crate::app_yes::installed_names(apps) {
+        let Some(manifest) = crate::app_yes::installed(apps, &name) else {
+            continue;
+        };
+        if manifest.help.is_empty() || lamp_msgs::app_help::help_ok(&manifest.help).is_err() {
+            continue;
+        }
+        let help: Option<std::collections::BTreeMap<String, String>> = manifest
+            .help
+            .iter()
+            .map(|(language, text)| {
+                lamp_msgs::app_help::tidy(text).map(|text| (language.clone(), text))
+            })
+            .collect();
+        let Some(help) = help else { continue };
+        let app = AppsHelp { app: name, help };
+        let one = AppHelps {
+            apps: vec![app.clone()],
+        };
+        let cost = serde_json::to_string(&app).map_or(usize::MAX, |json| json.len() + 1);
+        if one.check().is_ok()
+            && list.apps.len() < AppHelps::MAX_APPS
+            && bytes.saturating_add(cost) <= AppHelps::MOST_LIST_BYTES
+        {
+            bytes += cost;
             list.apps.push(app);
         }
     }
@@ -84,6 +126,29 @@ pub fn start(bus: &lamp_bus::Bus, shared: Arc<Shared>) {
             }
         }
         Err(error) => eprintln!("lamp-control: no app triggers are told: {error}"),
+    }
+    match bus.publisher_declared(AppHelps::TOPIC, &AppHelps::declaration(), "control") {
+        Ok(mut publisher) => {
+            let shared = shared.clone();
+            let spawned = std::thread::Builder::new()
+                .name("app-help".into())
+                .spawn(move || {
+                    loop {
+                        // Read from the installed manifests every time: an
+                        // app installed or removed is told within 5 s.
+                        let list = shared.installed_help();
+                        if let Err(error) = publisher.publish_json(lamp_ipc::monotonic_us(), &list)
+                        {
+                            eprintln!("lamp-control: the apps' help was not told: {error}");
+                        }
+                        std::thread::sleep(SAY_EVERY);
+                    }
+                });
+            if let Err(error) = spawned {
+                eprintln!("lamp-control: no app help is told: {error}");
+            }
+        }
+        Err(error) => eprintln!("lamp-control: no app help is told: {error}"),
     }
     match bus.publisher_declared(AppTook::TOPIC, &AppTook::declaration(), "control") {
         Ok(publisher) => {
@@ -145,5 +210,48 @@ pub fn start(bus: &lamp_bus::Bus, shared: Arc<Shared>) {
             }
         }
         Err(error) => eprintln!("lamp-control: no trigger is offered to an app: {error}"),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use serde_json::json;
+
+    fn install(apps: &Path, name: &str, help: serde_json::Value) {
+        let dir = apps.join(name).join("current");
+        std::fs::create_dir_all(&dir).unwrap();
+        let mut manifest = json!({
+            "format": 2, "kind": "app", "name": name, "title": "T", "version": "1.0.0",
+            "min_build": 1, "runtime": {"name": "python3", "entry": "app"},
+            "grants": ["hear"], "triggers": [], "files": []
+        });
+        if !help.is_null() {
+            manifest["help"] = help;
+        }
+        std::fs::write(dir.join("lamp-skill.json"), manifest.to_string()).unwrap();
+    }
+
+    /// #7415: every installed app's help is told, started or not, tidied;
+    /// one with none, or with help the lamp would not take, is left out.
+    #[test]
+    fn every_installed_apps_help_is_told_tidied_and_bad_help_left_out() {
+        let apps = std::env::temp_dir().join(format!("lampos-app-help-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&apps);
+        install(
+            &apps,
+            "gym-coach",
+            json!({"en": "Stand \"side-on\", see https://x.io", "vi": "Đứng nghiêng."}),
+        );
+        install(&apps, "no-help", serde_json::Value::Null);
+        install(&apps, "only-vi", json!({"vi": "Đứng nghiêng."}));
+        install(&apps, "too-long", json!({"en": "a".repeat(301)}));
+        let told = helps_of(&apps);
+        assert!(told.check().is_ok());
+        assert_eq!(told.apps.len(), 1, "{told:?}");
+        assert_eq!(told.apps[0].app, "gym-coach");
+        assert_eq!(told.apps[0].help["en"], "Stand side-on, see");
+        assert_eq!(told.apps[0].help["vi"], "Đứng nghiêng.");
+        let _ = std::fs::remove_dir_all(&apps);
     }
 }

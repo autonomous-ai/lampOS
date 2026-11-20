@@ -397,6 +397,39 @@ fn phrases_and_triggers_hold_the_doors_rule_and_their_caps() {
     );
 }
 
+/// #7415: `help` is optional; when there, English is required, the lamp's
+/// languages only, at most 300 bytes each, read back as written.
+#[test]
+fn help_is_english_first_within_its_bound_and_optional() {
+    let read = changed(|m, _| {
+        m["help"] =
+            json!({"en": "Stand side-on, 2 to 3 m away.", "vi": "Đứng nghiêng, cách 2 đến 3 m."})
+    })
+    .expect("help in English and Vietnamese reads");
+    assert_eq!(read.manifest.help["vi"], "Đứng nghiêng, cách 2 đến 3 m.");
+    assert!(
+        changed(|_, _| {}).unwrap().manifest.help.is_empty(),
+        "no help is fine"
+    );
+    refused(
+        changed(|m, _| m["help"] = json!({"vi": "Đứng nghiêng."})),
+        "help needs English",
+    );
+    refused(
+        changed(|m, _| m["help"] = json!({"en": "ok", "fr": "d'accord"})),
+        "not one of the lamp's languages",
+    );
+    refused(
+        changed(|m, _| m["help"] = json!({"en": "a".repeat(301)})),
+        "1 to 300 bytes",
+    );
+    assert!(changed(|m, _| m["help"] = json!({"en": "a".repeat(300)})).is_ok());
+    refused(
+        changed(|m, _| m["help"] = json!({"en": ["not", "text"]})),
+        "expected a string",
+    );
+}
+
 #[test]
 fn settings_hold_each_types_rules() {
     let setting = |value: Value| move |m: &mut Value, _: &mut Files| m["settings"] = json!([value]);
