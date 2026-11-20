@@ -763,7 +763,9 @@ look starts none, and the app sees it on `update.status` (`now` stays
 
 ### Update now (#7517, `update.now`, `LAMP_UPDATE_NOW`)
 
-With `LAMP_UPDATE_NOW=on` here and in `lamp-update` (and `LAMP_APP_UPDATE=on`),
+With `LAMP_UPDATE_NOW=on` here and in `lamp-update` (and `LAMP_APP_UPDATE=on`;
+all three on in the product, `lamp-update` taking its switch from the carried
+`/etc/lampOS/update.env`),
 the app's Update now takes a build that waits for a quiet moment at once.
 
 - **Who may ask.** Only the lamp's own account channel, as every kind
