@@ -111,8 +111,7 @@ pub fn on(value: Option<&str>) -> bool {
 /// [`start_made_terms`] has read them, or without [`SKILL_ENVIRONMENT`].
 /// Never waits.
 pub fn made() -> Vec<String> {
-    MADE
-        .get()
+    MADE.get()
         .and_then(|made| made.try_lock().ok().map(|made| made.clone()))
         .unwrap_or_default()
 }
@@ -360,7 +359,11 @@ mod tests {
         let heard = listening_with(&full, true, &made);
         assert!(heard.len() <= MOST, "{}", heard.len());
         for term in ["apple file", "tech news"] {
-            assert_eq!(heard.iter().filter(|said| *said == term).count(), 1, "{term}");
+            assert_eq!(
+                heard.iter().filter(|said| *said == term).count(),
+                1,
+                "{term}"
+            );
         }
         // Many made skills: at most MOST_MADE of their words, all after
         // every other term.
@@ -374,7 +377,11 @@ mod tests {
         let heard = listening_with(&fixed, true, &many);
         let first = heard.iter().position(|term| term.starts_with("made skill"));
         assert_eq!(heard.len() - first.unwrap(), MOST_MADE);
-        assert!(heard[first.unwrap()..].iter().all(|term| term.starts_with("made skill")));
+        assert!(
+            heard[first.unwrap()..]
+                .iter()
+                .all(|term| term.starts_with("made skill"))
+        );
         std::fs::remove_dir_all(dir).ok();
     }
 
