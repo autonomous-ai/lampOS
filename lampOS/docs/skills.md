@@ -2274,18 +2274,24 @@ run = "scripts/main.py"
   journal says why either way (`do.run: failed: run_failed: its script
   ended with status 1; nothing said, as a trigger started it`), never the
   script's output.
-- **Not given**: `net` (its fence has only `lo`) and keys (`secrets`): a
-  skill that needs either uses a `do.task`; lamp-tasks refuses a `run` step
-  with either, in words.
+- **`net`**: given as a net task's is today, with the same yes (the owner's
+  yes naming `net` for the folder as it is, `LAMP_TASK_NET` on): the run's
+  own egress socket, the public web on ports 80 and 443 only, through
+  `HTTPS_PROXY` (`127.0.0.1:3128`) in its fence ([tasks.md](tasks.md), "A
+  skill's `run` step"). Without that yes, refused before anything runs.
+- **Not given**: keys (`secrets`): a skill that needs them uses a
+  `do.task`; lamp-tasks refuses a `run` step for one, in words.
+- **Its own caps**: the script runs with its own memory (768 MiB of address
+  space), CPU time (30 s) and niceness (10), never lamp-tasks' whole budget.
 - **Timing** (each hop, trigger to script): the fire's thread spawns the
   hand-over thread; the folder is hashed (the skill's few files); the yes
   asked of lamp-control (one local socket line); the ledger written; one
   line to lamp-tasks; the token minted (one local socket line to
   lamp-control); the fence made (`unshare`, a few mounts) and `python3`
   started. No agent, no Harness, no network. The journal times the hand-over
-  (`do.run: handed over N ms after it came due`) and lamp-tasks the token
-  and the script's start (`skill run RUN: its script started N ms into its
-  run`). Unit level, with a stand-in fence, a script's whole run takes
+  (`do.run: handed over N ms after it came due`) and lamp-tasks the token,
+  the script's start (`skill run RUN: its script started N ms into its
+  run`) and the whole (`skill run RUN: hand-over to script start N ms`). Unit level, with a stand-in fence, a script's whole run takes
   tens of milliseconds (`skill_run::tests`); on a lamp the target is a few
   seconds from trigger to the first word, not measured yet.
 
