@@ -4751,8 +4751,13 @@ impl HandOvers {
                 std::sync::Arc::new(crate::skill_keys::ServicesKeys::default())
                     as std::sync::Arc<dyn crate::skill_keys::Keys + Send + Sync>
             }),
-            // A `run` step's script, run here in its own fence (#8158).
-            direct: Some(std::sync::Arc::new(crate::skill_run::DirectRunner::lamp())),
+            // A `run` step's script, run here in its own fence (#8158); one
+            // granted `net` gets its own egress socket as a net task's
+            // (LAMP_TASK_NET on).
+            direct: Some(std::sync::Arc::new(crate::skill_run::DirectRunner {
+                egress: net.then(crate::egress::Grant::lamp),
+                ..crate::skill_run::DirectRunner::lamp()
+            })),
         }
     }
 
