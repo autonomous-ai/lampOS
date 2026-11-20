@@ -208,21 +208,18 @@ pub fn sized(clip: &Clip, size: f32, pace: f32) -> Clip {
     }
 }
 
-/// The built-in clips held under a level's `clip_size` (#8153), so that on
-/// the deployed lamps' standing poses each stays as clear of V1's anti-tip
-/// rule as at level 1: no frame within 85% of 22 mm off the base's axis,
-/// none leaning the lamp back past 16 mm (`crate::cog`,
-/// `every_built_in_clip_at_level_five_passes_v1s_rule`).
+/// The built-in clips held under a level's `clip_size` (#8153), each at
+/// the largest gain that keeps it inside V1's anti-tip rule on the deployed
+/// lamps' standing poses: no frame 22 mm or more off the base's axis (so
+/// none refused at play time), none leaning the lamp back past 16 mm
+/// (`crate::cog`, `every_built_in_clip_at_level_five_passes_v1s_rule`).
 /// Found on the host over all 21 clips at level 5; the rest take x1.6.
-pub const CLIP_SIZE_CAP: [(&str, f32); 8] = [
-    ("greeting", 1.3),
-    ("shy", 1.48),
-    ("stretching", 1.16),
-    ("surprised", 1.05),
-    ("sleepy", 1.12),
-    ("excited", 1.08),
+pub const CLIP_SIZE_CAP: [(&str, f32); 5] = [
+    ("greeting", 1.58),
+    ("surprised", 1.32),
+    ("sleepy", 1.51),
+    ("excited", 1.31),
     ("dance_groove", 1.59),
-    ("dance_hype", 1.55),
 ];
 
 /// One level's rate of clips started of themselves (#6893).
