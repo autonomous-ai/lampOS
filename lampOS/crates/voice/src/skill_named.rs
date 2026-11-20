@@ -1558,7 +1558,10 @@ mod tests {
             json!({ crate::made_run::RUN: "mail-check" }),
         ));
         crate::made_skill::set_asks_here(Some(true));
-        for line in ["Hey Lamp, run my mail check skill now.", "Hey Lamp, mail check."] {
+        for line in [
+            "Hey Lamp, run my mail check skill now.",
+            "Hey Lamp, mail check.",
+        ] {
             assert_eq!(heard(&settings, line), run, "{line}");
             assert_eq!(Heard::new(settings.clone()).heard(line), run, "{line}");
         }
