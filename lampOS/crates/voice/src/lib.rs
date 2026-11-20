@@ -139,6 +139,7 @@ pub mod owner_voice;
 pub mod pause_join;
 pub mod person;
 pub mod photo_faces;
+pub mod relay_share;
 pub mod remember_speaker;
 pub mod scoped_session;
 pub mod setup_journal;

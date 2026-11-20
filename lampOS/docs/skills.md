@@ -9126,9 +9126,24 @@ taken.
   about 100 s of a busy core), never on a hot board (a thermal zone over
   84 °C, `made_remake::HOT_MILLI_C`; #7879's `board/heat` isn't in this
   base), never in the made skills' quiet hours (22:00 to 08:00; a zone that
-  can't be read counts as quiet), at most 5 begun a day, and, but a quick
-  fix, only on a lamp with an agent to do its task. Waiting, nothing is
-  tried, no try is counted and the old skills stay. Each remake goes through the very path a new
+  can't be read counts as quiet), never past the voice's share of the
+  account's day, and, but a quick fix, only on a lamp with an agent to do
+  its task. There is no count a day (the owner, 20 Nov: at 5 a day, a lamp
+  with about 58 old skills took 12 days): the next one begins at most a
+  minute after the last one ended, as many in one idle stretch as there
+  are. **The day's budget** (the first builder's 20 Nov 10:24) is the one
+  skills' runs are held to (#7342, `LAMP_SKILL_RUNS_VOICE_SHARE`, `on` in
+  the product's `lamp-voice` too): a remake begins only while what is left
+  of the day the relay counts (`X-Usage-Day-Used`, as lamp-cloud's
+  forwarder keeps it) is above the voice's share, by the very check a
+  skill's run is refused with (`relay_share::would_refuse`, moved from
+  lamp-skills to lamp-voice and re-exported there as
+  `lamp_skills::relay_share`); past it, the rest wait for the relay's next
+  day. No header (an account with no day limit), no reading or one of
+  another day is no bound. Waiting, nothing is tried, no try is counted
+  and the old skills stay. Each try is counted as it begins, so one the
+  process ended in is still one of the two tries, each on a day of its
+  own; one out of tries is never begun again. Each remake goes through the very path a new
   make judged no quick reaction takes (`make_skill_local::remade_as_task`,
   `make_no_cannot::skill_text`), under the same name. While it runs, that
   thread reads as `LAMP_MAKE_REACTIONS_ONLY_DEEPSEEK` on, so the guards are
@@ -9167,8 +9182,13 @@ taken.
   still age out after 7 days (`made_remake::age_out`, a look a minute in
   the second route's worker, ended once none is kept; none kept, no
   thread).
-- **One line, once, after the fact.** When the day's remakes are done, the
-  owner's next heard line with nothing else waiting is told first, once, in
+- **One line, once, after the fact.** When the remakes are done for now,
+  with none left or none running when the owner speaks (a heard line ends
+  the idle time a remake needs, so none begins until it is quiet again;
+  one running then is told with the rest, never alone,
+  `made_remake::done_for_now`), the owner's next heard line with nothing
+  else waiting is told first, once, with every skill remade since the last
+  line ("I fixed 12 of your skills…"), in
   the lamp's language (else the conversation's), the real count and one
   real name: a broken one, "I fixed your zorbo coin price skill so it does
   what you asked. Say 'put my old zorbo coin price skill back' to undo."
@@ -9205,7 +9225,9 @@ Tests (`made_remake::tests`):
 `forget_everything_clears_the_remakes_undo_too`,
 `removing_a_remade_skill_drops_its_old_package`,
 `no_offer_is_ever_given_and_qualifying_skills_are_queued_on_their_own`,
-`one_at_a_time_five_a_day_idle_only_never_at_night`,
+`more_than_five_are_remade_in_one_idle_stretch_one_at_a_time`,
+`remakes_stop_at_the_voices_share_of_a_limited_day`,
+`a_remake_that_never_came_back_counts_as_a_try`,
 `a_remake_replaces_it_under_its_name_with_made_with_and_off_kept`,
 `a_failed_remake_keeps_the_old_skill_untouched_and_tries_once_more_another_day`,
 `only_the_lamps_own_task_script_goes_on_any_other_code_is_never_put_on`,

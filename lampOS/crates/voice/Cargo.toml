@@ -5,7 +5,17 @@ edition.workspace = true
 rust-version.workspace = true
 publish.workspace = true
 
+[features]
+default = []
+# The voice's share's per-thread stand-ins (`relay_share::set_here`) for
+# another crate's test: lamp-skills' `share-fixture` turns it on. Never in a
+# product build.
+share-fixture = []
+
 [dependencies]
+# `O_NOFOLLOW` for reading the relay's day used (`relay_share`, #7342): the
+# version lamp-skills already builds, constants only.
+libc = "0.2"
 serde.workspace = true
 serde_json.workspace = true
 rtrb.workspace = true

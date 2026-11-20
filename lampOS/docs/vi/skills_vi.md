@@ -6515,10 +6515,26 @@ duy nhất của lamp-tasks không bao giờ bị chiếm.
   một lần làm lại tốn khoảng 100 giây của một lõi bận), không bao giờ khi
   bo mạch nóng (một vùng nhiệt trên 84 °C, `made_remake::HOT_MILLI_C`;
   `board/heat` của #7879 chưa có trong base này), không bao giờ trong giờ
-  yên lặng (22:00 tới 08:00; múi giờ không đọc được coi là yên lặng), tối
-  đa 5 lần bắt đầu mỗi ngày, và, trừ lần sửa nhanh, chỉ trên đèn có agent
-  làm việc của nó. Khi chờ thì không thử gì, không tính lượt thử và các kỹ
-  năng cũ giữ nguyên. Mỗi lần làm lại đi đúng đường của một lần làm
+  yên lặng (22:00 tới 08:00; múi giờ không đọc được coi là yên lặng),
+  không bao giờ vượt phần của giọng nói trong ngày của tài khoản, và, trừ
+  lần sửa nhanh, chỉ trên đèn có agent làm việc của nó. Không có giới hạn
+  số lần mỗi ngày (chủ, 20/11: với 5 lần một ngày, đèn có khoảng 58 kỹ
+  năng cũ mất 12 ngày): lần tiếp theo bắt đầu muộn nhất một phút sau khi
+  lần trước kết thúc, bao nhiêu cũng được trong một quãng rảnh. **Ngân sách
+  của ngày** (phán quyết 10:24 ngày 20/11 của first builder) là ngân sách
+  mà lượt chạy của kỹ năng tuân theo (#7342, `LAMP_SKILL_RUNS_VOICE_SHARE`,
+  cũng `on` trong `lamp-voice` của sản phẩm): một lần làm lại chỉ bắt đầu
+  khi phần còn lại của ngày mà relay đếm (`X-Usage-Day-Used`, như
+  forwarder của lamp-cloud lưu) còn lớn hơn phần của giọng nói, bằng đúng
+  phép kiểm tra từ chối lượt chạy của kỹ năng (`relay_share::would_refuse`,
+  chuyển từ lamp-skills sang lamp-voice và được lamp-skills xuất lại là
+  `lamp_skills::relay_share`); quá mức đó, phần còn lại chờ ngày tiếp theo
+  của relay. Không có header (tài khoản không giới hạn ngày), không có số
+  đọc hoặc số đọc của ngày khác thì không giới hạn. Khi chờ thì không thử
+  gì, không tính lượt thử và các kỹ năng cũ giữ nguyên. Mỗi lượt thử được
+  tính khi bắt đầu, nên lần mà tiến trình dừng giữa chừng vẫn là một trong
+  hai lượt thử, mỗi lượt vào một ngày riêng; hết lượt thử thì không bao giờ
+  bắt đầu lại. Mỗi lần làm lại đi đúng đường của một lần làm
   mới được đánh giá không phải phản ứng nhanh
   (`make_skill_local::remade_as_task`, `make_no_cannot::skill_text`), dưới
   cùng tên. Khi nó chạy, luồng đó đọc như bật
@@ -6558,9 +6574,14 @@ duy nhất của lamp-tasks không bao giờ bị chiếm.
   và các bản cũ vẫn hết hạn sau 7 ngày (`made_remake::age_out`, mỗi phút
   một lần trong worker của route thứ hai, dừng khi không còn bản nào; không
   giữ bản nào thì không có luồng).
-- **Một câu, một lần, sau khi xong.** Khi xong các lần làm lại trong ngày,
-  câu nghe được tiếp theo của chủ khi không có gì khác đang chờ được báo
-  trước, một lần, bằng ngôn ngữ của đèn (nếu không thì ngôn ngữ của cuộc
+- **Một câu, một lần, sau khi xong.** Khi các lần làm lại xong trong lúc
+  này, không còn cái nào hoặc không có cái nào đang chạy khi chủ nói (một
+  câu nghe được kết thúc quãng rảnh mà lần làm lại cần, nên không lần nào
+  bắt đầu cho tới khi yên lại; lần đang chạy lúc đó được báo cùng các lần
+  khác, không bao giờ riêng, `made_remake::done_for_now`), câu nghe được
+  tiếp theo của chủ khi không có gì khác đang chờ được báo trước, một lần,
+  với mọi kỹ năng đã làm lại từ câu báo trước ("I fixed 12 of your
+  skills…"), bằng ngôn ngữ của đèn (nếu không thì ngôn ngữ của cuộc
   trò chuyện), với số thật và một tên thật: kỹ năng hỏng, "I fixed your
   zorbo coin price skill so it does what you asked. Say 'put my old zorbo
   coin price skill back' to undo." (nhiều kỹ năng: "I fixed 3 of your skills so they do what you

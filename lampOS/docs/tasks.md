@@ -3621,6 +3621,14 @@ the voice) since 19 Nov, the first builder's DEFAULT-ON on #7814.
   skills' runs wait until its day starts again". A run asked for by voice
   hears it; one started by a trigger is journaled only, since saying it
   would spend the voice's share on words nobody asked for.
+- **Old skills' remakes too** (#7765, the first builder's 20 Nov 10:24):
+  with the switch set in lamp-voice (`on` in the product's
+  `lamp-voice.service` since 20 Nov), an old skill's remake through the
+  agent begins only below the same mark, by the same check
+  (`relay_share::would_refuse`; the module lives in lamp-voice and
+  lamp-skills re-exports it). Past it, the rest wait for the relay's next
+  day; not known, no bound ([skills.md](skills.md), "Old skills remade in
+  the middle form").
 - **The voice is never refused by it.** The voice talks to the relay itself.
   The forwarder only reads the header and forwards every request as before,
   the owner's own agent tasks and a request past the share included.

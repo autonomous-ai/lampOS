@@ -21,7 +21,9 @@
 //!   the day, `1 - used`, is at or below the voice's share: [`DEFAULT_SHARE`]
 //!   with the switch `on`, or the share it gives (`0.3`). The share is of the
 //!   relay's own count, never of a token number guessed here. The words are
-//!   plain, for the voice to say when the owner asked for the run.
+//!   plain, for the voice to say when the owner asked for the run. The old
+//!   skills' remake (`made_remake`) is held to the same bound in lamp-voice
+//!   ([`would_refuse`]): past the share, the rest wait for the next day.
 //! - **What it never does:** refuse the voice. The voice talks to the relay
 //!   itself, and the forwarder only reads the header; it forwards every
 //!   request as before, the owner's own agent tasks included.

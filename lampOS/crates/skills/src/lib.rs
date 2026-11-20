@@ -31,7 +31,9 @@ pub mod knowledge;
 pub mod known;
 pub mod limits;
 pub mod package;
-pub mod relay_share;
+// The voice's share of the relay's day (#7342), kept in lamp-voice so its
+// old skills' remake (`made_remake`) is held to the same bound.
+pub use lamp_voice::relay_share;
 pub mod remind;
 pub mod requested_audio;
 pub mod routine;

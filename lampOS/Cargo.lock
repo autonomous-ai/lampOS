@@ -2795,6 +2795,7 @@ dependencies = [
  "lamp-turn-end-wire",
  "lamp-turn-owner",
  "lamp-voice-processes",
+ "libc",
  "nix 0.29.0",
  "reqwest",
  "rtrb",

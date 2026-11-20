@@ -2838,11 +2838,12 @@ fn the_skills_page_loads_skills_with_lamp_skills_own_switches() {
 
 /// Skills' runs wait late in a busy day so the voice keeps half of it (#7342,
 /// the first builder's DEFAULT-ON on #7814): `LAMP_SKILL_RUNS_VOICE_SHARE=on`
-/// once in the two units whose part reads it, alike, and named by no other
+/// once in the three units whose part reads it, alike, and named by no other
 /// product unit: `lamp-skills` (the bound, `relay_share::share`, where `on`
-/// is half the day) and `lamp-cloud` (its model forwarder keeps the reading).
+/// is half the day), `lamp-cloud` (its model forwarder keeps the reading)
+/// and `lamp-voice` (old skills' remakes held to the same bound, #7765).
 #[test]
-fn the_product_keeps_half_the_day_for_the_voice_alike_in_its_two_units() {
+fn the_product_keeps_half_the_day_for_the_voice_alike_in_its_three_units() {
     let name = lamp_skills::relay_share::SWITCH;
     assert_eq!(name, "LAMP_SKILL_RUNS_VOICE_SHARE");
     assert_eq!(
@@ -2851,7 +2852,11 @@ fn the_product_keeps_half_the_day_for_the_voice_alike_in_its_two_units() {
         "`on` keeps half the day"
     );
     let switch = format!("Environment={name}=on");
-    let readers = ["lamp-skills.service", "lamp-cloud.service"];
+    let readers = [
+        "lamp-skills.service",
+        "lamp-cloud.service",
+        "lamp-voice.service",
+    ];
     for (unit, text) in install::PRODUCT {
         let service = section(text, "Service");
         let on = service.iter().filter(|line| **line == switch).count();

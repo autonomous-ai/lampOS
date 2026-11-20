@@ -53,7 +53,13 @@
 //!   only code is the lamp's own agent script (`made_skill::Uses::agent_task`).
 //! - **Remade one at a time** ([`step`]), only while idle (no line heard for
 //!   [`IDLE_FOR`]), never in the made skills' quiet hours
-//!   (`made_skill::MANNERS_QUIET`), at most [`MOST_A_DAY`] a day, and only
+//!   (`made_skill::MANNERS_QUIET`), never on a hot board ([`HOT_MILLI_C`]),
+//!   after a person's make, never past the voice's share of the account's
+//!   day (`LAMP_SKILL_RUNS_VOICE_SHARE`, [`crate::relay_share::would_refuse`],
+//!   as skills' runs; no header, no bound: the first builder's 20 Nov 10:24),
+//!   with no count a day (the owner, 20 Nov: a lamp with 58 old skills would
+//!   take 12 days at five): the next begins at most [`LOOK_EVERY`] after the
+//!   last ended, and only
 //!   on a lamp with an agent to do its task (none: nothing is tried, no try
 //!   counted, the old ones stay). The new one replaces the old under the
 //!   same name, its on/off state kept, only once it was kept (the same
@@ -68,8 +74,9 @@
 //!   removed takes its old package with it, and the owner's "forget
 //!   everything" clears this undo with `make_no_asks`' keep ([`clear`]).
 //!   Every write of the index here holds its lock (`made_skill::index_locked`).
-//! - **Told once after** ([`told_line`], [`note`]): on the owner's next heard
-//!   line with nothing else waiting, in the lamp's or the conversation's
+//! - **Told once after** ([`told_line`], [`note`]): once the remakes are done
+//!   for now ([`done_for_now`]), on the owner's next heard line with nothing
+//!   else waiting, every one remade since the last line in it, in the lamp's or the conversation's
 //!   language: "I fixed your zorbo coin price skill so it does what you
 //!   asked. Say 'put my old zorbo coin price skill back' to undo." (one
 //!   skill names it, so an older remove's undo never takes its place)
@@ -106,15 +113,14 @@ pub const PUT_BACK: &str = "put_back";
 pub const PUT_BACK_UNDO_TOLD: &str = " Not for a fixed or moved skill's old one: put_back.";
 /// The pass's own record, in the made skills' folder.
 pub const STATE_FILE: &str = "remake.json";
-/// The most remakes begun in a day.
-pub const MOST_A_DAY: u32 = 5;
 /// How long no line is heard before a remake may begin.
 pub const IDLE_FOR: Duration = Duration::from_secs(10 * 60);
 /// How long a remade skill's old one is kept to be put back.
 pub const UNDO_FOR: Duration = Duration::from_secs(7 * 86_400);
 /// The most times one skill's remake is tried, each on its own day.
 pub const MOST_TRIES: u32 = 2;
-/// How often the pass looks.
+/// How often the pass looks: one remake begins at most this long after
+/// the last one ended, with no count a day.
 const LOOK_EVERY: Duration = Duration::from_secs(60);
 /// How long the manage helper is waited on to put one on.
 const HELPER_WAIT: Duration = Duration::from_secs(8);
@@ -981,11 +987,6 @@ pub struct State {
     pub put_back: BTreeSet<String>,
     #[serde(default)]
     pub failed: BTreeMap<String, Tried>,
-    /// The day [`State::begun_today`] counts.
-    #[serde(default)]
-    pub day: i64,
-    #[serde(default)]
-    pub begun_today: u32,
     /// Remade, not told yet.
     #[serde(default)]
     pub untold: Vec<String>,
@@ -995,17 +996,13 @@ pub struct State {
     pub moved: BTreeSet<String>,
 }
 
-/// Whether no remake can begin again today: none queued, the day's
-/// [`MOST_A_DAY`] begun, or each queued one tried today.
-fn done_today(state: &State) -> bool {
-    state.queue.is_empty()
-        || state.begun_today >= MOST_A_DAY
-        || state.queue.iter().all(|name| {
-            state
-                .failed
-                .get(name)
-                .is_some_and(|tried| tried.day == state.day)
-        })
+/// Whether the remakes are done for now, for the line after: none runs.
+/// With none queued none begins; and the owner's heard line, the only one
+/// [`note`] is asked on, ends the idle time a remake needs ([`IDLE_FOR`]),
+/// so none begins until it is quiet again. One running when they speak is
+/// told with the rest at their next free line, never on its own.
+fn done_for_now() -> bool {
+    !REMAKING.load(Ordering::Acquire)
 }
 
 /// The made skills' index as it stands (its time and size): scanned for
@@ -1048,8 +1045,9 @@ fn said_in(language: Option<crate::language::Language>) -> &'static str {
 
 /// The note for the owner's heard line (`owner`; none for anyone else,
 /// whose line reads nothing here), with nothing else waiting (`busy`): the
-/// one line once no remake can begin again today ([`told_line`]), told
-/// once in `language` ([`said_in`]). Never an ask.
+/// one line once the remakes are done for now ([`done_for_now`]), every
+/// skill remade since the last line in it ([`told_line`]), told once in
+/// `language` ([`said_in`]). Never an ask.
 pub fn note(
     keeping: &Keeping,
     owner: bool,
@@ -1060,7 +1058,7 @@ pub fn note(
         return None;
     }
     let mut state = load(&keeping.directory);
-    if state.untold.is_empty() || !done_today(&state) {
+    if state.untold.is_empty() || !done_for_now() {
         return None;
     }
     let line = told_line(&state.untold, &state.moved)?;
@@ -1078,7 +1076,7 @@ pub fn note(
 
 /// The person's own ask to remake their old skills (`heard`: spoken;
 /// `owner_hears`: the owner's line): every one that qualifies queued, one
-/// they put back or out of tries too, remade by the pass within its caps.
+/// they put back or out of tries too, remade by the pass within its bounds.
 /// On a lamp with no agent for their tasks (`agent_here`), none is queued.
 /// What the model is told.
 pub fn asked(
@@ -1139,7 +1137,8 @@ pub fn asked(
 /// When and how busy it is, for [`step`]: the lamp's own, or a test's.
 pub trait When {
     fn now_ms(&self) -> u64;
-    /// The local day, for [`MOST_A_DAY`].
+    /// The local day: a failed remake is tried again only on another
+    /// ([`MOST_TRIES`]).
     fn day(&self) -> i64;
     /// In the made skills' quiet hours (`made_skill::MANNERS_QUIET`).
     fn quiet(&self) -> bool;
@@ -1149,6 +1148,11 @@ pub trait When {
     fn turn_open(&self) -> bool;
     /// The board is hot: a zone over [`HOT_MILLI_C`].
     fn hot(&self) -> bool;
+    /// What is left of the account's day is at or below the voice's share
+    /// (`LAMP_SKILL_RUNS_VOICE_SHARE`, [`crate::relay_share::refuses`]), as
+    /// a skill's run is refused: the rest wait for the relay's next day. An
+    /// unlimited day (no header) or one not known never is.
+    fn day_used_up(&self) -> bool;
 }
 
 /// How long after a spoken turn ends a remake still waits (the first
@@ -1292,7 +1296,10 @@ impl Drop for One {
 }
 
 /// One look of the pass: old ones past [`UNDO_FOR`] dropped, then at most
-/// one remake, within every cap.
+/// one remake, within every bound: one at a time, idle, out of the quiet
+/// hours, on a cool board, within the voice's share of the day, after a
+/// person's make, each tried at most
+/// [`MOST_TRIES`] times on days of its own; no count a day.
 pub fn step(keeping: &Keeping, hands: &impl Hands, when: &impl When) -> Step {
     let Some(_one) = One::take() else {
         return Step::Waits("another remake runs");
@@ -1300,6 +1307,13 @@ pub fn step(keeping: &Keeping, hands: &impl Hands, when: &impl When) -> Step {
     let now_ms = when.now_ms();
     drop_old(keeping, now_ms);
     let mut state = load(&keeping.directory);
+    // Out of tries, one that never came back among them: never begun again.
+    state.queue.retain(|name| {
+        state
+            .failed
+            .get(name)
+            .is_none_or(|tried| tried.times < MOST_TRIES)
+    });
     // Queued on their own (18:23): each that qualifies, never one put back
     // or out of tries, scanned again only once the index changed.
     if state.queue.is_empty() {
@@ -1341,13 +1355,6 @@ pub fn step(keeping: &Keeping, hands: &impl Hands, when: &impl When) -> Step {
         }
     }
     let day = when.day();
-    if state.day != day {
-        state.day = day;
-        state.begun_today = 0;
-    }
-    if state.begun_today >= MOST_A_DAY {
-        return Step::Waits("five remakes today");
-    }
     if when.quiet() {
         return Step::Waits("the quiet hours");
     }
@@ -1361,6 +1368,11 @@ pub fn step(keeping: &Keeping, hands: &impl Hands, when: &impl When) -> Step {
     }
     if when.hot() {
         return Step::Waits("the board is hot");
+    }
+    // The first builder's 20 Nov 10:24: no count a day, but never past the
+    // voice's share of the account's day, as skills' runs (#7342).
+    if when.day_used_up() {
+        return Step::Waits("the voice's share of the day");
     }
     // One not tried today and tried fewer than [`MOST_TRIES`] times.
     let Some(name) = state
@@ -1386,7 +1398,13 @@ pub fn step(keeping: &Keeping, hands: &impl Hands, when: &impl When) -> Step {
     if pick.quick.is_none() && !hands.agent_here() {
         return Step::Waits("no agent for its task here");
     }
-    state.begun_today += 1;
+    // Counted as tried before it begins, so one that never comes back (the
+    // process ended in it) is still one of its [`MOST_TRIES`], each on a day
+    // of its own: with no count a day, nothing else keeps it from being
+    // begun again and again.
+    let tried = state.failed.entry(name.clone()).or_default();
+    tried.day = day;
+    tried.times += 1;
     if save(&keeping.directory, &state).is_err() {
         return Step::Waits("the record can't be kept");
     }
@@ -1406,9 +1424,10 @@ pub fn step(keeping: &Keeping, hands: &impl Hands, when: &impl When) -> Step {
         Err(why) => {
             let tried = state.failed.entry(name.clone()).or_default();
             tried.day = day;
-            // Standing down for a person is no try of its own.
-            if why != STOOD_DOWN_WHY {
-                tried.times += 1;
+            // Counted when it began; standing down for a person is no try
+            // of its own.
+            if why == STOOD_DOWN_WHY {
+                tried.times = tried.times.saturating_sub(1);
             }
             if tried.times >= MOST_TRIES {
                 state.queue.retain(|queued| *queued != name);
@@ -1739,6 +1758,12 @@ impl When for Here {
                 .now_ms()
                 .saturating_sub(TURN_ENDED_MS.load(Ordering::Acquire))
                 < TURN_QUIET_FOR.as_millis() as u64
+    }
+
+    /// The same reading and share a skill's run is held to
+    /// (`lamp_skills::task::would_refuse`): off, never.
+    fn day_used_up(&self) -> bool {
+        crate::relay_share::would_refuse(self.now_ms()).is_some()
     }
 
     fn hot(&self) -> bool {
@@ -2160,6 +2185,8 @@ mod tests {
         quick_kept: RefCell<Vec<String>>,
         /// The helper refuses to put anything on (Twelve's P2 on #7765).
         put_fails: Cell<bool>,
+        /// The process ends in this make: it never comes back.
+        ends: bool,
     }
 
     impl Hands for Fake {
@@ -2185,6 +2212,7 @@ mod tests {
             if self.person {
                 assert!(stand_down(), "a remake runs");
             }
+            assert!(!self.ends, "the process ended in this make");
             if self.fail {
                 return Err("no answer".into());
             }
@@ -2293,6 +2321,10 @@ mod tests {
         idle: Duration,
         turn_open: bool,
         hot: bool,
+        /// The voice's share and the relay's day used, as the forwarder
+        /// keeps it (`relay_share::Reading`).
+        share: Option<f64>,
+        reading: Option<crate::relay_share::Reading>,
     }
 
     impl Clock {
@@ -2303,6 +2335,8 @@ mod tests {
                 idle: IDLE_FOR,
                 turn_open: false,
                 hot: false,
+                share: None,
+                reading: None,
             }
         }
     }
@@ -2326,6 +2360,11 @@ mod tests {
         fn hot(&self) -> bool {
             self.hot
         }
+        fn day_used_up(&self) -> bool {
+            self.share.is_some_and(|share| {
+                crate::relay_share::refuses(self.reading.as_ref(), share, self.now_ms).is_some()
+            })
+        }
     }
 
     /// The first builder's 10:47 on #7814: a remake waits while a spoken
@@ -2341,7 +2380,7 @@ mod tests {
         clock.turn_open = true;
         assert_eq!(step(&keeping, &fake, &clock), Step::Waits("a turn is open"));
         assert!(fake.asked.borrow().is_empty());
-        assert_eq!(load(&keeping.directory).begun_today, 0);
+        assert!(load(&keeping.directory).failed.is_empty());
         clock.turn_open = false;
         assert_eq!(
             step(&keeping, &fake, &clock),
@@ -2375,7 +2414,7 @@ mod tests {
             Step::Waits("the board is hot")
         );
         assert!(fake.asked.borrow().is_empty());
-        assert_eq!(load(&keeping.directory).begun_today, 0);
+        assert!(load(&keeping.directory).failed.is_empty());
         clock.hot = false;
         assert_eq!(
             step(&keeping, &fake, &clock),
@@ -3076,7 +3115,7 @@ mod tests {
         assert!(fake.asked.borrow().is_empty());
         let state = load(&keeping.directory);
         assert!(
-            state.failed.is_empty() && state.begun_today == 0,
+            state.failed.is_empty() && state.queue.len() == 1,
             "{state:?}"
         );
         assert!(
@@ -3194,17 +3233,21 @@ mod tests {
         assert!(asked(&keeping, false, || true, || true)["error"].is_string());
     }
 
+    /// The owner, 20 Nov: no count a day. Seven remade in one idle
+    /// stretch, one at a time; the quiet hours, a line heard and a person's
+    /// make still stop one. The line after is told once, at the owner's next
+    /// free line, with every one remade since the last line, never while one
+    /// runs.
     #[test]
-    fn one_at_a_time_five_a_day_idle_only_never_at_night() {
+    fn more_than_five_are_remade_in_one_idle_stretch_one_at_a_time() {
         let _serial = SERIAL.lock().unwrap_or_else(|p| p.into_inner());
-        let (_root, keeping) = lamp("caps");
-        let names: Vec<String> = (1..=7).map(|n| format!("glow-{n}")).collect();
-        for name in &names {
-            old_skill(&keeping, name, PRESENCE, "local:1");
+        let (_root, keeping) = lamp("no-count");
+        for n in 1..=9 {
+            old_skill(&keeping, &format!("glow-{n}"), PRESENCE, "local:1");
         }
-        let fake = Fake::default();
         let mut clock = Clock::day_idle();
         clock.quiet = true;
+        let fake = Fake::default();
         assert_eq!(
             step(&keeping, &fake, &clock),
             Step::Waits("the quiet hours")
@@ -3217,6 +3260,17 @@ mod tests {
         );
         clock.idle = IDLE_FOR;
         assert!(fake.asked.borrow().is_empty());
+        // A person's make goes first: the remake keeps nothing, no try is
+        // counted, and it waits for another day.
+        let person = Fake {
+            person: true,
+            ..Fake::default()
+        };
+        assert_eq!(
+            step(&keeping, &person, &clock),
+            Step::NotKept(STOOD_DOWN_WHY)
+        );
+        assert_eq!(load(&keeping.directory).failed["glow-1"].times, 0);
         // One at a time: a look while a remake runs starts none.
         let fake = Fake {
             inner: Cell::new(Some(false)),
@@ -3224,21 +3278,163 @@ mod tests {
         };
         assert_eq!(
             step(&keeping, &fake, &clock),
-            Step::Kept("glow-1".to_owned())
+            Step::Kept("glow-2".to_owned())
         );
         assert_eq!(fake.inner.get(), Some(true));
-        for _ in 2..=5 {
-            assert!(matches!(step(&keeping, &fake, &clock), Step::Kept(_)));
+        // Past five in the same idle stretch, one a look.
+        for n in 3..=8 {
+            clock.now_ms += LOOK_EVERY.as_millis() as u64;
+            assert_eq!(
+                step(&keeping, &fake, &clock),
+                Step::Kept(format!("glow-{n}"))
+            );
         }
+        assert_eq!(load(&keeping.directory).untold.len(), 7);
+        // The owner speaks: none begins, and the line waits while one runs.
+        clock.idle = Duration::ZERO;
+        {
+            let _running = One::take().unwrap();
+            assert_eq!(note(&keeping, true, false, None), None);
+        }
+        let told = note(&keeping, true, false, None).unwrap();
+        assert!(told.contains("I moved 7 of your skills"), "{told}");
+        assert_eq!(note(&keeping, true, false, None), None);
         assert_eq!(
             step(&keeping, &fake, &clock),
-            Step::Waits("five remakes today")
+            Step::Waits("a conversation not long ago")
         );
+        // Idle again: the last, then only the one stood down, another day.
+        clock.idle = IDLE_FOR;
+        assert_eq!(
+            step(&keeping, &fake, &clock),
+            Step::Kept("glow-9".to_owned())
+        );
+        assert_eq!(
+            step(&keeping, &fake, &clock),
+            Step::Waits("each tried today")
+        );
+        let told = note(&keeping, true, false, None).unwrap();
+        assert!(told.contains("I moved your glow 9 skill"), "{told}");
         clock.now_ms += DAY_MS;
         assert_eq!(
             step(&keeping, &fake, &clock),
-            Step::Kept("glow-6".to_owned())
+            Step::Kept("glow-1".to_owned())
         );
+        assert_eq!(step(&keeping, &fake, &clock), Step::Nothing);
+    }
+
+    /// The first builder's 20 Nov 10:24: no count a day, but remakes stop
+    /// at the voice's share of a limited day and the rest wait for the
+    /// relay's next day; an unlimited day (a 2xx answer with no header) or
+    /// one not read at all isn't bounded.
+    #[test]
+    fn remakes_stop_at_the_voices_share_of_a_limited_day() {
+        use crate::relay_share::{self, Reading};
+        let _serial = SERIAL.lock().unwrap_or_else(|p| p.into_inner());
+        let (root, keeping) = lamp("share");
+        for n in 1..=8 {
+            old_skill(&keeping, &format!("glow-{n}"), PRESENCE, "local:1");
+        }
+        let mut clock = Clock::day_idle();
+        clock.share = Some(relay_share::DEFAULT_SHARE);
+        let read = |now_ms: u64, used: Option<f64>| {
+            Some(Reading {
+                day: relay_share::day_of(now_ms),
+                used,
+                at_ms: now_ms,
+                ..Reading::default()
+            })
+        };
+        let fake = Fake::default();
+        // Under the share: remade, one a look.
+        clock.reading = read(clock.now_ms, Some(0.2));
+        for n in 1..=3 {
+            assert_eq!(
+                step(&keeping, &fake, &clock),
+                Step::Kept(format!("glow-{n}"))
+            );
+        }
+        // At the share: the rest wait, nothing asked and no try counted.
+        clock.reading = read(clock.now_ms, Some(0.5));
+        let waiting = Fake::default();
+        assert_eq!(
+            step(&keeping, &waiting, &clock),
+            Step::Waits("the voice's share of the day")
+        );
+        assert!(waiting.asked.borrow().is_empty());
+        assert!(!load(&keeping.directory).failed.contains_key("glow-4"));
+        // The relay's next day: the reading is yesterday's, and they go on.
+        clock.now_ms += DAY_MS;
+        assert_eq!(
+            step(&keeping, &fake, &clock),
+            Step::Kept("glow-4".to_owned())
+        );
+        // An unlimited day, then none read: never bounded.
+        clock.reading = read(clock.now_ms, None);
+        for n in 5..=6 {
+            assert_eq!(
+                step(&keeping, &fake, &clock),
+                Step::Kept(format!("glow-{n}"))
+            );
+        }
+        clock.reading = None;
+        for n in 7..=8 {
+            assert_eq!(
+                step(&keeping, &fake, &clock),
+                Step::Kept(format!("glow-{n}"))
+            );
+        }
+        // The lamp's own: the forwarder's reading and the switch's share,
+        // as a skill's run reads them; off, never bounded.
+        let cloud = root.join("cloud");
+        fs::create_dir_all(&cloud).unwrap();
+        let now = now_unix_ms();
+        relay_share::keep(&cloud, read(now, Some(0.6)).as_ref().unwrap()).unwrap();
+        relay_share::set_here(Some(relay_share::DEFAULT_SHARE), Some(&cloud));
+        assert!(Here.day_used_up());
+        relay_share::keep(&cloud, read(now, None).as_ref().unwrap()).unwrap();
+        assert!(!Here.day_used_up());
+        relay_share::keep(&cloud, read(now, Some(0.6)).as_ref().unwrap()).unwrap();
+        relay_share::set_here(None, Some(&cloud));
+        assert!(!Here.day_used_up());
+        relay_share::set_here(None, None);
+    }
+
+    /// A remake that never came back (the process ended in it) is still
+    /// one of its [`MOST_TRIES`]: with no count a day it is begun at most
+    /// twice, each on a day of its own, then never again.
+    #[test]
+    fn a_remake_that_never_came_back_counts_as_a_try() {
+        let _serial = SERIAL.lock().unwrap_or_else(|p| p.into_inner());
+        let (_root, keeping) = lamp("never-back");
+        old_skill(&keeping, "water", PRESENCE, "local:1");
+        let mut clock = Clock::day_idle();
+        let ends = Fake {
+            ends: true,
+            ..Fake::default()
+        };
+        for tries in 1..=MOST_TRIES {
+            let ended = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+                step(&keeping, &ends, &clock)
+            }));
+            assert!(ended.is_err());
+            // Not begun again the same day; out of tries, never.
+            let left = if tries < MOST_TRIES {
+                Step::Waits("each tried today")
+            } else {
+                Step::Nothing
+            };
+            assert_eq!(step(&keeping, &Fake::default(), &clock), left);
+            clock.now_ms += DAY_MS;
+        }
+        assert_eq!(
+            *ends.asked.borrow(),
+            vec![request_of("water"); MOST_TRIES as usize]
+        );
+        assert_eq!(load(&keeping.directory).failed["water"].times, MOST_TRIES);
+        let fake = Fake::default();
+        assert_eq!(step(&keeping, &fake, &clock), Step::Nothing);
+        assert!(fake.asked.borrow().is_empty());
     }
 
     #[test]
@@ -3631,6 +3827,7 @@ mod tests {
     /// language: never to a guest, never while something else waits.
     #[test]
     fn the_one_line_after_is_told_once_in_the_owners_language() {
+        let _serial = SERIAL.lock().unwrap_or_else(|p| p.into_inner());
         let (_root, keeping) = lamp("vi");
         for name in ["water", "welcome", "hum"] {
             old_skill(&keeping, name, PRESENCE, "local:1");

@@ -19,7 +19,7 @@ default = []
 # (`task::set_on_here`, `relay_share::set_here`) for another crate's test:
 # lamp-cloud's forwarder test of the voice's share (#7342) turns it on as a
 # dev-dependency. Never in a product build.
-share-fixture = []
+share-fixture = ["lamp-voice/share-fixture"]
 
 [dependencies]
 serde.workspace = true
@@ -68,6 +68,9 @@ base64 = "0.22"
 rustix = { version = "=1.1.5", features = ["pipe", "fs", "event", "net", "process"] }
 
 [dev-dependencies]
+# `relay_share::set_here` in this crate's own tests (`task.rs`): the voice's
+# share now lives in lamp-voice.
+lamp-voice = { path = "../voice", features = ["share-fixture"] }
 tempfile = "3"
 hound.workspace = true
 # The public skill format's schema patterns (tests/it/format.rs); already
