@@ -5874,6 +5874,12 @@ after a take-over, but now for every turn:
     (`said_to_me::Said::CutInNoLook`) and chained as the answer above is. A
     line begun over only the lamp's wait sound is not one; the same words
     said with the lamp silent are held as before.
+    In the window a hearing of the name under `attention::NEAR_SCORE`
+    (0.95) is no name for this rule (#7891 heard it at 0.939 in meeting
+    talk), so a no-look line carrying only that is held too and renews
+    nothing (Fifth's P3 on #8093); a hearing of 0.95 or more, or words
+    calling the lamp, still name it. Out of the window, and with the switch
+    off, any hearing names the line as before.
   - **Under a sure hearing, a face or the name in the words**
     (`LAMP_NAME_FACE_OR_WORDS=on`, on in the product's lamp-voice.service,
     #8136, from #8114's shapes 5-7). On lamp-74ff on 20 Nov (build 15146,
