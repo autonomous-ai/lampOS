@@ -23,10 +23,10 @@ classifiers = [
     "Topic :: Software Development :: Libraries",
     "Framework :: AsyncIO",
 ]
-dependencies = ["websockets>=13", "cryptography>=42", "tomli>=2; python_version < '3.11'"]
+dependencies = ["websockets>=13", "cryptography>=42", "zeroconf>=0.130", "tomli>=2; python_version < '3.11'"]
 
 [project.optional-dependencies]
-find = ["zeroconf>=0.130"]
+find = []  # kept so 'lampos[find]' still installs; zeroconf is a dependency now
 check = ["jsonschema>=4.20", "tomli>=2; python_version < '3.11'"]
 test = ["pytest>=8", "jsonschema>=4.20", "tomli>=2; python_version < '3.11'"]
 

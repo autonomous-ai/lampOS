@@ -261,26 +261,29 @@ door"). It is on every lamp, and nothing listens until the owner turns
 developer access on in the app, which starts it within moments. Turning it
 off closes every computer's connection.
 
-**Pair once.** In the app, the owner adds a developer computer and ticks
-the grants. The lamp says the first 8 characters of its pin aloud, and the
-app shows the same 8 for the owner to confirm they match; only then does it
-show the 8-digit code, the lamp's full pin (64 hex) and a 5-minute expiry. If
-the lamp couldn't say its pin, the app cancels the code.
-No lamp announces itself by mDNS yet, so give `lamp pair` the lamp's
-address, its name (`lamp-xxxx.local`) or its IP address. A step-by-step
-walkthrough is in [sdk/README.md](../sdk/README.md#pair-a-computer-with-a-customer-lamp).
+**Pair once.** In the app, the owner turns developer access on, adds a
+developer computer and ticks the grants. The app shows an 8-digit code with
+a 5-minute expiry and the command to copy, `lamp pair 12345678`. Without
+`--host`, `lamp pair` finds the lamp by mDNS (`_autonomous._tcp`, which the
+lamp already announces, keeping only lamps whose port 7731 answers, that is
+with developer access on); if several answer it names them and asks for
+`--host lamp-xxxx.local` (or the IP address). A step-by-step walkthrough is
+in [sdk/README.md](../sdk/README.md#pair-a-computer-with-a-customer-lamp).
 
 On a test lamp without the app, its keeper can make a code as root:
 `lamp-control code --grants body,light,speak,look`. It prints the code and
 the pin.
 
 ```sh
-lamp pair 12345678 --pin 3f9a… --host lamp-xxxx.local   # the code, the pin, the lamp's address
+lamp pair 12345678                 # the code; finds the lamp on this network
 lamp hello                         # connects and shows the grants
 ```
 
-The pin is checked after the TLS and WebSocket handshakes and before any
-protocol frame, so the code's proof never
+Without `--pin`, the computer trusts the certificate the lamp shows at
+pairing, as ssh does a new host, and keeps its pin; every later connect must
+show the same certificate, else it stops with `wrong_lamp` before any
+protocol frame. With `--pin PIN` (the pin `lamp-control code` prints), the
+certificate is checked before the `pair` frame, so the code's proof never
 reaches another host. Then run `first.py` with no `LAMPOS_HOME`, against
 the real lamp. With the lamp's pairing cue on (`LAMP_CONTROL_PAIR_CUE`, off unless the unit
 sets it), the ring glows once when a computer pairs for the first time;

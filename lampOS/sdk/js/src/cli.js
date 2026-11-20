@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // `lamp`: pair this computer with a lamp, find lamps, and check a pairing.
 //   lamp find
-//   lamp pair 12345678 --pin <64 hex> [--host lamp-75c9.local] [--name "Dev's laptop"]
+//   lamp pair 12345678 [--host lamp-75c9.local] [--pin <64 hex>] [--name "Dev's laptop"]
 //   lamp hello [LAMP_ID]
 //   lamp fake [--every 10] [--cycles N] [--everything] [--hands]
 //   lamp speaker FILE.wav|- [--rate 16000|24000]
@@ -11,12 +11,13 @@ import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { Lamp, SPEAKER_RATES, wavSamples } from './client.js';
-import { find } from './discovery.js';
+import { choose, find, pairable } from './discovery.js';
+import { Keyring } from './keys.js';
 import { PORT } from './schema.js';
 import { fake } from './fake.js';
 
 const USAGE = `usage: lamp find
-       lamp pair CODE --pin PIN [--host HOST] [--port PORT] [--name NAME]
+       lamp pair CODE [--host HOST] [--pin PIN] [--port PORT] [--name NAME]
        lamp hello [LAMP_ID]
        lamp fake [--every S] [--cycles N] [--everything] [--hands]
        lamp speaker FILE.wav|- [LAMP_ID] [--rate N]
@@ -48,21 +49,27 @@ async function main() {
     console.log(USAGE);
   } else if (command === 'find') {
     for (const lamp of await find()) console.log(`${lamp.id}\t${lamp.name}\t${lamp.host}:${lamp.port}\tpin starts ${lamp.fp}`);
-  } else if (command === 'pair' && arg && values.pin) {
-    const pin = values.pin.replaceAll(' ', '').replaceAll(':', '').toLowerCase();
+  } else if (command === 'pair' && arg) {
+    const pin = values.pin === undefined ? undefined : values.pin.replaceAll(' ', '').replaceAll(':', '').toLowerCase();
     let host = values.host;
     let port = Number(values.port ?? PORT);
+    let found;
     if (!host) {
-      // mDNS only finds where the lamp is; its pin, checked before anything is
-      // sent, is what says it is the lamp.
-      const lamps = (await find()).filter((lamp) => lamp.fp && pin.startsWith(lamp.fp));
-      if (lamps.length !== 1) {
-        console.error(`found ${lamps.length} lamps with that pin; say which with --host`);
+      // mDNS only finds where the lamp is; the code's proof, and the pin when
+      // one is given, are what say it is the lamp.
+      const picked = choose(await pairable(), pin);
+      if (!picked.lamp) {
+        console.error(`lamp: ${picked.why}`);
         return 2;
       }
-      ({ host, port } = lamps[0]);
+      found = picked.lamp;
+      // Connect by the address mDNS resolved; keep the host name, which
+      // outlives a new address.
+      host = found.address || found.host;
+      port = found.port;
     }
     const pairing = await Lamp.pair(arg, host, { pin, port, name: values.name });
+    if (found?.host && pairing.host !== found.host) new Keyring().remember({ ...pairing, host: found.host });
     console.log(`paired with ${pairing.lamp} (${pairing.name}) as ${pairing.client}: ${pairing.grants.join(', ')}`);
   } else if (command === 'fake') {
     return fake({ every: Number(values.every ?? 10), cycles: values.cycles === undefined ? undefined : Number(values.cycles), everything: Boolean(values.everything), hands: Boolean(values.hands) });

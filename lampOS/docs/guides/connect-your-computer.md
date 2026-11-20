@@ -20,31 +20,19 @@ computers**, and turns on the switch **Developer access**. The lamp starts
 its door within moments. Until then nothing listens on port 7731, so a
 computer that tries gets a refused connection (see "If it fails").
 
-## 2. Get a code and a pin from the app
+## 2. Get a code from the app
 
 On that page the owner taps **Add a developer computer** and ticks what it
-may do (the grants). Then comes **Check with Lamp**: Lamp says the first 8
-characters of its pin aloud, the app shows the same 8, and the owner taps
-**They match** or **They don't match**. That is how you know the app is
-talking to the lamp in front of you. Only after a match does the app show,
-under **Pairing code**:
+may do (the grants). The app then shows, under **Pairing code**:
 
 - **the code**: 8 digits, with a countdown **Expires in m:ss** (5 minutes);
   a new code voids the old one;
-- **the pin** under it: the lamp's full pin, 64 hex characters.
+- the command to copy, `lamp pair` with the code: `lamp pair 12345678`.
 
-The app 2.5.6 or newer shows the pin with a copy button, then the command
-under "On the computer, type", filled in with the code and the pin, each with
-a copy button. Copy it as it is. It carries `--host` only when the app knows
-Lamp's name (`lamp-xxxx.local`) or its home-network IP. Otherwise a line under
-the command says to add `--host` with Lamp's address (`lamp-xxxx.local` or
-Lamp's IP address) to the first command; the computer keeps it after pairing.
-An older app may show the code only: then you need the lamp's name or IP
-address yourself (your router's list of devices shows it). No customer lamp
-announces itself by mDNS yet, so `lamp pair` has to be told where the lamp is.
+Copy it as it is. The computer finds the lamp on its network by itself: no
+pin is needed, and an address only when several lamps answer (step 4).
 
-A mismatch, or a lamp that could not say its pin, drops the code. When the
-code runs out the page says "The code expired. Make a new one to pair a
+When the code runs out the page says "The code expired. Make a new one to pair a
 computer." with a **New code** button.
 
 ## 3. Install the SDK
@@ -74,22 +62,30 @@ Check it installed: `lamp --help` lists `pair`, `find`, `fake`, `hello` and
 
 ## 4. Pair
 
-Within the code's 5 minutes, run the command the app shows. It has this
-shape, with the lamp's address:
+Within the code's 5 minutes, run the command the app shows:
 
 ```sh
-lamp pair CODE --pin PIN --host HOST
+lamp pair CODE
 ```
 
-`CODE` is the 8 digits, `PIN` the 64 hex characters, `HOST` the lamp's name
-or IP address. All three are needed: without `--pin`, `lamp pair` stops with
-`the following arguments are required: --pin`, and without `--host` it looks
-for the lamp by mDNS, which no customer lamp answers yet. The pairing is
-kept in `~/.config/lampos/`, so later connections need no code.
+`CODE` is the 8 digits. `lamp pair` looks for the lamp by mDNS on this
+computer's network and keeps only lamps that have developer access on. With
+one, it pairs. With several, it names them and stops:
+`lamp: 2 lamps answered: lamp-one (lamp-one.local), lamp-two (lamp-two.local); say which with --host`.
+Then add `--host` with the lamp's name or IP address:
 
-The SDK checks the lamp's certificate against the pin after the TLS and
-WebSocket handshakes and before any protocol frame, so the code's proof
-never goes to another host.
+```sh
+lamp pair CODE --host lamp-xxxx.local
+```
+
+The pairing is kept in `~/.config/lampos/`, with the lamp's name, so later
+connections need no code.
+
+The computer trusts the certificate the lamp shows at pairing, as ssh does a
+new host, and keeps its pin. Every later connection checks the lamp shows the
+same certificate, after the TLS and WebSocket handshakes and before any
+protocol frame. If you have the lamp's pin (a test lamp's keeper gets it from
+`lamp-control code`), `--pin PIN` checks the lamp before the pairing too.
 
 ## 5. Say hello
 
@@ -130,14 +126,19 @@ to an agent ([develop.md](../develop.md), section 4).
 
 ## If it fails
 
-What each message below means. They are the SDK's own words, copied from runs
-on 17 Nov 2026 (`lampos` 0.2.0); the address you gave shows here as `HOST`.
+What each message below means. They are the SDK's own words, most copied from
+runs on 17 Nov 2026 (`lampos` 0.2.0), the ones about finding the lamp and a
+changed key from the SDK that pairs without a pin; the address shows here as
+`HOST`.
 
 | You see | Why | What to do |
 |---|---|---|
 | `lamp: bad_request: the code is the 8 digits the app shows` | The code is not 8 digits. | Copy the 8 digits from the app. |
-| `lamp: wrong_lamp: no pin to check the lamp by: the 64 hex the owner's app shows with the code` | `--pin` is missing or not the 64 hex characters. | Copy the whole pin the app shows with the code. |
-| `lamp: wrong_lamp: the certificate at HOST is not the lamp's: …` (the two fingerprints follow) | Something answered at that address, but not the lamp with that pin. | Check the address; check the pin is from this lamp's screen. |
+| `lamp: no lamp with developer access on answered on this network: …` | No lamp on this network answered with port 7731 open: developer access is off, the computer is on another network, or the network drops mDNS. | Ask the owner to turn developer access on; join the lamp's network; or add `--host lamp-xxxx.local` (or its IP address). |
+| `lamp: 2 lamps answered: …; say which with --host` | More than one lamp with developer access on is on this network. | Add `--host` with one of the names it lists. |
+| `lamp: wrong_lamp: the lamp at HOST shows another key than the one this computer paired with (…): …` | The lamp's certificate is not the one kept at pairing: the lamp was reset, or something else answers at its address. | If the lamp was reset, pair again (`lamp pair CODE` with a new code from the app). If not, don't connect: find out what answers there. |
+| `lamp: wrong_lamp: no pin to check the lamp by: …` | `--pin` was given but is not the 64 hex characters. | Copy the whole pin, or leave `--pin` out. |
+| `lamp: wrong_lamp: the certificate at HOST is not the lamp's: …` (the two fingerprints follow) | With `--pin`: something answered at that address, but not the lamp with that pin. | Check the address; check the pin is this lamp's. |
 | `lamp: not_paired: no pairing here for that lamp: run `lamp pair` first` | `lamp hello` (or a program) ran before a pairing was kept on this computer. | Pair first. |
 | A Python traceback ending in `ConnectionRefusedError: [Errno 111] Connect call failed ('HOST', PORT)` | Nothing listens at that address and port: the owner has not turned developer access on, or the address is wrong. | Ask the owner to turn developer access on; check the address. |
 | A traceback ending in `OSError: [Errno 65] No route to host`, on a Mac | macOS's Local Network privacy setting can stop Python from reaching the lamp: `ping` and `nc -vz HOST 7731` from Terminal work, yet Python never appears in the setting, so you are never asked (seen with python.org Python 3.12). | Open System Settings, Privacy & Security, **Local Network**, and turn on Python if it is listed. If it is not, relay through `nc`, which Terminal may use: see "On a Mac when Python is not listed" below. |
@@ -158,12 +159,12 @@ while true; do nc -l 127.0.0.1 17731 < "$F" | nc "$LAMP" 7731 > "$F"; done
 Then pair and connect through it, from another Terminal window:
 
 ```sh
-lamp pair CODE --pin PIN --host 127.0.0.1 --port 17731
+lamp pair CODE --host 127.0.0.1 --port 17731
 lamp hello
 ```
 
-The relay passes TLS through untouched, so the pin check still holds end to
-end. Pairing, `lamp hello`, `say` and full sessions worked through it on the
+The relay passes TLS through untouched, so the certificate check still holds end
+to end. Pairing, `lamp hello`, `say` and full sessions worked through it on the
 SDK builder's Mac. A program that reconnects right after closing can be
 refused for about half a second while the loop restarts: retry once.
 

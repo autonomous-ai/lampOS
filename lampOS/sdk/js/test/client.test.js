@@ -121,8 +121,9 @@ test('another certificate than the pinned one is refused', async (t) => {
   const keyring = new Keyring(folder());
   // Another certificate than the pin: refused before any frame is sent.
   await assert.rejects(Lamp.pair(fake.code, fake.host, { pin: '0'.repeat(64), port: fake.port, keyring }), WrongLamp);
-  // No pin, or mDNS's short hint: no pairing, and no connection.
-  for (const pin of [undefined, '', fake.fp]) {
+  // An empty pin, or mDNS's short hint: no pairing, and no connection. (No pin
+  // at all is trust on first use: test/short-pair.test.js.)
+  for (const pin of ['', fake.fp]) {
     await assert.rejects(Lamp.pair(fake.code, fake.host, { pin, port: fake.port, keyring }), WrongLamp);
   }
   assert.deepEqual(fake.received, []);

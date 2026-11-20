@@ -11,7 +11,7 @@ naming every public call, tool, event and error code they have.
 
 | what | Python | JavaScript | MCP |
 |---|---|---|---|
-| pair once (owner's code and pin) | `await Lamp.pair(code, host, pin=pin, name=name)` | `await Lamp.pair(code, host, { pin, name })` | run `lamp pair` first |
+| pair once (owner's code; pin optional) | `await Lamp.pair(code, host, pin=pin, name=name)` | `await Lamp.pair(code, host, { pin, name })` | run `lamp pair` first |
 | connect, say hello | `await Lamp.connect()` (or `Lamp.connect(lamp_id, host=..., keyring=...)`) | `await Lamp.connect()` (or `Lamp.connect(lampId, { host, keyring })`) | `lamp-mcp` connects at start (`--lamp ID`) |
 | the lamp, grants, limits | `lamp.info`, `lamp.grants`, `lamp.limits` | `lamp.info`, `lamp.grants`, `lamp.limits` | in `lamp_state("lamp")` and the tool list |
 | the owner's language (`en`, `vi`, `ja`, `zh`, `ko`), from hello, so a program's own lines follow it | `lamp.language` | `lamp.language` | — |
@@ -24,12 +24,17 @@ naming every public call, tool, event and error code they have.
 | an installed app's manifest trigger and taking its turn | `lamp.on("app.trigger", handler)`, then `await lamp.took(event["turn"])` | `lamp.on('app.trigger', handler)`, then `await lamp.took(event.turn)` | — | — |
 | an installed app's settings, and the owner changing one | `await lamp.settings()`; `lamp.on("app.settings", handler)` | `await lamp.settings()`; `lamp.on('app.settings', handler)` | — | — |
 | an installed app's panel in the owner's app (title, at most 6 lines, one a minute) | `await lamp.panel("Title", ["line"])` | `await lamp.panel('Title', ['line'])` | — | — |
-| find lamps on this network | `await find()` (`lampos.discovery`, the `[find]` extra) | `await find()` | — |
+| find lamps on this network | `await find()`, `await pairable()` (`lampos.discovery`) | `await find()`, `await pairable()` | — |
 | any op of the schema | `await lamp.request(op, **fields)` (`on_id=` is told its id before it is sent) | `lamp.request(op, fields)` | — |
 
-No lamp announces itself by mDNS yet (any build): `find()` and `lamp find`
-return none, so give `host` (`lamp-xxxx.local` or the IP address). The
-pairing keeps it for later connects.
+No lamp announces `_lampos._tcp` yet (any build): `find()` and `lamp find`
+return none. `pairable()` also browses `_autonomous._tcp`, which every lamp
+announces, and keeps the lamps whose port 7731 answers (developer access on);
+`lamp pair CODE` without `--host` pairs with the one it finds and stops if
+there are several or none. Else give `host` (`lamp-xxxx.local` or the IP
+address). The pairing keeps it for later connects. Without `pin`, the first
+connection is trusted, so pair on your own network; pass `pin` for the strict
+check. A later connect showing another certificate is `WrongLamp`.
 
 ## Events and state
 
@@ -232,7 +237,7 @@ Every refusal is a `LampError` (Python `lampos.errors.BY_CODE[code]`, JS
 
 ## The command line
 
-`lamp find`, `lamp pair CODE --pin PIN --host HOST [--port 7731] [--name NAME]`,
+`lamp find`, `lamp pair CODE [--host HOST] [--pin PIN] [--port 7731] [--name NAME]`,
 `lamp hello [LAMP_ID]`, `lamp fake [--every 10] [--cycles N] [--everything] [--hands]`,
 `lamp skill check FOLDER...`, `lamp skill push FOLDER`, `lamp skill list`,
 `lamp skill remove NAME`. `LAMPOS_HOME` sets where the key and pairings

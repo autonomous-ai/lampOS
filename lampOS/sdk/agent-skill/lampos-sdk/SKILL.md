@@ -31,7 +31,7 @@ on its PATH. An unpaired start says in one stderr line which folder it looked in
 
 **On a customer lamp (the stable build; the GUIDE's Plan and status rows say
 the build and date each row works from)** four things are missing: limp and
-pose, mDNS (pair with `--host`), local event times (`at` is UTC), and a look at
+pose, `lamp find` (`lamp pair CODE` still finds the lamp; else `--host`), local event times (`at` is UTC), and a look at
 a face. `look` at a name is refused, and the lamp doesn't track hands yet (the
 GUIDE's Follow a hand row: in development; lamp-body refuses a hold that says
 `follow`). Skill push (from 11091), `joints` for `roll`, `shoulder` and
@@ -62,7 +62,7 @@ push, which a customer lamp refuses. In tests, use `lampos.testing.FakeLamp` (JS
 ## Pair with a real lamp
 
 The owner makes a code in the lamp's app: an 8-digit code, the
-certificate's pin (64 hex), and the grants this computer gets. Ask the
+certificate's pin (64 hex, optional), and the grants this computer gets. Ask the
 owner for the grants your program needs, by what it does:
 
 | your program | grants |
@@ -82,13 +82,15 @@ owner for the grants your program needs, by what it does:
 **A grant added later needs a new pairing code:** the owner can't widen a pairing. Then, on the computer:
 
 ```sh
-lamp pair CODE --pin PIN --host lamp-xxxx.local --name my-laptop
+lamp pair CODE --name my-laptop   # finds the lamp by mDNS; else add --host lamp-xxxx.local --pin PIN
 lamp hello                 # connects, says this computer's grants
 python scripts/check_pairing.py   # this skill's check: grants, limits, what each refusal means
 ```
 
 The pairing (a key and the lamp's pin) is kept in `~/.config/lampos`, or
-`LAMPOS_HOME`.
+`LAMPOS_HOME`. Without `--pin`, the first connection is trusted (its pin is
+kept and checked on every later connect), so pair on your own network; pass
+`--pin` for the strict check.
 
 **A pairing holding a grant a lamp's build doesn't know** stops an older
 lamp-control at its start (fixed from #4525 on). If you pair with a new

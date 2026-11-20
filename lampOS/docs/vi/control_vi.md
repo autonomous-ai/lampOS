@@ -54,16 +54,25 @@ và thoát với mã 0.
 
 ## Đường truyền
 
-- `wss://<đèn>.local:7731/v1`, tìm bằng mDNS `_lampos._tcp`, chứng chỉ tự
-  ký của đèn, mà máy kiểm tra theo mã ghim (SHA-256) ứng dụng đưa kèm mã
-  ghép đôi, trước khi gửi bất cứ thứ gì.
+- `wss://<đèn>.local:7731/v1`, chứng chỉ tự ký của đèn. Đèn chưa quảng bá
+  `_lampos._tcp`; không có `--host`, `lamp pair` tìm qua mDNS
+  `_autonomous._tcp` (avahi của đèn đã quảng bá, tên `lamp-xxxx`) và chỉ giữ
+  đèn có cổng 7731 nhận kết nối TCP (tức đang bật quyền truy cập cho nhà
+  phát triển). Một đèn thì ghép đôi; nhiều đèn thì nêu tên và đòi `--host`.
 - Mỗi khung là một đối tượng JSON: yêu cầu `{"id":7,"op":"..."}`, trả lời
   `{"re":7,"ok":true}` hoặc `{"re":7,"ok":false,"error":{...}}`, sự kiện
   `{"ev":"...","at":"..."}`.
-- **Ghép đôi** một lần cho mỗi máy: mã dùng một lần từ ứng dụng, kèm mã
-  ghim chứng chỉ của đèn; không có ghép đôi nào thiếu mã ghim đó. `lamp pair`
-  kiểm tra chứng chỉ trước, rồi gửi khóa Ed25519 công khai cùng bằng chứng
-  (HMAC trên mã ghim, khóa và nonce). Bằng chứng sai thì kết nối bị đóng, và
+- **Ghép đôi** một lần cho mỗi máy: mã dùng một lần từ ứng dụng; ứng dụng
+  chỉ đưa lệnh `lamp pair 12345678`, không mã ghim, không host, không kiểm
+  tra bằng giọng (quyết định của chủ đèn trên #7415). Có `--pin`, `lamp pair`
+  kiểm tra chứng chỉ theo mã ghim trước khi gửi bất cứ thứ gì. Không có
+  `--pin`, máy tin chứng chỉ lần đầu (trust on first use, như ssh): nhận
+  chứng chỉ đèn đưa ra, giữ mã ghim của nó, và mọi lần kết nối sau phải đúng
+  chứng chỉ đó, nếu không thì dừng với `wrong_lamp`. Cách này chỉ bảo đảm các
+  lần sau là cùng một đèn, không bảo đảm lần đầu đúng là đèn; mã ghim, hay
+  PAKE sau này, mới bảo đảm điều đó. Rồi máy gửi khóa Ed25519 công khai cùng
+  bằng chứng (HMAC trên mã ghim, khóa và nonce, như trước; phía đèn kiểm tra
+  y như cũ). Bằng chứng sai thì kết nối bị đóng, và
   mỗi giây chỉ một lần thử trên cả đèn. **Hello** trên mỗi kết nối, ký bằng
   khóa đó, một lần cho mỗi kết nối.
 

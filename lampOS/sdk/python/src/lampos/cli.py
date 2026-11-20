@@ -2,7 +2,7 @@
 it all with no lamp.
 
     lamp find
-    lamp pair 12345678 --pin <64 hex> [--host lamp-75c9.local] [--name "Dev's laptop"]
+    lamp pair 12345678 [--host lamp-75c9.local] [--pin <64 hex>] [--name "Dev's laptop"]
     lamp hello [LAMP_ID]
     lamp fake [--every 10] [--cycles N] [--everything] [--hands]
     lamp skill check FOLDER...
@@ -22,22 +22,41 @@ import warnings
 
 from . import schema
 from .client import Lamp
-from .discovery import find
+from .discovery import find, pairable
 from .errors import LampError
+from .keys import Keyring
 
 
 async def _pair(args) -> int:
     host, port = args.host, args.port
+    pin = None if args.pin is None else args.pin.replace(" ", "").replace(":", "").lower()
+    found = None
     if host is None:
-        pin = args.pin.replace(" ", "").replace(":", "").lower()
-        # mDNS only finds where the lamp is; its pin, checked before
-        # anything is sent, is what says it is the lamp.
-        lamps = [lamp for lamp in await find() if pin.startswith(lamp.fp)]
-        if len(lamps) != 1:
-            print(f"found {len(lamps)} lamps with that pin; say which with --host", file=sys.stderr)
+        # mDNS only finds where the lamp is; the code's proof, and the pin
+        # when one is given, are what say it is the lamp.
+        lamps = await pairable()
+        if pin is not None:
+            lamps = [lamp for lamp in lamps if lamp.fp and pin.startswith(lamp.fp)]
+        if not lamps:
+            print(
+                "lamp: no lamp with developer access on answered on this network: check that the owner turned it on "
+                "in the app and that this computer is on the lamp's network, or say where it is with "
+                "--host lamp-xxxx.local (or its IP address)",
+                file=sys.stderr,
+            )
             return 2
-        host, port = lamps[0].host, lamps[0].port
-    pairing = await Lamp.pair(args.code, host, pin=args.pin, port=port, name=args.name)
+        if len(lamps) > 1:
+            names = ", ".join(f"{lamp.name or lamp.id} ({lamp.host or lamp.address})" for lamp in lamps)
+            print(f"lamp: {len(lamps)} lamps answered: {names}; say which with --host", file=sys.stderr)
+            return 2
+        found = lamps[0]
+        # Connect by the address mDNS resolved; keep the host name, which
+        # outlives a new address.
+        host, port = found.address or found.host, found.port
+    pairing = await Lamp.pair(args.code, host, pin=pin, port=port, name=args.name)
+    if found is not None and found.host and pairing.host != found.host:
+        pairing.host = found.host
+        Keyring().remember(pairing)
     print(f"paired with {pairing.lamp} ({pairing.name}) as {pairing.client}: {', '.join(pairing.grants)}")
     return 0
 
@@ -48,7 +67,6 @@ async def _fake(args) -> int:
     `--every` seconds, and prints what it is asked. Try an example against
     it in another terminal, with the same LAMPOS_HOME. With `--hands`, a
     hand waves for 3 s after each arrival (examples/follow_hand.py)."""
-    from .keys import Keyring
     from .testing import LAMP_CONTROL_REFUSES, FakeLamp, hand_track
 
     hands = getattr(args, "hands", False)
@@ -180,8 +198,11 @@ def parser() -> argparse.ArgumentParser:
     commands = parser.add_subparsers(dest="command", required=True)
     pair = commands.add_parser("pair", help="pair this computer with a lamp, with the owner's code")
     pair.add_argument("code", help="the 8 digits the app shows")
-    pair.add_argument("--pin", required=True, help="the lamp's pin the app shows with the code (64 hex)")
     pair.add_argument("--host", help="the lamp's address; without it, found by mDNS")
+    pair.add_argument(
+        "--pin",
+        help="the lamp's certificate pin (64 hex), checked before the code is sent; without it, the key the lamp shows now is kept and checked on every later connect",
+    )
     pair.add_argument("--port", type=int, default=schema.PORT)
     pair.add_argument("--name", help="this computer's name in the app")
     pair.set_defaults(run=_pair)
