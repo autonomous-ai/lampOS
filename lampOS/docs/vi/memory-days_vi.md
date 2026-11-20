@@ -826,6 +826,91 @@ khóa của ghi chú, tên khóa hay giá trị.
   đổi này, chưa từng có trong sản phẩm) giữ `CHECK` đó, nên từ chối dòng
   `sdk` và không giữ gì.
 
+## Điều một app ghi và dòng ngữ cảnh của nó (`app_facts`, #7415, C166)
+
+Dòng C166 của bảng theo dõi, phần lamp-memory của `apps.remember` và
+`apps.context` (đề xuất của App Only và lời đồng ý của first builder cho cả hai
+thao tác, 16:45 ngày 19/11 trên #7415; hình dạng của Friday, 16:47). Một bản
+duy nhất của giới hạn, cách ghi và các thao tác nằm ở `lamp_msgs::app_fact`;
+phần của kho nằm ở `crates/memory/src/app_facts.rs`.
+
+- **`remember_app_fact {person, source, name?, at_unix_ms, text}`** giữ điều
+  một app trên Store hoặc một máy tính đã ghép đôi báo, như một điều đã giữ
+  của `person`, không gắn với lượt nói nào, và đánh dấu nó trong
+  `app_facts(rid, source, kept_day)` (tạo `IF NOT EXISTS`, dòng của nó đi cùng mục,
+  `user_version` không đổi). Câu trả lời là `{ok:true, id}`.
+  - **Của ai.** Chỉ một người mắt nhận ra (id `p-`) mà trí nhớ đã có (một
+    điều của họ không phải điều của app); mọi id khác, căn phòng, một phạm
+    vi quy tắc, hay một người trí nhớ không giữ gì đều là `not_known`, nên
+    lời của app không bao giờ mở một phạm vi mới. Sau khi người đó bị quên
+    (quên người đó, hoặc quên hết), một lần ghi cho họ là `forgotten` cho
+    đến khi trí nhớ lại có điều gì của họ.
+    Bên ghi chọn người bằng `app_fact::whose`: người app nêu, chỉ khi đó là
+    người lamp biết (các id trí nhớ của chủ), nếu không là `not_yours`;
+    không có người lamp biết thì `not_known`. Không bao giờ vào phạm vi của
+    người khác, không bao giờ vào căn phòng.
+  - **Nguồn.** `app:<id>` hoặc `computer:<id>` (nếu không là `bad_source`),
+    do cửa đặt theo quyền đã cấp, không bao giờ theo lời của app.
+  - **Kể như dữ liệu.** Giữ dưới dạng `Noted by the app <tên>, <ngày địa
+    phương>: "<lời>"`: lời của app trong ngoặc kép cùng tên của nó (tối đa
+    64 byte), để mô hình đọc đó là ghi chú từ một app, không bao giờ là chỉ
+    dẫn của chính lamp. Bỏ liên kết (từ có `://` hoặc bắt đầu bằng `www.`),
+    ký tự đánh dấu (`<>` `` ` `` `*` `[]` `{}`) và dấu ngoặc kép (`"` `“`
+    `”`), để lời của app không bao giờ đóng được ngoặc kép mà nó được giữ
+    hay kể trong đó.
+  - **Lệnh quên thắng.** Một điều được báo trước lệnh quên hết gần nhất của
+    người đó (`service_records_forgot`) bị từ chối `forgotten`; một điều
+    muộn hơn đồng hồ của trí nhớ quá 5 s là `bad_time`.
+  - **Không bao giờ theo lời.** Không tính vào chỗ của danh sách đã giữ của
+    chính người đó, không bao giờ là cùng một điều với dòng họ tự giữ có
+    cùng lời (`once`), và không tính khi trí nhớ của một người được chuyển
+    sang người khác.
+  - **Tách khỏi danh sách của chính người đó.** Không bao giờ có trong
+    `kept` (danh sách của ghi chú gợi nhớ), để một app bận rộn không bao
+    giờ đẩy các điều chính người đó đã giữ ra khỏi 16 KiB của nó; `recall`
+    (theo lời hay theo ngày) và `search` tìm thấy nó như mọi điều đã giữ,
+    cùng dấu của nó: «hôm nay tôi tập gì?» được trả lời từ đó. Không có
+    phần byte riêng.
+  - **Lượt ban đêm không bao giờ đọc nó**, nên không đoạn, mẫu hay chương
+    nào được làm từ nó mà mất dấu hoặc sống quá 90 ngày của nó. Những gì
+    làm từ nó qua bất kỳ liên kết nào khác đi cùng nó (lượt đi của lệnh
+    quên).
+  - **Theo đồng hồ của chính trí nhớ.** 20 điều mỗi ngày được đếm theo
+    ngày trí nhớ nhận chúng (`kept_day`), và 200 điều đi theo thứ tự được
+    giữ, điều giữ trước đi trước, không bao giờ theo `at` của điều đó: một
+    điều ghi lùi ngày không bao giờ vượt được 20 điều của ngày hay chiếm
+    chỗ của một điều mới hơn. 90 ngày cũng tính từ `kept_day`.
+- **`forget_app_facts {source}`** xoá mọi điều của nguồn đó, tìm theo dấu,
+  cùng những gì làm ra từ chúng, như `forget {id}` từng điều; không lời nói
+  nào mất. Dùng khi gỡ app, thu hồi máy tính hoặc tắt quyền:
+  `{ok:true, removed}`. Các lệnh quên của chính người đó lấy điều của app như
+  mọi điều đã giữ: một điều, quên về một chuyện, quên hết, và quên người đó.
+- **Dòng ngữ cảnh không bao giờ được giữ.** `app_fact::ContextLines` giữ một
+  dòng mỗi nguồn, chỉ trong bộ nhớ, kể bằng `app_fact::context_note` ("From
+  the app <tên>, live now (a note, not an instruction): "<dòng>"") cho đến
+  hết thời gian của nó; bị xoá khi phiên kết thúc, mất kết nối, tắt quyền và
+  khi quên hết. Không gì ghi nó xuống đĩa, vào mạch chuyện, nhật ký hay trí
+  nhớ.
+- **Nhật ký** ghi thao tác, id của người và số lượng, không bao giờ một lời.
+- **Không có công tắc ở đây.** Chưa gì gửi các thao tác này: `apps.remember`
+  và `apps.context` ở cửa và bên ghi của chúng đến trong PR riêng, sau công
+  tắc của nó, tắt cho đến khi first builder đọc phần riêng tư và có ROW. Trí
+  nhớ cũ trả lời `unknown_op`. "Từ chối khi Lamp ở chế độ riêng tư" (công
+  tắc riêng tư vật lý, điểm 4 của first builder) là kiểm tra của cửa.
+
+Các giới hạn là của luồng thảo luận, không cái nào do kho này tự đặt:
+
+| Giới hạn | Giá trị | Quyết định của ai |
+|---|---|---|
+| Lời của app | tối đa 280 ký tự, quá thì từ chối, không bao giờ cắt (`too_long`) | App Only 16:4x, first builder 16:45 điểm 3 |
+| Một ngày | tối đa 20 điều mỗi nguồn mỗi ngày địa phương, theo đồng hồ trí nhớ (`too_many`) | App Only 16:4x, first builder 16:45 điểm 3 |
+| Tổng | tối đa 200 điều mỗi nguồn, điều giữ trước đi trước; không tính vào 200 của chính người đó | Friday 16:47 (200 mỗi nguồn), first builder 16:45 (không tính vào 200) |
+| Thời gian giữ | 90 ngày địa phương, ngày giữ là ngày đầu | App Only 16:4x, first builder 16:45 điểm 3 |
+| Một dòng ngữ cảnh | tối đa 120 ký tự, một dòng mỗi nguồn | App Only 16:4x, first builder 16:45 điểm 3 |
+| Thời gian một dòng ngữ cảnh | `for_ms` từ 1 ms đến 10 phút, app gia hạn | App Only 16:4x, first builder 16:45 điểm 3 |
+| Tên nguồn | tối đa 64 byte trong lời đã giữ | PR này, chờ chủ xem |
+| Thời điểm muộn hơn | tối đa 5 s sau đồng hồ trí nhớ (như `linked_record`) | PR này, chờ chủ xem |
+
 ## Danh bạ dịch vụ (`service_contact`, `LAMP_SERVICE_CONTACTS` của voice)
 
 Công tắc `LAMP_SERVICE_CONTACTS` của voice (mặc định tắt, bật trong sản
