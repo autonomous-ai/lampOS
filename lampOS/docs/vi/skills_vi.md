@@ -5171,7 +5171,10 @@ chính đèn (đèn, đầu, một câu nói). "When I say send my test note, em
    called in code", hoặc "not called in code: made in this conversation,
    but the lamp's last turn removed or turned a made skill"; và một câu
    không nêu kỹ năng nào trong khi có kỹ năng vừa tạo ghi bao nhiêu kỹ
-   năng đó có trong danh sách kỹ năng tự tạo mà bộ so khớp đọc ("the heard
+   năng đó có trong danh sách kỹ năng tự tạo mà bộ so khớp đọc (`made_asks`
+   của tools file, như bộ so khớp đọc ở câu đó, kể cả tên một từ: trên
+   lamp-52e6 lúc 12:11 ngày 20/11 một "applefile" đã giữ bị đếm 0 vì tên
+   chỉ có một từ, không phải vì đọc trễ) ("the heard
    words named no skill; 1 made in this conversation, 0 of them among the
    made skills the heard words are read for; 2 word(s) of its own,
    nearest: name, 1 word(s) off"), không có từ nào của câu và không có tên
