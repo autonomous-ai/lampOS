@@ -149,6 +149,7 @@ pub mod spoken_stop;
 pub mod turned_away;
 pub mod untied_going_on;
 pub use lamp_ipc::log_relay;
+pub use termination::{exits_clean, is_sigterm_stop};
 pub mod head_cue;
 pub mod name_or_follow_up;
 pub mod not_speech;
