@@ -458,7 +458,8 @@ heard line only, nothing kept.
   `draft_id` the new draft's id in Drafts from `APPEND`'s
   `[APPENDUID <validity> <uid>]` (UIDPLUS, RFC 4315; left out when the
   server names none), so the draft can be changed or deleted later
-  (`LAMP_GMAIL_DRAFT_EDITS`) and its service record keeps it as its result
+  (`LAMP_GMAIL_DRAFT_EDITS`; that UID is kept as the lamp's own,
+  `lamp_drafts`) and its service record keeps it as its result
   id; a refused `APPEND` is "not saved: Gmail couldn't be reached". The prepare's `next` says
   "Nothing is saved yet. Read read_back to the person in full; save the
   draft only if they agree, in any words."
@@ -1059,6 +1060,14 @@ Off unless `LAMP_SERVICES_WRITE=on`. Two phases (`writes.rs`):
    changed; nothing was saved" for a draft); the same account linked again
    still goes (Reviewer-two on #5982), unless its link itself changed
    (below). The journal says only "a confirmed write to <code> was sent".
+   A write refused or failed says one line of its kind of reason
+   (`serve::write_said`; lamp-9adf, 20 Nov: a `save_draft` failed in 18 ms
+   and the journal said nothing of why), never an address, a subject, a
+   mail's words or anything a service answered: "lamp-services: the voice's
+   service_write of gmail save_draft: refused: an address that isn't one"
+   (or "no address in to", "no subject", "too long or too many", "not a
+   draft the lamp saved", "failed: the service couldn't be reached", …; a
+   confirm is "a confirm", and a skill's run's "a skill run's").
 
 One write waits at a time (a new one replaces it), for 120 s. Bounds: a text
 at most 3,000 characters (line breaks kept), a subject or title one line of
@@ -1317,14 +1326,38 @@ Calendar's edits are given in `event_id`'s.
 
 - **Which draft: its id in Drafts.** A `draft_id` is `draft<UID>`, an id
   only a lamp's own save (its answer's `draft_id`, from `APPENDUID`) or a
-  `drafts` read gives. The model has it from the save's answer, from the
-  drafts read, or from the save's service record, which keeps it as its
-  result id (`LAMP_SERVICE_RECORDS_TOLD` tells it with the record, as a
-  created event's `event_id`). Any other id (the inbox's `41`, All Mail's
-  `all41`, Gmail's own API id) is refused before anything is read or held,
+  `drafts` read gives. The model has it from the save's answer or from the
+  save's service record, which keeps it as its result id
+  (`LAMP_SERVICE_RECORDS_TOLD` tells it with the record, as a created
+  event's `event_id`). Any other id (the inbox's `41`, All Mail's `all41`,
+  Gmail's own API id) is refused before anything is read or held,
   `writes::NOT_A_DRAFT`: "draft_id names no draft in Gmail's Drafts: use the
-  draft_id a save_draft or a drafts read gave, like draft12", so no other
-  mailbox is ever touched. A redo of a saved draft from its record
+  draft_id the lamp's own save_draft gave, like draft12", so no other
+  mailbox is ever touched.
+- **Only a draft the lamp saved itself** (the first builder's rule on
+  #8005, after lamp-9adf on 20 Nov, where the lamp's own save had failed and
+  "that draft" resolved to one the owner wrote in Gmail, whose delete a
+  spoken yes then confirmed). Every confirmed save keeps its account and its
+  UID in Drafts in `lamp_drafts::FILE`, `gmail-lamp-drafts.json` in the
+  store folder (0600; it survives a restart, and a wipe takes it), never a
+  word of the mail; a change replaces it by the new draft's UID (none when
+  Gmail names none), and a delete, or a draft found gone, takes it away; at
+  most 100 are kept (`lamp_drafts::KEPT_MOST`), the oldest dropped first,
+  and a file that can't be read owns nothing. `update_draft` and
+  `delete_draft` take only a UID kept there for the linked account, checked
+  before anything is read or held, and again at the yes. A draft in Drafts
+  the lamp didn't save (the person's own, one a `drafts` read found) is
+  read, never changed or deleted: with drafts of its own kept,
+  `writes::NOT_LAMPS_DRAFT`, "Not changed: that draft isn't one the lamp
+  saved. The lamp changes or deletes only drafts it saved itself, so nothing
+  was changed. Say so plainly, and offer to write a new draft with
+  save_draft."; with none, `writes::NO_LAMP_DRAFTS`, "Not changed: the lamp
+  has no draft it saved itself, and it changes or deletes only those, so
+  nothing was changed. Say it has none, and offer to write one with
+  save_draft." Refused at the yes, either follows "not saved: " or "not
+  deleted: ". `draft_id`'s description says the same: "A draft the lamp
+  saved itself, by the id its save_draft gave, like draft12: only those can
+  be changed or deleted." A redo of a saved draft from its record
   (`LAMP_SERVICE_REDO`) is refused with the way to change it
   (`redo::DRAFT_DONE`), never saved again beside it; `update_draft` or
   `delete_draft` with `from_record` naming that record fills its
@@ -1332,7 +1365,7 @@ Calendar's edits are given in `event_id`'s.
 - **Read back from the draft as it is now.** Without `send_id`, the lamp
   first reads that one draft by its id (`EXAMINE` of Drafts and its UID,
   read-only, as `message {id}`). None there (sent, deleted or changed in
-  Gmail, or never one the lamp saved or read there) is `writes::DRAFT_GONE`:
+  Gmail) is `writes::DRAFT_GONE`, and it is the lamp's no longer:
   "That draft is no longer in Gmail's Drafts: it was sent, deleted or
   changed there, and nothing was changed. Say it's no longer there, and
   offer to save it again with save_draft." Nothing is held. An

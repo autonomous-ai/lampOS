@@ -193,8 +193,17 @@ pub const NO_DRAFT_EDITS: &str =
     "this Gmail link can't change drafts: only one linked with an app password can";
 
 /// What a draft's change is told when its id names no draft in Drafts: an
-/// inbox or All Mail id, or one no save or drafts read gave.
-pub const NOT_A_DRAFT: &str = "draft_id names no draft in Gmail's Drafts: use the draft_id a save_draft or a drafts read gave, like draft12";
+/// inbox or All Mail id, or one no save gave.
+pub const NOT_A_DRAFT: &str = "draft_id names no draft in Gmail's Drafts: use the draft_id the lamp's own save_draft gave, like draft12";
+
+/// What a draft's change is told when its id is a draft in Drafts the lamp
+/// didn't save, while it has saved others (the first builder's rule on
+/// #8005): the person's own drafts are read, never changed or deleted.
+pub const NOT_LAMPS_DRAFT: &str = "Not changed: that draft isn't one the lamp saved. The lamp changes or deletes only drafts it saved itself, so nothing was changed. Say so plainly, and offer to write a new draft with save_draft.";
+
+/// What a draft's change is told when the lamp has saved no draft that is
+/// still its own (none saved, or each changed or deleted since).
+pub const NO_LAMP_DRAFTS: &str = "Not changed: the lamp has no draft it saved itself, and it changes or deletes only those, so nothing was changed. Say it has none, and offer to write one with save_draft.";
 
 /// What a draft's change is told when its draft is no longer in Drafts:
 /// sent, deleted or changed in Gmail itself.

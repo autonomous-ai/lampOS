@@ -353,7 +353,7 @@ pub fn skill_name_ok(name: &str) -> bool {
 }
 
 /// One file of the store folder, read whole or empty.
-fn read<T: for<'de> Deserialize<'de> + Default>(path: &Path) -> T {
+pub(crate) fn read<T: for<'de> Deserialize<'de> + Default>(path: &Path) -> T {
     fs::read(path)
         .ok()
         .and_then(|bytes| serde_json::from_slice(&bytes).ok())
@@ -362,7 +362,7 @@ fn read<T: for<'de> Deserialize<'de> + Default>(path: &Path) -> T {
 
 /// One file of the store folder written whole: beside, 0600, synced, then
 /// renamed over.
-fn keep<T: Serialize>(path: &Path, value: &T) -> io::Result<()> {
+pub(crate) fn keep<T: Serialize>(path: &Path, value: &T) -> io::Result<()> {
     let folder = path.parent().ok_or(io::ErrorKind::InvalidInput)?;
     let name = path
         .file_name()
