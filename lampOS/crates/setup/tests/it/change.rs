@@ -80,7 +80,6 @@ fn the_energy_is_kept_with_the_words_and_restarts_nothing() {
         r#"{"character": {"text": "calm", "energy": 0}}"#,
         r#"{"character": {"text": "calm", "energy": 6}}"#,
         r#"{"character": {"text": "calm", "energy": "3"}}"#,
-        r#"{"character": {"energy": 3}}"#,
     ] {
         let (reply, done) = answer(refused, &config, true);
         assert!(reply["refused"].is_string() && done.is_none(), "{refused}");
@@ -107,6 +106,83 @@ fn the_energy_is_kept_with_the_words_and_restarts_nothing() {
     let (reply, _) = answer(r#"{"character": {"text": ""}}"#, &config, true);
     assert_eq!(reply, json!({"done": {"text": "", "energy": 1}}));
     assert!(!energy.exists());
+}
+
+/// #7566: the movement level alone keeps the words and sets the level as
+/// chosen, restarting nothing; with no words kept it is kept all the same;
+/// an empty text still clears both; a level out of 1..5, or neither text nor
+/// level, is refused with nothing written.
+#[test]
+fn the_movement_level_alone_keeps_the_words() {
+    let root = Root::new();
+    let config = root.config();
+    let words = change::beside_language(&config, "character");
+    let energy = change::beside_language(&config, "energy");
+    let kept = || lamp_msgs::chosen_voice::energy_kept(&energy);
+
+    // No words yet: the level is kept all the same.
+    let (reply, done) = answer(r#"{"character": {"energy": 4}}"#, &config, true);
+    assert_eq!(reply, json!({"done": {"text": "", "energy": 4}}));
+    assert!(
+        !done.unwrap().restart_voice,
+        "a level alone restarts nothing"
+    );
+    assert!(!words.exists());
+    assert_eq!(
+        kept(),
+        lamp_msgs::Energy {
+            level: 4,
+            chosen: true
+        }
+    );
+
+    // Words kept, then the level alone: the words stay, the level changes.
+    answer(
+        r#"{"character": {"text": "calm and quiet"}}"#,
+        &config,
+        true,
+    );
+    let (reply, done) = answer(
+        r#"{"character": {"energy": 5, "text": null}}"#,
+        &config,
+        true,
+    );
+    assert_eq!(
+        reply,
+        json!({"done": {"text": "calm and quiet", "energy": 5}})
+    );
+    assert!(!done.unwrap().restart_voice);
+    assert_eq!(fs::read_to_string(&words).unwrap().trim(), "calm and quiet");
+    assert_eq!(
+        kept(),
+        lamp_msgs::Energy {
+            level: 5,
+            chosen: true
+        }
+    );
+
+    for refused in [
+        r#"{"character": {"energy": 0}}"#,
+        r#"{"character": {"energy": 6}}"#,
+        r#"{"character": {"energy": "3"}}"#,
+        r#"{"character": {}}"#,
+    ] {
+        let (reply, done) = answer(refused, &config, true);
+        assert!(reply["refused"].is_string() && done.is_none(), "{refused}");
+    }
+    assert_eq!(
+        kept(),
+        lamp_msgs::Energy {
+            level: 5,
+            chosen: true
+        }
+    );
+    assert_eq!(fs::read_to_string(&words).unwrap().trim(), "calm and quiet");
+
+    // An empty text still clears the words and the level.
+    let (reply, _) = answer(r#"{"character": {"text": ""}}"#, &config, true);
+    assert_eq!(reply, json!({"done": {"text": "", "energy": 1}}));
+    assert!(!words.exists() && !energy.exists());
 }
 
 /// #5394: the chosen voice and the character words are kept beside the
