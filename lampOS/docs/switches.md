@@ -825,7 +825,7 @@ What a person would notice with each switch on, one plain line per switch counte
 | `LAMP_HERMES_SKILLS` | The lamp's own coding agent can use the lamp's skills, as the voice does, but not while the lamp is private. |
 | `LAMP_SKILL_TASKS` | Nothing you'd notice alone: a skill's task reaches the lamp with a pass for that one run. |
 | `LAMP_OPENCLAW_ON_LAMP` | The lamp installs OpenClaw, a second coding agent, at a quiet time, beside its own Hermes. |
-| `LAMP_OPENCLAW_GATEWAY_BY_DEFAULT` | OpenClaw's gateway runs only while OpenClaw is the lamp's agent, so a Hermes lamp gets back its memory and stays cooler. |
+| `LAMP_OPENCLAW_GATEWAY_BY_DEFAULT` | OpenClaw's gateway runs only while it's the lamp's agent: a Hermes lamp gets its memory back. |
 | `LAMP_OPENCLAW_SKILLS` | The lamp's OpenClaw can use the lamp's skills, as the voice does, but not while the lamp is private. |
 | `LAMP_OPENCLAW_V1_TOOLS` | The lamp's OpenClaw can run commands as V1's did, so it can make and check new skills. |
 | `LAMP_LAMP_ENGINE` | Nothing you'd notice: picks which of the lamp's agents works on the lamp; the app's choice wins. |
