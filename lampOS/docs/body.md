@@ -1486,13 +1486,15 @@ the voice, Expression and lamp-skills (each with `energy_in::EnergyIn`, the body
   | 5 | 1.6 | 1.5 |
 
   Five clips are held under that size, each at the largest gain (to 0.01) that keeps it inside V1's
-  anti-tip rule on the deployed lamps' stand: no frame 22 mm or more off the axis, so none is
-  refused at play time, and none leaning the lamp back past 16 mm (`energy::CLIP_SIZE_CAP`,
-  `cog::every_built_in_clip_at_level_five_passes_v1s_rule`; no bound moved): greeting 1.58,
-  surprised 1.32, sleepy 1.51, excited 1.31 and dance_groove 1.59. On the host at level 5 the
-  clips' worst frame is 3.3 to just under 22 mm off the axis (greeting 21.96, surprised 22.00
-  rounded, sleepy and excited 21.92; level 1: 3.1 to 17.99), so seven clips come within 85% of it
-  and are said in the journal as V1 said them (`tipping.close`), and the farthest back is 15.93 mm
+  anti-tip rule on the deployed lamps' stand with a margin: no frame past 21.5 mm off the axis,
+  half a millimetre under the 22 mm at which a clip is refused at play time, because a mood's lean
+  at play time (listening, speaking) adds to the stand pose the host check uses; and none leaning
+  the lamp back past 16 mm (`energy::CLIP_SIZE_CAP`,
+  `cog::every_built_in_clip_at_level_five_passes_v1s_rule`; no bound moved): greeting 1.54,
+  surprised 1.27, sleepy 1.44, excited 1.27 and dance_groove 1.59 (its lean back). On the host at
+  level 5 the clips' worst frame is 3.3 to 21.46 mm off the axis (greeting 21.46, surprised and
+  sleepy 21.42, excited 21.33; level 1: 3.1 to 17.99), so seven clips come within 85% of 22 mm and
+  are said in the journal as V1 said them (`tipping.close`), and the farthest back is 15.93 mm
   (dance_groove). The fastest joint of 15 of the 21 clips reaches the servo's 1,000 counts a second
   (level 1: headshake alone), and each clip takes about 0.7 of its level-1 time.
 
@@ -1502,8 +1504,8 @@ the voice, Expression and lamp-skills (each with `energy_in::EnergyIn`, the body
   the speed the servos are written to follow (`Tuning::SERVO_SPEED_CAP`), so V1's fastest flicks
   come out slower and longer. Its size stops at the gesture's reach: happy's base yaw swung 697
   counts in V1 and swings 240 at level 5, about a third, because the reach holds yaw to 250 either
-  way of the pose. Excited and surprised stop at about 1.3 because V1's own tip rule (`cog`, 22 mm)
-  leaves them no room at 1.6. Closing any of these needs a servo, reach or tip bound
+  way of the pose. Excited and surprised stop at 1.27 because V1's own tip rule (`cog`, 22 mm, kept
+  0.5 mm clear) leaves them no room at 1.6. Closing any of these needs a servo, reach or tip bound
   raised, which #8153 does not do.
 - **Pause nod.** Expression's pause clip waits `pause_cooldown_us`: the catalogue's cooldown at level 1,
   else the level's gap, never longer than the catalogue's and never under 3 s.

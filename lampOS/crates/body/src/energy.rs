@@ -209,16 +209,18 @@ pub fn sized(clip: &Clip, size: f32, pace: f32) -> Clip {
 }
 
 /// The built-in clips held under a level's `clip_size` (#8153), each at
-/// the largest gain that keeps it inside V1's anti-tip rule on the deployed
-/// lamps' standing poses: no frame 22 mm or more off the base's axis (so
-/// none refused at play time), none leaning the lamp back past 16 mm
+/// the largest gain (to 0.01) that keeps it inside V1's anti-tip rule on
+/// the deployed lamps' standing poses with half a millimetre to spare: no
+/// frame past 21.5 mm off the base's axis (22 mm is refused at play time,
+/// and a mood's lean then may add to the stand's), none leaning the lamp
+/// back past 16 mm
 /// (`crate::cog`, `every_built_in_clip_at_level_five_passes_v1s_rule`).
 /// Found on the host over all 21 clips at level 5; the rest take x1.6.
 pub const CLIP_SIZE_CAP: [(&str, f32); 5] = [
-    ("greeting", 1.58),
-    ("surprised", 1.32),
-    ("sleepy", 1.51),
-    ("excited", 1.31),
+    ("greeting", 1.54),
+    ("surprised", 1.27),
+    ("sleepy", 1.44),
+    ("excited", 1.27),
     ("dance_groove", 1.59),
 ];
 
