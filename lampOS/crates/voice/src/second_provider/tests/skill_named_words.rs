@@ -1371,7 +1371,10 @@ async fn a_skill_made_in_this_conversation_runs_by_its_words_past_a_question() {
             APPLE,
         )
         .await;
-        assert!(ran.is_empty(), "{line}: nothing made here, the model's: {ran:?}");
+        assert!(
+            ran.is_empty(),
+            "{line}: nothing made here, the model's: {ran:?}"
+        );
     }
     let owner = crate::services::owner_of(None);
     crate::just_made::kept_from_make(
@@ -1389,7 +1392,10 @@ async fn a_skill_made_in_this_conversation_runs_by_its_words_past_a_question() {
                 made("Made apple file. Want me to try it now?"),
                 "the say-back asks",
             ),
-            (tried("Apple file, now?"), "58 s later, the lamp's answer asked"),
+            (
+                tried("Apple file, now?"),
+                "58 s later, the lamp's answer asked",
+            ),
         ] {
             let ran = made_ran_of(line, history, &["made:apple-file"], APPLE).await;
             assert_eq!(ran, [apple_run()], "{line} ({why}): run in code");

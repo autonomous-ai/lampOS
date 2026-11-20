@@ -8337,7 +8337,22 @@ grants, its code, or the lamp's own steps (the light, the head, a say).
    other question the made skill still starts in code ("What sort of
    name do you like?"; the lead's live test, 19 Nov 09:06: four "daily
    brief" lines after the lamp's "Want me to ...?" were each left to the
-   model, which called nothing). A run that speaks
+   model, which called nothing). A skill made in this conversation
+   (`just_made::made_here`: the owner's, within its 10 minutes, still
+   kept, not turned since) starts in code past any question, its make's
+   say-back or the lamp's answer to a first try naming it included: its
+   words are the person's trigger for it (the first builder's ruling on
+   #8022, 20 Nov 07:29; lamp-52e6, 14951, 07:25: "Hey Lamp, apple file."
+   right after the make and again 58 s later got `calls=none`). A held
+   yes, or a remove or turn the lamp's last turn ran, still waits. The
+   journal says which: "the lamp's last words asked something, but it is
+   the skill made in this conversation: called in code", or "not called
+   in code: made in this conversation, but the lamp's last turn removed or
+   turned a made skill"; and a line naming no skill while one was made in
+   this conversation says how many of those the made skills the heard
+   words are read for hold ("the heard words named no skill; 1 made in
+   this conversation, 0 of them among the made skills the heard words are
+   read for"), with no word of the line and no skill's name. A run that speaks
    its own words (lamp-skills' `says`, `made_run::speaks_itself`) ends the
    turn there, with no round 2 and no line of the lamp's own, so the
    skill's say, at priority 8, is the first thing heard, about a second
