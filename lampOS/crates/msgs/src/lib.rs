@@ -60,6 +60,8 @@ mod ears;
 pub use ears::*;
 mod app_triggers;
 pub use app_triggers::*;
+mod play_allow;
+pub use play_allow::*;
 mod body_sound;
 pub use body_sound::*;
 mod lamp_did;
