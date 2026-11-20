@@ -398,3 +398,24 @@ fn past_the_name_is_the_line_past_the_misheard_name_on_a_named_line() {
         assert_eq!(past_the_name_heard_as(said, true), None, "{said}");
     }
 }
+
+/// [`past_the_name_heard_as`] reads past the lamp's name heard as itself too,
+/// set off by a stop or a comma (kit-8101's second ROW, lamp-52e6, 20 Nov
+/// 15:54: "Hey Lamp." and then the make, two sentences).
+#[test]
+fn past_the_name_is_the_line_past_the_lamps_own_name_too() {
+    for (said, rest) in [
+        (
+            "Hey Lamp. Make me a skill that hums at noon.",
+            "Make me a skill that hums at noon.",
+        ),
+        ("Lamp, apple file.", "apple file."),
+        ("Hey, Lamp, mail check.", "mail check."),
+    ] {
+        assert_eq!(past_the_name_heard_as(said, true), Some(rest), "{said}");
+        assert_eq!(past_the_name_heard_as(said, false), Some(rest), "{said}");
+    }
+    for said in ["Hey Lamp.", "Turn off the lamp.", "Hello, Anna. Lamp, mail check."] {
+        assert_eq!(past_the_name_heard_as(said, true), None, "{said}");
+    }
+}
