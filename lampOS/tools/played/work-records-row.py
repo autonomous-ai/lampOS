@@ -300,7 +300,11 @@ class Lamp:
 
 # The how turn's tool, HW's.
 HOW_TOOL = 'check_agent_task'
-RUNNING_WORDS = re.compile(r'\b(working|still|looking|checking|searching)\b', re.IGNORECASE)
+# c0a4-15 HW: "…been quiet for about nine minutes on the weather-style lookups, though. I'll tell you myself
+# when it's done." names a running task without these words: a promise to tell when done counts too.
+RUNNING_WORDS = re.compile(r"\b(working|still|looking|checking|searching|going|underway|on it|not done|"
+                           r"(?:tell|let) you (?:\w+ )?(?:know )?when (?:it'?s|it is) (?:done|finished|ready))\b",
+                           re.IGNORECASE)
 
 
 def running_verdict(leg, at_heard, calls, reply, after):
