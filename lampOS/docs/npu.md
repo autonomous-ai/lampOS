@@ -4,7 +4,8 @@ The lamp's NPU has one owner: `lamp-npu` (`crates/npu`), the only process that
 opens `/dev/vipcore`. Its first op is `pose`; the eyes' face models (YuNet,
 SFace) and later app models are meant to move onto the same service, so that
 two processes never fight over the NPU. Off unless `LAMP_NPU=on`
-(switches.md). Built for #7415 on the first builder's ruling of 16:48 on
+(switches.md), which the product units set (the first builder's DEFAULT-ON
+of 20 Nov). Built for #7415 on the first builder's ruling of 16:48 on
 19 Nov 2026 (`pose` first, App Only builds it, one owner of the NPU, `pose` on
 the camera grant, the model kept out of the repository) and the owner's
 decision on the model's delivery, with the first builder's four rules of 16:55.
@@ -226,10 +227,14 @@ the service's state, `/var/lib/lampos-npu` (setup.md).
 adds `SupplementaryGroups=video`, so `lampos` opens it. An update reloads
 udev's rules but triggers nothing, so the rule applies from the next boot.
 **Not yet run as the product unit**: the lamp-0c89 runs were as the normal
-user, from a temporary folder. With `LAMP_NPU`
-unset, `serve` idles and touches nothing: no socket, no file, no NPU, no
-network. A drop-in setting `LAMP_NPU=on` here and in `lamp-control.service`,
-and the Store's `--models-url` and `--models-host`, turns it on.
+user, from a temporary folder. It sets `LAMP_NPU=on`, as `lamp-control.service` does (the first
+builder's DEFAULT-ON of 20 Nov, on the coach set's ROW), and the Store's
+host, `--models-url https://cdn.autonomous.ai/production/skills-store/npu-models`
+on `--models-host cdn.autonomous.ai` (Backend3's, 20 Nov): the pose model is
+read from `…/pose/VIP9000NANODI_PID0X1000003B/` (`lamp-model.json`,
+`lamp-model.sig`, `movenet_lightning_i16.nb`). With `LAMP_NPU` unset (a
+drop-in that clears it), `serve` idles and touches nothing: no socket, no
+file, no NPU, no network.
 
 ## Measured
 

@@ -45,6 +45,9 @@ Environment=LAMP_TASK_NET=on
 Environment=LAMP_SKILL_WRITES=on
 # #7233, docs/skills.md; owner, 16 Nov
 Environment=LAMP_MADE_SKILL_ASKS=on
+# LAMP_NPU: #7415, `pose` forwarded to lamp-npu; on in the product by the first builder's DEFAULT-ON of 20 Nov, the
+# same line in lamp-npu.service; its rules are its row in docs/switches.md.
+Environment=LAMP_NPU=on
 # The run socket (/run/lampos-control/control.sock) for lamp-tasks' skill runs as `lampos` (#6071 PR 1,
 # docs/control.md "The control socket, lamp-control's side"). With LAMP_CONTROL off, lamp-control serves only it and
 # admin.sock (no TLS door), once the first builder's (b) of 12 Nov 08:15 lands.
@@ -85,8 +88,8 @@ ReadWritePaths=/run/lampos-bus
 # The apps' socket folder, made by the tmpfiles (lampos.conf); `-` so a lamp without it still starts.
 ReadWritePaths=-/run/lampos-apps
 # `pose` (#7415, docs/npu.md): forwarded to lamp-npu's /run/lampos-npu/npu.sock (lampos's, 0700) only with
-# LAMP_NPU=on in this unit's own environment; unset here, so off. A drop-in `Environment=LAMP_NPU=on`, with the same
-# line in lamp-npu.service, turns it on. Connecting needs no ReadWritePaths= (as the body's and the voice's sockets).
+# LAMP_NPU=on in this unit's own environment, set below with the same line in lamp-npu.service. Connecting needs no
+# ReadWritePaths= (as the body's and the voice's sockets).
 ProtectHome=yes
 PrivateTmp=yes
 CapabilityBoundingSet=
