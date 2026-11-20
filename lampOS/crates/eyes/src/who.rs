@@ -975,14 +975,20 @@ impl People {
     }
 
     /// How alike this print is to the nearest of anyone's kept prints,
-    /// whether or not it reaches [`SAME_PERSON`]; `None` with nobody kept. For the
-    /// journal's line on each check: a number, never a name.
-    pub fn best_likeness(&self, print: &[f32]) -> Option<f32> {
+    /// whether or not it reaches [`SAME_PERSON`], and when that person's
+    /// prints were added (their `added_unix_s`: the file keeps one time per
+    /// person, not per print); `None` with nobody kept. For the journal's
+    /// line on each check ([`recognition_line`]): numbers, never a name.
+    pub fn best_likeness(&self, print: &[f32]) -> Option<(f32, u64)> {
         self.people
             .iter()
-            .flat_map(|person| &person.prints)
-            .map(|kept| likeness(kept, print))
-            .reduce(f32::max)
+            .flat_map(|person| {
+                person
+                    .prints
+                    .iter()
+                    .map(|kept| (likeness(kept, print), person.added_unix_s))
+            })
+            .max_by(|a, b| a.0.total_cmp(&b.0))
     }
 
     /// How alike this print is to `name`'s own kept prints, at best; `None`
@@ -1918,6 +1924,30 @@ pub fn ask_of(line: &[u8]) -> Option<Ask> {
 /// lamp: people at it were 0.12 to 0.27 on lamp-4ace. Smaller faces are not
 /// recognised and not remembered.
 pub const NEAR_ENOUGH: f32 = 0.10;
+
+/// The journal's line on each check (#3126): the best likeness and how many
+/// seconds ago the closest person's prints were added (#7424), the largest
+/// face's height and width as shares of the picture's, the near gate and the
+/// threshold. Numbers only, never a name or an id.
+pub fn recognition_line(
+    best: Option<(f32, u64)>,
+    height: f32,
+    width: f32,
+    now_unix_s: u64,
+) -> String {
+    let (best, age) = best.map_or_else(
+        || ("none".to_owned(), "none".to_owned()),
+        |(how, added)| {
+            (
+                format!("{how:.3}"),
+                format!("{} s", now_unix_s.saturating_sub(added)),
+            )
+        },
+    );
+    format!(
+        "recognition best {best} height {height:.3} width {width:.3} prints age {age} (near at {NEAR_ENOUGH}, same at {SAME_PERSON})"
+    )
+}
 
 /// Whether a look found anyone at the lamp: a face at least [`NEAR_ENOUGH`]
 /// of the picture's height `tall`. A far or flicker face is no one to
@@ -5150,8 +5180,8 @@ mod tests {
         assert_eq!(name, "A");
         assert!(how > 0.99);
         // The journal's number: the best likeness, matched or not.
-        assert_eq!(people.best_likeness(&print(0.3)), Some(how));
-        let far = people.best_likeness(&print(1.7)).unwrap();
+        assert_eq!(people.best_likeness(&print(0.3)), Some((how, 1)));
+        let (far, _) = people.best_likeness(&print(1.7)).unwrap();
         assert!(far < SAME_PERSON, "{far}");
         // Someone else is nobody.
         assert_eq!(people.who(&print(1.7)), None);

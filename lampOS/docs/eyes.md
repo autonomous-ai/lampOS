@@ -791,11 +791,13 @@ this room" until someone asks to be recognised.
 - **The score, in the journal.** Each check with a face in view, outside a
   remembering, says one line, at most every two seconds (with
   `LAMP_FACE_REFOUND=on`, also at a forced check above):
-  `recognition best 0.341 height 0.152 (near at 0.1, same at 0.363)`, the
-  best cosine against anyone's kept prints (`none` with nobody remembered
-  or no face near enough), the largest face's height as a share of the
-  picture's, the near gate and the threshold. No name, no id: only numbers,
-  always on (#3126).
+  `recognition best 0.341 height 0.152 width 0.114 prints age 86400 s (near at 0.1, same at 0.363)`,
+  the best cosine against anyone's kept prints (`none` with nobody remembered
+  or no face near enough), the largest face's height and width as shares of
+  the picture's, how many seconds ago the closest person's prints were
+  added (their `added_unix_s`: people.json keeps one time per person, not
+  per print; `none` with the best), the near gate and the threshold. No
+  name, no id: only numbers, always on (#3126, width and age #7424).
 - **Kept.** `--people FILE` (on lamp-4ace `/var/lib/lampos-eyes/people.json`,
   in a directory of mode 0700 and a file of mode 0600). Per person: the
   name, up to five prints and when they were added; with
