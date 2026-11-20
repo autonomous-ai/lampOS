@@ -5417,7 +5417,7 @@ fn carries_task(table: &toml::Table) -> bool {
             .is_some_and(|steps| {
                 steps.iter().any(|step| {
                     step.as_table()
-                        .is_some_and(|step| step.contains_key("task"))
+                        .is_some_and(|step| step.contains_key("task") || step.contains_key("run"))
                 })
             })
 }
@@ -5588,9 +5588,10 @@ fn held(table: &toml::Table, added: bool, reads: bool) -> Result<(String, Uses),
         if says.iter().any(|say| say_text(say).is_none()) {
             return Err(Refused::new(SAY_NOT_TEXT));
         }
-        // Code of its own (#6307): a `task` step and its grants, only with
+        // Code of its own (#6307): a `task` step, or a `run` step whose
+        // script does the whole job (#8157), and its grants, only with
         // their switch; off, what the lamp can't do yet.
-        let tasks: Vec<&toml::Value> = steps().filter_map(|step| step.get("task")).collect();
+        let tasks: Vec<&toml::Value> = steps().filter_map(code_step).collect();
         if !tasks.is_empty() || table.contains_key("grants") {
             if !scripts_on() {
                 return Err(Refused::new(cant_yet(CODE_OF_ITS_OWN)));
@@ -5733,29 +5734,31 @@ fn code_held(
         .and_then(toml::Value::as_array)
         .into_iter()
         .flatten()
-        .filter(|step| step.get("task").is_some())
+        .filter(|step| code_step(step).is_some())
         .all(|step| step.as_table().is_some_and(|step| step.len() == 1));
     if !alone {
         return Err(scripts_not_held("a task step with another kind beside it"));
     }
-    let Some(task) = task.as_table() else {
-        return Err(scripts_not_held("a task step that isn't a table"));
+    // A `run` step (#8157): the script it names, no words of its own.
+    let run = match task {
+        toml::Value::String(run) => Some(run.as_str()),
+        toml::Value::Table(task) => {
+            if task.keys().any(|key| key != "task" && key != "run") {
+                return Err(scripts_not_held(
+                    "a task step with a key other than task and run",
+                ));
+            }
+            let words = task.get("task").and_then(toml::Value::as_str).unwrap_or("");
+            if !task_words_plain(words) {
+                return Err(scripts_not_held(
+                    "a task's words, empty, too long or not plain",
+                ));
+            }
+            task.get("run").and_then(toml::Value::as_str)
+        }
+        _ => return Err(scripts_not_held("a task step that isn't a table")),
     };
-    if task.keys().any(|key| key != "task" && key != "run") {
-        return Err(scripts_not_held(
-            "a task step with a key other than task and run",
-        ));
-    }
-    let words = task.get("task").and_then(toml::Value::as_str).unwrap_or("");
-    if !task_words_plain(words) {
-        return Err(scripts_not_held(
-            "a task's words, empty, too long or not plain",
-        ));
-    }
-    let runs = task
-        .get("run")
-        .and_then(toml::Value::as_str)
-        .is_some_and(|run| script_path_ok(run) && run.ends_with(RUNNABLE_ENDING));
+    let runs = run.is_some_and(|run| script_path_ok(run) && run.ends_with(RUNNABLE_ENDING));
     if !runs {
         return Err(scripts_not_held(
             "a task's run, not a .py file under scripts/",
@@ -5820,14 +5823,26 @@ fn code_held(
     Ok(grants)
 }
 
-/// The `run` of a made skill's `task` step: the file its code starts at.
+/// The `run` of a made skill's `task` step, or its `run` step's script
+/// (#8157): the file its code starts at.
 pub fn task_run(toml: &str) -> Option<String> {
     let table: toml::Table = toml::from_str(toml).ok()?;
     table
         .get("do")?
         .as_array()?
         .iter()
-        .find_map(|step| step.get("task")?.get("run")?.as_str().map(str::to_owned))
+        .find_map(|step| match code_step(step)? {
+            toml::Value::String(run) => Some(run.clone()),
+            task => task.get("run")?.as_str().map(str::to_owned),
+        })
+}
+
+/// A `[[do]]` step's code (#6307, #8157): its `task` table, or the script
+/// a `run` step names (`run = "scripts/main.py"`, a script that does the
+/// whole job with no agent); none for any other step.
+fn code_step(step: &toml::Value) -> Option<&toml::Value> {
+    step.get("task")
+        .or_else(|| step.get("run").filter(|run| run.is_str()))
 }
 
 /// A made skill's code held to its `skill.toml` (#6307): code only with a
@@ -6742,7 +6757,7 @@ fn said_plainly(table: &toml::Table, reads: bool, general: bool) -> Result<Strin
     let has_task = table
         .get("do")
         .and_then(toml::Value::as_array)
-        .is_some_and(|steps| steps.iter().any(|step| step.get("task").is_some()));
+        .is_some_and(|steps| steps.iter().any(|step| code_step(step).is_some()));
     if !code && (has_task || table.contains_key("grants")) {
         return Err(Unsaid::cant(CODE_OF_ITS_OWN));
     }
@@ -7023,11 +7038,19 @@ fn said_plainly(table: &toml::Table, reads: bool, general: bool) -> Result<Strin
     Ok(said)
 }
 
+/// How a made skill's `run` step is read back (#8157): its script does
+/// the whole job, so it is said plainly, with no words of its own.
+pub const RUN_STEP_SAID: &str = "runs its own script";
+
 /// A made skill's `task` step in plain words (#6307): "runs its own code
 /// to “take a photo”", its words as written, at most [`MOST_TASK_CHARS`];
 /// none for any other step, or one not in that form.
 fn task_plainly(step: &toml::Value) -> Option<String> {
     let step = step.as_table().filter(|step| step.len() == 1)?;
+    // A `run` step (#8157): its script does the whole job, said plainly.
+    if let Some(run) = step.get("run") {
+        return run.as_str().map(|_| RUN_STEP_SAID.to_owned());
+    }
     let task = step.get("task")?.as_table()?;
     let words = task.get("task")?.as_str()?.trim();
     task.get("run")?.as_str()?;
@@ -7355,7 +7378,7 @@ fn step_cant_yet(step: &toml::Value) -> Option<&'static str> {
         return (!writes_on()).then_some(SENDS_ON_ITS_OWN);
     }
     // Code of its own, only with its switch (#6307).
-    if step.contains_key("task") && step.len() == 1 {
+    if (step.contains_key("task") || step.contains_key("run")) && step.len() == 1 {
         return (!scripts_on()).then_some(CODE_OF_ITS_OWN);
     }
     let sends = [
@@ -18561,6 +18584,56 @@ task = { task = "take a photo and send it to the app", run = "scripts/main.py" }
         };
         assert_eq!(names(&GRANTS), names(&crate::skill_task_yes::GRANTS));
         assert_eq!(SKILLS_GRANT.0, crate::skill_task_yes::NEVER);
+    }
+
+    /// #8157: a made skill's `run` step (`run = "scripts/main.py"`, its
+    /// script doing the whole job) is code as a `task` step is: held, its
+    /// grants kept, its script matched to the files written, and read back
+    /// plainly, "runs its own script", and what its code may use.
+    #[test]
+    fn a_run_step_is_held_and_read_back_as_a_task_step_is() {
+        set_scripts_here(Some(true));
+        let run = CODE_TOML.replace(
+            "task = { task = \"take a photo and send it to the app\", run = \"scripts/main.py\" }",
+            "run = \"scripts/main.py\"",
+        );
+        assert!(run.contains("\nrun = \"scripts/main.py\"\n"), "{run}");
+        let uses = capped_with(&run, false).unwrap().1;
+        assert!(uses.code);
+        assert_eq!(uses.grants, ["camera", "light"]);
+        assert_eq!(task_run(&run).as_deref(), Some("scripts/main.py"));
+        let files = |script: &str| Files {
+            toml: run.clone(),
+            card: CODE_CARD.to_owned(),
+            left_out: None,
+            scripts: vec![(script.to_owned(), MAIN_PY.to_owned())],
+            shows: Vec::new(),
+        };
+        assert!(code_matches(&files("scripts/main.py"), &uses).is_ok());
+        assert!(code_matches(&files("scripts/other.py"), &uses).is_err());
+        let said = plainly(&mannered(&run)).unwrap();
+        for part in [
+            "it runs its own script",
+            "The lamp's model wrote its code, and that code may use the camera and its light.",
+        ] {
+            assert!(said.contains(part), "{part}: {said}");
+        }
+        assert!(said.ends_with(RUNS_AFTER_YES), "{said}");
+        // A run that is no script under scripts/, or beside another kind,
+        // is refused as a task's would be.
+        for bad in [
+            run.replace("run = \"scripts/main.py\"", "run = \"main.sh\""),
+            run.replace(
+                "run = \"scripts/main.py\"",
+                "run = \"scripts/main.py\"\nsay = \"Hi.\"",
+            ),
+        ] {
+            assert!(capped_with(&bad, false).is_err(), "{bad}");
+        }
+        // Off, code of its own is what the lamp can't do yet.
+        set_scripts_here(Some(false));
+        assert!(capped_with(&run, false).is_err());
+        set_scripts_here(None);
     }
 
     /// On (#6307): the say-back says that it runs its own code and what
