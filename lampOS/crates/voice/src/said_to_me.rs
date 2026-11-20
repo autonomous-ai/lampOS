@@ -141,6 +141,10 @@ pub enum Held {
     /// Out of the window, a second voice in the room lately
     /// ([`Line::second_voice`], #7891).
     SecondVoice,
+    /// In the window with [`Line::looks_needed`]: no look, no face turned
+    /// and the speaker's pose unread, and no first answer to the lamp's
+    /// waiting question (#8092).
+    NoLook,
 }
 
 impl Held {
@@ -155,6 +159,7 @@ impl Held {
             Self::Short => "held: a short line",
             Self::FewLooks => "held: seen speaking facing in fewer than 2 looks",
             Self::SecondVoice => "held: a second voice in the room",
+            Self::NoLook => "held: no look in a conversation",
         }
     }
 }
@@ -207,6 +212,14 @@ pub struct Line<'a> {
     /// far side, a video, someone off camera), or seen spoken by two faces.
     /// Faces and looks only: no voice print (#7891).
     pub second_voice: bool,
+    /// `LAMP_NAME_SIGN_TIED` (#8092): in the window, a line with no look
+    /// (no face turned to the lamp, the speaker's pose unread:
+    /// [`Said::PoseUnread`] counts as no look) is held, but for one answer
+    /// to the lamp's waiting question ([`Said::AnswerNoLook`]).
+    pub looks_needed: bool,
+    /// With [`Self::looks_needed`]: that one answer with no look was let
+    /// out since the last line let out with a look or the name.
+    pub look_free_answered: bool,
 }
 
 impl Line<'_> {
@@ -260,6 +273,10 @@ pub enum Said {
     /// (no pitch, no gaze): journaled so a row can count it (#6902: a head
     /// down may give no pitch; #7721).
     PoseUnread,
+    /// With [`Line::looks_needed`], in the window with no look: the one
+    /// answer to the lamp's waiting question, let out; it renews nothing
+    /// (#8092).
+    AnswerNoLook,
     /// Said to the lamp: facing, seen speaking, long enough or a question.
     ToTheLamp,
     /// Not said to the lamp: the face and the conversation are no sign.
@@ -273,6 +290,9 @@ impl Said {
             Self::Stands => "stands (named, a yes awaited, or not judged here)",
             Self::InConversation => "said to the lamp, in a conversation",
             Self::PoseUnread => "said to the lamp, in a conversation, the speaker's pose unread",
+            Self::AnswerNoLook => {
+                "an answer to the lamp's waiting question, no look: it renews nothing"
+            }
             Self::ToTheLamp => "said to the lamp, facing and seen speaking",
             Self::Held(held) => held.reason(),
         }
@@ -296,6 +316,15 @@ pub fn judge(line: Line<'_>) -> Said {
         return Said::Stands;
     }
     if line.going_on {
+        // `LAMP_NAME_SIGN_TIED` (#8092): no look, no renewal; one answer
+        // to the lamp's waiting question only.
+        if false && line.looks_needed && !line.turned && line.pitch.is_none() && line.looking.is_none() {
+            return if line.lamp_asked && line.question_waits && !line.look_free_answered {
+                Said::AnswerNoLook
+            } else {
+                Said::Held(Held::NoLook)
+            };
+        }
         return if line.lamp_asked {
             Said::InConversation
         } else if words <= SHORT_WORDS && !line.seen_speaking && line.read_silent {
@@ -751,5 +780,84 @@ mod tests {
             ..short
         };
         assert_eq!(short_stood_by(late), None);
+    }
+
+    /// #8092, the first builder's ruling 3 (12:45): lamp-74ff, build 14967,
+    /// 20 Nov, a meeting: after a line taken as the name, about 10 lines of
+    /// meeting talk with 0 looks were let out as the conversation going on
+    /// ("pitch unread, looking unread, 0 looks"). With `LAMP_NAME_SIGN_TIED`,
+    /// in the window a line with no look (no face turned, the pose unread)
+    /// is held; the one exception is an answer to the lamp's waiting
+    /// question, let out once ([`Said::AnswerNoLook`], which renews
+    /// nothing). A look, a face turned, or the name let it out as before;
+    /// off, as before.
+    #[test]
+    fn with_looks_needed_a_line_with_no_look_in_the_window_is_held() {
+        let talk = Line {
+            heard: "We should ship the slides by Friday.",
+            going_on: true,
+            looks_needed: true,
+            ..Line::default()
+        };
+        assert_eq!(judge(talk), Said::Held(Held::NoLook));
+        assert_eq!(
+            judge(Line {
+                looks_needed: false,
+                ..talk
+            }),
+            Said::PoseUnread
+        );
+        let answer = Line {
+            heard: "Yes, at three.",
+            lamp_asked: true,
+            question_waits: true,
+            ..talk
+        };
+        assert_eq!(judge(answer), Said::AnswerNoLook);
+        assert_eq!(
+            judge(Line {
+                look_free_answered: true,
+                ..answer
+            }),
+            Said::Held(Held::NoLook)
+        );
+        // A stale question (`lamp_asked` alone, no clock) is no exception.
+        assert_eq!(
+            judge(Line {
+                question_waits: false,
+                ..answer
+            }),
+            Said::Held(Held::NoLook)
+        );
+        for looked in [
+            Line {
+                pitch: Some(0.1),
+                ..talk
+            },
+            Line {
+                looking: Some(true),
+                ..talk
+            },
+            Line {
+                turned: true,
+                ..talk
+            },
+        ] {
+            assert!(!matches!(judge(looked), Said::Held(_)), "{looked:?}");
+        }
+        assert_eq!(
+            judge(Line {
+                name_heard: true,
+                ..talk
+            }),
+            Said::Stands
+        );
+        assert_eq!(
+            judge(Line {
+                heard: "Lamp, what time is it?",
+                ..talk
+            }),
+            Said::Stands
+        );
     }
 }
