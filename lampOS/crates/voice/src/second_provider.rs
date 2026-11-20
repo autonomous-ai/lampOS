@@ -1691,6 +1691,10 @@ pub type Heed =
 /// (`ProviderInput::TurnOpened`, `crate::control_turn`): its line is a call,
 /// as a tap's (`crate::attention::Attention::turn_opened`).
 pub type Opened = Arc<dyn Fn(u64) + Send + Sync>;
+/// The rule is told the request whose line `LAMP_NAME_NEAR` ruled not the
+/// name, with lamp-name's near score by its start
+/// ([`Engine::telling_near_not_the_name`], #8092).
+pub type RuledNotTheName = Arc<dyn Fn(u64, f32) + Send + Sync>;
 /// Whether the same person said a line cut short and the line that cut it
 /// ([`Engine::joining_cut_words`]).
 #[derive(Clone, Debug, PartialEq)]
@@ -2349,7 +2353,7 @@ struct Shared {
     name_near: Option<NameNear>,
     /// Told the request whose line `name_near` ruled not the name
     /// ([`Engine::telling_near_not_the_name`], #8092).
-    near_not_the_name: Option<Opened>,
+    near_not_the_name: Option<RuledNotTheName>,
     /// `LAMP_NAME_WORDLESS_BAR=on`: lamp-name's best hearing in a line, for
     /// one marked as only the name whose words came back empty
     /// ([`Engine::holding_a_wordless_call`]).
@@ -3222,13 +3226,13 @@ fn named_near(
     window: (u64, u64),
     near: &NameNear,
     as_a_sentence: bool,
-) -> (String, bool) {
+) -> (String, Option<f32>) {
     let Some((start, end)) = first_word_set_off(&text) else {
-        return (text, false);
+        return (text, None);
     };
     let word = &text[start..end];
     if word.eq_ignore_ascii_case(net::key_terms::NAME) || word.eq_ignore_ascii_case("lamb") {
-        return (text, false);
+        return (text, None);
     }
     let like = like_the_name(word);
     let (heard, turned) = near(window);
@@ -3270,8 +3274,9 @@ fn named_near(
         }
         (LikeTheName::Not, None) => None,
     };
-    // Heard near by the line's start and not taken: ruled not the name.
-    let not_the_name = named.is_none() && near_enough.is_some();
+    // Heard near by the line's start and not taken: ruled not the name,
+    // with the score it was heard at.
+    let not_the_name = near_enough.filter(|_| named.is_none());
     match named {
         Some(signs) => {
             eprintln!(
@@ -3279,7 +3284,7 @@ fn named_near(
             );
             (
                 format!("{}{}{}", &text[..start], net::key_terms::NAME, &text[end..]),
-                false,
+                None,
             )
         }
         None => (text, not_the_name),
@@ -6452,9 +6457,9 @@ impl Engine {
     /// With [`Self::hearing_the_name_near`]: `told` is given the request
     /// whose line [`named_near`] ruled not the name, lamp-name's near
     /// hearing at its start on a first word, set off, that is not the name,
-    /// before its words are judged; the rule then counts no second sign for
+    /// with that hearing's score, before its words are judged; the rule then counts no second sign for
     /// that hearing (`LAMP_NAME_SIGN_TIED`, #8092). Before any turn only.
-    pub fn telling_near_not_the_name(mut self, told: Opened) -> Self {
+    pub fn telling_near_not_the_name(mut self, told: RuledNotTheName) -> Self {
         if let Some(shared) = Arc::get_mut(&mut self.shared) {
             shared.near_not_the_name = Some(told);
         }
@@ -10943,8 +10948,10 @@ async fn spoken(
             );
             // The rule counts no second sign for that hearing
             // (`LAMP_NAME_SIGN_TIED`, #8092).
-            if not_the_name && let Some(told) = &shared.near_not_the_name {
-                told(request);
+            if let Some(score) = not_the_name
+                && let Some(told) = &shared.near_not_the_name
+            {
+                told(request, score);
             }
             text
         }

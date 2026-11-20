@@ -405,15 +405,15 @@ fn a_first_word_is_a_sentence_of_its_own_only_before_a_stop_and_more_words() {
 /// One line heard as `heard`, lamp-name's near hearing `near` by its
 /// start and a face `turned` or not, `LAMP_NAME_AS_A_SENTENCE` on as in the
 /// product: the requests the rule was told `LAMP_NAME_NEAR` ruled not the
-/// name ([`Engine::telling_near_not_the_name`]).
-async fn told_not_the_name(heard: &str, near: Option<f32>, turned: bool) -> Vec<u64> {
+/// name, each with its near score ([`Engine::telling_near_not_the_name`]).
+async fn told_not_the_name(heard: &str, near: Option<f32>, turned: bool) -> Vec<(u64, f32)> {
     let script = Arc::new(Script {
         heard: Mutex::new([Ok(heard.to_owned())].into()),
         chats: Mutex::new([vec![text("Sure."), Ok(ChatEvent::Done)]].into()),
         ..Script::default()
     });
     let (engine, _, _) = scripted(script.clone());
-    let told: Arc<Mutex<Vec<u64>>> = Arc::default();
+    let told: Arc<Mutex<Vec<(u64, f32)>>> = Arc::default();
     let tell = told.clone();
     let mut engine = engine
         .heeding(Arc::new(|_, _, words, _, _| {
@@ -422,8 +422,8 @@ async fn told_not_the_name(heard: &str, near: Option<f32>, turned: bool) -> Vec<
         }))
         .hearing_the_name_near(Arc::new(move |_: (u64, u64)| (near, turned)))
         .taking_the_name_as_a_sentence(true)
-        .telling_near_not_the_name(Arc::new(move |request| {
-            tell.lock().unwrap().push(request);
+        .telling_near_not_the_name(Arc::new(move |request, score| {
+            tell.lock().unwrap().push((request, score));
         }));
     engine.submit(start(1));
     engine.submit(ProviderInput::Audio {
@@ -438,25 +438,28 @@ async fn told_not_the_name(heard: &str, near: Option<f32>, turned: bool) -> Vec<
     told.lock().unwrap().clone()
 }
 
-/// #8092 (lamp-74ff, build 14967, 20 Nov): request 4's line, lamp-name
-/// near at 0.86 by the line's start, and request 5's words heard near
-/// under [`crate::attention::SURE_SCORE`] (at 1.00 it is the next
-/// test's), their first word, set off, not the name: `LAMP_NAME_NEAR`
-/// ruled each not the name, and the rule is told so before it judges the
+/// #8092 (lamp-74ff, build 14967, 20 Nov): request 4's and request 5's
+/// lines, lamp-name near at 0.86 and 1.00 by the line's start, their first
+/// word, set off, not the name: `LAMP_NAME_NEAR` ruled each not the name,
+/// and the rule is told so, with the near score, before it judges the
 /// line, so the hearing counts by no second sign there
-/// (`LAMP_NAME_SIGN_TIED`). A word of the name's shape with no face turned
-/// is ruled so too. Not told: a first word taken as the name, the name
-/// itself, and a line with no near hearing.
+/// (`LAMP_NAME_SIGN_TIED`, but for a sure one: the next test). A word of
+/// the name's shape with no face turned is ruled so too. Not told: a first
+/// word taken as the name, the name itself, and a line with no near
+/// hearing.
 #[tokio::test]
 async fn a_line_name_near_rules_not_the_name_is_told_to_the_rule() {
-    assert_eq!(told_not_the_name("Really?", Some(0.86), false).await, [1]);
     assert_eq!(
-        told_not_the_name("Yes, it is.", Some(0.998), false).await,
-        [1]
+        told_not_the_name("Really?", Some(0.86), false).await,
+        [(1, 0.86)]
+    );
+    assert_eq!(
+        told_not_the_name("Yes, it is.", Some(1.0), false).await,
+        [(1, 1.0)]
     );
     assert_eq!(
         told_not_the_name("Leon, pass me that", Some(0.6), false).await,
-        [1]
+        [(1, 0.6)]
     );
     for (heard, near, turned) in [
         ("Louvre, I want to start reading more.", Some(0.62), false),
@@ -472,70 +475,83 @@ async fn a_line_name_near_rules_not_the_name_is_told_to_the_rule() {
     }
 }
 
-/// The first builder's 14:29 ruling on #8092: `LAMP_NAME_NEAR`'s "not the
-/// name" never throws away a sure hearing at the line's start. A hearing
-/// of [`crate::attention::SURE_SCORE`] or more, near by the line's start,
-/// is not ruled not the name though its first word, set off, doesn't sound
-/// like it, so the rule weighs it as any hearing at the line's start
-/// (`LAMP_NAME_SIGN_TIED`). 13:55 on lamp-52e6, request 16: a real call,
-/// near at 1.00, its hearing 1250 ms into the line, now a call. The
-/// meeting stays held: 10:55's request 4 (0.86, its hearing 15 s deep) and
-/// a line under the sure score whose first word is unlike the name. Named
-/// for the first builder: 10:55's request 5 (three words, near at 1.00,
-/// its hearing 1155 ms in) has 13:55's numbers, so out of the window it is
-/// now a call too. Off, the rule weighs each line as before, told or not.
+/// The first builder's rulings on #8092 at 14:29 and 14:47:
+/// `LAMP_NAME_NEAR`'s "not the name" never throws away a sure hearing at
+/// the line's start (near at [`crate::attention::SURE_SCORE`] or more by
+/// it) when the room is not busy or a face is turned to the lamp; the rule
+/// then weighs it as any hearing at the line's start
+/// (`LAMP_NAME_SIGN_TIED`). 13:55 on lamp-52e6, request 16: a real call in
+/// a quiet room, no look, near at 1.00, its hearing 1250 ms into the line:
+/// a call. 10:55 on lamp-74ff, request 5: three words in a busy meeting
+/// room, no look, near at 1.00, its hearing 1155 ms in: held; with a face
+/// turned it would be a call. Held too: request 4 (0.86, its hearing 15 s
+/// deep), quiet or busy, and a line under the sure score whose first word
+/// is unlike the name. Off, the rule weighs each line as before.
 #[tokio::test]
 async fn with_the_sign_tied_a_sure_hearing_at_the_start_outlives_not_the_name() {
     // Whether the rule drops the name heard in the room's sound for the
     // line, told what `LAMP_NAME_NEAR` ruled, out of a conversation.
-    let dropped = |tied: bool, told: &[u64], heard: &str, into_us: u64, score: f32| {
+    let dropped = |tied: bool, told: &[(u64, f32)], line: (&str, u64, f32), seen: (bool, bool)| {
+        let (heard, into_us, score) = line;
+        let (busy, turned) = seen;
         let began = 10_000_000;
         let mut attention = crate::attention::Attention::default();
         attention.ask_a_second_sign_of_the_name(true);
         attention.tie_the_second_sign(tied);
-        for request in told {
-            attention.near_not_the_name(*request);
+        for (request, near) in told {
+            attention.near_not_the_name(*request, *near);
         }
+        attention.set_room_busy(busy);
         attention.began_at(1, 1, began);
         attention.name_heard_scored(began + into_us, score);
         attention.heard(heard);
-        attention.weigh_the_name(None, false)
+        attention.weigh_the_name(Some(turned), false)
     };
-    let call_1355 = "Hey Mom, ask me a question.";
-    let told = told_not_the_name(call_1355, Some(1.0), false).await;
-    assert!(told.is_empty(), "13:55, told {told:?}");
-    assert!(!dropped(true, &told, call_1355, 1_250_000, 1.0), "13:55");
+    let (quiet, busy, busy_turned) = ((false, false), (true, false), (true, true));
+    let call_1355 = ("Hey Mom, ask me a question.", 1_250_000, 1.0);
+    let told = told_not_the_name(call_1355.0, Some(1.0), false).await;
+    assert_eq!(told, [(1, 1.0)]);
+    assert!(!dropped(true, &told, call_1355, quiet), "13:55");
     // At the sure score itself too.
-    let sure = Some(crate::attention::SURE_SCORE);
-    assert!(told_not_the_name(call_1355, sure, false).await.is_empty());
-    // 10:55's request 5: the same numbers, so a call out of the window.
-    let request_5 = "Yes, it is.";
-    let told = told_not_the_name(request_5, Some(1.0), false).await;
-    assert!(told.is_empty(), "10:55 request 5, told {told:?}");
+    let sure = crate::attention::SURE_SCORE;
+    let told = told_not_the_name(call_1355.0, Some(sure), false).await;
     assert!(
-        !dropped(true, &told, request_5, 1_155_000, 1.0),
-        "10:55 request 5"
+        !dropped(true, &told, (call_1355.0, 1_250_000, sure), quiet),
+        "13:55 at the sure score"
+    );
+    // 10:55's request 5: the same numbers in a busy room, nobody turned:
+    // held; a face turned to the lamp makes it a call.
+    let request_5 = ("Yes, it is.", 1_155_000, 1.0);
+    let told = told_not_the_name(request_5.0, Some(1.0), false).await;
+    assert_eq!(told, [(1, 1.0)]);
+    assert!(dropped(true, &told, request_5, busy), "10:55 request 5");
+    assert!(
+        !dropped(true, &told, request_5, busy_turned),
+        "10:55 request 5, a face turned"
     );
     // 10:55's request 4: near at 0.86, its hearing 15 s deep: held.
-    let told = told_not_the_name("Really?", Some(0.86), false).await;
-    assert_eq!(told, [1]);
-    assert!(
-        dropped(true, &told, "Really?", 15_194_000, 0.86),
-        "10:55 request 4"
-    );
-    // Under the sure score, its first word unlike the name: held.
-    let told = told_not_the_name(request_5, Some(0.998), false).await;
-    assert_eq!(told, [1]);
-    assert!(dropped(true, &told, request_5, 200_000, 0.998), "0.998");
-    // Off: as before, the ruling counts for nothing.
-    for (heard, into_us, score) in [
-        (call_1355, 1_250_000, 1.0),
-        (request_5, 1_155_000, 1.0),
-        (request_5, 200_000, 0.998),
-    ] {
+    let request_4 = ("Really?", 15_194_000, 0.86);
+    let told = told_not_the_name(request_4.0, Some(0.86), false).await;
+    assert_eq!(told, [(1, 0.86)]);
+    for seen in [quiet, busy] {
         assert!(
-            !dropped(false, &[1], heard, into_us, score),
-            "{heard} {score}, off"
+            dropped(true, &told, request_4, seen),
+            "10:55 request 4, {seen:?}"
         );
+    }
+    // Under the sure score, its first word unlike the name: held, even in
+    // a quiet room.
+    let under = ("Yes, it is.", 200_000, 0.998);
+    let told = told_not_the_name(under.0, Some(0.998), false).await;
+    assert_eq!(told, [(1, 0.998)]);
+    assert!(dropped(true, &told, under, quiet), "0.998");
+    // Off: as before, the ruling counts for nothing.
+    for (line, near) in [(call_1355, 1.0), (request_5, 1.0), (under, 0.998)] {
+        for seen in [quiet, busy] {
+            assert!(
+                !dropped(false, &[(1, near)], line, seen),
+                "{line:?}, {seen:?}, off"
+            );
+        }
     }
 }
