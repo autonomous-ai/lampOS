@@ -776,8 +776,8 @@ mod tests {
     }
 
     /// Level 1 (and 0, nothing said) fills nothing: the voice as today.
-    /// Level 5 fills about 40% of the answers with none, never within 20 s
-    /// of the last fill and never the same twice in a row; a matched cue is
+    /// Level 5 fills every answer with none (#8153), never within 8 s of
+    /// the last fill and never the same twice in a row; a matched cue is
     /// still sent at every level, and is no fill.
     #[test]
     fn an_answer_with_no_gesture_is_filled_only_above_level_one() {
@@ -785,17 +785,16 @@ mod tests {
             assert!(fills(level, 1_000, 30).is_empty(), "level {level}");
         }
         let spaced = fills(5, 1_000, 30);
-        assert!(
-            (350..=450).contains(&spaced.len()),
-            "{} of 1000",
-            spaced.len()
-        );
+        assert_eq!(spaced.len(), 1_000);
         let close = fills(5, 1_000, 5);
-        assert!(!close.is_empty());
+        // Every other answer 5 s apart: the 8 s gap skips the next.
+        assert_eq!(close.len(), 500);
         for pair in close.windows(2).chain(spaced.windows(2)) {
-            assert!(pair[1].0 - pair[0].0 >= 20_000_000, "{pair:?}");
+            assert!(pair[1].0 - pair[0].0 >= 8_000_000, "{pair:?}");
             assert_ne!(pair[1].1, pair[0].1, "{pair:?}");
         }
+        let half = fills(3, 1_000, 30).len();
+        assert!((450..=550).contains(&half), "{half} of 1000");
         assert!(fills(2, 1_000, 30).len() < fills(3, 1_000, 30).len());
         for level in 1..=5 {
             let mut cue = Cue::seeded(7);

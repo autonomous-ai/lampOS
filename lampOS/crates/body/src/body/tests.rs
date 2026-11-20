@@ -21792,6 +21792,70 @@ fn a_gestures_roll_at_level_five_plays_under_the_servos_speed() {
     assert!(fastest <= 21, "{fastest}");
 }
 
+/// The built-in nod asked at 8 s while it speaks, at `level` with
+/// `LAMP_BODY_ENERGY=on` (#8153): the report and the elbow's goal each step
+/// from then on.
+fn nodded_at(level: u8) -> (BodyReport, Vec<u16>) {
+    let (mut lamp, mut clock) = folded(Duration::from_secs(14));
+    lamp.arm_moves = true;
+    lamp.overload_clears = 1;
+    let limits = Limits {
+        energy: true,
+        ..Limits::folded_with(Tuning {
+            reach: [150, 15, 1, 250],
+            speed: 120,
+            servo_speed: 1_000,
+            servo_acceleration: 60,
+        })
+        .unwrap()
+    };
+    let time = clock.time.clone();
+    let seen = clock.time.clone();
+    let mut asked = false;
+    let mut elbows = Vec::new();
+    let report = run_alive(
+        &mut lamp,
+        &mut clock,
+        limits,
+        Some(HOME),
+        Some(standing(100, 60)),
+        None,
+        || Some((Mood::Speaking, 60)),
+        move || {
+            let due = !asked && time.get() >= Duration::from_secs(8);
+            asked |= due;
+            Asked {
+                gesture: due.then_some(&crate::clips::NOD),
+                energy: level,
+                ..Asked::default()
+            }
+        },
+        |glimpse| {
+            if seen.get() >= Duration::from_secs(8) {
+                elbows.push(glimpse.arm_goals[1]);
+            }
+        },
+    );
+    (report, elbows)
+}
+
+/// #8153: a built-in clip at level 5 is played 1.6 times its size (the
+/// nod's elbow, 212 counts peak to peak as recorded), passed through the
+/// anti-tip check as played; at level 1 as recorded.
+#[test]
+fn a_built_in_clip_at_level_five_plays_larger_than_at_level_one() {
+    let span = |goals: &[u16]| goals.iter().max().unwrap() - goals.iter().min().unwrap();
+    let (report, today) = nodded_at(1);
+    assert_eq!(report.gestures, 1, "{report:?}");
+    assert_eq!(report.tipping.refused, 0, "{report:?}");
+    let (report, lively) = nodded_at(5);
+    assert_eq!(report.gestures, 1, "{report:?}");
+    assert_eq!(report.tipping.refused, 0, "{report:?}");
+    let (today, lively) = (span(&today), span(&lively));
+    assert!((200..=225).contains(&today), "{today}");
+    assert!(lively >= today * 3 / 2, "{today} {lively}");
+}
+
 /// A gesture only an energy level above 1 starts of itself (`lively`, the
 /// voice's fill, a lively skill's run, #6893) is dropped while lamp-control
 /// holds the body; the same nod not marked plays under the lease, as today.
