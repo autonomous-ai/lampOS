@@ -91,7 +91,8 @@ Functions per `acts` class:
 
 Preconditions (`pre`) must be set up before the ask is played:
 
-- `face`: a known face is in view (17, 18, 75, 118, 119).
+- `face`: a known face is in view (17, 18, 19, 75, 118, 119). For 19 it must be
+  the same face as in 17, because a personal keep is tied to that face.
 - `after:<id>`: that case has run first in the same session (19 after 17,
   109 after 12, 110 after 11).
 

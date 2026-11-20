@@ -47,7 +47,6 @@ class CheckTest(unittest.TestCase):
             {"rule": "P9"}, {"rule": "P2"}, {"rule": "P1", "acts": "light"},
             {"rule": "P3", "expect": "hand_over", "doors": ["task"]},
             {"rule": "P7b", "expect": "hand_over", "doors": ["answer", "ask"]},
-            {"rule": "P8"},
         ]:
             cases = v3(); cases[0].update(patch)
             self.assertIn("rule", codes(self.run_check(cases)))
@@ -73,6 +72,22 @@ class CheckTest(unittest.TestCase):
             self.assertIn("pre", codes(self.run_check(cases)))
         cases = v3(); cases[18]["pre"] = ["face", "after:17"]
         self.assertEqual(self.run_check(cases), [])
+
+    def test_check_allows_p8_on_any_id(self):
+        cases = v3(); cases[0]["rule"] = "P8"
+        self.assertEqual(self.run_check(cases), [])
+
+    def test_check_flags_twins_differing_in_acts(self):
+        cases = v3()
+        cases[14].update(rule="P2", acts="volume")   # id 15
+        cases[15].update(rule="P2", acts="light")    # id 16
+        self.assertIn("twins", codes(self.run_check(cases, twins=[(15, 16)])))
+
+    def test_check_reports_uncomparable_twin_group(self):
+        cases = v3()
+        cases[82].update(rule="P3", expect="hand_over")   # id 83, no doors
+        errs = self.run_check(cases, twins=[(83, 84)])
+        self.assertTrue(any(e.startswith("83: twins:") for e in errs), errs)
 
     def test_check_flags_twins_diverging(self):
         cases = v3(); cases[82].update(rule="P7a")    # id 83, twin 84 still P1
@@ -184,3 +199,41 @@ class ReviewTest(unittest.TestCase):
         spec = [{"id": 1, "expect": "hand_over", "doors": ["ask"]}]
         with self.assertRaisesRegex(ValueError, "1"):
             rasks.agree(spec, [lab(1, "hand_over")])
+
+
+class CliTest(unittest.TestCase):
+    def agree_exit(self, spec, reviews, partial=False):
+        with tempfile.TemporaryDirectory() as d:
+            v3p = os.path.join(d, "v3.json"); rasks.save(v3p, spec)
+            keyp = os.path.join(d, "key.json")
+            with open(keyp, "w") as f:
+                json.dump({str(c["id"]): c["id"] for c in spec}, f)
+            paths = []
+            for n, rows in enumerate(reviews):
+                p = os.path.join(d, f"r{n}.json"); rasks.save(p, rows); paths.append(p)
+            argv = ["agree", v3p, *paths, "--key", keyp] + (["--partial"] if partial else [])
+            with open(os.devnull, "w") as null:
+                import contextlib
+                with contextlib.redirect_stdout(null):
+                    return rasks.main(argv)
+
+    def spec(self):
+        return [{"id": i, "ask": f"a{i}", "expect": "answer"} for i in range(1, 21)]
+
+    def test_agree_cli_passes_full_agreement(self):
+        rows = [lab(i) for i in range(1, 21)]
+        self.assertEqual(self.agree_exit(self.spec(), [rows, rows]), 0)
+
+    def test_agree_cli_fails_below_threshold(self):
+        good = [lab(i) for i in range(1, 21)]
+        bad = [lab(i, "hand_over", ["ask"]) if i <= 2 else lab(i) for i in range(1, 21)]   # 90%
+        self.assertEqual(self.agree_exit(self.spec(), [good, bad]), 1)
+
+    def test_agree_cli_fails_when_both_miss_a_case(self):
+        one = [lab(1, "hand_over", ["ask"])] + [lab(i) for i in range(2, 21)]   # 95%, at the bar
+        self.assertEqual(self.agree_exit(self.spec(), [one, one]), 1)
+
+    def test_agree_cli_partial_allows_a_sample(self):
+        sample = [lab(i) for i in range(1, 6)]
+        self.assertEqual(self.agree_exit(self.spec(), [sample]), 1)
+        self.assertEqual(self.agree_exit(self.spec(), [sample], partial=True), 0)

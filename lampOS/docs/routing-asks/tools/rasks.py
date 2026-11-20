@@ -83,8 +83,6 @@ def _rule_errors(c):
         errs.append(f"{rule} needs acts")
     if not needs_acts and "acts" in c:
         errs.append(f"{rule} takes no acts")
-    if rule == "P8" and c["id"] <= 100:
-        errs.append("P8 is for ids 101 and up only")
     return errs
 
 
@@ -156,11 +154,12 @@ def check(cases, v2_cases, policy_text, twins):
             err(group[0], "twins", f"group {group} has an absent member")
             continue
         try:
-            labels = {(m["expect"], door_set(m), m.get("rule")) for m in members}
+            labels = {(m["expect"], door_set(m), m.get("rule"), m.get("acts")) for m in members}
         except (KeyError, TypeError):
+            err(group[0], "twins", f"group {group} cannot be compared: a member has a bad label")
             continue
         if len(labels) > 1:
-            err(group[0], "twins", f"group {group} differs in expect, doors or rule")
+            err(group[0], "twins", f"group {group} differs in expect, doors, rule or acts")
 
     for detail in _policy_errors(policy_text):
         err(0, "policy", detail)

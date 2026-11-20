@@ -6,7 +6,7 @@ describes what exists. It does not say how today's model routes any ask.
 
 ## Setup the asks assume
 
-- The second route: DeepSeek chat (`deploy/product/lamp-voice.service:111`, `:113`).
+- The second route, the product's voice path: DeepSeek chat with the lamp's own functions (`deploy/product/lamp-voice.service:111`, `:113`).
 - `LAMP_HARD_ASKS_TO_AGENT=on` in lamp-voice and lamp-tasks, which offers
   `ask_agent` (`docs/switches.md:399`).
 - One language per lamp (`crates/voice/src/language.rs:1`; it supports five, and these asks use English and Vietnamese).

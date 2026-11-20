@@ -5,6 +5,17 @@ which door. The policy describes the behaviour we want. Rules are judged by
 what the person means, never by a word list or by how long their sentence is.
 Paths are in `lampOS/` on `origin/subdarren/task-progress`.
 
+Terms used below:
+
+- **v2**: the 100-case file from #7930 (`routing-asks-v2.json`). Its `about`
+  line is the only record of how it was labelled.
+- **The first builder**: the person who ruled on v2's doors in comments on
+  #7930 (at 03:05 and 04:08). Those rulings are not in the repo.
+- **The second route**: the product's voice path, DeepSeek chat with the
+  lamp's own functions (`LAMP_VOICE_ROUTE=second`); see `capabilities.md`.
+- **Door**: how a hand-over is made. `ask` = `ask_agent`, `task` =
+  `start_agent_task`, `answer` = no hand-over call.
+
 | rule | expect | doors | acts | meaning |
 |---|---|---|---|---|
 | P1 | answer | none | none | quick fact, maths, small talk, comfort, jokes, short poem; the time, the date and "how long until", read from the request's context. Any own-tool call is accepted; a hand-over fails |
@@ -140,12 +151,14 @@ cases run separately, because a lamp has one language.
   therefore check that a refusal is not handed to the agent; they do not check
   that the voice actually refuses. A lamp that answers a P8 ask in full passes.
 
-## Decisions on the open points
+## Decisions taken while building v3
 
-- O1. Long creative pieces the person asks to have written (stories, speeches) are `answer` or `task` (P7b).
-- O2. Summaries of a page or of the news are `ask` only (P3).
-- O3. The first builder's 03:05 and 04:08 rulings on #7930 are not in the
+These settle questions v2 left open.
+
+- Long creative pieces the person asks to have written (stories, speeches) are `answer` or `task` (P7b).
+- Summaries of a page or of the news are `ask` only (P3).
+- The first builder's 03:05 and 04:08 rulings on #7930 are not in the
   repo. v2's `about` is taken as their record. P3, P4 and P4b follow it; P7a
   and P7b depart from it.
-- O4. Coverage cases start at id 101 and carry `new: true`. Scores are not
+- Coverage cases start at id 101 and carry `new: true`. Scores are not
   comparable with the 19 Nov run of 81–88 of 100, because labels change.

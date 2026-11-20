@@ -9,7 +9,7 @@ ids, ask text and language), `policy.md` and `capabilities.md`.
 | Gate | What it checks | Result |
 |---|---|---|
 | G1 Traceable | Every case names a rule; every rule cites a source or is marked provisional | Pass (`check`) |
-| G2 Consistent | Rule, `expect`, `doors` and `acts` agree; 32 twin groups share a label | Pass (`check`) |
+| G2 Consistent | Rule, `expect`, `doors` and `acts` agree; 33 twin groups share a label | Pass (`check`) |
 | G3 Reproducible | Fresh blind reviewers reach v3's labels from the policy alone | Pass: two reviewers on the final text, `expect` 100% each, door 99.2% and 100%, no case missed by both |
 | G3b Human check | A person blind-labels 20 cases | **Pending**, for the lamp team (`review/human-sheet.md`) |
 | G4 Achievable | Every label can be passed within the lamp's contracts, or the policy names the contract change | Pass, with the weaknesses named in `policy.md` |
@@ -28,7 +28,7 @@ OK 119 cases
 
 `check` also confirms that the ask text, `kind` and `lang` of ids 1–100 are
 unchanged from v2. The tool's own tests: `python3 -I -m unittest` in `tools/`,
-18 tests, OK.
+25 tests, OK.
 
 ## G3: blind agreement
 
@@ -123,6 +123,20 @@ about 1–1.5 s; a hand-over answer after 20–90 s). It flagged 7
 An earlier user-side review decided the borderline cases from the first blind
 round (`review/user-lens.md`). It changed two labels against the reviewers:
 75 to P2 `memory`, and 83 (with twin 84) to P7b.
+
+## Changes after the blind rounds
+
+Made after round 4, from the final review's minor findings. None changes a
+route:
+
+- 105's ask was reworded to a clear-cut refusal; its label (P8) is unchanged.
+- 19 gained the `face` precondition that 17's keep needs.
+- 1 and 2 became a twin group; both were already P1.
+- `check` now compares `acts` within twin groups, reports a twin group it
+  cannot compare instead of skipping it, and no longer limits P8 to ids 101
+  and up (the policy does not say so). The `agree` command has tests for its
+  thresholds, the both-missed rule and `--partial`.
+- `policy.md` defines v2, the first builder, the second route and doors.
 
 ## What is not verified
 
