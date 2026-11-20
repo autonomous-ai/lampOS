@@ -5725,6 +5725,48 @@ after a take-over, but now for every turn:
     chain, so it keeps no conversation going and renews no call
     (`LAMP_BUSY_FOLLOW_UP_RENEWS`). After that the next line needs a look or
     the name, until a line with one is played.
+  - **Under a sure hearing, a face or the name in the words**
+    (`LAMP_NAME_FACE_OR_WORDS=on`, on in the product's lamp-voice.service,
+    #8136, from #8114's shapes 5-7). On lamp-74ff on 20 Nov (build 15146,
+    today's stable) two people talked Vietnamese with their backs to the
+    lamp. At 17:26:23 a seven-word line, lamp-name at 0.921 by 210 ms into
+    it, in a room the voice itself called busy with nobody turned to the
+    lamp, counted by `its hearing at the line's start` alone and was
+    answered (shape 5): the start is the same false hearing again. At
+    17:32:11 a hearing of 0.904 the faint floor turned away, in a request
+    speech to text gave no words, was owed the second look (`said to the
+    lamp by name and got nothing`, `crate::second_look`): the lamp spoke
+    unasked, and that opened the window the room's next lines were
+    answered in (shapes 6 and 7). The first builder's two rules at 17:36 on
+    #8114, under one switch:
+    - **A hearing under `attention::SURE_SCORE` (0.999)**, only in the
+      room's sound, counts only with a face turned to the lamp or the
+      line's words calling it (`attention::called`, or `called_by_name`
+      with `LAMP_NAME_IN_PASSING=ignored`), busy room or not; its place at
+      the line's start, closeness, said from close and a conversation going
+      on count for nothing alone (`Attention::need_a_face_or_words`, in
+      `weigh_the_name`). The journal says `its name, heard only in the
+      room's sound under a sure hearing (began N ms into the line), counts
+      for nothing: no face is turned to the lamp and its words don't call
+      it; its start or closeness is not enough; the model is not told it
+      was heard (LAMP_NAME_FACE_OR_WORDS, #8136)`. A sure hearing is
+      weighed as before. Known cost: a real call heard under 0.999 whose
+      words speech to text didn't write as the name, with no face turned,
+      is not answered.
+    - **A hearing the faint floor turned away, in a request with no
+      words**, owes no second look (`SecondLook::holding_a_faint_wordless_call`):
+      the coordinator marks a hearing over speech blocks the floor turned
+      away (`FaintNamed::turned_away`, the hearing `the faint floor turned
+      the line away` names), and a request whose transcript had no word
+      (`words_heard`) owes nothing for it. The journal says `request N: its
+      name was heard (score S) where the faint floor turned the line away,
+      and no words came: the lamp says nothing and opens no window
+      (LAMP_NAME_FACE_OR_WORDS, #8136)`. A request with words, and a
+      hearing the floor let by, are as before.
+    Not in it: the wordless cut-in calling a room with two voices "a quiet
+    room" (`LAMP_CUT_IN_WORDLESS_RESUMES`, shape 7's second half), and a
+    short line standing in a conversation's window by a hearing under the
+    sure score (`said_to_me`'s `named`).
 - **A hearing of the name stays with its own line**
   (`LAMP_NAME_STAYS_IN_ITS_LINE=on`, on in the product unit). On lamp-4ace on
   2026-10-26 at 06:21 (build 6919, the busy scene played) `lamp-name` heard

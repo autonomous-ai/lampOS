@@ -2257,8 +2257,21 @@ impl Attention {
         let ruled_out =
             self.near_not_the_name_of == Some(self.request) && !called_by_real_name(&self.heard);
         self.name_near_dropped = weighed && self.sign_tied && (ruled_out || one_word_unlike);
-        let alone =
-            weighed && (signs.is_empty() || self.name_short_dropped || self.name_near_dropped);
+        // `LAMP_NAME_FACE_OR_WORDS`: under a sure hearing only a face turned
+        // to the lamp or its words calling it count, busy room or not; the
+        // start is the same false hearing again (#8136: lamp-74ff, 17:26:23,
+        // 0.921 by 210 ms into two people's talk, answered).
+        self.name_unsure_dropped = weighed
+            && self.face_or_words
+            && !self.named_sure
+            && turned != Some(true)
+            && !text_calls
+            && !signs.is_empty();
+        let alone = weighed
+            && (signs.is_empty()
+                || self.name_short_dropped
+                || self.name_near_dropped
+                || self.name_unsure_dropped);
         self.name_signs = if weighed && !alone { signs } else { Vec::new() };
         if alone {
             self.named = false;
