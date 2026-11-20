@@ -70,6 +70,12 @@ fn output_of(command: &mut Command) -> Output {
     .unwrap()
 }
 
+/// The stand-in agent's last activity. The runtime reads the real wall
+/// clock, and a row last active before its task was handed over is an
+/// earlier task's and is dropped (#7930), so this sits after any test's
+/// hand-over (1 Jan 2100).
+const LAST_ACTIVE_UNIX_MS: u64 = 4_102_444_800_000;
+
 #[derive(Clone)]
 struct Injected(Arc<Mutex<Sample>>);
 impl Clock for Injected {
@@ -469,14 +475,14 @@ impl Adapter for Script {
         let mut listed = vec![Listed {
             agent_id: AGENT.into(),
             state: "working".into(),
-            last_active_unix_ms: Some(1_792_022_712_345),
+            last_active_unix_ms: Some(LAST_ACTIVE_UNIX_MS),
             about: self.counts.about.lock().unwrap().clone(),
         }];
         if self.counts.theirs.load(Ordering::SeqCst) {
             listed.push(Listed {
                 agent_id: THEIRS.into(),
                 state: "idle".into(),
-                last_active_unix_ms: Some(1_792_022_712_345),
+                last_active_unix_ms: Some(LAST_ACTIVE_UNIX_MS),
                 about: None,
             });
         }
@@ -1197,7 +1203,7 @@ fn with_progress_a_value_from_the_start_each_task_read_at_once_then_on_schedule_
         )
     );
     assert_eq!(task.working_s, Some(0));
-    assert_eq!(task.last_active_unix_ms, Some(1_792_022_712_345));
+    assert_eq!(task.last_active_unix_ms, Some(LAST_ACTIVE_UNIX_MS));
     // The line changes; the next read is half a minute later.
     *s.counts.about.lock().unwrap() = Some("Fixed it; all tests pass".into());
     s.clock.0.lock().unwrap().monotonic_ms = 29_999;
