@@ -5631,8 +5631,8 @@ backoffs, a spoken task's 3 put-backs, a skill run's words typed again,
 - **One value, `tasks/agent`.** lamp-tasks computes the lamp's own
   agent's readiness (`crate::agent`, `lamp_msgs::AgentReadiness`, kept
   value) and publishes it at its start and at every change of `state` or
-  `why`, only with the one session on (off, the topic is not touched and
-  the state is `off`). The same value is answered on every socket route
+  `why`, with the one session on; off, it is published once at the
+  start as `off`, so a value kept from an earlier stop never stays. The same value is answered on every socket route
   (the voice's, the app's, lamp-update's read-only one) by
   `{"op":"agent"}` → `{"ok":true,"agent":{"engine","state","why",
   "since_unix_ms","read_unix_ms"}}`. Journal: `tasks: agent: <old> ->
@@ -5679,12 +5679,17 @@ backoffs, a spoken task's 3 put-backs, a skill run's words typed again,
   at the open, `ensure` saying `confirmed: true` (or a session already up
   that Harness did not say unconfirmed), a hand-over taken, or the watch
   reading it `idle`/`done`; with none of these, 120 s after it was opened
-  (`OPEN_IDLE_WITHIN`, `confirm_if_warmed`), so it never stays `starting`
-  for good. So `prepare` refuses during the warm-up and nothing is handed
-  to a warming session. A hand-over refused by a session still warming
-  (not confirmed, or `ensure` made it new under 120 s ago, `made_new`)
-  ends that task told (`one_session_not_started`) but does not replace
-  the session: the agent reads `starting` again until it is confirmed.
+  (`OPEN_IDLE_WITHIN`, `confirm_if_warmed`) one `show` looks first: up, it
+  is confirmed; dead or still `starting`, a fault replaced fresh; no
+  verdict, looked at again 30 s later. So it never stays `starting` for
+  good, and is never taken as up blind. `prepare` refuses during the
+  warm-up and nothing is handed to a warming session. A hand-over refused
+  `ENGINE_NOT_READY` by a session still warming (not confirmed, or
+  `ensure` made it new under 120 s ago, `made_new`) ends that task told
+  (`one_session_not_started`) but does not replace the session: the agent
+  reads `starting` again until it is confirmed. `NOT_RUNNING` (dead) or a
+  whole hold not taken (a late delivery would run a task told not done)
+  is a fault even while warming: closed `--now`, recovered fresh.
 - **A hand-over refused ends the task at the first sign, before any
   recovery.** The kept session's first reply of a hand-over is held 10 s
   (`REPLY_KEPT_FIRST_HELD`). Its first `ENGINE_NOT_READY` ends the task
@@ -5721,7 +5726,10 @@ backoffs, a spoken task's 3 put-backs, a skill run's words typed again,
   once by the store `not_sent` `one_session_stuck` (`turn_broken`,
   `Engine::end_broken`: its agent and reads dropped, as for a task never
   handed over), so the voice tells it as it tells a refused hand-over,
-  then the session is replaced fresh. With a launch, read or close under
+  then the session is replaced fresh. A turn's end the watch read first
+  (`done`, then `stopped`) is read instead, never ended as stuck: its end
+  is taken before any break, and `end_broken` waits while a read of the
+  task is asked for. With a launch, read or close under
   way the store tries again at its next pass (`put_turn_broken`); a
   turn's end the store can't read yet is kept the same way
   (`put_turn_end`).
@@ -5757,10 +5765,11 @@ backoffs, a spoken task's 3 put-backs, a skill run's words typed again,
   replacement due, a spoken turn ended at once, above). `watch` says the
   state now first: that first line is never read as the end of a turn of
   ours. The lamp kills the watch on `done`; after that, with no turn of
-  ours held or nothing said but the first line (an idle session's last
-  `done`), it is not started again until a turn is handed over or 30 s
+  ours held, it is not started again until a turn is handed over or 30 s
   pass (`WATCH_IDLE_REST`): one Node child per 30 s while idle, not one
-  per 2-4 s. Ended at its own bound, or cancelled when another session
+  per 2-4 s. With a turn held it is started again 2 s later
+  (`WATCH_RETRY`), so an earlier turn's `done` never hides this turn's
+  end. Ended at its own bound, or cancelled when another session
   is open, it is started again at once. A watch that fails leaves the state unknown:
   with no turn held the session is let go (`recovering`, `watch_lost`)
   and ensured again at the next look, a live one coming back as it is,

@@ -2885,8 +2885,8 @@ nay.
 - **Một giá trị, `tasks/agent`.** lamp-tasks tính trạng thái sẵn sàng của
   agent riêng của đèn (`crate::agent`, `lamp_msgs::AgentReadiness`, giá
   trị được giữ) và phát nó lúc khởi động và mỗi khi `state` hoặc `why`
-  đổi, chỉ khi một phiên bật (tắt thì topic không bị chạm và trạng thái là
-  `off`). Cùng giá trị đó được trả lời trên mọi route của socket (của
+  đổi, khi một phiên bật; tắt thì nó được phát một lần lúc khởi động là
+  `off`, để một giá trị giữ lại từ lần dừng trước không bao giờ còn lại. Cùng giá trị đó được trả lời trên mọi route của socket (của
   voice, của app, route chỉ đọc của lamp-update) bởi `{"op":"agent"}` →
   `{"ok":true,"agent":{"engine","state","why","since_unix_ms",
   "read_unix_ms"}}`. Journal: `tasks: agent: <cũ> -> <mới> (<why>)`. Khi
@@ -2933,12 +2933,17 @@ nay.
   `ensure` nói `confirmed: true` (hoặc một phiên đã chạy sẵn mà Harness
   không nói là chưa xác nhận), một lần giao được nhận, hoặc watch đọc nó
   `idle`/`done`; không có điều nào, thì 120 s sau khi nó được mở
-  (`OPEN_IDLE_WITHIN`, `confirm_if_warmed`), để nó không bao giờ kẹt ở
-  `starting`. Vậy `prepare` từ chối trong lúc khởi động ấm và không gì
-  được giao cho phiên đang ấm lên. Một lần giao bị phiên còn đang ấm từ
-  chối (chưa xác nhận, hoặc `ensure` tạo mới dưới 120 s trước,
-  `made_new`) kết thúc việc đó có báo (`one_session_not_started`) nhưng
-  không thay phiên: agent đọc `starting` lại cho tới khi được xác nhận.
+  (`OPEN_IDLE_WITHIN`, `confirm_if_warmed`) một lần `show` nhìn trước:
+  chạy, thì được xác nhận; chết hoặc vẫn `starting`, là lỗi và được thay
+  mới; không kết luận, nhìn lại sau 30 s. Vậy nó không bao giờ kẹt ở
+  `starting`, và không bao giờ được coi là chạy khi chưa nhìn. `prepare`
+  từ chối trong lúc khởi động ấm và không gì được giao cho phiên đang ấm
+  lên. Một lần giao bị phiên còn đang ấm từ chối `ENGINE_NOT_READY` (chưa
+  xác nhận, hoặc `ensure` tạo mới dưới 120 s trước, `made_new`) kết thúc
+  việc đó có báo (`one_session_not_started`) nhưng không thay phiên: agent
+  đọc `starting` lại cho tới khi được xác nhận. `NOT_RUNNING` (chết) hoặc
+  cả lần giữ không được nhận (một lần giao muộn sẽ chạy việc đã báo là
+  không làm) là lỗi kể cả khi đang ấm: close `--now`, phục hồi mới.
 - **Một lần giao bị từ chối kết thúc việc ngay ở dấu hiệu đầu, trước mọi
   phục hồi.** Reply đầu tiên của một lần giao vào phiên được giữ được giữ
   10 s (`REPLY_KEPT_FIRST_HELD`). `ENGINE_NOT_READY` đầu tiên kết thúc việc
@@ -2973,7 +2978,10 @@ nay.
   kết thúc ngay `not_sent` `one_session_stuck` (`turn_broken`,
   `Engine::end_broken`: bỏ agent và các lần đọc của nó, như một việc chưa
   từng được giao), nên voice báo nó như báo một lần giao bị từ chối, rồi
-  phiên được thay mới. Khi có launch, read hoặc close đang chạy, store thử
+  phiên được thay mới. Kết thúc của lượt mà watch đọc trước (`done`, rồi
+  `stopped`) được đọc thay vào đó, không bao giờ bị kết thúc là kẹt: kết
+  thúc của nó được lấy trước mọi lỗi, và `end_broken` chờ khi một lần đọc
+  của việc đang được yêu cầu. Khi có launch, read hoặc close đang chạy, store thử
   lại ở lượt sau (`put_turn_broken`); kết thúc của một lượt mà store chưa
   đọc được cũng được giữ như vậy (`put_turn_end`).
 - **Phiên mới trước, không backoff mù.** Mọi lỗi đều thay phiên: close
@@ -3007,10 +3015,11 @@ nay.
   thay phiên được để lại, lượt nói được kết thúc ngay, ở trên). `watch` nói
   trạng thái hiện tại trước: dòng đầu đó không bao giờ được đọc là kết thúc
   của một lượt của ta. Đèn giết watch khi gặp `done`; sau đó, khi không có
-  lượt nào của ta được giữ hoặc không có gì ngoài dòng đầu (`done` cuối
-  của một phiên rảnh), nó không được chạy lại cho tới khi có một lần giao
-  hoặc qua 30 s (`WATCH_IDLE_REST`): một tiến trình con Node mỗi 30 s khi
-  rảnh, không phải mỗi 2-4 s. Kết thúc ở giới hạn riêng của nó, hoặc bị
+  lượt nào của ta được giữ, nó không được chạy lại cho tới khi có một lần
+  giao hoặc qua 30 s (`WATCH_IDLE_REST`): một tiến trình con Node mỗi 30 s
+  khi rảnh, không phải mỗi 2-4 s. Khi có lượt được giữ, nó được chạy lại
+  sau 2 s (`WATCH_RETRY`), để `done` của một lượt trước không bao giờ che
+  kết thúc của lượt này. Kết thúc ở giới hạn riêng của nó, hoặc bị
   huỷ khi có phiên khác mở, thì nó được chạy lại ngay. Một watch lỗi để trạng thái là không biết: khi không lượt
   nào được giữ, phiên được buông (`recovering`, `watch_lost`) và được
   ensure lại ở lần nhìn sau, phiên còn sống quay về như cũ, rồi được watch
