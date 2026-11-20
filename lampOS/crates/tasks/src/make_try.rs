@@ -638,9 +638,12 @@ mod tests {
         assert!(judged(Kind::Task, "scripts/fetch.py", &empty).is_err());
     }
 
+    /// What a [`Fake`] launch was asked: each script and its grants.
+    type Asked = Arc<Mutex<Vec<(String, Vec<String>)>>>;
+
     /// A launch that records what it was asked and answers `ran`.
     struct Fake {
-        asked: Arc<Mutex<Vec<(String, Vec<String>)>>>,
+        asked: Asked,
         ran: Ran,
     }
 
@@ -665,13 +668,7 @@ mod tests {
         }
     }
 
-    fn tries(
-        ran: Ran,
-    ) -> (
-        tempfile::TempDir,
-        Tries,
-        Arc<Mutex<Vec<(String, Vec<String>)>>>,
-    ) {
+    fn tries(ran: Ran) -> (tempfile::TempDir, Tries, Asked) {
         let work = tempfile::tempdir().unwrap();
         let asked = Arc::new(Mutex::new(Vec::new()));
         let tries = Tries {
