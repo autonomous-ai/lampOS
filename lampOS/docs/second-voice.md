@@ -5693,7 +5693,24 @@ after a take-over, but now for every turn:
     the hearing began to 0.3 s after (`worker::near_at_a_hearing`). The
     line is then judged as one with no name. A word taken as the name, the
     name in its words, and a line with no near hearing are as before.
-    Not changed: the short-line rule above, and the follow-up window.
+    The first builder's rulings at 12:45 on #8092 ("the bar is a pet's: it
+    looks up when it's called, and lets the room's talk go by") add two more
+    under the same switch. **One word:** a line of one word, `?` or not,
+    with no face turned to the lamp, counts the room's hearing only when its
+    word sounds like the name (`second_provider::sounds_like_the_name`, or
+    one written for it, or words calling it): "Yeah?" and "Okay?" stay said
+    to nobody, "Lamp?" and "Lump?" are weighed as before; the journal line
+    above says so. **The window:** with `LAMP_SAID_TO_ME=on` and eyes, a
+    line in the conversation's window with no look (no face turned to the
+    lamp and the speaker's pose unread; `PoseUnread` counts as no look) is
+    held, `held: no look in a conversation` (`said_to_me::Held::NoLook`).
+    The one exception is an answer to the lamp's waiting question
+    (`lamp_asked` and a fresh `question_waits`, never a stale one), let out
+    once as `an answer to the lamp's waiting question, no look: it renews
+    nothing` (`said_to_me::Said::AnswerNoLook`): its answer goes on the
+    chain, so it keeps no conversation going and renews no call
+    (`LAMP_BUSY_FOLLOW_UP_RENEWS`). After that the next line needs a look or
+    the name, until a line with one is played.
 - **A hearing of the name stays with its own line**
   (`LAMP_NAME_STAYS_IN_ITS_LINE=on`, on in the product unit). On lamp-4ace on
   2026-10-26 at 06:21 (build 6919, the busy scene played) `lamp-name` heard

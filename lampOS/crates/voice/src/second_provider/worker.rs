@@ -12110,7 +12110,7 @@ impl Heeding {
         if self.attention.weigh_the_name(signs.turned, signs.going_on) {
             if self.attention.name_dropped_by_near() {
                 eprintln!(
-                    "lamp-voice second: request {request}: its name, heard only in the room's sound (began {} ms into the line{soft_lead}), counts for nothing: LAMP_NAME_NEAR ruled the line not the name, and that verdict wins over every second sign; the model is not told it was heard (LAMP_NAME_SIGN_TIED, #8092)",
+                    "lamp-voice second: request {request}: its name, heard only in the room's sound (began {} ms into the line{soft_lead}), counts for nothing: LAMP_NAME_NEAR ruled the line not the name, or its one word, with no face turned, doesn't sound like the name, and that verdict wins over every second sign; the model is not told it was heard (LAMP_NAME_SIGN_TIED, #8092)",
                     name_into_ms.map_or_else(|| "?".to_owned(), |ms| ms.to_string())
                 );
             } else if self.attention.name_dropped_as_short() {

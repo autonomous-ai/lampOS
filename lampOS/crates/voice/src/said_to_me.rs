@@ -18,7 +18,9 @@
 //!    looking away over the line, no question of the lamp's waiting
 //!    ([`Line::lamp_asked`]): a person head down talking at a phone just
 //!    after the lamp answered is not going on with it (#7721, lamp-74ff,
-//!    18 Nov). A pose unread lets it out ([`Said::PoseUnread`]);
+//!    18 Nov). A pose unread lets it out ([`Said::PoseUnread`]), but with
+//!    [`Line::looks_needed`] (`LAMP_NAME_SIGN_TIED`, #8092) a line with no
+//!    look is held, but for one answer to the lamp's waiting question;
 //! 3. **said to the lamp:** a face turned to it, facing (pitch inside
 //!    [`PITCH_DEG`] and not looking away over the line's looks, when the
 //!    eyes say so), seen speaking the line in at least [`FACING_LOOKS`]
@@ -318,7 +320,7 @@ pub fn judge(line: Line<'_>) -> Said {
     if line.going_on {
         // `LAMP_NAME_SIGN_TIED` (#8092): no look, no renewal; one answer
         // to the lamp's waiting question only.
-        if false && line.looks_needed && !line.turned && line.pitch.is_none() && line.looking.is_none() {
+        if line.looks_needed && !line.turned && line.pitch.is_none() && line.looking.is_none() {
             return if line.lamp_asked && line.question_waits && !line.look_free_answered {
                 Said::AnswerNoLook
             } else {
