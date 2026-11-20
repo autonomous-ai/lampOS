@@ -5214,7 +5214,23 @@ chính đèn (đèn, đầu, một câu nói). "When I say send my test note, em
    Sau mọi câu hỏi khác, kỹ năng tự tạo vẫn bắt đầu trong code ("What sort
    of name do you like?"; lần thử trực tiếp của lead, 19/11 09:06: bốn câu
    "daily brief" sau câu "Want me to ...?" của đèn đều để model đọc, và
-   model không gọi gì). Một lần chạy tự nói lời của nó
+   model không gọi gì). Một kỹ năng tạo trong cuộc trò chuyện này
+   (`just_made::made_here`: của chủ đèn, trong 10 phút của nó, vẫn còn
+   giữ, chưa tắt hay bật từ đó) bắt đầu trong code sau bất kỳ câu hỏi nào,
+   kể cả câu nói lại khi tạo hay câu trả lời của đèn cho lần thử đầu có nêu
+   tên nó: các từ của nó là lệnh kích hoạt của chính người dùng (phán quyết
+   của first builder trên #8022, 20/11 07:29; lamp-52e6, 14951, 07:25:
+   "Hey Lamp, apple file." ngay sau khi tạo và lần nữa 58 s sau đều
+   `calls=none`). Một lời đồng ý đang giữ, hay một lần xoá hoặc tắt/bật
+   mà lượt cuối của đèn đã chạy, vẫn chờ. Journal ghi rõ: "the lamp's last
+   words asked something, but it is the skill made in this conversation:
+   called in code", hoặc "not called in code: made in this conversation,
+   but the lamp's last turn removed or turned a made skill"; và một câu
+   không nêu kỹ năng nào trong khi có kỹ năng vừa tạo ghi bao nhiêu kỹ
+   năng đó có trong danh sách kỹ năng tự tạo mà bộ so khớp đọc ("the heard
+   words named no skill; 1 made in this conversation, 0 of them among the
+   made skills the heard words are read for"), không có từ nào của câu và
+   không có tên kỹ năng. Một lần chạy tự nói lời của nó
    (`says` của lamp-skills, `made_run::speaks_itself`) kết thúc lượt ở đó,
    không có vòng 2 và không có câu nào của riêng đèn, nên câu say của kỹ
    năng, ở mức ưu tiên 8, là điều đầu tiên được nghe, khoảng một giây sau
