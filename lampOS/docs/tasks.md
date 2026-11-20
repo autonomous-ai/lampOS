@@ -5265,6 +5265,16 @@ in and signed out, and on 0.6.60, signed in (#7507's ROW).
   keeps the task queued and typed once the session is idle. A busy status
   line now reads `working`; sign W still needs two looks and the record
   unmoved for 600 s.
+- **Harness 0.6.77 for OpenClaw (openharness#4509, carried by the 0.6.78 pin, #8138).**
+  A message OpenClaw refused while its history was failing is cleared
+  (only text Harness itself typed) and sent once more after `/session`.
+  `held` says why in one sentence (`namedState`): the device waiting for
+  approval, the Gateway refusing its sign-in, or no Gateway running.
+  `wait` and `watch` report `starting`, `failed` and `held` at once (about
+  3 s, where a run that ended with no new turn took 33 s, up to 60 s). A
+  launch is confirmed in about 0.3-0.6 s, and a Harness daemon restart
+  between typing the first task and OpenClaw's confirmation no longer
+  loses it. 0.6.76 and 0.6.78 change nothing for OpenClaw.
 - **Signed-in replies, acknowledged.** With a Harness that acknowledges replies, every reply into a session of the person's (the one pane of `harness new`, `--reply-named`, a resumed session, a first message) counts as handed over only on `taken` with its `inputId`; a `TIMEOUT` with `cancelled: true` is typed again (a first message's is not: any answer but `taken` leaves it uncertain, `type_first_message`), one with `cancelled: false` and an `inputId` is typed and never sent again, and the one pane's turn ends with `harness wait --after <inputId>`. An older Harness's answers read as before.
 - **Rotation and removal.** OpenClaw's kept session is not rotated by
   count (its gateway compacts the session itself, `agents.defaults.compaction`);
