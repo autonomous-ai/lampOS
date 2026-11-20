@@ -1191,11 +1191,17 @@ pub fn keep_gateway(
 
 /// Between rounds (#8105): with OpenClaw there ([`WRAPPER`] and its unit),
 /// the gateway kept as [`Gateway`] says. Each change is said once; a
-/// gateway already as wanted is left with no word.
+/// gateway already as wanted is left with no word. A gateway started here
+/// with the one run path on (`one_path`) gets agent `main`'s allow-list
+/// entry added at once ([`keep_run_entry`], which waits for it to be
+/// ready), as a round adds it, so a first make after OpenClaw is chosen
+/// doesn't wait for the next round (Twelve's P2 on #8116).
 pub fn keep_between_rounds(
     root: &Path,
     systemd: &mut dyn Systemd,
     gateway: Gateway,
+    one_path: bool,
+    run: &mut Runner,
     say: &mut dyn FnMut(&str),
 ) {
     let there = fs::symlink_metadata(on(root, WRAPPER)).is_ok()
@@ -1234,6 +1240,11 @@ pub fn keep_between_rounds(
             ));
         }
         keep_gateway(root, systemd, gateway, say);
+        if gateway == Gateway::Wanted && one_path && keep_run_entry(run, say) == Some(false) {
+            say(&format!(
+                "agent {RUN_AGENT}'s allow-list entry not taken after the gateway started; the next round asks the one-shot"
+            ));
+        }
     }
 }
 
