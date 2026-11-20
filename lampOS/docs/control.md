@@ -1199,6 +1199,12 @@ agent.
 They run on the developer's computer, never on a lamp. Until `lamp-control`
 is built they are tested against a fake server that speaks this schema.
 
+### The cloud's message for a play (`lamp_msgs::PlayAllow`, #7415)
+
+When the lamp plays a URL for an app or a computer (`lamp-play`, `LAMP_PLAY_URL`), **which hosts the play may touch comes from the cloud's message, never from the asker.** lamp-cloud, which makes the cloud call for the app, sends lamp-control `{"play_allow": {"app", "play_id", "hosts", "ttl_ms", "url"?}}` **before** it gives the app the answer: `app` an app's manifest name or a paired computer's id, `play_id` from 1 (the app passes it back in `speaker.play_url`), `hosts` at most 16 exact lower-case names, every host the play may touch, redirect hops and trackers included (an empty list withdraws the set), `ttl_ms` 1 ms to 10 minutes on lamp-control's own clock, and `url` the exact URL when the cloud pins it. lamp-control keeps the sets in memory only (at most 8 for each asker, each used up by the play it starts), never on disk and never in a journal. The type (`crates/msgs/src/play_allow.rs`) is only the checked payload; the op that takes it is lamp-control's and comes after it.
+
+**It is a request on lamp-control's own socket, accepted from lamp-cloud's cgroup alone, and not a bus topic.** A bus topic's `source` is a name the publisher writes into its own header, and every `lampos` unit (22 of them, among them the ones that start skill and agent code) may publish to any topic (the bus's directories are 0770 and its sockets 0660, one group), so a subscriber cannot know who published and the bus cannot keep a grant to one publisher. lamp-control knows lamp-cloud by its cgroup (`SO_PEERCRED`'s pid, `/proc/<pid>/cgroup`), as it does for `app_state` and the apps' yes.
+
 ## Sounds
 
 A paired computer keeps clips of its own on its lamp and plays them by name
