@@ -207,6 +207,35 @@ pub fn sentence_count(said: &str) -> usize {
     sentences(said).len()
 }
 
+/// Which sentence of `said` (1-based, split as [`asks_to_make`] splits
+/// it) alone opens with the ask and says what the skill does, the first
+/// read past the lamp's name as [`make_asked`] reads it
+/// (`second_provider::past_the_name_heard_as`, `named` as [`heard_named`]
+/// keeps it); `None` when none does, or the line takes the make back or
+/// doubts it, as [`asks_to_make`] reads the whole line. For round 1's
+/// journal line (#8022 case 2): a count, never a word.
+pub fn ask_sentence(said: &str, named: bool) -> Option<usize> {
+    if crate::remember::asked::withdrawn(said)
+        || sentences(said)
+            .iter()
+            .flatten()
+            .any(|word| DOUBT.contains(&word.as_str()))
+    {
+        return None;
+    }
+    let asks = |words: &[String]| ask_ends(words).is_some_and(|end| words.len() > end);
+    let said = said.replace('\u{2019}', "'");
+    said.split_inclusive(['.', '!', '?', ';'])
+        .filter(|sentence| !lower_words(sentence).is_empty())
+        .enumerate()
+        .find(|&(at, sentence)| {
+            let past = crate::second_provider::past_the_name_heard_as(sentence, named);
+            let past = past.filter(|_| at == 0).map(lower_words);
+            asks(&lower_words(sentence)) || past.is_some_and(|words| asks(&words))
+        })
+        .map(|(at, _)| at + 1)
+}
+
 /// The person's lines that name the lamp (`named`, as
 /// `second_provider::answer` knows it), newest last, at most
 /// [`NAMED_KEPT`], by their words: [`force`] sees only the messages
@@ -230,6 +259,13 @@ pub fn heard_named(said: &str, named: bool) {
     }
 }
 
+/// Whether `said` was kept as a line that names the lamp ([`heard_named`]).
+pub fn named(said: &str) -> bool {
+    NAMED
+        .lock()
+        .is_ok_and(|lines| lines.iter().any(|line| line == said))
+}
+
 /// What [`force`] reads of a person's line, and round 1's `make_ask=`:
 /// whether it asks to make a skill ([`asks_to_make`]) as said or, on a
 /// line that names the lamp ([`heard_named`]), past the lamp's name heard
@@ -238,10 +274,7 @@ pub fn heard_named(said: &str, named: bool) {
 /// ROW, lamp-52e6, 20 Nov 14:38). Said to a person ("Hey, Anna, make me a
 /// skill that …"), the line names nothing, and is read as said.
 pub fn make_asked(said: &str) -> bool {
-    let named = NAMED
-        .lock()
-        .is_ok_and(|lines| lines.iter().any(|line| line == said));
-    let past = crate::second_provider::past_the_name_heard_as(said, named);
+    let past = crate::second_provider::past_the_name_heard_as(said, named(said));
     asks_to_make(said) || past.is_some_and(asks_to_make)
 }
 

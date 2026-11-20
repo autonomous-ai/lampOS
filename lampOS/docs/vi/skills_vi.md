@@ -837,15 +837,25 @@ sau:
      1 mà chat được hỏi (không phải kỹ năng được code gọi theo tên, không
      phải dòng trích dẫn) ghi, trên đúng các message nó được hỏi:
      `lamp-voice second: request N: round 1: task_offered=y make_offered=y
-     forced=make_skill make_ask=y sentences=1`. `task_offered` và
+     forced=make_skill make_ask=y sentences=1 ask_in=1 opening=name`.
+     `task_offered` và
      `make_offered` là `start_agent_task` và `make_skill` có được đưa hay
      không; `forced` là hàm mà `tool_choice` chỉ tên (`none` nếu không có);
      `make_ask` là dòng của người nói có yêu cầu tạo kỹ năng hay không,
      theo đúng cách lệnh ép đọc (`make_skill_asked::make_asked`, xem dưới),
-     và `sentences` là số câu nó đếm được trong dòng. `?` khi services không
-     cho biết được, hoặc khi message cuối không phải dòng của người nói.
-     Chỉ có tên, `y`/`n` và một con số, không bao giờ có từ nào của dòng.
-     Test: `round_one_forced::round_one_says_its_force_and_the_make_ask_never_its_words`.
+     và `sentences` là số câu nó đếm được trong dòng; `ask_in` là câu nào
+     (đếm từ 1, tách câu như lệnh ép tách) tự nó mở bằng yêu cầu và nói kỹ
+     năng làm gì, câu đầu được đọc sau tên đèn như lệnh ép đọc
+     (`make_skill_asked::ask_sentence`; `none` nếu không câu nào, hoặc dòng
+     có từ nghi ngờ hay rút lại), và `opening` là cách dòng mở đầu: `name`
+     khi mở bằng chính tên đèn được tách ra (`name_call_rest`), `misheard`
+     khi tên đèn bị nghe thành từ khác trên một dòng gọi đèn
+     (`wake_heard_as`), `none` khi không phải hai trường hợp đó. `?` khi
+     services không cho biết được, hoặc khi message cuối không phải dòng của
+     người nói. Chỉ có tên, `y`/`n` và con số, không bao giờ có từ nào của
+     dòng. Test:
+     `round_one_forced::round_one_says_its_force_and_the_make_ask_never_its_words`,
+     `round_one_forced::round_one_says_which_sentence_asks_and_how_the_line_opens`.
    - **Sau tên đèn bị nghe thành từ khác** (#8022 case 2, nguyên nhân
      thứ ba: ROW của kit-8101 trên lamp-52e6, 20/11 14:38, phát yêu cầu
      tạo kỹ năng; speech to text viết tên đèn thành một từ khác, tách bằng
