@@ -1,6 +1,6 @@
 # The Store apps' manage helper, one request (#7415, docs/apps.md): started by lamp-apps-manage.socket for each
 # connection, as root, the connection its standard input and output. `lamp-apps-manage asked` reads one line and
-# answers one line; every change but a list needs LAMP_STORE_APPS=on in this environment (a drop-in turns it on, #7415).
+# answers one line; every change but a list needs LAMP_STORE_APPS=on in this environment (the unit sets it, #7415, #7956).
 # The owner's yes is asked of lamp-control's admin socket (a unix socket); the package is read from the staging
 # folder, never fetched here (PrivateNetwork). It makes no user and writes no unit. It writes no app's data: a remove asks systemd
 # (`systemctl clean --what=state`) to take the dynamic user's state and its link away, so no app's data path is writable here. Slice= the parts', which lamp-control reads.
@@ -19,6 +19,8 @@ Type=simple
 User=root
 Group=root
 Slice=lampos-parts.slice
+# LAMP_STORE_APPS: #7415, the Store apps; on in the product by the first builder's DEFAULT-ON of 20 Nov; its rules are its rows in docs/switches.md.
+Environment=LAMP_STORE_APPS=on
 ExecStart=/opt/lampOS/apps-manage/current/lamp-apps-manage asked
 StandardInput=socket
 StandardOutput=socket
