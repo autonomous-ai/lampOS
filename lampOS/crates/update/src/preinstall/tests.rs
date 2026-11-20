@@ -33,6 +33,7 @@ fn a_product_lamp_wants_all_three_by_the_builds_defaults() {
             engines: true,
             tasks,
             one_path,
+            now: false,
         };
         let wanted = wanted(true, switches, &none);
         assert!(wanted.harness.on);
@@ -95,6 +96,7 @@ fn an_image_with_none_asks_for_all_three_with_the_rounds_asks() {
         engines: true,
         tasks: true,
         one_path: true,
+        now: false,
     };
     let wanted = wanted(true, switches, &none);
     let asked = ask_missing(&root, &records, &wanted).unwrap();
@@ -177,6 +179,7 @@ fn openclaw_s_gateway_unit_is_written_as_a_round_writes_it() {
         engines: true,
         tasks: true,
         one_path: true,
+        now: false,
     };
     let wanted = wanted(true, switches, &none);
     assert_eq!(write_units(&root, &wanted), Ok(true));

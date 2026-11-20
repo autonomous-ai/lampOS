@@ -1702,7 +1702,9 @@ on lamp-e82d on 11 Nov.
 
 ### Update now (#7517, `LAMP_UPDATE_NOW`)
 
-With `LAMP_UPDATE_NOW=on` in `lamp-update`'s environment (off unless set),
+With `LAMP_UPDATE_NOW=on` for `lamp-update` (on in the product: its
+environment, else the carried `/etc/lampOS/update.env`, as its own switches
+are read, "The update switch file"; off unless set either way),
 `serve` takes the owner's Update now: an `update/check` with `now`,
 vouched for by `lamp-cloud`'s mark (`/var/lib/lampos-cloud/update-now`, at
 most 5 s old, each once; `crate::update_now`). Between rounds it starts
@@ -2586,8 +2588,10 @@ With `LAMP_UPDATE_APPLY=on` in `lamp-update.service`'s environment:
   (`manifest::UPDATE_ENV`, `deploy/product/settings/update.env`,
   `install::UPDATE_SETTING`) is carried by every build with settings from
   updater 12 (`manifest::UPDATE_ENV_UPDATER`, #6607): `LAMP_APP_ENGINES=on`,
-  `LAMP_SKILL_TASKS=on` and `LAMP_SKILL_DEFAULT_AGENT=on` (the one run
-  path, #6685, read only with `LAMP_SKILL_TASKS` on). No round rewrites lamp-update's own unit, so
+  `LAMP_SKILL_TASKS=on`, `LAMP_SKILL_DEFAULT_AGENT=on` (the one run
+  path, #6685, read only with `LAMP_SKILL_TASKS` on) and
+  `LAMP_UPDATE_NOW=on` (the owner's Update now, #7517, on any lamp, as
+  `LAMP_APP_ENGINES` is). No round rewrites lamp-update's own unit, so
   these lines in `lamp-update.service` never reached a lamp already in a
   home. lamp-update reads each switch at its start
   (`switches::update_switches`): set in its environment, `on` exactly, and

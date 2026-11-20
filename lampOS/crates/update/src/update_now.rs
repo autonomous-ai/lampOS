@@ -22,7 +22,9 @@ use std::{
     time::Duration,
 };
 
-/// The switch, in lamp-update's environment: `on` exactly. Off by default.
+/// The switch, `on` exactly, read as lamp-update's own switches are
+/// (`crate::switches::update_switch`): its environment, else the carried
+/// `/etc/lampOS/update.env`, which turns it on in the product (#7517).
 pub const SWITCH: &str = "LAMP_UPDATE_NOW";
 
 /// The quiet the voice is given before an Update now's switch: time to end
