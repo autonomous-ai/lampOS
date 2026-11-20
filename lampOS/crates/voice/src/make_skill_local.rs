@@ -13410,7 +13410,10 @@ printf 'tar of %s' \"$name\" > \"$3/$name-1.0.0.tar\"\n",
                 format!("runs: when Bitcoin goes under 90000 dollars\n{priced}"),
             ),
             (200, reminder),
-            (200, format!("runs: every 90 minutes\n{watch}")),
+            (
+                200,
+                format!("runs: every 90 minutes\ntell: once_while_holding\n{watch}"),
+            ),
         ]);
         let told = make_with_by(
             0,
@@ -13426,7 +13429,7 @@ printf 'tar of %s' \"$name\" > \"$3/$name-1.0.0.tar\"\n",
         assert_eq!((sent.len(), tasks.hand_overs()), (4, 0), "{told}");
         assert!(is_judgement(&sent[0], BTC), "{}", sent[0]);
         assert!(
-            sent[1].contains("A watch on something only the internet tells")
+            sent[1].contains("add a line tell: once_while_holding")
                 && sent[1].contains("rain-watch")
                 && sent[1].contains(made_skill::REMINDER_IS_TIMER),
             "the watch told beside the reminder's refusal: {}",
@@ -13486,6 +13489,75 @@ printf 'tar of %s' \"$name\" > \"$3/$name-1.0.0.tar\"\n",
             made_with_of(&keeping, "bitcoin-watch").as_deref(),
             Some("hermes")
         );
+        // The model judged it a watch made to speak when something holds:
+        // its task keeps the lamp's tell, said back (#8089).
+        assert_eq!(
+            table["do"][0]["task"]["tell"].as_str(),
+            Some(crate::make_no_cannot::TELL_ONCE),
+            "{table:?}"
+        );
+        assert!(
+            told.to_string()
+                .contains("telling you once each time it holds"),
+            "{told}"
+        );
+        net_make_here(None);
+        made_skill::set_loose_here(None);
+        made_skill::set_reactions_here(None);
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    /// The Reviewer-lead's must-check on #8089: "every 2 hours, tell me
+    /// the headlines" is a plain report every while, not a watch: the
+    /// model writes no `tell:` line, so its task keeps no `tell` and every
+    /// run's words are said. It is kept on the lamp's clock every 2 hours,
+    /// said back "Every 2 hours", granted `net`.
+    #[test]
+    fn with_the_switch_a_report_every_while_keeps_no_tell_once() {
+        made_skill::set_reactions_here(Some(true));
+        made_skill::set_loose_here(Some(true));
+        net_make_here(Some(true));
+        let (root, keeping, copy) = keeping_copied("reactions-headlines");
+        const HEADLINES: &str = "Lamp, every 2 hours, tell me the headlines.";
+        let report = trigger_answer(
+            "headlines",
+            "net, speak",
+            "clock/local",
+            "field = \"known\"\nequals = true\ncooldown = \"2h\"\n",
+        );
+        let tasks = agent_answering(vec![]);
+        let (url, served) = service_sent(vec![
+            judgement(false),
+            (200, format!("runs: every 2 hours\n{report}")),
+        ]);
+        let told = make_with_by(
+            0,
+            None,
+            HEADLINES,
+            &keeping,
+            chat_at(url),
+            NOW,
+            || None,
+            Some(&tasks.agent()),
+        );
+        let sent = served.join().unwrap();
+        assert_eq!((sent.len(), tasks.hand_overs()), (2, 0), "{told}");
+        assert!(
+            sent[1].contains("every 2 hours, tell me the headlines")
+                && sent[1].contains("has no tell: line"),
+            "the report's example told: {}",
+            sent[1]
+        );
+        assert_eq!(told["made"], "headlines", "{told}");
+        assert!(told.to_string().contains("Every 2 hours"), "{told}");
+        assert!(!told.to_string().contains("once each time"), "{told}");
+        let words = crate::make_no_cannot::task_words(HEADLINES);
+        let table = one_task_of(&copy, &words, crate::make_no_cannot::RUN);
+        assert_eq!(table["trigger"]["cooldown"].as_str(), Some("2h"));
+        assert!(
+            table["do"][0]["task"].get("tell").is_none(),
+            "a report says every run: {table:?}"
+        );
         net_make_here(None);
         made_skill::set_loose_here(None);
         made_skill::set_reactions_here(None);
@@ -13526,11 +13598,7 @@ printf 'tar of %s' \"$name\" > \"$3/$name-1.0.0.tar\"\n",
         );
         let sent = served.join().unwrap();
         assert_eq!((sent.len(), tasks.hand_overs()), (2, 0), "{told}");
-        assert!(
-            sent[1].contains("A watch is never a reminder"),
-            "{}",
-            sent[1]
-        );
+        assert!(sent[1].contains("Neither is a reminder"), "{}", sent[1]);
         assert!(told.get("made").is_none(), "{told}");
         assert!(
             told["error"].as_str().is_some_and(

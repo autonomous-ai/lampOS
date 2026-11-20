@@ -3643,10 +3643,21 @@ cả hai người viết.
   now, answer only a dash (-)", và câu đó không nói gì. **Nói một lần cho
   tới khi điều kiện thôi đúng (#8089, P2 của Twelve trong HOLD):**
   lamp-skills đọc câu trả lời của lần chạy là có lời, im lặng (chỉ một
-  gạch hoặc không có gì) hay lỗi (`task::ran`), và với lần chạy của việc
-  theo dõi mà không ai hỏi bằng giọng nói lúc đó
-  (`lamp_voice::made_skill::is_clock_watch` của `skill.toml`), giữ một dấu
-  đã nói theo skill và sha256 của thư mục trong `task-watch-told.json` của
+  gạch hoặc không có gì) hay lỗi (`task::ran`). Chỉ việc theo dõi được làm
+  để nói khi điều kiện đúng mới được nói một lần (must-check của
+  Reviewer-lead trên #8089): mô hình phân biệt theo nghĩa giữa việc theo
+  dõi ("if Bitcoin goes under 90k, tell me") và báo cáo đều đặn ("every 2
+  hours, tell me the headlines", ví dụ thứ hai trong prompt,
+  `make_no_cannot::REPORT_EXAMPLE`), và chỉ viết dòng `tell:
+  once_while_holding` cho việc theo dõi (`make_no_cannot::tells_once`);
+  trên việc theo dõi theo đồng hồ, đèn giữ nó trong bước task, `task = {
+  task, run, tell = "once_while_holding" }` (`make_no_cannot::TELL_ONCE`;
+  trên trigger khác thì bỏ đi và ghi nhật ký), nói lại là ", telling you
+  once each time it holds", và lamp-skills không nhận `tell` nào khác
+  (`task::TELL_ONCE_WHILE_HOLDING`, `TaskStep::tell_once`). Báo cáo không
+  có `tell` và nói lời của mọi lần chạy, nói lại là "Every 2 hours, …".
+  Với lần chạy của việc theo dõi có đánh dấu mà không ai hỏi bằng giọng
+  nói lúc đó, lamp-skills giữ một dấu đã nói theo skill và sha256 của thư mục trong `task-watch-told.json` của
   `--state-dir` (`task::watch_tells`): lần chạy đầu tiên điều kiện đúng
   được nói và đánh dấu; khi còn dấu, lần chạy điều kiện đúng không nói gì
   (nhật ký `its watch still holds, told already: not said again`); lần
@@ -3666,6 +3677,10 @@ cả hai người viết.
   dõi, mỗi cái 16 lần một ngày, đã lấp đầy nó nếu không có gì khác, và lần
   chạy vượt quá không được giao, chỉ có một dòng nhật ký. Test:
   `a_watch_tells_once_until_it_stops_holding`,
+  `only_a_watch_made_to_speak_when_it_holds_is_told_once`,
+  `a_task_is_told_once_only_with_the_lamps_own_tell`,
+  `only_a_watch_the_model_marked_is_told_once`,
+  `with_the_switch_a_report_every_while_keeps_no_tell_once`,
   `a_no_net_refusal_is_said_once_a_day_unless_asked_by_voice`,
   `with_reactions_on_a_watch_on_outside_data_is_told_on_the_clock`,
   `a_reminder_after_a_trigger_on_what_no_topic_carries_is_asked_again_as_a_watch`,

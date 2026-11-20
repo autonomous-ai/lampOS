@@ -6131,7 +6131,14 @@ fn hand_task(
             _ => tried.failed(),
         };
         let state = state.as_deref();
-        let found = watch_found(&skill, &folder, state, found.take(), ran.take(), asked_at);
+        let found = watch_found(
+            &skill,
+            (&folder, step.tell_once),
+            state,
+            found.take(),
+            ran.take(),
+            asked_at,
+        );
         tell_its_run(
             &skill,
             found,
@@ -6147,15 +6154,17 @@ fn hand_task(
     });
 }
 
-/// What a run's agent `found` that is said: all of it, but for a clock
-/// watch's run nobody asked by voice now (`asked_at`, [`asked_now`]) once
-/// its condition was told and still holds (#8089,
-/// `lamp_skills::task::watch_tells`, its mark in `state`): a watch made by
-/// voice on the lamp's clock (`lamp_voice::made_skill::is_clock_watch` of
-/// its `skill.toml` in `folder`) tells once until it stops holding.
+/// What a run's agent `found` that is said: all of it, but for a watch's
+/// run nobody asked by voice now (`asked_at`, [`asked_now`]) once its
+/// condition was told and still holds (#8089,
+/// `lamp_skills::task::watch_tells`, its mark in `state`, keyed by the
+/// sha256 of its `folder`): only a skill made to speak when something
+/// holds, its `do.task`'s `tell_once`
+/// ([`lamp_skills::task::TELL_ONCE_WHILE_HOLDING`]), tells once until it
+/// stops holding; any other says every run's words.
 fn watch_found(
     skill: &str,
-    folder: &Path,
+    (folder, tell_once): (&Path, bool),
     state: Option<&Path>,
     found: Option<Vec<String>>,
     ran: Option<lamp_skills::task::Ran>,
@@ -6164,10 +6173,10 @@ fn watch_found(
     let (Some(state), Some(ran)) = (state, ran) else {
         return found;
     };
-    if asked_now(asked_at, unix_ms())
-        || !std::fs::read_to_string(folder.join("skill.toml"))
-            .is_ok_and(|text| lamp_voice::made_skill::is_clock_watch(&text))
-    {
+    // Only a watch made to speak when something holds carries its `tell`
+    // (the Reviewer-lead's must-check on #8089): a plain report every
+    // while ("every 2 hours, tell me the headlines") says every run.
+    if !tell_once || asked_now(asked_at, unix_ms()) {
         return found;
     }
     let sha256 = lamp_skills::task::folder_sha256(folder).unwrap_or_default();
@@ -7099,6 +7108,7 @@ mod tests {
             words: "Sum up this morning's mail".into(),
             run: "scripts/main.py".into(),
             quiet,
+            tell_once: false,
         };
         let mut room = task_room("morning-mail", &step(Some(window)), &runner);
         assert_eq!(room.quiet, Some(window));
@@ -7276,6 +7286,7 @@ mod tests {
             words: "Find the bitcoin price".into(),
             run: "scripts/main.py".into(),
             quiet: None,
+            tell_once: false,
         }));
         let now = unix_ms() - 2_000;
         for (skill, calls, voice, switched) in [
@@ -7368,6 +7379,7 @@ mod tests {
             words: "Check my mail".into(),
             run: "scripts/main.py".into(),
             quiet: None,
+            tell_once: false,
         }));
         let now = unix_ms();
         for owners in [true, false] {
@@ -9033,6 +9045,7 @@ mod tests {
                 words: "Read my unread mail.".into(),
                 run: "scripts/mail.sh".into(),
                 quiet: None,
+                tell_once: false,
             }))
         };
         assert_eq!(
@@ -9155,6 +9168,7 @@ mod tests {
             words: lamp_skills::core_agent::PILOTS[0].tasks[0].task.into(),
             run: lamp_skills::core_agent::RUN.into(),
             quiet: None,
+            tell_once: false,
         }));
         let fired = Instant::now();
         let _made = start(
@@ -9212,6 +9226,7 @@ mod tests {
                 words: "Start a study block.".into(),
                 run: "scripts/study.sh".into(),
                 quiet: None,
+                tell_once: false,
             }))
         };
         assert_eq!(
@@ -9464,5 +9479,47 @@ mod tests {
         let did = refused;
         assert_eq!(did.why, "its trigger held");
         assert!(!did.why.contains("Walter"));
+    }
+
+    /// The Reviewer-lead's must-check on #8089: only a skill made to speak
+    /// when something holds (its `do.task`'s `tell_once`) is told once
+    /// while it holds. A plain report every while ("every 2 hours, tell me
+    /// the headlines") says both of two runs with words. A marked watch
+    /// says the first of two holding runs, nothing for a run not holding,
+    /// and the next holding run again. A run asked by voice now is always
+    /// said.
+    #[test]
+    fn only_a_watch_made_to_speak_when_it_holds_is_told_once() {
+        use lamp_skills::task::Ran;
+        let dir = tempfile::tempdir().unwrap();
+        let (state, folder) = (dir.path().join("state"), dir.path().join("skill"));
+        std::fs::create_dir_all(&state).unwrap();
+        std::fs::create_dir_all(&folder).unwrap();
+        std::fs::write(folder.join("skill.toml"), "kind = \"installable\"\n").unwrap();
+        let words = || Some(vec!["Here are the headlines.".to_owned()]);
+        let found = |skill: &str, once: bool, found: Option<Vec<String>>, ran: Ran| {
+            watch_found(skill, (&folder, once), Some(&state), found, Some(ran), None)
+        };
+        // A plain report: every run's words said.
+        for _ in 0..2 {
+            assert_eq!(found("headlines", false, words(), Ran::Words), words());
+        }
+        // A marked watch: once while it holds, again after it didn't.
+        let holds = || Some(vec!["Bitcoin is under 90,000 dollars.".to_owned()]);
+        assert_eq!(found("bitcoin-watch", true, holds(), Ran::Words), holds());
+        assert_eq!(found("bitcoin-watch", true, holds(), Ran::Words), None);
+        assert_eq!(found("bitcoin-watch", true, None, Ran::Silent), None);
+        assert_eq!(found("bitcoin-watch", true, holds(), Ran::Words), holds());
+        assert_eq!(found("bitcoin-watch", true, holds(), Ran::Words), None);
+        // Asked by voice now: said, the mark aside.
+        let asked = watch_found(
+            "bitcoin-watch",
+            (&folder, true),
+            Some(&state),
+            holds(),
+            Some(Ran::Words),
+            Some(unix_ms()),
+        );
+        assert_eq!(asked, holds());
     }
 }
