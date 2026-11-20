@@ -207,6 +207,13 @@ pub fn sentence_count(said: &str) -> usize {
     sentences(said).len()
 }
 
+/// Keeps whether `said`, a person's line, names the lamp (`named`, as
+/// `second_provider::answer` knows it), for [`force`], which sees only the
+/// messages (#8022 case 2).
+pub fn heard_named(said: &str, named: bool) {
+    let _ = (said, named);
+}
+
 /// The force the second route's chat is given with the switch on
 /// (`second_provider::net::Chat::forcing`): a request whose last message is
 /// a person's line that plainly asks to make a skill must call
