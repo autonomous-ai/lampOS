@@ -10,8 +10,7 @@ use crate::second_provider::net::Force;
 
 /// The function `force` names for the person's one line `said`.
 fn forced(force: &Force, said: &str) -> Option<&'static str> {
-    force(&[Message::system("You are a lamp."), Message::user(said)])
-        .map(|forced| forced.name)
+    force(&[Message::system("You are a lamp."), Message::user(said)]).map(|forced| forced.name)
 }
 
 /// Each word-read first-round force, its own natural ask as said after
@@ -69,10 +68,18 @@ fn each_force_reads_its_ask_past_the_lamps_name_set_off_or_misheard() {
         assert_eq!(forced(&force, &stopped), Some(name), "{switch}: {stopped}");
         let misheard = format!("Hey, Lynn, {ask}");
         crate::tools::make_skill_asked::heard_named(&misheard, true);
-        assert_eq!(forced(&force, &misheard), Some(name), "{switch}: {misheard}");
+        assert_eq!(
+            forced(&force, &misheard),
+            Some(name),
+            "{switch}: {misheard}"
+        );
         let to_a_person = format!("Hey, Anna, {ask}");
         crate::tools::make_skill_asked::heard_named(&to_a_person, false);
-        assert_eq!(forced(&force, &to_a_person), None, "{switch}: {to_a_person}");
+        assert_eq!(
+            forced(&force, &to_a_person),
+            None,
+            "{switch}: {to_a_person}"
+        );
     }
 }
 
@@ -83,7 +90,10 @@ fn a_misheard_name_is_read_past_only_while_the_line_names_the_lamp() {
     let force = crate::tools::schedule_asked::force();
     let said = "Hey, Lynn, set a timer for two minutes.";
     crate::tools::make_skill_asked::heard_named(said, true);
-    assert_eq!(forced(&force, said), Some(crate::tools::schedule_asked::TIMER));
+    assert_eq!(
+        forced(&force, said),
+        Some(crate::tools::schedule_asked::TIMER)
+    );
     crate::tools::make_skill_asked::heard_named(said, false);
     assert_eq!(forced(&force, said), None);
 }
