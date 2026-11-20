@@ -7429,6 +7429,18 @@ fn conversation_with_gate_inner(
             lamp_audio::duplex::LATE_YIELD_WINDOW_BLOCKS,
         );
     }
+    // A person heard Unknown past a reply's start counts toward the yield's
+    // onset run (`LAMP_CUT_IN_STALE_ONSET=on`, #7413): a cut-in in a pause
+    // of the lamp's story, its alignment stale or its render silent, was
+    // never 7 Over in a row (lamp-52e6, 20-21 Nov). Off unless set.
+    let stale_onset = duplex && crate::turn_taking::cut_in_stale_onset();
+    if stale_onset {
+        eprintln!(
+            "lamp-voice: stale onsets: a block heard unknown past an answer's first {} blocks counts toward the {} that make the lamp stop for a person",
+            lamp_audio::duplex::Confirmation::EVALUATED.early_blocks,
+            lamp_audio::duplex::Confirmation::EVALUATED.onset_blocks,
+        );
+    }
     detector.keep_first_words(first_words);
     // A line that begins softly keeps its first word (`LAMP_SOFT_START=on`):
     // an ordinary start, the lamp silent, may begin at it. Off unless set;
@@ -7670,6 +7682,9 @@ fn conversation_with_gate_inner(
         }
         if late_yield {
             mask.cut_in_late_yield();
+        }
+        if stale_onset {
+            mask.cut_in_stale_onset();
         }
         if backchannel_holds {
             mask.hold_backchannels();
