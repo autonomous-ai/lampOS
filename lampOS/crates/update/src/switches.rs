@@ -268,6 +268,11 @@ pub struct UpdateSwitches {
     /// crate::update_now::SWITCH), on any lamp, read as `engines` is: the
     /// carried file turns it on for a lamp already in a home.
     pub now: bool,
+    /// OpenClaw's gateway only while OpenClaw is the lamp's default agent
+    /// (#8105, `LAMP_OPENCLAW_GATEWAY_BY_DEFAULT`,
+    /// crate::openclaw_install::BY_DEFAULT_SWITCH), on any lamp, read as
+    /// `engines` is.
+    pub gateway_by_default: bool,
 }
 
 /// lamp-update's switches, each by [`update_switch`], `env` giving
@@ -294,6 +299,11 @@ pub fn update_switches(
             root,
             crate::update_now::SWITCH,
             env(crate::update_now::SWITCH).as_deref(),
+        ),
+        gateway_by_default: update_switch(
+            root,
+            crate::openclaw_install::BY_DEFAULT_SWITCH,
+            env(crate::openclaw_install::BY_DEFAULT_SWITCH).as_deref(),
         ),
         tasks,
         one_path: tasks
@@ -571,6 +581,7 @@ mod tests {
                 tasks: true,
                 one_path: true,
                 now: true,
+                gateway_by_default: false,
             }
         );
         assert!(restart_for(started, now));
