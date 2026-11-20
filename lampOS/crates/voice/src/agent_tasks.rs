@@ -2154,7 +2154,17 @@ pub fn prepared_next(lead_in: bool, choosing: bool, who: &str) -> String {
 }
 
 /// What the model is told after `confirm_agent_task` handed the work over.
+/// The lamp's own work ([`OWN_ENGINE`]) is said in the first person, never
+/// as given to the lamp (#7930).
 pub fn handing_over_next(lead_in: bool, who: &str) -> String {
+    if who == OWN_ENGINE {
+        return if lead_in {
+            "They have heard you say you will work on it. Add only, in a few words, that you will tell them when it is done, unless you said that already. It has not been started yet: do not say it has."
+        } else {
+            "Tell them in a few natural words that you will work on it now and will let them know when it is done, the way a chief of staff would (\"Sure, I'll work on that. I'll tell you when it's done.\"). It has not been started yet: do not say it has."
+        }
+        .to_owned();
+    }
     if lead_in {
         format!(
             "They have heard you say you are giving it to {who}. Add only, in a few words, that you will tell them when it is done, unless you said that already. It has not been taken up yet: do not say it has."
@@ -2170,6 +2180,15 @@ pub fn handing_over_next(lead_in: bool, who: &str) -> String {
 /// over ([`QUESTIONS_FLAG`]): that it asked, that the answer takes a few
 /// minutes, and that it is told when it comes, never guessed now.
 pub fn asked_next(lead_in: bool, who: &str) -> String {
+    // The lamp's own work in the first person (#7930).
+    if who == OWN_ENGINE {
+        return if lead_in {
+            "They have heard you say you will look into it. Add only, in a few words, that it may take a few minutes and you will tell them what you find, unless you said that already. Nothing is found yet: never guess or give the answer yourself."
+        } else {
+            "Tell them in a few natural words that you are looking into it, that it may take a few minutes, and that you will tell them what you find (\"Sure, I'll look into that. It may take a few minutes; I'll tell you what I find.\"). Nothing is found yet: never guess or give the answer yourself."
+        }
+        .to_owned();
+    }
     if lead_in {
         format!(
             "They have heard you say you are giving it to {who}. Add only, in a few words, that it may take a few minutes and you will tell them what {who} says, unless you said that already. {who} has not answered yet: never guess or give the answer yourself."
@@ -2683,6 +2702,12 @@ fn missing_target(
 /// that, and never that it can't be reached just now (#1390). No place is
 /// named: a home has no "office", and a target's name can be anything.
 fn not_set_up(who: &str) -> Value {
+    // The lamp's own work in the first person (#7930).
+    if who == OWN_ENGINE {
+        return json!({"error":
+            "That isn't set up here yet, so it can't be started. \
+             Say so plainly in a few words (\"That isn't set up here yet.\")."});
+    }
     json!({"error": format!(
         "{who} isn't set up for the lamp yet, so this can't be handed over. \
          Say so plainly in a few words: it needs setting up on the computer first."
@@ -5596,9 +5621,23 @@ fn work_of(record: &Value) -> Option<(&str, &'static str)> {
     Some((id, kind))
 }
 
-/// Who has a piece of work, as the person calls them: the voice's name for
-/// the record's engine, else its own words, short.
+/// Whether a work record's engine is one the lamp runs itself (#7930): one
+/// of the lamp's engines as last read, or Hermes or OpenClaw, which run
+/// on the lamp alone.
+fn own_engine_work(record: &Value) -> bool {
+    let said = record["who"].as_str().unwrap_or_default();
+    let mut engines = lamp_engines();
+    engines.extend(["hermes".to_owned(), "openclaw".to_owned()]);
+    lamp_engine_called(&engines, said).is_some()
+}
+
+/// Who has a piece of work, as the person calls them: [`OWN_ENGINE`] for
+/// the lamp's own, never its engine's name (the owner, #7930); else the
+/// voice's name for the record's engine, else its own words, short.
 fn work_who(record: &Value) -> String {
+    if own_engine_work(record) {
+        return OWN_ENGINE.to_owned();
+    }
     let said = record["who"].as_str().unwrap_or_default();
     name_of(said).map_or_else(
         || {
@@ -6063,8 +6102,10 @@ fn from_record(record: &Value, id: &str, told_file: &Path) -> Value {
     }
     if !settled && let Some(tool) = step_tool(record) {
         answered["step"] = json!({"n": record["step"]["n"].as_u64(), "tool": tool});
+        // The lamp's own work is the task's, never its engine's (#7930).
+        let whose = if who == OWN_ENGINE { "the task" } else { &who };
         answered["next"] = json!(format!(
-            "Tell them in a few words how far {who} is: step is the tool it used last and tools how many it has used; say it plainly, never the tool's code name. Then say you will tell them yourself when it is done. Do not check again unless they ask again."
+            "Tell them in a few words how far {whose} is: step is the tool it used last and tools how many it has used; say it plainly, never the tool's code name. Then say you will tell them yourself when it is done. Do not check again unless they ask again."
         ));
     }
     answered
@@ -6548,16 +6589,17 @@ pub(crate) fn forget_sessions_if(
     if !emptied || !theirs {
         return told;
     }
+    // The work this voice handed over last too, its label the person's
+    // words (#7930), whatever the tasks part answers (a failed mark write
+    // too): no note and no "lost after a restart" for work forgotten on
+    // purpose.
+    set_handed(None);
     match ask(
         &directory.join("voice.sock"),
         &json!({"op":"forget_sessions"}),
         FORGET_SESSIONS_DEADLINE,
     ) {
         Some(answer) if answer["ok"] == true => {
-            // The work this voice handed over last too, its label the
-            // person's words (#7930): no note and no "lost after a
-            // restart" for work forgotten on purpose.
-            set_handed(None);
             if answer["forgotten"] == true {
                 eprintln!(
                     "lamp-voice: the sessions the lamp started were forgotten with everything about them"
@@ -10012,6 +10054,68 @@ pub(crate) mod tests {
         let _ = std::fs::remove_dir_all(&directory);
     }
 
+    /// #7930 (the owner): a record of the lamp's own engine is told as the
+    /// lamp's own work with no engine name, its step as how far the task
+    /// is; a computer's agent the person named keeps its name.
+    #[test]
+    fn a_record_names_a_computers_agent_never_the_lamps_own() {
+        lamp_engines_here(Some(&["openclaw"]));
+        let own = json!({"id":"w4","kind":"task","who":"OpenClaw","words":"Research Hermes, the Greek god",
+            "state":"working","elapsed_s":5,"tools":1,"step":{"n":1,"tool":"web_search"},"done":false});
+        assert_eq!(work_who(&own), OWN_ENGINE);
+        assert_eq!(work_entry(&own).unwrap()["who"], OWN_ENGINE);
+        let told_file =
+            std::env::temp_dir().join(format!("lamp-voice-told-own-{}", std::process::id()));
+        let told = from_record(&own, "w4", &told_file);
+        let next = told["next"].as_str().unwrap();
+        assert!(next.contains("how far the task is"), "{next}");
+        assert!(
+            !next.contains("OpenClaw") && !next.contains("the lamp is"),
+            "{next}"
+        );
+        // A task about Hermes keeps it in its own words.
+        assert!(told["task"].as_str().unwrap().contains("Hermes"), "{told}");
+        let named = json!({"id":"w5","kind":"task","who":"Codex","words":"Fix the parser",
+            "state":"working","tools":1,"step":{"n":1,"tool":"Edit"},"done":false});
+        assert_eq!(work_who(&named), "Codex");
+        let told = from_record(&named, "w5", &told_file);
+        assert!(
+            told["next"].as_str().unwrap().contains("how far Codex is"),
+            "{told}"
+        );
+        lamp_engines_here(None);
+        let _ = std::fs::remove_file(&told_file);
+    }
+
+    /// #7930: the lamp's own work is handed over and asked in the first
+    /// person, never "giving that to the lamp"; a named agent as before.
+    #[test]
+    fn the_lamps_own_work_is_handed_over_in_the_first_person() {
+        for lead_in in [false, true] {
+            for line in [
+                handing_over_next(lead_in, OWN_ENGINE),
+                asked_next(lead_in, OWN_ENGINE),
+            ] {
+                assert!(!line.contains(OWN_ENGINE), "{line}");
+                assert!(!line.contains("giving"), "{line}");
+            }
+        }
+        assert!(handing_over_next(false, OWN_ENGINE).contains("\"Sure, I'll work on that."));
+        assert!(asked_next(false, OWN_ENGINE).contains("\"Sure, I'll look into that."));
+        assert!(handing_over_next(false, "Codex").contains("\"Sure, I'm giving that to Codex."));
+        let error = not_set_up(OWN_ENGINE)["error"].as_str().unwrap().to_owned();
+        assert!(
+            !error.contains(OWN_ENGINE) && error.contains("isn't set up here"),
+            "{error}"
+        );
+        assert!(
+            not_set_up("Codex")["error"]
+                .as_str()
+                .unwrap()
+                .starts_with("Codex isn't set up")
+        );
+    }
+
     /// #7930: with a work id, check_agent_task asks lamp-tasks for that one
     /// record (`work`) and answers about it: a task the store no longer holds, its
     /// step's tool and tool count, never the agent's words.
@@ -10027,7 +10131,9 @@ pub(crate) mod tests {
         assert!(answered, "{told}");
         assert_eq!(seen.recv().unwrap(), json!({"op":"work","id":"w3"}));
         assert_eq!(told["work_id"], "w3", "{told}");
-        assert_eq!(told["who"], "Hermes", "{told}");
+        // The lamp's own engine is never named (the owner, #7930).
+        assert_eq!(told["who"], OWN_ENGINE, "{told}");
+        assert!(!told.to_string().contains("Hermes"), "{told}");
         assert_eq!(told["state"], "working", "{told}");
         assert_eq!(told["tools"], 4, "{told}");
         assert_eq!(told["elapsed_s"], 60, "{told}");
@@ -10038,7 +10144,10 @@ pub(crate) mod tests {
         );
         assert!(told.get(NEWS_KEY).is_none(), "{told}");
         assert!(
-            told["next"].as_str().unwrap().contains("how far Hermes is"),
+            told["next"]
+                .as_str()
+                .unwrap()
+                .contains("how far the task is"),
             "{told}"
         );
         // The record's words are marked quoted and untrusted.
@@ -10200,11 +10309,13 @@ pub(crate) mod tests {
         assert_eq!(kinds, ["task", "task", "task"], "{told}");
         assert_eq!(
             works[1],
-            json!({"id":"w3","kind":"task","who":"Hermes",
+            json!({"id":"w3","kind":"task","who":OWN_ENGINE,
                 "label":"Water the garden plants every morning at seven, and then",
                 "state":"working","done":false,"elapsed_s":60,"tools":4,"step":"write_file"})
         );
+        // A computer's agent keeps its name; the lamp's own never has one.
         assert_eq!(works[2]["who"], "Claude Code");
+        assert_eq!(works[0]["who"], OWN_ENGINE);
         // The newest, done, told from its record.
         assert_eq!(told["work_id"], "r9", "{told}");
         assert_eq!(told["answer"], "The plants are watered.", "{told}");

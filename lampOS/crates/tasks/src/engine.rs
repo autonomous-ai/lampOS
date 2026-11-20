@@ -1714,11 +1714,19 @@ impl<P: Persistence> Engine<P> {
     }
     /// The owner's "forget everything" now (#7930): this store and its
     /// newest task id, so every task it holds, on the work records yet or
-    /// not, is left off them ([`Engine::works`]).
+    /// not, is left off them ([`Engine::works`]); one only prepared now is
+    /// not, so a yes after the forget puts it on them.
     pub fn forget_mark(&self) -> crate::works::Forgotten {
         crate::works::Forgotten {
             store_id: self.state.store_id.clone(),
             through: self.state.next_task_id.saturating_sub(1),
+            prepared: self
+                .state
+                .tasks
+                .iter()
+                .filter(|task| task.dispatch.state == DispatchState::Prepared)
+                .map(|task| task.id)
+                .collect(),
         }
     }
     pub fn session_id(&self) -> &str {

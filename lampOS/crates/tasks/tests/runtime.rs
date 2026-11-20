@@ -4429,6 +4429,28 @@ fn forget_sessions_covers_a_store_task_not_yet_on_the_records() {
     s.counts.hold_launch.store(false, Ordering::SeqCst);
 }
 
+/// #7930 (Twelve's P3): a task prepared before forget everything and
+/// confirmed after it is a new yes: it is on the records.
+#[test]
+fn forget_sessions_spares_a_task_prepared_before_and_confirmed_after() {
+    let _alone = works_alone();
+    let s = Running::new(false);
+    s.counts.hold_launch.store(true, Ordering::SeqCst);
+    let prepared = s.ask(json!({"op":"prepare","guard":s.guard(),
+        "text":"Find a bakery near West Lake","target":"coding"}));
+    assert_eq!(prepared["ok"], true, "{prepared}");
+    assert_eq!(s.trusted(json!({"op":"forget_sessions"}))["ok"], true);
+    let confirmed = s.trusted(s.confirmation(&prepared));
+    assert_eq!(confirmed["ok"], true, "{confirmed}");
+    assert!(records_hold(
+        &s,
+        &prepared["id"],
+        "bakery near West Lake",
+        3_000
+    ));
+    s.counts.hold_launch.store(false, Ordering::SeqCst);
+}
+
 /// #7930 (Heron's P2 1): after forget everything, a fresh lamp-tasks over
 /// the same store doesn't open the forgotten tasks again; one handed over
 /// after it is on the records.
