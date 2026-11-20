@@ -17458,7 +17458,18 @@ async fn answer(
                 .skill_named
                 .as_ref()
                 .filter(|_| read_back_named.is_none())
-                .and_then(|named| named(&said))
+                .and_then(|skill| {
+                    // Past the lamp's name heard as another word, as its
+                    // kept line is ([`wake_heard_as`]): "Hey, Lynn. An
+                    // apple file." (#8022's kit-8043 ROW, lamp-52e6, 20 Nov
+                    // 09:14: `calls=none`).
+                    skill(&said).or_else(|| {
+                        named
+                            .then(|| wake_heard_as(&said))
+                            .flatten()
+                            .and_then(|(_, rest)| skill(rest))
+                    })
+                })
         })
         .flatten();
     // The line a skill was matched in, for whether the lamp's last words
@@ -17643,6 +17654,12 @@ async fn answer(
     // The heard words, kept for a hand-over made in code when an agent
     // they name is still given no `start_agent_task` (#6547 cause 3).
     let named_words = named_agent.is_some().then(|| said.clone());
+    // The words the made-skill matcher reads, past the lamp's name heard as
+    // another word, for its miss line's shape below.
+    let skill_words = named
+        .then(|| wake_heard_as(&said))
+        .flatten()
+        .map_or_else(|| said.clone(), |(_, rest)| rest.to_owned());
     let question = match picture {
         Some(jpeg) => Message::user_seeing(said, &jpeg),
         None => Message::user(said),
@@ -18160,8 +18177,19 @@ async fn answer(
                     .filter(|made| named(&crate::skill_named::spoken(made)))
                     .count()
             });
+            // The matcher's input shape, no word of it: its own words past
+            // those said around an ask, and how far the nearest made name is.
+            let line = skill_words.as_str();
+            let own = crate::skill_named::own_words_of(line);
+            let off = made_here
+                .iter()
+                .map(|made| {
+                    crate::skill_named::words_off(line, &crate::skill_named::spoken(made))
+                })
+                .min()
+                .unwrap_or_default();
             eprintln!(
-                "lamp-voice second: request {request}: the heard words named no skill; {} made in this conversation, {read} of them among the made skills the heard words are read for",
+                "lamp-voice second: request {request}: the heard words named no skill; {} made in this conversation, {read} of them among the made skills the heard words are read for; {own} word(s) of its own, nearest: name, {off} word(s) off",
                 made_here.len()
             );
         }

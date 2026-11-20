@@ -4680,8 +4680,12 @@ chính đèn (đèn, đầu, một câu nói). "When I say send my test note, em
    không nêu kỹ năng nào trong khi có kỹ năng vừa tạo ghi bao nhiêu kỹ
    năng đó có trong danh sách kỹ năng tự tạo mà bộ so khớp đọc ("the heard
    words named no skill; 1 made in this conversation, 0 of them among the
-   made skills the heard words are read for"), không có từ nào của câu và
-   không có tên kỹ năng. Một lần chạy tự nói lời của nó
+   made skills the heard words are read for; 2 word(s) of its own,
+   nearest: name, 1 word(s) off"), không có từ nào của câu và không có tên
+   kỹ năng. Một câu gọi đèn bằng tên bị nghe thành từ khác ("Hey, Lynn. An
+   apple file.") cũng được so khớp bỏ qua từ đó, như dòng được giữ của nó
+   (ROW của kit-8043, lamp-52e6, 20/11 09:14: câu như vậy bị
+   `calls=none`). Một lần chạy tự nói lời của nó
    (`says` của lamp-skills, `made_run::speaks_itself`) kết thúc lượt ở đó,
    không có vòng 2 và không có câu nào của riêng đèn, nên câu say của kỹ
    năng, ở mức ưu tiên 8, là điều đầu tiên được nghe, khoảng một giây sau
