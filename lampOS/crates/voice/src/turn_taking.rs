@@ -798,8 +798,11 @@ impl PlaybackMask {
         }
         let Some(evidence) = evidence else {
             duplex.blind = true;
-            // A yield in force still runs to its deadline.
-            let step = duplex.interruption.block(Heard::Unknown, speaking);
+            // A yield in force still runs to its deadline. Under, not
+            // Unknown: a block with no evidence is not a person's sound, and
+            // never counts toward a late yield (#7413); the two act alike in
+            // every other rule of the yield.
+            let step = duplex.interruption.block(Heard::Under, speaking);
             // No evidence either way, and the end of any onset run.
             duplex.onset = YieldEvidence::default();
             if step == Step::Yield {
@@ -821,11 +824,10 @@ impl PlaybackMask {
         {
             duplex.matched = duplex.matched.saturating_add(1);
         }
-        let heard = match duplex.hearing.heard(probability, evidence) {
-            // The lamp's own sound has not been found in this reply yet.
-            Heard::Over if speaking && duplex.matched < MATCHED_BLOCKS => Heard::Unknown,
-            heard => heard,
-        };
+        let judged = duplex.hearing.heard(probability, evidence);
+        // The lamp's own sound has not been found in this reply yet.
+        let unmatched = judged == Heard::Over && speaking && duplex.matched < MATCHED_BLOCKS;
+        let heard = if unmatched { Heard::Unknown } else { judged };
         duplex.margin.observe(heard, evidence);
         duplex.over_run = if speaking && heard == Heard::Over {
             duplex.over_run.saturating_add(1)
@@ -865,7 +867,14 @@ impl PlaybackMask {
         if under.is_some() {
             duplex.under_asker_db = under;
         }
-        let step = duplex.interruption.observe(heard, plain, may_yield);
+        // Over before the match is the lamp's own voice not yet found: as
+        // Under to the yield, which it is in every rule but the count
+        // toward a late yield, where it must not count (#7413).
+        let step = duplex.interruption.observe(
+            if unmatched { Heard::Under } else { heard },
+            plain,
+            may_yield,
+        );
         if step == Step::Yield {
             duplex.under_asker_db = None;
         }
