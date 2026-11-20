@@ -27,6 +27,9 @@ pub const MOST: usize = 49;
 /// A term is at most this many characters: setup's own limit for a name
 /// (`person::MOST_CHARS`).
 pub const MOST_CHARS: usize = 64;
+/// At most this many of the made skills' names and asks ([`made`]), after
+/// every other term.
+pub const MOST_MADE: usize = 16;
 /// How often the names are read again.
 pub const READ_EVERY: Duration = Duration::from_secs(60);
 /// How often the made skills' names and asks are read again: a skill is
@@ -49,11 +52,12 @@ pub fn known() -> Vec<String> {
 }
 
 /// What a stream listens for after the lamp's name: the unit's words
-/// (`fixed`), then, with [`SKILL_ENVIRONMENT`] on, the words of a skill's
-/// make ([`SKILL_TERMS`]) and the made skills' names and asks ([`made`]),
-/// then the owner's place's names from the app, with `LAMP_OWNER_PLACE=on`
-/// (`crate::owner_place::terms`, #4333), then the names the lamp knows
-/// ([`known`]), each once.
+/// (`fixed`), then the words of a skill's make with [`SKILL_ENVIRONMENT`]
+/// on ([`SKILL_TERMS`]), then the owner's place's names from the app, with
+/// `LAMP_OWNER_PLACE=on` (`crate::owner_place::terms`, #4333), then the
+/// names the lamp knows ([`known`]), then, with [`SKILL_ENVIRONMENT`] on,
+/// at most [`MOST_MADE`] of the made skills' names and asks ([`made`]),
+/// each once.
 pub fn listening(fixed: &[String]) -> Vec<String> {
     listening_with(fixed, skill_terms_on(), &made())
 }
@@ -71,9 +75,11 @@ fn listening_with(fixed: &[String], skill: bool, made: &[String]) -> Vec<String>
                     .filter(|_| skill)
                     .map(|term| (*term).to_owned()),
             )
-            .chain(made.iter().filter(|_| skill).cloned())
             .chain(crate::owner_place::terms())
-            .chain(known()),
+            .chain(known())
+            // Last, and at most MOST_MADE, so made skills never push the
+            // owner's place or the names the lamp knows out of MOST.
+            .chain(made.iter().filter(|_| skill).take(MOST_MADE).cloned()),
     )
 }
 
@@ -359,6 +365,19 @@ mod tests {
         for term in ["apple file", "open my apple file", "tech news"] {
             assert_eq!(heard.iter().filter(|said| *said == term).count(), 1, "{term}");
         }
+        // Many made skills: at most MOST_MADE of their words, all after
+        // every other term.
+        // Letters only, as every term is (`plain`): a digit drops it.
+        let many: Vec<String> = (0..30u8)
+            .map(|n| {
+                let (first, second) = (b'a' + n / 26, b'a' + n % 26);
+                format!("made skill {}{}", char::from(first), char::from(second))
+            })
+            .collect();
+        let heard = listening_with(&fixed, true, &many);
+        let first = heard.iter().position(|term| term.starts_with("made skill"));
+        assert_eq!(heard.len() - first.unwrap(), MOST_MADE);
+        assert!(heard[first.unwrap()..].iter().all(|term| term.starts_with("made skill")));
         std::fs::remove_dir_all(dir).ok();
     }
 
