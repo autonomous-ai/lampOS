@@ -248,7 +248,7 @@ await lamp.closed();
   | `touch` | `kind` (`tap`, `pet`, `hold`), `where` | none |
   | `button` | `press` (`press`, `long_press`) | none |
   | `time` | your schedule | none |
-  | `lamp.changed` | `lamp_state`: `talking`, `paused`, `private`, `asleep` (each true or false; a lease change is a `lease` event) | none |
+  | `lamp.changed` | `lamp_state`: `talking`, `paused`, `private`, `asleep`, `muted_after_fault` (each true or false; the last is the lamp muted by its restart guard after a fault, not by the person; a lease change is a `lease` event) | none |
   | `volume.changed` | `level` (0–100), `muted`: the speaker's volume changed, whoever changed it (the person by voice or in the app, or a computer) | `speak` |
   | `lamp.said` | `text`, `by`, `source`, `cut`: a line the lamp said out loud (its fixed phrases, a computer's own say back to it, a reply said to the owner); never what a person says | `speech` |
   | `body.state` | `joints` (`pitch`, `roll`, `yaw`, `shoulder`, `elbow`: each `deg`, `counts`, `goal_deg`, `load`, `moving`, `temp_c`) and `lamp` (`light`, `talking`, `private`), at most 25 a second (12.5 today) | `body` |
@@ -470,7 +470,7 @@ subscribe.
 | `sound.heard` | `class`: `music`, `laughter`, `door` or `footsteps`. `score`: 0.5–1, 2 places | `{"ev":"sound.heard","class":"door","score":0.72}` | a class's score rises past 0.5 (again only after it falls under). Never speech | `sound` |
 | `touch` | `kind`: `tap` (two or more taps are one tap) or `pet`. The schema also has `hold` and `where`, not sent yet | `{"ev":"touch","kind":"pet"}` | a tap or a pet on the lamp | none |
 | `button` | `press`: `long_press`. The schema also has `press`, not sent yet | `{"ev":"button","press":"long_press"}` | the button is held | none |
-| `lamp.changed` | `lamp_state`: `talking`, `paused`, `private`, `asleep` (each true or false) | `{"ev":"lamp.changed","lamp_state":{"talking":true,"paused":false,"private":false,"asleep":false}}` | any of the four changes | none |
+| `lamp.changed` | `lamp_state`: `talking`, `paused`, `private`, `asleep`, `muted_after_fault` (each true or false) | `{"ev":"lamp.changed","lamp_state":{"talking":true,"paused":false,"private":false,"asleep":false,"muted_after_fault":false}}` | any of the five changes | none |
 | `volume.changed` | `level`: 0–100 of what the lamp allows. `muted`: true at 0 | `{"ev":"volume.changed","level":30,"muted":false}` | the volume changes, whoever changed it: the person by voice or in the app, or a computer | `speak` |
 | `lamp.said` | `text`: what the lamp said, as written. `by`: `lamp` or `computer`. `source`: `reply`, `exact` or `cached`. `cut`: true when it was cut short | `{"ev":"lamp.said","text":"Going to sleep now.","by":"lamp","source":"cached"}` | the lamp says a line out loud (its fixed phrases, a computer's own say back to it alone, a reply only when said to the owner); never what a person says | `speech` |
 | `time` | your schedule | | accepted in a subscription, not produced yet | none |
@@ -494,7 +494,7 @@ And two that come by themselves, with no subscription:
 | `mood` | `energy`, `warmth`, `awake`, `asleep`, the lamp's inner state. `null` until known | `{"energy":0.6,"warmth":0.7,"awake":true,"asleep":false}` | none |
 | `air` | the newest reading, as `air.changed` gives it, and `known: true`; `{"known": false}` with no sensor, its part not running, or no reading in 15 s | `{"pm2_5":7.4,"co2_ppm":912,"feel":"fine","known":true}` | `air` |
 | `device` | the lamp's own computer: `cpu_load` (the last minute's, 1 is every processor busy), `memory_used` and `disk_free` (0–1), `uptime_s`, `temperature_c` (by sensor, °C), and `known: true`; `{"known": false}` with no reading in 15 s | `{"cpu_load":0.42,"memory_used":0.55,"disk_free":0.71,"uptime_s":3600,"temperature_c":{"cpu_thermal":61.5},"known":true}` | `device` |
-| `lamp` | `talking`, `paused`, `private`, `asleep` | `{"talking":false,"paused":false,"private":false,"asleep":false}` | none |
+| `lamp` | `talking`, `paused`, `private`, `asleep`, `muted_after_fault` | `{"talking":false,"paused":false,"private":false,"asleep":false,"muted_after_fault":false}` | none |
 | `volume` | `level` (0–100 of what the lamp allows), `muted`. `null` until lamp-actions has said it | `{"level":50,"muted":false}` | `speak` |
 | `body` | `known`; `joints` (`yaw`, `pitch`, `roll`, `shoulder`, `elbow`), each with `counts`, `deg` from its home, `min_deg`, `max_deg`, `min_counts`, `max_counts`, `home_counts`, `folded_counts`, `stand_counts`; `stands`, `speed_deg_s`, `acceleration_deg_s2`, `load_limit`, `heat_stop_c`, `counts_per_turn` | `{"known":true,"joints":{"yaw":{"counts":2015.0,"deg":0.0,"min_deg":-3.5,"max_deg":3.5,...},...},"stands":true,"speed_deg_s":4.4,...}` | body |
 

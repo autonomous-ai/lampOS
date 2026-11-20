@@ -507,7 +507,7 @@ export class FakeLamp {
     this.pushed = new Map();
     this.pushing = null;
     this.subscribed = new Map();
-    this.state = { presence: { count: 0, near: 0, facing: false }, light: null, mood: null, lamp: { talking: false, paused: false, private: false, asleep: false },
+    this.state = { presence: { count: 0, near: 0, facing: false }, light: null, mood: null, lamp: { talking: false, paused: false, private: false, asleep: false, muted_after_fault: false },
       // Made-up readings, as lamp-control answers them; `setAir` changes the
       // air and tells `air.changed`, `{ known: false }` for none.
       air: { ...AIR }, device: { ...DEVICE, temperature_c: { ...DEVICE.temperature_c } }, volume: { level: 50, muted: false },
