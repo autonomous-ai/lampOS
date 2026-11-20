@@ -13481,9 +13481,7 @@ printf 'tar of %s' \"$name\" > \"$3/$name-1.0.0.tar\"\n",
             brief,
             crate::make_no_cannot::script("every 90 minutes", &words)
         );
-        assert!(
-            brief.contains("nothing at all when what they said is only for when something holds")
-        );
+        assert!(brief.contains("it doesn't now, answer only a dash (-)"));
         assert_eq!(
             made_with_of(&keeping, "bitcoin-watch").as_deref(),
             Some("hermes")

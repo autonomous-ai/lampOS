@@ -7831,6 +7831,20 @@ fn clock_watch(trigger: &toml::Table) -> Option<String> {
     })
 }
 
+/// Whether the skill whose `skill.toml` is `text` is a clock watch
+/// ([`clock_watch`]), whatever this process's switches: lamp-skills reads
+/// it to tell a watch's condition once until it stops holding
+/// (`lamp_skills::task::watch_tells`, #8089).
+pub fn is_clock_watch(text: &str) -> bool {
+    toml::from_str::<toml::Table>(text).is_ok_and(|table| {
+        table
+            .get("trigger")
+            .and_then(toml::Value::as_table)
+            .and_then(clock_watch)
+            .is_some()
+    })
+}
+
 /// Whether a clock watch ([`clock_watch`]) may be said here: only for a
 /// task for the lamp's agent (`LAMP_MAKE_NO_CANNOT` or a make of what only
 /// the internet tells, [`crate::make_no_cannot::agent_tasks_made`]), and,
@@ -14414,6 +14428,46 @@ light = { colour = "green", level = 3, for = "20s" }
         assert_eq!(watch("90m").as_deref(), Some("90 minutes"));
         for cooldown in ["15m", "72m", "89m", "1h"] {
             assert_eq!(watch(cooldown), None, "{cooldown}");
+        }
+    }
+
+    /// #8089 (Twelve's P3 on the HOLD): a clock trigger with any key that
+    /// limits or holds it (`during`, `days`, `rearm`, `for`, `when`,
+    /// `absent_for`, `wait`) is no watch, so it is never said "Every 90
+    /// minutes" while it runs only some hours or days; lamp-skills reads
+    /// the same ([`is_clock_watch`]).
+    #[test]
+    fn a_clock_trigger_limited_or_held_is_no_watch() {
+        let base = "topic = \"clock/local\"\nfield = \"known\"\nequals = true\n\
+                    cooldown = \"90m\"\n";
+        let skill = |trigger: &str| {
+            format!("[permissions]\ntopics = [\"clock/local\"]\n\n[trigger]\n{trigger}")
+        };
+        let said = |trigger: &str| {
+            let _agent = AgentScript::set(true);
+            crate::make_no_cannot::set_on_here(Some(true));
+            let said = fire_said(&skill(trigger));
+            crate::make_no_cannot::set_on_here(None);
+            said
+        };
+        assert_eq!(said(base).as_deref(), Some("every 90 minutes"));
+        assert!(is_clock_watch(&skill(base)));
+        for extra in [
+            "during = { from = \"09:00\", to = \"17:00\" }",
+            "days = [\"mon\", \"fri\"]",
+            "rearm = \"ends\"",
+            "for = \"5m\"",
+            "when = \"appears\"",
+            "absent_for = \"5m\"",
+            "wait = \"10m\"",
+        ] {
+            let trigger = format!("{base}{extra}\n");
+            assert!(!is_clock_watch(&skill(&trigger)), "{extra}");
+            assert_ne!(
+                said(&trigger).as_deref(),
+                Some("every 90 minutes"),
+                "{extra}"
+            );
         }
     }
 

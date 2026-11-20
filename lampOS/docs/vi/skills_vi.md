@@ -3635,22 +3635,47 @@ cả hai người viết.
   "Every 90 minutes, …" và brief của lần chạy gọi tên nó ("has fired
   (every 90 minutes)"); chỉ được nói (và giữ) cho task của agent đèn làm ở
   đây (`made_skill::clock_watch`, `watch_here`): bản nháp DeepSeek hỏi đồng
-  hồ đều đặn là nhắc việc lặp lại và vẫn bị từ chối. Brief của mọi lần
-  chạy giờ kết thúc "…, or nothing at all when what they said is only for
-  when something holds and it doesn't now", nên việc theo dõi im lặng cho
-  tới khi điều kiện đúng. Khi `LAMP_MADE_SKILL_LOOSE` bật, như sản phẩm
-  chạy, không `most_a_day` hay `[budget]` nào giới hạn nó, và mức sàn 90
-  phút giữ nó trong `task::PER_SKILL` cả ngày (test
-  `a_made_watch_fits_the_task_runs_a_day` của lamp-skills giữ hai số này
-  khớp nhau). Test:
+  hồ đều đặn là nhắc việc lặp lại và vẫn bị từ chối
+  (`a_clock_trigger_limited_or_held_is_no_watch`: trigger có `during`,
+  `days`, `rearm`, `for`, `when`, `absent_for` hay `wait` không bao giờ
+  được nói "Every 90 minutes"). Brief của mọi lần chạy giờ kết thúc "…,
+  or, when what they said is only for when something holds and it doesn't
+  now, answer only a dash (-)", và câu đó không nói gì. **Nói một lần cho
+  tới khi điều kiện thôi đúng (#8089, P2 của Twelve trong HOLD):**
+  lamp-skills đọc câu trả lời của lần chạy là có lời, im lặng (chỉ một
+  gạch hoặc không có gì) hay lỗi (`task::ran`), và với lần chạy của việc
+  theo dõi mà không ai hỏi bằng giọng nói lúc đó
+  (`lamp_voice::made_skill::is_clock_watch` của `skill.toml`), giữ một dấu
+  đã nói theo skill và sha256 của thư mục trong `task-watch-told.json` của
+  `--state-dir` (`task::watch_tells`): lần chạy đầu tiên điều kiện đúng
+  được nói và đánh dấu; khi còn dấu, lần chạy điều kiện đúng không nói gì
+  (nhật ký `its watch still holds, told already: not said again`); lần
+  chạy im lặng xoá dấu, nên chỉ nói lại khi điều kiện đã thôi đúng rồi
+  đúng lại; lần chạy lỗi không đổi gì; việc theo dõi làm lại bắt đầu không
+  có dấu. Trạng thái là của đèn, không phải của agent, vốn không giữ gì
+  giữa các lần chạy. **Lời từ chối không có mạng một lần một ngày:** trên
+  đèn mà agent không tới được internet, `NO_NET_SAID` được nói nhiều nhất
+  một lần cho mỗi skill trong 24 giờ với lần chạy không ai hỏi bằng giọng
+  nói (`task::refusal_said_today`, giữ trong `task-refusals-said.json`);
+  lần chạy vừa được hỏi bằng giọng nói luôn được trả lời. Khi
+  `LAMP_MADE_SKILL_LOOSE` bật, như sản phẩm chạy, không `most_a_day` hay
+  `[budget]` nào giới hạn nó, và mức sàn 90 phút giữ nó trong
+  `task::PER_SKILL` cả ngày (test `a_made_watch_fits_the_task_runs_a_day`
+  của lamp-skills giữ hai số này khớp nhau). Mọi skill dùng chung
+  `task::ALL_SKILLS`, 100 lần chạy task trong 24 giờ: khoảng sáu việc theo
+  dõi, mỗi cái 16 lần một ngày, đã lấp đầy nó nếu không có gì khác, và lần
+  chạy vượt quá không được giao, chỉ có một dòng nhật ký. Test:
+  `a_watch_tells_once_until_it_stops_holding`,
+  `a_no_net_refusal_is_said_once_a_day_unless_asked_by_voice`,
   `with_reactions_on_a_watch_on_outside_data_is_told_on_the_clock`,
   `a_reminder_after_a_trigger_on_what_no_topic_carries_is_asked_again_as_a_watch`,
   `a_reminder_with_no_watch_before_it_is_still_the_lamps_timer`,
   `with_the_switch_a_price_watch_runs_on_the_clock_as_one_task_never_a_reminder`
-  và `with_the_switch_a_one_off_reminder_is_still_the_lamps_timer`. Đèn không có agent nào (`missing` của
-  #7375): "this lamp has no agent set up to make it"; chưa biết agent (chưa
-  đọc được targets của lamp-tasks, hoặc engine không có lần chạy make):
-  không đánh giá, của DeepSeek như trước. Câu trả lời `cannot:`
+  và `with_the_switch_a_one_off_reminder_is_still_the_lamps_timer`.
+  Đèn không có agent nào (`missing` của #7375): "this lamp has no agent
+  set up to make it"; chưa biết agent (chưa đọc được targets của
+  lamp-tasks, hoặc engine không có lần chạy make): không đánh giá, của
+  DeepSeek như trước. Câu trả lời `cannot:`
   (nhắc việc một lần là bộ hẹn giờ của đèn, không bao giờ là make), dòng
   internet và make dịch vụ liên kết giữ tuyến của chúng. Hai guard: một
   `[[while]]` trên `voice/state` hoặc `room/activity` đọc như trên được nói

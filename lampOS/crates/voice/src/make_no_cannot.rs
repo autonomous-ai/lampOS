@@ -154,12 +154,15 @@ const SCRIPT_HEAD: &str = "print(\"A skill the person made has fired (";
 const SCRIPT_SAID: &str = "). When they made it, they said: «";
 /// How [`script`]'s brief ends: what they said only for when something
 /// holds (a watch on outside data on the lamp's clock, [`WATCH`], #8079:
-/// "if Bitcoin goes under ninety thousand dollars, tell me") is told only
-/// when it holds, never at each run.
+/// "if Bitcoin goes under ninety thousand dollars, tell me") is answered
+/// with a lone dash while it doesn't hold, which lamp-skills says nothing
+/// of and reads as "not holding" (`lamp_skills::task::Ran::Silent`); it
+/// then tells a holding watch once until a run finds it not holding again
+/// (`lamp_skills::task::watch_tells`, #8089).
 const SCRIPT_TAIL: &str = "». Do now what it is for, with your own tools and only the skill's \
 grants, never making, changing or removing a skill; then tell the owner in a sentence or two what \
-you found or did, or nothing at all when what they said is only for when something holds and it \
-doesn't now.\")\n";
+you found or did, or, when what they said is only for when something holds and it doesn't now, \
+answer only a dash (-).\")\n";
 
 /// [`RUN`]'s text for a task on a trigger: the brief the agent reads at
 /// each run (the first builder, 02:09 on #7819), naming what fired it
@@ -526,17 +529,17 @@ const SAT_EXAMPLE_ASKED: &str = "when I've sat at my desk a long while, remind m
 /// timer): what only the internet tells, with no topic of the lamp's, runs
 /// on the lamp's clock every while (`made_skill::clock_watch`, a cooldown
 /// of at least `made_skill::LEAST_WATCH_SECS`, 90 minutes: 16 runs a day
-/// stay under lamp-skills' 20 task runs per skill in 24 hours), its one task granted `net`
-/// checking the condition and speaking only when it holds; never a
-/// reminder. The model judges by meaning which a request is, as for the
+/// stay under lamp-skills' 20 task runs per skill in 24 hours), its one
+/// task granted `net` checking the condition, told once while it holds
+/// (`lamp_skills::task::watch_tells`, #8089); never a reminder. The model judges by meaning which a request is, as for the
 /// sitting ([`SITTING`]); the lamp holds no list of words.
 const WATCH: &str = " A watch on something only the internet tells, with no topic of the \
 lamp's (a price, the weather, a web page, a count on a service), to tell the person when it \
 holds, runs on the lamp's clock every while: \"clock/local\", \"known\", equals true, \
 cooldown = \"90m\" (or less often when the request asks, never under 90m), no rearm, during or \
-days; net among its grants, the task checks it each time and speaks only when it holds. A watch \
-is never a reminder: only a time or a while the request names for the person to be told \
-something is.";
+days; net among its grants, the task checks it each time and speaks only when it holds, and the \
+lamp tells it once until it stops holding. A watch is never a reminder: only a time or a while \
+the request names for the person to be told something is.";
 
 /// One whole answer for a watch on outside data ([`WATCH`]), shown to the
 /// model with `LAMP_MAKE_REACTIONS_ONLY_DEEPSEEK` on.
@@ -587,7 +590,7 @@ const RUNS_ASKED: &str = "asked";
 const EXAMPLE_RUNS: &str = "runs: every morning at eight\n";
 const ASKED_EXAMPLE_RUNS: &str = "runs: asked\n";
 const SAT_EXAMPLE_RUNS: &str = "runs: someone has sat at the desk a long while\n";
-const WATCH_EXAMPLE_RUNS: &str = "runs: every 90 minutes, until it rains\n";
+const WATCH_EXAMPLE_RUNS: &str = "runs: every 90 minutes, told once each time it starts raining\n";
 
 /// One whole answer for a task only asked for, shown to the model.
 const ASKED_EXAMPLE: &str = "name: desk-photo

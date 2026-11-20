@@ -1175,6 +1175,162 @@ pub fn refusal_said(answer: &str) -> Option<&'static str> {
         .then_some(NO_NET_SAID)
 }
 
+/// In `--state-dir`: when each skill's [`NO_NET_SAID`] was last said for a
+/// run nobody asked by voice ([`refusal_said_today`], #8089).
+pub const REFUSALS_SAID_FILE: &str = "task-refusals-said.json";
+
+/// [`refusal_said`] at most once per skill in any [`DAY_MS`] for a run
+/// nobody asked by voice (`asked` false: a trigger's or a clock watch's,
+/// #8089, Twelve's P2 on the HOLD: on a lamp whose agent can't reach the
+/// internet, a watch every 90 minutes would say "I can't run that one…"
+/// 16 times a day, since a refused run isn't counted against the day).
+/// A run asked by voice now is always answered: the person who just asked
+/// would hear nothing else. Each one said is kept in `state`'s
+/// [`REFUSALS_SAID_FILE`]; a ledger that can't be read says it, as before.
+pub fn refusal_said_today(
+    state: Option<&Path>,
+    skill: &str,
+    answer: &str,
+    asked: bool,
+    now_ms: u64,
+) -> Option<&'static str> {
+    let line = refusal_said(answer)?;
+    let Some(state) = state else {
+        return Some(line);
+    };
+    let said = ledger_change(
+        state,
+        REFUSALS_SAID_FILE,
+        |said: &mut Vec<(String, u64)>| {
+            said.retain(|(_, at)| now_ms.saturating_sub(*at) < DAY_MS);
+            let today = said.iter().any(|(name, _)| name == skill);
+            if asked || !today {
+                said.retain(|(name, _)| name != skill);
+                said.push((skill.to_owned(), now_ms));
+            }
+            asked || !today
+        },
+    );
+    match said {
+        Ok(true) => Some(line),
+        Ok(false) => {
+            eprintln!(
+                "lamp-skills: skill:{skill}: do.task: its refusal was said today already: not said again"
+            );
+            None
+        }
+        Err(error) => {
+            eprintln!("lamp-skills: skill:{skill}: do.task: its refusal: {error}");
+            Some(line)
+        }
+    }
+}
+
+/// In `--state-dir`: the clock watches whose condition was told and hasn't
+/// stopped holding since, each its skill and its folder's sha256
+/// ([`watch_tells`], #8089).
+pub const WATCH_TOLD_FILE: &str = "task-watch-told.json";
+
+/// How a run of a skill's task ended, as a clock watch reads it
+/// ([`watch_tells`]).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Ran {
+    /// It ended well and its agent's answer has words to say ([`told`]):
+    /// the watch's condition holds.
+    Words,
+    /// It ended well with no words (none, or a lone dash, as its brief
+    /// asks when the condition doesn't hold,
+    /// `lamp_voice::make_no_cannot::SCRIPT_TAIL`): it doesn't hold now.
+    Silent,
+    /// Refused, failed or unread: nothing is known of the condition.
+    Failed,
+}
+
+/// How lamp-tasks' answer to a hand-over (`answer`) ended ([`Ran`]).
+pub fn ran(answer: &str) -> Ran {
+    let ok = serde_json::from_str::<serde_json::Value>(answer.trim())
+        .ok()
+        .and_then(|answer| answer.get("ok").and_then(serde_json::Value::as_bool))
+        == Some(true);
+    match (ok, told(answer).is_some()) {
+        (true, true) => Ran::Words,
+        (true, false) => Ran::Silent,
+        (false, _) => Ran::Failed,
+    }
+}
+
+/// Whether what a clock watch's run found (`ran`) is said (#8089, Twelve's
+/// P2 on the HOLD: "tell me if Bitcoin goes under 90k" said so every 90
+/// minutes while it stayed under; a person means once): told once when its
+/// condition holds, then not again while it still holds; told again only
+/// after a run in which it didn't hold ([`Ran::Silent`]) clears the mark.
+/// A failed run changes nothing. The mark is kept in `state`'s
+/// [`WATCH_TOLD_FILE`] under the skill and its folder's `sha256`, so a
+/// watch made again starts unmarked. A mark that can't be read is said, so
+/// a watch never goes silent for the lamp's own fault.
+pub fn watch_tells(state: &Path, skill: &str, sha256: &str, ran: Ran) -> bool {
+    let tells = ledger_change(
+        state,
+        WATCH_TOLD_FILE,
+        |told: &mut Vec<(String, String)>| {
+            let at = told.iter().position(|(name, _)| name == skill);
+            let marked = at.is_some_and(|at| told[at].1 == sha256);
+            match ran {
+                Ran::Words if marked => false,
+                Ran::Words => {
+                    told.retain(|(name, _)| name != skill);
+                    told.push((skill.to_owned(), sha256.to_owned()));
+                    true
+                }
+                Ran::Silent => {
+                    told.retain(|(name, _)| name != skill);
+                    false
+                }
+                Ran::Failed => false,
+            }
+        },
+    );
+    match tells {
+        Ok(tells) => tells,
+        Err(error) => {
+            eprintln!("lamp-skills: skill:{skill}: do.task: its watch's told mark: {error}");
+            ran == Ran::Words
+        }
+    }
+}
+
+/// A small list in `state`'s `file`, read, changed by `change` and written
+/// back whole when it changed, under one lock so no other change is lost
+/// between the read and the write; `change`'s answer back. A list that
+/// can't be parsed starts again empty, so it heals.
+fn ledger_change<T, R>(
+    state: &Path,
+    file: &str,
+    change: impl FnOnce(&mut Vec<T>) -> R,
+) -> Result<R, String>
+where
+    T: serde::de::DeserializeOwned + serde::Serialize + PartialEq + Clone,
+{
+    static LEDGERS: Mutex<()> = Mutex::new(());
+    let _held = LEDGERS.lock().unwrap_or_else(|poison| poison.into_inner());
+    let path = state.join(file);
+    let (mut kept, unparsed): (Vec<T>, bool) = match read_small(&path, 64 * 1024) {
+        Ok(Some(bytes)) => {
+            serde_json::from_slice(&bytes).map_or_else(|_| (Vec::new(), true), |kept| (kept, false))
+        }
+        Ok(None) => (Vec::new(), false),
+        Err(_) => return Err(format!("{file} can't be read")),
+    };
+    let before = kept.clone();
+    let answer = change(&mut kept);
+    if kept != before || unparsed {
+        let json = serde_json::to_vec(&kept).map_err(|error| error.to_string())?;
+        lamp_update::records::write_whole(&path, &json, 0o644)
+            .map_err(|error| format!("{file}: {error}"))?;
+    }
+    Ok(answer)
+}
+
 /// The most sentences of an agent's answer said ([`told`]): as many as a
 /// read's lines, its count and [`crate::service_read::MOST_ITEMS`] items.
 pub const MOST_TOLD_LINES: usize = 11;
@@ -1655,6 +1811,80 @@ mod tests {
         );
         set_agent_services_here(None);
         set_on_here(None);
+    }
+
+    /// #8089 (Twelve's P2 on the HOLD): a clock watch whose condition holds
+    /// is told once; a second holding run says nothing; a run in which it
+    /// doesn't hold (its agent's lone dash, or no words) says nothing and
+    /// clears the mark, so the next holding run tells again; a failed run
+    /// changes nothing; a watch made again (its folder's sha256) starts
+    /// unmarked; another watch's mark is its own.
+    #[test]
+    fn a_watch_tells_once_until_it_stops_holding() {
+        let holds =
+            json!({"ok": true, "id": 1, "answer": "Bitcoin is under 90,000 dollars."}).to_string();
+        let not_now = json!({"ok": true, "id": 2, "answer": "-"}).to_string();
+        let failed = json!({"ok": false, "error": "run_failed", "message": "x"}).to_string();
+        assert_eq!(ran(&holds), Ran::Words);
+        assert_eq!(ran(&not_now), Ran::Silent);
+        assert_eq!(told(&not_now), None, "a run not holding says nothing");
+        assert_eq!(ran(r#"{"ok":true,"id":3}"#), Ran::Silent);
+        assert_eq!(ran(&failed), Ran::Failed);
+        assert_eq!(ran("not json"), Ran::Failed);
+        let dir = tempfile::tempdir().unwrap();
+        let state = dir.path();
+        let watch = |answer: &str| watch_tells(state, "bitcoin-watch", "ab", ran(answer));
+        // Two holding runs: only the first speaks.
+        assert!(watch(&holds));
+        assert!(!watch(&holds));
+        // A failed run knows nothing of the condition: its mark stands.
+        assert!(!watch(&failed));
+        assert!(!watch(&holds));
+        // It stops holding, then holds again: told again, once.
+        assert!(!watch(&not_now));
+        assert!(watch(&holds));
+        assert!(!watch(&holds));
+        // Another watch, and this one made again, are unmarked.
+        assert!(watch_tells(state, "rain-watch", "cd", Ran::Words));
+        assert!(watch_tells(state, "bitcoin-watch", "ef", Ran::Words));
+        assert!(!watch_tells(state, "bitcoin-watch", "ef", Ran::Words));
+        // A mark list that can't be read heals, and tells.
+        std::fs::write(state.join(WATCH_TOLD_FILE), b"{not json").unwrap();
+        assert!(watch(&holds));
+        assert!(!watch(&holds));
+    }
+
+    /// #8089 (Twelve's P2 on the HOLD): on a lamp whose agent can't reach
+    /// the internet, a watch's [`NO_NET`] refusal is said once a day for a
+    /// run nobody asked by voice, never every 90 minutes; a run asked by
+    /// voice now is always answered; another skill's is its own; a day on,
+    /// it is said again. Any other answer says nothing, as before.
+    #[test]
+    fn a_no_net_refusal_is_said_once_a_day_unless_asked_by_voice() {
+        let no_net = json!({"ok": false, "error": NO_NET, "message": "no way out"}).to_string();
+        let dir = tempfile::tempdir().unwrap();
+        let state = Some(dir.path());
+        let said = |skill: &str, asked: bool, at: u64| {
+            refusal_said_today(state, skill, &no_net, asked, at)
+        };
+        assert_eq!(said("bitcoin-watch", false, 1_000), Some(NO_NET_SAID));
+        for at in [1_000 + 90 * 60_000, 1_000 + 180 * 60_000, DAY_MS] {
+            assert_eq!(said("bitcoin-watch", false, at), None, "{at}");
+        }
+        assert_eq!(said("bitcoin-watch", true, DAY_MS), Some(NO_NET_SAID));
+        assert_eq!(said("rain-watch", false, DAY_MS), Some(NO_NET_SAID));
+        // The voice's answer counts as today's: a day after it, again.
+        assert_eq!(said("bitcoin-watch", false, 2 * DAY_MS - 1), None);
+        assert_eq!(said("bitcoin-watch", false, 2 * DAY_MS), Some(NO_NET_SAID));
+        assert_eq!(said("bitcoin-watch", false, 3 * DAY_MS - 1), None);
+        assert_eq!(
+            refusal_said_today(state, "bitcoin-watch", r#"{"ok":true,"id":0}"#, false, 0),
+            None
+        );
+        assert_eq!(
+            refusal_said_today(None, "bitcoin-watch", &no_net, false, 0),
+            Some(NO_NET_SAID)
+        );
     }
 
     /// A told answer still waiting when lamp-skills stops is found once at
