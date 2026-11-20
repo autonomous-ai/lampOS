@@ -2024,14 +2024,22 @@ As root, on a lamp with the base image (`crates/update/src/install.rs`):
      `HermesRunner` gives them. Any other folder: these lines change
      nothing. `HERMES_YOLO_MODE` is unset for every start and set to 1
      only in a run (#6684): nobody is there to answer Hermes's approval
-     prompt, and its hardline list still holds (Hermes's own
-     `tools/approval.py` `_floor_block`, `detect_hardline_command` in
-     `tools/approval_detection.py`, checked before any YOLO bypass in
-     `check_dangerous_command`, v0.21.5). It is set to 1 too in
-     lamp-tasks' kept session (#8151): a start whose folder (`pwd -P`) is
-     exactly `/var/lib/lampos-tasks/harnesses/lamp-tasks/one-session`,
-     where only Harness starts it for lamp-tasks (that folder is
-     `lampos`'s, 0700 under its home), since nobody answers there either.
+     prompt, and its hardline list still holds: in Hermes v0.22.2 (the lamp reports 0.21.5+12940, commit d923a5e),
+     `_floor_block` in `tools/approval.py` (lines 1046-1068) checks
+     `HARDLINE_PATTERNS` (`tools/approval_detection.py`, lines 107-142)
+     before the YOLO check, so `rm -rf /` or `reboot` stays blocked.
+     Hermes reads `HERMES_YOLO_MODE` once, at its start
+     (`tools/approval.py` line 46), so the wrapper sets it before its
+     `exec`. It is set to 1 too in lamp-tasks' kept session (#8151): a
+     start whose folder (`pwd -P`) is exactly
+     `/var/lib/lampos-tasks/harnesses/lamp-tasks/one-session`, where only
+     Harness starts it for lamp-tasks (that folder is `lampos`'s, 0700
+     under its home), since nobody answers there either; there
+     `HERMES_ACCEPT_HOOKS=1` is set as well, as Hermes asks "Allow this
+     hook to run?" (`agent/shell_hooks.py`) for Harness's own
+     `on_session_start` and `pre_llm_call` hooks
+     (openharness `engines/hermes/contract.ts`), and
+     `HERMES_NONINTERACTIVE` does not skip that question.
      `HERMES_NONINTERACTIVE=1` (#7781), which lamp-tasks gives every
      Harness command and Harness's env file, passes through every wrapper
      and namespace unchanged. With the switch off, the

@@ -830,6 +830,19 @@ pub(crate) fn replace(path: &Path, text: &str) -> io::Result<()> {
 /// Both files under `hermes_home` merged, on the forwarder's `port`, with
 /// its local `token`; a file already right is not written. Nothing is
 /// written when `config.yaml` can't be merged or the token isn't plain.
+/// Whether `config.yaml` in `hermes_home` already names the lamp's provider
+/// (`model.provider: "custom:lamp"`, [`merge_config`]): until it does, a
+/// Hermes Harness starts would ask "Run setup now?", which nobody answers
+/// in a pane, so lamp-tasks' kept session is not opened (#8151). The
+/// provider lines are lamp-tasks' own (written at its start, [`write`]);
+/// the `hooks:` block is Harness's, kept as Harness wrote it.
+pub fn provider_set(hermes_home: &Path) -> bool {
+    std::fs::read_to_string(hermes_home.join("config.yaml")).is_ok_and(|text| {
+        text.lines()
+            .any(|line| line.trim() == format!("provider: \"custom:{PROVIDER}\""))
+    })
+}
+
 pub fn write(hermes_home: &Path, port: u16, token: &str) -> io::Result<Written> {
     write_for(hermes_home, port, token, agent_services_on())
 }
@@ -1141,6 +1154,22 @@ custom_providers:
         );
         let config = fs::read_to_string(dir.path().join("config.yaml")).unwrap();
         assert!(!config.contains(MCP_NAME), "{config}");
+    }
+
+    /// #8151: the kept session waits for the lamp's provider in the
+    /// config, so Hermes never asks "Run setup now?" in it.
+    #[test]
+    fn the_provider_is_seen_set_only_once_merged() {
+        let home = tempfile::tempdir().unwrap();
+        assert!(!provider_set(home.path()));
+        std::fs::write(home.path().join("config.yaml"), HARNESS).unwrap();
+        assert!(!provider_set(home.path()));
+        std::fs::write(
+            home.path().join("config.yaml"),
+            merge_config(HARNESS, 7741).unwrap(),
+        )
+        .unwrap();
+        assert!(provider_set(home.path()));
     }
 
     #[test]

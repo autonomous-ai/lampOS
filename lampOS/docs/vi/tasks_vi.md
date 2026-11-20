@@ -2583,7 +2583,7 @@ khi đăng xuất, và với 0.6.60 khi đăng nhập (ROW của #7507).
       không cho `engineSession`), các phiên của pane được tìm chỉ đọc theo
       thư mục và lúc mở của nó, giữ trong `one-session.json` là `folder` và
       `opened`: các dòng `sessions` có `cwd` là thư mục đó và `started_at`
-      không sớm hơn một phút trước lúc mở (Hermes v0.21.5 ghi thư mục khởi
+      không sớm hơn một phút trước lúc mở (Hermes v0.22.2 (the lamp reports 0.21.5+12940, commit d923a5e) ghi thư mục khởi
       động vào `cwd`); kho không có các cột đó thì không xoá gì, ghi journal
       `nothing to delete: no engine session (<why>)`.
     - **Chạy riêng.** Mọi lần xoá (xoay vòng, quên, đăng xuất, đóng khi
@@ -2617,8 +2617,15 @@ khi đăng xuất, và với 0.6.60 khi đăng nhập (ROW của #7507).
   - **Không hỏi phê duyệt.** Không ai trả lời phiên được giữ, nên các
     wrapper Hermes của đèn đặt `HERMES_YOLO_MODE=1` cho lần khởi động trong
     thư mục của nó `/var/lib/lampos-tasks/harnesses/lamp-tasks/one-session`,
-    như với lần chạy kỹ năng (#6684); danh sách hardline của Hermes vẫn giữ
-    (install.md, "Hermes on the lamp"). `HERMES_NONINTERACTIVE=1` (#7781)
+    như với lần chạy kỹ năng (#6684), và `HERMES_ACCEPT_HOOKS=1` cho các hook
+    của chính Harness, mà nếu không Hermes sẽ hỏi; danh sách hardline của
+    Hermes vẫn giữ (`_floor_block`, `HARDLINE_PATTERNS`; install.md, "Hermes
+    on the lamp"). Pane không được mở cho tới khi lamp-tasks lúc khởi động
+    đã ghi provider của Hermes (`hermes_config::provider_set`), nếu không
+    Hermes sẽ hỏi "Run setup now?", và nó không bao giờ truyền `-m` hay
+    `--provider`, nên câu hỏi đổi model của Hermes không bao giờ xuất hiện.
+    Chỉ session id đầy đủ (từ 16 ký tự, từ `ensure`, `show` hoặc kho) mới
+    được đưa cho `sessions delete`, vốn cũng nhận một tiền tố duy nhất. `HERMES_NONINTERACTIVE=1` (#7781)
     giữ cho lần khởi động đầu không hỏi gì.
   - **Lần chạy kỹ năng và make** vẫn chạy riêng từng lần (ở trên, và
     `MakeHermes`). Một khoảng hở đã biết: wrapper của Hermes đọc file token

@@ -5947,6 +5947,7 @@ fn hermes_cli(home: &std::path::Path, mode: &str) -> (HermesDelete, PathBuf) {
         within: Duration::from_secs(20),
         all_within: Duration::from_secs(60),
         retry_after: Duration::ZERO,
+        least_id: 1,
     };
     (delete, log)
 }
@@ -6058,7 +6059,13 @@ fn a_path_like_hermes_session_id_is_refused() {
         .into_iter()
         .map(str::to_owned)
         .collect();
-    assert!(cli.delete(&HermesGone { ids: ids.clone(), ..HermesGone::default() }).is_empty());
+    assert!(
+        cli.delete(&HermesGone {
+            ids: ids.clone(),
+            ..HermesGone::default()
+        })
+        .is_empty()
+    );
     assert_eq!(hermes_calls(home.path(), &log), ["z"]);
     assert!(cli.delete_one("../a").is_err());
 }
@@ -6243,4 +6250,22 @@ fn a_hermes_pane_with_no_engine_session_is_looked_for_by_its_folder() {
     let (folder, opened) = asked[0].started_in.clone().unwrap();
     assert_eq!(folder, hermes_place().folder);
     assert!(opened > 1_000_000_000.0);
+}
+
+/// #8151: Hermes's `sessions delete` takes a unique prefix too, so a short
+/// id could name another session: on a lamp none shorter than a whole id
+/// of Hermes's ([`HERMES_ID_LEAST`]) is passed on, nor kept for later.
+#[test]
+fn a_hermes_id_short_enough_to_be_a_prefix_is_never_passed_on() {
+    let home = tempfile::tempdir().unwrap();
+    rusqlite::Connection::open(home.path().join(HERMES_STATE_DB))
+        .unwrap()
+        .execute_batch("CREATE TABLE sessions (id TEXT PRIMARY KEY);")
+        .unwrap();
+    let (mut cli, log) = hermes_cli(home.path(), "ok");
+    cli.least_id = HermesDelete::lamp().least_id;
+    let whole = "20261120_231500_ab12cd";
+    assert!(cli.delete(&gone_ids(&["2026", whole])).is_empty());
+    assert_eq!(hermes_calls(home.path(), &log), [whole]);
+    assert!(cli.delete_one("2026").is_err());
 }

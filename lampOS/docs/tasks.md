@@ -5343,7 +5343,7 @@ in and signed out, and on 0.6.60, signed in (#7507's ROW).
       `engineSession`), the pane's sessions are found read-only by its
       folder and open, kept in `one-session.json` as `folder` and `opened`:
       `sessions` rows whose `cwd` is that folder and whose `started_at` is
-      no earlier than a minute before the open (Hermes v0.21.5 records the
+      no earlier than a minute before the open (Hermes v0.22.2 (the lamp reports 0.21.5+12940, commit d923a5e) records the
       start folder in `cwd`); a store without those columns deletes
       nothing, journaled `nothing to delete: no engine session (<why>)`.
     - **Aside.** Every delete (a rotation, a forget, a sign-out, the idle
@@ -5378,8 +5378,16 @@ in and signed out, and on 0.6.60, signed in (#7507's ROW).
   - **No approvals asked.** Nobody answers the kept session, so the
     lamp's Hermes wrappers set `HERMES_YOLO_MODE=1` for a start in its
     folder `/var/lib/lampos-tasks/harnesses/lamp-tasks/one-session`, as
-    for a skill's run (#6684); Hermes's hardline list still holds
-    (install.md, "Hermes on the lamp"). `HERMES_NONINTERACTIVE=1` (#7781,
+    for a skill's run (#6684), and `HERMES_ACCEPT_HOOKS=1` for Harness's
+    own hooks, which Hermes would otherwise ask about; Hermes's hardline
+    list still holds (`_floor_block`, `HARDLINE_PATTERNS`; install.md,
+    "Hermes on the lamp"). The pane is not opened until lamp-tasks' start
+    has written Hermes's provider (`hermes_config::provider_set`), or
+    Hermes would ask "Run setup now?", and it never passes `-m` or
+    `--provider`, so Hermes's model-override question never comes up.
+    Only whole session ids (16 characters or more, from `ensure`, `show`
+    or the store) go to `sessions delete`, which takes a unique prefix
+    too. `HERMES_NONINTERACTIVE=1` (#7781,
     "Hermes asks nothing at its first start") keeps its first start from
     asking anything.
   - **Skill runs and makes** still run per run (above, and `MakeHermes`).

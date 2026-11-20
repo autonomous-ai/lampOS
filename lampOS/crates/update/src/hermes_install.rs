@@ -480,7 +480,9 @@ macro_rules! run_lines {
             "fi\n",
             "# lamp-tasks' kept session (#8151), started by Harness in its own folder: nobody answers it either, so Hermes asks\n",
             "# no approval in it; its hardline list still holds. Only lampos reaches that folder (0700 under its home).\n",
-            "[ \"$P\" != /var/lib/lampos-tasks/harnesses/lamp-tasks/one-session ] || { HERMES_YOLO_MODE=1; export HERMES_YOLO_MODE; }\n"
+            "# Hermes reads HERMES_YOLO_MODE once, when it starts (tools/approval.py), so it is set here, before its exec. Harness's\n",
+            "# own hooks (on_session_start, pre_llm_call) would be asked \"Allow this hook to run?\": HERMES_ACCEPT_HOOKS takes them.\n",
+            "[ \"$P\" != /var/lib/lampos-tasks/harnesses/lamp-tasks/one-session ] || { HERMES_YOLO_MODE=1 HERMES_ACCEPT_HOOKS=1; export HERMES_YOLO_MODE HERMES_ACCEPT_HOOKS; }\n"
         )
     };
 }
@@ -619,7 +621,8 @@ pub const AGENT_ENV: &str = r#"  T=$(cat /var/lib/lampos-cloud/hermes-token 2>/d
   export LAMP_HERMES_TOKEN HERMES_HOME
   unset T HERMES_YOLO_MODE
   # lamp-tasks' kept session (#8151), in its own folder: nobody answers it either; its hardline list still holds.
-  [ "${P-}" != /var/lib/lampos-tasks/harnesses/lamp-tasks/one-session ] || { HERMES_YOLO_MODE=1; export HERMES_YOLO_MODE; }
+  # Read once at Hermes's start (tools/approval.py), so set before its exec; Harness's hooks are accepted too, unasked.
+  [ "${P-}" != /var/lib/lampos-tasks/harnesses/lamp-tasks/one-session ] || { HERMES_YOLO_MODE=1 HERMES_ACCEPT_HOOKS=1; export HERMES_YOLO_MODE HERMES_ACCEPT_HOOKS; }
 "#;
 /// Hermes's own lines in a skill's run only (#6684): nobody answers a
 /// skill's run, so Hermes asks no approval in it; its hardline list still

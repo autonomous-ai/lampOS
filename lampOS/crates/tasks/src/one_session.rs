@@ -1257,6 +1257,16 @@ pub fn lamp_place(
             .before_launch_until(Instant::now() + LAMP_PLACE_GATEWAY_WITHIN, &|| false)
             .map_err(|why| format!("OpenClaw's gateway is not ready: {why}"))?;
     }
+    // Hermes with no provider set would ask "Run setup now?" at its start,
+    // which nobody answers in the pane (#8151): not opened until lamp-tasks'
+    // start has written it. The kept session never passes `-m` or
+    // `--provider` (Harness's `ensure hermes` gives neither), so Hermes's
+    // model-override question never comes up either.
+    if engine == EngineKind::Hermes
+        && !crate::hermes_config::provider_set(Path::new(crate::runtime::HERMES_HOME))
+    {
+        return Err("Hermes's provider is not set yet (lamp-tasks writes it at its start)".into());
+    }
     let folder = project.join(FOLDER);
     std::fs::DirBuilder::new()
         .recursive(true)
@@ -1511,6 +1521,13 @@ const PENDING_FIELD: &str = "hermes_pending";
 /// for its pane, oldest first.
 const SESSIONS_FIELD: &str = "sessions";
 
+/// The shortest id passed to Hermes's CLI on a lamp: Hermes's own are
+/// `YYYYMMDD_HHMMSS_<6 hex>` (22) or `local-<64 hex>`, and its `sessions
+/// delete` takes a unique prefix of one too, so a short id could name
+/// another session. Only whole ids, from `ensure`, `show` or the store, are
+/// passed on.
+pub const HERMES_ID_LEAST: usize = 16;
+
 /// Whether `id` may be a Hermes session id: plain characters, never a
 /// path or an option.
 fn hermes_session_id(id: &str) -> bool {
@@ -1546,6 +1563,8 @@ pub struct HermesDelete {
     pub all_within: Duration,
     /// [`HERMES_RETRY_AFTER`].
     pub retry_after: Duration,
+    /// [`HERMES_ID_LEAST`]: a shorter id is never passed on.
+    pub least_id: usize,
 }
 
 impl HermesDelete {
@@ -1571,6 +1590,7 @@ impl HermesDelete {
             within: HERMES_DELETE_WITHIN,
             all_within: HERMES_DELETES_WITHIN,
             retry_after: HERMES_RETRY_AFTER,
+            least_id: HERMES_ID_LEAST,
         }
     }
 
@@ -1581,6 +1601,8 @@ impl HermesDelete {
     /// store: nothing to delete, and Hermes is never started (its CLI would
     /// make one). An id that is not a plain session id is never passed on.
     pub fn delete(&self, gone: &HermesGone) -> Vec<String> {
+        // No store: never start Hermes's CLI, whose `sessions delete` opens
+        // a writer that makes `state.db` where there was none.
         let db = self.home.join(HERMES_STATE_DB);
         let found;
         let recorded = match &gone.started_in {
@@ -1602,7 +1624,7 @@ impl HermesDelete {
             .iter()
             .filter(|id| !gone.keep.contains(id))
             .filter(|id| {
-                let plain = hermes_session_id(id);
+                let plain = hermes_session_id(id) && id.len() >= self.least_id;
                 if !plain {
                     eprintln!(
                         "tasks: one session: a Hermes session id that is not one was refused"
@@ -1666,7 +1688,7 @@ impl HermesDelete {
     pub fn delete_one(&self, id: &str) -> Result<(), String> {
         use std::io::Read;
         use std::process::{Command, Stdio};
-        if !hermes_session_id(id) {
+        if !hermes_session_id(id) || id.len() < self.least_id {
             return Err("not a Hermes session id".into());
         }
         let mut child = Command::new(&self.program)
@@ -2265,7 +2287,12 @@ impl OneSession {
     fn started_in(&self, agent: &str) -> Option<(String, f64)> {
         let record = self.record();
         (record["agent"] == agent)
-            .then(|| Some((record["folder"].as_str()?.to_owned(), record["opened"].as_f64()?)))
+            .then(|| {
+                Some((
+                    record["folder"].as_str()?.to_owned(),
+                    record["opened"].as_f64()?,
+                ))
+            })
             .flatten()
     }
 

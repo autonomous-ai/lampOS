@@ -875,7 +875,9 @@ fn hermes_on_the_one_path_has_its_data_and_approvals_off_only_in_a_run() {
 /// Hermes asks no approval there (`HERMES_YOLO_MODE=1`, its hardline list
 /// still Hermes's own), on the one run path and through the older wrapper;
 /// any other folder, a near name too, keeps the approvals, and a caller's
-/// own value is dropped. `HERMES_NONINTERACTIVE` passes through (#7781).
+/// own value is dropped. Harness's hooks are accepted there unasked
+/// (`HERMES_ACCEPT_HOOKS=1`). `HERMES_NONINTERACTIVE` passes through
+/// (#7781).
 #[test]
 fn hermes_in_the_kept_session_folder_has_approvals_off() {
     let folder = tempfile::tempdir().unwrap();
@@ -910,10 +912,16 @@ fn hermes_in_the_kept_session_folder_has_approvals_off() {
             env.lines().any(|line| line == "HERMES_NONINTERACTIVE=1"),
             "{env}"
         );
+        // Harness's own hooks are taken unasked there too.
+        assert!(
+            env.lines().any(|line| line == "HERMES_ACCEPT_HOOKS=1"),
+            "{env}"
+        );
         let out = lamp.run_in(&near, &given, "/usr/bin:/bin");
         assert!(out.status.success(), "{out:?}");
         let env = lamp.read("env").unwrap();
         assert!(!env.contains("HERMES_YOLO_MODE"), "{env}");
+        assert!(!env.contains("HERMES_ACCEPT_HOOKS"), "{env}");
     }
 }
 
