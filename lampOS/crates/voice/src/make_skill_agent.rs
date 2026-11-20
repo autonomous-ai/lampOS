@@ -647,7 +647,8 @@ pub enum Tried {
     /// A script failed its try: lamp-tasks' words, for a repair.
     Failed(String),
     /// The try couldn't be made (an older lamp-tasks, its fence, its
-    /// token): why. The skill is kept as before, journaled.
+    /// token, busy): why, journaled. The skill is not kept (#8180: a made
+    /// skill with code is kept only once a try passed).
     NotTried(String),
 }
 
@@ -1919,6 +1920,14 @@ pub(crate) mod tests {
         assert_eq!(
             tried_of(&json!({"ok": true, "tried": true, "passed": true, "said": 2})),
             Tried::Passed { said: 2 }
+        );
+        // #8180: what the try ran without (`net`, `camera`, ...) is read
+        // past, never a reason to call the answer unreadable.
+        assert_eq!(
+            tried_of(
+                &json!({"ok": true, "tried": true, "passed": true, "said": 1, "without": ["net", "camera"]})
+            ),
+            Tried::Passed { said: 1 }
         );
         assert_eq!(
             tried_of(&json!({"ok": true, "tried": false})),

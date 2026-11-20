@@ -4106,8 +4106,13 @@ Dù đèn chạy agent nào (OpenClaw hay Hermes; không chỗ nào ở đây g�
   lamp-tasks, gửi lại agent như một lần sửa (tối đa hai), rồi lần tạo được
   báo là thất bại và không giữ gì. Lần thử đạt thêm `made_skill::TRIED_SAID`
   ("I tried it once and it worked.") vào lời đọc lại; vẫn hỏi người dùng đồng
-  ý như trước. Lần thử không làm được (lamp-tasks cũ, không có phần tasks)
-  được ghi nhật ký và kỹ năng được giữ như trước. Không áp cho kỹ năng thêm
+  ý như trước. Lần thử không làm được (lamp-tasks đang bận, không có token,
+  hàng rào lỗi, lamp-tasks cũ không biết `make_try`, không có trả lời) thì
+  đóng an toàn (#8180): ghi nhật ký kèm lý do, không giữ gì, và người dùng
+  nghe `made_skill::NOT_TRIED_LINE` ("I made it, but the lamp couldn't try
+  it out, so I didn't keep it. Please ask me again in a minute."). Chỉ khi
+  voice không có thư mục tasks nào (`LAMP_TASKS_DIR` không đặt, không có
+  phần tasks) thì kỹ năng được giữ mà không thử. Không áp cho kỹ năng thêm
   từ tệp.
 - **Ai đã viết nó** luôn có trên thẻ và trong mục `made.json`:
   `made_with: openclaw`, `hermes` (engine phần tasks báo cho lần tạo) hoặc
@@ -4254,8 +4259,9 @@ run = "scripts/main.py"
 - **Không được cấp**: khóa (`secrets`): kỹ năng cần khóa dùng `do.task`;
   lamp-tasks từ chối bước `run` của kỹ năng đó, bằng lời.
 - **Giới hạn riêng**: script chạy với giới hạn bộ nhớ (768 MiB không gian
-  địa chỉ), thời gian CPU (30 s) và độ nice (10) của riêng nó, không bao giờ
-  dùng cả ngân sách của lamp-tasks.
+  địa chỉ), thời gian CPU (30 s) và độ nice (10) cho mỗi tiến trình, và tối
+  đa 64 tiến trình và luồng cho cả lần chạy (#8180), không bao giờ dùng cả
+  ngân sách của lamp-tasks. Lần chạy thử lúc tạo có cùng hàng rào và giới hạn.
 - **Thời gian** (từng chặng, từ trigger đến script): luồng của lần kích
   hoạt tạo luồng bàn giao; thư mục được băm (vài file của kỹ năng); hỏi
   lamp-control lời đồng ý (một dòng socket cục bộ); ghi sổ; một dòng tới
