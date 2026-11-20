@@ -2030,7 +2030,12 @@ def test_follow_hand_stops_when_asked_at_a_stop_or_when_the_lamp_takes_the_body_
                 ended = await following.wait()
                 assert (ended["how"], ended["why"]) == ("cut_short", "hand")
                 await following.stop()
-                assert fake.asked("lease.release") == [{"lease": "l_1"}, {"lease": "l_2"}]
+                # The first is let go by its own stop; the second the lamp
+                # gave back at the client's stop (`lost` `released`, #7513),
+                # so its release may or may not still be sent; the third,
+                # lost to a hand, is never released.
+                released = [ask["lease"] for ask in fake.asked("lease.release")]
+                assert released[0] == "l_1" and set(released) <= {"l_1", "l_2"}, released
 
     run(go())
 

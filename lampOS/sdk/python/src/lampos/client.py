@@ -1632,13 +1632,18 @@ class Lamp:
         return await self._act("listen.set", False, on=on)
 
     async def stop(self) -> dict:
-        reply = await self._act("stop", False)
-        if self._following is not None:
-            # A stop ends what this client asked for; its lease goes too.
-            following = self._following
+        # A stop ends what this client asked for; its lease goes too. Ended
+        # here before it is sent, so the lamp's `lost` `released` for the
+        # lease it gives back (#7513) never reads as the reason.
+        following = self._following
+        if following is not None:
             following.end("cut_short", "stop")
-            await following._end()
-        return reply
+        try:
+            return await self._act("stop", False)
+        finally:
+            # Its renewals end even when the stop itself fails.
+            if following is not None:
+                await following._end()
 
     # Skills of this computer's own, put on the lamp (the `skills` grant;
     # docs/control.md, "Skills pushed from a computer").
