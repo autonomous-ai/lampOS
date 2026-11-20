@@ -12248,11 +12248,11 @@ impl Heeding {
                 );
             }
             // The name note goes with the name (`heed_signs`), but for a
-            // line whose words call the lamp or a sure hearing at its start
-            // (`LAMP_NAME_FACE_OR_WORDS`, #8136).
+            // line whose words call the lamp (`LAMP_NAME_FACE_OR_WORDS`,
+            // #8136).
             if self.attention.name_note_kept() {
                 eprintln!(
-                    "lamp-voice second: request {request}: its words call the lamp, or a sure hearing began at its start: the model is still told its name was heard (LAMP_NAME_FACE_OR_WORDS, #8136)"
+                    "lamp-voice second: request {request}: its words call the lamp: the model is still told its name was heard (LAMP_NAME_FACE_OR_WORDS, #8136)"
                 );
             } else {
                 self.noted = Some((request, None));
@@ -28550,9 +28550,10 @@ mod tests {
     /// hearing; the line was played as "the text shows it was called", but
     /// the model was not told the lamp's name was heard and called
     /// `not_for_me`. With `LAMP_NAME_FACE_OR_WORDS=on` (#8136) the model is
-    /// still told when the line's words call the lamp or a sure hearing
-    /// began at its start; an unsure hearing on words that don't call it is
-    /// not told. Off, as on 15164.
+    /// still told when the line's words call the lamp; a hearing on words
+    /// that don't call it is not told, sure at the start or not (a sure
+    /// start alone is #8119's, with its room and face rule). Off, as on
+    /// 15164.
     #[test]
     fn a_line_its_words_call_is_told_the_name_whatever_name_near_ruled() {
         use crate::room_told::Room;
@@ -28577,7 +28578,7 @@ mod tests {
         assert_eq!(noted(true, call, 1.0), told, "request 19");
         assert_eq!(noted(true, call, 0.95), told, "its words, unsure");
         let plain = "Yes, make the light blue.";
-        assert_eq!(noted(true, plain, 1.0), told, "a sure hearing at the start");
+        assert_eq!(noted(true, plain, 1.0), None, "sure at the start, no call");
         assert_eq!(noted(true, plain, 0.95), None, "unsure, no call");
         assert_eq!(noted(false, call, 1.0), None, "off, as on 15164");
     }
