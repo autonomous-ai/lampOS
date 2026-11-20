@@ -2593,6 +2593,9 @@ pub fn serve(
     crate::second_provider::net::key_terms::start_from_environment(files.tools.tasks.is_some());
     // The owner's place's names too, with LAMP_OWNER_PLACE=on (#4333).
     crate::owner_place::start_terms();
+    // The made skills' names and asks too, with LAMP_SKILL_KEYTERM=on
+    // (#8022): read beside the turns, as the names are.
+    crate::second_provider::net::key_terms::start_made_terms(files.tools.clone());
     // Each chat answer's tokens and each declined turn counted for the day,
     // with LAMP_VOICE_DAY_TALLY=on (`day_tally`, #7347): numbers only.
     crate::day_tally::start_from_environment();
