@@ -5783,9 +5783,12 @@ after a take-over, but now for every turn:
       called`, but the name note's room rule, `LAMP_NAME_NOTE_BUSY=face`,
       withheld the note, `the lamp's name was heard in a busy room and
       nobody is turned to the lamp; the model is not told`, and no tool was
-      called): when the verdict's own text check calls the lamp
-      (`called_in_text`, `Attention::told_by_its_words`), the model is told
-      in a busy room with nobody turned too (`Heeding::note_the_name`). The
+      called): when the verdict's own text check calls the lamp by its own
+      name set off, "Lamp" or "Lamb" (`called_in_text` and
+      `begins_with_the_name`, `Attention::told_by_its_words`), the model is
+      told in a busy room with nobody turned too (`Heeding::note_the_name`).
+      A stand-in ("Hey man, …", ", Lynn, …") is office talk there (#1712)
+      and is not told, whatever `LAMP_BUSY_CALLED_STRICT` says. The
       journal says `the lamp's name was heard in a busy room and nobody is
       turned to the lamp, but its words call the lamp: the model is told
       (LAMP_NAME_FACE_OR_WORDS, #8136)`. A busy room where only the room's

@@ -2366,12 +2366,14 @@ impl Attention {
         self.name_note_kept
     }
 
-    /// Whether the line last judged is told the name heard whatever the
-    /// room: its words call the lamp (the verdict's "the text shows it was
-    /// called"), with [`Self::need_a_face_or_words`] (#8136; lamp-52e6,
-    /// request 41, a busy room with nobody turned to the lamp).
+    /// Whether the line last judged is told the name heard in a busy room
+    /// with nobody turned to the lamp: its words call the lamp (the
+    /// verdict's "the text shows it was called") by the lamp's own name
+    /// set off ([`begins_with_the_name`], "Lamp"/"Lamb"), never a stand-in
+    /// ("Hey man, …", ", Lynn, …" are office talk there, #1712), with
+    /// [`Self::need_a_face_or_words`] (#8136; lamp-52e6, request 41).
     pub fn told_by_its_words(&self) -> bool {
-        self.face_or_words && self.called_in_text()
+        self.face_or_words && self.called_in_text() && begins_with_the_name(&self.heard_as_a_call())
     }
 
     /// In a busy room, let a line out only as the conversation going on
