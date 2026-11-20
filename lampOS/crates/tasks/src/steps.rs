@@ -70,7 +70,7 @@ const MOST_EVENT_BYTES: usize = 256 * 1024;
 const MOST_RUNNING: usize = 64;
 
 /// [`SWITCH`]'s value: `on` exactly. Off, there is no reader and no
-/// publisher at all.
+/// publisher at all, for the work records neither (#7930).
 pub fn switched(value: Option<&str>, roots: Vec<PathBuf>) -> Option<Steps> {
     (value == Some("on")).then(|| Steps::new(roots))
 }
@@ -108,6 +108,22 @@ pub fn spawn(
                 std::thread::sleep(LOOK_EVERY);
             }
         })
+}
+
+/// What becomes of one step read (#7930), the reader running with
+/// [`SWITCH`] on only: a tool call's number and the tool's name alone go
+/// to `record` (its task's work record, [`crate::works`]); the step whole,
+/// with its arguments, result or reply text, goes to `publish`
+/// (`tasks/step`).
+pub fn deliver(
+    step: &TaskStep,
+    record: &mut dyn FnMut(u64, u64, &str),
+    publish: &mut dyn FnMut(&TaskStep),
+) {
+    if step.kind == StepKind::Call && !step.tool.is_empty() {
+        record(step.task, u64::from(step.n), &step.tool);
+    }
+    publish(step);
 }
 
 /// Whether [`SWITCH`] is on in this process's environment, read once: the

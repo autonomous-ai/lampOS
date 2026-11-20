@@ -153,6 +153,20 @@ impl EngineKind {
         }
     }
 
+    /// The engine's name as the person calls it (#7930's work records,
+    /// [`crate::works`]): "OpenClaw", "Hermes", "Claude Code".
+    pub fn spoken(self) -> &'static str {
+        match self {
+            Self::Codex => "Codex",
+            Self::Claude => "Claude Code",
+            Self::Opencode => "OpenCode",
+            Self::Devin => "Devin",
+            Self::DevinCloud => "Devin Cloud",
+            Self::Hermes => "Hermes",
+            Self::Openclaw => "OpenClaw",
+        }
+    }
+
     /// The engine's name on the bus (`tasks/status`), whose check takes
     /// letters, digits and `_` only (`msgs::tasks`): `devin_cloud` for Devin
     /// Cloud, whose name for Harness has a dash (the reviewer on #2240).

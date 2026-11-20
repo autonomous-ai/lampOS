@@ -2078,6 +2078,9 @@ fn owner<C: Clock>(
     // last step outlives the tracker's line, which goes when the watch
     // lets the task go.
     let mut tasks_now = progress.then(TasksNow::new);
+    // The work records (#7930, [`crate::works`]): the store's tasks on
+    // them brought up to date at most this often, and before each read.
+    let mut works_due = Instant::now();
     let mut status: Option<(u64, Arc<TaskStatus>)> = None;
     let mut status_began = Instant::now();
     // A store kept aside is looked for again once a minute (#1505).
@@ -2752,6 +2755,32 @@ fn owner<C: Clock>(
                     let answer = engine.identified(record.body(unix_ms()));
                     requests = requests.saturating_add(1);
                     let _ = work.response.try_send(answer);
+                } else if let Request::Work { id } = &work.request {
+                    works_refresh(&engine, &clock.sample()?, tracker.as_ref());
+                    let found = crate::works::with(|board| board.get(id, unix_ms()));
+                    let answer = match found {
+                        Some(record) => engine.identified(json!({"work":record})),
+                        None => Err(EngineError {
+                            code: "no_such_work",
+                            message: "No work with that id is on the lamp's records.",
+                        }),
+                    };
+                    requests = requests.saturating_add(1);
+                    let _ = work.response.try_send(answer);
+                } else if let Request::WorkList { limit } = &work.request {
+                    let answer = if (1..=crate::works::LIST_MOST).contains(limit) {
+                        works_refresh(&engine, &clock.sample()?, tracker.as_ref());
+                        let works =
+                            crate::works::with(|board| board.list(usize::from(*limit), unix_ms()));
+                        engine.identified(json!({"works":works}))
+                    } else {
+                        Err(EngineError {
+                            code: "bad_request",
+                            message: "The limit must be between 1 and 10.",
+                        })
+                    };
+                    requests = requests.saturating_add(1);
+                    let _ = work.response.try_send(answer);
                 } else if let Request::ForgetSessions {} = &work.request {
                     // On the voice's route only: the owner's "forget
                     // everything" (#6274).
@@ -2759,6 +2788,9 @@ fn owner<C: Clock>(
                         // The kept session too: closed, its conversation
                         // deleted, and a new one opened (openharness#4393).
                         crate::one_session::forgotten();
+                        // The work records too, with the person's words
+                        // and the agents' answers in them (#7930).
+                        crate::works::forget_all();
                         match crate::session_index::forget(&session_index) {
                             Ok(forgotten) => {
                                 if forgotten {
@@ -2856,6 +2888,11 @@ fn owner<C: Clock>(
         // task go, below.
         if let (Some(record), Some(tracker)) = (tasks_now.as_mut(), tracker.as_ref()) {
             record.refresh(&engine.recent(&clock.sample()?), tracker, unix_ms());
+        }
+        // The work records too, before the watch lets a task's line go.
+        if works_due <= Instant::now() {
+            works_due = Instant::now() + WORKS_EVERY;
+            works_refresh(&engine, &clock.sample()?, tracker.as_ref());
         }
         if !busy && !stop.load(Ordering::Acquire) {
             let now = clock.sample()?;
@@ -3059,6 +3096,8 @@ fn owner<C: Clock>(
             status: status.clone(),
             reads: tracker.as_ref().map(Tracker::reads),
             set_up,
+            // For the steps' reader, with `LAMP_TASKS_STEPS` on only, as
+            // before #7930: off, nothing is read.
             watched: if crate::steps::on() {
                 engine.watched(&clock.sample()?)
             } else {
@@ -4408,6 +4447,29 @@ impl Drop for Waits {
     }
 }
 
+/// How often the owner brings the store's tasks on the work records up to
+/// date (#7930): well within the watch's half minute, and far less often
+/// than the owner's tick.
+const WORKS_EVERY: Duration = Duration::from_millis(500);
+
+/// The store's tasks on the work records brought up to date from the store
+/// and the watch's read ([`crate::works::Board::tasks`]): in memory only,
+/// the records' lock held for that alone.
+fn works_refresh(engine: &Engine<Store>, now: &ClockSample, tracker: Option<&Tracker>) {
+    let seen = engine.works(now);
+    let at = unix_ms();
+    crate::works::with(|board| {
+        board.tasks(&seen, |task| crate::works::line_of(tracker, task), at);
+    });
+}
+
+/// The steps' reader for [`crate::steps::SWITCH`]'s value and
+/// [`crate::steps::STATE_SETTING`]'s: one only with the switch `on`, as
+/// before #7930; off, nothing is read, for the records neither.
+fn steps_reader(switch: Option<&str>, state: Option<&str>) -> Option<crate::steps::Steps> {
+    crate::steps::switched(switch, crate::steps::roots(state))
+}
+
 fn unix_ms() -> u64 {
     std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
@@ -5294,10 +5356,12 @@ pub fn serve_with_adapter<C: Clock, A: Adapter>(
     let mut status_published = 0u64;
     // An OpenClaw task's own steps (#7267): with `LAMP_TASKS_STEPS=on` only,
     // on a thread of their own, never on this accept loop; off, no reader
-    // and the topic is not touched.
-    let _steps = match crate::steps::switched(
+    // and the topic is not touched, and a work record's step stays empty,
+    // its tools from `harness show` alone. With it on, each tool call's
+    // number and name also go to its task's work record (#7930).
+    let _steps = match steps_reader(
         std::env::var(crate::steps::SWITCH).ok().as_deref(),
-        crate::steps::roots(std::env::var(crate::steps::STATE_SETTING).ok().as_deref()),
+        std::env::var(crate::steps::STATE_SETTING).ok().as_deref(),
     ) {
         Some(reader) => {
             let mut out =
@@ -5312,7 +5376,15 @@ pub fn serve_with_adapter<C: Clock, A: Adapter>(
                         .map(|report| report.watched.clone())
                         .unwrap_or_default()
                 },
-                move |step| publish(&mut out, step, &mut errors),
+                move |step| {
+                    let mut record = |task: u64, n: u64, tool: &str| {
+                        let at = unix_ms();
+                        crate::works::with(|board| board.step(task, n, tool, at));
+                    };
+                    crate::steps::deliver(step, &mut record, &mut |step: &TaskStep| {
+                        publish(&mut out, step, &mut errors);
+                    });
+                },
                 stop.clone(),
             )?)
         }
@@ -5686,6 +5758,17 @@ fn with_sign_in(
 #[cfg(test)]
 mod tests {
     use super::code_handed;
+
+    /// #7930: the steps' reader is made only with `LAMP_TASKS_STEPS` exactly
+    /// `on`, as before: off, unset or anything else, nothing is read, for
+    /// the work records neither.
+    #[test]
+    fn no_steps_reader_with_the_switch_off() {
+        for off in [None, Some("off"), Some(""), Some("1"), Some("ON")] {
+            assert!(super::steps_reader(off, None).is_none(), "{off:?}");
+        }
+        assert!(super::steps_reader(Some("on"), None).is_some());
+    }
 
     /// #5488: `status` says Harness's sign-in once it was read, and nothing
     /// else changes.

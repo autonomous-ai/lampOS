@@ -1927,6 +1927,11 @@ impl<P: Persistence> Engine<P> {
                     "Progress is not read; the service runs without --progress.",
                 ));
             }
+            // The work records are held by the service (#7930,
+            // [`crate::works`]): one that reaches here is not read.
+            Request::Work { .. } | Request::WorkList { .. } => {
+                return Err(err("unsupported", "Work records are held by the service."));
+            }
             // A look at a named session is held by the service, on a lane
             // of its own (#6274): one that reaches here is not looked at.
             Request::Session { .. } => {
@@ -2837,6 +2842,73 @@ impl<P: Persistence> Engine<P> {
     /// with a settled newest answer kept in this boot. One settled in an
     /// earlier boot cannot be dated and is left out. Reads nothing and
     /// changes nothing.
+    /// Each task handed over, for its work record (#7930,
+    /// [`crate::works`]): one queued or being sent; one Harness has, while
+    /// watched or once settled in this boot; one cancelled or not sent in
+    /// this boot. Its words and answer cut to the record's bounds; its
+    /// state the dispatch's or the newest settled observation's, none
+    /// while the agent has it with nothing settled.
+    pub fn works(&self, now: &Clock) -> Vec<crate::works::TaskWork> {
+        use crate::works::{MOST_ANSWER_CHARS, MOST_WORDS_CHARS, State, cut};
+        let this_boot = |audit: &Audit| audit.boot_id == now.boot_id;
+        self.state
+            .tasks
+            .iter()
+            .filter_map(|task| {
+                let newest = task.observations.last();
+                let settled_seen = newest.filter(|seen| settled(&seen.data));
+                let state = match task.dispatch.state {
+                    DispatchState::Prepared | DispatchState::Invalidated => return None,
+                    DispatchState::Queued | DispatchState::Attempting | DispatchState::Pending => {
+                        Some(State::Queued)
+                    }
+                    DispatchState::Cancelled if this_boot(&task.updated) => Some(State::Cancelled),
+                    DispatchState::NotSent | DispatchState::Uncertain
+                        if this_boot(&task.updated) =>
+                    {
+                        Some(State::Failed)
+                    }
+                    DispatchState::Cancelled
+                    | DispatchState::NotSent
+                    | DispatchState::Uncertain => return None,
+                    DispatchState::Accepted => match settled_seen {
+                        Some(seen) if this_boot(&seen.observed) => {
+                            Some(State::of_settled(&seen.data.state))
+                        }
+                        Some(_) => return None,
+                        None if watched_age(task, now).is_some() => None,
+                        None => return None,
+                    },
+                };
+                Some(crate::works::TaskWork {
+                    task_id: task.id,
+                    engine: engine_of(task),
+                    words: cut(&task.launch.prompt, MOST_WORDS_CHARS),
+                    state,
+                    tools: newest.map_or(0, |seen| seen.data.tools),
+                    answer: settled_seen
+                        .map(|seen| seen.data.answer.as_str())
+                        .filter(|answer| !answer.trim().is_empty())
+                        .map(|answer| cut(answer, MOST_ANSWER_CHARS)),
+                    // Once Harness made its agent: the machine it is
+                    // followed on and that agent's id, never a path.
+                    session: task
+                        .dispatch
+                        .agent_id
+                        .as_ref()
+                        .filter(|_| task.dispatch.state == DispatchState::Accepted)
+                        .map(|agent| (machine_of(task).to_owned(), agent.clone())),
+                    // When it was handed over (confirmed, else made), if
+                    // in this boot: a lamp-tasks restart keeps the
+                    // monotonic clock, so its record keeps its start.
+                    started_ago_ms: Some(task.dispatch.confirmed.as_ref().unwrap_or(&task.created))
+                        .filter(|at| at.boot_id == now.boot_id)
+                        .map(|at| now.monotonic_ms.saturating_sub(at.monotonic_ms)),
+                })
+            })
+            .collect()
+    }
+
     pub fn recent(&self, now: &Clock) -> Vec<Recent> {
         let ago = |audit: &Audit| {
             (audit.boot_id == now.boot_id)
@@ -4183,6 +4255,104 @@ mod tests {
             monotonic_ms: 1,
         };
         assert!(engine.recent(&other).is_empty());
+    }
+
+    /// #7930: a task handed over is on the work records from the store:
+    /// queued, then working while Harness has it, then overwritten by its
+    /// settled observation (done, its tools and its answer); one prepared
+    /// only is not; one settled in an earlier boot is not.
+    #[test]
+    fn a_task_handed_over_is_on_the_work_records_queued_working_then_done() {
+        use crate::works::{Board, State};
+        let none = |_: u64| None;
+        let mut board = Board::new();
+        let (mut engine, _) = opened();
+        let prepared = prepare(&mut engine, 0);
+        assert!(engine.works(&clock(0)).is_empty(), "prepared only");
+        engine
+            .handle(&confirmation(&engine, prepared), &clock(0), true)
+            .unwrap();
+        let queued = engine.works(&clock(0));
+        assert_eq!(queued.len(), 1);
+        assert_eq!(queued[0].state, Some(State::Queued));
+        board.tasks(&queued, none, 1_000);
+        let id = prepared.to_string();
+        let record = board.get(&id, 1_000).unwrap();
+        assert_eq!(record["state"], "queued");
+        assert_eq!(record["who"], "Codex");
+        assert_eq!(
+            record["words"],
+            "Review this project without changing files."
+        );
+        // No agent yet: no session.
+        assert_eq!(record["session"], Value::Null);
+        engine.begin_launch(&clock(1)).unwrap().unwrap();
+        engine
+            .finish_launch(
+                prepared,
+                LaunchOutcome::Created {
+                    agent_id: AGENT.into(),
+                },
+                &clock(1),
+            )
+            .unwrap();
+        let working = engine.works(&clock(2));
+        assert_eq!(working[0].state, None);
+        board.tasks(&working, none, 2_000);
+        let record = board.get(&id, 2_000).unwrap();
+        assert_eq!(record["state"], "working");
+        // Its machine and Harness agent, ids only.
+        assert_eq!(
+            record["session"],
+            json!({"machine": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "agent": AGENT})
+        );
+        // The watch's read says idle once: the record says so.
+        board.tasks(&working, |_| Some((Some(State::Idle), Some(1_900))), 3_000);
+        assert_eq!(board.get(&id, 3_000).unwrap()["state"], "idle");
+        observe(&mut engine, prepared, "Reviewed: two typos.", 40);
+        let settled = engine.works(&clock(41));
+        assert_eq!(settled[0].state, Some(State::Done));
+        board.tasks(&settled, none, 41_000);
+        let done = board.get(&id, 50_000).unwrap();
+        assert_eq!(done["state"], "done");
+        assert_eq!(done["done"], true);
+        assert_eq!(done["tools"], 2);
+        assert_eq!(done["answer"], "Reviewed: two typos.");
+        assert_eq!(done["elapsed_s"], 40);
+        assert_eq!(board.list(10, 50_000).len(), 1);
+        let other = Clock {
+            boot_id: "next-boot".into(),
+            monotonic_ms: 1,
+        };
+        assert!(engine.works(&other).is_empty());
+    }
+
+    /// #7930: a task's work record dates from when it was handed over, by
+    /// the store's own clock, so lamp-tasks opened again in the same boot
+    /// gives its record the same start; another boot cannot date it.
+    #[test]
+    fn a_task_on_the_work_records_is_dated_from_its_hand_over_across_a_restart() {
+        let (mut engine, memory) = opened();
+        let prepared = prepare(&mut engine, 0);
+        engine
+            .handle(&confirmation(&engine, prepared), &clock(10), true)
+            .unwrap();
+        assert_eq!(engine.works(&clock(10))[0].started_ago_ms, Some(0));
+        engine.begin_launch(&clock(11)).unwrap().unwrap();
+        engine
+            .finish_launch(
+                prepared,
+                LaunchOutcome::Created {
+                    agent_id: AGENT.into(),
+                },
+                &clock(12),
+            )
+            .unwrap();
+        drop(engine);
+        let recovered = Engine::open(memory, targets(), STORE, RESTART, &clock(90_010)).unwrap();
+        let seen = recovered.works(&clock(90_010));
+        assert_eq!(seen[0].task_id, prepared);
+        assert_eq!(seen[0].started_ago_ms, Some(90_000));
     }
 
     /// `serve --route`: a task the router typed into a session the person
