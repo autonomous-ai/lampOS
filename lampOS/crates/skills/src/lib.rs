@@ -328,6 +328,14 @@ struct SkillFile {
     /// ([`core_agent`], `LAMP_CORE_VIA_AGENT`): never in the file itself.
     #[serde(skip)]
     via_agent: bool,
+    /// An old made skill's own steps, kept beside the `do.task` the lamp
+    /// remade it into for its agent (`lamp_voice::made_remake`, #7765):
+    /// `[[otherwise]]` tables, each a `[[do]]` step as the old skill had
+    /// it, run in the agent's place ([`Engine::run_otherwise`]) when its
+    /// answer isn't ready within [`task::OTHERWISE_AFTER_MS`] of the fire,
+    /// or the task isn't handed over. Only beside a `do.task`, and never a
+    /// task of its own.
+    otherwise: Option<toml::Value>,
 }
 
 /// `[budget]`: the skills naming one `group` start at most `per_hour` runs
@@ -2529,9 +2537,19 @@ pub struct Skill {
     /// ([`core_agent`], `LAMP_CORE_VIA_AGENT`): its `do.task` is the line,
     /// and its say the fallback. False for every other skill.
     pub via_agent: bool,
+    /// A remade skill's old steps (`[[otherwise]]`, #7765), run in its
+    /// agent's place ([`Engine::run_otherwise`]); empty for every other
+    /// skill.
+    otherwise: Vec<(Option<Only>, Step)>,
 }
 
 impl Skill {
+    /// Whether it is a remade skill with its old steps kept
+    /// (`[[otherwise]]`, #7765, [`Engine::run_otherwise`]).
+    pub fn has_otherwise(&self) -> bool {
+        !self.otherwise.is_empty()
+    }
+
     /// Its `do.task` step, if it has one ([`task`], #6305): one a skill.
     pub fn task_step(&self) -> Option<&task::TaskStep> {
         self.steps.iter().find_map(|(_, step)| match step {
@@ -4294,6 +4312,7 @@ fn manifest(
 ) -> Result<Skill, String> {
     let read =
         |file: &str| fs::read_to_string(dir.join(file)).map_err(|error| format!("{file}: {error}"));
+    let otherwise = file.otherwise.take();
     match file.format {
         None | Some(1) => {}
         Some(2) => file.permissions.format_2 = true,
@@ -5931,6 +5950,7 @@ fn manifest(
         manners_shed: Vec::new(),
         made_here,
         via_agent: file.via_agent,
+        otherwise: Vec::new(),
     };
     // A watch shows a faint mark while it is on, texts the person, and
     // tells a known face from one it does not know: each needs its key.
@@ -6030,7 +6050,46 @@ fn manifest(
             return Err(format!("not permitted: {why}"));
         }
     }
+    if let Some(old) = otherwise {
+        skill.otherwise = otherwise_steps(dir, &skill, (description_text, manifest_text), old)?;
+    }
     Ok(skill)
+}
+
+/// A remade skill's `[[otherwise]]` (`old`, #7765) loaded as its old
+/// steps: the same file with them as its `[[do]]`, its grants and secrets
+/// left out, checked whole as any skill is; only beside `skill`'s
+/// `do.task`, never with a task of its own.
+fn otherwise_steps(
+    dir: &Path,
+    skill: &Skill,
+    texts: (&str, &str),
+    old: toml::Value,
+) -> Result<Vec<(Option<Only>, Step)>, String> {
+    if skill.task_step().is_none() {
+        return Err("otherwise: a remade skill's old steps, only beside its do.task".into());
+    }
+    let mut table: toml::Table =
+        toml::from_str(texts.1).map_err(|error| format!("skill.toml: {error}"))?;
+    for key in ["otherwise", "grants", "secrets", "present"] {
+        table.remove(key);
+    }
+    table.insert("do".into(), old);
+    let file = toml::Value::Table(table)
+        .try_into::<SkillFile>()
+        .map_err(|error| format!("otherwise: {error}"))?;
+    let old = manifest(
+        dir,
+        skill.name.clone(),
+        skill.description.clone(),
+        texts,
+        file,
+    )
+    .map_err(|why| format!("otherwise: {why}"))?;
+    if old.task_step().is_some() {
+        return Err("otherwise: a remade skill's old steps hand no task over".into());
+    }
+    Ok(old.steps)
 }
 
 /// Whether `path` is a sound the voice will play, by the voice's own check
@@ -11073,6 +11132,66 @@ impl Engine {
         Ok(run)
     }
 
+    /// The run of a remade skill's old steps (`[[otherwise]]`, #7765), in
+    /// its agent's place: its task's answer wasn't ready within
+    /// [`task::OTHERWISE_AFTER_MS`] of the fire, or the task wasn't handed
+    /// over. Made as its trigger would make them, so the old skill runs as
+    /// it always did; or why not (no old steps, off or snoozed since, or
+    /// steps that last only while their moment holds).
+    pub fn run_otherwise(&mut self, name: &str, now_us: u64) -> Result<Run, String> {
+        let skill = self
+            .skills
+            .iter()
+            .find(|skill| skill.name == name)
+            .ok_or("it isn't on the lamp now")?;
+        if skill.otherwise.is_empty() {
+            return Err("it has no old steps".into());
+        }
+        if self.stopped(name, now_us) {
+            return Err("it is turned off or snoozed".into());
+        }
+        let trigger = match skill.triggers.as_slice() {
+            [one] => Some(one),
+            _ => None,
+        };
+        let old = Skill {
+            steps: skill.otherwise.clone(),
+            otherwise: Vec::new(),
+            ..skill.clone()
+        };
+        let calls = calls_with(
+            seen!(self, skill),
+            &self.picked,
+            &old,
+            trigger,
+            now_us,
+            &Value::Null,
+            None,
+            self.desk_time.then_some(self.clock),
+        );
+        if calls.is_empty() {
+            return Err("its old steps have nothing to do now".into());
+        }
+        if calls.iter().any(Call::held_until_ends) {
+            return Err("its old steps last only while their moment holds".into());
+        }
+        Ok(Run {
+            held: None,
+            generation: None,
+            skill: skill.name.clone(),
+            events: vec![event(
+                &skill.name,
+                SkillStage::Triggered,
+                "its old steps run in its agent's place".into(),
+                None,
+            )],
+            calls,
+            ask: None,
+            queue: false,
+            from: None,
+        })
+    }
+
     /// [`Engine::run_now`]'s run of `name` made at `now_us`: a read is
     /// under way from here, as a trigger's is once made.
     pub fn ran_now(&mut self, name: &str, now_us: u64) {
@@ -13401,6 +13520,93 @@ mod tests {
                 .is_none()
         );
         lamp_voice::made_skill::set_asks_here(None);
+    }
+
+    /// The first builder's 06:08 ruling on #7765: a working old skill
+    /// remade for the lamp's agent keeps its own steps (`[[otherwise]]`),
+    /// run as they always were when the agent's answer isn't ready in
+    /// time. They load only beside a `do.task`, never with a task of their
+    /// own, and are checked as any skill's steps are.
+    #[test]
+    fn a_remade_skill_keeps_its_old_steps_to_run_in_its_agents_place() {
+        let dir = tempfile::tempdir().unwrap();
+        lamp_voice::made_skill::set_asks_here(Some(true));
+        let task = "kind = \"installable\"\nversion = \"1.0.0\"\ngrants = []\n\
+                    asks = [\"moon time\"]\n[permissions]\nspeak = true\nlight = true\n\
+                    [[do]]\ntask = { task = \"tell me when the moon is up\", run = \
+                    \"scripts/agent.py\" }\n";
+        let old = "[[otherwise]]\nlight = { colour = \"blue\" }\n\
+                   [[otherwise]]\nsay = { text = \"The moon is up.\" }\n";
+        let folder = made_here(dir.path(), "moon-time", &format!("{task}{old}"));
+        std::fs::create_dir_all(folder.join("scripts")).unwrap();
+        std::fs::write(folder.join("scripts/agent.py"), "print('task')\n").unwrap();
+        let skill = load(&folder).unwrap();
+        assert!(skill.has_otherwise() && skill.task_step().is_some());
+        let mut engine = Engine::new(vec![skill], false);
+        // Its own run is the task alone; its old steps, in its place.
+        let run = engine.run_now("moon-time", 1_000_000).unwrap();
+        assert!(
+            matches!(run.calls.as_slice(), [Call::Task(_)]),
+            "{:?}",
+            run.calls
+        );
+        let run = engine.run_otherwise("moon-time", 1_000_000).unwrap();
+        let said: Vec<&Words> = run
+            .calls
+            .iter()
+            .filter_map(|call| match call {
+                Call::Words(words) => Some(words),
+                _ => None,
+            })
+            .collect();
+        assert_eq!(said.len(), 1, "{:?}", run.calls);
+        assert_eq!(said[0].words, "The moon is up.");
+        assert!(
+            run.calls
+                .iter()
+                .any(|call| matches!(call, Call::Light { .. }))
+        );
+        // A skill with none has none to run.
+        let plain = made_here(dir.path(), "plain-task", task);
+        std::fs::create_dir_all(plain.join("scripts")).unwrap();
+        std::fs::write(plain.join("scripts/agent.py"), "print('task')\n").unwrap();
+        let plain = load(&plain).unwrap();
+        assert!(!plain.has_otherwise());
+        let mut engine = Engine::new(vec![plain], false);
+        assert!(engine.run_otherwise("plain-task", 1_000_000).is_err());
+        // Only beside a task, never one of their own, and checked whole.
+        let alone = made_here(
+            dir.path(),
+            "no-task",
+            &format!(
+                "asks = [\"moon time\"]\nversion = \"1.0.0\"\n[permissions]\nspeak = true\n\
+                 light = true\n[[do]]\nlight = {{ colour = \"blue\" }}\n{old}"
+            ),
+        );
+        assert!(load(&alone).unwrap_err().contains("otherwise"));
+        for bad in [
+            "[[otherwise]]\ntask = { task = \"again\", run = \"scripts/agent.py\" }\n",
+            "[[otherwise]]\nwave = true\n",
+        ] {
+            let folder = made_here(dir.path(), "bad-old", &format!("{task}{bad}"));
+            std::fs::create_dir_all(folder.join("scripts")).unwrap();
+            std::fs::write(folder.join("scripts/agent.py"), "print('task')\n").unwrap();
+            assert!(load(&folder).unwrap_err().contains("otherwise"), "{bad}");
+        }
+        lamp_voice::made_skill::set_asks_here(None);
+    }
+
+    /// One fire of a remade skill goes one way: its agent's answer, or its
+    /// old steps, whichever comes first, never both.
+    #[test]
+    fn a_remade_skills_fire_is_told_its_agents_answer_or_runs_its_old_steps_never_both() {
+        let first = task::Otherwise::default();
+        assert!(first.answered());
+        assert!(!first.old_steps() && !first.answered());
+        let late = task::Otherwise::default();
+        assert!(late.old_steps());
+        assert!(!late.answered() && !late.old_steps());
+        assert_eq!(task::OTHERWISE_AFTER_MS, 10_000);
     }
 
     /// An uploaded `SKILL.md`'s trigger phrases (`LAMP_MADE_SKILL_ASKS`)

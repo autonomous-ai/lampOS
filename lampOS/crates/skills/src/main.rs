@@ -1310,6 +1310,7 @@ fn serve(
         energy: Cell::new(1),
         tasks: RefCell::new(Tasks {
             of: HashMap::new(),
+            otherwise: HashSet::new(),
             state: options.state.clone(),
             socket: options.tasks_socket.clone(),
             say: sockets.say.clone(),
@@ -1418,6 +1419,13 @@ fn serve(
         sample_clock(&mut engine, &runner, clock::now_us());
         while let Ok(event) = done.try_recv() {
             let skill = event.skill.clone();
+            // A remade skill's agent didn't answer in time, or its task
+            // wasn't handed over (#7765): its old steps run in its place,
+            // as they always did. Never published as a run's end.
+            if event.why == lamp_skills::task::OTHERWISE_DUE {
+                run_otherwise(&skill, &mut engine, &mut runs, &mut out, &runner);
+                continue;
+            }
             let unwritten = lamp_skills::service_write::waiting(&event.why);
             let ended_unsaid = lamp_skills::ended_unsaid(&event.why);
             publish_finished(&mut out, event);
@@ -1616,6 +1624,11 @@ fn serve(
                 runner.tasks.borrow_mut().via_agent = skills
                     .iter()
                     .filter(|skill| skill.via_agent)
+                    .map(|skill| skill.name.clone())
+                    .collect();
+                runner.tasks.borrow_mut().otherwise = skills
+                    .iter()
+                    .filter(|skill| skill.has_otherwise())
                     .map(|skill| skill.name.clone())
                     .collect();
                 if let Some(counting) = &counting {
@@ -2134,6 +2147,10 @@ struct Runner {
 #[derive(Default)]
 struct Tasks {
     of: HashMap<String, (PathBuf, Vec<String>)>,
+    /// The remade skills with their old steps kept (`[[otherwise]]`,
+    /// #7765), as of the last load: run in their agent's place when its
+    /// answer isn't ready in time ([`hand_task`]).
+    otherwise: HashSet<String>,
     state: Option<PathBuf>,
     socket: Option<PathBuf>,
     say: PathBuf,
@@ -2816,12 +2833,18 @@ fn start(
     // nothing, and says so, rather than "goes on on its own".
     if let Some(why) = tasks_refused(&skill, &calls, &runner.tasks.borrow()) {
         did_refused(&skill, made_here, &calls, held.as_deref());
+        let otherwise = runner.tasks.borrow().otherwise.contains(&skill);
         let _ = runner.finished.send(SkillEvent {
-            skill,
+            skill: skill.clone(),
             stage: SkillStage::Done,
             why: format!("not made: {why}"),
             allowed: None,
         });
+        // A remade skill (#7765): its old steps run instead, as they
+        // always did, once this run's end has let its place go.
+        if otherwise {
+            otherwise_due(&skill, &runner.finished);
+        }
         return made_rx;
     }
     did_begun(&skill, made_here, &calls, held.as_deref());
@@ -2853,7 +2876,14 @@ fn start(
     for call in tasks {
         let Call::Task(step) = call else { continue };
         let room = task_room(&skill, &step, runner);
-        hand_task(&skill, *step, &runner.tasks.borrow(), room, line_to.clone());
+        hand_task(
+            &skill,
+            *step,
+            &runner.tasks.borrow(),
+            room,
+            line_to.clone(),
+            &runner.finished,
+        );
     }
     drop(line_to);
     if handed && calls.is_empty() {
@@ -5952,14 +5982,26 @@ fn tasks_refused(skill: &str, calls: &[Call], tasks: &Tasks) -> Option<String> {
 /// ([`lamp_skills::task_sure`]), a run lamp-tasks says failed is told as
 /// one fixed line behind the same gate, and one refused `busy` waits its
 /// turn in the lamp's one line ([`lamp_skills::task_sure::LAMP`]), on this
-/// thread; off, as before.
+/// thread; off, as before. A remade skill with its old steps kept
+/// (`[[otherwise]]`, #7765) has its agent's answer told only when it is
+/// ready within [`lamp_skills::task::OTHERWISE_AFTER_MS`] (a run that
+/// ended well with no words to tell counts); else, or when the task wasn't
+/// handed over or failed, its old steps run in its place, asked of the
+/// main loop through `finished`, and nothing of the task is told. A yes
+/// asked aloud in its place is the fire's line: no old steps after it.
 fn hand_task(
     skill: &str,
     step: lamp_skills::task::TaskStep,
     tasks: &Tasks,
     mut room: LampRoom,
     line: Option<mpsc::Sender<lamp_skills::core_agent::Heard>>,
+    finished: &Waking<SkillEvent>,
 ) {
+    let otherwise = tasks.otherwise.contains(skill).then(|| {
+        let otherwise = Arc::new(lamp_skills::task::Otherwise::default());
+        otherwise_after(skill, &otherwise, finished);
+        (otherwise, finished.clone())
+    });
     // This run's own: a run now asked by voice, never a trigger's after it.
     // Its quiet lifted and its not-ready line only with
     // `LAMP_TOLD_WHEN_ASKED` (#7180), as before; its failure answered in
@@ -5987,7 +6029,14 @@ fn hand_task(
             "priority": lamp_voice::say::NORMAL_PRIORITY,
             "expires_in_ms": lamp_skills::task::ASK_EXPIRES_MS,
         });
-        let say_yes = || say(&say_socket, "say", &skill, ask.clone(), &[], || {});
+        // A remade skill's fire (#7765): the question is its line, so its
+        // old steps never run after it (Thirteen's P3).
+        let say_yes = || {
+            if let Some((otherwise, _)) = &otherwise {
+                otherwise.asked();
+            }
+            say(&say_socket, "say", &skill, ask.clone(), &[], || {})
+        };
         // With `LAMP_SKILL_TASK_SURE` on: a failed run's told line, and
         // whether lamp-tasks said `busy`, so it waits its turn
         // (`lamp_skills::task_sure`). Off, neither is ever set.
@@ -5995,6 +6044,8 @@ fn hand_task(
         let found = std::cell::Cell::new(None);
         let refused = std::cell::Cell::new(None);
         let not_ready = std::cell::Cell::new(None);
+        // lamp-tasks' whole answer, for a remade skill's way (#7765).
+        let ended = std::cell::Cell::new(None::<String>);
         let tried = lamp_skills::task_sure::Tried::default();
         let send = |socket: &Path, line: &str| {
             // With `LAMP_SKILL_RUNS_VOICE_SHARE` set (#7342), the relay's day
@@ -6027,6 +6078,7 @@ fn hand_task(
                 )
             );
             found.set(lamp_skills::task::told(&answer));
+            ended.set(Some(answer.clone()));
             refused.set(lamp_skills::task::refusal_said(&answer));
             not_ready.set(lamp_skills::task::not_ready_line(
                 &answer,
@@ -6041,6 +6093,7 @@ fn hand_task(
             found.set(None);
             refused.set(None);
             not_ready.set(None);
+            ended.set(None);
             tried.once(|| {
                 lamp_skills::task::hand(
                     &skill,
@@ -6087,6 +6140,29 @@ fn hand_task(
                 ),
             }
             return;
+        }
+        // A remade skill (#7765): its run that ended well first is its
+        // answer, told as any run's (nothing, with no words: said aloud
+        // already); not handed over or failed, its old steps run in its
+        // place and nothing of the task is told, so the owner never hears
+        // both.
+        if let Some((otherwise, finished)) = &otherwise {
+            match otherwise.after_hand(ended.take().as_deref()) {
+                lamp_skills::task::OtherwiseAfter::Tell => {}
+                lamp_skills::task::OtherwiseAfter::OldSteps => {
+                    eprintln!(
+                        "lamp-skills: skill:{skill}: do.task: no answer of its agent's: its old steps run"
+                    );
+                    otherwise_due(&skill, finished);
+                    return;
+                }
+                lamp_skills::task::OtherwiseAfter::Nothing => {
+                    eprintln!(
+                        "lamp-skills: skill:{skill}: do.task: its old steps ran first, or its yes was asked: nothing of its task is said"
+                    );
+                    return;
+                }
+            }
         }
         // A refusal the person must hear (a run granted the internet the
         // lamp's agent can't be given, #7200): said in plain words, the
@@ -6164,6 +6240,61 @@ fn asker(asked_at: Option<u64>, owners: bool, ready: u64) -> lamp_skills::servic
         (true, false) => Asker::Another,
         (false, _) => Asker::Nobody,
     }
+}
+
+/// A remade skill's old steps run in its agent's place (`[[otherwise]]`,
+/// #7765, [`lamp_skills::Engine::run_otherwise`]), started as a trigger's
+/// run is ([`start`]), so every bound of its steps holds; or the journal
+/// says why not.
+fn run_otherwise(
+    skill: &str,
+    engine: &mut Engine,
+    runs: &mut Runs,
+    out: &mut Publisher,
+    runner: &Runner,
+) {
+    match engine.run_otherwise(skill, clock::now_us()) {
+        Ok(run) => {
+            eprintln!("lamp-skills: skill:{skill}: its old steps run in its agent's place");
+            for event in run.events {
+                publish(out, event);
+            }
+            let _ = start(run.skill, run.calls, run.held, &mut runs.busy, out, runner);
+        }
+        Err(why) => eprintln!("lamp-skills: skill:{skill}: its old steps didn't run: {why}"),
+    }
+}
+
+/// A remade skill's task handed over (#7765): at most
+/// [`lamp_skills::task::OTHERWISE_AFTER_MS`] after its fire, a look whether
+/// its agent's answer is ready; none, its old steps are asked of the main
+/// loop through `finished` ([`lamp_skills::task::OTHERWISE_DUE`]).
+fn otherwise_after(
+    skill: &str,
+    otherwise: &Arc<lamp_skills::task::Otherwise>,
+    finished: &Waking<SkillEvent>,
+) {
+    let (skill, otherwise, finished) = (skill.to_owned(), otherwise.clone(), finished.clone());
+    std::thread::spawn(move || {
+        std::thread::sleep(Duration::from_millis(lamp_skills::task::OTHERWISE_AFTER_MS));
+        if otherwise.old_steps() {
+            eprintln!(
+                "lamp-skills: skill:{skill}: do.task: its agent's answer isn't ready within {} s: its old steps run",
+                lamp_skills::task::OTHERWISE_AFTER_MS / 1000
+            );
+            otherwise_due(&skill, &finished);
+        }
+    });
+}
+
+/// The main loop asked to run `skill`'s old steps ([`run_otherwise`]).
+fn otherwise_due(skill: &str, finished: &Waking<SkillEvent>) {
+    let _ = finished.send(SkillEvent {
+        skill: skill.to_owned(),
+        stage: SkillStage::Done,
+        why: lamp_skills::task::OTHERWISE_DUE.into(),
+        allowed: None,
+    });
 }
 
 /// The owner's spoken ask whose run's told answer, found or failed, lifts
@@ -8975,6 +9106,7 @@ mod tests {
             .unwrap();
         let tasks = Tasks {
             of: HashMap::from([("study".to_owned(), (root.path().join("study"), Vec::new()))]),
+            otherwise: HashSet::new(),
             state: Some(root.path().to_owned()),
             socket: None,
             say: root.path().join("say.sock"),
@@ -9075,6 +9207,7 @@ mod tests {
                 state: None,
                 socket: None,
                 say: root.path().join("say.sock"),
+                otherwise: HashSet::new(),
                 via_agent: HashSet::from([skill.to_owned()]),
             }),
             local_time: None,
@@ -9154,6 +9287,7 @@ mod tests {
         let (finished, done) = waking(&Arc::new(waker));
         let tasks = Tasks {
             of: HashMap::from([("study".to_owned(), (root.path().join("study"), Vec::new()))]),
+            otherwise: HashSet::new(),
             state: Some(root.path().to_owned()),
             socket: None,
             say: root.path().join("say.sock"),
@@ -9227,6 +9361,27 @@ mod tests {
         // Nothing was made, so nothing tells it began.
         assert!(told.recv().is_err());
         assert!(!root.path().join(lamp_skills::task::RUNS_FILE).exists());
+        // A remade skill with its old steps kept (#7765): the same refusal,
+        // then its old steps asked of the main loop, once its place is let
+        // go, never published.
+        runner
+            .tasks
+            .borrow_mut()
+            .otherwise
+            .insert("study".to_owned());
+        let _ = start(
+            "study".into(),
+            vec![task()],
+            None,
+            &mut HashSet::new(),
+            &mut out,
+            &runner,
+        );
+        let event = done.recv_timeout(Duration::from_secs(2)).unwrap();
+        assert!(event.why.starts_with("not made: "), "{}", event.why);
+        let event = done.recv_timeout(Duration::from_secs(2)).unwrap();
+        assert_eq!(event.skill, "study");
+        assert_eq!(event.why, lamp_skills::task::OTHERWISE_DUE);
     }
 
     /// A run's sockets carry its own skill's permissions, as of the last

@@ -1744,6 +1744,10 @@ fn worker_command(
             role,
             var(crate::make_no_asks::ENVIRONMENT).as_deref(),
         ))
+        .envs(made_remake_worker_environment(
+            role,
+            var(crate::made_remake::ENVIRONMENT).as_deref(),
+        ))
         .envs(onboarding_worker_environment(
             role,
             var(crate::onboarding::ENVIRONMENT).as_deref(),
@@ -1984,6 +1988,22 @@ fn made_off_said_worker_environment(
 ) -> Option<(&'static str, &'static str)> {
     (matches!(role, "provider" | "second") && value == Some(std::ffi::OsStr::new("on")))
         .then_some((crate::made_skill::OFF_SAID_ENVIRONMENT, "on"))
+}
+
+// Old skills remade for the lamp's agent (`made_remake::scope`), passed
+// the same narrow way: the exact `on` or `all`, to the two routes whose
+// `make_skill` takes the ask and whose heard lines carry the line after.
+fn made_remake_worker_environment(
+    role: &str,
+    value: Option<&std::ffi::OsStr>,
+) -> Option<(&'static str, &'static str)> {
+    if !matches!(role, "provider" | "second") {
+        return None;
+    }
+    match crate::made_remake::scope_with(value.and_then(std::ffi::OsStr::to_str))? {
+        crate::made_remake::Scope::Broken => Some((crate::made_remake::ENVIRONMENT, "on")),
+        crate::made_remake::Scope::All => Some((crate::made_remake::ENVIRONMENT, "all")),
+    }
 }
 
 // A make with nothing of what was heard refused (#7621,
@@ -3585,6 +3605,10 @@ mod tests {
             ),
             (
                 crate::make_no_asks::ENVIRONMENT,
+                ["provider", "second"].as_slice(),
+            ),
+            (
+                crate::made_remake::ENVIRONMENT,
                 ["provider", "second"].as_slice(),
             ),
         ] {

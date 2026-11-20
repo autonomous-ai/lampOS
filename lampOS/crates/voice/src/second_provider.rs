@@ -9494,6 +9494,10 @@ async fn spoken(
     continues_from: Option<u64>,
 ) {
     let (mut turn, scope, marks) = context;
+    // While this turn is open, and 15 s after, no old skill's remake
+    // begins (`crate::made_remake::TurnOpen`, the first builder's 10:47 on
+    // #7814): one counter, nothing waited on.
+    let _open = crate::made_remake::TurnOpen::begin();
     // Captured at Start-arm entry, before begin or any other callbacks:
     // neither a delayed callback nor a task first polled after forgetting
     // may adopt the new generation for this already-processing line.
@@ -12076,6 +12080,12 @@ async fn spoken(
         .chain(linked)
         // A made skill's sends since the last told (#6066), once each.
         .chain(crate::skill_writes_told::note_for(request))
+        // Old skills remade in the middle form (`LAMP_REMAKE_OLD_SKILLS`):
+        // the line once remade, to the owner alone.
+        .chain(crate::made_remake::note_for(
+            request,
+            crate::services::owner_of(scope.as_ref()).is_some(),
+        ))
         // A skill said back and waiting for its yes (#6066, #6305, #6307):
         // its id, as this route's history keeps no call's answer.
         .chain(crate::skill_write_yes::waiting_note(
