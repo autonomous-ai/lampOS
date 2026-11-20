@@ -4834,7 +4834,21 @@ fn the_installed_bedtime_skill_is_live_and_adds_no_function() {
     // The FAQ, How to use the lamp, since #5790.
     // Bedtime and Morning since its nights on lamp-06c1 (#5753).
     // Light show since #5745; Light scenes and Point the light since #5744.
-    assert_eq!(installed.len(), 31);
+    // The four seen reactions since the owner's call (#6543).
+    assert_eq!(installed.len(), 35);
+    // The four the desk-noticing yes covers (the owner's call, 23 Nov on
+    // #7668) are installed, each core and on.
+    for name in lamp_skills::SEEN_PRODUCT {
+        let skill = installed
+            .iter()
+            .find(|skill| skill.name == name)
+            .unwrap_or_else(|| panic!("{name} installed"));
+        assert!(
+            skill.enabled && skill.kind == lamp_skills::SkillKind::Core,
+            "{name}"
+        );
+        assert!(install::PRODUCT_SKILLS.contains(&name), "{name}");
+    }
     let bedtime = installed
         .iter()
         .find(|skill| skill.name == "bedtime-morning")
@@ -4859,16 +4873,17 @@ fn the_installed_bedtime_skill_is_live_and_adds_no_function() {
     );
     assert!(root.join("bedtime-morning/SKILL.md").is_file());
     // Inventory includes the disabled core and its grants; only live skills
-    // contribute functions. The twenty-six live skills (with Bedtime and
+    // contribute functions. The thirty live skills (with Bedtime and
     // Morning, which declares none, since #5753) (with music sway since
     // #5770 and watch you leave since #2834, Head pat and its wiggle, which declare
     // none, and Sit back, which shares wellbeing_nudges) offer Dance,
     // prepare_to_unplug, hidden at run time unless LAMP_UNPLUG=on, the
     // wellbeing nudges' one wellbeing_nudges (since 25 Oct), Pose's set_pose (#4135),
     // the FAQ's lamp_help (#5790), Light show's light_show (#5745), and
-    // Light scenes' light_scene and Point the light's point_light (#5744).
+    // Light scenes' light_scene and Point the light's point_light (#5744),
+    // and the four seen reactions' one seen_remarks (#6543).
     let inventory = lamp_skills::load_each(&root);
-    assert_eq!(inventory.len(), 31);
+    assert_eq!(inventory.len(), 35);
     assert!(inventory.iter().all(|(_, skill)| skill.is_ok()));
     let listed = lamp_skills::package::list(&root).unwrap();
     let row = listed
@@ -4886,16 +4901,16 @@ fn the_installed_bedtime_skill_is_live_and_adds_no_function() {
             .last()
             .unwrap()
             .starts_with(
-                "The skills here give the model 8 functions (dance, lamp_help, light_scene, light_show, point_light, prepare_to_unplug, set_pose, wellbeing_nudges)."
+                "The skills here give the model 9 functions (dance, lamp_help, light_scene, light_show, point_light, prepare_to_unplug, seen_remarks, set_pose, wellbeing_nudges)."
             ),
         "{listed}"
     );
     let (live, errors) = lamp_skills::load_all(&root);
     assert!(errors.is_empty(), "{errors:?}");
-    assert_eq!(live.len(), 26);
+    assert_eq!(live.len(), 30);
     assert!(live.iter().any(|skill| skill.name == bedtime.name));
     // Each core skill installed off is disabled on the lamp and adds no
-    // function, its tool or not: the 8 above are all a session is told.
+    // function, its tool or not: the 9 above are all a session is told.
     for (name, _) in install::PRODUCT_SKILLS_OFF {
         let skill = installed.iter().find(|skill| skill.name == *name).unwrap();
         assert!(!skill.enabled, "{name}");

@@ -1,6 +1,6 @@
-//! The four seen reactions together, as a lamp that has them on holds them
-//! (#6543, the owner's call on #7401 and the first builder's rulings for
-//! the switch-on, #7668; not yet product skills): Seen celebrating, a
+//! The four seen reactions together, as the product ships them (#6543, the
+//! owner's call on #7401 and the first builder's rulings for the switch-on,
+//! #7668): Seen celebrating, a
 //! drink, eating and tired each say one line when lamp-seen's count of
 //! their kind rises, with no day's most, group's hour or gap, or rest; the
 //! same kind not again within 20 minutes of its last line heard (a
@@ -20,18 +20,15 @@ fn skills_root() -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR")).join("../../skills")
 }
 
-/// The seen reactions named, loaded and turned on, as a lamp that has them
-/// on would hold them: in the tree they are installable and off, not yet
-/// product skills, until their switch-on after the owner's working-day row
-/// (#7668).
+/// The seen reactions named, loaded as the product installs them: core
+/// skills, on.
 fn seen(names: &[&str]) -> Vec<Skill> {
     names
         .iter()
         .map(|name| {
-            let mut skill = load(&skills_root().join(name)).unwrap();
-            assert!(!skill.enabled, "{name} comes off");
-            assert_eq!(skill.kind, SkillKind::Installable, "{name}");
-            skill.enabled = true;
+            let skill = load(&skills_root().join(name)).unwrap();
+            assert!(skill.enabled, "{name} comes on");
+            assert_eq!(skill.kind, SkillKind::Core, "{name}");
             skill
         })
         .collect()
@@ -561,9 +558,7 @@ fn drops_kept_false_or_left_out_changes_nothing() {
     // (subscribed), and a rise kept through a talk is kept through the
     // slide's closing too, said once both hold.
     for edit in ["drops_kept = false\n", ""] {
-        let mut drink = drink_with(|toml| toml.replace("drops_kept = true\n", edit)).unwrap();
-        // Off in the tree, not yet a product skill (#7668): turned on.
-        drink.enabled = true;
+        let drink = drink_with(|toml| toml.replace("drops_kept = true\n", edit)).unwrap();
         let mut engine = Engine::new(vec![drink], true);
         assert!(!engine.reads_privacy(), "{edit:?}");
         assert!(engine.topics().iter().any(|topic| topic == "voice/privacy"));
@@ -783,4 +778,97 @@ fn a_new_rise_after_a_kept_rise_dropped_past_its_wait_still_has_its_line() {
     assert_eq!(named(&said), [(expires + 5, "seen-drink")]);
     assert_eq!(drops.len(), 1, "{drops:?}");
     assert_eq!(drops[0].0, expires, "{drops:?}");
+}
+
+/// The owner's call (23 Nov on #7668): the desk-noticing yes covers the
+/// four. With it and no `seen_more` line each has its line; without it
+/// none; taken back (or a forget, which removes it) nothing more is said;
+/// and each skill's own off still silences it.
+#[test]
+fn the_desk_noticing_yes_covers_the_four_with_no_seen_more_line() {
+    let sightings = [(10, "drank"), (20, "ate"), (30, "tired"), (40, "celebrate")];
+    let sitting = Sitting::of(45, &sightings);
+    let every = [
+        (10, "seen-drink"),
+        (20, "seen-eat"),
+        (30, "seen-tired"),
+        (40, "seen-celebrate"),
+    ];
+
+    // The yes, with no seen_more line kept.
+    let mut engine = Engine::new(seen(&SEEN), true);
+    let _state = seen_more_yes(&mut engine, &[]);
+    for name in SEEN {
+        assert!(!engine.hears_more(name), "{name} before the yes");
+    }
+    assert!(engine.set_desk_noticing(true).is_some());
+    assert!(engine.set_desk_noticing(true).is_none(), "unchanged");
+    for name in SEEN {
+        assert!(engine.hears_more(name), "{name}");
+    }
+    let said = play_on(&mut engine, &sitting, |_, _, _| {});
+    assert_eq!(named(&said), every);
+
+    // Without it, none.
+    let mut engine = Engine::new(seen(&SEEN), true);
+    let _state = seen_more_yes(&mut engine, &[]);
+    assert!(engine.set_desk_noticing(false).is_none());
+    let said = play_on(&mut engine, &sitting, |_, _, _| {});
+    assert!(said.is_empty(), "{said:?}");
+
+    // Taken back at 15 minutes: the drink's line, nothing after.
+    let mut engine = Engine::new(seen(&SEEN), true);
+    let _state = seen_more_yes(&mut engine, &[]);
+    engine.set_desk_noticing(true);
+    let said = play_on(&mut engine, &sitting, |engine, at, _| {
+        if at / 60_000_000 == 15 {
+            engine.set_desk_noticing(false);
+        }
+    });
+    assert_eq!(named(&said), [(10, "seen-drink")]);
+
+    // Each keeps its own off: seen-drink off, the other three speak.
+    let state = tempfile::tempdir().unwrap();
+    lamp_skills::keep_names(
+        &state.path().join(lamp_skills::OFF_FILE),
+        &["seen-drink".to_owned()].into_iter().collect(),
+    )
+    .unwrap();
+    let mut engine = Engine::new(seen(&SEEN), true);
+    engine.keep_off_in(state.path()).unwrap();
+    engine.set_desk_noticing(true);
+    let said = play_on(&mut engine, &sitting, |_, _, _| {});
+    assert_eq!(named(&said), every[1..]);
+}
+
+/// The cover is the four product skills' alone: a skill of another name,
+/// an installable one or a pushed one of one of the four names still needs
+/// its own `seen_more` yes, desk-noticing yes or not.
+#[test]
+fn a_skill_not_among_the_four_still_needs_its_own_seen_more_yes() {
+    let sitting = Sitting::of(12, &[(10, "drank")]);
+    let mut renamed = seen(&["seen-drink"]).remove(0);
+    renamed.name = "my-drink".into();
+    let mut installable = seen(&["seen-drink"]).remove(0);
+    installable.kind = SkillKind::Installable;
+    let mut pushed = seen(&["seen-drink"]).remove(0);
+    pushed.pushed_by = Some("a computer".into());
+    for skill in [renamed, installable, pushed] {
+        let name = skill.name.clone();
+        let mut engine = Engine::new(vec![skill.clone()], true);
+        // Named in no journal line with LAMP_SEEN_JOURNAL_LABELS off: it
+        // names humans/doing_more (lamp_skills::journal).
+        assert!(lamp_skills::journal::hidden_now().contains(&name), "{name}");
+        let _state = seen_more_yes(&mut engine, &[]);
+        engine.set_desk_noticing(true);
+        assert!(!engine.hears_more(&name), "{name}");
+        let said = play_on(&mut engine, &sitting, |_, _, _| {});
+        assert!(said.is_empty(), "{name}: {said:?}");
+        // Its own yes, as before.
+        let mut engine = Engine::new(vec![skill], true);
+        let _state = seen_more_yes(&mut engine, &[&name]);
+        engine.set_desk_noticing(true);
+        let said = play_on(&mut engine, &sitting, |_, _, _| {});
+        assert_eq!(said.len(), 1, "{name}: {said:?}");
+    }
 }
