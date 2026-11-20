@@ -1548,6 +1548,25 @@ cắt, không điều nào khớp; chỉ id và số lượng, không bao giờ 
 quên; `remember::ForgetNotAsked`, hàng của Thirteen trên
 #5627). Vậy TV nói «quên cái ô của tôi» chỉ được hỏi lại, không
 bao giờ chạy.
+**Một yêu cầu quên không bao giờ tự thành một ký ức** (#8038, lamp-06c1,
+20/11: lượt quan sát giữ lại «họ muốn đèn quên mái chèo kayak» từ một lệnh
+quên đang giữ chờ, và mọi lệnh quên sau đó của điều ấy khớp hai hàng). Trên
+đường thứ hai, mọi `forget` hay `forget_everything` mô hình gọi đều đánh dấu
+yêu cầu ấy không ghi vào journal và được đếm là một lệnh quên cho lượt quan
+sát (`remember::forget_called`), dù kết quả ra sao: chạy, giữ chờ lời «có»,
+hỏi lại một lần, hay bị từ chối trước khi tới bộ nhớ. Quyết định theo lời gọi,
+không bao giờ theo lời nói, như việc điều phối của đường Live đã làm. Khi chọn
+trên câu một khuôn mặt, một quan sát khớp cạnh đúng một điều đã giữ không phải
+lần khớp thứ hai (`remember::one_kept_among`, theo loại của các hàng từ một
+lượt liệt kê `kept` thứ hai không có quan sát), và lời «có» của họ cho lệnh
+quên ấy xoá luôn các quan sát đó theo id
+(`remember::agreed_forget_observations`). Một lệnh quên không được hỏi vì hai
+hàng khớp, không hàng nào khớp, hay không nêu một điều nào thì được báo đúng
+nguyên nhân ấy (`remember::FORGET_SEVERAL_MATCH`, `FORGET_NO_MATCH`,
+`FORGET_NAME_ONE`), và journal ghi «forget not run: <lý do>»; không bao giờ
+báo «không thấy ai đang nói», vì khuôn mặt họ có trong khung. Nguyên nhân của
+chính đèn (forget-all tắt, liệt kê thất bại hay có thể bị cắt) bị từ chối như
+trước.
 **Cũng không gì mang tính xoá bỏ, hay làm thay họ ngoài việc lưu và nhớ lại**
 (lần đọc riêng tư trên #5592): một `remember` sửa một điều đã giữ theo id
 (`replaces`, `remember::corrects`) bị từ chối như lệnh quên, và khi không có

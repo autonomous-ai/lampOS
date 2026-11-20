@@ -994,7 +994,25 @@ run as before. A one-face forget it does not ask about is journaled with why
 match the words (2)", or forget-all off, the model named a `source_id` on a
 line that names no subject, listing failed, listing may be cut, no kept
 thing matches; ids and counts only, never the words they asked to
-forget; `remember::ForgetNotAsked`, Thirteen's row on #5627). A TV saying "forget my umbrella" is therefore asked, never run. **Nor
+forget; `remember::ForgetNotAsked`, Thirteen's row on #5627). A TV saying "forget my umbrella" is therefore asked, never run.
+**A forget request is never itself a memory** (#8038, lamp-06c1, 20 Nov: the
+observation pass kept "they want the lamp to forget the kayak paddle" from a
+held forget, and every later forget of it matched two rows). On the second
+route, every `forget` or `forget_everything` the model calls marks its
+request kept out of the journal and counts as a forget for the observation
+pass (`remember::forget_called`), whatever becomes of it: run, held for
+their yes, asked about once, or refused before the memory. Decided by the
+call, never by the words, as the Live route's dispatch already does. In the
+one-face pick, an observation matching beside exactly one kept thing is no
+second match (`remember::one_kept_among`, by the rows' kinds from a second
+`kept` listing without observations), and their yes to that forget takes
+those observations with it by id (`remember::agreed_forget_observations`).
+A forget not asked for two matches, none, or no one thing named is told
+that cause (`remember::FORGET_SEVERAL_MATCH`, `FORGET_NO_MATCH`,
+`FORGET_NAME_ONE`), and the journal says "forget not run: <why>"; it is never
+told "I couldn't see who was talking", since their face was in view. A cause
+of the lamp's own (forget-all off, a listing failed or may be cut) is refused
+as before. **Nor
 anything destructive, or acting for them beyond saving and recall** (the
 privacy read on #5592): a `remember` that corrects a kept thing by id
 (`replaces`, `remember::corrects`) is refused like a forget, and without an
