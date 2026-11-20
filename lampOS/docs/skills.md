@@ -8940,7 +8940,10 @@ grants, its code, or the lamp's own steps (the light, the head, a say).
    in code: made in this conversation, but the lamp's last turn removed or
    turned a made skill"; and a line naming no skill while one was made in
    this conversation says how many of those the made skills the heard
-   words are read for hold ("the heard words named no skill; 1 made in
+   words are read for hold (the tools file's `made_asks`, as the matcher
+   reads it on the line, a one-word name too: on lamp-52e6 at 12:11 on
+   20 Nov a kept "applefile" was counted 0, its name being one word, not
+   for being read late) ("the heard words named no skill; 1 made in
    this conversation, 0 of them among the made skills the heard words are
    read for; 2 word(s) of its own, nearest: name, 1 word(s) off"), with
    no word of the line and no skill's name; the words read are those past
