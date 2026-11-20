@@ -1,0 +1,31 @@
+[package]
+name = "lamp-play"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+
+# The lamp plays a URL (#7415, the first builder's yes of 20 Nov 15:08): the
+# pure parts first. What a play may touch (`hosts`): https, port 443, a host
+# the lamp's cloud named for that play, public IPv4 addresses only, checked
+# before any connect. The decoder, the fetch and the unit come after.
+[[bin]]
+name = "lamp-play"
+path = "src/main.rs"
+
+[dependencies]
+url = "2"
+serde.workspace = true
+serde_json.workspace = true
+# The peer of the socket by its credentials (SO_PEERCRED), as lamp-apps reads it.
+rustix = { version = "=1.1.5", features = ["net", "process", "fs"] }
+# The fetch speaks HTTP/1.1 itself over rustls, as lamp-update and lamp-policy do: one GET,
+# `Connection: close`; the versions and features they already build.
+rustls = { version = "0.23", default-features = false, features = ["ring", "std", "tls12"] }
+webpki-roots = "1"
+httparse = "1.10"
+# MP3 only (no other codec or container is built): pure Rust, MPL-2.0, read, pinned.
+symphonia = { version = "=0.5.4", default-features = false, features = ["mp3"] }
+
+[lints]
+workspace = true
