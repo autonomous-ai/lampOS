@@ -368,3 +368,33 @@ fn a_line_that_calls_the_lamp_by_name_is_held_without_the_call() {
         );
     }
 }
+
+/// [`past_the_name`] (#8022): on a line that names the lamp, the words past
+/// its name heard as another word, which the made-skill matcher and
+/// `LAMP_MAKE_SKILL_ASKED`'s force both read; on a line that doesn't, or
+/// one that opens with no such word, none.
+#[test]
+fn past_the_name_is_the_line_past_the_misheard_name_on_a_named_line() {
+    for (said, rest) in [
+        (
+            "Hey, Lynn, make me a skill that hums at noon.",
+            "make me a skill that hums at noon.",
+        ),
+        ("Hey, Lynn. Mail check.", "Mail check."),
+        ("Lynn, apple file.", "apple file."),
+        ("Edeland, my dog is called Moe.", "my dog is called Moe."),
+    ] {
+        assert_eq!(past_the_name(said, true), Some(rest), "{said}");
+        assert_eq!(past_the_name(said, false), None, "{said}: not named");
+    }
+    for said in [
+        "Hey Lamp, mail check.",
+        "Lamp, make me a skill that hums at noon.",
+        "Yes, please.",
+        "Lynn.",
+        "Mail check.",
+        "Hello, Anna. Lamp, mail check.",
+    ] {
+        assert_eq!(past_the_name(said, true), None, "{said}");
+    }
+}
