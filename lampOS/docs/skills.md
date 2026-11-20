@@ -6886,8 +6886,9 @@ the same code for both writers.
   send or a memory, words chosen each time or saying what changes, several
   steps one after another, and a nudge worded for the person each time
   (to stretch after a long sitting). A one-off reminder is judged one, as
-  the lamp's own timer answers it. So "whenever I come back to the desk,
-  wave at me" and "glow pink when I pat your head" are DeepSeek's; the
+  the lamp's own timer answers it. So "wave at me when someone arrives at
+  the desk" (for anyone who arrives, a guest too) and "glow pink when I pat
+  your head" are DeepSeek's; the
   gold price at seven, the apple file and the stretch are the agent's
   (`made_skill::tests::the_reaction_judge_defines_a_quick_reaction_by_the_lamps_own_parts`,
   `make_skill_local::tests::with_the_owners_lines_a_quick_reaction_is_deepseeks_and_all_else_the_agents`).
@@ -6896,8 +6897,13 @@ the same code for both writers.
   (`made_skill::quick_reaction`, by its start and its step kinds alone,
   never a word): started by the lamp's own (words the person names,
   `asks` or a `[said]` start; no trigger, run only when asked; or a
-  `[trigger]` on a topic the lamp has: a touch, a pat or the button,
-  someone arriving or leaving, the lamp's clock, any other of its senses), with only `light`,
+  `[trigger]` its read-back says plainly, `made_skill::reaction_trigger`:
+  a touch, a pat or the button, someone arriving or leaving, a face in
+  view, someone getting up, stuffy air, the lamp going quiet, the lamp's
+  clock; never the camera's frames, a microphone, `voice/said`, `chat/in`,
+  `speaker/audio` or `selftest/*`, which a yes would hear only as "When its
+  moment comes", so the agent makes those, held to an ask by phrase:
+  Heron's P2 on #7819), with only `light`,
   `body`, a `say` of exact words (never the model's `internet:` or
   `cannot:` marker) or the hum, and no `task`, no `[[while]]` and no
   `grants`. Judged none, unsure, late or failed, no draft is asked for; a
