@@ -28633,13 +28633,29 @@ mod tests {
         assert_eq!(noted(false, call, 0.979), None, "off, as on 15177");
         let plain = "Yes, make it blue now.";
         assert_eq!(noted(true, plain, 0.979), None, "only the room's sound");
-        assert_eq!(noted(false, plain, 0.979), None, "only the room's sound, off");
+        assert_eq!(
+            noted(false, plain, 0.979),
+            None,
+            "only the room's sound, off"
+        );
         // A stand-in for the name is office talk in a busy room (#1712,
         // the reviewer-lead's HOLD on #8149): never told there.
-        assert_eq!(noted(true, "Hey man, make it blue.", 0.979), None, "hey man");
-        assert_eq!(noted(true, "Okay, Lynn, make it blue.", 0.979), None, "Lynn");
+        assert_eq!(
+            noted(true, "Hey man, make it blue.", 0.979),
+            None,
+            "hey man"
+        );
+        assert_eq!(
+            noted(true, "Okay, Lynn, make it blue.", 0.979),
+            None,
+            "Lynn"
+        );
         assert_eq!(noted(true, "Hey Lamb, make it blue.", sure), told, "Lamb");
-        assert_eq!(noted(true, "Hey Lamb, make it blue.", 0.979), None, "Lamb, near");
+        assert_eq!(
+            noted(true, "Hey Lamb, make it blue.", 0.979),
+            None,
+            "Lamb, near"
+        );
     }
 
     /// row-8149b on lamp-52e6 (21 Nov 01:2x, case B try 5, request 26):
@@ -28669,7 +28685,11 @@ mod tests {
         };
         let told = Some(crate::called::note(false));
         let man = "Lamb. That meeting ran long.";
-        assert_eq!(noted(man, 0.95, false), None, "'Man,' heard as the name, near");
+        assert_eq!(
+            noted(man, 0.95, false),
+            None,
+            "'Man,' heard as the name, near"
+        );
         assert_eq!(noted(man, 0.95, true), told, "the same, with a look");
         let call = "Hey Lamp, make it blue.";
         let sure = crate::attention::SURE_SCORE;
