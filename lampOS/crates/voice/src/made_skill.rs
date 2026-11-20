@@ -6294,7 +6294,18 @@ fn code_held(
     let run = match task {
         toml::Value::String(run) => Some(run.as_str()),
         toml::Value::Table(task) => {
-            if task.keys().any(|key| key != "task" && key != "run") {
+            // Beside them only the lamp's own `tell` of a watch made to
+            // speak when something holds (`crate::make_no_cannot::TELL_ONCE`,
+            // #8089), as lamp-skills takes it.
+            let tell_ok = |key: &String| {
+                key == "tell"
+                    && task.get("tell").and_then(toml::Value::as_str)
+                        == Some(crate::make_no_cannot::TELL_ONCE)
+            };
+            if task
+                .keys()
+                .any(|key| key != "task" && key != "run" && !tell_ok(key))
+            {
                 return Err(scripts_not_held(
                     "a task step with a key other than task and run",
                 ));
@@ -7603,9 +7614,17 @@ fn task_plainly(step: &toml::Value) -> Option<String> {
     // `do.task` is read back.
     let agents = crate::make_no_cannot::agent_tasks_made()
         && task.get("run").and_then(toml::Value::as_str) == Some(crate::make_no_cannot::RUN);
+    // A watch made to speak when something holds says so (#8089).
+    let once = if task.get("tell").and_then(toml::Value::as_str)
+        == Some(crate::make_no_cannot::TELL_ONCE)
+    {
+        ", telling you once each time it holds"
+    } else {
+        ""
+    };
     task_words_plain(words).then(|| {
         if agents {
-            format!("hands one task to the lamp's agent: “{words}”")
+            format!("hands one task to the lamp's agent: “{words}”{once}")
         } else {
             format!("runs its own code to “{words}”")
         }

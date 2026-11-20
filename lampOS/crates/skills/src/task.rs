@@ -177,7 +177,17 @@ pub const NO_CONTROL: &str =
 pub struct TaskFile {
     task: String,
     run: String,
+    /// How what its agent found is told (#8089): only
+    /// [`TELL_ONCE_WHILE_HOLDING`], written by the voice's make for a watch
+    /// made to speak when something holds; none, every run's words said.
+    #[serde(default)]
+    tell: Option<String>,
 }
+
+/// A `do.task`'s `tell` for a watch made to speak when something holds
+/// (`lamp_voice::make_no_cannot::TELL_ONCE`, #8089): what its agent found
+/// is told once while it holds ([`watch_tells`]). The only `tell` there is.
+pub const TELL_ONCE_WHILE_HOLDING: &str = lamp_voice::make_no_cannot::TELL_ONCE;
 
 /// A `do.task` step as loaded: its words, its script's path in the
 /// skill's folder, and the skill's own `[quiet]`.
@@ -198,6 +208,10 @@ pub struct TaskStep {
     /// lamp-tasks itself, with no agent, handed over as `skill_run`. Its
     /// `task` and `words` are [`RUN_WORDS`]. False for a `do.task`.
     pub direct: bool,
+    /// Its `tell` is [`TELL_ONCE_WHILE_HOLDING`]: a watch made to speak
+    /// when something holds, told once until a run finds it not holding
+    /// ([`watch_tells`], #8089). False: every run's words are said.
+    pub tell_once: bool,
 }
 
 /// What a `run` step stands for where a task's words go (the owner's yes
@@ -285,6 +299,7 @@ impl TaskStep {
             run: run.to_owned(),
             quiet,
             direct: true,
+            tell_once: false,
         })
     }
 }
@@ -300,12 +315,22 @@ impl TaskFile {
             ));
         }
         run_ok(dir, &self.run)?;
+        let tell_once = match self.tell.as_deref() {
+            None => false,
+            Some(TELL_ONCE_WHILE_HOLDING) => true,
+            Some(_) => {
+                return Err(format!(
+                    "do.task: tell is only \"{TELL_ONCE_WHILE_HOLDING}\", or left out"
+                ));
+            }
+        };
         Ok(TaskStep {
             task: task.to_owned(),
             words: self.task.clone(),
             run: self.run,
             quiet,
             direct: false,
+            tell_once,
         })
     }
 }
@@ -2152,6 +2177,7 @@ mod tests {
         TaskFile {
             task: "Take a photo".into(),
             run: run.into(),
+            tell: None,
         }
         .step(dir, None)
     }
@@ -2187,6 +2213,7 @@ mod tests {
             let refused = TaskFile {
                 task: task.into(),
                 run: "scripts/main.py".into(),
+                tell: None,
             }
             .step(&folder, None)
             .unwrap_err();
@@ -2339,6 +2366,30 @@ mod tests {
         std::fs::write(state.join(WATCH_TOLD_FILE), b"{not json").unwrap();
         assert!(watch(&holds));
         assert!(!watch(&holds));
+    }
+
+    /// The Reviewer-lead's must-check on #8089: a `do.task`'s `tell` is
+    /// the voice's own [`TELL_ONCE_WHILE_HOLDING`] or left out; left out,
+    /// every run's words are said; any other value refuses the skill.
+    #[test]
+    fn a_task_is_told_once_only_with_the_lamps_own_tell() {
+        let dir = tempfile::tempdir().unwrap();
+        let folder = folder(dir.path());
+        let step = |tell: &str| {
+            toml::from_str::<TaskFile>(&format!(
+                "task = \"tell me if it rains\"\nrun = \"scripts/main.py\"\n{tell}"
+            ))
+            .unwrap()
+            .step(&folder, None)
+        };
+        assert!(!step("").unwrap().tell_once);
+        assert!(
+            step(&format!("tell = \"{TELL_ONCE_WHILE_HOLDING}\""))
+                .unwrap()
+                .tell_once
+        );
+        let refused = step("tell = \"always\"").unwrap_err();
+        assert!(refused.contains("tell is only"), "{refused}");
     }
 
     /// #8089 (Twelve's P2 on the HOLD): on a lamp whose agent can't reach

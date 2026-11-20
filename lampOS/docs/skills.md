@@ -7391,10 +7391,21 @@ the same code for both writers.
   task is only for when something holds and it doesn't now, answer only a
   dash (-)", which says nothing. **Told once until it stops holding
   (#8089, a reader's P2 on its HOLD):** lamp-skills reads a run's answer
-  as words, silent (a lone dash or none) or failed (`task::ran`), and for
-  a watch's run nobody asked by voice now
-  (`lamp_voice::made_skill::is_clock_watch` of its `skill.toml`) keeps a
-  told mark per skill and folder sha256 in `--state-dir`'s
+  as words, silent (a lone dash or none) or failed (`task::ran`). Only a
+  watch made to speak when something holds is told once (the second
+  reader's must-check on #8089): the model judges, by meaning, a watch
+  ("if Bitcoin goes under 90k, tell me") from a plain report every while
+  ("every 2 hours, tell me the headlines", a second example in the
+  prompt, `make_no_cannot::REPORT_EXAMPLE`) and writes the line `tell:
+  once_while_holding` for a watch alone (`make_no_cannot::tells_once`);
+  on a clock watch the lamp keeps it in the task step, `task = { task,
+  run, tell = "once_while_holding" }` (`make_no_cannot::TELL_ONCE`; on any
+  other trigger it is left out and journaled), said back ", telling you
+  once each time it holds", and lamp-skills takes no other `tell`
+  (`task::TELL_ONCE_WHILE_HOLDING`, `TaskStep::tell_once`). A report
+  keeps no `tell` and says every run's words, said back "Every 2 hours,
+  …". For a marked watch's run nobody asked by voice now, lamp-skills
+  keeps a told mark per skill and folder sha256 in `--state-dir`'s
   `task-watch-told.json` (`task::watch_tells`): the first holding run is
   told and marked; while marked, a holding run says nothing (journal `its
   watch still holds, told already: not said again`); a silent run clears
@@ -7413,6 +7424,10 @@ the same code for both writers.
   six watches at 16 a day fill it beside nothing else, and a run past it is
   not handed over, with only a journal line. Tests:
   `a_watch_tells_once_until_it_stops_holding`,
+  `only_a_watch_made_to_speak_when_it_holds_is_told_once`,
+  `a_task_is_told_once_only_with_the_lamps_own_tell`,
+  `only_a_watch_the_model_marked_is_told_once`,
+  `with_the_switch_a_report_every_while_keeps_no_tell_once`,
   `a_no_net_refusal_is_said_once_a_day_unless_asked_by_voice`,
   `with_reactions_on_a_watch_on_outside_data_is_told_on_the_clock`,
   `a_reminder_after_a_trigger_on_what_no_topic_carries_is_asked_again_as_a_watch`,
