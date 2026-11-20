@@ -83,6 +83,12 @@ chối và không token nào được cấp. Lời đồng ý được giữ mà
 lời đồng ý: token của nó không nêu quyền nào (`"grants": []`), nên lần chạy
 chỉ `hello` được, mọi thao tác cần quyền đều bị từ chối `no_grant`.
 
+### Lần chạy thử của một lần tạo
+
+(#8157, #8180) `{"mint": {"try": [QUYỀN...], "run": RUN_ID}}` cấp token cho bản nháp trước khi được giữ, dưới tên skill `make-try`, đánh dấu là chạy thử. Quyền là của chính bản nháp, mỗi quyền một lần; `net` bị bỏ (lamp-tasks không cho lượt thử đường ra ngoài), còn `skills`, `camera` hay `microphone` làm việc cấp token bị từ chối (`task_yes::try_grants_of`; lamp-tasks bỏ các cảm biến ra và báo cho lượt tạo biết lượt thử chạy không có chúng). Mỗi thao tác được xếp bởi `protocol::in_try`, một `match` đầy đủ: **chạy thật** (`pair`, `hello`, `subscribe`, `unsubscribe`, `get`, các thao tác lease, `stop`, `say`, `sound`, `light`, `look`, `express`, `gesture`, `move`, `play`, `joints`, `sound.list`, `notes.get`, `notes.list`, `service.read`); **trả lời từ bản giả** với `"tried": true`, không giữ hay gửi gì (`service.write`, `notes.set`, `notes.delete`, `sound.upload`, `sound.remove`, `volume`, `listen.set`, `turn.end`; `protocol::tried_stub`); hoặc **bị từ chối** `refused`, "a make's tried run gets no camera, microphone, speaker stream, turn or skills: it ran without them" (`camera.snapshot`, `camera.stream`, `pose`, `microphone.stream`, `speaker.stream`, `turn.start`, `skill.push`, `skill.list`, `skill.remove`). Khi lượt thử kết thúc (hay hết hạn), mọi ghi chú của client nó (`<c_run>.json`) hay của skill `make-try` đều bị xoá, cả trên đĩa.
+
+### Token cho skill run: lệnh ghi cố định
+
 **Lượt chạy của một lệnh ghi cố định** (`LAMP_SKILL_WRITE_AGENT=on` trong
 lamp-control, đúng `on`, bật trong các unit lamp-control, lamp-skills, lamp-tasks và lamp-services của sản phẩm; quyết định của
 chủ đèn, 13/11): khi cấp token cho một skill không có lời đồng ý task nào mà
