@@ -1495,8 +1495,19 @@ the voice, Expression and lamp-skills (each with `energy_in::EnergyIn`, the body
   level 5 the clips' worst frame is 3.3 to 21.46 mm off the axis (greeting 21.46, surprised and
   sleepy 21.42, excited 21.33; level 1: 3.1 to 17.99), so seven clips come within 85% of 22 mm and
   are said in the journal as V1 said them (`tipping.close`), and the farthest back is 15.93 mm
-  (dance_groove). The fastest joint of 15 of the 21 clips reaches the servo's 1,000 counts a second
-  (level 1: headshake alone), and each clip takes about 0.7 of its level-1 time.
+  (dance_groove). The fastest joint of 13 of the 21 clips reaches the servo's 1,000 counts a second
+  (level 1: headshake alone), and 14 clips take 0.68 to 0.75 of their level-1 time.
+
+  The base (base yaw) carries the lamp's weight, so a level never asks it to change speed from one
+  step to the next harder than level 1 already asks of it in some clip: `energy::BASE_BEND`, 7,690
+  counts a second a second (headshake's 7,689.4, rounded up). On lamp-52e6 'curious' at x1.6 and
+  x1.5 asked the base for about 11,200 and the base rang for half a second (row-8155b, 21 Nov).
+  `energy::sized` first plays such a clip at a slower step, never slower than its own, and where even
+  its own pace would ask more, keeps the base at the clip's own size while the head and arm still
+  grow (headshake, dance_chill). At level 5, 13 clips play at the full x1.5 step; curious,
+  dance_jazz, scanning, confused, dance_chill and dance_hype take 0.8 to 0.99 of their level-1 time,
+  and headshake 1.02 (its own step, the larger head stretched under the servo's speed)
+  (`energy::tests::no_level_bends_the_base_harder_than_level_one_does`).
 
   **Where V1 stays out of reach, and why.** V1 played its recordings at their recorded speed with
   no servo ceiling: its emotion clips peak at a median of about 2,000 counts a second (excited's
