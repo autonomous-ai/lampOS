@@ -61,8 +61,10 @@
 //! A new text is checked by OpenClaw itself before it is renamed into
 //! place (#7108; on 15 Nov a merge OpenClaw 2026.11.2 refused took
 //! lamp-52e6's gateway down, 78/CONFIG): [`validate`] runs `config
-//! validate --json` through lamp-update's wrapper ([`VALIDATOR`]) on the
-//! new file beside `openclaw.json`, never the live one. Refused, the file
+//! validate --json` on the new file beside `openclaw.json`, never the live
+//! one, through lamp-update's wrapper ([`VALIDATOR`]) into the running
+//! gateway, or with no gateway running in OpenClaw's own namespace, as
+//! lamp-update and lamp-setup check theirs (#8060). Refused, the file
 //! is left byte for byte and [`write`] fails with OpenClaw's words. With
 //! no wrapper there (OpenClaw not installed) the text is written as
 //! before.
@@ -104,12 +106,20 @@ pub struct Check {
 }
 
 impl Check {
-    /// The lamp's.
+    /// The lamp's: lamp-update's wrapper, its gateway's unit's `MainPID`
+    /// and its own-namespace check as lamp-update's `gateway` block and
+    /// lamp-setup's reset run it
+    /// (`lamp_update::openclaw_install::own_namespace_validate_argv`),
+    /// with lamp-tasks' own ids (`lampos`, OpenClaw's).
     pub fn lamp() -> Self {
+        let uid = rustix::process::getuid().as_raw().to_string();
+        let gid = rustix::process::getgid().as_raw().to_string();
         Check {
             wrapper: VALIDATOR.into(),
-            main_pid: Vec::new(),
-            own: Box::new(|_: &str| Vec::new()),
+            main_pid: lamp_update::openclaw_install::main_pid_argv(),
+            own: Box::new(move |file: &str| {
+                lamp_update::openclaw_install::own_namespace_validate_argv(&uid, &gid, file)
+            }),
         }
     }
 }
@@ -395,8 +405,9 @@ pub fn merge_config(
 /// `openclaw.json` under `state_dir` merged ([`merge_config`]); `true`
 /// when it was written, `false` when it was right already. Nothing is
 /// written when it can't be merged, or when OpenClaw's own check
-/// ([`validate`] through [`VALIDATOR`]) refuses it; with no gateway there
-/// to check it, it is tried again over [`GATEWAY_WAITS`]
+/// ([`validate`]) refuses it: joined to the running gateway, or with none
+/// in OpenClaw's own namespace (#8060). A gateway the check could not join
+/// yet, or one that came up under it, is tried again over [`GATEWAY_WAITS`]
 /// ([`write_waiting`]), so it can take minutes. Run at every
 /// lamp-tasks start, so an existing lamp's file gets V1's tools (or loses
 /// them) on its next start or update, its model, workspace and every other
@@ -459,13 +470,16 @@ pub fn write_checked(
 }
 
 /// OpenClaw's own check of the config text in `file`: `config validate
-/// --json` run through its wrapper `validator`, pointed at `file` by
-/// `OPENCLAW_CONFIG_PATH` (never the live `openclaw.json`), joined to the
-/// running gateway's namespaces as the wrapper's every other call is
-/// (never `LAMP_OPENCLAW_GATEWAY`: namespaces of its own are refused by
-/// OpenClaw 2026.11.2 while its gateway runs, `GatewayLockNamespaceError`,
-/// #7268's ROW FAIL on lamp-52e6), so with no gateway running the wrapper
-/// fails closed and nothing is written; with OpenClaw's own environment
+/// --json`, pointed at `file` by `OPENCLAW_CONFIG_PATH` (never the live
+/// `openclaw.json`). While the gateway's unit has a `MainPID`, through its
+/// wrapper, joined to the running gateway's namespaces as the wrapper's
+/// every other call is (never `LAMP_OPENCLAW_GATEWAY`: namespaces of its
+/// own are refused by OpenClaw 2026.11.2 while its gateway runs,
+/// `GatewayLockNamespaceError`, #7268's ROW FAIL on lamp-52e6). With none
+/// (`MainPID` 0), in OpenClaw's namespace of its own (`check.own`, #8060),
+/// where no gateway holds the lock: so a config OpenClaw refuses, already
+/// in place and keeping its gateway down, can still be replaced by one it
+/// takes. Either way a refusal writes nothing. With OpenClaw's own environment
 /// (`crate::gateway::APPROVALS_ENV`) and nothing else, killed with its
 /// process group past [`VALIDATE_WITHIN`]. `Ok` only on status 0; else
 /// what OpenClaw said, on one line and short.
@@ -475,10 +489,14 @@ pub fn validate(check: &Check, file: &Path) -> Result<(), String> {
         .ok_or("OpenClaw's config check: the new file's path is not UTF-8")?;
     let mut env = crate::gateway::APPROVALS_ENV.to_vec();
     env.push(("OPENCLAW_CONFIG_PATH", file));
-    let argv = [check.wrapper.to_string_lossy().into_owned()]
-        .into_iter()
-        .chain(["config", "validate", "--json"].map(str::to_owned))
-        .collect::<Vec<_>>();
+    let argv = if lamp_update::openclaw_install::gateway_runs(&check.main_pid) {
+        [check.wrapper.to_string_lossy().into_owned()]
+            .into_iter()
+            .chain(["config", "validate", "--json"].map(str::to_owned))
+            .collect::<Vec<_>>()
+    } else {
+        (check.own)(file)
+    };
     lamp_checked_replace::validate(&argv, &env, VALIDATE_WITHIN)
 }
 
@@ -998,8 +1016,8 @@ mod tests {
     /// `LAMP_OPENCLAW_GATEWAY=on`, the wrapper gave it namespaces of its
     /// own and OpenClaw 2026.11.2 refused with `GatewayLockNamespaceError`
     /// whatever the text): never that switch, OpenClaw's own environment.
-    /// With no gateway running the wrapper fails closed, and so does the
-    /// write.
+    /// A `MainPID` the wrapper finds no gateway behind (one stopping or
+    /// just started) fails closed, and so does the write.
     #[test]
     fn a_text_openclaws_own_validate_refuses_never_lands() {
         let dir = tempfile::tempdir().unwrap();
@@ -1263,13 +1281,14 @@ mod tests {
         assert!(!folder_lock_held(&state), "the lock outlived the write");
     }
 
-    /// #7268's HOLD at 950bb215dd: lamp-tasks can start before OpenClaw's
+    /// #7268's HOLD at 950bb215dd: lamp-tasks can start with OpenClaw's
     /// gateway (at a boot, or an update that restarts both), and the
-    /// check fails closed with no gateway. So the write is tried again
-    /// while the wrapper finds no gateway, after each of a bounded list of
-    /// waits: nothing is written before the gateway is there, then the
-    /// text lands through the check. Past the last wait it fails as
-    /// before; a text OpenClaw refuses is never tried again.
+    /// wrapper fails closed while it finds no gateway behind a `MainPID`.
+    /// So the write is tried again while the wrapper finds none, after
+    /// each of a bounded list of waits: nothing is written before the
+    /// gateway is there, then the text lands through the check. Past the
+    /// last wait it fails as before; a text OpenClaw refuses is never
+    /// tried again.
     #[test]
     fn a_write_waits_for_the_gateway_bounded() {
         let dir = tempfile::tempdir().unwrap();
