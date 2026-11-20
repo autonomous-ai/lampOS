@@ -5771,10 +5771,11 @@ after a take-over, but now for every turn:
       called `not_for_me`): a hearing `weigh_the_name` drops is still told
       to the model (`Attention::name_note_kept`, then the name note as
       ever, `Heeding::note_the_name`) when the verdict's own text check
-      calls the lamp (`called_in_text`) or a sure hearing began at the
-      line's start. The journal says `its words call the lamp, or a sure
-      hearing began at its start: the model is still told its name was
-      heard (LAMP_NAME_FACE_OR_WORDS, #8136)`. It changes no verdict.
+      calls the lamp (`called_in_text`); a sure hearing at the line's start
+      with words that don't call the lamp is not told (that is #8119's,
+      with its room and face rule). The journal says `its words call the
+      lamp: the model is still told its name was heard
+      (LAMP_NAME_FACE_OR_WORDS, #8136)`. It changes no verdict.
     Not in it: the wordless cut-in calling a room with two voices "a quiet
     room" (`LAMP_CUT_IN_WORDLESS_RESUMES`, shape 7's second half), and a
     short line standing in a conversation's window by a hearing under the
