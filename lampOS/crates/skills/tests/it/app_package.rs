@@ -397,10 +397,12 @@ fn phrases_and_triggers_hold_the_doors_rule_and_their_caps() {
     );
 }
 
-/// #7415: `help` is optional; when there, English is required, the lamp's
-/// languages only, at most 300 bytes each, read back as written.
+/// #7415: `help` is optional and holds the production Store's rules
+/// (Backend3, comment 7033402561), so a Store-approved app installs: `en`
+/// required, up to 8 well-formed language keys, 1 to 300 bytes and 3 lines
+/// each, no quotes, markup or links; refused in the Store's own words.
 #[test]
-fn help_is_english_first_within_its_bound_and_optional() {
+fn help_holds_the_stores_rules_and_is_optional() {
     let read = changed(|m, _| {
         m["help"] =
             json!({"en": "Stand side-on, 2 to 3 m away.", "vi": "Đứng nghiêng, cách 2 đến 3 m."})
@@ -411,17 +413,42 @@ fn help_is_english_first_within_its_bound_and_optional() {
         changed(|_, _| {}).unwrap().manifest.help.is_empty(),
         "no help is fine"
     );
-    refused(
-        changed(|m, _| m["help"] = json!({"vi": "Đứng nghiêng."})),
-        "help needs English",
+    assert!(changed(|m, _| m["help"] = json!({"en": "ok", "pt-br": "Fique de lado."})).is_ok());
+    assert!(
+        changed(|m, _| m["help"] = json!({"en": "Stand side-on.\nKeep your whole body in view.\nSay stop workout to end."}))
+            .is_ok(),
+        "3 lines"
+    );
+    assert!(
+        changed(|m, _| m["help"] = json!({"en": "ok", "vi": "ok", "ja": "ok", "zh": "ok", "ko": "ok", "pt-br": "ok", "fr": "ok", "de": "ok"}))
+            .is_ok(),
+        "8 languages"
     );
     refused(
-        changed(|m, _| m["help"] = json!({"en": "ok", "fr": "d'accord"})),
-        "not one of the lamp's languages",
+        changed(
+            |m, _| m["help"] = json!({"en": "ok", "vi": "ok", "ja": "ok", "zh": "ok", "ko": "ok", "pt-br": "ok", "fr": "ok", "de": "ok", "es": "ok"}),
+        ),
+        "help: at most 8 languages",
+    );
+    refused(
+        changed(|m, _| m["help"] = json!({"en": "one\ntwo\nthree\nfour"})),
+        "help.en: at most 3 lines",
+    );
+    refused(
+        changed(|m, _| m["help"] = json!({"vi": "Đứng nghiêng."})),
+        "lamp-skill.json: help: en is required when help is given",
+    );
+    refused(
+        changed(|m, _| m["help"] = json!({"en": "Say <b>stop</b>"})),
+        "lamp-skill.json: help.en: no quotes, markup or links (found \"<\")",
+    );
+    refused(
+        changed(|m, _| m["help"] = json!({"en": "see https://x.io"})),
+        "no quotes, markup or links",
     );
     refused(
         changed(|m, _| m["help"] = json!({"en": "a".repeat(301)})),
-        "1 to 300 bytes",
+        "help.en: 1 to 300 bytes",
     );
     assert!(changed(|m, _| m["help"] = json!({"en": "a".repeat(300)})).is_ok());
     refused(
