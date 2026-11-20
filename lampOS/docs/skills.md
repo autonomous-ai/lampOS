@@ -2260,7 +2260,9 @@ run = "scripts/main.py"
 - **Not given**: keys (`secrets`): a skill that needs them uses a
   `do.task`; lamp-tasks refuses a `run` step for one, in words.
 - **Its own caps**: the script runs with its own memory (768 MiB of address
-  space), CPU time (30 s) and niceness (10), never lamp-tasks' whole budget.
+  space), CPU time (30 s) and niceness (10) for each process, and at most 64
+  processes and threads for the whole run (#8180), never lamp-tasks' whole
+  budget. Its try at the make gets the same fence and caps.
 - **Timing** (each hop, trigger to script): the fire's thread spawns the
   hand-over thread; the folder is hashed (the skill's few files); the yes
   asked of lamp-control (one local socket line); the ledger written; one
@@ -7581,8 +7583,13 @@ forces one), a skill it makes is made whole, with everything a run needs:
   is told failed and nothing is kept. A passed try adds
   `made_skill::TRIED_SAID` ("I tried it once and it worked.") to its
   read-back; the person's yes is asked as before. A try that can't be made
-  at all (an older lamp-tasks, no tasks part) is journaled and the skill
-  kept as before. Not for a skill added from a file.
+  at all (lamp-tasks busy, no token, its fence, an older lamp-tasks that
+  doesn't know `make_try`, no answer) fails closed (#8180): it is
+  journaled with why, nothing is kept, and the person hears
+  `made_skill::NOT_TRIED_LINE` ("I made it, but the lamp couldn't try it
+  out, so I didn't keep it. Please ask me again in a minute."). Only a
+  voice with no tasks folder at all (`LAMP_TASKS_DIR` unset, no tasks
+  part) keeps it untried. Not for a skill added from a file.
 - **Who wrote it** is always on its card and in its `made.json` entry:
   `made_with: openclaw`, `hermes` (the engine the tasks part named for the
   make) or `deepseek` (the lamp's own model), whatever
