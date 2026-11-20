@@ -51,6 +51,9 @@ thread_local! {
     /// `LAMP_CONVERSATION_CARRIES_OWN_TRACK` ([`Engine::carrying_own_track`])
     /// for the next [`lines_known`] on this thread, once.
     static OWN_TRACK: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
+    /// `LAMP_FACE_STICKY` ([`Engine::holding_sticky`]) for the next
+    /// [`lines_known`] on this thread, once.
+    static STICKY: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
     /// The same-voice check not running for the route
     /// ([`Engine::reading_carried_where_heard`]) for the next
     /// [`lines_known`] on this thread, once.
@@ -661,6 +664,7 @@ async fn lines_known(
         .saving_carried(saves)
         .reading_carried(CARRIED_MEMORY.with(|on| on.replace(false)))
         .carrying_own_track(OWN_TRACK.with(|on| on.replace(false)))
+        .holding_sticky(STICKY.with(|on| on.replace(false)))
         .reading_carried_where_heard(!CARRIED_UNHEARD.with(|unheard| unheard.replace(false)));
     if let Some(found) = DONT_KNOW_FOUND.with(|found| found.borrow_mut().take()) {
         engine = engine.recalling_before_a_dont_know(found);
@@ -5493,6 +5497,16 @@ async fn her_own_covered_face_carries_with_the_own_track_switch() {
     }
     for (what, on, covered, carried, named) in [
         ("own-track-on", true, vec![("f1", false)], true, true),
+        // With `LAMP_FACE_STICKY` too, the eyes' let-go on her box is
+        // someone else's: never carried as hers (Friday's P2 on #7933).
+        ("own-track-sticky", true, vec![("f1", false)], false, true),
+        (
+            "own-track-sticky-room",
+            true,
+            vec![("f1", false)],
+            false,
+            false,
+        ),
         ("own-track-other", true, vec![("f2", false)], false, true),
         (
             "own-track-two",
@@ -5519,6 +5533,7 @@ async fn her_own_covered_face_carries_with_the_own_track_switch() {
         ),
     ] {
         OWN_TRACK.with(|own| own.set(on));
+        STICKY.with(|sticky| sticky.set(what.starts_with("own-track-sticky")));
         let chats = vec![
             vec![text("Lunch, then."), Ok(ChatEvent::Done)],
             vec![text("Okay."), Ok(ChatEvent::Done)],

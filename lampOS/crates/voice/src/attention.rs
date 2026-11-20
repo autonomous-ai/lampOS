@@ -1905,6 +1905,19 @@ pub struct Attention {
     /// weighed because `LAMP_NAME_NEAR` ruled it not the name, for the
     /// journal (#8092).
     name_near_dropped: bool,
+    /// Under a sure hearing, the name heard only in the room's sound counts
+    /// only with a face turned to the lamp or its words calling it
+    /// (`LAMP_NAME_FACE_OR_WORDS=on`, [`Self::need_a_face_or_words`],
+    /// #8136).
+    face_or_words: bool,
+    /// The name heard in the room's sound was dropped for the line last
+    /// weighed as under a sure hearing with no face turned and no words
+    /// calling the lamp, for the journal (#8136).
+    name_unsure_dropped: bool,
+    /// The name heard for the line last weighed was dropped, but the model
+    /// is still told it was heard: the line's words call the lamp
+    /// ([`Self::name_note_kept`], #8136).
+    name_note_kept: bool,
 }
 
 /// The most text kept for one request.
@@ -2248,14 +2261,32 @@ impl Attention {
         let ruled_out =
             self.near_not_the_name_of == Some(self.request) && !called_by_real_name(&self.heard);
         self.name_near_dropped = weighed && self.sign_tied && (ruled_out || one_word_unlike);
-        let alone =
-            weighed && (signs.is_empty() || self.name_short_dropped || self.name_near_dropped);
+        // `LAMP_NAME_FACE_OR_WORDS`: under a sure hearing only a face turned
+        // to the lamp or its words calling it count, busy room or not; the
+        // start is the same false hearing again (#8136: lamp-74ff, 17:26:23,
+        // 0.921 by 210 ms into two people's talk, answered).
+        self.name_unsure_dropped = weighed
+            && self.face_or_words
+            && !self.named_sure
+            && turned != Some(true)
+            && !text_calls
+            && !signs.is_empty();
+        let alone = weighed
+            && (signs.is_empty()
+                || self.name_short_dropped
+                || self.name_near_dropped
+                || self.name_unsure_dropped);
         self.name_signs = if weighed && !alone { signs } else { Vec::new() };
         if alone {
             self.named = false;
             self.named_sure = false;
             self.best_score = 0.0;
         }
+        // `LAMP_NAME_FACE_OR_WORDS`: a dropped hearing is still told to the
+        // model when the verdict's own text check calls the lamp (gate 1111,
+        // request 19: a "Hey Lamp, …" ruled not the name, played, then
+        // `not_for_me`). A sure start alone is #8119's, with its room rule.
+        self.name_note_kept = alone && self.face_or_words && self.called_in_text();
         alone
     }
 
@@ -2309,6 +2340,30 @@ impl Attention {
     /// ([`short_line_without_the_name`], #7891).
     pub fn name_dropped_as_short(&self) -> bool {
         self.name_short_dropped
+    }
+
+    /// `LAMP_NAME_FACE_OR_WORDS=on` (#8136), with
+    /// [`Self::ask_a_second_sign_of_the_name`]: a hearing of the name only
+    /// in the room's sound under [`SURE_SCORE`] counts only with a face
+    /// turned to the lamp or the line's words calling it, busy room or not;
+    /// its place at the line's start, closeness and a conversation going on
+    /// no longer count on their own. A sure hearing is weighed as before.
+    pub fn need_a_face_or_words(&mut self, on: bool) {
+        self.face_or_words = on;
+    }
+
+    /// Whether the name heard for the line last weighed was dropped as
+    /// under a sure hearing with no face turned and no words calling the
+    /// lamp ([`Self::need_a_face_or_words`], #8136).
+    pub fn name_dropped_as_unsure(&self) -> bool {
+        self.name_unsure_dropped
+    }
+
+    /// Whether the name heard for the line last weighed, though dropped, is
+    /// still told to the model: its words call the lamp (the verdict's "the
+    /// text shows it was called"; [`Self::need_a_face_or_words`], #8136).
+    pub fn name_note_kept(&self) -> bool {
+        self.name_note_kept
     }
 
     /// In a busy room, let a line out only as the conversation going on
@@ -7685,6 +7740,86 @@ mod tests {
             )
             .0
         );
+    }
+
+    /// #8136, from #8114's shape 5 (lamp-74ff, build 15146, 20 Nov 17:26:23,
+    /// two people talking to each other with their backs to the lamp; the
+    /// journal's fixed lines, no words kept): seven words, lamp-name at
+    /// 0.921 by 210 ms into the line, a busy room, nobody turned to the
+    /// lamp, counted by "its hearing at the line's start" alone and
+    /// answered. With `LAMP_NAME_FACE_OR_WORDS=on` a hearing under
+    /// [`SURE_SCORE`] counts only with a face turned to the lamp or words
+    /// calling it: the start and closeness count for nothing alone. Still
+    /// counted: "Hey Lamp, …" with no look (its words), the same line with
+    /// a face turned, and a sure hearing at the start; off, as before.
+    #[test]
+    fn with_a_face_or_words_needed_an_unsure_hearing_at_the_start_is_no_call() {
+        let began = 10_000_000;
+        // (dropped, second signs, dropped as unsure)
+        let weighed = |on: bool, line: (&str, u64, f32), turned: Option<bool>, near: bool| {
+            let (heard, into_us, score) = line;
+            let mut attention = Attention::default();
+            attention.ask_a_second_sign_of_the_name(true);
+            attention.tie_the_second_sign(true);
+            attention.need_a_face_or_words(on);
+            attention.began_at(5, 1, began);
+            attention.name_heard_scored(began + into_us, score);
+            attention.heard(heard);
+            attention.set_near(near);
+            attention.set_near_at_the_name(near);
+            let dropped = attention.weigh_the_name(turned, false);
+            (
+                dropped,
+                attention.second_signs().to_vec(),
+                attention.name_dropped_as_unsure(),
+            )
+        };
+        let start = "its hearing at the line's start";
+        let shape_5 = ("You want the? Yeah. It's been on.", 210_000, 0.921);
+        assert_eq!(
+            weighed(true, shape_5, None, false),
+            (true, Vec::new(), true),
+            "shape 5"
+        );
+        assert_eq!(
+            weighed(false, shape_5, None, false),
+            (false, vec![start], false),
+            "shape 5, off"
+        );
+        // Closeness at an unsure hearing mid-line is no call alone either.
+        let close = ("What time is it?", 15_194_000, 0.96);
+        assert_eq!(
+            weighed(true, close, None, true),
+            (true, Vec::new(), true),
+            "close"
+        );
+        assert_eq!(
+            weighed(false, close, None, true),
+            (false, vec!["the name said close to it"], false),
+            "close, off"
+        );
+        // A real call with no look: its words carry the name.
+        let call = ("Hey Lamp, what time is it?", 200_000, 0.95);
+        assert_eq!(
+            weighed(true, call, None, false),
+            (false, vec!["its words calling it", start], false),
+            "Hey Lamp, no look"
+        );
+        // A face turned to the lamp.
+        assert_eq!(
+            weighed(true, shape_5, Some(true), false),
+            (false, vec!["a face turned to the lamp", start], false),
+            "shape 5, a face turned"
+        );
+        // A sure hearing at the start counts as today.
+        for score in [SURE_SCORE, 1.0] {
+            let sure = (shape_5.0, 210_000, score);
+            assert_eq!(
+                weighed(true, sure, None, false),
+                (false, vec![start], false),
+                "sure at {score}"
+            );
+        }
     }
 
     /// #4226, `LAMP_NAME_START_USUAL=on`: a line whose sound began 0.3 s

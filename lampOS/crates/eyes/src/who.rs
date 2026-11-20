@@ -82,7 +82,8 @@ pub fn known_unsure_of(known: &Path) -> PathBuf {
 /// An unsure check ([`Unprinted::Unsure`]): the known file and its face
 /// move to [`known_unsure_of`], the name first, so no reader of the known
 /// file sees the name held; already unsure, both renewed as
-/// [`renew_known`] renews the known file. No known file, nothing to hold.
+/// [`renew_known`] renews the known file and its face. No known file,
+/// nothing to hold.
 pub fn hold_unsure(known: &Path) {
     let unsure = known_unsure_of(known);
     if !unsure.exists() {
@@ -92,7 +93,6 @@ pub fn hold_unsure(known: &Path) {
         let _ = std::fs::rename(known_face_of(known), known_face_of(&unsure));
     }
     renew_known(&unsure);
-    renew_known(&known_face_of(&unsure));
 }
 
 /// The held face's passing id while unsure ([`hold_unsure`]), for a print
@@ -126,6 +126,7 @@ pub fn keep_known(path: &Path, name: Option<&str>, id: Option<&str>, face: Optio
         let _ = std::fs::remove_file(path);
         // A let-go: whatever was unsure is decided, after the remove.
         clear_unsure(path);
+        clear_held(path);
         return;
     };
     // The name first, then the face (the reviewer on #2008). The voice reads
@@ -143,15 +144,55 @@ pub fn keep_known(path: &Path, name: Option<&str>, id: Option<&str>, face: Optio
     // A match or a print's keep: whatever was unsure is decided, after the
     // write (the Reviewer-lead's P2 on #5743).
     clear_unsure(path);
+    // A match: no longer held, after the write. A held write marks again
+    // first ([`keep_known_held`]).
+    clear_held(path);
+}
+
+/// [`keep_known`] for a name kept by a hold (`LAMP_FACE_STICKY`): the held
+/// mark first ([`mark_held`]), then the write, the mark left in place.
+pub fn keep_known_held(path: &Path, name: &str, id: Option<&str>, face: Option<&str>) {
+    mark_held(path);
+    let beside = known_face_of(path);
+    replace_line(path, &lamp_msgs::known::known_text(name, id));
+    match face {
+        Some(face) => replace_line(&beside, face),
+        None => {
+            let _ = std::fs::remove_file(&beside);
+        }
+    }
+    clear_unsure(path);
+}
+
+/// A check's named person written to the known file: a real match over
+/// [`SAME_PERSON`] with [`keep_known`] (the held mark cleared), a T7
+/// rematch at [`REMATCH_LIKENESS`] (`rematched`) with [`keep_known_held`],
+/// the held mark, as a held check: read and kept as theirs, but never a
+/// forget, correction or rule, never the owner present or alone, and no
+/// `adopt` anchor (Friday's P1 on #7933, 20 Nov 03:16). Nobody: let go.
+pub fn keep_found(
+    path: &Path,
+    name: Option<&str>,
+    id: Option<&str>,
+    face: Option<&str>,
+    rematched: bool,
+) {
+    match name {
+        Some(name) if rematched => keep_known_held(path, name, id, face),
+        _ => keep_known(path, name, id, face),
+    }
 }
 
 /// A held check (a miss within [`KNOWN_HOLD`]): the known file's words and
-/// its face beside it stay as they are, and only its modified time is set to
-/// now, so the voice, which takes the file as fresh for a few seconds after
-/// it was written, keeps naming the one held until the hold lets them go.
+/// its face beside it ([`known_face_of`]) stay as they are, and only their
+/// modified times are set to now, so the voice, which takes both as fresh
+/// for [`lamp_msgs::known::FRESH`] after they were written, keeps naming the
+/// one held, and their face, until the hold lets them go (#7146).
 pub fn renew_known(path: &Path) {
-    if let Ok(file) = std::fs::File::options().write(true).open(path) {
-        let _ = file.set_modified(std::time::SystemTime::now());
+    for path in [path.to_owned(), known_face_of(path)] {
+        if let Ok(file) = std::fs::File::options().write(true).open(path) {
+            let _ = file.set_modified(std::time::SystemTime::now());
+        }
     }
 }
 
@@ -496,6 +537,12 @@ pub fn plain_name(name: &str) -> Option<String> {
             .chars()
             .all(|c| c.is_alphabetic() || matches!(c, ' ' | '-' | '\'' | '’'));
     fine.then_some(name)
+}
+
+/// Whether two names are the same person's name, as the people file
+/// compares them, for the eyes' own loop (`LAMP_FACE_STICKY`'s takeover).
+pub fn is_same_name(a: &str, b: &str) -> bool {
+    same_name(a, b)
 }
 
 pub(crate) fn same_name(a: &str, b: &str) -> bool {
@@ -989,6 +1036,25 @@ impl People {
                     .map(|kept| (likeness(kept, print), person.added_unix_s))
             })
             .max_by(|a, b| a.0.total_cmp(&b.0))
+    }
+
+    /// The second person's best likeness to this print (each person's best
+    /// over their own prints), `None` with fewer than two kept: for the
+    /// journal's recognition line (T0), a number, never a name.
+    pub fn second_likeness(&self, print: &[f32]) -> Option<f32> {
+        let mut bests: Vec<f32> = self
+            .people
+            .iter()
+            .filter_map(|person| {
+                person
+                    .prints
+                    .iter()
+                    .map(|kept| likeness(kept, print))
+                    .reduce(f32::max)
+            })
+            .collect();
+        bests.sort_by(|a, b| b.total_cmp(a));
+        bests.get(1).copied()
     }
 
     /// How alike this print is to `name`'s own kept prints, at best; `None`
@@ -1997,9 +2063,10 @@ pub const TAKING_FOR_US: u64 = 4_000_000;
 /// 2026-10-15 the model waited 4.2 s for "I could not see a face".
 pub const NOBODY_FOR_US: u64 = 1_500_000;
 
-/// Whose the near face is, asked at most this often: a print takes a
-/// tenth of a second or more on the lamp.
-pub const RECOGNISE_EVERY: Duration = Duration::from_secs(2);
+/// Whose the near face is, asked at most this often
+/// ([`lamp_msgs::known::RECOGNISE_EVERY`]): the voice's bound on the known
+/// file and its face is twice it ([`lamp_msgs::known::FRESH`]).
+pub const RECOGNISE_EVERY: Duration = lamp_msgs::known::RECOGNISE_EVERY;
 
 /// Off unless `LAMP_FACE_FULL_CROP=on` on lamp-eyes: faces are recognised
 /// and remembered from the frame at its own size ([`align_full`]), and the
@@ -2054,6 +2121,87 @@ pub const REFOUND_ENVIRONMENT: &str = "LAMP_FACE_REFOUND";
 pub fn refound_on() -> bool {
     std::env::var(REFOUND_ENVIRONMENT).ok().as_deref() == Some("on")
 }
+
+/// Off unless `LAMP_FACE_STICKY=on` on lamp-eyes (and the hold on): the
+/// sticky identity plan's eyes part (`docs/face-recognition-sticky-identity-plan.md`,
+/// T3, T4, T7), as the plan's owner set it on #7933 (20 Nov, 01:55,
+/// overruling the 19 Nov 20:00, 21:14 and 22:14 rulings). Once someone is
+/// matched, the name is hard to lose: missed prints, no face, a turned head
+/// and unknown prints on the held face's own or followed passing id never
+/// drop it. Only a new id, or nobody near for [`STICKY_HOLD`] (the voice's
+/// `GONE_AFTER`, 30 s), clears it; each look of their face on that id
+/// renews the hold ([`Held::seen_theirs`]). Another enrolled person takes
+/// the name only on two looks ([`Takeover`], [`sticky_look`]); someone
+/// matched in the last [`REMATCH_WITHIN`] is matched again at
+/// [`REMATCH_LIKENESS`] when nobody else scores higher ([`Recent`]). While
+/// the name is held and not matched, the held mark is written beside the
+/// known file ([`known_held_of`]): the voice reads and keeps such a name as
+/// theirs, but never for a forget, a correction, a rule, a yes, or the
+/// owner present or alone.
+pub const STICKY_ENVIRONMENT: &str = "LAMP_FACE_STICKY";
+
+pub fn sticky_on() -> bool {
+    std::env::var(STICKY_ENVIRONMENT).ok().as_deref() == Some("on")
+}
+
+/// Off unless `LAMP_FACE_FOLLOW_NEAR_NEW_ID=on` on lamp-eyes (and
+/// [`STICKY_ENVIRONMENT`] on): a new passing id whose box centre is within
+/// [`JUMP_SHARE`] of the held face's last box width from it, the only near
+/// face, while the sitter check says the sitter is not standing up, becomes
+/// the followed id ([`Held::follow_near`]). Row 5 on lamp-06c1 (20 Nov):
+/// the detector lost a covered face for 0.2 to 3 s at a time and each return
+/// was a new id, and T3's "a new id clears" let the held name go (legs E and
+/// H). Off in the product: it changes the owner's T3 and waits for their call.
+pub const FOLLOW_NEAR_NEW_ID_ENVIRONMENT: &str = "LAMP_FACE_FOLLOW_NEAR_NEW_ID";
+
+pub fn follow_near_new_id_on() -> bool {
+    std::env::var(FOLLOW_NEAR_NEW_ID_ENVIRONMENT)
+        .ok()
+        .as_deref()
+        == Some("on")
+}
+
+/// Off unless `LAMP_FACE_TAKEOVER_SCORE=on` on lamp-eyes (and
+/// [`STICKY_ENVIRONMENT`] on): another enrolled person's look on the held
+/// face counts toward T4's two only when the near face's detector score is
+/// at least [`TAKEOVER_SCORE`] ([`takeover_uncounted`]). Row 5 on lamp-06c1
+/// (20 Nov): a covered face scored 0.60 to 0.81 and matched another enrolled
+/// person at 0.34 to 0.50; a real swap (leg F) scored 0.85 to 0.89. A new
+/// cap, off in the product until the owner rules on it.
+pub const TAKEOVER_SCORE_ENVIRONMENT: &str = "LAMP_FACE_TAKEOVER_SCORE";
+
+pub fn takeover_score_on() -> bool {
+    std::env::var(TAKEOVER_SCORE_ENVIRONMENT).ok().as_deref() == Some("on")
+}
+
+/// With [`TAKEOVER_SCORE_ENVIRONMENT`], the detector score a takeover look
+/// needs: `still::PERSON_SCORE` (0.8, "scored this high, is a person's"),
+/// reused as a cap. The margin is thin: one covered print in row 5 scored
+/// 0.81.
+pub const TAKEOVER_SCORE: f32 = crate::still::PERSON_SCORE;
+
+/// With [`STICKY_ENVIRONMENT`], how long a held name lasts with nobody near
+/// since their face was last seen on its id (a match, or a look of it,
+/// printed or not, [`Held::seen_theirs`]). The voice's
+/// `known_faces::GONE_AFTER`, 30 s: the plan's T3.
+pub const STICKY_HOLD: Duration = Duration::from_secs(30);
+
+/// With [`STICKY_ENVIRONMENT`], another enrolled person's print on the held
+/// face keeps the one held; a second within this long, each over
+/// [`SAME_PERSON`] and over the held person's likeness, takes the name
+/// ([`Takeover`], the plan's T4).
+pub const TAKEOVER_WITHIN: Duration = Duration::from_secs(4);
+
+/// With [`STICKY_ENVIRONMENT`], someone matched within this long is matched
+/// again at [`REMATCH_LIKENESS`] ([`Recent`], the plan's T7).
+pub const REMATCH_WITHIN: Duration = Duration::from_secs(10 * 60);
+
+/// With [`STICKY_ENVIRONMENT`], the bar a print must reach to match again
+/// someone matched within [`REMATCH_WITHIN`], when no other enrolled person
+/// scores higher: [`HOLD_LIKENESS`] (0.30), under [`SAME_PERSON`] (0.363).
+/// The plan's T7 test: 0.32 after a recent match counts. Provisional: T0's
+/// recognition lines (best and second-best likeness) are to tune it.
+pub const REMATCH_LIKENESS: f32 = HOLD_LIKENESS;
 
 /// Whether the known person is held through a short miss: with either
 /// switch on.
@@ -2121,6 +2269,17 @@ pub struct Held {
     /// Held unsure since a check with no print ([`Unprinted::Unsure`]),
     /// until a print decides: a match, a held print, or a let-go.
     unsure: bool,
+    /// `LAMP_FACE_STICKY=on` ([`Held::sticky`]).
+    sticky: bool,
+    /// When a print last read the held face as theirs: the last match. With
+    /// [`Held::sticky`], [`STICKY_HOLD`] is counted from it.
+    kept_at: Option<Instant>,
+    /// `LAMP_FACE_FOLLOW_NEAR_NEW_ID=on` ([`Held::follows_near`]).
+    near_follow: bool,
+    /// The held face's last box on its own or followed id: its centre across
+    /// and its width, in pixels ([`Held::saw_near`]). In memory only, gone
+    /// with [`Held::let_go`].
+    held_box: Option<(f32, f32)>,
 }
 
 /// What a check with no print does with the one known ([`Held::unprinted`]).
@@ -2159,6 +2318,104 @@ impl Held {
             unsure_on: false,
             unsure: false,
             on_id: false,
+            sticky: false,
+            kept_at: None,
+            near_follow: false,
+            held_box: None,
+        }
+    }
+
+    /// With `on` (`LAMP_FACE_FOLLOW_NEAR_NEW_ID`) and [`Held::sticky`], a
+    /// new id near the held face's last box may follow it
+    /// ([`Held::follow_near`]).
+    pub fn follows_near(mut self, on: bool) -> Self {
+        self.near_follow = on;
+        self
+    }
+
+    /// A look's near face, on passing id `id`, its box centre across `x` and
+    /// width `width` in pixels: on the held face's own or followed id, kept
+    /// as the held face's last box ([`Held::follow_near`]).
+    pub fn saw_near(&mut self, id: Option<&str>, x: f32, width: f32) {
+        if self.holding() && id.is_some() && self.on_held_face(id) {
+            self.held_box = Some((x, width));
+        }
+    }
+
+    /// With [`Held::follows_near`] and [`Held::sticky`], within the sticky
+    /// hold: the near face `near` (its passing id, box centre across and
+    /// width), the only near face (`near_faces` one), is a new id whose
+    /// centre is within [`JUMP_SHARE`] of the held face's last box width
+    /// from that box's centre, and the sitter check says the sitter is not
+    /// standing up (`not_standing_up`, `activity::Judge::not_standing_up`):
+    /// it becomes the followed id, so T3 does not let go on it. A detector
+    /// that loses a covered face and finds it again in the same place gives
+    /// it a new id each time (row 5 on lamp-06c1, 20 Nov). Whether it follows.
+    pub fn follow_near(
+        &mut self,
+        now: Instant,
+        near: Option<(&str, f32, f32)>,
+        near_faces: usize,
+        not_standing_up: bool,
+    ) -> bool {
+        let Some((id, x, _)) = near else {
+            return false;
+        };
+        let follows = self.near_follow
+            && self.is_sticky()
+            && self.keeps_face(now)
+            && near_faces == 1
+            && not_standing_up
+            && !self.on_held_face(Some(id))
+            && self.held_box.is_some_and(|(held_x, held_width)| {
+                (x - held_x).abs() <= JUMP_SHARE * held_width.max(1.0)
+            });
+        if follows {
+            self.pending = Some(id.to_owned());
+        }
+        follows
+    }
+
+    /// With `on` (`LAMP_FACE_STICKY`), the name holds through any print or
+    /// none on the held face's own or followed id, and through nobody near
+    /// up to [`STICKY_HOLD`] ([`Held::keeps_print`], [`Held::keeps_unprinted`]).
+    pub fn sticky(mut self, on: bool) -> Self {
+        self.sticky = on;
+        self
+    }
+
+    /// Whether [`Held::sticky`] is on, with the hold.
+    pub fn is_sticky(&self) -> bool {
+        self.on && self.sticky
+    }
+
+    /// With [`Held::sticky`], whether their face was seen on its id within
+    /// [`STICKY_HOLD`] ([`Held::seen_theirs`]); without it, [`Held::keeps`].
+    pub fn keeps_face(&self, now: Instant) -> bool {
+        if !self.is_sticky() {
+            return self.keeps(now);
+        }
+        self.kept_at
+            .is_some_and(|at| now.saturating_duration_since(at) < STICKY_HOLD)
+    }
+
+    /// With [`Held::sticky`], their face was seen at `now` on its own or
+    /// followed id (a print kept them, or a check with no print found it
+    /// there): [`STICKY_HOLD`] counts from here. Off, nothing.
+    pub fn seen_theirs(&mut self, now: Instant) {
+        if self.is_sticky() && self.holding() {
+            self.kept_at = Some(now);
+        }
+    }
+
+    /// With [`Held::sticky`], whether the near face's passing id `id` is the
+    /// held face's: the match's id, or the new id that follows it
+    /// ([`Held::follow`]). With no id at the match, any face is (the eyes
+    /// can't tell it from a new one). The plan's T3: only a new id clears.
+    pub fn on_held_face(&self, id: Option<&str>) -> bool {
+        match self.matched_id.as_deref() {
+            None => true,
+            Some(matched) => id == Some(matched) || (id.is_some() && id == self.pending.as_deref()),
         }
     }
 
@@ -2203,7 +2460,7 @@ impl Held {
                 Unprinted::LetGo
             };
         }
-        if !self.keeps(now) {
+        if !self.keeps(now) && (!self.is_sticky() || !self.keeps_unprinted(now, near, id)) {
             return Unprinted::LetGo;
         }
         if !self.unsure && near && self.keeps_unprinted(now, near, id) {
@@ -2236,7 +2493,7 @@ impl Held {
         near_faces: usize,
     ) -> bool {
         let follows = self.follows
-            && self.keeps(now)
+            && self.keeps_face(now)
             && near_faces == 1
             && followed.is_some()
             && self.matched_id.as_deref() == followed;
@@ -2274,6 +2531,7 @@ impl Held {
     pub fn matched(&mut self, now: Instant, id: Option<String>) {
         self.last_print = None;
         self.matched_at = Some(now);
+        self.kept_at = Some(now);
         self.unbroken = id.is_some();
         self.missed = 0;
         self.gapped = false;
@@ -2330,6 +2588,10 @@ impl Held {
             }
             (true, Some(_)) => self.pending = id.map(str::to_owned),
             (true, None) => {}
+            // With `LAMP_FACE_STICKY`, an unknown print on the held face's
+            // own or followed id never drops them (the plan's T3): only a new
+            // id does.
+            (false, _) if self.is_sticky() => {}
             (false, _) => {
                 self.unbroken = false;
                 self.pending = None;
@@ -2343,11 +2605,16 @@ impl Held {
 
     /// Whether a check that found nobody keeps the one known: only within
     /// [`KNOWN_HOLD`] of their last match.
+    ///
+    /// With [`Held::sticky`], counted from the last print read as theirs (the
+    /// last match).
     pub fn keeps(&self, now: Instant) -> bool {
-        self.on
-            && self
-                .matched_at
-                .is_some_and(|at| now.saturating_duration_since(at) < KNOWN_HOLD)
+        let since = if self.sticky {
+            self.kept_at
+        } else {
+            self.matched_at
+        };
+        self.on && since.is_some_and(|at| now.saturating_duration_since(at) < KNOWN_HOLD)
     }
 
     /// Whether a check that printed a near face matching nobody keeps the
@@ -2365,7 +2632,16 @@ impl Held {
     /// of a face never out of view, not a stranger, who comes on another id
     /// or after a gap (#7424). Never a followed id, never a person no longer
     /// kept.
+    ///
+    /// With [`Held::sticky`], any print on the held face's own or followed
+    /// id keeps them, whatever its likeness, within [`STICKY_HOLD`]: an
+    /// unknown print on the same followed face never drops a known person
+    /// (the plan's T3, the owner's call on #7933, 20 Nov 01:55). A print on
+    /// a new id lets go.
     pub fn keeps_print(&self, now: Instant, likeness: Option<f32>, id: Option<&str>) -> bool {
+        if self.is_sticky() {
+            return self.keeps_face(now) && self.on_held_face(id);
+        }
         let on_their_id = self.on_id
             && self.unbroken
             && self
@@ -2381,6 +2657,47 @@ impl Held {
             })
     }
 
+    /// With [`Held::sticky`], within the sticky hold ([`Held::keeps_face`]):
+    /// a print that matched nobody at the real bar (`matched` false: no
+    /// match, no photo's face) on the near face `near` (its passing id and box centre across, in
+    /// pixels), a new id ([`Held::on_held_face`] false) whose centre is more
+    /// than [`JUMP_SHARE`] of the held face's last box width from that box's
+    /// centre ([`Held::saw_near`]), counts as nobody near at the held place:
+    /// the name stays, and the caller renews nothing ([`Held::seen_theirs`]
+    /// is not called, so [`STICKY_HOLD`] still counts from the last sighting
+    /// of the held face), follows nothing and carries nothing. On lamp-06c1
+    /// (row 5, 20 Nov) a covered held face left the detector and a second
+    /// small face far across the frame became the only near one, on a new
+    /// id, and the name let go. A new id within [`JUMP_SHARE`] goes through
+    /// [`Held::follow_near`] or lets go, as before; with no held box, no
+    /// passing id, or sticky off, never. The owner's call on #7933, 20 Nov.
+    pub fn keeps_away(&self, now: Instant, matched: bool, near: Option<(&str, f32)>) -> bool {
+        let Some((id, x)) = near else {
+            return false;
+        };
+        !matched
+            && self.is_sticky()
+            && self.holding()
+            && self.keeps_face(now)
+            && !self.on_held_face(Some(id))
+            && self.held_box.is_some_and(|(held_x, held_width)| {
+                (x - held_x).abs() > JUMP_SHARE * held_width.max(1.0)
+            })
+    }
+
+    /// The journal line for [`Held::keeps_away`], the near face's box centre
+    /// across `x` and the held face's last, in pixels: numbers only, never a
+    /// name.
+    pub fn away_told(&self, x: f32) -> String {
+        let held_x = self
+            .held_box
+            .map_or_else(|| "none".to_owned(), |(held_x, _)| format!("{held_x:.0}"));
+        format!(
+            "lamp-eyes: a new unknown face away from the one held (across {x:.0} px, the one held last at {held_x} px): not at their place, the one held stays (sticky T3) until {} s from their last sighting",
+            STICKY_HOLD.as_secs()
+        )
+    }
+
     /// Whether a check with no print keeps the one known: within the hold,
     /// if no near face was seen (`near`), however long the looks before it
     /// found no face (a screen blank, #5546 on lamp-52e6), as no name goes
@@ -2389,7 +2706,17 @@ impl Held {
     /// since ([`Held::looked`]). Another face, one with no id to tell it by,
     /// or an id that left the view (someone else may have sat into it) lets
     /// them go at once, as with the hold off.
+    ///
+    /// With [`Held::sticky`], nobody near, or a near face on their own or
+    /// followed id ([`Held::on_held_face`]), with no print, keeps them while
+    /// their face was seen within [`STICKY_HOLD`] ([`Held::keeps_face`]); a
+    /// new id lets go.
     pub fn keeps_unprinted(&self, now: Instant, near: bool, id: Option<&str>) -> bool {
+        if self.is_sticky() {
+            // Nobody near (covered, turned out of the detector's reach): the
+            // name stays, marked held, up to 30 s (the plan's T3).
+            return self.keeps_face(now) && (!near || self.on_held_face(id));
+        }
         self.keeps(now)
             && (!near
                 || (self.unbroken
@@ -2406,10 +2733,339 @@ impl Held {
         self.gapped = false;
         self.last_print = None;
         self.matched_at = None;
+        self.kept_at = None;
         self.matched_id = None;
         self.pending = None;
         self.unsure = false;
+        self.held_box = None;
     }
+
+    /// Whether anyone is held now (a match not let go since).
+    pub fn holding(&self) -> bool {
+        self.matched_at.is_some()
+    }
+}
+
+/// With `LAMP_FACE_STICKY`, the first of two looks another enrolled person
+/// needs to take the name from the one held (T4): kept in memory only, gone
+/// with [`Takeover::reset`]. The first look keeps the one held
+/// ([`sticky_look`]).
+#[derive(Debug, Default)]
+pub struct Takeover {
+    first: Option<(String, Instant)>,
+}
+
+impl Takeover {
+    /// A check at `now` matched `found` (over [`SAME_PERSON`], at
+    /// `found_likeness`) while someone else is held, whose own likeness to
+    /// this print is `held_likeness` (`None`: no longer kept). Whether
+    /// `found` takes the name now: on the second such look of the same
+    /// person within [`TAKEOVER_WITHIN`], each over the held person's
+    /// likeness. A look not over it starts nothing. A held person no longer
+    /// kept is taken at once.
+    pub fn look(
+        &mut self,
+        now: Instant,
+        found: &str,
+        found_likeness: f32,
+        held_likeness: Option<f32>,
+    ) -> bool {
+        let Some(held) = held_likeness else {
+            self.first = None;
+            return true;
+        };
+        if found_likeness <= held {
+            self.first = None;
+            return false;
+        }
+        match self.first.take() {
+            Some((first, at))
+                if same_name(&first, found)
+                    && now.saturating_duration_since(at) <= TAKEOVER_WITHIN =>
+            {
+                true
+            }
+            _ => {
+                self.first = Some((found.to_owned(), now));
+                false
+            }
+        }
+    }
+
+    /// The held person matched again, or let go: no look is pending.
+    pub fn reset(&mut self) {
+        self.first = None;
+    }
+
+    /// Whether a first look is pending, for tests and the journal.
+    pub fn pending(&self) -> bool {
+        self.first.is_some()
+    }
+}
+
+/// With `LAMP_FACE_STICKY`, what a check's match does while a name is held
+/// ([`sticky_look`]).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum StickyLook {
+    /// As without the rule: the match (or nobody) is named.
+    AsFound,
+    /// Another enrolled person's first look on the held face: the one held
+    /// stays, as a held check keeps them.
+    KeepsHeld,
+    /// Their second look within [`TAKEOVER_WITHIN`]: they take the name.
+    SecondLook,
+    /// Another enrolled person on the held face, on a look that does not
+    /// count toward the two ([`takeover_uncounted`]): the one held stays and
+    /// no first look is started or spent.
+    NotALook(Uncounted),
+}
+
+/// Why another enrolled person's look on the held face does not count
+/// toward T4's two ([`takeover_uncounted`]).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Uncounted {
+    /// A T7 rematch at the lower bar: a rematch never takes a name (row 5 on
+    /// lamp-06c1, 20 Nov: a covered face rematched another enrolled person).
+    Rematch,
+    /// With [`TAKEOVER_SCORE_ENVIRONMENT`], the near face's detector score
+    /// was under [`TAKEOVER_SCORE`].
+    Score,
+}
+
+/// Whether a takeover look does not count: a T7 rematch never does
+/// (`rematched`); with `score_on` (`LAMP_FACE_TAKEOVER_SCORE`), neither does
+/// one whose near face's detector score is under [`TAKEOVER_SCORE`] or
+/// unknown.
+pub fn takeover_uncounted(
+    rematched: bool,
+    score: Option<f32>,
+    score_on: bool,
+) -> Option<Uncounted> {
+    if rematched {
+        Some(Uncounted::Rematch)
+    } else if score_on && score.is_none_or(|score| score < TAKEOVER_SCORE) {
+        Some(Uncounted::Score)
+    } else {
+        None
+    }
+}
+
+/// What the known hold's gap line says of a check's print after a gap
+/// ([`Held::printed`]): `same`, the print read the held face as theirs;
+/// `held`, the check kept the name; `followed`, on a new id that now follows
+/// the held face's ([`Held::carry`]). Row 5 on lamp-06c1 (20 Nov) logged
+/// "kept on its id" on checks that let the name go.
+///
+/// `matched`, the check's print matched someone at the real bar (a match or
+/// a photo's face): "matched", never "let go" (a 0.726 match to the held set
+/// on lamp-06c1 at 1795163856.5 printed "let go"). `away`, held on a new
+/// unknown face away from the held face's box ([`Held::keeps_away`]).
+pub fn gap_told(same: bool, held: bool, followed: bool, matched: bool, away: bool) -> &'static str {
+    match (same, held, followed) {
+        (true, ..) => "same face",
+        (false, true, _) if away => {
+            "not read as theirs, a new unknown face away from the one held: the one held stays (sticky T3)"
+        }
+        (false, true, true) => {
+            "not read as theirs, followed: the new id near the held face's box keeps the name (sticky)"
+        }
+        (false, true, false) => "not read as theirs, kept on its id (sticky)",
+        (false, false, _) if matched => "matched",
+        (false, false, _) => "let go",
+    }
+}
+
+/// With `LAMP_FACE_STICKY` (the plan's T4, the owner's call on #7933, 20 Nov
+/// 01:55, overruling the 22:14 ruling that dropped the held name on the
+/// first look), a check's match `found` (name, likeness) at `now`, on the
+/// near face's passing id `id`, while `held_name` is held. Another enrolled
+/// person on the held face ([`Held::on_held_face`]) takes the name only on
+/// a second look within [`TAKEOVER_WITHIN`], each over the held person's
+/// likeness `held_likeness` (`None`: no longer kept, taken at once); one
+/// stray print keeps the one held. On a new id the held name is cleared by
+/// T3 anyway, so the match is named as found. A look that does not count
+/// (`uncounted`, [`takeover_uncounted`]) keeps the one held and leaves any
+/// first look as it was.
+#[allow(clippy::too_many_arguments)]
+pub fn sticky_look(
+    held: &Held,
+    takeover: &mut Takeover,
+    now: Instant,
+    held_name: Option<&str>,
+    found: Option<(&str, f32)>,
+    held_likeness: Option<f32>,
+    id: Option<&str>,
+    uncounted: Option<Uncounted>,
+) -> StickyLook {
+    let (Some((found, found_likeness)), Some(held_name)) = (found, held_name) else {
+        return StickyLook::AsFound;
+    };
+    if !held.is_sticky() || !held.keeps_face(now) {
+        return StickyLook::AsFound;
+    }
+    if same_name(found, held_name) || !held.on_held_face(id) {
+        takeover.reset();
+        return StickyLook::AsFound;
+    }
+    if let Some(uncounted) = uncounted {
+        return StickyLook::NotALook(uncounted);
+    }
+    if takeover.look(now, found, found_likeness, held_likeness) {
+        StickyLook::SecondLook
+    } else {
+        StickyLook::KeepsHeld
+    }
+}
+
+/// With `LAMP_FACE_STICKY`, who was last matched over [`SAME_PERSON`] and
+/// when (the plan's T7): kept in memory only, never written. A print that
+/// matches nobody is matched to them again at [`REMATCH_LIKENESS`] within
+/// [`REMATCH_WITHIN`], when nobody else scores higher ([`Recent::rematch`]).
+#[derive(Debug, Default)]
+pub struct Recent {
+    last: Option<(String, Instant)>,
+}
+
+impl Recent {
+    /// `name` matched over [`SAME_PERSON`] at `now`. A match again at the
+    /// lower bar never renews it.
+    pub fn matched(&mut self, name: &str, now: Instant) {
+        self.last = Some((name.to_owned(), now));
+    }
+
+    /// Forget whoever it was.
+    pub fn clear(&mut self) {
+        self.last = None;
+    }
+
+    /// The person matched within [`REMATCH_WITHIN`] of `now`, and this
+    /// print's likeness to them, if it reaches [`REMATCH_LIKENESS`] and the
+    /// best likeness to anyone (`best`) is not higher. `likeness_to` gives a
+    /// person's likeness to the print, `None` when they are no longer kept.
+    pub fn rematch(
+        &self,
+        now: Instant,
+        likeness_to: impl FnOnce(&str) -> Option<f32>,
+        best: Option<f32>,
+    ) -> Option<(String, f32)> {
+        let (name, at) = self.last.as_ref()?;
+        if now.saturating_duration_since(*at) > REMATCH_WITHIN {
+            return None;
+        }
+        let likeness = likeness_to(name)?;
+        (likeness >= REMATCH_LIKENESS && best.is_none_or(|best| best <= likeness))
+            .then(|| (name.clone(), likeness))
+    }
+}
+
+/// What a T7 rematch ([`Recent::rematch`]) does while `held_name` is held
+/// ([`held_rematch`]).
+#[derive(Clone, Debug, PartialEq)]
+pub enum Rematch {
+    /// Matched again at the lower bar, as T7 does: the one held themself, or
+    /// with nobody held, whoever matched recently.
+    Taken(String, f32),
+    /// Another than the one held, at this likeness: not taken. Not a match,
+    /// not a takeover look, and no let-go by itself; another person still
+    /// needs T4's two looks at [`SAME_PERSON`] (the owner's call on #7933,
+    /// 20 Nov, after leg 1b on lamp-06c1 switched the held name on a rematch).
+    Refused(f32),
+}
+
+/// While someone is held (`held_name`), T7's lower bar may only match the
+/// one held again: a rematch `rematch` of anyone else is
+/// [`Rematch::Refused`]. With nobody held, T7 as it was.
+pub fn held_rematch(rematch: Option<(String, f32)>, held_name: Option<&str>) -> Option<Rematch> {
+    let (name, likeness) = rematch?;
+    match held_name {
+        Some(held) if !same_name(held, &name) => Some(Rematch::Refused(likeness)),
+        _ => Some(Rematch::Taken(name, likeness)),
+    }
+}
+
+/// The journal's line for a [`Rematch::Refused`] at `likeness`, `held`
+/// whether the check kept the one held. No name.
+pub fn rematch_refused_told(likeness: f32, held: bool) -> String {
+    format!(
+        "lamp-eyes: matched again at {likeness:.3} to another than the one held: not taken (sticky T7), {}",
+        if held {
+            "the one held stays"
+        } else {
+            "the hold lets go"
+        }
+    )
+}
+
+/// The recognition line's measures beyond the best likeness (T0): numbers
+/// only, never a name, a print or a picture.
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
+pub struct RecognitionMeasures {
+    /// The best likeness to anyone kept, `None` with no print or nobody.
+    pub best: Option<f32>,
+    /// The second person's best likeness, `None` with fewer than two kept.
+    pub second: Option<f32>,
+    /// The largest face's height, as a share of the picture's.
+    pub tallest: f32,
+    /// The near face's eye distance in the picture, in pixels.
+    pub eyes_px: Option<f32>,
+    /// How far the near face's head is turned, in degrees (`facing::yaw_deg`).
+    pub turned_deg: Option<f32>,
+    /// The detector's score for the near face.
+    pub score: Option<f32>,
+    /// How long the print took, in ms; `None` with none read.
+    pub print_ms: Option<u128>,
+}
+
+/// The eyes' recognition line, for the journal: the measures, never a name.
+pub fn recognition_told(measures: &RecognitionMeasures) -> String {
+    let number = |value: Option<f32>, places: usize| {
+        value.map_or_else(|| "none".to_owned(), |value| format!("{value:.places$}"))
+    };
+    format!(
+        "lamp-eyes: recognition best {} height {:.3} (near at {NEAR_ENOUGH}, same at {SAME_PERSON}) second {} eyes {} px turned {} deg score {} print {} ms",
+        number(measures.best, 3),
+        measures.tallest,
+        number(measures.second, 3),
+        number(measures.eyes_px, 1),
+        number(measures.turned_deg, 0),
+        number(measures.score, 2),
+        measures
+            .print_ms
+            .map_or_else(|| "none".to_owned(), |ms| ms.to_string()),
+    )
+}
+
+/// Beside the known file (`--known-file`): `-held`, an empty mark the eyes
+/// renew while the one known is kept by a hold and not matched at this
+/// check (`LAMP_FACE_STICKY=on` only). Fresh for as long as the known file
+/// is (3 s), written before the known file is renewed and removed after a
+/// match's write ([`keep_known`]), so a reader never takes a held name for
+/// a fresh match. The voice reads the name with it for memory only: no
+/// forget, correction, rule or yes, and never as the owner present or
+/// alone for a private read-back.
+pub fn known_held_of(known: &Path) -> PathBuf {
+    let mut beside = known.as_os_str().to_owned();
+    beside.push("-held");
+    PathBuf::from(beside)
+}
+
+/// The held mark written or renewed ([`known_held_of`]), before the known
+/// file's renewal.
+pub fn mark_held(known: &Path) {
+    let held = known_held_of(known);
+    if std::fs::File::options()
+        .write(true)
+        .open(&held)
+        .and_then(|file| file.set_modified(std::time::SystemTime::now()))
+        .is_err()
+    {
+        let _ = std::fs::write(&held, b"");
+    }
+}
+
+/// The held mark removed: a match, or a let-go, after its write.
+pub fn clear_held(known: &Path) {
+    let _ = std::fs::remove_file(known_held_of(known));
 }
 
 /// Whether this look asks whose the near face is: at every look while
@@ -2444,6 +3100,56 @@ pub fn recognise_due_near(
         || (refound
             && near_id.is_some_and(|id| !printed.iter().any(|kept| kept == id))
             && looked_for.is_none_or(|at| now.saturating_duration_since(at) >= REFOUND_RETRY))
+}
+
+/// With `LAMP_FACE_STICKY`, how far the near face's box centre may move
+/// between two looks, as a share of its width, before it is a newly seen
+/// face ([`NewFace`]).
+pub const JUMP_SHARE: f32 = 1.0 / 3.0;
+
+/// With `LAMP_FACE_STICKY`, while a name is held, a newly seen near face is
+/// recognised at once, outside [`RECOGNISE_EVERY`] (the first builder on
+/// #7933, 19 Nov 22:14: in row 4 a swapped-in face carried the held name
+/// 3.35 s before its first print). Newly seen: a near face after none, a
+/// new passing id, or a box whose centre moved more than [`JUMP_SHARE`] of
+/// its width since the last look. Each such change asks for one print, at
+/// most every [`REFOUND_RETRY`]; a steady box asks for none. Kept in memory
+/// only: the box's centre and width and its passing id, never a picture.
+#[derive(Debug, Default)]
+pub struct NewFace {
+    last: Option<(Option<String>, f32, f32)>,
+    pending: bool,
+}
+
+impl NewFace {
+    /// A look's near face: its passing id, its box's centre across and its
+    /// width, in pixels (`None`: no near face). `holding`: a name is held
+    /// under `LAMP_FACE_STICKY`; otherwise nothing is asked.
+    pub fn looked(&mut self, near: Option<(Option<&str>, f32, f32)>, holding: bool) {
+        let new = match (&self.last, near) {
+            (_, None) => false,
+            (None, Some(_)) => true,
+            (Some((was_id, was_x, was_width)), Some((id, x, _))) => {
+                let id_changed =
+                    matches!((was_id.as_deref(), id), (Some(was), Some(now)) if was != now);
+                id_changed || (x - was_x).abs() > JUMP_SHARE * was_width.max(1.0)
+            }
+        };
+        self.last = near.map(|(id, x, width)| (id.map(str::to_owned), x, width));
+        self.pending = holding && (self.pending || new);
+    }
+
+    /// Whether a check is due now for a newly seen face: one is pending and
+    /// the last check was at least [`REFOUND_RETRY`] ago.
+    pub fn due(&self, looked_for: Option<Instant>, now: Instant) -> bool {
+        self.pending
+            && looked_for.is_none_or(|at| now.saturating_duration_since(at) >= REFOUND_RETRY)
+    }
+
+    /// A check ran: whatever was pending is answered.
+    pub fn checked(&mut self) {
+        self.pending = false;
+    }
 }
 
 /// While the hold is unsure ([`Held::unsure`]) and a near face is seen, a
@@ -5047,6 +5753,36 @@ mod tests {
         std::fs::remove_dir_all(known.parent().unwrap()).unwrap();
     }
 
+    /// #7146: a held check renews the known face beside the known file too,
+    /// so the voice, which takes the face as fresh only as long as the
+    /// name, never reads a held person's face as gone while their name is
+    /// still renewed.
+    #[test]
+    fn a_held_check_renews_the_known_face_as_well_as_the_known_file() {
+        let known = file("known-renew-face").with_file_name("known");
+        let beside = known_face_of(&known);
+        keep_known(&known, Some("Alpha"), None, Some("f3"));
+        let back = std::time::SystemTime::now() - Duration::from_millis(2_500);
+        for path in [&known, &beside] {
+            std::fs::File::options()
+                .write(true)
+                .open(path)
+                .unwrap()
+                .set_modified(back)
+                .unwrap();
+        }
+        let before = std::time::SystemTime::now();
+        renew_known(&known);
+        for path in [&known, &beside] {
+            assert!(
+                std::fs::metadata(path).unwrap().modified().unwrap() >= before,
+                "{path:?}"
+            );
+        }
+        assert_eq!(std::fs::read_to_string(&beside).unwrap(), "f3\n");
+        std::fs::remove_dir_all(known.parent().unwrap()).unwrap();
+    }
+
     /// #4493: the same names are not written again (the voice reads the
     /// file's time as a change); other names are.
     #[test]
@@ -6829,5 +7565,971 @@ mod tests {
         keep_known(&known, Some("Sam"), people.id_of("Sam").as_deref(), None);
         assert_eq!(std::fs::read_to_string(&known).unwrap(), "Sam\n");
         std::fs::remove_dir_all(path.parent().unwrap()).unwrap();
+    }
+
+    /// A unit print on `axis`, mixed with `axis + 1` so its likeness to
+    /// the pure `axis` print is `alike`.
+    fn print_alike(axis: usize, alike: f32) -> Vec<f32> {
+        let mut print = vec![0.0; PRINT];
+        print[axis] = alike;
+        print[axis + 1] = (1.0 - alike * alike).max(0.0).sqrt();
+        print
+    }
+
+    /// The plan's T3 (the owner's call on #7933, 20 Nov 01:55): with
+    /// `LAMP_FACE_STICKY`, a match, misses, a print under 0.30 on the same
+    /// id, then 10 s with no face, then a match: the name holds throughout.
+    /// No face for 31 s clears it; so does a print on a new id. Off, today's
+    /// hold: a print under 0.30 lets go.
+    #[test]
+    fn sticky_holds_the_name_through_unknown_prints_on_its_id() {
+        let start = Instant::now();
+        let mut held = Held::new(true).sticky(true).following(true);
+        held.matched(start, Some("f3".to_owned()));
+        let mut at = start;
+        // Misses: their face on its id, no print.
+        for _ in 0..3 {
+            at += RECOGNISE_EVERY;
+            held.looked(|id| id == "f3", true);
+            assert!(held.keeps_unprinted(at, true, Some("f3")));
+            held.seen_theirs(at);
+        }
+        // A print under 0.30 on the same id, any likeness: kept.
+        at += RECOGNISE_EVERY;
+        for likeness in [Some(0.29), Some(0.05), None] {
+            assert!(held.keeps_print(at, likeness, Some("f3")), "{likeness:?}");
+        }
+        held.seen_theirs(at);
+        // Then 10 s with no face.
+        for gone in [2, 6, 10] {
+            assert!(
+                held.keeps_unprinted(at + Duration::from_secs(gone), false, None),
+                "{gone} s"
+            );
+        }
+        // Then a match.
+        at += Duration::from_secs(10);
+        held.matched(at, Some("f3".to_owned()));
+        assert!(held.holding());
+        // No face for 31 s clears it.
+        assert!(held.keeps_unprinted(at + Duration::from_secs(29), false, None));
+        assert!(!held.keeps_unprinted(at + Duration::from_secs(31), false, None));
+        // A print on a new id lets go; the followed id keeps.
+        assert!(!held.keeps_print(at + RECOGNISE_EVERY, Some(0.29), Some("f9")));
+        assert!(held.follow(at + RECOGNISE_EVERY, Some("f4"), Some("f3"), 1));
+        assert!(held.keeps_print(at + RECOGNISE_EVERY, Some(0.10), Some("f4")));
+        // Off: today's hold lets a print under 0.30 go.
+        let mut off = Held::new(true);
+        off.matched(start, Some("f3".to_owned()));
+        off.looked(|id| id == "f3", true);
+        assert!(!off.keeps_print(start + RECOGNISE_EVERY, Some(0.29), Some("f3")));
+    }
+
+    /// T3 with no print: a covered face the detector misses (25 s), a
+    /// turned head on their own id, or their box on the id that follows it,
+    /// past today's 4 s, to [`STICKY_HOLD`] since their face was last seen.
+    /// Off, 4 s as before.
+    #[test]
+    fn sticky_holds_the_name_through_no_print_to_its_bound() {
+        let start = Instant::now();
+        let mut held = Held::new(true).sticky(true).following(true);
+        held.matched(start, Some("f3".to_owned()));
+        held.looked(|id| id == "f3", true);
+        // No face detected for 25 s.
+        for gone in [4, 10, 25] {
+            let at = start + Duration::from_secs(gone);
+            assert!(held.keeps_unprinted(at, false, None), "{gone} s");
+            assert_eq!(held.unprinted(at, false, None), Unprinted::Sure, "{gone} s");
+        }
+        // A turned head, no print, on their unbroken id.
+        assert!(held.keeps_unprinted(start + Duration::from_secs(20), true, Some("f3")));
+        // Another near face with no print: not theirs.
+        assert!(!held.keeps_unprinted(start + Duration::from_secs(20), true, Some("f9")));
+        // Their box lost, on the id that follows it, no print.
+        let then = start + Duration::from_secs(20);
+        assert!(held.follow(then, Some("f4"), Some("f3"), 1));
+        assert!(held.keeps_unprinted(then, true, Some("f4")));
+        // The bound: 30 s from the last match.
+        assert!(!held.keeps_unprinted(start + STICKY_HOLD, false, None));
+        assert_eq!(
+            held.unprinted(start + STICKY_HOLD, false, None),
+            Unprinted::LetGo
+        );
+        // Off: nobody near keeps only today's 4 s from the match.
+        let mut off = Held::new(true);
+        off.matched(start, Some("f3".to_owned()));
+        assert!(off.keeps_unprinted(start + Duration::from_secs(3), false, None));
+        assert!(!off.keeps_unprinted(start + Duration::from_secs(5), false, None));
+    }
+
+    /// lamp-74ff, 19 Nov at lunch: its one enrolled user ate with his hands
+    /// over his face, a face on his id the whole time and matched in none of
+    /// about 230 looks. With `LAMP_FACE_STICKY` each look of his face on its
+    /// id renews the hold, so the name stays all meal; only nobody near for
+    /// [`STICKY_HOLD`] ends it.
+    #[test]
+    fn a_face_on_its_id_unmatched_for_minutes_keeps_its_name() {
+        let start = Instant::now();
+        let mut held = Held::new(true).sticky(true);
+        held.matched(start, Some("f3".to_owned()));
+        let mut at = start;
+        while at < start + Duration::from_secs(9 * 60) {
+            at += RECOGNISE_EVERY;
+            held.looked(|id| id == "f3", true);
+            assert!(held.keeps_print(at, Some(0.12), Some("f3")));
+            held.seen_theirs(at);
+        }
+        assert!(held.keeps_unprinted(at + Duration::from_secs(29), false, None));
+        assert!(!held.keeps_unprinted(at + STICKY_HOLD, false, None));
+        // Off the sticky switch, seeing renews nothing.
+        let mut off = Held::new(true);
+        off.matched(start, Some("f3".to_owned()));
+        off.seen_theirs(start + Duration::from_secs(3));
+        assert!(!off.keeps_unprinted(start + KNOWN_HOLD, false, None));
+    }
+
+    /// T4's two looks (`Takeover`): the second look of the same person
+    /// within `TAKEOVER_WITHIN`, each over the held person's likeness, takes
+    /// the name; the first keeps the one held ([`sticky_look`]).
+    #[test]
+    fn another_enrolled_person_takes_the_name_only_on_two_looks() {
+        let start = Instant::now();
+        let mut takeover = Takeover::default();
+        assert!(!takeover.look(start, "Bea", 0.50, Some(0.20)));
+        assert!(takeover.pending());
+        assert!(takeover.look(start + RECOGNISE_EVERY, "Bea", 0.45, Some(0.21)));
+        // Too far apart: the second look is a first again.
+        let mut slow = Takeover::default();
+        assert!(!slow.look(start, "Bea", 0.50, Some(0.20)));
+        assert!(!slow.look(
+            start + TAKEOVER_WITHIN + Duration::from_millis(1),
+            "Bea",
+            0.50,
+            Some(0.20)
+        ));
+        // Not over the held person's likeness: nothing starts.
+        let mut under = Takeover::default();
+        assert!(!under.look(start, "Bea", 0.40, Some(0.41)));
+        assert!(!under.pending());
+        // Another name between the two looks: a first again.
+        let mut two = Takeover::default();
+        assert!(!two.look(start, "Bea", 0.50, Some(0.20)));
+        assert!(!two.look(start + RECOGNISE_EVERY, "Cal", 0.50, Some(0.20)));
+        // A match of the held person resets it.
+        two.reset();
+        assert!(!two.pending());
+        // The held person no longer kept: taken at once.
+        assert!(Takeover::default().look(start, "Bea", 0.50, None));
+    }
+
+    /// The plan's T4 (the owner's call on #7933, 20 Nov 01:55, overruling
+    /// the 22:14 drop on the first look): held A, one stray B print on A's
+    /// face keeps A; a second within `TAKEOVER_WITHIN` switches to B. B on a
+    /// new id is named as found (T3 clears A on a new id anyway). Off, as
+    /// found.
+    #[test]
+    fn one_stray_print_of_another_enrolled_person_keeps_the_one_held() {
+        let start = Instant::now();
+        let step = RECOGNISE_EVERY;
+        let mut held = Held::new(true).sticky(true);
+        held.matched(start, Some("f3".to_owned()));
+        let mut takeover = Takeover::default();
+        let look = |takeover: &mut Takeover, held: &Held, at, id| {
+            sticky_look(
+                held,
+                takeover,
+                at,
+                Some("Ann"),
+                Some(("Bea", 0.50)),
+                Some(0.20),
+                id,
+                None,
+            )
+        };
+        // One stray B print: A kept.
+        assert_eq!(
+            look(&mut takeover, &held, start + step, Some("f3")),
+            StickyLook::KeepsHeld
+        );
+        assert!(
+            held.keeps_print(start + step, Some(0.20), Some("f3")),
+            "A held"
+        );
+        // A's own match between: nothing pending.
+        assert_eq!(
+            sticky_look(
+                &held,
+                &mut takeover,
+                start + step * 2,
+                Some("Ann"),
+                Some(("Ann", 0.6)),
+                Some(0.6),
+                Some("f3"),
+                None
+            ),
+            StickyLook::AsFound
+        );
+        assert!(!takeover.pending());
+        // Two B prints within 4 s: B.
+        assert_eq!(
+            look(&mut takeover, &held, start + step * 3, Some("f3")),
+            StickyLook::KeepsHeld
+        );
+        assert_eq!(
+            look(&mut takeover, &held, start + step * 4, Some("f3")),
+            StickyLook::SecondLook
+        );
+        // B on a new id: as found.
+        assert_eq!(
+            look(&mut Takeover::default(), &held, start + step, Some("f9")),
+            StickyLook::AsFound
+        );
+        // Off: as found.
+        let mut off = Held::new(true);
+        off.matched(start, Some("f3".to_owned()));
+        assert_eq!(
+            look(&mut Takeover::default(), &off, start + step, Some("f3")),
+            StickyLook::AsFound
+        );
+    }
+
+    /// With a name held under `LAMP_FACE_STICKY`, a newly seen near face (a
+    /// new id, or a box jump over a third of its width) is checked on the
+    /// next look, outside the 2 s cadence; a steady box asks for no extra
+    /// print. It only speeds recognition and agrees with T3: the print on a
+    /// new id lets the name go, one on the same id keeps it.
+    #[test]
+    fn a_newly_seen_face_is_printed_at_once_while_a_name_is_held() {
+        let start = Instant::now();
+        let look = Duration::from_millis(100);
+        let mut held = Held::new(true).sticky(true);
+        held.matched(start, Some("f3".to_owned()));
+        // A steady box: no extra print within the 2 s cadence.
+        let mut new_face = NewFace::default();
+        // The look that matched them: its check answers it.
+        new_face.looked(Some((Some("f3"), 160.0, 60.0)), true);
+        new_face.checked();
+        let mut extra = 0;
+        for step in 0..19u32 {
+            let at = start + look * step;
+            new_face.looked(Some((Some("f3"), 160.0 + (step % 3) as f32, 60.0)), true);
+            if new_face.due(Some(start), at) {
+                extra += 1;
+                new_face.checked();
+            }
+        }
+        assert_eq!(extra, 0, "no extra print on a steady box");
+        assert!(!recognise_due(Some(start), false, start + look * 18));
+        // A new id: a print on the next look, not theirs: the name drops.
+        let at = start + Duration::from_millis(1_000);
+        new_face.looked(Some((Some("f9"), 161.0, 60.0)), true);
+        assert!(
+            new_face.due(Some(start), at),
+            "a new id is printed on the next look"
+        );
+        assert!(
+            !recognise_due(Some(start), false, at),
+            "outside the 2 s cadence"
+        );
+        new_face.checked();
+        assert!(
+            !held.keeps_print(at, Some(0.21), Some("f9")),
+            "a new id: let go (T3)"
+        );
+        // Once printed, the same id asks for nothing more.
+        new_face.looked(Some((Some("f9"), 161.0, 60.0)), true);
+        assert!(!new_face.due(Some(at), at + look * 6));
+        // A box jump (on the same id) does the same.
+        let mut jump = NewFace::default();
+        jump.looked(Some((Some("f3"), 100.0, 60.0)), true);
+        jump.checked();
+        jump.looked(Some((Some("f3"), 100.0 + 21.0, 60.0)), true);
+        assert!(
+            jump.due(Some(start), at),
+            "a jump over a third of the width is printed"
+        );
+        jump.checked();
+        assert!(
+            held.keeps_print(at, Some(0.21), Some("f3")),
+            "the same id: kept (T3), a match renews it"
+        );
+        jump.looked(Some((Some("f3"), 121.0 + 19.0, 60.0)), true);
+        assert!(!jump.due(Some(start), at), "under a third: steady");
+        // At most every REFOUND_RETRY; and nothing asked with no name held.
+        jump.looked(Some((Some("f5"), 140.0, 60.0)), true);
+        assert!(!jump.due(Some(at), at + Duration::from_millis(400)));
+        assert!(jump.due(Some(at), at + REFOUND_RETRY));
+        let mut free = NewFace::default();
+        free.looked(Some((Some("f1"), 100.0, 60.0)), false);
+        free.looked(Some((Some("f2"), 300.0, 60.0)), false);
+        assert!(!free.due(None, at), "no name held: the 2 s cadence only");
+    }
+
+    /// The plan's T7 (restored by the owner's call on #7933, 20 Nov 01:55):
+    /// 0.32 after a recent match counts; 0.32 with no recent match doesn't;
+    /// 0.32 when B scores 0.33 doesn't; past ten minutes, nothing.
+    #[test]
+    fn someone_matched_recently_is_matched_again_at_the_lower_bar() {
+        let start = Instant::now();
+        let mut recent = Recent::default();
+        assert_eq!(
+            recent.rematch(start, |_| Some(0.32), Some(0.32)),
+            None,
+            "no recent match"
+        );
+        recent.matched("Ann", start);
+        let soon = start + Duration::from_secs(60);
+        assert_eq!(
+            recent.rematch(soon, |_| Some(0.32), Some(0.32)),
+            Some(("Ann".to_owned(), 0.32))
+        );
+        assert_eq!(
+            recent.rematch(soon, |_| Some(0.32), Some(0.33)),
+            None,
+            "B scores 0.33"
+        );
+        assert_eq!(
+            recent.rematch(soon, |_| Some(0.29), Some(0.29)),
+            None,
+            "under the bar"
+        );
+        assert_eq!(
+            recent.rematch(soon, |_| None, Some(0.35)),
+            None,
+            "no longer kept"
+        );
+        assert_eq!(
+            recent.rematch(
+                start + REMATCH_WITHIN + Duration::from_secs(1),
+                |_| Some(0.32),
+                Some(0.32)
+            ),
+            None
+        );
+        recent.clear();
+        assert_eq!(recent.rematch(soon, |_| Some(0.32), Some(0.32)), None);
+        const { assert!(REMATCH_LIKENESS <= 0.32 && REMATCH_LIKENESS < SAME_PERSON) };
+    }
+
+    /// T0: the recognition line has its measures and never a name.
+    #[test]
+    fn the_recognition_line_has_numbers_only() {
+        let line = recognition_told(&RecognitionMeasures {
+            best: Some(0.341),
+            second: Some(0.12),
+            tallest: 0.2,
+            eyes_px: Some(14.25),
+            turned_deg: Some(-12.4),
+            score: Some(0.91),
+            print_ms: Some(152),
+        });
+        assert_eq!(
+            line,
+            "lamp-eyes: recognition best 0.341 height 0.200 (near at 0.1, same at 0.363) second 0.120 eyes 14.2 px turned -12 deg score 0.91 print 152 ms"
+        );
+        let none = recognition_told(&RecognitionMeasures::default());
+        assert!(
+            none.contains("best none") && none.contains("print none ms"),
+            "{none}"
+        );
+        // Nothing in it but words of its own and numbers.
+        for word in line.split_whitespace() {
+            assert!(
+                word.parse::<f32>().is_ok()
+                    || [
+                        "lamp-eyes:",
+                        "recognition",
+                        "best",
+                        "height",
+                        "(near",
+                        "at",
+                        "0.1,",
+                        "same",
+                        "0.363)",
+                        "second",
+                        "eyes",
+                        "px",
+                        "turned",
+                        "deg",
+                        "score",
+                        "print",
+                        "ms"
+                    ]
+                    .contains(&word),
+                "{word}"
+            );
+        }
+    }
+
+    /// The second person's likeness, for T0's line; none with one person.
+    #[test]
+    fn the_second_likeness_is_the_second_person_s_best() {
+        let path = file("second-likeness");
+        let mut people = People::open(path.clone()).unwrap();
+        people
+            .remember("Ann", vec![print_alike(0, 1.0)], 1)
+            .unwrap();
+        assert_eq!(people.second_likeness(&print_alike(0, 1.0)), None);
+        people
+            .remember("Bea", vec![print_alike(2, 1.0)], 1)
+            .unwrap();
+        let second = people.second_likeness(&print_alike(0, 1.0)).unwrap();
+        assert!(second.abs() < 1e-6, "{second}");
+        std::fs::remove_dir_all(path.parent().unwrap()).unwrap();
+    }
+
+    /// The held mark: written before a held write, kept by it, and removed
+    /// by a match's write or a let-go.
+    #[test]
+    fn the_held_mark_goes_with_a_held_write_and_only_a_match_or_let_go_clears_it() {
+        let known = file("known-held").with_file_name("known");
+        keep_known(&known, Some("Ann"), None, Some("f3"));
+        assert!(!known_held_of(&known).exists());
+        keep_known_held(&known, "Ann", None, Some("f4"));
+        assert!(known_held_of(&known).exists());
+        assert_eq!(std::fs::read_to_string(&known).unwrap(), "Ann\n");
+        assert_eq!(
+            std::fs::read_to_string(known_face_of(&known))
+                .unwrap()
+                .trim(),
+            "f4"
+        );
+        mark_held(&known);
+        assert!(known_held_of(&known).exists());
+        keep_known(&known, Some("Ann"), None, Some("f4"));
+        assert!(!known_held_of(&known).exists(), "a match clears it");
+        mark_held(&known);
+        keep_known(&known, None, None, None);
+        assert!(!known_held_of(&known).exists(), "a let-go clears it");
+        std::fs::remove_dir_all(known.parent().unwrap()).unwrap();
+    }
+
+    /// Friday's P1 on #7933 (20 Nov 03:16): a T7 rematch (0.31 within ten
+    /// minutes of a match) writes the held mark, as a held check does, so the
+    /// voice gives it no forget and no private read-back; a real match at
+    /// `SAME_PERSON` clears the mark.
+    #[test]
+    fn a_rematch_is_written_held_and_only_a_real_match_clears_the_mark() {
+        let known = file("rematch-held").with_file_name("known");
+        let start = Instant::now();
+        let mut recent = Recent::default();
+        recent.matched("Ann", start);
+        let (name, likeness) = recent
+            .rematch(start + Duration::from_secs(60), |_| Some(0.31), Some(0.31))
+            .expect("rematched at 0.31");
+        assert!(likeness < SAME_PERSON);
+        keep_found(&known, Some(&name), None, Some("f3"), true);
+        assert!(known_held_of(&known).exists(), "a rematch is held");
+        assert_eq!(std::fs::read_to_string(&known).unwrap(), "Ann\n");
+        keep_found(&known, Some("Ann"), None, Some("f3"), false);
+        assert!(!known_held_of(&known).exists(), "a real match clears it");
+        keep_found(&known, None, None, None, true);
+        assert!(!known.exists(), "nobody: let go");
+        std::fs::remove_dir_all(known.parent().unwrap()).unwrap();
+    }
+
+    /// One check with a print, as lamp-eyes' loop runs it while `held_name`
+    /// is held under `LAMP_FACE_STICKY`: the near face (passing id, box
+    /// centre, width) and its detector `score`, the match `found`, the held
+    /// person's likeness, whether it was a T7 rematch, `score_on`
+    /// (`LAMP_FACE_TAKEOVER_SCORE`) and the sitter check. The name it names
+    /// ("" for nobody).
+    #[allow(clippy::too_many_arguments)]
+    fn row5_check(
+        held: &mut Held,
+        takeover: &mut Takeover,
+        now: Instant,
+        held_name: &str,
+        near: (&str, f32, f32),
+        score: f32,
+        found: Option<(&str, f32)>,
+        held_likeness: f32,
+        rematched: bool,
+        score_on: bool,
+    ) -> String {
+        held.follow_near(now, Some(near), 1, true);
+        let look = sticky_look(
+            held,
+            takeover,
+            now,
+            Some(held_name),
+            found,
+            Some(held_likeness),
+            Some(near.0),
+            takeover_uncounted(rematched, Some(score), score_on),
+        );
+        let waits = matches!(look, StickyLook::KeepsHeld | StickyLook::NotALook(_));
+        let found = if waits { None } else { found };
+        let kept =
+            waits || (found.is_none() && held.keeps_print(now, Some(held_likeness), Some(near.0)));
+        if kept {
+            held.carry(Some(near.0));
+            if look != StickyLook::KeepsHeld {
+                held.seen_theirs(now);
+            }
+            held.saw_near(Some(near.0), near.1, near.2);
+            return held_name.to_owned();
+        }
+        takeover.reset();
+        match found {
+            Some((name, _)) => {
+                held.matched(now, Some(near.0.to_owned()));
+                held.saw_near(Some(near.0), near.1, near.2);
+                name.to_owned()
+            }
+            None => {
+                held.let_go();
+                String::new()
+            }
+        }
+    }
+
+    /// Row 5's leg E on lamp-06c1 (20 Nov), as the journal had it: Ann held
+    /// on f42, her lower face covered, the detector losing it and finding it
+    /// again in the same place as f43, f44, f46, each print matching Bea at
+    /// 0.36 to 0.50 with a detector score of 0.60 to 0.72. With
+    /// LAMP_FACE_FOLLOW_NEAR_NEW_ID and LAMP_FACE_TAKEOVER_SCORE on, Ann
+    /// stays named throughout, past 30 s; with both off (the product today), Bea is
+    /// named on the first print, on its new id; with only the follow on, Bea
+    /// takes the name on two looks within 4 s.
+    #[test]
+    fn a_covered_face_on_new_ids_in_its_place_keeps_the_name_with_the_follow_and_score_on() {
+        let start = Instant::now();
+        let ms = Duration::from_millis;
+        // Passing id, box centre, time after the match, detector score, the
+        // match, and whether it was a T7 rematch.
+        type Check<'a> = (&'a str, f32, Duration, f32, (&'a str, f32), bool);
+        let checks: [Check; 6] = [
+            ("f43", 305.0, ms(3_100), 0.66, ("Bea", 0.364), false),
+            ("f44", 302.0, ms(6_200), 0.60, ("Bea", 0.348), true),
+            ("f45", 298.0, ms(9_100), 0.69, ("Bea", 0.499), false),
+            ("f46", 301.0, ms(12_700), 0.72, ("Bea", 0.391), false),
+            ("f46", 301.0, ms(13_600), 0.60, ("Bea", 0.393), false),
+            // Past 30 s from the match: a look that does not count is her
+            // face on its id, so it renewed the sticky hold.
+            ("f50", 299.0, ms(34_000), 0.81, ("Bea", 0.408), false),
+        ];
+        let run = |follow: bool, score_on: bool| -> Vec<String> {
+            let mut held = Held::new(true).sticky(true).follows_near(follow);
+            held.matched(start, Some("f42".to_owned()));
+            held.saw_near(Some("f42"), 300.0, 90.0);
+            let mut takeover = Takeover::default();
+            checks
+                .iter()
+                .map(|(id, x, after, score, found, rematched)| {
+                    row5_check(
+                        &mut held,
+                        &mut takeover,
+                        start + *after,
+                        "Ann",
+                        (id, *x, 90.0),
+                        *score,
+                        Some(*found),
+                        0.12,
+                        *rematched,
+                        score_on,
+                    )
+                })
+                .collect()
+        };
+        assert!(
+            run(true, true).iter().all(|name| name == "Ann"),
+            "both on: Ann held"
+        );
+        assert_eq!(
+            run(false, false)[0],
+            "Bea",
+            "both off: Bea on one print, on its new id"
+        );
+        let follow_only = run(true, false);
+        assert_eq!(
+            &follow_only[..2],
+            ["Ann", "Ann"],
+            "the follow alone keeps the first look"
+        );
+        assert_eq!(
+            follow_only[3], "Bea",
+            "and Bea takes it on two looks within 4 s"
+        );
+    }
+
+    /// Row 5's leg F-enrolled: Ann held on f22, Bea in her place on the same
+    /// id, scored 0.87, matching 0.6 twice within 4 s: Bea takes the name on
+    /// the second look whatever the two switches.
+    #[test]
+    fn a_real_swap_on_the_same_id_switches_on_two_looks_whatever_the_switches() {
+        let start = Instant::now();
+        for (follow, score_on) in [(false, false), (true, false), (false, true), (true, true)] {
+            let mut held = Held::new(true).sticky(true).follows_near(follow);
+            held.matched(start, Some("f22".to_owned()));
+            held.saw_near(Some("f22"), 300.0, 50.0);
+            let mut takeover = Takeover::default();
+            let mut look = |after| {
+                row5_check(
+                    &mut held,
+                    &mut takeover,
+                    start + after,
+                    "Ann",
+                    ("f22", 302.0, 50.0),
+                    0.87,
+                    Some(("Bea", 0.6)),
+                    0.2,
+                    false,
+                    score_on,
+                )
+            };
+            assert_eq!(
+                look(RECOGNISE_EVERY),
+                "Ann",
+                "{follow} {score_on}: one look"
+            );
+            assert_eq!(
+                look(RECOGNISE_EVERY * 2),
+                "Bea",
+                "{follow} {score_on}: two looks"
+            );
+        }
+    }
+
+    /// A T7 rematch of another enrolled person on the held face never counts
+    /// toward T4's two looks, whatever LAMP_FACE_TAKEOVER_SCORE; with it on,
+    /// a look under `TAKEOVER_SCORE` or with no score doesn't either.
+    #[test]
+    fn a_rematch_never_counts_as_a_takeover_look() {
+        assert_eq!(
+            takeover_uncounted(true, Some(0.95), false),
+            Some(Uncounted::Rematch)
+        );
+        assert_eq!(
+            takeover_uncounted(true, Some(0.95), true),
+            Some(Uncounted::Rematch)
+        );
+        assert_eq!(takeover_uncounted(false, Some(0.66), false), None);
+        assert_eq!(
+            takeover_uncounted(false, Some(0.66), true),
+            Some(Uncounted::Score)
+        );
+        assert_eq!(
+            takeover_uncounted(false, None, true),
+            Some(Uncounted::Score)
+        );
+        assert_eq!(takeover_uncounted(false, Some(TAKEOVER_SCORE), true), None);
+        let start = Instant::now();
+        let mut held = Held::new(true).sticky(true);
+        held.matched(start, Some("f3".to_owned()));
+        let mut takeover = Takeover::default();
+        for k in 1..=3 {
+            assert_eq!(
+                sticky_look(
+                    &held,
+                    &mut takeover,
+                    start + RECOGNISE_EVERY * k,
+                    Some("Ann"),
+                    Some(("Bea", 0.34)),
+                    Some(0.1),
+                    Some("f3"),
+                    Some(Uncounted::Rematch),
+                ),
+                StickyLook::NotALook(Uncounted::Rematch)
+            );
+        }
+        assert!(!takeover.pending(), "no first look started");
+    }
+
+    /// Leg 1b on lamp-06c1 (20 Nov): Ann held on f7, a partial cover, Bea
+    /// matched at 0.452 (a look blocked by the score bar) and so recent,
+    /// then a print at 0.356 to Bea: T7's lower bar does not take Bea while
+    /// Ann is held. Ann stays, on her id, and no first look is started.
+    #[test]
+    fn a_rematch_of_another_than_the_one_held_is_not_taken() {
+        let start = Instant::now();
+        let mut held = Held::new(true).sticky(true);
+        held.matched(start, Some("f7".to_owned()));
+        held.seen_theirs(start);
+        let mut recent = Recent::default();
+        recent.matched("Bea", start);
+        let now = start + Duration::from_secs(4);
+        let rematch = recent.rematch(now, |_| Some(0.356), Some(0.356));
+        assert_eq!(
+            held_rematch(rematch, Some("Ann")),
+            Some(Rematch::Refused(0.356))
+        );
+        // Not a match: nothing found, so no takeover look.
+        let mut takeover = Takeover::default();
+        assert_eq!(
+            sticky_look(
+                &held,
+                &mut takeover,
+                now,
+                Some("Ann"),
+                None,
+                Some(-0.019),
+                Some("f7"),
+                None,
+            ),
+            StickyLook::AsFound
+        );
+        assert!(!takeover.pending());
+        assert!(
+            held.keeps_print(now, Some(-0.019), Some("f7")),
+            "Ann stays on her id"
+        );
+        assert_eq!(
+            rematch_refused_told(0.356, true),
+            "lamp-eyes: matched again at 0.356 to another than the one held: not taken (sticky T7), the one held stays"
+        );
+        assert!(rematch_refused_told(0.356, false).ends_with("the hold lets go"));
+        assert!(!rematch_refused_told(0.356, true).contains("Bea"));
+    }
+
+    /// While Ann is held, a rematch at the lower bar of Ann herself is taken
+    /// as T7 does (any case of her name).
+    #[test]
+    fn a_rematch_of_the_one_held_is_taken() {
+        let start = Instant::now();
+        let mut recent = Recent::default();
+        recent.matched("Ann", start);
+        let soon = start + Duration::from_secs(60);
+        assert_eq!(
+            held_rematch(
+                recent.rematch(soon, |_| Some(0.32), Some(0.32)),
+                Some("Ann")
+            ),
+            Some(Rematch::Taken("Ann".to_owned(), 0.32))
+        );
+        assert_eq!(
+            held_rematch(
+                recent.rematch(soon, |_| Some(0.32), Some(0.32)),
+                Some("ann")
+            ),
+            Some(Rematch::Taken("Ann".to_owned(), 0.32))
+        );
+        assert_eq!(held_rematch(None, Some("Ann")), None);
+    }
+
+    /// With nobody held, T7 as before: 0.32 after a recent match of Bea
+    /// counts.
+    #[test]
+    fn with_nobody_held_a_rematch_is_taken_as_before() {
+        let start = Instant::now();
+        let mut recent = Recent::default();
+        recent.matched("Bea", start);
+        let soon = start + Duration::from_secs(60);
+        assert_eq!(
+            held_rematch(recent.rematch(soon, |_| Some(0.32), Some(0.32)), None),
+            Some(Rematch::Taken("Bea".to_owned(), 0.32))
+        );
+        assert_eq!(held_rematch(None, None), None);
+    }
+
+    /// While Ann is held, Bea on two clear looks at the real bar within 4 s
+    /// still takes the name (T4), with the score bar on: the held rule only
+    /// stops the lower bar.
+    #[test]
+    fn two_clear_looks_of_another_still_take_the_name_while_one_is_held() {
+        let start = Instant::now();
+        let mut held = Held::new(true).sticky(true);
+        held.matched(start, Some("f7".to_owned()));
+        held.seen_theirs(start);
+        let mut takeover = Takeover::default();
+        let mut look = |after| {
+            sticky_look(
+                &held,
+                &mut takeover,
+                start + after,
+                Some("Ann"),
+                Some(("Bea", SAME_PERSON)),
+                Some(0.1),
+                Some("f7"),
+                takeover_uncounted(false, Some(0.9), true),
+            )
+        };
+        assert_eq!(look(RECOGNISE_EVERY), StickyLook::KeepsHeld);
+        assert_eq!(
+            look(RECOGNISE_EVERY + Duration::from_secs(3)),
+            StickyLook::SecondLook
+        );
+    }
+
+    /// LAMP_FACE_FOLLOW_NEAR_NEW_ID follows a new id only near the held
+    /// face's last box, as the only near face, with the sitter not standing
+    /// up, within the sticky hold; off, never.
+    #[test]
+    fn a_new_id_follows_only_near_the_held_box_one_face_and_no_standing_up() {
+        let start = Instant::now();
+        let fresh = || {
+            let mut held = Held::new(true).sticky(true).follows_near(true);
+            held.matched(start, Some("f42".to_owned()));
+            held.saw_near(Some("f42"), 300.0, 90.0);
+            held
+        };
+        let at = start + Duration::from_secs(3);
+        assert!(fresh().follow_near(at, Some(("f43", 329.0, 90.0)), 1, true));
+        assert!(
+            !fresh().follow_near(at, Some(("f43", 331.0, 90.0)), 1, true),
+            "past a third of its width"
+        );
+        assert!(
+            !fresh().follow_near(at, Some(("f43", 305.0, 90.0)), 2, true),
+            "two near faces"
+        );
+        assert!(
+            !fresh().follow_near(at, Some(("f43", 305.0, 90.0)), 1, false),
+            "standing up"
+        );
+        assert!(
+            !fresh().follow_near(start + STICKY_HOLD, Some(("f43", 305.0, 90.0)), 1, true),
+            "past the sticky hold"
+        );
+        let mut off = Held::new(true).sticky(true);
+        off.matched(start, Some("f42".to_owned()));
+        off.saw_near(Some("f42"), 300.0, 90.0);
+        assert!(
+            !off.follow_near(at, Some(("f43", 305.0, 90.0)), 1, true),
+            "off"
+        );
+        let mut followed = fresh();
+        assert!(followed.follow_near(at, Some(("f43", 305.0, 90.0)), 1, true));
+        assert!(followed.on_held_face(Some("f43")));
+        followed.let_go();
+        assert!(
+            !followed.follow_near(at, Some(("f44", 305.0, 90.0)), 1, true),
+            "let go: no box"
+        );
+    }
+
+    /// The gap line says what the check did: "let go" when it let go,
+    /// "followed" on a new id that follows, "kept on its id" otherwise.
+    #[test]
+    fn the_gap_line_says_let_go_or_followed_truthfully() {
+        assert_eq!(gap_told(true, true, false, false, false), "same face");
+        assert_eq!(gap_told(false, false, false, false, false), "let go");
+        assert_eq!(gap_told(false, false, true, false, false), "let go");
+        assert_eq!(
+            gap_told(false, true, false, false, false),
+            "not read as theirs, kept on its id (sticky)"
+        );
+        assert!(gap_told(false, true, true, false, false).contains("followed"));
+        assert!(gap_told(false, true, false, false, true).contains("away from the one held"));
+    }
+
+    /// A check whose print matched someone says "matched", never "let go"
+    /// (1795163856.5 on lamp-06c1: a 0.726 match printed "let go").
+    #[test]
+    fn the_gap_line_says_matched_on_a_match() {
+        assert_eq!(gap_told(false, false, false, true, false), "matched");
+        assert_eq!(gap_told(false, false, true, true, false), "matched");
+        assert_eq!(gap_told(true, false, false, true, false), "same face");
+    }
+
+    fn held_on_f42_at(start: Instant) -> Held {
+        let mut held = Held::new(true).sticky(true).follows_near(true);
+        held.matched(start, Some("f42".to_owned()));
+        held.saw_near(Some("f42"), 300.0, 90.0);
+        held
+    }
+
+    /// Sticky T3: a new unknown id far from the held box keeps the name
+    /// without renewing the 30 s from the last sighting (`kept_at`).
+    #[test]
+    fn a_new_unknown_face_far_from_the_held_box_keeps_the_name_unrenewed() {
+        let start = Instant::now();
+        let mut held = held_on_f42_at(start);
+        let at = start + Duration::from_secs(10);
+        // Far across (x 80 px against the held 300 px, width 90).
+        assert!(held.keeps_away(at, false, Some(("f50", 80.0))));
+        assert!(
+            !held.keeps_print(at, None, Some("f50")),
+            "today's rule lets go"
+        );
+        // The caller renews nothing on it: the hold still ends 30 s from
+        // the match, not from this check.
+        assert_eq!(held.kept_at, Some(start));
+        assert!(!held.keeps_away(start + STICKY_HOLD, false, Some(("f50", 80.0))));
+        assert!(
+            held.away_told(80.0)
+                .contains("until 30 s from their last sighting")
+        );
+        held.let_go();
+        assert!(
+            !held.keeps_away(at, false, Some(("f50", 80.0))),
+            "let go: no box"
+        );
+    }
+
+    /// 30 s after the last sighting of the held face, a far unknown face
+    /// lets go, however often it was seen in between.
+    #[test]
+    fn a_far_unknown_face_lets_go_30_s_after_the_last_sighting() {
+        let start = Instant::now();
+        let held = held_on_f42_at(start);
+        for s in [5, 15, 25, 29] {
+            assert!(held.keeps_away(start + Duration::from_secs(s), false, Some(("f50", 80.0))));
+        }
+        assert!(!held.keeps_away(start + STICKY_HOLD, false, Some(("f50", 80.0))));
+        assert!(!held.keeps_face(start + STICKY_HOLD));
+    }
+
+    /// A new id within a third of the held box's width is not "away": it
+    /// follows (`follow_near`) or lets go, as before.
+    #[test]
+    fn a_new_unknown_face_near_the_held_box_follows_or_lets_go_as_before() {
+        let start = Instant::now();
+        let at = start + Duration::from_secs(3);
+        let held = held_on_f42_at(start);
+        assert!(!held.keeps_away(at, false, Some(("f43", 329.0))));
+        assert!(
+            !held.keeps_print(at, None, Some("f43")),
+            "unfollowed: lets go"
+        );
+        let mut followed = held_on_f42_at(start);
+        assert!(followed.follow_near(at, Some(("f43", 329.0, 90.0)), 1, true));
+        assert!(
+            followed.keeps_print(at, None, Some("f43")),
+            "followed: held"
+        );
+        assert!(
+            !followed.keeps_away(at, false, Some(("f43", 329.0))),
+            "on the held face"
+        );
+        // Their own id far across is theirs, not someone else's.
+        assert!(!held.keeps_away(at, false, Some(("f42", 80.0))));
+    }
+
+    /// A far new face whose print matches someone else is no "nobody":
+    /// `keeps_away` never holds on a match, and the look goes as today
+    /// (T4's `sticky_look`: on a new id, as found).
+    #[test]
+    fn a_far_new_face_matching_someone_goes_through_t4() {
+        let start = Instant::now();
+        let held = held_on_f42_at(start);
+        let at = start + Duration::from_secs(3);
+        assert!(!held.keeps_away(at, true, Some(("f50", 80.0))));
+        let mut takeover = Takeover::default();
+        assert_eq!(
+            sticky_look(
+                &held,
+                &mut takeover,
+                at,
+                Some("X"),
+                Some(("Y", 0.6)),
+                Some(0.2),
+                Some("f50"),
+                None
+            ),
+            StickyLook::AsFound
+        );
+    }
+
+    /// Sticky off: no new rule, a far new id lets go as before.
+    #[test]
+    fn sticky_off_a_far_new_face_is_unchanged() {
+        let start = Instant::now();
+        let mut held = Held::new(true).follows_near(true);
+        held.matched(start, Some("f42".to_owned()));
+        held.saw_near(Some("f42"), 300.0, 90.0);
+        let at = start + Duration::from_secs(1);
+        assert!(!held.keeps_away(at, false, Some(("f50", 80.0))));
+        assert!(!held.keeps_print(at, Some(0.9), Some("f50")));
     }
 }

@@ -3212,7 +3212,7 @@ When the coordinator switches (below):
     the forgotten name (`memory/tests/it/voice_name.rs`, #1722, 21 Oct
     15:28).
   - **Never told:** for the room's turn, another person's turn, or a face
-    gone, since the known file is fresh only 3 s. Nor for a line carried in
+    gone, since the known file is fresh only 4 s. Nor for a line carried in
     a person's conversation (`LAMP_CONVERSATION_CARRIES`): its scope is
     theirs, but no face was seen speaking it. A line narrowed to the room
     whose person's face was only alone in view is not named this way; the
@@ -3222,7 +3222,7 @@ When the coordinator switches (below):
     a turn is told by presence and nobody is named (Thirteen's P3 on #5325):
     the session's person, read from the known file, would name a face in
     view to a voice off camera (the reviewer-lead's P3 on #2559).
-  - **Right after `forget_my_face`,** a round within the known file's 3 s
+  - **Right after `forget_my_face`,** a round within the known file's 4 s
     can still carry the name, as on the Live route.
   - **The name switch, not to be confused:** `LAMP_SECOND_KNOWN_NAMES` is the
     speech to text's listening for names; this one tells the model the face's
@@ -5725,6 +5725,61 @@ after a take-over, but now for every turn:
     chain, so it keeps no conversation going and renews no call
     (`LAMP_BUSY_FOLLOW_UP_RENEWS`). After that the next line needs a look or
     the name, until a line with one is played.
+  - **Under a sure hearing, a face or the name in the words**
+    (`LAMP_NAME_FACE_OR_WORDS=on`, on in the product's lamp-voice.service,
+    #8136, from #8114's shapes 5-7). On lamp-74ff on 20 Nov (build 15146,
+    today's stable) two people talked Vietnamese with their backs to the
+    lamp. At 17:26:23 a seven-word line, lamp-name at 0.921 by 210 ms into
+    it, in a room the voice itself called busy with nobody turned to the
+    lamp, counted by `its hearing at the line's start` alone and was
+    answered (shape 5): the start is the same false hearing again. At
+    17:32:11 a hearing of 0.904 the faint floor turned away, in a request
+    speech to text gave no words, was owed the second look (`said to the
+    lamp by name and got nothing`, `crate::second_look`): the lamp spoke
+    unasked, and that opened the window the room's next lines were
+    answered in (shapes 6 and 7). The first builder's two rules at 17:36 on
+    #8114, under one switch:
+    - **A hearing under `attention::SURE_SCORE` (0.999)**, only in the
+      room's sound, counts only with a face turned to the lamp or the
+      line's words calling it (`attention::called`, or `called_by_name`
+      with `LAMP_NAME_IN_PASSING=ignored`), busy room or not; its place at
+      the line's start, closeness, said from close and a conversation going
+      on count for nothing alone (`Attention::need_a_face_or_words`, in
+      `weigh_the_name`). The journal says `its name, heard only in the
+      room's sound under a sure hearing (began N ms into the line), counts
+      for nothing: no face is turned to the lamp and its words don't call
+      it; its start or closeness is not enough; the model is not told it
+      was heard (LAMP_NAME_FACE_OR_WORDS, #8136)`. A sure hearing is
+      weighed as before. Known cost: a real call heard under 0.999 whose
+      words speech to text didn't write as the name, with no face turned,
+      is not answered.
+    - **A hearing the faint floor turned away, in a request with no
+      words**, owes no second look (`SecondLook::holding_a_faint_wordless_call`):
+      the coordinator marks a hearing over speech blocks the floor turned
+      away (`FaintNamed::turned_away`, the hearing `the faint floor turned
+      the line away` names), and a request whose transcript had no word
+      (`words_heard`) owes nothing for it. The journal says `request N: its
+      name was heard (score S) where the faint floor turned the line away,
+      and no words came: the lamp says nothing and opens no window
+      (LAMP_NAME_FACE_OR_WORDS, #8136)`. A request with words, and a
+      hearing the floor let by, are as before.
+    - **A dropped hearing still told** (a regression from #8093, gate 1111
+      on lamp-52e6, build 15164, request 19: "Hey Lamp, make the light
+      blue." heard at 1.00 by the line's start, its first word written as
+      one unlike the name, ruled `not the name (LAMP_NAME_NEAR)`, played as
+      `the text shows it was called`, and the model, never told the name,
+      called `not_for_me`): a hearing `weigh_the_name` drops is still told
+      to the model (`Attention::name_note_kept`, then the name note as
+      ever, `Heeding::note_the_name`) when the verdict's own text check
+      calls the lamp (`called_in_text`); a sure hearing at the line's start
+      with words that don't call the lamp is not told (that is #8119's,
+      with its room and face rule). The journal says `its words call the
+      lamp: the model is still told its name was heard
+      (LAMP_NAME_FACE_OR_WORDS, #8136)`. It changes no verdict.
+    Not in it: the wordless cut-in calling a room with two voices "a quiet
+    room" (`LAMP_CUT_IN_WORDLESS_RESUMES`, shape 7's second half), and a
+    short line standing in a conversation's window by a hearing under the
+    sure score (`said_to_me`'s `named`).
 - **A hearing of the name stays with its own line**
   (`LAMP_NAME_STAYS_IN_ITS_LINE=on`, on in the product unit). On lamp-4ace on
   2026-10-26 at 06:21 (build 6919, the busy scene played) `lamp-name` heard
@@ -6398,7 +6453,12 @@ name is also taken out of the lamp's own earlier lines the reply is given
 (its "You:" lines in the thread and its side of each exchange; the
 person's words are theirs), said as "(their name)", and the reply is told
 that marks a name held back, never to be said (`person::without_name`,
-`person::HELD_BACK_NOTE`). Taken are the whole name, its words in order,
+`person::HELD_BACK_NOTE`). Asked who they are, it says it can't see their
+face well enough to be sure who it is right now, never that it doesn't
+know their name, asks for no name and no face, and says a name only if
+they tell it now: on lamp-74ff (19 Nov) it said "I don't know your name
+yet" while only holding a known name back (the sticky plan's owner on
+#7933, 20 Nov). Taken are the whole name, its words in order,
 NFC and case aside, for a name of more words, and one word of it alone only
 as written in the name, capitalised the same, where it can't be a
 sentence's own first word, so "I will" and "Will it rain?" stay for an
@@ -6424,7 +6484,8 @@ last 10 s holds the name back (`a face not at the desk seen speaking`,
 the one screen face read as two). The face the eyes know is read from their
 known file while it is at most 8 s old (`known_faces::known_lately`): the
 eyes rewrite it at each check, every 2–3 s, and remove it as soon as the
-near face matches nobody, so the 3 s read of `known_now` took a file still
+near face matches nobody, so `known_now`'s read, then 3 s (4 s,
+`lamp_msgs::known::FRESH`, since #7146), took a file still
 there for nobody (16:49, "an unknown face in view" with the file present;
 #4118). On lamp-29e7 on 8545 (29 Oct) the owner,
 4.5 minutes after setup, asked "can you remember my name?" and was told
@@ -8657,4 +8718,4 @@ return, and the latency targets, which lamp-52e6 did not meet (above).
 
 A final line, heard clear of the lamp's voice and not let in only as the conversation going on (`CONVERSATION_ALONE`; the caller's own `FOLLOW_UP_NOTE` follow-up counts), and not while the lamp waits on an answer (a task read back, a write or skill say-back, a held forget or rename) or another person's cut words are kept for it, that **is** a trigger of a running app (the manifest's `triggers`, which lamp-control keeps on `apps/triggers`) is told to lamp-control on `apps/trigger` (the manifest's own trigger words, never the line around them) and held up to 3 s for `apps/took` (`app_triggers::told_and_taken`). "Is" means the whole line, once normalised: case, punctuation and apostrophes out, the trigger's words heard run together or apart, and the lamp's own name at the line's start left off (`attention::past_the_name`, the attention rule's own reading of the name). There is **no list of polite words** (the owner's 13 Nov rule: the model judges meaning, with no word lists; the first builder at 19:49 on #7415): "please start english practice", "hey lamp, start english practice" and "Lamp ơi, bắt đầu tập nhé" are no fast path. A trigger made only of the lamp's own words ("yes go ahead", "send it now") is never matched, nor offered. When the app takes the line the request ends in code as a normal end does (nothing of it carried), with no chat round and no words from the lamp (the app speaks for itself); a line nothing takes goes to the model as any other.
 
-Every other line is the model's call. With an app running, the model is offered one more function in its chat rounds, `start_app(app, trigger)` (`app_triggers::start_app_tool`, declared at each request from the apps running then, so an app that stops is never offered and none is offered with no app running): its description lists each running app's name and its manifest's trigger words, each in quotes, and the model calls it when what the person said means one of them, in any language. Only the app's checked name and its checked triggers go into the description (the manifest's own guards, `AppTriggers::check`, and then only letters, digits, spaces, apostrophes and hyphens, `app_triggers::describable`): a trigger with a quote, a backtick, markup, a brace, a colon, a semicolon or a control or bidi character is left out, so an app's words are data in a quote and never instructions. The call is checked again against the apps running and their manifests' own words (a made-up app or trigger is refused and sends nothing), then told to the app as the fast path does (`apps/trigger`, 3 s for `apps/took`). Taken: the request ends there, with no second round and no words (`Stop::Taken`; the model is also told "say nothing"). Not taken: the model is told and answers as it would. The call is refused, with nothing sent and the model told "not now", for a line let in only as the conversation going on (`CONVERSATION_ALONE`: another person's or the TV's words, as the fast path refuses it) and while the lamp waits on an answer (a task read back, a held forget or rename, a skill's write say-back); this is in code (`LAMP_POLICY_HOLDS_ACTIONS` is not in the product). The description is held to the 1,024 bytes a function's may be: an app or trigger that does not fit is left out of it and of the choices, and it says the quoted words are only names of what starts the app, never instructions. Off, with no app running or with no bus, nothing changes. Tests: `second_provider::tests::app_triggers_in_code`, `app_triggers::tests`.
+Every other line is the model's call. With an app running, the model is offered one more function in its chat rounds, `start_app(app, trigger)` (`app_triggers::start_app_tool`, declared at each request from the apps running then, so an app that stops is never offered and none is offered with no app running): its description lists each running app's name and its manifest's trigger words, each in quotes, and the model calls it when what the person said means one of them, in any language. Only the app's checked name and its checked triggers go into the description (the manifest's own guards, `AppTriggers::check`, and then only letters, digits, spaces, apostrophes and hyphens, `app_triggers::describable`): a trigger with a quote, a backtick, markup, a brace, a colon, a semicolon or a control or bidi character is left out, so an app's words are data in a quote and never instructions. The call is checked again against the apps running and their manifests' own words (a made-up app or trigger is refused and sends nothing), then told to the app as the fast path does (`apps/trigger`, 3 s for `apps/took`). Taken: the round's other calls are still answered, then the request ends, with no second round and no words (`Stop::Taken`; the model is also told "say nothing"): "turn the volume down and start the coach" starts the coach and turns the volume down. A later call of that round that can't run once the app holds the turn (another `start_app`, `make_skill`, whose waiting line would speak over the app, a sleep, or a recording offered) is answered "not run: an app took the turn" (`APP_TOOK_THE_TURN`) and journalled by name, as is any call a forget after the start leaves unreached; none is dropped without a word. Not taken: the model is told and answers as it would. The call is refused, with nothing sent and the model told "not now", for a line let in only as the conversation going on (`CONVERSATION_ALONE`: another person's or the TV's words, as the fast path refuses it) and while the lamp waits on an answer (a task read back, a held forget or rename, a skill's write say-back); this is in code (`LAMP_POLICY_HOLDS_ACTIONS` is not in the product). The description is held to the 1,024 bytes a function's may be: an app or trigger that does not fit is left out of it and of the choices, and it says the quoted words are only names of what starts the app, never instructions. Off, with no app running or with no bus, nothing changes. Tests: `second_provider::tests::app_triggers_in_code`, `app_triggers::tests`.

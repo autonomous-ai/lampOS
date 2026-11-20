@@ -471,6 +471,31 @@ pub const SCOPED_CONTEXT_ENVIRONMENT: &str = "LAMP_SECOND_SCOPED_CONTEXT";
 /// again only when the person changes or the worker restarts.
 pub const REOPEN_QUIET_ENVIRONMENT: &str = "LAMP_MEMORY_REOPEN_QUIET";
 
+/// The sticky plan's T9 (Friday's P2 on #7933): a carried line read as its
+/// person's (`LAMP_CONVERSATION_CARRIED_MEMORY`) is journalled in their
+/// record. `on` only; off, kept out as before. Its own switch, switched on
+/// on its own evidence (T0's counts).
+pub const CARRIED_JOURNAL_ENVIRONMENT: &str = "LAMP_CARRIED_JOURNAL";
+
+/// Whether the service's environment says `LAMP_CARRIED_JOURNAL=on`, read
+/// once.
+pub fn carried_journal_on() -> bool {
+    static ON: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
+    *ON.get_or_init(|| std::env::var(CARRIED_JOURNAL_ENVIRONMENT).ok().as_deref() == Some("on"))
+}
+
+/// Carried lines journalled as their person's since the worker started
+/// ([`keep_out_scoped`]), for the journal's count.
+static CARRIED_JOURNALLED: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+
+/// The journal's line for a carried line journalled as its person's: the
+/// request and the count so far, no words and no name.
+pub(crate) fn carried_journalled_line(request: u64, count: u64) -> String {
+    format!(
+        "lamp-voice second: request {request}: a carried line read as its person's is journalled in their record ({count} so far, LAMP_CARRIED_JOURNAL)"
+    )
+}
+
 /// Whether the service's environment says `LAMP_SECOND_SCOPED_CONTEXT=on`.
 pub fn scoped_context_from_environment() -> bool {
     std::env::var(SCOPED_CONTEXT_ENVIRONMENT).ok().as_deref() == Some("on")
@@ -2970,23 +2995,35 @@ pub fn serve(
     // face in view keeps its memory scope (#2176 row 5b).
     // The eyes' faces in view, read beside the known file for that hold;
     // without them nothing can be held, so the hold is off.
-    let faces_bus = crate::memory_scope::gap_from_environment()
+    // With `LAMP_FACE_STICKY` too: a name the eyes hold is read for memory
+    // only with a face in view, so the faces are needed for it.
+    let sticky = crate::known_faces::sticky_on();
+    let faces_bus = (crate::memory_scope::gap_from_environment().is_some() || sticky)
+        .then_some(())
         .and(files.bus_root.clone())
         .and_then(|root| lamp_bus::Bus::new(root).ok())
         .map(Arc::new);
     let face_gap = faces_bus
         .as_ref()
         .and(crate::memory_scope::gap_from_environment());
-    match (crate::memory_scope::gap_from_environment(), &faces_bus) {
+    match (face_gap, &faces_bus) {
+        (Some(gap), Some(_)) if gap == crate::memory_scope::Gap::no_face() => eprintln!(
+            "lamp-voice second: a known face lost with no face in view keeps the conversation's person, told from the conversation only, for up to 30 s with no face and 2 min with nothing said (LAMP_FACE_NO_FACE_HOLD)"
+        ),
         (Some(_), Some(_)) => eprintln!(
             "lamp-voice second: a known face lost for a few seconds, with no face in view and while the lamp answers them, keeps its memory scope (LAMP_FACE_GAP_HOLD)"
         ),
-        (Some(_), None) => eprintln!(
-            "lamp-voice second: LAMP_FACE_GAP_HOLD is on but there is no bus to read the eyes' faces from, so no face is held"
+        (None, None) if crate::memory_scope::gap_from_environment().is_some() => eprintln!(
+            "lamp-voice second: LAMP_FACE_GAP_HOLD or LAMP_FACE_NO_FACE_HOLD is on but there is no bus to read the eyes' faces from, so no face is held"
         ),
         _ => {}
     }
-    let face_cache = Arc::new(crate::memory_scope::FaceCache::holding_gaps(face_gap));
+    if sticky {
+        eprintln!(
+            "lamp-voice second: a name the eyes hold, not match, is read and kept as theirs with a face in view, with no forget, correction, rule or yes (LAMP_FACE_STICKY)"
+        );
+    }
+    let face_cache = Arc::new(crate::memory_scope::FaceCache::holding(face_gap));
     // Cold from the voice's start (#2807): a room's line looks later for
     // its keeper until a face is named or `COLD_FOR` passes.
     face_cache.went_cold(Instant::now());
@@ -3280,8 +3317,20 @@ pub fn serve(
                     let name = name.as_str();
                     let faces = bus
                         .as_ref()
-                        .and_then(|_| crate::known_faces::most_faces_lately());
-                    let known_now = who.as_deref().and_then(crate::known_faces::known_lately);
+                        // With LAMP_FACE_STICKY, near faces only: a tiny
+                        // face far behind is no one at the lamp.
+                        .and_then(|_| {
+                            crate::known_faces::faces_for_name(crate::known_faces::sticky_on())
+                        });
+                    // A name the eyes hold, not match, is never the owner
+                    // present (`LAMP_FACE_STICKY`, the sticky plan's rule).
+                    let known_now = who
+                        .as_deref()
+                        .filter(|path| {
+                            !(crate::known_faces::sticky_on()
+                                && crate::known_faces::held_mark(path))
+                        })
+                        .and_then(crate::known_faces::known_lately);
                     let another = another_voice_told.load(std::sync::atomic::Ordering::Acquire);
                     // A face not at the desk seen speaking: a far guest who
                     // is the only voice (`LAMP_FACES_AT_DESK_ONLY`).
@@ -3941,7 +3990,13 @@ pub fn serve(
                 "lamp-voice second: a line no face was seen speaking carries on the face last named as them while the same unbroken track is alone in view, the eyes no longer naming it (LAMP_CONVERSATION_CARRIES_OWN_TRACK)"
             );
             engine = engine.carrying_own_track(true);
+            if crate::known_faces::sticky_on() {
+                eprintln!(
+                    "lamp-voice second: LAMP_CONVERSATION_CARRIES_OWN_TRACK is inert while LAMP_FACE_STICKY holds the name"
+                );
+            }
         }
+        engine = engine.holding_sticky(crate::known_faces::sticky_on());
     }
     // Where the eyes read speaking (`LAMP_EYES_SPEAKING=on`, #2377): a held
     // forget's yes counts only from the held person's face seen saying it.
@@ -5018,6 +5073,20 @@ pub fn serve(
                 heeding.attention.tie_the_second_sign(true);
             }
         }
+        // Under a sure hearing, a face or the name in the words
+        // (`LAMP_NAME_FACE_OR_WORDS=on`, #8136): the line's start, closeness
+        // and a conversation going on no longer count alone.
+        if std::env::var(crate::second_provider::NAME_FACE_OR_WORDS_ENVIRONMENT)
+            .is_ok_and(|value| value == "on")
+        {
+            eprintln!(
+                "lamp-voice second: a hearing of the lamp's name only in the room's sound under {} counts only with a face turned to the lamp or its words calling it, busy room or not (LAMP_NAME_FACE_OR_WORDS)",
+                crate::attention::SURE_SCORE
+            );
+            if let Ok(mut heeding) = heeding.lock() {
+                heeding.attention.need_a_face_or_words(true);
+            }
+        }
         // A hearing at the line's start is no second sign of its own on a
         // line said to a person ("Ma'am, …"), and a conversation going on
         // gives back only that start (`LAMP_NAME_SAID_TO_A_PERSON=on`, #3945).
@@ -5990,17 +6059,24 @@ pub fn serve(
                     let read = tokio::task::spawn_blocking(move || {
                         // An unsure hold's name moved aside is still the
                         // one known to this cache (#5738).
+                        // The eyes' held mark beside the known file, read
+                        // before the name so a match's write never reads as
+                        // held after it (`LAMP_FACE_STICKY`); and whether a
+                        // file is there at all, for why a line is the room's.
+                        let held = sticky && crate::known_faces::held_mark(&path);
                         let path = crate::speaking_faces::known_or_held(&path);
+                        let there = path.exists();
                         let mark = crate::known_faces::KnownMark::read(&path);
                         let at = Instant::now();
                         (
                             (mark, at),
                             crate::known_faces::FaceObservation::read(&path),
                             bus.as_deref().and_then(crate::known_faces::faces_in_view),
+                            (held, there),
                         )
                     })
                     .await;
-                    let Ok(((mark, at), observation, in_view)) = read else {
+                    let Ok(((mark, at), observation, in_view, (held, there))) = read else {
                         face_cache.replace_seen(token, None, None);
                         continue;
                     };
@@ -6009,7 +6085,8 @@ pub fn serve(
                             "lamp-voice second: the eyes' known file changed: the face cache is cold"
                         );
                     }
-                    face_cache.replace_seen(token, observation, in_view);
+                    face_cache.known_file_there(there);
+                    face_cache.replace_marked(token, observation, in_view, held);
                 }
             })
         });
@@ -12149,6 +12226,11 @@ impl Heeding {
                     "lamp-voice second: request {request}: its name, heard only in the room's sound (began {} ms into the line{soft_lead}), counts for nothing: LAMP_NAME_NEAR ruled the line not the name, or its one word, with no face turned, doesn't sound like the name, and that verdict wins over every second sign; the model is not told it was heard (LAMP_NAME_SIGN_TIED, #8092)",
                     name_into_ms.map_or_else(|| "?".to_owned(), |ms| ms.to_string())
                 );
+            } else if self.attention.name_dropped_as_unsure() {
+                eprintln!(
+                    "lamp-voice second: request {request}: its name, heard only in the room's sound under a sure hearing (began {} ms into the line{soft_lead}), counts for nothing: no face is turned to the lamp and its words don't call it; its start or closeness is not enough; the model is not told it was heard (LAMP_NAME_FACE_OR_WORDS, #8136)",
+                    name_into_ms.map_or_else(|| "?".to_owned(), |ms| ms.to_string())
+                );
             } else if self.attention.name_dropped_as_short() {
                 eprintln!(
                     "lamp-voice second: request {request}: its name, heard only in the room's sound (began {} ms into the line{soft_lead}), counts for nothing on a line of one or two words, not a question, with no word written for the name and no conversation going on; the model is not told it was heard (LAMP_NAME_SECOND_SIGN, #7891)",
@@ -12165,8 +12247,16 @@ impl Heeding {
                     name_into_ms.map_or_else(|| "?".to_owned(), |ms| ms.to_string())
                 );
             }
-            // The name note goes with the name (`heed_signs`).
-            self.noted = Some((request, None));
+            // The name note goes with the name (`heed_signs`), but for a
+            // line whose words call the lamp (`LAMP_NAME_FACE_OR_WORDS`,
+            // #8136).
+            if self.attention.name_note_kept() {
+                eprintln!(
+                    "lamp-voice second: request {request}: its words call the lamp: the model is still told its name was heard (LAMP_NAME_FACE_OR_WORDS, #8136)"
+                );
+            } else {
+                self.noted = Some((request, None));
+            }
         } else {
             // Which second sign let the name count, never the words (#3945:
             // a "Ma'am, …" line let out with nothing saying why).
@@ -14975,6 +15065,31 @@ pub(crate) fn keep_admitted(event: &ProviderOutput, lease: &crate::memory_scope:
     keep_scoped(event, None, Some(lease), None)
 }
 
+/// Keeps a line's exchange out of the journal for its admitted scope
+/// (`lease`): a held one (`LAMP_FACE_GAP_HOLD`, `LAMP_FACE_NO_FACE_HOLD`, a
+/// carry), or a carried one read as its person's. With `journal`
+/// (`LAMP_CARRIED_JOURNAL`, the sticky plan's T9), a carried line read as its
+/// person's is journalled in their record: it was carried only with their
+/// own face the one face in view through it and no other voice
+/// (`SpeakingFaces::one_face_in_view`, `LAMP_CONVERSATION_CARRIED_MEMORY`),
+/// so a face was seen. Still no forget, correction, rule or yes runs on it,
+/// and it is never summarised. Whether it was kept out.
+pub(crate) fn keep_out_scoped(lease: &crate::memory_scope::ScopeLease, journal: bool) -> bool {
+    let held = lease
+        .scope()
+        .is_some_and(crate::memory_scope::ScopeSnapshot::held);
+    let carried = lease.reads_carried();
+    if held || (carried && !journal) {
+        crate::remember::held_by_gap(lease.key().request);
+        return true;
+    }
+    if carried {
+        let count = CARRIED_JOURNALLED.fetch_add(1, std::sync::atomic::Ordering::Relaxed) + 1;
+        eprintln!("{}", carried_journalled_line(lease.key().request, count));
+    }
+    false
+}
+
 /// [`keep`] for a request's admitted scope (`lease`). With `held`
 /// (`LAMP_SAID_AS_HEARD`), an answer's hand-on to memory at its turn's end is
 /// held until it is known how much of it was heard.
@@ -14997,14 +15112,10 @@ fn keep_scoped(
     // keep their own face is seen saying yes to is written (the first
     // builder's call on #4508).
     // A carried line read as its person's (`LAMP_CONVERSATION_CARRIED_MEMORY`)
-    // is kept out too: its keep is written, its exchange never journalled.
-    if let Some(lease) = lease
-        && (lease
-            .scope()
-            .is_some_and(crate::memory_scope::ScopeSnapshot::held)
-            || lease.reads_carried())
-    {
-        crate::remember::held_by_gap(lease.key().request);
+    // is kept out too: its keep is written, its exchange never journalled,
+    // but with `LAMP_CARRIED_JOURNAL` ([`keep_out_scoped`]).
+    if let Some(lease) = lease {
+        keep_out_scoped(lease, carried_journal_on());
     }
     // A carried line keeps its person's memory conversation going, never
     // journalled (`LAMP_CARRIED_LINES_KEEP_TALK`).
@@ -28428,6 +28539,48 @@ mod tests {
         assert!(judged(true, 25_000_000, 0.93, false).is_some(), "unsure");
         assert!(judged(true, 25_000_000, 0.97, true).is_some(), "ruled");
         assert_eq!(judged(false, 25_000_000, 0.97, true), None, "ruled, off");
+    }
+
+    /// A regression from #8093, seen at gate 1111 (lamp-52e6, build 15164,
+    /// request 19, the clip "Hey Lamp, make the light blue."; the journal's
+    /// fixed lines, no words kept): 6 words in the window, 0 looks,
+    /// lamp-name near at 1.00 by the line's start, its first word, set off,
+    /// written as one that doesn't sound like the name, so `LAMP_NAME_NEAR`
+    /// ruled the line not the name and `LAMP_NAME_SIGN_TIED` dropped its
+    /// hearing; the line was played as "the text shows it was called", but
+    /// the model was not told the lamp's name was heard and called
+    /// `not_for_me`. With `LAMP_NAME_FACE_OR_WORDS=on` (#8136) the model is
+    /// still told when the line's words call the lamp; a hearing on words
+    /// that don't call it is not told, sure at the start or not (a sure
+    /// start alone is #8119's, with its room and face rule). Off, as on
+    /// 15164.
+    #[test]
+    fn a_line_its_words_call_is_told_the_name_whatever_name_near_ruled() {
+        use crate::room_told::Room;
+        let line = (10_000_000, 12_690_000);
+        let noted = |on: bool, heard: &str, score: f32| {
+            let mut heeding = room_name_heeding(true);
+            heeding.telling_the_name(true, false);
+            heeding.attention.tie_the_second_sign(true);
+            heeding.attention.need_a_face_or_words(on);
+            heeding.attention.near_not_the_name(19);
+            let names = vec![(line.0 + 891_000, score)];
+            heeding.heed_signs(
+                19,
+                line,
+                heard,
+                room_name_signs(Room::Quiet, true, None, false, names),
+            );
+            heeding.name_note_for(19)
+        };
+        let told = Some(crate::called::note(false));
+        let call = "Hey Man, make the light blue.";
+        assert_eq!(noted(true, call, 1.0), told, "request 19");
+        assert_eq!(noted(true, call, 0.95), told, "its words, unsure");
+        let plain = "Yes, make the light blue.";
+        assert_eq!(noted(true, plain, 1.0), None, "sure at the start, no call");
+        assert_eq!(noted(true, plain, 0.95), None, "unsure, no call");
+        assert_eq!(noted(false, call, 1.0), None, "off, as on 15164");
     }
 
     /// #4226, `LAMP_NAME_START_USUAL=on`: a line whose sound began 0.3 s

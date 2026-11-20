@@ -135,6 +135,7 @@ struct Fake {
     /// How many skills [`reset::remove_installed_skills`] removed in the
     /// product's skills folder, which a test can't reach.
     installed: usize,
+    apps: usize,
     /// How many of Hermes's and OpenClaw's per-person files
     /// [`reset::forget_agents`] removed in the lamp's folders.
     agents: usize,
@@ -241,6 +242,10 @@ impl Effects for Fake {
         self.calls.borrow_mut().push("skills".into());
         Ok(self.installed)
     }
+    fn remove_installed_apps(&mut self) -> io::Result<usize> {
+        self.calls.borrow_mut().push("apps".into());
+        Ok(self.apps)
+    }
     fn forget_agents(&mut self) -> io::Result<usize> {
         self.calls.borrow_mut().push("agents".into());
         Ok(self.agents)
@@ -315,6 +320,7 @@ fn a_reset_stops_wipes_removes_the_marker_and_reboots_in_that_order() {
             "list-units",
             "stop",
             "skills",
+            "apps",
             "agents",
             "sync",
             "sync",
@@ -784,7 +790,7 @@ fn a_failed_stop_reboots_at_once_into_setup_which_finishes_the_wipe() {
     assert!(!steps.contains(&Step::Rebooting));
     assert_eq!(
         *start.calls.borrow(),
-        ["list-units", "skills", "agents", "sync", "sync"]
+        ["list-units", "skills", "apps", "agents", "sync", "sync"]
     );
     // Nothing left to finish.
     assert!(
@@ -1163,7 +1169,26 @@ fn a_reset_takes_harness_sign_in_and_pairings_and_keeps_harness_itself() {
 /// beside #4542: `/var/lib/lampOS/skills-dev` on #4514).
 #[test]
 fn every_product_data_folder_is_wiped_by_the_reset_or_kept_for_a_reason() {
-    const KEPT: [(&str, &str); 6] = [
+    const KEPT: [(&str, &str); 10] = [
+        // The Store apps (#7415, piece C): nothing is installed while
+        // LAMP_STORE_APPS is off, which it is in the product. The wipe of
+        // every app's code, data and marks is the apps' own piece 8 (the
+        // reset plan's Migrate), owed before the switch goes on anywhere
+        // but a test lamp. `/opt/lampOS/apps` (the apps' code, root's) is
+        // no tmpfiles line any more (#7920: `lamp-apps-manage folders`, run by
+        // lamp-apps-folders.service, makes it and the two `/var/lib` folders
+        // below), so this scan does not see it: piece 8 names it in the plan.
+        // `/var/lib/lampos-apps-staging` is named by lamp-cloud's unit (its ReadWritePaths, #7956), so it is kept
+        (
+            "/var/lib/lampos-apps-staging",
+            "staged packages, off: piece 8",
+        ),
+        ("/var/lib/lampapp-", "app data, off: piece 8"),
+        ("/var/lib/lampapp-%i", "app data, off: piece 8"),
+        (
+            "/var/lib/lampos-apps-state",
+            "the apps' marks, off: piece 8",
+        ),
         // The factory's self-test record, kept on purpose (install.md).
         ("/var/lib/lamp-selftest", "the self-test's runs"),
         // Each servo's highest load and temperature a day (#4501,
@@ -2678,6 +2703,123 @@ fn the_reset_removes_installed_skills_after_the_plans_wipes_by_no_name() {
     assert!(!steps.contains(&Step::InstalledSkillsRemoved));
 }
 
+/// #7956 (App Only's and Heron's HOLD at e05bc64ce2, 20 Nov): "forget everything" leaves no Store app of the previous
+/// owner for the next. The app units are stopped by the barrier (`WRITERS`), the apps' step runs after the plan's
+/// wipes and the skills' step, before the marker and the journal go, and says once, by no name, that it removed some.
+#[test]
+fn the_reset_removes_the_stores_apps_after_the_plans_wipes_by_no_name() {
+    assert!(reset::WRITERS.contains(&"lamp-app@*.service"));
+    assert!(reset::WRITERS.contains(&"lamp-app-net@*.service"));
+    let root = Root::new();
+    let plan = lamp(&root);
+    let mut fake = Fake {
+        apps: 3,
+        installed: 1,
+        ..Fake::default()
+    };
+    let steps = reset::reset(&plan, &mut fake).unwrap();
+    wiped(&root);
+    let at = steps
+        .iter()
+        .position(|step| *step == Step::InstalledAppsRemoved)
+        .expect("the apps removed said");
+    let skills = steps
+        .iter()
+        .position(|step| *step == Step::InstalledSkillsRemoved)
+        .unwrap();
+    assert!(skills < at, "after the skills' step");
+    assert!(
+        steps[..at]
+            .iter()
+            .filter(|step| matches!(step, Step::Wiped(_)))
+            .count()
+            == plan.wipe.len()
+    );
+    assert!(
+        steps[at..].contains(&Step::JournalRemoved),
+        "before the journal goes"
+    );
+    assert_eq!(
+        serde_json::to_value(&steps[at]).unwrap(),
+        serde_json::json!({"step": "installed_apps_removed"})
+    );
+    let root = Root::new();
+    let plan = lamp(&root);
+    let steps = reset::reset(&plan, &mut Fake::default()).unwrap();
+    assert!(!steps.contains(&Step::InstalledAppsRemoved));
+}
+
+/// An installed app and everything it left on a lamp, then the reset's removal: none of its code, its dynamic user's
+/// data and the link to it, its marks or a staged package is left, the folders the units name stay, and what is
+/// not an app's (the other folders of `/var/lib`, `/var/lib/private`, another part's state) is untouched.
+#[test]
+fn the_apps_removal_leaves_no_app_code_data_mark_or_staged_package_and_nothing_else() {
+    let root = Root::new();
+    let at = |path: &str| root.0.join(path);
+    for dir in [
+        "opt/lampOS/apps/english-practice/1.0.0/src",
+        "opt/lampOS/apps/lamp-learn/0.3.7",
+        "var/lib/private/lampapp-english-practice/notes",
+        "var/lib/private/systemd-timesync",
+        "var/lib/lampos-apps-staging/stage-1",
+        "var/lib/lampos-update",
+    ] {
+        fs::create_dir_all(at(dir)).unwrap();
+    }
+    fs::write(
+        at("opt/lampOS/apps/english-practice/1.0.0/src/main.py"),
+        "x",
+    )
+    .unwrap();
+    fs::write(at("opt/lampOS/apps/.run.py"), "launcher").unwrap();
+    fs::create_dir_all(at("var/lib/lampos-apps-state")).unwrap();
+    for mark in ["english-practice.stopped", "lamp-learn.removing"] {
+        fs::write(at("var/lib/lampos-apps-state").join(mark), "").unwrap();
+    }
+    fs::write(
+        at("var/lib/private/lampapp-english-practice/notes/n"),
+        "the owner's",
+    )
+    .unwrap();
+    std::os::unix::fs::symlink(
+        at("var/lib/private/lampapp-english-practice"),
+        at("var/lib/lampapp-english-practice"),
+    )
+    .unwrap();
+    fs::write(at("var/lib/lampos-update/state.json"), "{}").unwrap();
+    let removed = reset::remove_installed_apps(&root.0).unwrap();
+    assert!(!removed.is_empty());
+    for gone in [
+        "opt/lampOS/apps/english-practice",
+        "opt/lampOS/apps/lamp-learn",
+        "opt/lampOS/apps/.run.py",
+        "var/lib/private/lampapp-english-practice",
+        "var/lib/lampapp-english-practice",
+        "var/lib/lampos-apps-state/english-practice.stopped",
+        "var/lib/lampos-apps-state/lamp-learn.removing",
+        "var/lib/lampos-apps-staging/stage-1",
+    ] {
+        assert!(fs::symlink_metadata(at(gone)).is_err(), "{gone} is left");
+    }
+    for kept in [
+        "opt/lampOS/apps",
+        "var/lib/lampos-apps-state",
+        "var/lib/lampos-apps-staging",
+        "var/lib/private/systemd-timesync",
+        "var/lib/lampos-update/state.json",
+    ] {
+        assert!(fs::symlink_metadata(at(kept)).is_ok(), "{kept} must stay");
+    }
+    // Run again, and on a lamp with no apps at all: nothing to remove, no error.
+    assert!(reset::remove_installed_apps(&root.0).unwrap().is_empty());
+    assert!(
+        reset::remove_installed_apps(&Root::new().0)
+            .unwrap()
+            .is_empty()
+    );
+    assert!(reset::remove_installed_apps(Path::new("relative")).is_err());
+}
+
 /// The package install and reset removal together: Desk tutor put on from
 /// its package, as the Store and a made skill are, is removed, and
 /// Onboarding, which comes with the lamp as a folder, stays and still loads.
@@ -3337,7 +3479,15 @@ fn a_resumed_reset_stops_the_openclaw_gateway_before_finishing() {
     );
     assert_eq!(
         *fake.calls.borrow(),
-        ["list-units", "stop", "skills", "agents", "sync", "sync"]
+        [
+            "list-units",
+            "stop",
+            "skills",
+            "apps",
+            "agents",
+            "sync",
+            "sync"
+        ]
     );
     assert!(reset::WRITERS.contains(&reset::OPENCLAW_GATEWAY));
 }
@@ -3493,6 +3643,7 @@ fn a_resumed_reset_stops_the_agents_user_manager_and_starts_it_after() {
             "list-units",
             "stop",
             "skills",
+            "apps",
             "agents",
             "sync",
             "sync",

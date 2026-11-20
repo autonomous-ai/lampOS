@@ -273,6 +273,34 @@ pub const PRODUCT: &[(&str, &str)] = &[
     ),
     // Setup's hotspot again when a set-up lamp's saved network is gone
     // (#3020); `LAMP_WIFI_RECOVERY=on` in the unit (#5758).
+    // The Store apps (#7415, docs/apps.md): the manage helper, root's, started by its socket for each
+    // connection (the socket enabled, the template never); the boot's start of the apps the owner has
+    // not stopped; and the two static app templates, started by name, never enabled. All do nothing
+    // while LAMP_STORE_APPS is off in their own environment.
+    (
+        "lamp-apps-manage.socket",
+        include_str!("../../../deploy/product/lamp-apps-manage.socket"),
+    ),
+    (
+        "lamp-apps-manage@.service",
+        include_str!("../../../deploy/product/lamp-apps-manage@.service"),
+    ),
+    (
+        "lamp-apps-folders.service",
+        include_str!("../../../deploy/product/lamp-apps-folders.service"),
+    ),
+    (
+        "lamp-apps-start.service",
+        include_str!("../../../deploy/product/lamp-apps-start.service"),
+    ),
+    (
+        "lamp-app@.service",
+        include_str!("../../../deploy/product/lamp-app@.service"),
+    ),
+    (
+        "lamp-app-net@.service",
+        include_str!("../../../deploy/product/lamp-app-net@.service"),
+    ),
     (
         "lamp-setup-recover.service",
         include_str!("../../../deploy/product/lamp-setup-recover.service"),
@@ -298,6 +326,9 @@ pub const EXIT_NOTE_UNITS: &[&str] = &[
     "lamp-addons.service",
     "lamp-air-clock.service",
     "lamp-air.service",
+    "lamp-apps-folders.service",
+    "lamp-apps-manage@.service",
+    "lamp-apps-start.service",
     "lamp-body.service",
     "lamp-cloud.service",
     "lamp-control.service",
@@ -1322,8 +1353,8 @@ const TIMED: &[&str] = &[
     "lamp-update-back.service",
 ];
 
-/// Services a round starts, and never enabled.
-const STARTED_BY_A_ROUND: &[&str] = &[crate::apply::UNIT];
+/// Services a round starts, or another unit requires (the apps' folders), and never enabled.
+const STARTED_BY_A_ROUND: &[&str] = &[crate::apply::UNIT, "lamp-apps-folders.service"];
 
 /// The units enabled: the target, and what starts outside it.
 pub(crate) fn enabled() -> Vec<String> {
@@ -1344,6 +1375,7 @@ pub(crate) fn enabled() -> Vec<String> {
             "lampos-setup-done.path",
             "lamp-region.path",
             "lamp-skills-manage.socket",
+            "lamp-apps-manage.socket",
             "lamp-setup-change.socket",
             "lamp-setup-wifi.socket",
             "lamp-eyes-camera.socket",
@@ -3851,6 +3883,79 @@ mod tests {
         }
     }
 
+    /// #7956 (the first builder, 17:3x): a round carries a product unit only when it starts a lamp program
+    /// (`publish.rs`: `unit::program` or `unit::linked`; a part's template, socket or timer through
+    /// `companion::part`), and adds one only through its part. A unit that is not carried reaches a lamp by
+    /// `lamp-update install` alone, so a unit the product needs is carried or is named here, with why. Found by
+    /// the Store apps' two templates and their slice, which a round never brought.
+    #[test]
+    fn every_product_unit_a_round_needs_is_carried_or_named_not_carried() {
+        // Image-only, each with why: the image or `lamp-update install` puts it there, and no unit a round
+        // adds needs it to be new. A unit that is not here and not carried fails this test.
+        const NOT_CARRIED: &[(&str, &str)] = &[
+            (
+                "lampos.target",
+                "the product's grouping target: on the image from the start",
+            ),
+            ("lampos.slice", "a grouping slice: on the image, no program"),
+            (
+                "lampos-voice.slice",
+                "a grouping slice: on the image, no program",
+            ),
+            (
+                "lampos-parts.slice",
+                "a grouping slice: on the image, no program",
+            ),
+            (
+                "lamp-update-back.service",
+                "starts from its fixed path, which no round switches (#1680)",
+            ),
+            (
+                "lamp-update-back.timer",
+                "the back service's timer: fixed with its service",
+            ),
+            (
+                "lamp-update-apply.service",
+                "the switch's own unit, started by a round, never carried by one",
+            ),
+            (
+                "lampos-setup-done.path",
+                "a path watch on setup's marker: on the image",
+            ),
+            (
+                "lamp-region.path",
+                "a path watch for the region one-shot: on the image",
+            ),
+        ];
+        let texts: std::collections::BTreeMap<&str, &str> = PRODUCT.iter().copied().collect();
+        let mut wrong = Vec::new();
+        for (name, text) in PRODUCT {
+            let carried = match crate::companion::kind(name) {
+                Some(_) => {
+                    crate::companion::part(name, text, |unit| texts.get(unit).copied()).is_some()
+                }
+                // A service is carried only under a name a manifest may carry (`lamp-<x>.service`): `lampapp@`
+                // (no dash) starts a linked program too, and no round ever carried it (#7956, 19:50).
+                None => {
+                    crate::manifest::is_unit_name(name)
+                        && (unit::program(text).is_some() || unit::linked(text).is_some())
+                }
+            };
+            let named = NOT_CARRIED.iter().any(|(unit, _)| unit == name);
+            if carried == named {
+                wrong.push(format!(
+                    "{name}: {}",
+                    if named {
+                        "is carried now: take it off the list"
+                    } else {
+                        "no round can carry it (it starts no lamp program): make it start one, or name it in NOT_CARRIED"
+                    }
+                ));
+            }
+        }
+        assert!(wrong.is_empty(), "{wrong:#?}");
+    }
+
     #[test]
     fn every_product_part_starts_through_its_current_link() {
         let parts = parts();
@@ -3868,12 +3973,13 @@ mod tests {
         // setup's three helpers (the names', the Wi-Fi's and its boot
         // restore) share one binary, and so do the air and its bus clock,
         // the skills and their manage helper, the eyes and their camera
-        // helper (#2892), and lamp-update and its region one-shot (#6256);
+        // helper (#2892), the apps' manage helper with its boot start, its folders and its two app templates, and lamp-update
+        // and its region one-shot (#6256);
         // every other service is a part.
         let services = PRODUCT.iter().filter(|(name, _)| linked(name)).count();
         assert_eq!(
             parts.len(),
-            services - 10,
+            services - 14,
             "every product service is a part"
         );
         for part in &parts {

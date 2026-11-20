@@ -51,6 +51,11 @@ fn each_shipped_template_socket_and_timer_belongs_to_its_part_or_none() {
         })
         .collect();
     let expected = BTreeMap::from([
+        // The Store apps' templates (#7956): named `lamp-<x>`, so a round carries them with the apps-manage part.
+        ("lamp-app-net@.service", linked("apps-manage")),
+        ("lamp-app@.service", linked("apps-manage")),
+        ("lamp-apps-manage.socket", linked("apps-manage")),
+        ("lamp-apps-manage@.service", linked("apps-manage")),
         ("lamp-eyes-camera.socket", linked("eyes")),
         ("lamp-eyes-camera@.service", linked("eyes")),
         ("lamp-keeper-restart.socket", None),

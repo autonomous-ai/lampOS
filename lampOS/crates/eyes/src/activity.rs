@@ -559,6 +559,14 @@ impl Judge {
         }
     }
 
+    /// Whether the sitter check says the sitter is not standing up: a sitter
+    /// is followed and no loss of their face was judged a standing up since
+    /// it was last seen (`who::Held::follow_near`, LAMP_FACE_FOLLOW_NEAR_NEW_ID).
+    /// No sitter: false.
+    pub fn not_standing_up(&self) -> bool {
+        self.sitter.is_some() && self.leaving.is_none()
+    }
+
     /// The journal's line for the sitter's face lost, once a loss: numbers
     /// only, so a run can tell why a leave was or wasn't a standing up.
     pub fn lost_journal(&mut self) -> Option<String> {
@@ -1137,6 +1145,32 @@ mod tests {
         judge.looked(131 * S, &[]);
         judge.looked(132 * S, &[SEATED]);
         assert_eq!(judge.stood_up(134 * S), None);
+    }
+
+    /// LAMP_FACE_FOLLOW_NEAR_NEW_ID reads this: a face lost without rising
+    /// is "not standing up"; a face lost rising is not; nobody followed is
+    /// not either.
+    #[test]
+    fn the_sitter_check_says_not_standing_up_only_for_a_sitter_lost_without_rising() {
+        let mut judge = seated();
+        looks(&mut judge, 125, 130, Some(SEATED));
+        judge.looked(131 * S, &[]);
+        assert!(judge.not_standing_up(), "lost without rising");
+        let mut judge = seated();
+        looks(&mut judge, 125, 130, Some(SEATED));
+        for (k, centre) in [0.45, 0.38, 0.30, 0.22].iter().enumerate() {
+            judge.looked(
+                130 * S + k as u64 * 250_000,
+                &[Look {
+                    centre_y: *centre,
+                    height: 0.22 * (1.0 - 0.06 * k as f32),
+                    ..SEATED
+                }],
+            );
+        }
+        judge.looked(131 * S, &[]);
+        assert!(!judge.not_standing_up(), "lost rising");
+        assert!(!Judge::default().not_standing_up(), "nobody followed");
     }
 
     /// For watching them go (#1669): the side of the picture they were last

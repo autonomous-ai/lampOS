@@ -5003,7 +5003,7 @@ long-lived bus filesystem stalls and the real Health unit remain for First.
 ### Request-bound tool scope
 
 Both voice routes bind memory tool calls to an immutable observation at input
-admission. The face file's original three-second freshness deadline is preserved
+admission. The face file's freshness deadline (`lamp_msgs::known::FRESH`, 4 s) is preserved
 across cache refreshes. Admission reads a nonblocking cache; a missing, expired,
 or contended observation uses the room scope. It does not fall back to a sticky
 conversation owner or a shadow voice candidate. The Second route refreshes off
@@ -5107,8 +5107,8 @@ a refresh that names nobody inside those 5 s does not end it. 5 s because
 on lamp-c0a4 on 23 October a face remembered through the eyes' own socket
 about 1 s after a voice restart said its first line 1 to 2 s later, which
 at `39a68c91b` (cold only until the first refresh) fell past the window and
-was kept as `everyone`'s; and the known file names a face for 3 s after the
-eyes write it. Past those 5 s with nobody named, the cache is warm: nobody
+was kept as `everyone`'s; and the known file names a face for 4 s after the
+eyes write it (3 s until #7146). Past those 5 s with nobody named, the cache is warm: nobody
 known is in view, so a room's line that starts warm and sees no cold event
 before its end plus 300 ms has no late look, and a known face first cached
 during it never takes its keep (El's P2 on #3108). A cold event mid-line
@@ -5194,7 +5194,7 @@ for.
 ### A known face lost for a moment
 
 A request's scope is the known face fresh as it is admitted, and the eyes'
-known file is fresh for 3 s after they last see the face. So on lamp-4ace on
+known file is fresh for 4 s after they last see the face. So on lamp-4ace on
 20 October at 12:13, someone known who was lost for a moment mid-conversation
 had their next line's memory calls go to the room's scope (#2176 row 5b).
 
@@ -5242,12 +5242,12 @@ a gap, only while all of these hold:
   hand-on sends it to the journal, as theirs or anyone's. Its exchange stays
   in the spoken thread, so the conversation carries on when they look back.
 - **Within the gap:** up to 12 s (`GAP`) past the face's last fresh
-  sighting, which is the known file's 3 s freshness, so up to about 15 s
+  sighting, which is the known file's 4 s freshness, so up to about 16 s
   after the eyes last saw it, and up to 12 s past the end of the lamp's last
   answer to them, whichever ends first. Holding never renews it. It was
   8 s until lamp-c0a4, where a person who turned away and asked again took
   8 to 9 s from the end of the lamp's answer (the first builder on #1722,
-  21 Oct). A face last seen as the answer ends stays fresh 3 s more, so
+  21 Oct). A face last seen as the answer ends stays fresh 4 s more, so
   there the answer's 12 s end first.
 
 A different known face is theirs at once, and a privacy change revokes a held
@@ -5258,6 +5258,87 @@ line past the gap, admitted as the room's, is journalled as the room's. With
 that switch off the exchange stays with the person counted at the lamp
 (`known_faces::Presence`, 30 s), and a held line is still never journalled. Without a bus root for the eyes' looks, nothing is held.
 The Live route is not covered.
+
+**For the conversation, with `LAMP_FACE_NO_FACE_HOLD=on`** (off unless set,
+on in the product unit; the sticky plan's T1, the owner's call on #7933, 20 Nov 01:55, which overrules #7814's held-only condition and the first builder's privacy P3). The same hold
+with the conversation's bounds instead of 12 s (`memory_scope::Gap::no_face`):
+up to 30 s past the face's last fresh sighting (`NO_FACE_SEEN`, the eyes'
+`GONE_AFTER`) and 2 min past the lamp's last answer to them (`NO_FACE_QUIET`),
+whichever ends first, never renewed. Under the plan's single-user decision
+the held line is theirs, `ScopeSnapshot::sticky`: their memory is read, a
+keep is kept and the exchange is journalled as theirs. The accepted risk, as
+the plan states it: someone off camera in that window is answered from the
+person's memory. It still runs no forget of any kind, correction, rule or
+yes, and is never the owner present or alone ("A name the eyes hold"). Any
+face in view ends it; another known face takes the line at once. With it on,
+`LAMP_FACE_GAP_HOLD`'s 12 s is not used.
+
+### A name the eyes hold
+
+The sticky identity plan (face-recognition-sticky-identity-plan.md), only
+with `LAMP_FACE_STICKY=on` in the voice (on in the product unit;
+`known_faces::sticky_on`), beside the eyes' own switch (eyes.md, "Sticky"):
+
+- **A held name is theirs, with less trust.** The face
+  cache reads the eyes' held mark beside the known file (`known-held`, fresh
+  for 3 s, `known_faces::held_mark`). A line whose scope comes from a name the
+  eyes hold, not match, with a face in view or none (the owner's call on #7933, 20 Nov 01:55, which overrules #7814's held-only condition and the first builder's privacy P3),
+  is `ScopeSnapshot::sticky`: their
+  memory is read and a keep is kept as theirs, as the one-face rule with reads
+  does, but no forget of any kind, correction (`remember` with `replaces`),
+  rule, role or face function runs on it, nor any held forget's yes, the
+  single-item yes (#5627) included (`second_provider::one_face_refused`,
+  `ScopeLease::sticky_held`, `tools`); only undoing the line's own keep runs.
+  Nothing is asked about it, and no face or voice check is added to any
+  confirmation. Narrowed to the room, nothing of this is left.
+- **Never the owner present or alone.** A sticky line, from the mark or the
+  no-face hold, has no owner in `services::owner_among`. While the mark is
+  fresh, the checks
+  that read the eyes' known file for a private read-back see nobody
+  (`known_faces::known_for_owner_checks`, `held_now`): diary, mail and the
+  services' sends (`services::owner_sees_alone_now`, `owner_alone`,
+  `seen_saying_owner`), a run's written result (`run_write_yes`) and the
+  said-once scope (`said_scope`); a held line has no owner in
+  `services::owner_among`.
+- **A tiny far face is no one, for the name only.** The by-default name
+  (`person::someone_else_now`) counts only near faces, at least 0.10 of the
+  picture's height (`known_faces::NEAR_ENOUGH`, `most_near_faces_lately`):
+  a face far in the background never makes "more than one face in view"
+  or "an unknown face in view" (lamp-74ff, 19 Nov 12:07:29, a face 0.08
+  tall behind the owner; the owner's call on #7933, 20 Nov). The private
+  read-backs' "owner alone in view" checks still count every face.
+- **T6, a lone match takes the room's lines.** With
+  `LAMP_MEMORY_FOLLOWS_FACE` too, a conversation started as the room's
+  follows the caller's face when they are first matched alone: lines with
+  nothing to tell them by (no print, no face) go with them as long as no line
+  showed another voice or face (`follows_face::theirs_alone`,
+  `remember::follow_face`). A line that showed someone else keeps every line
+  where it was. Only a match anchors it: while the eyes' held mark is fresh,
+  `follows_face::known_now` reads nobody, so nothing moves on a held name.
+- **The own-track carry is inert.** `LAMP_CONVERSATION_CARRIES_OWN_TRACK`
+  (#7869) carries a line on the owner's box once the eyes let the name go.
+  With STICKY the eyes keep the name on that box and let go only on a new
+  id or nobody near for 30 s, so its carry is off (`Engine::holding_sticky`); its switch is to be
+  removed once STICKY is the default.
+
+**T9, a carried line is journalled,** only with `LAMP_CARRIED_JOURNAL=on`
+(off unless set, on in the product unit by the owner's call on #7933, 20 Nov
+01:55; the second route,
+`process::carried_journal_worker_environment`). A line carried as its
+person's and read as theirs (`LAMP_CONVERSATION_CARRIED_MEMORY`, their face
+the one face in view through it) is journalled in their record, not kept out
+(`worker::keep_out_scoped`), and the journal says so with the request and a
+count, no words and no name. No forget runs on it, it is never summarised,
+and "never forgets" stays. A line held by `LAMP_FACE_GAP_HOLD`'s 12 s is
+still kept out.
+- **Why a line is the room's.** Whatever the switch, a heard line admitted as
+  the room's says why on the journal: `memory scope the room's: snapshot
+  empty: known stale, a known face last fresh 4200 ms ago (lines the room's
+  so far: known stale 1, no known 1, never known 0)`, a reason (`known
+  stale`, `no known`, `never known this conversation`) and counts since the
+  start, no name (`memory_scope::room_line`, the plan's T0).
+
+Off, nothing reads the mark and every line is as before.
 
 ### Live route session scope
 

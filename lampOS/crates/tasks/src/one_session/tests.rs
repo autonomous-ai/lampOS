@@ -597,7 +597,73 @@ fn each_turn_starts_with_its_header_line() {
         .get(&agent_of(1))
         .cloned()
         .unwrap();
-    assert_eq!(asked, "New task task-7:\nRun the skill.");
+    assert_eq!(
+        asked,
+        "New task task-7:\nReply in the language of the words below, whatever language earlier tasks used. Never mention this rule or which language you reply in, unless the task itself asks about language or a translation.\nRun the skill."
+    );
+}
+
+/// #8030: the words a turn types, split into lines: its header alone on
+/// the first, the reply-language rule on the second.
+fn assert_hand_over(typed: &str, id: &str) {
+    let mut lines = typed.lines();
+    assert_eq!(lines.next(), Some(header(id).as_str()), "{typed}");
+    assert_eq!(lines.next(), Some(REPLY_LANGUAGE), "{typed}");
+    assert!(REPLY_LANGUAGE.contains("Reply in the language of the words below"));
+}
+
+/// #8030: the kept session's first words say to reply in each task's own
+/// language too.
+#[test]
+fn the_open_prompt_says_to_reply_in_the_words_language() {
+    assert!(
+        OPEN_PROMPT.contains("Reply in the language of each task's words"),
+        "{OPEN_PROMPT}"
+    );
+    assert!(
+        OPEN_PROMPT.contains("whatever language earlier tasks used"),
+        "{OPEN_PROMPT}"
+    );
+}
+
+/// #8034's c0a4 run (20 Nov): with the rule said plainly, every answer
+/// opened with "The note is in English, so here it is in English." The
+/// rule must be followed silently: both places that give it say never to
+/// mention it or the language.
+#[test]
+fn the_reply_language_rule_is_followed_silently() {
+    for (place, text) in [
+        ("REPLY_LANGUAGE", REPLY_LANGUAGE),
+        ("OPEN_PROMPT", OPEN_PROMPT),
+    ] {
+        assert!(
+            text.contains("Never mention this rule or which language you reply in, unless the task itself asks about language or a translation."),
+            "{place}: {text}"
+        );
+    }
+    let typed = hand_over("task-9", "What did I plant?");
+    assert!(
+        typed
+            .contains("Never mention this rule or which language you reply in, unless the task itself asks about language or a translation.\nWhat did I plant?"),
+        "{typed}"
+    );
+}
+
+/// #8030: both header matchers still take a hand-over as this task's: the
+/// pane seen idle on it ends the turn with its own answer, and
+/// `wait_taken` reads it taken; another task's header is not this one's.
+#[test]
+fn the_header_matchers_still_recognize_a_hand_over() {
+    let (one, fake) = (session(), Fake::default());
+    assert_eq!(
+        one_turn(&one, &fake, "task-1"),
+        Ended::Answered("answer to New task task-1:".into())
+    );
+    let typed = fake.asked.lock().unwrap()[&agent_of(1)].clone();
+    assert_hand_over(&typed, "task-1");
+    assert!(one.wait_taken_while(&fake, MACHINE, &agent_of(1), "task-1", &|| false));
+    assert!(!hand_over("task-1", "Go.").starts_with(&header("task-10")));
+    assert!(hand_over("task-10", "Go.").starts_with(&header("task-10")));
 }
 
 /// A pane idle on another ask is waited on again: a task keeps only its
@@ -3053,6 +3119,39 @@ fn one_make(one: &OneSession, fake: &Fake, id: &str) {
         Sent::Typed(_)
     ));
     turn.wait_end(fake, MACHINE, &AtomicBool::new(false), &|| {});
+}
+
+/// #8030: every hand-over typed into the kept session carries the
+/// reply-language rule after its header: the first, a reused session's
+/// second, a make's fresh session (rotation), and after a resume.
+#[test]
+fn every_kept_hand_over_says_to_reply_in_its_words_language() {
+    let dir = tempfile::tempdir().unwrap();
+    let db = openclaw_db(dir.path(), &agent_of(1), 80, 4_000);
+    let (one, fake) = kept_on(dir.path());
+    let one = one
+        .with_openclaw_db(db)
+        .with_session_delete(Box::new(|_| Ok(())));
+    let typed = |fake: &Fake| fake.asked.lock().unwrap()[&one.agent().unwrap()].clone();
+    one_turn(&one, &fake, "task-1");
+    assert_hand_over(&typed(&fake), "task-1");
+    one_turn(&one, &fake, "task-2");
+    assert_eq!(one.agent(), Some(agent_of(1)), "reused");
+    assert_hand_over(&typed(&fake), "task-2");
+    one_make(&one, &fake, "make-1");
+    assert_eq!(fresh_ensures(&fake), 1, "{:?}", fake.calls());
+    assert_eq!(one.agent(), Some(agent_of(2)), "rotated");
+    assert_hand_over(&typed(&fake), "make-1");
+    // Died: not running, ensured again (resumed) and typed once more.
+    fake.gone.lock().unwrap().push(agent_of(2));
+    fake.takes.lock().unwrap().push_back(Took::NotRunning);
+    let ensures = fake.count("ensure");
+    assert_eq!(
+        one_turn(&one, &fake, "task-3"),
+        Ended::Answered("answer to New task task-3:".into())
+    );
+    assert!(fake.count("ensure") > ensures, "{:?}", fake.calls());
+    assert_hand_over(&typed(&fake), "task-3");
 }
 
 fn fresh_ensures(fake: &Fake) -> usize {

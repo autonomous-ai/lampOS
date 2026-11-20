@@ -146,6 +146,8 @@ Environment=LAMP_NAME_NEAR=on
 Environment=LAMP_NAME_SECOND_SIGN=on
 # LAMP_NAME_SIGN_TIED: its why and rules are its row in docs/switches.md (#8092).
 Environment=LAMP_NAME_SIGN_TIED=on
+# LAMP_NAME_FACE_OR_WORDS: its why and rules are its row in docs/switches.md (#8136).
+Environment=LAMP_NAME_FACE_OR_WORDS=on
 # LAMP_NAME_AS_A_SENTENCE: its why and rules are its row in docs/switches.md (#5277, #6078).
 Environment=LAMP_NAME_AS_A_SENTENCE=on
 # LAMP_NAME_SAID_TO_A_PERSON: its why and rules are its row in docs/switches.md (#3945, #5233).
@@ -596,6 +598,12 @@ Environment=LAMP_MEMORY_ROOM_NOT_ASKER=on
 Environment=LAMP_MEMORY_FORGET_ASKS=on
 # LAMP_MEMORY_FOLLOWS_FACE: its why and rules are its row in docs/switches.md (#2176).
 Environment=LAMP_MEMORY_FOLLOWS_FACE=on
+# LAMP_FACE_STICKY: its why and rules are its row in docs/switches.md (the sticky identity plan).
+Environment=LAMP_FACE_STICKY=on
+# LAMP_FACE_NO_FACE_HOLD (the plan's T1) and LAMP_CARRIED_JOURNAL (T9): their rows in docs/switches.md (the owner's
+# call on #7933, 20 Nov 01:55).
+Environment=LAMP_FACE_NO_FACE_HOLD=on
+Environment=LAMP_CARRIED_JOURNAL=on
 # LAMP_MEMORY_STABLE_ID: its why and rules are its row in docs/switches.md (#2176, #4710).
 Environment=LAMP_MEMORY_STABLE_ID=on
 # LAMP_MEMORY_KEEP_HEARD: its why and rules are its row in docs/switches.md (#2176, #5276).

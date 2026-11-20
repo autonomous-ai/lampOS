@@ -14,7 +14,7 @@ use std::sync::{Mutex, Once};
 use std::time::{Duration, Instant};
 
 /// How long the cached known face stays proof after the provider's loop
-/// noted it (it notes every 500 ms; the cache drops a face over 3 s old
+/// noted it (it notes every 500 ms; the cache drops a face over 4 s old
 /// before noting it, so the two windows add up to little more than 1 s
 /// past the cache's own).
 pub const KNOWN_FRESH: Duration = Duration::from_secs(1);
@@ -150,7 +150,10 @@ fn read_once(
 ) {
     let now = Instant::now();
     // The known person now: the one a speaking look is bound to.
+    // A name the eyes hold, not match, is no one here for the owner's
+    // checks (`LAMP_FACE_STICKY`).
     let person = known
+        .filter(|known| !(crate::known_faces::sticky_on() && crate::known_faces::held_mark(known)))
         .and_then(crate::known_faces::FaceObservation::read)
         .map(|face| face.name().to_owned());
     let faces_message = bus

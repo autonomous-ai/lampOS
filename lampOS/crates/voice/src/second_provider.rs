@@ -143,6 +143,11 @@ pub(crate) const WORDS_AFTER_CAP_NOTE: &str = "(For you to know: this request ma
 /// What the lamp says when that round has no words either: never silence
 /// after the person waited through every round.
 pub(crate) const UNFINISHED_LINE: &str = "Sorry, I couldn't finish that. Could you ask me again?";
+
+/// What a call is answered that can't run once an app the model started in
+/// the same round holds the turn (`start_app`, #7415): another app start, a
+/// skill made by voice, a sleep or a recording would speak over the app.
+pub(crate) const APP_TOOK_THE_TURN: &str = "not run: an app took the turn";
 /// A turn's first chat round that has not begun (no word, no call) this
 /// long after it was asked, which is as soon as speech to text gave the
 /// words, is given up and the turn ends unanswered: an answer said 12 s
@@ -1020,6 +1025,19 @@ pub const NAME_SAID_TO_A_PERSON_ENVIRONMENT: &str = "LAMP_NAME_SAID_TO_A_PERSON"
 /// counted by closeness read 15 s before its hearing, and opened a
 /// conversation in a meeting (#8092).
 pub const NAME_SIGN_TIED_ENVIRONMENT: &str = "LAMP_NAME_SIGN_TIED";
+
+/// Where the worker and the coordinator read whether a hearing of the
+/// lamp's name needs a face or its words (`on`, and nothing else): on the
+/// second route, a hearing only in the room's sound under
+/// `attention::SURE_SCORE` counts only with a face turned to the lamp or
+/// the line's words calling it (`attention::Attention::need_a_face_or_words`);
+/// and a request with no words whose hearing the faint floor turned away
+/// owes no second look (`second_look::SecondLook::holding_a_faint_wordless_call`).
+/// On lamp-74ff on 20 Nov (build 15146) two people talking Vietnamese with
+/// their backs to it were answered on a 0.921 hearing at a line's start,
+/// and a 0.904 hearing the floor turned away made the lamp speak unasked
+/// and open a window (#8114's shapes 5-7, #8136).
+pub const NAME_FACE_OR_WORDS_ENVIRONMENT: &str = "LAMP_NAME_FACE_OR_WORDS";
 
 /// Where the worker reads whether a hearing of the lamp's name inside one
 /// line's sound stays with that line, never counting for the one begun
@@ -2505,6 +2523,9 @@ struct Shared {
     /// unbroken track alone in view, is theirs for the carry
     /// (`LAMP_CONVERSATION_CARRIES_OWN_TRACK`, [`Engine::carrying_own_track`]).
     carries_own_track: bool,
+    /// `LAMP_FACE_STICKY` ([`Engine::holding_sticky`]): the eyes hold the
+    /// name themselves, so the own-track carry is inert.
+    face_sticky: bool,
     /// A carried line may save into the conversation's scope
     /// (`LAMP_CONVERSATION_CARRIED_SAVES`, [`Engine::saving_carried`]).
     carried_saves: bool,
@@ -2712,7 +2733,11 @@ fn own_track_face(
     begun: Instant,
     finishing: Instant,
 ) -> Option<String> {
-    if !shared.carries_own_track {
+    // With `LAMP_FACE_STICKY` the eyes' own hold keeps naming the face;
+    // a name they let go of on that box went on a print they couldn't
+    // read as the person's, which may be someone else's: never carried as
+    // the person (Friday's P2 on #7933).
+    if !shared.carries_own_track || shared.face_sticky {
         return None;
     }
     eyes.own_track_alone(
@@ -5400,6 +5425,7 @@ impl Engine {
                 carries: None,
                 skill_yes_carry: false,
                 carries_own_track: false,
+                face_sticky: false,
                 carried_saves: false,
                 carried_memory: false,
                 held_words_seen: false,
@@ -5598,6 +5624,14 @@ impl Engine {
                     };
                     eprintln!("lamp-voice second: request {request}: memory scope {whose}: {told}");
                 }
+                // Why a heard line is the room's when the eyes' snapshot is
+                // empty, whatever the switches (the sticky plan's T0): a
+                // reason, ms and counts, never a name.
+                if let Some(told) = cache.room_told(now) {
+                    eprintln!(
+                        "lamp-voice second: request {request}: memory scope the room's: {told}"
+                    );
+                }
                 // A line held only by a gap is never journalled, whether or
                 // not its exchange is filed by its scope
                 // (`LAMP_SECOND_SCOPED_CONTEXT`): kept out as it is admitted,
@@ -5726,6 +5760,17 @@ impl Engine {
     pub fn carrying_own_track(mut self, on: bool) -> Self {
         let shared = Arc::get_mut(&mut self.shared).expect("configured before admission");
         shared.carries_own_track = on;
+        self
+    }
+
+    /// `LAMP_FACE_STICKY=on`: the eyes hold a known name through weak
+    /// prints on their own box and let go only of a face clearly someone
+    /// else's, so [`Self::carrying_own_track`] is inert: a let-go print on
+    /// the owner's box is never carried as the owner. Its switch is to be
+    /// removed once STICKY is the default (the sticky identity plan).
+    pub fn holding_sticky(mut self, on: bool) -> Self {
+        let shared = Arc::get_mut(&mut self.shared).expect("configured before admission");
+        shared.face_sticky = on;
         self
     }
 
@@ -15072,13 +15117,20 @@ fn one_face_refuses(name: &str, args: &Value, reminders: bool) -> bool {
 
 /// Whether `call` is refused on this scope by the one-face rule
 /// ([`one_face_refuses`]), by every runner.
+///
+/// A line from a name the eyes hold (`LAMP_FACE_STICKY`,
+/// `ScopeLease::sticky_held`) is refused all of them, the single-item yes
+/// (#5627) included: a held identity never runs a forget, correction or
+/// rule. Only the lamp's own take-back of its own keep still runs.
 fn one_face_refused(scope: Option<&crate::memory_scope::ScopeLease>, call: &net::ToolCall) -> bool {
     scope.is_some_and(|scope| {
-        scope.forgets_need_mouth()
-            // The lamp taking back its own keep of this request on its own
-            // doubt ([`undo_doubted_keep`]): no one's forget.
-            && !(call.name == crate::remember::FORGET
-                && (scope.undoes_own_keep(&call.args) || scope.agreed_forget(&call.args)))
+        let own_undo = call.name == crate::remember::FORGET && scope.undoes_own_keep(&call.args);
+        (scope.sticky_held() && !own_undo)
+            || (scope.forgets_need_mouth()
+                // The lamp taking back its own keep of this request on its own
+                // doubt ([`undo_doubted_keep`]): no one's forget.
+                && !(call.name == crate::remember::FORGET
+                    && (own_undo || scope.agreed_forget(&call.args))))
     }) && one_face_refuses(
         &call.name,
         &call.args,
@@ -16721,12 +16773,15 @@ fn ask_once_forget(
     scope: Option<&crate::memory_scope::ScopeLease>,
 ) -> Option<Value> {
     let lease = scope?;
+    // A line from a name the eyes hold (`LAMP_FACE_STICKY`) is asked
+    // nothing: its forget is refused, as a held identity runs none.
     if !heard
         || call.name != crate::remember::FORGET
         || held_by_gap(scope)
         || !lease.forgets_need_mouth()
         // Their yes to one asked about already ([`agree_held_forget`]).
         || lease.agreed_forget(&call.args)
+        || lease.sticky_held()
     {
         return None;
     }
@@ -21185,9 +21240,39 @@ async fn answer(
             };
             // A held call still ends the turn even if a forget stops the batch.
             let policy_held = policed.contains(&Policed::Held);
+            // An app the model started in this round took the line
+            // (`start_app`, #7415): the round's other calls still run, as
+            // they were asked ("turn the volume down and start the coach",
+            // the Reviewer-lead's must-fix on #8131), and the request ends
+            // as taken once they are answered. `reached` is how many calls
+            // the loop came to, so none is left without a word.
+            let mut app_took = false;
+            let mut reached = 0;
             for (call_index, ((call, held), policed)) in
                 calls.iter().zip(held_by_rule).zip(policed).enumerate()
             {
+                reached = call_index + 1;
+                // A call that can't run once an app holds the turn: another
+                // `start_app` (the line is taken already), a skill made by
+                // voice (its waiting line would speak over the app) and a
+                // sleep (it would end the app's turn). Answered as not run
+                // and journalled, never dropped without a word.
+                if app_took
+                    && (call.name == crate::app_triggers::START_APP
+                        || call.name == crate::made_skill::MAKE
+                        || crate::sleep_asked::is_tool(&call.name))
+                {
+                    eprintln!(
+                        "lamp-voice second: request {request} chat round {round}: {} not run: an app took the turn ({})",
+                        call.name,
+                        crate::app_triggers::ENVIRONMENT
+                    );
+                    messages.push(Message::tool(
+                        call.id.clone(),
+                        serde_json::json!({"error": APP_TOOK_THE_TURN}).to_string(),
+                    ));
+                    continue;
+                }
                 if let Some((_, note)) = dropped_told.as_ref().filter(|(id, _)| *id == call.id) {
                     messages.push(Message::tool(call.id.clone(), note.clone()));
                     continue;
@@ -21665,14 +21750,28 @@ async fn answer(
                     return Err(Stop::Gone);
                 }
                 // An app the model started (`start_app`, #7415) took the
-                // line and speaks for itself: the request ends here as the
-                // fast path's does, with no further round and no words.
+                // line and speaks for itself: the request ends after this
+                // round as the fast path's does, with no further round and
+                // no words; the round's other calls are answered first.
                 if call.name == crate::app_triggers::START_APP && answer.told["started"] == true {
                     eprintln!(
-                        "lamp-voice second: request {request}: the model started an app, which took the line: the request ends here ({})",
+                        "lamp-voice second: request {request}: the model started an app, which took the line: the request ends after this round's other calls ({})",
                         crate::app_triggers::ENVIRONMENT
                     );
-                    return Err(Stop::Taken);
+                    app_took = true;
+                    continue;
+                }
+                // A recording offered once an app holds the turn would play
+                // over the app: not played, and the model told so.
+                if app_took && answer.requested_audio.is_some() {
+                    eprintln!(
+                        "lamp-voice second: request {request} chat round {round}: {} offered a recording after an app took the turn; not played ({})",
+                        call.name,
+                        crate::app_triggers::ENVIRONMENT
+                    );
+                    answer = crate::tools::ToolAnswer::plain(serde_json::json!({
+                        "error": APP_TOOK_THE_TURN
+                    }));
                 }
                 // A skill turned off, its function asked for on a heard line
                 // (`LAMP_MADE_SKILL_OFF_SAID`; the first builder, 18:41 on 18
@@ -22059,6 +22158,19 @@ async fn answer(
                     }
                     dispatched.store(true, Ordering::Relaxed);
                 }
+            }
+            // An app took the line in this round: every call the loop came
+            // to is answered; any it did not come to (a forget after the
+            // start stops the batch) is journalled, and the request ends.
+            if app_took {
+                for call in &calls[reached..] {
+                    eprintln!(
+                        "lamp-voice second: request {request} chat round {round}: {} not run: an app took the turn ({})",
+                        call.name,
+                        crate::app_triggers::ENVIRONMENT
+                    );
+                }
+                return Err(Stop::Taken);
             }
             // Every call answered: the round goes with the words if a line
             // cuts them now (#5026). After a forget, no round before it

@@ -2,7 +2,7 @@
 //! socket"): the door's WebSocket `/v1` on a unix socket with no TLS, for the
 //! apps `lamp-apps-manage` installed. The peer is known by its cgroup
 //! (`SO_PEERCRED`'s pid, `/proc/<pid>/cgroup`): the unit
-//! `lampapp@<name>.service` in `lampos-apps.slice` and nothing below it, never
+//! `lamp-app@<name>.service` in `lampos-apps.slice` and nothing below it, never
 //! a name the app says. Its grants are its installed manifest's; the owner's
 //! pairing has no part in it. Behind `LAMP_STORE_APPS` ([`crate::app_yes::on`]).
 //!
@@ -22,9 +22,9 @@ pub const SOCKET: &str = "/run/lampos-apps/apps.sock";
 pub const ENVIRONMENT: &str = "LAMP_APP_SOCKET";
 /// The slice every app's unit is in, and the unit's name begins and ends so.
 pub const SLICE: &str = "/lampos.slice/lampos-apps.slice/";
-pub const UNIT_PREFIX: &str = "lampapp@";
+pub const UNIT_PREFIX: &str = "lamp-app@";
 /// The unit of an app whose manifest says `net: true` (lamp-apps' `net_unit`).
-pub const NET_UNIT_PREFIX: &str = "lampapp-net@";
+pub const NET_UNIT_PREFIX: &str = "lamp-app-net@";
 /// At most this many connections an app, and at once in all.
 pub const MOST_EACH: usize = 4;
 pub const MOST: usize = 32;
@@ -36,7 +36,7 @@ pub const PANEL_LINE: usize = 80;
 pub const OFF: &str = "apps are off on this lamp";
 
 /// The app a cgroup's text says, and whether its unit is the `net` one:
-/// `lampapp@<name>.service` or `lampapp-net@<name>.service` directly in
+/// `lamp-app@<name>.service` or `lamp-app-net@<name>.service` directly in
 /// [`SLICE`], with nothing under it, and `<name>` an app's name.
 pub fn app_of_cgroup(cgroup: &str) -> Option<(String, bool)> {
     cgroup.lines().find_map(|line| {

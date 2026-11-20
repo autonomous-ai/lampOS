@@ -10088,6 +10088,7 @@ impl DaysClient {
                 let early = early.then(|| Early {
                     words,
                     follows,
+                    sticky: crate::known_faces::sticky_on(),
                     lines: &crate::follows_face::LINES_HEARD,
                     known: &crate::follows_face::known_now,
                     forgets: &crate::follows_face::FORGETS,
@@ -14312,6 +14313,10 @@ struct Early<'a> {
     words: bool,
     /// `LAMP_MEMORY_FOLLOWS_FACE`: the caller's own lines (the second route).
     follows: bool,
+    /// `LAMP_FACE_STICKY` (the sticky plan's T6): with the caller matched
+    /// alone and no other voice or face shown, their lines with nothing to
+    /// tell them by follow them too ([`crate::follows_face::theirs_alone`]).
+    sticky: bool,
     lines: &'a Mutex<crate::follows_face::Lines>,
     /// The eyes' known person now (a memory id) and their face's passing
     /// id ([`crate::follows_face::known_now`]).
@@ -14511,18 +14516,37 @@ fn follow_face(
             .filter(|(_, request)| *request != anchor)
             .filter_map(|(_, request)| lines.of(*request));
         let caller = &crate::follows_face::caller(anchored?, others, to, known);
-        conversation
-            .lines
-            .iter()
-            .filter_map(|(id, request)| {
-                let theirs = lines
-                    .of(*request)
-                    .map_or(Err(crate::follows_face::Why::CantTell), |line| {
-                        crate::follows_face::theirs(line, caller)
-                    });
-                theirs.map_err(|why| stayed.count(why)).ok().map(|()| *id)
-            })
-            .collect()
+        let judge = |lone: bool, stayed: &mut crate::follows_face::Stayed| -> Vec<u64> {
+            conversation
+                .lines
+                .iter()
+                .filter_map(|(id, request)| {
+                    let theirs = lines
+                        .of(*request)
+                        .map_or(Err(crate::follows_face::Why::CantTell), |line| {
+                            crate::follows_face::theirs_alone(line, caller, lone)
+                        });
+                    theirs.map_err(|why| stayed.count(why)).ok().map(|()| *id)
+                })
+                .collect()
+        };
+        let ids = judge(false, &mut stayed);
+        // With `LAMP_FACE_STICKY`, a lone match with no one else shown in
+        // the conversation takes its lines with nothing against them too
+        // (T6). Counts only in the journal.
+        if early.sticky && !stayed.shows_someone_else() && stayed.cant_tell > 0 {
+            let mut lone = crate::follows_face::Stayed::default();
+            let widened = judge(true, &mut lone);
+            eprintln!(
+                "lamp-voice provider: a lone face matched with no one else shown: lines with nothing to tell them by follow it too: moved={} was={} (LAMP_FACE_STICKY)",
+                widened.len(),
+                ids.len()
+            );
+            stayed = lone;
+            widened
+        } else {
+            ids
+        }
     };
     // A room exchange or kept thing of no known line stays too.
     stayed.cant_tell += (exchanges + kept).saturating_sub(conversation.lines.len());
@@ -24832,6 +24856,7 @@ mod tests {
             early.then_some(Early {
                 words: true,
                 follows: false,
+                sticky: false,
                 lines: &Mutex::new(crate::follows_face::Lines::default()),
                 known: &|| None,
                 forgets: &AtomicU64::new(0),
@@ -24932,6 +24957,8 @@ mod tests {
         print_wait: Duration,
         hold: Option<Duration>,
         forget: Held,
+        /// `LAMP_FACE_STICKY` (T6).
+        sticky: bool,
     }
 
     /// A forget said while the end is held, ordered against the saving
@@ -24957,6 +24984,7 @@ mod tests {
                 print_wait: crate::follows_face::PRINT_WAIT,
                 hold: None,
                 forget: Held::No,
+                sticky: false,
             }
         }
     }
@@ -25109,6 +25137,7 @@ mod tests {
                 follows.then_some(Early {
                     words: false,
                     follows: true,
+                    sticky: timing.sticky,
                     lines: &heard,
                     known: &known_now,
                     forgets: &forgets,
@@ -25232,6 +25261,7 @@ mod tests {
                 print_wait: Duration::from_secs(5),
                 hold: Some(Duration::from_millis(1500)),
                 forget: Held::No,
+                sticky: false,
             },
         );
         assert_eq!(adopted(&read), Some(json!([1, 7, 3])), "{read:?}");
@@ -25305,6 +25335,7 @@ mod tests {
                 print_wait: Duration::from_secs(5),
                 hold: Some(Duration::from_millis(300)),
                 forget: Held::BeforePrint,
+                sticky: false,
             },
         );
         assert_eq!(adopted(&read), None, "{read:?}");
@@ -25339,6 +25370,7 @@ mod tests {
                 print_wait: Duration::from_secs(5),
                 hold: Some(Duration::from_millis(300)),
                 forget: Held::AfterMove,
+                sticky: false,
             },
         );
         assert_eq!(adopted(&read), Some(json!([1, 7, 3])), "{read:?}");
@@ -25376,6 +25408,7 @@ mod tests {
                 print_wait: Duration::from_millis(200),
                 hold: Some(Duration::from_millis(1500)),
                 forget: Held::No,
+                sticky: false,
             },
         );
         assert_eq!(adopted(&read), Some(json!([3])), "{read:?}");
@@ -25514,6 +25547,93 @@ mod tests {
         assert_eq!(read[2]["ids"], json!([3]));
         assert_eq!(read[3]["source_ids"], json!([1]));
         assert_eq!(read[4]["source_ids"], json!([103]));
+    }
+
+    /// T6 of the sticky plan (`LAMP_FACE_STICKY`): a room conversation, then
+    /// a lone match of Bramble's face saying the third line, with no other
+    /// voice or face shown: the two earlier exchanges with nothing to tell
+    /// them by (no print, no face) move to her, and what was kept in them.
+    /// A second voice's line between keeps every unseen line the room's.
+    #[test]
+    fn with_face_sticky_a_lone_match_takes_the_unseen_lines_with_it() {
+        let lone = Timing {
+            sticky: true,
+            ..Timing::default()
+        };
+        let (read, _) = follows_conversation_timed(
+            "follows-sticky-lone",
+            5,
+            [
+                heard_line(None, &[]),
+                heard_line(None, &[]),
+                heard_line(Some(BRAMBLE), &["e/f1"]),
+            ],
+            false,
+            lone,
+        );
+        assert_eq!(adopted(&read), Some(json!([1, 7, 3])), "{read:?}");
+        // Another voice between: nothing unseen moves, as before.
+        let lone = Timing {
+            sticky: true,
+            ..Timing::default()
+        };
+        let (read, _) = follows_conversation_timed(
+            "follows-sticky-other",
+            7,
+            [
+                heard_line(None, &[]),
+                heard_line(Some(SOMEONE_ELSE), &[]),
+                heard_line(Some(BRAMBLE), &["e/f1"]),
+            ],
+            true,
+            lone,
+        );
+        assert_eq!(adopted(&read), Some(json!([3])), "{read:?}");
+    }
+
+    /// Friday's P1 on #7933: with `LAMP_FACE_STICKY`, an anchor the eyes only
+    /// hold (`follows_face::known_now` reads nobody while their held mark is
+    /// fresh) moves nothing: the early room lines stay the room's, the
+    /// unseen ones too. T6 moves lines only on a matched anchor.
+    #[test]
+    fn with_face_sticky_a_held_anchor_moves_nothing() {
+        let jobs = vec![
+            follows_exchange(1, "my name is bramble", None),
+            DaysJob::Kept {
+                id: 7,
+                request: Some(1),
+                replaced: None,
+            },
+            DaysJob::FaceSaved {
+                request: 3,
+                to: "p-b".into(),
+                forgets: 0,
+            },
+            follows_exchange(3, "remember my face", None),
+            DaysJob::End,
+        ];
+        let lines = [1, 2, 3]
+            .into_iter()
+            .zip([
+                heard_line(None, &[]),
+                heard_line(None, &[]),
+                heard_line(Some(BRAMBLE), &["e/f1"]),
+            ])
+            .collect();
+        let (read, _, _) = follows_jobs_timed(
+            "follows-sticky-held",
+            4,
+            lines,
+            jobs,
+            None,
+            false,
+            true,
+            Timing {
+                sticky: true,
+                ..Timing::default()
+            },
+        );
+        assert_eq!(adopted(&read), None, "{read:?}");
     }
 
     /// The reviewer-lead's P1 on #2673, the saved path: B, off camera, says

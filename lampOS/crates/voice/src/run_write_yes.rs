@@ -250,8 +250,9 @@ pub fn read_back_allowed(
 /// owner's memory ids, and the most faces lately.
 pub fn read_back_allowed_now() -> bool {
     let private_room = crate::person::private_room();
+    // A held name is never the owner in view (`LAMP_FACE_STICKY`).
     let owner_in_view = !private_room
-        && crate::known_faces::known_from_environment()
+        && crate::known_faces::known_for_owner_checks()
             .map(|name| crate::known_faces::memory_person(&name))
             .is_some_and(|seen| crate::person::owner_ids().contains(&seen));
     read_back_allowed(private_room, owner_in_view, crate::services::owner_alone)

@@ -18,7 +18,9 @@
 //!   retries (#7239). One input, then `harness wait`, then `show`, then the
 //!   next: each task's answer is its own turn's.
 //! - **A header line per turn** ([`header`]), "New task <id>: ...", so the
-//!   agent does not take a task as the last one's follow-up.
+//!   agent does not take a task as the last one's follow-up, then the
+//!   reply-language line ([`REPLY_LANGUAGE`], #8030), then the words
+//!   ([`hand_over`]).
 //! - **Never closed at a task's end.** A skill run's turn ends when the
 //!   pane is idle on its header; a spoken task's when the store, which
 //!   watches the pane as a session the person had (`Joined`), has read its
@@ -185,7 +187,7 @@ pub fn name_for(engine: EngineKind) -> String {
 pub const STATE_FILE: &str = "one-session.json";
 /// The pane's first words: `harness new` needs a task, and OpenClaw waits
 /// for its first prompt before it is ready.
-pub const OPEN_PROMPT: &str = "You are the lamp's standing agent session. Tasks will be typed here one at a time, each starting with a line `New task <id>:`. Treat each as new work unless it says it follows an earlier one. For now, answer only: ready.";
+pub const OPEN_PROMPT: &str = "You are the lamp's standing agent session. Tasks will be typed here one at a time, each starting with a line `New task <id>:`. Treat each as new work unless it says it follows an earlier one. Reply in the language of each task's words, whatever language earlier tasks used. Never mention this rule or which language you reply in, unless the task itself asks about language or a translation. For now, answer only: ready.";
 /// The most runs waiting for the pane at once; one more is [`BUSY`].
 pub const QUEUE_MOST: usize = 4;
 /// How long one run waits for the pane before it is [`BUSY`]: as long as
@@ -577,6 +579,19 @@ pub const BUSY: &str =
 /// The one header line each task's turn starts with.
 pub fn header(id: &str) -> String {
     format!("New task {id}:")
+}
+
+/// The line after every hand-over's header (#8030): a long kept session
+/// otherwise drifts into an earlier task's language. Followed silently:
+/// said plainly, every answer opened by naming its language (#8034's c0a4
+/// run). Also in [`OPEN_PROMPT`].
+pub const REPLY_LANGUAGE: &str = "Reply in the language of the words below, whatever language earlier tasks used. Never mention this rule or which language you reply in, unless the task itself asks about language or a translation.";
+
+/// The text one task's turn types into the pane: [`header`] alone on its
+/// first line (the matchers take an ask starting with it as this task's),
+/// [`REPLY_LANGUAGE`], then the words.
+pub fn hand_over(id: &str, words: &str) -> String {
+    format!("{}\n{REPLY_LANGUAGE}\n{words}", header(id))
 }
 
 /// What kind of work waits for the pane: spoken tasks go ahead of skill
@@ -4366,7 +4381,7 @@ impl Turn<'_> {
         if !self.one.takes_reply() {
             return Sent::NoReply;
         }
-        let text = format!("{}\n{words}", header(&self.id));
+        let text = hand_over(&self.id, words);
         let mut reopened = false;
         let mut sized = false;
         // #7906 sign 1: since when the pane has refused the words (busy,

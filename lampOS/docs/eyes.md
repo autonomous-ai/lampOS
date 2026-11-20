@@ -789,7 +789,7 @@ this room" until someone asks to be recognised.
   the face is cut from the frame at its own size instead
   ([below](#held-through-a-miss-lamp_face_full_cropon-3126)).
 - **The score, in the journal.** Each check with a face in view, outside a
-  remembering, says one line, at most every two seconds (with
+  remembering, says two lines, at most every two seconds (with
   `LAMP_FACE_REFOUND=on`, also at a forced check above):
   `recognition best 0.341 height 0.152 width 0.114 turn -0.18 across 0.712 prints age 86400 s (near at 0.1, same at 0.363)`,
   the best cosine against anyone's kept prints (`none` with nobody remembered
@@ -802,6 +802,13 @@ this room" until someone asks to be recognised.
   added (their `added_unix_s`: people.json keeps one time per person, not
   per print; `none` with the best), the near gate and the threshold. No
   name, no id: only numbers, always on (#3126; width, turn, across and age #7424).
+  Beside it, the sticky plan's T0 line (`who::recognition_told`):
+  `recognition best 0.341 height 0.152 (near at 0.1, same at 0.363) second 0.120 eyes 14.2 px turned -12 deg score 0.91 print 152 ms`,
+  the best likeness and the largest face's height again, then `second` (the
+  best cosine against anyone else's prints), `eyes` (the near face's eye
+  distance in pixels), `turned` (its turn in degrees), `score` (the
+  detector's) and `print` (the print's time in ms), each `none` when not
+  measured. Numbers only as well.
 - **Kept.** `--people FILE` (on lamp-4ace `/var/lib/lampos-eyes/people.json`,
   in a directory of mode 0700 and a file of mode 0600). Per person: the
   name, up to five prints and when they were added; with
@@ -1099,9 +1106,13 @@ analysis on #3126). With the switch on:
   more on the same clock, always lets go (the Reviewer-lead's P2 on
   #5546; stamped after the print it held a third check, past 6 s). A held check does not count a visit, and it
   leaves the known file's words and `known-face` as they were and only
-  sets its modified time to now (`who::renew_known`, #4493): the voice
-  takes the file as fresh for 3 s after it was written, so without the
-  renewal it stopped naming a held face a second before the next check. Someone
+  sets both their modified times to now (`who::renew_known`, #4493; the
+  face too since #7146): the voice takes both as fresh for 4 s after they
+  were written (`lamp_msgs::known::FRESH`, twice the eyes' 2 s check,
+  `lamp_msgs::known::RECOGNISE_EVERY`), so without the renewal it stopped
+  naming a held face before the next check. With only the name renewed,
+  a held person's face went stale under it and their line was taken as
+  another face's (#7146). Someone
   else matched, or a face from a photo, replaces them at once. An unknown
   face ends the hold too: a near face that printed and matched nobody keeps
   the held name only if it is still at least 0.30 alike to that person's
@@ -1176,6 +1187,119 @@ person for 3 min, quiet and talking, before and after a fresh save, the
 known file naming them in at least 9 of 10 looks; the #5546 swap row
 still sends the one who sat down to the room.
 
+**Sticky** (the sticky identity plan, face-recognition-sticky-identity-plan.md),
+only with `LAMP_FACE_STICKY=on` and the hold on (on in the product unit;
+`who::sticky_on`). A known person was too often treated as nobody: one
+poor print, a hand or a turned head let the name go. The rules are the
+plan's own §3 and T3, T4 and T7, as its owner set them on #7933 (20 Nov,
+01:55). That call overrules the first builder's 19 Nov rulings: 20:00 (a
+print under the match bar dropping the name), 21:14 (no lower bar after a
+recent match) and 22:14 (the first look of another enrolled person
+dropping the name), and with them the 15:45 privacy HOLD's 2 min total and
+near-face-only read. With it on, once someone is matched:
+
+- **Hard to lose (T3).** Missed prints, no face, a turned head and any
+  print, whatever its likeness, on the held face's own passing id or the
+  id that follows it keep the name (`Held::keeps_print`,
+  `Held::keeps_unprinted`, `Held::on_held_face`). After a gap, a print not
+  read as theirs keeps it too while it is on that id (`Held::printed`).
+  Only a new id, or nobody near for `who::STICKY_HOLD` (30 s, the voice's
+  `GONE_AFTER`), clears it. Each check that finds their face on that id,
+  printed or not, renews the 30 s (`Held::seen_theirs`): an owner eating
+  with his hands over his face (lamp-74ff, 19 Nov at lunch, matched in 0 of
+  about 230 looks) keeps his name. `LAMP_FACE_KNOWN_ON_ID` (on) is
+  subsumed. Off, 4 s as before.
+  A new unknown face away from the held place counts as nobody near
+  there (`Held::keeps_away`): a print matching nobody at the real bar, on
+  a new id whose box centre is more than `who::JUMP_SHARE` of the held
+  face's last box width from that box (`Held::saw_near`), keeps the name
+  but renews nothing: no `Held::seen_theirs`, no follow, no carry, so the
+  name still goes 30 s from the last sighting of the held face, the
+  existing bound (the owner's call on #7933, 20 Nov). The journal says "a
+  new unknown face away from the one held (across … px, the one held last
+  at … px): not at their place, the one held stays (sticky T3) until 30 s
+  from their last sighting", with no name. A new id within `JUMP_SHARE`
+  still follows (`Held::follow_near`) or lets go, a far face matching
+  someone goes through T4 as before, and with no held box nothing changes.
+  On lamp-06c1 (#7933 at 443fea27, 20 Nov 15:28) a covered held face left
+  the detector and a second small face far across the frame (about 0.13
+  to 0.17 across, the held box at 0.40 to 0.50) was the only near face, on
+  a new id, so the name let go.
+- **Another enrolled person takes two looks (T4).** A print matching
+  someone else enrolled, on the held face, keeps the one held; a second
+  within `who::TAKEOVER_WITHIN` (4 s), each over `SAME_PERSON` and over the
+  held person's likeness, takes the name (`who::sticky_look`,
+  `who::Takeover`). Another enrolled person on a new id is named as found:
+  the new id has cleared the held name already.
+- **A lower bar after a recent match (T7).** Someone matched over
+  `SAME_PERSON` in the last `who::REMATCH_WITHIN` (10 min) is matched again
+  at `who::REMATCH_LIKENESS` (0.30) when nobody else enrolled scores higher
+  (`who::Recent`); a match at the lower bar never renews the 10 min. A
+  rematch is held, not a full match: it is written with the held mark
+  (`who::keep_found`, `keep_known_held`), so the voice reads and keeps it
+  as theirs but runs no forget, correction or rule on it, never counts it
+  the owner present or alone, and anchors no `adopt`; only a print at
+  `SAME_PERSON` is a real match and clears the mark (Friday's P1 on #7933,
+  20 Nov 03:16).
+  A rematch of another enrolled person on the held face never counts
+  toward T4's two looks: it keeps the one held (`who::takeover_uncounted`;
+  row 5 on lamp-06c1, 20 Nov, where a covered face rematched another
+  enrolled person).
+  While someone is held, the lower bar may only match the one held again
+  (`who::held_rematch`): a rematch whose person is another is not taken,
+  not a match, not a takeover look and no let-go by itself; the hold
+  decides as for a print that matches nobody, and the journal says "matched
+  again at … to another than the one held: not taken (sticky T7)", then
+  whether the one held stays or the hold lets go (`who::rematch_refused_told`).
+  Another person still needs T4's two looks at `SAME_PERSON` (and, with
+  `LAMP_FACE_TAKEOVER_SCORE`, the score bar). With nobody held, T7 as above
+  (the owner's call on #7933, 20 Nov, after leg 1b on lamp-06c1 switched
+  the held name on a rematch at 0.356).
+- **The gap line says what the check did.** After a gap, the known hold's
+  journal line ends "same face", "kept on its id (sticky)", "followed",
+  "a new unknown face away from the one held", "matched" or "let go",
+  decided after the check (`who::gap_told`). Row 5 logged "kept on its id"
+  on checks that let the name go, and a check whose print matched someone
+  (0.726 to the held set, 1795163856.5 on lamp-06c1) logged "let go".
+- **Two switches, on as a pair by the owner's call (row 5).** The detector lost a
+  covered face for 0.2 to 3 s at a time and found it again as a new id,
+  so T3 let the name go: to another enrolled person on one print (leg E),
+  or to nobody for 6 s (leg H).
+  - **`LAMP_FACE_FOLLOW_NEAR_NEW_ID=on`** follows such an id
+    (`Held::follow_near`). The id must be within `who::JUMP_SHARE` of the
+    held face's last box (`Held::saw_near`) and the only near face, with
+    the sitter check (LAMP_ACTIVITY) saying the sitter is not standing up
+    (`activity::Judge::not_standing_up`).
+  - **`LAMP_FACE_TAKEOVER_SCORE=on`** counts a takeover look only on a face
+    the detector scored at least `who::TAKEOVER_SCORE`, which reuses
+    `still::PERSON_SCORE` (0.8). A look under it keeps and renews the one
+    held. Covered prints scored 0.60 to 0.81, and the real swap 0.85 to
+    0.89.
+
+  Both are on in the product unit, by the owner's call on #7933 (20 Nov;
+  switches.md). E needs both on: with the
+  follow alone, the covered face still switched on two looks.
+- **A newly seen face is printed at once.** While a name is held, a newly
+  seen near face (a near face after none, a new passing id, or a box whose
+  centre moved more than a third of its width since the last look) is
+  printed on the next look, outside the 2 s cadence, at most once per such
+  change and at most every 0.5 s (`who::NewFace`); a steady box asks for no
+  extra print. It only speeds recognition, and agrees with T3: that print
+  on a new id lets the name go, on the same id keeps it. The cost: one
+  print (152 ms on a lamp) per new face or jump.
+- **The held mark.** While a name is kept by a hold and not a match, the
+  eyes renew an empty file, the known file's name with `-held`, before the
+  known file (`who::mark_held`, `who::keep_known_held`); a match's write or a
+  let-go removes it. The voice reads and keeps such a name as theirs, with
+  a face in view or none (memory.md, "A name the eyes hold"), but a held
+  name runs no forget, correction or rule and is never the owner present
+  or alone.
+
+The accepted risk is the plan's (§2): until another known face is matched
+or the conversation goes quiet, someone else at the lamp is answered from
+the current person's memory. Off, nothing changes. The lamp check, owed on
+lamp-06c1: the plan's §7 session, judged against §3.
+
 **The followed id** (#4885), only with both `LAMP_FACE_KNOWN_HOLD=on` and
 `LAMP_FACE_REFOUND=on` (off unless set, both on in the product unit,
 `LAMP_FACE_REFOUND` since C65, the memory owner's call;
@@ -1245,7 +1369,7 @@ print.
   due every 0.5 s (`who::recognise_due_unsure`), not every 2 s, so a print
   comes within the voice's wait.
 - **The second voice waits for it.** A line ending while `known-unsure` is
-  fresh (3 s, as the known file) is tied to no one until it goes, at most
+  fresh (4 s, as the known file) is tied to no one until it goes, at most
   1 s past the line's end (`speaking_faces::known_once_printed`): then the
   known file as it stands, theirs only if a print wrote it back; still
   unsure at the bound, the room's ([second-voice.md](second-voice.md)). A

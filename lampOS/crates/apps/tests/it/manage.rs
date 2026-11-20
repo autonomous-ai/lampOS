@@ -79,8 +79,8 @@ fn rig(apps: &[(&str, bool)]) -> Rig {
     }
 }
 
-const A: &str = "lampapp@alpha.service";
-const A_NET: &str = "lampapp-net@alpha.service";
+const A: &str = "lamp-app@alpha.service";
+const A_NET: &str = "lamp-app-net@alpha.service";
 
 fn line(verb: &str, unit: &str) -> String {
     format!("/usr/bin/systemctl {verb} -- {unit}")
@@ -107,16 +107,64 @@ fn start_stops_the_other_variant_then_starts_and_forgets_the_stop() {
     let mut r = rig(&[("alpha", true)]);
     set(&r.layout.state, "alpha", Mark::Stopped).unwrap();
     start(&r.layout, &mut r.fx, "alpha").unwrap();
-    assert_eq!(r.fx.calls, [line("stop", A), line("start", A_NET)]);
+    // The shared cap is asked again before anything is stopped or started.
+    assert_eq!(
+        r.fx.calls,
+        [
+            "systemctl set-property --runtime lampos-apps.slice CPUWeight=50 IOWeight=50 MemoryHigh=192M MemoryMax=256M TasksMax=128".to_owned(),
+            line("stop", A),
+            line("reset-failed", A_NET),
+            line("start", A_NET)
+        ]
+    );
     assert!(!has(&r.layout.state, "alpha", Mark::Stopped));
+}
+
+/// After 5 crashes in 600 s the unit is `start-limit-hit` and systemd refuses a start until the window passes:
+/// the owner's Start clears the failed state first, the unit it is about to start, before the start. A unit that
+/// is not loaded (exit 1, "not loaded") is nothing to clear, and the start goes on.
+#[test]
+fn start_clears_the_failed_state_of_the_unit_just_before_starting_it() {
+    let mut r = rig(&[("alpha", false)]);
+    start(&r.layout, &mut r.fx, "alpha").unwrap();
+    let calls = &r.fx.calls;
+    let reset = calls
+        .iter()
+        .position(|c| *c == line("reset-failed", A))
+        .unwrap();
+    let start_at = calls.iter().position(|c| *c == line("start", A)).unwrap();
+    assert_eq!(start_at, reset + 1, "{calls:?}");
+    let mut r = rig(&[("alpha", false)]);
+    let reset = line("reset-failed", A);
+    r.fx.exits.push((reset.clone(), 1));
+    r.fx.says.push((
+        reset,
+        "Failed to reset failed state of unit lamp-app@alpha.service: Unit lamp-app@alpha.service not loaded.".into(),
+    ));
+    start(&r.layout, &mut r.fx, "alpha").unwrap();
+    assert_eq!(r.fx.calls.last(), Some(&line("start", A)));
 }
 
 #[test]
 fn a_failed_start_stays_stopped() {
     let mut r = rig(&[("alpha", false)]);
     set(&r.layout.state, "alpha", Mark::Stopped).unwrap();
-    r.fx.fail_at = Some(1);
+    // call 0 is the shared cap, 1 the stop of the other variant, 2 the reset of the failed state, 3 the start
+    r.fx.fail_at = Some(3);
     assert!(start(&r.layout, &mut r.fx, "alpha").is_err());
+    assert!(has(&r.layout.state, "alpha", Mark::Stopped));
+}
+
+/// An owner start or an install's start with the shared cap not set (it lives in /run: a failed set, or a lost
+/// one) must not run the app uncapped: refused, nothing stopped or started, the stop mark kept.
+#[test]
+fn start_refuses_an_app_when_the_shared_cap_cannot_be_set() {
+    let mut r = rig(&[("alpha", false)]);
+    set(&r.layout.state, "alpha", Mark::Stopped).unwrap();
+    r.fx.fail_at = Some(0);
+    let error = start(&r.layout, &mut r.fx, "alpha").unwrap_err();
+    assert!(error.contains("shared limit"), "{error}");
+    assert_eq!(r.fx.calls.len(), 1, "{:?}", r.fx.calls);
     assert!(has(&r.layout.state, "alpha", Mark::Stopped));
 }
 
@@ -150,20 +198,81 @@ fn start_all_starts_the_running_ones_only() {
     let (started, errors) = start_all(&r.layout, &mut r.fx);
     assert_eq!(started, ["alpha", "beta"]);
     assert!(errors.is_empty());
+    // The shared cap is set before the first app starts.
     assert_eq!(
         r.fx.calls,
-        [line("start", A), line("start", "lampapp-net@beta.service")]
+        [
+            "systemctl set-property --runtime lampos-apps.slice CPUWeight=50 IOWeight=50 MemoryHigh=192M MemoryMax=256M TasksMax=128"
+                .to_owned(),
+            line("start", A),
+            line("start", "lamp-app-net@beta.service")
+        ]
+    );
+}
+
+/// The slice has no unit file, so its cap is set at runtime; if that fails no app starts (fails closed).
+#[test]
+fn start_all_starts_no_app_when_the_shared_cap_cannot_be_set() {
+    let mut r = rig(&[("alpha", false), ("beta", false)]);
+    r.fx.fail_at = Some(0);
+    let (started, errors) = start_all(&r.layout, &mut r.fx);
+    assert!(started.is_empty());
+    assert_eq!(errors.len(), 1, "{errors:?}");
+    assert!(errors[0].contains("no app starts"), "{errors:?}");
+    assert_eq!(
+        r.fx.calls.len(),
+        1,
+        "nothing else was asked: {:?}",
+        r.fx.calls
     );
 }
 
 #[test]
 fn start_all_reports_a_failure_and_goes_on() {
     let mut r = rig(&[("alpha", false), ("beta", false)]);
-    r.fx.fail_at = Some(0);
+    // call 0 is the shared cap; call 1 is alpha's start
+    r.fx.fail_at = Some(1);
     let (started, errors) = start_all(&r.layout, &mut r.fx);
     assert_eq!(started, ["beta"]);
     assert_eq!(errors.len(), 1);
     assert!(errors[0].starts_with("alpha: "));
+}
+
+/// 0c89, 20 Nov 16:04: an installed app whose unit is not loaded (its template not placed yet by the old updater
+/// that ran the round, #8115) makes `systemctl start` exit 5. `start_all` reports it and goes on to the next app
+/// (the OS's own units are the round's to judge), and the boot start's exit never fails because of it
+/// (`main.rs`, checked below).
+#[test]
+fn start_all_goes_on_past_an_app_whose_unit_is_not_loaded() {
+    let mut r = rig(&[("alpha", false), ("beta", false)]);
+    r.fx.exits.push((line("start", A), 5));
+    let (started, errors) = start_all(&r.layout, &mut r.fx);
+    assert_eq!(started, ["beta"]);
+    assert_eq!(errors.len(), 1, "{errors:?}");
+    assert!(errors[0].starts_with("alpha: "), "{errors:?}");
+    assert!(errors[0].contains("exit 5"), "{errors:?}");
+}
+
+/// `start-all` never exits non-zero for an app that will not start: the unit is restarted by an update's round, and
+/// a failed unit puts the whole round back (0c89, 20 Nov 16:04). The arm of `main` that runs it returns success
+/// after logging each error, and nowhere in that arm after `start_all(` is a failure returned.
+#[test]
+fn the_boot_start_never_fails_its_unit_for_an_app_that_will_not_start() {
+    let source =
+        std::fs::read_to_string(concat!(env!("CARGO_MANIFEST_DIR"), "/src/main.rs")).unwrap();
+    let arm = source
+        .split("Some(\"start-all\") =>")
+        .nth(1)
+        .expect("the start-all arm");
+    let after = arm
+        .split("start_all(&layout, &mut fx)")
+        .nth(1)
+        .expect("the call")
+        .split("_ => {")
+        .next()
+        .unwrap();
+    assert!(after.contains("ExitCode::SUCCESS"), "{after}");
+    assert!(!after.contains("FAILURE"), "{after}");
 }
 
 #[test]

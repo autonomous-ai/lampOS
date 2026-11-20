@@ -831,6 +831,9 @@ fn the_exit_note_allowlist_is_exactly_clouds_product_services() {
         .unwrap()
         .map(|entry| entry.unwrap().file_name().into_string().unwrap())
         .filter(|name| name.starts_with("lamp-") && name.ends_with(".service"))
+        // The Store apps' templates are a third party's program, never reported by Cloud (and no app's name is
+        // sent): the same two names are left out in lamp-cloud's own check.
+        .filter(|name| !["lamp-app@.service", "lamp-app-net@.service"].contains(&name.as_str()))
         .collect();
     services.sort();
     assert_eq!(services, names, "no duplicate, omitted or extra unit");
@@ -1535,7 +1538,7 @@ fn every_part_of_the_lamp_waits_for_setups_marker_itself() {
             );
         }
     }
-    assert_eq!(gated.len(), 28, "{gated:?}");
+    assert_eq!(gated.len(), 29, "{gated:?}");
     for outside in ["lamp-update.service", "lamp-records.timer"] {
         assert!(!gated.contains(&outside), "{outside}");
     }
@@ -4099,6 +4102,60 @@ fn the_product_reads_speaking_on_steady_looks() {
         "Environment=LAMP_FACE_REFOUND=on",
     ] {
         assert!(service.contains(&on), "lamp-eyes.service lacks {on}");
+    }
+}
+
+/// The sticky identity plan (docs/face-recognition-sticky-identity-plan.md),
+/// as its owner set it on #7933 (20 Nov, 01:55): the eyes and the voice both
+/// read `LAMP_FACE_STICKY`; the eyes hold a poor print on the held id
+/// (`LAMP_FACE_KNOWN_ON_ID`, T5), follow a new id in the held face's place
+/// (`LAMP_FACE_FOLLOW_NEAR_NEW_ID`) and count no poorly scored takeover look
+/// (`LAMP_FACE_TAKEOVER_SCORE`), the pair on by the owner's call (20 Nov);
+/// the voice holds the conversation's person
+/// with no face (`LAMP_FACE_NO_FACE_HOLD`, T1) and journals carried lines
+/// (`LAMP_CARRIED_JOURNAL`, T9). Each switch is in its own unit only.
+#[test]
+fn the_product_holds_a_known_name_sticky_with_the_plans_switches_on() {
+    for (name, on, off) in [
+        (
+            "lamp-eyes.service",
+            &[
+                "Environment=LAMP_FACE_STICKY=on",
+                "Environment=LAMP_FACE_KNOWN_ON_ID=on",
+                "Environment=LAMP_FACE_FOLLOW_NEAR_NEW_ID=on",
+                "Environment=LAMP_FACE_TAKEOVER_SCORE=on",
+            ][..],
+            &["LAMP_FACE_NO_FACE_HOLD=on", "LAMP_CARRIED_JOURNAL=on"][..],
+        ),
+        (
+            "lamp-voice.service",
+            &[
+                "Environment=LAMP_FACE_STICKY=on",
+                "Environment=LAMP_FACE_NO_FACE_HOLD=on",
+                "Environment=LAMP_CARRIED_JOURNAL=on",
+            ][..],
+            &[
+                "LAMP_FACE_KNOWN_ON_ID=on",
+                "LAMP_FACE_FOLLOW_NEAR_NEW_ID=on",
+                "LAMP_FACE_TAKEOVER_SCORE=on",
+            ][..],
+        ),
+    ] {
+        let text = install::PRODUCT
+            .iter()
+            .find(|(unit, _)| *unit == name)
+            .unwrap_or_else(|| panic!("no {name}"))
+            .1;
+        let service = section(text, "Service");
+        for line in on {
+            assert!(service.contains(line), "{name} lacks {line}");
+        }
+        for line in off {
+            assert!(
+                !service.iter().any(|kept| kept.contains(line)),
+                "{name} has {line}, not its own switch"
+            );
+        }
     }
 }
 
@@ -9589,4 +9646,20 @@ fn the_product_sees_with_cloud_perception() {
             "{name} sets the voice's offer"
         );
     }
+}
+
+/// A round carries a product unit only if its first `ExecStart=` is a lamp program (#7956's row on lamp-75c9: the
+/// folders unit that ran `/usr/bin/install` was never in the manifest, so no round could add it).
+#[test]
+fn the_apps_folders_unit_is_binary_backed_so_a_round_can_carry_and_add_it() {
+    let (_, text) = PRODUCT
+        .iter()
+        .find(|(name, _)| *name == "lamp-apps-folders.service")
+        .expect("in the product's list");
+    assert!(
+        lamp_update::unit::linked(text)
+            .is_some_and(|(folder, binary)| folder == "/opt/lampOS/apps-manage/"
+                && binary == "lamp-apps-manage"),
+        "{text}"
+    );
 }
