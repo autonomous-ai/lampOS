@@ -237,6 +237,60 @@ mod tests {
         );
     }
 
+    /// With the skill switch, the made skills' names as said and their
+    /// asks, read from the tools file the matcher reads (`made_asks`),
+    /// follow the words of a make: lamp-52e6, 20 Nov, "Hey Lamp, apple
+    /// file." came back as two other words. Each once, within the bound;
+    /// off, none.
+    #[test]
+    fn the_made_skills_names_and_asks_follow_a_makes_words_with_the_switch() {
+        let dir = std::env::temp_dir().join(format!("lvs-key-terms-made-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        std::fs::write(
+            dir.join(crate::tools::CATALOG_FILE),
+            serde_json::json!({
+                "tools": [],
+                "made_asks": {
+                    "apple-file": ["open my apple file", "Skill"],
+                    "tech_news": [],
+                },
+            })
+            .to_string(),
+        )
+        .unwrap();
+        let settings = crate::tools::Settings {
+            skills: Some(dir.clone()),
+            ..Default::default()
+        };
+        let made = made_terms(&settings);
+        assert_eq!(made, ["apple file", "open my apple file", "Skill", "tech news"]);
+        let fixed = ["Hanoi"].map(String::from);
+        if NAMES.get().is_none() {
+            assert_eq!(listening_with(&fixed, false, &made), fixed);
+            assert_eq!(
+                listening_with(&fixed, true, &made),
+                [
+                    "Hanoi",
+                    "skill",
+                    "make a skill",
+                    "new skill",
+                    "apple file",
+                    "open my apple file",
+                    "tech news",
+                ]
+            );
+        }
+        let full: Vec<String> = (0..crate::second_config::MOST_KEY_TERMS)
+            .map(|n| format!("Place {}", char::from(b'a' + n as u8)))
+            .collect();
+        let heard = listening_with(&full, true, &made);
+        assert!(heard.len() <= MOST, "{}", heard.len());
+        for term in ["apple file", "open my apple file", "tech news"] {
+            assert_eq!(heard.iter().filter(|said| *said == term).count(), 1, "{term}");
+        }
+        std::fs::remove_dir_all(dir).ok();
+    }
+
     #[test]
     fn the_switch_is_on_only_for_on() {
         assert!(on(Some("on")));
