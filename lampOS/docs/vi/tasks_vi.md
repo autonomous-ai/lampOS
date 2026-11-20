@@ -2950,7 +2950,11 @@ không thêm gì vào prompt của lượt ngoài một dòng việc-còn-mở b
   work; say what is being done or what was found." (`NO_AGENT_NAME`); một
   engine do người dùng tự nêu thì được nói lại đúng tên, còn lời của việc
   và câu trả lời của agent không bao giờ bị đổi
-  (`the_lamps_own_engine_is_never_named_in_its_news`).
+  (`the_lamps_own_engine_is_never_named_in_its_news`). Lời giao việc của nó
+  nói ở ngôi thứ nhất ("Sure, I'll work on that.", với câu hỏi "Sure, I'll
+  look into that."), không bao giờ "giving that to the lamp", và khi chưa
+  cài thì "That isn't set up here yet."
+  (`the_lamps_own_work_is_handed_over_in_the_first_person`).
   Mỗi lần đọc được ghi vào journal, chỉ ở lượt có đọc:
   `lamp-voice: tasks: request N: open work <id> read in <ms> ms (<state>|none)`,
   `none` khi lamp-tasks không trả bản ghi (không tới được, bị từ chối, hoặc
@@ -2980,7 +2984,10 @@ không thêm gì vào prompt của lượt ngoài một dòng việc-còn-mở b
   (`a_made_skills_brief_is_never_told_as_the_persons_work`).
 - **Không có `task`.** Voice hỏi `{"op":"work_list","limit":5}` và trả lời
   bằng `works`, mới nhất trước. Mỗi dòng gồm `id`, `kind` (`task`), `who`
-  (tên agent như tin báo nói), `label`, `state`, `done`, và khi bản ghi có
+  (tên agent như tin báo nói: "the lamp" cho các engine riêng của đèn,
+  những engine đã đọc cùng Hermes và OpenClaw, không bao giờ nói tên chúng,
+  #7930, và bước của một việc đang chạy được kể là "how far the task is";
+  `a_record_names_a_computers_agent_never_the_lamps_own`), `label`, `state`, `done`, và khi bản ghi có
   thì `elapsed_s`, `tools` và `step` (tên công cụ của bước mới nhất, không
   bao giờ là lời của agent), và `session` khi agent đã bắt đầu:
   `{"agent":"…"}`, kèm `"machine":"…"` khi có. Việc mới nhất được kể đầy đủ
@@ -4169,9 +4176,12 @@ dõi): lamp-tasks giữ một dấu bên cạnh store, `works-forgotten.json` (m
 0600, chỉ có id: id của store và id tác vụ mới nhất của nó lúc đó,
 `works::Forgotten`), và không tác vụ nào của store đó tới id ấy được mở
 lại, dù bởi lần cập nhật sau hay bởi một lamp-tasks khởi động lại trên
-cùng store. Một dấu không ghi được thì trả lời `forget_failed`. Một tác vụ
-giao sau đó có bản ghi của nó. Giọng nói cũng buông việc nó giao gần nhất
-(`HANDED`), nên không có ghi chú việc-còn-mở nào và không có "mất sau khi
+cùng store. Một tác vụ mới chỉ được chuẩn bị lúc quên thì không nằm trong
+dấu (`prepared`): một lời đồng ý sau khi quên đưa nó lên bản ghi
+(`forget_sessions_spares_a_task_prepared_before_and_confirmed_after`). Một
+dấu không ghi được thì trả lời `forget_failed`. Một tác vụ giao sau đó có
+bản ghi của nó. Giọng nói cũng buông việc nó giao gần nhất (`HANDED`), dù
+tasks part trả lời thế nào, nên không có ghi chú việc-còn-mở nào và không có "mất sau khi
 khởi động lại" nào theo sau
 (`forget_all_leaves_no_record_words_or_answer` và
 `the_forget_mark_hides_its_stores_tasks_up_to_its_id_and_is_kept`,

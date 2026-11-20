@@ -60,17 +60,22 @@ pub const FORGOTTEN_FILE: &str = "works-forgotten.json";
 /// newest task id then. Every task of that store up to it is never on the
 /// records again: one confirmed a moment before, not yet on the records,
 /// or one a restarted lamp-tasks would open again from the store. Kept
-/// beside the store ([`FORGOTTEN_FILE`]), ids only.
+/// beside the store ([`FORGOTTEN_FILE`]), ids only. A task only prepared
+/// then (`prepared`) is left out: a yes after the forget is new, and that
+/// task is on the records once it is confirmed.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Forgotten {
     pub store_id: String,
     pub through: u64,
+    /// The tasks only prepared at the forget, not yet confirmed.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub prepared: Vec<u64>,
 }
 
 impl Forgotten {
     /// Whether store `store_id`'s task `task` was forgotten.
     pub fn hides(&self, store_id: &str, task: u64) -> bool {
-        self.store_id == store_id && task <= self.through
+        self.store_id == store_id && task <= self.through && !self.prepared.contains(&task)
     }
 
     /// The mark kept in `file`; none when there is none or it can't be read.
@@ -550,15 +555,20 @@ mod tests {
     }
 
     /// #7930: the forget mark hides its own store's tasks up to its id
-    /// only, and is read back as it was kept.
+    /// only, never one only prepared then, and is read back as it was kept.
     #[test]
     fn the_forget_mark_hides_its_stores_tasks_up_to_its_id_and_is_kept() {
         let mark = Forgotten {
             store_id: "s1".into(),
             through: 4,
+            prepared: vec![3],
         };
         assert!(mark.hides("s1", 1) && mark.hides("s1", 4));
         assert!(!mark.hides("s1", 5) && !mark.hides("s2", 1));
+        assert!(!mark.hides("s1", 3));
+        // A mark kept before `prepared` was added reads as none prepared.
+        let old: Forgotten = serde_json::from_str(r#"{"store_id":"s1","through":4}"#).unwrap();
+        assert!(old.hides("s1", 3));
         let dir = tempfile::tempdir().unwrap();
         let file = dir.path().join(FORGOTTEN_FILE);
         assert_eq!(Forgotten::load(&file), None);

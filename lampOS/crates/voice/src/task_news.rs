@@ -2521,9 +2521,6 @@ mod tests {
         NewsWords::in_dir(&std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../skills"))
     }
 
-    /// What the voice said before its words were Task news' (#940), kept
-    /// here as it was: the byte-for-byte test below holds the skill's
-    /// words to it.
     /// #7930 (the owner): news of work the lamp's own engine did never
     /// names that engine, and carries the one rule; a task about Hermes
     /// keeps "Hermes" in its own words.
@@ -2541,6 +2538,9 @@ mod tests {
         assert_eq!(who(&computer), "Claude Code");
     }
 
+    /// What the voice said before its words were Task news' (#940), kept
+    /// here as it was: the byte-for-byte test below holds the skill's
+    /// words to it.
     mod before {
         use super::super::*;
 
@@ -5279,14 +5279,15 @@ mod tests {
         };
         assert!(on_the_lamp(&fetched(Value::Null)));
         assert_eq!(their_computer(&fetched(Value::Null)), "the lamp");
-        assert_eq!(who(&fetched(Value::Null)), "Hermes");
+        // The lamp's own engine is never named (the owner, #7930).
+        assert_eq!(who(&fetched(Value::Null)), crate::agent_tasks::OWN_ENGINE);
         let elsewhere = fetched(json!({"alias":"office","machine_id":"m","engine":"codex"}));
         assert!(!on_the_lamp(&elsewhere));
         assert_eq!(their_computer(&elsewhere), "their computer");
         assert_eq!(who(&elsewhere), "Codex");
         let on = |alias: &str, engine: &str| json!({"text":"Write a poem","target":{"engine":engine},"target_alias":alias});
         let lamp = note(&own(), &on("lamp", "hermes"), &done, 0).unwrap();
-        assert!(lamp.contains("Hermes"), "{lamp}");
+        assert!(!lamp.contains("Hermes"), "{lamp}");
         assert!(lamp.ends_with(&format!("{ON_THE_LAMP})")), "{lamp}");
         assert_eq!(their_computer(&on("lamp", "hermes")), "the lamp");
         let office = note(&own(), &on("office", "claude"), &done, 0).unwrap();
@@ -5297,7 +5298,7 @@ mod tests {
     }
 
     /// #6226: work done by OpenClaw on the lamp itself is told as done
-    /// here on the lamp, by OpenClaw, as Hermes's.
+    /// here on the lamp, as Hermes's, never naming either (#7930).
     #[test]
     fn work_done_by_openclaw_on_the_lamp_is_told_as_done_here() {
         let done =
@@ -5305,10 +5306,10 @@ mod tests {
         let on =
             json!({"text":"Write a poem","target":{"engine":"openclaw"},"target_alias":"lamp"});
         assert!(on_the_lamp(&on));
-        assert_eq!(who(&on), "OpenClaw");
+        assert_eq!(who(&on), crate::agent_tasks::OWN_ENGINE);
         assert_eq!(their_computer(&on), "the lamp");
         let lamp = note(&own(), &on, &done, 0).unwrap();
-        assert!(lamp.contains("OpenClaw"), "{lamp}");
+        assert!(!lamp.contains("OpenClaw"), "{lamp}");
         assert!(lamp.ends_with(&format!("{ON_THE_LAMP})")), "{lamp}");
         let office =
             json!({"text":"Write a poem","target":{"engine":"openclaw"},"target_alias":"office"});

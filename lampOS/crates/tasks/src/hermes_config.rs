@@ -1005,10 +1005,6 @@ custom_providers:
 
     const SERVERS: &str = "mcp_servers:\n  lamp-services:\n    command: \"/opt/lampOS/services/current/lamp-services\"\n    args:\n    - \"mcp\"\n    env:\n      LAMP_CONTROL_SOCKET: \"${LAMP_CONTROL_SOCKET}\"\n      LAMP_CONTROL_TOKEN: \"${LAMP_CONTROL_TOKEN}\"\n";
 
-    /// LAMP_AGENT_SERVICES: on, the lamp's MCP server is added, once, with
-    /// the run's socket and token left to Hermes's interpolation; off, the
-    /// lamp's entry alone is taken out, a person's server kept, and an
-    /// emptied `mcp_servers` goes.
     /// #7930 (the owner's P1): the guidance asks for a last answer that says
     /// what the agent found, first, within what reaches the voice; Hermes'
     /// and OpenClaw's alike.
@@ -1029,6 +1025,10 @@ custom_providers:
         }
     }
 
+    /// LAMP_AGENT_SERVICES: on, the lamp's MCP server is added, once, with
+    /// the run's socket and token left to Hermes's interpolation; off, the
+    /// lamp's entry alone is taken out, a person's server kept, and an
+    /// emptied `mcp_servers` goes.
     #[test]
     fn the_lamps_mcp_server_is_added_on_and_removed_off() {
         let on = merge_config_for(HARNESS, 7741, true).unwrap();
