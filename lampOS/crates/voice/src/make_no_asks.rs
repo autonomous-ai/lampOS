@@ -138,6 +138,41 @@ pub const NOT_OWNERS_CODE: &str =
 pub const CODE_OFF: &str = "this lamp doesn't run a made skill's own code";
 /// What a remove or an undo not the owner's is told.
 pub const NOT_OWNER: &str = "only the lamp's owner can remove a skill they made, or undo that";
+
+/// What the model is told, beside a spoken line's words in its first chat
+/// round, when the line went on, at once, from words cut short just
+/// before it and not joined to them ([`split_note`], #7976): judge whether
+/// they are one ask. A line that is its own ask is answered as it was
+/// said (Heron's P2 on #7990: "make a skill that glows blue at nine" after
+/// "what time is it"), and a whole ask keeps every part of it (his P3:
+/// "turn off the tea reminder and the daily brief"). Never a list of
+/// words.
+pub const SPLIT_NEXT: &str = "Judge whether this line goes on with those words. If it does, \
+     they are one ask: do all of it, every part, with the words of every line (a skill to make \
+     is made with the whole ask of all of them as its request), and turn off, turn on, remove, \
+     undo or run no skill for words that only describe that ask. If it is its own ask, answer \
+     it as it was said. Never mention this note.";
+
+/// The note told beside a spoken line's words in its first chat round
+/// when the line began `gap` after the last of `parts`, words cut short
+/// before any of their answer was heard and not joined to it, oldest first:
+/// one line, or a chain of lines each cut short by the next (#7976: on
+/// lamp-9adf "Lamp, make a skill called tea reminder: every afternoon at
+/// three, remind me to drink a cup of green tea." came as three lines, and
+/// the last, asked alone, lost the make). The model judges whether the
+/// line goes on with them ([`SPLIT_NEXT`]), whatever it calls first.
+pub fn split_note(parts: &[&str], gap: Duration) -> String {
+    let said = parts
+        .iter()
+        .map(|part| format!("\"{}\"", part.trim()))
+        .collect::<Vec<_>>()
+        .join(", then ");
+    format!(
+        "Words said just before this line, cut short by it and not answered, oldest first: {said}. \
+         This line began {} ms after they ended. {SPLIT_NEXT}",
+        gap.as_millis()
+    )
+}
 /// What an undo with nothing to undo is told.
 pub const NOTHING_TO_UNDO: &str = "nothing that can be undone was done to a skill they made";
 

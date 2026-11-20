@@ -4895,6 +4895,46 @@ và khôi phục cài đặt gốc là còn hỏi. Khi bật (`crate::make_no_as
   (`make_skill_local::PRODUCT_MOST_PARAMETERS_BYTES`, chừa chỗ cho một
   tham số sau này; #8002: trước đó là 4.174, mỗi mô tả được nói ngắn hơn,
   giữ mọi tham số và ý nghĩa của nó).
+- **Một lần tạo bị tách đôi vẫn là một lần tạo** (#7976: trên lamp-9adf,
+  19/11, "Lamp, make a skill called tea reminder: every day at five in the
+  afternoon, glow green and say time for tea." đến thành hai câu, cắt ở
+  dấu hai chấm; câu thứ hai bắt đầu 0,76 s sau khi câu đầu kết thúc và cắt
+  ngang nó trước khi nghe được câu trả lời nào, phần nối từ chối ghép vì
+  không có kiểm tra giọng hay khuôn mặt nào được thấy nói cả hai, và câu
+  thứ hai, được hỏi riêng, đã tắt một kỹ năng cũ, time for tea; và ngày
+  20/11, 01:01, "Lamp, make a skill called tea reminder: every afternoon
+  at three, remind me to drink a cup of green tea." đến thành ba câu, câu
+  cuối được hỏi riêng, lời gọi đầu tiên của nó là `list_reminders`, và
+  lần tạo bị mất). Trên route thứ hai, một câu bắt đầu trong vòng 3 s của
+  phần nối (`JOIN_WITHIN`) sau những lời bị cắt ngang ngay trước nó, chưa
+  nghe được câu trả lời nào, không được ghép vào nó và không được phân
+  biệt với nó (trừ riêng tên của đèn, lời mang qua một câu bị giữ, và lời
+  của người khác bị cắt trong khoảng ân hạn của quãng ngừng đã được báo
+  trước; không bao giờ khi phán quyết của phần nối là hai giọng theo bản
+  in giọng nói hay hai khuôn mặt được thấy nói, `Joined::told_apart`), thì
+  được cho biết những lời đó bên cạnh lời của chính nó ngay trong lượt
+  chat đầu tiên (`make_no_asks::split_note`), dù mô hình gọi gì trước. Một
+  chuỗi cũng được tính: khi câu bị cắt chính nó đã được cho biết những lời
+  bị cắt ngay trước nó, thì những lời đó đứng trước, cũ nhất trước, mỗi
+  mắt xích trong vòng 3 s và cả chuỗi trong 20 s của chuỗi
+  (`CHAIN_MOST_FOR`). Mô hình tự phán đoán câu này có nói tiếp những lời
+  đó không (`make_no_asks::SPLIT_NEXT`): nếu có thì chúng là một yêu cầu,
+  làm đủ mọi phần với lời của mọi câu, kỹ năng được tạo với cả yêu cầu
+  làm request, và không kỹ năng nào bị tắt, bật, xóa, hoàn tác hay chạy vì
+  những lời chỉ mô tả yêu cầu đó; "If it is its own ask, answer it as it
+  was said." Các lời gọi được chạy ngay khi đến, không bao giờ dùng danh
+  sách từ. Câu không có lời nào bị cắt ngay trước, câu sau quá 3 s, câu đã
+  được ghép, hoặc câu đã được phân biệt, vẫn như trước: không có ghi chú,
+  không thêm lượt và không chờ; một câu bị tách được cho biết ngay trong
+  lượt nó vốn được hỏi, nên cũng không tốn thêm lượt mô hình nào, chỉ thêm
+  lời của ghi chú. Nhưng một cuộc chat bắt đầu sớm trên lời sớm của câu bị
+  tách sẽ bị bỏ (ghi chú đi bên cạnh lời, `Prepared::misfit`), nên câu đó
+  chờ lượt đầu tiên từ lời cuối cùng của nó. Không có gì cho thấy một
+  người đã nói tất cả, nên việc ghi nhớ của câu bị tách là của căn phòng
+  (`narrow_to_room`), như lời được báo trước. Một câu bị cắt mà các lượt
+  chat của nó đã chạy một lời gọi thì không được báo, cũng như mọi lời đã
+  báo cho nó trước đó: nó đã làm theo những lời ấy. Lời giữ cho một chuỗi
+  bị bỏ khi dừng, khi đóng quyền riêng tư hoặc khi tắt tiếng.
 
 `lamp-voice` truyền đúng `on` cho worker `provider` và `second`. Khi tắt,
 mọi lần tạo và xóa giống hệt từng byte như trước.

@@ -1671,6 +1671,22 @@ pub enum Joined {
     /// as today, and the journal says why.
     Not(String),
 }
+/// Why [`Joined::Not`] when two faces were seen speaking the two lines.
+pub const TWO_FACES_SPEAKING: &str = "two faces were seen speaking them";
+/// How [`Joined::Not`]'s why opens when the two lines' voice prints are
+/// two people's, the cosine after it.
+pub const TWO_VOICES: &str = "two voices (cosine";
+
+impl Joined {
+    /// Whether the verdict told the two lines apart: two faces seen
+    /// speaking them, or two voices by their prints. Not a refusal for
+    /// want of a sign, nor a sign of someone else in the room (#7976:
+    /// only a line nothing could tell apart is held as a split one).
+    pub fn told_apart(&self) -> bool {
+        matches!(self, Joined::Not(why) if why == TWO_FACES_SPEAKING || why.starts_with(TWO_VOICES))
+    }
+}
+
 /// Asked of the line cut short and the line that cut it, by request.
 pub type SameSpeaker = Arc<dyn Fn(u64, u64) -> Joined + Send + Sync>;
 /// Where a spoken turn's verdict is said (`voice/turn`, #1155): its
@@ -1997,6 +2013,17 @@ struct Shared {
     /// (`LAMP_CUT_ASK_ANSWERED`): still set when [`answer`] returns, its
     /// answer only declined, and they are answered in its place.
     declined_in_place: Mutex<Option<u64>>,
+    /// The words cut short just before the last spoken line, none of their
+    /// answer heard and not joined to it, the line begun within
+    /// [`JOIN_WITHIN`] of their end (#7976, with `LAMP_MAKE_NO_ASKS`): told
+    /// beside its words in its first chat round, and kept so a line that
+    /// cuts it short in turn is told them too ([`keep_split_before`]).
+    split_before: Mutex<Option<SplitBefore>>,
+    /// The words cut short and the line that cut them, by request, when
+    /// the join's verdict told the two apart: two faces seen speaking them,
+    /// or two voices by their prints ([`Joined::told_apart`]). Such a line
+    /// is never held as a split one (#7976).
+    cut_told_apart: Mutex<Option<(u64, u64)>>,
     /// Whether a request was judged said by the person the lamp asked:
     /// their voice, or a face turned to the lamp
     /// ([`Engine::answering_the_asked_person`]).
@@ -5160,6 +5187,8 @@ impl Engine {
                 answer_again: false,
                 cut_ask_answered: false,
                 declined_in_place: Mutex::new(None),
+                split_before: Mutex::new(None),
+                cut_told_apart: Mutex::new(None),
                 asked_person: None,
                 written_wait: false,
                 begin: begin_limits(false),
@@ -5375,6 +5404,11 @@ impl Engine {
             // A write read back and waiting for its send goes too
             // (Thirteen's P2 on #5968).
             crate::services::forget_waiting();
+            // Words cut short a split line was told are not told across a
+            // privacy close or a mute (Heron's P3 on #7990).
+            if let Ok(mut split) = self.shared.split_before.lock() {
+                *split = None;
+            }
             if self.shared.remember_speaker {
                 crate::remember_speaker::forget();
                 if let Some(eyes) = &self.shared.enrollment_sight {
@@ -8787,6 +8821,10 @@ impl Engine {
     /// Words cut short and not yet taken are let go, and the journal says
     /// `why`.
     fn let_go_cut(&self, why: &str) {
+        // Words a split line was told go with them (Heron's P3 on #7990).
+        if let Ok(mut split) = self.shared.split_before.lock() {
+            *split = None;
+        }
         if let Some(cut) = self.shared.cut.lock().ok().and_then(|mut cut| cut.take()) {
             eprintln!(
                 "lamp-voice second: request {}'s words, cut short, are let go: {why}",
@@ -11684,6 +11722,29 @@ async fn spoken(
         );
     }
     let cut_told = cut_in_the_grace.is_some();
+    // Words cut short just before it and not joined (#7976): told beside
+    // its words in its first round, whatever the model calls first, never
+    // words told above as another person's. One lock, no I/O.
+    let split = keep_split_before(
+        &shared,
+        request,
+        &marks,
+        carried.as_ref().filter(|_| !the_name_refused && !cut_told),
+    );
+    // Nothing showed one person said them all: in the dark no print and no
+    // face, so the words may be another person's. The line's keep is the
+    // room's, as words told first are (Heron's and Twelve's P2 on #7990),
+    // and the chat begun early, asked as the person's, is dropped.
+    if split.is_some() {
+        if let Some(scope) = &scope {
+            scope.narrow_to_room();
+        }
+        if prepared.take().is_some() {
+            eprintln!(
+                "lamp-voice second: request {request}: the chat begun on its early words is dropped: it was asked as the person's, and the line is told cut words (#7976)"
+            );
+        }
+    }
     let earlier_parts: Vec<Part> = kept_earlier
         .into_iter()
         .chain(
@@ -12069,6 +12130,7 @@ async fn spoken(
     let mut notes: Vec<String> = stopped
         .into_iter()
         .chain(earlier)
+        .chain(split)
         .chain(pushed)
         .chain(misheard)
         .chain(staff)
@@ -13352,6 +13414,107 @@ async fn said_by_the_name(
     }
 }
 
+/// Words cut short just before spoken line `request`, not joined to it
+/// ([`Shared::split_before`], #7976): their parts, oldest first, with any
+/// told the line they came from in turn, and how long after their end the
+/// line began.
+#[derive(Clone)]
+struct SplitBefore {
+    request: u64,
+    parts: Vec<Part>,
+    gap: Duration,
+}
+
+/// The note for spoken line `request` of the words `carried` it cut short
+/// and was not joined to, when they were that line's own and the line just
+/// before it, `request` begun within [`JOIN_WITHIN`] of their end, and they
+/// were more than the lamp's name: a split line, whose first part is not
+/// in the model's words (#7976). Told beside its words in its first chat
+/// round, so the model judges whether they are one ask whatever it calls
+/// first. A chain counts: when the cut line was itself told words cut
+/// short just before it, those come first, oldest first, each link within
+/// the join's window and the whole within [`CHAIN_MOST_FOR`]. Only when
+/// nothing told the two lines apart: words a voice print or two speaking
+/// faces showed another person's ([`Shared::cut_told_apart`]) are never
+/// told; nor are words whose line already ran a call, or any told it
+/// before them: that line acted on them, and telling them as not answered
+/// would do it twice (Twelve's P2 on #7990). Anything else, or the switch
+/// off, tells none and keeps none.
+fn keep_split_before(
+    shared: &Shared,
+    request: u64,
+    marks: &Marks,
+    carried: Option<&Carried>,
+) -> Option<String> {
+    let apart = shared
+        .cut_told_apart
+        .lock()
+        .ok()
+        .and_then(|mut apart| apart.take());
+    let Ok(mut kept) = shared.split_before.lock() else {
+        return None;
+    };
+    let before = kept.take();
+    let now = (shared.clock)();
+    let split = carried
+        .filter(|carried| carried.said_by == carried.request)
+        .filter(|carried| apart != Some((carried.request, request)))
+        .filter(|carried| !ran_a_call(&carried.rounds))
+        .filter(|_| crate::make_no_asks::on())
+        .and_then(|carried| {
+            let (_, gap) = marks.after_end.filter(|(of, _)| *of == carried.request)?;
+            let parts = split_parts(before, carried, now);
+            let words = words_of(&parts);
+            (gap <= JOIN_WITHIN
+                && words.chars().any(char::is_alphanumeric)
+                && !name_alone(&words)
+                && !crate::attention::only_the_name(&words))
+            .then_some(SplitBefore {
+                request,
+                parts,
+                gap,
+            })
+        });
+    kept.clone_from(&split);
+    drop(kept);
+    let split = split?;
+    let said: Vec<&str> = split
+        .parts
+        .iter()
+        .map(|part| part.text.trim())
+        .filter(|text| !text.is_empty())
+        .collect();
+    eprintln!(
+        "lamp-voice second: request {request}: told the words cut short just before it, not joined to it ({} line(s), {} words; it began {} ms after them): the model judges whether they are one ask (#7976)",
+        said.len(),
+        said.iter()
+            .map(|text| text.split_whitespace().count())
+            .sum::<usize>(),
+        split.gap.as_millis()
+    );
+    Some(crate::make_no_asks::split_note(&said, split.gap))
+}
+
+/// The parts a split line is told ([`keep_split_before`]): those the cut
+/// line `carried` was itself told, when `before` is that line's own and
+/// each began within [`CHAIN_MOST_FOR`] of `now`, then `carried`'s own,
+/// oldest first.
+fn split_parts(before: Option<SplitBefore>, carried: &Carried, now: Instant) -> Vec<Part> {
+    let mut parts: Vec<Part> = before
+        .filter(|before| before.request == carried.request)
+        .map(|before| before.parts)
+        .unwrap_or_default();
+    parts.retain(|part| now.saturating_duration_since(part.at) <= CHAIN_MOST_FOR);
+    parts.extend(carried.parts.iter().cloned());
+    parts
+}
+
+/// Whether finished chat rounds kept with a line's words ([`Carried::rounds`])
+/// ran a call: a call's result among them.
+fn ran_a_call(rounds: &[Message]) -> bool {
+    rounds.iter().any(|message| message.role == "tool")
+}
+
 /// `text`, the words of `request`, let out or held (`let_out`), and
 /// `carried`, the words of the line it cut short, none of whose answer was
 /// heard, with the chain cut short before that line: all asked as one line
@@ -13403,6 +13566,11 @@ async fn joined_with_cut(
         return (text, Some(carried), vec![own]);
     }
     let said = said_by_one(same, (carried.request, request), bound).await;
+    if said.told_apart()
+        && let Ok(mut apart) = shared.cut_told_apart.lock()
+    {
+        *apart = Some((carried.request, request));
+    }
     let verdict = said.clone();
     let why = match said {
         Joined::Same(why) => Ok(why.to_owned()),
