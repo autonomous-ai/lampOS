@@ -191,6 +191,7 @@ pub fn args_on_cdn(args: impl Iterator<Item = std::ffi::OsString>) -> Vec<std::f
 mod tests {
     use super::*;
     use crate::fetch::Fetch;
+    use crate::round::{Config, Outcome};
     use ring::{rand::SystemRandom, signature::Ed25519KeyPair, signature::KeyPair};
     use std::collections::HashMap;
 
@@ -397,6 +398,176 @@ mod tests {
             SWITCH,
             Some("on".as_ref())
         ));
+    }
+
+    fn following(url: &str) -> crate::round::Config {
+        crate::round::Config {
+            root: "/".into(),
+            units: "/etc/systemd/system/".into(),
+            records: "/var/lib/lampos-update/".into(),
+            channel: "lamp-voice".into(),
+            channel_url: url.into(),
+            key: [7; 32],
+            lamp: "lamp-06c1".into(),
+            apply: true,
+            quiet_wait: std::time::Duration::ZERO,
+            watch: std::time::Duration::ZERO,
+            keep_free: 0,
+            self_switch: true,
+            running: None,
+            updater: manifest::UPDATER,
+            models: false,
+            models_file: false,
+            settings: false,
+            product_settings: false,
+            image: false,
+            first_update: false,
+            writer_from: None,
+        }
+    }
+
+    const MINUTE: u64 = 60 * 1000;
+
+    /// One round at `now`, the CDN answering with `cdn` and GitHub with
+    /// `Switched(14923)`: the feeds read, in order.
+    fn round_at(
+        records: &Path,
+        config: &crate::round::Config,
+        now: u64,
+        cdn: Outcome,
+    ) -> (Outcome, Vec<String>) {
+        let mut read = Vec::new();
+        let outcome = round_on(
+            config,
+            records,
+            now,
+            &mut |config: &crate::round::Config| {
+                read.push(config.channel_url.clone());
+                if config.channel_url == CDN {
+                    cdn.clone()
+                } else {
+                    // The same key, channel and switches as the CDN round's.
+                    assert_eq!(config.key, [7; 32]);
+                    assert_eq!(config.channel, "lamp-voice");
+                    assert!(config.apply && config.self_switch);
+                    Outcome::Switched(14923)
+                }
+            },
+            &mut |_| {},
+        );
+        (outcome, read)
+    }
+
+    fn down() -> Outcome {
+        Outcome::Unreachable("no answer".into())
+    }
+
+    #[test]
+    fn the_cdn_stays_first_and_github_is_read_only_after_an_hour_of_cdn_failures() {
+        let folder = tempfile::tempdir().unwrap();
+        let records = folder.path();
+        let config = following(CDN);
+        let t0 = 1_800_000_000_000;
+        // The CDN up: the CDN only.
+        let (outcome, read) = round_at(records, &config, t0, Outcome::UpToDate(14922));
+        assert_eq!((outcome, read), (Outcome::UpToDate(14922), vec![CDN.to_owned()]));
+        // Down under the hour: no GitHub, the CDN again next round.
+        for minutes in [0, 15, 59] {
+            let (outcome, read) = round_at(records, &config, t0 + minutes * MINUTE, down());
+            assert_eq!((outcome, read), (down(), vec![CDN.to_owned()]), "{minutes}");
+        }
+        // Down for an hour: this round reads GitHub after the CDN.
+        let (outcome, read) = round_at(records, &config, t0 + 60 * MINUTE, down());
+        assert_eq!(outcome, Outcome::Switched(14923));
+        assert_eq!(read, [CDN, GITHUB_STABLE]);
+        // Never sticky: the next round tries the CDN first again.
+        let (_, read) = round_at(records, &config, t0 + 75 * MINUTE, down());
+        assert_eq!(read, [CDN, GITHUB_STABLE]);
+        let (_, read) = round_at(records, &config, t0 + 90 * MINUTE, Outcome::UpToDate(14923));
+        assert_eq!(read, [CDN]);
+        // A CDN round that read it resets the clock: down again, an hour again.
+        let (_, read) = round_at(records, &config, t0 + 91 * MINUTE, down());
+        assert_eq!(read, [CDN]);
+        let (_, read) = round_at(records, &config, t0 + 150 * MINUTE, down());
+        assert_eq!(read, [CDN]);
+        let (_, read) = round_at(records, &config, t0 + 151 * MINUTE, down());
+        assert_eq!(read, [CDN, GITHUB_STABLE]);
+        // No build published on the CDN is the CDN failing too.
+        let (_, read) = round_at(records, &config, t0 + 152 * MINUTE, Outcome::NothingPublished);
+        assert_eq!(read, [CDN, GITHUB_STABLE]);
+    }
+
+    #[test]
+    fn the_failure_clock_is_kept_in_the_records_across_a_restart_and_a_bad_file_starts_it_again() {
+        let folder = tempfile::tempdir().unwrap();
+        let records = folder.path();
+        let config = following(CDN);
+        let t0 = 1_800_000_000_000;
+        round_at(records, &config, t0, down());
+        assert_eq!(
+            fs::read_to_string(records.join(DOWN_SINCE)).unwrap().trim(),
+            t0.to_string()
+        );
+        // Each call reads the file afresh, as lamp-update started again does.
+        assert!(!due(records, t0 + 59 * MINUTE));
+        assert!(due(records, t0 + 60 * MINUTE));
+        let (_, read) = round_at(records, &config, t0 + 60 * MINUTE, down());
+        assert_eq!(read, [CDN, GITHUB_STABLE]);
+        // Garbage, a huge file, or a time ahead of the clock: not due, and
+        // the next failure starts the clock again from now.
+        for bad in [
+            b"soon".to_vec(),
+            vec![b'1'; 1 << 20],
+            (t0 + 600 * MINUTE).to_string().into_bytes(),
+        ] {
+            fs::write(records.join(DOWN_SINCE), &bad).unwrap();
+            assert!(!due(records, t0 + 120 * MINUTE));
+            let (_, read) = round_at(records, &config, t0 + 120 * MINUTE, down());
+            assert_eq!(read, [CDN]);
+            assert_eq!(
+                fs::read_to_string(records.join(DOWN_SINCE)).unwrap().trim(),
+                (t0 + 120 * MINUTE).to_string()
+            );
+        }
+        // A CDN round that read it removes the file.
+        round_at(records, &config, t0 + 121 * MINUTE, Outcome::UpToDate(14923));
+        assert!(!records.join(DOWN_SINCE).exists());
+    }
+
+    #[test]
+    fn a_lamp_on_another_feed_never_falls_back_and_never_starts_the_clock() {
+        let folder = tempfile::tempdir().unwrap();
+        let records = folder.path();
+        let t0 = 1_800_000_000_000;
+        for url in [GITHUB_STABLE, CANARY, "file:///var/tmp/lampos-channel/"] {
+            let config = following(url);
+            for minutes in [0, 61, 200] {
+                let mut read = Vec::new();
+                round_on(
+                    &config,
+                    records,
+                    t0 + minutes * MINUTE,
+                    &mut |config: &crate::round::Config| {
+                        read.push(config.channel_url.clone());
+                        down()
+                    },
+                    &mut |_| {},
+                );
+                assert_eq!(read, [url], "{url}");
+            }
+            assert!(!records.join(DOWN_SINCE).exists(), "{url}");
+        }
+    }
+
+    #[test]
+    fn on_github_changes_only_the_feed() {
+        let config = following(CDN);
+        let github = on_github(&config);
+        assert_eq!(github.channel_url, GITHUB_STABLE);
+        assert_eq!(
+            format!("{:?}", Config { channel_url: CDN.into(), ..github }),
+            format!("{config:?}")
+        );
     }
 
     #[test]
