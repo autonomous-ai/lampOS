@@ -2685,8 +2685,9 @@ khi đăng xuất, và với 0.6.60 khi đăng nhập (ROW của #7507).
     (`CONFIRM_MS`, 120 s từ lúc prepare việc) làm nó hết hạn mà không ai
     nghe, nên nó nằm chờ tới giới hạn 480 s của lamp-voice (lamp-c0a4,
     19/11 21:47-21:55). Việc đang chờ kết thúc với một câu ngắn "hãy hỏi
-    lại", được Task news báo một lần (`failed_stuck`: "I can't handle that
-    right now; please ask me again in a few minutes."); việc đóng và mở lại
+    lại", được Task news báo một lần là chưa làm được (`failed_stuck`,
+    #8138: "I couldn't finish that; something went wrong. Ask me again in a
+    moment."), không bao giờ làm lại sau đó; việc đóng và mở lại
     vẫn diễn ra như trên, và việc tiếp theo đi vào phiên đã mở lại.
     Bên cạnh giới hạn của #7895: một lần từ chối `ENGINE_NOT_READY` không
     bao giờ tiêu một trong `STARTING_RESUMES_MOST` (3) lần thử của một việc
@@ -3002,6 +3003,46 @@ Hermes cũng mang token trong môi trường như vậy.
 Bản sửa là #7024 (P1): lamp-tasks tự khởi động script trong hàng rào, bên
 ngoài các namespace của gateway, với token từ lamp-tasks và không bao
 giờ qua launcher, và cũng vậy cho lần chạy của Hermes.
+
+## Agent của chính đèn chưa sẵn sàng: phía giọng nói (#8138)
+
+lamp-tasks phát trạng thái sẵn sàng của agent của chính đèn trên
+`tasks/agent` (`lamp_msgs::AgentReadiness`: `off`, `not_installed`,
+`installing`, `starting`, `ready`, `working`, `recovering`, `error`).
+lamp-voice (`crates/voice/src/agent_ready.rs`) dùng nó để người dùng không
+bao giờ phải chờ sau câu "I'll look into that":
+
+- **Từ chối ngay.** Provider worker theo dõi `tasks/agent`. Một lần gọi
+  `start_agent_task` cho agent của chính đèn (engine mặc định, hoặc engine
+  mà `tasks/agent` nêu) trong lúc giá trị mới nhất không phải `ready` hay
+  `working` (và không phải `off`) bị từ chối trước khi hỏi lamp-tasks bất
+  cứ điều gì, không chờ mạng: model được bảo nói ngay, và chỉ thế, "I'm
+  having a problem right now; ask me again in a moment." Lỗi
+  `agent_not_ready` của chính lamp-tasks lúc prepare (hoặc lúc confirm)
+  cũng được báo như vậy. Không có gì được chuẩn bị, nên không có câu đọc
+  lại hay "I'll look into that" nào đi trước; model nói câu đó bằng ngôn
+  ngữ của người dùng. Việc cho máy tính không bao giờ bị giữ theo trạng
+  thái của đèn.
+- **Việc đã giao mà hỏng được báo là chưa làm được.** `not_sent` với
+  `one_session_stuck`, `one_session_not_started` hoặc `agent_broken` được
+  Task news báo một lần (`failed_stuck`): "I couldn't finish that;
+  something went wrong. Ask me again in a moment." Ghi chú nói rằng việc
+  sẽ không được làm sau đó, và giọng nói không có đường "I restarted it and
+  did your request". Mỗi thay đổi của `tasks/agent` đánh thức bộ đọc của
+  Task news ngay và thêm một lần sau 2 s, nên lỗi được đọc ngay khi
+  lamp-tasks giữ nó, không trễ tới 10 s, và được báo cùng lúc như mọi tin
+  về việc.
+- **"Ready again", một lần.** Task news cũng theo dõi `tasks/agent`. Khi
+  agent đi từ một trạng thái không nhận việc sang `ready`, và trong 15 phút
+  qua có người bị từ chối (provider worker ghi vào `agent-refused`, cạnh
+  file những gì đã báo) hoặc một việc của nó hỏng như trên, câu "I'm ready
+  again; you can ask me now." được đưa ra một lần như tin về việc (khóa
+  `agent-ready-<since_unix_ms>`): nó chờ một lúc yên lặng như các tin khác,
+  không bao giờ được báo lại, và bị bỏ sau 5 phút. Không ai bị từ chối,
+  lúc giọng nói mới khởi động, hoặc với `working`, thì không nói gì.
+- **Khi được hỏi.** `harness_status` trả lời kèm `you`: trạng thái và một
+  dòng cho model (không bao giờ có engine hay `why`), nên câu "is your agent
+  OK?" được trả lời đúng sự thật. Mô tả của nó nêu câu hỏi đó.
 
 ## Giọng nói hỏi về việc nó đã giao (#7930)
 

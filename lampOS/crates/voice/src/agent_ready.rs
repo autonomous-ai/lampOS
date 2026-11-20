@@ -1,0 +1,385 @@
+//! The lamp's own agent's readiness as the voice keeps it (`tasks/agent`,
+//! #8138, `docs/tasks.md`, "The lamp's own agent not ready").
+//!
+//! lamp-tasks publishes one [`AgentReadiness`] for the lamp's own agent on
+//! every change. The voice uses it three ways:
+//!
+//! - the provider worker keeps the latest ([`watch`], [`latest`]): a task
+//!   for the lamp's own agent while it is not `ready` or `working` is
+//!   refused at once, before anything is asked of lamp-tasks, with
+//!   [`PROBLEM_LINE`] ([`refuses_now`], [`refusal`]); lamp-tasks' own
+//!   `agent_not_ready` at prepare is told the same way; `harness_status`
+//!   says the state ([`status_entry`]);
+//! - a refusal, or a task of the lamp's own ended on a fault (Task news),
+//!   is noted ([`note_refused`], [`note_failed`]);
+//! - the coordinator follows it ([`ReadyAgain`]): when the agent comes back
+//!   `ready` after being down, and someone was refused or had a task fail
+//!   within [`REFUSED_WITHIN_MS`] of it, [`READY_AGAIN_LINE`] is offered
+//!   once as task news, so it waits for a quiet moment like other news.
+//!   Otherwise nothing is said: unprompted speech stays small.
+use lamp_msgs::{AgentReadiness, Readiness};
+use serde_json::{Value, json};
+use std::{
+    path::{Path, PathBuf},
+    sync::{Mutex, OnceLock},
+    time::{Duration, SystemTime, UNIX_EPOCH},
+};
+
+/// What the person hears, at once, when the lamp's own agent can't take
+/// their task: no engine, no technical words, nothing promised later.
+pub const PROBLEM_LINE: &str = "I'm having a problem right now; ask me again in a moment.";
+
+/// What the person hears when a task already handed to the lamp's own
+/// agent ended on a fault (`one_session_stuck`, `one_session_not_started`,
+/// `agent_broken`): told as not done, and never done later.
+pub const NOT_DONE_LINE: &str =
+    "I couldn't finish that; something went wrong. Ask me again in a moment.";
+
+/// What the lamp says once its own agent is back, only after someone was
+/// refused or had a task fail while it was down ([`ReadyAgain`]).
+pub const READY_AGAIN_LINE: &str = "I'm ready again; you can ask me now.";
+
+/// A refusal or a failure counts for [`READY_AGAIN_LINE`] this long.
+pub const REFUSED_WITHIN_MS: u64 = 15 * 60_000;
+
+/// [`READY_AGAIN_LINE`] is let go if no quiet moment came this long after
+/// the agent came back: later, it is old news.
+pub const READY_AGAIN_FRESH: Duration = Duration::from_secs(5 * 60);
+
+/// lamp-tasks' codes for a task of the lamp's own ended on a fault after
+/// it was handed over (#7906, #7919, #8138): told as [`NOT_DONE_LINE`].
+pub const FAULT_CODES: [&str; 3] = [
+    "one_session_stuck",
+    "one_session_not_started",
+    "agent_broken",
+];
+
+/// lamp-tasks' refusal at prepare (or confirm) while the lamp's own agent
+/// is not ready.
+pub const NOT_READY_CODE: &str = "agent_not_ready";
+
+/// The latest readiness the provider worker read.
+static LATEST: Mutex<Option<AgentReadiness>> = Mutex::new(None);
+/// Once a process: [`watch`].
+static WATCHING: OnceLock<()> = OnceLock::new();
+/// When a task of the lamp's own last ended on a fault, as the
+/// coordinator's Task news saw it, in milliseconds since 1970.
+#[cfg(not(test))]
+static FAILED_AT_MS: Mutex<Option<u64>> = Mutex::new(None);
+
+#[cfg(test)]
+thread_local! {
+    /// The readiness for a test on this thread only ([`latest`]).
+    pub(crate) static LATEST_HERE: std::cell::RefCell<Option<AgentReadiness>> =
+        const { std::cell::RefCell::new(None) };
+    /// How many refusals a test on this thread noted ([`note_refused`]).
+    pub(crate) static REFUSED_HERE: std::cell::Cell<u32> = const { std::cell::Cell::new(0) };
+    /// A fault a test on this thread noted ([`note_failed`]).
+    pub(crate) static FAILED_HERE: std::cell::Cell<Option<u64>> = const { std::cell::Cell::new(None) };
+}
+
+/// Now, in milliseconds since 1970.
+pub fn unix_ms() -> u64 {
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map_or(0, |since| since.as_millis() as u64)
+}
+
+/// Follow `tasks/agent` on a thread of its own, once a process, keeping the
+/// latest for [`latest`]. Without a bus nothing is kept, and lamp-tasks'
+/// own refusal at prepare still tells the person.
+pub fn watch() {
+    if WATCHING.set(()).is_err() {
+        return;
+    }
+    let spawned = std::thread::Builder::new()
+        .name("lamp-voice-agent-ready".into())
+        .spawn(|| {
+            loop {
+                let subscribed = lamp_bus::Bus::from_environment().and_then(|bus| {
+                    bus.subscribe_typed(AgentReadiness::TOPIC, "voice", AgentReadiness::TYPE)
+                });
+                match subscribed {
+                    Ok(mut readiness) => loop {
+                        match readiness.recv(Duration::from_secs(1)) {
+                            Ok(Some(message)) => {
+                                if let Some(read) = checked(message.parse().ok())
+                                    && let Ok(mut latest) = LATEST.lock()
+                                {
+                                    *latest = Some(read);
+                                }
+                            }
+                            Ok(None) => {}
+                            Err(error) => {
+                                eprintln!(
+                                    "lamp-voice: {} could not be read: {error}",
+                                    AgentReadiness::TOPIC
+                                );
+                                break;
+                            }
+                        }
+                    },
+                    Err(error) => eprintln!(
+                        "lamp-voice: {} cannot be followed: {error}",
+                        AgentReadiness::TOPIC
+                    ),
+                }
+                std::thread::sleep(Duration::from_secs(30));
+            }
+        });
+    if spawned.is_err() {
+        eprintln!("lamp-voice: no thread to follow the lamp's own agent");
+    }
+}
+
+/// `read` if it passes its own check.
+pub(crate) fn checked(read: Option<AgentReadiness>) -> Option<AgentReadiness> {
+    read.filter(|read| read.check().is_ok())
+}
+
+/// The latest readiness of the lamp's own agent; none before the first
+/// read, or without a bus.
+pub fn latest() -> Option<AgentReadiness> {
+    #[cfg(test)]
+    if let Some(here) = LATEST_HERE.with(|here| here.borrow().clone()) {
+        return Some(here);
+    }
+    LATEST.lock().ok().and_then(|latest| latest.clone())
+}
+
+/// The state that refuses a task for the lamp's own agent now, if any:
+/// the latest read says it takes none (not `ready` or `working`), for the
+/// engine `named` or, with none named, the lamp's default. An engine other
+/// than the one it reads is never refused here; lamp-tasks decides.
+pub fn refuses_now(named: Option<&str>) -> Option<Readiness> {
+    let latest = latest()?;
+    if latest.state.takes_tasks() || latest.state == Readiness::Off {
+        return None;
+    }
+    named
+        .is_none_or(|named| named == latest.engine)
+        .then_some(latest.state)
+}
+
+/// What the model is told when a task for the lamp's own agent is refused
+/// because it is not ready: [`PROBLEM_LINE`] at once, nothing handed over
+/// and nothing done later.
+pub fn refusal() -> Value {
+    json!({"error": format!(
+        "Nothing was handed over: you can't take work right now, and it will not be done later. Tell them at once in these words, and nothing more: \"{PROBLEM_LINE}\""
+    )})
+}
+
+/// The file the provider worker notes its refusals in, for the
+/// coordinator's [`ReadyAgain`]: beside Task news' file of what was told.
+pub fn refused_file() -> PathBuf {
+    refused_beside(&crate::task_news::told_file())
+}
+
+/// [`refused_file`] beside the file of what was told, `told`.
+pub fn refused_beside(told: &Path) -> PathBuf {
+    told.with_file_name("agent-refused")
+}
+
+/// Note a refusal for want of the lamp's own agent, now ([`refused_file`]).
+pub fn note_refused() {
+    #[cfg(test)]
+    REFUSED_HERE.with(|here| here.set(here.get() + 1));
+    #[cfg(not(test))]
+    if let Err(error) = std::fs::write(refused_file(), unix_ms().to_string()) {
+        eprintln!("lamp-voice: a refusal of the lamp's own agent was not noted: {error}");
+    }
+}
+
+/// When the last refusal was noted in `file`, in milliseconds since 1970.
+pub fn refused_at_ms(file: &Path) -> Option<u64> {
+    std::fs::read_to_string(file).ok()?.trim().parse().ok()
+}
+
+/// Note, in the coordinator, that a task of the lamp's own ended on a
+/// fault now.
+pub fn note_failed() {
+    #[cfg(test)]
+    FAILED_HERE.with(|here| here.set(Some(unix_ms())));
+    #[cfg(not(test))]
+    if let Ok(mut failed) = FAILED_AT_MS.lock() {
+        *failed = Some(unix_ms());
+    }
+}
+
+/// When a task of the lamp's own last ended on a fault ([`note_failed`]).
+pub fn failed_at_ms() -> Option<u64> {
+    #[cfg(test)]
+    return FAILED_HERE.with(std::cell::Cell::get);
+    #[cfg(not(test))]
+    FAILED_AT_MS.lock().ok().and_then(|failed| *failed)
+}
+
+/// The lamp's own agent for `harness_status`: its state, and, when it
+/// takes no task now, what to say if asked. Never its `why` or engine.
+pub fn status_entry() -> Option<Value> {
+    let latest = latest()?;
+    let state = serde_json::to_value(latest.state).ok()?;
+    let next = match latest.state {
+        Readiness::Ready | Readiness::Working => "You can take work now; say so plainly if asked.",
+        Readiness::Off | Readiness::NotInstalled => {
+            "Your own helper is not set up on this lamp; say so plainly if asked."
+        }
+        Readiness::Installing | Readiness::Starting => {
+            "You are still getting ready to take work; say so plainly if asked."
+        }
+        Readiness::Recovering | Readiness::Error => {
+            "You can't take work right now; if asked, say you're having a problem right now and to ask again in a moment, with no technical words."
+        }
+    };
+    Some(json!({"state": state, "next": next}))
+}
+
+/// The coordinator's follower of the readiness, for [`READY_AGAIN_LINE`].
+#[derive(Debug, Default)]
+pub struct ReadyAgain {
+    /// The state last seen; none before the first.
+    last: Option<Readiness>,
+    /// The agent was seen down (taking no task) since it was last `ready`.
+    down: bool,
+    /// The refusal or failure already answered by a ready-again line, so
+    /// that one is never answered twice.
+    answered_ms: Option<u64>,
+}
+
+impl ReadyAgain {
+    /// `read` seen at `now_ms`, with the latest refusal or failure at
+    /// `refused_ms`: whether [`READY_AGAIN_LINE`] is due now. Due only when
+    /// the agent goes from down to `ready`, with a refusal or failure
+    /// within [`REFUSED_WITHIN_MS`] not answered before. Never at the first
+    /// value seen, nor for `working`: a task under way is its own news.
+    pub fn seen(&mut self, read: Readiness, refused_ms: Option<u64>, now_ms: u64) -> bool {
+        self.last = Some(read);
+        if !read.takes_tasks() {
+            // Down, at the voice's start too: a refusal from then on counts.
+            self.down = true;
+            return false;
+        }
+        if read != Readiness::Ready || !self.down {
+            return false;
+        }
+        self.down = false;
+        let due = refused_ms.is_some_and(|refused| {
+            now_ms.saturating_sub(refused) <= REFUSED_WITHIN_MS
+                && self.answered_ms.is_none_or(|answered| refused > answered)
+        });
+        if due {
+            self.answered_ms = refused_ms;
+        }
+        due
+    }
+
+    /// Whether the agent is down now, as last seen.
+    pub fn down(&self) -> bool {
+        self.last.is_some_and(|last| !last.takes_tasks())
+    }
+}
+
+/// The note Task news gives the model for [`READY_AGAIN_LINE`].
+pub fn ready_again_note() -> String {
+    crate::task_news::unprompted(&format!(
+        "You are working again after a problem that kept you from taking a request a little while ago. Tell them in these words, and nothing more: \"{READY_AGAIN_LINE}\""
+    ))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    const AT: u64 = 1_800_000_000_000;
+
+    /// #8138: ready again is due once, only after the agent was down and
+    /// someone was refused within 15 minutes; never otherwise.
+    #[test]
+    fn ready_again_is_due_once_and_only_after_a_refusal() {
+        let mut follow = ReadyAgain::default();
+        // Ready at the start: nothing.
+        assert!(!follow.seen(Readiness::Ready, None, AT));
+        // Down and back with nobody refused: nothing.
+        assert!(!follow.seen(Readiness::Recovering, None, AT + 1));
+        assert!(!follow.seen(Readiness::Ready, None, AT + 2));
+        // Down, someone refused, back: due once.
+        assert!(!follow.seen(Readiness::Recovering, None, AT + 3));
+        assert!(follow.seen(Readiness::Ready, Some(AT + 4), AT + 5));
+        // The same ready again, or another value: not again.
+        assert!(!follow.seen(Readiness::Ready, Some(AT + 4), AT + 6));
+        assert!(!follow.seen(Readiness::Working, Some(AT + 4), AT + 7));
+        assert!(!follow.seen(Readiness::Ready, Some(AT + 4), AT + 8));
+        // Down again; the old refusal was answered: nothing.
+        assert!(!follow.seen(Readiness::Error, Some(AT + 4), AT + 9));
+        assert!(!follow.seen(Readiness::Ready, Some(AT + 4), AT + 10));
+        // A refusal older than 15 minutes: nothing.
+        assert!(!follow.seen(Readiness::Starting, Some(AT + 11), AT + 11));
+        assert!(!follow.seen(Readiness::Ready, Some(AT + 11), AT + 12 + REFUSED_WITHIN_MS));
+        // Back as working first, then ready: due once ready.
+        assert!(!follow.seen(Readiness::Recovering, None, AT + 20));
+        assert!(!follow.seen(Readiness::Working, Some(AT + 21), AT + 22));
+        assert!(follow.seen(Readiness::Ready, Some(AT + 21), AT + 23));
+    }
+
+    /// Down at the voice's start counts as down: a refusal then is answered.
+    #[test]
+    fn down_at_the_start_counts() {
+        let mut follow = ReadyAgain::default();
+        assert!(!follow.seen(Readiness::Recovering, None, AT));
+        assert!(follow.down());
+        assert!(follow.seen(Readiness::Ready, Some(AT + 1), AT + 2));
+    }
+
+    fn read(state: Readiness) -> AgentReadiness {
+        AgentReadiness {
+            engine: if state == Readiness::Off {
+                String::new()
+            } else {
+                "openclaw".into()
+            },
+            state,
+            why: None,
+            since_unix_ms: AT,
+            read_unix_ms: AT,
+        }
+    }
+
+    /// Only a state that takes no task refuses, for the default or the
+    /// engine it reads; another engine named is lamp-tasks' to decide.
+    #[test]
+    fn only_a_down_agent_refuses_and_only_its_own_engine() {
+        for (state, refuses) in [
+            (Readiness::Ready, false),
+            (Readiness::Working, false),
+            (Readiness::Off, false),
+            (Readiness::NotInstalled, true),
+            (Readiness::Installing, true),
+            (Readiness::Starting, true),
+            (Readiness::Recovering, true),
+            (Readiness::Error, true),
+        ] {
+            LATEST_HERE.with(|here| *here.borrow_mut() = Some(read(state)));
+            assert_eq!(refuses_now(None).is_some(), refuses, "{state:?}");
+            assert_eq!(refuses_now(Some("openclaw")).is_some(), refuses);
+            assert_eq!(refuses_now(Some("hermes")), None);
+        }
+        LATEST_HERE.with(|here| *here.borrow_mut() = None);
+        assert_eq!(refuses_now(None), None, "nothing read refuses nothing");
+    }
+
+    /// The lines carry no engine or technical words.
+    #[test]
+    fn the_lines_name_no_engine() {
+        for line in [PROBLEM_LINE, NOT_DONE_LINE, READY_AGAIN_LINE] {
+            for word in [
+                "OpenClaw", "Hermes", "agent", "session", "gateway", "Harness",
+            ] {
+                assert!(!line.contains(word), "{line}");
+            }
+        }
+        assert!(refusal()["error"].as_str().unwrap().contains(PROBLEM_LINE));
+        assert!(!refusal().to_string().contains("look into"));
+        assert!(ready_again_note().contains(READY_AGAIN_LINE));
+    }
+}

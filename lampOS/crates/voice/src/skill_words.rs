@@ -252,10 +252,11 @@ pub struct NewsWords {
     /// failure. A skill without it says the built-in words.
     #[serde(default = "failed_not_ready")]
     pub failed_not_ready: String,
-    /// ...or was ended as the lamp's kept session got stuck and was
-    /// restarted under it (lamp-tasks' `one_session_stuck`, #7906 sign 5):
-    /// told at once in [`STUCK_LINE`]'s words. A skill without it says the
-    /// built-in words.
+    /// ...or was ended on a fault of the lamp's own agent after it was
+    /// handed over (lamp-tasks' `one_session_stuck`, #7906 sign 5;
+    /// `one_session_not_started`, #7919; `agent_broken`, #8138): told at
+    /// once as not done in [`STUCK_LINE`]'s words, and never done later. A
+    /// skill without it says the built-in words.
     #[serde(default = "failed_stuck")]
     pub failed_stuck: String,
     /// A hand-over that went into an earlier session of the person's, by
@@ -380,15 +381,15 @@ fn failed_not_ready() -> String {
     )
 }
 
-/// What the person hears when the lamp's agent got stuck under their ask
-/// and is being restarted (#7906 sign 5): the ask ended, the next one goes
-/// to the restarted session.
-pub const STUCK_LINE: &str = "I can't handle that right now; please ask me again in a few minutes.";
+/// What the person hears when the lamp's own agent failed under their ask
+/// (#7906 sign 5, #8138): the ask ended as not done, never redone later;
+/// the next one goes to the recovered agent.
+pub const STUCK_LINE: &str = crate::agent_ready::NOT_DONE_LINE;
 
 /// [`NewsWords::failed_stuck`]'s words, built in.
 fn failed_stuck() -> String {
     format!(
-        "The work the person asked you to hand over, \"{{asked}}\", was not handed to {{who}}: the lamp's agent got stuck and is being restarted, so nothing was done. Tell them in these words, and nothing more: \"{STUCK_LINE}\""
+        "The work the person asked you to hand over, \"{{asked}}\", ended before {{who}} finished it: something went wrong, and it will not be done later. Tell them in these words, and nothing more: \"{STUCK_LINE}\""
     )
 }
 
