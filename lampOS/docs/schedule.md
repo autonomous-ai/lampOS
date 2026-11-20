@@ -782,11 +782,19 @@ reminders are not memories (memory.md's decision record), and a fired
 reminder's turn is kept out of the journal on purpose. The miss was the
 model calling `recall`, or nothing, and saying it did not remember. So
 `list_reminders`' description now ends (`LIST_ASKED`, after the earlier
-text, kept as `LIST_BEFORE`): call this, not recall, for any question about
-their reminders or timers, what is set, when one is due or when they set
-it; never say you do not remember a reminder before calling this; and
-never list reminders unasked (rule 8). Both routes declare the same
-catalog, so the Live route and the second route are told the same.
+text, kept as `LIST_BEFORE`): any question about their reminders or timers
+(what is set, when it is due or when it was set), in any wording or
+language, even one that sounds a word short, is answered only after calling
+this in that turn, not recall; and never list reminders unasked (rule 8).
+The wording and language part is #7987's: on lamp-52e6 (gate 1079) "Hey
+Lamp, what reminders do I have?" heard as 6 of its 7 words was not one of
+`LAMP_REMINDERS_ASKED`'s exact phrases, so no call was forced, and the
+model answered with no call. The exact phrases' forced call stays as it
+is (no new phrases, no one-word tolerance); every other line is the
+model's choice, which this text makes. The description as it was before is
+kept as `LIST_DESCRIBED_BEFORE`, for the probe's old arm. Both routes
+declare the same catalog, so the Live route and the second route are told
+the same.
 
 Each listed item now says when it was set: `set_day` (`today`,
 `yesterday`, or its `YYYY-MM-DD`) and `set_clock` (its local `HH:MM`), so
