@@ -919,7 +919,11 @@ it is held as a forget by that thing's id (`second_provider::ask_once_forget`,
 `HeldForget::one_face`), and the model is told to ask once, naming only the
 subject in their own words, in their language ("Shall I forget what you
 kept about your bike lock code?"). The kept text is never told to the model
-or said: the speaker was not seen (the Reviewer-lead's P2 on #6673).
+or said: the speaker was not seen (the Reviewer-lead's P2 on #6673). The
+held note tells the model that if they say yes within 30 s it calls
+`forget`, naming nothing else, and that only that call runs it
+(`remember::one_face_forget_asks`; #8059: it used to say "Do not call forget
+again for their yes", so on stable a yes ran nothing).
 Only their yes on a later line within 30 s
 (`remember::ONE_FACE_FORGET_YES_FOR`), from the same session's same person,
 with their face seen saying it, or in the private room

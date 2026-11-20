@@ -1474,7 +1474,10 @@ xoá; lệnh được giữ như một lệnh quên theo id của điều ấy
 báo hỏi một lần, chỉ nêu chủ đề bằng chính lời của họ, bằng ngôn ngữ của họ
 («Mình có nên quên điều đã giữ về mã khóa xe của bạn không?»). Nội dung đã giữ
 không bao giờ được báo cho mô hình hay nói ra: người nói không được nhìn thấy
-(P2 của Reviewer-lead trên #6673). Chỉ lời «có» của họ ở câu sau trong vòng 30 giây
+(P2 của Reviewer-lead trên #6673). Ghi chú giữ chờ bảo mô hình rằng nếu họ nói «có» trong
+vòng 30 giây thì gọi `forget`, không nêu gì khác, và chỉ lời gọi ấy mới chạy
+(`remember::one_face_forget_asks`; #8059: trước đây nó nói «Do not call forget
+again for their yes», nên trên stable lời «có» không chạy gì). Chỉ lời «có» của họ ở câu sau trong vòng 30 giây
 (`remember::ONE_FACE_FORGET_YES_FOR`), của cùng người trong cùng phiên, khi
 thấy mặt họ nói, hoặc trong phòng riêng (`LAMP_PRIVATE_ROOM`) trên một câu là
 của họ vì mặt họ một mình trong khung, mới chạy đúng lệnh quên theo id ấy
