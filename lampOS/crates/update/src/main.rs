@@ -1093,6 +1093,16 @@ fn on_the_lamp(command: &str, options: &BTreeMap<String, String>) -> ExitCode {
         app_check = app_check
             .map(|check| check.with_now(lamp_update::update_now::Marks::under(&config.root)));
     }
+    // The GitHub stable feed moved to its CDN mirror (#7728): off unless set,
+    // here or in the carried /etc/lampOS/update.env; only a `serve` that acts.
+    let cdn_feed = config.apply
+        && command == "serve"
+        && lamp_update::switches::update_switch(
+            &config.root,
+            lamp_update::cdn_feed::SWITCH,
+            std::env::var_os(lamp_update::cdn_feed::SWITCH).as_deref(),
+        );
+    let mut cdn_feed_said = String::new();
     // The agents' switches (#5197, #5978, #6226), read in the one place the
     // image's pre-install reads them too (#7274): only a `serve` that acts
     // takes a product lamp's defaults.
@@ -1558,6 +1568,46 @@ fn on_the_lamp(command: &str, options: &BTreeMap<String, String>) -> ExitCode {
                     );
                 }
                 Err(error) => eprintln!("lamp-update: its own program is not known: {error}"),
+            }
+        }
+        // After any round, an up-to-date or unreachable one too (#7018's
+        // rule: the build that carries it acts itself, not one build late).
+        if cdn_feed {
+            use lamp_update::cdn_feed::{self, Moved};
+            match cdn_feed::move_to_cdn(
+                &config.on(&config.units),
+                &config.channel_url,
+                &config.key,
+                &config.channel,
+                &mut channel,
+                &mut || systemd.reload(),
+            ) {
+                Moved::Moved => {
+                    eprintln!(
+                        "lamp-update: {} follows {} now (#7728): lamp-update starts again on it",
+                        lamp_update::round::OWN_UNIT,
+                        cdn_feed::CDN
+                    );
+                    match std::env::current_exe() {
+                        Ok(program) => {
+                            let error = Command::new(&program)
+                                .args(cdn_feed::args_on_cdn(std::env::args_os().skip(1)))
+                                .exec();
+                            eprintln!(
+                                "lamp-update: {} cannot be started: {error}; the CDN feed waits for the next start",
+                                program.display()
+                            );
+                        }
+                        Err(error) => {
+                            eprintln!("lamp-update: its own program is not known: {error}")
+                        }
+                    }
+                }
+                Moved::Kept(why) if why != cdn_feed_said => {
+                    eprintln!("lamp-update: kept on the GitHub stable feed: {why}");
+                    cdn_feed_said = why;
+                }
+                Moved::Kept(_) | Moved::NotGitHub => {}
             }
         }
         // A round that says what the one before said is not said again.

@@ -174,26 +174,8 @@ pub fn on_image<'a>(
 /// unit names none (the carried `/etc/lampOS/update.env` is read by
 /// crate::switches itself).
 pub fn unit_environment(root: &Path) -> Vec<(String, String)> {
-    use std::fs;
     let units = root.join(crate::install::UNITS.trim_start_matches('/'));
-    let unit = crate::round::OWN_UNIT;
-    let mut texts: Vec<String> = fs::read_to_string(units.join(unit)).into_iter().collect();
-    let mut drop_ins: Vec<_> = fs::read_dir(units.join(format!("{unit}.d")))
-        .into_iter()
-        .flatten()
-        .flatten()
-        .map(|entry| entry.path())
-        .filter(|path| {
-            path.extension()
-                .is_some_and(|extension| extension == "conf")
-        })
-        .collect();
-    drop_ins.sort();
-    texts.extend(
-        drop_ins
-            .iter()
-            .filter_map(|path| fs::read_to_string(path).ok()),
-    );
+    let texts = crate::cdn_feed::own_unit_texts(&units);
     let mut set: Vec<(String, String)> = Vec::new();
     for text in &texts {
         let found = crate::switches::environment(text);
