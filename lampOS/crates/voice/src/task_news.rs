@@ -516,7 +516,16 @@ fn send_told(directory: &Path, key: &str) -> Sent {
         ]
         .contains(&code)
         {
-            eprintln!("lamp-voice: the tasks part did not take the news heard ({key}): {code}");
+            // A task given way to since: a full store lets its oldest
+            // spent task go, told or not (lamp-tasks `MAX_TASKS`, #8051).
+            // Nothing failed: there is nothing left to mark.
+            if code == "not_found" {
+                eprintln!(
+                    "lamp-voice: the news heard ({key}) is of a task the tasks part no longer keeps"
+                );
+            } else {
+                eprintln!("lamp-voice: the tasks part did not take the news heard ({key}): {code}");
+            }
             return Sent::Done;
         }
     }
@@ -1202,9 +1211,9 @@ impl TaskNews {
     /// together; one waiting for the person, one that stopped, a hand-over
     /// that failed and progress are told on their own. Fewer go together
     /// when one note would keep too little of each answer
-    /// ([`TOGETHER_ANSWER_LEAST`]). The coordinator does not tell
-    /// together while news waits for a skill ([`by_skill`]), which tells
-    /// each task in its own run (#1042).
+    /// ([`TOGETHER_ANSWER_LEAST`]). While news waits for a skill
+    /// ([`by_skill`]), which tells each task in its own run (#1042), only a
+    /// backlog is told together ([`Self::tell_waiting`]).
     pub fn tell_together(&mut self) -> Option<News> {
         let mut news = self.tell()?;
         let Some(first) = news.finished.clone() else {
@@ -1253,6 +1262,53 @@ impl TaskNews {
             places.pop();
         }
         Some(news)
+    }
+
+    /// The news first in line, taken to tell: with other tasks that
+    /// finished ([`Self::tell_together`]) when the coordinator says it may
+    /// be (`together`: `LAMP_TASK_NEWS_AT_PAUSE=on`, no skill's ticket, no
+    /// skill asking for news, not a retelling), else alone ([`Self::tell`]).
+    /// While news waits for a skill (`by_skill`) each task is told in its
+    /// own run (#1042), but for a backlog ([`Self::backlog`]): work that
+    /// finished while nobody was there is told together on their return,
+    /// not one task every 20 s (#8051, lamp-c0a4 on 20 Nov: twenty told one
+    /// by one over seven minutes).
+    pub fn tell_waiting(&mut self, together: bool, by_skill: bool) -> Option<News> {
+        if together && (!by_skill || self.backlog()) {
+            self.tell_together()
+        } else {
+            self.tell()
+        }
+    }
+
+    /// Whether the news waiting is a backlog of finished work (#8051): the
+    /// first in line and at least one more finished with an answer, and
+    /// each of the first [`TOGETHER_MOST`] of those came in at least
+    /// [`crate::say::SKILL_WAITS_US`] ago. Their wait for a skill's ask is
+    /// over, so the voice tells each itself anyway, and the coordinator
+    /// checks that no skill's ask waits now. News just in still waits for
+    /// its own skill's ask, and is told alone. Call after [`Self::waiting`].
+    fn backlog(&self) -> bool {
+        if self
+            .waiting
+            .front()
+            .is_none_or(|news| news.finished.is_none())
+        {
+            return false;
+        }
+        let waited = Duration::from_micros(crate::say::SKILL_WAITS_US);
+        let finished: Vec<&News> = self
+            .waiting
+            .iter()
+            .filter(|news| news.finished.is_some())
+            .take(TOGETHER_MOST)
+            .collect();
+        finished.len() >= 2
+            && finished.iter().all(|news| {
+                self.found
+                    .get(&news.key)
+                    .is_some_and(|found| found.elapsed() >= waited)
+            })
     }
 }
 
@@ -4374,6 +4430,64 @@ mod tests {
         assert!(news.waiting().is_some());
         assert_eq!(news.tell(), Some(one));
         assert_eq!(news.tell(), Some(two));
+    }
+
+    /// #8051 (lamp-c0a4, 20 Nov): three tasks finished while nobody was
+    /// there, news through the Task news skill (`LAMP_TASK_NEWS=skill`).
+    /// Their skill's asks are long over, so on the person's return the
+    /// voice tells all three in one turn, each one marked told, and not one
+    /// every 20 s.
+    #[test]
+    fn work_finished_while_nobody_was_there_is_told_together_through_the_skill() {
+        let line: Vec<News> = (1..=3)
+            .map(|id| news_of(id, "claude", "idle", 80))
+            .collect();
+        let (mut news, _heard) = TaskNews::all_waiting_for_test(line, Duration::from_secs(600));
+        let (told, sent) = mpsc::channel();
+        news.told = told;
+        assert!(news.waiting().is_some());
+        let turn = news.tell_waiting(true, true).expect("the news");
+        assert_eq!(
+            (turn.key.as_str(), turn.also.clone()),
+            ("s:1:1", vec!["s:2:1".to_owned(), "s:3:1".to_owned()])
+        );
+        assert!(turn.note.contains("three pieces of work"), "{}", turn.note);
+        assert_eq!(
+            sent.try_iter().collect::<Vec<Wake>>(),
+            ["s:1:1", "s:2:1", "s:3:1"].map(|key| Wake::Told(key.into()))
+        );
+        assert!(news.waiting().is_none());
+    }
+
+    /// #8051's guard for #1042: through the skill, news just in waits for
+    /// its own skill's ask and is told alone; so is news told with a
+    /// skill's ticket (`together` false), and a lone task.
+    #[test]
+    fn news_through_the_skill_is_still_told_alone_when_just_in_or_asked_for() {
+        let pair = || {
+            vec![
+                news_of(1, "claude", "idle", 80),
+                news_of(2, "codex", "idle", 80),
+            ]
+        };
+        let (mut just_in, _heard) = TaskNews::all_waiting_for_test(pair(), Duration::from_secs(3));
+        assert!(just_in.waiting().is_some());
+        let turn = just_in.tell_waiting(true, true).unwrap();
+        assert_eq!((turn.key.as_str(), turn.also.len()), ("s:1:1", 0));
+        let (mut asked, _heard) = TaskNews::all_waiting_for_test(pair(), Duration::from_secs(600));
+        assert!(asked.waiting().is_some());
+        let turn = asked.tell_waiting(false, true).unwrap();
+        assert_eq!((turn.key.as_str(), turn.also.len()), ("s:1:1", 0));
+        let (mut alone, _heard) = TaskNews::all_waiting_for_test(
+            vec![news_of(1, "claude", "idle", 80)],
+            Duration::from_secs(600),
+        );
+        assert!(alone.waiting().is_some());
+        assert_eq!(alone.tell_waiting(true, true).unwrap().also.len(), 0);
+        // Without the skill, finished work goes together as before.
+        let (mut plain, _heard) = TaskNews::all_waiting_for_test(pair(), Duration::from_secs(3));
+        assert!(plain.waiting().is_some());
+        assert_eq!(plain.tell_waiting(true, false).unwrap().also, ["s:2:1"]);
     }
 
     /// One note holds 1,024 bytes. Three long answers would keep under 120
