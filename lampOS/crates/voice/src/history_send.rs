@@ -1,13 +1,13 @@
 //! Each conversation turn the memory keeps, saved to the account's history
-//! store too (#7771, `LAMP_HISTORY_SEND=on`, off): the product owner's
+//! store too (#7771, `LAMP_HISTORY_SEND=on`): the product owner's
 //! decision of 18 Nov that a person's conversations are kept on the server,
 //! and Backend3's live store of 19 Nov, `POST /api/v1/ai/history/turns` with
 //! the lamp's own key (`x-api-key`). Sent only to the lamp's own cloud API,
 //! the relay host the second route's `llm_base_url` names ([`url`]); with a
 //! direct provider's base nothing is sent. The second route only: a Live
-//! route turn is never saved. Off in every unit: by the first builder's
-//! rulings (#7935, and 17:09 on #7957) the save goes on in the product only
-//! after the forget half (`LAMP_HISTORY_FORGET`) is on, with its row.
+//! route turn is never saved. On in the product unit only together with
+//! the forget half (`LAMP_HISTORY_FORGET`), never alone: the first
+//! builder's rulings (#7935, and 17:09 on #7957).
 //!
 //! **What is sent:** only an exchange the Days memory wrote (`append_linked`
 //! answered with its id), in a known person's scope (`p-…`) or the room's,
@@ -340,6 +340,16 @@ impl Queue {
             *waits = (*waits).max(through);
         }
         self.let_go_where(false, |pending| scopes.contains(&pending.scope.as_str()));
+    }
+
+    /// A forget everything of `scope` answered: every turn of theirs
+    /// handed over so far is forgotten, and let go.
+    fn empty(&mut self, scope: &str) {
+        let through = self.handed_through(scope);
+        let emptied = self.emptied.entry(scope.to_owned()).or_insert(0);
+        *emptied = (*emptied).max(through);
+        let gone = scope.to_owned();
+        self.let_go_where(true, move |pending| pending.scope == gone);
     }
 
     fn remember_forgotten(&mut self, scope: &str, exchange: u64) {
@@ -1171,11 +1181,7 @@ impl Sender {
                 .map(|id| vec![(scope.clone(), id)])
         });
         if ok && everything {
-            let through = queue.handed_through(&scope);
-            let emptied = queue.emptied.entry(scope.clone()).or_insert(0);
-            *emptied = (*emptied).max(through);
-            let gone = scope.clone();
-            queue.let_go_where(true, move |pending| pending.scope == gone);
+            queue.empty(&scope);
         }
         match named.filter(|_| ok) {
             Some(named) => {
@@ -1226,6 +1232,49 @@ impl Sender {
                 .any(|(scope, id)| *scope == pending.scope && *id == pending.exchange)
         });
         self.shared.1.notify_all();
+    }
+
+    /// A memory answer the voice read (`history_forget::answered`, every
+    /// forget op's way, and `history_forget::recover`'s pages): the turn
+    /// ids its `exchanges` names are never posted, and each known person
+    /// its `all` names (a whole history the memory kept for the account to
+    /// delete: a removal in the app, `Days::forget_person`, or a forget
+    /// everything) is emptied as a forget everything of theirs is, before
+    /// that delete can lift the save's hold (Heron's P1 on #8125: such a
+    /// person's turns waiting in the save were posted after it).
+    pub fn seen(&self, answer: &Value) {
+        if answer["ok"] != true {
+            return;
+        }
+        let persons: Vec<&str> = answer["all"]
+            .as_array()
+            .into_iter()
+            .flatten()
+            .filter_map(Value::as_str)
+            .filter(|person| lamp_msgs::known::is_person_id(person))
+            .collect();
+        if !persons.is_empty() {
+            let mut queue = locked(&self.shared);
+            for person in &persons {
+                queue.empty(person);
+            }
+            drop(queue);
+            self.shared.1.notify_all();
+        }
+        let Some(by_scope) = answer.get("exchanges").and_then(Value::as_object) else {
+            return;
+        };
+        let ids: Vec<String> = by_scope
+            .values()
+            .filter_map(Value::as_array)
+            .flatten()
+            .filter_map(Value::as_str)
+            .filter(|turn| parse_turn(turn).is_some())
+            .map(str::to_owned)
+            .collect();
+        if !ids.is_empty() {
+            self.deleting(&ids);
+        }
     }
 
     /// Turns not sent so far (a full queue, a hold, a forget, a batch past
@@ -1325,26 +1374,9 @@ pub fn deleting(ids: &[String]) {
     with_sender(|sender| sender.deleting(ids));
 }
 
-/// A memory answer the voice read (`history_forget::answered`, every
-/// forget op's way): the turn ids its `exchanges` names are never posted.
+/// [`Sender::seen`] on the voice's sender, if started.
 pub fn forget_seen(answer: &Value) {
-    if answer["ok"] != true {
-        return;
-    }
-    let Some(by_scope) = answer.get("exchanges").and_then(Value::as_object) else {
-        return;
-    };
-    let ids: Vec<String> = by_scope
-        .values()
-        .filter_map(Value::as_array)
-        .flatten()
-        .filter_map(Value::as_str)
-        .filter(|turn| parse_turn(turn).is_some())
-        .map(str::to_owned)
-        .collect();
-    if !ids.is_empty() {
-        deleting(&ids);
-    }
+    with_sender(|sender| sender.seen(answer));
 }
 
 /// Where saves go, from the second route's `llm_base_url`: the lamp's own

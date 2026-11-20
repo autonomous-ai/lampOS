@@ -60,8 +60,8 @@ use std::os::unix::fs::OpenOptionsExt;
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex, OnceLock};
 
-/// `on` and nothing else: forgets reach the account's history. Off in
-/// every unit.
+/// `on` and nothing else: forgets reach the account's history. On in the
+/// product unit, always with `LAMP_HISTORY_SEND`.
 pub const ENVIRONMENT: &str = "LAMP_HISTORY_FORGET";
 /// The queue's file, in the voice's state folder.
 pub const FILE: &str = "/var/lib/lampOS/voice/history-forget.json";
@@ -741,6 +741,23 @@ impl Worker {
         self.send(Handed::Recover(socket.to_owned()), 0)
     }
 
+    /// [`unanswered`] for this worker: when `asked`, the request as sent,
+    /// is a forget the memory was asked to keep ([`asking_with`]), the
+    /// worker reads what it kept, as at a start ([`Worker::recover_from`]);
+    /// whether it was handed. Any other request, nothing.
+    pub fn unanswered(&self, socket: &Path, asked: &Value) -> bool {
+        let op = asked["op"].as_str().unwrap_or_default();
+        if asked[lamp_msgs::MEMORY_HISTORY_UNSENT_FIELD] != true
+            || !lamp_msgs::MEMORY_FORGETS_TELLING_EXCHANGES.contains(&op)
+        {
+            return false;
+        }
+        eprintln!(
+            "lamp-voice history: a forget's answer was not read; what the memory kept of it is read once it answers"
+        );
+        self.recover_from(socket)
+    }
+
     /// `handed` (of `ids` turns) to the thread, never blocking; one not
     /// taken is said in the journal, and what the memory kept of it read
     /// again after the next job.
@@ -859,6 +876,110 @@ pub fn recover_at_start(socket: &Path) {
     if on() {
         Worker::voices().recover_from(socket);
     }
+}
+
+/// A forget sent whole to the memory at `socket` with no answer read (the
+/// voice stopped waiting while the memory was still at it, or the answer
+/// was lost; leg 7 on #8125, the first builder's call, item 2): with the
+/// switch on, the worker reads what the memory kept of it
+/// ([`Worker::unanswered`]), owed and read again every [`RECOVER_AGAIN`]
+/// until the memory answers, so its delete is queued once the memory is
+/// done, never only at the next start; while owed, the save holds
+/// ([`holds`]). Off, its rows wait in the memory for a start with the
+/// switch on, as every forget's ([`asking`]).
+pub fn unanswered(socket: &Path, asked: &Value) {
+    #[cfg(test)]
+    UNANSWERED.with(|seen| seen.borrow_mut().push(asked.clone()));
+    if on() {
+        Worker::voices().unanswered(socket, asked);
+    }
+}
+
+#[cfg(test)]
+thread_local! {
+    /// Tests: each request [`unanswered`] was given on this thread.
+    pub(crate) static UNANSWERED: std::cell::RefCell<Vec<Value>> =
+        const { std::cell::RefCell::new(Vec::new()) };
+}
+
+/// The name this reads `memory/forgot` under, apart from the tone's.
+const REMOVALS_SUBSCRIBER: &str = "history_removals";
+
+/// The app's removal of a person (lamp-cloud's `forget_person` on the
+/// memory's forget socket, the Reviewer-lead's HOLD on #8125) never passes
+/// the voice's way: the memory keeps that person's whole history for the
+/// account ([`recover`]'s rows) and tells `memory/forgot`. With the switch
+/// on, a thread of its own reads that topic from the bus at `root` and,
+/// for each known person's forget the memory tells, has the worker read
+/// what the memory kept ([`Worker::recover_from`]), as at a start; once on
+/// each subscribe too, so a removal while it was not reading is not
+/// missed. Started once. Off, nothing.
+pub fn watch_removals(root: &Path, socket: &Path) {
+    static NEVER: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+    static STARTED: OnceLock<()> = OnceLock::new();
+    if on() && STARTED.set(()).is_ok() {
+        watch_removals_with(Worker::voices(), root, socket, &NEVER);
+    }
+}
+
+/// [`watch_removals`] for `worker`, until `stop`; whether its thread
+/// started.
+pub fn watch_removals_with(
+    worker: &'static Worker,
+    root: &Path,
+    socket: &Path,
+    stop: &'static std::sync::atomic::AtomicBool,
+) -> bool {
+    let (root, socket) = (root.to_owned(), socket.to_owned());
+    let started = std::thread::Builder::new()
+        .name("history-removals".into())
+        .spawn(move || {
+            while !stop.load(std::sync::atomic::Ordering::SeqCst) {
+                if let Err(error) = removals(worker, &root, &socket, stop) {
+                    eprintln!(
+                        "lamp-voice history: memory/forgot could not be read ({}); an app's removal is read at the next start",
+                        error.kind()
+                    );
+                }
+                std::thread::sleep(std::time::Duration::from_secs(1));
+            }
+        });
+    if started.is_err() {
+        eprintln!(
+            "lamp-voice history: no thread reads memory/forgot; an app's removal is read at the next start"
+        );
+    }
+    started.is_ok()
+}
+
+fn removals(
+    worker: &Worker,
+    root: &Path,
+    socket: &Path,
+    stop: &std::sync::atomic::AtomicBool,
+) -> io::Result<()> {
+    let bus = lamp_bus::Bus::new(root)?;
+    let mut forgot = bus.subscribe_typed(
+        lamp_msgs::MemoryForgot::TOPIC,
+        REMOVALS_SUBSCRIBER,
+        lamp_msgs::MemoryForgot::TYPE,
+    )?;
+    worker.recover_from(socket);
+    while !stop.load(std::sync::atomic::Ordering::SeqCst) {
+        if let Some(message) = forgot.recv(std::time::Duration::from_millis(200))?
+            && message.header.source == "memory"
+            && let Ok(told) = message.parse::<lamp_msgs::MemoryForgot>()
+            && told.check().is_ok()
+            && told
+                .person
+                .as_deref()
+                .is_some_and(lamp_msgs::known::is_person_id)
+        {
+            worker.recover_from(socket);
+        }
+        let _ = forgot.notices();
+    }
+    Ok(())
 }
 
 /// One handed forget, off the voice's way: queued on disk, then every
@@ -1849,6 +1970,53 @@ mod tests {
         );
         assert_eq!(pending.all, BTreeSet::from([LAN.to_owned()]));
         assert!(memory.rows.lock().unwrap().is_empty());
+    }
+
+    /// The first builder's call on #8125 (item 2): a forget the voice
+    /// stopped waiting for, its request sent whole and the memory still at
+    /// it (leg 7: 1.5 s, the memory done about 15 s later), is queued for
+    /// the account once the memory's late answer is in, by the worker's
+    /// own read again, never only at the next start. While the memory is
+    /// busy the read is owed, tried again every [`RECOVER_AGAIN`], and the
+    /// save holds; once it is done, its rows go on the queue and are said
+    /// done. A forget the memory was not asked to keep reads nothing.
+    #[test]
+    fn a_forget_answered_late_is_queued_without_a_start() {
+        use std::sync::atomic::{AtomicBool, Ordering::SeqCst};
+        let path = scratch("late");
+        let memory = Arc::new(FakeMemory::default());
+        let busy = Arc::new(AtomicBool::new(true));
+        let worker = {
+            let (memory, busy) = (memory.clone(), busy.clone());
+            test_worker(
+                &path,
+                Arc::new(move |_: &Path, line: &Value| {
+                    (!busy.load(SeqCst)).then(|| memory.answer(line)).flatten()
+                }),
+            )
+        };
+        assert!(!worker.unanswered(Path::new(SOCKET), &forget()));
+        let asked = asking_with(&forget()).into_owned();
+        assert!(worker.unanswered(Path::new(SOCKET), &asked));
+        assert!(settled(&worker));
+        // The memory still at the forget: owed, and the save holds.
+        assert!(worker.flight.owed.load(SeqCst));
+        assert!(worker.holds("everyone"));
+        assert!(worker.queue.pending().is_empty());
+        // The memory done: what it removed is kept, its late answer lost.
+        memory.kept(MINH, &kept_turns(MINH, [4, 5]));
+        busy.store(false, SeqCst);
+        let until = std::time::Instant::now() + 3 * RECOVER_AGAIN;
+        while std::time::Instant::now() < until && !memory.rows.lock().unwrap().is_empty() {
+            std::thread::sleep(std::time::Duration::from_millis(20));
+        }
+        assert!(memory.rows.lock().unwrap().is_empty());
+        assert_eq!(
+            worker.queue.pending().ids[MINH],
+            turns(MINH, [4, 5]).into_iter().collect::<BTreeSet<_>>()
+        );
+        assert!(!worker.flight.owed.load(SeqCst));
+        assert!(!worker.holds("everyone"));
     }
 
     /// A forget the worker queued whole is said done once, and never read

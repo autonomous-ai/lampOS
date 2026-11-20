@@ -672,7 +672,7 @@ pub trait Check {
 
 /// TLS 1.2 and 1.3 with the `ring` provider and the webpki roots, as the
 /// other lampOS clients have it.
-fn tls() -> Option<rustls::ClientConfig> {
+pub(crate) fn tls() -> Option<rustls::ClientConfig> {
     let roots = rustls::RootCertStore {
         roots: webpki_roots::TLS_SERVER_ROOTS.to_vec(),
     };

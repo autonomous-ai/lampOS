@@ -153,6 +153,36 @@ software, its releases, the update key, the touch calibration and other
 per-lamp facts (the servos' daily load and temperature peaks in
 `/var/lib/lampos-body/peaks`, #4501, among them), and physical privacy.
 
+**The account's history goes first** (#7771; the first builder's ruling on
+#8125): with `LAMP_HISTORY_FORGET=on` in `lamp-voice.service`'s environment
+(read with `systemctl show -p Environment --value`, itself bounded at 5 s,
+`reset::query::QUERY_WITHIN`), every reset (the button's and setup's `reset-now`,
+and the resume at boot) posts the delete of the lamp's whole history,
+`{"all":true,"every_person":true}`, to the lamp's own cloud API with the
+relay key that `second.json` names, and reads its answer, before the first
+path is wiped (`reset::Effects::forget_history`,
+`history_forget::before_wipe`). The delete's tries take at most 10 s
+(`history_forget::WITHIN`), a failed try tried again after 1 s (`AGAIN`), so
+with the environment read a button or app reset waits at most about 15 s
+(a name lookup still under way at the bound may hold it a little longer)
+for it: a 2xx is done, a 401 means the key is already gone from the account
+and is never tried again, and anything else, a dead network included, is
+journalled and the reset goes on. The voice's own delete at its next start
+(the changed memory epoch) stays as the fallback, but with the new setup's
+key it can't reach the old account; the journal says so. Off, nothing is
+read or sent.
+
+**A reset finished at boot may leave the account's history in place.** The
+resume after a power cut, or after a stop that failed, runs from `serve`
+before Wi-Fi and DNS are up (`lamp-setup.service` is ordered only after the
+local file systems). With the switch on, it first waits for the lamp's cloud
+API's name to resolve, looked at every second (`NETWORK_AGAIN`), at most
+60 s (`history_forget::NETWORK_WITHIN`: the usual boot has Wi-Fi and DNS
+within it, and a reset is never held longer), then sends the delete as
+above, so this path waits at most about 75 s in all. With no route or DNS
+in the 60 s, nothing is sent, the reset goes on, and the journal says the
+delete did not reach the account: that history may stay on it.
+
 Onboarding uses `/var/lib/lampOS/voice/onboarding/progress.json`; the privacy
 checkpoint and transient handoff files share its root-owned 0700 directory.
 The room sounds yes (#1722 item 1) is `/var/lib/lampOS/consent/room-sounds.json`,

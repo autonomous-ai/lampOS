@@ -1264,7 +1264,7 @@ most 2,000 a person, the one changed longest ago going first past it. An
 older memory answers `unknown_op`, so the voice sends them only with its
 switch on.
 
-## The account's history (the voice's `LAMP_HISTORY_SEND`, #7771, off)
+## The account's history (the voice's `LAMP_HISTORY_SEND`, #7771, on in the product)
 
 The product owner's decision of 18 Nov: a person's conversations with the lamp
 are kept on our server too. With `LAMP_HISTORY_SEND=on` (the second route only,
@@ -1337,7 +1337,14 @@ body `{"turns":[{"id","at","person","heard","said"}]}`.
   removals answered, what went was named on its way and nothing more is let
   go; when one timed out or was lost part way (the kept things' forgets or the
   exchanges forget), what went is not known, and it is taken as a forget
-  naming no ids, never as "nothing removed". A source forgotten
+  naming no ids, never as "nothing removed". A forget sent whole whose
+  answer the voice stopped waiting for (the memory still at it) or lost has
+  its delete queued once the memory is done, never only at the next start
+  (the first builder's call on #8125, item 2): with `LAMP_HISTORY_FORGET` on,
+  the forget worker reads what the memory kept of it (`history_forget::unanswered`,
+  as at a start), owed and read again every 5 s while the memory is busy, so
+  within about 5 s of the memory's late answer; while it is owed, no turn is
+  posted. With the switch off, its ids wait in the memory as above. A source forgotten
   outside the voice is taken as an unnamed forget of that person's.
 - **Nothing lost at a restart, and no words on disk:** only ids are kept, in
   `/var/lib/lampOS/voice/history-marks.json` (0600,
@@ -1376,12 +1383,19 @@ body `{"turns":[{"id","at","person","heard","said"}]}`.
   forget covering it came is deleted after its POST answers (the
   Reviewer-lead's must-fix on #8091). A reset or a forget of everyone
   deletes the lamp's whole history first (`{"all":true,"every_person":true}`;
+  a reset sends it from lamp-setup, its answer read before the lamp's keys
+  are wiped, within 10 s, a 401 taken as done, [setup.md](setup.md);
   one that missed the worker's hand-off is seen at the next read again by
   the memory's changed epoch),
-  and nothing is saved before it goes ([memory.md](memory.md)).
-- **Off in every unit:** by the first builder's rulings (#7935, and 17:09 on
-  #7957), the save goes on in the product only after the forget half
-  (`LAMP_HISTORY_FORGET`) is on, with its row. The setup sentence the issue
+  and nothing is saved before it goes ([memory.md](memory.md)). A person
+  removed in the app (`forget_person`, from lamp-cloud) has their whole
+  history deleted on the account too (`{"all":true,"person":<p- id>}`): the
+  memory keeps it in the removal's own transaction and the voice reads it on
+  `memory/forgot` or at its next start (the Reviewer-lead's HOLD on #8125).
+- **On in the product unit, with the forget half:** by the first builder's
+  rulings (#7935, and 17:09 on #7957), the save goes on only together with the
+  forget half (`LAMP_HISTORY_FORGET`), never alone; the unit sets both, and its
+  install test pins the pair. The setup sentence the issue
   first asked for was dropped by the product owner (18 Nov): the notice is in
   the privacy policy.
 
@@ -2083,14 +2097,31 @@ any other id is refused `bad_person`); an older memory answers
 were not settled: the memory lost or refusing the listing, too much to look
 through, or more than eight matching (the model asks which one). Some removed, the answer says how many
 (`exchanges`, never their words) and the conversation stops being
-journalled, as after a forgotten kept thing. Sent and not answered (a
-timeout or a lost answer; a refusal removed none), what was said about it
-is not known gone: the model is told `history: "not_reached"` beside the kept things'
-own result, never "forgot nothing". With nothing kept gone, the note says
-none of what is kept went and that it couldn't finish forgetting, and not
-to say nothing was there or that it is forgotten; with some gone, a
-`history_note` says so beside what went. One more local request inside
-the call's 1.5 s.
+journalled, as after a forgotten kept thing. With no answer (a refusal
+removed none), what was said about it is not known gone, never "forgot
+nothing", and the model is told one of two things beside the kept things'
+own result (the first builder's call on #8125, item 3). The voice waits
+3 s for this answer (`EXCHANGES_FORGET_WITHIN`, `crates/voice/src/remember.rs`),
+counted from when it is asked, for this op alone: every other memory request,
+the kept things' listing and their forgets included, keeps the call's 1.5 s
+(`ASK_DEADLINE`). A 100-turn forget answers in about 2.1 to 2.5 s on the lamp
+(#8231), so it is told done (the first builder's ruling, 23:53 on #8231):
+- **Sent whole, no answer in time** (past its 3 s): the memory goes on with it after the
+  voice stops waiting (lamp-06c1, 20 Nov: a forget of about 100 turns
+  answered about 15 s after the call's 1.5 s), so `history:
+  "still_forgetting"`. With nothing kept gone, the note says to tell them
+  "I'm still forgetting that. It'll be gone in a moment.", never that it
+  couldn't, nor that nothing was there or that it is already forgotten; with
+  some gone, a `history_note` says what went and that the rest is still
+  going. Its delete on the account follows once the memory is done (below).
+- **The memory not reached at all** (not connected, the request not sent
+  whole, no time left, or closed with no answer): `history: "not_reached"`.
+  With nothing kept gone, the note says to tell them "I couldn't finish
+  forgetting that just now.", and not to say nothing was there or that it
+  is forgotten; with some gone, a `history_note` says what went and that it
+  couldn't finish.
+
+One more local request, waited for 3 s of its own.
 
 **A forget by id whose line names a subject** (#8259; lamp-06c1, 22 Nov,
 #8125's leg 15). "Forget what I said about the bicycle" may be called by
@@ -2104,10 +2135,17 @@ subject for an id; no other word list), and marks the call with it
 known person's own exchanges about the subject go too, by the same
 `exchanges_forget` a forget about sends (`DaysClient::forget_exchanges_about`),
 in their scope alone: never in the room's scope, never another's. The
-model is told one count (the kept thing, `exchanges` beside it), or
-`history: "not_reached"` as above; the account's history waits for both
-answers, as after a forget about. It runs after the forget by id, inside the
-same call's time (no extra wait, no new cap). A line that names nothing
+model is told one count (the kept thing, `exchanges` beside it), or, as a
+forget about's, the late line (`history: "still_forgetting"`, "I'm still
+forgetting that. It'll be gone in a moment.") or the unreached one
+(`history: "not_reached"`) above; the account's history waits for both
+answers, as after a forget about. It runs after the forget by id, its
+`exchanges_forget` waited for the same 3 s a forget about's has
+(`EXCHANGES_FORGET_WITHIN`, from when it is asked, never less than what is
+left of the call's 1.5 s; the Reviewer-lead's must-fix on #8125), no new
+cap: at worst the forget by id takes the call's 1.5 s and its turns 3 s
+more, about 4.5 s, and its answer is told past the 1.5 s as a forget
+about's is. A line that names nothing
 ("forget that"), an id that was not there, a bare forget and the second
 route taking back its own keep run by the id alone, as before. A forget
 about and the agreed one-face forget (below in `memory.md`, which already
@@ -2143,8 +2181,11 @@ is respected the same way: apply leaves such an exchange out as
 `forgotten`, with every item citing it. Another person's lines, and a day
 outside the window, are untouched. Latency: the voice sends `forget_mark`
 after the `forget {about}` it follows, within the call's 1.5 s, but given at
-least 250 ms (`FORGET_MARK_WITHIN`) when the forget used it all, so the
-turn's worst case is about 1.75 s on the local socket. `forget_all` and `forget_person` take the person's
+least 250 ms (`FORGET_MARK_WITHIN`) when the forget used it all. With the
+exchanges forget's own 3 s, the person waits about 3.25 s at most when the
+kept things answer at once, as they do on the local socket, and about 4.75 s
+in the worst case (the kept things using the whole 1.5 s, then the 3 s, then
+the mark's 250 ms). `forget_all` and `forget_person` take the person's
 marks (their exchanges are gone); a mark goes once its day is past the
 `keep_days` its exchanges last.
 

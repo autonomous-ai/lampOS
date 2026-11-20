@@ -146,6 +146,10 @@ struct Fake {
     /// whether it was there when [`reset::forget_agents`] ran.
     token: Option<PathBuf>,
     token_at_forget: Option<bool>,
+    /// The account's history delete before the wipe (#8125): what it does
+    /// in place of the lamp's, given whether the reset was resumed at boot,
+    /// and only then is it in `calls`.
+    history: Option<Box<dyn FnMut(bool)>>,
 }
 impl Effects for Fake {
     fn run(&mut self, argv: &[String]) -> io::Result<()> {
@@ -258,6 +262,12 @@ impl Effects for Fake {
     fn agent_manager(&mut self) -> Option<String> {
         self.manager.clone()
     }
+    fn forget_history(&mut self, resumed: bool) {
+        if let Some(history) = self.history.as_mut() {
+            self.calls.borrow_mut().push("history".into());
+            history(resumed);
+        }
+    }
 }
 
 /// A unit name against a `systemctl` pattern, `*` standing for any run of
@@ -331,6 +341,163 @@ fn a_reset_stops_wipes_removes_the_marker_and_reboots_in_that_order() {
             "sync",
             "reboot"
         ]
+    );
+}
+
+/// The lamp's relay key and the second route's settings, under `root`,
+/// wiped by `plan` as the product's are; the settings path.
+fn history_keys(root: &Root, plan: &mut Plan) -> PathBuf {
+    fs::create_dir_all(root.path("voice/own")).unwrap();
+    fs::write(root.path("voice/credential"), b"relay-secret\n").unwrap();
+    fs::write(root.path("voice/own/deepseek.key"), b"own").unwrap();
+    let config = root.path("voice/second.json");
+    fs::write(
+        &config,
+        serde_json::json!({
+            "llm_base_url": "https://campaign-api.autonomous.ai/api/v1/ai",
+            "llm_credential_file": root.path("voice/credential"),
+        })
+        .to_string(),
+    )
+    .unwrap();
+    plan.wipe
+        .extend([root.path("voice/credential"), root.path("voice/own")]);
+    config
+}
+
+/// The first builder's ruling on #8125 (7049606477): at every reset entry
+/// (the button's and setup's `reset-now`, said first; a plain reset; the
+/// resume after a power cut), with the voice's `LAMP_HISTORY_FORGET=on`,
+/// the lamp's whole history is deleted on the account and its answer read
+/// before the lamp's keys are wiped; then they are.
+#[test]
+fn at_every_reset_the_accounts_history_is_deleted_before_the_keys_are_wiped() {
+    for entry in ["said", "reset", "resume"] {
+        let root = Root::new();
+        let mut plan = lamp(&root);
+        let config = history_keys(&root, &mut plan);
+        let seen: Rc<RefCell<Vec<String>>> = Rc::default();
+        let (key, own, kept) = (
+            root.path("voice/credential"),
+            root.path("voice/own/deepseek.key"),
+            Rc::clone(&seen),
+        );
+        let mut fake = Fake {
+            history: Some(Box::new(move |resumed| {
+                assert_eq!(resumed, entry == "resume", "{entry}");
+                let outcome = lamp_setup::history_forget::before_wipe(
+                    "LAMP_HISTORY_FORGET=on LAMP_HISTORY_SEND=on",
+                    &config,
+                    lamp_setup::history_forget::WITHIN,
+                    |url, sent_key, _| {
+                        assert!(key.exists() && own.exists(), "the keys are still there");
+                        kept.borrow_mut().push(format!("sent {url} {sent_key}"));
+                        Ok(200)
+                    },
+                );
+                assert!(key.exists(), "answered before the wipe");
+                kept.borrow_mut().push(format!("{outcome:?}"));
+            })),
+            ..Fake::default()
+        };
+        match entry {
+            "said" => {
+                reset::said_then_reset(&plan, &mut fake, |_, _| Ok(()), |_| {}).unwrap();
+            }
+            "reset" => {
+                reset::reset(&plan, &mut fake).unwrap();
+            }
+            _ => {
+                fs::write(&plan.journal, b"{}").unwrap();
+                reset::resume(&plan, &mut fake).unwrap();
+            }
+        }
+        wiped(&root);
+        assert!(!root.path("voice/credential").exists(), "{entry}");
+        assert_eq!(fs::read_dir(root.path("voice/own")).unwrap().count(), 0);
+        assert_eq!(
+            *seen.borrow(),
+            [
+                "sent https://campaign-api.autonomous.ai/api/v1/ai/history/turns/delete relay-secret"
+                    .to_owned(),
+                "Done(200)".to_owned(),
+            ],
+            "{entry}"
+        );
+        // Once, before anything is wiped.
+        let calls = fake.calls.borrow();
+        assert_eq!(calls.iter().filter(|call| *call == "history").count(), 1);
+    }
+}
+
+/// Off (the voice's switch unset), the reset is as it was: nothing is read
+/// or sent, the keys are wiped.
+#[test]
+fn with_the_switch_off_a_reset_sends_nothing() {
+    let root = Root::new();
+    let mut plan = lamp(&root);
+    let config = history_keys(&root, &mut plan);
+    let mut fake = Fake {
+        history: Some(Box::new(move |_| {
+            let outcome = lamp_setup::history_forget::before_wipe(
+                "LAMP_HISTORY_SEND=on",
+                &config,
+                lamp_setup::history_forget::WITHIN,
+                |_, _, _| panic!("nothing is sent with the switch off"),
+            );
+            assert_eq!(outcome, lamp_setup::history_forget::Outcome::Off);
+        })),
+        ..Fake::default()
+    };
+    reset::reset(&plan, &mut fake).unwrap();
+    wiped(&root);
+    assert!(!root.path("voice/credential").exists());
+}
+
+/// Heron's P2 on #8125: a reset resumed at boot with no network for the
+/// whole wait sends nothing, says the delete did not reach the account,
+/// and goes on: the keys are wiped.
+#[test]
+fn a_resumed_reset_with_no_network_goes_on_and_says_so() {
+    use lamp_setup::history_forget as history;
+    let root = Root::new();
+    let mut plan = lamp(&root);
+    let config = history_keys(&root, &mut plan);
+    let said: Rc<RefCell<Option<String>>> = Rc::default();
+    let kept = Rc::clone(&said);
+    let mut fake = Fake {
+        history: Some(Box::new(move |resumed| {
+            assert!(resumed);
+            let waited = std::cell::Cell::new(std::time::Duration::ZERO);
+            let outcome = history::before_wipe_after(
+                "LAMP_HISTORY_FORGET=on",
+                &config,
+                history::WITHIN,
+                || {
+                    history::network_within(
+                        history::NETWORK_WITHIN,
+                        history::NETWORK_AGAIN,
+                        |_| false,
+                        |wait| waited.set(waited.get() + wait),
+                        || waited.get(),
+                    )
+                },
+                |_, _, _| panic!("nothing is sent with no network"),
+            );
+            assert_eq!(outcome, history::Outcome::NoNetwork);
+            assert_eq!(waited.get(), history::NETWORK_WITHIN);
+            *kept.borrow_mut() = Some(outcome.said());
+        })),
+        ..Fake::default()
+    };
+    fs::write(&plan.journal, b"{}").unwrap();
+    reset::resume(&plan, &mut fake).unwrap();
+    wiped(&root);
+    assert!(!root.path("voice/credential").exists());
+    let said = said.borrow().clone().unwrap();
+    assert!(
+        said.contains("the delete did not reach the account"),
+        "{said}"
     );
 }
 

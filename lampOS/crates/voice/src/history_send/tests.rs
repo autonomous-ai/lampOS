@@ -742,6 +742,49 @@ fn the_catch_up_leaves_out_what_was_forgotten() {
     let _ = std::fs::remove_dir_all(&dir);
 }
 
+/// Twelve's P3 (#7957, owed on #8125), pinned as it is: memory does not
+/// mark a turn's route, so a Live-route turn kept between the mark and
+/// `offered` in the same run is sent at the catch-up with the rest (a
+/// forget reaches it like any other). One kept above `offered` never is.
+#[test]
+fn a_live_turn_between_the_mark_and_offered_goes_at_the_catch_up() {
+    let dir = scratch("catch-up-live");
+    let marks = dir.join("history-marks.json");
+    write_marks(
+        &marks,
+        STORE,
+        &BTreeMap::from([(A.to_owned(), 0)]),
+        &BTreeMap::from([(A.to_owned(), 3)]),
+    )
+    .unwrap();
+    let (post, told) = recording(vec![Answer::Saved]);
+    let sender = Sender::new();
+    sender
+        .spawn(
+            post,
+            memory(
+                STORE,
+                json!({A:4}),
+                vec![
+                    (A, 1, "handed"),
+                    (A, 2, "said on the Live route"),
+                    (A, 3, "handed"),
+                    (A, 4, "said on the Live route after"),
+                ],
+            ),
+            Some(marks.clone()),
+            QUICK,
+        )
+        .unwrap();
+    let body = next(&told);
+    assert_eq!(ids(&body), [id(A, 1), id(A, 2), id(A, 3)]);
+    assert_eq!(body["turns"][1]["heard"], "said on the Live route");
+    marks_once(&marks, A, 4);
+    none_within(&told, Duration::from_millis(100));
+    // The sender may still be writing its marks: a best-effort cleanup.
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
 /// The first builder's must-fix (01:16 on #7957): turns the memory kept
 /// while the switch was off (no sender ran) are never sent, on the
 /// switch-on's start nor on any start after; only turns kept after it are.
@@ -1206,4 +1249,78 @@ fn a_post_in_flight_when_a_forget_naming_no_ids_came_is_deleted_after() {
     }
     assert_eq!(*deleted.lock().unwrap(), [id(A, 1)]);
     none_within(&told, Duration::from_millis(100));
+}
+
+/// Heron's P1 on #8125: a person removed in the app (`Days::forget_person`)
+/// with a turn waiting in the save while the privacy switch is closed.
+/// The whole-person delete the memory kept is read back (`recover`) and
+/// goes through; once the switch opens, nothing of theirs is posted.
+#[test]
+fn a_removed_persons_waiting_turn_is_never_posted_after_their_delete() {
+    let dir = scratch("removed-waiting");
+    let store = lamp_memory::days::Days::open(
+        lamp_memory::store::Options {
+            dir: dir.join("memory"),
+            keep_days: 30,
+            local: lamp_memory::store::LocalTime::Offset(0),
+        },
+        1_760_356_800_000,
+    )
+    .unwrap();
+    let store = Mutex::new(store);
+    let ask = |line: &Value| -> Option<Value> {
+        let answer = lamp_memory::days_protocol::answer(
+            &mut store.lock().unwrap(),
+            line.to_string().as_bytes(),
+            1_760_356_800_000,
+        );
+        serde_json::from_str(answer.line.trim()).ok()
+    };
+    let kept = ask(
+        &json!({"op":"append","person":A,"at_unix_ms":1_760_356_800_001u64,
+        "heard":"h","said":"s"}),
+    )
+    .unwrap();
+    assert_eq!(kept["ok"], true, "{kept}");
+    let deletes: &'static crate::history_forget::Queue = Box::leak(Box::new(
+        crate::history_forget::Queue::at(dir.join("history-forget.json")),
+    ));
+    let open = Arc::new(std::sync::atomic::AtomicBool::new(false));
+    let switch = open.clone();
+    let (post, told) = recording(vec![Answer::Saved]);
+    let sender = Sender::new();
+    sender.guarded(
+        Arc::new(move |scope: &str| {
+            switch.load(std::sync::atomic::Ordering::SeqCst) && !deletes.pending().reaches(scope)
+        }),
+        Arc::new(|_: &[String]| {}),
+    );
+    // Their turn waits: the switch is closed.
+    offer(&sender, Some(A), 1);
+    sender.spawn(post, fresh(), None, QUICK).unwrap();
+    none_within(&told, Duration::from_millis(200));
+    // The app removes them, and the worker reads what the memory kept.
+    let removed = ask(&json!({"op":"forget_person","person":A})).unwrap();
+    assert_eq!(removed["ok"], true, "{removed}");
+    let bell = tokio::sync::Notify::new();
+    assert!(crate::history_forget::recover(
+        deletes,
+        &bell,
+        ask,
+        |answer| {
+            sender.seen(answer);
+        }
+    ));
+    assert!(deletes.pending().reaches(A), "{:?}", deletes.pending());
+    // Their whole-person delete reaches the account, then the switch opens.
+    deletes
+        .change(|pending| {
+            let call = pending.next().unwrap();
+            pending.done(&call);
+        })
+        .unwrap();
+    assert!(deletes.pending().is_empty(), "{:?}", deletes.pending());
+    open.store(true, std::sync::atomic::Ordering::SeqCst);
+    none_within(&told, Duration::from_millis(400));
+    assert_eq!(queued(&sender), (vec![], vec![]));
 }
