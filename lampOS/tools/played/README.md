@@ -194,6 +194,12 @@ the lamp's OpenClaw does it, and does the voice say how far it is (`docs/tasks.m
   journal `kept session … idle|working`); no socket is a clear FAIL. Then the voice's own ops: `status` and `prepare` on `request.sock`, `confirm`
   on `voice.sock`. Then `{"op":"work","id":…}` every 2 s, up to 4 minutes. PASS: at least two states,
   `tools` above 0 and rising, `step` set, and `done` with an answer.
+- **`step` only with the steps switch** (c0a4-16): lamp-tasks reads tool calls into a record's `step`
+  only with `LAMP_TASKS_STEPS=on`, which is off in the product, so `step` stays null there. The kit reads
+  lamp-tasks' environment once (logged `LAMP_TASKS_STEPS=on|off`). On, L1, L4 and HW require the step as
+  above. Off, they require its state, a tool counted and its session instead (L1: `session_filled` in
+  place of `step_set`; L4: `record_has_id_state_tools_session` in place of `record_has_id_state_step`;
+  HW: the same check on the record as the how was heard), and the reply naming a state.
 - **L2, the list.** `work_list` while L1 runs and after it: the task newest both times.
 - **L4, the voice side.** No spoken yes: a task is handed over by `request.sock` as in L1 and waited
   for until `working` (with a tool if one comes, up to 90 s). Then only the "how far is it?" clip plays
@@ -240,7 +246,8 @@ the lamp's OpenClaw does it, and does the voice say how far it is (`docs/tasks.m
   SIGINT (Ctrl-C) or SIGTERM do the same at once. The leg under way gets no verdict (`stopped
   STOPPED` in `verdict.txt`). A signal during the put-back is held, so it always runs to its end.
 - **Put-back**, always, and alone with `--put-back`: the installed binaries back (checked against the
-  SHA-256 read before), the drop-in removed, both units restarted, read twice, logged. A lamp-voice
+  SHA-256 read before), the drop-in removed, L0's ask helper (`/tmp/work-records-ask.py`) removed, both
+  units restarted, read twice (the helper gone in each), logged. A lamp-voice
   hard-asks drop-in an older kit run left (`lamp-voice.service.d/zz-7930-row-hard-asks.conf`, under
   `/run` or `/etc`) is removed too, and both places are checked in its reads; with no state file, such a
   leftover is still removed and the units restarted. After a round,

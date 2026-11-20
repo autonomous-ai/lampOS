@@ -307,10 +307,21 @@ RUNNING_WORDS = re.compile(r"\b(working|still|looking|checking|searching|going|u
                            re.IGNORECASE)
 
 
-def running_verdict(leg, at_heard, calls, reply, after):
+def record_checks(record, steps_on):
+    """What a record must carry for a leg: with lamp-tasks' LAMP_TASKS_STEPS=on its id, state and step
+    (strict); off (the product), the steps reader never runs and `step` stays null (c0a4-16), so its id,
+    state, a tool counted and its session instead."""
+    if steps_on:
+        return {'record_has_id_state_step': bool(record.get('id') and record.get('state') and record.get('step'))}
+    return {'record_has_id_state_tools_session': bool(record.get('id') and record.get('state')
+                                                      and record.get('tools') is not None and record.get('session'))}
+
+
+def running_verdict(leg, at_heard, calls, reply, after, steps_on=False):
     """HW scored: VOID when the record was already over as the how was heard ("finished too fast");
-    else PASS only when the how turn called the how tool, the record was `working` as it was heard, and
-    the reply names a running state or the step (its tool's name as words), not the answer."""
+    else PASS only when the how turn called the how tool, the record was `working` as it was heard and
+    carried what `record_checks` asks for the steps switch, and the reply names a running state or the
+    step (its tool's name as words), not the answer."""
     if at_heard.get('done') or at_heard.get('state') in ('done', 'failed', 'timed_out', 'cancelled', 'stopped'):
         return {'verdict': 'VOID', 'checks': {}, 'why': 'finished too fast: the record was '
                 f'{at_heard.get("state")} when the how was heard'}
@@ -320,6 +331,7 @@ def running_verdict(leg, at_heard, calls, reply, after):
         'working_when_heard': at_heard.get('state') == 'working',
         'reply_names_running_state_or_step': bool(RUNNING_WORDS.search(reply)) or bool(step and step in reply.lower()),
         'reply_not_the_answer': not answer_told(reply, after.get('answer')),
+        **record_checks(at_heard, steps_on),
     }
     ok = all(checks.values())
     return {'verdict': 'PASS' if ok else 'FAIL', 'checks': checks,
@@ -342,6 +354,16 @@ class Row:
             self.lock.renewing(self.log)
         self.since = 0
         self.state = None
+        self.steps = None
+
+    def steps_on(self):
+        """Whether lamp-tasks runs with LAMP_TASKS_STEPS=on (its units' environment, read once): only then
+        is a record's `step` required."""
+        if self.steps is None:
+            self.steps = self.lamp.environment('lamp-tasks').get('LAMP_TASKS_STEPS', '') == 'on'
+            self.log(f'LAMP_TASKS_STEPS={"on" if self.steps else "off"}: a record\'s step is '
+                     f'{"required" if self.steps else "not required (state, tools and session are)"}')
+        return self.steps
 
     def log(self, text):
         line = f'{time.strftime("%Y-%m-%dT%H:%M:%S%z")} {text}'
@@ -589,7 +611,8 @@ class Row:
             'session_filled': bool(sessions),
             'done_with_answer': last.get('state') == 'done' and bool(last.get('answer')),
         }
-        must = ('two_states', 'tools_rose', 'step_set', 'done_with_answer')
+        must = (('two_states', 'tools_rose', 'step_set', 'done_with_answer') if self.steps_on()
+                else ('two_states', 'tools_rose', 'session_filled', 'done_with_answer'))
         ok = all(checks[k] for k in must)
         result = {'verdict': 'PASS' if ok else 'FAIL', 'work_id': work_id, 'task': TASK, 'states': states,
                   'tools_seen': sorted(set(tools)), 'steps_seen': [dict(s) for s in {json.dumps(s): s for s in steps}.values()],
@@ -750,9 +773,9 @@ class Row:
         time.sleep(self.options['reply_wait'])
         after = work()
         scored = self.voice_score(how_at, how_at, how_us, after)
-        verdict = running_verdict(leg, at_heard, scored['tools_lines'], scored['reply'], after)
+        verdict = running_verdict(leg, at_heard, scored['tools_lines'], scored['reply'], after, self.steps_on())
         self.log(f'{leg}: {verdict["verdict"]} {json.dumps(verdict["checks"])} reply={scored["reply"][:120]!r}')
-        keep = lambda r: {k: r.get(k) for k in ('id', 'kind', 'state', 'done', 'step', 'tools', 'elapsed_s')}
+        keep = lambda r: {k: r.get(k) for k in ('id', 'kind', 'state', 'done', 'step', 'tools', 'session', 'elapsed_s')}
         return self.verdict(leg, dict(verdict, polled=keep(record), at_heard=keep(at_heard), after=keep(after),
                                       tools_lines=scored['tools_lines'], heard=scored['heard'], reply=scored['reply'],
                                       journal_by_request=scored['journal_by_request']))
@@ -796,7 +819,7 @@ class Row:
         checks = {
             'check_agent_task_called_or_answer_told': called or told,
             'reply_names_its_state': bool(STATE_WORDS.search(reply)) or told,
-            'record_has_id_state_step': bool(record.get('id') and record.get('state') and record.get('step')),
+            **record_checks(record, self.steps_on()),
         }
         if spoken:
             checks['handed_over'] = any(re.search(r'(start_agent_task|confirm_agent_task)', c['calls']) for c in calls)
@@ -835,6 +858,8 @@ class Row:
         except LockLost as holder:
             return self.verdict('putback', {'verdict': 'NOT RUN', 'why': f'lock not held: {holder}; the state is '
                                             'kept on the lamp for --put-back under the lock'})
+        # The ask helper L0 left in /tmp goes whatever else is put back.
+        lamp.run(f'rm -f {HELPER}', check=False)
         text = lamp.run(f'sudo -n cat {STATE}', check=False).strip()
         if not text:
             # No state, but a drop-in an older kit run left (/run or /etc) still goes, the units restarted on it.
@@ -884,19 +909,20 @@ class Row:
             reads.append({'running': {u: lamp.binary(u) for u in state['units']},
                           'sha256': {u: lamp.sha(lamp.binary(u)) for u in state['units']},
                           'engine': lamp.environment('lamp-tasks').get('LAMP_LAMP_ENGINE', ''),
-                          'drop_in': self.drop_in_left()})
+                          'drop_in': self.drop_in_left(),
+                          'helper_left': lamp.run(f'test -e {HELPER} && echo there || true').strip() == 'there'})
             time.sleep(3)
         def installed(unit, sha):
             row = state['units'][unit]
             return sha != row['staged_sha256'] and (round_ran or sha == row['installed_sha256'])
         ok = ready['ok'] and all(all(installed(u, r['sha256'][u]) for u in r['sha256']) and not r['drop_in']
-                                 for r in reads)
+                                 and not r['helper_left'] for r in reads)
         if ok:
             lamp.run(f'sudo -n sh -c "rm -rf {STATE_DIR} && echo \'{stamp} #7930 work-records ROW {state["label"]}: '
                      f'put back, read twice\' >> {CHANGES}"')
         return self.verdict('putback', {'verdict': 'PASS' if ok else 'FAIL', 'ready': ready, 'reads': reads,
                                         'round': {'links_moved': moved, 'journal': lines[:5]} if round_ran else None,
-                                        'why': '' if ok else 'not the installed build, a drop-in left, or not ready; state kept'})
+                                        'why': '' if ok else 'not the installed build, a drop-in or the helper left, or not ready; state kept'})
 
     def all_legs(self):
         for signum in (signal.SIGINT, signal.SIGTERM, signal.SIGALRM):

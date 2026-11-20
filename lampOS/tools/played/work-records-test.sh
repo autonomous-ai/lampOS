@@ -54,6 +54,9 @@ check "the state is cleared" test ! -e "$WORK_ROOT/var/tmp/work-records-7930"
 check "the put-back was logged" grep -q 'put back, read twice' "$WORK_ROOT/home/orangepi/changes.txt"
 check "the drop-in went under /run, which a reboot drops" grep -q 'drop-in .*/run/systemd/system/lamp-tasks.service.d/zz-7930-row-engine.conf' "$WORK_ROOT/home/orangepi/changes.txt"
 check "no drop-in under /etc" test -z "$(grep 'drop-in .*/etc/systemd' "$WORK_ROOT/home/orangepi/changes.txt")"
+check "the ask helper is gone from /tmp" test ! -e "$WORK_ROOT/tmp/work-records-ask.py"
+check "steps off (the product): L1 needs no step, a session instead" python3 -c "import json,sys; r=json.load(open('$V/L1.json')); sys.exit(bool(r['steps_seen']) or not r['checks']['session_filled'])"
+check "steps off: L4 checks state, tools and session" python3 -c "import json,sys; l=json.load(open('$V/L4.json'))['legs']; sys.exit(not all(l[x]['checks'].get('record_has_id_state_tools_session') for x in ('en','vi')))"
 
 # 1b. An older kit run's lamp-voice hard-asks drop-in, under /etc or /run, is removed by the put-back too.
 lamp a2 hermes
@@ -71,6 +74,12 @@ lamp b openclaw
 python3 "$HERE/work-records-row.py" dry-b --tasks-bin "$T/lamp-tasks" --voice-bin "$T/lamp-voice" "${FAST[@]}" >"$T/b.log" 2>&1
 V=$T/out/scenarios/work-records-dry-b
 check "openclaw lamp: L1 PASS" grep -q '^L1 PASS' "$V/verdict.txt"
+# 2b. LAMP_TASKS_STEPS=on: the step is required again, and set.
+lamp b2 openclaw
+echo "$(cat "$WORK_ROOT/env/lamp-tasks") LAMP_TASKS_STEPS=on" >"$WORK_ROOT/env/lamp-tasks"
+python3 "$HERE/work-records-row.py" dry-b2 --tasks-bin "$T/lamp-tasks" --voice-bin "$T/lamp-voice" "${FAST[@]}" >"$T/b2.log" 2>&1
+V2=$T/out/scenarios/work-records-dry-b2
+check "steps on: L1 PASS with a step" python3 -c "import json,sys; r=json.load(open('$V2/L1.json')); sys.exit(r['verdict']!='PASS' or not r['checks']['step_set'] or 'step_set' in r['why'])"
 check "openclaw lamp: no drop-in written" test -z "$(grep drop-in "$WORK_ROOT/home/orangepi/changes.txt")"
 check "no clips skips L4" grep -q '^L4 SKIP' "$V/verdict.txt"
 check "openclaw lamp: put back" grep -q '^putback PASS' "$V/verdict.txt"
@@ -247,9 +256,17 @@ check "--only L4: three lock looks (L0, L4, put-back)" test "$(wc -l <"$WORK_ROO
 rv() { python3 -c "
 import importlib.util, json, sys
 spec = importlib.util.spec_from_file_location('row', '$HERE/work-records-row.py'); row = importlib.util.module_from_spec(spec); spec.loader.exec_module(row)
-leg, heard, calls, reply, after = json.loads(sys.argv[1])
-print(row.running_verdict(leg, heard, [{'calls': c} for c in calls], reply, after)['verdict'])" "$1"; }
-W='{"state":"working","done":false,"step":{"n":3,"tool":"web_search"}}'
+leg, heard, calls, reply, after, *steps = json.loads(sys.argv[1])
+print(row.running_verdict(leg, heard, [{'calls': c} for c in calls], reply, after, *steps)['verdict'])" "$1"; }
+W='{"id":"7","state":"working","done":false,"tools":2,"session":{"machine":"","agent":"a1"},"step":{"n":3,"tool":"web_search"}}'
+# c0a4-16: with LAMP_TASKS_STEPS off (the product) a record's step stays null: state, tools and session are
+# required instead; with it on, the step is.
+NOSTEP='{"id":"7","state":"working","done":false,"tools":2,"session":{"machine":"","agent":"a1"},"step":null}'
+NOSESSION='{"id":"7","state":"working","done":false,"tools":2,"session":null,"step":null}'
+check "HW rules: steps off, no step, tools and session: PASS" test "$(rv "[\"HW\", $NOSTEP, [\"check_agent_task:1\"], \"It's still working.\", {}, false]")" = PASS
+check "HW rules: steps off, no session: FAIL" test "$(rv "[\"HW\", $NOSESSION, [\"check_agent_task:1\"], \"It's still working.\", {}, false]")" = FAIL
+check "HW rules: steps on, no step: FAIL" test "$(rv "[\"HW\", $NOSTEP, [\"check_agent_task:1\"], \"It's still working.\", {}, true]")" = FAIL
+check "HW rules: steps on, a step: PASS" test "$(rv "[\"HW\", $W, [\"check_agent_task:1\"], \"It's still working.\", {}, true]")" = PASS
 check "HW rules: working, check_agent_task, still working: PASS" test "$(rv "[\"HW\", $W, [\"check_agent_task:1\"], \"It's still working, on step 3.\", {}]")" = PASS
 check "HW rules: the step named as words: PASS" test "$(rv "[\"HW\", $W, [\"check_agent_task:1\"], \"It is on a web search now.\", {}]")" = PASS
 check "HW rules: done when heard: VOID" test "$(rv '["HW", {"state":"done","done":true}, ["check_agent_task:1"], "It is still working.", {}]')" = VOID
