@@ -4810,7 +4810,12 @@ chính đèn (đèn, đầu, một câu nói). "When I say send my test note, em
    made skills the heard words are read for; 2 word(s) of its own,
    nearest: name, 1 word(s) off"), không có từ nào của câu và không có tên
    kỹ năng; các từ được đọc là các từ sau tên đèn, như bộ so khớp đọc.
-   Một lần chạy tự nói lời của nó
+   Khi bật `LAMP_SKILL_KEYTERM=on`, speech to text cũng
+   nghe tên đọc ra của từng kỹ năng tự tạo và asks của nó
+   (`key_terms::made_terms`, cùng `made_asks` đó, đọc lại mỗi 2 giây), để
+   lời được viết đúng như đã nói; việc so khớp vẫn chính xác (#8022: trên
+   lamp-52e6 một câu "Hey Lamp, apple file." rõ ràng bị viết thành hai từ
+   khác). Một lần chạy tự nói lời của nó
    (`says` của lamp-skills, `made_run::speaks_itself`) kết thúc lượt ở đó,
    không có vòng 2 và không có câu nào của riêng đèn, nên câu say của kỹ
    năng, ở mức ưu tiên 8, là điều đầu tiên được nghe, khoảng một giây sau

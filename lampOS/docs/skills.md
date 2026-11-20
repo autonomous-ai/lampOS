@@ -8481,7 +8481,12 @@ grants, its code, or the lamp's own steps (the light, the head, a say).
    this conversation, 0 of them among the made skills the heard words are
    read for; 2 word(s) of its own, nearest: name, 1 word(s) off"), with
    no word of the line and no skill's name; the words read are those past
-   the lamp's name, as the matcher reads them. A run that speaks
+   the lamp's name, as the matcher reads them. With
+   `LAMP_SKILL_KEYTERM=on`, speech to text also listens for each made
+   skill's name as said and its asks (`key_terms::made_terms`, the same
+   `made_asks`, read every 2 s), so the words come back as said; the
+   match stays exact (#8022: on lamp-52e6 a clean "Hey Lamp, apple file."
+   was written as two other words). A run that speaks
    its own words (lamp-skills' `says`, `made_run::speaks_itself`) ends the
    turn there, with no round 2 and no line of the lamp's own, so the
    skill's say, at priority 8, is the first thing heard, about a second
