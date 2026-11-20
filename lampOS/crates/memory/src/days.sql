@@ -275,3 +275,21 @@ CREATE TABLE IF NOT EXISTS service_contacts (
     changed_unix_ms INTEGER NOT NULL,
     PRIMARY KEY(person,name_key)
 );
+-- #7415 (C166, the first builder's yes of 19 Nov 16:45): the kept things a
+-- Store app or a paired computer told (`Days::remember_app_fact`), each
+-- marked with its source (`app:<id>` / `computer:<id>`, set by the door from
+-- the grant) and never found by its words, so a person's own kept line in
+-- the same words is never one. At most `app_fact::MOST_A_DAY` a source a
+-- day and `app_fact::MOST_KEPT` a source in all (the first kept going),
+-- both by `kept_day`/`rid`, memory's own day and order of taking them, never
+-- the fact's `at`; gone `app_fact::KEPT_DAYS` after `kept_day`
+-- (`Days::maintain`) and with its source (`forget_app_facts`); not counted
+-- in the kept list's room, never in `kept`, never read by the nightly pass.
+-- Its row goes with the entry. Older builds pass this table over;
+-- `user_version` stays 1.
+CREATE TABLE IF NOT EXISTS app_facts (
+    rid INTEGER PRIMARY KEY REFERENCES entries(rid) ON DELETE CASCADE,
+    source TEXT NOT NULL,
+    kept_day TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS app_facts_source ON app_facts(source);

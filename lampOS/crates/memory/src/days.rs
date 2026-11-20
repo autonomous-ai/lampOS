@@ -476,10 +476,19 @@ impl Days {
             .map_or_else(|| "1970-01-01".into(), |d| d.to_string());
         let today =
             Day::at(self.now, &self.local).map_or_else(|| "1970-01-01".into(), |d| d.to_string());
+        // An app's fact lasts `app_fact::KEPT_DAYS` local days, the day it
+        // was kept the first (#7415).
+        let app_facts = Day::at(self.now, &self.local)
+            .and_then(|today| today.before(lamp_msgs::app_fact::KEPT_DAYS))
+            .map_or_else(|| "1970-01-01".into(), |d| d.to_string());
         let tx = self.db.transaction()?;
         keep_origins(&tx)?;
         tx.execute("DELETE FROM doomed", [])?;
         tx.execute("INSERT INTO doomed SELECT rid FROM entries WHERE (kind='exchange' AND day<?1) OR (kind='observation' AND coalesce(category,'') NOT IN ('talk','episode','fact','profile','pattern','ahead','feeling','chapter') AND used_unix_ms<?2 AND NOT EXISTS (SELECT 1 FROM event_days d WHERE d.rid=entries.rid AND d.day>=?3))",params![day,unused,event])?;
+        tx.execute(
+            "INSERT OR IGNORE INTO doomed SELECT rid FROM app_facts WHERE kept_day<=?1",
+            [&app_facts],
+        )?;
         // Nightly pass B's items close on their own end days, and an
         // episode, feeling or pattern after 90 unused days, never with
         // their source exchanges (`nightly::expire`).
@@ -872,10 +881,11 @@ impl Days {
     }
 
     /// Whether this person's kept list has room for one more. Only active
-    /// kept things count: a replaced version (#2510) is history, not a slot.
+    /// kept things count: a replaced version (#2510) is history, not a slot;
+    /// nor is an app's fact (#7415), held to its source's own bounds.
     fn kept_room(&self, person: &Person) -> Result<()> {
         let count: u64 = self.db.query_row(
-            "SELECT count(*) FROM entries WHERE person=? AND kind='kept' AND active=1",
+            "SELECT count(*) FROM entries WHERE person=? AND kind='kept' AND active=1 AND rid NOT IN (SELECT rid FROM app_facts)",
             [person.as_str()],
             |r| r.get(0),
         )?;
@@ -889,11 +899,12 @@ impl Days {
     }
 
     /// The id of this person's active kept thing with `text`, the same by
-    /// [`once_text`].
+    /// [`once_text`]. Never an app's fact (#7415): a person's own line in
+    /// its words is their own, and stays when the app goes.
     fn kept_already(&self, person: &Person, text: &str) -> Result<Option<u64>> {
         let wanted = once_text(person, text);
         let mut statement = self.db.prepare(
-            "SELECT id,text FROM entries WHERE person=? AND kind='kept' AND active=1 ORDER BY id",
+            "SELECT id,text FROM entries WHERE person=? AND kind='kept' AND active=1 AND rid NOT IN (SELECT rid FROM app_facts) ORDER BY id",
         )?;
         let mut rows = statement.query([person.as_str()])?;
         while let Some(row) = rows.next()? {
@@ -1059,8 +1070,9 @@ impl Days {
         observations: bool,
     ) -> Result<Vec<Kept>> {
         // A replaced kept thing (#2510) is no longer kept: only its history;
-        // and a superseded observation is no longer what was noticed.
-        let mut statement=self.db.prepare("SELECT id,at_unix_ms,text FROM entries WHERE person=?1 AND (kind='kept' OR (?2 AND kind='observation')) AND active=1 ORDER BY id DESC")?;
+        // and a superseded observation is no longer what was noticed. An
+        // app's fact (#7415) is not the person's own list: recall finds it.
+        let mut statement=self.db.prepare("SELECT id,at_unix_ms,text FROM entries WHERE person=?1 AND (kind='kept' OR (?2 AND kind='observation')) AND active=1 AND rid NOT IN (SELECT rid FROM app_facts) ORDER BY id DESC")?;
         let rows = statement.query_map(params![person.as_str(), observations], |r| {
             Ok(Kept {
                 id: r.get(0)?,
@@ -1619,7 +1631,7 @@ impl Days {
     /// A set-aside database is the person's memory too, and this build can't
     /// reach a fact or a person inside it: every forget removes it whole,
     /// with its sidecars, so nothing said forgotten stays on disk (#2067).
-    fn forget_set_aside(&mut self) -> Result<()> {
+    pub(crate) fn forget_set_aside(&mut self) -> Result<()> {
         remove_set_aside(&self.dir, None)?;
         self.set_aside = None;
         Ok(())
@@ -2805,7 +2817,7 @@ impl Days {
             ("observation", MAX_OBSERVATIONS),
         ] {
             let after: u64 = tx.query_row(
-                "SELECT count(*) FROM entries WHERE kind=?2 AND (kind!='kept' OR active=1) AND coalesce(category,'')!='talk' AND (person=?1 OR rid IN (SELECT rid FROM adopting))",
+                "SELECT count(*) FROM entries WHERE kind=?2 AND (kind!='kept' OR active=1) AND coalesce(category,'')!='talk' AND rid NOT IN (SELECT rid FROM app_facts) AND (person=?1 OR rid IN (SELECT rid FROM adopting))",
                 params![to.as_str(), kind],
                 |r| r.get(0),
             )?;
@@ -3268,7 +3280,7 @@ fn said_after(tx: &Transaction<'_>, rid: i64, at: u64) -> Result<bool> {
 /// the scope as origin, not only an exchange (Reviewer-lead's P3). In the
 /// caller's transaction, before [`erase`]; never on expiry, so an exchange
 /// that ages out at `keep_days` leaves the time it was said again.
-fn said_again_with_doomed(tx: &Transaction<'_>) -> Result<()> {
+pub(crate) fn said_again_with_doomed(tx: &Transaction<'_>) -> Result<()> {
     tx.execute(
         "DELETE FROM said_again WHERE (rid,at_unix_ms) IN (SELECT a.rid,a.at_unix_ms FROM said_again a JOIN entries k ON k.rid=a.rid JOIN entries x ON x.person=k.person AND x.id=a.origin WHERE x.rid IN (SELECT rid FROM doomed))",
         [],
@@ -3654,7 +3666,7 @@ fn literal(text: &str) -> String {
 /// derives from them and every version, except a kept thing that isn't
 /// itself doomed already (#3113); for expiry, from the first day whose
 /// events no longer hold (`expiry`), what derives from them only.
-fn descendants(db: &Connection, expiry: Option<&str>) -> Result<()> {
+pub(crate) fn descendants(db: &Connection, expiry: Option<&str>) -> Result<()> {
     if let Some(event) = expiry {
         // Expiry: a kept thing never expires, even one remembered with its
         // conversation (#1693): the walk stops at it, and its link to an
@@ -3801,7 +3813,7 @@ fn room_from_citing(tx: &Transaction<'_>, person: &Person) -> Result<()> {
 /// for talk notes): it is one note of the whole conversation, in the
 /// lamp's words, so it may carry what was forgotten in any of them. Never
 /// on expiry: an exchange that ages out leaves the note kept.
-fn talk_with_doomed(tx: &Transaction<'_>) -> Result<()> {
+pub(crate) fn talk_with_doomed(tx: &Transaction<'_>) -> Result<()> {
     keep_origins(tx)?;
     tx.execute(
         "INSERT OR IGNORE INTO doomed SELECT DISTINCT s.child FROM sources s JOIN entries e ON e.rid=s.child WHERE s.parent IN (SELECT rid FROM doomed) AND e.kind='observation' AND e.category='talk'",

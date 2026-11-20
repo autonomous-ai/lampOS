@@ -388,6 +388,20 @@ enum Extra {
     /// The store's epoch for the account's history ids (#7771,
     /// [`lamp_msgs::history_turn_id`]).
     HistoryEpoch {},
+    /// What a Store app or a paired computer told, kept as the lamp's known
+    /// person's fact marked with its source (#7415,
+    /// `lamp_msgs::app_fact::REMEMBER_OP`, `Days::remember_app_fact`).
+    RememberAppFact {
+        person: String,
+        source: String,
+        #[serde(default)]
+        name: String,
+        at_unix_ms: u64,
+        text: String,
+    },
+    /// Every fact of one source, by its mark (#7415,
+    /// `lamp_msgs::app_fact::FORGET_OP`, `Days::forget_app_facts`).
+    ForgetAppFacts { source: String },
     /// A forget about a thing's subjects: a known person's own exchanges
     /// that have them forgotten (`Days::exchanges_forget`).
     ExchangesForget {
@@ -1343,6 +1357,26 @@ fn extra(store: &mut Days, request: Extra, now: u64) -> Result<Value> {
             json!({"ok":true,"exchanges":exchanges_value(&page),"more":more})
         }
         Extra::HistoryEpoch {} => json!({"ok":true,"epoch":store.history_epoch()}),
+        Extra::RememberAppFact {
+            person,
+            source,
+            name,
+            at_unix_ms,
+            text,
+        } => {
+            let person = Person::new(&person).ok_or_else(|| {
+                Error::new(
+                    "not_known",
+                    "an app's fact is kept only for the lamp's known person",
+                )
+            })?;
+            value(Response::Added {
+                id: store.remember_app_fact(&person, &source, &name, at_unix_ms, &text)?,
+            })
+        }
+        Extra::ForgetAppFacts { source } => {
+            json!({"ok":true,"removed":store.forget_app_facts(&source)?})
+        }
         Extra::ExchangesForget { person, about } => {
             json!({"ok":true,"removed":store.exchanges_forget(&one(person)?, &about)?})
         }
@@ -1477,6 +1511,8 @@ pub fn answer(store: &mut Days, line: &[u8], now: u64) -> protocol::Answer {
             "service_contacts",
             "service_contacts_forget",
             "exchanges_forget",
+            lamp_msgs::app_fact::REMEMBER_OP,
+            lamp_msgs::app_fact::FORGET_OP,
             lamp_msgs::MEMORY_FORGOT_EXCHANGES_OP,
             lamp_msgs::MEMORY_HISTORY_EPOCH_OP,
             crate::history_store::ISSUED_OP,
@@ -1569,8 +1605,10 @@ pub fn answer(store: &mut Days, line: &[u8], now: u64) -> protocol::Answer {
             let outcome = format!("ok entries={count}");
             // Reads, maintenance and successful no-op removals must not
             // clear an earlier failure to add a record.
-            let wrote = matches!(op.as_str(), "append" | "remember" | "append_linked")
-                && response["existing"] != true;
+            let wrote = matches!(
+                op.as_str(),
+                "append" | "remember" | "append_linked" | "remember_app_fact"
+            ) && response["existing"] != true;
             (response, outcome, false, wrote)
         }
         Err(e) => (
