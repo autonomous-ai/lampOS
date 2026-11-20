@@ -1217,8 +1217,10 @@ pub const MEMORY_FORGETS_TELLING_EXCHANGES: [&str; 5] = [
     "exchanges_forget",
 ];
 
-/// The memory request that pages the rest of the exchanges the last forget
-/// removed, when its answer said `"exchanges_more":true` (#7771).
+/// The memory request that pages the rest of the exchanges a forget
+/// removed, when its answer said `"exchanges_more":true`, by the
+/// `"exchanges_token"` that answer gave (`{"op":"forgot_exchanges",
+/// "token":…}`; a token not kept is refused `rest_gone`, #7771).
 pub const MEMORY_FORGOT_EXCHANGES_OP: &str = "forgot_exchanges";
 
 /// The memory request that answers its store's epoch,

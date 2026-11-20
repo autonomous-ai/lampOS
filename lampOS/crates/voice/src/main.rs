@@ -42,6 +42,9 @@ fn main() {
     // closed: after `run`, or while a panic unwinds out of it.
     let stalls_end = lamp_voice::stalls::Finishing(std::time::Duration::from_millis(300));
     let result = run();
+    // A clean stop: forgets handed off the voice's way are written first,
+    // within a bound (`LAMP_HISTORY_FORGET`, #7771; Twelve on #8086).
+    lamp_voice::history_forget::drain();
     if let Err(error) = &result {
         eprintln!("lamp-voice: {error}");
     }

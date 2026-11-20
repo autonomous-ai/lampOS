@@ -5,9 +5,12 @@
 //! is queued or sent).
 //!
 //! The lamp's own forget is the only one the person waits for: "forgotten"
-//! follows the memory's answer, as before. What it removed goes on a queue
-//! here, persisted in the voice's state folder ([`FILE`]), and is sent in
-//! the background by [`crate::second_provider::net::history`]:
+//! follows the memory's answer, as before. Its answer is handed to this
+//! module's worker thread ([`answered`], no disk and no page read on the
+//! voice's way), which puts what it removed on a queue persisted in the
+//! voice's state folder ([`FILE`]), read with the pages of its rest by
+//! the token its answer gave; the queue is sent in the background by
+//! [`crate::second_provider::net::history`]:
 //!
 //! - **forget everything** of a known person (`forget_all` of a `p-` id,
 //!   answered `ok`): that person's whole history, `{"all":true,
@@ -16,8 +19,9 @@
 //! - **any other forget** (`forget`, `forget_last`, `exchanges_forget`,
 //!   `forget_said`, and the room's lines a forget everything took): the
 //!   exchanges the memory says it removed (its answer's `exchanges`, by
-//!   scope and id, and every page `forgot_exchanges` gives when it says
-//!   `exchanges_more`), `{"ids":[…]}` as the memory tells them. Every removed id is
+//!   scope and id, and every page `forgot_exchanges` gives for its
+//!   `exchanges_token` when it says `exchanges_more`), `{"ids":[…]}` as the
+//!   memory tells them. Every removed id is
 //!   told: a forget never deletes more of the account's history than the
 //!   lamp forgot. A whole-history delete is a known person's forget
 //!   everything only.
@@ -338,35 +342,293 @@ pub fn queue() -> &'static (Queue, Arc<tokio::sync::Notify>) {
     QUEUE.get_or_init(|| (Queue::at(FILE), Arc::new(tokio::sync::Notify::new())))
 }
 
-/// A memory request `line` to `socket` answered `answer`: with the switch
-/// on, what it removed is queued for the account's history, with every
-/// page of the rest read from `socket` ([`pages`]), and the sender woken.
-/// Off, nothing. On a forget's way only for a small file's write, and for
-/// the pages' reads when it removed more ids than one answer names (400).
+/// A memory request `line` to `socket` answered `answer`, on the voice's
+/// way: what it removed is never posted by the save
+/// (`LAMP_HISTORY_SEND`, whatever this switch), and, with the switch on, a
+/// forget's answer is handed to the forget worker ([`work`]), which queues
+/// it on disk, reads the pages of its rest and wakes the sender. Off,
+/// nothing. No file is written and no page read here, so a forget's reply
+/// never waits on the SD card or a page (Twelve's P2 on #7935).
 pub fn answered(socket: &Path, line: &Value, answer: &Value) {
-    // What it removed is never posted by the save (`LAMP_HISTORY_SEND`),
-    // whatever this switch.
     crate::history_send::forget_seen(answer);
-    if !on() || answer["ok"] != true {
+    if !on() {
         return;
     }
-    let (queue, bell) = queue();
-    answered_into(true, queue, bell, line, answer);
-    if answer["exchanges_more"] == true {
-        for page in pages(|page| crate::tools::exchange_up_to(socket, page, PAGE_WITHIN, 65_536)) {
-            answered_into(true, queue, bell, &page.0, &page.1);
+    answered_with(Worker::voices(), socket, line, answer);
+}
+
+/// [`answered`]'s hand-off to a given worker, the switch taken as on:
+/// nothing but a channel send.
+pub fn answered_with(worker: &Worker, socket: &Path, line: &Value, answer: &Value) -> bool {
+    worker.hand(socket, line, answer)
+}
+
+/// A forget's answer, handed from the voice's way to [`work`].
+#[derive(Debug)]
+pub struct Job {
+    socket: PathBuf,
+    line: Value,
+    answer: Value,
+}
+
+impl Job {
+    /// The ids its answer names, for the journal's counts.
+    fn ids(&self) -> usize {
+        self.answer["exchanges"].as_object().map_or(0, |scopes| {
+            scopes
+                .values()
+                .filter_map(Value::as_array)
+                .map(Vec::len)
+                .sum()
+        })
+    }
+}
+
+/// The most forgets waiting for the worker; past it (the worker stuck on
+/// pages), one is said in the journal as not reached.
+const MOST_HANDED: usize = 256;
+
+/// How long a clean stop of the voice gives the worker to write what it
+/// holds ([`drain`]): one queue write each, the pages cut short.
+pub const DRAIN_WITHIN: std::time::Duration = std::time::Duration::from_secs(2);
+
+/// How a page is asked: the memory's socket, the page's request.
+type Ask = dyn Fn(&Path, &Value) -> Option<Value> + Send + Sync;
+
+/// What the worker holds: forgets handed and not yet written, and their
+/// ids, for [`Worker::drain`].
+#[derive(Default)]
+struct Flight {
+    held: Mutex<(usize, usize)>,
+    done: std::sync::Condvar,
+    stopping: std::sync::atomic::AtomicBool,
+}
+
+/// The forget worker: one thread taking the forgets in the order they were
+/// answered, started on the first, and again if it has stopped (said in
+/// the journal).
+pub struct Worker {
+    to: Mutex<Option<std::sync::mpsc::SyncSender<Job>>>,
+    queue: &'static Queue,
+    bell: Arc<tokio::sync::Notify>,
+    ask: Arc<Ask>,
+    flight: Arc<Flight>,
+}
+
+impl Worker {
+    /// A worker on `queue`, its pages asked by `ask`; no thread until the
+    /// first forget.
+    pub fn new(queue: &'static Queue, bell: Arc<tokio::sync::Notify>, ask: Arc<Ask>) -> Self {
+        Self {
+            to: Mutex::new(None),
+            queue,
+            bell,
+            ask,
+            flight: Arc::default(),
         }
+    }
+
+    /// The voice's worker, on its queue at [`FILE`], pages read from the
+    /// memory's socket.
+    pub fn voices() -> &'static Self {
+        static WORKER: OnceLock<Worker> = OnceLock::new();
+        WORKER.get_or_init(|| {
+            let (queue, bell) = queue();
+            Self::new(
+                queue,
+                bell.clone(),
+                Arc::new(|socket: &Path, page: &Value| {
+                    crate::tools::exchange_up_to(socket, page, PAGE_WITHIN, 65_536)
+                }),
+            )
+        })
+    }
+
+    /// Its thread, started.
+    fn start(&self) -> Option<std::sync::mpsc::SyncSender<Job>> {
+        let (to, from) = std::sync::mpsc::sync_channel::<Job>(MOST_HANDED);
+        let (queue, bell, ask, flight) = (
+            self.queue,
+            self.bell.clone(),
+            self.ask.clone(),
+            self.flight.clone(),
+        );
+        let started = std::thread::Builder::new()
+            .name("history-forget".into())
+            .spawn(move || {
+                for job in from {
+                    let stopping = || flight.stopping.load(std::sync::atomic::Ordering::SeqCst);
+                    work(
+                        queue,
+                        &bell,
+                        &job,
+                        |page| (!stopping()).then(|| ask(&job.socket, page)).flatten(),
+                        crate::history_send::forget_seen,
+                    );
+                    flight.finish(job.ids());
+                }
+            });
+        match started {
+            Ok(_) => Some(to),
+            Err(_) => {
+                eprintln!("lamp-voice history: the forget worker could not start");
+                None
+            }
+        }
+    }
+
+    /// `answer` to `line` handed to the thread, when it is one of
+    /// memory's forgets answered `ok`; whether it was. Never blocks: a full
+    /// hand-off is said in the journal as not reached; a stopped thread is
+    /// said as stopped and started again once.
+    pub fn hand(&self, socket: &Path, line: &Value, answer: &Value) -> bool {
+        let op = line["op"].as_str().unwrap_or_default();
+        if answer["ok"] != true || !lamp_msgs::MEMORY_FORGETS_TELLING_EXCHANGES.contains(&op) {
+            return false;
+        }
+        let mut job = Job {
+            socket: socket.to_owned(),
+            line: line.clone(),
+            answer: answer.clone(),
+        };
+        let ids = job.ids();
+        let mut to = self.to.lock().unwrap_or_else(|poison| poison.into_inner());
+        for again in [false, true] {
+            if to.is_none() {
+                *to = self.start();
+            }
+            let Some(sender) = to.as_ref() else {
+                break;
+            };
+            self.flight.add(ids);
+            match sender.try_send(job) {
+                Ok(()) => return true,
+                Err(std::sync::mpsc::TrySendError::Full(_)) => {
+                    self.flight.finish(ids);
+                    eprintln!(
+                        "lamp-voice history: the forget worker is behind; a forget of {ids} turns is not reached on the account"
+                    );
+                    return false;
+                }
+                Err(std::sync::mpsc::TrySendError::Disconnected(back)) => {
+                    self.flight.finish(ids);
+                    eprintln!(
+                        "lamp-voice history: the forget worker had stopped{}",
+                        if again { "" } else { "; it starts again" }
+                    );
+                    *to = None;
+                    job = back;
+                }
+            }
+        }
+        eprintln!(
+            "lamp-voice history: the forget worker is stopped; a forget of {ids} turns is not reached on the account"
+        );
+        false
+    }
+
+    /// A clean stop: the thread is given `within` to write every forget it
+    /// holds (pages are cut short, said as not reached); what is still
+    /// held after is said in the journal as a count. Whether it all was.
+    pub fn drain(&self, within: std::time::Duration) -> bool {
+        self.flight
+            .stopping
+            .store(true, std::sync::atomic::Ordering::SeqCst);
+        let until = std::time::Instant::now() + within;
+        let mut held = self
+            .flight
+            .held
+            .lock()
+            .unwrap_or_else(|poison| poison.into_inner());
+        while held.0 > 0 {
+            let Some(left) = until.checked_duration_since(std::time::Instant::now()) else {
+                break;
+            };
+            held = self
+                .flight
+                .done
+                .wait_timeout(held, left)
+                .unwrap_or_else(|poison| poison.into_inner())
+                .0;
+        }
+        if held.0 > 0 {
+            eprintln!(
+                "lamp-voice history: at the stop, {} forgets ({} turns) were not written; they are not reached on the account",
+                held.0, held.1
+            );
+            return false;
+        }
+        true
+    }
+}
+
+impl Flight {
+    fn add(&self, ids: usize) {
+        let mut held = self
+            .held
+            .lock()
+            .unwrap_or_else(|poison| poison.into_inner());
+        held.0 += 1;
+        held.1 += ids;
+    }
+
+    fn finish(&self, ids: usize) {
+        let mut held = self
+            .held
+            .lock()
+            .unwrap_or_else(|poison| poison.into_inner());
+        held.0 = held.0.saturating_sub(1);
+        held.1 = held.1.saturating_sub(ids);
+        self.done.notify_all();
+    }
+}
+
+/// The voice stopping cleanly (`lamp-voice`'s `main`, after its run):
+/// with the switch on and a forget handed, the worker is drained for at
+/// most [`DRAIN_WITHIN`]. Otherwise nothing.
+pub fn drain() {
+    if on() {
+        Worker::voices().drain(DRAIN_WITHIN);
+    }
+}
+
+/// One handed forget, off the voice's way: queued on disk, then every
+/// page of its rest asked by `ask` with its answer's token ([`pages`]),
+/// each page's answer given to `seen` (the save's hold,
+/// [`crate::history_send::forget_seen`]) and queued.
+pub fn work(
+    queue: &Queue,
+    bell: &tokio::sync::Notify,
+    job: &Job,
+    ask: impl Fn(&Value) -> Option<Value>,
+    seen: impl Fn(&Value),
+) {
+    answered_into(true, queue, bell, &job.line, &job.answer);
+    if job.answer["exchanges_more"] != true {
+        return;
+    }
+    let Some(token) = job.answer["exchanges_token"].as_str() else {
+        eprintln!(
+            "lamp-voice history: the rest of a forget's turns came with no token; they are not reached on the account"
+        );
+        return;
+    };
+    for (line, answer) in pages(token, ask) {
+        seen(&answer);
+        answered_into(true, queue, bell, &line, &answer);
     }
 }
 
 /// How long one page may take.
 const PAGE_WITHIN: std::time::Duration = std::time::Duration::from_secs(2);
 
-/// The pages of `forgot_exchanges`, each its request and answer, asked by
-/// `ask` until one says no `more`, at most [`MOST_PAGES`]. A page not
-/// answered ends them, said in the journal as not reached.
-pub fn pages(ask: impl Fn(&Value) -> Option<Value>) -> Vec<(Value, Value)> {
-    let line = serde_json::json!({"op": lamp_msgs::MEMORY_FORGOT_EXCHANGES_OP});
+/// The pages of `forgot_exchanges` for the forget whose answer gave
+/// `token`, each its request and answer, asked by `ask` until one says no
+/// `more`, at most [`MOST_PAGES`]. A page not answered, or refused (its
+/// rest let go, or the memory restarted: `rest_gone`), ends them, said in
+/// the journal as not reached; another forget's rest is never read.
+pub fn pages(token: &str, ask: impl Fn(&Value) -> Option<Value>) -> Vec<(Value, Value)> {
+    let line = serde_json::json!({"op": lamp_msgs::MEMORY_FORGOT_EXCHANGES_OP, "token": token});
     let mut pages = Vec::new();
     for _ in 0..MOST_PAGES {
         match ask(&line) {
@@ -587,8 +849,9 @@ mod tests {
             &json!({"op":"exchanges_forget","person":MINH}),
             &json!({"ok":true,"removed":600,"exchanges":{MINH:ids(MINH, 0..400)},"exchanges_more":true}),
         );
-        let paged =
-            pages(|_| Some(json!({"ok":true,"exchanges":{MINH:ids(MINH, 400..600)},"more":false})));
+        let paged = pages("t1", |_| {
+            Some(json!({"ok":true,"exchanges":{MINH:ids(MINH, 400..600)},"more":false}))
+        });
         assert_eq!(paged.len(), 1);
         for (line, answer) in &paged {
             pending.add_answered(line, answer);
@@ -606,7 +869,7 @@ mod tests {
             &json!({"op":"forget_all","person":LAN}),
             &json!({"ok":true,"removed":900,"exchanges":{"everyone":ids("everyone", 0..400)},"exchanges_more":true}),
         );
-        for (line, answer) in pages(|_| {
+        for (line, answer) in pages("t2", |_| {
             Some(json!({"ok":true,"exchanges":{"everyone":ids("everyone", 400..450)},"more":false}))
         }) {
             everything.add_answered(&line, &answer);
@@ -614,7 +877,7 @@ mod tests {
         assert_eq!(everything.all, BTreeSet::from([LAN.to_owned()]));
         assert_eq!(everything.ids[""].len(), 450);
         // A page not answered ends the pages.
-        assert!(pages(|_| None).is_empty());
+        assert!(pages("t3", |_| None).is_empty());
     }
 
     /// With 450 waiting, a second person's 51 stay 51; only past
@@ -702,5 +965,217 @@ mod tests {
         );
         assert_eq!(pending.ids[MINH], BTreeSet::from([turn_id(MINH, 7)]));
         assert_eq!(pending.count(), 1);
+    }
+
+    /// A forget's answer as memory gives it past one answer's room: the
+    /// first ids, `exchanges_more` and its token.
+    fn big(person: &str, scope: &str, told: std::ops::Range<u64>, token: &str) -> Job {
+        Job {
+            socket: PathBuf::from("/nonexistent"),
+            line: json!({"op":"exchanges_forget","person":person}),
+            answer: json!({"ok":true,"exchanges":{scope:turns(scope, told)},"exchanges_more":true,"exchanges_token":token}),
+        }
+    }
+
+    /// Two big forgets in a row: each one's rest is read by its own token,
+    /// and every id of both is queued (the first builder's P2 on #7935).
+    #[test]
+    fn two_forgets_in_a_row_each_send_their_own_rest() {
+        let queue = Queue::at(scratch("two-rests"));
+        let asked = Mutex::new(Vec::new());
+        let memory = |page: &Value| -> Option<Value> {
+            let token = page["token"].as_str().unwrap_or_default().to_owned();
+            asked.lock().unwrap().push(token.clone());
+            match token.as_str() {
+                "a" => {
+                    Some(json!({"ok":true,"exchanges":{MINH:turns(MINH, 100..250)},"more":false}))
+                }
+                "b" => Some(json!({"ok":true,"exchanges":{LAN:turns(LAN, 100..180)},"more":false})),
+                _ => Some(json!({"ok":false,"error":"rest_gone"})),
+            }
+        };
+        let (first, second) = (big(MINH, MINH, 0..100, "a"), big(LAN, LAN, 0..100, "b"));
+        // Each page's answer goes to the save's hold too.
+        let seen = Mutex::new(Vec::new());
+        let hold = |answer: &Value| seen.lock().unwrap().push(answer["exchanges"].clone());
+        work(&queue, &bell(), &first, memory, hold);
+        work(&queue, &bell(), &second, memory, hold);
+        assert_eq!(*asked.lock().unwrap(), ["a", "b"]);
+        assert_eq!(
+            *seen.lock().unwrap(),
+            [
+                json!({MINH:turns(MINH, 100..250)}),
+                json!({LAN:turns(LAN, 100..180)})
+            ]
+        );
+        let pending = queue.pending();
+        assert_eq!(
+            pending.ids[MINH],
+            turns(MINH, 0..250).into_iter().collect::<BTreeSet<_>>()
+        );
+        assert_eq!(
+            pending.ids[LAN],
+            turns(LAN, 0..180).into_iter().collect::<BTreeSet<_>>()
+        );
+        assert!(pending.all.is_empty());
+    }
+
+    /// A forget whose rest the memory no longer keeps (replaced, or the
+    /// memory restarted) reads no other forget's rest: only its own told
+    /// ids are queued, and an answer with no token pages nothing.
+    #[test]
+    fn a_stale_rest_is_never_sent_for_another_forget() {
+        let queue = Queue::at(scratch("stale-rest"));
+        let asked = Mutex::new(Vec::new());
+        // The memory keeps only "b"'s rest now.
+        let memory = |page: &Value| -> Option<Value> {
+            asked.lock().unwrap().push(page["token"].clone());
+            (page["token"] == "b")
+                .then(|| json!({"ok":true,"exchanges":{LAN:turns(LAN, 100..180)},"more":false}))
+                .or_else(|| Some(json!({"ok":false,"error":"rest_gone"})))
+        };
+        work(
+            &queue,
+            &bell(),
+            &big(MINH, MINH, 0..100, "a"),
+            memory,
+            |_| {},
+        );
+        let pending = queue.pending();
+        assert_eq!(pending.ids[MINH].len(), 100);
+        assert!(!pending.ids.contains_key(LAN));
+        let mut tokenless = big(MINH, MINH, 0..100, "");
+        tokenless
+            .answer
+            .as_object_mut()
+            .unwrap()
+            .remove("exchanges_token");
+        work(&queue, &bell(), &tokenless, memory, |_| {});
+        assert_eq!(*asked.lock().unwrap(), [json!("a")]);
+        assert!(!queue.pending().ids.contains_key(LAN));
+    }
+
+    /// A worker on its own queue at `path`, pages answered by `ask`.
+    fn test_worker(path: &Path, ask: Arc<Ask>) -> Worker {
+        let queue: &'static Queue = Box::leak(Box::new(Queue::at(path)));
+        Worker::new(queue, Arc::new(bell()), ask)
+    }
+
+    fn no_page() -> Arc<Ask> {
+        Arc::new(|_: &Path, _: &Value| -> Option<Value> {
+            panic!("no page is read on the voice's way")
+        })
+    }
+
+    const SOCKET: &str = "/nonexistent/memory.sock";
+
+    fn forget() -> Value {
+        json!({"op":"forget","person":MINH,"id":9})
+    }
+
+    fn told() -> Value {
+        json!({"ok":true,"removed":101,"exchanges":{MINH:turns(MINH, [4])},"exchanges_more":true,"exchanges_token":"a"})
+    }
+
+    /// On the voice's way a forget writes nothing and reads no page:
+    /// [`answered_with`] only hands it to the worker's channel, never
+    /// blocking when the worker is behind; the worker's [`work`] writes
+    /// the queue (Twelve's P2 on #7935).
+    #[test]
+    fn the_forget_turn_does_no_disk_or_page_on_the_voice_path() {
+        let path = scratch("voice-path");
+        let worker = test_worker(&path, no_page());
+        // The worker's thread held by the test: nothing takes the job.
+        let (to, from) = std::sync::mpsc::sync_channel(1);
+        *worker.to.lock().unwrap() = Some(to);
+        let socket = Path::new(SOCKET);
+        assert!(answered_with(&worker, socket, &forget(), &told()));
+        assert!(!path.exists());
+        // Not a forget, or refused: nothing handed.
+        assert!(!answered_with(
+            &worker,
+            socket,
+            &json!({"op":"status"}),
+            &json!({"ok":true,"exchanges":{}})
+        ));
+        assert!(!answered_with(
+            &worker,
+            socket,
+            &forget(),
+            &json!({"ok":false})
+        ));
+        // The worker behind: let go at once, never waited on.
+        let started = std::time::Instant::now();
+        assert!(!answered_with(&worker, socket, &forget(), &told()));
+        assert!(started.elapsed() < std::time::Duration::from_millis(100));
+        assert!(!path.exists());
+        let job: Job = from.try_recv().unwrap();
+        assert_eq!(job.socket, socket);
+        work(
+            worker.queue,
+            &bell(),
+            &job,
+            |_| Some(json!({"ok":true,"exchanges":{MINH:turns(MINH, [5])},"more":false})),
+            |_| {},
+        );
+        assert!(path.exists());
+        assert_eq!(worker.queue.pending().ids[MINH].len(), 2);
+        // What the thread still held at a stop is counted, never waited
+        // on past the bound.
+        assert!(answered_with(&worker, socket, &forget(), &told()));
+        let started = std::time::Instant::now();
+        assert!(!worker.drain(std::time::Duration::from_millis(50)));
+        assert!(started.elapsed() < std::time::Duration::from_secs(1));
+    }
+
+    /// A worker that has stopped (its channel's other end gone) is said as
+    /// stopped and started again, and the forget still reaches the queue.
+    #[test]
+    fn a_stopped_worker_is_started_again() {
+        let path = scratch("stopped");
+        let worker = test_worker(
+            &path,
+            Arc::new(|_: &Path, _: &Value| {
+                Some(json!({"ok":true,"exchanges":{MINH:turns(MINH, [5])},"more":false}))
+            }),
+        );
+        let (to, from) = std::sync::mpsc::sync_channel(1);
+        drop(from);
+        *worker.to.lock().unwrap() = Some(to);
+        // A forget with no rest: a drain cuts pages short, never its write.
+        let small = json!({"ok":true,"removed":1,"exchanges":{MINH:turns(MINH, [4])}});
+        assert!(answered_with(&worker, Path::new(SOCKET), &forget(), &small));
+        assert!(worker.drain(DRAIN_WITHIN));
+        assert_eq!(
+            worker.queue.pending().ids[MINH],
+            BTreeSet::from([turn_id(MINH, 4)])
+        );
+    }
+
+    /// A clean stop gives the worker [`DRAIN_WITHIN`] to write every forget
+    /// it holds: pages still coming are cut short, and each held forget's
+    /// told ids are on disk before the drain returns.
+    #[test]
+    fn a_clean_stop_drains_what_the_worker_holds() {
+        let path = scratch("drain");
+        // A memory whose pages never end, each slow.
+        let worker = test_worker(
+            &path,
+            Arc::new(|_: &Path, page: &Value| {
+                std::thread::sleep(std::time::Duration::from_millis(100));
+                let n = page["token"].as_str().map_or(0, str::len) as u64;
+                Some(json!({"ok":true,"exchanges":{LAN:turns(LAN, [1_000 + n])},"more":true}))
+            }),
+        );
+        let socket = Path::new(SOCKET);
+        assert!(answered_with(&worker, socket, &forget(), &told()));
+        let second = json!({"ok":true,"removed":1,"exchanges":{MINH:turns(MINH, [8])}});
+        assert!(answered_with(&worker, socket, &forget(), &second));
+        let started = std::time::Instant::now();
+        assert!(worker.drain(DRAIN_WITHIN));
+        assert!(started.elapsed() < DRAIN_WITHIN);
+        let pending = worker.queue.pending();
+        assert!(pending.ids[MINH].contains(&turn_id(MINH, 4)));
+        assert!(pending.ids[MINH].contains(&turn_id(MINH, 8)));
     }
 }
