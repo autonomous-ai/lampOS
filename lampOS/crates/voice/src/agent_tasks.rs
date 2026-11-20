@@ -2069,16 +2069,16 @@ fn on_the_lamp_description(place: &Place, staff: &[Member]) -> String {
         )
     };
     format!(
-        "Hand work to an agent: the lamp's own{or_computer}. Call it for what takes \
+        "Hand work over: the lamp's own{or_computer}. Call it for what takes \
          you over 10 s (research, code, files, several steps), what is asked of an agent, and \
          what you have no function for: hand it over, never say you can't. Never for a quick \
-         answer, a story or joke told aloud, or your own functions (light, volume, timers, \
-         reminders, time, weather, memory, skills). {NO_AGENT_NAME} New work goes to the lamp's own: leave out \
-         `where` and `who`, even for code or a website; `where` only if they name a machine \
+         answer, a story or joke told aloud, or your functions (light, volume, timers, \
+         reminders, time, weather, memory, skills). {NO_AGENT_NAME} For new work leave out \
+         `where` and `who`, even for code or a site; `where` only if they name a machine \
          (computer, Mac, laptop, PC). More on earlier work (\"in the sea poem, add a line\") \
          is a new call with `session`, made now, before you say it back: never a recall or \
-         words alone. Don't ask for details or who first. {} Asked to start an agent with no \
-         task, ask what for, then call this.",
+         words alone. Don't ask for details or who first. {} With no task, ask what for, \
+         then call this.",
         read_back(place.lead_in, with_who, place.one_yes)
     )
 }
@@ -4870,6 +4870,10 @@ fn run_for_asked(
                             "{who}, in the session \"{session}\" on {}, not a new one",
                             where_done(place, &sent_to)
                         )
+                    } else if who == OWN_ENGINE {
+                        // The lamp's own work, its engine never named
+                        // (#7930): only where it is done.
+                        where_done(place, &sent_to)
                     } else {
                         format!("{who} on {}", where_done(place, &sent_to))
                     };
@@ -5591,10 +5595,21 @@ const WORK_STATES: [&str; 9] = [
 
 /// A short label for work whose words are `words` (#7930): the question
 /// alone for a question task, without paths, on one line, at most
-/// [`MOST_LABEL_CHARS`].
+/// [`MOST_LABEL_CHARS`], cut at a whole word ("and then", never "and then
+/// tel").
 pub(crate) fn label_of(words: &str) -> String {
     let words = without_paths(question_of(words).unwrap_or(words));
-    let (label, _) = crate::task_news::quoted(&words, MOST_LABEL_CHARS);
+    let (whole, _) = crate::task_news::quoted(&words, usize::MAX);
+    let mut label: String = whole.chars().take(MOST_LABEL_CHARS).collect();
+    // Cut inside a word: back to the last whole one, when there is one.
+    if whole
+        .chars()
+        .nth(MOST_LABEL_CHARS)
+        .is_some_and(|next| !next.is_whitespace())
+        && let Some(space) = label.rfind(' ')
+    {
+        label.truncate(space);
+    }
     label.trim_end().to_owned()
 }
 
@@ -10735,32 +10750,37 @@ pub(crate) mod tests {
                 .find(|tool| tool.name == START)
                 .unwrap()
         };
-        // Before the lamp's engines are read, its default is said: Hermes
-        // (#6498).
+        // The lamp's own engine is never named, read or not (the owner,
+        // #7930); the computer's agent is.
         lamp_engines_here(Some(&[]));
+        let unread = start(true);
         assert!(
-            start(true).description.contains(
-                "Hermes here on the lamp, or Claude Code on the person's office computer"
-            )
+            unread
+                .description
+                .contains("the lamp's own, or Claude Code on the person's office computer"),
+            "{}",
+            unread.description
         );
-        // OpenClaw as the lamp's default engine is named the same way.
+        assert!(!unread.description.contains("Hermes"));
         lamp_engines_here(Some(&["openclaw"]));
         let openclaw = start(true);
         assert!(openclaw.validate().is_ok());
         assert!(
-            openclaw.description.contains(
-                "OpenClaw here on the lamp, or Claude Code on the person's office computer"
-            ),
+            openclaw
+                .description
+                .contains("the lamp's own, or Claude Code on the person's office computer"),
             "{}",
             openclaw.description
         );
-        assert!(!openclaw.description.contains("Hermes"));
+        assert!(
+            !openclaw.description.contains("Hermes") && !openclaw.description.contains("OpenClaw")
+        );
         lamp_engines_here(Some(&["hermes", "openclaw"]));
         let (off, on) = (start(false), start(true));
         assert_eq!(off, declared(&at, &staff)[0]);
         assert!(on.validate().is_ok());
         for words in [
-            "Hermes here on the lamp, or Claude Code on the person's office computer",
+            "the lamp's own, or Claude Code on the person's office computer",
             "what takes you over 10 s (research, code, files, several steps)",
             "what you have no function for: hand it over, never say you can't",
             "Never for a quick answer, a story or joke told aloud",
@@ -14184,7 +14204,7 @@ pub(crate) mod tests {
             json!({"task":"Write a file called fruits.md with five good fruits"}),
             8,
         );
-        assert_eq!(lamp["where"], "Hermes on the lamp", "{lamp}");
+        assert_eq!(lamp["where"], "the lamp", "{lamp}");
         assert_eq!(prepare()["target"], "lamp");
         // Hermes named: the lamp's engine, prepared on the lamp.
         let hermes = run_with(
@@ -14488,7 +14508,7 @@ pub(crate) mod tests {
             "what takes you over 10 s",
             "research, code or files, several steps, or what you have no function for",
             "an earlier session of theirs that fits by its name or its work, the lamp's own first",
-            "a new one here on the lamp, done by the lamp's own Hermes",
+            "a new one here on the lamp, done by the lamp's own agent",
             "\"computer\" only when they name their computer",
             "\"on the lamp\" or \"do it yourself\"",
             "starts on their yes",
@@ -14574,7 +14594,7 @@ pub(crate) mod tests {
             told
         };
         let lamp = run_with(true, json!({"task":"Write a poem"}), 3);
-        assert_eq!(lamp["where"], "Hermes on the lamp", "{lamp}");
+        assert_eq!(lamp["where"], "the lamp", "{lamp}");
         let computer = run_with(true, json!({"task":"Write a poem","where":"computer"}), 4);
         assert_eq!(
             computer["where"], "Claude Code on the office computer",
@@ -14680,7 +14700,7 @@ pub(crate) mod tests {
         assert_eq!(by_who["where"], "Hermes on the lamp", "{by_who}");
         assert_eq!(prepare()["engine"], "hermes");
         let unnamed = run_with(&hermes_first, json!({"task":"Write a poem"}), 5);
-        assert_eq!(unnamed["where"], "Hermes on the lamp", "{unnamed}");
+        assert_eq!(unnamed["where"], "the lamp", "{unnamed}");
         let sent = prepare();
         assert_eq!(sent["target"], "lamp");
         assert_eq!(sent.get("engine"), None, "{sent}");
@@ -14710,7 +14730,7 @@ pub(crate) mod tests {
             json!({"task":"Write a poem","where":"lamp","engine":"codex"}),
             8,
         );
-        assert_eq!(elsewhere["where"], "Hermes on the lamp", "{elsewhere}");
+        assert_eq!(elsewhere["where"], "the lamp", "{elsewhere}");
         let sent = prepare();
         assert_eq!(sent.get("engine"), None, "{sent}");
         let refused = run_with(
@@ -15294,7 +15314,15 @@ pub(crate) mod tests {
         .0;
         lamp_engines_here(None);
         LAMP_THERE_HERE.with(|here| here.set(None));
-        assert_eq!(lamp["where"], "OpenClaw on the lamp", "{lamp}");
+        assert_eq!(lamp["where"], "the lamp", "{lamp}");
+        // The lamp's own work: no engine name and no doubled lamp (#7930).
+        let said = lamp["where"].as_str().unwrap();
+        assert!(
+            !said.contains("the lamp on the lamp")
+                && !said.contains("OpenClaw")
+                && !said.contains("Hermes"),
+            "{lamp}"
+        );
         assert_eq!(named["where"], "OpenClaw on the lamp", "{named}");
         let targets: Vec<Value> = (0..4)
             .map(|_| seen.recv_timeout(PEER_WAIT).unwrap())
