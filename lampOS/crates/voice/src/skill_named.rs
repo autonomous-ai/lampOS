@@ -404,7 +404,10 @@ pub fn words_off(heard: &str, name: &str) -> usize {
     let heard = lower_words(heard);
     let heard = own_words(&heard);
     let name = lower_words(name);
-    heard.iter().filter(|word| !name.iter().any(|n| n == *word)).count()
+    heard
+        .iter()
+        .filter(|word| !name.iter().any(|n| n == *word))
+        .count()
         + name.iter().filter(|n| !heard.contains(&n.as_str())).count()
 }
 

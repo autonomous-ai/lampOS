@@ -18183,9 +18183,7 @@ async fn answer(
             let own = crate::skill_named::own_words_of(line);
             let off = made_here
                 .iter()
-                .map(|made| {
-                    crate::skill_named::words_off(line, &crate::skill_named::spoken(made))
-                })
+                .map(|made| crate::skill_named::words_off(line, &crate::skill_named::spoken(made)))
                 .min()
                 .unwrap_or_default();
             eprintln!(
