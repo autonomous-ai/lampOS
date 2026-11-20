@@ -544,6 +544,9 @@ pub const LONG_FORM_PEAK_DBFS: f64 = -6.0;
 /// The RMS the limiter aims at, a part of the cap: 2% (0.18 dB) under it.
 const RMS_MARGIN: f64 = 0.98;
 
+/// The peak the limiter aims at, a part of the bound: 0.1% under it.
+const PEAK_MARGIN: f64 = 0.999;
+
 /// A stream's limiter: per 10 ms window (240 samples, one speaker chunk) the
 /// gain that brings its RMS to the cap, taken at once when it must go down
 /// and let up across the window when it can go back, then no sample past the
@@ -579,8 +582,7 @@ impl Limiter {
         }
     }
 
-    /// Limits `block` in place; how many of its 10 ms windows were lowered
-    /// or clipped. A window shorter than 240 (the end of a block) is its own.
+    /// Limits `block` in place; how many of its 10 ms windows were lowered. A window shorter than 240 (the end of a block) is its own.
     fn limit(&mut self, block: &mut [i16]) -> u64 {
         let full = 32_767.0;
         let peak = (full * 10f64.powf(self.peak_dbfs / 20.0)).floor();
@@ -591,7 +593,21 @@ impl Limiter {
         for window in block.chunks_mut(LIMIT_WINDOW) {
             let power = window.iter().map(|&s| f64::from(s).powi(2)).sum::<f64>();
             let rms = (power / window.len() as f64).sqrt();
-            let target = if rms > loudest { loudest / rms } else { 1.0 };
+            // The loudest sample of the window brings the gain down too, so a
+            // peak past the bound is lowered with the whole window (its shape
+            // kept) and not cut flat. A part under 0.1% leaves the rounding
+            // of whole samples no way to put one over.
+            let top = window
+                .iter()
+                .map(|&s| f64::from(s).abs())
+                .fold(0.0, f64::max);
+            let by_rms = if rms > loudest { loudest / rms } else { 1.0 };
+            let by_peak = if top > peak {
+                peak * PEAK_MARGIN / top
+            } else {
+                1.0
+            };
+            let target = by_rms.min(by_peak);
             let start = if target < self.gain {
                 target
             } else {
@@ -608,6 +624,8 @@ impl Limiter {
                     start + (target - start) * (at as f64 + 1.0) / count
                 };
                 let mut value = f64::from(*sample) * gain;
+                // Only the rounding's own last hair: the gain above already
+                // keeps every sample under the bound.
                 if value.abs() > peak {
                     value = value.signum() * peak;
                     touched = true;
@@ -903,6 +921,44 @@ mod tests {
         assert!(short.limit(&mut lowered) > 0);
         let (rms, _) = loudest(&lowered);
         assert!(rms < 32_767.0 * 10f64.powf(-29.5 / 20.0), "{rms}");
+    }
+
+    #[test]
+    fn a_peak_past_the_bound_is_lowered_with_its_window_and_never_cut_flat() {
+        // One 30,000 pulse a window on a quiet tone: quiet as RMS (about
+        // -21 dBFS), 5 dB past the -6 dBFS peak bound. A hard clip would cut
+        // the pulse and leave the tone as it was; the limiter scales the
+        // whole window so the pulse fits and the tone keeps its shape.
+        let cap_peak = 32_767.0 * 10f64.powf(LONG_FORM_PEAK_DBFS / 20.0);
+        let mut input = sine(3_000.0, 4_800);
+        for window in input.chunks_mut(240) {
+            window[100] = 30_000;
+        }
+        let mut limiter = Limiter::long_form();
+        let mut played = input.clone();
+        let mut limited = 0;
+        for part in played.chunks_mut(240) {
+            limited += limiter.limit(part);
+        }
+        assert!(limited >= 19, "{limited}");
+        let (_, peak) = loudest(&played);
+        assert!(peak <= cap_peak, "{peak} past {cap_peak}");
+        // Not flat: every window's pulse is the window's top, and the tone
+        // beside it is scaled by the same gain (about 0.55), not untouched.
+        for (before, after) in input.chunks(240).zip(played.chunks(240)).skip(1) {
+            assert!(after[100] > 15_000, "pulse cut to {}", after[100]);
+            let gain = f64::from(after[100]) / f64::from(before[100]);
+            assert!((0.45..0.6).contains(&gain), "{gain}");
+            for at in [20, 60, 140, 200] {
+                if before[at].abs() > 1_500 {
+                    let ratio = f64::from(after[at]) / f64::from(before[at]);
+                    assert!(
+                        (ratio - gain).abs() < 0.02,
+                        "sample {at}: {ratio} vs {gain}"
+                    );
+                }
+            }
+        }
     }
 
     #[test]
