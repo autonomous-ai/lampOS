@@ -847,8 +847,7 @@ sau:
      Test: `round_one_forced::round_one_says_its_force_and_the_make_ask_never_its_words`.
    - **Tạo kỹ năng không bao giờ là một task** (#8022 case 2, first builder
      đồng ý lúc 11:05): khi `make_skill` được khai báo, mô tả của
-     `start_agent_task` kết thúc bằng "An ask to make a skill, even one
-     whose work an agent does, is make_skill's, never this."
+     `start_agent_task` kết thúc bằng "Making a skill is make_skill's, never this."
      (`agent_tasks::MAKE_TOLD`), chỉ khi cả hai vẫn vừa 1.024 byte của
      link; mô tả nào không vừa thì giữ nguyên. Không có `make_skill` thì câu
      này không bao giờ được nói. Mô hình vẫn tự đánh giá; không khớp từ
