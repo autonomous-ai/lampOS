@@ -62,6 +62,9 @@ mod app_triggers;
 pub use app_triggers::*;
 mod play_allow;
 pub use play_allow::*;
+/// An installed app's help (`apps/help`, #7415): its bounds and tidying.
+pub mod app_help;
+pub use app_help::{AppHelps, AppsHelp, app_help_topics};
 mod body_sound;
 pub use body_sound::*;
 mod lamp_did;
@@ -2789,6 +2792,7 @@ pub fn declaration_of(topic: &str) -> Option<Declaration> {
         .chain(lamp_did_topics())
         .chain(app_trigger_topics())
         .chain(app_fact::app_fact_topics())
+        .chain(app_help_topics())
         .chain(chat_topics())
         .chain(presence_topics())
         .chain(heat_topics())

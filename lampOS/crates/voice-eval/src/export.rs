@@ -676,6 +676,7 @@ const BUS_TOPICS: &[&str] = &[
     "addon/proposal",
     "air/state",
     "apps/context",
+    "apps/help",
     "apps/remember",
     "apps/remembered",
     "apps/took",

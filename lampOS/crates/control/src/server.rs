@@ -1046,6 +1046,13 @@ impl Shared {
         crate::app_triggers::list_of(&apps_dir, &running)
     }
 
+    /// The help of every installed app with one, started or not
+    /// ([`crate::app_triggers::helps_of`], #7415).
+    pub fn installed_help(&self) -> lamp_msgs::AppHelps {
+        let apps_dir = self.apps_dir.lock().expect("apps_dir").clone();
+        crate::app_triggers::helps_of(&apps_dir)
+    }
+
     /// The voice holds a line that says `trigger` of app `app`
     /// (`apps/trigger`): offered to the app's sockets, as `app.trigger`, only
     /// when apps are on, the app is running and the manifest's triggers
