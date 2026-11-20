@@ -214,6 +214,7 @@ pub fn lively_rearm(rearm: bool, level: u8) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::clips::Clip;
 
     /// The value after `flag` on the product unit's command line.
     fn unit_value(flag: &str) -> f32 {
@@ -307,6 +308,128 @@ mod tests {
             assert!(pair[1].music_cooldown_min < pair[0].music_cooldown_min);
         }
         assert!(GESTURE.iter().all(|row| row.pause_gap_s >= 3.0));
-        assert!(GESTURE[1..].iter().all(|row| row.fill_gap_s >= 20));
+        assert!(GESTURE[1..].iter().all(|row| row.fill_gap_s >= 8));
+    }
+
+    /// #8153: the fill and the music sway per level. Level 1 is today's
+    /// exactly; level 5 fills every answer with no cue of its own, at least
+    /// 8 s apart; 2 to 4 lie between; music sway's 6 min at 5 is kept.
+    #[test]
+    fn the_fill_per_level_is_every_answer_at_five_and_none_at_one() {
+        assert_eq!(
+            GESTURE[0],
+            Gesture {
+                fill: 0.0,
+                fill_gap_s: 0,
+                pause_gap_s: 4.0,
+                music_cooldown_min: 30,
+                music_rearm: true,
+            }
+        );
+        let fill: Vec<f32> = GESTURE.iter().map(|row| row.fill).collect();
+        assert_eq!(fill, [0.0, 0.25, 0.5, 0.75, 1.0]);
+        let gap: Vec<u32> = GESTURE[1..].iter().map(|row| row.fill_gap_s).collect();
+        assert_eq!(gap, [40, 25, 15, 8]);
+        let music: Vec<u32> = GESTURE.iter().map(|row| row.music_cooldown_min).collect();
+        assert_eq!(music, [30, 20, 15, 10, 6]);
+    }
+
+    /// The farthest `clip` takes each joint from the pose.
+    fn farthest(clip: &Clip) -> [u16; 5] {
+        std::array::from_fn(|joint| {
+            clip.frames
+                .iter()
+                .map(|frame| frame[joint].unsigned_abs())
+                .max()
+                .unwrap_or(0)
+        })
+    }
+
+    /// #8153: level 1 plays every clip as recorded, the very clip; the clip
+    /// size and pace lie evenly from x1 at level 1 to x1.6 and x1.5 at 5.
+    #[test]
+    fn level_one_plays_every_clip_as_recorded() {
+        for said in [0, 1, 6] {
+            for clip in crate::clips::ALL {
+                let played = livelier(clip, said);
+                assert!(std::ptr::eq(played, clip), "{}", clip.name);
+                assert_eq!(played.frames, clip.frames);
+                assert_eq!(played.step_ms, clip.step_ms);
+            }
+        }
+        // A clip not built in (a move from a file, the call's glance, a
+        // shift at rest) is played as it is at every level.
+        for level in 1..=5 {
+            for clip in [&crate::clips::CALLED, &crate::clips::TILT_LEFT] {
+                assert!(std::ptr::eq(livelier(clip, level), clip));
+            }
+        }
+        let size: Vec<f32> = TABLE.iter().map(|row| row.clip_size).collect();
+        let pace: Vec<f32> = TABLE.iter().map(|row| row.clip_pace).collect();
+        assert_eq!(size, [1.0, 1.15, 1.3, 1.45, 1.6]);
+        assert_eq!(pace, [1.0, 1.125, 1.25, 1.375, 1.5]);
+    }
+
+    /// #8153: at level 5 each built-in clip is up to 1.6 times its size,
+    /// joint by joint, never past the gesture's reach (`GESTURE_REACH`), and
+    /// up to 1.5 times its pace; played under the servo's 1,000 counts a
+    /// second (`Limits::clip_ceiling`), no joint goes faster than that on
+    /// any step. Level 3 lies between 1 and 5.
+    #[test]
+    fn level_five_plays_clips_bigger_and_quicker_never_past_the_reach_or_the_servo() {
+        let reach = crate::body::GESTURE_REACH;
+        let ceiling = Some(1_000.0);
+        let mut grown = 0;
+        for clip in crate::clips::ALL {
+            let (one, three, five) = (farthest(clip), livelier(clip, 3), livelier(clip, 5));
+            assert_eq!(five.name, clip.name);
+            assert_eq!(five.frames.len(), clip.frames.len(), "{}", clip.name);
+            assert_eq!(five.frames[0], [0; 5]);
+            assert_eq!(five.frames[five.frames.len() - 1], [0; 5]);
+            // The pace: a step 1/1.5 of its time, rounded up to a whole ms.
+            let quick = (f32::from(clip.step_ms) / 1.5).ceil() as u16;
+            assert_eq!(five.step_ms, quick, "{}", clip.name);
+            assert!(three.step_ms < clip.step_ms && three.step_ms > five.step_ms);
+            for joint in 0..5 {
+                let (at_three, at_five) = (farthest(three)[joint], farthest(five)[joint]);
+                let wanted = (f32::from(one[joint]) * 1.6)
+                    .round()
+                    .min(reach[joint]);
+                assert!(
+                    f32::from(at_five) <= reach[joint],
+                    "{} joint {joint}: {at_five}",
+                    clip.name
+                );
+                assert!(
+                    (f32::from(at_five) - wanted).abs() <= 1.0,
+                    "{} joint {joint}: {at_five} against {wanted}",
+                    clip.name
+                );
+                assert!(
+                    one[joint] <= at_three && at_three <= at_five,
+                    "{} joint {joint}: {} {at_three} {at_five}",
+                    clip.name,
+                    one[joint]
+                );
+                grown += usize::from(at_five > one[joint]);
+            }
+            // Played at a 20 ms tick under the servo's ceiling, no joint
+            // goes faster than it.
+            let mut last = [0.0f32; 5];
+            for elapsed in (0..five.duration_within_us(ceiling)).step_by(20_000) {
+                let now = five.at_within(elapsed, ceiling).unwrap();
+                for joint in 0..5 {
+                    let speed = (now[joint] - last[joint]).abs() / 0.02;
+                    assert!(speed <= 1_000.5, "{} joint {joint}: {speed}", clip.name);
+                }
+                last = now;
+            }
+        }
+        assert!(grown >= 60, "{grown}");
+        // The same clip at the same level is the same one, made once.
+        assert!(std::ptr::eq(
+            livelier(&crate::clips::NOD, 5),
+            livelier(&crate::clips::NOD, 5)
+        ));
     }
 }
