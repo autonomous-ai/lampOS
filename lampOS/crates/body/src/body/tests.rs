@@ -21844,7 +21844,11 @@ fn nodded_at(level: u8) -> (BodyReport, Vec<u16>) {
 /// anti-tip check as played; at level 1 as recorded.
 #[test]
 fn a_built_in_clip_at_level_five_plays_larger_than_at_level_one() {
-    let span = |goals: &[u16]| goals.iter().max().unwrap() - goals.iter().min().unwrap();
+    // Over the 4 s from the ask, before the lamp sits down.
+    let span = |goals: &[u16]| {
+        let goals = &goals[..200];
+        goals.iter().max().unwrap() - goals.iter().min().unwrap()
+    };
     let (report, today) = nodded_at(1);
     assert_eq!(report.gestures, 1, "{report:?}");
     assert_eq!(report.tipping.refused, 0, "{report:?}");

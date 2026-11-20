@@ -8,7 +8,8 @@
 //! Applied: the pose's speed and acceleration, the stand and fold pace, the
 //! idle waits (`Limits::at`, `crate::idle`), the head's roll standing
 //! (`Limits::at`), the listening lean (`crate::body::mood_lean`) and a spoken
-//! nod's size (`crate::body`); under `LAMP_BODY_PRESENCE` (#7301) also the
+//! nod's size (`crate::body`), a built-in clip's size and pace ([`livelier`],
+//! #8153); under `LAMP_BODY_PRESENCE` (#7301) also the
 //! size of a shift's arm sag (`idle_size`), and for a few minutes after an
 //! arrival or talk the shifts' waits and size are a level or two livelier
 //! than the owner's (`crate::body::LIVELY_FOR`), that switch's own, so with
@@ -18,6 +19,9 @@
 //! (the pause nod's gap) and lamp-skills (a `lively` trigger's cooldown and
 //! rearm, the music sway's). The body drops such a new clip while
 //! lamp-control holds it (`crate::body::Asked::lively`).
+
+use crate::clips::Clip;
+use std::sync::OnceLock;
 
 /// One level's movement.
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -41,6 +45,12 @@ pub struct Energy {
     /// How much a shift at rest's arm offsets are scaled under
     /// `LAMP_BODY_PRESENCE` (#7301, `crate::idle::sag`); the head's never.
     pub idle_size: f32,
+    /// How much a built-in clip asked of the body is scaled, joint by joint,
+    /// never past the gesture's reach ([`livelier`], #8153).
+    pub clip_size: f32,
+    /// How much quicker a built-in clip's frames come ([`livelier`]); each
+    /// step is still stretched under the servo's speed at play time.
+    pub clip_pace: f32,
 }
 
 /// Levels 1 to 5. Level 1 says the product unit's values; the body applies
@@ -54,6 +64,8 @@ pub const TABLE: [Energy; 5] = [
         nod_share: 1.0,
         idle_share: 1.0,
         idle_size: 1.0,
+        clip_size: 1.0,
+        clip_pace: 1.0,
     },
     Energy {
         speed: 425,
@@ -63,6 +75,8 @@ pub const TABLE: [Energy; 5] = [
         nod_share: 1.1,
         idle_share: 0.85,
         idle_size: 1.05,
+        clip_size: 1.15,
+        clip_pace: 1.125,
     },
     Energy {
         speed: 550,
@@ -72,6 +86,8 @@ pub const TABLE: [Energy; 5] = [
         nod_share: 1.2,
         idle_share: 0.7,
         idle_size: 1.1,
+        clip_size: 1.3,
+        clip_pace: 1.25,
     },
     Energy {
         speed: 675,
@@ -81,6 +97,8 @@ pub const TABLE: [Energy; 5] = [
         nod_share: 1.3,
         idle_share: 0.6,
         idle_size: 1.15,
+        clip_size: 1.45,
+        clip_pace: 1.375,
     },
     Energy {
         speed: 800,
@@ -90,6 +108,8 @@ pub const TABLE: [Energy; 5] = [
         nod_share: 1.4,
         idle_share: 0.5,
         idle_size: 1.2,
+        clip_size: 1.6,
+        clip_pace: 1.5,
     },
 ];
 
@@ -123,6 +143,88 @@ pub fn stand_seconds(base: f32, level: u8) -> f32 {
     }
 }
 
+/// A built-in clip (`crate::clips::ALL`) as `level` plays it (#8153):
+/// each joint `clip_size` times as far, held to the gesture's reach
+/// (`crate::body::GESTURE_REACH`), and its frames `clip_pace` times as
+/// quick, the step rounded up to a whole millisecond. The body plays it
+/// only under `LAMP_BODY_ENERGY`, so each step is stretched under the
+/// servo's speed (`Limits::clip_ceiling`), and checks it against V1's
+/// anti-tip rule as played. Level 1, and any other clip (a move from a
+/// file, a shift at rest, the call's glance), is the clip itself. Each is
+/// made once and kept: at most 21 clips for each of 4 levels.
+pub fn livelier(clip: &'static Clip, level: u8) -> &'static Clip {
+    static MADE: [[OnceLock<Clip>; 4]; crate::clips::ALL.len()] =
+        [const { [const { OnceLock::new() }; 4] }; crate::clips::ALL.len()];
+    let level = taken(level);
+    let built_in = crate::clips::ALL
+        .iter()
+        .position(|own| own.name == clip.name && own.frames == clip.frames);
+    let (Some(index), 2..=5) = (built_in, level) else {
+        return clip;
+    };
+    MADE[index][usize::from(level) - 2].get_or_init(|| {
+        let row = of(level);
+        let size = CLIP_SIZE_CAP
+            .iter()
+            .find(|(name, _)| *name == clip.name)
+            .map_or(row.clip_size, |(_, cap)| row.clip_size.min(*cap));
+        sized(clip, size, row.clip_pace)
+    })
+}
+
+/// `clip` with each joint `size` times as far, held to the gesture's reach
+/// (`crate::body::GESTURE_REACH`), and its frames `pace` times as quick,
+/// the step rounded up to a whole millisecond. Its frames are kept for good.
+pub fn sized(clip: &Clip, size: f32, pace: f32) -> Clip {
+    let reach = crate::body::GESTURE_REACH;
+    let gain: [f32; 5] = std::array::from_fn(|joint| {
+        let most = clip
+            .frames
+            .iter()
+            .map(|frame| frame[joint].unsigned_abs())
+            .max()
+            .unwrap_or(0);
+        if most == 0 {
+            1.0
+        } else {
+            size.min(reach[joint] / f32::from(most))
+        }
+    });
+    let frames: Vec<[i16; 5]> = clip
+        .frames
+        .iter()
+        .map(|frame| {
+            std::array::from_fn(|joint| {
+                (f32::from(frame[joint]) * gain[joint])
+                    .round()
+                    .clamp(-reach[joint], reach[joint]) as i16
+            })
+        })
+        .collect();
+    Clip {
+        name: clip.name,
+        step_ms: (f32::from(clip.step_ms) / pace).ceil() as u16,
+        frames: frames.leak(),
+    }
+}
+
+/// The built-in clips held under a level's `clip_size` (#8153), so that on
+/// the deployed lamps' standing poses each stays as clear of V1's anti-tip
+/// rule as at level 1: no frame within 85% of 22 mm off the base's axis,
+/// none leaning the lamp back past 16 mm (`crate::cog`,
+/// `every_built_in_clip_at_level_five_passes_v1s_rule`).
+/// Found on the host over all 21 clips at level 5; the rest take x1.6.
+pub const CLIP_SIZE_CAP: [(&str, f32); 8] = [
+    ("greeting", 1.3),
+    ("shy", 1.48),
+    ("stretching", 1.16),
+    ("surprised", 1.05),
+    ("sleepy", 1.12),
+    ("excited", 1.08),
+    ("dance_groove", 1.59),
+    ("dance_hype", 1.55),
+];
+
 /// One level's rate of clips started of themselves (#6893).
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct Gesture {
@@ -150,15 +252,15 @@ pub const GESTURE: [Gesture; 5] = [
         music_rearm: true,
     },
     Gesture {
-        fill: 0.10,
-        fill_gap_s: 60,
+        fill: 0.25,
+        fill_gap_s: 40,
         pause_gap_s: 3.75,
         music_cooldown_min: 20,
         music_rearm: true,
     },
     Gesture {
-        fill: 0.20,
-        fill_gap_s: 45,
+        fill: 0.5,
+        fill_gap_s: 25,
         pause_gap_s: 3.5,
         music_cooldown_min: 15,
         music_rearm: true,
@@ -166,15 +268,15 @@ pub const GESTURE: [Gesture; 5] = [
     // A playlist never stays under the rearm line for 5 minutes: with it,
     // the lamp would sway once ever.
     Gesture {
-        fill: 0.30,
-        fill_gap_s: 30,
+        fill: 0.75,
+        fill_gap_s: 15,
         pause_gap_s: 3.25,
         music_cooldown_min: 10,
         music_rearm: false,
     },
     Gesture {
-        fill: 0.40,
-        fill_gap_s: 20,
+        fill: 1.0,
+        fill_gap_s: 8,
         pause_gap_s: 3.0,
         music_cooldown_min: 6,
         music_rearm: false,
@@ -214,7 +316,6 @@ pub fn lively_rearm(rearm: bool, level: u8) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::clips::Clip;
 
     /// The value after `flag` on the product unit's command line.
     fn unit_value(flag: &str) -> f32 {
@@ -370,8 +471,9 @@ mod tests {
         assert_eq!(pace, [1.0, 1.125, 1.25, 1.375, 1.5]);
     }
 
-    /// #8153: at level 5 each built-in clip is up to 1.6 times its size,
-    /// joint by joint, never past the gesture's reach (`GESTURE_REACH`), and
+    /// #8153: at level 5 each built-in clip is up to 1.6 times its size
+    /// (less where `CLIP_SIZE_CAP` holds it for V1's anti-tip rule), joint
+    /// by joint, never past the gesture's reach (`GESTURE_REACH`), and
     /// up to 1.5 times its pace; played under the servo's 1,000 counts a
     /// second (`Limits::clip_ceiling`), no joint goes faster than that on
     /// any step. Level 3 lies between 1 and 5.
@@ -392,9 +494,11 @@ mod tests {
             assert!(three.step_ms < clip.step_ms && three.step_ms > five.step_ms);
             for joint in 0..5 {
                 let (at_three, at_five) = (farthest(three)[joint], farthest(five)[joint]);
-                let wanted = (f32::from(one[joint]) * 1.6)
-                    .round()
-                    .min(reach[joint]);
+                let size = CLIP_SIZE_CAP
+                    .iter()
+                    .find(|(name, _)| *name == clip.name)
+                    .map_or(1.6, |(_, cap)| cap.min(1.6));
+                let wanted = (f32::from(one[joint]) * size).round().min(reach[joint]);
                 assert!(
                     f32::from(at_five) <= reach[joint],
                     "{} joint {joint}: {at_five}",

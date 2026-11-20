@@ -255,12 +255,15 @@ mod tests {
     }
 
     /// #8153: every built-in clip as level 5 plays it (`energy::livelier`,
-    /// up to 1.6 times its size), on each deployed lamp's standing pose,
-    /// is not refused by V1's rule at play time (no frame past 22 mm off the
-    /// axis) and leans the lamp back no farther than 16 mm. Prints the worst
+    /// up to 1.6 times its size, `energy::CLIP_SIZE_CAP` where held), on
+    /// each deployed lamp's standing pose, stays as clear of V1's rule as
+    /// at level 1 (`every_built_in_clip_passes_v1s_rule`): no frame within
+    /// 85% of 22 mm off the axis, so none refused at play time, and none
+    /// leaning the lamp back past 16 mm. Prints the worst
     /// of each, for the record (`cargo test -- --nocapture`).
     #[test]
     fn every_built_in_clip_at_level_five_passes_v1s_rule() {
+        let mut failed = Vec::new();
         for (lamp, stand, _) in LAMPS {
             for clip in clips::ALL {
                 let played = crate::energy::livelier(clip, 5);
@@ -280,9 +283,14 @@ mod tests {
                     "cog L5 {lamp} {:<13} off axis {mm:5.2} mm (level 1 {before:5.2}), back {back:5.2} mm",
                     clip.name
                 );
-                assert!(mm < CLIP_MM, "{lamp} {} frame {frame}: {mm}", clip.name);
-                assert!(back <= LOOK_MM, "{lamp} {}: {back}", clip.name);
+                if mm >= CLIP_MM * WARN_SHARE || back > LOOK_MM {
+                    failed.push(format!(
+                        "{lamp} {} frame {frame}: {mm} back {back}",
+                        clip.name
+                    ));
+                }
             }
         }
+        assert!(failed.is_empty(), "{failed:?}");
     }
 }
