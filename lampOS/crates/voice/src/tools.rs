@@ -2382,10 +2382,12 @@ fn run_call_with_scope(
                         // (`LAMP_MEMORY_DOUBT_UNDOES`, C37).
                         // Nor (#5627) the forget by id their yes agreed to,
                         // the lamp having asked them once about it.
+                        // A line from a name the eyes hold (`LAMP_FACE_STICKY`,
+                        // `ScopeLease::sticky_held`) takes no yes either.
                         if model.name == crate::remember::FORGET
                             && lease.forgets_need_mouth()
                             && !lease.undoes_own_keep(&call.args)
-                            && !lease.agreed_forget(&call.args)
+                            && (!lease.agreed_forget(&call.args) || lease.sticky_held())
                         {
                             eprintln!(
                                 "lamp-voice: request {request}: a forget on a line whose keep is the one known face's is not run: nothing saw the mouth say it (LAMP_PERSON_SCOPE_ONE_FACE_READS)"

@@ -6398,7 +6398,12 @@ name is also taken out of the lamp's own earlier lines the reply is given
 (its "You:" lines in the thread and its side of each exchange; the
 person's words are theirs), said as "(their name)", and the reply is told
 that marks a name held back, never to be said (`person::without_name`,
-`person::HELD_BACK_NOTE`). Taken are the whole name, its words in order,
+`person::HELD_BACK_NOTE`). Asked who they are, it says it can't see their
+face well enough to be sure who it is right now, never that it doesn't
+know their name, asks for no name and no face, and says a name only if
+they tell it now: on lamp-74ff (19 Nov) it said "I don't know your name
+yet" while only holding a known name back (the sticky plan's owner on
+#7933, 20 Nov). Taken are the whole name, its words in order,
 NFC and case aside, for a name of more words, and one word of it alone only
 as written in the name, capitalised the same, where it can't be a
 sentence's own first word, so "I will" and "Will it rain?" stay for an

@@ -1772,7 +1772,19 @@ pub(crate) fn owner_alone() -> bool {
     if let Some(alone) = ALONE_FOR_TEST.with(std::cell::Cell::get) {
         return alone;
     }
-    crate::known_faces::most_faces_lately() == Some(1)
+    // A name the eyes hold, not match, is never the owner alone
+    // (`LAMP_FACE_STICKY`, `known_faces::held_now`).
+    alone_in(
+        crate::known_faces::most_faces_lately(),
+        crate::known_faces::held_now(),
+    )
+}
+
+/// [`owner_alone`] from the faces counted, every face, near or far
+/// (`known_faces::most_faces_lately`, never the near-only count the
+/// by-default name uses), and whether the eyes hold the name.
+pub(crate) fn alone_in(faces: Option<usize>, held: bool) -> bool {
+    faces == Some(1) && !held
 }
 
 #[cfg(test)]
@@ -1810,11 +1822,22 @@ pub(crate) fn owner_sees_alone(
 /// then (#6307, `make_skill_local::app_code_asked`).
 pub(crate) fn owner_sees_alone_now() -> bool {
     let private_room = crate::person::private_room();
+    // A name the eyes hold, not match, is never the owner in view
+    // (`LAMP_FACE_STICKY`, `known_faces::known_for_owner_checks`).
     let owner_in_view = !private_room
-        && crate::known_faces::known_from_environment()
-            .map(|name| crate::known_faces::memory_person(&name))
-            .is_some_and(|seen| crate::person::owner_ids().contains(&seen));
+        && owner_known(
+            crate::known_faces::known_for_owner_checks(),
+            &crate::person::owner_ids(),
+        );
     owner_sees_alone(private_room, owner_in_view, owner_alone)
+}
+
+/// Whether the eyes' known name for the owner's checks (`known`,
+/// `known_faces::known_for_owner_checks`) is one of `owners`.
+pub(crate) fn owner_known(known: Option<String>, owners: &[String]) -> bool {
+    known
+        .map(|name| crate::known_faces::memory_person(&name))
+        .is_some_and(|seen| owners.contains(&seen))
 }
 
 /// Whether a yes with no asker's line before it (a skill run's write,
@@ -1997,7 +2020,11 @@ pub(crate) fn seen_saying_owner(request: u64, owner: &str) -> (bool, bool) {
     {
         return (false, false);
     }
-    seen_saying_owner_in(crate::speaking_faces::line_seen(request).as_ref(), owner)
+    let (seen, other) =
+        seen_saying_owner_in(crate::speaking_faces::line_seen(request).as_ref(), owner);
+    // A name the eyes hold, not match, is never the owner seen saying it
+    // (`LAMP_FACE_STICKY`, `known_faces::held_now`).
+    (seen && !crate::known_faces::held_now(), other)
 }
 
 /// [`seen_saying_owner`] of the eyes' reading `line`.
@@ -4913,6 +4940,88 @@ mod tests {
         crate::person::set_private_room_for_test(Some(true));
         assert!(owner_of(None).is_some());
         crate::person::set_private_room_for_test(None);
+    }
+
+    /// The sticky plan's (e): a line from a name the eyes hold, not match
+    /// (`LAMP_FACE_STICKY`), or held by the no-face hold (T1), never counts
+    /// the owner present or alone: it has
+    /// no owner for a private read-back, and with the eyes' held mark fresh
+    /// the owner's checks read no known name; off, the mark is not read.
+    #[test]
+    fn a_held_name_is_never_the_owner_present_or_alone() {
+        use crate::memory_scope::{RequestKey, RequestScope, ScopeSnapshot};
+        let key = RequestKey {
+            worker: lamp_turn_owner::BootId::new([58; 16]).unwrap(),
+            session: 1,
+            request: 1,
+        };
+        let a = crate::remember::person_id("A");
+        let owners = [a.clone()];
+        let held = RequestScope::new(key, ScopeSnapshot::sticky_of("A"));
+        let lease = held.lease();
+        assert_eq!(
+            lease.scope().unwrap().person(),
+            Some(a.as_str()),
+            "read as theirs"
+        );
+        assert_eq!(owner_among(Some(&lease), &owners), None, "never the owner");
+        // Held by the no-face hold (the plan's T1, nobody in view): read as
+        // theirs, never the owner present or alone.
+        let cache =
+            crate::memory_scope::FaceCache::holding(Some(crate::memory_scope::Gap::no_face()));
+        let path = std::env::temp_dir().join(format!("held-owner-t1-{}", std::process::id()));
+        std::fs::write(&path, "A").unwrap();
+        let seen = crate::known_faces::FaceObservation::read(&path).unwrap();
+        std::fs::remove_file(&path).unwrap();
+        let until = seen.valid_until();
+        assert!(cache.replace_seen(cache.begin_refresh(), Some(seen), Some(1)));
+        cache.answered(&ScopeSnapshot::of("A"), until);
+        assert!(cache.replace_seen(cache.begin_refresh(), None, Some(0)));
+        let gap = RequestScope::new(
+            key,
+            cache.snapshot(until + std::time::Duration::from_secs(25)),
+        );
+        assert_eq!(
+            gap.lease().scope().unwrap().person(),
+            Some(a.as_str()),
+            "T1: theirs"
+        );
+        assert_eq!(
+            owner_among(Some(&gap.lease()), &owners),
+            None,
+            "T1: never the owner"
+        );
+        // The same name matched is the owner's, as before.
+        let seen = RequestScope::new(key, ScopeSnapshot::of("A"));
+        assert_eq!(owner_among(Some(&seen.lease()), &owners), Some(a.clone()));
+        // The eyes' held mark beside the known file.
+        let directory = std::env::temp_dir().join(format!("held-owner-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&directory);
+        std::fs::create_dir_all(&directory).unwrap();
+        let socket = directory.join("who.sock");
+        let known = crate::known_faces::known_file_of(&socket);
+        std::fs::write(&known, "A\n").unwrap();
+        assert!(
+            !crate::known_faces::held_in(true, Some(&socket)),
+            "no mark: matched"
+        );
+        std::fs::write(crate::known_faces::known_held_of(&known), b"").unwrap();
+        assert!(crate::known_faces::held_in(true, Some(&socket)), "held");
+        assert!(
+            !crate::known_faces::held_in(false, Some(&socket)),
+            "off: not read"
+        );
+        assert!(!crate::known_faces::held_in(true, None));
+        // A stale mark (over 3 s) is not held.
+        let old = std::time::SystemTime::now() - Duration::from_secs(4);
+        std::fs::File::options()
+            .write(true)
+            .open(crate::known_faces::known_held_of(&known))
+            .unwrap()
+            .set_modified(old)
+            .unwrap();
+        assert!(!crate::known_faces::held_in(true, Some(&socket)));
+        std::fs::remove_dir_all(&directory).unwrap();
     }
 
     /// The privacy read's P1 on #5592: an off-camera guest says "read my

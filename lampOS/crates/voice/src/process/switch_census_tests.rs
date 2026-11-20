@@ -669,6 +669,10 @@ fn census_leaving_out(left_out: &[&str]) -> Census {
 const THROUGH_HELPERS: &[(&str, &str)] = &[
     ("LAMP_FACE_GAP_HOLD", "memory_scope::gap_from_environment"),
     (
+        "LAMP_FACE_NO_FACE_HOLD",
+        "memory_scope::gap_from_environment",
+    ),
+    (
         "LAMP_SECOND_SPEAKING_FACE",
         "speaking_faces::from_environment",
     ),

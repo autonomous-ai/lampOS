@@ -638,6 +638,9 @@ pub fn by_default_owner(
 /// far behind them who is the conversation's only voice would otherwise be
 /// told the owner's name (the Reviewer-lead's P2 on #4987). Carried or
 /// not, it holds the name back.
+///
+/// `faces`, with `LAMP_FACE_STICKY`, counts near faces only
+/// (`known_faces::faces_for_name`): a tiny face far behind is no one here.
 pub fn someone_else_now(
     owners: &[String],
     faces: Option<usize>,
@@ -693,8 +696,12 @@ pub const HELD_BACK: &str = "(their name)";
 
 /// Told beside a reply's facts while the owner's name is held back, so the
 /// marker is never said (the Reviewer-lead's and Reviewer-three's P3 on
-/// #4308).
-pub const HELD_BACK_NOTE: &str = "(For you to know, not to answer: “(their name)” in what you said before stands for a name held back, since someone else may be here now. Never say it, and don't take the person speaking for anyone.)";
+/// #4308). Asked who they are, the lamp says it can't see the face well
+/// enough to be sure right now, never that it doesn't know their name, and
+/// asks for no name or face: on lamp-74ff (19 Nov) it said "I don't know
+/// your name yet" while only holding a known name back (the plan's owner on
+/// #7933, 20 Nov).
+pub const HELD_BACK_NOTE: &str = "(For you to know, not to answer: “(their name)” in what you said before stands for a name held back, since someone else may be here now. Never say it, and don't take the person speaking for anyone. If they ask who they are, or you would name them, say you can't see their face well enough to be sure who it is right now. Never say you don't know their name, and never ask them to tell you their name or to face you to be remembered. Say a name only if they tell it to you now.)";
 
 /// The lamp's own line `text` with the owner's `name` said as
 /// [`HELD_BACK`], while someone else may be speaking ([`someone_else_now`]):
@@ -1815,5 +1822,36 @@ mod tests {
         for value in [None, Some("off"), Some("ON"), Some(" on"), Some("1")] {
             assert!(!private_room_for(value), "{value:?}");
         }
+    }
+
+    /// The held-back note says the lamp can't see well enough to be sure,
+    /// never that it doesn't know the name, and asks for no name or face
+    /// (lamp-74ff, 19 Nov: "I don't know your name yet" with the name only
+    /// held back). Its privacy part stays.
+    #[test]
+    fn the_held_back_note_says_it_cannot_see_well_enough_not_that_it_does_not_know() {
+        let note = HELD_BACK_NOTE.to_lowercase();
+        assert!(
+            note.contains("can't see their face well enough to be sure"),
+            "{note}"
+        );
+        for said in [
+            "don't know your name yet",
+            "i don't know your name",
+            "what's your name",
+        ] {
+            assert!(!note.contains(said), "{said}: {note}");
+        }
+        assert!(
+            note.contains("never say you don't know their name"),
+            "{note}"
+        );
+        assert!(
+            note.contains("never ask them to tell you their name or to face you"),
+            "{note}"
+        );
+        assert!(note.contains("never say it, and don't take the person speaking for anyone"));
+        assert!(note.contains("say a name only if they tell it to you now"));
+        assert!(note.contains(HELD_BACK));
     }
 }
