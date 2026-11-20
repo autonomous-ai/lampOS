@@ -88,24 +88,37 @@ pub fn let_go() -> u64 {
 }
 
 /// Tell `moment`'s first audio was queued. Off: nothing at all. On: one
-/// `try_send` to the thread that publishes (started on the first call; the
-/// bus is opened there, never by the caller), never waited on.
+/// `try_send` to the thread that publishes ([`ready`] starts it with the
+/// coordinator; the bus is opened there, never by the caller), never waited on.
 pub fn told(moment: Moment) {
     if !on() {
         return;
     }
-    let out = OUT.get_or_init(|| {
+    if let Some(out) = sender()
+        && out.try_send(moment).is_err()
+    {
+        LET_GO.fetch_add(1, Ordering::Relaxed);
+    }
+}
+
+/// The thread's sender, the thread started on the first call.
+fn sender() -> Option<&'static mpsc::SyncSender<Moment>> {
+    OUT.get_or_init(|| {
         let (to_thread, from_callers) = mpsc::sync_channel::<Moment>(8);
         let spawned = std::thread::Builder::new()
             .name("did-voice".into())
             .spawn(move || publish(from_callers))
             .is_ok();
         spawned.then_some(to_thread)
-    });
-    if let Some(out) = out
-        && out.try_send(moment).is_err()
-    {
-        LET_GO.fetch_add(1, Ordering::Relaxed);
+    })
+    .as_ref()
+}
+
+/// Start the publishing thread now, so the first [`told`] never spawns it on
+/// the audio path. Off: nothing at all.
+pub fn ready() {
+    if on() {
+        let _ = sender();
     }
 }
 
