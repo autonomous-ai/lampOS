@@ -1289,8 +1289,12 @@ tạo một lần và trọn vẹn"); `lamp_tasks::make_try`.
   và không bao giờ tới lamp-services, dù dịch vụ liên kết bật hay tắt; lệnh
   đọc chạy thật.
 - **Số câu đã nói** (cũng cho bước `run` của #8158): lamp-control đếm mỗi
-  `say` mà loa đã nhận cho client của một lần chạy (`runs::Run::said`) và
-  trả lời `{"end":{"run"}}` trên socket admin bằng `{"ended":true,"said":N}`.
+  `say` của client một lần chạy mà giọng đã nói trọn (`done` với
+  `how: finished`; câu bị bỏ vì riêng tư hay hết hạn, hoặc một `sound`,
+  không được đếm; `Parts::said_take`) và trả lời `{"end":{"run"}}` trên
+  socket admin bằng `{"ended":BOOL,"said":N}`. `lamp.say` của script phải
+  chờ câu nói xong (`wait=True`), nếu không script có thể thoát trước khi
+  câu được nói và câu đó bị bỏ.
 
 Kiểm thử: `a_run_step_tries_its_script_and_a_task_each_of_its_scripts`,
 `a_try_passes_only_on_exit_0_in_time_and_for_a_run_step_a_say`,

@@ -726,9 +726,9 @@ pub trait Tokens {
     fn mint_try(&self, _grants: &[String], _run: &str) -> Result<Minted, String> {
         Err("no tried run's token on this lamp".into())
     }
-    /// The run ended, as [`Tokens::end`], and how many `say`s its parts
-    /// took (#8157, lamp-control's `end` answer's `"said"`); none when
-    /// that isn't known.
+    /// The run ended, as [`Tokens::end`], and how many of its `say`s the
+    /// voice said whole (#8157, lamp-control's `end` answer's `"said"`; a
+    /// say dropped is not counted); none when that isn't known.
     fn end_said(&self, run: &str) -> Option<u32> {
         self.end(run);
         None
