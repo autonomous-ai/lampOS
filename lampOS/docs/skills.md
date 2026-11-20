@@ -6240,10 +6240,17 @@ V2's 12:47 and the first builder's 10:02 on #7874 and 11:42 on #7894):
   `[quiet]` (`task::TaskStep::quiet`), waited for up to 60 minutes, then
   skipped unsaid), in the lamp's one read turn, the gate judged again
   before each line, someone coming stopping it with "I'll tell you the
-  rest later."
+  rest later." One its owner asked by voice, ready past those five
+  minutes (`answer_asked`), keeps this gate but for the second face: a
+  face beside the owner's at the desk no longer holds it, and it is said
+  whoever is near once the rest opens (#8049, the product owner's
+  private-room stance; `Seen::asked`). A time's or a trigger's run keeps
+  it whole.
 
 A scheduled `do.read` keeps its whole gate, quiet hours included
-(docs/services.md). The
+(docs/services.md). A `do.read` its owner runs now by voice (a made
+skill's calendar or mail) is held by no second face, said whoever is near
+(#8049, `read_asked`); the rest of its gate holds. The
 sentences are `task::told`'s: markdown's marks left out, each
 at most the say service's 900 bytes, all of them at most about 400
 characters (`task::MOST_TOLD_CHARS`, the first builder on #7591: a person

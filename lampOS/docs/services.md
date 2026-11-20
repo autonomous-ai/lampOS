@@ -1963,7 +1963,7 @@ publishes, every 250 ms:
 | Not private: the microphones known open, the lamp not asleep or muted | `routine::kept_asleep`, `voice/privacy` (`permitted`) | "private" |
 | Not paused (the lamp's stand-in for do-not-disturb) | `lamp/pause` | "paused" |
 | Not quiet hours: 22:00–07:00 local, or the skill's `[quiet]`; an unknown local time counts as quiet | `lamp_local_time::quiet_hours` | "quiet hours" |
-| One face in view, at most (`faces_at_most = 1`) | `humans/faces/tracked`, fresh within 3 s | "not alone" |
+| One face in view, at most (`faces_at_most = 1`), for a run nobody asked (below, "Asked") | `humans/faces/tracked`, fresh within 3 s | "not alone" |
 | That face is the owner's known face | The eyes' known file (fresh within 2 s), its name the owner's, case aside | "not the owner" / "the owner not in view" |
 | No voice heard in the last minute | Each line on `voice/heard`, marked as it comes by a thread of `lamp-skills`' own (the topic is an event: the bus keeps no latest of it, so before this fix the row never held a read back; lamp-9adf, 5 Nov) | "a voice heard" |
 
@@ -1972,11 +1972,25 @@ In the private room (`LAMP_PRIVATE_ROOM=on`, set in the product's
 `lamp_voice::person::private_room`, into `Seen::private_room`) no ownership
 check runs: the rows for an owner face enrolled and the owner's known face
 don't apply, so one face alone in view will do, known or not, with no name
-typed at setup. One face at most still holds ("not alone"): counting faces
-is not an ownership check, and a skill reads unasked, so a second person
-in view doesn't hear the owner's mail or calendar. Nobody in view still
-holds it ("the owner not in view"), and the other rows hold as above. The
-cost the owner accepted: one stranger alone in view hears it.
+typed at setup. One face at most still holds ("not alone") for a run nobody
+asked: counting faces is not an ownership check, and a time's or a
+trigger's run reads unasked, so a second person in view doesn't hear the
+owner's mail or calendar from it. Nobody in view still holds it ("the
+owner not in view"), and the other rows hold as above. The cost the owner
+accepted: one stranger alone in view hears it.
+
+**Asked** (#8049, the product owner's private-room stance, asked on the
+Queue at 08:30): a read its owner asked for by voice is said whoever is
+near. A made skill's `do.read` run now (marked as any run now is, with
+`LAMP_TOLD_WHEN_ASKED` or `LAMP_SKILL_TASK_SURE` on, the product's, and
+taken once by its read, `read_asked`), and the told answer of a run its
+owner asked, however late it is ready (`answer_asked`), are held by no
+second face (`Seen::asked`): the one-face row doesn't apply, and a face
+that comes mid-read doesn't stop it. Every other row holds: out of the
+private room the owner's known face must be among those in view, and a
+voice heard still holds and stops it. A run nobody asked (a time's or a
+trigger's), and a guest's ask outside the private room, keep the one-face
+row.
 
 All must hold steadily for 5 s. Until then the run waits, at most 60
 minutes, and then skips the day with nothing said ("skipped: <why>").
@@ -2002,7 +2016,9 @@ docs/skills.md): it is said as soon as its run ended, held only while the
 lamp is private or paused, and takes the turn only from a read under way,
 with no minute's gap; it gives the turn back as it ends, so a scheduled
 read still waits its minute after it. One asked by anyone else keeps this
-gate after one short line, and one nobody asked keeps it whole. A
+gate after one short line, one its owner asked that is ready past five
+minutes keeps it but for the second face ("Asked", above), and one nobody
+asked keeps it whole. A
 read runs once a local day per skill (kept in `lamp-skills`' memory, so a
 restart of `lamp-skills` forgets it and can allow another read that day).
 While its run waits for the gate, and after it came

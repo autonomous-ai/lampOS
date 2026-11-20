@@ -3226,7 +3226,8 @@ fn voice_asked_switched() -> bool {
 /// Marks `skill`'s run, its steps `calls`, as asked by voice at `now_ms`
 /// when the voice asked it (`voice`), a switch is on (`switched`) and it
 /// has a task, whose own hand-over takes the mark
-/// ([`lamp_skills::task::take_asked_by_voice`]): a run now
+/// ([`lamp_skills::task::take_asked_by_voice`]), or a read, whose read
+/// takes it ([`read_asked`], #8049): a run now
 /// ([`run_now_call`]) or the model's call of the skill's tool
 /// ([`tool_call`]) alike. True when marked.
 /// `owners`: the ask was the owner's own (a run now, which the voice runs
@@ -3240,7 +3241,11 @@ fn mark_voice_asked(
     owners: bool,
     now_ms: u64,
 ) -> bool {
-    let marked = voice && switched && calls.iter().any(|call| matches!(call, Call::Task(_)));
+    let marked = voice
+        && switched
+        && calls
+            .iter()
+            .any(|call| matches!(call, Call::Task(_) | Call::ServiceRead(_)));
     if marked {
         lamp_skills::task::asked_by_voice(skill, now_ms);
         lamp_skills::task::asked_by_owner(skill, owners);
@@ -5830,8 +5835,9 @@ fn hear_voices(bus: &Bus) {
 
 /// A skill's read of a linked service that came due (#5288,
 /// [`lamp_skills::service_read`]): held to its permissions and once a
-/// local day, then run behind its gate. The journal's words: counts and
-/// the gate's outcome only.
+/// local day, then run behind its gate: held by no second face when its
+/// owner ran it now by voice ([`read_asked`], #8049). The journal's words:
+/// counts and the gate's outcome only.
 fn read_service(
     skill: &str,
     read: &lamp_skills::service_read::ReadStep,
@@ -5841,6 +5847,8 @@ fn read_service(
     local_time: Option<Arc<lamp_local_time::LocalTime>>,
 ) -> String {
     use lamp_skills::service_read;
+    // Taken first, so a refused run leaves no mark for a trigger's after it.
+    let asked = read_asked(skill);
     if !service_read::on() {
         return format!("not made: {} is not on", service_read::ENVIRONMENT);
     }
@@ -5863,6 +5871,7 @@ fn read_service(
         }
     }
     let mut room = lamp_room(skill, sockets, bus, known_file, local_time, read.quiet);
+    room.asked = asked;
     let outcome = service_read::run(read, &mut room);
     tell_gate(&service_read::answer_news(skill, &outcome));
     outcome
@@ -5895,6 +5904,7 @@ fn lamp_room(
         local_time,
         quiet,
         quiet_lifted: None,
+        asked: false,
     }
 }
 
@@ -6166,6 +6176,23 @@ fn asker(asked_at: Option<u64>, owners: bool, ready: u64) -> lamp_skills::servic
     }
 }
 
+/// Whether a run's told answer answers its owner's spoken ask, however
+/// long after it is ready (#8049): marked asked by voice (`asked_at`) and
+/// the owner's own (`owners`). Its room then holds it to no second face
+/// ([`LampRoom::asked`]); within five minutes it has no read's gate at all
+/// ([`asker`]). A guest's ask outside the private room, or nobody's, never.
+fn answer_asked(asked_at: Option<u64>, owners: bool) -> bool {
+    asked_at.is_some() && owners
+}
+
+/// Whether `skill`'s read now was asked by its owner's voice (#8049): a
+/// run now ([`run_now_call`]'s mark, [`mark_voice_asked`]), taken once
+/// here, so a time's or a trigger's run after it never is.
+fn read_asked(skill: &str) -> bool {
+    let asked = lamp_skills::task::take_asked_by_voice(skill).is_some();
+    lamp_skills::task::take_asked_by_owner(skill) && asked
+}
+
 /// The owner's spoken ask whose run's told answer, found or failed, lifts
 /// the quiet (#7180): `asked`, with `LAMP_TOLD_WHEN_ASKED` on, or with
 /// `LAMP_SKILL_TASK_SURE` on (`sure`) any run now asked by voice
@@ -6245,6 +6272,8 @@ fn tell_its_run(
             ),
         }
     }
+    // Its owner's ask, however late: no second face holds it (#8049).
+    room.asked = answer_asked(asked_at, owners);
     let told = match &failed {
         Some(line) => lamp_skills::service_read::tell_failed(line, asking, room),
         None => {
@@ -6462,6 +6491,10 @@ struct LampRoom {
     /// lifted for a told answer its owner asked for by voice (#7180,
     /// `lamp_voice::told_when_asked`); none, they hold.
     quiet_lifted: Option<u64>,
+    /// Its read, or the run whose answer it tells, asked by its owner's
+    /// voice ([`read_asked`], [`answer_asked`]): no second face holds it
+    /// (`Seen::asked`, #8049).
+    asked: bool,
 }
 
 /// What [`LampRoom`] asks the voice's say socket for a read's line or a
@@ -6529,6 +6562,7 @@ impl lamp_skills::service_read::Room for LampRoom {
             quiet,
             // The voice's own switch, read the same way (`on` only).
             private_room: lamp_voice::person::private_room(),
+            asked: self.asked,
         }
     }
 
@@ -7086,6 +7120,7 @@ mod tests {
             local_time: None,
             quiet: None,
             quiet_lifted: None,
+            asked: false,
         };
         assert!(room.seen().quiet);
         let ready = unix_ms();
@@ -7148,6 +7183,7 @@ mod tests {
             local_time: None,
             quiet: None,
             quiet_lifted: None,
+            asked: false,
         };
         let not_taken = Err(lamp_skills::service_write::Unrun::NotTaken(
             "lamp-tasks couldn't be reached".into(),
@@ -7212,6 +7248,86 @@ mod tests {
             "say: the voice's say service was not reached (Resource temporarily unavailable)",
         ] {
             assert_eq!(answer_outcome(lost, false), Ok(()), "{lost}");
+        }
+    }
+
+    /// #8049: a run now of a skill whose step is a read (a made skill's
+    /// calendar or mail) is marked asked by its owner's voice, and its read
+    /// takes the mark once ([`read_asked`]); another peer's run is not. A
+    /// run's told answer to its owner's ask is asked however late it is
+    /// ready ([`answer_asked`]), and its room is held to no second face;
+    /// a guest's ask or nobody's never is.
+    #[test]
+    fn an_asked_read_and_its_told_answer_are_marked_asked() {
+        let read = Call::ServiceRead(Box::new(lamp_skills::service_read::ReadStep {
+            service: "google_calendar".into(),
+            what: "events".into(),
+            day: Some("tomorrow".into()),
+            args: serde_json::Map::new(),
+            quiet: None,
+            order_read_as_none: false,
+        }));
+        let now = unix_ms() - 2_000;
+        assert!(mark_voice_asked(
+            "cal-asked",
+            std::slice::from_ref(&read),
+            true,
+            true,
+            true,
+            now
+        ));
+        assert!(read_asked("cal-asked"));
+        assert!(!read_asked("cal-asked"), "taken once");
+        assert!(!mark_voice_asked(
+            "cal-peer",
+            &[read],
+            false,
+            true,
+            true,
+            now
+        ));
+        assert!(!read_asked("cal-peer"));
+        let late = Some(unix_ms() - 10 * 60_000);
+        assert!(answer_asked(late, true));
+        assert!(!answer_asked(late, false));
+        assert!(!answer_asked(None, true));
+        // Its room, as `tell_its_run` leaves it: no owner's face enrolled,
+        // so the late answer is given up at once, the room asked.
+        let dir = tempfile::Builder::new()
+            .prefix("ar")
+            .tempdir_in("/tmp")
+            .unwrap();
+        for (asked_at, owners, asked) in [
+            (late, true, true),
+            (late, false, false),
+            (None, true, false),
+        ] {
+            let mut room = LampRoom {
+                skill: "mail-late".into(),
+                say: dir.path().join("say.sock"),
+                services: dir.path().join("call.sock"),
+                bus: Bus::new(dir.path().join("bus")).unwrap(),
+                known_file: None,
+                owner: None,
+                local_time: None,
+                quiet: None,
+                quiet_lifted: None,
+                asked: false,
+            };
+            let told = tell_its_run(
+                "mail-late",
+                Some(vec!["You have one recent mail.".into()]),
+                None,
+                false,
+                None,
+                asked_at,
+                owners,
+                false,
+                None,
+                &mut room,
+            );
+            assert!(told.is_some());
+            assert_eq!(room.asked, asked, "{asked_at:?} {owners}");
         }
     }
 
@@ -7282,6 +7398,7 @@ mod tests {
             local_time: Some(local),
             quiet: Some((minute, (minute + 2) % (24 * 60))),
             quiet_lifted: None,
+            asked: false,
         };
         let not_taken = Err(lamp_skills::service_write::Unrun::NotTaken(
             "lamp-tasks couldn't be reached".into(),
@@ -7366,6 +7483,7 @@ mod tests {
             local_time: None,
             quiet: None,
             quiet_lifted: None,
+            asked: false,
         };
         for asked_at in [None, Some(now - 5 * 60_000 - 10_000)] {
             let told = tell_its_run(
@@ -7412,6 +7530,7 @@ mod tests {
             local_time: None,
             quiet: None,
             quiet_lifted: None,
+            asked: false,
         };
         // No local time is quiet; a told answer its owner asked for by voice
         // lifts it until its lift's end, and no longer (#7180).

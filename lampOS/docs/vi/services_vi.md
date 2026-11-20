@@ -2052,7 +2052,7 @@ hai lần bị mô hình trả về thành thêm một khóa bên trong, bị t�
 | Không riêng tư: micro được biết là mở, đèn không ngủ hay tắt tiếng | `routine::kept_asleep`, `voice/privacy` (`permitted`) | "private" |
 | Không tạm dừng (thay cho chế độ không làm phiền) | `lamp/pause` | "paused" |
 | Không trong giờ yên lặng: 22:00–07:00 địa phương, hoặc `[quiet]` của kỹ năng; giờ địa phương không rõ thì tính là yên lặng | `lamp_local_time::quiet_hours` | "quiet hours" |
-| Tối đa một khuôn mặt trong tầm nhìn (`faces_at_most = 1`) | `humans/faces/tracked`, mới trong 3 s | "not alone" |
+| Tối đa một khuôn mặt trong tầm nhìn (`faces_at_most = 1`), với lần chạy không ai hỏi (dưới, "Được hỏi") | `humans/faces/tracked`, mới trong 3 s | "not alone" |
 | Khuôn mặt đó là khuôn mặt quen của chủ đèn | Tệp known của mắt (mới trong 2 s), tên là tên chủ đèn, không phân biệt hoa thường | "not the owner" / "the owner not in view" |
 | Không nghe giọng nào trong một phút qua | Mỗi dòng trên `voice/heard`, được một luồng riêng của `lamp-skills` đánh dấu khi đến (topic này là event: bus không giữ bản mới nhất, nên trước bản sửa này dòng này chưa từng giữ lại lần đọc nào; lamp-9adf, 5/11) | "a voice heard" |
 
@@ -2062,12 +2062,25 @@ của sản phẩm và được đọc như giọng nói đọc nó,
 tra quyền sở hữu nào chạy: các dòng về khuôn mặt chủ đèn đã đăng ký và khuôn
 mặt quen của chủ đèn không áp dụng, nên chỉ cần một khuôn mặt một mình trong
 tầm nhìn, quen hay không, kể cả khi không có tên gõ lúc cài đặt. Dòng tối đa
-một khuôn mặt vẫn giữ ("not alone"): đếm khuôn mặt không phải là kiểm tra
-quyền sở hữu, và một kỹ năng đọc khi không ai hỏi, nên người thứ hai trong
-tầm nhìn không nghe được thư hay lịch của chủ đèn. Không thấy ai vẫn giữ cổng
-đóng ("the owner not in view"), và các dòng còn lại vẫn áp dụng như trên. Cái
-giá chủ sản phẩm đã chấp nhận: một người lạ ở một mình trong tầm nhìn vẫn
-nghe được.
+một khuôn mặt vẫn giữ ("not alone") với lần chạy không ai hỏi: đếm khuôn mặt
+không phải là kiểm tra quyền sở hữu, và lần chạy theo giờ hay trigger đọc khi
+không ai hỏi, nên người thứ hai trong tầm nhìn không nghe được thư hay lịch
+của chủ đèn từ nó. Không thấy ai vẫn giữ cổng đóng ("the owner not in
+view"), và các dòng còn lại vẫn áp dụng như trên. Cái giá chủ sản phẩm đã
+chấp nhận: một người lạ ở một mình trong tầm nhìn vẫn nghe được.
+
+**Được hỏi** (#8049, lập trường căn phòng riêng của chủ sản phẩm, được hỏi
+trên Queue lúc 08:30): lần đọc chủ đèn hỏi bằng giọng nói được nói dù ai ở
+gần. Một `do.read` của kỹ năng tự làm được chạy ngay (được đánh dấu như mọi
+lần chạy ngay, khi bật `LAMP_TOLD_WHEN_ASKED` hoặc `LAMP_SKILL_TASK_SURE`,
+như trong sản phẩm, và được lần đọc của nó lấy một lần, `read_asked`), và
+câu trả lời cần nói của lần chạy chủ đèn đã hỏi, dù sẵn sàng muộn đến đâu
+(`answer_asked`), không bị khuôn mặt thứ hai giữ lại (`Seen::asked`): dòng
+một khuôn mặt không áp dụng, và một khuôn mặt đến giữa lúc đọc không làm nó
+dừng. Mọi dòng khác vẫn giữ: ngoài căn phòng riêng, khuôn mặt quen của chủ
+đèn phải nằm trong số các khuôn mặt trong tầm nhìn, và một giọng nói nghe
+được vẫn giữ và làm dừng nó. Lần chạy không ai hỏi (theo giờ hay trigger),
+và lời hỏi của khách ngoài căn phòng riêng, vẫn giữ dòng một khuôn mặt.
 
 Tất cả phải đạt liên tục trong 5 s. Trước đó lượt chạy chờ, tối đa 60 phút,
 rồi bỏ qua ngày đó mà không nói gì ("skipped: <why>").
@@ -2092,7 +2105,9 @@ bằng giọng nói không phải lượt đọc và không có cổng này (#78
 chỉ bị giữ khi đèn riêng tư hoặc tạm dừng, và chỉ chờ lượt khi một lượt đọc
 đang nói, không chờ khoảng một phút; nó trả lượt khi kết thúc, nên lượt đọc
 theo lịch vẫn chờ một phút sau nó. Câu trả lời cho lời hỏi của người khác
-vẫn giữ cổng này sau một câu ngắn, còn lần chạy không ai hỏi giữ nguyên cổng. Mỗi kỹ năng đọc một lần
+vẫn giữ cổng này sau một câu ngắn, câu trả lời cho lời hỏi của chủ đèn sẵn
+sàng sau năm phút giữ cổng này trừ khuôn mặt thứ hai ("Được hỏi", ở trên),
+còn lần chạy không ai hỏi giữ nguyên cổng. Mỗi kỹ năng đọc một lần
 mỗi ngày địa phương (giữ trong bộ nhớ của `lamp-skills`, nên khởi động lại thì
 quên và có thể cho phép đọc lại trong ngày đó). Trong lúc lượt chạy chờ cổng, và sau khi đến hạn cho tới nửa đêm địa
 phương, trigger của kỹ năng không được ghi là triggered hay hỏi Policy mỗi
