@@ -77,6 +77,14 @@ pub trait Parts {
     /// The connection the next `act` or `reply` is for, told just before
     /// it: a part that tells an action's end later sends it there alone.
     fn asking(&mut self, _connection: Option<u64>) {}
+    /// How many of `client`'s `say`s the voice said whole (`done` with
+    /// `how: finished`) since it was last asked, taken: a skill's `run`
+    /// step succeeds only when its run said at least one (#8158). A run's
+    /// count is taken when its token ends (the admin `end`), so it never
+    /// outlives the run. None counted by default.
+    fn said_take(&mut self, _client: &str) -> u32 {
+        0
+    }
 }
 
 /// A part's answer: now, or what to run off the door's lock for it.
@@ -1630,11 +1638,6 @@ impl Door {
                 // Counted only once the part took it.
                 if let Some(class) = class {
                     self.rates.count(&client, class, now_us);
-                }
-                // A run's say the speaker took, counted for its end's
-                // answer (#8157).
-                if matches!(op, Op::Say { .. }) && session.run_socket {
-                    self.runs.count_said(&client, now_us);
                 }
                 match reply {
                     Reply::Now(with) => ok(re, with),
@@ -4795,27 +4798,5 @@ mod tests {
         door.mark_tried("r1");
         let stubbed = door.handle(&mut session, &write_frame("gmail"), &mut fake, S, 1);
         assert_eq!(reply(&stubbed)["result"]["sent"], false, "{stubbed:?}");
-    }
-
-    /// #8157: each `say` a run's parts took is counted on its run, told
-    /// when it ends; a refused one is not.
-    #[test]
-    fn a_runs_says_are_counted_to_its_end() {
-        let say = r#"{"id":3,"op":"say","text":"Hi."}"#;
-        let (mut door, mut session, mut fake) = run_door(&[Grant::Speak], None);
-        assert_eq!(
-            reply(&door.handle(&mut session, say, &mut fake, S, 1))["ok"],
-            true
-        );
-        assert_eq!(
-            reply(&door.handle(&mut session, say, &mut fake, 2 * S, 1))["ok"],
-            true
-        );
-        let ended = door.end_run("r1", None).unwrap();
-        assert_eq!(ended.said, 2);
-        let (mut door, mut session, mut fake) = run_door(&[Grant::Light], None);
-        let refused = door.handle(&mut session, say, &mut fake, S, 1);
-        assert_eq!(code_of(&refused), Some("no_grant"), "{refused:?}");
-        assert_eq!(door.end_run("r1", None).unwrap().said, 0);
     }
 }

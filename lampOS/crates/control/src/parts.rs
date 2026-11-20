@@ -223,6 +223,9 @@ pub struct Lamp {
     voice: Arc<Mutex<Voice>>,
     /// Each client's says still waiting on the voice, for its `stop`.
     says: Says,
+    /// Each client's `say`s the voice said whole, until taken
+    /// ([`Parts::said_take`], #8158): a skill run's sign it said something.
+    said: Arc<Mutex<HashMap<String, u32>>>,
     /// The number the next say is kept under.
     next_say: u64,
     /// The microphone, the ears' blocks on the bus; none without the bus.
@@ -334,6 +337,7 @@ impl Lamp {
             voice: Arc::default(),
             actions: None,
             says: Says::default(),
+            said: Arc::default(),
             next_say: 0,
             microphone: None,
             speaker: None,
@@ -908,7 +912,7 @@ impl Lamp {
             // is said again without (`say_to_voice`).
             line["by"] = json!(client);
         }
-        self.say_to_voice(client, re, line)
+        self.say_to_voice_counted(client, re, line, true)
     }
 
     /// `sound`: the lamp's own short hum, the voice's built-in cue (no file,
@@ -1165,6 +1169,18 @@ impl Lamp {
     /// A line to the voice for `client`'s action `re`, kept for its `stop`
     /// (`{"cancel":true}` on the same connection) until its outcome comes.
     fn say_to_voice(&mut self, client: &str, re: u64, line: Value) -> Result<Value, Error> {
+        self.say_to_voice_counted(client, re, line, false)
+    }
+
+    /// [`Self::say_to_voice`], a line said whole counted for `client` when
+    /// `counted` (a `say`, never a sound: #8158's [`Parts::said_take`]).
+    fn say_to_voice_counted(
+        &mut self,
+        client: &str,
+        re: u64,
+        line: Value,
+        counted: bool,
+    ) -> Result<Value, Error> {
         let Some(path) = self.say.clone() else {
             return Err(not_here("the voice"));
         };
@@ -1175,6 +1191,7 @@ impl Lamp {
         let number = self.next_say;
         self.next_say += 1;
         let says = Arc::clone(&self.says);
+        let said = counted.then(|| Arc::clone(&self.said));
         says.lock()
             .expect("says")
             .entry(client.clone())
@@ -1210,6 +1227,15 @@ impl Lamp {
             }
             let (how, why) = result;
             forget_say(&says, &client, number);
+            // Counted before its `done` is sent, so a run that waited for
+            // the `done` ends with it counted.
+            if let Some(said) = said.filter(|_| how == "finished") {
+                *said
+                    .lock()
+                    .expect("said")
+                    .entry(client.clone())
+                    .or_default() += 1;
+            }
             let mut done = json!({"ev": "done", "re": re, "how": how});
             if let Some(why) = why {
                 done["why"] = json!(why);
@@ -1651,6 +1677,10 @@ impl Parts for Lamp {
 
     fn asking(&mut self, connection: Option<u64>) {
         self.asking = connection;
+    }
+
+    fn said_take(&mut self, client: &str) -> u32 {
+        self.said.lock().expect("said").remove(client).unwrap_or(0)
     }
 
     fn state(&self, kind: StateKind) -> Value {
@@ -2491,6 +2521,60 @@ mod tests {
                 json!({"ev": "done", "re": 14, "how": "finished"})
             )
         );
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    /// #8158: a `say` the voice said whole is counted for its client until
+    /// taken, once; one dropped is not, nor the hum (a `sound`), so a skill
+    /// run's `run` step is told only of the words it had said.
+    #[test]
+    fn a_say_said_whole_is_counted_for_its_client_until_taken() {
+        let dir = dir("said");
+        let path = dir.join("say.sock");
+        let listener = std::os::unix::net::UnixListener::bind(&path).unwrap();
+        let told: Arc<Mutex<Vec<(String, Value)>>> = Arc::default();
+        let sink = told.clone();
+        let events: Events =
+            Arc::new(move |client, event| sink.lock().unwrap().push((client.to_owned(), event)));
+        let voice = std::thread::spawn(move || {
+            for answer in [
+                r#"{"outcome":"spoken"}"#,
+                r#"{"outcome":"dropped","why":"expired"}"#,
+                r#"{"outcome":"spoken"}"#,
+            ] {
+                let (stream, _) = listener.accept().unwrap();
+                let mut line = String::new();
+                BufReader::new(&stream).read_line(&mut line).unwrap();
+                let mut out = &stream;
+                writeln!(out, "{answer}").unwrap();
+            }
+        });
+        let mut lamp = Lamp::new(None, None, Some(path), "boot".into(), events);
+        let wait_for = |n: usize| {
+            for _ in 0..500 {
+                if told.lock().unwrap().len() >= n {
+                    return;
+                }
+                std::thread::sleep(Duration::from_millis(10));
+            }
+            panic!("no done");
+        };
+        assert_eq!(lamp.said_take("c_9"), 0);
+        lamp.act("c_9", 1, &op(r#"{"id":1,"op":"say","text":"One."}"#), 0)
+            .unwrap();
+        wait_for(1);
+        lamp.act("c_9", 2, &op(r#"{"id":2,"op":"say","text":"Two."}"#), 0)
+            .unwrap();
+        wait_for(2);
+        // The hum: said, but no say of the client's.
+        lamp.act("c_9", 3, &op(r#"{"id":3,"op":"sound","name":"hum"}"#), 0)
+            .unwrap();
+        wait_for(3);
+        voice.join().unwrap();
+        assert_eq!(told.lock().unwrap()[2].1["how"], "finished");
+        assert_eq!(lamp.said_take("c_8"), 0, "another client's none");
+        assert_eq!(lamp.said_take("c_9"), 1);
+        assert_eq!(lamp.said_take("c_9"), 0, "taken once");
         let _ = std::fs::remove_dir_all(&dir);
     }
 
