@@ -572,6 +572,14 @@ impl Chat {
             .any(|tool| tool.name == name)
     }
 
+    /// The function a request on `messages`, never declaring `without`,
+    /// must call, by name ([`Self::forcing`]): none when nothing is forced
+    /// or the one forced isn't given. Round 1's journal line (#8022).
+    pub fn forced(&self, messages: &[Message], without: &[&str]) -> Option<&'static str> {
+        let _ = (messages, without);
+        None
+    }
+
     /// A request's bytes and tool count on `messages`, as
     /// [`Self::send_watched`] would make it now and its journal line counts
     /// them (`LAMP_CUT_IN_PROMPT_LOG`, #6218).

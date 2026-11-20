@@ -2056,6 +2056,25 @@ fn on_the_lamp_description(place: &Place, staff: &[Member]) -> String {
     )
 }
 
+/// What [`START`]'s description adds while `make_skill` is declared (#8022
+/// case 2): on lamp-52e6 on 20 Nov a spoken ask to make a skill whose work
+/// an agent does, not forced to `make_skill` (`LAMP_MAKE_SKILL_ASKED`),
+/// called this twice of two, and the yes started a plain task. The model
+/// still judges; no word is matched.
+pub const MAKE_TOLD: &str =
+    " An ask to make a skill, even one whose work an agent does, is make_skill's, never this.";
+
+/// The link's most for a description (`lamp_gemini::Tool::validate`).
+const MOST_DESCRIPTION_BYTES: usize = 1_024;
+
+/// `tools`' [`START`] told [`MAKE_TOLD`] after its own words, when the two
+/// still fit the link's most; one that would not is left as it was, so the
+/// function is never refused for it. Only while `make_skill` is declared,
+/// so it never names a function that isn't offered.
+pub fn tell_make(tools: &mut [Tool]) {
+    let _ = (tools, MOST_DESCRIPTION_BYTES);
+}
+
 /// [`STATUS`]'s description: the one for "is Harness signed in?", "which
 /// computers do you have?" and "what can you hand work to?" (#6061 part B).
 fn status_description(lead_in: bool) -> String {

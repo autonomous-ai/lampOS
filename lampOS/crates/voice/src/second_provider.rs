@@ -14419,6 +14419,22 @@ impl TurnTools {
     }
 }
 
+/// Round 1's journal line (#8022 case 2): whether `start_agent_task` and
+/// `make_skill` were offered (`offered`), the function it was forced to
+/// call (`forced`, `none` for none), whether the person's line asks to make
+/// a skill (`crate::tools::make_skill_asked::asks_to_make`) and how many
+/// sentences it has. `?` where the services cannot say, or where the last
+/// message is no person's line. Names, `y`/`n` and a count: never a word.
+fn round_one_line(
+    request: u64,
+    messages: &[Message],
+    offered: impl Fn(&str) -> Option<bool>,
+    forced: Option<Option<&str>>,
+) -> String {
+    let _ = (request, messages, offered, forced);
+    String::new()
+}
+
 /// A fault's category as a decision's error code (`voice/decision`,
 /// #7267): `rate_limited`, `transport`, …; never server text.
 fn fault_code(fault: &Fault) -> String {
