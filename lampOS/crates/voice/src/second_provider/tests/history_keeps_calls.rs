@@ -543,3 +543,25 @@ fn a_service_writes_status_and_fields_are_kept() {
         assert!(line.starts_with('(') && line.ends_with(')'), "{line}");
     }
 }
+
+/// A model's own `confirm_agent_task` that handed the task over is told as
+/// handed over in a later turn's history, so a bare "how far is it?" is
+/// about it (#7930, c0a4 ROW c0a4-5); one that handed nothing over is told
+/// the plain kept result.
+#[test]
+fn a_confirm_that_handed_over_is_kept_as_handed_over() {
+    assert_eq!(
+        kept_result(
+            crate::agent_tasks::CONFIRM,
+            &json!({"handing_over": true, "work_id": "67"})
+        ),
+        Some(crate::second_provider::TASK_HANDED_OVER)
+    );
+    assert_eq!(
+        kept_result(
+            crate::agent_tasks::CONFIRM,
+            &json!({"error": "nothing_prepared"})
+        ),
+        None
+    );
+}
