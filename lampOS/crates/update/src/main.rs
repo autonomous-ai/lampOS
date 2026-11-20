@@ -1178,6 +1178,47 @@ fn on_the_lamp(command: &str, options: &BTreeMap<String, String>) -> ExitCode {
         }
         acts.then_some((on, shown))
     };
+    // OpenClaw's gateway only while OpenClaw is the lamp's default agent
+    // (#8105, LAMP_OPENCLAW_GATEWAY_BY_DEFAULT): lamp-tasks is asked every
+    // KEEP_EVERY between rounds, on a thread of its own, so a choice in the
+    // app starts the gateway within seconds and another default stops it.
+    // A round asks once more for its own OpenClaw step, and the thread
+    // leaves the gateway alone while a round runs.
+    let gateway_by_default = matches!(openclaw, Some((true, _))) && switches.gateway_by_default;
+    let tasks_app_socket = config
+        .root
+        .join(lamp_update::openclaw_install::TASKS_APP_SOCKET.trim_start_matches('/'));
+    let round_running = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
+    if gateway_by_default {
+        use lamp_update::openclaw_install as openclaw;
+        say(
+            "OpenClaw's gateway runs only while OpenClaw is the lamp's agent (LAMP_OPENCLAW_GATEWAY_BY_DEFAULT)",
+        );
+        let root = config.root.clone();
+        let socket = tasks_app_socket.clone();
+        let round_running = round_running.clone();
+        let started = std::thread::Builder::new()
+            .name("gateway-by-default".into())
+            .spawn(move || {
+                let mut systemd = Systemctl::default();
+                let mut said = |line: &str| eprintln!("lamp-update: {line}");
+                loop {
+                    if !round_running.load(std::sync::atomic::Ordering::Acquire) {
+                        let gateway =
+                            openclaw::gateway_wanted(true, openclaw::said_default(&socket));
+                        if !round_running.load(std::sync::atomic::Ordering::Acquire) {
+                            openclaw::keep_between_rounds(&root, &mut systemd, gateway, &mut said);
+                        }
+                    }
+                    std::thread::sleep(openclaw::KEEP_EVERY);
+                }
+            });
+        if let Err(error) = started {
+            say(&format!(
+                "OpenClaw's gateway is not kept to the lamp's agent: no thread: {error}"
+            ));
+        }
+    }
     // Hermes's schedule (#5978): each install watched while it runs, the
     // voice heard from the start, so speech freezes it and a lost privacy
     // reading stops it; one watch for Hermes's and OpenClaw's both (#6226).
@@ -1262,6 +1303,7 @@ fn on_the_lamp(command: &str, options: &BTreeMap<String, String>) -> ExitCode {
         )
     }));
     loop {
+        round_running.store(true, std::sync::atomic::Ordering::Release);
         let before_setup = lamp_update::first_update::before_setup(&config);
         if let Some(first) = &mut first {
             first.begin(lamp_update::records::unix_ms(), &mut say);
@@ -1369,10 +1411,19 @@ fn on_the_lamp(command: &str, options: &BTreeMap<String, String>) -> ExitCode {
                         window
                     }
                 });
-                openclaw_install::after_round(
+                let gateway = if gateway_by_default {
+                    openclaw_install::gateway_wanted(
+                        true,
+                        openclaw_install::said_default(&tasks_app_socket),
+                    )
+                } else {
+                    openclaw_install::Gateway::Wanted
+                };
+                openclaw_install::after_round_with(
                     &config.root,
                     &records,
                     shown,
+                    gateway,
                     &mut systemd,
                     &mut lamp_update::install::output_of,
                     now_unix_ms,
@@ -1506,6 +1557,7 @@ fn on_the_lamp(command: &str, options: &BTreeMap<String, String>) -> ExitCode {
         // After each round: `update/current` may have moved and been
         // confirmed by another lamp-update meanwhile (#6898).
         onto_current(&config, &mut reexec_tried);
+        round_running.store(false, std::sync::atomic::Ordering::Release);
         // Between rounds the bus is still read, so that what the voice said
         // meanwhile does not wait in the sockets. A check from the app ends
         // the wait (#4153); one that came during the round is dropped.

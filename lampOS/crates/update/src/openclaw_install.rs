@@ -925,6 +925,36 @@ pub fn after_round(
     window: Result<crate::hermes_schedule::Window, String>,
     say: &mut dyn FnMut(&str),
 ) -> Option<OpenclawInstall> {
+    after_round_with(
+        root,
+        records,
+        shown,
+        Gateway::Wanted,
+        systemd,
+        run,
+        now_unix_ms,
+        window,
+        say,
+    )
+}
+
+/// [`after_round`], with whether the gateway is wanted now ([`Gateway`],
+/// #8105): wanted, it is enabled and started as before; not wanted, it is
+/// stopped and not started at boot, and agent `main`'s allow-list entry,
+/// which goes through the running gateway, waits for a round that wants
+/// it; unknown, it is left as it is.
+#[allow(clippy::too_many_arguments)]
+pub fn after_round_with(
+    root: &Path,
+    records: &Path,
+    shown: Shown,
+    gateway: Gateway,
+    systemd: &mut dyn Systemd,
+    run: &mut Runner,
+    now_unix_ms: u64,
+    window: Result<crate::hermes_schedule::Window, String>,
+    say: &mut dyn FnMut(&str),
+) -> Option<OpenclawInstall> {
     match crate::writer_unit::write_unit(root, UNIT, &unit_text_for(shown)) {
         Ok(written) => {
             if written && let Err(why) = systemd.reload() {
@@ -948,7 +978,7 @@ pub fn after_round(
     };
     let there = present(root, shown);
     if there {
-        gateway_on(root, systemd, say);
+        keep_gateway(root, systemd, gateway, say);
     }
     // #6685: the entry recorded is added again every round with the
     // gateway up (an add of an entry there writes nothing), as a factory
@@ -957,6 +987,7 @@ pub fn after_round(
     if there
         && shown.one_path
         && !allowlist_due
+        && gateway != Gateway::NotWanted
         && keep_run_entry(run, say) == Some(false)
         && let Some(mut said) = before.take()
     {
@@ -964,7 +995,10 @@ pub fn after_round(
         before = Some(write(records, said));
         allowlist_due = true;
     }
-    let due = allowlist_due || launcher_due(root, shown);
+    // A gateway not wanted (#8105) asks no one-shot for the allow-list,
+    // which goes through the running gateway: it would start it every round
+    // only to be stopped again. The entry is added by a round that wants it.
+    let due = (allowlist_due && gateway != Gateway::NotWanted) || launcher_due(root, shown);
     if there && !due {
         if before
             .as_ref()
@@ -1057,6 +1091,182 @@ pub fn after_round(
     }
 }
 
+/// The switch (#8105): `on` exactly, in lamp-update's environment or the
+/// carried `/etc/lampOS/update.env`. With it on, OpenClaw's gateway runs
+/// only while OpenClaw is the lamp's default agent, as lamp-tasks says it
+/// ([`said_default`]); off, it is always on with OpenClaw there, as before.
+pub const BY_DEFAULT_SWITCH: &str = "LAMP_OPENCLAW_GATEWAY_BY_DEFAULT";
+
+/// lamp-tasks' socket for the app's calls, where it says the lamp's default
+/// agent (`app_engine_default_state`, the line lamp-cloud asks for
+/// `update.status`).
+pub const TASKS_APP_SOCKET: &str = "/run/lampos-tasks/app.sock";
+
+/// How long lamp-tasks is given to answer: as lamp-cloud's wait.
+pub const TASKS_WAIT: Duration = Duration::from_secs(2);
+
+/// How often `serve` asks lamp-tasks, between rounds and during them, so a
+/// choice of OpenClaw in the app starts its gateway within seconds.
+pub const KEEP_EVERY: Duration = Duration::from_secs(10);
+
+/// The most bytes of lamp-tasks' answer read: one small JSON line.
+const MOST_TASKS_REPLY: u64 = 4096;
+
+/// Whether OpenClaw's gateway is wanted now (#8105).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Gateway {
+    /// Enabled at boot and running: the switch off (always on, as before),
+    /// or OpenClaw the lamp's default agent.
+    Wanted,
+    /// Stopped and not started at boot: another agent is the lamp's
+    /// default.
+    NotWanted,
+    /// Left as it is: lamp-tasks not reached, or no default said yet.
+    Unknown,
+}
+
+/// The lamp's default agent as lamp-tasks says it at `socket`: `None` when
+/// it does not answer (down, starting, its socket not there), `Some(None)`
+/// when it answers with no default, else the engine's name.
+pub fn said_default(socket: &Path) -> Option<Option<String>> {
+    use std::io::{BufRead, BufReader, Read, Write};
+    let asked = || -> io::Result<String> {
+        let mut stream = std::os::unix::net::UnixStream::connect(socket)?;
+        stream.set_read_timeout(Some(TASKS_WAIT))?;
+        stream.set_write_timeout(Some(TASKS_WAIT))?;
+        stream.write_all(b"{\"op\":\"app_engine_default_state\"}\n")?;
+        let mut reply = String::new();
+        BufReader::new(stream.take(MOST_TASKS_REPLY)).read_line(&mut reply)?;
+        Ok(reply)
+    };
+    default_of(&asked().ok()?)
+}
+
+/// lamp-tasks' answer read ([`said_default`]): `None` for a refusal or a
+/// line that is not its answer.
+fn default_of(reply: &str) -> Option<Option<String>> {
+    let reply: serde_json::Value = serde_json::from_str(reply.trim()).ok()?;
+    if reply.get("ok").and_then(serde_json::Value::as_bool) != Some(true) {
+        return None;
+    }
+    Some(
+        reply
+            .get("default")
+            .and_then(serde_json::Value::as_str)
+            .map(str::trim)
+            .filter(|engine| !engine.is_empty())
+            .map(str::to_owned),
+    )
+}
+
+/// The rule (#8105): with the switch off, always [`Gateway::Wanted`]; on,
+/// wanted only while lamp-tasks says `openclaw` is the default, not wanted
+/// while it says another, and unknown while it says none or can't be
+/// reached, so a lamp-tasks that is starting never stops the gateway.
+pub fn gateway_wanted(by_default: bool, said: Option<Option<String>>) -> Gateway {
+    if !by_default {
+        return Gateway::Wanted;
+    }
+    match said {
+        Some(Some(engine)) if engine == "openclaw" => Gateway::Wanted,
+        Some(Some(_)) => Gateway::NotWanted,
+        Some(None) | None => Gateway::Unknown,
+    }
+}
+
+/// The gateway kept as [`Gateway`] says, with OpenClaw there: wanted,
+/// [`gateway_on`]; not wanted, [`gateway_idle`]; unknown, nothing.
+pub fn keep_gateway(
+    root: &Path,
+    systemd: &mut dyn Systemd,
+    gateway: Gateway,
+    say: &mut dyn FnMut(&str),
+) {
+    match gateway {
+        Gateway::Wanted => gateway_on(root, systemd, say),
+        Gateway::NotWanted => gateway_idle(root, systemd, say),
+        Gateway::Unknown => {}
+    }
+}
+
+/// Between rounds (#8105): with OpenClaw there ([`WRAPPER`] and its unit),
+/// the gateway kept as [`Gateway`] says. Each change is said once; a
+/// gateway already as wanted is left with no word.
+pub fn keep_between_rounds(
+    root: &Path,
+    systemd: &mut dyn Systemd,
+    gateway: Gateway,
+    say: &mut dyn FnMut(&str),
+) {
+    let there = fs::symlink_metadata(on(root, WRAPPER)).is_ok()
+        && fs::symlink_metadata(unit_path(root)).is_ok();
+    if !there {
+        return;
+    }
+    // Harness's one-shot at work (an install or its steps run through the
+    // gateway): left to it, and kept again at the next look.
+    let one_shot = systemd
+        .states(&[harness_install::UNIT.to_owned()])
+        .ok()
+        .and_then(|states| states.into_iter().next())
+        .is_some_and(|state| state.active == "active" || state.active == "activating");
+    if one_shot {
+        return;
+    }
+    // Already as wanted: nothing run, nothing said, every KEEP_EVERY.
+    let enabled = fs::symlink_metadata(on(root, WANTS)).is_ok();
+    let active = gateway_state(systemd);
+    let up = active
+        .as_deref()
+        .is_some_and(|active| active == "active" || active == "activating");
+    let down = active
+        .as_deref()
+        .is_some_and(|active| active == "inactive" || active == "failed");
+    let settled = match gateway {
+        Gateway::Wanted => enabled && up,
+        Gateway::NotWanted => !enabled && down,
+        Gateway::Unknown => true,
+    };
+    if !settled {
+        if gateway == Gateway::Wanted {
+            say(&format!(
+                "{UNIT} started: OpenClaw is the lamp's agent (#8105)"
+            ));
+        }
+        keep_gateway(root, systemd, gateway, say);
+    }
+}
+
+/// The gateway not wanted (#8105): [`WANTS`] taken out (systemd reloaded),
+/// so boot doesn't start it, and stopped when it runs. Said once, when it
+/// changes something.
+fn gateway_idle(root: &Path, systemd: &mut dyn Systemd, say: &mut dyn FnMut(&str)) {
+    let wants = on(root, WANTS);
+    if fs::symlink_metadata(&wants).is_ok() {
+        match fs::remove_file(&wants) {
+            Ok(()) => {
+                say(&format!(
+                    "{UNIT} disabled: OpenClaw is not the lamp's agent, so its gateway is not started at boot (#8105)"
+                ));
+                if let Err(why) = systemd.reload() {
+                    say(&format!("systemd not reloaded: {why}"));
+                }
+            }
+            Err(error) => say(&format!("{UNIT} not disabled: {error}")),
+        }
+    }
+    let running =
+        gateway_state(systemd).is_some_and(|active| active != "inactive" && active != "failed");
+    if running {
+        match systemd.stop(UNIT) {
+            Ok(()) => say(&format!(
+                "{UNIT} stopped: OpenClaw is not the lamp's agent (#8105)"
+            )),
+            Err(why) => say(&format!("{UNIT} not stopped: {why}")),
+        }
+    }
+}
+
 /// The gateway always on with OpenClaw there (the owner on #6226): enabled
 /// at boot by [`WANTS`] (made when missing, as `systemctl enable` does,
 /// systemd then reloaded) and started (a no-op when it runs).
@@ -1085,6 +1295,15 @@ fn gateway_on(root: &Path, systemd: &mut dyn Systemd, say: &mut dyn FnMut(&str))
     if let Err(why) = systemd.start_unit(UNIT) {
         say(&format!("{UNIT} not started: {why}"));
     }
+}
+
+/// The gateway's `ActiveState` as systemd says it, `None` when it can't.
+fn gateway_state(systemd: &mut dyn Systemd) -> Option<String> {
+    systemd
+        .states(&[UNIT.to_owned()])
+        .ok()
+        .and_then(|states| states.into_iter().next())
+        .map(|state| state.active)
 }
 
 /// The properties [`loaded_as_written`] reads of [`UNIT`], in `systemctl
