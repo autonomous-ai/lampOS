@@ -1064,18 +1064,6 @@ fn on_the_lamp(command: &str, options: &BTreeMap<String, String>) -> ExitCode {
     // `serve` that acts, the one that says `update/status`.
     let mut app_check = (config.apply && command == "serve")
         .then(|| lamp_update::app_check::AppCheck::new(&bus_root, &mut say));
-    // The owner's Update now (#7517): only with its switch on, vouched for by
-    // lamp-cloud's mark under the lamp's root. Read as lamp-update's own
-    // switches are, so the carried /etc/lampOS/update.env turns it on for a
-    // lamp in a home, whose unit no round rewrites.
-    if lamp_update::switches::update_switch(
-        &config.root,
-        lamp_update::update_now::SWITCH,
-        std::env::var_os(lamp_update::update_now::SWITCH).as_deref(),
-    ) {
-        app_check = app_check
-            .map(|check| check.with_now(lamp_update::update_now::Marks::under(&config.root)));
-    }
     // The first update after setup (#6284, LAMP_FIRST_UPDATE=on): only
     // the `serve` that acts, the one the app's check is read by.
     let mut first = app_check
@@ -1097,6 +1085,14 @@ fn on_the_lamp(command: &str, options: &BTreeMap<String, String>) -> ExitCode {
         })
     };
     let switches = read_switches();
+    // The owner's Update now (#7517): only with its switch on (`switches.now`,
+    // so the carried /etc/lampOS/update.env turns it on for a lamp in a home,
+    // whose unit no round rewrites), vouched for by lamp-cloud's mark under
+    // the lamp's root.
+    if switches.now {
+        app_check = app_check
+            .map(|check| check.with_now(lamp_update::update_now::Marks::under(&config.root)));
+    }
     // The agents' switches (#5197, #5978, #6226), read in the one place the
     // image's pre-install reads them too (#7274): only a `serve` that acts
     // takes a product lamp's defaults.
