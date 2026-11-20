@@ -4086,8 +4086,7 @@ gone ([switches.md](switches.md)). What happens:
      `round_one_forced::round_one_says_its_force_and_the_make_ask_never_its_words`.
    - **A make is never a task** (#8022 case 2, the first builder's yes at
      11:05): while `make_skill` is declared, `start_agent_task`'s
-     description ends "An ask to make a skill, even one whose work an agent
-     does, is make_skill's, never this." (`agent_tasks::MAKE_TOLD`), only
+     description ends "Making a skill is make_skill's, never this." (`agent_tasks::MAKE_TOLD`), only
      when the two still fit the link's 1,024 bytes; one that would not is
      left as it was. Without `make_skill` it is never said. The model still
      judges; no word is matched. Host test:
