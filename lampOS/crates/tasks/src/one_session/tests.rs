@@ -99,6 +99,8 @@ struct Fake {
     ensure_session: Mutex<Option<String>>,
     /// The engine session `show` names (#8151); none: none named.
     shown_session: Mutex<Option<String>>,
+    /// `ensure` names no engine session at all (#8151).
+    no_engine_session: Mutex<bool>,
 }
 
 fn agent_of(n: u32) -> String {
@@ -313,13 +315,13 @@ impl PaneHarness for Fake {
                 .clone()
                 .unwrap_or_else(|| "idle".into()),
             why: None,
-            engine_session: Some(
+            engine_session: (!*self.no_engine_session.lock().unwrap()).then(|| {
                 self.ensure_session
                     .lock()
                     .unwrap()
                     .clone()
-                    .unwrap_or_else(|| format!("agent:main:kept-{}", agent_id_now)),
-            ),
+                    .unwrap_or_else(|| format!("agent:main:kept-{}", agent_id_now))
+            }),
             confirmed: *self.ensure_confirmed.lock().unwrap(),
             why_code: self.ensure_why_code.lock().unwrap().clone(),
         })
@@ -5657,8 +5659,8 @@ fn hermes_kept_on(dir: &std::path::Path) -> (OneSession, Fake, Deleted, Deleted)
     let (seen_hermes, seen_openclaw) = (hermes.clone(), openclaw.clone());
     let (one, fake) = kept_on(dir);
     let one = one
-        .with_hermes_delete(Box::new(move |ids| {
-            seen_hermes.lock().unwrap().extend(ids.iter().cloned());
+        .with_hermes_delete(Arc::new(move |gone: &HermesGone| {
+            seen_hermes.lock().unwrap().extend(gone.ids.iter().cloned());
             Vec::new()
         }))
         .with_session_delete(Box::new(move |key| {
@@ -5761,6 +5763,7 @@ fn a_forget_deletes_the_kept_hermes_conversation() {
     one.forget_conversation();
     hermes_keep_open_step(&one, &fake, &mut looks);
     assert_eq!(fake.count("close-kept"), 1);
+    one.deletes_done();
     assert_eq!(*hermes.lock().unwrap(), vec!["hermes-1".to_owned()]);
     assert!(openclaw.lock().unwrap().is_empty());
     assert_eq!(one.agent(), Some(agent_of(2)), "{:?}", fake.calls());
@@ -5776,6 +5779,7 @@ fn a_sign_out_or_an_idle_close_deletes_the_kept_hermes_conversation() {
     one.drop_when_free("the lamp signed out");
     one.tend(&fake, &hermes_place(), &|| false);
     assert_eq!(fake.count("close-kept"), 1);
+    one.deletes_done();
     assert_eq!(*hermes.lock().unwrap(), vec!["hermes-1".to_owned()]);
     assert!(!dir.path().join(STATE_FILE).exists());
 
@@ -5786,6 +5790,7 @@ fn a_sign_out_or_an_idle_close_deletes_the_kept_hermes_conversation() {
     one.kept_idle_max = Duration::ZERO;
     hermes_keep_open_step(&one, &fake, &mut looks);
     assert_eq!(fake.count("close-kept"), 1);
+    one.deletes_done();
     assert_eq!(*hermes.lock().unwrap(), vec!["hermes-1".to_owned()]);
     assert!(openclaw.lock().unwrap().is_empty());
 }
@@ -5808,6 +5813,7 @@ fn a_hermes_session_id_moved_by_a_compression_is_followed() {
     one.tend(&fake, &hermes_place(), &|| false);
     // Every session the pane was named: the one it moved to and the one
     // before, recorded as a list.
+    one.deletes_done();
     assert_eq!(
         *hermes.lock().unwrap(),
         vec!["hermes-2".to_owned(), "hermes-1".to_owned()]
@@ -5857,6 +5863,7 @@ fn a_hermes_kept_session_is_rotated_at_its_bound_and_the_old_one_deleted() {
         "{:?}",
         fake.calls()
     );
+    one.deletes_done();
     assert_eq!(*hermes.lock().unwrap(), vec!["hermes-1".to_owned()]);
     assert!(openclaw.lock().unwrap().is_empty());
     assert_eq!(one.turns(), 1);
@@ -5876,11 +5883,19 @@ fn a_died_hermes_session_is_resumed_without_a_gateway_check() {
     assert!(one.revive_or_replace(&fake, MACHINE, &agent_of(1), "its engine exited", true));
     assert_eq!(*fake.holds_read.lock().unwrap(), reads, "no Gateway read");
     assert_eq!(fake.count("close-kept"), 0);
+    one.deletes_done();
     assert!(hermes.lock().unwrap().is_empty());
 }
 
 /// A Hermes `state.db` as Hermes makes it: conversation `a`, compressed
 /// to `b` and again to `c`, and another conversation `z`.
+fn gone_ids(ids: &[&str]) -> HermesGone {
+    HermesGone {
+        ids: ids.iter().map(|id| (*id).to_owned()).collect(),
+        ..HermesGone::default()
+    }
+}
+
 fn hermes_store(home: &std::path::Path) -> rusqlite::Connection {
     let db = rusqlite::Connection::open(home.join(HERMES_STATE_DB)).unwrap();
     db.execute_batch(
@@ -5970,7 +5985,7 @@ fn a_hermes_conversation_is_deleted_by_hermes_own_cli_children_first() {
     let home = tempfile::tempdir().unwrap();
     let db = hermes_store(home.path());
     let (cli, log) = hermes_cli(home.path(), "ok");
-    assert!(cli.delete(&["b".into()]).is_empty());
+    assert!(cli.delete(&gone_ids(&["b".into()])).is_empty());
     assert_eq!(hermes_calls(home.path(), &log), ["c", "b", "a"]);
     let count = |sql: &str| db.query_row(sql, [], |row| row.get::<_, i64>(0)).unwrap();
     assert_eq!(count("SELECT count(*) FROM sessions"), 4, "only read");
@@ -5978,7 +5993,7 @@ fn a_hermes_conversation_is_deleted_by_hermes_own_cli_children_first() {
     // A session Hermes has none of: already gone, so done.
     std::fs::remove_file(&log).unwrap();
     let (cli, log) = hermes_cli(home.path(), "gone");
-    assert!(cli.delete(&["z".into()]).is_empty());
+    assert!(cli.delete(&gone_ids(&["z".into()])).is_empty());
     assert_eq!(hermes_calls(home.path(), &log), ["z"]);
 }
 
@@ -5990,11 +6005,11 @@ fn a_refused_hermes_delete_is_tried_once_more_then_left_pending() {
     let home = tempfile::tempdir().unwrap();
     hermes_store(home.path());
     let (cli, log) = hermes_cli(home.path(), "busy");
-    assert_eq!(cli.delete(&["z".into()]), ["z"]);
+    assert_eq!(cli.delete(&gone_ids(&["z".into()])), ["z"]);
     assert_eq!(hermes_calls(home.path(), &log), ["z", "z"]);
     std::fs::remove_file(&log).unwrap();
     let (cli, log) = hermes_cli(home.path(), "once");
-    assert!(cli.delete(&["b".into()]).is_empty());
+    assert!(cli.delete(&gone_ids(&["b".into()])).is_empty());
     assert_eq!(
         hermes_calls(home.path(), &log),
         ["c", "b", "a", "c", "b", "a"]
@@ -6007,7 +6022,7 @@ fn a_refused_hermes_delete_is_tried_once_more_then_left_pending() {
 fn no_hermes_store_means_no_hermes_delete() {
     let home = tempfile::tempdir().unwrap();
     let (cli, log) = hermes_cli(home.path(), "ok");
-    assert!(cli.delete(&["a".into()]).is_empty());
+    assert!(cli.delete(&gone_ids(&["a".into()])).is_empty());
     assert!(!log.exists(), "never started");
     assert!(!home.path().join(HERMES_STATE_DB).exists());
 }
@@ -6024,7 +6039,7 @@ fn a_hermes_store_of_another_schema_has_its_recorded_ids_only_deleted() {
     )
     .unwrap();
     let (cli, log) = hermes_cli(home.path(), "ok");
-    assert!(cli.delete(&["b".into(), "x".into()]).is_empty());
+    assert!(cli.delete(&gone_ids(&["b".into(), "x".into()])).is_empty());
     assert_eq!(hermes_calls(home.path(), &log), ["b", "x"]);
 }
 
@@ -6043,7 +6058,7 @@ fn a_path_like_hermes_session_id_is_refused() {
         .into_iter()
         .map(str::to_owned)
         .collect();
-    assert!(cli.delete(&ids).is_empty());
+    assert!(cli.delete(&HermesGone { ids: ids.clone(), ..HermesGone::default() }).is_empty());
     assert_eq!(hermes_calls(home.path(), &log), ["z"]);
     assert!(cli.delete_one("../a").is_err());
 }
@@ -6057,9 +6072,9 @@ fn a_failed_hermes_delete_is_kept_and_tried_at_the_next_close_and_start() {
     let (one, fake, _, _) = hermes_kept_on(dir.path());
     let tried = Deleted::default();
     let seen = tried.clone();
-    let one = one.with_hermes_delete(Box::new(move |ids| {
-        seen.lock().unwrap().extend(ids.iter().cloned());
-        ids.to_vec()
+    let one = one.with_hermes_delete(Arc::new(move |gone: &HermesGone| {
+        seen.lock().unwrap().extend(gone.ids.iter().cloned());
+        gone.ids.clone()
     }));
     let record = || -> serde_json::Value {
         serde_json::from_str(&std::fs::read_to_string(dir.path().join(STATE_FILE)).unwrap())
@@ -6068,6 +6083,7 @@ fn a_failed_hermes_delete_is_kept_and_tried_at_the_next_close_and_start() {
     hermes_turn(&one, &fake, "task-1");
     one.drop_when_free("the lamp signed out");
     one.tend(&fake, &hermes_place(), &|| false);
+    one.deletes_done();
     assert_eq!(
         record(),
         serde_json::json!({ "hermes_pending": ["hermes-1"] })
@@ -6079,6 +6095,7 @@ fn a_failed_hermes_delete_is_kept_and_tried_at_the_next_close_and_start() {
     assert_eq!(record()["hermes_pending"], serde_json::json!(["hermes-1"]));
     one.drop_when_free("the lamp signed out");
     one.tend(&fake, &hermes_place(), &|| false);
+    one.deletes_done();
     assert_eq!(*tried.lock().unwrap(), ["hermes-1", "hermes-2", "hermes-1"]);
     assert_eq!(
         record(),
@@ -6108,9 +6125,9 @@ fn a_pending_hermes_retry_never_holds_up_the_first_open() {
     let (cli, log) = hermes_cli(home.path(), "slow");
     let asked = Deleted::default();
     let seen = asked.clone();
-    let one = Arc::new(one.with_hermes_delete(Box::new(move |ids| {
-        seen.lock().unwrap().extend(ids.iter().cloned());
-        cli.delete(ids)
+    let one = Arc::new(one.with_hermes_delete(Arc::new(move |gone: &HermesGone| {
+        seen.lock().unwrap().extend(gone.ids.iter().cloned());
+        cli.delete(gone)
     })));
     let began = Instant::now();
     hermes_keep_open_step(&one, &fake, &mut Looks::default());
@@ -6130,4 +6147,100 @@ fn a_pending_hermes_retry_never_holds_up_the_first_open() {
             .unwrap();
     assert_eq!(kept["session"], "hermes-1");
     assert_eq!(kept["hermes_pending"], serde_json::json!(["hermes-1"]));
+}
+
+/// #8151: Hermes's deletes at a forget or sign-out run aside: with a slow
+/// Hermes (a stub that takes 3 s), the next open and a spoken task go on
+/// at once, and the delete still ends.
+#[test]
+fn a_slow_hermes_delete_at_a_sign_out_never_holds_up_a_spoken_task() {
+    let dir = tempfile::tempdir().unwrap();
+    let home = tempfile::tempdir().unwrap();
+    hermes_store(home.path());
+    let (one, fake, _, _) = hermes_kept_on(dir.path());
+    let (cli, log) = hermes_cli(home.path(), "slow");
+    let one = one.with_hermes_delete(Arc::new(move |gone: &HermesGone| cli.delete(gone)));
+    *fake.ensure_session.lock().unwrap() = Some("z".into());
+    hermes_turn(&one, &fake, "task-1");
+    let began = Instant::now();
+    one.drop_when_free("the lamp signed out");
+    one.tend(&fake, &hermes_place(), &|| false);
+    *fake.ensure_session.lock().unwrap() = Some("a".into());
+    hermes_turn(&one, &fake, "task-2");
+    assert!(
+        began.elapsed() < Duration::from_secs(2),
+        "{:?}",
+        began.elapsed()
+    );
+    one.deletes_done();
+    assert_eq!(hermes_calls(home.path(), &log), ["z"]);
+}
+
+/// #8151: the live kept session, and any session made from it, is never
+/// in a delete's tree, even when an old id's chain reaches it.
+#[test]
+fn the_live_hermes_session_is_never_in_a_deletes_tree() {
+    let home = tempfile::tempdir().unwrap();
+    hermes_store(home.path());
+    let (cli, log) = hermes_cli(home.path(), "ok");
+    let gone = HermesGone {
+        ids: vec!["a".into()],
+        keep: vec!["b".into()],
+        started_in: None,
+    };
+    assert!(cli.delete(&gone).is_empty());
+    assert_eq!(hermes_calls(home.path(), &log), ["a"]);
+}
+
+/// #8151: no engine session ever named (Harness's `ensure` gave none):
+/// the kept pane's sessions are found by its folder and open in Hermes's
+/// store (`cwd`, `started_at`), read-only; a store without those columns
+/// deletes nothing, and says so.
+#[test]
+fn with_no_engine_session_the_kept_panes_hermes_sessions_are_found_by_folder() {
+    let home = tempfile::tempdir().unwrap();
+    let db = rusqlite::Connection::open(home.path().join(HERMES_STATE_DB)).unwrap();
+    db.execute_batch(
+        "CREATE TABLE sessions (id TEXT PRIMARY KEY, parent_session_id TEXT, cwd TEXT, started_at REAL);
+         INSERT INTO sessions VALUES ('old', NULL, '/w/one-session', 100.0),            ('k1', NULL, '/w/one-session', 1000.0), ('k2', 'k1', '/w/one-session', 1100.0),            ('run', NULL, '/w/skill-1', 1000.0);",
+    )
+    .unwrap();
+    let (cli, log) = hermes_cli(home.path(), "ok");
+    let gone = HermesGone {
+        started_in: Some(("/w/one-session".into(), 1000.0)),
+        ..HermesGone::default()
+    };
+    assert!(cli.delete(&gone).is_empty());
+    assert_eq!(hermes_calls(home.path(), &log), ["k2", "k1"]);
+    let other = tempfile::tempdir().unwrap();
+    hermes_store(other.path());
+    let (cli, log) = hermes_cli(other.path(), "ok");
+    assert!(cli.delete(&gone).is_empty());
+    assert!(!log.exists());
+}
+
+/// #8151: a kept Hermes pane whose `ensure` named no engine session still
+/// has its sessions looked for at a sign-out, by its folder and open.
+#[test]
+fn a_hermes_pane_with_no_engine_session_is_looked_for_by_its_folder() {
+    let dir = tempfile::tempdir().unwrap();
+    let (one, fake, _, _) = hermes_kept_on(dir.path());
+    let asked: Arc<Mutex<Vec<HermesGone>>> = Arc::default();
+    let seen = asked.clone();
+    let one = one.with_hermes_delete(Arc::new(move |gone: &HermesGone| {
+        seen.lock().unwrap().push(gone.clone());
+        Vec::new()
+    }));
+    *fake.ensure_session.lock().unwrap() = None;
+    *fake.no_engine_session.lock().unwrap() = true;
+    hermes_turn(&one, &fake, "task-1");
+    one.drop_when_free("the lamp signed out");
+    one.tend(&fake, &hermes_place(), &|| false);
+    one.deletes_done();
+    let asked = asked.lock().unwrap();
+    assert_eq!(asked.len(), 1, "{asked:?}");
+    assert!(asked[0].ids.is_empty());
+    let (folder, opened) = asked[0].started_in.clone().unwrap();
+    assert_eq!(folder, hermes_place().folder);
+    assert!(opened > 1_000_000_000.0);
 }

@@ -5337,7 +5337,20 @@ in and signed out, and on 0.6.60, signed in (#7507's ROW).
       sessions (`HERMES_DELETE_MOST`): only the recorded ids, journaled
       (`Hermes's store not read (<why>); only its recorded sessions are
       deleted`). No `state.db`: nothing to delete, and Hermes is not
-      started (its CLI would make the store).
+      started (its CLI would make the store). The live kept session (a
+      rotation's new one) and any session made from it are never in the
+      tree. With no engine session ever named (an `ensure` that gave no
+      `engineSession`), the pane's sessions are found read-only by its
+      folder and open, kept in `one-session.json` as `folder` and `opened`:
+      `sessions` rows whose `cwd` is that folder and whose `started_at` is
+      no earlier than a minute before the open (Hermes v0.21.5 records the
+      start folder in `cwd`); a store without those columns deletes
+      nothing, journaled `nothing to delete: no engine session (<why>)`.
+    - **Aside.** Every delete (a rotation, a forget, a sign-out, the idle
+      close, a cancel or stuck replacement) runs on a thread of its own,
+      never on the one-session thread, so the next open and a spoken task
+      go on at once; its ids are written to `hermes_pending` first and
+      taken out once deleted.
     - **How.** `hermes sessions delete <id> --yes`, one call per session,
       children before their parents (Hermes deletes a session's messages,
       delegations, unused system prompt and transcripts, but only detaches
@@ -5348,7 +5361,8 @@ in and signed out, and on 0.6.60, signed in (#7507's ROW).
       reads itself), in `/var/lib/lampos-hermes`, with only `PATH`,
       `HERMES_HOME=/var/lib/lampos-hermes/.hermes` and `LAMP_NS_NET=run` (no
       network) in its environment. An exit 0, or Hermes's `No session
-      '<id>'` (already gone), is done. An id that is not plain characters
+      '<id>'` (already gone; Hermes prints it on stdout, which is read),
+      is done. An id that is not plain characters
       (`A-Z a-z 0-9 _ - . :`, not starting with `.` or `-`, at most 128) is
       never passed on.
     - **A refusal.** Hermes refuses a session mid-turn or being compressed;

@@ -2577,7 +2577,20 @@ khi đăng xuất, và với 0.6.60 khi đăng nhập (ROW của #7507).
       (`HERMES_DELETE_MOST`): chỉ các id đã ghi lại, có ghi journal
       (`Hermes's store not read (<why>); only its recorded sessions are
       deleted`). Không có `state.db`: không có gì để xoá, và Hermes không
-      được khởi động (CLI của nó sẽ tạo kho).
+      được khởi động (CLI của nó sẽ tạo kho). Phiên được giữ đang chạy (phiên
+      mới của một lần xoay vòng) và mọi phiên sinh ra từ nó không bao giờ nằm
+      trong cây. Khi chưa từng có engine session nào được nêu (một `ensure`
+      không cho `engineSession`), các phiên của pane được tìm chỉ đọc theo
+      thư mục và lúc mở của nó, giữ trong `one-session.json` là `folder` và
+      `opened`: các dòng `sessions` có `cwd` là thư mục đó và `started_at`
+      không sớm hơn một phút trước lúc mở (Hermes v0.21.5 ghi thư mục khởi
+      động vào `cwd`); kho không có các cột đó thì không xoá gì, ghi journal
+      `nothing to delete: no engine session (<why>)`.
+    - **Chạy riêng.** Mọi lần xoá (xoay vòng, quên, đăng xuất, đóng khi
+      rảnh, huỷ hay thay phiên kẹt) chạy trên một luồng riêng, không bao giờ
+      trên luồng one-session, nên lần mở kế tiếp và một việc nói tiếp tục
+      ngay; id của nó được ghi vào `hermes_pending` trước và bỏ ra khi đã
+      xoá.
     - **Cách xoá.** `hermes sessions delete <id> --yes`, mỗi phiên một lần
       gọi, phiên con trước phiên cha (Hermes xoá tin nhắn, các uỷ quyền,
       system prompt không còn dùng và transcript của phiên, nhưng chỉ tách
@@ -2587,8 +2600,8 @@ khi đăng xuất, và với 0.6.60 khi đăng nhập (ROW của #7507).
       đèn được khởi động: namespace của nó, file token forwarder nó tự đọc),
       trong `/var/lib/lampos-hermes`, với môi trường chỉ có `PATH`,
       `HERMES_HOME=/var/lib/lampos-hermes/.hermes` và `LAMP_NS_NET=run`
-      (không mạng). Thoát 0, hoặc `No session '<id>'` của Hermes (đã mất),
-      là xong. Id không phải ký tự thường (`A-Z a-z 0-9 _ - . :`, không bắt
+      (không mạng). Thoát 0, hoặc `No session '<id>'` của Hermes (đã mất;
+      Hermes in nó ra stdout, vốn được đọc), là xong. Id không phải ký tự thường (`A-Z a-z 0-9 _ - . :`, không bắt
       đầu bằng `.` hoặc `-`, tối đa 128) không bao giờ được chuyển đi.
     - **Bị từ chối.** Hermes từ chối phiên đang giữa lượt hoặc đang nén;
       mỗi id bị từ chối được thử thêm một lần sau 2 s, khi pane đã đóng.
