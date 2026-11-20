@@ -976,6 +976,8 @@ fn core_tools_within(settings: &Settings, bound: usize) -> Vec<Tool> {
     // kept, so there is no function to put it on (the owner, 10 Nov).
     if settings.make_skill {
         tools.push(crate::make_skill_local::tool());
+        // A make is make_skill's, never a task's (#8022 case 2).
+        crate::agent_tasks::tell_make(&mut tools);
     }
     if settings.who.is_some() {
         tools.extend(crate::known_faces::tools_for(face_switches(settings)));
@@ -8483,5 +8485,75 @@ mod tests {
         assert_eq!(asked.lock().unwrap().len(), before);
         std::fs::remove_dir_all(&dir).unwrap();
         std::fs::remove_dir_all(&exec).unwrap();
+    }
+
+    /// #8022 case 2: `start_agent_task`'s description says a make is
+    /// `make_skill`'s while `make_skill` is declared, within the link's
+    /// most, and never without it; one the sentence would push past the
+    /// most is left as it was.
+    #[test]
+    fn a_make_is_told_make_skills_only_while_make_skill_is_declared() {
+        let place = crate::agent_tasks::Place {
+            directory: "/run/lampos-tasks".into(),
+            target: "workstation".into(),
+            who: false,
+            lead_in: false,
+            asked: false,
+            accounts: false,
+            machine_names: false,
+            needs: None,
+            staff_note: false,
+            named_only: false,
+            correct: false,
+            questions: false,
+            now: false,
+            one_yes: false,
+            reply_named: false,
+            harness_status: false,
+            sign_in: false,
+            sign_in_app: false,
+        };
+        let start = |make_skill: bool| {
+            let settings = Settings {
+                tasks: Some(place.clone()),
+                make_skill,
+                ..Settings::default()
+            };
+            core_tools(&settings)
+                .into_iter()
+                .find(|tool| tool.name == crate::agent_tasks::START)
+                .unwrap()
+        };
+        let told = start(true);
+        assert!(
+            told.description.ends_with(crate::agent_tasks::MAKE_TOLD),
+            "{}",
+            told.description
+        );
+        assert!(told.description.contains(crate::made_skill::MAKE));
+        assert!(told.validate().is_ok(), "{}", told.description.len());
+        let plain = start(false);
+        assert!(
+            !plain.description.contains(crate::agent_tasks::MAKE_TOLD.trim()),
+            "{}",
+            plain.description
+        );
+        let start_with = |description: String| Tool {
+            name: crate::agent_tasks::START.into(),
+            description,
+            parameters: None,
+            silent: false,
+        };
+        let mut tools = vec![
+            start_with("Hand it over.".into()),
+            start_with("x".repeat(1_000)),
+        ];
+        crate::agent_tasks::tell_make(&mut tools);
+        crate::agent_tasks::tell_make(&mut tools);
+        assert_eq!(
+            tools[0].description,
+            format!("Hand it over.{}", crate::agent_tasks::MAKE_TOLD)
+        );
+        assert_eq!(tools[1].description.len(), 1_000);
     }
 }

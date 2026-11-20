@@ -42,6 +42,7 @@ mod person_scope_seen;
 mod read_back_words;
 mod remember_speaker;
 mod remove_words;
+mod round_one_forced;
 mod sent_write;
 mod short_done;
 mod short_sound_name;
