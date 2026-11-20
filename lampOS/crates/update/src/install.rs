@@ -373,10 +373,11 @@ pub const EXIT_NOTE: &str = include_str!("../../../deploy/product/exit-note.conf
 /// The skills every lamp receives: each a folder of `lampOS/skills/`, put in
 /// `/var/lib/lampOS/skills/` whole but for its `tests/` ([`SETTINGS`]).
 /// Every core skill is one (the owner: core skills are always installed;
-/// `tests/install.rs` holds the two lists equal). Twenty-seven keep their
-/// folders' own default: twenty-six enabled (Bedtime and Morning since #5753,
+/// `tests/install.rs` holds the two lists equal). Thirty-one keep their
+/// folders' own default: thirty enabled (Bedtime and Morning since #5753,
 /// with `LAMP_OUTPUT_CAPS=on` in the product units; Light show since #5745,
-/// Light scenes and Point the light since #5744; Music sway since #5770), and Comfort break
+/// Light scenes and Point the light since #5744; Music sway since #5770; the
+/// four seen reactions since the owner's call, #6543), and Comfort break
 /// by its own but on by its `[present]` with `LAMP_NUDGES_PRESENT=on`, which
 /// the product's skills units set (#5207); those of
 /// [`PRODUCT_SKILLS_OFF`] are installed disabled until their lamp checks,
@@ -431,6 +432,17 @@ pub const PRODUCT_SKILLS: &[&str] = &[
     // skill since its played check with a person on lamp-9adf (4 Nov). It
     // shares the wellbeing nudges' function and their hour.
     "sit-back",
+    // The seen reactions (#6543): a line at a drink, eating, tiredness or
+    // celebrating that lamp-seen saw, product skills by the owner's call
+    // (c6957458843). Silent without the owner's yes: they read only
+    // `humans/doing_more`, said with `LAMP_SEEN_MORE_DOINGS=on`, and hear it
+    // under the owner's desk-noticing yes, which covers them (the owner's
+    // call, 23 Nov on #7668; `lamp_skills::SEEN_PRODUCT`). Their one function, `seen_remarks` (their
+    // `[stop]`), is reached through `use_skill`.
+    "seen-celebrate",
+    "seen-drink",
+    "seen-eat",
+    "seen-tired",
     // A pet on the head (#3997, Part of #4133): Head pat's line, now and
     // then, and its wiggle at every pet, on `controls/pet`, which the
     // product's lamp-controls says (`LAMP_HEAD_PET=on`); the design owner's
@@ -562,29 +574,6 @@ pub const NOT_PRODUCT_SKILLS: &[(&str, &str)] = &[
         "tomorrows-plan",
         "an installable skill from the Skills Store: tomorrow's Google Calendar read once an \
          evening, which needs its owner's calendar linked",
-    ),
-    // The seen reactions (#6543): off until the owner's day-long row at
-    // lamp-06c1, at most one wrong remark in a working day, through the lead.
-    (
-        "seen-celebrate",
-        "off until the owner's day-long row at lamp-06c1 (#6543): a warm line when lamp-seen sees \
-         celebrating, with `LAMP_SEEN_MORE_DOINGS=on` and the owner's `seen_more` use",
-    ),
-    (
-        "seen-drink",
-        "off until the owner's day-long row at lamp-06c1 (#6543): a light line when lamp-seen \
-         newly sees a drink, with `LAMP_SEEN_MORE_DOINGS=on` and the owner's `seen_more` use",
-    ),
-    (
-        "seen-eat",
-        "off until the owner's day-long row at lamp-06c1 (#6543): a light line when lamp-seen \
-         newly sees eating, with `LAMP_SEEN_MORE_DOINGS=on` and the owner's `seen_more` use",
-    ),
-    (
-        "seen-tired",
-        "off until the owner's day-long row at lamp-06c1 (#6543): a light line when lamp-seen \
-         newly sees a yawn or stretch, with `LAMP_SEEN_MORE_DOINGS=on` and the owner's \
-         `seen_more` use",
     ),
     (
         "quiet-focus",
@@ -727,6 +716,14 @@ pub const SETTINGS: &[(&str, &str)] = &[
     skill_file!("sit-back", "SKILL.md"),
     skill_file!("sit-back", "agent.toml"),
     core_brief!("sit-back"),
+    skill_file!("seen-celebrate", "skill.toml"),
+    skill_file!("seen-celebrate", "SKILL.md"),
+    skill_file!("seen-drink", "skill.toml"),
+    skill_file!("seen-drink", "SKILL.md"),
+    skill_file!("seen-eat", "skill.toml"),
+    skill_file!("seen-eat", "SKILL.md"),
+    skill_file!("seen-tired", "skill.toml"),
+    skill_file!("seen-tired", "SKILL.md"),
     skill_file!("head-pat", "skill.toml"),
     skill_file!("head-pat", "SKILL.md"),
     skill_file!("head-pat", "README.md"),

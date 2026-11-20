@@ -6337,13 +6337,13 @@ và ăn mừng, `lamp-seen` chỉ phát khi `LAMP_SEEN_MORE_DOINGS=on`, bật tr
 sản phẩm) là một chủ
 đề riêng: kỹ năng ghi nó hiện quyền dùng `seen_more`, riêng tư và tách khỏi
 `seen`, nên kỹ năng được `humans/doing` không bao giờ nhận nó. Bốn kỹ năng
-phản ứng với điều thấy được đọc nó, đang tắt (bên dưới). **Lời đồng ý seen_more của chủ đèn** (#6543): kỹ năng ghi chủ
+phản ứng với điều thấy được đọc nó, là kỹ năng sản phẩm từ lần bật (#7668, bên dưới). **Lời đồng ý seen_more của chủ đèn** (#6543): kỹ năng ghi chủ
 đề này không nhận được gì từ nó cho tới khi chủ đèn đồng ý cho chính kỹ năng
 đó trong app (`skills.seen_more`, [cloud.md](../cloud.md)), giữ theo tên
 trong tệp `seen_more` của `--state-dir`, như lời đồng ý camera (tệp
 `camera`). Chưa có lời đồng ý, kể cả kỹ năng lõi, không trigger nào trên chủ
 đề này đúng, không `[[while]]` hay `sooner` nào đọc nó: nó như một chủ đề
-chưa nói gì, nên `unknown = "holds"` đúng trên nó. Nhật ký ghi `skill:NAME:
+chưa nói gì, nên `unknown = "holds"` đúng trên nó. **Tên trong nhật ký** (bài đọc quyền riêng tư trên #8375): tên kỹ năng nói điều đã thấy, và nhật ký còn lại sau một lần quên, nên trừ khi `LAMP_SEEN_JOURNAL_LABELS=on` có trong môi trường của lamp-skills (đọc một lần lúc khởi động; không có trong unit nào), mọi dòng nhật ký của lamp-skills (Triggered, Asked, Answered, Done, từ chối, dừng hay tắt, lỗi) ghi `a seen reaction` thay cho kỹ năng đọc chủ đề này (bốn phản ứng với điều thấy, mọi kỹ năng được nạp có ghi nó, mọi tên có lời đồng ý `seen_more`), và trên dòng như vậy hay dòng nêu `humans/doing_more`, các số đọc nêu loại (`drank_seen`, `yawn`, …) ghi `a reading` (`lamp_skills::journal`; test `a_seen_reaction_is_never_named_with_the_switch_off`). Bus vẫn như trước. Nhật ký ghi `skill:NAME:
 humans/doing_more not given to it: the owner hasn't said yes to its
 seen_more` một lần cho mỗi kỹ năng như vậy, chỉ ghi lại sau một lần đồng ý.
 Các lời đồng ý được đọc lúc khởi động và đọc lại cùng tệp off, trong vòng
@@ -6352,7 +6352,27 @@ chủ đề (đồng hồ `[[while]]` bắt đầu lại, lượt chạy giữ t
 vậy kết thúc thì được kết thúc). Trình quản lý nhận `{"seen_more": NAME}` và
 `{"seen_more_off": NAME}` (`package::seen_more`); gỡ kỹ năng, hay cài không
 từ Store dưới tên đó, đều rút lời đồng ý lại. Không kỹ năng nào đi kèm đèn
-có sẵn lời đồng ý này. Ba bộ đếm của `humans/doing` luôn có mặt, đếm từ
+có sẵn lời đồng ý này. **Lời đồng ý cho đèn để ý bàn làm việc bao gồm bốn
+phản ứng với điều thấy** (quyết định của chủ đèn, 23/11 trên #7668: "make
+the desk-noticing yes toggle covers these 4 too", như phán quyết của first
+builder ngày 18/11): `seen-drink`, `seen-eat`, `seen-tired` và
+`seen-celebrate` (`lamp_skills::SEEN_PRODUCT`), mỗi kỹ năng được nạp là lõi
+và không phải kỹ năng được đẩy, nghe chủ đề này như thể tên của nó có trong
+`seen_more` khi lời đồng ý để ý bàn làm việc của chủ đèn còn đó
+(`/var/lib/lampOS/consent/seen-activity.json`,
+`lamp_skills::DESK_NOTICING_YES`, đọc theo quy tắc của
+`lamp_msgs::consent::allowed` với mặc định của `LAMP_NOTICING_BY_DEFAULT`,
+như lamp-seen đọc), đọc lại mỗi 2 s cùng tệp off
+(`Engine::set_desk_noticing`). lamp-seen chỉ phát chủ đề này khi câu bật có
+nêu mệt, việc ở bàn và ăn mừng đã bắt đầu được nói cho lời đồng ý đó
+([seen.md](../seen.md)), nên không gì tới chúng trước khi người dùng nghe
+câu ấy. Rút lời đồng ý, hay một lần quên (xóa tệp), lấy lại ngay, như rút
+một lời đồng ý `seen_more`. Mỗi kỹ năng giữ lệnh tắt riêng và hàm dừng
+chung `seen_remarks`. Mọi kỹ năng khác, kể cả kỹ năng cài thêm hay được đẩy
+mang một trong các tên đó, vẫn cần lời đồng ý `seen_more` riêng; không có gì
+mới được ghi hay rời khỏi đèn (test
+`the_desk_noticing_yes_covers_the_four_with_no_seen_more_line`,
+`a_skill_not_among_the_four_still_needs_its_own_seen_more_yes`). Ba bộ đếm của `humans/doing` luôn có mặt, đếm từ
 lúc đến bàn khi chưa thấy gì, nên `[[while]] topic = "humans/doing" field =
 "drank_s_ago" above = 1799 unknown = "holds_stale"` vẫn đúng với người đèn
 chưa thấy uống, như khi chỉ có đồng hồ; mỗi giá trị `humans/posture` được
@@ -6430,18 +6450,16 @@ như một lần tạm hoãn). Kiểm thử
 (`crates/skills/tests/it/holds.rs`). Mô tả đầy đủ của `[stop.done]` ở
 [skills.md](../skills.md), hàng `[stop]`.
 
-### Bốn phản ứng với điều thấy được (#6543, #7668: có trong cây mã, chưa là kỹ năng sản phẩm)
+### Bốn phản ứng với điều thấy được (#6543, bật trong sản phẩm, #7668)
 
 `seen-drink`, `seen-eat`, `seen-tired` và `seen-celebrate`: phản ứng của
 kỹ năng wellbeing V1 với điều nó thấy, mỗi loại một kỹ năng để mỗi loại có
-lệnh tắt riêng. Đều là `installable`, tắt (`enabled = false`), có trong cây
-mã nhưng nằm trong `install::NOT_PRODUCT_SKILLS`: chưa được cài làm kỹ năng
-sản phẩm cho tới pull request bật chúng, sau hàng thử một ngày làm việc của
-chủ đèn trên lamp-06c1 (#6543, #7668); kể cả khi đó vẫn im lặng khi chưa có
-lời đồng ý `seen_more` của chủ đèn. Quyết định của chủ đèn trên #7401 (19/11):
+lệnh tắt riêng. Đều là `core`, bật, nằm trong `install::PRODUCT_SKILLS`
+(#7668, quyết định của chủ đèn ở c6957458843): được cài trên mọi đèn ở lượt
+cập nhật kế tiếp, và im lặng khi chưa có lời đồng ý để ý bàn làm việc của chủ đèn, lời đồng ý bao gồm cả chúng (quyết định của chủ đèn, 23/11 trên #7668), không cần dòng `seen_more` riêng. Quyết định của chủ đèn trên #7401 (19/11):
 mỗi lần thấy là một phản ứng, cùng các phán quyết của first builder cho lần
 bật (#7401, 19:05 và 19:10). Mỗi kỹ
-năng đọc `humans/doing_more` (quyền dùng `seen_more` của chủ đèn,
+năng đọc `humans/doing_more` (quyền dùng `seen_more`, do lời đồng ý để ý bàn làm việc của chủ đèn trao,
 `LAMP_SEEN_MORE_DOINGS=on`) và phản ứng khi bộ đếm của nó tăng một:
 `drank_seen`, `ate_seen`, `yawn_seen` hoặc `stretch_seen` (`seen-tired` có hai
 trigger, `yawn` và `stretch`, mỗi trigger một câu riêng qua `do.on`, nên
@@ -6489,11 +6507,15 @@ nhắn, không camera, không lịch sử hay tìm kiếm), và mọi lệnh g�
 về khuôn mặt hoặc một câu (`nothing_the_reactions_see_leaves_the_lamp_through_them`);
 điều rời khỏi đèn vẫn là của riêng lamp-seen, không đổi khi bật. Nhịp clip
 vẫn là một burst mỗi phút: không unit sản phẩm nào đặt
-`LAMP_SEEN_BURST_15S` (`no_product_unit_sets_the_fifteen_second_switch`
+`LAMP_SEEN_BURST_15S`, công tắc này chờ một lần đo nhiệt và xác nhận sức chứa
+của dịch vụ perception (`no_product_unit_sets_the_fifteen_second_switch`
 trong `crates/seen`). Một hàm `[stop]`, `seen_remarks`, dùng chung nhờ
 `[stop] group = "seen-remarks"`; một câu không ai nghe thấy không phải là
-câu gần nhất. Của ai: lamp-seen chỉ gửi ảnh khi
-có đúng một khuôn mặt đã nhớ, nên điều thấy là của người đang ngồi đó; chưa
+câu gần nhất. Của ai: lamp-seen không kiểm tra người lạ
+([seen.md](../seen.md), "No stranger check"): cổng mở với bất kỳ khuôn mặt nào
+ở bàn, kể cả một vị khách bên cạnh chủ đèn, nên điều thấy có thể là của khách
+và một câu có thể được nói khi có khách trong khung hình; bốn kỹ năng không có
+quy tắc nào về người khác trong khung hình (không có `faces_at_most`), và chưa
 có quy tắc chủ đèn riêng cho tới khi `humans/familiar` nói ai là chủ. Chưa
 thể diễn đạt: kết quả "không nói gì" (một ghi chú luôn được nói), số đếm
 trong lời (ghi chú không có chỗ cho số), tắt theo loại (hàm chung tắt cái

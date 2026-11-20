@@ -2,6 +2,18 @@
 //! skill folder, reloads them when one changes, listens to the topics their
 //! triggers name, and runs their steps through the body's sockets, the
 //! actions part and the voice's say service.
+/// Every journal line goes through `lamp_skills::journal::line`, so a skill
+/// that reads `humans/doing_more` is not named there unless
+/// `LAMP_SEEN_JOURNAL_LABELS=on` (the privacy read on #8375).
+macro_rules! eprintln {
+    () => {
+        ::std::eprintln!()
+    };
+    ($($arg:tt)*) => {
+        lamp_skills::journal::line(::std::format!($($arg)*))
+    };
+}
+
 use lamp_bus::{Bus, Declaration, Kind, Publisher, Subscriber};
 use lamp_msgs::{
     BodyGesture, Decision, GestureState, Hand, LampDid, Light, LightOutranked, LightReached,
@@ -1018,6 +1030,14 @@ fn serve(
         forget_tools(tools);
     }
     let (skip_ask, ask_policy) = (options.ask == "skip", options.ask == "policy");
+    // Read once, at the start (`lamp_skills::journal`): on, the skills that
+    // read `humans/doing_more` are named in the journal.
+    if lamp_skills::journal::labels() {
+        eprintln!(
+            "lamp-skills: {} is on: the journal names the skills that read humans/doing_more",
+            lamp_skills::journal::LABELS
+        );
+    }
     let bus = match root {
         Some(root) => Bus::new(root)?,
         None => Bus::from_environment()?,
@@ -1480,6 +1500,19 @@ fn serve(
             // The owner's seen_more yeses (#6543), written by the same helper.
             if let Some(ends) = engine.reread_seen_more() {
                 eprintln!("lamp-skills: the seen_more yeses read again: the app changed them");
+                for run in ends {
+                    handle(run, &mut runs, &mut out, &runner);
+                }
+            }
+            // The owner's desk-noticing yes covers the four seen reactions
+            // (the owner's call, 23 Nov on #7668): read as lamp-seen reads it.
+            let desk = lamp_skills::desk_noticing_yes(Path::new(lamp_skills::DESK_NOTICING_YES));
+            if let Some(ends) = engine.set_desk_noticing(desk) {
+                eprintln!(
+                    "lamp-skills: the desk-noticing yes is {}: the four seen reactions {} humans/doing_more",
+                    if desk { "on" } else { "off" },
+                    if desk { "hear" } else { "no longer hear" }
+                );
                 for run in ends {
                     handle(run, &mut runs, &mut out, &runner);
                 }

@@ -153,6 +153,7 @@ fn the_skills_page_reads_the_agreed_reply_and_its_refusal() {
         store: false,
         addons: false,
         seen_more: false,
+        desk_noticing: root.join("seen-activity.json"),
         link: None,
     }));
     let started = Instant::now();
@@ -289,6 +290,7 @@ fn removing_answers_the_page_as_it_now_is_and_refuses_in_the_envelope() {
         store: false,
         addons: false,
         seen_more: false,
+        desk_noticing: root.join("seen-activity.json"),
         link: None,
     }));
     let before = sent(&mut real)["data"]["skills"].as_array().unwrap().len();
@@ -406,6 +408,7 @@ fn a_skill_from_a_package_is_listed_with_its_sha256_and_version() {
         store: false,
         addons: false,
         seen_more: false,
+        desk_noticing: root.join("seen-activity.json"),
         link: None,
     }));
     let rows = |real: &mut Real| sent(real)["data"]["skills"].as_array().unwrap().clone();
@@ -519,6 +522,7 @@ fn the_seen_more_yes_is_on_the_page_only_with_its_switch_and_set_as_the_camera()
         store: false,
         addons: false,
         seen_more,
+        desk_noticing: root.join("seen-activity.json"),
         link: None,
     };
     let mut off = real(Some(places(false)));
@@ -643,5 +647,46 @@ fn the_seen_more_yes_is_on_the_page_only_with_its_switch_and_set_as_the_camera()
         &json!({"name": "tired-glow", "allow": "yes"}),
     );
     assert_eq!(bad["error"], "allow must be true or false");
+
+    // The owner's desk-noticing yes covers the four seen reactions (the
+    // owner's call, 23 Nov on #7668): allowed while it stands, with no
+    // seen_more line, as lamp-skills gives them the topic; tired-glow still
+    // needs its own; taken back, the four are not allowed again.
+    let four = lamp_skills::SEEN_PRODUCT;
+    let allowed_of = |page: &Value, name: &str| {
+        rows(page)
+            .into_iter()
+            .find(|row| row["name"] == name)
+            .unwrap()
+            .get("seen_more_allowed")
+            .cloned()
+    };
+    let page = sent(&mut on);
+    for name in four {
+        assert_eq!(allowed_of(&page, name), Some(json!(false)), "{name}");
+    }
+    fs::write(
+        root.join("seen-activity.json"),
+        lamp_msgs::consent::bytes(lamp_msgs::consent::SEEN_ACTIVITY, 1, "app"),
+    )
+    .unwrap();
+    let page = sent(&mut on);
+    for name in four {
+        assert_eq!(allowed_of(&page, name), Some(json!(true)), "{name}");
+    }
+    assert_eq!(
+        allowed(&page),
+        Some(json!(false)),
+        "tired-glow needs its own"
+    );
+    assert!(
+        !sent(&mut off).to_string().contains("seen_more_allowed"),
+        "the switch off, as before"
+    );
+    fs::remove_file(root.join("seen-activity.json")).unwrap();
+    let page = sent(&mut on);
+    for name in four {
+        assert_eq!(allowed_of(&page, name), Some(json!(false)), "{name}");
+    }
     let _ = fs::remove_dir_all(&root);
 }

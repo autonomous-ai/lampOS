@@ -35,14 +35,13 @@
 # for a reading, so the line carries no number. No "say nothing" outcome
 # (B2): the guards below are the silence.
 needs = ["eyes", "body", "voice"]
-# Off, and not in the product's install (`install::NOT_PRODUCT_SKILLS`),
-# until the switch-on pull request after the owner's working-day row at
-# lamp-06c1 (#6543, #7668); installable until then, since every core skill
-# is a product skill. It says nothing without the owner's yes even then: it
-# reads only `humans/doing_more`, which lamp-seen says with
-# `LAMP_SEEN_MORE_DOINGS=on` and the owner's `seen_more` use.
-kind = "installable"
-enabled = false
+# A product skill (#6543, the owner's call at c6957458843: the four seen
+# reactions ship as product skills, on for every lamp whose owner said
+# yes): core, on, in the product's install (`install::PRODUCT_SKILLS`). It
+# says nothing without that yes: it reads only `humans/doing_more`, which
+# lamp-seen says with `LAMP_SEEN_MORE_DOINGS=on` and the owner's
+# `seen_more` use.
+kind = "core"
 version = "1.0.0"
 
 # What it may read and use, and nothing more: what lamp-seen saw beyond
@@ -102,7 +101,7 @@ drops_kept = true
 [stop]
 tool = "seen_remarks"
 group = "seen-remarks"
-about = "Stop the lamp's remarks on what it sees them do (a drink, eating, a yawn, celebrating): snooze till morning, off till asked, or on again. All out: the last one; all = true: every one."
+about = "Stop the lamp's remarks on what it sees them do: snooze till morning, off till asked, or on again."
 when = "When asked to snooze, turn off or on again the lamp's remarks on what it sees them do."
 
 [ask]
