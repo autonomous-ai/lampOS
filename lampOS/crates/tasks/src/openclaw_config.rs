@@ -102,8 +102,12 @@ pub struct Check {
     /// What prints the gateway's unit's `MainPID`.
     pub main_pid: Vec<String>,
     /// The check of `file` in OpenClaw's namespace of its own.
-    pub own: Box<dyn Fn(&str) -> Vec<String>>,
+    pub own: OwnCheck,
 }
+
+/// [`Check::own`]: the command that checks a file in OpenClaw's namespace
+/// of its own.
+pub type OwnCheck = Box<dyn Fn(&str) -> Vec<String>>;
 
 impl Check {
     /// The lamp's: lamp-update's wrapper, its gateway's unit's `MainPID`
