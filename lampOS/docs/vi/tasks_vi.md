@@ -3062,7 +3062,14 @@ bao giờ phải chờ sau câu "I'll look into that":
   cứ điều gì, không chờ mạng: model được bảo nói ngay, và chỉ thế, "I'm
   having a problem right now; ask me again in a moment." Lỗi
   `agent_not_ready` của chính lamp-tasks lúc prepare (hoặc lúc confirm)
-  cũng được báo như vậy. Không có gì được chuẩn bị, nên không có câu đọc
+  cũng được báo như vậy (đọc `readiness` và `why` từ câu trả lời, hoặc
+  `why` mới nhất). Các trạng thái lâu dài giữ câu riêng của chúng, không
+  bao giờ "in a moment": `not_installed` nói câu "chưa được thiết lập" sẵn
+  có của đèn, và `error` với why `signed_out` nói "I've been signed out.
+  Please set me up again in the app."; cả hai không tính cho "ready
+  again". `starting` (cả với why `tasks_restarting`), `installing`,
+  `recovering` và mọi `error` khác nhận câu báo lỗi. Không có gì được chuẩn
+  bị, nên không có câu đọc
   lại hay "I'll look into that" nào đi trước; model nói câu đó bằng ngôn
   ngữ của người dùng. Việc cho máy tính không bao giờ bị giữ theo trạng
   thái của đèn.
