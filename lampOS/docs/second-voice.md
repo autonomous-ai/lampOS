@@ -6740,7 +6740,12 @@ stands), and eyes that can't be reached at all name nobody, as before. Without a
   their scope only; a line narrowed since forgets nothing and keeps it
   (`remember::AGREED_FORGET_NOT_NOW`) (`OneFaceForgetYes`,
   `ScopeLease::mark_forget_agreed`, which both runners and the memory route
-  let through); a no, another line, another face or 30 s keeps it. So are a correction
+  let through); a no, another line, another face or 30 s keeps it. A no
+  with no forget word, or every forget word negated ("No, don't forget
+  it.", `known_faces::refuses`), keeps it whatever the model calls, its
+  `forget` answered with `remember::said_no_told`, and a line with a
+  negated and an un-negated forget word is asked once more
+  (`one_face_answer`, #8165). So are a correction
   (`remember` with `replaces`), `keep_rule`, `list_rules`, `set_role` and
   `end_role` (the privacy read on #5385, also in
   `remember::role_for_guarded`), and

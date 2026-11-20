@@ -260,25 +260,62 @@ pub(crate) fn lower_words(text: &str) -> Vec<String> {
 /// Refusing a yes costs a turn; keeping a wrong name does not fail safe.
 fn agrees(said: &str) -> bool {
     let words = lower_words(said);
-    let phrase_at = |at: usize, phrase: &[&str]| {
-        phrase
-            .iter()
-            .enumerate()
-            .all(|(next, word)| words.get(at + next).is_some_and(|said| said == word))
-    };
+    let pleasantry = pleasantries(&words);
+    let agreeing = (0..words.len())
+        .any(|at| pleasantry[at] || AGREE.iter().any(|phrase| phrase_at(&words, at, phrase)));
+    agreeing && !takes_back(&words, &pleasantry)
+}
+
+/// Whether `phrase` is said in `words` from `at`.
+fn phrase_at(words: &[String], at: usize, phrase: &[&str]) -> bool {
+    phrase
+        .iter()
+        .enumerate()
+        .all(|(next, word)| words.get(at + next).is_some_and(|said| said == word))
+}
+
+/// Which of `words` are in a yes that holds a no word ([`AGREE_WITH_A_NO`]:
+/// "No problem", "why not").
+fn pleasantries(words: &[String]) -> Vec<bool> {
     let mut pleasantry = vec![false; words.len()];
     for at in 0..words.len() {
-        if let Some(phrase) = AGREE_WITH_A_NO.iter().find(|phrase| phrase_at(at, phrase)) {
+        if let Some(phrase) = AGREE_WITH_A_NO
+            .iter()
+            .find(|phrase| phrase_at(words, at, phrase))
+        {
             pleasantry[at..at + phrase.len()].fill(true);
         }
     }
-    let agreeing = (0..words.len())
-        .any(|at| pleasantry[at] || AGREE.iter().any(|phrase| phrase_at(at, phrase)));
-    agreeing
-        && !words
-            .iter()
-            .zip(&pleasantry)
-            .any(|(word, kept)| !kept && DISAGREE.contains(&word.as_str()))
+    pleasantry
+}
+
+/// Whether a [`DISAGREE`] word stands in `words` outside a pleasantry
+/// (`pleasantry`, [`pleasantries`]): the half of [`agrees`] that takes a
+/// yes back, and of [`refuses`].
+fn takes_back(words: &[String], pleasantry: &[bool]) -> bool {
+    words
+        .iter()
+        .zip(pleasantry)
+        .any(|(word, kept)| !kept && DISAGREE.contains(&word.as_str()))
+}
+
+/// Whether the turn says no to the lamp's question and nothing that
+/// forgets (#8165): a no ([`DISAGREE`] outside a pleasantry, a plain no by
+/// `services::plain_no`, or a forget word negated, `remember::negates_a_forget`)
+/// and no forget word or phrase that is not negated
+/// (`remember::forgets_unnegated`). So "No.", "No, keep it.", "Don't.",
+/// "Lamp, no.", "No, don't forget it.", "Don't drop it.", "Đừng quên."
+/// refuse; "No problem, go ahead.", "No, just forget it.", "No, drop it."
+/// and "No, I don't need it." don't. A keep-side backstop to the model's
+/// judgment of a one-face forget's answer
+/// (`second_provider::take_held_forget`): it only ever keeps, never forgets.
+pub(crate) fn refuses(turn: &str) -> bool {
+    let words = lower_words(turn);
+    let pleasantry = pleasantries(&words);
+    (takes_back(&words, &pleasantry)
+        || crate::services::plain_no(turn)
+        || crate::remember::negates_a_forget(turn))
+        && !crate::remember::forgets_unnegated(turn)
 }
 
 /// How many letters the person said a name has: "three letters", "it's 4
@@ -5716,6 +5753,64 @@ mod tests {
         };
         assert!(!name_heard("Jim", &corrected));
         assert!(!agreed_to("Jim", &corrected));
+    }
+
+    /// #8165: a no to the one-face forget question refuses it, a pleasantry
+    /// and a yes never do, and a no beside a word that forgets after all
+    /// ("No, just forget it.") is no refusal.
+    #[test]
+    fn refuses_reads_the_noes_and_never_a_yes() {
+        for no in [
+            "No.",
+            "No, keep it.",
+            "Don't.",
+            "Lamp, no.",
+            "No, no, keep it.",
+            "Nope.",
+            "Nah, leave it.",
+            "No thanks.",
+            "Of course not.",
+            "Kh\u{f4}ng, gi\u{1eef} l\u{1ea1}i.",
+            "\u{110}\u{1eeb}ng.",
+            "No, don't forget it.",
+            "No, don't delete it.",
+            "Don't forget it.",
+            "\u{110}\u{1eeb}ng qu\u{ea}n.",
+            "No, don't get rid of it.",
+            "Don't drop it.",
+            "No, never drop that.",
+            "Don't scratch that.",
+        ] {
+            assert!(refuses(no), "{no}");
+        }
+        for not in [
+            "Yes.",
+            "Lamp, yes.",
+            "Loan. Yes.",
+            "Yes please.",
+            "Sure, go ahead.",
+            "No problem, go ahead.",
+            "No worries, do it.",
+            "Why not?",
+            "Yes, I don't mind.",
+            "No, just forget it.",
+            "No no, delete it.",
+            "No, I don't need it.",
+            "No, don't keep it.",
+            "No, erase it.",
+            "No, remove it.",
+            "No, drop it.",
+            "No, get rid of it.",
+            "No, do not keep it.",
+            "Why don't you forget it?",
+            // Forget said and taken back in one line: asked once more.
+            "No, don't keep it, forget it. No wait, don't delete it.",
+            "Wait.",
+            "Keep it.",
+            "",
+        ] {
+            assert!(!refuses(not), "{not}");
+        }
     }
 
     /// The reviewer on #1208 at 04:40: a yes to the lamp's read-back holds
