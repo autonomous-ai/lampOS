@@ -1061,6 +1061,47 @@ fn the_lamps_agents_are_answered_and_a_missing_one_installed() {
     let again = sent(&mut real, "engines.install", json!({"engine": "hermes"}));
     assert_eq!(again["error"], lamp_cloud::update::TOO_SOON, "{again}");
 
+    // #8138: the lamp's own agent from lamp-tasks' `tasks/agent`, with the
+    // field types the app takes; never reinstalled while it runs.
+    let told = sent(&mut real, "update.status", json!({}));
+    assert_eq!(told["data"]["agent"], json!({"state": "unknown"}), "{told}");
+    update
+        .publisher_declared(
+            lamp_msgs::AgentReadiness::TOPIC,
+            &lamp_msgs::AgentReadiness::declaration(),
+            "tasks",
+        )
+        .unwrap()
+        .publish_json(
+            0,
+            &lamp_msgs::AgentReadiness {
+                engine: "hermes".into(),
+                state: lamp_msgs::Readiness::Starting,
+                why: Some("gateway_starting".into()),
+                since_unix_ms: 1_762_850_000_000,
+                read_unix_ms: 1_762_850_000_100,
+            },
+        )
+        .unwrap();
+    let told = sent(&mut real, "update.status", json!({}));
+    for (path, kind_of_value) in [
+        ("agent.engine", Type::Text),
+        ("agent.state", Type::Text),
+        ("agent.why", Type::Text),
+        ("agent.since_unix_ms", Type::Whole),
+        ("engines.hermes.running", Type::Flag),
+    ] {
+        let value = field(&told["data"], path);
+        assert!(
+            value.is_some_and(|value| is(value, kind_of_value)),
+            "update.status {path}: the app takes {kind_of_value:?}, lamp-cloud said {value:?}"
+        );
+    }
+    assert_eq!(told["data"]["engines"]["hermes"]["running"], true, "{told}");
+    let running = sent(&mut real, "engines.install", json!({"engine": "hermes"}));
+    assert_eq!(running["status"], "failure", "{running}");
+    assert_eq!(running["error"], lamp_cloud::update::RUNNING_AGENT);
+
     // Without the agents' switch: no `engines`, and the kind is not here.
     real.update_checks = Default::default();
     let told = sent(&mut real, "update.status", json!({}));

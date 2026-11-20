@@ -781,6 +781,12 @@ async fn session(
         .map(crate::onboarding_step::Steps::new);
     // An update's start and end told to the app (#6284), with their switch.
     let mut update_events = lamp.update_events().map(crate::update_events::Events::new);
+    // The lamp's own agent followed for the app (#8138), with the agents'
+    // switch (`LAMP_APP_UPDATE=on` and `LAMP_APP_ENGINES=on`):
+    // `update.status` pushed unasked whenever its `agent` moves.
+    let mut agent_follow = lamp
+        .engines_page()
+        .then(crate::update::AgentFollow::default);
     // A skill that needs a connector not linked, told to the app
     // (`crate::skills::NEEDS_LINK_KIND`), with its switch.
     let skill_link = lamp.skills().is_some_and(|places| places.link.is_some());
@@ -833,7 +839,7 @@ async fn session(
                         back_to_tcp = true;
                         break None;
                     }
-                    _ = tick.tick(), if skill_lines || skill_link || changes.is_some() || services.is_some() || apps.is_some() || uploads.is_some() || harness_sign_in.is_some() || onboarding_done.is_some() || update_events.is_some() || devices_on => {
+                    _ = tick.tick(), if skill_lines || skill_link || changes.is_some() || services.is_some() || apps.is_some() || uploads.is_some() || harness_sign_in.is_some() || onboarding_done.is_some() || update_events.is_some() || agent_follow.is_some() || devices_on => {
                         let me = identity.borrow().clone();
                         // A skill installed or made that needs a connector
                         // not linked (#6059): only while connected, best
@@ -922,6 +928,20 @@ async fn session(
                                     say.line(&events.handed(round, which));
                                 }
                             }
+                        }
+                        // The lamp's own agent (#8138): only while
+                        // connected, best effort, tried once; the app asks
+                        // `update.status` on its page's open for what it
+                        // missed.
+                        if connected
+                            && let Some(follow) = agent_follow.as_mut()
+                            && follow.due(looked, || lamp.agent_readiness())
+                            && let Ok(Some(status)) = crate::answer::update_status(&*lamp)
+                        {
+                            let state = status["agent"]["state"].as_str().unwrap_or("unknown").to_owned();
+                            let pushed = me.data(&now(), crate::update::PUSHED, &Ok(Some(status))).to_string();
+                            let took = handed.publish(&client, account.fd_channel.as_str(), pushed, None);
+                            say.line(&format!("{} pushed, the agent {state}: {}", crate::update::PUSHED, if took { "handed to the client" } else { "not handed to the client, not tried again" }));
                         }
                         if devices_on {
                             // The voice's asks for a desk or a Hydrate: sent

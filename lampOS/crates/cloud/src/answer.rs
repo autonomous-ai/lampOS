@@ -301,6 +301,12 @@ pub trait Lamp {
         None
     }
 
+    /// lamp-tasks' kept `tasks/agent` (#8138), the lamp's own agent's
+    /// readiness, if it has said one.
+    fn agent_readiness(&self) -> Option<lamp_bus::Message> {
+        None
+    }
+
     /// The file the app's `update.started` and `update.ended` are kept in
     /// (#6284, `crate::update_events`): there only with
     /// `LAMP_APP_UPDATE_EVENTS=on` and a state folder.
@@ -601,6 +607,21 @@ pub const QUIET_WHEN_DONE: [&str; 1] = ["led.resting.preview"];
 /// Why `mic.set` is refused: only the person at the lamp may unmute it.
 pub const MIC_SET_REFUSED: &str =
     "on this lamp the microphones are muted and unmuted with the button or the switch";
+
+/// `update.status` as the app is given it, asked or pushed (#8138): with
+/// the agents' switch on, the lamp's own agent and which agent runs
+/// (`crate::update::add_agent`), and the default agent beside them (#6492),
+/// when lamp-tasks says one; never a failure of the status.
+pub fn update_status(lamp: &impl Lamp) -> Result<Option<Value>, String> {
+    let mut status = crate::update::status(lamp.update_status(), lamp.engines_page())?;
+    if let Some(status) = status.as_mut() {
+        if lamp.engines_page() {
+            crate::update::add_agent(status, lamp.agent_readiness());
+        }
+        crate::engine_default::add_to(status, &lamp.tasks_app_socket());
+    }
+    Ok(status)
+}
 
 /// The answer to `kind` with `data`: its reply's `data`, or why not.
 pub fn answer(lamp: &mut impl Lamp, kind: &str, data: &Value) -> Result<Option<Value>, String> {
@@ -999,15 +1020,7 @@ pub fn answer(lamp: &mut impl Lamp, kind: &str, data: &Value) -> Result<Option<V
         }
         // The lamp's software update, for the app's Lamp 2 page (#2194):
         // only with `LAMP_APP_UPDATE=on`.
-        "update.status" if on(lamp, kind) => {
-            let mut status = crate::update::status(lamp.update_status(), lamp.engines_page())?;
-            // The default agent beside the agents (#6492), when lamp-tasks
-            // says one; never a failure of the status.
-            if let Some(status) = status.as_mut() {
-                crate::engine_default::add_to(status, &lamp.tasks_app_socket());
-            }
-            Ok(status)
-        }
+        "update.status" if on(lamp, kind) => update_status(lamp),
         // The app's Check for update (#4153): `serve`'s next round now, not
         // after its wait. Refused while a round runs and within a minute of
         // the last; the round keeps its own lock and quiet moment.
@@ -1045,7 +1058,9 @@ pub fn answer(lamp: &mut impl Lamp, kind: &str, data: &Value) -> Result<Option<V
             let engine = data["engine"]
                 .as_str()
                 .ok_or("engine must be the agent's name")?;
-            let status = crate::update::status(lamp.update_status(), true)?.unwrap_or_default();
+            let mut status = crate::update::status(lamp.update_status(), true)?.unwrap_or_default();
+            // Never under the lamp's own agent while it runs (#8138).
+            crate::update::add_agent(&mut status, lamp.agent_readiness());
             crate::update::installable(&status, engine)?;
             lamp.install_engine(engine, std::time::Instant::now())?;
             some(crate::update::install_started())
@@ -1353,6 +1368,13 @@ pub mod tests {
             self.update_bus
                 .as_ref()?
                 .latest(lamp_msgs::UpdateStatus::TOPIC)
+                .ok()
+                .flatten()
+        }
+        fn agent_readiness(&self) -> Option<lamp_bus::Message> {
+            self.update_bus
+                .as_ref()?
+                .latest(lamp_msgs::AgentReadiness::TOPIC)
                 .ok()
                 .flatten()
         }
@@ -2858,6 +2880,98 @@ pub mod tests {
         assert_eq!(
             answer(&mut lamp, "engines.install", &hermes),
             Err(not_here("engines.install"))
+        );
+    }
+
+    /// #8138: `update.status` carries the lamp's own agent and which agent
+    /// runs, with the agents' switch; `engines.install` is refused for the
+    /// agent while it runs and taken once it has failed.
+    #[test]
+    fn the_app_sees_the_agent_and_never_reinstalls_it_while_it_runs() {
+        let root = tempfile::tempdir().unwrap();
+        let bus = lamp_bus::Bus::new(root.path()).unwrap();
+        let mut lamp = Fake {
+            update_bus: Some(lamp_bus::Bus::new(root.path()).unwrap()),
+            update_page: true,
+            ..lamp()
+        };
+        bus.publisher_declared(
+            lamp_msgs::UpdateStatus::TOPIC,
+            &lamp_msgs::UpdateStatus::declaration(),
+            "update",
+        )
+        .unwrap()
+        .publish_json(
+            0,
+            &lamp_msgs::UpdateStatus {
+                running: None,
+                now: "idle".into(),
+                last: None,
+                harness: None,
+                round: None,
+                refused: None,
+                engines: Some(std::collections::BTreeMap::from([(
+                    "openclaw".to_owned(),
+                    lamp_msgs::EngineInstall {
+                        state: "failed".into(),
+                        version: None,
+                        reason: Some("no_space".into()),
+                        at_unix_ms: Some(3),
+                    },
+                )])),
+            },
+        )
+        .unwrap();
+        let mut tasks = bus
+            .publisher_declared(
+                lamp_msgs::AgentReadiness::TOPIC,
+                &lamp_msgs::AgentReadiness::declaration(),
+                "tasks",
+            )
+            .unwrap();
+        let says = |tasks: &mut lamp_bus::Publisher, state| {
+            tasks
+                .publish_json(
+                    0,
+                    &lamp_msgs::AgentReadiness {
+                        engine: "openclaw".into(),
+                        state,
+                        why: None,
+                        since_unix_ms: 9,
+                        read_unix_ms: 10,
+                    },
+                )
+                .unwrap();
+        };
+        // Only the update page's switch: no agents, so no agent either.
+        let status = answer(&mut lamp, "update.status", &json!({}))
+            .unwrap()
+            .unwrap();
+        assert!(status.get("agent").is_none(), "{status}");
+        lamp.update_checks = crate::update::Checks::with_engines(true);
+        let status = answer(&mut lamp, "update.status", &json!({}))
+            .unwrap()
+            .unwrap();
+        assert_eq!(status["agent"], json!({"state": "unknown"}), "{status}");
+        says(&mut tasks, lamp_msgs::Readiness::Ready);
+        let status = answer(&mut lamp, "update.status", &json!({}))
+            .unwrap()
+            .unwrap();
+        assert_eq!(
+            status["agent"],
+            json!({"engine": "openclaw", "state": "ready", "since_unix_ms": 9})
+        );
+        assert_eq!(status["engines"]["openclaw"]["running"], json!(true));
+        let openclaw = json!({"engine": "openclaw"});
+        assert_eq!(
+            answer(&mut lamp, "engines.install", &openclaw),
+            Err(crate::update::RUNNING_AGENT.to_owned())
+        );
+        says(&mut tasks, lamp_msgs::Readiness::Error);
+        // Taken past the refusal: only no lamp-update reads it here.
+        assert_eq!(
+            answer(&mut lamp, "engines.install", &openclaw),
+            Err(crate::update::NOT_LISTENING.to_owned())
         );
     }
 
