@@ -2371,9 +2371,15 @@ impl Attention {
     /// verdict's "the text shows it was called") by the lamp's own name
     /// set off ([`begins_with_the_name`], "Lamp"/"Lamb"), never a stand-in
     /// ("Hey man, …", ", Lynn, …" are office talk there, #1712), with
-    /// [`Self::need_a_face_or_words`] (#8136; lamp-52e6, request 41).
+    /// [`Self::need_a_face_or_words`] (#8136; lamp-52e6, request 41). Only
+    /// on a sure hearing ([`SURE_SCORE`]) counted for the line: a near one
+    /// counts there only with a face turned (the first builder's ruling on
+    /// #8149: row-8149b's "Man, …" written as "Lamb." and heard at 0.95).
     pub fn told_by_its_words(&self) -> bool {
-        self.face_or_words && self.called_in_text() && begins_with_the_name(&self.heard_as_a_call())
+        self.face_or_words
+            && self.named_sure
+            && self.called_in_text()
+            && begins_with_the_name(&self.heard_as_a_call())
     }
 
     /// In a busy room, let a line out only as the conversation going on

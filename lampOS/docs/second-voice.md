@@ -5786,8 +5786,15 @@ after a take-over, but now for every turn:
       called): when the verdict's own text check calls the lamp by its own
       name set off, "Lamp" or "Lamb" (`called_in_text` and
       `begins_with_the_name`, `Attention::told_by_its_words`), the model is
-      told in a busy room with nobody turned too (`Heeding::note_the_name`).
-      A stand-in ("Hey man, …", ", Lynn, …") is office talk there (#1712)
+      told in a busy room with nobody turned too (`Heeding::note_the_name`),
+      but only on a sure hearing counted for the line (`SURE_SCORE`, 0.999;
+      the first builder's ruling on #8149, 21 Nov 01:49): a near one counts
+      there only with a face turned to the lamp. On lamp-52e6 (row-8149b,
+      21 Nov 01:2x, case B try 5) "Man, that meeting ran long." was written
+      by speech to text with the name first and heard at 0.95 by the line's
+      start, and was told. Cost: a real call heard under 0.999 in a busy
+      room with nobody turned, request 41's own 0.979 among them, is not
+      told. A stand-in ("Hey man, …", ", Lynn, …") is office talk there (#1712)
       and is not told, whatever `LAMP_BUSY_CALLED_STRICT` says. The
       journal says `the lamp's name was heard in a busy room and nobody is
       turned to the lamp, but its words call the lamp: the model is told
