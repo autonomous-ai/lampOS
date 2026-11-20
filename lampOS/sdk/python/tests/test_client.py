@@ -874,7 +874,7 @@ def test_get_answers_the_states_asked(tmp_path):
                 state = await lamp.get("presence", "lamp")
             # As lamp-control answers: the states by the names asked, `lamp` included, and nothing else.
             assert state == {"presence": {"count": 2, "near": 0.4, "facing": True},
-                             "lamp": {"talking": False, "paused": False, "private": False, "asleep": False}}
+                             "lamp": {"talking": False, "paused": False, "private": False, "asleep": False, "muted_after_fault": False}}
 
     run(go())
 

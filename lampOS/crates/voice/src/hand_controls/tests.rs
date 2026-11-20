@@ -881,6 +881,38 @@ fn a_guard_of_this_boot_still_restores_its_mute() {
     assert!(marker.is_file());
 }
 
+/// #8081: a computer's `listen.set true` lifts only its own hold. The restart
+/// guard's mute, left after a fault, is no computer's hold, so a hold taken and
+/// lifted (the line on its own connection) leaves the lamp muted, and the mute
+/// still reads as the guard's; only the person's hand lifts it. The app sees it
+/// as `muted_after_fault` (lamp-control, #8081) and cannot clear it.
+#[test]
+fn a_computers_lift_leaves_the_restart_guards_mute_in_place() {
+    let directory = Directory::new();
+    let (mut owner, _sender) = fixture(options(false, Some(&directory.file())));
+    owner.mark_guard = true;
+    owner.arm_active().unwrap();
+    drop(owner);
+    let (mut restarted, _sender, released) = restart_as_restore(&directory, CLOCK, START);
+    assert!(!released);
+    assert!(restarted.muted() && restarted.restored_after_fault());
+    let mutes = crate::control_mute::ControlMutes::default();
+    mutes.serve(true);
+    restarted.use_control_mutes(mutes.clone());
+    let hold = mutes.hold().unwrap();
+    let held = restarted.poll_at(START + 1_000).unwrap();
+    assert!(held.muted, "muted, by the guard and by the computer");
+    // `{"listen":true}` on the computer's own connection.
+    hold.lift(crate::control_mute::Lift::Asked);
+    let after = restarted.poll_at(START + 2_000_000).unwrap();
+    assert!(
+        after.muted,
+        "the guard's mute is still on after the computer's lift"
+    );
+    assert!(restarted.muted() && restarted.restored_after_fault());
+    assert!(!mutes.take(), "no computer holds one now");
+}
+
 /// #7224: a lamp asleep when the voice faults is not the guard's: no run
 /// arms the guard while it is muted, so it comes back asleep, as it was,
 /// and the guard's sign never shows for it.
