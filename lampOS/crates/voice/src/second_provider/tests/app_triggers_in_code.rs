@@ -246,6 +246,20 @@ fn went_starting_an_app(
     note: Option<&'static str>,
     awaiting_a_yes: bool,
 ) -> (Vec<Vec<Message>>, Vec<String>, Told3) {
+    let (asked, outputs, told, _) =
+        went_starting_an_app_with(heard, takes, note, awaiting_a_yes, Vec::new());
+    (asked, outputs, told)
+}
+
+/// As [`went_starting_an_app`], the model's first round also calling `more`
+/// after its `start_app`; also gives the names of the other calls that ran.
+fn went_starting_an_app_with(
+    heard: &str,
+    takes: bool,
+    note: Option<&'static str>,
+    awaiting_a_yes: bool,
+    more: Vec<ToolCall>,
+) -> (Vec<Vec<Message>>, Vec<String>, Told3, Vec<String>) {
     struct Apps {
         takes: bool,
         told: Arc<Mutex<Vec<(u64, String, String)>>>,
@@ -275,11 +289,16 @@ fn went_starting_an_app(
         chats: Mutex::new(
             [
                 vec![
-                    Ok(ChatEvent::ToolCalls(vec![call(
-                        "c1",
-                        crate::app_triggers::START_APP,
-                        json!({"app": "english-practice", "trigger": "start english practice"}),
-                    )])),
+                    Ok(ChatEvent::ToolCalls(
+                        [call(
+                            "c1",
+                            crate::app_triggers::START_APP,
+                            json!({"app": "english-practice", "trigger": "start english practice"}),
+                        )]
+                        .into_iter()
+                        .chain(more)
+                        .collect(),
+                    )),
                     Ok(ChatEvent::Done),
                 ],
                 vec![text("Sorry, it did not start."), Ok(ChatEvent::Done)],
@@ -288,11 +307,18 @@ fn went_starting_an_app(
         ),
         ..Script::default()
     });
-    // The worker's own answer to the call: checked against the apps running.
+    // The worker's own answer to `start_app`: checked against the apps
+    // running. Any other call is kept by its name and answered done.
+    let ran: Arc<Mutex<Vec<String>>> = Arc::default();
+    let ran_by = ran.clone();
     let runner: ToolRunner = Arc::new(move |request, _, name, args| {
         let apps = apps.clone();
+        let ran = ran_by.clone();
         Box::pin(async move {
-            assert_eq!(name, crate::app_triggers::START_APP);
+            if name != crate::app_triggers::START_APP {
+                ran.lock().unwrap().push(name);
+                return json!({"ok": true});
+            }
             crate::app_triggers::start_app_answer(&*apps, request, &args)
         })
     });
@@ -322,7 +348,8 @@ fn went_starting_an_app(
     crate::agent_tasks::awaits_yes_here(None);
     let asked = script.asked.lock().unwrap().clone();
     let told = told.lock().unwrap().clone();
-    (asked, outputs, told)
+    let ran = ran.lock().unwrap().clone();
+    (asked, outputs, told, ran)
 }
 
 /// "can you start english practice please" and a line in another language
@@ -407,4 +434,74 @@ fn a_start_app_for_a_line_not_said_to_the_lamp_or_over_an_open_yes_starts_nothin
         went_starting_an_app("can you start english practice please", true, None, true);
     assert!(told.is_empty(), "an open yes started the app: {told:?}");
     assert_eq!(asked.len(), 2, "{asked:?}");
+}
+
+/// The Reviewer-lead's must-fix on #8131: "turn the volume down and start
+/// the coach" is one round with `start_app` and `set_volume`. The app takes
+/// the line, and the round's other call still runs before the request ends
+/// with no second round and no words from the lamp; never dropped.
+#[test]
+fn a_start_app_the_app_takes_still_runs_the_rounds_other_calls() {
+    let (asked, outputs, told, ran) = went_starting_an_app_with(
+        "turn the volume down and start english practice",
+        true,
+        None,
+        false,
+        vec![call("c2", "set_volume", json!({"level": 30}))],
+    );
+    assert_eq!(told.len(), 1, "the app was told once: {told:?}");
+    assert_eq!(ran, ["set_volume"], "the volume call was dropped");
+    assert_eq!(
+        asked.len(),
+        1,
+        "no second round after a taken call: {asked:?}"
+    );
+    assert!(
+        !outputs
+            .iter()
+            .any(|label| label.starts_with("audio") || label.starts_with("words")),
+        "no words from the lamp: {outputs:?}"
+    );
+    assert!(
+        outputs.iter().any(|label| label == "complete"),
+        "the turn ends: {outputs:?}"
+    );
+}
+
+/// A later call that can't run once an app holds the turn (another
+/// `start_app`, or a skill made by voice, whose waiting line would speak
+/// over the app) is answered as not run and journalled; the other calls of
+/// the round still run, and the request ends as taken.
+#[test]
+fn a_call_that_cannot_run_once_an_app_took_the_turn_is_not_run() {
+    let (asked, outputs, told, ran) = went_starting_an_app_with(
+        "start english practice twice, make me a skill and turn the volume down",
+        true,
+        None,
+        false,
+        vec![
+            call(
+                "c2",
+                crate::app_triggers::START_APP,
+                json!({"app": "english-practice", "trigger": "start english practice"}),
+            ),
+            call(
+                "c3",
+                crate::made_skill::MAKE,
+                json!({"description": "a space fact"}),
+            ),
+            call("c4", "set_volume", json!({"level": 30})),
+        ],
+    );
+    assert_eq!(
+        told.len(),
+        1,
+        "a second start_app reached the app: {told:?}"
+    );
+    assert_eq!(ran, ["set_volume"], "{ran:?}");
+    assert_eq!(asked.len(), 1, "{asked:?}");
+    assert!(
+        outputs.iter().any(|label| label == "complete"),
+        "the turn ends: {outputs:?}"
+    );
 }
