@@ -2074,8 +2074,8 @@ fn on_the_lamp_description(place: &Place, staff: &[Member]) -> String {
          what you have no function for: hand it over, never say you can't. Never for a quick \
          answer, a story or joke told aloud, or your functions (light, volume, timers, \
          reminders, time, weather, memory, skills). {NO_AGENT_NAME} For new work leave out \
-         `where` and `who`, even for code or a site; `where` only if they name a machine \
-         (computer, Mac, laptop, PC). More on earlier work (\"in the sea poem, add a line\") \
+         `where` and `who`, even for code or a site; `where` only if they name a machine. \
+         More on earlier work (\"in the sea poem, add a line\") \
          is a new call with `session`, made now, before you say it back: never a recall or \
          words alone. Don't ask for details or who first. {} With no task, ask what for, \
          then call this.",
@@ -10754,6 +10754,64 @@ pub(crate) mod tests {
             member("office-codex", "codex"),
         ]
     }
+    /// #8022 case 2, the Reviewer-lead's HOLD at e93e06d22c: with the
+    /// product unit's tasks switches on (`LAMP_TOOL_LEAD_IN`,
+    /// `LAMP_TASKS_WHO`, `_ASKED`, `_NAMED_ONLY`, `_CORRECT`, `_SIGN_IN`,
+    /// `_SIGN_IN_APP`, `_REPLY_NAMED`, `_HARNESS_STATUS`, `LAMP_STAFF_NOTE`,
+    /// `LAMP_MAKE_SKILL`), the lamp's own target and one paired computer
+    /// (the `who` read-back), `start_agent_task` as `core_tools` declares it
+    /// still says a make is make_skill's, within the link's 1,024 bytes,
+    /// whichever of the lamp's engines is its default.
+    #[test]
+    fn with_the_product_switches_and_a_computer_paired_the_make_still_fits() {
+        let _staff = STAFF_HELD
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        let mut product = place(Path::new("/run/lampos-tasks"), true);
+        product.lead_in = true;
+        product.asked = true;
+        product.staff_note = true;
+        product.named_only = true;
+        product.correct = true;
+        product.sign_in = true;
+        product.sign_in_app = true;
+        product.reply_named = true;
+        product.harness_status = true;
+        *STAFF.lock().unwrap() = vec![member("office", "claude")];
+        LAMP_THERE_HERE.with(|here| here.set(Some(true)));
+        let settings = crate::tools::Settings {
+            tasks: Some(product),
+            make_skill: true,
+            ..crate::tools::Settings::default()
+        };
+        let defaults: [&[&str]; 3] = [&[], &["openclaw"], &["claude"]];
+        for engines in defaults {
+            lamp_engines_here(Some(engines));
+            let start = crate::tools::core_tools(&settings)
+                .into_iter()
+                .find(|tool| tool.name == START)
+                .unwrap();
+            assert!(
+                start.description.contains("person's office computer"),
+                "{}",
+                start.description
+            );
+            assert!(
+                start.description.ends_with(MAKE_TOLD),
+                "{engines:?}: {} bytes",
+                start.description.len()
+            );
+            assert!(
+                start.description.len() <= MOST_DESCRIPTION_BYTES,
+                "{engines:?}: {} bytes",
+                start.description.len()
+            );
+        }
+        lamp_engines_here(None);
+        LAMP_THERE_HERE.with(|here| here.set(None));
+        STAFF.lock().unwrap().clear();
+    }
+
     /// #5978, scored by `provider-check --hand-overs` (#6547): while the lamp has
     /// its own target, start_agent_task says the lamp's Hermes does work by
     /// default and what is never handed over, the whole ask goes, and
@@ -10809,7 +10867,7 @@ pub(crate) mod tests {
             "what you have no function for: hand it over, never say you can't",
             "Never for a quick answer, a story or joke told aloud",
             "(light, volume, timers, reminders, time, weather, memory, skills)",
-            "`where` only if they name a machine (computer, Mac, laptop, PC)",
+            "`where` only if they name a machine.",
             "Don't ask for details or who first",
         ] {
             assert!(on.description.contains(words), "{words}");
