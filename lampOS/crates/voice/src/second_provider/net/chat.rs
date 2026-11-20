@@ -517,9 +517,8 @@ impl Chat {
         let mut declared = self.declared(messages, only, without);
         let forced = only
             .is_none()
-            .then(|| self.force.get().and_then(|force| force(messages)))
-            .flatten()
-            .filter(|forced| declared.iter().any(|tool| tool.name == forced.name));
+            .then(|| self.forced_among(messages, &declared))
+            .flatten();
         if let Some(Forced { name, only, fields }) = forced
             && let Some(tool) = declared.iter_mut().find(|tool| tool.name == name)
         {
@@ -576,8 +575,17 @@ impl Chat {
     /// must call, by name ([`Self::forcing`]): none when nothing is forced
     /// or the one forced isn't given. Round 1's journal line (#8022).
     pub fn forced(&self, messages: &[Message], without: &[&str]) -> Option<&'static str> {
-        let _ = (messages, without);
-        None
+        self.forced_among(messages, &self.declared(messages, None, without))
+            .map(|forced| forced.name)
+    }
+
+    /// The function a request on `messages`, given `declared`, must call
+    /// ([`Self::forcing`]), when it is among them.
+    fn forced_among(&self, messages: &[Message], declared: &[lamp_gemini::Tool]) -> Option<Forced> {
+        self.force
+            .get()
+            .and_then(|force| force(messages))
+            .filter(|forced| declared.iter().any(|tool| tool.name == forced.name))
     }
 
     /// A request's bytes and tool count on `messages`, as
