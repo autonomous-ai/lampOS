@@ -376,7 +376,7 @@ const GESTURE_STEP: [f32; 5] = [24.0, 34.0, 26.0, 21.0, 21.0];
 /// where the look alone already has the base, if farther): a sway alone goes
 /// 250 either way of home, and over a turned look it stops at the reach and
 /// says so in the journal, never past it.
-const GESTURE_REACH: [f32; 5] = [220.0, 220.0, 250.0, 360.0, 360.0];
+pub(crate) const GESTURE_REACH: [f32; 5] = [220.0, 220.0, 250.0, 360.0, 360.0];
 /// The farthest a holder's pose (`Asked::pose`) takes the head's roll from
 /// the pose; the arm goes anywhere inside its window instead (the pose's
 /// own clamp), and pitch and yaw stay with the holder's look.
@@ -8155,6 +8155,15 @@ fn run_on_dyn<P: PortIo, R: Runtime>(
                             (1.0 - stand).max(0.0) * up.seconds
                         }
                     });
+                    // #8153: under `LAMP_BODY_ENERGY` a built-in clip is
+                    // played at the level's size and pace, and everything
+                    // below (its window, the reach, the anti-tip check)
+                    // takes it as played.
+                    let clip = if stretch.is_some() && from_outside(clip) {
+                        crate::energy::livelier(clip, energy)
+                    } else {
+                        clip
+                    };
                     let earlier = pending;
                     let begins = (now + Duration::from_secs_f32(rising))
                         .max(earlier.map_or(now, |(_, since)| since));
