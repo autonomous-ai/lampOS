@@ -544,6 +544,13 @@ fn lamp_engines() -> Vec<String> {
         .unwrap_or_default()
 }
 
+/// Who does the lamp's own work, as the person hears it (#7930): never the
+/// engine's name, which the person has no need of.
+pub(crate) const OWN_ENGINE: &str = "the lamp";
+/// The one line the model is told about naming agents (the owner, #7930).
+pub(crate) const NO_AGENT_NAME: &str =
+    "Never tell the person which agent runs their work; say what is being done or what was found.";
+
 /// Who does the work on the lamp itself, as the person calls them: the
 /// lamp's default engine as last read, Hermes until read (lamp-tasks'
 /// default when the app has chosen none, #6498; a name only, nothing is
@@ -1393,16 +1400,16 @@ fn engine_refused(code: &str, name: &str) -> String {
 }
 
 /// `start_agent_task`'s `where` while the lamp has its own target (#5978),
-/// naming the lamp's own engine (`name`, #6226); the computer only when
+/// never naming the lamp's own engine (#7930); the computer only when
 /// one is paired (`computer`, #6547).
-fn where_description(name: &str, computer: bool) -> String {
+fn where_description(computer: bool) -> String {
     let computer = if computer {
         " \"computer\" only when they name their computer (\"on my computer\", \"on the Mac\"): then it goes there, as when they name an agent on it."
     } else {
         ""
     };
     format!(
-        "Where the work is done. Hand over what takes you over 10 s: research, code or files, several steps, or what you have no function for. Leave it out and it goes into an earlier session of theirs that fits by its name or its work, the lamp's own first, else to a new one here on the lamp, done by the lamp's own {name}.{computer} \"lamp\" when they say \"on the lamp\" or \"do it yourself\". The task is said back and starts on their yes, as always."
+        "Where the work is done. Hand over what takes you over 10 s: research, code or files, several steps, or what you have no function for. Leave it out and it goes into an earlier session of theirs that fits by its name or its work, the lamp's own first, else to a new one here on the lamp, done by the lamp's own agent.{computer} \"lamp\" when they say \"on the lamp\" or \"do it yourself\". The task is said back and starts on their yes, as always."
     )
 }
 
@@ -1888,7 +1895,7 @@ fn declared_on(place: &Place, staff: &[Member], lamp: bool) -> Vec<Tool> {
         start_parameters["properties"]["where"] = json!({
             "type": "string",
             "enum": places,
-            "description": where_description(lamp_name(), !staff.is_empty())
+            "description": where_description(!staff.is_empty())
         });
         // The lamp's engine, only when one is named (#6492).
         // Offered from the lamp's engines as last read, whatever they are
@@ -2061,13 +2068,12 @@ fn on_the_lamp_description(place: &Place, staff: &[Member]) -> String {
             computer(place)
         )
     };
-    let name = lamp_name();
     format!(
-        "Hand work to an agent: {name} here on the lamp{or_computer}. Call it for what takes \
+        "Hand work to an agent: the lamp's own{or_computer}. Call it for what takes \
          you over 10 s (research, code, files, several steps), what is asked of an agent, and \
          what you have no function for: hand it over, never say you can't. Never for a quick \
          answer, a story or joke told aloud, or your own functions (light, volume, timers, \
-         reminders, time, weather, memory, skills). New work goes to {name} here: leave out \
+         reminders, time, weather, memory, skills). {NO_AGENT_NAME} New work goes to the lamp's own: leave out \
          `where` and `who`, even for code or a website; `where` only if they name a machine \
          (computer, Mac, laptop, PC). More on earlier work (\"in the sea poem, add a line\") \
          is a new call with `session`, made now, before you say it back: never a recall or \
@@ -4648,7 +4654,10 @@ fn run_for_asked(
             let (target, who) = if on_the_lamp {
                 (
                     LAMP_TARGET,
-                    engine.as_deref().map_or_else(lamp_name, display_name),
+                    // The lamp's own engine is never named to the person
+                    // (the owner, #7930): the lamp itself does the work;
+                    // an engine they named is said back as named.
+                    engine.as_deref().map_or(OWN_ENGINE, display_name),
                 )
             } else {
                 member.map_or((place.target.as_str(), CLAUDE_CODE), |member| {
@@ -13945,7 +13954,7 @@ pub(crate) mod tests {
         };
         let unpaired = where_of(&[]);
         assert_eq!(unpaired["enum"], json!(["lamp"]));
-        assert_eq!(unpaired["description"], where_description(HERMES, false));
+        assert_eq!(unpaired["description"], where_description(false));
         assert!(
             !unpaired["description"]
                 .as_str()
@@ -13955,7 +13964,7 @@ pub(crate) mod tests {
         );
         let paired = where_of(&[member("office", "claude")]);
         assert_eq!(paired["enum"], json!(["lamp", "computer"]));
-        assert_eq!(paired["description"], where_description(HERMES, true));
+        assert_eq!(paired["description"], where_description(true));
         let computer = json!({"where":"computer"});
         // Refused before this with none paired (`asks_a_computer`): never
         // the lamp's (V2's P1 on 12587).
@@ -14354,7 +14363,7 @@ pub(crate) mod tests {
         // No computer paired here (no staff): the lamp alone (#6547).
         assert_eq!(said["enum"], json!(["lamp"]));
         // Hermes, the lamp's default engine until read (#6498).
-        assert_eq!(said["description"], where_description(HERMES, false));
+        assert_eq!(said["description"], where_description(false));
         let paired = declared_on(&off, &[member("office", "claude")], true)
             .into_iter()
             .find(|tool| tool.name == START)
@@ -14363,7 +14372,7 @@ pub(crate) mod tests {
             paired.parameters.unwrap()["properties"]["where"]["enum"],
             json!(["lamp", "computer"])
         );
-        let where_said = where_description(HERMES, true);
+        let where_said = where_description(true);
         for words in [
             "what takes you over 10 s",
             "research, code or files, several steps, or what you have no function for",

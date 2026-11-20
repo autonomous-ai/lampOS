@@ -2944,6 +2944,13 @@ không thêm gì vào prompt của lượt ngoài một dòng việc-còn-mở b
   được tạo (việc make của chính lamp) không bao giờ được giao như việc của
   người dùng, nên nó không có dòng nào. Sau lệnh "quên hết" của owner cũng
   không có dòng nào ("Bản ghi công việc", bên dưới).
+  Engine riêng của đèn không bao giờ được nói tên với người dùng (#7930,
+  chủ đèn): lời đọc lại, `where` và lời giao việc nói "the lamp", tin báo
+  nói "the lamp" và thêm "Never tell the person which agent runs their
+  work; say what is being done or what was found." (`NO_AGENT_NAME`); một
+  engine do người dùng tự nêu thì được nói lại đúng tên, còn lời của việc
+  và câu trả lời của agent không bao giờ bị đổi
+  (`the_lamps_own_engine_is_never_named_in_its_news`).
   Mỗi lần đọc được ghi vào journal, chỉ ở lượt có đọc:
   `lamp-voice: tasks: request N: open work <id> read in <ms> ms (<state>|none)`,
   `none` khi lamp-tasks không trả bản ghi (không tới được, bị từ chối, hoặc

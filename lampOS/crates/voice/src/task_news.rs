@@ -1868,6 +1868,11 @@ pub(crate) fn unprompted(words: &str) -> String {
 /// work to is named in its news (a Hermes task was told as Claude Code's);
 /// Claude Code, the default target's, for a task naming no known engine.
 pub(crate) fn who(task: &Value) -> &'static str {
+    // The lamp's own engine is never named to the person (the owner,
+    // #7930): the lamp did it.
+    if on_the_lamp(task) {
+        return crate::agent_tasks::OWN_ENGINE;
+    }
     engine_of(task)
         .as_str()
         .and_then(crate::agent_tasks::name_of)
@@ -1931,8 +1936,9 @@ fn engine_of(task: &Value) -> &Value {
 }
 
 /// What a note of work done on the lamp itself adds (#5978): the person
-/// hears that the lamp did it, here.
-const ON_THE_LAMP: &str = " It was done here on the lamp itself, not on their computer: say so in the same breath (\"I did it here on the lamp\").";
+/// hears that the lamp did it, here, and never which agent ran it (the
+/// owner, #7930, [`crate::agent_tasks::NO_AGENT_NAME`]).
+const ON_THE_LAMP: &str = " It was done here on the lamp itself, not on their computer: say so in the same breath (\"I did it here on the lamp\"). Never tell the person which agent runs their work; say what is being done or what was found.";
 
 /// At most `most` characters of `text` on one line, with no double quotes
 /// to end the note's quotation early.
@@ -2518,6 +2524,23 @@ mod tests {
     /// What the voice said before its words were Task news' (#940), kept
     /// here as it was: the byte-for-byte test below holds the skill's
     /// words to it.
+    /// #7930 (the owner): news of work the lamp's own engine did never
+    /// names that engine, and carries the one rule; a task about Hermes
+    /// keeps "Hermes" in its own words.
+    #[test]
+    fn the_lamps_own_engine_is_never_named_in_its_news() {
+        let task = json!({"text":"Research Hermes, the Greek god, in three lines",
+            "target":{"engine":"openclaw"},"task":{"target_alias":"lamp"}});
+        assert_eq!(who(&task), crate::agent_tasks::OWN_ENGINE);
+        assert!(ON_THE_LAMP.contains(crate::agent_tasks::NO_AGENT_NAME));
+        assert!(!ON_THE_LAMP.contains("OpenClaw") && !ON_THE_LAMP.contains("Hermes"));
+        let (asked, _) = quoted(asked_text(&task).unwrap(), MOST_TASK_CHARS);
+        assert!(asked.contains("Hermes"), "{asked}");
+        let computer = json!({"text":"Fix the parser","target":{"engine":"claude"},
+            "task":{"target_alias":"coding"}});
+        assert_eq!(who(&computer), "Claude Code");
+    }
+
     mod before {
         use super::super::*;
 
