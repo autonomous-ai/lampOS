@@ -1445,7 +1445,7 @@ pub fn chat_tools(
     let mut told = time_elsewhere(lamp, places);
     told.extend(search.iter().cloned());
     if look {
-        told.push(look_tool());
+        told.push(look_beside(&told));
         core.insert(crate::second_provider::LOOK_CALL.to_owned());
     }
     crate::tools::fit_within(
@@ -1626,12 +1626,46 @@ pub(crate) fn look_tool() -> lamp_gemini::Tool {
     }
 }
 
+/// Point the light's function (`skills/point-light`, #5744).
+pub(crate) const POINT_LIGHT: &str = "point_light";
+
+/// Told after the look's description when point-light is offered (#8175,
+/// #7069's row P on lamp-52e6, 15 Nov: "Lamp, point the light at my book"
+/// took `take_a_look`, with point-light offered beside it). The model
+/// tells the two apart by their lines; code knows only that the skill is
+/// offered (installed and on), never what a line means.
+pub(crate) const POINT_LIGHT_NOTE: &str = " Never to put your light on a thing they name, as in \"point the light at my book\": that is point_light's.";
+
+/// Whether `tools` offer point-light: its own function, or `use_skill`
+/// naming it ([`crate::use_skill::offered`]).
+fn points_light(tools: &[lamp_gemini::Tool]) -> bool {
+    tools.iter().any(|tool| {
+        tool.name == POINT_LIGHT
+            || (tool.name == crate::use_skill::NAME
+                && tool
+                    .parameters
+                    .as_ref()
+                    .and_then(|parameters| parameters["properties"]["skill"]["enum"].as_array())
+                    .is_some_and(|names| names.iter().any(|name| name == POINT_LIGHT)))
+    })
+}
+
+/// The look's function beside `tools`: with [`POINT_LIGHT_NOTE`] when they
+/// offer point-light, else [`look_tool`] as it is, byte for byte.
+fn look_beside(tools: &[lamp_gemini::Tool]) -> lamp_gemini::Tool {
+    let mut look = look_tool();
+    if points_light(tools) {
+        look.description.push_str(POINT_LIGHT_NOTE);
+    }
+    look
+}
+
 /// `tools`, already fitted, with the look's after them (the probe's list):
 /// within this route's bound of [`crate::second_provider::MAX_TOOLS`], the last that isn't
 /// the lamp's own leaves for it, never the look, and it is said.
 pub(crate) fn with_look(tools: Vec<lamp_gemini::Tool>) -> Vec<lamp_gemini::Tool> {
     let mut tools = tools;
-    tools.push(look_tool());
+    tools.push(look_beside(&tools));
     let core = [crate::second_provider::LOOK_CALL.to_owned()].into();
     crate::tools::fit_within(tools, &[], &core, crate::second_provider::MAX_TOOLS)
 }

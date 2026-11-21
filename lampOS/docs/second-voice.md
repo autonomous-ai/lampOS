@@ -7105,7 +7105,18 @@ stands), and eyes that can't be reached at all name nobody, as before. Without a
   `LAMP_LOOK_FULL`), spoken turns are offered `take_a_look`
   (`second_provider::LOOK_CALL`, `worker::chat_tools` with `look`; texts
   are not) and told "When you would look, call take_a_look"
-  (`worker::LOOK_CALL_NOTE`). It is one of the core within the route's bound of 64:
+  (`worker::LOOK_CALL_NOTE`). When point-light is offered in the same
+  round (installed and on, its `point_light` or `use_skill` naming it),
+  the look's description ends "Never to put your light on a thing they
+  name, as in "point the light at my book": that is point_light's."
+  (`worker::POINT_LIGHT_NOTE`, #8175), and point-light's own line says it
+  puts the light on a thing the person names, never that it looks. Which
+  of the two a line asks is the model's: nothing in code reads the words
+  (#7069's forced pick, a word list, was closed for that: "light up my
+  life" bent the head at nothing). On lamp-52e6 on 15 Nov "Lamp, point
+  the light at my book" took `take_a_look` with point-light offered
+  beside it, and point-light's line then said "light or look at".
+  It is one of the core within the route's bound of 64:
   a list at the bound before it keeps it, and the bound cuts the next in
   its order instead (`fetch_page` first), said once as every cut is
   (`past the bound of 64, left out: …`). Added after the bound before, a
