@@ -563,6 +563,9 @@ topic catalogue. Neither carries any sound.
 | `AppTriggers` | `apps/triggers` | latest | 10 s / 30 s | The spoken triggers of the apps running now (each manifest's `triggers`, at most 8 an app); written by lamp-control, read by the voice; local, no audio (#7415 piece 6, [apps.md](apps.md)) |
 | `AppTrigger` | `apps/trigger` | event | none / none | The voice holds a final line that says an app's trigger: the request (`turn`), the `app`, its `trigger`, the words heard and the time; the voice to lamp-control, once per line (#7415 piece 6) |
 | `AppTook` | `apps/took` | event | none / none | The app took that line (`turn`, `app`): the voice ends the request in code and says nothing; lamp-control to the voice (#7415 piece 6) |
+| `AppRemember` | `apps/remember` | event | none / none | An installed app's fact for the lamp's known person, checked and tidied at the door (`ask`, `app`, `name`, `text`, `at_unix_ms`); lamp-control to the voice, which keeps it with memory's `remember_app_fact` (`lamp_msgs::app_fact`, #7415 C166, [apps.md](apps.md)) |
+| `AppRemembered` | `apps/remembered` | event | none / none | How an `AppRemember` went (`ask`, `app`, `outcome`: `kept` or one code); the voice to lamp-control, which answers the app |
+| `AppFactsForget` | `apps/forget_facts` | event | none / none | An app removed: the voice forgets every fact of `app:<app>` (memory's `forget_app_facts`); lamp-control to the voice |
 
 Levels are dBFS from -120 (digital silence) to 0; `check()` refuses
 anything else, and a peak under its quiet.

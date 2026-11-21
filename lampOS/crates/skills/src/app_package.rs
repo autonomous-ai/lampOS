@@ -27,10 +27,11 @@ pub const FORMAT: u32 = 2;
 pub const KIND: &str = "app";
 /// The deepest path in an app package, parts inside its folder.
 pub const MOST_DEPTH: usize = 8;
-/// The door's grants an app may ask (`lamp_control::protocol`'s plain
-/// grants): `net` and `logs` are manifest booleans, never grants, and a
-/// service's grant is never an app's own.
-pub const GRANTS: [&str; 14] = [
+/// The grants an app may ask: the door's plain grants
+/// (`lamp_control::protocol`'s), then [`REMEMBER_GRANT`], an app's own. `net`
+/// and `logs` are manifest booleans, never grants, and a service's grant is
+/// never an app's own.
+pub const GRANTS: [&str; 15] = [
     "body",
     "light",
     "speak",
@@ -45,7 +46,12 @@ pub const GRANTS: [&str; 14] = [
     "speaker",
     "notes",
     "speech",
+    REMEMBER_GRANT,
 ];
+/// An app's own grant, no computer's: `apps.remember` on the app socket, a
+/// fact kept for the lamp's known person marked with the app (#7415, C166;
+/// granted at install with nothing more asked, the owner's 18 Nov rule).
+pub const REMEMBER_GRANT: &str = "remember";
 /// The lamp's NPU ops an app may name in `npu` (#7415): the lamp fetches
 /// each op's model when such an app is installed (`lamp-npu`), not at its
 /// first ask. An op rides an existing grant: `pose` the camera's.

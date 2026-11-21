@@ -1,4 +1,4 @@
-use lamp_apps::facts::{DOOR_GRANTS, check, unit_of};
+use lamp_apps::facts::{APP_GRANTS, DOOR_GRANTS, check, unit_of};
 use lamp_apps::testing::StubApp;
 
 #[test]
@@ -32,6 +32,12 @@ fn only_the_doors_plain_grants_and_no_service_grant() {
     }
     app.grants = vec!["body".into(), "body".into()];
     assert!(check(&app, Some(200)).is_err(), "a grant twice");
+    // An app's own grant (`remember`, apps.remember), beside the door's.
+    assert_eq!(APP_GRANTS, ["remember"]);
+    app.grants = vec!["remember".into(), "speak".into()];
+    assert_eq!(check(&app, Some(200)), Ok(()));
+    app.grants = vec!["remember".into(), "remember".into()];
+    assert!(check(&app, Some(200)).is_err(), "remember twice");
 }
 
 #[test]

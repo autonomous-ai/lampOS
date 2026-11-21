@@ -904,11 +904,16 @@ phần của kho nằm ở `crates/memory/src/app_facts.rs`.
   khi quên hết. Không gì ghi nó xuống đĩa, vào mạch chuyện, nhật ký hay trí
   nhớ.
 - **Nhật ký** ghi thao tác, id của người và số lượng, không bao giờ một lời.
-- **Không có công tắc ở đây.** Chưa gì gửi các thao tác này: `apps.remember`
-  và `apps.context` ở cửa và bên ghi của chúng đến trong PR riêng, sau công
-  tắc của nó, tắt cho đến khi first builder đọc phần riêng tư và có ROW. Trí
-  nhớ cũ trả lời `unknown_op`. "Từ chối khi Lamp ở chế độ riêng tư" (công
-  tắc riêng tư vật lý, điểm 4 của first builder) là kiểm tra của cửa.
+- **Không có công tắc ở đây.** Bên ghi là `apps.remember` ở cửa (C166,
+  [apps.md](../apps.md), "What an app tells Lamp's memory"), sau công tắc
+  riêng `LAMP_APP_REMEMBER` trong lamp-control, tắt cho đến khi first builder
+  đọc phần riêng tư và có ROW. lamp-control kiểm tra quyền của app, lời của nó
+  (`app_fact::tidy`), công tắc riêng tư và giới hạn ba lần một phút, rồi báo
+  cho voice trên `apps/remember`; voice chọn người bằng `app_fact::whose` mà
+  không hỏi người nào (các id trí nhớ của chủ) và gửi `remember_app_fact` với
+  nguồn `app:<name>`. Khi gỡ một app, `forget_app_facts` cho nguồn của nó được
+  gửi cùng cách (`apps/forget_facts`). `apps.context` chưa được xây. Trí nhớ
+  cũ trả lời `unknown_op`, báo cho app là `unavailable`.
 
 Các giới hạn là của luồng thảo luận, không cái nào do kho này tự đặt:
 
