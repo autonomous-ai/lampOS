@@ -566,6 +566,9 @@ pub struct Listed {
     pub state: String,
     pub last_active_unix_ms: Option<u64>,
     pub about: Option<String>,
+    /// The agent Harness runs in it, as `ps` names it (`openclaw`,
+    /// `hermes`, …): `None` when the row gives none (#8105).
+    pub agent: Option<String>,
 }
 
 /// One harness `harness wait --any` came back for: its agent id and how it
@@ -7230,6 +7233,8 @@ struct PsRow {
     last_active: Option<String>,
     #[serde(default)]
     about: Option<String>,
+    #[serde(default)]
+    agent: Option<String>,
 }
 
 /// The read before a close found the agent idle with background commands
@@ -7422,11 +7427,16 @@ pub fn parse_ps(bytes: &[u8]) -> Result<Vec<Listed>, &'static str> {
             .about
             .map(|about| clip(about.trim(), MOST_ABOUT_BYTES))
             .filter(|about| !about.is_empty());
+        let agent = row
+            .agent
+            .map(|agent| agent.trim().to_ascii_lowercase())
+            .filter(|agent| token(agent, 32));
         listed.push(Listed {
             state: state_of(&row.id, row.state, None),
             agent_id: row.id,
             last_active_unix_ms,
             about,
+            agent,
         });
     }
     Ok(listed)

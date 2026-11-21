@@ -5309,6 +5309,8 @@ pub fn serve_with_adapter<C: Clock, A: Adapter>(
     }
     let began = Instant::now();
     let sample = clock.sample()?;
+    // The lamp's own panes, read between jobs (#8105): which run OpenClaw.
+    let lamp_panes = lamp_target_of(&config);
     let mut engine = Engine::open(
         Store::open(&config.dir)?,
         config.targets,
@@ -5468,7 +5470,14 @@ pub fn serve_with_adapter<C: Clock, A: Adapter>(
         .name("tasks-harness".into())
         .spawn(move || {
             let mut gateway = adapter.openclaw_gateway();
+            let mut panes_due = Instant::now() + crate::gateway::PANES_EVERY;
             while !cli_stop.load(Ordering::Acquire) {
+                if Instant::now() >= panes_due {
+                    panes_due = Instant::now() + crate::gateway::PANES_EVERY;
+                    if let Some(lamp) = lamp_panes() {
+                        crate::gateway::panes_read(&adapter.status(&lamp.machine_id));
+                    }
+                }
                 match jobs_rx.recv_timeout(TICK) {
                     Ok(job) => {
                         let result = match job {

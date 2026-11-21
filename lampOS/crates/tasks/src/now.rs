@@ -265,6 +265,7 @@ mod tests {
                 state: "working".into(),
                 last_active_unix_ms: Some(wall - 3_000),
                 about: Some((*about).to_owned()),
+                agent: None,
             })
             .collect();
         let _ = tracker.read(MACHINE, Ok(listed), &watched, wall, 400);
