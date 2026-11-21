@@ -1875,7 +1875,14 @@ With the switch:
   description, names checked or not, says that a question of whether the
   lamp knows or remembers them ("Do you remember me?", "Did you remember my
   face?", "Do you know my face?") is no ask: answer it from who you see now,
-  never with this call. The line's words are never judged in the handler:
+  never with this call. Before that line it says every clear ask to
+  remember them is a call in any turn, also when their face was kept
+  earlier in the conversation (the handler answers that it already knows
+  them, below) and before they said their name (with an empty name, told
+  `There was no name in that for me to keep.` before any look) (#8053,
+  row-8053q on lamp-52e6, 21 Nov: such asks called it 17 of 30 after a
+  save, and an ask with no name rarely after a greeting or after the lamp
+  asked a name; `known_faces::ASK_IS_A_CALL`). The line's words are never judged in the handler:
   whether a line asks or only wonders is the model's call. In the handler
   (`known_faces::run_switched`), before any name check, a call with no
   `replace` past setup's first save, whatever the line says:
