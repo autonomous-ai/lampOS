@@ -2105,11 +2105,40 @@ một byte (`crates/tasks/src/one_session.rs`).
   của đèn là OpenClaw hoặc Hermes (`one_session::shares`); engine khác
   giữ đường đi theo từng việc. Việc nói trên đèn Hermes vào phiên duy nhất
   của nó như trên đèn OpenClaw (`lamp-one-hermes`; xem "Phiên được giữ").
-  Lần chạy kỹ năng chỉ dùng chung phiên trên OpenClaw
-  (`one_session::skill_runs_share`): wrapper của lần chạy Hermes đọc file
-  token của lần chạy một lần, lúc chính nó khởi động, trong namespace riêng
-  của lần chạy đó, nên Hermes được giữ đã khởi động một lần không nhận được
-  token của lần chạy sau, và mỗi lần chạy kỹ năng Hermes giữ pane riêng.
+  Lần chạy kỹ năng dùng chung phiên trên cả hai
+  (`one_session::skill_runs_share`), qua cùng một cửa skill-start
+  (#8151, "Lần chạy kỹ năng Hermes qua cửa skill-start" bên dưới).
+- **Lần chạy kỹ năng Hermes qua cửa skill-start (#8151).** Hermes trên
+  đèn không có gateway, nên lần chạy của nó không phải một lượt của
+  gateway; nhưng nó vẫn đi qua launcher của OpenClaw. lamp-tasks mở lần
+  chạy cho launcher (token chỉ giữ trong bộ nhớ, không bao giờ nằm trong
+  file) và gõ `Run /usr/local/lib/lampos/skill-start <run-id> once` vào pane
+  Hermes được giữ, nơi việc hỏi duyệt đã tắt trong thư mục của nó. Terminal
+  của Hermes chạy launcher; launcher nhận lần chạy một lần qua
+  `/run/lampos-skill-start/start.sock` (cùng các kiểm tra tiến trình như
+  với gateway của OpenClaw: namespace của Hermes hạ về `lampos` trong một
+  user namespace lồng, như của OpenClaw) và fence của nó chạy script của
+  lần chạy với token trên fd 3. Lần chạy được cấp `net` có socket egress
+  riêng, do fence chuyển tiếp, như của OpenClaw (`LAMP_TASKS_GATEWAY_NET`).
+  Không có công tắc nào và không có tên engine nào trong lựa chọn: cửa được
+  dùng theo những gì đã cài (`HarnessRunner::through_door`):
+  - phiên duy nhất của lamp-tasks, Harness được gọi với tư cách người dùng;
+  - namespace của agent hiện `/run/lampos-skill-start`
+    (`skill_task::AGENT_NS_START_LINE` ngay sau dòng của lamp-control, do
+    `agent_ns::wrapper::one_path_start_edits` của lamp-update ghi);
+  - launcher tại `/usr/local/lib/lampos/skill-start`;
+  - lần chạy có script riêng (bản ghi cố định không có) và không có file khoá;
+  - với `net`, fence của launcher có chuyển tiếp.
+  Nếu không, lần chạy giữ pane riêng như trước, file token được ghi trước
+  khi nó khởi động, với một dòng journal: `skill task <id>: its own pane,
+  not the skill-start door: <why>`. Một lần chạy qua cửa mà phiên được giữ
+  không nhận (không reply được) thì lần mở cho launcher bị kết thúc, không
+  bao giờ nhận lại được, file token được ghi và lời của chính nó được gửi
+  trong pane riêng (`skill task <id>: the kept session didn't take it; its
+  own pane, its token file written`). Wrapper theo từng lần chạy của Hermes
+  chỉ đọc file token, nên cửa chỉ dành cho phiên được giữ. Danh sách exec
+  được phép của OpenClaw (`SkillStartAllowed`) chỉ được đọc cho agent có
+  gateway.
 - **Mở ngay khi khởi động, khi agent sẵn sàng.** Khi công tắc bật (cùng
   `LAMP_SKILL_TASKS` và `LAMP_SKILL_DEFAULT_AGENT`), một luồng của
   lamp-tasks (`one-session`) chạy mỗi 2 s. Nó chỉ mở pane khi Harness đã
@@ -2633,12 +2662,27 @@ khi đăng xuất, và với 0.6.60 khi đăng nhập (ROW của #7507).
     Chỉ session id đầy đủ (từ 16 ký tự, từ `ensure`, `show` hoặc kho) mới
     được đưa cho `sessions delete`, vốn cũng nhận một tiền tố duy nhất. `HERMES_NONINTERACTIVE=1` (#7781)
     giữ cho lần khởi động đầu không hỏi gì.
-  - **Lần chạy kỹ năng và make** vẫn chạy riêng từng lần (ở trên, và
-    `MakeHermes`). Một khoảng hở đã biết: wrapper của Hermes đọc file token
-    của mỗi lần chạy một lần duy nhất, lúc chính nó khởi động, trong
-    namespace của lần chạy đó, nên một Hermes được giữ đã khởi động không
-    nhận được token của lần chạy sau; cho tới khi làm được, lần chạy kỹ năng
-    Hermes giữ pane riêng (`skill_runs_share`).
+  - **Lần chạy kỹ năng** vào phiên được giữ qua cửa skill-start ("Lần chạy
+    kỹ năng Hermes qua cửa skill-start"); lần nào cửa không nhận thì giữ
+    pane riêng.
+  - **Make** có `"one_path":true` cũng được gõ vào phiên được giữ, như make
+    qua gateway của OpenClaw (#8151): khi phiên đang mở và Harness được gọi
+    với tư cách người dùng, lựa chọn make của `MakeGateway`
+    (`HarnessRunner::make_pick`, từ `kept_make`) là Hermes của đèn trong pane
+    đó, và journal ghi `make: handed to hermes in the lamp's kept session`.
+    Make không có token và không có script kỹ năng nên không cần cửa. Khi
+    không có phiên được giữ (Harness được gọi như một agent, hoặc chưa mở
+    phiên), make chạy trong namespace Hermes của đèn (`MakeHermes`) như trước.
+    Câu hỏi trực tiếp (live ask) giữ lựa chọn riêng (`MakeGateway::pick`),
+    không đổi: Hermes của đèn trên runner của make. lamp-tasks tạo thư mục
+    project Harness của nó (0700) trước thư mục của pane bên trong, vì make
+    không tạo thư mục lần chạy.
+  - **`LAMP_MAKE_AGENT_NET=held`** chỉ giữ `MakeHermes` khỏi mạng, trên
+    OpenClaw cũng như Hermes: `MakeHandOvers::lamp` đọc nó một lần
+    (`crates/tasks/src/skill_make.rs:1971`) và chỉ truyền cho
+    `lamp_runner(home, held)` (`:1980`); `MakeGateway::lamp(home, harness)`
+    (`:1981`) không có tham số này, nên make gõ vào pane được giữ vẫn dùng
+    mạng của pane trên cả hai.
 - **Xoay vòng và gỡ bỏ.** Phiên giữ lại của OpenClaw không bị xoay theo
   số lượt (gateway của nó tự nén phiên, `agents.defaults.compaction`); khi có
   xoay vòng thì là `ensure --fresh`. Huỷ, câu hỏi không ai trả lời, đăng xuất

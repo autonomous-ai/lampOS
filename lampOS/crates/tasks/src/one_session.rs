@@ -115,9 +115,9 @@
 //!   by Hermes's own `hermes sessions delete` ([`HermesDelete`]) as
 //!   OpenClaw's is by the Gateway; lamp-tasks only reads Hermes's store.
 //!   A delete that fails is tried again at the next start or close. A
-//!   Hermes skill run still goes its own way: its
-//!   wrapper reads the run's token file once at its own start, in a
-//!   namespace of that run's ([`skill_runs_share`]).
+//!   Hermes skill run is typed into its kept session as OpenClaw's is,
+//!   through the same skill-start door ([`skill_runs_share`]); one that
+//!   door can't take keeps its own pane, its token in a file.
 //!
 //! **Opened as the person** (`--harness-as-person`, as the product's
 //! lamp-tasks runs): Harness closes an idle pane after 30 min only when an
@@ -948,13 +948,15 @@ pub fn shares(engine: EngineKind) -> bool {
 }
 
 /// Whether a default engine's skill runs are typed into the one pane:
-/// OpenClaw only, whose run's token reaches the run through the
-/// skill-start launcher over lamp-tasks' socket. A Hermes run's wrapper
-/// reads the run's token file once, at its own start, in a namespace of
-/// that run's (`lamp_update::hermes_install`): a kept Hermes started once
-/// can't take a later run's token, so each Hermes run keeps its own pane.
+/// every engine whose kept session it is ([`shares`]), OpenClaw and Hermes
+/// alike (#8151's parity). A run's token never reaches the pane: it
+/// reaches the run's script through the skill-start launcher over
+/// lamp-tasks' socket, for OpenClaw from its gateway, for Hermes from its
+/// kept session's terminal. A Hermes run the launcher's door can't take
+/// (`skill_task::HarnessRunner`'s `through_door`) keeps its own pane, its
+/// wrapper reading the run's token file at its start.
 pub fn skill_runs_share(engine: EngineKind) -> bool {
-    engine == EngineKind::Openclaw
+    shares(engine)
 }
 
 /// Deletes an engine's session from that engine's own store by its key

@@ -7632,6 +7632,7 @@ fn skill_runner_with(
         makes: false,
         egress: None,
         gateway_net: None,
+        start_door: None,
     }
 }
 
@@ -10312,47 +10313,224 @@ fn with_one_session_on_as_an_agent_each_run_keeps_its_own_pane() {
     assert_eq!((count("new"), count("close"), count("reply")), (2, 2, 0));
 }
 
-/// #7246, #8151: only an OpenClaw default's skill runs share the one pane
-/// (`one_session::skill_runs_share`). A Hermes default's spoken tasks
-/// share its kept session, but its skill runs keep the per-run path, even
-/// with a wrapper that is a gateway agent's (its run's token through the
-/// skill-start launcher, as OpenClaw's), the switch on and Harness called
-/// as the person: each run its own `new hermes` and `close`, nothing typed
-/// with `reply`.
+/// The lamp's Hermes the default on the one run path (#8151's parity):
+/// lamp-update's one run path wrapper, the agent namespace showing
+/// lamp-control's socket and, with `start_line`, the skill-start folder
+/// ([`skill_task::AGENT_NS_START_LINE`]), a launcher file when `launcher`,
+/// and lamp-tasks' one session.
+fn hermes_door_runner(rig: &Rig, start_line: bool, launcher: bool) -> HarnessRunner {
+    let mut ns = ns_with_runs();
+    if start_line {
+        ns.push_str(skill_task::AGENT_NS_START_LINE);
+    }
+    let mut runner = one_path_runner(
+        rig,
+        EngineKind::Hermes,
+        &[("hermes", ONE_PATH_HERMES)],
+        Some(&ns),
+    );
+    let door = rig.root.path().join("skill-start");
+    if launcher {
+        fs::write(&door, "launcher").unwrap();
+    }
+    runner.start_door = Some(door);
+    runner.one_session = Some(Arc::new(
+        lamp_tasks::one_session::OneSession::new(
+            Duration::from_secs(5),
+            Duration::from_millis(20),
+            Duration::from_secs(5),
+        )
+        .with_state_file(rig.root.path().join("one-session.json"))
+        .with_session_delete(Box::new(|_| Ok(()))),
+    ));
+    runner
+}
+
+/// Whether the run's token file `runs/task-1` is ever there while `seen`
+/// is watched (until `done`).
+fn watch_token_file(
+    rig: &Rig,
+    done: Arc<std::sync::atomic::AtomicBool>,
+) -> thread::JoinHandle<bool> {
+    let token = rig.root.path().join("runs/task-1");
+    thread::spawn(move || {
+        let mut seen = false;
+        while !done.load(std::sync::atomic::Ordering::Acquire) {
+            seen |= token.exists();
+            thread::sleep(Duration::from_millis(1));
+        }
+        seen
+    })
+}
+
+/// #8151's parity (the manager's condition: the door is the normal case):
+/// with the lamp's Hermes the default, its kept session up and the door
+/// installed (the agent namespace showing the launcher's folder, the
+/// launcher there), each skill run is typed into the one Hermes pane as
+/// `skill-start <run-id>`, exactly as OpenClaw's: one `new hermes` (the
+/// pane's, `lamp-one-hermes` in `one-session`), a `reply` per run, no
+/// `close`, no `skill-task-1` pane, and no token file ever written: the
+/// token reaches only the launcher's claim, once per run.
 #[test]
-fn with_one_session_on_a_hermes_default_keeps_the_per_run_path_for_skill_runs() {
+fn with_one_session_on_a_hermes_defaults_skill_runs_go_through_the_door_in_its_kept_session() {
     let mut rig = Rig::new();
     rig.config.as_person = true;
     one_session_plan(&rig);
-    let gateway_ns = rig.root.path().join("openclaw-ns");
-    fs::write(
-        &gateway_ns,
-        format!("#!/bin/sh\n{}", skill_task::AGENT_NS_TASKS_LINE),
-    )
-    .unwrap();
-    let wrapper = openclaw_gateway_wrapper(&gateway_ns);
-    let mut runner = one_path_runner(
-        &rig,
-        EngineKind::Hermes,
-        &[("hermes", &wrapper)],
-        Some("#!/bin/sh\n"),
-    );
-    runner.one_session = one_session_runner(&rig).one_session;
-    for _ in 0..2 {
+    let runner = hermes_door_runner(&rig, true, true);
+    let done = Arc::new(std::sync::atomic::AtomicBool::new(false));
+    let watched = watch_token_file(&rig, done.clone());
+    for _ in 0..3 {
         let launched = launch_start(&rig, &runner.starts, true, Some("started"));
+        let run = skill_run(Duration::from_secs(20));
+        assert_eq!(runner.run(&run, &|| {}), Ok(0));
+        assert_eq!(
+            run.answer.get().map(String::as_str),
+            Some("Took the photo.")
+        );
+        let claimed = launched.join().unwrap().expect("live before it ended");
+        let grant = lamp_tasks::skill_start::parse_answer(&claimed.answer).unwrap();
+        assert_eq!(grant.token, RUN_SECRET);
+        assert!(
+            !claimed.entries.iter().any(|entry| entry.contains("token")),
+            "{:?}",
+            claimed.entries
+        );
+        assert!(!runner.starts.is_live("task-1"), "not live after its end");
+        nothing_left(&rig);
+    }
+    done.store(true, std::sync::atomic::Ordering::Release);
+    assert!(!watched.join().unwrap(), "no token file is ever written");
+    assert!(!rig.root.path().join("runs").exists(), "no token file");
+    let calls = rig.calls();
+    for call in &calls {
+        assert!(!call.to_string().contains(RUN_SECRET), "{call}");
+    }
+    let count = |verb: &str| calls.iter().filter(|call| call["args"][0] == verb).count();
+    assert_eq!((count("new"), count("reply"), count("close")), (1, 3, 0));
+    let new = calls.iter().find(|call| call["args"][0] == "new").unwrap();
+    assert_eq!(new["args"][1], "hermes");
+    assert!(new.to_string().contains("one-session"), "{new}");
+    assert!(!new.to_string().contains("skill-task-1"), "{new}");
+    let named = new["args"]
+        .as_array()
+        .unwrap()
+        .windows(2)
+        .any(|pair| pair[0] == "--name" && pair[1] == "lamp-one-hermes");
+    assert!(named, "the pane's fixed name: {new}");
+    for reply in calls.iter().filter(|call| call["args"][0] == "reply") {
+        assert_eq!(reply["args"][3], AGENT, "the one pane: {reply}");
+        let words = reply["args"][6].as_str().unwrap();
+        assert!(words.starts_with("New task task-1:\n"), "{words}");
+        assert!(
+            words.contains("Run `/usr/local/lib/lampos/skill-start task-1` once"),
+            "{words}"
+        );
+    }
+}
+
+/// #8151's parity: a Hermes default's run the door can't take, by what is
+/// installed or what the run is, keeps its own pane as before: its own
+/// `new hermes` in `skill-task-1` with its own words, its token file
+/// written before it, nothing typed into the kept session. The door's
+/// pieces each missing in turn: the agent namespace's line for the
+/// launcher's folder, the launcher, a kept session (Harness called as an
+/// agent), and a fixed write with no script.
+#[test]
+fn a_hermes_run_the_door_cant_take_keeps_its_own_pane_with_its_token_file() {
+    for (case, start_line, launcher, as_person, fixed) in [
+        ("no start line", false, true, true, false),
+        ("no launcher", true, false, true, false),
+        ("no kept session", true, true, false, false),
+        ("a fixed write", true, true, true, true),
+    ] {
+        let mut rig = Rig::new();
+        rig.config.as_person = as_person;
+        one_session_plan(&rig);
+        let runner = hermes_door_runner(&rig, start_line, launcher);
+        let done = Arc::new(std::sync::atomic::AtomicBool::new(false));
+        let watched = watch_token_file(&rig, done.clone());
+        let mut run = if fixed {
+            write_run(Duration::from_secs(20))
+        } else {
+            skill_run(Duration::from_secs(20))
+        };
+        if fixed {
+            run.script = PathBuf::new();
+        }
+        assert_eq!(runner.run(&run, &|| {}), Ok(0), "{case}");
+        done.store(true, std::sync::atomic::Ordering::Release);
+        assert!(watched.join().unwrap(), "{case}: the token file written");
+        assert!(!runner.starts.is_live("task-1"), "{case}");
+        nothing_left(&rig);
+        let calls = rig.calls();
+        let count = |verb: &str| calls.iter().filter(|call| call["args"][0] == verb).count();
+        assert_eq!((count("new"), count("reply")), (1, 0), "{case}: {calls:?}");
+        let new = calls.iter().find(|call| call["args"][0] == "new").unwrap();
+        assert_eq!(new["args"][1], "hermes", "{case}");
+        assert!(new.to_string().contains("skill-task-1"), "{case}: {new}");
+        assert!(!new.to_string().contains("one-session"), "{case}: {new}");
+        assert!(!new.to_string().contains("skill-start"), "{case}: {new}");
+        for call in &calls {
+            assert!(!call.to_string().contains(RUN_SECRET), "{case}: {call}");
+        }
+    }
+}
+
+/// #8151's parity: a Hermes door run its kept session doesn't take (its
+/// reply refused `REPLY_OFF`) is not failed and never claimable: its live
+/// start ended, its token file written, its own pane with its own words;
+/// the next run goes there at once. OpenClaw's exec allow-list is never
+/// read for Hermes (it has no gateway).
+#[test]
+fn a_hermes_door_run_the_kept_session_doesnt_take_goes_per_run_with_its_token_file() {
+    let mut rig = Rig::new();
+    rig.config.as_person = true;
+    rig.plan(json!({
+        "machines":{"default":true},
+        "new":{"default":true},
+        "wait":{"stdout":waited("idle", AGENT)},
+        "show":{"stdout":json!({
+            "id":AGENT,"state":"idle","ask":"Run the skill.",
+            "answer":"Took the photo.","truncated":false,"tools":1
+        }).to_string()},
+        "reply":{
+            "stdout":format!("{}\n", json!({"error":"REPLY_OFF","detail":"…","code":"REPLY_OFF","next":[]})),
+            "exit":5
+        },
+        "close":{"exit":0},
+    }));
+    let mut runner = hermes_door_runner(&rig, true, true);
+    runner.skill_start_allowed = lamp_tasks::gateway::SkillStartAllowed::new(
+        Box::new(|| panic!("OpenClaw's allow-list read for Hermes")),
+        Box::new(|| None),
+    );
+    for _ in 0..2 {
+        let done = Arc::new(std::sync::atomic::AtomicBool::new(false));
+        let watched = watch_token_file(&rig, done.clone());
         assert_eq!(
             runner.run(&skill_run(Duration::from_secs(20)), &|| {}),
             Ok(0)
         );
-        launched.join().unwrap();
+        done.store(true, std::sync::atomic::Ordering::Release);
+        assert!(watched.join().unwrap(), "the token file written");
+        assert!(!runner.starts.is_live("task-1"), "never claimable");
         nothing_left(&rig);
     }
     let calls = rig.calls();
     let count = |verb: &str| calls.iter().filter(|call| call["args"][0] == verb).count();
-    assert_eq!((count("new"), count("close"), count("reply")), (2, 2, 0));
-    let new = calls.iter().find(|call| call["args"][0] == "new").unwrap();
-    assert_eq!(new["args"][1], "hermes");
-    assert!(!new.to_string().contains("one-session"), "{new}");
+    // The pane's own `new`, its one refused reply, then each run's own
+    // `new` and `close`.
+    assert_eq!((count("new"), count("reply"), count("close")), (3, 1, 2));
+    let runs: Vec<&Value> = calls
+        .iter()
+        .filter(|call| call["args"][0] == "new" && call.to_string().contains("skill-task-1"))
+        .collect();
+    assert_eq!(runs.len(), 2, "{calls:?}");
+    for new in runs {
+        assert_eq!(new["args"][1], "hermes");
+        assert!(new.to_string().contains("--task"), "{new}");
+        assert!(!new.to_string().contains("skill-start"), "{new}");
+    }
 }
 
 /// #7246: a run past its deadline in the one pane ends its turn: the
@@ -10514,6 +10692,111 @@ fn with_one_session_on_a_reply_off_sends_each_run_its_own_way() {
         assert!(new.to_string().contains("--task"), "{new}");
         assert!(!new.to_string().contains("one-session"), "{new}");
     }
+}
+
+/// #8151's parity (the manager's condition: makes take OpenClaw's path):
+/// with the lamp's Hermes the default and its kept session up (Harness
+/// called as the person), a one_path make is typed into that one Hermes
+/// pane, as a gateway agent's make is: one `new hermes` (the pane's,
+/// `lamp-one-hermes` in `one-session`), the make's words by `reply`, no
+/// `close`, and never the lamp's Hermes in its namespace (`MakeHermes`).
+/// A live ask keeps its own pick (`pick`): the lamp's Hermes, unchanged.
+/// With no kept session (Harness called as an agent), the make goes to
+/// `MakeHermes` as before, Harness never asked.
+#[test]
+fn a_hermes_make_with_its_kept_session_up_is_typed_into_that_pane_not_make_hermes() {
+    use lamp_tasks::skill_make::MakeAgent;
+    let mut rig = Rig::new();
+    rig.config.as_person = true;
+    // The pane seen with the make's words taken (a make's header names no
+    // run id) and answered in its chat (a `cannot:` line, a make's answer).
+    rig.plan(json!({
+        "machines":{"default":true},
+        "new":{"default":true},
+        "wait":{"stdout":waited("idle", AGENT)},
+        "show":{"stdout":json!({
+            "id":AGENT,"state":"idle","ask":format!("{}\nRULES", lamp_tasks::one_session::header("")),
+            "answer":"cannot: the lamp has no camera","truncated":false,"tools":1
+        }).to_string()},
+        "reply":{"default":true},
+        "close":{"exit":0},
+    }));
+    let work = make_work(&rig);
+    let mut runner = hermes_door_runner(&rig, false, false);
+    runner.default_agent = false;
+    runner.makes = true;
+    let gateway = lamp_tasks::skill_make::MakeGateway::of(Arc::new(runner));
+    assert_eq!((gateway.pick)(), Ok(MakeAgent::Hermes), "an ask: unchanged");
+    assert_eq!(
+        gateway.make_pick.as_ref().unwrap()(),
+        Ok(MakeAgent::Gateway(EngineKind::Hermes)),
+        "a make: the kept pane"
+    );
+    let hermes = MakeHermesStandIn::default();
+    let answered = lamp_tasks::skill_make::answer_with(
+        &make_line(Some(true), 20_000),
+        true,
+        &work,
+        &hermes,
+        Some(&gateway),
+        &mut || {},
+    );
+    assert_eq!(answered["ok"], json!(true), "{answered}");
+    assert_eq!(
+        answered["answer"],
+        json!("cannot: the lamp has no camera"),
+        "{answered}"
+    );
+    assert_eq!(hermes.0.load(Ordering::Acquire), 0, "never MakeHermes");
+    let calls = rig.calls();
+    let count = |verb: &str| calls.iter().filter(|call| call["args"][0] == verb).count();
+    assert_eq!(
+        (count("new"), count("reply"), count("close")),
+        (1, 1, 0),
+        "{calls:?}"
+    );
+    let new = calls.iter().find(|call| call["args"][0] == "new").unwrap();
+    assert_eq!(new["args"][1], "hermes");
+    assert!(new.to_string().contains("one-session"), "{new}");
+    let named = new["args"]
+        .as_array()
+        .unwrap()
+        .windows(2)
+        .any(|pair| pair[0] == "--name" && pair[1] == "lamp-one-hermes");
+    assert!(named, "the pane's fixed name: {new}");
+    let reply = calls
+        .iter()
+        .find(|call| call["args"][0] == "reply")
+        .unwrap();
+    assert_eq!(reply["args"][3], AGENT, "the one pane: {reply}");
+    assert!(
+        reply
+            .to_string()
+            .contains("You are making a skill for this lamp"),
+        "the make's words: {reply}"
+    );
+
+    // No kept session (Harness called as an agent): MakeHermes, as before.
+    let mut rig = Rig::new();
+    rig.config.as_person = false;
+    one_session_plan(&rig);
+    let work = make_work(&rig);
+    let mut runner = hermes_door_runner(&rig, false, false);
+    runner.default_agent = false;
+    runner.makes = true;
+    let gateway = lamp_tasks::skill_make::MakeGateway::of(Arc::new(runner));
+    let hermes = MakeHermesStandIn::default();
+    let answered = lamp_tasks::skill_make::answer_with(
+        &make_line(Some(true), 20_000),
+        true,
+        &work,
+        &hermes,
+        Some(&gateway),
+        &mut || {},
+    );
+    assert_eq!(answered, json!({"ok": true, "answer": "HERMES"}));
+    assert_eq!(hermes.0.load(Ordering::Acquire), 1);
+    assert!(rig.calls().is_empty(), "Harness never asked");
 }
 
 /// #7245: the lamp's make runner with an OpenClaw gateway default, its

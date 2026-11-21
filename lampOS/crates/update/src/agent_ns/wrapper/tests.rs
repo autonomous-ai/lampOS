@@ -1243,6 +1243,60 @@ fn a_runs_keys_file_is_read_once_deleted_and_never_in_argv() {
     );
 }
 
+/// #8151's parity: with the one run path and the tasks switch, every
+/// agent's namespace shows the skill-start launcher's socket folder and the
+/// pushed skills read-only, OpenClaw's gateway's own lines
+/// ([`one_path_start_edits`], each found once): staged before `/run` is
+/// hidden, moved back read-only, its staging removed, `admin.sock` never
+/// named, and lamp-control's line byte for byte as lamp-tasks reads it.
+/// Without the tasks switch, or off the one run path, none of it.
+#[test]
+fn the_one_path_namespace_shows_the_skill_start_folder_read_only_for_every_agent() {
+    for shown in SHOWN {
+        let on = Shown {
+            one_path: true,
+            ..shown
+        };
+        let text = ns_text(on);
+        let edits = one_path_start_edits();
+        assert_eq!(edits.len(), 6);
+        for (from, to) in &edits {
+            let found = text.matches(to.as_str()).count();
+            assert_eq!(found, usize::from(shown.tasks), "{shown:?}: {to}");
+            // Its anchor is gone where the edit replaces it (some keep it,
+            // adding a line after): the edit was made, not added beside.
+            if shown.tasks && !to.contains(from) {
+                assert!(!text.contains(from), "{shown:?}: {from}");
+            }
+        }
+        let q = "\nQ=/run/lampos-skill-start\n";
+        assert_eq!(
+            text.matches(q).count(),
+            usize::from(shown.tasks),
+            "{shown:?}"
+        );
+        assert!(!text.contains("admin.sock"), "{shown:?}");
+        if shown.tasks {
+            assert!(text.contains(
+                " L=/run/lampos-control/control.sock B=/run/lampos-tasks/model.sock P=/var/lib/lampOS/skills-dev S=/tmp/.lampos-ns\nQ=/run/lampos-skill-start\n"
+            ));
+            let staged = text.find("mount --bind \"$Q\" \"$S/q\"").unwrap();
+            let hidden = text.find("none /run || fail").unwrap();
+            let shown_again = text
+                .find("mount --move \"$S/q\" \"$Q\" && ro \"$Q\"")
+                .unwrap();
+            assert!(staged < hidden && hidden < shown_again, "{shown:?}");
+            assert!(text.contains("{ [ -z \"$Q\" ] || rmdir \"$S/q\"; }"));
+            assert!(text.contains("if [ -d \"$P\" ]; then mkdir -m 0700 \"$S/p\""));
+            assert!(!text.contains("if [ \"${LAMP_NS_NET-}\" = run ] && [ -d \"$P\" ]"));
+            assert!(text.contains("/usr/local/lib/lampos/skill-start's way to lamp-tasks"));
+        }
+        sh_n(&text);
+        let off = ns_text(shown);
+        assert!(!off.contains("lampos-skill-start"), "{shown:?}");
+    }
+}
+
 /// (#6685) With the one run path, the namespace script takes the agent's
 /// home from its wrapper: every edit found once for every switch, the home
 /// checked against the agents' homes (its own under [`HOMES`], or its own in
