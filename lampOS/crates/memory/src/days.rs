@@ -1419,12 +1419,26 @@ impl Days {
                 .map(|(id, _, _)| id)
                 .collect()
         };
-        let mut removed = 0;
+        // Each is forgotten as `forget {id}` forgets it, in turn, but all in
+        // one transaction: one commit for the lot, not one a turn. lamp-06c1,
+        // 21 Nov: ~101 matching turns took ~15 s at one commit each, far past
+        // the voice's answer budget. A failure part way removes none.
+        let tx = self.db.transaction()?;
+        let (mut removed, mut gone, mut unsent) = (0, Vec::new(), None);
         for id in matching {
-            if self.forget_here(person, id, false)? > 0 {
-                removed += 1;
+            if let Some((count, took, kept)) =
+                forget_in(&tx, person, id, false, self.unsent_asked, &self.epoch)?
+            {
+                if count > 0 {
+                    removed += 1;
+                }
+                gone.extend(took);
+                unsent = crate::history_unsent::joined(unsent, kept);
             }
         }
+        tx.commit()?;
+        self.told(gone);
+        self.unsent = crate::history_unsent::joined(self.unsent, unsent);
         if removed > 0 {
             self.forget_set_aside()?;
         }
@@ -1432,75 +1446,12 @@ impl Days {
     }
 
     fn forget_here(&mut self, person: &Person, id: u64, selective: bool) -> Result<u64> {
-        let Some(record) = self.record(person, id)? else {
+        let tx = self.db.transaction()?;
+        let Some((count, gone, unsent)) =
+            forget_in(&tx, person, id, selective, self.unsent_asked, &self.epoch)?
+        else {
             return Ok(0);
         };
-        let tx = self.db.transaction()?;
-        tx.execute("DELETE FROM doomed", [])?;
-        tx.execute(
-            "INSERT INTO doomed SELECT rid FROM entries WHERE person=? AND id=?",
-            params![person.as_str(), id],
-        )?;
-        versions(&tx)?;
-        // A kept thing or an observation with no distinctive word ("Stop.")
-        // takes no walk (#8031): it, its literal copies and the exchanges it
-        // came from go, with every version it replaced back to the first
-        // (the same kept thing at an earlier time: the first builder's HOLD
-        // on #8033), and no other kept thing. lamp-06c1, 20 Nov: forgetting
-        // a kept "Stop." by id took 28 rows, four of them kept things.
-        let wordless = selective
-            && (record.kind == "observation" || record.kind == "kept")
-            && walk_words(&doomed_texts(&tx)?).is_empty();
-        if wordless {
-            tx.execute(
-                "WITH RECURSIVE chain(rid) AS (SELECT rid FROM entries WHERE person=?1 AND id=?2 UNION SELECT r.older FROM replacements r JOIN chain c ON r.newer=c.rid) DELETE FROM doomed WHERE rid IN (SELECT rid FROM entries WHERE kind='kept') AND rid NOT IN (SELECT rid FROM chain)",
-                params![person.as_str(), id],
-            )?;
-        }
-        // Forgetting an extracted fact also removes its evidence, otherwise a
-        // later tidy pass could simply extract the same fact again; and a
-        // kept thing goes with the conversation it came up in (#1693,
-        // `remember_from`). This can remove an entire exchange containing
-        // more than one subject. One step back, the person's own exchanges
-        // only: an exchange's own sources are what its session was shown,
-        // not where the fact came from, so climbing them removed kept things
-        // that were only shown (#2003). A rule the exchange followed, in the
-        // scope beside theirs, is not evidence either.
-        //
-        // The evidence goes, but nothing goes because it derives from the
-        // evidence (#3113): with `LAMP_MEMORY_FORGET_ALL` a kept thing's
-        // sources are its conversation's exchanges, so one exchange can be
-        // the evidence of the colour and a source of the wedding, and of
-        // other things noticed in it. Forgetting the colour took the wedding;
-        // forgetting the wedding took the colour. So the walk below starts
-        // from what is named (with its versions) only, and the evidence joins
-        // after it; a link from something kept to a removed exchange goes by
-        // the foreign key, as on expiry.
-        let evidence: Vec<i64> = if record.kind == "observation" || record.kind == "kept" {
-            tx.prepare("SELECT DISTINCT s.parent FROM sources s JOIN doomed d ON s.child=d.rid JOIN entries e ON e.rid=s.parent WHERE e.person=?1 AND e.kind='exchange'")?
-                .query_map([person.as_str()], |r| r.get(0))?
-                .collect::<rusqlite::Result<_>>()?
-        } else {
-            Vec::new()
-        };
-        // A kept thing or an observation takes what carries its words, not
-        // all that was shown it ([`selective_descendants`]); an exchange,
-        // all that derives from it, as before.
-        if selective && (record.kind == "observation" || record.kind == "kept") {
-            selective_descendants(&tx, person)?;
-        } else {
-            descendants(&tx, None)?;
-        }
-        for rid in evidence {
-            tx.execute("INSERT OR IGNORE INTO doomed VALUES (?1)", [rid])?;
-        }
-        talk_with_doomed(&tx)?;
-        // Nightly pass B: what rests on anything going goes too.
-        crate::nightly::with_doomed(&tx)?;
-        said_again_with_doomed(&tx)?;
-        let gone = doomed_exchanges(&tx)?;
-        let unsent = crate::history_unsent::keep(&tx, self.unsent_asked, &self.epoch, &gone, None)?;
-        let count = erase(&tx)?;
         tx.commit()?;
         self.told(gone);
         self.unsent = crate::history_unsent::joined(self.unsent, unsent);
@@ -3452,6 +3403,94 @@ fn event_day(proposal: &tidy::Proposal, at: u64, local: &LocalTime) -> Option<Da
         return None;
     }
     kept_day(proposal.on.as_deref()?, at, local)
+}
+
+/// What one forget in a transaction took ([`forget_in`]): how many rows
+/// went, the exchanges among them (scope and id), and the range of the rows
+/// kept for the account's history.
+type Forgotten = (u64, Vec<(String, u64)>, Option<(u64, u64)>);
+
+/// One forget of `person`'s record `id` in `tx` ([`Days::forget_here`]),
+/// uncommitted: how many rows went, the exchanges among them (scope and id)
+/// and the rows kept for the account's history (`asked`, under `epoch`).
+/// `None` for a record not there (never, or already gone in `tx`).
+fn forget_in(
+    tx: &Transaction<'_>,
+    person: &Person,
+    id: u64,
+    selective: bool,
+    asked: bool,
+    epoch: &str,
+) -> Result<Option<Forgotten>> {
+    let Some(record) = read_record(tx, person, id)? else {
+        return Ok(None);
+    };
+    tx.execute("DELETE FROM doomed", [])?;
+    tx.execute(
+        "INSERT INTO doomed SELECT rid FROM entries WHERE person=? AND id=?",
+        params![person.as_str(), id],
+    )?;
+    versions(tx)?;
+    // A kept thing or an observation with no distinctive word ("Stop.")
+    // takes no walk (#8031): it, its literal copies and the exchanges it
+    // came from go, with every version it replaced back to the first
+    // (the same kept thing at an earlier time: the first builder's HOLD
+    // on #8033), and no other kept thing. lamp-06c1, 20 Nov: forgetting
+    // a kept "Stop." by id took 28 rows, four of them kept things.
+    let wordless = selective
+        && (record.kind == "observation" || record.kind == "kept")
+        && walk_words(&doomed_texts(tx)?).is_empty();
+    if wordless {
+        tx.execute(
+            "WITH RECURSIVE chain(rid) AS (SELECT rid FROM entries WHERE person=?1 AND id=?2 UNION SELECT r.older FROM replacements r JOIN chain c ON r.newer=c.rid) DELETE FROM doomed WHERE rid IN (SELECT rid FROM entries WHERE kind='kept') AND rid NOT IN (SELECT rid FROM chain)",
+            params![person.as_str(), id],
+        )?;
+    }
+    // Forgetting an extracted fact also removes its evidence, otherwise a
+    // later tidy pass could simply extract the same fact again; and a
+    // kept thing goes with the conversation it came up in (#1693,
+    // `remember_from`). This can remove an entire exchange containing
+    // more than one subject. One step back, the person's own exchanges
+    // only: an exchange's own sources are what its session was shown,
+    // not where the fact came from, so climbing them removed kept things
+    // that were only shown (#2003). A rule the exchange followed, in the
+    // scope beside theirs, is not evidence either.
+    //
+    // The evidence goes, but nothing goes because it derives from the
+    // evidence (#3113): with `LAMP_MEMORY_FORGET_ALL` a kept thing's
+    // sources are its conversation's exchanges, so one exchange can be
+    // the evidence of the colour and a source of the wedding, and of
+    // other things noticed in it. Forgetting the colour took the wedding;
+    // forgetting the wedding took the colour. So the walk below starts
+    // from what is named (with its versions) only, and the evidence joins
+    // after it; a link from something kept to a removed exchange goes by
+    // the foreign key, as on expiry.
+    let evidence: Vec<i64> = if record.kind == "observation" || record.kind == "kept" {
+        tx.prepare("SELECT DISTINCT s.parent FROM sources s JOIN doomed d ON s.child=d.rid JOIN entries e ON e.rid=s.parent WHERE e.person=?1 AND e.kind='exchange'")?
+            .query_map([person.as_str()], |r| r.get(0))?
+            .collect::<rusqlite::Result<_>>()?
+    } else {
+        Vec::new()
+    };
+    // A kept thing or an observation takes what carries its words, not
+    // all that was shown it ([`selective_descendants`]); an exchange,
+    // all that derives from it, as before.
+    if selective && (record.kind == "observation" || record.kind == "kept") {
+        selective_descendants(tx, person)?;
+    } else {
+        descendants(tx, None)?;
+    }
+    for rid in evidence {
+        tx.execute("INSERT OR IGNORE INTO doomed VALUES (?1)", [rid])?;
+    }
+    talk_with_doomed(tx)?;
+    // Nightly pass B: what rests on anything going goes too.
+    crate::nightly::with_doomed(tx)?;
+    said_again_with_doomed(tx)?;
+    let gone = doomed_exchanges(tx)?;
+    let unsent = crate::history_unsent::keep(tx, asked, epoch, &gone, None)?;
+    let count = erase(tx)?;
+    Ok(Some((count, gone, unsent)))
 }
 
 /// `on` as an event day said at `at`: a real `YYYY-MM-DD` from the local

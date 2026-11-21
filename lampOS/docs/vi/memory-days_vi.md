@@ -1933,7 +1933,10 @@ từng được giữ vẫn còn, và `recall` tìm thấy nó: "quên bữa ti�
 lời nghe và lời đáp có mọi từ khóa của một chủ đề (chữ thường, bỏ dấu, dạng
 số ít) bị quên như `forget {id}` của một lượt nói, cùng những gì dẫn từ nó
 (ghi chú trò chuyện), không bao giờ một điều đã giữ (#3113):
-`{ok:true,removed}`, số lượt nói. Lượt nói của phòng là của mọi người trong
+`{ok:true,removed}`, số lượt nói. Tất cả bị xóa trong một giao dịch, lần
+lượt từng lượt như lệnh quên riêng của nó: một lần commit, nên quên sau một
+cuộc nói dài vẫn trả lời kịp (lamp-06c1, 21/11: ~101 lượt khớp mất ~15 s khi
+mỗi lượt một commit), và lỗi giữa chừng thì không xóa gì. Lượt nói của phòng là của mọi người trong
 nhà và không bao giờ bị chạm tới (phòng, phạm vi quy tắc hay id khác bị từ
 chối `bad_person`); bộ nhớ cũ trả `unknown_op` và voice đi tiếp. Không gửi
 khi các điều đã giữ chưa xong: bộ nhớ không trả lời hay từ chối danh sách,

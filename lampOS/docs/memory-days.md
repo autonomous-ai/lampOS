@@ -2012,7 +2012,10 @@ from the talk about it. After the kept things, the voice now sends
 heard and said words have every key word of a subject (lower case, without
 accents, as singulars) is forgotten as a `forget {id}` of an exchange is,
 with what derives from it (its talk notes), never a kept thing (#3113):
-`{ok:true,removed}`, the count of exchanges. The room's exchanges are
+`{ok:true,removed}`, the count of exchanges. All of them go in one
+transaction, each in turn as its own forget would: one commit, so a forget
+after a long talk answers in time (lamp-06c1, 21 Nov: ~101 matching turns
+took ~15 s at one commit each), and a failure part way removes none. The room's exchanges are
 everyone's in the house and are never reached (the room, a rules scope or
 any other id is refused `bad_person`); an older memory answers
 `unknown_op` and the voice goes on. It is not sent when the kept things
