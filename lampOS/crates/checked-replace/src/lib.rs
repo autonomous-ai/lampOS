@@ -18,8 +18,10 @@ use std::time::{Duration, Instant};
 
 use rustix::fs::{AtFlags, Gid, Mode, OFlags, Uid};
 
-/// The longest OpenClaw's config check runs before it counts as a
-/// refusal: a cold start of its Node CLI on a lamp.
+/// The longest OpenClaw's config check runs before it is killed: a cold
+/// start of its Node CLI on a lamp. Not a refusal (#8225,
+/// [`check_did_not_finish`]): nothing is written, and the writer tries
+/// again later.
 // ponytail: a fixed bound, unmeasured on a lamp; tune once a lamp's check
 // is timed.
 pub const VALIDATE_WITHIN: Duration = Duration::from_secs(60);
@@ -106,6 +108,42 @@ pub const GATEWAY_WAITS: [Duration; 8] = [
 /// text.
 pub fn gateway_not_there(error: &str) -> bool {
     error.contains(NO_GATEWAY) || error.contains(NODE_NOT_READY)
+}
+
+/// What [`validate`] says of a check ended by a signal, OpenClaw's verdict
+/// never given (#7268's FINDING: a check racing the gateway's own start).
+pub const KILLED: &str = "(status killed)";
+/// What [`validate`] says of a check it killed past its bound.
+pub const RAN_PAST: &str = "OpenClaw's own config check ran past";
+/// The start of what a writer says of a check that did not finish
+/// ([`check_did_not_finish`]), and how that is known again.
+pub const DID_NOT_FINISH: &str = "OpenClaw's config check did not finish";
+
+/// Whether `why`, a failed config check's words, says it ended before
+/// OpenClaw gave a verdict (#8225: on lamp-52e6 the gateway a check had
+/// joined restarted under it, and `runuser` said "Killed"): ended by a
+/// signal ([`KILLED`], [`validate`]'s; "ended with signal: ", a leader's
+/// exit status; or a last line `Killed` or `Terminated`, what `runuser`
+/// says of a child a signal ended), past its bound ([`RAN_PAST`];
+/// "did not end within", lamp-update's bounded runner), or said so
+/// already ([`DID_NOT_FINISH`]). Nothing was judged: not a refusal. Only
+/// a check that ran and exited non-zero is one.
+pub fn check_did_not_finish(why: &str) -> bool {
+    let tail = why.trim_end();
+    let signal_line = ["Killed", "Terminated"].into_iter().any(|name| {
+        tail.strip_suffix(name)
+            .is_some_and(|before| before.is_empty() || before.ends_with([' ', '\n', ':']))
+    });
+    signal_line
+        || [
+            KILLED,
+            RAN_PAST,
+            DID_NOT_FINISH,
+            "ended with signal: ",
+            "did not end within",
+        ]
+        .into_iter()
+        .any(|said| why.contains(said))
 }
 
 /// `bytes` in place of `path`, with `mode`, through a new file beside it
@@ -236,14 +274,13 @@ pub fn validate(argv: &[String], env: &[(&str, &str)], within: Duration) -> Resu
         .collect();
     match status.map(|status| status.code()) {
         Some(Some(0)) => Ok(()),
-        Some(code) => Err(format!(
-            "OpenClaw's own config check refused it (status {}): {said}",
-            code.map_or("killed".into(), |code| code.to_string())
+        Some(Some(code)) => Err(format!(
+            "OpenClaw's own config check refused it (status {code}): {said}"
         )),
-        None => Err(format!(
-            "OpenClaw's own config check ran past {} s",
-            within.as_secs()
+        Some(None) => Err(format!(
+            "OpenClaw's own config check refused it {KILLED}: {said}"
         )),
+        None => Err(format!("{RAN_PAST} {} s", within.as_secs())),
     }
 }
 
@@ -325,6 +362,64 @@ pub fn redact(said: &str) -> String {
 mod tests {
     use super::*;
     use std::os::unix::fs::PermissionsExt;
+
+    /// #8225: a check a signal ended or one past its bound is not a
+    /// refusal, whichever runner reports it; one that ran and exited
+    /// non-zero is, even when OpenClaw's words name a kill.
+    #[test]
+    fn a_check_killed_or_past_its_bound_did_not_finish_and_a_refusal_did() {
+        let argv = "runuser -u lampos -- env /usr/local/bin/openclaw config validate --json";
+        for why in [
+            format!("{argv}: Killed"),
+            format!("{argv}: node said this\nTerminated\n"),
+            format!("{argv}: update query ended with signal: 9 (SIGKILL)"),
+            format!("{argv}: did not end within 90 s: it ran on"),
+            "OpenClaw's own config check refused it (status killed): ".to_owned(),
+            "OpenClaw's own config check ran past 60 s".to_owned(),
+        ] {
+            assert!(check_did_not_finish(&why), "{why}");
+        }
+        for why in [
+            format!("{argv}: models.mode: Unrecognized key"),
+            "OpenClaw's own config check refused it (status 1): gateway.port: Unrecognized key"
+                .to_owned(),
+            format!("{argv}: agents.Killed: Unrecognized key"),
+            format!(
+                "{argv}: openclaw: its gateway (lamp-openclaw-gateway.service) is not running in its own namespaces; nothing runs without it"
+            ),
+        ] {
+            assert!(!check_did_not_finish(&why), "{why}");
+        }
+
+        // From the check itself: a signal, then a bound.
+        let dir = tempfile_dir("killed");
+        let program = dir.join("openclaw");
+        std::fs::write(&program, "#!/bin/sh\nkill -9 $$\n").unwrap();
+        std::fs::set_permissions(&program, std::fs::Permissions::from_mode(0o755)).unwrap();
+        let argv = [program.to_string_lossy().into_owned()];
+        let killed = validate(&argv, &[], Duration::from_secs(10)).unwrap_err();
+        assert!(check_did_not_finish(&killed), "{killed}");
+        std::fs::write(&program, "#!/bin/sh\nexec sleep 30\n").unwrap();
+        let past = validate(&argv, &[], Duration::from_millis(200)).unwrap_err();
+        assert!(check_did_not_finish(&past), "{past}");
+        std::fs::write(
+            &program,
+            "#!/bin/sh\necho 'models.mode: Unrecognized key'\nexit 1\n",
+        )
+        .unwrap();
+        let refused = validate(&argv, &[], Duration::from_secs(10)).unwrap_err();
+        assert!(!check_did_not_finish(&refused), "{refused}");
+        std::fs::remove_dir_all(&dir).unwrap();
+    }
+
+    fn tempfile_dir(name: &str) -> std::path::PathBuf {
+        let dir = std::env::temp_dir().join(format!(
+            "lamp-checked-replace-{name}-{}",
+            std::process::id()
+        ));
+        std::fs::create_dir_all(&dir).unwrap();
+        dir
+    }
 
     /// Seventh's P3 on #7872: OpenClaw's words go to the journal, so a
     /// value its error quotes from the config (a gateway token, a

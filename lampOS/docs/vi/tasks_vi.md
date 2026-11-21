@@ -3701,7 +3701,9 @@ thử lại sau 5, 10, 20, 40 s rồi 60 s bốn lần, tổng 5 phút 15 s
 s"; không ghi gì trước khi gateway kiểm tra nó. Lần kiểm tra bị một signal
 kết thúc trước khi OpenClaw trả lời ("status killed": trên lamp-52e6,
 lamp-tasks và gateway khởi động lại cùng lúc và lần kiểm tra đua với lúc
-gateway tự khởi động, FINDING của #7268) cũng được thử lại theo cùng các lần
+gateway tự khởi động, FINDING của #7268), hoặc bị kill vì quá giới hạn 60 s
+(`lamp_checked_replace::VALIDATE_WITHIN`, "ran past"; #8225,
+`lamp_checked_replace::check_did_not_finish`), cũng được thử lại theo cùng các lần
 chờ đó, mỗi lần một dòng nhật ký "OpenClaw's settings were not checked,
 OpenClaw's check was killed before it answered; tried again in N s", không
 có giá trị nào của file. Quá lần chờ cuối thì không

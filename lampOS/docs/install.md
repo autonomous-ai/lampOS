@@ -2479,8 +2479,18 @@ As root, on a lamp with the base image (`crates/update/src/install.rs`):
      from the read to the rename. Refused, the new file is
      removed, `openclaw.json` stays byte for byte, and the install fails
      with error `config` and OpenClaw's words ("... OpenClaw's own config
-     check refused it: ..."), so the gateway is not restarted onto it. With
-     no `openclaw-ns` there the block is written unchecked, said. The
+     check refused it: ..."), so the gateway is not restarted onto it. A
+     check that did not finish is no refusal (#8225: on lamp-52e6 the
+     gateway the check had joined restarted under it, and `runuser` said
+     "Killed"): one ended by a signal or past its bound
+     (`lamp_checked_replace::check_did_not_finish`) leaves `openclaw.json`
+     byte for byte too, takes nothing out (wrapper, `openclaw-ns`,
+     `skill-start` stay), puts the record back as it was before the
+     install (`absent` with none), and says "OpenClaw is not installed
+     now: ...openclaw.json: OpenClaw's config check did not finish (<why>):
+     not checked now, kept as it was; the next round tries again"; the
+     next round asks the install again. With no `openclaw-ns` there the
+     block is written unchecked, said. The
      install sets only the block's own keys (`mode`, `bind`, `port`,
      `auth.mode`, `auth.token`), keeping any other key in it or beside it.
    - **The `gateway` block, each round (#7868):** a reset whose cut was
@@ -2506,7 +2516,10 @@ As root, on a lamp with the base image (`crates/update/src/install.rs`):
      written again, checked by OpenClaw, and the gateway restarted if it
      ran". Refused, `openclaw.json` stays byte for byte, nothing is
      restarted, and the line says "... not written again, the gateway not
-     restarted: <OpenClaw's words, masked>"; the next round asks again.
+     restarted: <OpenClaw's words, masked>"; the next round asks again. A
+     check that did not finish (#8225, above) is the same, its words
+     "OpenClaw's config check did not finish (<why>): not checked now,
+     kept as it was; the next round tries again".
      The one-shot's check joins the running gateway (above), and a gateway
      just (re)started may not be there to join yet: only that refusal (the
      wrapper's "is not running in its own namespaces", or "'node': No such
