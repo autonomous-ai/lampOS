@@ -2488,6 +2488,37 @@ fn mandatory(worker: &Worker, standby: bool) -> bool {
     worker.role != "second" || !standby
 }
 
+/// `snapshot` as `worker`'s authority. A full control socket
+/// (`WouldBlock`) is a renewal skipped, never an error (#8204): the worker
+/// stopped reading for a while (its only thread waiting on a slow call),
+/// and the next tick sends a whole new snapshot. What the authority
+/// guards holds without this one: the worker's last authority lapses at its
+/// own lease (`MAX_AUTHORITY_LEASE_US`, 250 ms), so a skip only lets it
+/// lapse, never lengthens it; and a refused send takes no sequence number,
+/// so the next one arrives in order. Any other error (a closed socket, a
+/// peer gone) is returned as before, and so is a `WouldBlock` once the
+/// skips have run past `process::RENEWAL_SKIPS_MOST_US` (3 s): a worker
+/// deadlocked with its process alive still restarts the voice.
+fn send_authority(worker: &mut Worker, snapshot: Snapshot) -> io::Result<()> {
+    match worker
+        .channels
+        .control
+        .send(Control::Authority { snapshot })
+    {
+        Ok(()) => {
+            worker.renewal_stall.delivered(&worker.role, monotonic_us());
+            Ok(())
+        }
+        Err(error)
+            if error.kind() == io::ErrorKind::WouldBlock
+                && worker.renewal_stall.skip(&worker.role, monotonic_us()) =>
+        {
+            Ok(())
+        }
+        Err(error) => Err(error),
+    }
+}
+
 /// A worker's refused authority send, as the session ends on it. On the
 /// Controls route a privacy worker that ended cleanly is its switch
 /// unreadable, as at its start (`privacy_started`): the microphones stay
@@ -2546,10 +2577,7 @@ impl Rig {
             if held && worker.role == "capture" {
                 continue;
             }
-            if let Err(error) = worker
-                .channels
-                .control
-                .send(Control::Authority { snapshot })
+            if let Err(error) = send_authority(worker, snapshot)
                 && mandatory(worker, standby)
             {
                 failure.get_or_insert(authority_refused(worker, privacy_controls, error));
@@ -2595,10 +2623,7 @@ impl Rig {
             if held && worker.role == "capture" {
                 continue;
             }
-            if let Err(error) = worker
-                .channels
-                .control
-                .send(Control::Authority { snapshot })
+            if let Err(error) = send_authority(worker, snapshot)
                 && mandatory(worker, standby)
             {
                 return Err(authority_refused(worker, privacy_controls, error));
@@ -22297,3 +22322,6 @@ mod stream_turn_tests;
 #[cfg(test)]
 #[path = "coordinator/optional_ring_tests.rs"]
 mod optional_ring_tests;
+#[cfg(test)]
+#[path = "coordinator/renewal_stall_tests.rs"]
+mod renewal_stall_tests;
