@@ -315,4 +315,38 @@ mod tests {
         let set = vec![Message::user("Remind me to call Sam at six.")];
         assert_eq!(choice(&listed, &set), None);
     }
+
+    /// A question about the person's own reminders that the force does not
+    /// read is the model's choice, from the descriptions alone: on
+    /// lamp-52e6 in gate 1126 (#8181) such a line, the 2nd of a
+    /// conversation, went to faq's `lamp_help` with `topic` `reminders`.
+    /// So `list_reminders` says it is for their own reminders and timers
+    /// at any point, not `lamp_help`, and faq's description says it is not
+    /// for their own, which are `list_reminders`'. Each within its bound:
+    /// a function's 1,024 bytes, and faq's whole line in `use_skill`.
+    #[test]
+    fn list_reminders_and_lamp_help_say_which_is_for_their_own_reminders() {
+        let listing = lamp_actions::schedule::LIST_DESCRIBED;
+        for words in [
+            "their own reminders or timers at any point",
+            "not recall or lamp_help",
+        ] {
+            assert!(listing.contains(words), "{words}: {listing}");
+        }
+        assert!(listing.len() <= 1_024, "{}", listing.len());
+        let faq = include_str!("../../../../skills/faq/SKILL.md");
+        let field = |key: &str| {
+            faq.lines()
+                .find_map(|line| line.strip_prefix(key))
+                .unwrap_or_else(|| panic!("no {key}"))
+        };
+        for key in ["description: ", "when: "] {
+            let said = field(key);
+            assert!(
+                said.contains("not for their own reminders or timers") && said.contains(LIST),
+                "{key}{said}"
+            );
+        }
+        assert!(field("when: ").len() <= 200);
+    }
 }
