@@ -1,6 +1,6 @@
 # Where V2 is: the build rows and the quality rows
 
-Written by the first builder from the team's review page at 2026-11-21 09:16 (+07). The lead asked for it on #1711 (20 Oct, 16:43), so anyone can read where V2 is without waiting for the next post. It's a copy, cut once a day in the morning. The figures the first builder posts on #1711 every four hours are the live ones.
+Written by the first builder from the team's review page at 2026-11-21 09:30 (+07). The lead asked for it on #1711 (20 Oct, 16:43), so anyone can read where V2 is without waiting for the next post. It's a copy, cut once a day in the morning. The figures the first builder posts on #1711 every four hours are the live ones.
 
 **Build 92.0% over 76 rows. Quality 71.2% over 17 rows.** For later (mood, and texting from the app): 48.8% over 4 rows, not in the build figure.
 
@@ -12,11 +12,11 @@ Written by the first builder from the team's review page at 2026-11-21 09:16 (+0
 
 | Row | Score | Issues | Owners | Where it is |
 |---|---|---|---|---|
-| The voice never dies (SD stalls, power cuts, midnight) | 0.90 | #784 #762 #1178 #7224 #6672 #8081 | fifth, eighth, el | 21 Nov 09:1x, unchanged at 0.9: the fix for the boot exit El found is on stable 15322 (promoted 09:09; |
+| The voice never dies (SD stalls, power cuts, midnight) | 0.90 | #784 #762 #1178 #7224 #6672 #8081 | fifth, eighth, el | 21 Nov 09:1x, unchanged at 0.9: P0 #7224’s boot fix is on stable 15322 (a slow conversation worker is waited for instead of the voice exiting, #8172), and El’s reboot read on a plain stable lamp closes it. |
 | Speed: tool turns and comma pauses | 1.00 | #799 #782 | second, fourth |  |
 | Who is talking, and when not to answer | 0.93 | #753 #792 #800 #7297 | fourth, second, sixth | 19 Nov 09:1x, up from 0.9: on stable 14432 lines said to nobody count as the busy room's talk (LAMP_ROOM_HELD_TALK, #7656), the caller's follow-up with no face seen speaking renews their call (LAMP_BUSY_NO_FACE_RENEWS, #… |
 | Privacy switch closes both microphones | 1.00 | #795 | — |  |
-| Faces: remember, hello by name | 0.92 | #759 #775 #7331 | first, sixth | 21 Nov 09:1x, unchanged at 0.92, its two signals still open (the owner matched at the desk on lamp-74ff, and #8053’s 9 in 10), though two face fixes reached customers this morning: the lamp keeps knowing who it’s talking… |
+| Faces: remember, hello by name | 0.92 | #759 #775 #7331 | first, sixth | 21 Nov 09:1x, unchanged at 0.92: #7218 and #7704 reached customers this morning, but its two signals are still open, the owner matched at the desk on lamp-74ff and #8053’s 9 in 10. |
 | Hand work to Claude Code or Codex, and its news | 1.00 | #751 #765 #798 #733 | seventh |  |
 | Backup voice when Gemini is down | 0.50 | #778 #754 | sixth | 16 Nov 13:0x, down from 1.0: the product runs one voice route, and when that route is down the lamp says so and no second voice takes over. |
 | Gives way to a hand; wakes after power | 1.00 | #780 #790 #702 #703 #701 | fifth | Arm-goal guard merged (#1192) |
@@ -25,7 +25,7 @@ Written by the first builder from the team's review page at 2026-11-21 09:16 (+0
 | Speaks first when it should (the Policy) | 1.00 | #752 | second |  |
 | Each person’s memory kept apart | 1.00 | #764 | seventh |  |
 | Sleep, and waking on its name | 0.90 | #749 #714 #7219 | fourth, second, fifth, seventh | 16 Nov 20:2x, up from 0.85: the sleep a person asks for by voice is on again in the product, on stable 13500 since 19:00, after its walk on a freshly reset lamp-52e6 (#7318). |
-| Reminders, timers, memory across days | 0.90 | #748 #743 #7987 #8181 #8182 | fifth, seventh | 21 Nov 09:1x, unchanged at 0.9: #8181 and #8182 are still open, and gate 1133 on stable 15322 answered 4 of 4 reminders questions by the model’s own choice, the force firing 0 of 4 at the gate’s quiet volume (#7987). |
+| Reminders, timers, memory across days | 0.90 | #748 #743 #7987 #8181 #8182 | fifth, seventh | 21 Nov 09:1x, 0.9, down from 0.95 at 05:0x: two misses are the model’s choice (#8181, #8182, open), and on stable 15322 the reminders force fired 0 of 4 at the gate’s quiet volume (#7987). |
 | Setup for a home, 5 s reset | 0.95 | #806 #1209 #2861 #3579 | first, el | 26 Oct 20:3x, up from 0.85: shown on lamp-52e6 with build 7071 (the lead’s agent, 20:10–20:28). |
 | A safe shutdown from the app and a long press | 1.00 | #3697 #3698 #3713 #3735 | fifth, mobile | 2 Nov 16:0x, up from 0.85, built: on in the product since #4909, stable in 9528 (16:0x). |
 | Touch strip and head pads | 0.95 | #711 #1362 #2445 #2460 #2857 | first, fifth | 27 Oct 15:1x: found on the tester’s 7071 lamps: a hand kept 3 s put the lamp to sleep unsaid, in onboarding’s touch and giving-way steps, and they reset it (#3747, #3749). |
@@ -67,7 +67,7 @@ Written by the first builder from the team's review page at 2026-11-21 09:16 (+0
 | “Look for my keys”, an installable skill | 0.90 | #1685 #1738 #2444 #2466 #2835 #2904 | first, thirteen | 6 Nov 17:3x, up from 0.85: installed from the Store through the app on 9adf at 10226, and it looked and answered. |
 | The light dims and goes out when nobody is there, a core skill | 0.85 | #1677 #1721 #1747 | nine | 6 Nov 21:5x, down from 1.0, as Build now counts what a customer gets (the lead’s agent for the lead, 21:34): it is built and was tried on a lamp, but `light-out` is installed off on customer lamps (install::PRODUCT_SKILL… |
 | What you teach it (“don’t say hello in the morning”) is kept and honoured | 1.00 | #813 | seventh | Built |
-| Forgets on request: that, everything, my face, and everything it came from | 0.97 | #1586 #1693 #2849 #2850 | fourth, friday, twelve | 21 Nov 09:1x, back up to 0.97 from 0.85: all four forget faults found on 20 Nov are fixed for customers on stable 15322 (promoted 09:09), each shown on lamp-06c1: a short line’s forget takes no other kept thing (#8031, b… |
+| Forgets on request: that, everything, my face, and everything it came from | 0.97 | #1586 #1693 #2849 #2850 | fourth, friday, twelve | 21 Nov 09:1x, back up to 0.97 from 0.85: the four forget faults found on 20 Nov (#8031, #8038, #8059, #8165) are fixed for customers on stable 15322, each shown on lamp-06c1. |
 | Remembers what matters without being asked (“how was the wedding?”) | 0.90 | #1693 #2648 #2680 #2805 #2806 #2807 #2808 | friday, twelve, thirteen | 26 Oct 09:5x, up from 0.85: the product keeps what matters without being asked, dated things and one open thread, for the person seen saying it only, and “forget everything about me” reaches it (#3450, merged 08:4x: OBSE… |
 | Keeps going when one part fails | 1.00 | — | — | Built: each part its own unit, restarted alone, health says how the lamp is |
 | Change the Wi-Fi, name or time zone after setup, without a reset | 0.90 | #1982 #1995 #2038 #2851 #2852 #2853 | fourteen, mobile, migrate | 12 Nov 20:3x, up from 0.85: a lamp whose saved network is gone now finds a new one by itself, for customers since stable 12337 (17:09, `LAMP_WIFI_RECOVERY` on, #6254). |
@@ -102,7 +102,7 @@ Written by the first builder from the team's review page at 2026-11-21 09:16 (+0
 | Cutting in | 0.70 | 0.75 | 20 Nov 07:1x, up from 0.65: on stable 14922 a cut-in with no words (a cough, a knock) resumes the cut answer from its sentence, says “Oops, cut off again” on a second, and pauses on a third until the person says “Lamp” (… |
 | Stop words | 0.70 | 0.75 | 9 Nov 10:2x, up from 0.6: stable 10824 (promoted 9 Nov 08:41) has the stop words heard over the lamp’s own voice (LAMP_STOP_WORDS_KEYTERM on, #5111 closed). |
 | Its own echo | 0.65 | 0.70 | Measured right today (#968): the canceller takes a median 54 dB off the lamp’s own voice on lamp-52e6, the same hardware; |
-| Not spoken to | 0.60 | 0.90 | 21 Nov 09:1x, unchanged at 0.6: the meeting fix (#8137) is on stable since 15264, but Migrate’s seeded runs on lamp-e82d this morning still had the lamp answer 10 lines nobody aimed at it in 15 minutes, 6 in the window a… |
+| Not spoken to | 0.60 | 0.90 | 21 Nov 09:1x, 0.6, down from 0.65 on 20 Nov: the lamp still answers talk nobody aimed at it (#8114), 10 lines in 15 minutes on lamp-e82d with the meeting fix (#8137) in, and 15 of 53 English lines calling a person. |
 | Several people | 0.70 | 0.85 | 17 Nov 14:1x, back up from 0.6: the lamp no longer answers two people talking to each other while the one facing it listens, for customers since stable 13753 (LAMP_TURNED_FACE_SPEAKS, #7297 closed): its rows on lamp-52e6… |
 | Sounds that are not speech | 0.80 | 0.80 | 18 Oct 17:48, the same 48 noises now judged from the lamp’s own state recorded during the run (the 17 Oct zeros came from an older recording, so they do not compare): answered 0 times, but 12 of 48 taken for a voice and … |
 | Speaking up on its own | 0.85 | 0.85 | 9 Nov 10:2x, back up from 0.8: #5498’s fix (a stale oldest reminder no longer silences every later one, ec2be29dbc) is on stable since 10686, and on 10824 a one-minute timer rang and was said on lamp-52e6 (Fifth, 07:20) … |
@@ -110,7 +110,7 @@ Written by the first builder from the team's review page at 2026-11-21 09:16 (+0
 | Remembers you: your name and what you told it | 0.70 | 0.90 | 17 Nov 13:1x, up from 0.65: the fix for the name the owner’s lamp could not learn is on stable 13706 (#7397, LAMP_NAME_LEARN_FIX), and a fresh-lamp walk on 13706 learned the name with a yes (12:13). |
 | A good companion | 0.70 | 0.90 | 18 Nov 13:1x, down from 0.75: at the owner’s own lamp today a water nudge said they had been at the desk a while, and asked how long, the lamp said it did not track their time, though its eyes measure the sitting: it con… |
 | Both microphones | 0.70 | 0.80 | 17 Nov 09:0x, up from 0.6: on lamp-52e6, build 13601, whose code is in stable 13681, no request with words of 70 came back with none heard (Fifth’s q-mics 53bf20296506, per-run counts saved). |
-| Body | 0.70 | 0.80 | 21 Nov 09:1x, unchanged at 0.7: a lively character now moves at about V1’s pace on stable 15322 (#8155, measured against V1), but plays clips about 3 times a minute against V1’s 5.5, and shorter than V1’s (#8153, open, a… |
+| Body | 0.70 | 0.80 | 21 Nov 09:1x, unchanged at 0.7: level 5 now moves at about V1’s pace on stable 15322 (#8155), but plays fewer and shorter clips than V1 (#8153, open). |
 | Head and eye | 0.65 | 0.80 | 23 Oct 11:2x, up from 0.6: head touch passed with the lead’s own hand on lamp-52e6: a tap, a stroke, a 3 s hold that put it to sleep, a tap that woke it, and nothing with hands away (#2857 closed). |
 | The cheaper voice (Deepgram + DeepSeek + ElevenLabs) as good as Live | 0.65 | 0.90 | 6 Nov 17:3x, down from 0.70: installed 9928 on 52e6 in office hours heard 11/32 and 20/32 right, well below the 48/49 of its old run; |
 | Light and all of it together | 0.75 | 0.80 | 19 Nov 09:1x, up from 0.7: 11 promote gates in a row on lamp-52e6 (14320 to 14432, 18 Nov 23:xx to 19 Nov 08:3x) passed the light row and the mid-story light asks, where 4 of 9 failed on 16 Nov. |
