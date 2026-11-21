@@ -85,7 +85,7 @@ fn replay(blocks: &[Block], switch: bool) -> Vec<(usize, Step)> {
 
 /// Each try's trail starts this many blocks before its clip played: the
 /// blocks before it are the lamp's story alone, nobody talking.
-const TRIES: [(&str, usize); 3] = [
+const TRIES: [(&str, usize); 4] = [
     // The clip's words came late, from block 516 (+3.15 s), after the
     // kit's +3 s window: "Wait" heard 6 Own and 4 Over, "hold on." 25
     // blocks Unknown, 13 with no echo and 12 at an alignment 50-60 old.
@@ -97,6 +97,11 @@ const TRIES: [(&str, usize); 3] = [
     // In a pause of the story, from block 313 (+1.32 s): 12 Unknown with
     // no echo (the render silent where its echo would be), then 1 Over.
     ("8159d_r2_t4", 181),
+    // The story paused 9 blocks Still (blocks 113-121), went on, and from
+    // block 178 its own voice was heard Over, plainly, for 7 blocks
+    // (explained 0, alignment 0-19 old): a yield at block 184 (-0.39 s),
+    // before the clip's words (from about block 334, +1.1 s).
+    ("8159d_r1_t15", 224),
 ];
 
 /// `LAMP_CUT_IN_STALE_ONSET=on`: a person heard Unknown past the reply's
@@ -121,11 +126,13 @@ fn cut_ins_heard_unknown_past_the_replys_start_yield_only_with_the_switch() {
 }
 
 /// The lamp's own story before each clip yields to nothing with the switch.
-/// And try 15, whose yield at -0.39 s was on the lamp's own sound after a
-/// pause (7 plain Over) and whose real cut-in came after the resume, heard
-/// Over before the lamp's sound was matched again: the switch changes
-/// nothing there. That yield is not this switch's to fix, and the blocks
-/// before the match are left as they are (#8159).
+/// That includes try 15's: its yield at -0.39 s was on the lamp's own sound
+/// after a pause in the story (7 plain Over, 63 blocks after the last Still),
+/// and its resume restarted the reply's first blocks, so the real cut-in
+/// that followed was never yielded to. With the switch, a reply going on
+/// after its sound fell still has begun again for the onset, as one going
+/// on after a resume has: 10 Over in a row, not 7. Without the switch that
+/// yield is as on the lamp.
 #[test]
 fn the_lamps_own_voice_yields_to_nothing_more_with_the_switch() {
     for (name, clip) in TRIES {
@@ -133,7 +140,5 @@ fn the_lamps_own_voice_yields_to_nothing_more_with_the_switch() {
         assert_eq!(replay(&blocks[..clip], true), [], "{name}");
     }
     let blocks = trail("8159d_r1_t15");
-    let off = replay(&blocks, false);
-    assert_eq!(off.first(), Some(&(184, Step::Yield)));
-    assert_eq!(replay(&blocks, true), off);
+    assert_eq!(replay(&blocks, false).first(), Some(&(184, Step::Yield)));
 }
