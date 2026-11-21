@@ -284,15 +284,25 @@ impl Search {
 }
 
 /// DeepSeek's fetch answer as the model is told it: the page's title and
-/// text cut short, or what went wrong.
+/// text cut short, or what went wrong. A page status of 400 or more that
+/// the answer gives (`status`, `status_code`) goes with them, so a 404 page
+/// is told as one and backs no live figure (`crate::live_fact::found`).
 fn fetch_told(fetched: std::result::Result<Result<Value>, tokio::time::error::Elapsed>) -> Value {
     match fetched {
         Ok(Ok(answer)) => {
             let cut = |text: &str, chars: usize| text.chars().take(chars).collect::<String>();
-            json!({
+            let mut told = json!({
                 "title": cut(answer["title"].as_str().unwrap_or(""), 200),
                 "content": cut(answer["content"].as_str().unwrap_or(""), PAGE_CHARS),
-            })
+            });
+            if let Some(status) = ["status", "status_code", "statusCode"]
+                .iter()
+                .find_map(|key| answer[*key].as_u64())
+                .filter(|status| *status >= 400)
+            {
+                told["status"] = json!(status);
+            }
+            told
         }
         Ok(Err(error)) => json!({"error": format!("the page could not be read: {error}")}),
         Err(_) => json!({"error": "the page did not come in time"}),
@@ -969,6 +979,26 @@ mod tests {
         ] {
             assert!(!fetchable(unfit), "{unfit}");
         }
+    }
+
+    /// A page's failed status goes with its words, so it backs no live
+    /// figure (Twelve's P3 on #7719); a page that came, or a status under
+    /// 400, is told as before.
+    #[test]
+    fn a_page_read_tells_its_failed_status() {
+        let page = |answer: Value| fetch_told(Ok(Ok(answer)));
+        let missing = page(json!({"title": "Gold", "content": "Gone.", "status_code": 404}));
+        assert_eq!(
+            missing,
+            json!({"title": "Gold", "content": "Gone.", "status": 404})
+        );
+        assert!(!crate::live_fact::found(&missing));
+        let came = page(json!({"title": "Gold", "content": "$4,061 an ounce.", "status": 200}));
+        assert_eq!(
+            came,
+            json!({"title": "Gold", "content": "$4,061 an ounce."})
+        );
+        assert!(crate::live_fact::found(&came));
     }
 
     /// One answer from a local server, and the request it got.

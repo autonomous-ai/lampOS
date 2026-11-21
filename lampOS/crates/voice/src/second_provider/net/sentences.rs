@@ -101,10 +101,21 @@ impl Sentences {
     /// followed by whitespace): for a voice asked one request a piece, so
     /// its first sound waits for neither a sentence nor a clause (#1712).
     pub fn words(&mut self, n: usize) -> Option<String> {
+        self.words_past(n, |_| false)
+    }
+
+    /// [`Self::words`], but a piece whose last word is one `goes_on` names
+    /// takes the next whole word too, and so on: "Silver is about 31" waits
+    /// for "dollars" (`crate::live_fact::is_number`, Twelve's HOLD on #8224).
+    pub fn words_past(&mut self, n: usize, goes_on: impl Fn(&str) -> bool) -> Option<String> {
         let mut words = 0;
+        let mut word_at = 0;
         let mut in_word = false;
         for (at, c) in self.text.char_indices() {
             if !c.is_whitespace() {
+                if !in_word {
+                    word_at = at;
+                }
                 in_word = true;
             } else if std::mem::replace(&mut in_word, false) {
                 if at > self.decided {
@@ -112,7 +123,7 @@ impl Sentences {
                     return None;
                 }
                 words += 1;
-                if words == n {
+                if words >= n && !goes_on(&self.text[word_at..at]) {
                     let piece = self.text[..at].trim().to_owned();
                     self.take(at);
                     return Some(piece);

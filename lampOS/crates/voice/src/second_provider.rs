@@ -17615,6 +17615,7 @@ fn said_quietly(
     }
     let said = hold.say(sentence?, remembered)?;
     quiet.spoken(&said);
+    live.said(&said);
     Some(said)
 }
 
@@ -18286,6 +18287,9 @@ async fn answer(
         && !held_by_gap(scope.as_ref())
         && crate::dont_know::about_themself(&said))
     .then(|| said.clone());
+    // Whether the line asks for a live fact: only the first-words wait of
+    // `LAMP_LIVE_FACT_CHECKED` reads it (the first builder on #8224).
+    let asks_live = crate::live_fact::asks_live(&said);
     let reminded = said.to_lowercase().contains("remind");
     // Whether the worded claims judge this turn (`LAMP_ACTION_CLAIM_WORDED`,
     // #5215): never a line the person asked as a question, whose reply may
@@ -19068,7 +19072,8 @@ async fn answer(
             shared.live_facts && !quoted && !matches!(asked, Asker::Reminder { .. }),
             request,
             &rounds,
-        );
+        )
+        .asking_live(asks_live);
         let mut live_note: Option<String> = None;
         // Whether a claim with no call (or a step word alone, with the
         // switch) was asked again once already, and whether the next round
@@ -20061,16 +20066,27 @@ async fn answer(
                         // So does a step word in the walk (#5890): its ask
                         // is read whole before it is said or dropped.
                         // Nor while a made skill not on is guarded (#7270):
-                        // its claim is judged whole.
+                        // its claim is judged whole. Nor on a line asking a
+                        // live fact before a lookup found one
+                        // (`LAMP_LIVE_FACT_CHECKED`): its figure is judged
+                        // whole; any other line is cut as with it off.
                         if sentences.is_empty()
                             && !queue.started
                             && queue.made_not_on.is_none()
-                            && !live.watching()
+                            && !live.holds_back()
                             && !crate::remember::may_offer_a_keep(split.pending())
                             && !crate::onboarding::may_open_a_step(split.pending())
                         {
                             sentences.extend(split.clause().or_else(|| {
-                                shared.first_words.and_then(|words| split.words(words))
+                                shared.first_words.and_then(|words| {
+                                    // While live figures are judged, a
+                                    // piece never ends on a bare number.
+                                    if live.watching() {
+                                        split.words_past(words, crate::live_fact::is_number)
+                                    } else {
+                                        split.words(words)
+                                    }
+                                })
                             }));
                         }
                         for sentence in sentences {
@@ -20595,6 +20611,7 @@ async fn answer(
                             if let Some(sentence) = live.pass(sentence)
                                 && let Some(sentence) = offer_hold.say(sentence, remember_ran)
                             {
+                                live.said(&sentence);
                                 queue.push(sentence).await?;
                             }
                         }
@@ -21049,6 +21066,7 @@ async fn answer(
                             if let Some(sentence) = live.pass(sentence)
                                 && let Some(sentence) = offer_hold.say(sentence, remember_ran)
                             {
+                                live.said(&sentence);
                                 queue.push(sentence).await?;
                             }
                         }
@@ -21400,7 +21418,7 @@ async fn answer(
                                 calls.len()
                             );
                             live.asking_again();
-                            live_note = Some(crate::live_fact::note(tool));
+                            live_note = Some(live.note(tool));
                         }
                         Some(tool) if round < MAX_ROUNDS && !live.asked_again => {
                             eprintln!(
@@ -21408,7 +21426,7 @@ async fn answer(
                                 turn_called.len()
                             );
                             live.asking_again();
-                            messages.push(Message::system(crate::live_fact::note(tool)));
+                            messages.push(Message::system(live.note(tool)));
                             continue;
                         }
                         _ if calls.is_empty() => {
