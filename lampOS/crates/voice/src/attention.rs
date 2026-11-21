@@ -923,6 +923,15 @@ pub(crate) const SAID_TO_A_PERSON: &[&str] = &[
 /// you done?", "Hi, Tam." are; "Hey, Lynn.", "Okay, Lan.", "Lamb, …" are
 /// not (stand-ins kept, the first builder's 08:57).
 pub(crate) fn called_by_another_name(heard: &str) -> bool {
+    called_by_another_name_among(heard, &crate::known_faces::names_kept())
+}
+
+/// [`called_by_another_name`] with the names of the faces the lamp knows,
+/// `known` (#8114, the first builder's 10:52): a word written for the
+/// lamp's name ("Lynn", "Lan") that is one of them calls that person, not
+/// the lamp, as any other person's name does. In a home with no face of
+/// that name the stand-in calls the lamp, as before.
+pub(crate) fn called_by_another_name_among(heard: &str, known: &[String]) -> bool {
     let Some((start, end)) = crate::second_provider::first_word_set_off(heard) else {
         return false;
     };
@@ -931,16 +940,23 @@ pub(crate) fn called_by_another_name(heard: &str) -> bool {
     let opener = heard[start..end].to_lowercase();
     if crate::second_provider::OPENS_SET_OFF.contains(&opener.as_str()) {
         let rest = heard[end..].trim_start_matches([',', ' ']);
-        return rest.len() < heard.len() - end && called_by_another_name(rest);
+        return rest.len() < heard.len() - end && called_by_another_name_among(rest, known);
     }
     if opener == "thank" {
         let rest = heard[end..].trim_start();
         if let Some(rest) = rest.strip_prefix("you") {
-            return called_by_another_name(rest.trim_start_matches([',', ' ']));
+            return called_by_another_name_among(rest.trim_start_matches([',', ' ']), known);
         }
     }
     let word = &heard[start..end];
     let lower = word.to_lowercase();
+    // A stand-in that is the name of a face the lamp knows is that person's.
+    if word.chars().all(char::is_alphabetic)
+        && (STAND_INS.contains(&lower.as_str()) || STAND_ALONE_INS.contains(&lower.as_str()))
+        && known.iter().any(|name| name.trim().to_lowercase() == lower)
+    {
+        return true;
+    }
     word.len() >= 2
         && word.chars().all(char::is_alphabetic)
         && word.chars().next().is_some_and(char::is_uppercase)
@@ -7857,6 +7873,39 @@ mod tests {
             "hey, dan, lower case is no name",
         ] {
             assert!(!called_by_another_name(not_theirs), "{not_theirs}");
+        }
+    }
+
+    /// #8114 (the first builder's 10:52): a stand-in that is the name of a
+    /// face the lamp knows ("Lynn", "Lan") calls that person; with no such
+    /// face it is the lamp's, as before, and the lamp's own name never is.
+    #[test]
+    fn a_stand_in_that_names_a_known_face_is_that_persons() {
+        let none: [String; 0] = [];
+        let known = ["Lynn".to_owned(), "Lan".to_owned(), "Dee".to_owned()];
+        for line in [
+            "Lynn, are you done?",
+            "Hey, Lynn. Can you come here?",
+            "Okay, LAN. Let's go.",
+            "Thanks, Lynn.",
+        ] {
+            assert!(
+                called_by_another_name_among(line, &known),
+                "{line}: a known face"
+            );
+            assert!(
+                !called_by_another_name_among(line, &none),
+                "{line}: no such face"
+            );
+        }
+        // Stand-ins no face is named, and the lamp's own name, stay the lamp's.
+        for line in [
+            "Hey, Lam. What time is it?",
+            "Hey, Lamp. What time is it?",
+            "Lamb, what time is it?",
+            "Hey, man. How are you?",
+        ] {
+            assert!(!called_by_another_name_among(line, &known), "{line}");
         }
     }
 
