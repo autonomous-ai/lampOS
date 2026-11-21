@@ -1,9 +1,11 @@
 //! The lamp's OpenClaw Gateway, waited for before an OpenClaw launch
 //! (#6226). OpenClaw's TUI panes talk to one running Gateway (loopback
 //! [`PORT`]), which Harness never starts. lamp-update's Gateway unit
-//! runs it always while
-//! `LAMP_OPENCLAW_ON_LAMP` is on (the owner's decision: every lamp has
-//! 6 GB); lamp-tasks never starts or stops it. A TUI started while the
+//! runs it while `LAMP_OPENCLAW_ON_LAMP` is on: always, or with
+//! `LAMP_OPENCLAW_GATEWAY_BY_DEFAULT` on only while OpenClaw is the lamp's
+//! default or in use (#8105, [`in_use_said`]: a wait here or a Harness pane
+//! on it). lamp-tasks never starts or stops it itself; a wait marks it
+//! wanted, and lamp-update starts it within its 10 s look. A TUI started while the
 //! Gateway is still coming up loses its first prompt, and Harness neither
 //! retries nor says so (lamp-c0a4), so before `harness new openclaw`
 //! lamp-tasks waits until the Gateway takes a connection and answers, at
@@ -24,8 +26,10 @@ use crate::skill_task::{PYTHONPATH_ENV, SOCKET_ENV, SkillRun};
 /// Where the Gateway listens, on loopback.
 pub const PORT: u16 = 18789;
 /// How long a launch waits for a Gateway not answering yet before it is
-/// given up: the Gateway runs always, so this covers only its own start
-/// (27-50 s on lamp-c0a4 with two plugins) after a boot or a restart.
+/// given up: its own start after a boot or a restart (27-50 s on lamp-c0a4
+/// with two plugins). A Gateway stopped by `LAMP_OPENCLAW_GATEWAY_BY_DEFAULT`
+/// starts colder (port 107-112 s, RPCs 220-241 s on lamp-e82d, #8105): a
+/// launch's wait for that comes before the switch is on.
 pub const READY_WITHIN: Duration = Duration::from_secs(60);
 /// Between two looks at the port while it is waited for.
 const READY_EVERY: Duration = Duration::from_millis(250);
@@ -37,11 +41,13 @@ const ANSWER_WITHIN: Duration = Duration::from_secs(2);
 pub const NOT_READY: &str = "openclaw_gateway_not_ready";
 
 /// When lamp-tasks last needed OpenClaw's Gateway (#8105): a launch or a
-/// run on OpenClaw waiting for it, in unix ms, 0 for never in this start.
-/// Marked at each look of [`Gateway::before_launch_until`], whatever the
-/// lamp's default engine, so lamp-update keeps the Gateway up while
-/// OpenClaw is in use and starts it when a run asks for it.
-static WANTED_AT_UNIX_MS: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+/// run on OpenClaw waiting for it, in ms on [`mono_ms`]'s clock plus one,
+/// 0 for never in this start. Marked at each look of
+/// [`Gateway::before_launch_until`], whatever the lamp's default engine, so
+/// lamp-update keeps the Gateway up while OpenClaw is in use and starts it
+/// when a run asks for it. Monotonic: a clock step after boot never ends a
+/// fresh mark (Twelve on #8223).
+static WANTED_AT_MS: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
 
 /// How long a need of OpenClaw keeps it "in use" for lamp-update (#8105):
 /// 4 h, the first builder's 15:33 rule for a cold start over 2 min (three
@@ -49,22 +55,22 @@ static WANTED_AT_UNIX_MS: std::sync::atomic::AtomicU64 = std::sync::atomic::Atom
 /// through a day waits for its start at most once or twice.
 pub const IN_USE_HOLD: Duration = Duration::from_secs(4 * 60 * 60);
 
-fn now_unix_ms() -> u64 {
-    std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .map_or(0, |since| since.as_millis() as u64)
+/// Milliseconds since this process first asked, on the monotonic clock.
+fn mono_ms() -> u64 {
+    static BASE: std::sync::OnceLock<Instant> = std::sync::OnceLock::new();
+    u64::try_from(BASE.get_or_init(Instant::now).elapsed().as_millis()).unwrap_or(u64::MAX)
 }
 
 /// Marks OpenClaw's Gateway as needed now (#8105).
 pub fn mark_wanted() {
-    WANTED_AT_UNIX_MS.store(now_unix_ms(), std::sync::atomic::Ordering::Release);
+    WANTED_AT_MS.store(mono_ms() + 1, std::sync::atomic::Ordering::Release);
 }
 
-/// Whether OpenClaw's Gateway was needed within `hold` of `now_unix_ms`
-/// (#8105): never marked is not in use.
-pub fn wanted_within(hold: Duration, now_unix_ms: u64) -> bool {
-    let at = WANTED_AT_UNIX_MS.load(std::sync::atomic::Ordering::Acquire);
-    at != 0 && now_unix_ms.saturating_sub(at) <= hold.as_millis() as u64
+/// Whether OpenClaw's Gateway was needed within `hold` of `now_ms` (on
+/// [`mono_ms`]'s clock, #8105): never marked is not in use.
+pub fn wanted_within(hold: Duration, now_ms: u64) -> bool {
+    let at = WANTED_AT_MS.load(std::sync::atomic::Ordering::Acquire);
+    at != 0 && (now_ms + 1).saturating_sub(at) <= hold.as_millis() as u64
 }
 
 /// The lamp's Harness panes at the last good read (#8105, the first
@@ -72,15 +78,24 @@ pub fn wanted_within(hold: Duration, now_unix_ms: u64) -> bool {
 /// failed read leaves it as it was.
 static PANES_ON_OPENCLAW: std::sync::atomic::AtomicU8 = std::sync::atomic::AtomicU8::new(0);
 
+/// When lamp-update last asked whether OpenClaw is in use, as
+/// [`WANTED_AT_MS`]: it asks only with `LAMP_OPENCLAW_GATEWAY_BY_DEFAULT`
+/// on, so the panes are read only then (Twelve's P1 on #8223).
+static UPDATE_ASKED_AT_MS: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+
 /// How often the lamp's own panes are read for [`panes_read`].
 pub const PANES_EVERY: Duration = Duration::from_secs(60);
 
+/// A pane's states that run nothing: a dead pane never keeps the Gateway
+/// up (Twelve on #8223).
+const PANE_ENDED: [&str; 6] = ["stopped", "failed", "offline", "exited", "done", "closed"];
+
 /// Whether a pane in `listed` runs OpenClaw, by Harness's own `agent`
-/// field: a pane whose agent can't be read counts as OpenClaw, and a
-/// stopped pane runs nothing.
+/// field: a pane whose agent can't be read counts as OpenClaw, and an
+/// ended pane ([`PANE_ENDED`]) runs nothing.
 pub fn panes_on_openclaw(listed: &[crate::harness::Listed]) -> bool {
     listed.iter().any(|pane| {
-        pane.state != "stopped"
+        !PANE_ENDED.contains(&pane.state.as_str())
             && pane
                 .agent
                 .as_deref()
@@ -101,11 +116,40 @@ pub fn panes_read(read: &Result<Vec<crate::harness::Listed>, String>) {
     PANES_ON_OPENCLAW.store(if on { 1 } else { 2 }, std::sync::atomic::Ordering::Release);
 }
 
-/// [`wanted_within`] the [`IN_USE_HOLD`], now, or a pane on OpenClaw at the
-/// last good read of the lamp's panes.
+/// lamp-update asked whether OpenClaw is in use (`Route::UpdateRead`).
+pub fn update_asked() {
+    UPDATE_ASKED_AT_MS.store(mono_ms() + 1, std::sync::atomic::Ordering::Release);
+}
+
+/// Whether the lamp's panes are to be read now, the last read at `last`:
+/// only while lamp-update asks (within two of its looks' worth of
+/// [`PANES_EVERY`]), at once on its first ask, then every [`PANES_EVERY`].
+pub fn panes_due(last: Option<Instant>) -> bool {
+    let asked = UPDATE_ASKED_AT_MS.load(std::sync::atomic::Ordering::Acquire);
+    asked != 0
+        && (mono_ms() + 1).saturating_sub(asked) <= 2 * PANES_EVERY.as_millis() as u64
+        && last.is_none_or(|last| last.elapsed() >= PANES_EVERY)
+}
+
+/// Whether OpenClaw is in use, as lamp-update hears it: yes within the
+/// [`IN_USE_HOLD`] of a need or with a pane on OpenClaw at the last good
+/// read; no with neither once the panes were read; unknown (`None`) before
+/// the first read, so a lamp-tasks just started never stops the Gateway
+/// under an open pane (Twelve on #8223).
+pub fn in_use_said() -> Option<bool> {
+    if wanted_within(IN_USE_HOLD, mono_ms()) {
+        return Some(true);
+    }
+    match PANES_ON_OPENCLAW.load(std::sync::atomic::Ordering::Acquire) {
+        1 => Some(true),
+        2 => Some(false),
+        _ => None,
+    }
+}
+
+/// [`in_use_said`], unknown read as in use.
 pub fn in_use() -> bool {
-    wanted_within(IN_USE_HOLD, now_unix_ms())
-        || PANES_ON_OPENCLAW.load(std::sync::atomic::Ordering::Acquire) == 1
+    in_use_said() != Some(false)
 }
 
 /// What the part's targets read of OpenClaw: whether the Harness on the
@@ -1286,16 +1330,55 @@ pub fn prompt(launcher: &Path, run: &SkillRun) -> String {
 mod tests {
     use super::*;
 
-    /// #8105: a wait for the Gateway marks OpenClaw in use for the hold,
-    /// never before one, and not after the hold has gone by.
+    /// #8105: a mark holds OpenClaw in use for the hold, not after it, and
+    /// the hold is the first builder's 4 h.
     #[test]
     fn a_wait_for_the_gateway_marks_openclaw_in_use_for_the_hold() {
+        assert_eq!(IN_USE_HOLD, Duration::from_secs(4 * 60 * 60));
         mark_wanted();
-        let now = now_unix_ms();
+        let now = mono_ms();
         assert!(wanted_within(IN_USE_HOLD, now));
         assert!(wanted_within(IN_USE_HOLD, now + 60_000));
         assert!(!wanted_within(Duration::from_secs(60), now + 10 * 60_000));
-        assert!(in_use());
+        assert_eq!(in_use_said(), Some(true));
+    }
+
+    /// #8105 (Twelve on #8223): the wait itself marks OpenClaw wanted, at
+    /// its first look, ready or not.
+    #[test]
+    fn the_wait_for_the_gateway_itself_marks_openclaw_wanted() {
+        let before = mono_ms() + 1;
+        let fake = Fake {
+            ready_from: Some(1),
+            ..Fake::default()
+        };
+        let mut waited = Gateway::with_bounds(
+            Box::new(fake),
+            Duration::from_millis(50),
+            Duration::from_millis(1),
+        );
+        assert!(waited.before_launch().is_ok());
+        assert!(WANTED_AT_MS.load(std::sync::atomic::Ordering::Acquire) >= before);
+    }
+
+    /// #8105 (Twelve on #8223): lamp-update's read says `openclaw_in_use`
+    /// as a bool or null, the field lamp-update reads, and notes the ask.
+    #[test]
+    fn lamp_updates_read_says_whether_openclaw_is_in_use() {
+        let body = crate::runtime::update_read_body(serde_json::json!({"default": "hermes"}));
+        assert!(body["openclaw_in_use"].is_boolean() || body["openclaw_in_use"].is_null());
+        assert!(body.get("openclaw_in_use").is_some());
+        assert!(panes_due(None));
+    }
+
+    /// #8105 (Twelve's P1 on #8223): the panes are read only while
+    /// lamp-update asks, at once on its first ask, then once a minute.
+    #[test]
+    fn the_panes_are_read_only_while_lamp_update_asks() {
+        update_asked();
+        assert!(panes_due(None));
+        assert!(!panes_due(Some(Instant::now())));
+        assert!(panes_due(Instant::now().checked_sub(PANES_EVERY)));
     }
 
     /// #8105 (the first builder's 15:33): a pane is OpenClaw's by Harness's
@@ -1318,6 +1401,10 @@ mod tests {
         ]));
         assert!(panes_on_openclaw(&[pane(None, "idle")]));
         assert!(!panes_on_openclaw(&[pane(Some("openclaw"), "stopped")]));
+        assert!(!panes_on_openclaw(&[
+            pane(None, "failed"),
+            pane(Some("openclaw"), "offline")
+        ]));
         panes_read(&Ok(vec![pane(Some("openclaw"), "idle")]));
         assert_eq!(
             PANES_ON_OPENCLAW.load(std::sync::atomic::Ordering::Acquire),
@@ -1328,7 +1415,7 @@ mod tests {
             PANES_ON_OPENCLAW.load(std::sync::atomic::Ordering::Acquire),
             1
         );
-        assert!(in_use());
+        assert_eq!(in_use_said(), Some(true));
         panes_read(&Ok(vec![pane(Some("hermes"), "idle")]));
         assert_eq!(
             PANES_ON_OPENCLAW.load(std::sync::atomic::Ordering::Acquire),
