@@ -2593,6 +2593,50 @@ mod tests {
         }
     }
 
+    /// The first builder's question on #8260 (06:25, 22 Nov): a kept thing
+    /// with "said" in it, forgotten by id with the selective rule, leaves an
+    /// unrelated turn of theirs that only shares "said" with it (unlinked,
+    /// not a copy: it lacks the kept thing's other words), and a forget of
+    /// their exchanges about the line's subject leaves it too.
+    #[test]
+    fn a_forget_by_id_of_a_kept_said_leaves_an_unrelated_said_turn() {
+        let (_scratch, mut store) = Scratch::new("forget-said-unrelated");
+        let person = "p-0123456789abcdef";
+        let send = |store: &mut Days, request: Value| -> Value {
+            serde_json::from_str(&answer(store, request.to_string().as_bytes(), NOW).line).unwrap()
+        };
+        let kept = send(
+            &mut store,
+            json!({"op":"remember","person":person,"at_unix_ms":NOW,"text":"Ossa said the bicycle lock code is 4512"}),
+        );
+        let unrelated = send(
+            &mut store,
+            json!({"op":"append","person":person,"at_unix_ms":NOW+1,"heard":"I said hello to the neighbour this morning","said":"That's kind of you."}),
+        );
+        let forgotten = send(
+            &mut store,
+            json!({"op":"forget","person":person,"id":kept["id"],"selective":true}),
+        );
+        assert_eq!(forgotten["ok"], true, "{forgotten}");
+        assert_eq!(forgotten["removed"], 1, "{forgotten}");
+        let turns = send(
+            &mut store,
+            json!({"op":"exchanges_forget","person":person,"about":[["bicycle"]]}),
+        );
+        assert_eq!(turns["ok"], true, "{turns}");
+        assert_eq!(turns["removed"], 0, "{turns}");
+        assert!(
+            store
+                .record(
+                    &Person::new(person).unwrap(),
+                    unrelated["id"].as_u64().unwrap()
+                )
+                .unwrap()
+                .is_some(),
+            "the unrelated turn with \"said\" stays"
+        );
+    }
+
     #[test]
     fn a_broad_day_span_keeps_older_kept_facts_among_recent_exchanges() {
         let (_scratch, mut store) = Scratch::new("span-kept-priority");
