@@ -7313,7 +7313,11 @@ stands), and eyes that can't be reached at all name nobody, as before. Without a
   - **The words.** With no sitting known (no fresh value, away, nobody
     sitting, or not exactly one face in view) it is told to say warmly "I
     didn't catch when you sat down", never that it doesn't keep track of
-    them; the function's description says the same.
+    them; the function's description says the same. The description also
+    tells it to call again on every such ask, since the time moves on and an
+    earlier answer in the conversation is out of date (row-7694q on
+    lamp-52e6: asked again 9 minutes later in the same thread, it called 0
+    times and repeated "about six minutes").
 
   Privacy, squared with `doing_told`'s "never volunteers" (its header says
   both): only the current sitting, which the eyes begin again when someone

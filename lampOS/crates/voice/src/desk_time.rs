@@ -63,9 +63,11 @@ pub fn tool() -> Tool {
         description: "Call this when the person at the desk asks how long they have been sitting \
                       there, or when they last took a break (\"how long have I been at my desk?\", \
                       \"when did I last get up?\"). It reads the current sitting as your eyes \
-                      measure it. Then say what it gives you as \"say\", in a few words, in their \
-                      language, rounded the way a person would say it. Never say you don't keep \
-                      track of them: when it has no time, say warmly that you didn't catch when \
+                      measure it. Call it again on every such ask, even when you answered it \
+                      earlier in the conversation: the time moves on, so an earlier answer is out \
+                      of date; never answer from it. Then say what it gives you as \"say\", in a \
+                      few words, in their language, rounded the way a person would say it. Never \
+                      say you don't keep track of them: when it has no time, say warmly that you didn't catch when \
                       they sat down. Never bring it up unless you were asked, and never about \
                       anyone else."
             .into(),
