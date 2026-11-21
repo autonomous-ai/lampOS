@@ -161,11 +161,13 @@ A skill does nothing that would surprise the person who asked for it.
   script once, in that same fence with the skill's own grants: a `run`
   step's script, or each script of a `task` step. Each must exit 0 within
   30 s; a `run` step's must say at least one line with `lamp.say`, and a
-  `task` step's must print something. Nothing is sent at the try: a write
-  answers as if done, and the try has no internet, camera or microphone,
-  so a fetch fails as offline. So a script runs with no arguments, handles
-  a failed fetch or an unlinked service by saying so, and ends. A failed try comes
-  back to you as a repair with its words.
+  `task` step's must print something. The try is a real run: it has
+  every grant the skill declares (the internet, the camera, the microphone,
+  its voice, sounds, light and body), and what it says, shows, keeps or
+  sends is done for real, as at the skill's own run. So a script runs with
+  no arguments, does its one job once, handles a failed fetch or an
+  unlinked service by saying so, and ends. A failed try comes back to you
+  as a repair with its words.
 
 ## 2. Write a draft
 
