@@ -20,7 +20,9 @@
 //!    after the lamp answered is not going on with it (#7721, lamp-74ff,
 //!    18 Nov). A pose unread lets it out ([`Said::PoseUnread`]), but with
 //!    [`Line::looks_needed`] (`LAMP_NAME_SIGN_TIED`, #8092) a line with no
-//!    look is held, but for one answer to the lamp's waiting question;
+//!    look is held, but for one answer to the lamp's waiting question or
+//!    one line that cut in over the lamp's own answer ([`Line::cut_in`],
+//!    #8205), sharing that one use;
 //! 3. **said to the lamp:** a face turned to it, facing (pitch inside
 //!    [`PITCH_DEG`] and not looking away over the line's looks, when the
 //!    eyes say so), seen speaking the line in at least [`FACING_LOOKS`]
@@ -145,7 +147,8 @@ pub enum Held {
     SecondVoice,
     /// In the window with [`Line::looks_needed`]: no look, no face turned
     /// and the speaker's pose unread, and no first answer to the lamp's
-    /// waiting question (#8092).
+    /// waiting question (#8092) nor first cut-in over its own answer
+    /// (#8205).
     NoLook,
 }
 
@@ -222,6 +225,14 @@ pub struct Line<'a> {
     /// With [`Self::looks_needed`]: that one answer with no look was let
     /// out since the last line let out with a look or the name.
     pub look_free_answered: bool,
+    /// It began over the lamp's own answer as the lamp was heard saying it,
+    /// and so cut it: the coordinator admits such a line only by stopping
+    /// the answer (`commit_admitted_input`'s `user_interrupted`; the
+    /// journal's `N of its answer's M words were played ... before it was
+    /// cut`). The second route's worker reads it from the line's Start
+    /// (`Heeding::began_over`); a line begun over only the lamp's wait
+    /// sound is not one (#8205).
+    pub cut_in: bool,
 }
 
 impl Line<'_> {
@@ -279,6 +290,12 @@ pub enum Said {
     /// answer to the lamp's waiting question, let out; it renews nothing
     /// (#8092).
     AnswerNoLook,
+    /// With [`Line::looks_needed`], in the window with no look: the one
+    /// line that cut in over the lamp's own answer ([`Line::cut_in`]), let
+    /// out as [`Self::AnswerNoLook`] is, sharing its one use; it renews
+    /// nothing (#8205: lamp-52e6's core row w3, "Hey Lamp, ..." said over
+    /// the lamp's story, its name not heard).
+    CutInNoLook,
     /// Said to the lamp: facing, seen speaking, long enough or a question.
     ToTheLamp,
     /// Not said to the lamp: the face and the conversation are no sign.
@@ -295,6 +312,7 @@ impl Said {
             Self::AnswerNoLook => {
                 "an answer to the lamp's waiting question, no look: it renews nothing"
             }
+            Self::CutInNoLook => "a cut-in over the lamp's own answer, no look: it renews nothing",
             Self::ToTheLamp => "said to the lamp, facing and seen speaking",
             Self::Held(held) => held.reason(),
         }
@@ -319,10 +337,15 @@ pub fn judge(line: Line<'_>) -> Said {
     }
     if line.going_on {
         // `LAMP_NAME_SIGN_TIED` (#8092): no look, no renewal; one answer
-        // to the lamp's waiting question only.
+        // to the lamp's waiting question, or one line that cut in over the
+        // lamp's own answer (#8205), only.
         if line.looks_needed && !line.turned && line.pitch.is_none() && line.looking.is_none() {
-            return if line.lamp_asked && line.question_waits && !line.look_free_answered {
+            return if line.look_free_answered {
+                Said::Held(Held::NoLook)
+            } else if line.lamp_asked && line.question_waits {
                 Said::AnswerNoLook
+            } else if line.cut_in {
+                Said::CutInNoLook
             } else {
                 Said::Held(Held::NoLook)
             };
@@ -858,6 +881,51 @@ mod tests {
             judge(Line {
                 heard: "Lamp, what time is it?",
                 ..talk
+            }),
+            Said::Stands
+        );
+    }
+
+    /// #8205 (lamp-52e6, core row w3, 21 Nov): in the window with no look,
+    /// a line that cut in over the lamp's own answer is let out once, as
+    /// the answer to its waiting question is, sharing that one use; the
+    /// same line not over the lamp's answer is held as before, and with
+    /// `looks_needed` off, or out of the window, nothing changes.
+    #[test]
+    fn with_looks_needed_one_cut_in_over_the_lamps_answer_is_let_out() {
+        let cut_in = Line {
+            heard: "wait, what was the dragon's name again?",
+            going_on: true,
+            looks_needed: true,
+            cut_in: true,
+            ..Line::default()
+        };
+        assert_eq!(judge(cut_in), Said::CutInNoLook);
+        assert_eq!(
+            judge(Line {
+                cut_in: false,
+                ..cut_in
+            }),
+            Said::Held(Held::NoLook)
+        );
+        assert_eq!(
+            judge(Line {
+                look_free_answered: true,
+                ..cut_in
+            }),
+            Said::Held(Held::NoLook)
+        );
+        assert_eq!(
+            judge(Line {
+                looks_needed: false,
+                ..cut_in
+            }),
+            Said::PoseUnread
+        );
+        assert_eq!(
+            judge(Line {
+                going_on: false,
+                ..cut_in
             }),
             Said::Stands
         );

@@ -5772,7 +5772,21 @@ after a take-over, but now for every turn:
     nothing` (`said_to_me::Said::AnswerNoLook`): its answer goes on the
     chain, so it keeps no conversation going and renews no call
     (`LAMP_BUSY_FOLLOW_UP_RENEWS`). After that the next line needs a look or
-    the name, until a line with one is played.
+    the name, until a line with one is played. A line that cut in over the
+    lamp's own answer shares that one use (#8205): on lamp-52e6's core row
+    w3 (builds 15259 to 15338, 21 Nov), "Hey Lamp, …" said over the story
+    the lamp was asked for by name, with its name not heard and nobody in
+    view, was held `held: no look in a conversation` and got no answer,
+    although it had cut the story (`request 2: 9 of its answer's 99 words
+    were played, 3720 ms of it, before it was cut; request 3 is asked with
+    only those`). A line begun over the lamp's answer as it was heard (its
+    Start's `over_the_lamps_voice`, `said_to_me::Line::cut_in`) is admitted
+    only by stopping that answer, so it is the person cutting the lamp
+    short; with no look and the one use free it is let out as `a cut-in
+    over the lamp's own answer, no look: it renews nothing`
+    (`said_to_me::Said::CutInNoLook`) and chained as the answer above is. A
+    line begun over only the lamp's wait sound is not one; the same words
+    said with the lamp silent are held as before.
   - **Under a sure hearing, a face or the name in the words**
     (`LAMP_NAME_FACE_OR_WORDS=on`, on in the product's lamp-voice.service,
     #8136, from #8114's shapes 5-7). On lamp-74ff on 20 Nov (build 15146,

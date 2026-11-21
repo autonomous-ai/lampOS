@@ -8311,7 +8311,8 @@ pub(crate) struct Heeding {
     no_face_renews: bool,
     /// `LAMP_NAME_SIGN_TIED` (#8092): the request `LAMP_SAID_TO_ME` let out
     /// as the one answer with no look to the lamp's waiting question
-    /// ([`crate::said_to_me::Said::AnswerNoLook`]): its answer renews
+    /// ([`crate::said_to_me::Said::AnswerNoLook`]), or as the one cut-in
+    /// over its own answer (`Said::CutInNoLook`, #8205): its answer renews
     /// nothing. And whether that answer was played since the last line
     /// played with a look or the name.
     no_look_answer: Option<u64>,
@@ -11746,6 +11747,8 @@ impl Heeding {
             // `LAMP_NAME_SIGN_TIED` (#8092): only with eyes to give a look.
             looks_needed: self.attention.second_sign_tied() && self.eyes.is_some(),
             look_free_answered: self.look_free_used,
+            // Begun over the lamp's own answer, which it cut (#8205).
+            cut_in: self.began_over == Some(request),
             ..Default::default()
         };
         // The eyes' signs as the replay of saved journals reads them
@@ -11765,8 +11768,11 @@ impl Heeding {
         }
         let going_on = signs.going_on;
         let decision = crate::said_to_me::judge(line);
-        self.no_look_answer =
-            (decision == crate::said_to_me::Said::AnswerNoLook).then_some(request);
+        self.no_look_answer = matches!(
+            decision,
+            crate::said_to_me::Said::AnswerNoLook | crate::said_to_me::Said::CutInNoLook
+        )
+        .then_some(request);
         let mut pose = crate::said_to_me::pose(line.pitch, line.looking, looks);
         if skipped {
             pose.push_str(", the lone face's pose skipped: another voice");
