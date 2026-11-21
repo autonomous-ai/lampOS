@@ -14,7 +14,7 @@ use lamp_skills::routine::Permit;
 use lamp_skills::watch::{self, Out, Outs, Watches};
 use lamp_skills::{
     Admission, BODY_REQUESTS_ENVIRONMENT, CLIP_GAP_US, Call, Engine, Permissions, Run, body_ask,
-    clip_us, clock, duration_us, load_all_with, package, run_tests, told, tools_file,
+    clock, duration_us, load_all_with, package, run_tests, told, tools_file,
 };
 use serde_json::json;
 use std::{
@@ -5175,7 +5175,14 @@ fn act(
             }
             Call::Gesture(_) | Call::Move(_) => {
                 let (what, name, length_us) = match call {
-                    Call::Gesture(name) => (format!("gesture {name}"), name.clone(), clip_us(name)),
+                    // The longest the body may play it at any energy level
+                    // (#8153: level 5 plays a cut clip for all of its
+                    // recording), so its end is waited for.
+                    Call::Gesture(name) => (
+                        format!("gesture {name}"),
+                        name.clone(),
+                        lamp_body::clips::named(name).map(lamp_body::energy::longest_us),
+                    ),
                     Call::Move(clip) => (
                         format!("move {}", clip.name),
                         clip.name.clone(),
