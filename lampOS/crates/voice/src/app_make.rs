@@ -1518,7 +1518,7 @@ mod tests {
                 r#"{"outcome":"dropped","why":"user_interrupted"}"#,
                 r#"{"outcome":"spoken"}"#,
             ] {
-                let (stream, _) = listener.accept().unwrap();
+                let stream = crate::make_skill_local::tests::accept_within(&listener);
                 let mut line = String::new();
                 BufReader::new(&stream).read_line(&mut line).unwrap();
                 asked.push(serde_json::from_str::<Value>(&line).unwrap());
@@ -1555,7 +1555,7 @@ mod tests {
         let socket = dir.join("say.sock");
         let listener = UnixListener::bind(&socket).unwrap();
         let served = std::thread::spawn(move || {
-            let (stream, _) = listener.accept().unwrap();
+            let stream = crate::make_skill_local::tests::accept_within(&listener);
             let mut line = String::new();
             BufReader::new(&stream).read_line(&mut line).unwrap();
             writeln!(&stream, r#"{{"outcome":"spoken"}}"#).unwrap();
