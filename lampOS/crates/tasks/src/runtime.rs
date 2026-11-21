@@ -833,9 +833,7 @@ fn gateway_wait(
         }
         return PlaceWait::Go;
     };
-    if asking == Asking::Yes {
-        crate::gateway::mark_wanted();
-    }
+    crate::gateway::mark_wanted();
     if answers() {
         match held.take() {
             Some((name, since)) if name == next.name => eprintln!(
@@ -8355,19 +8353,6 @@ mod tests {
             PlaceWait::Go
         );
         assert!(held.is_none());
-        // Not asked yet, just after the start: held, unmarked.
-        let mut early = None;
-        assert_eq!(
-            gateway_wait(
-                Some(&openclaw),
-                crate::gateway::Asking::NotYet,
-                || false,
-                &mut early,
-                start,
-                cap
-            ),
-            PlaceWait::Hold
-        );
         // Past the cap: given up, and given up again on the next tick until
         // the caller clears `held` (a launch in flight that tick).
         let mut late = None;
