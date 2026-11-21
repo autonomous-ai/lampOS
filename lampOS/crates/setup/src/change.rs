@@ -584,12 +584,17 @@ pub fn apply_or(change: &Change, config: &Config, by_default: bool) -> io::Resul
         // the voice, which the words alone shape (#6893). A derived level is
         // the keyword table's; with LAMP_ENERGY_FROM_MODEL=on lamp-cloud says
         // the model's in its place (#7314).
+        // A level the owner chose stays through a save of words alone; only
+        // a derived one is derived again (the first builder's 18:36 on
+        // #7566), and empty words still clear both.
         Change::Character(text, chosen) => {
             let path = beside_language(config, "character");
+            let kept = lamp_msgs::chosen_voice::energy_kept(&beside_language(config, "energy"));
             let changed = keep_line(&path, text.as_deref())?;
-            let level = text.as_deref().map(|words| {
-                let level = chosen.unwrap_or_else(|| lamp_msgs::chosen_voice::energy_of(words));
-                (level, chosen.is_some())
+            let level = text.as_deref().map(|words| match chosen {
+                Some(level) => (*level, true),
+                None if kept.chosen => (kept.level, true),
+                None => (lamp_msgs::chosen_voice::energy_of(words), false),
             });
             keep_line(
                 &beside_language(config, "energy"),
