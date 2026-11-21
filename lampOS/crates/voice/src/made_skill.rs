@@ -12384,7 +12384,7 @@ mod tests {
         let _ = std::fs::remove_file(&socket);
         let listener = std::os::unix::net::UnixListener::bind(&socket).unwrap();
         let served = std::thread::spawn(move || {
-            let (stream, _) = listener.accept().unwrap();
+            let stream = crate::make_skill_local::tests::accept_within(&listener);
             let mut line = String::new();
             std::io::BufReader::new(&stream)
                 .read_line(&mut line)
@@ -15885,7 +15885,7 @@ light = { colour = "green", level = 3, for = "20s" }
         use std::io::{BufRead, BufReader};
         let listener = std::os::unix::net::UnixListener::bind(socket).unwrap();
         std::thread::spawn(move || {
-            let (stream, _) = listener.accept().unwrap();
+            let stream = crate::make_skill_local::tests::accept_within(&listener);
             let mut line = String::new();
             BufReader::new(&stream).read_line(&mut line).unwrap();
             writeln!(&stream, "{answer}").unwrap();
