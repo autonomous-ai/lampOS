@@ -23,7 +23,7 @@ fn helper(socket: &Path, lines: usize) -> std::thread::JoinHandle<Vec<Value>> {
     std::thread::spawn(move || {
         (0..lines)
             .map(|_| {
-                let (stream, _) = listener.accept().unwrap();
+                let stream = crate::make_skill_local::tests::accept_within(&listener);
                 let mut line = String::new();
                 std::io::BufReader::new(&stream)
                     .read_line(&mut line)
