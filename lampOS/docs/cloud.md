@@ -943,7 +943,7 @@ value, `tasks/agent` (`lamp_msgs::AgentReadiness`), at its start and on
 every change (`docs/tasks.md`). With `LAMP_APP_UPDATE=on` and
 `LAMP_APP_ENGINES=on`, lamp-cloud gives it in `update.status` as `agent`:
 `engine` (`openclaw` or `hermes`, left out while `off`), `state`, `why`
-(a short code such as `gateway_down` or `deaf`, only when lamp-tasks gives
+(a short code such as `gateway_down` or `held_approval`, only when lamp-tasks gives
 one) and `since_unix_ms` (when the state last changed). Before lamp-tasks
 has said one, or for one that fails `AgentReadiness::check`, it is
 `{"state": "unknown"}`. Each agent in `engines` then carries `running`:
@@ -953,7 +953,7 @@ has said one, or for one that fails `AgentReadiness::check`, it is
 guess.
 
 ```json
-"agent": {"engine": "openclaw", "state": "recovering", "why": "deaf", "since_unix_ms": 1763630000000},
+"agent": {"engine": "openclaw", "state": "recovering", "why": "gateway_down", "since_unix_ms": 1763630000000},
 "engines": {
   "openclaw": {"state": "installed", "running": true},
   "hermes": {"state": "installed", "running": false},

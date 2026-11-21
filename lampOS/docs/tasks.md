@@ -5659,7 +5659,7 @@ backoffs, a spoken task's 3 put-backs, a skill run's words typed again,
   | Input | State | `why` |
   |---|---|---|
   | One session off, or no default engine | `off` | — |
-  | Harness's `ensure` or `show` last read the kept session `installing` (an OTA installing OpenClaw; `OneSession::saw_state`) | `installing` | `installing` |
+  | Harness's `ensure` or `show` last read the kept session `installing` (an OTA installing OpenClaw; `OneSession::saw_state`), and no later `ensure`, `show` or watch line read it otherwise | `installing` | `installing` |
   | No Harness program on the lamp | `not_installed` | `harness_missing` |
   | The default engine known not found on the lamp (machines' look) | `not_installed` | `engine_missing` |
   | The default engine known not signed in on the lamp | `error` | `signed_out` |
@@ -5668,6 +5668,7 @@ backoffs, a spoken task's 3 put-backs, a skill run's words typed again,
   | Gateway not answering, under 360 s, after a session was open | `recovering` | `gateway_down` |
   | Gateway not answering for 360 s or more | `error` | `gateway_down` |
   | Opens failed past `OPEN_QUICK_TRIES`, or `REPLACE_MOST` broken sessions in a row | `error` | `open_failed` / `stuck_again` |
+  | Harness's watch read the kept session `held` for a cause only the person can clear (`namedState`: the device waiting for approval, the Gateway refusing its sign-in; `agent::LASTING_HOLDS`), until the watch reads it taking input again | `error` | `held_approval` / `held_sign_in` |
   | A fault seen (below), until a fresh session is open | `recovering` | the fault's code |
   | No session yet and Harness not read yet | `starting` | `harness_starting` |
   | Being opened, or open but not yet confirmed taking input (below) | `starting` | `session_starting` |
@@ -5676,14 +5677,17 @@ backoffs, a spoken task's 3 put-backs, a skill run's words typed again,
 
   Harness's own sign-out is not `error`: a signed-out lamp runs its agent
   (#6407). Fault codes (`one_session::fault_code`): `engine_not_ready`,
-  `not_running`, `held`, `launch_failed`, `engine_exited`,
+  `not_running`, `held`, `held_no_gateway`, `launch_failed`, `engine_exited`,
   `conversation_gone`, `session_gone`, `gateway_down`, `watch_lost`,
   `daemon_restarted`, `cancelled`, `asked_something`, `stuck`.
 - **Refused at prepare (`agent_not_ready`).** With the one session on, a
   `prepare` for the lamp's own target (`lamp`, no session named) on the
   lamp's default engine is refused at once in any state but `ready` and
   `working`, `off` never: `{"ok":false,"error":"agent_not_ready",
-  "message":...,"readiness":"<state>"}`, one fixed message a state. It is
+  "message":...,"readiness":"<state>"}`, one fixed message a state. Its
+  `confirm` (the person's yes) is refused the same way when the agent went
+  down since the read-back: nothing queued, the task left prepared until
+  it expires. It is
   one of `EARLY_REFUSALS`, so the machines are looked at again at once.
   No hand-over, no Harness call: well under 1 s. Tasks for the person's
   other computers are unchanged.
@@ -5780,7 +5784,16 @@ backoffs, a spoken task's 3 put-backs, a skill run's words typed again,
   with no turn held, and for a spoken turn held its task is read at once
   by the store (`take_turn_end`, `Engine::push`), not at its wait's
   bound (#8109); `held`, `failed`, `stopped` are faults (`recovering`,
-  replacement due, a spoken turn ended at once, above). `watch` says the
+  replacement due, a spoken turn ended at once, above), `held` with
+  `namedState` "OpenClaw Gateway is not running." as `held_no_gateway`.
+  A `held` whose `namedState` says the device waits for approval or the
+  Gateway refused its sign-in (`harness::Hold`) is a lasting hold, not a
+  fault: `error` with `held_approval` or `held_sign_in`, a spoken turn
+  still ended at once, but no fresh session (it would be held the same,
+  and "ready again" would be said between failures); an `ensure` after the
+  watch is lost leaves it `error`, and only a watch line reading it at
+  work or idle again reads `ready`. Any watch line but `started` also
+  ends `installing`. `watch` says the
   state now first: that first line is never read as the end of a turn of
   ours. The lamp kills the watch on `done`; after that, with no turn of
   ours held, it is not started again until a turn is handed over or 30 s
@@ -5801,10 +5814,10 @@ backoffs, a spoken task's 3 put-backs, a skill run's words typed again,
   lamp) for as long as the session is open.
 - **Not covered here.** A spoken task's turn already joined to the store
   that stalls with no watch event and the Gateway up is still left to
-  the store's own bounds.
-  lamp-update closing the session around an OpenClaw install, the voice's
-  "having a problem" and "ready again" lines and the app's view are the
-  other parts of #8138.
+  the store's own bounds. lamp-update closes no kept session around an
+  OpenClaw install: it only stops lamp-tasks before the gateway's restart
+  and starts it again after (above). The voice's "having a problem" and
+  "ready again" lines and the app's view are the other parts of #8138.
 
 ### The limit accepted for Monday: a running skill's grants inside the gateway
 

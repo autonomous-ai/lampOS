@@ -643,13 +643,57 @@ pub enum WatchEvent {
     /// (#5689).
     Background,
     /// Harness holds the input it was given, its engine not taking it (no
-    /// Gateway, a deaf TUI; Harness 0.6.77): a fault for the lamp's kept
-    /// session (#8138).
-    Held,
+    /// Gateway, a deaf TUI; Harness 0.6.77), with why ([`Hold`]): for the
+    /// lamp's kept session a fault, or a lasting hold only the person can
+    /// clear (#8138).
+    Held(Hold),
+}
+
+/// Why Harness holds a session (`held`), read from the watch line's
+/// `namedState` (Harness 0.6.77, openharness#4509: OpenClaw's
+/// `OPENCLAW_STATES` sentences, `engines/openclaw/contract.ts`).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Hold {
+    /// "OpenClaw Gateway is not running. ..."
+    NoGateway,
+    /// "OpenClaw is waiting for this device to be approved. ...": lasting,
+    /// until the device is approved.
+    Approval,
+    /// "OpenClaw's Gateway refused its sign-in. ...": lasting, until its
+    /// sign-in is fixed.
+    SignInRefused,
+    /// Any other sentence, or none.
+    Other,
+}
+
+/// Harness's sentence for a Gateway that is not running.
+pub const HOLD_NO_GATEWAY: &str = "OpenClaw Gateway is not running.";
+/// Harness's sentence for a device waiting for approval.
+pub const HOLD_APPROVAL: &str = "OpenClaw is waiting for this device to be approved.";
+/// Harness's sentence for a sign-in the Gateway refused.
+pub const HOLD_SIGN_IN_REFUSED: &str = "OpenClaw's Gateway refused its sign-in.";
+
+impl Hold {
+    /// The hold a `namedState` sentence says: by its first sentence, so a
+    /// remedy Harness words differently still reads the same.
+    pub fn of(named: Option<&str>) -> Self {
+        let Some(named) = named else {
+            return Self::Other;
+        };
+        if named.starts_with(HOLD_NO_GATEWAY) {
+            Self::NoGateway
+        } else if named.starts_with(HOLD_APPROVAL) {
+            Self::Approval
+        } else if named.starts_with(HOLD_SIGN_IN_REFUSED) {
+            Self::SignInRefused
+        } else {
+            Self::Other
+        }
+    }
 }
 
 impl WatchEvent {
-    fn of(event: &str) -> Option<Self> {
+    fn of(event: &str, named: Option<&str>) -> Option<Self> {
         Some(match event {
             "started" => Self::Started,
             "working" => Self::Working,
@@ -659,7 +703,7 @@ impl WatchEvent {
             "failed" => Self::Failed,
             "stopped" => Self::Stopped,
             "background" => Self::Background,
-            "held" => Self::Held,
+            "held" => Self::Held(Hold::of(named)),
             _ => return None,
         })
     }
@@ -674,7 +718,7 @@ impl WatchEvent {
             Self::Failed => "failed",
             Self::Stopped => "stopped",
             Self::Background => "background",
-            Self::Held => "held",
+            Self::Held(_) => "held",
         }
     }
     /// Whether the agent has settled, for now or for good: its task is read
@@ -7654,6 +7698,9 @@ struct WatchRow {
     id: Option<String>,
     #[serde(default)]
     error: Option<String>,
+    /// Why it is held, on a `held` line (Harness 0.6.77).
+    #[serde(default, rename = "namedState")]
+    named_state: Option<String>,
 }
 
 /// One line of `harness watch --json` for `agent` (openharness `watch`):
@@ -7673,7 +7720,7 @@ pub fn parse_watch_line(line: &[u8], agent: &str) -> Result<WatchLine, &'static 
     }
     row.event
         .as_deref()
-        .and_then(WatchEvent::of)
+        .and_then(|event| WatchEvent::of(event, row.named_state.as_deref()))
         .map(WatchLine::Event)
         .ok_or("watch_invalid_line")
 }

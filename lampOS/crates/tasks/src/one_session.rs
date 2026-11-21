@@ -118,7 +118,7 @@ use std::path::PathBuf;
 use std::path::Path;
 
 use crate::harness::{
-    Cli, Closed, EngineKind, Ensured, Launch, LaunchOutcome, PaneSeen, REPLY_KEPT_FIRST_HELD,
+    Cli, Closed, EngineKind, Ensured, Hold, Launch, LaunchOutcome, PaneSeen, REPLY_KEPT_FIRST_HELD,
     REPLY_KEPT_HELD, SessionSize, Target, Took, TurnRecord, Typed, WatchEnd, WatchEvent,
 };
 
@@ -2778,8 +2778,47 @@ impl OneSession {
             (inner.holder.clone(), inner.held_spoken)
         };
         use crate::agent::Session;
+        if event != WatchEvent::Started {
+            // Read again by the watch: not being installed (C3), so an
+            // install that ended or failed with the session kept never
+            // leaves `installing` behind.
+            self.saw_state(event.name());
+        }
+        if !matches!(
+            event,
+            WatchEvent::Started | WatchEvent::Held(_) | WatchEvent::Failed | WatchEvent::Stopped
+        ) {
+            // A lasting hold cleared: the session takes input again (C5).
+            self.agent.session_from(
+                &[
+                    Session::Failed(crate::agent::LASTING_HOLDS[0]),
+                    Session::Failed(crate::agent::LASTING_HOLDS[1]),
+                ],
+                Session::Ready,
+            );
+        }
         match event {
             WatchEvent::Started => {}
+            // C5: a hold only the person can clear is no fault: `error`
+            // with its why, no fresh session (a fresh one would be held the
+            // same), until the watch reads it taking input again. A spoken
+            // task held is still ended at once, told.
+            WatchEvent::Held(hold @ (Hold::Approval | Hold::SignInRefused)) => {
+                let why = if hold == Hold::Approval {
+                    crate::agent::LASTING_HOLDS[0]
+                } else {
+                    crate::agent::LASTING_HOLDS[1]
+                };
+                eprintln!(
+                    "tasks: one session: {}: Harness's watch says it is held ({why}); only the person can clear it, so no fresh session (#8138)",
+                    short(agent)
+                );
+                self.agent.session(Session::Failed(why));
+                let mut inner = self.lock();
+                if spoken && inner.turn_ended != holder {
+                    inner.turn_broken = holder;
+                }
+            }
             WatchEvent::Working | WatchEvent::Background | WatchEvent::NeedsPerson => {
                 self.agent
                     .session_from(&[Session::Ready, Session::Working], Session::Working);
@@ -2793,11 +2832,17 @@ impl OneSession {
                     self.turn_over();
                 }
             }
-            WatchEvent::Held | WatchEvent::Failed | WatchEvent::Stopped => {
-                let why = format!("Harness's watch says it is {}", event.name());
+            WatchEvent::Held(_) | WatchEvent::Failed | WatchEvent::Stopped => {
+                let why = match event {
+                    WatchEvent::Held(Hold::NoGateway) => {
+                        "Harness's watch says it is held: no Gateway running".to_owned()
+                    }
+                    _ => format!("Harness's watch says it is {}", event.name()),
+                };
                 eprintln!("tasks: one session: {}: {why} (#8138)", short(agent));
                 self.recovering(match event {
-                    WatchEvent::Held => "held",
+                    WatchEvent::Held(Hold::NoGateway) => "held_no_gateway",
+                    WatchEvent::Held(_) => "held",
                     WatchEvent::Failed => "launch_failed",
                     _ => "session_gone",
                 });
@@ -2945,10 +2990,11 @@ impl OneSession {
         }
         let mut why = None;
         {
-            let working = matches!(
-                harness.observe(&machine, &agent),
-                Ok(seen) if seen.seen.state == "working"
-            );
+            let seen = harness.observe(&machine, &agent);
+            if let Ok(seen) = &seen {
+                self.saw_state(&seen.seen.state);
+            }
+            let working = matches!(seen, Ok(seen) if seen.seen.state == "working");
             let record = working
                 .then(|| self.records(&harness, &agent).and_then(|read| read()))
                 .flatten();
@@ -3288,7 +3334,8 @@ impl OneSession {
         // ([`OneSession::confirm`]). A fresh session open ends a fault's
         // `recovering` and a failed open's `error` too, so a warming one
         // confirmed later reads `ready` (#8138 HOLD 2); never a fault seen
-        // on this very session meanwhile (its replacement due).
+        // on this very session meanwhile (its replacement due), nor a hold
+        // only the person can clear ([`crate::agent::LASTING_HOLDS`]).
         if opened.is_ok() {
             let (confirmed, fault_due) = {
                 let inner = self.lock();
@@ -3303,11 +3350,13 @@ impl OneSession {
             };
             if !fault_due {
                 self.agent.update(|facts| {
-                    facts.session = if confirmed {
-                        crate::agent::Session::Ready
-                    } else {
-                        crate::agent::Session::Opening
-                    };
+                    if !facts.session.lasting() {
+                        facts.session = if confirmed {
+                            crate::agent::Session::Ready
+                        } else {
+                            crate::agent::Session::Opening
+                        };
+                    }
                 });
             }
         }
@@ -4346,10 +4395,10 @@ pub fn fault_code(why: &str) -> &'static str {
     let has = |word: &str| why.contains(word);
     if has("engine_not_ready") || has("engine not ready") {
         "engine_not_ready"
-    } else if has("deaf") {
-        "deaf"
     } else if has("launch failed") {
         "launch_failed"
+    } else if has("held") && has("no gateway") {
+        "held_no_gateway"
     } else if has("held") {
         "held"
     } else if has("plain shell") || has("exited") {

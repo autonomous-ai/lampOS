@@ -2,10 +2,11 @@
 //! remote agent, credentials or provider is invoked by these tests.
 use lamp_tasks::harness::{
     AccountMachine, CLOSE_BUDGET, CLOSE_READ_TIMEOUT, Cli, CliConfig, Closed, Ended, EngineKind,
-    EngineRow, JoinedOn, Launch, LaunchOutcome, Listed, MOST_ABOUT_BYTES, MOST_LISTED, MOST_WAITED,
-    PS_STDOUT_LIMIT, PsSession, SessionMachines, SignIn, Target, WATCH_LINE_LIMIT, WatchEnd,
-    WatchEvent, WatchLine, iso_unix_ms, parse_auth_here, parse_auth_status, parse_daemon_here,
-    parse_engines, parse_machines, parse_ps, parse_wait, parse_watch_line, this_computer,
+    EngineRow, Hold, JoinedOn, Launch, LaunchOutcome, Listed, MOST_ABOUT_BYTES, MOST_LISTED,
+    MOST_WAITED, PS_STDOUT_LIMIT, PsSession, SessionMachines, SignIn, Target, WATCH_LINE_LIMIT,
+    WatchEnd, WatchEvent, WatchLine, iso_unix_ms, parse_auth_here, parse_auth_status,
+    parse_daemon_here, parse_engines, parse_machines, parse_ps, parse_wait, parse_watch_line,
+    this_computer,
 };
 use lamp_tasks::runtime::{
     HarnessSwitches, NEW_FOLDER_FILE, SESSION_INDEX_FILE, targets_from_machines,
@@ -6420,6 +6421,34 @@ fn a_watch_line_is_read_for_its_event_only() {
     );
     let long = vec![b' '; WATCH_LINE_LIMIT + 1];
     assert_eq!(parse_watch_line(&long, AGENT), Err("watch_invalid_line"));
+    // #8138 (C5): a `held` line says why in `namedState` (Harness 0.6.77).
+    for (named, hold) in [
+        (
+            Some(
+                "OpenClaw is waiting for this device to be approved. Run openclaw devices approve --latest.",
+            ),
+            Hold::Approval,
+        ),
+        (
+            Some("OpenClaw's Gateway refused its sign-in. Its terminal says how to fix it."),
+            Hold::SignInRefused,
+        ),
+        (
+            Some("OpenClaw Gateway is not running. Start it with openclaw gateway."),
+            Hold::NoGateway,
+        ),
+        (Some("Something newer."), Hold::Other),
+        (None, Hold::Other),
+    ] {
+        let mut line = json!({"event":"held","id":AGENT,"state":"held"});
+        if let Some(named) = named {
+            line["namedState"] = json!(named);
+        }
+        assert_eq!(
+            parse_watch_line(line.to_string().as_bytes(), AGENT),
+            Ok(WatchLine::Event(WatchEvent::Held(hold)))
+        );
+    }
     for event in [
         "started",
         "working",

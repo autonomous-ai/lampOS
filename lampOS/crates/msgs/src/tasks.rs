@@ -408,8 +408,9 @@ pub struct AgentReadiness {
     pub engine: String,
     pub state: Readiness,
     /// A short code for why it is not `ready` (`gateway_starting`,
-    /// `gateway_down`, `held_no_gateway`, `launch_failed`, `deaf`, `stuck`,
-    /// `signed_out`, `daemon_down`, …): ASCII lowercase, digits and `_`,
+    /// `gateway_down`, `held_no_gateway`, `held_approval`, `launch_failed`,
+    /// `stuck`, `signed_out`, `daemon_restarted`, …): ASCII lowercase,
+    /// digits and `_`,
     /// at most [`AGENT_READINESS_MOST_WHY_BYTES`]. Left out when `ready`
     /// or `working`.
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -514,21 +515,21 @@ mod readiness_tests {
     #[test]
     fn a_readiness_is_checked_and_reads_back_as_written() {
         assert!(one(Readiness::Ready, None).check().is_ok());
-        assert!(one(Readiness::Recovering, Some("deaf")).check().is_ok());
+        assert!(one(Readiness::Recovering, Some("stuck")).check().is_ok());
         assert!(one(Readiness::Off, None).check().is_ok());
-        assert!(one(Readiness::Ready, Some("deaf")).check().is_err());
+        assert!(one(Readiness::Ready, Some("stuck")).check().is_err());
         assert!(one(Readiness::Error, Some("Gateway down")).check().is_err());
         let mut no_engine = one(Readiness::Ready, None);
         no_engine.engine.clear();
         assert!(no_engine.check().is_err());
-        let text = serde_json::to_string(&one(Readiness::Recovering, Some("deaf"))).unwrap();
+        let text = serde_json::to_string(&one(Readiness::Recovering, Some("stuck"))).unwrap();
         assert_eq!(
             text,
-            r#"{"engine":"openclaw","state":"recovering","why":"deaf","since_unix_ms":1,"read_unix_ms":2}"#
+            r#"{"engine":"openclaw","state":"recovering","why":"stuck","since_unix_ms":1,"read_unix_ms":2}"#
         );
         assert_eq!(
             serde_json::from_str::<AgentReadiness>(&text).unwrap(),
-            one(Readiness::Recovering, Some("deaf"))
+            one(Readiness::Recovering, Some("stuck"))
         );
     }
 }

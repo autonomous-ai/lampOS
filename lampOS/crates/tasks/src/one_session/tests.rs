@@ -4517,7 +4517,7 @@ fn the_readiness_follows_the_kept_session() {
     one.watched_event(&agent_of(1), WatchEvent::Done);
     assert_eq!(one.readiness().state(), (Readiness::Ready, None));
     // Held: a fault at once, its fresh replacement due.
-    one.watched_event(&agent_of(1), WatchEvent::Held);
+    one.watched_event(&agent_of(1), WatchEvent::Held(crate::harness::Hold::Other));
     assert_eq!(
         one.readiness().state(),
         (Readiness::Recovering, Some("held"))
@@ -4780,7 +4780,7 @@ fn a_spoken_task_whose_session_breaks_under_it_is_ended_at_once() {
         spoken_launch(&one, &fake, &spoken("lamp-1")),
         Some(LaunchOutcome::Joined { .. })
     ));
-    one.watched_event(&agent_of(1), WatchEvent::Held);
+    one.watched_event(&agent_of(1), WatchEvent::Held(crate::harness::Hold::Other));
     assert_eq!(one.take_turn_broken().as_deref(), Some("lamp-1"));
     assert_eq!(one.take_turn_end(), None);
     // Kept when the store can't end it yet.
@@ -4856,7 +4856,7 @@ fn a_fresh_session_confirmed_after_a_fault_reads_ready_and_takes_a_task() {
     one.open_if_due(&fake, &place());
     assert_eq!(one.readiness().state(), (Readiness::Ready, None));
     // A fault: the session replaced fresh.
-    one.watched_event(&agent_of(1), WatchEvent::Held);
+    one.watched_event(&agent_of(1), WatchEvent::Held(crate::harness::Hold::Other));
     assert_eq!(
         one.readiness().state(),
         (Readiness::Recovering, Some("held"))
@@ -5006,6 +5006,72 @@ fn a_session_read_installing_makes_the_agent_installing() {
     fake.states.lock().unwrap().remove(&agent_of(1));
     one.pane_sign(&fake, MACHINE, &agent_of(1));
     assert_eq!(one.readiness().state(), (Readiness::Ready, None));
+}
+
+/// #8138 review (C3): `installing` is cleared by the watch reading the
+/// session again (an install that ended, or failed, with the session kept),
+/// not only by a later `ensure` or `show`.
+#[test]
+fn installing_is_cleared_once_the_watch_reads_the_session_again() {
+    use lamp_msgs::Readiness;
+    let dir = tempfile::tempdir().unwrap();
+    let (one, fake) = kept_on(dir.path());
+    one.open_if_due(&fake, &place());
+    fake.states
+        .lock()
+        .unwrap()
+        .insert(agent_of(1), "installing".into());
+    one.pane_sign(&fake, MACHINE, &agent_of(1));
+    assert_eq!(one.readiness().state().0, Readiness::Installing);
+    one.watched_event(&agent_of(1), WatchEvent::Idle);
+    assert_eq!(one.readiness().state(), (Readiness::Ready, None));
+}
+
+/// #8138 review (C5): a hold only the person can clear (the device waiting
+/// for approval, the Gateway refusing its sign-in) reads `error` with its
+/// why, opens no fresh session, and reads `ready` only once the watch reads
+/// the session taking input again; a session let go and ensured again
+/// meanwhile stays `error`. No Gateway running is still a fault.
+#[test]
+fn a_lasting_hold_reads_error_with_its_why_and_opens_no_fresh_session() {
+    use crate::harness::Hold;
+    use lamp_msgs::Readiness;
+    for (hold, why) in [
+        (Hold::Approval, "held_approval"),
+        (Hold::SignInRefused, "held_sign_in"),
+    ] {
+        let dir = tempfile::tempdir().unwrap();
+        let (one, fake) = kept_on(dir.path());
+        one.open_if_due(&fake, &place());
+        one.watched_event(&agent_of(1), WatchEvent::Held(hold));
+        assert_eq!(one.readiness().state(), (Readiness::Error, Some(why)));
+        assert_eq!(one.agent.refusal("openclaw"), Some(Readiness::Error));
+        one.restart_if_due(&fake);
+        one.open_if_due(&fake, &place());
+        assert_eq!(fake.count("close-kept"), 0, "{why}: {:?}", fake.calls());
+        assert_eq!(one.agent(), Some(agent_of(1)));
+        // Held again, the watch lost and the session ensured again: still
+        // `error`, never a `ready` between.
+        one.watched_event(&agent_of(1), WatchEvent::Held(hold));
+        one.watch_lost(&agent_of(1), "watch_failed");
+        one.open_if_due(&fake, &place());
+        assert_eq!(one.readiness().state(), (Readiness::Error, Some(why)));
+        assert_eq!(fake.count("close-kept"), 0, "{why}: {:?}", fake.calls());
+        // Cleared: the watch reads it idle.
+        let agent = one.agent().unwrap();
+        one.watched_event(&agent, WatchEvent::Idle);
+        assert_eq!(one.readiness().state(), (Readiness::Ready, None), "{why}");
+    }
+    let dir = tempfile::tempdir().unwrap();
+    let (one, fake) = kept_on(dir.path());
+    one.open_if_due(&fake, &place());
+    one.watched_event(&agent_of(1), WatchEvent::Held(Hold::NoGateway));
+    assert_eq!(
+        one.readiness().state(),
+        (Readiness::Recovering, Some("held_no_gateway"))
+    );
+    one.restart_if_due(&fake);
+    assert_eq!(fake.count("close-kept"), 1, "{:?}", fake.calls());
 }
 
 /// #8138 review 2 (2): `done` then `stopped` on a spoken turn: its end is

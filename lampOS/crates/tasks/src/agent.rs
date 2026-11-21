@@ -70,6 +70,20 @@ pub enum Session {
     Failed(&'static str),
 }
 
+/// The whys of a hold only the person can clear (Harness's watch reads the
+/// kept session `held`: the device waiting for approval, the Gateway
+/// refusing its sign-in): `error` with that why, no fresh session opened
+/// for it, until the watch reads the session taking input again (#8138
+/// review, C5).
+pub const LASTING_HOLDS: [&str; 2] = ["held_approval", "held_sign_in"];
+
+impl Session {
+    /// Whether this is a lasting hold ([`LASTING_HOLDS`]).
+    pub fn lasting(self) -> bool {
+        matches!(self, Session::Failed(why) if LASTING_HOLDS.contains(&why))
+    }
+}
+
 /// Whether Harness is on the lamp, as the part last read it.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Harness {
@@ -402,8 +416,11 @@ mod tests {
         assert_eq!(state_of(&facts, now), (Readiness::Ready, None));
         facts.session = Session::Working;
         assert_eq!(state_of(&facts, now), (Readiness::Working, None));
-        facts.session = Session::Recovering("deaf");
-        assert_eq!(state_of(&facts, now), (Readiness::Recovering, Some("deaf")));
+        facts.session = Session::Recovering("stuck");
+        assert_eq!(
+            state_of(&facts, now),
+            (Readiness::Recovering, Some("stuck"))
+        );
         facts.session = Session::Failed("open_failed");
         assert_eq!(
             state_of(&facts, now),
@@ -548,7 +565,7 @@ mod tests {
         assert_eq!(agent.refusal("claude"), None);
         agent.session(Session::Working);
         assert_eq!(agent.refusal("openclaw"), None);
-        agent.session(Session::Recovering("deaf"));
+        agent.session(Session::Recovering("stuck"));
         assert_eq!(agent.refusal("openclaw"), Some(Readiness::Recovering));
         for state in [
             Readiness::Installing,

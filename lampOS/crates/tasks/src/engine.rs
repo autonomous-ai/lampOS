@@ -2197,6 +2197,20 @@ impl<P: Persistence> Engine<P> {
                         "The exact prepared task needs a fresh spoken confirmation.",
                     ));
                 }
+                // The lamp's own agent gone down since the read-back
+                // (#8138, C1): refused at once as at prepare, nothing
+                // queued, so the voice tells the person now.
+                if let Some(state) = self
+                    .agent
+                    .as_ref()
+                    .filter(|_| {
+                        task.target_alias == crate::runtime::LAMP_TARGET
+                            && task.launch.session.is_none()
+                    })
+                    .and_then(|agent| agent.refusal(task.launch.target.engine.argument()))
+                {
+                    return Err(err(crate::agent::NOT_READY, crate::agent::message(state)));
+                }
                 task.dispatch.state = DispatchState::Queued;
                 task.dispatch.confirmed = Some(at.clone());
                 task.updated = at.clone();
@@ -4280,9 +4294,32 @@ mod tests {
         );
         // Ready again: taken.
         agent.update(|facts| facts.session = Session::Ready);
+        let id = engine
+            .handle(&prepare(&engine, "lamp", "p3"), &clock(3), false)
+            .unwrap()["id"]
+            .as_u64()
+            .unwrap();
+        // #8138 review (C1): down again between the read-back and the yes:
+        // the confirm is refused at once too, nothing queued; up, taken.
+        agent.update(|facts| facts.session = Session::Recovering("held"));
+        let refused = engine
+            .handle(&confirmation(&engine, id), &clock(4), true)
+            .unwrap_err();
+        assert_eq!(refused.code, crate::agent::NOT_READY);
+        assert_eq!(
+            crate::agent::state_of_message(refused.message),
+            Some(lamp_msgs::Readiness::Recovering)
+        );
+        assert_eq!(
+            engine.state.tasks[find(&engine.state, id).unwrap()]
+                .dispatch
+                .state,
+            DispatchState::Prepared
+        );
+        agent.update(|facts| facts.session = Session::Ready);
         assert!(
             engine
-                .handle(&prepare(&engine, "lamp", "p3"), &clock(3), false)
+                .handle(&confirmation(&engine, id), &clock(5), true)
                 .is_ok()
         );
     }
