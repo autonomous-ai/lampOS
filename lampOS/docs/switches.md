@@ -829,6 +829,7 @@ What a person would notice with each switch on, one plain line per switch counte
 
 | Switch | What a person would notice |
 |---|---|
+| `LAMP_END_KEEPS_REACH_BACK` | Right after you say "Hey Lamp," on its own, the first word of what you say next is no longer cut off. |
 | `LAMP_LIMIT_LOCAL_ASKS` | At its usage limit, the lamp still changes its light or volume, tells the time and rings timers. |
 | `LAMP_ADDRESSED` | The lamp checks whether each request was said to it from close by. |
 | `LAMP_VOICE_DAY_SHED` | Near the end of its day's allowance, the lamp keeps quiet unless you talk to it. |
