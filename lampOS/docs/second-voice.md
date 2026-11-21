@@ -6793,7 +6793,14 @@ stands), and eyes that can't be reached at all name nobody, as before. Without a
   it.", `known_faces::refuses`), keeps it whatever the model calls, its
   `forget` answered with `remember::said_no_told`, and a line with a
   negated and an un-negated forget word is asked once more
-  (`one_face_answer`, #8165). So are a correction
+  (`one_face_answer`, #8165). A plain yes (`agent_tasks::plain_yes_with`)
+  to a last question that offered the forget alone, with no "or"
+  (`remember::offers_only_forgetting`), runs it before round 1 though the model calls no forget, round 1 told
+  it ran, and a no that is only a no (`known_faces::only_refuses`) is
+  answered "Okay, I'll keep it." (`remember::KEPT_IT_LINE`) with no model
+  round, in the owner's language only from its clip rendered ahead
+  (`kept_line_clip`), else the model is told it is kept (#8185). A
+  privacy switch change drops the held question (`Engine::privacy`). So are a correction
   (`remember` with `replaces`), `keep_rule`, `list_rules`, `set_role` and
   `end_role` (the privacy read on #5385, also in
   `remember::role_for_guarded`), and

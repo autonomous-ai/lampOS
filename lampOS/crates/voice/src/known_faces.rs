@@ -318,6 +318,77 @@ pub(crate) fn refuses(turn: &str) -> bool {
         && !crate::remember::forgets_unnegated(turn)
 }
 
+/// The words a refusal that is only a refusal is made of ([`only_refuses`],
+/// #8185): no words, keep words, the forget words a no negates, and words
+/// that stand beside them. Never "just", "mind", "wait", "now" or
+/// "scratch": with the comma dropped, "Never mind just delete it" or "No,
+/// scratch it." asks for the forget (the second read on #8215).
+const ONLY_REFUSING: &[&str] = &[
+    "no",
+    "nope",
+    "nah",
+    "not",
+    "don't",
+    "dont",
+    "never",
+    "kh\u{f4}ng",
+    "\u{111}\u{1eeb}ng",
+    "ch\u{1edb}",
+    "th\u{f4}i",
+    "keep",
+    "leave",
+    "hold",
+    "gi\u{1eef}",
+    "l\u{1ea1}i",
+    "forget",
+    "delete",
+    "erase",
+    "remove",
+    "wipe",
+    "clear",
+    "drop",
+    "get",
+    "rid",
+    "of",
+    "qu\u{ea}n",
+    "x\u{f3}a",
+    "xo\u{e1}",
+    "please",
+    "lamp",
+    "hey",
+    "it",
+    "that",
+    "thanks",
+    "thank",
+    "you",
+    "i",
+    "want",
+    "need",
+    "to",
+    "course",
+    "\u{111}i",
+    "nh\u{e9}",
+];
+
+/// Whether the turn is a refusal and nothing else (#8185): [`refuses`],
+/// no question, at most six words (as `services::plain_no`), each of them
+/// a no, a keep word, a negated forget word or a word beside them
+/// ([`ONLY_REFUSING`]), "do" only in "do not". "No.", "Lamp, no.", "No,
+/// keep it.", "Don't.", "No, don't forget it.", "Không, giữ lại." are;
+/// "No, turn the lights on.", "Yes, but don't forget it." and "No, do it."
+/// are not: what else they say is the model's to answer.
+pub(crate) fn only_refuses(turn: &str) -> bool {
+    if turn.trim_end().ends_with('?') || !refuses(turn) {
+        return false;
+    }
+    let words = lower_words(turn);
+    words.len() <= 6
+        && words.iter().enumerate().all(|(at, word)| {
+            ONLY_REFUSING.contains(&word.as_str())
+                || word == "do" && words.get(at + 1).is_some_and(|next| next == "not")
+        })
+}
+
 /// How many letters the person said a name has: "three letters", "it's 4
 /// letters". The last count said, if any.
 fn letters_counted(said: &str) -> Option<usize> {
@@ -5849,6 +5920,53 @@ mod tests {
             "",
         ] {
             assert!(!refuses(not), "{not}");
+        }
+    }
+
+    /// #8185: a refusal that is only a refusal is answered by the lamp at
+    /// once; one that says anything else, or no refusal, is not.
+    #[test]
+    fn only_refuses_reads_a_no_and_nothing_else() {
+        for no in [
+            "No.",
+            "Lamp, no.",
+            "No, keep it.",
+            "No, no, keep it.",
+            "Don't.",
+            "Nope.",
+            "Nah, leave it.",
+            "No thanks.",
+            "Of course not.",
+            "No, don't forget it.",
+            "No, do not delete it.",
+            "No, don't get rid of it.",
+            "Don't drop it.",
+            "No, I want to keep it.",
+            "Kh\u{f4}ng, gi\u{1eef} l\u{1ea1}i.",
+            "\u{110}\u{1eeb}ng qu\u{ea}n.",
+        ] {
+            assert!(only_refuses(no), "{no}");
+        }
+        for not in [
+            "No, turn the lights on.",
+            "Yes, but don't forget it.",
+            "No. What time is it?",
+            "No?",
+            "No, do it.",
+            "No, no, no, please don't forget that, lamp.",
+            "I don't want to keep it.",
+            "No, I don't want it.",
+            "Never mind just delete it",
+            "Don't wait just delete it",
+            "No not now delete it now",
+            "No, scratch it.",
+            "No, just forget it.",
+            "No problem, go ahead.",
+            "Yes.",
+            "Keep it.",
+            "",
+        ] {
+            assert!(!only_refuses(not), "{not}");
         }
     }
 
