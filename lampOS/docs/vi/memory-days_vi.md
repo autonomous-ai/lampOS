@@ -1016,7 +1016,13 @@ khoản (Backend3, 19/11): `POST <base>/history/turns` với khóa của lamp tr
   `LAMP_HISTORY_FORGET` thế nào; khi nó bật, các trang phần còn lại của một
   lệnh quên lớn được đọc ngoài đường của voice và id của chúng cũng đến đó,
   cũng như các id mà bộ nhớ giữ lại của một lệnh quên mà worker chưa kịp xếp
-  hàng, được đọc lại ở lần khởi động sau (`history_unsent`, xem memory.md). Một
+  hàng, được đọc lại ở lần khởi động sau (`history_unsent`, xem memory.md). Khi
+  nó tắt sau khi lịch sử từng được gửi từ đèn này (file hàng đợi của nó hoặc
+  file marks của bộ lưu có trong `/var/lib/lampOS/voice`, như sau một lần
+  rollback), một lệnh quên vẫn nhờ bộ nhớ giữ id của nó
+  (`history_forget::ever_sent`); không gì được xếp hàng hay gửi khi nó tắt, và
+  lần khởi động đầu tiên khi nó bật lại sẽ đọc chúng và xóa các lượt đó trên tài
+  khoản. Khi chưa từng gửi gì, một lệnh quên không giữ gì, như trước. Một
   lệnh quên về một điều cũng giữ lại rồi thả các lần POST như mọi lệnh quên
   khác. Khi mọi lần xóa của nó đều được trả lời, những gì đã đi đã được nêu trên
   đường đi và không bỏ thêm gì; khi một lần hết giờ hay mất câu trả lời giữa
