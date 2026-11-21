@@ -1422,15 +1422,21 @@ fn seen_again(tx: &Transaction<'_>, person: &Person, text: &str, now: u64) -> Re
 /// note). In the caller's transaction after the forget's own walk and
 /// before `erase`; never on expiry.
 pub(crate) fn with_doomed(tx: &Transaction<'_>) -> Result<()> {
+    // Past their exchanges' expiry: from what goes, by `origins_by`, never
+    // by joining every item the scope has (`days::origin_sharers`).
+    let past_expiry = format!(
+        "INSERT OR IGNORE INTO doomed {}",
+        crate::days::origin_sharers(
+            "nightly_items t",
+            "NOT EXISTS (SELECT 1 FROM nightly_items nd WHERE nd.rid=d.rid) AND t.rid NOT IN (SELECT rid FROM doomed)",
+        )
+    );
     loop {
         let mut added = tx.execute(
             "INSERT OR IGNORE INTO doomed SELECT DISTINCT s.child FROM sources s JOIN nightly_items n ON n.rid=s.child WHERE s.parent IN (SELECT rid FROM doomed) AND s.child NOT IN (SELECT rid FROM doomed)",
             [],
         )?;
-        added += tx.execute(
-            "INSERT OR IGNORE INTO doomed SELECT DISTINCT t.rid FROM nightly_items t JOIN origins o ON o.rid=t.rid WHERE t.rid NOT IN (SELECT rid FROM doomed) AND EXISTS (SELECT 1 FROM entries d WHERE d.rid IN (SELECT rid FROM doomed) AND d.person=t.person AND coalesce(d.category,'')!='talk' AND NOT EXISTS (SELECT 1 FROM nightly_items nd WHERE nd.rid=d.rid) AND (d.id=o.origin OR EXISTS (SELECT 1 FROM origins od WHERE od.rid=d.rid AND od.origin=o.origin)))",
-            [],
-        )?;
+        added += tx.execute(&past_expiry, [])?;
         added += tx.execute(
             "INSERT OR IGNORE INTO doomed SELECT r.older FROM replacements r JOIN nightly_items n ON n.rid=r.older WHERE r.newer IN (SELECT rid FROM doomed) AND r.older NOT IN (SELECT rid FROM doomed)",
             [],
