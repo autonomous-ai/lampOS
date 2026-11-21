@@ -327,6 +327,27 @@ fn on_this_repository_a_file_install_never_places_turns_nothing_on() {
     );
 }
 
+/// The real units: lamp-update's own switch file, which install never writes
+/// but every round carries, is read, so a switch the product turns on only
+/// there (`LAMP_UPDATE_CDN_FEED`, #7728) counts as on, not as waiting.
+#[test]
+fn on_this_repository_the_carried_update_switch_file_turns_switches_on() {
+    let lamp_os = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../../lampOS");
+    let page = std::fs::read_to_string(lamp_os.join("docs/switches.md")).unwrap();
+    let files = notes::product_files(&lamp_os).unwrap();
+    assert!(files.contains_key("update.env"), "update.env is not read");
+    let on = turned_on(&files);
+    assert_eq!(
+        on.get("LAMP_UPDATE_CDN_FEED").map(String::as_str),
+        Some("update.env")
+    );
+    assert!(
+        !waiting(&page, &on)
+            .iter()
+            .any(|w| w.switch == "LAMP_UPDATE_CDN_FEED")
+    );
+}
+
 /// A file counts as placed only by the name install places it under: a hand
 /// drop-in holding an installed unit's text word for word is not read
 /// (Second's P3 on #4666).

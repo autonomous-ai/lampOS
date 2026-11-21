@@ -948,8 +948,9 @@ lamp-update install --channel-url URL [--channel NAME] [--key-file PATH] [--setu
 The product unit it writes follows the CDN feed,
 `https://cdn.autonomous.ai/lampos/stable/` (#6589). A lamp installed before
 that keeps `--channel-url .../lampos-stable/` on GitHub, since no round
-rewrites lamp-update's unit; with `LAMP_UPDATE_CDN_FEED=on` (off unless set,
-#7728) its own lamp-update moves it to the CDN with the drop-in
+rewrites lamp-update's unit; with `LAMP_UPDATE_CDN_FEED=on` (on in the
+product by the carried `/etc/lampOS/update.env`, #7728) its own lamp-update
+moves it to the CDN with the drop-in
 `lamp-update.service.d/zz-cdn-feed.conf`, only once the CDN's signed
 envelope is read and checked, and keeps the GitHub feed otherwise
 ([updates.md](updates.md), "Moving a lamp to the CDN feed"). On the CDN
