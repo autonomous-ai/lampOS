@@ -2065,6 +2065,27 @@ to say nothing was there or that it is forgotten; with some gone, a
 `history_note` says so beside what went. One more local request inside
 the call's 1.5 s.
 
+**A forget by id whose line names a subject** (#8259; lamp-06c1, 22 Nov,
+#8125's leg 15). "Forget what I said about the bicycle" may be called by
+the id recall gave (`forget {source_id}`) instead of by `about`; that took
+the one kept thing and left every other turn about the bicycle. Now the
+voice reads the subject from the person's own heard line, the same read a
+one-face pick asks about (`remember::named_subject`, `forget_want`'s
+subject for an id; no other word list), and marks the call with it
+(`heard_about`, the lamp's own argument, never sent to the memory;
+`remember::heard_about_by_id`). Once the memory confirms the id gone, that
+known person's own exchanges about the subject go too, by the same
+`exchanges_forget` a forget about sends (`DaysClient::forget_exchanges_about`),
+in their scope alone: never in the room's scope, never another's. The
+model is told one count (the kept thing, `exchanges` beside it), or
+`history: "not_reached"` as above; the account's history waits for both
+answers, as after a forget about. It runs after the forget by id, inside the
+same call's time (no extra wait, no new cap). A line that names nothing
+("forget that"), an id that was not there, a bare forget and the second
+route taking back its own keep run by the id alone, as before. A forget
+about and the agreed one-face forget (below in `memory.md`, which already
+carries its `about`) are unchanged: their exchanges are asked once.
+
 **Forget marks** (El's option 2 on #5333). Before the above, a topic
 forget matched kept things and observations only, so an exchange said
 and never kept had nothing to match and stayed active for its 30 days; the
