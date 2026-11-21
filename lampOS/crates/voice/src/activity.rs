@@ -1680,6 +1680,41 @@ mod tests {
         assert_eq!(seen, (1, 1));
     }
 
+    /// #7095 (`LAMP_END_KEEPS_REACH_BACK=on`): however long a held line's
+    /// quiet runs, what it keeps for the next pre-roll stays at
+    /// [`END_LEAD_BLOCKS`], the latest of it, and a speech block clears it.
+    #[test]
+    fn the_kept_trailing_quiet_stays_within_its_bound() {
+        let mut detector = TurnDetector::default();
+        detector.keep_end_leads(true);
+        let mut sequence = 0;
+        let mut push = |detector: &mut TurnDetector, probability: f32| {
+            sequence += 1;
+            detector.push(
+                ObservedAudio {
+                    sequence,
+                    captured_at_us: sequence * 10_000,
+                    samples: [0; CAPTURE_SAMPLES],
+                },
+                probability,
+            );
+            sequence
+        };
+        for _ in 0..50 {
+            push(&mut detector, 1.0);
+        }
+        detector.words_end(Some(Trailing::Filler));
+        let mut last = 0;
+        for _ in 0..100 {
+            last = push(&mut detector, 0.0);
+        }
+        assert!(detector.active, "the filler hold ended the line");
+        assert_eq!(detector.trailing.len(), END_LEAD_BLOCKS);
+        assert_eq!(detector.trailing.back().unwrap().0.sequence, last);
+        push(&mut detector, 1.0);
+        assert!(detector.trailing.is_empty());
+    }
+
     /// The first builder's test for #828: the processed block suppressed to
     /// silence while the linear output still holds the speech scores speech
     /// with the switch and not without it.
