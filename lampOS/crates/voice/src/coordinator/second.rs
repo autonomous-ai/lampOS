@@ -477,10 +477,7 @@ impl Route {
         {
             self.line.clear();
         }
-        self.worker
-            .channels
-            .control
-            .send(Control::Authority { snapshot })
+        super::send_authority(&mut self.worker, snapshot)
     }
 
     /// Whether the second route is the one answering now.
