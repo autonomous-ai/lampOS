@@ -474,9 +474,15 @@ impl crate::runs::SkillYes for KeptYes {
 
 /// The skill `name`'s folder under `skills` ([`folder_of`]) when its
 /// source needs no yes (#8180, `lamp_voice::made_skill::grants_need_no_yes`
-/// of `lamp_skills::source_of`): its declared grants as the token's, `net`
-/// left out (lamp-tasks' own); none for any other source.
+/// of `lamp_skills::source_of`) and `LAMP_MADE_CODE_ON_AT_ONCE` is on in
+/// this process (`lamp_skills::no_yes_switch_on`, on in the product's
+/// lamp-control unit): its declared grants as the token's, `net` left out
+/// (lamp-tasks' own); none for any other source, or with the switch off,
+/// so the mint and the check need the kept yes exactly as before.
 fn no_yes_folder(skills: &Path, name: &str) -> Option<(std::path::PathBuf, Vec<String>)> {
+    if !lamp_skills::no_yes_switch_on() {
+        return None;
+    }
     let folder = folder_of(skills, name);
     if !std::fs::symlink_metadata(&folder).is_ok_and(|meta| meta.is_dir())
         || !lamp_skills::grants_need_no_yes(lamp_skills::source_of(&folder))
@@ -959,6 +965,7 @@ mod tests {
             assert!(!grants_need_no_yes(other), "{other:?}");
         }
         lamp_voice::skill_task_yes::set_net_here(Some(true));
+        lamp_skills::set_no_yes_switch_here(Some(true));
         let dir = folder("made-no-yes");
         let state = dir.join("state");
         let skills = dir.join("skills");
@@ -975,6 +982,23 @@ mod tests {
             std::fs::write(
                 folder.join("skill.toml"),
                 format!("kind = \"installable\"\n{toml}"),
+            )
+            .unwrap();
+            // Put on by the manage helper: its install record, not the
+            // Store's (`lamp_skills::source_of` needs it to be Made).
+            let installed = lamp_skills::package::Installed {
+                sha256: "ab".repeat(32),
+                manifest: lamp_skills::package::Manifest {
+                    format: 1,
+                    name: name.into(),
+                    version: "1.0.0".into(),
+                    files: Vec::new(),
+                },
+                from_store: false,
+            };
+            std::fs::write(
+                folder.join(lamp_skills::package::INSTALLED_FROM),
+                serde_json::to_vec(&installed).unwrap(),
             )
             .unwrap();
             folder
@@ -1034,6 +1058,32 @@ mod tests {
             check("desk-glow", &sha256, json!(["light"]))["agreed"],
             false
         );
+        // The Reviewer-lead's P2 on #8180: with LAMP_MADE_CODE_ON_AT_ONCE
+        // off, a made skill needs its kept yes exactly as before: no token
+        // with none, its check waiting, and its yes kept agreed as ever.
+        lamp_skills::set_no_yes_switch_here(Some(false));
+        assert_eq!(kept.grants("photo-booth").unwrap_err(), NO_YES);
+        assert_eq!(kept.grants("tide-times").unwrap_err(), NO_YES);
+        let sha256 = lamp_skills::task::folder_sha256(&tide).unwrap();
+        assert_eq!(
+            check("tide-times", &sha256, json!(["net", "speak"])),
+            json!({"agreed": false, "why": "waiting"})
+        );
+        let asked_yes = Asked {
+            name: "tide-times".into(),
+            sha256: sha256.clone(),
+            grants: vec!["net".into(), "speak".into()],
+        };
+        record(&state, &asked_yes, 1).unwrap();
+        assert_eq!(
+            check("tide-times", &sha256, json!(["net", "speak"])),
+            json!({"agreed": true})
+        );
+        assert_eq!(
+            kept.grants("tide-times").unwrap(),
+            BTreeSet::from([Grant::Speak])
+        );
+        lamp_skills::set_no_yes_switch_here(None);
         lamp_voice::skill_task_yes::set_net_here(None);
         let _ = std::fs::remove_dir_all(&dir);
     }

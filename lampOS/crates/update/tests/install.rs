@@ -2661,9 +2661,10 @@ fn the_product_turns_the_skill_flows_three_switches_on_where_they_are_read() {
 
 /// The make flow's five switches (the first builder's DEFAULT-ON, 19 Nov
 /// 21:42, on #7814), each `on` once in lamp-voice, whose part reads it, and
-/// in no other unit: a make the lamp can't build itself made a task for its
-/// agent (`LAMP_MAKE_NO_CANNOT`, #7234), made code that only lights, speaks
-/// or moves on at once (`LAMP_MADE_CODE_ON_AT_ONCE`), a skill the lamp has
+/// in no other unit but lamp-control for made code's (its no-yes mint and
+/// check, #8180): a make the lamp can't build itself made a task for its
+/// agent (`LAMP_MAKE_NO_CANNOT`, #7234), made code on at once with its
+/// declared grants and no yes (`LAMP_MADE_CODE_ON_AT_ONCE`), a skill the lamp has
 /// but is off turned on for a make asking for it (`LAMP_MAKE_CORE_OFFER`),
 /// "make a skill" listened for (`LAMP_SKILL_KEYTERM`) with a thing to do on
 /// a repeat told as a skill, never a reminder
@@ -2675,7 +2676,10 @@ fn the_product_turns_the_make_flows_five_switches_on_where_they_are_read() {
     let voice: &[&str] = &["lamp-voice.service"];
     let switches: [(&str, &[&str]); 5] = [
         (lamp_voice::make_no_cannot::ENVIRONMENT, voice),
-        (lamp_voice::made_skill::CODE_AT_ONCE_ENVIRONMENT, voice),
+        (
+            lamp_voice::made_skill::CODE_AT_ONCE_ENVIRONMENT,
+            &["lamp-voice.service", "lamp-control.service"],
+        ),
         (lamp_voice::make_core_offer::ENVIRONMENT, voice),
         (
             lamp_voice::second_provider::net::key_terms::SKILL_ENVIRONMENT,
