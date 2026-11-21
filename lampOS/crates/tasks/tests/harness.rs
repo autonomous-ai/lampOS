@@ -4331,7 +4331,8 @@ fn a_listing_is_read_for_state_last_activity_and_the_line_and_nothing_else() {
                 state: "idle".into(),
                 last_active_unix_ms: None,
                 about: None,
-                agent: None,
+                // Harness's own `agent` is kept too (#8105).
+                agent: Some("codex".into()),
             },
         ]
     );
