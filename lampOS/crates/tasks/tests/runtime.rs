@@ -1,7 +1,7 @@
 use lamp_bus::Bus;
 use lamp_msgs::{AgentState, Diagnostic, Level, Sign, TaskStatus};
 use lamp_tasks::{
-    engine::{CLOSE_RETRY_MS, CLOSE_TRIES, Clock as Sample, WATCH_EARLY_MS},
+    engine::{CLOSE_RETRY_MS, CLOSE_TRIES, Clock as Sample, START_LOOK_EVERY_MS, WATCH_EARLY_MS},
     follow::{FOLLOW_TRIES, WatchLane},
     harness::{
         AccountMachine, Closed, Ended, EngineKind, EngineRow, Launch, LaunchOutcome, Listed,
@@ -13,6 +13,7 @@ use lamp_tasks::{
         Adapter, Clock, Config, EnginesLane, LampSide, SessionLane, SetUpLater, WaitLane,
         lamp_side, request, serve_with_adapter,
     },
+    start_check::Started,
     store::Store,
 };
 use serde_json::{Value, json};
@@ -96,6 +97,8 @@ struct Counts {
     ps_fails: AtomicBool,
     /// `show` finds the agent idle with an answer while set.
     idle: AtomicBool,
+    /// `show` finds the agent still at work while set (#8170).
+    working: AtomicBool,
     /// Each `wait` held, with the agents it named.
     waits: Mutex<Vec<Vec<String>>>,
     /// What the held `wait` comes back with, once set.
@@ -171,7 +174,20 @@ struct Counts {
     /// how many looks were made (#5199). A machine with none is unreachable.
     engines: Mutex<BTreeMap<String, Result<Vec<EngineRow>, String>>>,
     engine_looks: AtomicUsize,
+    /// #8170: each launch's `new` times out while set, as lamp-06c1's on
+    /// 21 Nov; its name as sent; what `ps` lists to settle it (a row named
+    /// [`OWN_NAME`] carries the launch's own name), and how often it was
+    /// asked.
+    times_out: AtomicBool,
+    launched_names: Mutex<Vec<String>>,
+    started: Mutex<Vec<Started>>,
+    started_reads: AtomicUsize,
+    /// How long that `ps` takes, in ms, unless told to yield.
+    started_ms: AtomicUsize,
 }
+
+/// In [`Counts::started`], the name the lamp gave its last launch.
+const OWN_NAME: &str = "own-name";
 type SignInRead = Result<lamp_tasks::sign_in::Event, &'static str>;
 /// A sign-in that reads the script's lines and keeps its answers.
 struct ScriptSignIn(
@@ -302,6 +318,16 @@ impl Script {
             .unwrap()
             .push(machine.to_owned());
         assert_eq!(id, AGENT);
+        if self.counts.working.load(Ordering::SeqCst) {
+            return Ok(Observation {
+                agent_id: AGENT.into(),
+                state: "working".into(),
+                ask: Some("Private scripted task".into()),
+                answer: String::new(),
+                truncated: false,
+                tools: 1,
+            });
+        }
         if let Some(answer) = self.counts.plain.lock().unwrap().clone() {
             return Ok(Observation {
                 agent_id: AGENT.into(),
@@ -353,6 +379,16 @@ impl Adapter for Script {
             .push((launch.target.machine_id.clone(), launch.target.engine));
         self.counts.launches.fetch_add(1, Ordering::SeqCst);
         self.counts.order.lock().unwrap().push("launch");
+        self.counts
+            .launched_names
+            .lock()
+            .unwrap()
+            .push(launch.name.clone());
+        if self.counts.times_out.load(Ordering::SeqCst) {
+            return LaunchOutcome::Uncertain {
+                code: "timeout".into(),
+            };
+        }
         while self.counts.hold_launch.load(Ordering::SeqCst) && !self.stop.load(Ordering::Acquire) {
             thread::sleep(Duration::from_millis(5));
         }
@@ -465,6 +501,34 @@ impl Adapter for Script {
     fn signed_in_here(&self) -> Result<(SignIn, Option<String>), String> {
         let sign_in = self.signed_in()?;
         Ok((sign_in, self.counts.computer.lock().unwrap().clone()))
+    }
+    fn started(&self, machine: &str, cancel: &AtomicBool) -> Result<Vec<Started>, String> {
+        assert_eq!(machine, "0123456789abcdef0123456789abcdef");
+        self.counts.started_reads.fetch_add(1, Ordering::SeqCst);
+        self.counts.order.lock().unwrap().push("check");
+        let took = Duration::from_millis(self.counts.started_ms.load(Ordering::SeqCst) as u64);
+        let began = Instant::now();
+        while began.elapsed() < took && !self.stop.load(Ordering::Acquire) {
+            if cancel.load(Ordering::Acquire) {
+                return Err("cancelled".into());
+            }
+            thread::sleep(Duration::from_millis(5));
+        }
+        let own = self.counts.launched_names.lock().unwrap().last().cloned();
+        Ok(self
+            .counts
+            .started
+            .lock()
+            .unwrap()
+            .iter()
+            .cloned()
+            .map(|mut row| {
+                if row.name.as_deref() == Some(OWN_NAME) {
+                    row.name = own.clone();
+                }
+                row
+            })
+            .collect())
     }
     fn status(&self, machine: &str) -> Result<Vec<Listed>, String> {
         self.counts.listings.fetch_add(1, Ordering::SeqCst);
@@ -639,6 +703,9 @@ impl Running {
     }
     fn confirmation(&self, prepared: &Value) -> Value {
         json!({"op":"confirm","guard":self.guard(),"id":prepared["id"],"prepared_digest":prepared["prepared_digest"],"session_id":self.status()["summary"]["session_id"]})
+    }
+    fn get(&self, id: &Value) -> Value {
+        self.ask(json!({"op":"get_task","id":id}))
     }
     fn wait(&self, id: &Value, predicate: impl Fn(&Value) -> bool) -> Value {
         let start = Instant::now();
@@ -826,6 +893,361 @@ fn a_harness_done_and_told_is_closed_once_by_the_service() {
         )]
     );
     assert!(s.counts.listings.load(Ordering::SeqCst) > 0, "ps was read");
+}
+
+/// #8170: one row of `ps`.
+fn listed_row(id: &str, name: &str, folder: &str) -> Started {
+    Started {
+        id: id.into(),
+        name: Some(name.into()),
+        folder: Some(folder.into()),
+    }
+}
+const FOLDER: &str = "/Users/me/harnesses/project";
+
+/// Prepared and confirmed, its `new` timing out: its id.
+fn timed_out(s: &Running) -> Value {
+    s.counts.times_out.store(true, Ordering::SeqCst);
+    let prepared = s.prepare();
+    assert_eq!(s.trusted(s.confirmation(&prepared))["ok"], true);
+    prepared["id"].clone()
+}
+
+/// #8170, lamp-06c1 on 21 Nov: a start that timed out but ran on the
+/// computer is found on the next round by the lamp's own name for it,
+/// followed and closed once told as any other, and never sent again. The
+/// person's own harness listed beside it, in the same folder and working
+/// since, is never touched.
+#[test]
+fn a_start_that_timed_out_and_ran_is_found_tracked_and_closed_never_sent_twice() {
+    let s = Running::closing(true);
+    *s.counts.started.lock().unwrap() = vec![
+        listed_row(THEIRS, "my notes", FOLDER),
+        listed_row(AGENT, OWN_NAME, FOLDER),
+    ];
+    *s.counts.plain.lock().unwrap() = Some("A poem about coffee.".into());
+    let id = timed_out(&s);
+    let found = s.wait(&id, |v| v["task"]["dispatch"]["state"] == "accepted");
+    assert_eq!(found["task"]["dispatch"]["agent_id"], AGENT, "{found}");
+    assert!(s.counts.started_reads.load(Ordering::SeqCst) >= 1);
+    read_and_tell(&s, &id);
+    assert!(!closed_within(&s, 5_000).is_empty(), "never closed");
+    s.clock.0.lock().unwrap().monotonic_ms = 10_000_000;
+    thread::sleep(Duration::from_millis(300));
+    assert_eq!(
+        closes(&s),
+        [(
+            "0123456789abcdef0123456789abcdef".to_string(),
+            AGENT.to_string()
+        )]
+    );
+    assert_eq!(s.counts.launches.load(Ordering::SeqCst), 1, "sent twice");
+}
+
+/// #8170, the clock moved to `at` ms and the look due then made (a look a
+/// round, every 30 s at most): what the task shows after it.
+fn looked_at(s: &Running, id: &Value, at: u64) -> Value {
+    let reads = s.counts.started_reads.load(Ordering::SeqCst);
+    s.clock.0.lock().unwrap().monotonic_ms = at;
+    s.wait(id, |_| {
+        s.counts.started_reads.load(Ordering::SeqCst) > reads
+    });
+    // Its answer taken by the owner.
+    thread::sleep(Duration::from_millis(200));
+    s.get(id)
+}
+
+/// #8170, the first builder's 04:16 ruling on #8240 (lamp-06c1, 22 Nov:
+/// Harness landed starts 6 and 9 minutes after a 60 s timeout): a start
+/// that timed out and never ran stays `start_checking` for 15 minutes from
+/// its end, looked for every 30 s, never said failed or not started
+/// meanwhile; a second ask for it in that window is held and never sent.
+/// At 15 minutes, with nothing listed that could be it, it is not started.
+/// The person's harness in another folder is never taken.
+#[test]
+fn a_start_that_never_lands_is_not_started_only_at_fifteen_minutes() {
+    let s = Running::closing(true);
+    *s.counts.started.lock().unwrap() =
+        vec![listed_row(THEIRS, "my notes", "/Users/me/code/other")];
+    let id = timed_out(&s);
+    let checking = s.wait(&id, |v| {
+        v["task"]["dispatch"]["code"] == "start_checking"
+            && s.counts.started_reads.load(Ordering::SeqCst) >= 1
+    });
+    assert_eq!(checking["task"]["dispatch"]["state"], "uncertain");
+    for at in [120_000, 360_000, 540_000, 870_000] {
+        let seen = looked_at(&s, &id, at);
+        assert_eq!(
+            seen["task"]["dispatch"]["code"], "start_checking",
+            "at {at}: {seen}"
+        );
+        let again = s.ask(
+            json!({"op":"prepare","guard":s.guard(),"text":"Private scripted task","target":"coding"}),
+        );
+        assert_eq!(again["error"], "start_checking", "at {at}: {again}");
+    }
+    let settled = looked_at(&s, &id, 900_000);
+    assert_eq!(
+        settled["task"]["dispatch"]["state"], "not_sent",
+        "{settled}"
+    );
+    assert_eq!(settled["task"]["dispatch"]["code"], "not_started");
+    // The second ask, held every time (or never made, as when the model
+    // answered without the call), sent nothing.
+    assert_eq!(s.counts.launches.load(Ordering::SeqCst), 1, "sent twice");
+    assert!(closes(&s).is_empty());
+    // Settled, the person may ask again.
+    assert_eq!(s.prepare()["ok"], true);
+}
+
+/// #8170, lamp-06c1 on 22 Nov (row on #8240): Harness landed a start that
+/// timed out 6 minutes after the ask in one run and 9 in the other. Found
+/// by the lamp's own name then, after looks that listed nothing, it is
+/// tracked, told and closed as any other, never sent twice.
+#[test]
+fn a_start_that_lands_at_six_or_nine_minutes_is_found_and_tracked() {
+    for minutes in [6, 9] {
+        let s = Running::closing(true);
+        *s.counts.plain.lock().unwrap() = Some("A poem about coffee.".into());
+        let id = timed_out(&s);
+        s.wait(&id, |_| s.counts.started_reads.load(Ordering::SeqCst) >= 1);
+        let seen = looked_at(&s, &id, 120_000);
+        assert_eq!(seen["task"]["dispatch"]["code"], "start_checking", "{seen}");
+        *s.counts.started.lock().unwrap() = vec![listed_row(AGENT, OWN_NAME, FOLDER)];
+        let found = looked_at(&s, &id, minutes * 60_000);
+        assert_eq!(
+            found["task"]["dispatch"]["state"], "accepted",
+            "{minutes}: {found}"
+        );
+        assert_eq!(found["task"]["dispatch"]["agent_id"], AGENT);
+        read_and_tell(&s, &id);
+        assert!(
+            !closed_within(&s, 5_000).is_empty(),
+            "{minutes}: never closed"
+        );
+        assert_eq!(s.counts.launches.load(Ordering::SeqCst), 1, "sent twice");
+    }
+}
+
+/// The watch's look at `at`: the clock set there, and the task once the
+/// agent was read again.
+fn watched_at(s: &Running, id: &Value, at: u64) -> Value {
+    let reads = s.counts.reads.load(Ordering::SeqCst);
+    s.clock.0.lock().unwrap().monotonic_ms = at;
+    s.wait(id, |_| s.counts.reads.load(Ordering::SeqCst) > reads);
+    // Its answer taken by the owner.
+    thread::sleep(Duration::from_millis(200));
+    s.get(id)
+}
+
+/// Kept and told, then closed: the answer the lamp kept of its own accord,
+/// never asked for by a read here.
+fn kept_told_and_closed(s: &Running, id: &Value, what: &str) {
+    let kept = s.wait(id, |v| {
+        v["observations"].as_array().is_some_and(|v| !v.is_empty())
+    });
+    let observation = &kept["observations"][0];
+    assert_eq!(observation["state"], "idle", "{what}: {kept}");
+    tell(s, id, observation["id"].clone());
+    assert!(!closed_within(s, 5_000).is_empty(), "{what}: never closed");
+    assert_eq!(
+        s.counts.launches.load(Ordering::SeqCst),
+        1,
+        "{what}: sent twice"
+    );
+}
+
+/// #8170, row-8240c on lamp-06c1 (22 Nov, on #8240): a start found by the
+/// lamp's own name 543 s after its timeout, its agent already idle with its
+/// answer at the first read. Read by the lamp itself, by the wait that
+/// came back or by the watch's own looks, it is done, told and closed as
+/// an accepted one is, never left as handed over.
+#[test]
+fn a_start_found_late_already_idle_is_done_told_and_closed() {
+    for pushed in [true, false] {
+        let what = if pushed { "wait" } else { "looks" };
+        let mut s = Running::unstarted(false, true, true, true);
+        s.config.push_wait = pushed;
+        s.start();
+        *s.counts.plain.lock().unwrap() = Some("A poem about coffee.".into());
+        let id = timed_out(&s);
+        s.wait(&id, |_| s.counts.started_reads.load(Ordering::SeqCst) >= 1);
+        looked_at(&s, &id, 120_000);
+        *s.counts.started.lock().unwrap() = vec![listed_row(AGENT, OWN_NAME, FOLDER)];
+        if pushed {
+            // As on 06c1: Harness's wait says it ended at once.
+            *s.counts.wait_ends.lock().unwrap() = Some(vec![Ended {
+                agent_id: AGENT.into(),
+                state: "idle".into(),
+                failure: None,
+            }]);
+        }
+        let found = looked_at(&s, &id, 600_000);
+        assert_eq!(
+            found["task"]["dispatch"]["state"], "accepted",
+            "{what}: {found}"
+        );
+        if !pushed {
+            // The watch's first look, then its second of the same answer.
+            watched_at(&s, &id, 600_000 + 30_000);
+            watched_at(&s, &id, 600_000 + 40_000);
+        }
+        kept_told_and_closed(&s, &id, what);
+    }
+}
+
+/// #8170, row-8240c on #8240: a start found late with its agent still at
+/// work is followed by the watch's looks until it is done, then told and
+/// closed; nothing is kept while it works.
+#[test]
+fn a_start_found_late_still_running_is_followed_until_done() {
+    let s = Running::all(false, true, true, true);
+    s.counts.working.store(true, Ordering::SeqCst);
+    let id = timed_out(&s);
+    s.wait(&id, |_| s.counts.started_reads.load(Ordering::SeqCst) >= 1);
+    *s.counts.started.lock().unwrap() = vec![listed_row(AGENT, OWN_NAME, FOLDER)];
+    let found = looked_at(&s, &id, 600_000);
+    assert_eq!(found["task"]["dispatch"]["state"], "accepted", "{found}");
+    for at in [630_000, 660_000] {
+        let seen = watched_at(&s, &id, at);
+        assert_eq!(seen["observations"], json!([]), "{at}: {seen}");
+    }
+    s.counts.working.store(false, Ordering::SeqCst);
+    *s.counts.plain.lock().unwrap() = Some("A poem about coffee.".into());
+    watched_at(&s, &id, 690_000);
+    watched_at(&s, &id, 700_000);
+    kept_told_and_closed(&s, &id, "running");
+}
+
+/// #8170, the first builder's 01:05 guard and Twelve's HOLD on #8240: with
+/// no row of the lamp's own name, harnesses in its folder (the person's,
+/// working since the ask, and one titled already) are never taken; once
+/// its bound has passed it ends not sure, never "not started", never sent
+/// again, nothing followed or closed.
+#[test]
+fn harnesses_in_its_folder_without_its_name_are_never_taken() {
+    let s = Running::closing(true);
+    *s.counts.started.lock().unwrap() = vec![
+        listed_row(THEIRS, "my notes", FOLDER),
+        listed_row(AGENT, "Short poem", FOLDER),
+    ];
+    let id = timed_out(&s);
+    s.wait(&id, |_| s.counts.started_reads.load(Ordering::SeqCst) >= 1);
+    s.clock.0.lock().unwrap().monotonic_ms = 1_000_000;
+    let settled = s.wait(&id, |v| v["task"]["dispatch"]["code"] == "start_unsure");
+    assert_eq!(settled["task"]["dispatch"]["state"], "uncertain");
+    assert!(settled["task"]["dispatch"]["agent_id"].is_null());
+    s.clock.0.lock().unwrap().monotonic_ms = 10_000_000;
+    thread::sleep(Duration::from_millis(300));
+    assert!(closes(&s).is_empty());
+    assert_eq!(s.counts.reads.load(Ordering::SeqCst), 0, "followed");
+    assert_eq!(s.counts.launches.load(Ordering::SeqCst), 1, "sent twice");
+}
+
+/// #8170, the latency rule: a launch asked while a start is being checked
+/// goes ahead of the check. The check's `ps` (10 s here) yields at once, the
+/// launch is sent, and the start is looked for again after it.
+#[test]
+fn a_launch_asked_while_a_start_is_checked_goes_ahead_of_the_check() {
+    let mut s = Running::unstarted(false, true, false, true);
+    s.config.targets.insert(
+        "docs".into(),
+        Target {
+            machine_id: "0123456789abcdef0123456789abcdef".into(),
+            project: "docs".into(),
+            engine: EngineKind::Codex,
+        },
+    );
+    s.start();
+    // Ten seconds, so a launch that waits for it is told apart from one
+    // slowed by a loaded runner (Thirteen's HOLD on #8240: 1.21 s in a
+    // parallel run).
+    s.counts.started_ms.store(10_000, Ordering::SeqCst);
+    let first = timed_out(&s);
+    s.wait(&first, |_| {
+        s.counts.started_reads.load(Ordering::SeqCst) >= 1
+    });
+    s.counts.times_out.store(false, Ordering::SeqCst);
+    let prepared = s.ask(
+        json!({"op":"prepare","guard":s.guard(),"text":"Private scripted task","target":"docs"}),
+    );
+    assert_eq!(prepared["ok"], true, "{prepared}");
+    let asked = Instant::now();
+    assert_eq!(s.trusted(s.confirmation(&prepared))["ok"], true);
+    s.wait(&prepared["id"], |_| {
+        s.counts.launches.load(Ordering::SeqCst) == 2
+    });
+    let waited = asked.elapsed();
+    eprintln!("a launch asked during a 10 s check was sent after {waited:?}");
+    assert!(waited < Duration::from_secs(5), "{waited:?}");
+    // Looked for again at its next look, `START_LOOK_EVERY_MS` on.
+    s.clock.0.lock().unwrap().monotonic_ms += START_LOOK_EVERY_MS;
+    s.wait(&first, |_| {
+        s.counts.started_reads.load(Ordering::SeqCst) >= 2
+    });
+    let order = s.counts.order.lock().unwrap().clone();
+    let sent = order.iter().rposition(|call| *call == "launch").unwrap();
+    assert!(order[sent..].contains(&"check"), "{order:?}");
+    assert_eq!(s.get(&first)["task"]["dispatch"]["code"], "start_checking");
+}
+
+/// The Gateway's look and lamp-update's ask are this process's: the tests
+/// that hold a launch for OpenClaw's Gateway run one at a time.
+static GATEWAY: Mutex<()> = Mutex::new(());
+
+/// #8170, the reviewer-lead's P2 on #8240: a start being checked while a
+/// launch is held in the queue (here for OpenClaw's Gateway, as the lamp's
+/// pane is held in the product) yields once, and is looked for again at its
+/// next look only, never a new `ps` each round for as long as the hold
+/// lasts. The held launch goes once the hold lifts.
+#[test]
+fn a_start_checked_while_a_launch_is_held_is_not_looked_for_each_round() {
+    let _one = GATEWAY
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner);
+    let serving = Arc::new(AtomicBool::new(false));
+    {
+        let serving = serving.clone();
+        lamp_tasks::gateway::look_cold_with(Box::new(move || serving.load(Ordering::SeqCst)));
+    }
+    lamp_tasks::gateway::asked_for_tests(true);
+    let mut s = Running::unstarted(false, true, false, true);
+    s.config.targets.insert(
+        "claw".into(),
+        Target {
+            machine_id: "0123456789abcdef0123456789abcdef".into(),
+            project: "claw".into(),
+            engine: EngineKind::Openclaw,
+        },
+    );
+    s.start();
+    s.counts.started_ms.store(10_000, Ordering::SeqCst);
+    let first = timed_out(&s);
+    s.wait(&first, |_| {
+        s.counts.started_reads.load(Ordering::SeqCst) >= 1
+    });
+    s.counts.times_out.store(false, Ordering::SeqCst);
+    let prepared = s.ask(
+        json!({"op":"prepare","guard":s.guard(),"text":"Private scripted task","target":"claw"}),
+    );
+    assert_eq!(prepared["ok"], true, "{prepared}");
+    let reads = s.counts.started_reads.load(Ordering::SeqCst);
+    assert_eq!(s.trusted(s.confirmation(&prepared))["ok"], true);
+    // Held about 3 s.
+    thread::sleep(Duration::from_secs(3));
+    let looks = s.counts.started_reads.load(Ordering::SeqCst) - reads;
+    assert_eq!(s.counts.launches.load(Ordering::SeqCst), 1, "not held");
+    assert_eq!(
+        s.get(&prepared["id"])["task"]["dispatch"]["state"],
+        "queued"
+    );
+    serving.store(true, Ordering::SeqCst);
+    s.wait(&prepared["id"], |_| {
+        s.counts.launches.load(Ordering::SeqCst) == 2
+    });
+    lamp_tasks::gateway::asked_for_tests(false);
+    assert!(looks <= 1, "{looks} looks while the launch was held");
+    assert_eq!(s.get(&first)["task"]["dispatch"]["code"], "start_checking");
 }
 
 /// Without the switch, nothing is closed.
@@ -4583,6 +5005,9 @@ fn forget_sessions_removes_the_index_of_the_sessions_the_lamp_started() {
 /// the serving read.
 #[test]
 fn a_task_on_openclaw_is_held_in_the_queue_until_its_gateway_serves() {
+    let _one = GATEWAY
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner);
     let serving = Arc::new(AtomicBool::new(false));
     let looked = Arc::new(std::sync::atomic::AtomicU64::new(0));
     {

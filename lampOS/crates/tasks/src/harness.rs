@@ -206,7 +206,7 @@ impl EngineKind {
     /// the computer ("Devin cannot start with a first message", Harness
     /// 0.5.6, 29 Oct). Its task is typed in with `harness reply` once it is
     /// idle ([`Cli::first_message`]).
-    fn typed_after(self) -> bool {
+    pub(crate) fn typed_after(self) -> bool {
         matches!(self, Self::Devin)
     }
 }
@@ -4102,6 +4102,37 @@ impl Cli {
             return Err("status_failed".into());
         }
         parse_ps_names(&reply.stdout).map_err(str::to_string)
+    }
+
+    /// Each harness on one machine with its name, folder, state and last
+    /// activity, from one `ps` ([`crate::start_check`], #8170: a start that
+    /// timed out looked for by the lamp's own name for it). A read only.
+    pub fn started(
+        &self,
+        machine: &str,
+        cancel: &AtomicBool,
+    ) -> Result<Vec<crate::start_check::Started>, String> {
+        if !machine_id(machine) {
+            return Err("invalid_machine".into());
+        }
+        let _guard = self.operation.try_lock().map_err(|_| "busy".to_string())?;
+        let reply = self
+            .run_cancellable(
+                &[
+                    "ps".into(),
+                    "--machine".into(),
+                    machine.into(),
+                    "--json".into(),
+                ],
+                self.config.read_timeout,
+                PS_STDOUT_LIMIT,
+                Some(cancel),
+            )
+            .map_err(|error| error.code.to_string())?;
+        if !reply.success {
+            return Err("status_failed".into());
+        }
+        crate::start_check::parse(&reply.stdout).map_err(str::to_string)
     }
 
     /// The agents live in `folder` on one machine, from one `ps` (#6432: a
