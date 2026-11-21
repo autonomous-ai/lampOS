@@ -783,7 +783,8 @@ reminder's turn is kept out of the journal on purpose. The miss was the
 model calling `recall`, or nothing, and saying it did not remember. So
 `list_reminders`' description now ends (`LIST_ASKED`, after the earlier
 text, kept as `LIST_BEFORE`): any question about their reminders or timers
-(what is set, when it is due or when it was set), in any wording or
+(what is set, when it is due or when it was set; since #8181, their own, at
+any point, "not recall or lamp_help", below), in any wording or
 language, even one that sounds a word short, is answered only after calling
 this in that turn, not recall; and never list reminders unasked (rule 8).
 The wording and language part is #7987's: on lamp-52e6 (gate 1079) "Hey
@@ -795,6 +796,24 @@ model's choice, which this text makes. The description as it was before is
 kept as `LIST_DESCRIBED_BEFORE`, for the probe's old arm. Both routes
 declare the same catalog, so the Live route and the second route are told
 the same.
+
+**Their own reminders are `list_reminders`', how reminders work is
+`lamp_help`'s (#8181).** On lamp-52e6 in gate 1126 (build 15285) the core
+reminders line, asked as the 2nd line of a conversation, forced nothing
+(round 1 `forced=none`, `opening=name`, `sentences=2`), and the model
+called faq's `lamp_help` with `topic` `reminders` (`calls=use_skill:1`)
+instead of `list_reminders`; the three first lines after a restart called
+`list_reminders`. No new phrases: the two descriptions now tell the two
+apart. `LIST_ASKED` now says any question about *their own* reminders or
+timers *at any point* is answered only after calling this, "not recall or
+lamp_help" (to fit a function's 1,024 bytes, its "(what is set, when due
+or set)" is gone: the description is 1,021 bytes). Faq's description and
+its `when` say it is "not for their own reminders or timers", which are
+`list_reminders`' ([skills.md](skills.md), "Core skill: how to use the
+lamp"). Test:
+`list_reminders_and_lamp_help_say_which_is_for_their_own_reminders`
+(`crates/voice/src/tools/reminders_asked.rs`). Whether the model calls
+`list_reminders` mid-conversation is a played row's.
 
 Each listed item now says when it was set: `set_day` (`today`,
 `yesterday`, or its `YYYY-MM-DD`) and `set_clock` (its local `HH:MM`), so
