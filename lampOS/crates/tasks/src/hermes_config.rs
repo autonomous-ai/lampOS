@@ -11,6 +11,13 @@
 //!   OpenAI-compatible chat (`api_mode: chat_completions`), its key read from
 //!   [`TOKEN_ENV`];
 //! - `approvals.mode` = `manual`: Hermes asks before a dangerous command;
+//! - `telemetry.shared_metrics` = [`SHARED_METRICS_OFF`] (#8151, First's
+//!   privacy HOLD): Hermes's own "No thanks", collected nowhere and sent
+//!   nowhere, recorded as answered (`offer_version`), so no lamp's Hermes
+//!   collects or sends usage data, whatever Hermes's shipped default, and
+//!   it never asks (`hermes_cli/observability/shared_metrics_consent.py`,
+//!   `consent_state` and `set_answer`, Hermes d923a5e). Every other key
+//!   there (a person's `endpoint`) is replaced with it;
 //! - [`SKILLS_DIR`] in `skills.external_dirs`: Hermes reads the lamp's own
 //!   skills where they are, read-only, never copied into `HERMES_HOME`;
 //!   the dirs a person added there are kept;
@@ -69,6 +76,18 @@ pub const DROPPED_KEYS: [&str; 5] = [
 ];
 /// Hermes' approval mode that asks before a dangerous command.
 pub const APPROVALS: &str = "manual";
+/// `telemetry.shared_metrics`, always (#8151): Hermes's "No thanks" as its
+/// own `set_answer` writes it (d923a5e): nothing collected, nothing sent,
+/// and `offer_version` 2, Hermes's `OFFER_VERSION`, without which an off
+/// answer reads as never seen and is asked again. Plain YAML: Hermes
+/// reads `enabled is True` and `offer_version != 2`, so neither may be a
+/// string.
+pub const SHARED_METRICS_OFF: [&str; 4] = [
+    "shared_metrics:",
+    "  enabled: false",
+    "  send: false",
+    "  offer_version: 2",
+];
 /// The lamp's own skills, the folder lamp-skills reads (`lamp-skills
 /// --dir`), given to Hermes in place through `skills.external_dirs`.
 pub const SKILLS_DIR: &str = "/var/lib/lampOS/skills";
@@ -655,6 +674,16 @@ pub fn merge_config_for(text: &str, port: u16, agent_services: bool) -> Result<S
         "mode",
         Some(&one("mode", APPROVALS)),
     )?;
+    let shared_metrics: Vec<String> = SHARED_METRICS_OFF
+        .iter()
+        .map(|line| (*line).to_owned())
+        .collect();
+    set_child(
+        &mut parts,
+        "telemetry",
+        "shared_metrics",
+        Some(&shared_metrics),
+    )?;
     add_to_list(&mut parts, "skills", "external_dirs", SKILLS_DIR)?;
     // A `terminal:` it can't merge (flow style, an anchor) keeps the rest:
     // only the SDK's path for a skill's run is left out, and said.
@@ -830,6 +859,19 @@ pub(crate) fn replace(path: &Path, text: &str) -> io::Result<()> {
 /// Both files under `hermes_home` merged, on the forwarder's `port`, with
 /// its local `token`; a file already right is not written. Nothing is
 /// written when `config.yaml` can't be merged or the token isn't plain.
+/// Whether `config.yaml` in `hermes_home` already names the lamp's provider
+/// (`model.provider: "custom:lamp"`, [`merge_config`]): until it does, a
+/// Hermes Harness starts would ask "Run setup now?", which nobody answers
+/// in a pane, so lamp-tasks' kept session is not opened (#8151). The
+/// provider lines are lamp-tasks' own (written at its start, [`write`]);
+/// the `hooks:` block is Harness's, kept as Harness wrote it.
+pub fn provider_set(hermes_home: &Path) -> bool {
+    std::fs::read_to_string(hermes_home.join("config.yaml")).is_ok_and(|text| {
+        text.lines()
+            .any(|line| line.trim() == format!("provider: \"custom:{PROVIDER}\""))
+    })
+}
+
 pub fn write(hermes_home: &Path, port: u16, token: &str) -> io::Result<Written> {
     write_for(hermes_home, port, token, agent_services_on())
 }
@@ -1143,6 +1185,22 @@ custom_providers:
         assert!(!config.contains(MCP_NAME), "{config}");
     }
 
+    /// #8151: the kept session waits for the lamp's provider in the
+    /// config, so Hermes never asks "Run setup now?" in it.
+    #[test]
+    fn the_provider_is_seen_set_only_once_merged() {
+        let home = tempfile::tempdir().unwrap();
+        assert!(!provider_set(home.path()));
+        std::fs::write(home.path().join("config.yaml"), HARNESS).unwrap();
+        assert!(!provider_set(home.path()));
+        std::fs::write(
+            home.path().join("config.yaml"),
+            merge_config(HARNESS, 7741).unwrap(),
+        )
+        .unwrap();
+        assert!(provider_set(home.path()));
+    }
+
     #[test]
     fn harness_hooks_block_is_kept_line_for_line() {
         let merged = merge_config(HARNESS, 7741).unwrap();
@@ -1170,6 +1228,37 @@ custom_providers:
              key_env: \"LAMP_HERMES_TOKEN\"\n    api_mode: \"chat_completions\"\n    \
              default_model: \"deepseek-flash\"\n"
         ));
+    }
+
+    /// #8151, First's privacy HOLD: Hermes's shared metrics are off and
+    /// answered on every lamp, whatever was there: from no file, from a
+    /// person's "send" answer (its endpoint too), and beside telemetry's
+    /// other keys, which are kept. Plain booleans and number, never strings.
+    #[test]
+    fn hermes_shared_metrics_are_always_off_and_answered() {
+        let off = "telemetry:\n  shared_metrics:\n    enabled: false\n    send: false\n    offer_version: 2\n";
+        let fresh = merge_config("", 7741).unwrap();
+        assert!(fresh.contains(off), "{fresh}");
+        let sharing = "telemetry:\n  shared_metrics:\n    enabled: true\n    send: true\n    endpoint: https://example.invalid/v1\n    offer_version: 2\n";
+        let merged = merge_config(sharing, 7741).unwrap();
+        assert!(merged.contains(off), "{merged}");
+        assert!(!merged.contains("enabled: true"), "{merged}");
+        assert!(!merged.contains("send: true"), "{merged}");
+        assert!(!merged.contains("example.invalid"), "{merged}");
+        assert_eq!(merged.matches("shared_metrics:").count(), 1, "{merged}");
+        let beside = "telemetry:\n  other_key: 1\n";
+        let merged = merge_config(beside, 7741).unwrap();
+        assert!(merged.contains("  other_key: 1\n"), "{merged}");
+        assert!(
+            merged.contains(
+                "  shared_metrics:\n    enabled: false\n    send: false\n    offer_version: 2\n"
+            ),
+            "{merged}"
+        );
+        assert!(!merged.contains("\"false\""), "{merged}");
+        assert_eq!(merge_config(&merged, 7741).unwrap(), merged, "merged twice");
+        // A make's home is merged from no file the same way.
+        assert!(merge_config_for("", 7741, true).unwrap().contains(off));
     }
 
     #[test]

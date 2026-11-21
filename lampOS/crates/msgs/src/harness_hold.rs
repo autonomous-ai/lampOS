@@ -82,6 +82,14 @@ pub fn harness_hold(switch: Option<&str>, lamp_update_exec_start: Option<&str>) 
 /// folders at a daemon start unless a name in its `OVERRIDE_NAMES`
 /// (`cli/src/homeMove/conditions.ts`) points inside it (`skipped-override`).
 pub const DATA_DIR: &str = "ADAPTER_DATA_DIR";
+/// Hermes's own: set, Hermes asks nothing at its first start (its first-run
+/// telemetry question), which a Hermes Harness starts can't answer, so its
+/// session stays `starting` and every reply is `ENGINE_NOT_READY` (#7781,
+/// #8151). In `harness-hold.env`, in every Harness command's environment
+/// and in the launcher's lines, so every Hermes Harness starts has it.
+pub const HERMES_NONINTERACTIVE: &str = "HERMES_NONINTERACTIVE";
+/// [`HERMES_NONINTERACTIVE`]'s value.
+pub const NONINTERACTIVE_ON: &str = "1";
 /// Its value under Harness's home, Harness's own default
 /// (`harnessPath('cli') + '/data'`, `cli/src/config/env.ts`).
 pub const HARNESS_DATA: &str = ".harness/cli/data";

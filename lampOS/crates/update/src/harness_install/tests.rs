@@ -1161,14 +1161,14 @@ fn a_pinned_install_reporting_another_version_records_version() {
 /// Harness's launcher as its installer writes it without `--no-updates`.
 const UNPINNED: &str = "#!/bin/sh\nexec \"/var/lib/lampos-tasks/.local/share/harness/node/bin/node\" \"/var/lib/lampos-tasks/.local/share/harness/cli/0.5.39/cli.js\" \"$@\"\n";
 /// The same in Harness's pinned shape (#5493).
-const PINNED: &str = "#!/bin/sh\nexport ADAPTER_UPDATE_DISABLE=true\nexport HARNESS_ENV_FILE=/var/lib/lampos-tasks/harness-hold.env\ncase \"${1-}\" in update) echo \"harness: this lamp keeps Harness at its pinned version and updates it itself; nothing was changed\" >&2; exit 1 ;; esac\nexport ADAPTER_DATA_DIR=/var/lib/lampos-tasks/.harness/cli/data\nexec \"/var/lib/lampos-tasks/.local/share/harness/node/bin/node\" \"/var/lib/lampos-tasks/.local/share/harness/cli/0.5.39/cli.js\" \"$@\"\n";
+const PINNED: &str = "#!/bin/sh\nexport ADAPTER_UPDATE_DISABLE=true\nexport HARNESS_ENV_FILE=/var/lib/lampos-tasks/harness-hold.env\ncase \"${1-}\" in update) echo \"harness: this lamp keeps Harness at its pinned version and updates it itself; nothing was changed\" >&2; exit 1 ;; esac\nexport HERMES_NONINTERACTIVE=1\nexport ADAPTER_DATA_DIR=/var/lib/lampos-tasks/.harness/cli/data\nexec \"/var/lib/lampos-tasks/.local/share/harness/node/bin/node\" \"/var/lib/lampos-tasks/.local/share/harness/cli/0.5.39/cli.js\" \"$@\"\n";
 /// Harness's data folder on the lamp (#7906).
 const DATA_AT: &str = "/var/lib/lampos-tasks/.harness/cli/data";
 /// [`UNPINNED`] as the canary keeps it: only the data folder exported.
 fn lifted() -> String {
     UNPINNED.replace(
         "\nexec ",
-        &format!("\nexport ADAPTER_DATA_DIR={DATA_AT}\nexec "),
+        &format!("\nexport HERMES_NONINTERACTIVE=1\nexport ADAPTER_DATA_DIR={DATA_AT}\nexec "),
     )
 }
 const HOLD_ON: &str =

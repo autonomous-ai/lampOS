@@ -82,7 +82,9 @@ const RUNTIME: &str = ".harness/runtime";
 /// into its user unit (`lib/platformDaemon.ts` `CARRIED_ENV`). The value is
 /// Harness's own default (`config/env.ts`), so nothing moves and the
 /// daemon's socket name and pane tags, which hash it, stay the same.
-pub use lamp_msgs::harness_hold::{DATA_DIR, HARNESS_DATA};
+pub use lamp_msgs::harness_hold::{
+    DATA_DIR, HARNESS_DATA, HERMES_NONINTERACTIVE, NONINTERACTIVE_ON,
+};
 /// `LAMP_HERMES_ON_LAMP` (#5978): the variable Harness finds Hermes'
 /// sessions by (openharness `config/env.ts`, `engines/hermes/home.ts`).
 /// With the switch it is in the file too, and given to every Harness
@@ -127,7 +129,8 @@ pub fn data_dir(home: &Path) -> Option<String> {
     plain.then(|| format!("{text}/{HARNESS_DATA}"))
 }
 
-/// `environment` with [`DATA_DIR`] at [`data_dir`] of its `HOME` (#7906),
+/// `environment` with [`DATA_DIR`] at [`data_dir`] of its `HOME` (#7906)
+/// and [`HERMES_NONINTERACTIVE`] `1` (#7781),
 /// so a Harness command, and a daemon it starts, keeps Harness's home in
 /// `~/.harness`. A value already set is replaced by that default, so the
 /// socket name and pane tags Harness hashes from it are the same for every
@@ -140,6 +143,8 @@ pub fn with_data_dir(mut environment: BTreeMap<String, OsString>) -> BTreeMap<St
     {
         environment.insert(DATA_DIR.into(), data.into());
     }
+    // Every Hermes a Harness command starts asks nothing (#7781).
+    environment.insert(HERMES_NONINTERACTIVE.into(), NONINTERACTIVE_ON.into());
     environment
 }
 
@@ -238,6 +243,9 @@ pub fn env_file_changed(
     if lamp_engine {
         text.push_str(&format!("{SHELL}={LAUNCH_SHELL}\n"));
     }
+    // Every Hermes Harness starts asks nothing at its first start (#7781),
+    // held or lifted.
+    text.push_str(&format!("{HERMES_NONINTERACTIVE}={NONINTERACTIVE_ON}\n"));
     // Harness's home kept in `~/.harness` (#7906), read by the daemon
     // through this file even when it is started without the variable.
     text.push_str(&lamp_msgs::harness_hold::data_line(&data));
@@ -262,6 +270,7 @@ pub fn env_file_changed(
     if lamp_engine {
         environment.insert(SHELL.into(), LAUNCH_SHELL.into());
     }
+    environment.insert(HERMES_NONINTERACTIVE.into(), NONINTERACTIVE_ON.into());
     Ok((path, changed))
 }
 
@@ -351,6 +360,7 @@ fn launcher_shaped(text: &str, env_file: Option<&str>, data: &str) -> Option<Str
         if line_text.starts_with(&format!("export {DISABLE}="))
             || line_text.starts_with(&format!("export {ENV_FILE}="))
             || line_text.starts_with(&format!("export {DATA_DIR}="))
+            || line_text.starts_with(&format!("export {HERMES_NONINTERACTIVE}="))
             || line_text == REFUSE_UPDATE
         {
             continue;
@@ -363,6 +373,9 @@ fn launcher_shaped(text: &str, env_file: Option<&str>, data: &str) -> Option<Str
         pinned.push_str(REFUSE_UPDATE);
         pinned.push('\n');
     }
+    pinned.push_str(&format!(
+        "export {HERMES_NONINTERACTIVE}={NONINTERACTIVE_ON}\n"
+    ));
     pinned.push_str(&format!("export {DATA_DIR}={data}\n"));
     for line in &lines[exec..] {
         pinned.push_str(line);
@@ -687,6 +700,37 @@ mod tests {
     const OTHER_LINE: &str = "/opt/lampOS/update/current/lamp-update serve --channel-url file:///var/tmp/lampos-channel/ --channel lamp-voice --key-file /etc/lampOS/update/key.pub --apply on";
     use std::{net::TcpListener, os::unix::fs::PermissionsExt};
 
+    /// #7781: every Hermes Harness starts asks nothing at its first start:
+    /// `HERMES_NONINTERACTIVE=1` in the env file held and lifted (the
+    /// lifted file without the hold's line), and in every Harness command's
+    /// environment, whatever the hold.
+    #[test]
+    fn every_hermes_harness_starts_is_noninteractive_held_or_lifted() {
+        let hermes = Path::new("/var/lib/lampos-hermes/.hermes");
+        for hold in [HarnessHold::Held, HarnessHold::Lifted] {
+            let home = tempfile::tempdir().unwrap();
+            let mut environment = BTreeMap::new();
+            environment.insert("HOME".to_owned(), OsString::from(home.path()));
+            let (path, _) = env_file_for(hold, &mut environment, Some(hermes), None)
+                .unwrap()
+                .unwrap();
+            let text = fs::read_to_string(path).unwrap();
+            assert!(
+                text.lines().any(|line| line == "HERMES_NONINTERACTIVE=1"),
+                "{hold:?}"
+            );
+            assert_eq!(text.contains(TEXT), hold == HarnessHold::Held, "{hold:?}");
+            assert_eq!(
+                environment.get(HERMES_NONINTERACTIVE),
+                Some(&OsString::from("1"))
+            );
+        }
+        let given = with_data_dir(BTreeMap::new());
+        assert_eq!(given.get(HERMES_NONINTERACTIVE), Some(&OsString::from("1")));
+        let launcher = pinned_launcher("#!/bin/sh\nexec node cli.js \"$@\"\n", "/e", "/d").unwrap();
+        assert!(launcher.contains("export HERMES_NONINTERACTIVE=1\n"));
+    }
+
     #[test]
     fn the_hold_writes_its_file_and_gives_harness_both_variables() {
         let home = tempfile::tempdir().unwrap();
@@ -779,11 +823,11 @@ mod tests {
     /// Harness's launcher as its installer writes it without `--no-updates`.
     const UNPINNED: &str = "#!/bin/sh\nexec \"/var/lib/lampos-tasks/.local/share/harness/node/bin/node\" \"/var/lib/lampos-tasks/.local/share/harness/cli/0.5.39/cli.js\" \"$@\"\n";
     /// The same, pinned.
-    const PINNED: &str = "#!/bin/sh\nexport ADAPTER_UPDATE_DISABLE=true\nexport HARNESS_ENV_FILE=/var/lib/lampos-tasks/harness-hold.env\ncase \"${1-}\" in update) echo \"harness: this lamp keeps Harness at its pinned version and updates it itself; nothing was changed\" >&2; exit 1 ;; esac\nexport ADAPTER_DATA_DIR=/var/lib/lampos-tasks/.harness/cli/data\nexec \"/var/lib/lampos-tasks/.local/share/harness/node/bin/node\" \"/var/lib/lampos-tasks/.local/share/harness/cli/0.5.39/cli.js\" \"$@\"\n";
+    const PINNED: &str = "#!/bin/sh\nexport ADAPTER_UPDATE_DISABLE=true\nexport HARNESS_ENV_FILE=/var/lib/lampos-tasks/harness-hold.env\ncase \"${1-}\" in update) echo \"harness: this lamp keeps Harness at its pinned version and updates it itself; nothing was changed\" >&2; exit 1 ;; esac\nexport HERMES_NONINTERACTIVE=1\nexport ADAPTER_DATA_DIR=/var/lib/lampos-tasks/.harness/cli/data\nexec \"/var/lib/lampos-tasks/.local/share/harness/node/bin/node\" \"/var/lib/lampos-tasks/.local/share/harness/cli/0.5.39/cli.js\" \"$@\"\n";
     const ENV_AT: &str = "/var/lib/lampos-tasks/harness-hold.env";
     /// Harness's data folder on the lamp (#7906), and its launcher line.
     const DATA_AT: &str = "/var/lib/lampos-tasks/.harness/cli/data";
-    const DATA_LINE: &str = "export ADAPTER_DATA_DIR=/var/lib/lampos-tasks/.harness/cli/data\n";
+    const DATA_LINE: &str = "export HERMES_NONINTERACTIVE=1\nexport ADAPTER_DATA_DIR=/var/lib/lampos-tasks/.harness/cli/data\n";
 
     /// [`UNPINNED`] with the hold lifted: only the data folder exported.
     fn lifted() -> String {
@@ -792,7 +836,10 @@ mod tests {
 
     /// The env file's line for Harness's data folder under `home` (#7906).
     fn data_line(home: &Path) -> String {
-        format!("ADAPTER_DATA_DIR={}/.harness/cli/data\n", home.display())
+        format!(
+            "HERMES_NONINTERACTIVE=1\nADAPTER_DATA_DIR={}/.harness/cli/data\n",
+            home.display()
+        )
     }
 
     #[test]
@@ -1206,7 +1253,7 @@ mod tests {
                 let (file, environment, launcher) = writers(hold, launcher);
                 assert_eq!(
                     file,
-                    format!("{TEXT}ADAPTER_DATA_DIR={DATA_AT}\n"),
+                    format!("{TEXT}HERMES_NONINTERACTIVE=1\nADAPTER_DATA_DIR={DATA_AT}\n"),
                     "{exec:?}"
                 );
                 assert!(environment.contains_key(DATA_DIR), "{exec:?}");
@@ -1227,7 +1274,10 @@ mod tests {
         assert_eq!(hold, HarnessHold::Lifted);
         for launcher in [UNPINNED, PINNED] {
             let (file, environment, launcher) = writers(hold, launcher);
-            assert_eq!(file, format!("ADAPTER_DATA_DIR={DATA_AT}\n"));
+            assert_eq!(
+                file,
+                format!("HERMES_NONINTERACTIVE=1\nADAPTER_DATA_DIR={DATA_AT}\n")
+            );
             assert!(!environment.contains_key(DISABLE));
             assert!(environment.contains_key(DATA_DIR));
             assert_eq!(launcher, lifted());

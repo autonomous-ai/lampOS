@@ -870,6 +870,120 @@ fn hermes_on_the_one_path_has_its_data_and_approvals_off_only_in_a_run() {
     assert!(String::from_utf8_lossy(&out.stderr).contains("hermes: no forwarder token"));
 }
 
+/// (#8151) lamp-tasks' kept session, started by Harness in its own folder
+/// (`one-session` in lamp-tasks' Harness project): nobody answers it, so
+/// Hermes asks no approval there (`HERMES_YOLO_MODE=1`, its hardline list
+/// still Hermes's own), on the one run path and through the older wrapper;
+/// any other folder, a near name too, keeps the approvals, and a caller's
+/// own value is dropped. Harness's hooks are accepted there unasked
+/// (`HERMES_ACCEPT_HOOKS=1`). `HERMES_NONINTERACTIVE` passes through
+/// (#7781).
+#[test]
+fn hermes_in_the_kept_session_folder_has_approvals_off() {
+    let folder = tempfile::tempdir().unwrap();
+    let top = fs::canonicalize(folder.path()).unwrap();
+    let place = top.join("hermes-home");
+    let program = place.join(".local/bin/hermes");
+    fs::create_dir_all(program.parent().unwrap()).unwrap();
+    fs::write(&program, "#!/bin/sh\nexit 0\n").unwrap();
+    fs::set_permissions(&program, fs::Permissions::from_mode(0o755)).unwrap();
+    let forwarder = top.join("hermes-token");
+    fs::write(&forwarder, "tok_forwarder\n").unwrap();
+    let one_path = one_path_text(&hermes_install::agent())
+        .unwrap()
+        .replace(hermes_install::TOKEN, forwarder.to_str().unwrap())
+        .replace(hermes_install::PLACE, place.to_str().unwrap());
+    let older = wrapper_text("hermes").unwrap();
+    for text in [one_path, older] {
+        let lamp = lamp_of("hermes", &text);
+        // The older wrapper finds Hermes's program on `PATH`.
+        let bin = lamp.top.join("bin2");
+        fs::create_dir_all(&bin).unwrap();
+        fs::write(bin.join("hermes"), "#!/bin/sh\nexit 0\n").unwrap();
+        fs::set_permissions(bin.join("hermes"), fs::Permissions::from_mode(0o755)).unwrap();
+        let path = format!("{}:/usr/bin:/bin", bin.display());
+        let kept = lamp.top.join("project").join("one-session");
+        let near = lamp.top.join("project").join("one-session-2");
+        fs::create_dir_all(&kept).unwrap();
+        fs::create_dir_all(&near).unwrap();
+        let given = [("HERMES_YOLO_MODE", "0"), ("HERMES_NONINTERACTIVE", "1")];
+        let out = lamp.run_in(&kept, &given, &path);
+        assert!(out.status.success(), "{out:?}");
+        let env = lamp.read("env").unwrap();
+        assert!(
+            env.lines().any(|line| line == "HERMES_YOLO_MODE=1"),
+            "{env}"
+        );
+        assert!(
+            env.lines().any(|line| line == "HERMES_NONINTERACTIVE=1"),
+            "{env}"
+        );
+        // Harness's own hooks are taken unasked there too.
+        assert!(
+            env.lines().any(|line| line == "HERMES_ACCEPT_HOOKS=1"),
+            "{env}"
+        );
+        // Any other folder (a near name, a person's own pane): unset, even
+        // when the caller set it (First's ruling, #8151).
+        let own = lamp.top.join("project").join("my-pane");
+        fs::create_dir_all(&own).unwrap();
+        let preset = [("HERMES_YOLO_MODE", "1"), ("HERMES_NONINTERACTIVE", "1")];
+        for other in [&near, &own] {
+            let out = lamp.run_in(other, &preset, &path);
+            assert!(out.status.success(), "{out:?}");
+            let env = lamp.read("env").unwrap();
+            assert!(!env.contains("HERMES_YOLO_MODE"), "{env}");
+            assert!(!env.contains("HERMES_ACCEPT_HOOKS"), "{env}");
+        }
+    }
+}
+
+/// #8151, #7781 (c0a4, 21 Nov): Harness starts an engine with an
+/// environment of its own list, so `HERMES_NONINTERACTIVE` from Harness's
+/// env file never reaches Hermes, and its telemetry question waited for an
+/// answer in the kept pane. Both Hermes wrappers set it themselves: with
+/// none from the caller, Hermes gets `HERMES_NONINTERACTIVE=1` in the kept
+/// folder and in every other folder alike.
+#[test]
+fn hermes_is_noninteractive_in_every_folder_without_the_caller_saying_so() {
+    let folder = tempfile::tempdir().unwrap();
+    let top = fs::canonicalize(folder.path()).unwrap();
+    let place = top.join("hermes-home");
+    let program = place.join(".local/bin/hermes");
+    fs::create_dir_all(program.parent().unwrap()).unwrap();
+    fs::write(&program, "#!/bin/sh\nexit 0\n").unwrap();
+    fs::set_permissions(&program, fs::Permissions::from_mode(0o755)).unwrap();
+    let forwarder = top.join("hermes-token");
+    fs::write(&forwarder, "tok_forwarder\n").unwrap();
+    let one_path = one_path_text(&hermes_install::agent())
+        .unwrap()
+        .replace(hermes_install::TOKEN, forwarder.to_str().unwrap())
+        .replace(hermes_install::PLACE, place.to_str().unwrap());
+    let older = wrapper_text("hermes").unwrap();
+    for text in [one_path, older] {
+        let lamp = lamp_of("hermes", &text);
+        let bin = lamp.top.join("bin2");
+        fs::create_dir_all(&bin).unwrap();
+        fs::write(bin.join("hermes"), "#!/bin/sh\nexit 0\n").unwrap();
+        fs::set_permissions(bin.join("hermes"), fs::Permissions::from_mode(0o755)).unwrap();
+        let path = format!("{}:/usr/bin:/bin", bin.display());
+        let kept = lamp.top.join("project").join("one-session");
+        let own = lamp.top.join("project").join("my-pane");
+        fs::create_dir_all(&kept).unwrap();
+        fs::create_dir_all(&own).unwrap();
+        for at in [&kept, &own] {
+            let out = lamp.run_in(at, &[], &path);
+            assert!(out.status.success(), "{out:?}");
+            let env = lamp.read("env").unwrap();
+            assert!(
+                env.lines().any(|line| line == "HERMES_NONINTERACTIVE=1"),
+                "{}: {env}",
+                at.display()
+            );
+        }
+    }
+}
+
 /// (#7200) A skill's run granted the internet on the one run path: its
 /// egress socket and fresh home are found by its run id, since Harness
 /// passes none of lamp-tasks' variables. A run whose socket lamp-tasks made

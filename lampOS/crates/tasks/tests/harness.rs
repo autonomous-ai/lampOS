@@ -284,8 +284,10 @@ fn launch_uses_exact_argv_auto_mode_null_stdin_and_stable_generic_identity() {
     );
     for call in calls {
         let environment = call["environment"].as_object().unwrap();
-        // HOME, PATH, ADAPTER_DATA_DIR (#7906) and the two marks.
-        assert_eq!(environment.len(), 6);
+        // HOME, PATH, ADAPTER_DATA_DIR (#7906), HERMES_NONINTERACTIVE
+        // (#7781) and the two marks.
+        assert_eq!(environment.len(), 7);
+        assert_eq!(environment["HERMES_NONINTERACTIVE"], "1");
         assert_eq!(environment["AI_AGENT"], "lampos");
         assert_eq!(environment["HARNESS_AGENT_SESSION"], "stable-session_123");
         for forbidden in [
@@ -316,7 +318,7 @@ fn as_the_person_the_call_carries_no_agent_mark_and_is_otherwise_the_same() {
     assert_eq!(calls[1]["args"][0], "new");
     for call in calls {
         let environment = call["environment"].as_object().unwrap();
-        assert_eq!(environment.len(), 4, "{environment:?}");
+        assert_eq!(environment.len(), 5, "{environment:?}");
         assert!(!environment.contains_key("AI_AGENT"));
         assert!(!environment.contains_key("HARNESS_AGENT_SESSION"));
     }
@@ -2666,6 +2668,7 @@ fn a_held_lamps_whole_environment_is_taken() {
         lamp_tasks::hold::HERMES_HOME,
         lamp_tasks::hold::OPENCLAW_STATE_DIR,
         lamp_tasks::hold::SHELL,
+        lamp_tasks::hold::HERMES_NONINTERACTIVE,
     ] {
         assert!(config.environment.contains_key(name), "{name}");
     }
@@ -10309,13 +10312,15 @@ fn with_one_session_on_as_an_agent_each_run_keeps_its_own_pane() {
     assert_eq!((count("new"), count("close"), count("reply")), (2, 2, 0));
 }
 
-/// #7246: only an OpenClaw default shares the one pane. A Hermes default
-/// whose wrapper is a gateway agent's (its run's token through the
-/// skill-start launcher, as OpenClaw's) keeps today's per-run path, even
-/// with the switch on and Harness called as the person: each run its own
-/// `new hermes` and `close`, nothing typed with `reply`.
+/// #7246, #8151: only an OpenClaw default's skill runs share the one pane
+/// (`one_session::skill_runs_share`). A Hermes default's spoken tasks
+/// share its kept session, but its skill runs keep the per-run path, even
+/// with a wrapper that is a gateway agent's (its run's token through the
+/// skill-start launcher, as OpenClaw's), the switch on and Harness called
+/// as the person: each run its own `new hermes` and `close`, nothing typed
+/// with `reply`.
 #[test]
-fn with_one_session_on_a_hermes_default_keeps_the_per_run_path() {
+fn with_one_session_on_a_hermes_default_keeps_the_per_run_path_for_skill_runs() {
     let mut rig = Rig::new();
     rig.config.as_person = true;
     one_session_plan(&rig);

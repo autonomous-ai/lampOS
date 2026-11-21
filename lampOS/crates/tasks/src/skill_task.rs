@@ -3823,7 +3823,10 @@ impl Runner for HarnessRunner {
         // Only with Harness called as the person, as the product's
         // lamp-tasks is: Harness closes an idle pane an agent started after
         // 30 min, so as an agent each run keeps its own.
-        // OpenClaw's only: a Hermes default keeps the per-run path.
+        // OpenClaw's only (`skill_runs_share`): a Hermes run's wrapper
+        // reads the run's token file once at its own start, so a Hermes
+        // default keeps the per-run path for skill runs, though its spoken
+        // tasks share the kept session (#8151).
         // A make (#7245, the owner 18 Nov 13:4x) is typed into the same
         // kept pane: its runner is built before the pane is, so it reads
         // the lamp's one session here; a fresh `new` per make spent 73 s
@@ -3835,7 +3838,7 @@ impl Runner for HarnessRunner {
         });
         if by_start
             && harness.config.as_person
-            && crate::one_session::shares(engine)
+            && crate::one_session::skill_runs_share(engine)
             && let Some(one) = &one_session
             && let Some(ended) = self.run_in_one_session(
                 one,
