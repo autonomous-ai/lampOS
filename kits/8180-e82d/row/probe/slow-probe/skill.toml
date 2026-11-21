@@ -1,0 +1,9 @@
+asks = ["slow probe"]
+kind = "installable"
+version = "1.0.0"
+grants = ["speak"]
+
+# #8180 ROW leg H test fixture, removed by unrow: a run step that runs about 20 s (under RUN_WITHIN's 30 s),
+# so lamp-tasks can be restarted while it runs.
+[[do]]
+run = "scripts/main.py"

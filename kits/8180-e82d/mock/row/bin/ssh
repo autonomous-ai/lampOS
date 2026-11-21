@@ -1,0 +1,66 @@
+#!/usr/bin/env python3
+# Mock ssh for row.sh: never connects. LAMP bodies -> fixture output by script; `journalctl -f` -> plays-driven journal.
+import os, sys, time, re, glob
+FX = os.environ["MOCK_FX"]; ROW = os.environ["MOCK_ROW"]; LOG = os.environ["MOCK_LOG"]
+a = sys.argv[1:]; i = 0; n = False
+while i < len(a) and a[i].startswith("-"):
+    if a[i] == "-n": n = True; i += 1
+    elif a[i] in ("-o", "-p", "-i", "-l"): i += 2
+    else: i += 1
+host = a[i] if i < len(a) else ""; cmd = " ".join(a[i+1:])
+def log(m):
+    with open(LOG, "a") as f: f.write("%.3f ssh %s: %s\n" % (time.time(), host, m))
+def fx(*names):
+    for nm in names:
+        p = os.path.join(FX, nm)
+        if os.path.exists(p): return open(p).read()
+    return None
+def lastleg():
+    try: ls = [l for l in open(os.path.join(ROW, "logs/plays.log")) if " PLAY " in l]
+    except FileNotFoundError: return "?"
+    m = re.search(r"leg=(\S+)", ls[-1]) if ls else None
+    return m.group(1) if m else "?"
+if "sudo sh -s" in cmd:
+    body = sys.stdin.read()
+    names = {}
+    for f in glob.glob(os.path.join(ROW, "*.lamp.sh")):
+        c = open(f).read()
+        if os.path.basename(f) != "common.lamp.sh" and body.endswith(c): names[os.path.basename(f)] = c
+    nm = max(names, key=lambda k: len(names[k])) if names else "unknown"
+    pre = body[: len(body) - len(names.get(nm, ""))].rstrip("\n").split("\n")[-1]
+    key = ""
+    m = re.search(r"STOPF=/tmp/t8180-stop\.(?:cg)?(\S+)", pre); key = m.group(1) if m else ""
+    m = re.search(r"MODE=(\S+)", pre); key = key or (m.group(1) if m else "")
+    m = re.search(r"NAME=(\S+)", pre); key = key or (m.group(1) if m else "")
+    if nm == "made.lamp.sh": key = lastleg()
+    if nm == "wshop.lamp.sh" and key == "hash":
+        st = os.path.join(os.environ["MOCK_STATE"], "wshop.n"); k = int(open(st).read()) + 1 if os.path.exists(st) else 1
+        open(st, "w").write(str(k)); key = "hash.%d" % k
+    log("LAMP %s key=%s pre=%r" % (nm, key, pre[:120]))
+    out = fx("out/%s.%s" % (nm, key), "out/%s" % nm)
+    if out is None: log("NO FIXTURE out/%s.%s" % (nm, key)); sys.exit(0)
+    sys.stdout.write(out.replace("@NOW@", "%.3f" % time.time())); sys.exit(0)
+log("CMD " + cmd)
+if "journalctl -f" in cmd:
+    # follow: on each new PLAY in the trigger file, append that clip's chunk (k-th play of it in its leg)
+    trig = os.path.join(os.environ["MOCK_STATE"], "played"); seen = 0; count = {}
+    while True:
+        try: ts = open(trig).read().splitlines()
+        except FileNotFoundError: ts = []
+        for t in ts[seen:]:
+            at, leg, clip = t.split()
+            count[(leg, clip)] = count.get((leg, clip), 0) + 1; k = count[(leg, clip)]
+            ch = fx("j/%s.%s.%d" % (leg, clip, k), "j/%s.%s" % (leg, clip)) or ""
+            for line in ch.splitlines():
+                mm = re.match(r"@\+([0-9.]+) (.*)", line)
+                if not mm: continue
+                sys.stdout.write("%.6f mock-lamp %s\n" % (float(at) + float(mm.group(1)), mm.group(2)))
+            sys.stdout.flush()
+        seen = len(ts); time.sleep(0.05)
+if "random/boot_id" in cmd: print((fx("cmd/bootid") or "boot-2").strip()); sys.exit(0)
+if cmd.startswith("date +%s.%N"): print("%.6f" % time.time()); sys.exit(0)
+if cmd.startswith("uname -r"): print(os.environ.get("MOCK_UNAME", "6.1.43-rockchip-rk3588")); sys.exit(0)
+if "command -v prlimit" in cmd: print(os.environ.get("MOCK_PRLIMIT", "/usr/bin/prlimit")); sys.exit(0)
+if "ps -eLo user=" in cmd: print(os.environ.get("MOCK_LAMPOS_TASKS", "88")); sys.exit(0)
+if cmd.startswith("journalctl -u"): sys.exit(0)        # STARTS: no starts in the last 10 min
+sys.exit(0)                                            # rm/touch/mkdir: nothing

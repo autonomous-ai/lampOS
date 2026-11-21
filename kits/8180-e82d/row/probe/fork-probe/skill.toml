@@ -1,0 +1,9 @@
+asks = ["fork probe"]
+kind = "installable"
+version = "1.0.0"
+grants = ["speak"]
+
+# #8180 ROW leg P test fixture, removed by unrow: a run step that starts 120 child processes, past its run
+# cgroup's pids.max (72) and the fence's per-process cap (64); the rest must be refused while another run answers.
+[[do]]
+run = "scripts/main.py"
