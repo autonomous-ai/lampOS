@@ -955,6 +955,8 @@ pub fn after_round_with(
     window: Result<crate::hermes_schedule::Window, String>,
     say: &mut dyn FnMut(&str),
 ) -> Option<OpenclawInstall> {
+    // #8138: an install cut off while lamp-tasks was stopped.
+    tasks_back(records, systemd, say);
     match crate::writer_unit::write_unit(root, UNIT, &unit_text_for(shown)) {
         Ok(written) => {
             if written && let Err(why) = systemd.reload() {
@@ -1446,6 +1448,8 @@ pub fn after_round_off(
     systemd: &mut dyn Systemd,
     say: &mut dyn FnMut(&str),
 ) -> bool {
+    // #8138: an install cut off while lamp-tasks was stopped.
+    tasks_back(records, systemd, say);
     gateway_off(root, systemd, say);
     let there = [WRAPPER, NS]
         .into_iter()
@@ -1915,15 +1919,15 @@ fn steps(
     // lamp-update's folder, not lamp-tasks' runtime folder, so the socket
     // lamp-tasks makes in it at its start shows in the gateway's namespace
     // whichever starts first.
-    let tasks_ran = tasks_stopped(run, say);
+    let tasks_ran = tasks_stopped(records, run, say);
     // Always on (the owner on #6226): started now, or restarted so one
     // running an older OpenClaw runs the new one. The round enables it.
     if let Err(why) = run(&["systemctl", "restart", UNIT].map(str::to_owned)) {
-        tasks_started(run, tasks_ran, say);
+        tasks_started(records, run, tasks_ran, say);
         return fail("gateway", format!("systemctl restart {UNIT}: {why}"), say);
     }
     gateway_answers(run, say);
-    tasks_started(run, tasks_ran, say);
+    tasks_started(records, run, tasks_ran, say);
     remove_aside(root, say);
     // Through the gateway just (re)started; an add not done is retried by
     // the next round, never a failure of the install.
@@ -2078,11 +2082,28 @@ fn gateway_active(run: &mut Runner) -> bool {
 /// lamp-tasks' unit, stopped around the gateway's restart ([`steps`]).
 pub const TASKS_UNIT: &str = "lamp-tasks.service";
 
+/// The record of a stop of [`TASKS_UNIT`] by [`tasks_stopped`] not yet
+/// followed by its start (#8138, the first builder's HOLD 1 on #8162),
+/// in the records folder: written before the stop, taken out once
+/// lamp-tasks is started again. One still there after the one-shot has
+/// ended (cut off by the watch's `systemctl stop`, its timeout or a
+/// crash) is how `serve` knows to start lamp-tasks ([`tasks_back`]).
+pub const TASKS_STOPPED: &str = "openclaw-tasks-stopped";
+
 /// [`TASKS_UNIT`] stopped when it is active: whether it was, so it is
 /// started again after the gateway's restart ([`tasks_started`]). One not
-/// active (not installed, or stopped by a person) is left as it is.
-fn tasks_stopped(run: &mut Runner, say: &mut dyn FnMut(&str)) -> bool {
+/// active (not installed, or stopped by a person) is left as it is. The
+/// stop is recorded first ([`TASKS_STOPPED`]); one that can't be recorded
+/// is not made (lamp-tasks then runs on through the restart, as before
+/// #8138), so a stop is never left that nothing brings back.
+fn tasks_stopped(records: &Path, run: &mut Runner, say: &mut dyn FnMut(&str)) -> bool {
     if run(&["systemctl", "is-active", "--quiet", TASKS_UNIT].map(str::to_owned)).is_err() {
+        return false;
+    }
+    if let Err(error) = write_whole(&records.join(TASKS_STOPPED), b"", 0o600) {
+        say(&format!(
+            "{TASKS_UNIT} not stopped while {UNIT} restarts: its stop not recorded: {error}"
+        ));
         return false;
     }
     match run(&["systemctl", "stop", TASKS_UNIT].map(str::to_owned)) {
@@ -2095,14 +2116,58 @@ fn tasks_stopped(run: &mut Runner, say: &mut dyn FnMut(&str)) -> bool {
 }
 
 /// [`TASKS_UNIT`] started again when [`tasks_stopped`] found it active,
-/// on every way out of the restart, a failed one too.
-fn tasks_started(run: &mut Runner, ran: bool, say: &mut dyn FnMut(&str)) {
+/// on every way out of the restart, a failed one too. Started, the stop's
+/// record is taken out; a start that fails leaves it, for [`tasks_back`].
+fn tasks_started(records: &Path, run: &mut Runner, ran: bool, say: &mut dyn FnMut(&str)) {
     if !ran {
         return;
     }
     match run(&["systemctl", "start", TASKS_UNIT].map(str::to_owned)) {
-        Ok(_) => say(&format!("{TASKS_UNIT} started again")),
+        Ok(_) => {
+            let _ = fs::remove_file(records.join(TASKS_STOPPED));
+            say(&format!("{TASKS_UNIT} started again"));
+        }
         Err(why) => say(&format!("{TASKS_UNIT} not started again: {why}")),
+    }
+}
+
+/// lamp-tasks brought back after an install cut off while it was stopped
+/// (#8138, the first builder's HOLD 1 on #8162): with [`TASKS_STOPPED`]
+/// there and Harness's one-shot not at work (its `ActiveState` read as
+/// `inactive` or `failed`: never while it runs, is frozen or is being
+/// stopped, so never mid-install), [`TASKS_UNIT`] started and the record
+/// taken out, said once. `serve` looks every [`KEEP_EVERY`] between
+/// rounds, and each round once. A start that fails keeps the record, so
+/// the next look tries again; its line is said only when the error
+/// changes (kept in the record), never every look.
+pub fn tasks_back(records: &Path, systemd: &mut dyn Systemd, say: &mut dyn FnMut(&str)) {
+    let stopped = records.join(TASKS_STOPPED);
+    let Ok(said) = fs::read(&stopped) else {
+        return;
+    };
+    let ended = systemd
+        .states(&[harness_install::UNIT.to_owned()])
+        .ok()
+        .and_then(|states| states.into_iter().next())
+        .is_some_and(|state| state.active == "inactive" || state.active == "failed");
+    if !ended {
+        return;
+    }
+    match systemd.start_unit(TASKS_UNIT) {
+        Ok(()) => {
+            let _ = fs::remove_file(&stopped);
+            say(&format!(
+                "{TASKS_UNIT} started again: OpenClaw's install ended while it was stopped for the gateway's restart (#8138)"
+            ));
+        }
+        Err(why) => {
+            if said != why.as_bytes() {
+                say(&format!(
+                    "{TASKS_UNIT} not started again after OpenClaw's install ended: {why}"
+                ));
+                let _ = write_whole(&stopped, why.as_bytes(), 0o600);
+            }
+        }
     }
 }
 

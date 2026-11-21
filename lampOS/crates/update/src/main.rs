@@ -1215,18 +1215,25 @@ fn on_the_lamp(command: &str, options: &BTreeMap<String, String>) -> ExitCode {
     // app starts the gateway within seconds and another default stops it.
     // A round asks once more for its own OpenClaw step. One lock is held by
     // the round for its whole run and by the thread for each look, so the
-    // two never touch the gateway at once (Twelve's P3 on #8116).
+    // two never touch the gateway at once (Twelve's P3 on #8116). The same
+    // thread runs with OpenClaw on whatever that switch says, for #8138: a
+    // lamp-tasks an install stopped and never started again (the one-shot
+    // cut off) is started within KEEP_EVERY of the one-shot's end
+    // (openclaw::tasks_back), never during a round.
     let gateway_by_default = matches!(openclaw, Some((true, _))) && switches.gateway_by_default;
     let tasks_app_socket = config
         .root
         .join(lamp_update::openclaw_install::TASKS_APP_SOCKET.trim_start_matches('/'));
     let gateway_lock = std::sync::Arc::new(std::sync::Mutex::new(()));
-    if gateway_by_default {
+    if matches!(openclaw, Some((true, _))) {
         use lamp_update::openclaw_install as openclaw;
-        say(
-            "OpenClaw's gateway runs only while OpenClaw is the lamp's agent (LAMP_OPENCLAW_GATEWAY_BY_DEFAULT)",
-        );
+        if gateway_by_default {
+            say(
+                "OpenClaw's gateway runs only while OpenClaw is the lamp's agent (LAMP_OPENCLAW_GATEWAY_BY_DEFAULT)",
+            );
+        }
         let root = config.root.clone();
+        let records = records.clone();
         let socket = tasks_app_socket.clone();
         let shown = openclaw.map(|(_, shown)| shown).unwrap_or_default();
         let gateway_lock = gateway_lock.clone();
@@ -1238,9 +1245,10 @@ fn on_the_lamp(command: &str, options: &BTreeMap<String, String>) -> ExitCode {
                 loop {
                     // A round holds the lock: this look is skipped.
                     if let Ok(_look) = gateway_lock.try_lock() {
-                        let gateway =
-                            openclaw::gateway_wanted(true, openclaw::said_default(&socket));
-                        {
+                        openclaw::tasks_back(&records, &mut systemd, &mut said);
+                        if gateway_by_default {
+                            let gateway =
+                                openclaw::gateway_wanted(true, openclaw::said_default(&socket));
                             openclaw::keep_between_rounds(
                                 &root,
                                 &mut systemd,
@@ -1256,7 +1264,7 @@ fn on_the_lamp(command: &str, options: &BTreeMap<String, String>) -> ExitCode {
             });
         if let Err(error) = started {
             say(&format!(
-                "OpenClaw's gateway is not kept to the lamp's agent: no thread: {error}"
+                "OpenClaw's gateway and lamp-tasks are not looked at between rounds: no thread: {error}"
             ));
         }
     }

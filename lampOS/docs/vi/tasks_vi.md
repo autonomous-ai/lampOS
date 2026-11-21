@@ -2539,8 +2539,11 @@ khi đăng xuất, và với 0.6.60 khi đăng nhập (ROW của #7507).
   lamp-tasks trước khi khởi động lại gateway của OpenClaw, chờ tới khi
   gateway trả lời `health` (tối đa 40 lần gọi, cách nhau 3 s), rồi mới
   khởi động lại lamp-tasks, để phiên được giữ mở trên một gateway nhận
-  được nó; một lần khởi động lại thất bại cũng khởi động lại lamp-tasks
-  (install.md, "The install's restart order").
+  được nó; một lần khởi động lại thất bại cũng khởi động lại lamp-tasks,
+  và một lần cài bị cắt ngang trước bước khởi động đó (watch dừng nó,
+  hết thời gian, hoặc crash) thì `serve` khởi động lamp-tasks trong
+  khoảng 10 s sau khi one-shot kết thúc, không bao giờ khi one-shot đang
+  chạy (install.md, "The install's restart order").
 - **Reply khi đã đăng nhập, có xác nhận.** Với Harness có xác nhận reply, mọi
   reply vào một phiên của người dùng (pane duy nhất của `harness new`,
   `--reply-named`, một phiên resumed, một tin nhắn đầu tiên) chỉ được tính là

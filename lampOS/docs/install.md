@@ -2554,7 +2554,10 @@ As root, on a lamp with the base image (`crates/update/src/install.rs`):
      place and checked (`openclaw --version`, the entry points, the unit),
      the one-shot restarts the gateway with no session talking to it:
      1. `lamp-tasks.service`, when `systemctl is-active` says it runs, is
-        stopped. lamp-tasks closes no idle session at its stop: the kept
+        stopped, the stop recorded first in lamp-update's records
+        (`openclaw-tasks-stopped`; one that can't be written leaves
+        lamp-tasks running through the restart, as before #8138).
+        lamp-tasks closes no idle session at its stop: the kept
         session's record and token stay (its pane then ends with the
         gateway's namespace in step 2). A skill run
         working at that moment is cancelled by the stop, and its kept
@@ -2567,9 +2570,28 @@ As root, on a lamp with the base image (`crates/update/src/install.rs`):
         the seconds. Past the bound: one line, and the install goes on,
         not failed (a slow gateway is not a broken install).
      4. `lamp-tasks.service` started again (only when step 1 found it
-        running), which opens its session on the gateway now answering.
+        running), which opens its session on the gateway now answering,
+        and the record of step 1 taken out.
      5. The set-aside OpenClaw removed, and agent `main`'s allow-list
         edited through the gateway (above).
+
+     **A one-shot cut off between steps 1 and 4** (the install watch's
+     `systemctl stop` on a lost privacy reading or its 40 min of
+     freezing, its timeout, a crash) never runs step 4, and
+     `Restart=on-failure` does not bring back a clean stop. `serve` does:
+     with the record of step 1 still there and Harness's one-shot read
+     `inactive` or `failed` (never while it runs, is frozen or is being
+     stopped), it starts `lamp-tasks.service`, takes the record out and
+     says once `lamp-tasks.service started again: OpenClaw's install
+     ended while it was stopped for the gateway's restart (#8138)`. It
+     looks every 10 s between rounds (the thread of
+     `LAMP_OPENCLAW_GATEWAY_BY_DEFAULT`, which runs with OpenClaw on
+     whatever that switch says; the switch only decides whether it also
+     keeps the gateway) and once at each round's OpenClaw step, so
+     lamp-tasks is back within about 10 s of the one-shot's end, or at
+     the end of a round under way. A start that fails keeps the record
+     and is tried again at the next look, its line said only when the
+     error changes.
 
      A restart that fails still starts lamp-tasks again; the install is
      then `failed` with `gateway` and, as every failed install, stops the

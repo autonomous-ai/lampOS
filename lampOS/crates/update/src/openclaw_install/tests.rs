@@ -73,7 +73,12 @@ impl Systemd for Fake {
         Ok(())
     }
     fn start_unit(&mut self, unit: &str) -> Result<(), String> {
-        assert_eq!(unit, UNIT, "a round starts only the gateway");
+        // #8138: lamp-tasks too, when an install cut off left it stopped.
+        if unit == TASKS_UNIT {
+            self.asked.push("start-tasks");
+            return Ok(());
+        }
+        assert_eq!(unit, UNIT, "a round starts only the gateway and lamp-tasks");
         self.asked.push("start-gateway");
         Ok(())
     }
@@ -1023,6 +1028,173 @@ fn a_failed_gateway_restart_still_starts_lamp_tasks_again() {
     assert!(health_calls(&runs).is_empty());
     assert!(start < runs.position(&format!("systemctl stop {UNIT}")));
     assert!(!lamp.at(WRAPPER).exists() && !lamp.at(NS).exists());
+}
+
+/// An install that stops lamp-tasks and is then cut off before the
+/// gateway's restart (the watch's `systemctl stop`, its timeout or a
+/// crash): `systemctl stop lamp-tasks` ran, its start never did.
+fn install_cut_off_after_the_stop(lamp: &Lamp) {
+    fs::write(lamp.unit(), UNIT_TEXT).unwrap();
+    lamp.ask();
+    let runs = Runs::new(lamp);
+    let restart = format!("systemctl restart {UNIT}");
+    let mut inner = runs.runner();
+    let mut run = |argv: &[String]| {
+        // The one-shot ends here: nothing after it runs.
+        assert_ne!(argv.join(" "), restart, "the one-shot is cut off");
+        inner(argv)
+    };
+    let cut = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+        install_with(
+            lamp.root(),
+            &lamp.records(),
+            &mut run,
+            &mut || 4,
+            &mut quiet(),
+            &kit(),
+        )
+    }));
+    assert!(cut.is_err(), "cut off");
+    let lines = runs.lines();
+    assert!(
+        lines.contains(&format!("systemctl stop {TASKS_UNIT}"))
+            && !lines.contains(&format!("systemctl start {TASKS_UNIT}")),
+        "{lines:#?}"
+    );
+}
+
+/// #8138 (the first builder's HOLD 1 on #8162): an install cut off between
+/// its stop of lamp-tasks and its start leaves lamp-tasks stopped, and
+/// `Restart=on-failure` does not bring a clean stop back. The next round
+/// starts it again once Harness's one-shot is no longer at work (never
+/// while it runs or is being stopped), said once; a round after that
+/// starts nothing.
+#[test]
+fn a_cut_off_install_never_leaves_lamp_tasks_stopped_after_the_next_round() {
+    let lamp = Lamp::new();
+    lamp.harness_there();
+    install_cut_off_after_the_stop(&lamp);
+    for at_work in ["active", "deactivating"] {
+        let mut systemd = Fake {
+            active: Some(at_work),
+            ..Fake::default()
+        };
+        round(&lamp, &mut systemd, false, 10);
+        assert!(
+            !systemd.asked.contains(&"start-tasks"),
+            "{at_work}: {:?}",
+            systemd.asked
+        );
+    }
+    let mut systemd = Fake {
+        active: Some("failed"),
+        ..Fake::default()
+    };
+    round(&lamp, &mut systemd, false, 11);
+    assert_eq!(
+        systemd
+            .asked
+            .iter()
+            .filter(|asked| **asked == "start-tasks")
+            .count(),
+        1,
+        "{:?}",
+        systemd.asked
+    );
+    let mut systemd = Fake {
+        active: Some("inactive"),
+        ..Fake::default()
+    };
+    round(&lamp, &mut systemd, false, 12);
+    assert!(
+        !systemd.asked.contains(&"start-tasks"),
+        "started once: {:?}",
+        systemd.asked
+    );
+}
+
+/// #8138: `serve`'s look between rounds ([`tasks_back`], every
+/// [`KEEP_EVERY`]) brings lamp-tasks back the same way, without waiting
+/// for a round: nothing while the one-shot is at work or systemd can't
+/// say, then one start, said once; a start that fails keeps the record
+/// and says its error once, not every look. With no stop recorded it
+/// asks systemd nothing.
+#[test]
+fn serve_starts_lamp_tasks_again_within_a_look_of_a_cut_off_install() {
+    let lamp = Lamp::new();
+    let mut systemd = Fake::default();
+    tasks_back(&lamp.records(), &mut systemd, &mut quiet());
+    assert!(systemd.asked.is_empty(), "{:?}", systemd.asked);
+    install_cut_off_after_the_stop(&lamp);
+    assert!(lamp.records().join(TASKS_STOPPED).exists());
+    for at_work in ["active", "activating", "deactivating"] {
+        let mut systemd = Fake {
+            active: Some(at_work),
+            ..Fake::default()
+        };
+        tasks_back(&lamp.records(), &mut systemd, &mut quiet());
+        assert_eq!(systemd.asked, ["state"], "{at_work}");
+    }
+    let mut lines = Vec::new();
+    let mut systemd = Fake {
+        active: Some("inactive"),
+        ..Fake::default()
+    };
+    for _ in 0..2 {
+        tasks_back(&lamp.records(), &mut systemd, &mut |line: &str| {
+            lines.push(line.to_owned())
+        });
+    }
+    assert_eq!(systemd.asked, ["state", "start-tasks"]);
+    assert_eq!(
+        lines,
+        [format!(
+            "{TASKS_UNIT} started again: OpenClaw's install ended while it was stopped for the gateway's restart (#8138)"
+        )]
+    );
+    assert!(!lamp.records().join(TASKS_STOPPED).exists());
+
+    // A start refused: kept, tried at each look, said once per error.
+    struct Refuses(Fake, usize);
+    impl Systemd for Refuses {
+        fn states(&mut self, units: &[String]) -> Result<Vec<UnitState>, String> {
+            self.0.states(units)
+        }
+        fn start_unit(&mut self, unit: &str) -> Result<(), String> {
+            assert_eq!(unit, TASKS_UNIT);
+            self.1 += 1;
+            Err("Job for lamp-tasks.service failed".to_owned())
+        }
+        fn self_recovery_ready(&mut self) -> Result<(), String> {
+            unreachable!()
+        }
+        fn reload(&mut self) -> Result<(), String> {
+            unreachable!()
+        }
+        fn restart(&mut self, _: &str) -> Result<(), String> {
+            unreachable!()
+        }
+        fn last_line(&mut self, _: &str) -> Option<String> {
+            unreachable!()
+        }
+    }
+    fs::write(lamp.records().join(TASKS_STOPPED), "").unwrap();
+    let mut refuses = Refuses(
+        Fake {
+            active: Some("failed"),
+            ..Fake::default()
+        },
+        0,
+    );
+    let mut lines = Vec::new();
+    for _ in 0..3 {
+        tasks_back(&lamp.records(), &mut refuses, &mut |line: &str| {
+            lines.push(line.to_owned())
+        });
+    }
+    assert_eq!(refuses.1, 3);
+    assert_eq!(lines.len(), 1, "{lines:#?}");
+    assert!(lamp.records().join(TASKS_STOPPED).exists());
 }
 
 /// Off: a round asks the one-shot to stop the gateway and take the entry
