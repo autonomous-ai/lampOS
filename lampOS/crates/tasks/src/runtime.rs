@@ -2704,7 +2704,7 @@ fn owner<C: Clock>(
                                 // 15:29 on #8116): a launch or run waited for its
                                 // Gateway within the hold.
                                 if update_read {
-                                    body["openclaw_in_use"] = crate::gateway::in_use().into();
+                                    body = update_read_body(body);
                                 }
                                 body
                             });
@@ -4822,6 +4822,16 @@ fn lamp_target_of(config: &Config) -> Box<dyn Fn() -> Option<Target> + Send + Sy
     }
 }
 
+/// lamp-update's read of the default (`Route::UpdateRead`, #8105): the
+/// answer also says whether OpenClaw is in use, true, false, or null before
+/// the lamp's panes were first read; and the ask is noted, so the panes are
+/// read while lamp-update asks.
+pub(crate) fn update_read_body(mut body: Value) -> Value {
+    crate::gateway::update_asked();
+    body["openclaw_in_use"] = crate::gateway::in_use_said().map_or(Value::Null, Value::from);
+    body
+}
+
 /// The lamp's default agent now, read at each call: [`lamp_default`], else
 /// the build's first switched on ([`lamp_order`]), else the lamp target's
 /// own engine. A skill's run with no Harness and a live ask read the same.
@@ -5470,10 +5480,12 @@ pub fn serve_with_adapter<C: Clock, A: Adapter>(
         .name("tasks-harness".into())
         .spawn(move || {
             let mut gateway = adapter.openclaw_gateway();
-            let mut panes_due = Instant::now() + crate::gateway::PANES_EVERY;
+            // Only while lamp-update asks, that is with its switch on
+            // (Twelve's P1 on #8223): with it off, no `ps` is ever run.
+            let mut panes_last: Option<Instant> = None;
             while !cli_stop.load(Ordering::Acquire) {
-                if Instant::now() >= panes_due {
-                    panes_due = Instant::now() + crate::gateway::PANES_EVERY;
+                if crate::gateway::panes_due(panes_last) {
+                    panes_last = Some(Instant::now());
                     if let Some(lamp) = lamp_panes() {
                         crate::gateway::panes_read(&adapter.status(&lamp.machine_id));
                     }
