@@ -68,7 +68,7 @@ impl Clip {
     /// The time from frame `frame` to the next, stretched where any joint
     /// would go faster than `ceiling` counts a second, so that none does;
     /// a step under it keeps its time (V1's stretch, #6893).
-    fn step_within_us(&self, frame: usize, ceiling: f32) -> u64 {
+    pub(crate) fn step_within_us(&self, frame: usize, ceiling: f32) -> u64 {
         let (from, to) = (self.frames[frame], self.frames[frame + 1]);
         let farthest = (0..5)
             .map(|joint| (i32::from(to[joint]) - i32::from(from[joint])).unsigned_abs())
