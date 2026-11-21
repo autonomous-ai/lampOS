@@ -17,8 +17,8 @@
 //! pending, the app's new facts wait ([`FORGETTING`]).
 //!
 //! Behind `LAMP_STORE_APPS` like the whole socket, and its own switch
-//! [`ENVIRONMENT`], off until the first builder's privacy read and the ROW
-//! (Friday's 16:47 on #7415).
+//! [`ENVIRONMENT`], on in the product's `lamp-control.service` by the first
+//! builder's DEFAULT-ON on the switch-on row (Friday's 16:47 on #7415).
 use crate::app_yes::Live;
 use crate::protocol::{Error, ErrorCode};
 use lamp_msgs::app_fact::{self, AppRemember, AppRemembered};

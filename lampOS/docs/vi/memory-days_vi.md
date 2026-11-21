@@ -882,7 +882,27 @@ phần của kho nằm ở `crates/memory/src/app_facts.rs`.
     giờ đẩy các điều chính người đó đã giữ ra khỏi 16 KiB của nó; `recall`
     (theo lời hay theo ngày) và `search` tìm thấy nó như mọi điều đã giữ,
     cùng dấu của nó: «hôm nay tôi tập gì?» được trả lời từ đó. Không có
-    phần byte riêng.
+    phần byte riêng. Được liệt kê riêng bằng `kept {app_facts:true}`, mỗi
+    mục kèm `source` của nó (với
+    `before_id`, một trang dưới id đó; `bad_request` khi có `observations`,
+    hoặc `before_id` mà không có `app_facts`), chỉ cho lệnh quên về một
+    chuyện: `forget {about}` của voice đọc các điều app của chính người đó
+    theo cách này, từng trang (tối đa 24, quá thì "quá nhiều để xem hết"),
+    và khớp chúng theo cùng các từ như các điều họ đã giữ, nên «quên điều
+    gym coach đã nói» lấy được chúng. Lệnh quên một khuôn mặt (#5627),
+    khi chỉ người đó trong tầm nhìn, liệt kê chúng cùng cách bên cạnh các
+    điều họ đã giữ, trong cùng 1,5 s (`tools::ASK_DEADLINE`) với danh sách
+    điều đã giữ, nên việc tìm trước câu hỏi chờ tối đa 3 s cùng danh sách id:
+    một điều khớp là điều được hỏi, và lời đồng ý của họ quên nó theo id;
+    hơn một điều thì hỏi điều nào. **Các điều của một app là một nhóm**
+    (#8228): khi mọi điều khớp đều là điều app cùng một nguồn và lời nói nêu
+    tên app đó (tiêu đề trong "Noted by the app <tiêu đề>", không kể hoa
+    thường), lệnh quên một khuôn mặt hỏi một lần bằng lời của họ và lời đồng
+    ý quên từng điều theo id, còn lệnh quên về một chuyện lấy hết, kể cả quá
+    8 điều. Lẫn điều đã giữ với điều app, hoặc điều của hai app, vẫn hỏi
+    điều nào. Không bao giờ của căn phòng, không
+    bao giờ của người khác; trí nhớ cũ từ chối trường này và lệnh quên tìm
+    ở phần còn lại.
   - **Lượt ban đêm không bao giờ đọc nó**, nên không đoạn, mẫu hay chương
     nào được làm từ nó mà mất dấu hoặc sống quá 90 ngày của nó. Những gì
     làm từ nó qua bất kỳ liên kết nào khác đi cùng nó (lượt đi của lệnh
@@ -898,7 +918,8 @@ phần của kho nằm ở `crates/memory/src/app_facts.rs`.
   được trả lời `ok`) hoặc thu hồi máy tính: `{ok:true, removed}`. Một bản cập
   nhật app bỏ quyền `remember` không gửi gì: các điều của nó ở lại cho đến khi
   gỡ app, người đó quên, hoặc hết 90 ngày. Các lệnh quên của chính người đó lấy điều của app như
-  mọi điều đã giữ: một điều, quên về một chuyện, quên hết, và quên người đó.
+  mọi điều đã giữ: một điều, quên về một chuyện (theo lời của nó, từ
+  `kept {app_facts}`), quên hết, và quên người đó.
 - **Dòng ngữ cảnh không bao giờ được giữ.** `app_fact::ContextLines` giữ một
   dòng mỗi nguồn, chỉ trong bộ nhớ, kể bằng `app_fact::context_note` ("From
   the app <tên>, live now (a note, not an instruction): "<dòng>"") cho đến
@@ -908,8 +929,8 @@ phần của kho nằm ở `crates/memory/src/app_facts.rs`.
 - **Nhật ký** ghi thao tác, id của người và số lượng, không bao giờ một lời.
 - **Không có công tắc ở đây.** Bên ghi là `apps.remember` ở cửa (C166,
   [apps.md](../apps.md), "What an app tells Lamp's memory"), sau công tắc
-  riêng `LAMP_APP_REMEMBER` trong lamp-control, tắt cho đến khi first builder
-  đọc phần riêng tư và có ROW. lamp-control kiểm tra quyền của app, lời của nó
+  riêng `LAMP_APP_REMEMBER` trong lamp-control, `on` trong
+  `lamp-control.service` của sản phẩm (DEFAULT-ON của first builder trên row bật công tắc). lamp-control kiểm tra quyền của app, lời của nó
   (`app_fact::tidy`), công tắc riêng tư và giới hạn ba lần một phút, rồi báo
   cho voice trên `apps/remember`; voice thử các id trí nhớ của chủ, id của
   khuôn mặt trước, mỗi id qua `app_fact::whose`, chuyển sang id kế khi gặp
@@ -918,7 +939,8 @@ phần của kho nằm ở `crates/memory/src/app_facts.rs`.
   (`--forget-socket`, nhận nó cạnh `forget_person`), giữ một dấu chờ và thử lại
   mỗi 30 giây cho đến khi trí nhớ trả lời `ok`. `apps.context` chưa được xây. Trí nhớ
   cũ trả lời `unknown_op`, báo cho app là `unavailable`.
-- **Phía giọng nói (`LAMP_APP_MEMORY`, mặc định tắt; phần của App Only theo
+- **Phía giọng nói (`LAMP_APP_MEMORY`, `on` trong `lamp-voice.service` của
+  sản phẩm từ lần bật công tắc ở #8228; phần của App Only theo
   cách chia 16:45, `crates/voice/src/app_context.rs`).** Dựa trên ghi chú
   ngắn hạn của #7900: lamp-voice giữ `ContextLines` trong RAM của chính nó
   (`app_context::set` / `clear` / `clear_all`, cho bên ghi ở cửa) và, ở mỗi

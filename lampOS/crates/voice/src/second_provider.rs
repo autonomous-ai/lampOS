@@ -17068,8 +17068,10 @@ fn told_on_forget(
 /// is refused as before, for any other call or line: a bare forget, two
 /// faces in view (the line is then nobody's by one face), a line held by a
 /// gap, or no one kept thing named ([`crate::remember::one_face_forget_target`]).
-/// The kept thing is looked up off the runtime's thread (#8204): its two
-/// listings wait up to `tools::ASK_DEADLINE` each on lamp-memory, and on
+/// The kept thing is looked up off the runtime's thread (#8204): its three
+/// listings (the kept things, then the person's app-fact pages within the
+/// same `tools::ASK_DEADLINE`, then the kept ids within another, #8228)
+/// wait up to two `tools::ASK_DEADLINE`s in all on lamp-memory, and on
 /// that thread the worker's control loop read nothing meanwhile, so the
 /// coordinator's renewals filled its socket and the voice ended. The turn
 /// still waits for it, so the forget's answer goes out in its place.

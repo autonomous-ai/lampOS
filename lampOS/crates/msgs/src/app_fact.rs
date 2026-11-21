@@ -21,8 +21,8 @@
 
 //!
 //! No switch here: the door's `apps.remember` (lamp-control) is behind its
-//! own, `LAMP_APP_REMEMBER`, off until the first builder's privacy read and
-//! the ROW (Friday's 16:47 on #7415). The door tells the voice on the bus
+//! own, `LAMP_APP_REMEMBER`, on in the product's `lamp-control.service` by
+//! the first builder's DEFAULT-ON on the switch-on row (Friday's 16:47 on #7415). The door tells the voice on the bus
 //! ([`AppRemember`]); the voice picks the person (the owner's ids, the
 //! face's first, each tried in turn past `not_known`), sends [`REMEMBER_OP`]
 //! to memory and says how it went ([`AppRemembered`]). A removed app's
