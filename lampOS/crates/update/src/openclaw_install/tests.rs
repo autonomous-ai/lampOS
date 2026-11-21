@@ -3194,3 +3194,110 @@ fn a_gateway_started_for_openclaw_gets_agent_mains_entry_at_once() {
         "settled: nothing run"
     );
 }
+
+/// An installed lamp with the one run path, and the bytes of its wrapper,
+/// namespace script and launcher.
+fn installed_with_launcher() -> (Lamp, [Vec<u8>; 3]) {
+    let lamp = Lamp::new();
+    lamp.harness_there();
+    tasks_there(&lamp, TASKS_BYTES);
+    let mut systemd = Fake::default();
+    round_shown(&lamp, &mut systemd, one_path());
+    let runs = Runs::new(&lamp);
+    let said = install(&lamp, &runs, 20).unwrap();
+    assert_eq!(said.install, "installed", "{:#?}", runs.lines());
+    let bytes = [WRAPPER, NS, SKILL_START].map(|path| fs::read(lamp.at(path)).unwrap());
+    (lamp, bytes)
+}
+
+/// The wrapper, namespace script and launcher hold `bytes`, nothing was
+/// stopped, and the record says failed with `error`.
+fn kept_as_it_was(
+    lamp: &Lamp,
+    runs: &Runs,
+    said: &OpenclawInstall,
+    error: &str,
+    bytes: &[Vec<u8>; 3],
+) {
+    assert_eq!(said.install, "failed", "{:#?}", runs.lines());
+    assert_eq!(said.error.as_deref(), Some(error));
+    assert_eq!(lamp.said().unwrap().install, "failed", "retried as before");
+    for (path, bytes) in [WRAPPER, NS, SKILL_START].iter().zip(bytes) {
+        assert_eq!(&fs::read(lamp.at(path)).unwrap(), bytes, "{path}");
+        assert_eq!(mode(&lamp.at(path)), 0o755, "{path}");
+    }
+    assert!(
+        !runs
+            .lines()
+            .iter()
+            .any(|line| line.contains(&format!("systemctl stop {UNIT}"))),
+        "{:#?}",
+        runs.lines()
+    );
+}
+
+/// #7156: an install that failed at the gateway's (re)start is tried
+/// again at the next round whose window is open, not a day later; another
+/// recent failure still waits its day.
+#[test]
+fn a_gateway_failure_is_tried_again_in_the_next_window() {
+    const HOUR_MS: u64 = 60 * 60 * 1000;
+    let lamp = Lamp::new();
+    lamp.harness_there();
+    write(&lamp.records(), failed(100, GATEWAY_FAILED));
+    let mut systemd = Fake::default();
+    let said = round(&lamp, &mut systemd, false, 100 + HOUR_MS);
+    assert_eq!(said.map(|said| said.install).as_deref(), Some("installing"));
+
+    let lamp = Lamp::new();
+    lamp.harness_there();
+    write(&lamp.records(), failed(100, "installer"));
+    let mut systemd = Fake::default();
+    assert_eq!(round(&lamp, &mut systemd, false, 100 + HOUR_MS), None);
+}
+
+/// #7156: a reinstall over a working OpenClaw (an earlier build's
+/// wrapper, a new lamp-tasks) that fails at its first run or at the
+/// gateway's restart puts the wrapper, the namespace script and the
+/// launcher back as they were and never stops the gateway; the record
+/// still says failed.
+#[test]
+fn a_failed_reinstall_puts_the_working_openclaw_back() {
+    for (fail_on, error) in [
+        (" --version", "installer"),
+        ("systemctl restart lamp-openclaw", "gateway"),
+    ] {
+        let (lamp, mut bytes) = installed_with_launcher();
+        let earlier = b"#!/bin/sh\n# an earlier build's wrapper\n".to_vec();
+        fs::write(lamp.at(WRAPPER), &earlier).unwrap();
+        bytes[0] = earlier;
+        tasks_there(&lamp, b"\x7fELF a newer lamp-tasks");
+        ask(&lamp.records(), false, one_path()).unwrap();
+        let runs = Runs {
+            fail_on: Some(fail_on),
+            ..Runs::new(&lamp)
+        };
+        let said = install(&lamp, &runs, 30).unwrap();
+        kept_as_it_was(&lamp, &runs, &said, error, &bytes);
+        assert!(lamp.at(OPENCLAW).exists(), "{fail_on}");
+    }
+}
+
+/// #7156: an upgrade whose `npm ci` fails puts the Node and package it
+/// moved aside back, and the entry points with them; nothing stopped.
+#[test]
+fn a_failed_npm_ci_puts_the_earlier_package_back() {
+    let (lamp, bytes) = installed_with_launcher();
+    put_package(lamp.root(), "2026.11.1");
+    ask(&lamp.records(), false, one_path()).unwrap();
+    let runs = Runs {
+        fail_on: Some(NPM_CI_ENV),
+        ..Runs::new(&lamp)
+    };
+    let said = install(&lamp, &runs, 30).unwrap();
+    runs.position(&format!("{NPM_CI_ENV}=on"));
+    kept_as_it_was(&lamp, &runs, &said, "installer", &bytes);
+    assert_eq!(package_version(lamp.root()).as_deref(), Some("2026.11.1"));
+    assert_eq!(node_version(lamp.root()).as_deref(), Some(NODE_VERSION));
+    assert!(!lamp.at(ASIDE).exists(), "put back, none left aside");
+}
