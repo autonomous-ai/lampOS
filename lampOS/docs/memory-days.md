@@ -1261,7 +1261,13 @@ body `{"turns":[{"id","at","person","heard","said"}]}`.
   `LAMP_HISTORY_FORGET`; with it on, the pages of a big forget's rest are
   read off the voice's way and their ids go there too, as do those the
   memory kept of a forget the worker never queued, read again at the next
-  start (`history_unsent`, [memory.md](memory.md)). A forget about a
+  start (`history_unsent`, [memory.md](memory.md)). With it off after
+  history was ever sent from this lamp (its queue file or the save's marks
+  file is in `/var/lib/lampOS/voice`, as after a rollback), a forget still
+  asks the memory to keep its ids (`history_forget::ever_sent`); nothing is
+  queued or sent while it is off, and the first start with it on again reads
+  them and deletes those turns on the account. With nothing ever sent, a
+  forget keeps nothing, as before. A forget about a
   thing holds and lifts the posts as every other forget. When each of its
   removals answered, what went was named on its way and nothing more is let
   go; when one timed out or was lost part way (the kept things' forgets or the

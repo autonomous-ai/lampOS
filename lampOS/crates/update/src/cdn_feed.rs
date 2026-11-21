@@ -15,7 +15,8 @@
 //! reloads systemd. Any failure leaves the drop-in as it was, so the lamp
 //! keeps the feed it had.
 //!
-//! On the CDN feed, with the same switch, every round reads the CDN first;
+//! On the CDN feed, switch or not (a product unit follows it from its
+//! install, [`falls_back`]), every round reads the CDN first;
 //! once the CDN has failed for an hour ([`DOWN_SINCE`] in the records) a
 //! round that fails on it is done again on [`GITHUB_STABLE`]
 //! ([`round_on`]). Nothing sticks: the next round reads the CDN first.
@@ -232,6 +233,14 @@ pub fn on_github(config: &Config) -> Config {
         channel_url: GITHUB_STABLE.into(),
         ..config.clone()
     }
+}
+
+/// Whether `config`'s rounds, and its own confirm, fall back to
+/// [`GITHUB_STABLE`] after an hour of CDN failures: a `serve` (`serve`)
+/// that acts, on [`CDN`]: every such lamp, a product unit's too, with
+/// [`SWITCH`] or without it (the lead, #7728).
+pub fn falls_back(config: &Config, serve: bool) -> bool {
+    serve && config.apply && config.channel_url == CDN
 }
 
 /// A round on `config`'s feed. On [`CDN`], a round that cannot read it
@@ -632,6 +641,58 @@ mod tests {
             Outcome::UpToDate(14923),
         );
         assert!(!records.join(DOWN_SINCE).exists());
+    }
+
+    #[test]
+    fn a_product_unit_lamp_on_the_cdn_falls_back_with_the_switch_unset() {
+        // The product unit's own feed, and no switch in its environment or
+        // under its root.
+        assert!(
+            include_str!("../../../deploy/product/lamp-update.service")
+                .contains(&format!("serve --channel-url {CDN} "))
+        );
+        let folder = tempfile::tempdir().unwrap();
+        let records = folder.path();
+        let config = Config {
+            root: folder.path().into(),
+            ..following(CDN)
+        };
+        assert!(!crate::switches::update_switch(
+            &config.root,
+            SWITCH,
+            std::env::var_os(SWITCH).as_deref()
+        ));
+        // The round falls back (main.rs: `round_on` when this holds), and so
+        // does its own confirm, done again on GitHub once `due`.
+        assert!(falls_back(&config, true));
+        let t0 = 1_800_000_000_000;
+        for minutes in [0, 59] {
+            let (_, read) = round_at(records, &config, t0 + minutes * MINUTE, down());
+            assert_eq!(read, [CDN], "{minutes}");
+        }
+        assert!(!due(records, t0 + 59 * MINUTE));
+        assert!(due(records, t0 + 60 * MINUTE));
+        let (outcome, read) = round_at(records, &config, t0 + 60 * MINUTE, down());
+        assert_eq!(outcome, Outcome::Switched(14923));
+        assert_eq!(read, [CDN, GITHUB_STABLE]);
+        // Never sticky: the CDN read again, the CDN only.
+        let (_, read) = round_at(records, &config, t0 + 61 * MINUTE, Outcome::UpToDate(14923));
+        assert_eq!(read, [CDN]);
+        assert!(!due(records, t0 + 61 * MINUTE));
+        // Only a serve that acts, only on the CDN.
+        assert!(!falls_back(&config, false));
+        let dry = Config {
+            apply: false,
+            ..config.clone()
+        };
+        assert!(!falls_back(&dry, true));
+        for url in [GITHUB_STABLE, CANARY] {
+            let other = Config {
+                channel_url: url.into(),
+                ..config.clone()
+            };
+            assert!(!falls_back(&other, true), "{url}");
+        }
     }
 
     #[test]

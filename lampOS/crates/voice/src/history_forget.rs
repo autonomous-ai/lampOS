@@ -2,7 +2,8 @@
 //! the lamp is deleted from the conversation history the account keeps
 //! too, by the lamp's own cloud API (`POST <base>/history/turns/delete`,
 //! with the lamp's key). Only with `LAMP_HISTORY_FORGET=on` (off: nothing
-//! is queued or sent).
+//! is queued or sent; after history was ever sent, a forget's ids are kept
+//! by the memory until the switch is on again, [`asking`]).
 //!
 //! The lamp's own forget is the only one the person waits for: "forgotten"
 //! follows the memory's answer, as before. Its answer is handed to this
@@ -459,17 +460,44 @@ pub fn queue() -> &'static (Queue, Arc<tokio::sync::Notify>) {
     QUEUE.get_or_init(|| (Queue::at(FILE), Arc::new(tokio::sync::Notify::new())))
 }
 
-/// The request `line` as sent to the memory: with the switch on, one of
-/// its forgets asks it to keep what it removes on its disk until the
-/// worker has it on the queue (`"history_unsent":true`, in the forget's own
-/// transaction, so no sync more before the reply). Anything else, or off,
-/// as it is.
+/// The request `line` as sent to the memory: with the switch on, or off
+/// after history was ever sent from this lamp ([`ever_sent`], a product
+/// rollback), one of its forgets asks it to keep what it removes on its
+/// disk until the worker has it on the queue (`"history_unsent":true`, in
+/// the forget's own transaction, so no sync more before the reply). Off,
+/// the rows wait in the memory, nothing sent, and the next start with the
+/// switch on reads them ([`recover_at_start`]): a turn the account took
+/// while the switch was on goes after a forget made while it is off.
+/// Anything else, or nothing ever sent, as it is.
 pub fn asking(line: &Value) -> std::borrow::Cow<'_, Value> {
-    if on() {
+    asking_when(line, || on() || ever_sent())
+}
+
+/// [`asking`], with `keep` whether the memory is asked to keep (read only
+/// for a forget).
+pub fn asking_when(line: &Value, keep: impl FnOnce() -> bool) -> std::borrow::Cow<'_, Value> {
+    let op = line["op"].as_str().unwrap_or_default();
+    if lamp_msgs::MEMORY_FORGETS_TELLING_EXCHANGES.contains(&op) && keep() {
         asking_with(line)
     } else {
         std::borrow::Cow::Borrowed(line)
     }
+}
+
+/// Whether history may ever have reached the account from this lamp: this
+/// queue's file ([`FILE`], kept with the memory's epoch from the first start
+/// with the switch on) or the save's marks ([`crate::history_send::MARKS_FILE`],
+/// written from the save's first start) is there. Either is only removed
+/// with the voice's state folder, at a reset.
+pub fn ever_sent() -> bool {
+    ever_sent_at(&[Path::new(FILE), Path::new(crate::history_send::MARKS_FILE)])
+}
+
+/// [`ever_sent`] for these files: any there, or not readable as missing.
+pub fn ever_sent_at(files: &[&Path]) -> bool {
+    files.iter().any(|file| {
+        !matches!(fs::symlink_metadata(file), Err(error) if error.kind() == io::ErrorKind::NotFound)
+    })
 }
 
 /// [`asking`], the switch taken as on.
@@ -1705,6 +1733,77 @@ mod tests {
         ] {
             assert!(matches!(asking_with(&line), std::borrow::Cow::Borrowed(_)));
         }
+    }
+
+    /// The gap found on #8125: with the switch off after history was sent
+    /// (a rollback), a forget still has the real memory keep its ids, and
+    /// nothing is queued or sent; with nothing ever sent, nothing is kept;
+    /// once the switch is on again, the next start queues them for the
+    /// account and the memory lets them go.
+    #[test]
+    fn a_forget_with_the_switch_off_after_a_send_is_kept_until_on() {
+        use lamp_memory::{days::Days, days_protocol, store};
+        let state = scratch("off-after-send").parent().unwrap().to_path_buf();
+        let files = [
+            state.join("history-forget.json"),
+            state.join("history-marks.json"),
+        ];
+        let files: Vec<&Path> = files.iter().map(PathBuf::as_path).collect();
+        let dir = state.join("memory");
+        const NOW: u64 = 1_760_356_800_000;
+        let store = std::cell::RefCell::new(
+            Days::open(
+                store::Options {
+                    dir: dir.clone(),
+                    keep_days: 30,
+                    local: store::LocalTime::Offset(0),
+                },
+                NOW,
+            )
+            .unwrap(),
+        );
+        let ask = |line: &Value| -> Value {
+            let answer =
+                days_protocol::answer(&mut store.borrow_mut(), line.to_string().as_bytes(), NOW);
+            serde_json::from_str(answer.line.trim()).unwrap()
+        };
+        let said = |n: u64| {
+            ask(&json!({"op":"append","person":MINH,"at_unix_ms":NOW + n,"heard":"h","said":"s"}))
+                ["id"]
+                .as_u64()
+                .unwrap()
+        };
+        let (one, two) = (said(1), said(2));
+        let kept = || ask(&json!({"op": lamp_msgs::MEMORY_HISTORY_UNSENT_OP, "after": 0}));
+        // Nothing ever sent: the forget is as it was, and nothing is kept.
+        assert!(!ever_sent_at(&files));
+        let line = json!({"op":"forget","person":MINH,"id":one});
+        let asked = asking_when(&line, || ever_sent_at(&files));
+        assert!(matches!(asked, std::borrow::Cow::Borrowed(_)));
+        let answer = ask(&asked);
+        assert_eq!(answer["ok"], true, "{answer}");
+        assert!(answer.get("unsent").is_none(), "{answer}");
+        assert_eq!(kept()["to"], Value::Null);
+        // The save's marks are there (it ran once with its switch on): the
+        // forget is kept, though this switch is off.
+        fs::write(files[1], "{}").unwrap();
+        assert!(ever_sent_at(&files));
+        let line = json!({"op":"forget","person":MINH,"id":two});
+        let answer = ask(&asking_when(&line, || ever_sent_at(&files)));
+        assert_eq!(answer["ok"], true, "{answer}");
+        assert!(answer["unsent"].is_array(), "{answer}");
+        let epoch = store.borrow().history_epoch().to_owned();
+        let turn = lamp_msgs::history_turn_id(&epoch, MINH, two);
+        assert_eq!(kept()["exchanges"][MINH], json!([turn.clone()]));
+        // Off, nothing goes anywhere: no queue file was written.
+        assert!(!files[0].exists());
+        // On again: the start's read queues it, and the memory lets it go.
+        let queue = Queue::at(files[0]);
+        assert!(recover(&queue, &bell(), |line| Some(ask(line)), |_| {}));
+        assert_eq!(queue.pending().ids[MINH], BTreeSet::from([turn]));
+        assert_eq!(kept()["to"], Value::Null);
+        drop(store);
+        let _ = fs::remove_dir_all(&state);
     }
 
     /// The first builder's condition on #8086: a forget the memory kept,

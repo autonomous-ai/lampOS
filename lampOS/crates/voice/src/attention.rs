@@ -911,6 +911,75 @@ pub(crate) const SAID_TO_A_PERSON: &[&str] = &[
     "guys",
 ];
 
+/// Whether `heard`'s call word is another person's name (#8114, the first
+/// builder's 08:54 and 08:57 on #8114): its first word, set off as a name
+/// is (past a greeting, or alone at the start, followed by a comma or a
+/// stop; [`crate::second_provider::first_word_set_off`]), a word of letters
+/// only, written with a capital as speech to text writes a name, that is
+/// none of: the lamp's name or "lamb", a word written for it
+/// ([`STAND_INS`], [`STAND_ALONE_INS`], [`STAND_INS_WITH_A_SIGN`], "one"),
+/// a greeting, a word said to a person ([`SAID_TO_A_PERSON`]), or a word a
+/// line opens with ("Thanks.", "Tomorrow, …"). "Hey, Lance.", "Dan, are
+/// you done?", "Hi, Tam." are; "Hey, Lynn.", "Okay, Lan.", "Lamb, …" are
+/// not (stand-ins kept, the first builder's 08:57).
+pub(crate) fn called_by_another_name(heard: &str) -> bool {
+    called_by_another_name_among(heard, &crate::known_faces::names_kept())
+}
+
+/// [`called_by_another_name`] with the names of the faces the lamp knows,
+/// `known` (#8114, the first builder's 10:52): a word written for the
+/// lamp's name ("Lynn", "Lan") that is one of them calls that person, not
+/// the lamp, as any other person's name does. In a home with no face of
+/// that name the stand-in calls the lamp, as before.
+pub(crate) fn called_by_another_name_among(heard: &str, known: &[String]) -> bool {
+    // "Thank you, Dan.": "Thank" is no word set off, so "Thank you" is passed
+    // over first (Twelve's P3 on #8198 and #8207).
+    let trimmed = heard.trim_start();
+    if trimmed.len() > "thank you".len()
+        && trimmed.is_char_boundary("thank you".len())
+        && trimmed[.."thank you".len()].eq_ignore_ascii_case("thank you")
+    {
+        let rest = trimmed["thank you".len()..].trim_start_matches([',', ' ']);
+        return rest.len() < trimmed.len() - "thank you".len()
+            && called_by_another_name_among(rest, known);
+    }
+    let Some((start, end)) = crate::second_provider::first_word_set_off(heard) else {
+        return false;
+    };
+    // "Thanks, Tam." and "Thank you, Dan.": past a word a line opens with,
+    // set off, the next word set off is the call word.
+    let opener = heard[start..end].to_lowercase();
+    if crate::second_provider::OPENS_SET_OFF.contains(&opener.as_str()) {
+        let rest = heard[end..].trim_start_matches([',', ' ']);
+        return rest.len() < heard.len() - end && called_by_another_name_among(rest, known);
+    }
+    let word = &heard[start..end];
+    let lower = word.to_lowercase();
+    // A stand-in that is the name of a face the lamp knows is that person's.
+    if word.chars().all(char::is_alphabetic)
+        && (STAND_INS.contains(&lower.as_str())
+            || STAND_ALONE_INS.contains(&lower.as_str())
+            || STAND_INS_WITH_A_SIGN.contains(&lower.as_str()))
+        && known.iter().any(|name| name.trim().to_lowercase() == lower)
+    {
+        return true;
+    }
+    word.len() >= 2
+        && word.chars().all(char::is_alphabetic)
+        && word.chars().next().is_some_and(char::is_uppercase)
+        && !lower.eq_ignore_ascii_case(crate::second_provider::net::key_terms::NAME)
+        && lower != "lamb"
+        && lower != "one"
+        && !STAND_INS.contains(&lower.as_str())
+        && !STAND_ALONE_INS.contains(&lower.as_str())
+        && !STAND_INS_WITH_A_SIGN.contains(&lower.as_str())
+        && !crate::second_provider::HEARD_FOR_THE_NAME.contains(&lower.as_str())
+        && !is_greeting(&lower)
+        && !SAID_TO_A_PERSON.contains(&lower.as_str())
+        && !crate::second_provider::OPENS_SET_OFF.contains(&lower.as_str())
+        && !crate::second_provider::NOT_A_NAME.contains(&lower.as_str())
+}
+
 /// The word on [`SAID_TO_A_PERSON`] that `heard` opens with, set off as a
 /// name is ([`crate::second_provider::first_word_set_off`]), compared lower
 /// case with its apostrophe, a curly one as a straight one.
@@ -1914,6 +1983,11 @@ pub struct Attention {
     /// weighed as under a sure hearing with no face turned and no words
     /// calling the lamp, for the journal (#8136).
     name_unsure_dropped: bool,
+    /// `LAMP_NAME_NOT_ANOTHERS=on` (#8114, [`Self::hold_anothers_name`]).
+    not_anothers: bool,
+    /// The name heard was dropped for the line last weighed because its
+    /// call word is another person's name and no face is turned (#8114).
+    name_anothers_dropped: bool,
     /// The name heard for the line last weighed was dropped, but the model
     /// is still told it was heard: the line's words call the lamp
     /// ([`Self::name_note_kept`], #8136).
@@ -2271,11 +2345,19 @@ impl Attention {
             && turned != Some(true)
             && !text_calls
             && !signs.is_empty();
+        // `LAMP_NAME_NOT_ANOTHERS`: a call word that is another person's
+        // name is theirs, at any score, unless a face is turned to the lamp
+        // (#8114: "Hey, Lance. Can you come here?" at 1.000, answered).
+        self.name_anothers_dropped = weighed
+            && self.not_anothers
+            && turned != Some(true)
+            && called_by_another_name(&self.heard);
         let alone = weighed
             && (signs.is_empty()
                 || self.name_short_dropped
                 || self.name_near_dropped
-                || self.name_unsure_dropped);
+                || self.name_unsure_dropped
+                || self.name_anothers_dropped);
         self.name_signs = if weighed && !alone { signs } else { Vec::new() };
         if alone {
             self.named = false;
@@ -2350,6 +2432,21 @@ impl Attention {
     /// no longer count on their own. A sure hearing is weighed as before.
     pub fn need_a_face_or_words(&mut self, on: bool) {
         self.face_or_words = on;
+    }
+
+    /// `LAMP_NAME_NOT_ANOTHERS=on` (#8114), with
+    /// [`Self::ask_a_second_sign_of_the_name`]: a hearing of the name only
+    /// in the room's sound counts for nothing, sure or not, when the line's
+    /// call word is another person's name ([`called_by_another_name`]) and
+    /// no face is turned to the lamp.
+    pub fn hold_anothers_name(&mut self, on: bool) {
+        self.not_anothers = on;
+    }
+
+    /// Whether the name heard for the line last weighed was dropped because
+    /// its call word is another person's name ([`Self::hold_anothers_name`]).
+    pub fn name_dropped_as_anothers(&self) -> bool {
+        self.name_anothers_dropped
     }
 
     /// Whether the name heard for the line last weighed was dropped as
@@ -7752,6 +7849,137 @@ mod tests {
     /// calling it: the start and closeness count for nothing alone. Still
     /// counted: "Hey Lamp, …" with no look (its words), the same line with
     /// a face turned, and a sure hearing at the start; off, as before.
+    /// #8114 (the first builder's 08:54 and 08:57): a call word that is
+    /// another person's name, from the N1 run on lamp-e82d (21 Nov,
+    /// 08:42–08:52) as speech to text wrote it; the lamp's name, "Lamb"
+    /// and the kept stand-ins are not.
+    #[test]
+    fn another_persons_name_in_the_calls_place_is_known() {
+        for theirs in [
+            "Hey, Lance. Can you come here?",
+            "Hi, Dan. How was the weekend?",
+            "Thanks, Tam.",
+            "Liam, did you send the file?",
+            "Ann, are you done?",
+            "Okay, Max. Let's go.",
+        ] {
+            assert!(called_by_another_name(theirs), "{theirs}");
+        }
+        for not_theirs in [
+            "Hey, Lamp. What time is it?",
+            "Lamb, what time is it?",
+            "Hey, Lynn. What's a good name for a cat?",
+            "Okay, LAN. Let's go.",
+            "Hey, Lam. Can I take ibuprofen?",
+            "Hey, man. How are you?",
+            "Hello, ma'am. How was the weekend?",
+            "Thanks. See you later.",
+            "Tomorrow, I see the dentist.",
+            "Yeah.",
+            "What time is it?",
+            "hey, dan, lower case is no name",
+        ] {
+            assert!(!called_by_another_name(not_theirs), "{not_theirs}");
+        }
+    }
+
+    /// #8114 (the first builder's 10:52): a stand-in that is the name of a
+    /// face the lamp knows ("Lynn", "Lan") calls that person; with no such
+    /// face it is the lamp's, as before, and the lamp's own name never is.
+    #[test]
+    fn a_stand_in_that_names_a_known_face_is_that_persons() {
+        let none: [String; 0] = [];
+        let known = ["Lynn".to_owned(), "Lan".to_owned(), "Dee".to_owned()];
+        for line in [
+            "Lynn, are you done?",
+            "Hey, Lynn. Can you come here?",
+            "Okay, LAN. Let's go.",
+            "Thanks, Lynn.",
+        ] {
+            assert!(
+                called_by_another_name_among(line, &known),
+                "{line}: a known face"
+            );
+            assert!(
+                !called_by_another_name_among(line, &none),
+                "{line}: no such face"
+            );
+        }
+        // Stand-ins no face is named, and the lamp's own name, stay the lamp's.
+        for line in [
+            "Hey, Lam. What time is it?",
+            "Hey, Lamp. What time is it?",
+            "Lamb, what time is it?",
+            "Hey, man. How are you?",
+        ] {
+            assert!(!called_by_another_name_among(line, &known), "{line}");
+        }
+    }
+
+    /// #8114 (Twelve's P3 on #8207): the rule reads the faces' names the
+    /// eyes gave (`known_faces::names_kept`) through the call the weighing
+    /// makes; "Lin" is a stand-in no other test names a face.
+    #[test]
+    fn a_known_face_named_as_a_stand_in_is_read_through_the_weighing() {
+        crate::known_faces::keep_names_for_test(vec!["Lin".to_owned()]);
+        let mut attention = Attention::default();
+        attention.ask_a_second_sign_of_the_name(true);
+        attention.tie_the_second_sign(true);
+        attention.hold_anothers_name(true);
+        attention.began_at(5, 1, 10_000_000);
+        attention.name_heard_scored(10_200_000, 1.0);
+        attention.heard("Lin, are you done?");
+        assert!(attention.weigh_the_name(None, false));
+        assert!(attention.name_dropped_as_anothers());
+        assert!(called_by_another_name("Thank you, Lin."), "Thank you, …");
+    }
+
+    /// #8114: with `LAMP_NAME_NOT_ANOTHERS=on`, a hearing of the name in the
+    /// sound counts for nothing on a line whose call word is another
+    /// person's name, sure or not, unless a face is turned to the lamp; a
+    /// real call and the stand-ins count as before; off, as before.
+    #[test]
+    fn another_persons_name_in_the_calls_place_is_no_call_without_a_look() {
+        let began = 10_000_000;
+        // (dropped, dropped as another's)
+        let weighed = |on: bool, heard: &str, score: f32, turned: Option<bool>| {
+            let mut attention = Attention::default();
+            attention.ask_a_second_sign_of_the_name(true);
+            attention.tie_the_second_sign(true);
+            attention.need_a_face_or_words(true);
+            attention.hold_anothers_name(on);
+            attention.began_at(5, 1, began);
+            attention.name_heard_scored(began + 200_000, score);
+            attention.heard(heard);
+            let dropped = attention.weigh_the_name(turned, false);
+            (dropped, attention.name_dropped_as_anothers())
+        };
+        let lance = "Hey, Lance. Can you come here?";
+        assert_eq!(
+            weighed(true, lance, 1.0, None),
+            (true, true),
+            "Lance at 1.000"
+        );
+        assert_eq!(
+            weighed(true, lance, 0.95, None),
+            (true, true),
+            "Lance unsure"
+        );
+        assert!(!weighed(false, lance, 1.0, None).1, "off: as before");
+        assert_eq!(
+            weighed(true, lance, 1.0, Some(true)),
+            (false, false),
+            "a face turned still makes it a call"
+        );
+        for call in [
+            "Hey, Lamp. What time is it?",
+            "Hey, Lynn. What time is it?",
+            "Lamb, what time is it?",
+        ] {
+            assert_eq!(weighed(true, call, 1.0, None), (false, false), "{call}");
+        }
+    }
+
     #[test]
     fn with_a_face_or_words_needed_an_unsure_hearing_at_the_start_is_no_call() {
         let began = 10_000_000;
