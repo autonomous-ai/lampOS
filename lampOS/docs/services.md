@@ -2167,9 +2167,27 @@ trigger starts, with no `each` and no tool. It needs
 permission is accepted only with the switch on and for a service in the
 table. With the switch off in `lamp-skills`, such a skill does not load.
 
-**Installing approves nothing.** Putting a made skill on, by
-`install_made` or any other way, records no approval. Until the owner says
-yes, each run is refused with "not sent: waiting for the owner's yes".
+**No yes is waited for** (the owner's rule, 21 Nov: a skill's declared
+grants and writes are on, nothing asked). A skill installed as a package
+whose `skill.toml` declares the write sends it at its first send:
+`lamp-services` reads the installed `skill.toml` itself
+(`skill_writes::package_writes`, no links followed, at most 64 KiB and
+`STEPS_MOST` steps), and a content that is one of the package's own
+declared writes is bound there (`Approvals::bind`) to the package's
+SHA-256 and the service's link as it is now, the journal saying "a skill's
+write bound to its link at its first send". Everything after the bind is
+as before: the link check, `STOPPED`, the bounds and the sent-log. A
+content that is none of the package's own (another recipient, a text
+changed by one character) is refused, "not sent: this write is not one
+the skill's installed package declares" (`skill_writes::NOT_APPROVED`); a
+skill not installed as a package (put in by hand, a developer's push) is
+refused, "not sent: the skill isn't on the lamp as an installed package"
+(`skill_writes::NOT_INSTALLED`); a service not linked is `STOPPED`
+("… isn't linked; nothing was sent"). A pushed skill never carries a
+service grant (lamp-control's `no_grant`), so it never reaches this.
+Test `a_skills_own_write_goes_at_its_first_send_with_no_yes`. The owner's
+yes below (`skill_write_approve`) still binds a write ahead of the first
+send; nothing waits for it.
 
 **The owner's yes** (`skill_write_approve`). It comes from the voice's
 yes path only, never from `lamp-skills`; the app has no yes for it
@@ -2213,9 +2231,9 @@ the link's token (`GET /repos/<owner>/<name>`, on GitHub's read list) and
 keeps whether it is public; one it can't read counts as public. The yes's
 answer is `{"approved": N, "public": ["owner/name", ...]}`, the
 repositories anyone can see, for the voice to say "anyone can see it". A
-repository approved as private is read again at each send: made public
-since, or unreadable, the write waits for a new yes (`WAITING`), since the
-yes didn't cover public.
+repository bound as private is read again at each send: made public
+since, or unreadable, it is bound again as public and sent, and the
+journal says so (no yes is waited for).
 
 **Who sends.** `lamp-skills` itself, as with a read: `lamp-services` takes
 `lamp-skills.service`'s cgroup on the tools socket when either
@@ -2235,11 +2253,11 @@ and no text:
    failed. This is held in memory. A restart clears it, because the wipe
    left nothing linked. The wipe also deletes the approvals, the bounds'
    ledger and the sent-log, so the owner says yes again.
-3. The content's hash approved for that skill. With no approval for the
-   skill the answer is `WAITING`. A content that is none of its approved
-   ones (a text changed by one character, another recipient) is refused,
-   "not sent: this write is not the one the owner said yes to", and the
-   journal says only how many have been refused since the start.
+3. The content's hash bound for that skill, or, at its first send, one of
+   its installed package's own declared writes, bound then (above). A
+   content that is neither (a text changed by one character, another
+   recipient) is refused, `NOT_APPROVED`, and the journal says only how
+   many have been refused since the start; no package is `NOT_INSTALLED`.
 4. The content is one of the kinds above, on a service with a write list
    in `catalog.rs`, never an MCP service.
 5. The service, by its exact code (no other Gmail link stands in), still
@@ -2314,8 +2332,13 @@ whole):
   (`made_skill::write_from_request`).
 - **Said back whole**, every recipient and the whole text quoted, for a
   GitHub write its repository and "anyone who can see that repo can see
-  it" (so the yes covers a public one), when and how often, ending "It waits for you to agree before it sends
-  anything." (`made_skill::WAITS_FOR_YES`): no word to repeat, no "yes".
+  it" (so the person hears a public one), when and how often, ending "It
+  sends just that, on its own; nothing is asked." (`made_skill::WAITS_FOR_YES`):
+  no word to repeat, no "yes".
+- **No yes is waited for** (the owner's rule, 21 Nov): the make is on as
+  made and starts no wait; lamp-services binds the write at its first send
+  (above). A read-back says what it sends and asks nothing. The yes below
+  is kept only for a code skill not put on at once.
 - **The yes.** Once the skill is on, its writes' exact contents wait in
   the voice's memory for 120 s (`crate::skill_write_yes`). An agreement
   in any words, judged by the model, is a `make_skill` call with only
@@ -2391,13 +2414,13 @@ is sent by a skill's run on the lamp's Hermes, not by `lamp-skills`:
   yes to the write is this program's.
 - **Here**, a call carrying `fixed_write_run` goes only through the same
   `skill_write` as `lamp-skills`' call (`serve::Services::run_fixed_write`):
-  the owner's kept yes matched on that exact content (a run that changes a
-  field is refused "not sent: this write is not the one the owner said yes
-  to", never held for a spoken yes), the link it was said under, the day's
+  that exact content bound for the skill, or its installed package's own
+  declared write bound at its first send (a run that changes a field is
+  refused `NOT_APPROVED`, never held), the link it was bound under, the day's
   bounds (50 a skill, 200 in all, 5 a skill an hour) and the sent-log, and **once a run**: a
   second try, whatever it sends, is refused ("not sent: a skill's fixed
-  write is sent once a run …"). The agent is told "Sent, as the owner said
-  yes to it." Any other call of that run is refused, and with the switch
+  write is sent once a run …"). The agent is told "Sent, as the skill declares it." (`mcp_server::SENT`)
+  Any other call of that run is refused, and with the switch
   off here such a call is refused and nothing is sent.
 - **The direct send stays the fallback** (the first builder's ruling on
   #6823: no lamp loses a send it has today). When the agent couldn't take
@@ -2490,92 +2513,31 @@ token ever leaves root's store: neither lamp-control nor the run holds one.
   the voice's reads are not cut so). At most 256 texts are cut
   (`serve::RUN_CUTS_MOST`): a read of more short texts than that is
   refused as too long, never walked once per text.
-- **A write** is only prepared: the same `service_write` path as the
-  voice's, read back and held 2 minutes (`writes::HOLD`), one at a time.
-  The run is answered `read_back`, `sent: false`, `held: true` and a `next`
-  that says nothing went, and **no `send_id`**: nothing can send it from
-  the run, and lamp-control refuses a `send_id` or `said` before it reaches
-  here (and so does this program). A run's write while another write waits
-  for its yes is refused ("another write waits for the person's yes"),
-  so it never drops the person's own. **A run's write whose read-back
-  can't fit the voice's one note is refused before it is held**
-  (`serve::run_read_back_room`): the room is `serve::RUN_NOTE_ROOM` (591
-  bytes: the note's 1,024, `lamp_gemini::wire::MAX_NOTE_BYTES`, less its
-  fixed words, send id and time left) less twice the skill's name and the
-  service's code, counted as the note writes it, a JSON string's bytes (a
-  line break or a quote mark two, an accented letter two or three;
-  `serve::run_read_back_bytes`). Over it, nothing is held and the run is
-  told the room in characters, the read-back's length and at least how
-  much to shorten it by ("nothing was prepared: the lamp reads a write back
-  to the owner in one go, and this read-back is 600 characters, over the
-  546 it can read out ... Shorten the text by at least 54 characters and
-  call service_write again", `serve::run_too_long`), so the agent shortens
-  it and calls again. Its `service_write` tool says so beforehand, naming
-  448 characters, the room for the longest skill name and service code
-  (`mcp_server::write_short`). Before this (lamp-9adf, build 13135), a
-  mail of 10 unread subjects was held, then only said too long, and the
-  run ended with nothing sent. The write is sent only by the
-  existing send, the spoken yes through the voice's gate, and then counts
-  against the skills' bounds as a made skill's write does (50 a day a skill,
-  200 across every skill, `skill_writes::Ledger`): over them it is "not sent".
-- **The voice reads it back** (`crates/voice/src/run_write_yes.rs`, with
-  `LAMP_SKILL_TASKS=on` in `lamp-voice` too). The coordinator asks this
-  program for the run's held write, the voice's own call on the tools
-  socket, never offered to its model: `run_write_waiting` answers
-  `{"waiting": {"send_id","service","skill","read_back","left_ms"}}` or
-  `{"waiting": null}`, and takes nothing (`Services::run_waiting`; refused
-  with the switch off here, and to anyone but the voice's cgroup). Asked at
-  most every 3 s, off the coordinator's loop. A write with at least 30 s of
-  its hold left is said once, as the lamp's own written turn
-  (`run_write_read_back`), under task news' gates: someone at the lamp, the
-  first pause after any turn (the person mid-turn, or the lamp, is waited
-  out), nothing owed, the room not busy, and, with `LAMP_PRIVATE_ROOM`
-  off, only to the owner seen alone (the eyes' known face one of the
-  owner's, the one face in view, `services::owner_sees_alone`, as a read in
-  full is held; otherwise it is not said and the hold lapses quietly); never
-  in the lamp's quiet
-  hours (`lamp_local_time::quiet_hours`; a local time not known is quiet,
-  as for a skill). The model is told to say this program's read-back word
-  for word after the skill's name: "Your <skill> skill wants to send: ….
-  Shall I send it?", and to call nothing. The line goes in the note as one
-  JSON string after a header the worker reads first, so nothing the run
-  wrote (a `")`, a newline, a header of its own) can close it or begin
-  another note. A write whose hold ends untold (nobody there, the quiet
-  hours, or under 30 s left when seen) is told once later, when the lamp
-  may speak: "Your <skill> skill wanted to send a mail, but nobody was here
-  to say yes, so nothing was sent." Kept in memory only: a restart never
-  tells it. A read-back too long for one note
-  (1 024 bytes) is never cut: the lamp says only that the skill wanted to
-  send something too long to read out, nothing waits, and the hold lapses.
-  This is only the backstop: this program refuses such a write before it
-  is held (above), and the voice's test holds `serve::run_read_back_room`
-  to its note exactly (`lamp_services_room_for_a_read_back_is_one_note_exactly`).
-- **The yes.** The voice's worker reads the note back exactly and keeps the
-  write waiting for its send as a write its own model prepared
-  (`services::wait_for_run_yes`), the note's request as its read-back's,
-  its two minutes counted from this program's hold. So the voice's gate
-  holds it (`services::gate`): heard live, a later request, the read-back
-  not cut, within the hold, the echo tail's voice check, the second route
-  only. It follows `LAMP_PRIVATE_ROOM` as a write the person prepares
-  does: on, whoever answers (any heard line is the owner's,
-  `owner_seen_saying`); off, only the owner's yes, their face seen saying
-  it or their voice at `same_voice::SERVICES_SAME_FROM` (0.55) or over to
-  their print, anyone else cancelled with `OTHER_VOICE`. On
-  top, a run's send needs a plain yes (`services::plain_yes`: "yes", "send
-  it", "ừ, gửi đi", at most six words and nothing else), so nothing the run
-  wrote can steer the model into a send; on anything else it is cancelled
-  ("a skill's write goes only on a plain yes"). The send names the SHA-256
-  of the read-back the lamp said (`sha256`), and this program sends a run's
-  write only when it is that of the read-back it holds
-  (`serve::read_back_sha256`, else `RUN_NOT_SAID`, nothing sent). A no, a
-  wait, another request answered or the hold over: nothing is sent. A
-  plain spoken no ("no", "don't send it", "cancel", "stop", "không, đừng
-  gửi", at most six words; "no, send it" is none) drops it at once
-  (`services::run_declined`): the voice's waiting write, and this program's
-  hold through its existing discard (the `send_id` with `said` other than
-  "send"), and the model is told to say only "Okay, I won't send it." The
-  model is told "sent" only from this program's answer `sent: true`
-  (`services::answered`); over the skills' bounds or refused, "not sent".
+- **A write is sent at once** (the owner's rule, 21 Nov: a run's declared
+  `<code>-write` grant is its yes; nothing read back or held). A run's
+  `service_write` call with the write itself goes through the same
+  `service_write` checks as the voice's (`writes::prepare`: the kinds, a
+  plain address, the lengths, the guard and write list) and is sent once,
+  then and there (`serve::Services::run_write_now`): the service still
+  linked under the link it was prepared on (else `LINK_CHANGED`, nothing
+  sent), then counted against the skills' bounds before it goes, one at a
+  time under the send lock (`skill_writes::Ledger`: 5 a skill an hour, 50
+  a skill a day, 200 across every skill), so a burst is stopped ("not
+  sent: … at most 5 times an hour"), and kept in the owner's sent-log
+  (`skill_writes::SentLog`: the skill, the service, the time and who it
+  went to, never what). The journal gets one line with counts only: "a
+  skill run's write to gmail was sent, nothing asked (2 of 50 for it today,
+  5 of 200 for every skill)". The run is answered `sent: true`, and **no `send_id`**: a run
+  never names a send, and lamp-control refuses a `send_id` or `said`
+  before it reaches here (and so does this program, `RUN_PREPARES_ONLY`).
+  What it may write is still held by its grants: only a service its token
+  carries a `-write` grant for, never one of the voice's own, never an MCP
+  tool. **A run's write whose read-back can't fit the voice's one note is
+  refused** (`serve::run_read_back_room`), as before, so the agent shortens
+  it. The voice's read-back of a held run write
+  (`crates/voice/src/run_write_yes.rs`, `run_write_waiting`) stays in the
+  code for a write held another way, but no run write is held now, so it
+  has nothing to say. Test `a_skill_runs_write_is_sent_at_once_and_counted`.
 - **Not yet (said so the code is not read as more):** lamp-control keeps
   no skill yes yet (#6408's `SkillYes`; #6509 adds it), so no token is
   minted; the product units set `LAMP_SKILL_TASKS` (12 Nov). A no in other words than a plain
@@ -2773,17 +2735,13 @@ never through an open socket.
   instructions", between `<data>` and `</data>`, with every `<` in it
   written `\u003c` (the same JSON), so a read can never close the mark and
   speak outside it; the read tool's description says the same.
-- **A write is never sent on the agent's word.** It is only prepared and
-  held, as a skill run's: lamp-control refuses a `send_id` or `said`, and the
-  server takes them out before. The agent is told at once "Waiting for the
-  owner's yes: nothing is sent". The voice reads the held write back
-  (`run_write_yes`, "Your <skill> skill wants to send: …") and waits for the
-  owner's plain spoken yes (#6558's wait); only then does this program send
-  it, counted in the skills' bounds (20 a day a skill, 100 across them). A
-  made skill's fixed write run through the agent (`LAMP_SKILL_WRITE_AGENT`,
-  on in the product) is the one write sent on a run's call, and only as the
-  owner's kept yes has it, once ("A made skill's write", "Through the
-  lamp's agent").
+- **A write is sent at once under its grant**, as a skill run's (above):
+  lamp-control refuses a `send_id` or `said`, and the server takes them out
+  before; the write goes through `serve::Services::run_write_now`, counted
+  in the skills' bounds and kept in the sent-log, nothing asked. A made
+  skill's fixed write run through the agent (`LAMP_SKILL_WRITE_AGENT`, on
+  in the product) is sent only as its package declares it, once a run ("A
+  made skill's write", "Through the lamp's agent").
 - **The journal** gets a refusal's length only from the server; the parts it
   calls journal the service and the `what` or `action`, never the text, an
   address or a subject.

@@ -1627,13 +1627,13 @@ pub const ASKS_RULES: &str = "A skill may also start when the person says words 
 /// [`cant_yet`]: "I can't do that yet: sending or writing on its own".
 pub const SENDS_ON_ITS_OWN: &str = "sending or writing on its own";
 
-/// How the say-back of a skill that sends or writes ends (#6066): that it
-/// waits for the person's agreement, never on a word for them to repeat,
-/// so its own last words heard back are no yes. It has no "yes" in it: a
-/// line made only of the say-back's words, begun in its echo tail, is held
-/// while the yes is awaited (`second_provider::own_echo::yes_echo`), and a
-/// person's quick "Yes." must not be one.
-pub const WAITS_FOR_YES: &str = " It waits for you to agree before it sends anything.";
+/// How the say-back of a skill that sends or writes ends (#6066; the
+/// owner's rule, 21 Nov: a skill's declared write goes with nothing asked):
+/// that it sends just that, on its own, with no word for the person to
+/// repeat. lamp-services binds the write at its first send to the
+/// installed package's own declared content (`skill_writes::package_writes`),
+/// so nothing waits for a yes. The name is kept for its many readers.
+pub const WAITS_FOR_YES: &str = " It sends just that, on its own; nothing is asked.";
 
 /// The switch for a made skill that carries code of its own (#6307, #6071
 /// PR 4, the first builder's 12:45 condition 4: model-written scripts last,
@@ -1790,13 +1790,20 @@ pub enum SkillSource {
 }
 
 /// Whether a skill from `source` is given its declared grants with no
-/// yes asked or recorded (#8180, the dev's ruling): lamp-control mints
-/// its run's token from its folder's own declared grants
-/// (`lamp_control::task_yes::KeptYes`), and its task's yes check is
-/// agreed for its folder as it is, `net` among them. Made skills only
-/// today; widening it to another source is this one line.
+/// yes asked or recorded (#8180, the dev's ruling; the owner's rule, 21
+/// Nov: every skill's declared grants are on, nothing asked, at its first
+/// run, every run and on its triggers): lamp-control mints its run's token
+/// from its folder's own declared grants
+/// (`lamp_control::task_yes::KeptYes`), and its task's yes check is agreed
+/// for its folder as it is, `net` among them. Every source alike: a skill
+/// made here, from the Skills Store, pushed by the owner's own computer, or
+/// added another way (a file, the app). What a folder may declare stays the
+/// load's and the mint's to limit (`lamp_skills::task::origin_refuses`,
+/// lamp-control's `grants_ok`), never a person's yes.
 pub fn grants_need_no_yes(source: SkillSource) -> bool {
-    matches!(source, SkillSource::Made)
+    match source {
+        SkillSource::Made | SkillSource::Store | SkillSource::Pushed | SkillSource::Other => true,
+    }
 }
 
 /// Whether code granted `grants` may go on at once: the switch on
@@ -1812,11 +1819,10 @@ pub fn grants_go_on_at_once(_grants: &[String]) -> bool {
 /// no yes is recorded at the keep; its run step's and task's tokens,
 /// `net` among them, are minted from its folder's declared grants
 /// ([`grants_need_no_yes`]), so they ask nothing. A task for the lamp's agent
-/// ([`Uses::agent_task`]) still waits for the spoken yes: it is not code
-/// the lamp's model wrote.
+/// ([`Uses::agent_task`]) alike (the owner's rule, 21 Nov): its declared
+/// grants are its own, nothing asked at its keep or its first run.
 pub fn code_goes_on_at_once(made: &Made) -> bool {
     made.uses.code
-        && !made.uses.agent_task
         && grants_need_no_yes(SkillSource::Made)
         && grants_go_on_at_once(&made.uses.grants)
 }
@@ -3005,7 +3011,7 @@ fn grants_plainly(grants: &[String]) -> Option<String> {
             if let Some((code, write)) = service_grant(grant) {
                 let service = code.replace('_', " ");
                 return if write {
-                    format!("sending with your {service}, each send only on your yes")
+                    format!("sending with your {service}")
                 } else {
                     format!("reading your {service}")
                 };
@@ -10629,8 +10635,8 @@ pub fn keep_agent(files: &Files, from: &str, keeping: &Keeping) -> Result<Made, 
 /// [`crate::make_no_cannot::ASKED_MARK`] and made by whoever asked
 /// ([`Maker::of`] `from`), what it does said as the task the agent will do
 /// (`words`) and when, never as made, and its uses marked
-/// [`Uses::agent_task`]. On, its task waits for the spoken yes at its first
-/// ask (`crate::upload_agent::first_run`).
+/// [`Uses::agent_task`]. Its first ask runs it with its declared grants,
+/// nothing asked (the owner's rule, 21 Nov).
 pub fn keep_agent_asked(
     files: &Files,
     from: &str,
@@ -10650,8 +10656,7 @@ pub fn keep_agent_asked(
     uses.agent_task = true;
     let grants = crate::upload_agent::grants_of_toml(&files.toml);
     let does = format!(
-        "only when you ask for it, it hands one task to the lamp's agent: “{words}”.{} The first \
-         time you ask, I'll read it back and wait for your yes.",
+        "only when you ask for it, it hands one task to the lamp's agent: “{words}”.{}",
         agent_said(&grants)
             .strip_suffix(RUNS_ONCE_AGREED)
             .unwrap_or_default()
@@ -12022,11 +12027,11 @@ pub fn on_line(made: &Made) -> String {
         return format!("I can have the lamp's agent do that, as {name}: {does}.");
     }
     // One that sends or writes is said whole, its every recipient and word
-    // in its description, and ends as that does: it waits for the
-    // person's yes (#6066), never on a word for them to repeat.
-    // One with code of its own alike (#6307): its grants and its wait;
-    // put on at once ([`code_goes_on_at_once`]), its grants and that it's on.
-    if code_goes_on_at_once(made) {
+    // in its description, and that it's on: it sends with nothing asked
+    // (the owner's rule, 21 Nov), never on a word for them to repeat.
+    // One with code of its own alike (#6307): its grants; put on at once
+    // ([`code_goes_on_at_once`]), its grants and that it's on, else its wait.
+    if code_goes_on_at_once(made) || (!made.uses.writes.is_empty() && !made.uses.code) {
         let mut said = format!("I made {name}, and it's on: {does}");
         if !said.ends_with(['.', '!', '?']) {
             said.push('.');
@@ -12114,11 +12119,12 @@ pub fn approved_line(made: &Made) -> String {
         .unwrap_or(&line)
         .trim_end();
     let line = line.strip_prefix("I made ").unwrap_or(line);
+    let line = line.replacen(", and it's on:", ":", 1);
     format!("Your {line} {APPROVED_ALREADY}")
 }
 
 /// How [`approved_line`] ends.
-pub const APPROVED_ALREADY: &str = "You agreed to it, so it sends as it says.";
+pub const APPROVED_ALREADY: &str = "It sends just that, as it says; nothing is asked.";
 
 /// What the lamp says of a made skill that sends or writes when the turn
 /// it was made in was cut (App Only's P2 on #6142): said through the say
@@ -12950,10 +12956,7 @@ light = { dim = 1 }
         let (_, uses) = capped(&toml).unwrap();
         assert_eq!(uses.grants, ["gmail-read"]);
         assert!(code_said(&uses.grants).contains("reading your gmail"));
-        assert!(
-            code_said(&["gmail-write".to_owned()])
-                .contains("sending with your gmail, each send only on your yes")
-        );
+        assert!(code_said(&["gmail-write".to_owned()]).contains("sending with your gmail"));
         set_agent_services_here(None);
         set_scripts_here(None);
     }
@@ -16867,9 +16870,9 @@ light = { colour = "green", level = 3, for = "20s" }
     }
 
     /// Item 4: the say-back says where it goes, every recipient, the whole
-    /// text quoted, when and how often, and that it waits for a yes, ending
-    /// on no word to repeat; the lamp's line for it says the same, never
-    /// "it's on".
+    /// text quoted, when and how often, and that it sends with nothing
+    /// asked, ending on no word to repeat; the lamp's line for it says the
+    /// same, and that it's on (the owner's rule, 21 Nov).
     #[test]
     fn a_writes_say_back_is_whole_and_ends_on_its_wait() {
         set_writes_here(Some(true));
@@ -16894,10 +16897,9 @@ light = { colour = "green", level = 3, for = "20s" }
         };
         let line = on_line(&made);
         assert!(
-            line.starts_with("I made leaving mail: when someone"),
+            line.starts_with("I made leaving mail, and it's on: when someone"),
             "{line}"
         );
-        assert!(!line.contains("it's on"), "{line}");
         assert!(line.ends_with(WAITS_FOR_YES.trim()), "{line}");
         // Off, the write is unsaid as what the lamp can't do yet.
         set_writes_here(Some(false));

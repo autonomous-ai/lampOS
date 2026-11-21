@@ -89,7 +89,7 @@ pub const WAITS: &str = "Waiting for the owner's yes: nothing is sent. The lamp 
 /// What the agent is told with a skill's fixed write sent
 /// (`LAMP_SKILL_WRITE_AGENT`, `serve::Services::run_fixed_write`): only
 /// the owner's kept yes to that exact content sent it.
-pub const SENT: &str = "Sent, as the owner said yes to it. Say so, and never send it again.";
+pub const SENT: &str = "Sent, as the skill declares it. Say so, and never send it again.";
 /// What every call is told with no run token.
 pub const NO_RUN: &str = "the lamp's linked services are only for a skill's run the owner said yes to: this run has no token, so nothing was read or sent";
 

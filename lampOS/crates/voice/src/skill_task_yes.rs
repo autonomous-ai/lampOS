@@ -134,13 +134,14 @@ pub fn service_grant(name: &str) -> Option<(&str, bool)> {
 }
 
 /// What a service grant lets the run do, in plain words: "reads your
-/// Gmail", "prepares sends with your Gmail, each sent only on your yes".
+/// Gmail", "sends with your Gmail" (each send goes at once, under its
+/// declared grant: the owner's rule, 21 Nov).
 pub fn service_words(name: &str) -> Option<String> {
     let (code, write) = service_grant(name)?;
     let service = lamp_services::catalog::service(code)
         .map_or_else(|| code.replace('_', " "), |service| service.name.to_owned());
     Some(if write {
-        format!("prepares sends with your {service}, each sent only on your yes")
+        format!("sends with your {service}")
     } else {
         format!("reads your {service}")
     })
@@ -1270,7 +1271,7 @@ mod tests {
         crate::made_skill::set_agent_services_here(Some(true));
         assert_eq!(
             uses_said(&grants),
-            "it reads your Gmail and prepares sends with your Gmail, each sent only on your yes"
+            "it reads your Gmail and sends with your Gmail"
         );
         assert!(service_grant("myspace-read").is_none());
         crate::made_skill::set_agent_services_here(Some(false));

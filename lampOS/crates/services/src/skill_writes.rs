@@ -128,7 +128,12 @@ pub const STOPPED: &str = "stopped: ";
 /// What a write with no approval for its skill is told.
 pub const WAITING: &str = "not sent: waiting for the owner's yes";
 /// What a write whose content is not the approved one is told.
-pub const NOT_APPROVED: &str = "not sent: this write is not the one the owner said yes to";
+pub const NOT_APPROVED: &str =
+    "not sent: this write is not one the skill's installed package declares";
+
+/// A skill's write refused when the skill is on with no installed package
+/// (a folder by hand, a developer's push): nothing binds its content.
+pub const NOT_INSTALLED: &str = "not sent: the skill isn't on the lamp as an installed package";
 
 /// What a made skill may write: a fixed-shape write of the services crate,
 /// with the keys it takes. No MCP tool call (its shape is the caller's), no
@@ -275,6 +280,127 @@ pub fn content(service: &str, action: &str, fields: &Map<String, Value>) -> Valu
     content.insert("service".into(), Value::from(service));
     content.insert("action".into(), Value::from(action));
     Value::Object(content)
+}
+
+/// `write = { … }`, as a skill's folder writes it: `service`, `action` and
+/// the action's own fields ([`KINDS`]). The one parser of a write step:
+/// `lamp-skills` loads a skill's write with it, and this service reads an
+/// installed package's own writes with it ([`package_writes`]), so both
+/// read the very same content.
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct WriteFile {
+    service: String,
+    action: String,
+    to: Option<Vec<String>>,
+    cc: Option<Vec<String>>,
+    subject: Option<String>,
+    text: Option<String>,
+    title: Option<String>,
+    start: Option<String>,
+    end: Option<String>,
+    calendar: Option<String>,
+    attendees: Option<Vec<String>>,
+    repo: Option<String>,
+    number: Option<u64>,
+    team_id: Option<String>,
+    project: Option<String>,
+    workspace: Option<String>,
+    id: Option<String>,
+}
+
+impl WriteFile {
+    /// The write's content, checked ([`check`]), or why the folder's words
+    /// are not one.
+    pub fn content(self) -> Result<Value, String> {
+        let mut fields = Map::new();
+        let strings = [
+            ("subject", self.subject),
+            ("text", self.text),
+            ("title", self.title),
+            ("start", self.start),
+            ("end", self.end),
+            ("calendar", self.calendar),
+            ("repo", self.repo),
+            ("team_id", self.team_id),
+            ("project", self.project),
+            ("workspace", self.workspace),
+            ("id", self.id),
+        ];
+        for (key, value) in strings {
+            if let Some(value) = value {
+                fields.insert(key.into(), json!(value));
+            }
+        }
+        for (key, value) in [
+            ("to", self.to),
+            ("cc", self.cc),
+            ("attendees", self.attendees),
+        ] {
+            if let Some(value) = value {
+                fields.insert(key.into(), json!(value));
+            }
+        }
+        if let Some(number) = self.number {
+            fields.insert("number".into(), json!(number));
+        }
+        let content = content(&self.service, &self.action, &fields);
+        check(&content).map_err(|why| format!("write: {why}"))?;
+        Ok(content)
+    }
+}
+
+/// The most bytes of an installed skill's `skill.toml` read for its writes.
+const SKILL_TOML_MOST: u64 = 64 * 1024;
+
+/// The writes `skill`'s installed folder in `skills` declares: each
+/// `[[do]]` step's `write`, its content as `lamp-skills` loads it
+/// ([`WriteFile::content`]); none for a folder or file that is a link, a
+/// file too long, or a step that isn't a write. What a skill's fixed write
+/// is bound to, in place of a yes (the owner's rule, 21 Nov: a skill's
+/// declared grants are on, nothing asked): content that is none of these
+/// is never sent.
+pub fn package_writes(skills: &Path, skill: &str) -> Vec<Value> {
+    use std::io::Read;
+    #[derive(Deserialize)]
+    struct Steps {
+        #[serde(rename = "do", default)]
+        steps: Vec<toml::Table>,
+    }
+    if !skill_name_ok(skill) {
+        return Vec::new();
+    }
+    let folder = skills.join(skill);
+    let path = folder.join("skill.toml");
+    let plain = |path: &Path, dir: bool| {
+        fs::symlink_metadata(path)
+            .is_ok_and(|meta| if dir { meta.is_dir() } else { meta.is_file() })
+    };
+    if !plain(&folder, true) || !plain(&path, false) {
+        return Vec::new();
+    }
+    let mut text = String::new();
+    let Ok(file) = fs::File::open(&path) else {
+        return Vec::new();
+    };
+    if file
+        .take(SKILL_TOML_MOST + 1)
+        .read_to_string(&mut text)
+        .is_err()
+        || text.len() as u64 > SKILL_TOML_MOST
+    {
+        return Vec::new();
+    }
+    let Ok(file) = toml::from_str::<Steps>(&text) else {
+        return Vec::new();
+    };
+    file.steps
+        .iter()
+        .filter_map(|step| step.get("write"))
+        .filter_map(|write| write.clone().try_into::<WriteFile>().ok())
+        .filter_map(|write| write.content().ok())
+        .take(STEPS_MOST)
+        .collect()
 }
 
 /// Which link a write is approved under: the account it names, else the
@@ -459,6 +585,52 @@ impl Approvals {
             }));
         keep(&self.path, &file)
             .map_err(|error| format!("the approval could not be kept ({})", error.kind()))
+    }
+
+    /// `skill`'s `write`, one of its installed `package`'s own
+    /// ([`package_writes`]), bound at its first send to the link it goes
+    /// under (`link_of`) and whether its destination is `public`: kept
+    /// beside its other writes' bindings for that package, in place of any
+    /// for this very content. Nothing is asked: the binding is what a later
+    /// send is held to (the same link, else [`STOPPED`]).
+    pub fn bind(
+        &self,
+        skill: &str,
+        package: &str,
+        write: &Value,
+        link_of: &str,
+        public: bool,
+    ) -> Result<Approval, String> {
+        let bound = Approval {
+            skill: skill.to_owned(),
+            sha256: hash(write),
+            service: write["service"].as_str().unwrap_or_default().to_owned(),
+            link_of: link_of.to_owned(),
+            package: package.to_owned(),
+            public,
+        };
+        let mut file: ApprovedFile = read(&self.path);
+        file.approved.retain(|one| {
+            one.skill != skill || (one.package == package && one.sha256 != bound.sha256)
+        });
+        if file
+            .approved
+            .iter()
+            .filter(|one| one.skill == skill)
+            .count()
+            >= STEPS_MOST
+        {
+            return Err(format!("a skill has at most {STEPS_MOST} writes"));
+        }
+        if file.approved.len() >= APPROVED_MOST {
+            return Err(format!(
+                "the lamp keeps at most {APPROVED_MOST} approved writes"
+            ));
+        }
+        file.approved.push(bound.clone());
+        keep(&self.path, &file)
+            .map_err(|error| format!("the write's binding could not be kept ({})", error.kind()))?;
+        Ok(bound)
     }
 
     /// What is approved for `skill`'s `write`, its installed package now

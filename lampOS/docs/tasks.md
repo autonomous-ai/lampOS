@@ -4451,17 +4451,18 @@ one runner (a fresh home per run, the token as a file) with no new rules:
   for the folder as it is. With `LAMP_MADE_CODE_ON_AT_ONCE` on in
   lamp-control (`lamp_skills::no_yes_switch_on`; on in the product), a skill
   made on the lamp needs no yes (#8180,
-  `lamp_voice::made_skill::grants_need_no_yes`, true for
-  `SkillSource::Made` only today, of `lamp_skills::source_of`: `made: here`
-  and put on with an install record not from the Store, so a folder put on
-  by hand is not Made):
+  `lamp_voice::made_skill::grants_need_no_yes`, true for every
+  `SkillSource` of `lamp_skills::source_of` since the owner's rule, 21 Nov:
+  a made skill, a Store skill, a pushed skill alike; a folder whose origin
+  the load refuses a task, `lamp_skills::task::origin_refuses`, is minted
+  nothing):
   lamp-control mints its token from its folder's declared grants
   (`task_yes::KeptYes::grants`, `no_yes_grants`; `net` left out, and the
   rules below, `net` never beside a private grant among them, still hold)
   and answers its check `{"agreed": true}` for its folder as it is (its
   SHA-256 and declared grants, `task_yes::agreed_with_no_yes`), so its
-  `net` asks nothing. A Store, pushed or other skill still needs its kept
-  yes, and with the switch off so does a made one, exactly as before. Off, `net` is refused as an unknown grant
+  `net` asks nothing. With the switch off a skill needs its kept yes,
+  exactly as before. Off, `net` is refused as an unknown grant
   (`bad_request`) before any token.
 - **What a `net` run never holds, and its bounds** (Heron's P1 and P3s on
   #7590, the first builder's 23:22 calls):
@@ -5387,9 +5388,10 @@ to lamp-services; the services' own tokens never leave root's store. The
 token is ended when the run ends, however it ends (answered, cancelled,
 at its deadline or at lamp-tasks' stop), the launcher's claim with it,
 and the run's folder `skill-<run id>` is removed, so a later turn in the
-same session holds no pass. A write to a linked service still waits for
-the owner's spoken yes: lamp-services sends only what the owner said yes
-to, once a run.
+same session holds no pass. A write to a linked service is sent at once
+under its `<code>-write` grant, nothing asked (the owner's rule, 21 Nov),
+within the skills' bounds and kept in the owner's sent-log
+([services.md](services.md), "A skill's run on the lamp's Hermes").
 
 Follow-up: #7260 (proposal: in the one session, a skill's run keeps the reach of its grants).
 

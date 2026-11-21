@@ -33,9 +33,8 @@
 //!   lamp's agent follow [`crate::upload_agent::INSTRUCTIONS`], the
 //!   person's request in the lamp's own words; kept by
 //!   `made_skill::keep_agent_asked`, marked [`ASKED_MARK`], so its read-back
-//!   says it comes from [`FROM`]. It is on, its task not agreed: the first
-//!   time it is asked for, it is read back and waits for the spoken yes
-//!   (`crate::upload_agent::first_run`), then runs.
+//!   says it comes from [`FROM`]. It is on, and its first ask runs it with
+//!   its declared grants, nothing asked (the owner's rule, 21 Nov).
 //! - **Its grants are checked against the ones there are** ([`covered`]):
 //!   `crate::skill_task_yes::GRANTS` and, with `LAMP_AGENT_SERVICES` on, a
 //!   known service's `-read` or `-write`, linked or not (one not linked is

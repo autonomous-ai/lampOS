@@ -578,7 +578,7 @@ impl WriteHandOver {
             "Send the one write of the skill `{skill}` the owner said yes to, for its run `{run}`: \
              call the `service_write` tool of the `lamp-services` MCP server once, \
              with exactly these arguments and nothing added: {arguments}\n\
-             The lamp gives the call the write the owner said yes to itself, so you never see or need its content. \
+             The lamp gives the call the write the skill declares itself, so you never see or need its content. \
              Never call it again, whatever it answers: lamp-services sends only what the owner said yes to, once. \
              Then say in one line what it answered. Never print, write or send the token in ${TOKEN_ENV}.",
             skill = self.skill,

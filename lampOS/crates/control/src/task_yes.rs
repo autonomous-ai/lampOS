@@ -484,9 +484,22 @@ fn no_yes_folder(skills: &Path, name: &str) -> Option<(std::path::PathBuf, Vec<S
         return None;
     }
     let folder = folder_of(skills, name);
-    if !std::fs::symlink_metadata(&folder).is_ok_and(|meta| meta.is_dir())
-        || !lamp_skills::grants_need_no_yes(lamp_skills::source_of(&folder))
+    if !std::fs::symlink_metadata(&folder).is_ok_and(|meta| meta.is_dir()) {
+        return None;
+    }
+    let source = lamp_skills::source_of(&folder);
+    if !lamp_skills::grants_need_no_yes(source) {
+        return None;
+    }
+    // What a folder may carry is held here as lamp-skills holds it at its
+    // load (`lamp_skills::task::origin_refuses`): with no yes kept, the mint
+    // is where a folder's own claim is checked, never only the load. A made
+    // skill's own path (#8180) is the make's.
+    if source != lamp_skills::SkillSource::Made
+        && let Some(why) =
+            lamp_skills::task::origin_refuses(&folder, source == lamp_skills::SkillSource::Pushed)
     {
+        eprintln!("lamp-control: a skill's grants not minted: {why}");
         return None;
     }
     let declared = lamp_skills::load_with(&folder, false).ok()?.grants;
@@ -954,15 +967,21 @@ mod tests {
     /// `lamp_voice::made_skill::grants_need_no_yes` holds needs no yes) is
     /// minted its folder's declared grants with no yes kept, the camera
     /// and microphone among them, and its task check (lamp-tasks' `net`
-    /// check) is agreed for its folder as it is; a skill of any other
-    /// source still needs its kept yes.
+    /// check) is agreed for its folder as it is. The owner's rule, 21 Nov:
+    /// every source alike needs no yes; a folder the load refuses a task
+    /// (`lamp_skills::task::origin_refuses`: one added by hand, neither the
+    /// Store's nor pushed) is not minted one with no yes either.
     #[test]
     fn a_made_skill_is_minted_its_declared_grants_with_no_yes() {
         use crate::runs::SkillYes as _;
         use lamp_voice::made_skill::{SkillSource, grants_need_no_yes};
-        assert!(grants_need_no_yes(SkillSource::Made));
-        for other in [SkillSource::Store, SkillSource::Pushed, SkillSource::Other] {
-            assert!(!grants_need_no_yes(other), "{other:?}");
+        for source in [
+            SkillSource::Made,
+            SkillSource::Store,
+            SkillSource::Pushed,
+            SkillSource::Other,
+        ] {
+            assert!(grants_need_no_yes(source), "{source:?}");
         }
         lamp_voice::skill_task_yes::set_net_here(Some(true));
         lamp_skills::set_no_yes_switch_here(Some(true));
@@ -1082,6 +1101,125 @@ mod tests {
         assert_eq!(
             kept.grants("tide-times").unwrap(),
             BTreeSet::from([Grant::Speak])
+        );
+        lamp_skills::set_no_yes_switch_here(None);
+        lamp_voice::skill_task_yes::set_net_here(None);
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    /// The owner's rule, 21 Nov: a skill from the Skills Store and one pushed
+    /// by the owner's own computer are each minted their folder's declared
+    /// grants with no yes kept, the camera and microphone among them, and
+    /// their task check (lamp-tasks' `net` check) is agreed for the folder as
+    /// it is, on every run and every trigger alike (the check is the same
+    /// for each): the same path whatever agent runs it, since the mint
+    /// names no engine. A folder changed since, or other grants asked, is
+    /// not agreed.
+    #[test]
+    fn a_store_and_a_pushed_skill_are_minted_their_declared_grants_with_no_yes() {
+        use crate::runs::SkillYes as _;
+        use lamp_voice::made_skill::SkillSource;
+        lamp_voice::skill_task_yes::set_net_here(Some(true));
+        lamp_skills::set_no_yes_switch_here(Some(true));
+        let dir = folder("store-pushed-no-yes");
+        let state = dir.join("state");
+        let skills = dir.join("skills");
+        let pushed = dir.join(PUSHED_NAME);
+        std::fs::create_dir_all(&state).unwrap();
+        let store = task_skill(
+            &skills,
+            "photo-booth",
+            r#"["camera", "microphone", "speak"]"#,
+        );
+        let toml = std::fs::read_to_string(store.join("skill.toml")).unwrap();
+        std::fs::write(
+            store.join("skill.toml"),
+            format!("kind = \"installable\"\n{toml}"),
+        )
+        .unwrap();
+        let installed = lamp_skills::package::Installed {
+            sha256: "cd".repeat(32),
+            manifest: lamp_skills::package::Manifest {
+                format: 1,
+                name: "photo-booth".into(),
+                version: "1.0.0".into(),
+                files: Vec::new(),
+            },
+            from_store: true,
+        };
+        std::fs::write(
+            store.join(lamp_skills::package::INSTALLED_FROM),
+            serde_json::to_vec(&installed).unwrap(),
+        )
+        .unwrap();
+        let tide = task_skill(&pushed, "tide-times", r#"["net", "speak"]"#);
+        std::fs::write(tide.join(lamp_skills::PUSHED_FROM), "{}").unwrap();
+        assert_eq!(lamp_skills::source_of(&store), SkillSource::Store);
+        assert_eq!(lamp_skills::source_of(&tide), SkillSource::Pushed);
+        let kept = KeptYes {
+            state: state.clone(),
+            skills: skills.clone(),
+            on: true,
+            write_agent: false,
+            services_to_agent: false,
+        };
+        // First use: minted with no yes kept, nothing recorded.
+        assert_eq!(
+            kept.grants("photo-booth").unwrap(),
+            BTreeSet::from([Grant::Camera, Grant::Microphone, Grant::Speak])
+        );
+        assert_eq!(
+            kept.grants("tide-times").unwrap(),
+            BTreeSet::from([Grant::Speak])
+        );
+        assert!(yeses(&state).is_empty(), "no yes is ever recorded");
+        let st = Some(state.as_path());
+        let check = |name: &str, sha256: &str, grants: Value| {
+            answer(
+                &skills,
+                st,
+                &asked(
+                    CHECK,
+                    json!({"name": name, "sha256": sha256, "grants": grants}),
+                ),
+                false,
+                true,
+                0,
+            )
+            .unwrap()
+        };
+        let booth_sha = lamp_skills::task::folder_sha256(&store).unwrap();
+        let tide_sha = lamp_skills::task::folder_sha256(&tide).unwrap();
+        // A trigger's run is checked as a spoken ask's is: agreed, twice.
+        for _ in 0..2 {
+            assert_eq!(
+                check(
+                    "photo-booth",
+                    &booth_sha,
+                    json!(["camera", "microphone", "speak"])
+                ),
+                json!({"agreed": true})
+            );
+            assert_eq!(
+                check("tide-times", &tide_sha, json!(["net", "speak"])),
+                json!({"agreed": true})
+            );
+        }
+        // Other grants than declared, or a folder changed since: not agreed.
+        assert_eq!(
+            check("tide-times", &tide_sha, json!(["speak"]))["agreed"],
+            false
+        );
+        std::fs::write(tide.join("scripts/main.py"), "print('changed')\n").unwrap();
+        assert_eq!(
+            check("tide-times", &tide_sha, json!(["net", "speak"]))["agreed"],
+            false
+        );
+        // Its new bytes, as they are now: agreed again, nothing asked.
+        let now = lamp_skills::task::folder_sha256(&tide).unwrap();
+        assert_eq!(
+            check("tide-times", &now, json!(["net", "speak"])),
+            json!({"agreed": true})
         );
         lamp_skills::set_no_yes_switch_here(None);
         lamp_voice::skill_task_yes::set_net_here(None);

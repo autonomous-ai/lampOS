@@ -1756,6 +1756,34 @@ lamp-tasks and lamp-update, which serve the run (#6432, #6306).
 `lamp_skills::task`, `lamp_skills::package::task_asks`,
 `lamp_voice::skill_task_yes`, `lamp_control::task_yes`.
 
+**No yes for a skill's grants** (the owner's rule, 21 Nov: a skill is
+never blocked). With `LAMP_MADE_CODE_ON_AT_ONCE=on` in lamp-control (on in
+the product, `lamp_skills::no_yes_switch_on`), every skill's declared
+grants are on with nothing asked, at its first run, every run and on its
+triggers, whatever its source (`lamp_voice::made_skill::grants_need_no_yes`
+is true for `Made`, `Store`, `Pushed` and `Other`) and whatever agent runs
+it (OpenClaw and Hermes take the same path: the mint names no engine).
+lamp-control mints the run's token from the folder's own declared grants
+(`task_yes::no_yes_grants`) and agrees the task's check for the folder as
+it is (`task_yes::agreed_with_no_yes`: its SHA-256 and declared grants;
+a changed folder is agreed again at its new bytes). What a folder may
+carry is still held, at the load and again at the mint
+(`lamp_skills::task::origin_refuses`: one put on by hand, neither the
+Store's nor pushed, is minted nothing), and lamp-control's `grants_ok`
+rules (`net` never beside a private grant) and the pushed skills' lack of
+service grants stay. A skill's writes go at once too ([services.md](services.md),
+"A made skill's write" and "A skill's run on the lamp's Hermes"). The
+read-back below still says what a skill uses when asked; where it speaks
+of the owner's yes, that yes is no longer waited for with the switch on.
+Only the skills' folders grant: only the root manage helper writes
+`/var/lib/lampOS/skills` and `/var/lib/lampOS/skills-dev` (test
+`only_the_manage_helper_can_write_the_skills_folders`). Kept as limits,
+not gates: lamp-control's admin socket hidden, keys refused, a run's web
+on ports 80 and 443 only, forget-all, the bounds and one run at a time.
+Tests: lamp-control's
+`a_store_and_a_pushed_skill_are_minted_their_declared_grants_with_no_yes`
+and `a_made_skill_is_minted_its_declared_grants_with_no_yes`.
+
 ```toml
 version = "1.0.0"
 grants = ["camera", "light"]
@@ -3905,13 +3933,20 @@ gone ([switches.md](switches.md)). What happens:
      `made_skill::SEEN_WITH_THE_REPO`, so the yes covers a public
      destination, its visibility being read only at the approval), how
      often, its manners, and last
-     `made_skill::WAITS_FOR_YES`, " It waits for you to agree before it
-     sends anything." It ends on no word to repeat and has no "yes" in it.
+     `made_skill::WAITS_FOR_YES`, " It sends just that, on its own;
+     nothing is asked." It ends on no word to repeat and has no "yes" in it.
      Said whole, up to 1,400 characters (`MOST_WRITE_PLAIN_CHARS`), never
-     cut, and the line is "I made leaving mail: …", never "it's on". The
+     cut, and the line is "I made leaving mail, and it's on: …". The
      uses add "your Gmail, sending to mai@example.com", and the app's
      `uses` carry `writes` and `sends_to` for the list's "sends to …"
      (the list's text lives in the app, not in this repository).
+   - **No yes is waited for** (the owner's rule, 21 Nov): the make starts
+     no wait for a skill that sends or writes (`make_skill_local::make_with`,
+     no `approve_id`); it is on as made, and `lamp-services` binds its
+     package's own declared write at its first send ([services.md](services.md),
+     "A made skill's write"). The yes below (`crate::skill_write_yes`) is
+     kept only for a skill with code of its own not put on at once
+     (`LAMP_MADE_CODE_ON_AT_ONCE` off).
    - **The yes** (`crate::skill_write_yes`): once the skill is on (the
      approval binds the installed package), its writes' exact contents,
      kept beside it in the index (`made_skill::writes_of`), wait in memory
@@ -3968,27 +4003,17 @@ gone ([switches.md](switches.md)). What happens:
      the route and the coordinator already judged the line a call. On 9adf
      an app's make with code (Gmail) said back, then a lone "Hello?" heard
      as the name, was put on by the forced round's yes.
-   - **Read back, and agreed to then** (the owner, 11 Nov;
-     `make_skill_local::read_back`): a write skill still waiting for its
-     yes (its make's turn cut, no answer then, or a "no") is heard again
-     by asking "what does my leaving mail skill send?" or "read me my
+   - **Read back** (the owner, 11 Nov; `make_skill_local::read_back`; no
+     yes since the owner's rule, 21 Nov): a write skill is heard again by
+     asking "what does my leaving mail skill send?" or "read me my
      leaving mail skill". The model calls `make_skill` with only
      `read_back`, the skill's name (offered with `LAMP_SKILL_WRITES`, or
      with `LAMP_SKILL_TASKS` for a skill's task, "A skill's task" above;
      "my" and "skill" dropped, `made_skill::name_asked`), and the voice
-     finds the kept skill on the lamp of that name. Not approved for what
-     it sends now, as `lamp-services` tells it (`skill_writes_approved`,
-     the voice's own call, which approves nothing; not told counts as not
-     approved), its make's own line (`made_skill::on_line`, "I made leaving
-     mail: … It waits for you to agree before it sends anything.") is said
-     word for word, and its writes wait for the yes again through the
-     make's very wait, `approve_id`: a plain agreement on a later heard
-     line approves it as at the make, with every guard of the make's (said
-     whole and uncut, so a cut read-back and then a yes is
-     `NOT_SAID_WHOLE`; the echo hold; the second route; the package said
-     back; the link). A "no", or no answer, calls nothing: it stays
-     unapproved. Approved already, its say-back is said ending "You agreed
-     to it, so it sends as it says." (`made_skill::approved_line`), and
+     finds the kept skill on the lamp of that name. The package on the lamp
+     (as `lamp-services`' `skill_writes_approved` tells it, whatever it says
+     of a kept yes, or not told) is said whole ending "It sends just that,
+     as it says; nothing is asked." (`made_skill::approved_line`), and
      nothing is asked or awaited. One that sends nothing is said so ("…
      doesn't send or write anything"); none of that name on the lamp is
      said so, with the names on only to a line the owner hears (below);
@@ -4240,17 +4265,19 @@ gone ([switches.md](switches.md)). What happens:
      made skill's code goes on at once whatever it declares (#8180, the
      dev's ruling, `made_skill::code_goes_on_at_once`): the camera, the
      microphone, `net`, hearing (`sound`), who is at the lamp and sends
-     among them; only a task for the lamp's agent (`uses.agent_task`)
-     still waits for its spoken yes. Such a make, by voice or from the
+     among them, and a task for the lamp's agent (`uses.agent_task`)
+     alike (the owner's rule, 21 Nov: nothing asked). Such a make, by voice or from the
      app's MAKE IT (`app_make::put_on_line`), goes on as it is made:
      exactly that package by its SHA-256 (`make_skill_local::code_on_at_once`,
      `made_skill::put_on_agreed`, the manage helper's same pack checks and
      cap). No yes is recorded at the keep: a made skill's source needs
-     none (`made_skill::grants_need_no_yes`, true for `SkillSource::Made`
-     only today, of `lamp_skills::source_of`), so lamp-control mints its
-     run step's and task's tokens from its folder's declared grants and
-     agrees its task check, `net` among them (docs/tasks.md), and its
-     first run asks nothing. Store and pushed skills keep their yes. It is said as made and on, what it does and what its code
+     none (`made_skill::grants_need_no_yes`, true for every
+     `SkillSource` of `lamp_skills::source_of` since the owner's rule, 21
+     Nov), so lamp-control mints its run step's and task's tokens from its
+     folder's declared grants and agrees its task check, `net` among them
+     (docs/tasks.md), and its first run asks nothing. A Store skill and a
+     pushed skill alike, on its first use, every run and its triggers
+     ("No yes for a skill's grants", below). It is said as made and on, what it does and what its code
      may use, the code itself never read out ("I made photo booth, and
      it's on: … The lamp's model wrote its code, and that code may use
      its light."; `made_skill::code_said` without `RUNS_AFTER_YES`); a
@@ -4757,13 +4784,11 @@ gone ([switches.md](switches.md)). What happens:
     `only_a_later_answered_line_is_going_on`. A turn that
     still waits gets the answer as before, and nothing goes to the say
     service. With the say service off, the line is not said. A skill that
-    sends or writes, made and on, is never said "it's on" there (App
-    Only's P2 on #6142): that turn never gave the model its say-back or its
-    `approve_id`, so no later yes can be taken, and its line is
-    `made_skill::cut_write_line`, "I made leaving mail. It waits for you to
-    agree before it sends anything. I couldn't tell you just now what it
-    sends, so it sends nothing yet." (no word to repeat, no "yes"; test
-    `a_write_made_in_a_cut_turn_is_said_to_wait_never_just_on`). A skill
+    sends or writes, made and on, is said as on with what it sends
+    (`made_skill::on_line`, "I made leaving mail, and it's on: … It sends
+    just that, on its own; nothing is asked."): nothing waits for a yes
+    since the owner's rule (21 Nov), so a cut turn loses none (test
+    `a_made_write_is_said_back_whole_and_goes_on_with_nothing_asked`). A skill
     with code of its own whose say-back is said so waits as an app's make
     with code does (`skill_write_yes::said_by_the_say_service`, #7245): no
     model round saw the make's answer, so the person's next line after the
@@ -4783,9 +4808,10 @@ gone ([switches.md](switches.md)). What happens:
     was told to hear it again, so nothing was forced or kept (tests
     `a_cut_code_makes_say_back_through_the_say_service_forces_the_next_yes`,
     `a_cut_code_makes_say_back_goes_to_the_say_service_whole`,
-    `a_cut_voice_makes_say_back_is_told_word_for_word`). A make's writes,
-    a code make that also sends included, keep `made_skill::cut_write_line`:
-    only the cut code line (`made_skill::cut_code_line`) is replaced.
+    `a_cut_voice_makes_say_back_is_told_word_for_word`). A make's writes
+    are said as on (`made_skill::on_line`, nothing waits for a yes since
+    the owner's rule, 21 Nov); only the cut code line
+    (`made_skill::cut_code_line`) is replaced.
     While the make is under way, or its line is still to be said
     (`make_skill_local::Pending`), and for at most 2 minutes after its call
     (`make_skill_local::MAKE_WITHIN`, the longest a make goes on; the line's
@@ -6216,7 +6242,7 @@ Tests:
   journaled as `MODELS_CANNOT_JOURNALED`), and
   `the_system_prompt_carries_the_rules_of_a_read` (one service at most,
   read only, the listed steps, `cannot:` otherwise; off, none);
-  `a_made_write_is_said_back_whole_and_waits_for_a_later_yes` and
+  `a_made_write_is_said_back_whole_and_goes_on_with_nothing_asked` and
   `the_system_prompt_and_function_carry_a_write_only_with_its_switch`,
   `a_writes_words_only_in_the_models_request_are_refused` (#6066);
   `skill_write_yes::tests::a_cut_or_summarised_say_back_does_not_approve`
@@ -6437,9 +6463,9 @@ With the same switch in `lamp-skills`, its manage helper, `lamp-voice` and
 `lamp-control` (which reads a skill's grants through lamp-skills at each
 token's mint), a `do.task`'s `grants` may name a linked service's grant
 (`task::grants_of`, `task::agent_services_on`): a skill so made loads, its
-grants are said back ("it reads your Gmail and prepares sends with your
-Gmail, each sent only on your yes", `skill_task_yes::service_words`), the
-owner's yes is kept for exactly them, and the run's token carries them
+grants are said ("it reads your Gmail and sends with your Gmail",
+`skill_task_yes::service_words`), nothing asked (the owner's rule, 21
+Nov), and the run's token carries them
 (`Grant::Service`). An unknown service, a second code (`gmail-app-read`)
 or another kind (`gmail-delete`) is "not a grant"; a service that is not
 linked is refused at the call by lamp-services ("isn't linked to this
@@ -8040,7 +8066,8 @@ bytes, as above):
   photo booth from a file, not from the Skills Store, and it's on: only
   when you ask for it, the lamp's agent follows the file, and it changes
   the light, speaks and plays sounds, uses the camera and reaches the
-  internet. The first time it runs, I'll ask you to agree." With grants
+  internet." Nothing is asked at its first run (the owner's rule, 21
+  Nov). With grants
   only of `light`, `speak` and `body` (#6659's at-once set), the voice records its
   task's yes with lamp-control as it goes on (`upload_agent::went_on`,
   `task_yes_record`, the folder as the manage helper reads it) and the
@@ -8478,11 +8505,11 @@ grants, its code, or the lamp's own steps (the light, the head, a say).
 4. **Said back with the words** (`made_skill::plainly`): "When you say
    “send my test note”, it mails me@example.com from your Gmail, subject
    “Test note”, saying “This is my test note.”. It starts only when you say
-   it, never on its own. It waits for you to agree before it sends
-   anything." Beside a trigger: "When someone sitting at the desk gets up,
-   or when you say “...”, it ...". A write keeps its read-back and the
-   owner's spoken yes on its exact content (`skill_write_yes`), as any
-   made write does.
+   it, never on its own. It sends just that, on its own; nothing is
+   asked." Beside a trigger: "When someone sitting at the desk gets up,
+   or when you say “...”, it ...". A write goes with nothing asked, bound
+   at its first send to its exact content (the owner's rule, 21 Nov), as
+   any made write does.
 5. **Loaded by lamp-skills** (`lamp_skills::started_by_words`): a skill
    made on this lamp (`made_on_the_lamp`: installable, never pushed,
    `made: here` and neither `added: file` nor `written: app` on its card,
