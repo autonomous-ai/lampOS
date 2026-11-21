@@ -1123,7 +1123,14 @@ Off unless `LAMP_END_KEEPS_REACH_BACK=on` in the voice's environment
   heard with the lamp silent, as a block pushed between lines has them.
   - At most 600 ms of it (`END_LEAD_BLOCKS`, the usual 300 ms and a soft
     start's 300 ms more), and never a block from the line's last speech
-    back: a speech block lets go of the quiet kept before it.
+    back: a speech block lets go of the quiet kept before it. A block counts
+    as quiet only when its own score is quiet too: one masked under the
+    lamp's sound but scored speech by itself is the person's words, already
+    the ended line's, and a yield's reach by its own scores would say them
+    again.
+  - A line begun inside the carried quiet is judged for the call's wait
+    from after it (`TurnDetector::name_heard`), as without the switch: the
+    last line's late name sign never starts a call wait on the next one.
   - A start right after the End then reaches back as any other start does,
     with every bound it has: the usual 300 ms, a soft start's 600 ms, a
     yield's reach by its own scores, and never more than the detector keeps
