@@ -888,7 +888,10 @@ phần của kho nằm ở `crates/memory/src/app_facts.rs`.
     chuyện: `forget {about}` của voice đọc các điều app của chính người đó
     theo cách này, từng trang (tối đa 24, quá thì "quá nhiều để xem hết"),
     và khớp chúng theo cùng các từ như các điều họ đã giữ, nên «quên điều
-    gym coach đã nói» lấy được một điều. Không bao giờ của căn phòng, không
+    gym coach đã nói» lấy được một điều. Lệnh quên một khuôn mặt (#5627),
+    khi chỉ người đó trong tầm nhìn, liệt kê chúng cùng cách bên cạnh các
+    điều họ đã giữ: một điều khớp là điều được hỏi, và lời đồng ý của họ quên
+    nó theo id; hơn một điều thì hỏi điều nào. Không bao giờ của căn phòng, không
     bao giờ của người khác; trí nhớ cũ từ chối trường này và lệnh quên tìm
     ở phần còn lại.
   - **Lượt ban đêm không bao giờ đọc nó**, nên không đoạn, mẫu hay chương

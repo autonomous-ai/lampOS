@@ -5808,14 +5808,31 @@ pub fn one_face_forget_target(
     if !forget_all_on() {
         return Err(ForgetNotAsked::ForgetAllOff);
     }
-    let (want, _) = forget_want(call, said)?;
+    // A bare or unclear forget is refused first, as before.
+    forget_want(call, said)?;
     let client = DAYS
         .get()
         .and_then(Option::as_ref)
         .filter(|client| client.forget_all.load(Ordering::Acquire))
         .ok_or(ForgetNotAsked::NoDaysMemory)?;
-    let entries = client.kept_listing(person, &want, lease)?;
-    let kept = client.kept_ids(person, lease);
+    one_face_target_of(client, call, said, person, lease)
+}
+
+/// [`one_face_forget_target`] with `client`, the days memory taking ids.
+fn one_face_target_of(
+    client: &DaysClient,
+    call: &ToolCall,
+    said: &str,
+    person: &str,
+    lease: &crate::memory_scope::ScopeLease,
+) -> Result<(u64, String), ForgetNotAsked> {
+    let (want, _) = forget_want(call, said)?;
+    let (entries, app_facts) = client.kept_listing(person, &want, lease)?;
+    // An app's fact is a kept thing of theirs too.
+    let kept = client.kept_ids(person, lease).map(|mut kept| {
+        kept.extend(app_facts);
+        kept
+    });
     let (id, subject) = one_face_pick_among(call, said, &entries, kept.as_deref())?;
     let line = client
         .context
@@ -5881,16 +5898,23 @@ fn one_face_pick_among(
     Ok((id, subject))
 }
 
+/// A listing's entries, by id and text.
+type Listing = Vec<(u64, String)>;
+
 impl DaysClient {
-    /// `person`'s kept things, by id and text, for [`one_face_pick`]: an
-    /// error for a failed listing, or one that may be cut when `want`
-    /// matches by what it is about.
+    /// `person`'s kept things, by id and text, for [`one_face_pick`], and
+    /// their own app facts after them (#7415, Friday's on #8228: alone in
+    /// front of the lamp, "forget what Gym Coach said" must reach one), with
+    /// those facts' ids, kept things too ([`one_kept_among`]): an error for
+    /// a failed listing, or one that may be cut when `want` matches by what
+    /// it is about. App facts only for a known person (`p-`), never the
+    /// room's; only for this forget's pick, never told.
     fn kept_listing(
         &self,
         person: &str,
         want: &ForgetWant,
         lease: &crate::memory_scope::ScopeLease,
-    ) -> Result<Vec<(u64, String)>, ForgetNotAsked> {
+    ) -> Result<(Listing, Vec<u64>), ForgetNotAsked> {
         let list = for_person(
             json!({"op":"kept","max_bytes":ABOUT_BYTES,"observations":true}),
             Some(person),
@@ -5912,7 +5936,24 @@ impl DaysClient {
         {
             return Err(ForgetNotAsked::ListingMayBeCut);
         }
-        Ok(entries)
+        let mut entries = entries;
+        if !lamp_msgs::known::is_person_id(person) {
+            return Ok((entries, vec![]));
+        }
+        let until = Instant::now() + crate::tools::ASK_DEADLINE;
+        let left = || {
+            until
+                .checked_duration_since(Instant::now())
+                .filter(|left| !left.is_zero())
+        };
+        let facts = match self.app_facts_listed(person, &left, Some(lease)) {
+            Ok(facts) => facts,
+            Err(Listed::Cut) => return Err(ForgetNotAsked::ListingMayBeCut),
+            Err(_) => return Err(ForgetNotAsked::ListingFailed("app facts: no answer")),
+        };
+        let ids = facts.iter().map(|(id, _)| *id).collect();
+        entries.extend(facts);
+        Ok((entries, ids))
     }
 }
 
@@ -12881,11 +12922,7 @@ impl DaysClient {
     }
 
     /// `person`'s own app facts (#7415) that are about one of `subjects`,
-    /// added to `matching` (and `found`), from memory's `kept {app_facts}`
-    /// listing, page by page below the oldest id listed, until a page with
-    /// room for the longest fact left, at most [`APP_FACT_PAGES`]. Never
-    /// listed for the hits note or anywhere else. An older memory refuses
-    /// the field (`bad_request`) and holds no app facts: nothing is added.
+    /// added to `matching` (and `found`), from [`Self::app_facts_listed`].
     fn app_facts_matching(
         &self,
         person: &str,
@@ -12895,6 +12932,29 @@ impl DaysClient {
         matching: &mut Vec<u64>,
         found: &mut [bool],
     ) -> Result<(), Listed> {
+        for (id, text) in self.app_facts_listed(person, left, lease)? {
+            if about_hits(&text, subjects, found) && !matching.contains(&id) {
+                matching.push(id);
+            }
+        }
+        Ok(())
+    }
+
+    /// `person`'s own app facts (#7415), by id and text, for a forget about
+    /// a thing alone (this one and the one-face forget's
+    /// [`Self::kept_listing`]), from memory's `kept {app_facts}` listing,
+    /// page by page below the oldest id listed, until a page with room for
+    /// the longest fact left, at most [`APP_FACT_PAGES`]. Never listed for
+    /// the hits note or anywhere else. An older memory refuses the field
+    /// (`bad_request`) and holds no app facts: none. [`Listed::Gone`] for no
+    /// answer, [`Listed::Cut`] past the pages.
+    fn app_facts_listed(
+        &self,
+        person: &str,
+        left: &impl Fn() -> Option<Duration>,
+        lease: Option<&crate::memory_scope::ScopeLease>,
+    ) -> Result<Vec<(u64, String)>, Listed> {
+        let mut all = vec![];
         let mut before: Option<u64> = None;
         for _ in 0..APP_FACT_PAGES {
             let mut list = for_person(
@@ -12913,23 +12973,17 @@ impl DaysClient {
                 eprintln!(
                     "lamp-voice provider: an older memory lists no app facts; a forget about looks in the rest"
                 );
-                return Ok(());
+                return Ok(all);
             }
             let entries = kept_entries(&answer).map_err(|_| Listed::Gone)?;
-            let mut listed = 0usize;
-            let mut oldest = None;
-            for (id, text) in &entries {
-                listed = listed.saturating_add(text.len());
-                oldest = Some(oldest.map_or(*id, |oldest: u64| oldest.min(*id)));
-                if about_hits(text, subjects, found) && !matching.contains(id) {
-                    matching.push(*id);
-                }
-            }
+            let listed: usize = entries.iter().map(|(_, text)| text.len()).sum();
+            let oldest = entries.iter().map(|(id, _)| *id).min();
+            all.extend(entries);
             // Whole: the store stops only at a fact that does not fit.
             let Some(oldest) = oldest
                 .filter(|_| listed.saturating_add(lamp_msgs::app_fact::KEPT_BYTES) > ABOUT_BYTES)
             else {
-                return Ok(());
+                return Ok(all);
             };
             before = Some(oldest);
         }
@@ -21470,6 +21524,143 @@ mod tests {
         assert_eq!(told["records"], 1, "{told}");
         drop(client);
         let _ = std::fs::remove_file(&socket);
+    }
+
+    /// Friday's one-face follow-up on #8228 (7063377782): alone in front of
+    /// the lamp, the one-face forget (#5627) picks the owner's app fact by
+    /// its words from the real memory, and their yes, a forget by that id,
+    /// takes it; a one-face forget about something else, or a known guest's
+    /// about the same words, names nothing and leaves it.
+    #[test]
+    fn a_one_face_forget_by_words_takes_the_owners_app_fact() {
+        use lamp_memory::{
+            Server,
+            days::Days,
+            store::{LocalTime as StoreTime, Options, Person},
+        };
+        let owner_request = scoped_request(Some("Owner"), 9_101);
+        let owner_lease = owner_request.lease();
+        let owner = owner_lease.scope().unwrap().person().unwrap().to_owned();
+        let guest_request = scoped_request(Some("Guest"), 9_102);
+        let guest_lease = guest_request.lease();
+        let guest = guest_lease.scope().unwrap().person().unwrap().to_owned();
+        assert_ne!(owner, guest);
+        let root = std::env::temp_dir().join(format!("lamp-one-face-app-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&root);
+        std::fs::create_dir_all(&root).unwrap();
+        let mut days = Days::open(
+            Options {
+                dir: root.join("store"),
+                keep_days: 30,
+                local: StoreTime::Offset(420),
+            },
+            NOW,
+        )
+        .unwrap();
+        for (person, n) in [(&owner, 1), (&guest, 2)] {
+            let said = lamp_memory::days_protocol::answer(
+                &mut days,
+                json!({"op":"append","person":person,"at_unix_ms":NOW - 60_000 + n,"heard":"hello","said":"Hi"})
+                    .to_string()
+                    .as_bytes(),
+                NOW,
+            );
+            assert!(said.line.contains("\"ok\":true"), "{}", said.line);
+        }
+        let own = lamp_memory::days_protocol::answer(
+            &mut days,
+            json!({"op":"remember","person":&owner,"at_unix_ms":NOW - 30_000,"text":"My bike lock code is in the drawer."})
+                .to_string()
+                .as_bytes(),
+            NOW,
+        );
+        assert!(own.line.contains("\"ok\":true"), "{}", own.line);
+        let fact = days
+            .remember_app_fact(
+                &Person::new(&owner).unwrap(),
+                "app:gym-coach",
+                "Gym Coach",
+                NOW - 1_000,
+                "squats 3x10 with zorblax tempo",
+            )
+            .unwrap();
+        let socket = root.join("m.sock");
+        let server = Server::bind(&socket).unwrap();
+        let stop = server.stopper();
+        let worker = std::thread::spawn(move || {
+            server.run(&mut days, &mut || NOW, &mut |_| {}).unwrap();
+        });
+        let client = DaysClient::new(socket.clone()).unwrap();
+        client.forget_all.store(true, Ordering::Release);
+        let listed = || {
+            bounded_exchange(
+                &socket,
+                &json!({"op":"kept","person":&owner,"app_facts":true}),
+                Duration::from_secs(2),
+            )
+            .expect("the memory answers")["entries"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .map(|entry| entry["id"].as_u64().unwrap())
+                .collect::<Vec<_>>()
+        };
+        let named = call(FORGET, json!({}));
+        // Something else of theirs: no match, the fact stays.
+        assert_eq!(
+            one_face_target_of(
+                &client,
+                &named,
+                "Lamp, forget my lunges.",
+                &owner,
+                &owner_lease
+            ),
+            Err(ForgetNotAsked::NoMatch(ForgetWant::About("lunges".into())))
+        );
+        // A known guest alone, the same words: never the owner's.
+        assert!(matches!(
+            one_face_target_of(
+                &client,
+                &named,
+                "Lamp, forget what the gym coach said.",
+                &guest,
+                &guest_lease
+            ),
+            Err(ForgetNotAsked::NoMatch(_))
+        ));
+        assert_eq!(listed(), [fact]);
+        // The owner alone: their app fact, by its id.
+        let (id, subject) = one_face_target_of(
+            &client,
+            &named,
+            "Lamp, forget what the gym coach said.",
+            &owner,
+            &owner_lease,
+        )
+        .unwrap();
+        assert_eq!(id, fact);
+        assert!(!subject.contains("zorblax"), "{subject}");
+        // Their yes: the held forget by that id.
+        let (told, answered) = client.run_at(
+            &call(FORGET, json!({"source_id": id, "about": subject})),
+            FIRST_READ,
+            NOW,
+            Some(&EAST),
+            Some(&owner),
+        );
+        assert!(answered, "{told}");
+        assert!(listed().is_empty(), "{told}");
+        let found = bounded_exchange(
+            &socket,
+            &json!({"op":"search","person":&owner,"query":"zorblax","limit":5}),
+            Duration::from_secs(2),
+        )
+        .unwrap();
+        assert_eq!(found["entries"], json!([]), "{found}");
+        drop(client);
+        stop.stop();
+        worker.join().unwrap();
+        let _ = std::fs::remove_dir_all(&root);
     }
 
     /// Friday's P2 on #8228: a spoken forget by words reaches the owner's
