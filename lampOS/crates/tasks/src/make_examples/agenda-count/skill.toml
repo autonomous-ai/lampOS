@@ -1,7 +1,8 @@
-asks = ["count my day"]
+asks = ["count my meetings", "my day's agenda"]
 kind = "installable"
 version = "1.0.0"
 grants = ["google_calendar-read"]
 
+# The agent sums up what the helper script read: a task, not a run.
 [[do]]
 task = { task = "Count the owner's calendar events left today and tell them how many, and when the next one starts", run = "scripts/main.py" }

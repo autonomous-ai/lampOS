@@ -777,9 +777,9 @@ fn guards_said(table: &toml::Table) -> Option<String> {
     )
 }
 
-/// Who made a skill (#6811, with [`reactions_on`]): written by the lamp
-/// alone as `made_with: <key>` on its card, after `made_by`, and as
-/// `"made_with"` in its [`INDEX`] entry. A line the model wrote is dropped,
+/// Who made a skill (#6811; always since #8157, the engine that really
+/// wrote it): written by the lamp alone as `made_with: <key>` on its card,
+/// after `made_by`, and as `"made_with"` in its [`INDEX`] entry. A line the model wrote is dropped,
 /// as a `made_by` one is.
 pub const MADE_WITH: &str = "made_with";
 
@@ -1627,13 +1627,13 @@ pub const ASKS_RULES: &str = "A skill may also start when the person says words 
 /// [`cant_yet`]: "I can't do that yet: sending or writing on its own".
 pub const SENDS_ON_ITS_OWN: &str = "sending or writing on its own";
 
-/// How the say-back of a skill that sends or writes ends (#6066): that it
-/// waits for the person's agreement, never on a word for them to repeat,
-/// so its own last words heard back are no yes. It has no "yes" in it: a
-/// line made only of the say-back's words, begun in its echo tail, is held
-/// while the yes is awaited (`second_provider::own_echo::yes_echo`), and a
-/// person's quick "Yes." must not be one.
-pub const WAITS_FOR_YES: &str = " It waits for you to agree before it sends anything.";
+/// How the say-back of a skill that sends or writes ends (#6066; the
+/// owner's rule, 21 Nov: a skill's declared write goes with nothing asked):
+/// that it sends just that, on its own, with no word for the person to
+/// repeat. lamp-services binds the write at its first send to the
+/// installed package's own declared content (`skill_writes::package_writes`),
+/// so nothing waits for a yes. The name is kept for its many readers.
+pub const WAITS_FOR_YES: &str = " It sends just that, on its own; nothing is asked.";
 
 /// The switch for a made skill that carries code of its own (#6307, #6071
 /// PR 4, the first builder's 12:45 condition 4: model-written scripts last,
@@ -1777,48 +1777,53 @@ pub(crate) fn set_code_at_once_here(on: Option<bool>) {
     CODE_AT_ONCE_HERE.with(|here| here.set(on));
 }
 
-/// The grants a made skill's code may hold and still go on at once with
-/// [`CODE_AT_ONCE_ENVIRONMENT`] (the first builder's ruling on #6059,
-/// 19:14, and his 19:44 line: "sound" is the lamp's own sounds and voice):
-/// its light, its voice and sounds (`speak`) and its head and arm; a timer
-/// is a trigger and needs no grant. Any other grant keeps the spoken yes
-/// ([`CODE_YES_GRANTS`] among them).
-pub const CODE_AT_ONCE_GRANTS: [&str; 3] = ["light", "speak", "body"];
+/// Where a skill on the lamp came from, as far as its grants' yes goes
+/// (#8180): made on the lamp (by voice or in the app), from the Store,
+/// pushed from the owner's computer, or anything else (the lamp's own, a
+/// file added, an app's written skill).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum SkillSource {
+    Made,
+    Store,
+    Pushed,
+    Other,
+}
 
-/// The grants that always keep a made skill's code to its spoken yes, the
-/// switch on or off (the same ruling): the camera, the microphone and
-/// `sound`, which is hearing, not playing (lamp-control's grant: "can hear
-/// kinds of sound, never words"; hearing keeps its yes, the 19:44 line). A
-/// send (a write, or messages to the phone) keeps it too
-/// ([`code_goes_on_at_once`]).
-pub const CODE_YES_GRANTS: [&str; 3] = ["camera", "microphone", "sound"];
+/// Whether a skill from `source` is given its declared grants with no
+/// yes asked or recorded (#8180, the dev's ruling; the owner's rule, 21
+/// Nov: every skill's declared grants are on, nothing asked, at its first
+/// run, every run and on its triggers): lamp-control mints its run's token
+/// from its folder's own declared grants
+/// (`lamp_control::task_yes::KeptYes`), and its task's yes check is agreed
+/// for its folder as it is, `net` among them. Every source alike: a skill
+/// made here, from the Skills Store, pushed by the owner's own computer, or
+/// added another way (a file, the app). What a folder may declare stays the
+/// load's and the mint's to limit (`lamp_skills::task::origin_refuses`,
+/// lamp-control's `grants_ok`), never a person's yes.
+pub fn grants_need_no_yes(source: SkillSource) -> bool {
+    match source {
+        SkillSource::Made | SkillSource::Store | SkillSource::Pushed | SkillSource::Other => true,
+    }
+}
 
-/// Whether code granted `grants` may go on at once: the switch on and
-/// every grant one of [`CODE_AT_ONCE_GRANTS`] (none at all is one).
-pub fn grants_go_on_at_once(grants: &[String]) -> bool {
+/// Whether code granted `grants` may go on at once: the switch on
+/// ([`CODE_AT_ONCE_ENVIRONMENT`]), whatever it declares (#8180, the dev's
+/// ruling: a made skill's declared grants are given at once, nothing
+/// asked; the camera, the microphone, `net` and sends among them).
+pub fn grants_go_on_at_once(_grants: &[String]) -> bool {
     code_on_at_once()
-        && grants
-            .iter()
-            .all(|grant| CODE_AT_ONCE_GRANTS.contains(&grant.as_str()))
 }
 
 /// Whether the made skill `made`, with code of its own, goes on at once
-/// ([`CODE_AT_ONCE_ENVIRONMENT`]): its grants within
-/// [`CODE_AT_ONCE_GRANTS`] ([`grants_go_on_at_once`]), and no send, no
-/// camera, no microphone and no knowing who is at the lamp (`who`,
-/// `known_faces`: identity is the camera's privacy, the first builder at
-/// 20:16 on #6659) in what it uses. lamp-control has no grant for who is
-/// there (`look` is "never who"), so these are its `uses`. Anything else
-/// waits for the spoken yes, exactly as with the switch off.
+/// ([`CODE_AT_ONCE_ENVIRONMENT`]): whatever it declares and uses (#8180):
+/// no yes is recorded at the keep; its run step's and task's tokens,
+/// `net` among them, are minted from its folder's declared grants
+/// ([`grants_need_no_yes`]), so they ask nothing. A task for the lamp's agent
+/// ([`Uses::agent_task`]) alike (the owner's rule, 21 Nov): its declared
+/// grants are its own, nothing asked at its keep or its first run.
 pub fn code_goes_on_at_once(made: &Made) -> bool {
     made.uses.code
-        && made.uses.writes.is_empty()
-        && !made.uses.messages
-        && !made.uses.camera
-        && !made.uses.listens()
-        && !made.uses.who
-        && !made.uses.known_faces
-        && !made.uses.agent_task
+        && grants_need_no_yes(SkillSource::Made)
         && grants_go_on_at_once(&made.uses.grants)
 }
 
@@ -2382,7 +2387,13 @@ const AGENT_TRIES: [&str; 4] = [
 
 /// The reasons [`plain_reason`] gives as they are: the model's silence or
 /// cut, said plainly with what to try.
-const PLAIN_REASONS: [&str; 4] = [MODEL_CUT_OFF, MODEL_SILENT, NOT_READY_LINE, NOTHING_READS];
+const PLAIN_REASONS: [&str; 5] = [
+    MODEL_CUT_OFF,
+    MODEL_SILENT,
+    NOT_READY_LINE,
+    NOTHING_READS,
+    NOT_TRIED_LINE,
+];
 
 /// What the person is told, at once, when lamp-tasks says a make on the
 /// lamp's agent can't start because Harness or the gateway isn't ready yet
@@ -2437,7 +2448,7 @@ pub fn not_made_line(why: &str) -> String {
     // whole already.
     if why.starts_with(CANT_YET)
         || why.starts_with(ALREADY_HAVE)
-        || [NOT_MADE_TRY, NOT_KEPT_TRY, NOT_READY_LINE].contains(&why)
+        || [NOT_MADE_TRY, NOT_KEPT_TRY, NOT_READY_LINE, NOT_TRIED_LINE].contains(&why)
         || AGENT_TRIES.contains(&why)
         || crate::make_no_cannot::said_as_is(why)
     {
@@ -3000,7 +3011,7 @@ fn grants_plainly(grants: &[String]) -> Option<String> {
             if let Some((code, write)) = service_grant(grant) {
                 let service = code.replace('_', " ");
                 return if write {
-                    format!("sending with your {service}, each send only on your yes")
+                    format!("sending with your {service}")
                 } else {
                     format!("reading your {service}")
                 };
@@ -5417,7 +5428,7 @@ fn carries_task(table: &toml::Table) -> bool {
             .is_some_and(|steps| {
                 steps.iter().any(|step| {
                     step.as_table()
-                        .is_some_and(|step| step.contains_key("task"))
+                        .is_some_and(|step| step.contains_key("task") || step.contains_key("run"))
                 })
             })
 }
@@ -5588,9 +5599,10 @@ fn held(table: &toml::Table, added: bool, reads: bool) -> Result<(String, Uses),
         if says.iter().any(|say| say_text(say).is_none()) {
             return Err(Refused::new(SAY_NOT_TEXT));
         }
-        // Code of its own (#6307): a `task` step and its grants, only with
+        // Code of its own (#6307): a `task` step, or a `run` step whose
+        // script does the whole job (#8157), and its grants, only with
         // their switch; off, what the lamp can't do yet.
-        let tasks: Vec<&toml::Value> = steps().filter_map(|step| step.get("task")).collect();
+        let tasks: Vec<&toml::Value> = steps().filter_map(code_step).collect();
         if !tasks.is_empty() || table.contains_key("grants") {
             if !scripts_on() {
                 return Err(Refused::new(cant_yet(CODE_OF_ITS_OWN)));
@@ -5733,29 +5745,31 @@ fn code_held(
         .and_then(toml::Value::as_array)
         .into_iter()
         .flatten()
-        .filter(|step| step.get("task").is_some())
+        .filter(|step| code_step(step).is_some())
         .all(|step| step.as_table().is_some_and(|step| step.len() == 1));
     if !alone {
         return Err(scripts_not_held("a task step with another kind beside it"));
     }
-    let Some(task) = task.as_table() else {
-        return Err(scripts_not_held("a task step that isn't a table"));
+    // A `run` step (#8157): the script it names, no words of its own.
+    let run = match task {
+        toml::Value::String(run) => Some(run.as_str()),
+        toml::Value::Table(task) => {
+            if task.keys().any(|key| key != "task" && key != "run") {
+                return Err(scripts_not_held(
+                    "a task step with a key other than task and run",
+                ));
+            }
+            let words = task.get("task").and_then(toml::Value::as_str).unwrap_or("");
+            if !task_words_plain(words) {
+                return Err(scripts_not_held(
+                    "a task's words, empty, too long or not plain",
+                ));
+            }
+            task.get("run").and_then(toml::Value::as_str)
+        }
+        _ => return Err(scripts_not_held("a task step that isn't a table")),
     };
-    if task.keys().any(|key| key != "task" && key != "run") {
-        return Err(scripts_not_held(
-            "a task step with a key other than task and run",
-        ));
-    }
-    let words = task.get("task").and_then(toml::Value::as_str).unwrap_or("");
-    if !task_words_plain(words) {
-        return Err(scripts_not_held(
-            "a task's words, empty, too long or not plain",
-        ));
-    }
-    let runs = task
-        .get("run")
-        .and_then(toml::Value::as_str)
-        .is_some_and(|run| script_path_ok(run) && run.ends_with(RUNNABLE_ENDING));
+    let runs = run.is_some_and(|run| script_path_ok(run) && run.ends_with(RUNNABLE_ENDING));
     if !runs {
         return Err(scripts_not_held(
             "a task's run, not a .py file under scripts/",
@@ -5820,14 +5834,26 @@ fn code_held(
     Ok(grants)
 }
 
-/// The `run` of a made skill's `task` step: the file its code starts at.
+/// The `run` of a made skill's `task` step, or its `run` step's script
+/// (#8157): the file its code starts at.
 pub fn task_run(toml: &str) -> Option<String> {
     let table: toml::Table = toml::from_str(toml).ok()?;
     table
         .get("do")?
         .as_array()?
         .iter()
-        .find_map(|step| step.get("task")?.get("run")?.as_str().map(str::to_owned))
+        .find_map(|step| match code_step(step)? {
+            toml::Value::String(run) => Some(run.clone()),
+            task => task.get("run")?.as_str().map(str::to_owned),
+        })
+}
+
+/// A `[[do]]` step's code (#6307, #8157): its `task` table, or the script
+/// a `run` step names (`run = "scripts/main.py"`, a script that does the
+/// whole job with no agent); none for any other step.
+fn code_step(step: &toml::Value) -> Option<&toml::Value> {
+    step.get("task")
+        .or_else(|| step.get("run").filter(|run| run.is_str()))
 }
 
 /// A made skill's code held to its `skill.toml` (#6307): code only with a
@@ -6742,7 +6768,7 @@ fn said_plainly(table: &toml::Table, reads: bool, general: bool) -> Result<Strin
     let has_task = table
         .get("do")
         .and_then(toml::Value::as_array)
-        .is_some_and(|steps| steps.iter().any(|step| step.get("task").is_some()));
+        .is_some_and(|steps| steps.iter().any(|step| code_step(step).is_some()));
     if !code && (has_task || table.contains_key("grants")) {
         return Err(Unsaid::cant(CODE_OF_ITS_OWN));
     }
@@ -7008,10 +7034,9 @@ fn said_plainly(table: &toml::Table, reads: bool, general: bool) -> Result<Strin
             .flatten()
             .filter_map(|grant| grant.as_str().map(str::to_owned))
             .collect();
-        // Its wait said unless it goes on at once: grants within
-        // [`CODE_AT_ONCE_GRANTS`] and nothing it reaches beside them
-        // (the camera, the microphone, who is in view, a message).
-        let at_once = grants_go_on_at_once(&grants) && !writes && reaches_plainly(table).is_empty();
+        // Its wait said unless it goes on at once (#8180: whatever it
+        // declares or reaches, with the switch on).
+        let at_once = grants_go_on_at_once(&grants);
         // A task for the lamp's agent (`LAMP_MAKE_NO_CANNOT`): said as one,
         // and it always waits for the yes.
         if agent_task(table) {
@@ -7023,11 +7048,19 @@ fn said_plainly(table: &toml::Table, reads: bool, general: bool) -> Result<Strin
     Ok(said)
 }
 
+/// How a made skill's `run` step is read back (#8157): its script does
+/// the whole job, so it is said plainly, with no words of its own.
+pub const RUN_STEP_SAID: &str = "runs its own script";
+
 /// A made skill's `task` step in plain words (#6307): "runs its own code
 /// to “take a photo”", its words as written, at most [`MOST_TASK_CHARS`];
 /// none for any other step, or one not in that form.
 fn task_plainly(step: &toml::Value) -> Option<String> {
     let step = step.as_table().filter(|step| step.len() == 1)?;
+    // A `run` step (#8157): its script does the whole job, said plainly.
+    if let Some(run) = step.get("run") {
+        return run.as_str().map(|_| RUN_STEP_SAID.to_owned());
+    }
     let task = step.get("task")?.as_table()?;
     let words = task.get("task")?.as_str()?.trim();
     task.get("run")?.as_str()?;
@@ -7355,7 +7388,7 @@ fn step_cant_yet(step: &toml::Value) -> Option<&'static str> {
         return (!writes_on()).then_some(SENDS_ON_ITS_OWN);
     }
     // Code of its own, only with its switch (#6307).
-    if step.contains_key("task") && step.len() == 1 {
+    if (step.contains_key("task") || step.contains_key("run")) && step.len() == 1 {
         return (!scripts_on()).then_some(CODE_OF_ITS_OWN);
     }
     let sends = [
@@ -9180,9 +9213,16 @@ fn keep_said(
     files: &Files,
     from: &str,
     keeping: &Keeping,
-    named: Option<&str>,
+    (named, made_with): (Option<&str>, MadeWith),
 ) -> Result<Made, Refused> {
-    let (name, marked) = card(&files.card, &said.description(), Maker::of(from))?;
+    // Who wrote it, always (#8157): the engine that really made it.
+    let (name, marked) = card_asked(
+        &files.card,
+        &said.description(),
+        Maker::of(from),
+        false,
+        Some(made_with),
+    )?;
     let (name, marked) = named_as_given(name, marked, named, MOST_WRITTEN_NAME_BYTES);
     // Its function's name within lamp-skills' 48 bytes, as a written one's.
     if name.len() > MOST_WRITTEN_NAME_BYTES
@@ -9665,7 +9705,7 @@ pub struct Asked<'a> {
     /// [`UNRELATED_ENVIRONMENT`]): none for the app's, and none off.
     pub judge: Option<Judge<'a>>,
     /// The engine whose answer this is ([`MadeWith`]), written on the card
-    /// and in the index with [`reactions_on`] alone.
+    /// and in the index always (#8157).
     pub made_with: MadeWith,
     /// The name the person gave the skill as they asked for it ("called
     /// evening rate", #7911), as the voice's model read it from their
@@ -9715,7 +9755,13 @@ pub fn keep_asked(
     if said_on()
         && let Some(said) = said_asked(&files.toml)?
     {
-        return keep_said(&said, &files, from, keeping, request.named);
+        return keep_said(
+            &said,
+            &files,
+            from,
+            keeping,
+            (request.named, request.made_with),
+        );
     }
     // A getting up's wait, which [`tidied`] takes out: said with what it
     // does, never dropped without a word (App Only's P2 on #6249).
@@ -9770,6 +9816,17 @@ pub fn keep_asked(
     // Each .py it wrote Python that parses, before its check and its
     // say-back (#6749 E): one that doesn't goes to a repair.
     scripts_parse(&files.scripts)?;
+    // A skill the lamp's agent made with code says what it uses, where its
+    // result is and what it answers (#8157): never a built-in, Store or
+    // pushed skill's, nor the lamp's own model's.
+    // The lamp's own one-line agent script (a task the lamp drafted for
+    // the agent, [`agent_script_only`]) is no code the agent wrote.
+    if request.made_with != MadeWith::DeepSeek
+        && !files.scripts.is_empty()
+        && !agent_script_only(&files.scripts)
+    {
+        sections_held(&files.card)?;
+    }
     // Each light show played by a step and held to its form (#7245).
     shows_held(&files.toml, &files.shows)?;
     // A say that claims a file or a note its code never keeps (#7245),
@@ -9810,7 +9867,10 @@ pub fn keep_asked(
         waited: waited.as_deref(),
         asked,
         limits,
-        made_with: reactions_on().then_some(request.made_with),
+        // Who wrote it, always (#8157): the agent that ran the make
+        // (OpenClaw or Hermes, as the tasks part named it) or the lamp's
+        // own model; `made_by` stays who asked.
+        made_with: Some(request.made_with),
         from,
         keeping,
         named: request.named,
@@ -9844,7 +9904,7 @@ struct Ending<'a> {
     /// Whether the request asked for limits ([`limits_asked`]), marked on
     /// its card ([`LIMITS_ASKED`]).
     limits: bool,
-    /// Who made it ([`MADE_WITH`]), with [`reactions_on`] alone.
+    /// Who made it ([`MADE_WITH`]), always (#8157).
     made_with: Option<MadeWith>,
     from: &'a str,
     keeping: &'a Keeping,
@@ -10575,8 +10635,8 @@ pub fn keep_agent(files: &Files, from: &str, keeping: &Keeping) -> Result<Made, 
 /// [`crate::make_no_cannot::ASKED_MARK`] and made by whoever asked
 /// ([`Maker::of`] `from`), what it does said as the task the agent will do
 /// (`words`) and when, never as made, and its uses marked
-/// [`Uses::agent_task`]. On, its task waits for the spoken yes at its first
-/// ask (`crate::upload_agent::first_run`).
+/// [`Uses::agent_task`]. Its first ask runs it with its declared grants,
+/// nothing asked (the owner's rule, 21 Nov).
 pub fn keep_agent_asked(
     files: &Files,
     from: &str,
@@ -10596,8 +10656,7 @@ pub fn keep_agent_asked(
     uses.agent_task = true;
     let grants = crate::upload_agent::grants_of_toml(&files.toml);
     let does = format!(
-        "only when you ask for it, it hands one task to the lamp's agent: “{words}”.{} The first \
-         time you ask, I'll read it back and wait for your yes.",
+        "only when you ask for it, it hands one task to the lamp's agent: “{words}”.{}",
         agent_said(&grants)
             .strip_suffix(RUNS_ONCE_AGREED)
             .unwrap_or_default()
@@ -10792,7 +10851,37 @@ fn packed_and_kept(
     })()
     .map_err(unkept);
     let packed = made.and_then(|()| pack(&keeping.program, &folder, &out, &name));
-    let result = packed.and(said).and_then(|description| {
+    // #8157: once its check has passed, a made skill with code is tried
+    // once by lamp-tasks, whichever agent made it, before it is kept; a
+    // failed try goes to a repair with its words, a passed one is told in
+    // its read-back.
+    let tried = packed.and_then(|()| {
+        if added || scripts.is_empty() {
+            return Ok(None);
+        }
+        let Some(tasks) = crate::make_skill_agent::try_tasks_dir() else {
+            return Ok(None);
+        };
+        let mut files = std::collections::BTreeMap::new();
+        files.insert("skill.toml".to_owned(), toml.to_owned());
+        files.insert("SKILL.md".to_owned(), marked.clone());
+        for (path, text) in scripts.iter().chain(shows.iter()) {
+            files.insert(path.clone(), text.clone());
+        }
+        tried_said(crate::make_skill_agent::try_made(&tasks, &name, &files))
+    });
+    // #8180: what the try said first, for the one line said once it's on.
+    let mut tried_first = None;
+    let said = tried.and_then(|tried| {
+        said.map(|description| match tried {
+            Some(first) => {
+                tried_first = Some(first);
+                format!("{description} {TRIED_SAID}")
+            }
+            None => description,
+        })
+    });
+    let result = said.and_then(|description| {
         let package = format!("{name}-{version}.tar");
         let bytes = fs::read(out.join(&package)).map_err(unkept)?;
         let sha256 = hex(&Sha256::digest(&bytes));
@@ -10806,6 +10895,9 @@ fn packed_and_kept(
             .directory
             .join(format!(".{name}-{version}-{}.tar.new", &sha256[..12]));
         fs::write(&new, &bytes).map_err(unkept)?;
+        if let Some(first) = tried_first.take() {
+            note_tried(&sha256, first);
+        }
         let made = Made {
             name,
             version,
@@ -10856,6 +10948,224 @@ fn packed_and_kept(
     });
     let _ = fs::remove_dir_all(&work);
     result
+}
+
+/// The sections a `SKILL.md` the lamp's agent made with code has (#8157),
+/// each a `## ` heading: what it uses (each script or lamp-services tool
+/// and its arguments), where each result is, and what is said aloud.
+pub const MADE_SECTIONS: [&str; 3] = ["Uses", "Result", "Answer"];
+
+/// What a made skill missing [`MADE_SECTIONS`] is refused as.
+pub const NO_SECTIONS: &str = "its SKILL.md doesn't say what it uses, its result or its answer";
+
+/// Whether `card` (a `SKILL.md`) has each of [`MADE_SECTIONS`] as a `## `
+/// heading with words under it; else refused with the lines for a repair.
+fn sections_held(card: &str) -> Result<(), Refused> {
+    let lines: Vec<&str> = card.lines().collect();
+    let missing: Vec<&str> = MADE_SECTIONS
+        .iter()
+        .copied()
+        .filter(|section| {
+            let Some(at) = lines.iter().position(|line| {
+                line.trim()
+                    .strip_prefix("## ")
+                    .is_some_and(|head| head.trim().eq_ignore_ascii_case(section))
+            }) else {
+                return true;
+            };
+            !lines[at + 1..]
+                .iter()
+                .take_while(|line| !line.trim_start().starts_with('#'))
+                .any(|line| !line.trim().is_empty())
+        })
+        .collect();
+    if missing.is_empty() {
+        return Ok(());
+    }
+    eprintln!("lamp-voice: a made skill was not kept: its SKILL.md lacks {missing:?}");
+    Err(Refused(
+        NO_SECTIONS.into(),
+        Some(format!(
+            "SKILL.md needs these sections, each a heading with lines under it: {}. ## Uses: \
+             each script and lamp-services tool it uses, with its arguments. ## Result: where \
+             each script's result is (what it prints, a file). ## Answer: what is said aloud, \
+             in one to three plain sentences: a script says it with lamp.say and the agent \
+             answers a lone -, or the agent's final answer is only the spoken summary.",
+            missing
+                .iter()
+                .map(|section| format!("## {section}"))
+                .collect::<Vec<_>>()
+                .join(", ")
+        )),
+    ))
+}
+
+/// What the person is told of a made skill that failed its tried run
+/// (#8157) after its repairs.
+pub const NOT_TRIED_PASSED: &str = "it didn't work when the lamp tried it";
+/// What the person is told of a made skill whose tried run couldn't be
+/// made at all (#8180: lamp-tasks busy, no token, its fence, an older
+/// lamp-tasks): nothing is kept untried, and why is said plainly.
+pub const NOT_TRIED_LINE: &str = "I made it, but the lamp couldn't try it out, so I didn't keep it. Please ask me again in a minute.";
+/// What a made skill's read-back adds after its tried run passed (#8157).
+pub const TRIED_SAID: &str = "I tried it once and it worked.";
+
+/// What each made skill's passed try said first, by its package's
+/// SHA-256 (#8180): `Some` its words, `None` a try that said nothing
+/// usable. A made skill with nothing tried has no entry.
+static TRIED_FIRST: std::sync::Mutex<std::collections::BTreeMap<String, Option<String>>> =
+    std::sync::Mutex::new(std::collections::BTreeMap::new());
+
+/// The most of a try's words said in [`tried_line`].
+pub const TRIED_WORDS_MOST: usize = 120;
+
+/// The package `sha256`'s passed try, what it said first kept for
+/// [`tried_line`]; at most 64 kept, the oldest first gone.
+fn note_tried(sha256: &str, first: Option<String>) {
+    let mut kept = TRIED_FIRST.lock().unwrap_or_else(|held| held.into_inner());
+    if kept.len() >= 64 {
+        kept.clear();
+    }
+    kept.insert(sha256.to_owned(), first);
+}
+
+/// The one line said of a made skill on (#8180, the first builder's
+/// ruling): what it uses ([`uses_briefly`]), then what its try did, with
+/// the undo: "Made it. It uses the camera and the internet, and I tried
+/// it: <what it said>. Say 'remove it' to undo.", or "Made <name>. It uses
+/// …, and I tried it. Say 'remove it' to undo." when it said nothing
+/// usable. With nothing beyond its voice, light and body, "Made it, and I
+/// tried it: …" with no uses (Heron's HOLD on #8180: no yes is asked, so
+/// this line is where the person learns what it uses);
+/// `extra`, a sentence of its own when not empty, before the undo. None
+/// for a made skill that wasn't tried (no script). Journaled.
+pub fn tried_line(made: &Made, extra: &str) -> Option<String> {
+    let first = TRIED_FIRST
+        .lock()
+        .unwrap_or_else(|held| held.into_inner())
+        .get(&made.sha256)
+        .cloned()?;
+    let words = first.map(|first| {
+        let line = first.split_whitespace().collect::<Vec<_>>().join(" ");
+        let line = match line.char_indices().nth(TRIED_WORDS_MOST) {
+            Some((at, _)) => &line[..at],
+            None => line.as_str(),
+        };
+        line.trim_end_matches(['.', '!', '?', ' ']).to_owned()
+    });
+    // With usable words, "Made it" and the words; without, its name.
+    let (what, words) = match words.filter(|words| !words.is_empty()) {
+        Some(words) => ("it".to_owned(), format!(": {words}")),
+        None => (spoken_name(&made.name), String::new()),
+    };
+    let uses =
+        uses_briefly(&made.uses).map_or_else(String::new, |uses| format!(". It uses {uses}"));
+    let line = format!("Made {what}{uses}, and I tried it{words}.{extra} Say 'remove it' to undo.");
+    // Never the try's words, which may be mail or what the camera saw
+    // (the Reviewer-lead's P2 on #8180): only the line's length.
+    eprintln!("{}", tried_journal(&line, !uses.is_empty()));
+    Some(line)
+}
+
+/// What [`tried_line`] journals of its line: its length and whether it
+/// named what the skill uses, never its words.
+fn tried_journal(line: &str, uses_named: bool) -> String {
+    format!(
+        "lamp-voice: a made skill is said on with its try ({} chars, {})",
+        line.chars().count(),
+        if uses_named {
+            "uses named"
+        } else {
+            "no uses named"
+        }
+    )
+}
+
+/// What a made skill uses beyond its voice, light and body, short, for
+/// [`tried_line`]: "the camera and the internet"; None when nothing more.
+fn uses_briefly(uses: &Uses) -> Option<String> {
+    let mut said: Vec<String> = Vec::new();
+    let mut say = |part: String| {
+        if !said.contains(&part) {
+            said.push(part);
+        }
+    };
+    let has = |grant: &str| uses.grants.iter().any(|kept| kept == grant);
+    if uses.camera || has("camera") {
+        say("the camera".to_owned());
+    }
+    if uses.listens() || has("microphone") {
+        say("the microphone".to_owned());
+    }
+    if has(crate::skill_task_yes::NET.0) {
+        say("the internet".to_owned());
+    }
+    if has("notes") {
+        say("notes".to_owned());
+    }
+    if has("speech") {
+        say("everything the lamp says".to_owned());
+    }
+    for code in &uses.reads {
+        say(format!("your {}", service_name(code)));
+    }
+    for (code, write) in uses.grants.iter().filter_map(|grant| service_grant(grant)) {
+        say(if write {
+            format!("sends to {}", service_name(code))
+        } else {
+            format!("your {}", service_name(code))
+        });
+    }
+    for code in &uses.writes {
+        say(format!("sends to {}", service_name(code)));
+    }
+    if uses.messages {
+        say("messages to your phone".to_owned());
+    }
+    if uses.known_faces {
+        say("known faces".to_owned());
+    }
+    if uses.who {
+        say("who is at the lamp".to_owned());
+    }
+    (!said.is_empty()).then(|| and_list(&said))
+}
+
+/// [`note_tried`] for a test's package.
+#[cfg(test)]
+pub(crate) fn note_tried_here(sha256: &str, first: Option<String>) {
+    note_tried(sha256, first);
+}
+
+/// A made skill's tried run (#8157) as its keep takes it: passed, what it
+/// said first (#8180, for [`tried_line`]); failed, refused with lamp-tasks'
+/// words for a repair; nothing to try, kept as before; a try that couldn't
+/// be made (journaled) fails closed: nothing kept, [`NOT_TRIED_LINE`] said
+/// (#8180).
+fn tried_said(tried: crate::make_skill_agent::Tried) -> Result<Option<Option<String>>, Refused> {
+    use crate::make_skill_agent::Tried;
+    match tried {
+        Tried::Passed { said, said_first } => {
+            eprintln!("lamp-voice: a made skill passed its tried run ({said} line(s) said)");
+            Ok(Some(said_first))
+        }
+        Tried::Nothing => Ok(None),
+        Tried::Failed(why) => {
+            eprintln!("lamp-voice: a made skill failed its tried run: not kept");
+            Err(Refused(
+                NOT_TRIED_PASSED.into(),
+                Some(format!(
+                    "When the lamp tried the skill once, {why}. Fix its scripts so each runs on \
+                     its own, with no arguments, and ends within 30 s; a run step's script says \
+                     its success line and its failure line with lamp.say."
+                )),
+            ))
+        }
+        Tried::NotTried(why) => {
+            eprintln!("lamp-voice: a made skill was not tried ({why}): not kept");
+            Err(Refused(NOT_TRIED_LINE.into(), None))
+        }
+    }
 }
 
 /// `lamp-skills pack --out OUT FOLDER`: the checks a load makes, its
@@ -11717,11 +12027,11 @@ pub fn on_line(made: &Made) -> String {
         return format!("I can have the lamp's agent do that, as {name}: {does}.");
     }
     // One that sends or writes is said whole, its every recipient and word
-    // in its description, and ends as that does: it waits for the
-    // person's yes (#6066), never on a word for them to repeat.
-    // One with code of its own alike (#6307): its grants and its wait;
-    // put on at once ([`code_goes_on_at_once`]), its grants and that it's on.
-    if code_goes_on_at_once(made) {
+    // in its description, and that it's on: it sends with nothing asked
+    // (the owner's rule, 21 Nov), never on a word for them to repeat.
+    // One with code of its own alike (#6307): its grants; put on at once
+    // ([`code_goes_on_at_once`]), its grants and that it's on, else its wait.
+    if code_goes_on_at_once(made) || (!made.uses.writes.is_empty() && !made.uses.code) {
         let mut said = format!("I made {name}, and it's on: {does}");
         if !said.ends_with(['.', '!', '?']) {
             said.push('.');
@@ -11809,11 +12119,12 @@ pub fn approved_line(made: &Made) -> String {
         .unwrap_or(&line)
         .trim_end();
     let line = line.strip_prefix("I made ").unwrap_or(line);
+    let line = line.replacen(", and it's on:", ":", 1);
     format!("Your {line} {APPROVED_ALREADY}")
 }
 
 /// How [`approved_line`] ends.
-pub const APPROVED_ALREADY: &str = "You agreed to it, so it sends as it says.";
+pub const APPROVED_ALREADY: &str = "It sends just that, as it says; nothing is asked.";
 
 /// What the lamp says of a made skill that sends or writes when the turn
 /// it was made in was cut (App Only's P2 on #6142): said through the say
@@ -12645,10 +12956,7 @@ light = { dim = 1 }
         let (_, uses) = capped(&toml).unwrap();
         assert_eq!(uses.grants, ["gmail-read"]);
         assert!(code_said(&uses.grants).contains("reading your gmail"));
-        assert!(
-            code_said(&["gmail-write".to_owned()])
-                .contains("sending with your gmail, each send only on your yes")
-        );
+        assert!(code_said(&["gmail-write".to_owned()]).contains("sending with your gmail"));
         set_agent_services_here(None);
         set_scripts_here(None);
     }
@@ -16562,9 +16870,9 @@ light = { colour = "green", level = 3, for = "20s" }
     }
 
     /// Item 4: the say-back says where it goes, every recipient, the whole
-    /// text quoted, when and how often, and that it waits for a yes, ending
-    /// on no word to repeat; the lamp's line for it says the same, never
-    /// "it's on".
+    /// text quoted, when and how often, and that it sends with nothing
+    /// asked, ending on no word to repeat; the lamp's line for it says the
+    /// same, and that it's on (the owner's rule, 21 Nov).
     #[test]
     fn a_writes_say_back_is_whole_and_ends_on_its_wait() {
         set_writes_here(Some(true));
@@ -16589,10 +16897,9 @@ light = { colour = "green", level = 3, for = "20s" }
         };
         let line = on_line(&made);
         assert!(
-            line.starts_with("I made leaving mail: when someone"),
+            line.starts_with("I made leaving mail, and it's on: when someone"),
             "{line}"
         );
-        assert!(!line.contains("it's on"), "{line}");
         assert!(line.ends_with(WAITS_FOR_YES.trim()), "{line}");
         // Off, the write is unsaid as what the lamp can't do yet.
         set_writes_here(Some(false));
@@ -18304,6 +18611,56 @@ task = { task = "take a photo and send it to the app", run = "scripts/main.py" }
         assert_eq!(SKILLS_GRANT.0, crate::skill_task_yes::NEVER);
     }
 
+    /// #8157: a made skill's `run` step (`run = "scripts/main.py"`, its
+    /// script doing the whole job) is code as a `task` step is: held, its
+    /// grants kept, its script matched to the files written, and read back
+    /// plainly, "runs its own script", and what its code may use.
+    #[test]
+    fn a_run_step_is_held_and_read_back_as_a_task_step_is() {
+        set_scripts_here(Some(true));
+        let run = CODE_TOML.replace(
+            "task = { task = \"take a photo and send it to the app\", run = \"scripts/main.py\" }",
+            "run = \"scripts/main.py\"",
+        );
+        assert!(run.contains("\nrun = \"scripts/main.py\"\n"), "{run}");
+        let uses = capped_with(&run, false).unwrap().1;
+        assert!(uses.code);
+        assert_eq!(uses.grants, ["camera", "light"]);
+        assert_eq!(task_run(&run).as_deref(), Some("scripts/main.py"));
+        let files = |script: &str| Files {
+            toml: run.clone(),
+            card: CODE_CARD.to_owned(),
+            left_out: None,
+            scripts: vec![(script.to_owned(), MAIN_PY.to_owned())],
+            shows: Vec::new(),
+        };
+        assert!(code_matches(&files("scripts/main.py"), &uses).is_ok());
+        assert!(code_matches(&files("scripts/other.py"), &uses).is_err());
+        let said = plainly(&mannered(&run)).unwrap();
+        for part in [
+            "it runs its own script",
+            "The lamp's model wrote its code, and that code may use the camera and its light.",
+        ] {
+            assert!(said.contains(part), "{part}: {said}");
+        }
+        assert!(said.ends_with(RUNS_AFTER_YES), "{said}");
+        // A run that is no script under scripts/, or beside another kind,
+        // is refused as a task's would be.
+        for bad in [
+            run.replace("run = \"scripts/main.py\"", "run = \"main.sh\""),
+            run.replace(
+                "run = \"scripts/main.py\"",
+                "run = \"scripts/main.py\"\nsay = \"Hi.\"",
+            ),
+        ] {
+            assert!(capped_with(&bad, false).is_err(), "{bad}");
+        }
+        // Off, code of its own is what the lamp can't do yet.
+        set_scripts_here(Some(false));
+        assert!(capped_with(&run, false).is_err());
+        set_scripts_here(None);
+    }
+
     /// On (#6307): the say-back says that it runs its own code and what
     /// for, that the lamp's model wrote it, each grant in plain words, and
     /// ends on its wait, with no "yes" in it; the lamp's line for it says the
@@ -18755,7 +19112,9 @@ task = { task = "take a photo and send it to the app", run = "scripts/main.py" }
         };
         let asked = made("glow green when I stand up, but not too often", "local:1");
         assert!(
-            asked.contains(&format!("\nmade_by: voice\n{LIMITS_ASKED}\n---")),
+            asked.contains(&format!(
+                "\nmade_by: voice\n{MADE_WITH}: deepseek\n{LIMITS_ASKED}\n---"
+            )),
             "{asked}"
         );
         assert!(asked.contains(&format!("most_a_day = {MANNERS_MOST_A_DAY}")));
@@ -20090,5 +20449,256 @@ task = { task = "take a photo and send it to the app", run = "scripts/main.py" }
             .1;
         assert!(!unmarked.contains("made_with"), "{unmarked}");
         assert_eq!(card_mark(&unmarked, MADE_WITH), None);
+    }
+
+    /// #8157: a made skill always says who really wrote it, on its card and
+    /// in the index (`made_with: openclaw`, `hermes`, or `deepseek` for the
+    /// lamp's own model), whatever `LAMP_MAKE_REACTIONS_ONLY_DEEPSEEK`
+    /// says; `made_by` stays who asked.
+    #[test]
+    fn a_made_skill_always_says_the_engine_that_wrote_it() {
+        use std::os::unix::fs::PermissionsExt;
+        let dir = scratch("made-with-always");
+        let program = dir.join("pack");
+        fs::write(
+            &program,
+            "#!/bin/sh\nname=$(basename \"$4\")\ncat \"$4/SKILL.md\" > \"$3/$name-1.0.0.tar\"\nexit 0\n",
+        )
+        .unwrap();
+        fs::set_permissions(&program, fs::Permissions::from_mode(0o755)).unwrap();
+        let keeping = Keeping {
+            directory: dir.join("made"),
+            program,
+            manage: dir.join("manage.sock"),
+            installed: dir.join("skills"),
+        };
+        let made = |with: MadeWith, from: &str| {
+            let asked = Asked {
+                request: "dim the light a shade at 10 pm",
+                made_with: with,
+                ..Asked::default()
+            };
+            let made = keep_asked(&answer(TOML, CARD), false, from, &keeping, &asked).unwrap();
+            let card = fs::read_to_string(&made.package).unwrap();
+            let entry = entries(&keeping.directory)
+                .into_iter()
+                .find(|entry| entry["name"] == made.name.as_str())
+                .unwrap();
+            (card_mark(&card, MADE_WITH), entry[MADE_WITH].clone(), card)
+        };
+        let mut at = 0;
+        for switch in [Some(false), Some(true)] {
+            set_reactions_here(switch);
+            for (with, key) in [
+                (MadeWith::OpenClaw, "openclaw"),
+                (MadeWith::Hermes, "hermes"),
+                (MadeWith::DeepSeek, "deepseek"),
+            ] {
+                at += 1;
+                let (card, entry, text) = made(with, &format!("local:with:{at}"));
+                assert_eq!(card.as_deref(), Some(key), "{switch:?}: {text}");
+                assert_eq!(entry, key, "{switch:?}");
+                assert!(text.contains("\nmade_by: voice\n"), "{text}");
+            }
+        }
+        set_reactions_here(None);
+    }
+
+    /// #8180 (the first builder's ruling): a made skill that was tried is
+    /// said on in one line with what its try said first, capped, and its
+    /// undo; one whose try said nothing usable, with its name; one never
+    /// tried, by the line it had.
+    #[test]
+    fn a_tried_skill_is_said_on_with_what_its_try_said() {
+        let made = |sha256: &str| Made {
+            name: "tide-times".into(),
+            version: "1.0.0".into(),
+            sha256: sha256.into(),
+            description: "Says the tide.".into(),
+            uses: Uses::default(),
+            package: PathBuf::from("/nowhere"),
+        };
+        note_tried_here(&"1".repeat(64), Some("  The tide is\nlow at six. ".into()));
+        assert_eq!(
+            tried_line(&made(&"1".repeat(64)), "").as_deref(),
+            Some("Made it, and I tried it: The tide is low at six. Say 'remove it' to undo.")
+        );
+        let long = "word ".repeat(60);
+        note_tried_here(&"2".repeat(64), Some(long));
+        let line = tried_line(&made(&"2".repeat(64)), "").unwrap();
+        let words = line
+            .strip_prefix("Made it, and I tried it: ")
+            .and_then(|rest| rest.strip_suffix(". Say 'remove it' to undo."))
+            .unwrap();
+        assert!(words.chars().count() <= TRIED_WORDS_MOST, "{line}");
+        // Said nothing usable: the fallback, with its name.
+        for nothing in [None, Some("  ".to_owned())] {
+            note_tried_here(&"3".repeat(64), nothing);
+            assert_eq!(
+                tried_line(&made(&"3".repeat(64)), CODE_RUNS_NOWHERE_YET).as_deref(),
+                Some(
+                    "Made tide times, and I tried it. But this lamp doesn't run its code yet. \
+                     Say 'remove it' to undo."
+                )
+            );
+        }
+        // Never tried: no line of a try.
+        assert_eq!(tried_line(&made(&"4".repeat(64)), ""), None);
+        assert_eq!(
+            crate::make_no_asks::made_line(&made(&"1".repeat(64)), ""),
+            "Made it, and I tried it: The tide is low at six. Say 'remove it' to undo."
+        );
+        assert_eq!(
+            crate::make_no_asks::made_line(&made(&"4".repeat(64)), ""),
+            "Made tide times. Say 'remove it' to undo."
+        );
+    }
+
+    /// Heron's HOLD on #8180: with no yes asked, the tried line names what
+    /// the skill uses before what its try said, with words and without;
+    /// one that only speaks gets nothing more.
+    #[test]
+    fn a_tried_skill_line_names_what_it_uses() {
+        let made = |sha256: &str, uses: Uses| Made {
+            name: "sky-watch".into(),
+            version: "1.0.0".into(),
+            sha256: sha256.into(),
+            description: "Watches the sky.".into(),
+            uses,
+            package: PathBuf::from("/nowhere"),
+        };
+        let camera_net = || Uses {
+            code: true,
+            grants: vec!["camera".into(), "net".into()],
+            ..Uses::default()
+        };
+        let speak = || Uses {
+            code: true,
+            speak: true,
+            grants: vec!["speak".into()],
+            ..Uses::default()
+        };
+        note_tried_here(&"5".repeat(64), Some("Clear skies tonight.".into()));
+        note_tried_here(&"6".repeat(64), None);
+        assert_eq!(
+            tried_line(&made(&"5".repeat(64), camera_net()), "").as_deref(),
+            Some(
+                "Made it. It uses the camera and the internet, and I tried it: \
+                 Clear skies tonight. Say 'remove it' to undo."
+            )
+        );
+        assert_eq!(
+            tried_line(&made(&"6".repeat(64), camera_net()), "").as_deref(),
+            Some(
+                "Made sky watch. It uses the camera and the internet, and I tried it. \
+                 Say 'remove it' to undo."
+            )
+        );
+        for sha in ["5", "6"] {
+            let line = tried_line(&made(&sha.repeat(64), speak()), "").unwrap();
+            assert!(
+                !line.contains("the camera") && !line.contains("the internet"),
+                "{line}"
+            );
+            assert!(!line.contains("It uses"), "{line}");
+        }
+        assert_eq!(
+            tried_line(&made(&"5".repeat(64), speak()), "").as_deref(),
+            Some("Made it, and I tried it: Clear skies tonight. Say 'remove it' to undo.")
+        );
+        assert_eq!(
+            tried_line(&made(&"6".repeat(64), speak()), "").as_deref(),
+            Some("Made sky watch, and I tried it. Say 'remove it' to undo.")
+        );
+        // Journaled by length alone, never the try's words.
+        let journal = tried_journal(
+            "Made it. It uses the camera, and I tried it: Your mail.",
+            true,
+        );
+        assert_eq!(
+            journal,
+            "lamp-voice: a made skill is said on with its try (55 chars, uses named)"
+        );
+        assert!(!journal.contains("mail"), "{journal}");
+        // The rest named, short: the microphone, notes, a service it sends
+        // to, messages and who.
+        let more = Uses {
+            code: true,
+            topics: vec!["voice/heard".into()],
+            grants: vec!["notes".into(), "gmail-write".into()],
+            messages: true,
+            who: true,
+            ..Uses::default()
+        };
+        let line = tried_line(&made(&"5".repeat(64), more), "").unwrap();
+        for part in [
+            "the microphone",
+            "notes",
+            "sends to ",
+            "messages to your phone",
+            "who is at the lamp",
+        ] {
+            assert!(line.contains(part), "{part}: {line}");
+        }
+    }
+
+    /// #8157: a passed try is told in the read-back; a failed one is
+    /// refused with lamp-tasks' words, which go to a repair; nothing to
+    /// try keeps it as before; a try that couldn't be made keeps nothing.
+    #[test]
+    fn a_tried_run_is_told_or_goes_to_a_repair() {
+        use crate::make_skill_agent::Tried;
+        assert_eq!(
+            tried_said(Tried::Passed {
+                said: 1,
+                said_first: Some("Low tide at six.".into())
+            }),
+            Ok(Some(Some("Low tide at six.".to_owned())))
+        );
+        assert_eq!(tried_said(Tried::Nothing), Ok(None));
+        // Fail closed (the Reviewer-lead's P2 on #8180): a try that
+        // couldn't be made keeps nothing, and the person is told why in
+        // a whole line of its own, never a repair.
+        for why in [
+            "not_tried",
+            "busy",
+            "bad_request",
+            "lamp-tasks can't be reached",
+        ] {
+            assert_eq!(
+                tried_said(Tried::NotTried(why.into())),
+                Err(Refused(NOT_TRIED_LINE.into(), None)),
+                "{why}"
+            );
+        }
+        assert_eq!(plain_reason(NOT_TRIED_LINE), NOT_TRIED_LINE);
+        assert_eq!(not_made_line(NOT_TRIED_LINE), NOT_TRIED_LINE);
+        let Err(Refused(why, Some(lines))) =
+            tried_said(Tried::Failed("scripts/main.py exited 1".into()))
+        else {
+            panic!("a failed try is refused with its lines");
+        };
+        assert_eq!(why, NOT_TRIED_PASSED);
+        assert!(lines.contains("scripts/main.py exited 1"), "{lines}");
+        assert!(lines.contains("lamp.say"), "{lines}");
+    }
+
+    /// #8157: a SKILL.md the agent made with code has its three sections,
+    /// each with words under it; one missing or empty goes to a repair.
+    #[test]
+    fn an_agents_skill_with_code_says_its_uses_result_and_answer() {
+        let whole = "---\nname: btc\ndescription: d\n---\n\n# BTC\n\n## Uses\n\n- scripts/main.py, no arguments\n\n## Result\n\nSaid aloud; nothing printed but a line.\n\n## Answer\n\nThe script says the price with lamp.say; the agent answers a lone -.\n";
+        assert_eq!(sections_held(whole), Ok(()));
+        let no_answer = whole.split("## Answer").next().unwrap();
+        let Err(Refused(why, Some(lines))) = sections_held(no_answer) else {
+            panic!("refused");
+        };
+        assert_eq!(why, NO_SECTIONS);
+        assert!(
+            lines.contains("## Answer") && !lines.contains("## Uses,"),
+            "{lines}"
+        );
+        let empty = whole.replace("- scripts/main.py, no arguments\n", "");
+        assert!(sections_held(&empty).is_err());
     }
 }

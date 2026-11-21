@@ -2894,6 +2894,11 @@ fn start(
     };
     for call in tasks {
         let Call::Task(step) = call else { continue };
+        // A `run` step (#8158): its script run by lamp-tasks with no agent.
+        if step.direct {
+            hand_run(&skill, *step, &runner.tasks.borrow());
+            continue;
+        }
         let room = task_room(&skill, &step, runner);
         hand_task(&skill, *step, &runner.tasks.borrow(), room, line_to.clone());
     }
@@ -3282,7 +3287,13 @@ fn mark_voice_asked(
     owners: bool,
     now_ms: u64,
 ) -> bool {
-    let marked = voice && switched && calls.iter().any(|call| matches!(call, Call::Task(_)));
+    // A `run` step is always marked (#8158): its failure line is said only
+    // to a run the person's words started.
+    let direct = calls
+        .iter()
+        .any(|call| matches!(call, Call::Task(step) if step.direct));
+    let marked =
+        voice && (switched || direct) && calls.iter().any(|call| matches!(call, Call::Task(_)));
     if marked {
         lamp_skills::task::asked_by_voice(skill, now_ms);
         lamp_skills::task::asked_by_owner(skill, owners);
@@ -3319,7 +3330,8 @@ fn run_now_refused(
             Call::Task(_) if !tasks.of.contains_key(skill) => {
                 Some("its folder is not known".to_owned())
             }
-            Call::Task(_) if handing => Some(HANDING_BUSY.to_owned()),
+            // A `run` step never waits behind an agent's task (#8158).
+            Call::Task(step) if handing && !step.direct => Some(HANDING_BUSY.to_owned()),
             Call::Task(_) => task::would_refuse(skill, tasks.state.as_deref(), now_ms).map(|why| {
                 why.strip_prefix(task::NOT_HANDED)
                     .unwrap_or(&why)
@@ -6178,6 +6190,103 @@ fn hand_task(
     });
 }
 
+/// A skill's `run` step that came due (#8158, [`lamp_skills::task`]):
+/// handed over as `skill_run` on a thread of its own, held to every gate a
+/// `do.task` is ([`lamp_skills::task::hand`]: the switch, the owner's yes
+/// for its folder and grants, asked aloud when there is none, one at a
+/// time a skill, the day's bounds), and run by lamp-tasks itself with no
+/// agent and no Harness, at most 30 s. Never handed over again for this
+/// trigger. Failed, it says [`lamp_skills::task::run_failed_line`] when the
+/// person's words started it (a run now or the model's call of its tool,
+/// marked by the voice); a trigger's says nothing and the journal says
+/// why ([`lamp_skills::task::run_outcome`]).
+///
+/// Its hops, trigger to script (#8158's latency): the fire's own thread
+/// spawns this one at once; the folder is hashed (a skill's few files);
+/// lamp-control asked for the yes (one local socket line); the ledger
+/// written; one line to lamp-tasks, which mints the token (one local
+/// socket line to lamp-control) and starts the fence (`unshare`, mounts,
+/// `python3`). No agent, no Harness, no network.
+fn hand_run(skill: &str, step: lamp_skills::task::TaskStep, tasks: &Tasks) {
+    let by_words = lamp_skills::task::take_asked_by_voice(skill).is_some();
+    let _ = lamp_skills::task::take_asked_by_owner(skill);
+    let Some((folder, grants)) = tasks.of.get(skill).cloned() else {
+        eprintln!("lamp-skills: skill:{skill}: do.run: not handed over: its folder is not known");
+        return;
+    };
+    let (state, socket, skill) = (tasks.state.clone(), tasks.socket.clone(), skill.to_owned());
+    let say_socket = tasks.say.clone();
+    let fired = Instant::now();
+    std::thread::spawn(move || {
+        let place = lamp_skills::task::Place {
+            state: state.as_deref(),
+            control: Path::new(lamp_voice::skill_task_yes::CONTROL_SOCKET),
+            socket: socket.as_deref(),
+        };
+        let ask = json!({
+            "task_yes": true,
+            "priority": lamp_voice::say::NORMAL_PRIORITY,
+            "expires_in_ms": lamp_skills::task::ASK_EXPIRES_MS,
+        });
+        let say_yes = || say(&say_socket, "say", &skill, ask.clone(), &[], || {});
+        let outcome = std::cell::Cell::new(None);
+        let send = |socket: &Path, line: &str| {
+            eprintln!(
+                "lamp-skills: skill:{skill}: do.run: handed over {} ms after it came due",
+                fired.elapsed().as_millis()
+            );
+            let sent = hand_over_run(socket, line);
+            outcome.set(Some(lamp_skills::task::run_outcome(
+                &skill, &sent, by_words,
+            )));
+            sent
+        };
+        let handed = lamp_skills::task::hand(
+            &skill,
+            &step,
+            &folder,
+            &grants,
+            place,
+            unix_ms(),
+            send,
+            say_yes,
+        );
+        eprintln!(
+            "lamp-skills: skill:{skill}: {} ({} ms)",
+            handed.replacen("do.task", "do.run", 1),
+            fired.elapsed().as_millis()
+        );
+        let Some((journal, line)) = outcome.take() else {
+            return;
+        };
+        eprintln!("lamp-skills: skill:{skill}: {journal}");
+        if let Some(line) = line {
+            let asking =
+                json!({"text": line, "exact": true, "priority": lamp_skills::SAY_PRIORITY});
+            let said = say(&say_socket, "say", &skill, asking, &[], || {});
+            eprintln!("lamp-skills: skill:{skill}: do.run: its failed line: {said}");
+        }
+    });
+}
+
+/// One `run` step's hand-over (#8158): as [`hand_over`], waited for at most
+/// [`lamp_skills::task::RUN_STEP_MOST`], and never counted in [`HANDING`],
+/// so it neither waits behind an agent's task nor holds one back.
+fn hand_over_run(socket: &Path, line: &str) -> Result<String, lamp_skills::service_write::Unrun> {
+    use lamp_skills::service_write::Unrun;
+    let stream = UnixStream::connect(socket)
+        .map_err(|error| Unrun::NotTaken(format!("lamp-tasks couldn't be reached: {error}")))?;
+    let exchange = || -> io::Result<String> {
+        stream.set_write_timeout(Some(Duration::from_secs(5)))?;
+        stream.set_read_timeout(Some(lamp_skills::task::RUN_STEP_MOST))?;
+        (&stream).write_all(format!("{line}\n").as_bytes())?;
+        let mut answer = String::new();
+        BufReader::new((&stream).take(8_192)).read_line(&mut answer)?;
+        Ok(answer)
+    };
+    exchange().map_err(|error| Unrun::Unknown(format!("lamp-tasks' answer never came: {error}")))
+}
+
 /// Whether a run's told line (what its agent found, or its #7200
 /// refusal) answers the person who just asked it by voice, and so is said
 /// at once with no read's gate (#7894): its run asked by voice at
@@ -7118,6 +7227,7 @@ mod tests {
             words: "Sum up this morning's mail".into(),
             run: "scripts/main.py".into(),
             quiet,
+            direct: false,
         };
         let mut room = task_room("morning-mail", &step(Some(window)), &runner);
         assert_eq!(room.quiet, Some(window));
@@ -7295,6 +7405,7 @@ mod tests {
             words: "Find the bitcoin price".into(),
             run: "scripts/main.py".into(),
             quiet: None,
+            direct: false,
         }));
         let now = unix_ms() - 2_000;
         for (skill, calls, voice, switched) in [
@@ -7387,6 +7498,7 @@ mod tests {
             words: "Check my mail".into(),
             run: "scripts/main.py".into(),
             quiet: None,
+            direct: false,
         }));
         let now = unix_ms();
         for owners in [true, false] {
@@ -9052,6 +9164,7 @@ mod tests {
                 words: "Read my unread mail.".into(),
                 run: "scripts/mail.sh".into(),
                 quiet: None,
+                direct: false,
             }))
         };
         assert_eq!(
@@ -9174,6 +9287,7 @@ mod tests {
             words: lamp_skills::core_agent::PILOTS[0].tasks[0].task.into(),
             run: lamp_skills::core_agent::RUN.into(),
             quiet: None,
+            direct: false,
         }));
         let fired = Instant::now();
         let _made = start(
@@ -9231,6 +9345,7 @@ mod tests {
                 words: "Start a study block.".into(),
                 run: "scripts/study.sh".into(),
                 quiet: None,
+                direct: false,
             }))
         };
         assert_eq!(

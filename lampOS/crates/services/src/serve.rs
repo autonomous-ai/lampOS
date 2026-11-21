@@ -53,9 +53,10 @@ pub const CONTROL_ASKER_CGROUP: &str = "/lampos.slice/lampos-parts.slice/lamp-co
 /// What a skill run's call to anything but a read or a write is told.
 pub const RUN_READS_AND_WRITES_ONLY: &str =
     "a skill's run may only read a linked service or prepare a write to it";
-/// What a skill run's write that names a send is told: only the person's
-/// spoken yes sends it, through the voice.
-pub const RUN_PREPARES_ONLY: &str = "a skill's run only prepares a write: the lamp reads it back and the person's spoken yes sends it";
+/// What a skill run's write that names a send is told: a run's write is
+/// sent at once by its own call ([`Services::run_write_now`]), never by a
+/// `send_id` or a `said` of the run's.
+pub const RUN_PREPARES_ONLY: &str = "a skill's run sends its write by calling service_write once with the write itself: never with a send_id or said";
 /// What a skill run's write is told while another write waits for its yes.
 pub const RUN_WRITE_WAITS: &str =
     "another write waits for the person's yes: nothing was prepared, try again later";
@@ -119,8 +120,6 @@ pub fn run_too_long(room: usize, bytes: usize) -> String {
 /// The fixed-write runs kept, one send each ([`Services::run_fixed_write`]):
 /// one run at a time on the lamp, so more than enough.
 pub const FIXED_RUNS_KEPT: usize = 32;
-/// What a skill run's prepared write tells it: nothing went.
-pub const RUN_HELD: &str = "Nothing is sent. The lamp reads it back to the person and sends it only if they say yes; say nothing of it as sent.";
 /// The most a skill run's whole answer line may be, its line break with
 /// it: lamp-control reads at most 8 KiB of it
 /// (`lamp_control::services::ANSWER_MOST`), and 1 KiB is kept spare. A run
@@ -734,28 +733,7 @@ impl<H: Http, M: Mail> Services<H, M> {
                 Err(RUN_PREPARES_ONLY.into())
             }
             tools::WRITE if self.desk.waiting_at(Instant::now()) => Err(RUN_WRITE_WAITS.into()),
-            tools::WRITE => match self.write_for(&args, Some(&skill)).await {
-                Ok(mut held) => {
-                    if let Some(send_id) = held
-                        .as_object_mut()
-                        .and_then(|held| held.remove("send_id"))
-                        .and_then(|id| id.as_str().map(str::to_owned))
-                    {
-                        *self
-                            .run_held
-                            .lock()
-                            .unwrap_or_else(|poisoned| poisoned.into_inner()) =
-                            Some((send_id, skill.clone()));
-                        eprintln!(
-                            "lamp-services: a skill's run prepared a write to {asked}, held for a spoken yes"
-                        );
-                    }
-                    held["held"] = json!(true);
-                    held["next"] = json!(RUN_HELD);
-                    Ok(held)
-                }
-                Err(why) => Err(why),
-            },
+            tools::WRITE => self.run_write_now(&skill, &args).await,
             _ => Err(RUN_READS_AND_WRITES_ONLY.into()),
         };
         let answer = match answer {
@@ -821,6 +799,60 @@ impl<H: Http, M: Mail> Services<H, M> {
         }
         self.skill_write(&json!({"skill": skill, "write": args}))
             .await
+    }
+
+    /// A skill's run's own write (`args`, its `service_write`), sent at once
+    /// under the skill's declared `<code>-write` grant (the owner's rule,
+    /// 21 Nov: a skill's declared grants are on, nothing asked; no read-back
+    /// waits for a yes): prepared as any write is ([`Self::write_for`]: the
+    /// service its grant names, linked, the link's scopes, the action's own
+    /// checks), then counted against the skills' bounds before it is sent,
+    /// one skill's write at a time ([`skill_writes::Ledger`]), and kept in
+    /// the owner's sent-log ([`skill_writes::SentLog`]). The journal says
+    /// counts and outcomes only.
+    async fn run_write_now(&self, skill: &str, args: &Value) -> Result<Value, String> {
+        let prepared = self.write_for(args, None).await?;
+        let Some(send_id) = prepared["send_id"].as_str() else {
+            return Err("not sent: the write was not prepared".into());
+        };
+        let Some(pending) = self.desk.take(send_id, Instant::now()) else {
+            return Err("not sent: the write was not prepared".into());
+        };
+        let (service, entry) = self.linked(args).await?;
+        if writes::link_of(&entry) != pending.link {
+            return Err(LINK_CHANGED.into());
+        }
+        let taken = {
+            let _one = self
+                .skill_send
+                .lock()
+                .unwrap_or_else(|poisoned| poisoned.into_inner());
+            skill_writes::Ledger::new(&self.store.0).take(skill, crate::now_secs())
+        };
+        let (mine, all) = match taken {
+            Ok(counts) => counts,
+            Err(why) => {
+                eprintln!("lamp-services: a skill run's write refused: {why}");
+                return Err(format!("not sent: {why}"));
+            }
+        };
+        let answer = self.send(service, &entry, pending).await?;
+        let told = skill_writes::Told {
+            skill: skill.to_owned(),
+            service: service.code.to_owned(),
+            at: crate::now_secs(),
+            to: skill_writes::sent_to(args),
+        };
+        if skill_writes::SentLog::new(&self.store.0).add(told).is_err() {
+            eprintln!("lamp-services: the owner's sent-log was not kept");
+        }
+        eprintln!(
+            "lamp-services: a skill run's write to {} was sent, nothing asked ({mine} of {} for it today, {all} of {} for every skill)",
+            service.code,
+            skill_writes::PER_SKILL,
+            skill_writes::ALL_SKILLS
+        );
+        Ok(answer)
     }
 
     /// The code a skill run's call goes to, for catalog code `code`: a run's
@@ -1287,17 +1319,28 @@ impl<H: Http, M: Mail> Services<H, M> {
             return Ok(json!({"on": false, "approved": false}));
         }
         let approvals = skill_writes::Approvals::new(&self.store.0);
-        let approved = writes.iter().all(|write| {
-            let skill_writes::Found::Approved(approval) =
-                approvals.find(skill, package.as_deref(), write)
-            else {
-                return false;
-            };
-            catalog::service(&approval.service)
+        let own = skill_writes::package_writes(&self.skills_dir, skill);
+        let link_now = |service: &str| {
+            catalog::service(service)
                 .and_then(|service| self.store.load(service.code))
                 .and_then(|entry| skill_writes::link_of(&entry))
-                .is_some_and(|link| link == approval.link_of)
-        });
+        };
+        // Agreed with no yes (the owner's rule, 21 Nov): a write bound at an
+        // earlier send, under the link it is linked by now, or one of the
+        // installed package's own on a service linked now (bound at its
+        // first send).
+        let approved =
+            writes.iter().all(
+                |write| match approvals.find(skill, package.as_deref(), write) {
+                    skill_writes::Found::Approved(approval) => {
+                        link_now(&approval.service).is_some_and(|link| link == approval.link_of)
+                    }
+                    _ => {
+                        own.contains(write)
+                            && write["service"].as_str().and_then(link_now).is_some()
+                    }
+                },
+            );
         Ok(json!({"on": true, "approved": approved}))
     }
 
@@ -1335,24 +1378,74 @@ impl<H: Http, M: Mail> Services<H, M> {
         }
         let write = args.get("write").cloned().unwrap_or(Value::Null);
         let package = skill_writes::installed_package(&self.skills_dir, skill);
-        let approval = match skill_writes::Approvals::new(&self.store.0).find(
-            skill,
-            package.as_deref(),
-            &write,
-        ) {
-            skill_writes::Found::Approved(approval) => approval,
-            skill_writes::Found::Waiting => return refused(skill_writes::WAITING.into()),
-            skill_writes::Found::Other => {
-                let count = self.not_approved.fetch_add(1, Ordering::SeqCst) + 1;
-                eprintln!(
-                    "lamp-services: a skill's write refused: not the approved content ({count} since start)"
-                );
-                return Err(skill_writes::NOT_APPROVED.into());
-            }
-        };
         if skill_writes::check(&write).is_err() {
             return refused("not sent: the write is not one a skill makes".into());
         }
+        let approvals = skill_writes::Approvals::new(&self.store.0);
+        let found = approvals.find(skill, package.as_deref(), &write);
+        // No yes is asked (the owner's rule, 21 Nov): a write that is one of
+        // the installed package's own is bound at its first send to the link
+        // it goes under; any other content is never sent.
+        let bound = match found {
+            skill_writes::Found::Approved(approval) => Some(approval),
+            skill_writes::Found::Waiting | skill_writes::Found::Other => None,
+        };
+        let own = || {
+            package.is_some()
+                && skill_writes::package_writes(&self.skills_dir, skill).contains(&write)
+        };
+        if bound.is_none() && !own() {
+            let count = self.not_approved.fetch_add(1, Ordering::SeqCst) + 1;
+            eprintln!(
+                "lamp-services: a skill's write refused: not its installed package's own ({count} since start)"
+            );
+            return Err(match package {
+                None => skill_writes::NOT_INSTALLED.into(),
+                Some(_) => skill_writes::NOT_APPROVED.into(),
+            });
+        }
+        let Some(service) = write["service"].as_str().and_then(catalog::service) else {
+            return refused("not sent: the lamp doesn't know that service".into());
+        };
+        let approval = match bound {
+            Some(approval) => approval,
+            None => {
+                let Some(link) = self
+                    .store
+                    .load(service.code)
+                    .and_then(|kept| skill_writes::link_of(&kept))
+                else {
+                    return refused(format!(
+                        "{}{} isn't linked; nothing was sent",
+                        skill_writes::STOPPED,
+                        service.name
+                    ));
+                };
+                let public = match skill_writes::github_repo(&write) {
+                    Some(repo) => match self.linked(&write).await {
+                        Ok((_, entry)) => !self.private_repo(service, &entry, repo).await,
+                        Err(why) => return refused(format!("not sent: {why}")),
+                    },
+                    None => false,
+                };
+                match approvals.bind(
+                    skill,
+                    package.as_deref().unwrap_or_default(),
+                    &write,
+                    &link,
+                    public,
+                ) {
+                    Ok(approval) => {
+                        eprintln!(
+                            "lamp-services: a skill's write bound to its link at its first send{}",
+                            if public { " (a public repository)" } else { "" }
+                        );
+                        approval
+                    }
+                    Err(why) => return refused(format!("not sent: {why}")),
+                }
+            }
+        };
         let Some(service) = catalog::service(&approval.service) else {
             return refused("not sent: the lamp doesn't know that service".into());
         };
@@ -1383,13 +1476,21 @@ impl<H: Http, M: Mail> Services<H, M> {
         if let Some(what) = writes::scope_missing(service.code, &write, &entry) {
             return refused(format!("not sent: {}", no_permission(service, what)));
         }
-        // Still private now: a repository approved as private and public
-        // since (or unreadable) needs a new yes, which says so.
+        // A repository bound as private and public since (or unreadable) is
+        // bound again as public and sent: nothing waits for a yes; the
+        // journal says so, as the make's line said it of a public one.
         if let Some(repo) = skill_writes::github_repo(&write)
             && !approval.public
             && !self.private_repo(service, &entry, repo).await
         {
-            return refused(skill_writes::WAITING.into());
+            if let Err(why) =
+                approvals.bind(skill, &approval.package, &write, &approval.link_of, true)
+            {
+                return refused(format!("not sent: {why}"));
+            }
+            eprintln!(
+                "lamp-services: a skill's write goes to a repository public since its first send"
+            );
         }
         let Ok(pending) = writes::prepare(service.code, &write, &entry) else {
             return refused("not sent: the write is not one the lamp makes".into());
@@ -3274,19 +3375,24 @@ mod tests {
         }
     }
 
-    /// #6432: a skill run's write is only prepared, read back and held as
-    /// every write, with no send_id for the run; it never sends one itself.
-    /// Sent on the yes's send, it counts against the skills' bounds.
+    /// The owner's rule, 21 Nov: a skill run's own write is sent at once,
+    /// nothing read back or held for a yes, counted against the skills'
+    /// bounds and kept in the owner's sent-log. A send named by the run is
+    /// refused ([`RUN_PREPARES_ONLY`]); a service not linked sends nothing;
+    /// a burst is stopped by the hour's bound.
     #[test]
-    fn a_skill_runs_write_is_held_for_the_yes_and_counted_when_sent() {
+    fn a_skill_runs_write_is_sent_at_once_and_counted() {
         let dir = tempfile::tempdir().unwrap();
         let services = services(dir.path(), "[]", true).with_skill_tasks(true);
+        let draft = json!({"service":"gmail","action":"send_mail","to":["mom@home.test"],
+            "subject":"Dinner","text":"Home by 7"});
+        // Not linked: refused, nothing sent.
+        let unlinked = run(services.run_tool(&run_line(tools::WRITE, draft.clone())));
+        assert_eq!(unlinked["ok"], false, "{unlinked}");
         run(services.admin(&set_line(
             "gmail",
             json!({"auth_type":"pat","api_key":"goodpassword","credentials":{"email":"me@home.test"}}),
         )));
-        let draft = json!({"service":"gmail","action":"send_mail","to":["mom@home.test"],
-            "subject":"Dinner","text":"Home by 7"});
         // A send named by the run: refused, nothing prepared.
         let mut sending = draft.clone();
         sending["send_id"] = json!("x");
@@ -3295,101 +3401,37 @@ mod tests {
             run(services.run_tool(&run_line(tools::WRITE, sending)))["error"],
             RUN_PREPARES_ONLY
         );
-        assert!(!services.desk.waiting());
-        let held = run(services.run_tool(&run_line(tools::WRITE, draft.clone())));
-        assert_eq!(held["ok"], true, "{held}");
-        assert!(
-            held["result"]["read_back"]
-                .as_str()
-                .unwrap()
-                .contains("Home by 7")
-        );
-        assert_eq!(held["result"]["sent"], false);
-        assert_eq!(held["result"]["held"], true);
-        assert!(held["result"].get("send_id").is_none(), "{held}");
-        assert!(services.desk.waiting());
-        assert!(services.mail.sent.lock().unwrap().is_empty());
-        // A second while it waits: refused, the first kept.
-        assert_eq!(
-            run(services.run_tool(&run_line(tools::WRITE, draft.clone())))["error"],
-            RUN_WRITE_WAITS
-        );
-        // The yes's send (the voice's, by the tools' socket): sent once, and
-        // counted for the skill.
-        let id = services.run_held.lock().unwrap().clone().unwrap();
-        assert_eq!(id.1, "mail-count");
-        let read_back = held["result"]["read_back"].as_str().unwrap().to_owned();
-        let send = |id: &str| {
-            json!({"op":"call","name":"service_write","args":{"service":"gmail","send_id":id,
-                "said":"send","sha256":read_back_sha256(&read_back)}})
-            .to_string()
-        };
-        assert_eq!(run(services.tool(&send(&id.0)))["result"]["sent"], true);
+        let sent = run(services.run_tool(&run_line(tools::WRITE, draft.clone())));
+        assert_eq!(sent["result"]["sent"], true, "{sent}");
+        assert!(sent["result"].get("send_id").is_none(), "{sent}");
+        assert!(!services.desk.waiting(), "nothing held");
+        assert!(services.run_held.lock().unwrap().is_none());
         assert_eq!(services.mail.sent.lock().unwrap().len(), 1);
-        // The skill's day's sends used up: the next is not sent.
-        let ledger = skill_writes::Ledger::new(&services.store.0);
+        assert_eq!(
+            services.mail.sent.lock().unwrap()[0].to,
+            vec!["mom@home.test"]
+        );
+        // Kept in the owner's sent-log: who, never what.
+        let log = run(services.tool(r#"{"op":"call","name":"skill_writes_sent"}"#));
+        assert_eq!(log["result"]["sent"][0]["skill"], "mail-count", "{log}");
+        assert!(!log.to_string().contains("Home by 7"), "{log}");
+        // A burst: the hour's bound stops it.
         for _ in 1..skill_writes::PER_SKILL_HOUR {
-            ledger.take("mail-count", crate::now_secs()).unwrap();
+            let again = run(services.run_tool(&run_line(tools::WRITE, draft.clone())));
+            assert_eq!(again["result"]["sent"], true, "{again}");
         }
-        run(services.run_tool(&run_line(tools::WRITE, draft)));
-        let id = services.run_held.lock().unwrap().clone().unwrap();
-        let refused = run(services.tool(&send(&id.0)));
+        let over = run(services.run_tool(&run_line(tools::WRITE, draft)));
         assert!(
-            refused["error"].as_str().unwrap().contains(&format!(
+            over["error"].as_str().unwrap().contains(&format!(
                 "at most {} times an hour",
                 skill_writes::PER_SKILL_HOUR
             )),
-            "{refused}"
+            "{over}"
         );
-        assert_eq!(services.mail.sent.lock().unwrap().len(), 1);
-    }
-
-    /// A skill run's write whose read-back can't fit the voice's one note
-    /// is refused with the room it has, by how much to shorten it, and
-    /// nothing held (the voice would only say it was too long and send
-    /// nothing); one at the room is held as any.
-    #[test]
-    fn a_skill_runs_write_too_long_to_read_back_is_refused_with_its_room() {
-        let dir = tempfile::tempdir().unwrap();
-        let services = services(dir.path(), "[]", true).with_skill_tasks(true);
-        run(services.admin(&set_line(
-            "gmail",
-            json!({"auth_type":"pat","api_key":"goodpassword","credentials":{"email":"me@home.test"}}),
-        )));
-        let draft = |text: &str| {
-            json!({"service":"gmail","action":"send_mail","to":["me@home.test"],
-                "subject":"Unread","text":text})
-        };
-        let room = run_read_back_room("mail-count", "gmail");
-        assert_eq!(room, RUN_NOTE_ROOM - 2 * "mail-count".len() - "gmail".len());
-        // The read-back's own words around one character of text.
-        let probe = run(services.run_tool(&run_line(tools::WRITE, draft("x"))));
-        let words = run_read_back_bytes(probe["result"]["read_back"].as_str().unwrap()) - 1;
-        services.desk.forget(None);
-        *services.run_held.lock().unwrap() = None;
-        let fits = "x".repeat(room - words);
-        // One byte over (a line break is two in the note): refused, held
-        // nowhere, the room and the shortening named.
-        let over = format!("x\n{}", &fits[2..]);
-        let refused = run(services.run_tool(&run_line(tools::WRITE, draft(&over))));
-        assert_eq!(refused["ok"], false, "{refused}");
-        assert_eq!(refused["error"], run_too_long(room, room + 1), "{refused}");
-        let error = refused["error"].as_str().unwrap();
-        assert!(
-            error.contains(&format!("over the {room}")) && error.contains("at least 1 character"),
-            "{error}"
-        );
-        assert!(!services.desk.waiting());
-        assert!(services.run_held.lock().unwrap().is_none());
-        // At the room: held for the yes.
-        let held = run(services.run_tool(&run_line(tools::WRITE, draft(&fits))));
-        assert_eq!(held["ok"], true, "{held}");
         assert_eq!(
-            run_read_back_bytes(held["result"]["read_back"].as_str().unwrap()),
-            room
+            services.mail.sent.lock().unwrap().len(),
+            skill_writes::PER_SKILL_HOUR
         );
-        assert!(services.desk.waiting());
-        assert!(services.mail.sent.lock().unwrap().is_empty());
     }
 
     /// `--run-calls` (the linked-service memory plan, slice 4): each of a
@@ -3439,10 +3481,10 @@ mod tests {
             run(on.run_tool(&named(tools::WRITE, draft.clone())))["ok"],
             true
         );
-        // A second write while one waits: refused, and kept as refused.
+        // A second write: sent at once too (nothing waits), and kept.
         assert_eq!(
             run(on.run_tool(&named(tools::WRITE, draft.clone())))["ok"],
-            false
+            true
         );
         // A name the lamp can't link: refused, kept with no service.
         run(on.run_tool(&named(
@@ -3470,9 +3512,9 @@ mod tests {
                 json!({"n":1,"run":"run-1","skill":"mail-count","tool":"service_read",
                     "service":"gmail","action":"recent","status":"read"}),
                 json!({"n":2,"run":"run-1","skill":"mail-count","tool":"service_write",
-                    "service":"gmail","action":"send_mail","status":"held"}),
+                    "service":"gmail","action":"send_mail","status":"sent"}),
                 json!({"n":3,"run":"run-1","skill":"mail-count","tool":"service_write",
-                    "service":"gmail","action":"send_mail","status":"refused"}),
+                    "service":"gmail","action":"send_mail","status":"sent"}),
                 json!({"n":4,"run":"run-1","skill":"mail-count","tool":"service_read",
                     "service":null,"action":"other","status":"refused"}),
             ]
@@ -3553,12 +3595,12 @@ mod tests {
         assert_eq!(pulled["result"]["last"], 1);
     }
 
-    /// #6432: the voice asks for a run's held write (its own call, with
-    /// LAMP_SKILL_TASKS=on alone) and is given it whole, still held; its
-    /// send goes only with the SHA-256 of that very read-back, and a no
-    /// cancels it unsent.
+    /// The voice's `run_write_waiting` (its own call, with LAMP_SKILL_TASKS=on
+    /// alone) has nothing to tell once a run's write goes at once (the
+    /// owner's rule, 21 Nov): a run's write is sent and nothing is held for
+    /// a read-back; a skill's run can't ask it.
     #[test]
-    fn the_voice_is_told_a_runs_held_write_and_sends_only_what_it_read_back() {
+    fn the_voice_is_told_no_runs_write_waits_once_it_is_sent() {
         let dir = tempfile::tempdir().unwrap();
         let waiting = json!({"op":"call","name":RUN_WAITING,"args":{}}).to_string();
         // Off: no such call.
@@ -3569,55 +3611,14 @@ mod tests {
             "gmail",
             json!({"auth_type":"pat","api_key":"goodpassword","credentials":{"email":"me@home.test"}}),
         )));
-        assert_eq!(
-            run(services.tool(&waiting))["result"],
-            json!({"waiting": null})
-        );
         let draft = json!({"service":"gmail","action":"send_mail","to":["mom@home.test"],
             "subject":"Dinner","text":"Home by 7"});
-        let held = run(services.run_tool(&run_line(tools::WRITE, draft.clone())));
-        let told = run(services.tool(&waiting));
-        let waits = &told["result"]["waiting"];
-        assert_eq!(waits["skill"], "mail-count", "{told}");
-        assert_eq!(waits["service"], "gmail");
-        assert_eq!(waits["read_back"], held["result"]["read_back"]);
-        assert!(waits["left_ms"].as_u64().unwrap() > 110_000);
-        // Asked again, still there: asking takes nothing.
-        assert_eq!(run(services.tool(&waiting))["result"]["waiting"], *waits);
-        let send = |sha: &str, said: &str| {
-            json!({"op":"call","name":"service_write","args":{"service":"gmail",
-                "send_id":waits["send_id"],"said":said,"sha256":sha}})
-            .to_string()
-        };
-        // Another read-back's SHA: not sent, and the write is gone.
-        let other = read_back_sha256("Send a mail to someone else");
-        assert_eq!(
-            run(services.tool(&send(&other, "send")))["error"],
-            RUN_NOT_SAID
-        );
-        assert!(services.mail.sent.lock().unwrap().is_empty());
+        let sent = run(services.run_tool(&run_line(tools::WRITE, draft)));
+        assert_eq!(sent["result"]["sent"], true, "{sent}");
         assert_eq!(
             run(services.tool(&waiting))["result"],
             json!({"waiting": null})
         );
-        // A no: cancelled, nothing sent.
-        run(services.run_tool(&run_line(tools::WRITE, draft.clone())));
-        let waits = run(services.tool(&waiting))["result"]["waiting"].clone();
-        let sha = read_back_sha256(waits["read_back"].as_str().unwrap());
-        let no = json!({"op":"call","name":"service_write","args":{"service":"gmail",
-            "send_id":waits["send_id"],"said":"no","sha256":sha}});
-        assert_eq!(
-            run(services.tool(&no.to_string()))["result"]["cancelled"],
-            true
-        );
-        assert!(services.mail.sent.lock().unwrap().is_empty());
-        // The yes with its read-back's SHA: sent once.
-        run(services.run_tool(&run_line(tools::WRITE, draft)));
-        let waits = run(services.tool(&waiting))["result"]["waiting"].clone();
-        let sha = read_back_sha256(waits["read_back"].as_str().unwrap());
-        let yes = json!({"op":"call","name":"service_write","args":{"service":"gmail",
-            "send_id":waits["send_id"],"said":"send","sha256":sha}});
-        assert_eq!(run(services.tool(&yes.to_string()))["result"]["sent"], true);
         assert_eq!(services.mail.sent.lock().unwrap().len(), 1);
         // A skill's run can't ask what waits: that call is the voice's.
         assert_eq!(
@@ -4497,6 +4498,98 @@ mod tests {
         on
     }
 
+    /// `skill` put on in `dir` as package `version` with its own
+    /// `skill.toml`, whose one step is the arrival mail.
+    fn put_on_with_its_write(dir: &std::path::Path, skill: &str, version: &str) {
+        put_on(dir, skill, version);
+        std::fs::write(
+            dir.join("skills").join(skill).join("skill.toml"),
+            "name = \"arrive-mail\"\n\n[[do]]\nwrite = { service = \"gmail\", action = \"send_mail\", \
+             to = [\"boss@work.test\"], subject = \"In\", text = \"I'm at my desk.\" }\n",
+        )
+        .unwrap();
+    }
+
+    /// The owner's rule, 21 Nov: a skill's declared grants are on, nothing
+    /// asked. A skill's own write (its installed package's `skill.toml`)
+    /// goes at its first send with no yes, bound to the link it went under;
+    /// any other content is still refused, a burst is stopped by the
+    /// bounds, and a skill with no package, or a service not linked, sends
+    /// nothing.
+    #[test]
+    fn a_skills_own_write_goes_at_its_first_send_with_no_yes() {
+        let dir = tempfile::tempdir().unwrap();
+        put_on_with_its_write(dir.path(), "arrive-mail", "1");
+        let on = services(dir.path(), "{}", true).with_skill_writes(true);
+        let line = skill_write_line("arrive-mail", &arrival_mail());
+        // Not linked yet: nothing sent, nothing bound.
+        let unlinked = run(on.skill_tool(&line));
+        assert!(
+            unlinked["error"]
+                .as_str()
+                .unwrap()
+                .starts_with(skill_writes::STOPPED),
+            "{unlinked}"
+        );
+        run(on.admin(&app_password_gmail("me@home.test")));
+        let sent = run(on.skill_tool(&line));
+        assert_eq!(sent["result"]["sent"], true, "{sent}");
+        assert_eq!(on.mail.sent.lock().unwrap()[0].to, vec!["boss@work.test"]);
+        // The voice's read-back asks nothing either: agreed as it is.
+        let package =
+            skill_writes::installed_package(&dir.path().join("skills"), "arrive-mail").unwrap();
+        let ask = json!({"op":"call","name":"skill_writes_approved","args":{
+            "skill":"arrive-mail","writes":[arrival_mail()],"sha256":package}});
+        assert_eq!(
+            run(on.tool(&ask.to_string()))["result"],
+            json!({"on": true, "approved": true})
+        );
+        // Another content: refused, never sent.
+        let mut redirected = arrival_mail();
+        redirected["to"] = json!(["someone@else.test"]);
+        let refused = run(on.skill_tool(&skill_write_line("arrive-mail", &redirected)));
+        assert_eq!(refused["error"], skill_writes::NOT_APPROVED, "{refused}");
+        assert_eq!(on.mail.sent.lock().unwrap().len(), 1);
+        // A burst: the hour's bound stops it.
+        for _ in 1..skill_writes::PER_SKILL_HOUR {
+            assert_eq!(run(on.skill_tool(&line))["result"]["sent"], true);
+        }
+        let over = run(on.skill_tool(&line));
+        assert!(
+            over["error"]
+                .as_str()
+                .unwrap()
+                .contains(&format!("at most {} times", skill_writes::PER_SKILL_HOUR)),
+            "{over}"
+        );
+        assert_eq!(
+            on.mail.sent.lock().unwrap().len(),
+            skill_writes::PER_SKILL_HOUR
+        );
+        // Linked again as another account: stopped, as before.
+        run(on.admin(&app_password_gmail("other@home.test")));
+        let stopped = run(on.skill_tool(&line));
+        assert!(
+            stopped["error"]
+                .as_str()
+                .unwrap()
+                .starts_with(skill_writes::STOPPED),
+            "{stopped}"
+        );
+        // A skill on with no installed package: nothing binds its content.
+        let bare = dir.path().join("skills").join("by-hand");
+        std::fs::create_dir_all(&bare).unwrap();
+        std::fs::copy(
+            dir.path().join("skills/arrive-mail/skill.toml"),
+            bare.join("skill.toml"),
+        )
+        .unwrap();
+        assert_eq!(
+            run(on.skill_tool(&skill_write_line("by-hand", &arrival_mail())))["error"],
+            skill_writes::NOT_INSTALLED
+        );
+    }
+
     /// The app's yes (lamp-cloud's admin door) approves as the voice's
     /// does; who said it is not checked.
     #[test]
@@ -4506,7 +4599,10 @@ mod tests {
         let on = services(dir.path(), "{}", true).with_skill_writes(true);
         run(on.admin(&app_password_gmail("me@home.test")));
         let line = skill_write_line("arrive-mail", &arrival_mail());
-        assert_eq!(run(on.skill_tool(&line))["error"], skill_writes::WAITING);
+        assert_eq!(
+            run(on.skill_tool(&line))["error"],
+            skill_writes::NOT_APPROVED
+        );
         let yes =
             json!({"op":"skill_write_approve","skill":"arrive-mail","writes":[arrival_mail()]});
         let (answer, said) = run(on.admin(&yes.to_string()));
@@ -4543,7 +4639,10 @@ mod tests {
             "{refused}"
         );
         let line = skill_write_line("arrive-mail", &arrival_mail());
-        assert_eq!(run(on.skill_tool(&line))["error"], skill_writes::WAITING);
+        assert_eq!(
+            run(on.skill_tool(&line))["error"],
+            skill_writes::NOT_APPROVED
+        );
         // The package installed now: approved, and from the app's door too.
         let now =
             skill_writes::installed_package(&dir.path().join("skills"), "arrive-mail").unwrap();
@@ -4577,7 +4676,10 @@ mod tests {
         );
         // Asking approves nothing.
         let line = skill_write_line("arrive-mail", &arrival_mail());
-        assert_eq!(run(on.skill_tool(&line))["error"], skill_writes::WAITING);
+        assert_eq!(
+            run(on.skill_tool(&line))["error"],
+            skill_writes::NOT_APPROVED
+        );
         assert_eq!(
             run(on.tool(&approve_line("arrive-mail", &[arrival_mail()])))["result"]["approved"],
             1
@@ -4618,12 +4720,12 @@ mod tests {
     fn a_skills_approved_write_goes_and_any_other_is_refused() {
         let dir = tempfile::tempdir().unwrap();
         let line = skill_write_line("arrive-mail", &arrival_mail());
-        // Put on but no yes: waiting for the owner's.
+        // Not on as a package: nothing binds it.
         let waiting = services(dir.path(), "{}", true).with_skill_writes(true);
         run(waiting.admin(&app_password_gmail("me@home.test")));
         assert_eq!(
             run(waiting.skill_tool(&line))["error"],
-            skill_writes::WAITING
+            skill_writes::NOT_INSTALLED
         );
         // Only the voice approves: never lamp-skills.
         assert_eq!(
@@ -4647,10 +4749,10 @@ mod tests {
             assert!(!refused.to_string().contains("else.test"));
         }
         assert_eq!(on.not_approved.load(Ordering::SeqCst), 2);
-        // Another skill's name with the same content: no yes for it.
+        // Another skill's name with the same content: no package of its own.
         assert_eq!(
             run(on.skill_tool(&skill_write_line("other-skill", &arrival_mail())))["error"],
-            skill_writes::WAITING
+            skill_writes::NOT_INSTALLED
         );
         assert_eq!(on.mail.sent.lock().unwrap().len(), 1);
         // Over its bound: PER_SKILL_HOUR within the hour, then refused.
@@ -4785,9 +4887,15 @@ mod tests {
         // Unlinking takes the yes back: the same account linked again is
         // waiting for a new one (App Only's P2-1 on #6123).
         run(on.admin(r#"{"op":"remove","code":"gmail"}"#));
-        assert_eq!(run(on.skill_tool(&line))["error"], skill_writes::WAITING);
+        assert_eq!(
+            run(on.skill_tool(&line))["error"],
+            skill_writes::NOT_APPROVED
+        );
         run(on.admin(&app_password_gmail("me@home.test")));
-        assert_eq!(run(on.skill_tool(&line))["error"], skill_writes::WAITING);
+        assert_eq!(
+            run(on.skill_tool(&line))["error"],
+            skill_writes::NOT_APPROVED
+        );
         // Linked over as another account: stopped.
         let yes = run(on.tool(&approve_line("arrive-mail", &[arrival_mail()])));
         assert_eq!(yes["result"]["approved"], 1, "{yes}");
@@ -4845,7 +4953,10 @@ mod tests {
             "{refused}"
         );
         run(on.admin(&app_password_gmail("me@home.test")));
-        assert_eq!(run(on.skill_tool(&line))["error"], skill_writes::WAITING);
+        assert_eq!(
+            run(on.skill_tool(&line))["error"],
+            skill_writes::NOT_APPROVED
+        );
         assert!(on.mail.sent.lock().unwrap().is_empty());
         // Only lamp-skills' own cgroup is a skill's caller, on the tools'
         // door, and only with a skill's switch on.
@@ -4871,14 +4982,23 @@ mod tests {
         let on = approved(dir.path());
         let line = skill_write_line("arrive-mail", &arrival_mail());
         put_on(dir.path(), "arrive-mail", "2");
-        assert_eq!(run(on.skill_tool(&line))["error"], skill_writes::WAITING);
+        assert_eq!(
+            run(on.skill_tool(&line))["error"],
+            skill_writes::NOT_APPROVED
+        );
         // Put back as it was: the old yes was dropped, so still waiting.
         put_on(dir.path(), "arrive-mail", "1");
-        assert_eq!(run(on.skill_tool(&line))["error"], skill_writes::WAITING);
+        assert_eq!(
+            run(on.skill_tool(&line))["error"],
+            skill_writes::NOT_APPROVED
+        );
         let yes = run(on.tool(&approve_line("arrive-mail", &[arrival_mail()])));
         assert_eq!(yes["result"]["approved"], 1, "{yes}");
         std::fs::remove_dir_all(dir.path().join("skills").join("arrive-mail")).unwrap();
-        assert_eq!(run(on.skill_tool(&line))["error"], skill_writes::WAITING);
+        assert_eq!(
+            run(on.skill_tool(&line))["error"],
+            skill_writes::NOT_INSTALLED
+        );
         assert!(on.mail.sent.lock().unwrap().is_empty());
         // A skill not on as a package is never approved.
         let refused = run(on.tool(&approve_line("arrive-mail", &[arrival_mail()])));
@@ -4931,21 +5051,16 @@ mod tests {
             calls[calls.len() - 2].url,
             "https://api.github.com/repos/o/r"
         );
-        // Made public since the private yes: waiting, nothing posted.
+        // Made public since the private yes: bound again as public and
+        // posted, nothing waited for (the owner's rule, 21 Nov).
         let made_public =
             services(dir.path(), r#"{"private":false}"#, true).with_skill_writes(true);
+        assert_eq!(run(made_public.skill_tool(&line))["result"]["sent"], true);
+        let calls = made_public.http.calls.lock().unwrap().clone();
+        assert_eq!(calls.last().unwrap().method, Method::Post);
         assert_eq!(
-            run(made_public.skill_tool(&line))["error"],
-            skill_writes::WAITING
-        );
-        assert!(
-            made_public
-                .http
-                .calls
-                .lock()
-                .unwrap()
-                .iter()
-                .all(|call| call.method == Method::Get)
+            calls.last().unwrap().url,
+            "https://api.github.com/repos/o/r/issues/3/comments"
         );
     }
 
@@ -4968,9 +5083,13 @@ mod tests {
                 .contains("not one a skill makes"),
             "{refused}"
         );
-        assert_eq!(
-            run(on.skill_tool(&skill_write_line("post", &post)))["error"],
-            skill_writes::WAITING
+        let refused = run(on.skill_tool(&skill_write_line("post", &post)));
+        assert!(
+            refused["error"]
+                .as_str()
+                .unwrap()
+                .contains("not one a skill makes"),
+            "{refused}"
         );
         assert!(on.http.calls.lock().unwrap().is_empty());
     }

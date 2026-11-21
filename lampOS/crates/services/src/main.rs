@@ -165,7 +165,7 @@ fn main() -> ExitCode {
         .as_deref());
     if skill_write_agent {
         say(
-            "a skill's fixed write through the lamp's agent on: its run sends it once, as the owner said yes to it",
+            "a skill's fixed write through the lamp's agent on: its run sends it once, as the skill declares it",
         );
     }
     // An uploaded skill's keys given in the app (LAMP_SKILL_SECRETS):

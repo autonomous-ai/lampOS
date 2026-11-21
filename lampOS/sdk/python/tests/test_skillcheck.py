@@ -333,6 +333,26 @@ def test_a_skill_with_a_task_and_its_script_passes(tmp_path):
     assert report.format == 2
 
 
+# A `run` step (#8158): the skill's own Python script run by lamp-tasks with no agent, held as a task is.
+RUN_RULES = (
+    'format = 2\nversion = "1.0.0"\ngrants = ["speak"]\ntool = "daily_brief"\n\n[permissions]\nspeak = true\n\n'
+    '[[do]]\nrun = "scripts/main.py"\n'
+)
+
+
+def test_a_run_step_and_its_script_pass_and_are_held_as_a_task(tmp_path):
+    report = check(task_skill(tmp_path / "daily-brief", rules=RUN_RULES))
+    assert report.ok, report.errors
+    not_alone = check(task_skill(tmp_path / "a", rules=RUN_RULES.replace('[[do]]\nrun', '[[do]]\nsay = "Hi."\nrun')))
+    assert any("do.run is alone" in e for e in not_alone.errors), not_alone.errors
+    shell = check(task_skill(tmp_path / "b", rules=RUN_RULES.replace("main.py", "main.sh"), run="scripts/main.sh"))
+    assert any("is a Python file" in e for e in shell.errors), shell.errors
+    missing = check(task_skill(tmp_path / "c", rules=RUN_RULES, script=None))
+    assert not missing.ok
+    both = RUN_RULES + '[[do]]\ntask = { task = "again", run = "scripts/main.py" }\n'
+    assert any("one do.task step" in e for e in check(task_skill(tmp_path / "d", rules=both)).errors)
+
+
 def test_a_script_beside_a_task_is_taken_under_scripts_only(tmp_path):
     folder = task_skill(tmp_path / "blue-task")
     (folder / "scripts" / "helper.py").write_text("print('h')\n")

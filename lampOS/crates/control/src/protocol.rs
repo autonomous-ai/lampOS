@@ -793,9 +793,10 @@ pub enum Op {
     },
 }
 
-/// What a skill run's `service.write` that tries to send is told: the
-/// person's spoken yes sends a write, never the run.
-pub const RUN_PREPARES_ONLY: &str = "a skill's run only prepares a write: the lamp reads it back and the person's spoken yes sends it, so send_id and said are not taken here";
+/// What a skill run's `service.write` that names a send is told: its write
+/// is sent at once by its own call, under its declared grant (the owner's
+/// rule, 21 Nov), never by a `send_id` or a `said`.
+pub const RUN_PREPARES_ONLY: &str = "a skill's run sends its write by calling service.write once with the write itself, so send_id and said are not taken here";
 
 impl Op {
     /// The grants it needs (all of them).

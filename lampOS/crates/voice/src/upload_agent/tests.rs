@@ -128,8 +128,7 @@ fn a_booth_file_becomes_an_agent_skill_with_light_speak_and_net() {
         line,
         "I added strip booth from a file, not from the Skills Store, and it's on: only when you \
          ask for it, the lamp's agent follows the file, and it changes the light, speaks and \
-         plays sounds and reaches the public internet. The first time it runs, I'll ask you to \
-         agree."
+         plays sounds and reaches the public internet."
     );
     // Going on records no yes: its first run asks it.
     let said = went_on(&made, &grants, |_| panic!("no yes is recorded for net"));
@@ -207,92 +206,6 @@ fn a_short_file_with_only_light_and_speak_goes_on_at_once() {
         "{}",
         files.toml
     );
-    let _ = std::fs::remove_dir_all(&root);
-    switches(false, false);
-}
-
-/// Its first run asks the yes: the model's call of its tool is answered
-/// with the say-back and the wait for the person's yes, and nothing runs;
-/// once agreed, the call runs. Another skill's call is not touched.
-#[test]
-fn an_agent_skills_first_run_asks_the_yes_and_an_agreed_one_runs() {
-    switches(true, true);
-    crate::skill_task_yes::set_on_here(Some(true));
-    let (root, keeping) = keeping("agent-first-run");
-    let made = take(&place(&root), &keeping, None, &strip_booth(), NOW).unwrap();
-    let asked = manage_helper(&keeping.manage);
-    made_skill::put_on(&keeping, &made).unwrap();
-    asked.join().unwrap();
-    let task = |approved: bool| crate::skill_task_yes::TaskAsks {
-        name: "strip-booth".into(),
-        sha256: "b".repeat(64),
-        grants: vec!["light".into(), "speak".into(), "net".into()],
-        task: "Counts down three times with the light and posts a strip to my chat.".into(),
-        package: None,
-        from: FROM.into(),
-        approved,
-    };
-    let asking = crate::make_skill_local::Asking {
-        request: 7,
-        heard: true,
-        owner_hears: true,
-        sends_here: true,
-    };
-    let pushed = root.join("pushed");
-    let now = std::time::Instant::now();
-    let told = first_run_with(
-        &keeping.directory,
-        "strip_booth",
-        asking,
-        &pushed,
-        |_| Ok(Some(task(false))),
-        now,
-    )
-    .unwrap();
-    assert_eq!(told["task_waits_for_yes"], true, "{told}");
-    let next = told["next"].as_str().unwrap();
-    assert!(
-        next.contains("comes from a file added in the app"),
-        "{next}"
-    );
-    assert!(next.contains("reaches the public internet"), "{next}");
-    assert!(next.contains("It runs only once you agree."), "{next}");
-    assert!(
-        first_run_with(
-            &keeping.directory,
-            "strip_booth",
-            asking,
-            &pushed,
-            |_| Ok(Some(task(true))),
-            now
-        )
-        .is_none()
-    );
-    assert!(
-        first_run_with(
-            &keeping.directory,
-            "light_on",
-            asking,
-            &pushed,
-            |_| Ok(Some(task(false))),
-            now
-        )
-        .is_none()
-    );
-    // Off: as today, the call runs as any skill's.
-    set_on_here(Some(false));
-    assert!(
-        first_run_with(
-            &keeping.directory,
-            "strip_booth",
-            asking,
-            &pushed,
-            |_| Ok(Some(task(false))),
-            now
-        )
-        .is_none()
-    );
-    crate::skill_task_yes::set_on_here(None);
     let _ = std::fs::remove_dir_all(&root);
     switches(false, false);
 }
@@ -461,8 +374,8 @@ fn a_file_that_uses_a_linked_service_gets_its_grants_with_the_switch_on() {
     );
     let said = on_line(&made, &grants);
     assert!(said.contains("reads your Gmail"), "{said}");
-    assert!(said.contains("each sent only on your yes"), "{said}");
-    assert!(said.contains("I'll ask you to agree"), "{said}");
+    assert!(said.contains("sends with your Gmail"), "{said}");
+    assert!(!said.contains("yes") && !said.contains("agree"), "{said}");
     let _ = std::fs::remove_dir_all(&root);
     // Off: a file naming a service is refused in plain words, nothing kept.
     crate::made_skill::set_agent_services_here(Some(false));

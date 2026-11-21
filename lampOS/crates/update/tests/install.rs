@@ -2620,9 +2620,10 @@ fn the_product_turns_the_skill_flows_three_switches_on_where_they_are_read() {
 
 /// The make flow's five switches (the first builder's DEFAULT-ON, 19 Nov
 /// 21:42, on #7814), each `on` once in lamp-voice, whose part reads it, and
-/// in no other unit: a make the lamp can't build itself made a task for its
-/// agent (`LAMP_MAKE_NO_CANNOT`, #7234), made code that only lights, speaks
-/// or moves on at once (`LAMP_MADE_CODE_ON_AT_ONCE`), a skill the lamp has
+/// in no other unit but lamp-control for made code's (its no-yes mint and
+/// check, #8180): a make the lamp can't build itself made a task for its
+/// agent (`LAMP_MAKE_NO_CANNOT`, #7234), made code on at once with its
+/// declared grants and no yes (`LAMP_MADE_CODE_ON_AT_ONCE`), a skill the lamp has
 /// but is off turned on for a make asking for it (`LAMP_MAKE_CORE_OFFER`),
 /// "make a skill" listened for (`LAMP_SKILL_KEYTERM`) with a thing to do on
 /// a repeat told as a skill, never a reminder
@@ -2634,7 +2635,10 @@ fn the_product_turns_the_make_flows_five_switches_on_where_they_are_read() {
     let voice: &[&str] = &["lamp-voice.service"];
     let switches: [(&str, &[&str]); 5] = [
         (lamp_voice::make_no_cannot::ENVIRONMENT, voice),
-        (lamp_voice::made_skill::CODE_AT_ONCE_ENVIRONMENT, voice),
+        (
+            lamp_voice::made_skill::CODE_AT_ONCE_ENVIRONMENT,
+            &["lamp-voice.service", "lamp-control.service"],
+        ),
         (lamp_voice::make_core_offer::ENVIRONMENT, voice),
         (
             lamp_voice::second_provider::net::key_terms::SKILL_ENVIRONMENT,
@@ -8994,6 +8998,57 @@ fn no_other_lampos_unit_can_write_lamp_controls_yes() {
 #[test]
 fn no_other_lampos_unit_can_write_the_apps_socket_folder() {
     no_other_lampos_unit_can_write("/run/lampos-apps", None);
+}
+
+/// The owner's rule, 21 Nov: a skill's declared grants are minted from its
+/// folder as it is, with no yes kept, so whoever can write the skills'
+/// folders grants. Only the manage helper (root) writes them: no product
+/// unit that runs as `lampos` names either folder writable
+/// (`ReadWritePaths=`), the pushed folder is made root's, 0755
+/// (`lampos.conf`), and the helper runs as root.
+#[test]
+fn only_the_manage_helper_can_write_the_skills_folders() {
+    let covers = |folder: &str, path: &str| {
+        let path = path.trim_start_matches(['-', '+']).trim_end_matches('/');
+        !path.is_empty() && (folder == path || folder.starts_with(&format!("{path}/")))
+    };
+    let mut checked = 0;
+    for (name, text) in PRODUCT.iter() {
+        let service = section(text, "Service");
+        if !service.contains(&"User=lampos") {
+            continue;
+        }
+        checked += 1;
+        for paths in service
+            .iter()
+            .filter_map(|line| line.strip_prefix("ReadWritePaths="))
+        {
+            for path in paths.split_whitespace() {
+                for folder in ["/var/lib/lampOS/skills", "/var/lib/lampOS/skills-dev"] {
+                    assert!(
+                        !covers(folder, path),
+                        "{name} runs as lampos and names {folder} writable ({path})"
+                    );
+                }
+            }
+        }
+    }
+    assert!(checked > 10, "only {checked} lampos units checked");
+    let unit = |wanted: &str| {
+        PRODUCT
+            .iter()
+            .find(|(name, _)| *name == wanted)
+            .map(|(_, text)| *text)
+            .unwrap_or_else(|| panic!("{wanted} is not in the product"))
+    };
+    let manage = section(unit("lamp-skills-manage@.service"), "Service");
+    assert!(manage.contains(&"User=root"), "{manage:?}");
+    assert!(
+        install::TMPFILES
+            .lines()
+            .any(|line| line.trim() == "d /var/lib/lampOS/skills-dev 0755 root root -"),
+        "the pushed folder is root's, 0755"
+    );
 }
 
 fn no_other_lampos_unit_can_write(folder: &str, state_directory: Option<&str>) {

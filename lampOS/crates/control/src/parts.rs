@@ -173,6 +173,26 @@ impl LightOut for lamp_bus::Publisher {
 /// the ring shows the person's light as before.
 pub const PAIR_CUE_HOLD_US: u64 = (LightPattern::PULSE_DEFAULT_MS as u64 + 500) * 1_000;
 
+/// The most characters of a run's first finished say kept for its end
+/// (`said_first`, #8180): what a make's try is told it said.
+pub const SAID_FIRST_CHARS: usize = 120;
+
+/// A client's finished says, until taken (#8158, #8180).
+#[derive(Debug, Default)]
+struct Said {
+    count: u32,
+    first: Option<String>,
+}
+
+/// `text` on one line, at most [`SAID_FIRST_CHARS`] characters.
+pub fn said_first(text: &str) -> String {
+    let line = text.split_whitespace().collect::<Vec<_>>().join(" ");
+    match line.char_indices().nth(SAID_FIRST_CHARS) {
+        Some((at, _)) => line[..at].to_owned(),
+        None => line,
+    }
+}
+
 /// The name a computer's `move` is given to the body, and said back on
 /// `body/gesture`.
 pub const MOVE_NAME: &str = "control";
@@ -223,6 +243,10 @@ pub struct Lamp {
     voice: Arc<Mutex<Voice>>,
     /// Each client's says still waiting on the voice, for its `stop`.
     says: Says,
+    /// Each client's `say`s the voice said whole, until taken
+    /// ([`Parts::said_take`], #8158): a skill run's sign it said something;
+    /// and the first one's words ([`Parts::said_take_first`], #8180).
+    said: Arc<Mutex<HashMap<String, Said>>>,
     /// The number the next say is kept under.
     next_say: u64,
     /// The microphone, the ears' blocks on the bus; none without the bus.
@@ -334,6 +358,7 @@ impl Lamp {
             voice: Arc::default(),
             actions: None,
             says: Says::default(),
+            said: Arc::default(),
             next_say: 0,
             microphone: None,
             speaker: None,
@@ -908,7 +933,7 @@ impl Lamp {
             // is said again without (`say_to_voice`).
             line["by"] = json!(client);
         }
-        self.say_to_voice(client, re, line)
+        self.say_to_voice_counted(client, re, line, true)
     }
 
     /// `sound`: the lamp's own short hum, the voice's built-in cue (no file,
@@ -1165,6 +1190,18 @@ impl Lamp {
     /// A line to the voice for `client`'s action `re`, kept for its `stop`
     /// (`{"cancel":true}` on the same connection) until its outcome comes.
     fn say_to_voice(&mut self, client: &str, re: u64, line: Value) -> Result<Value, Error> {
+        self.say_to_voice_counted(client, re, line, false)
+    }
+
+    /// [`Self::say_to_voice`], a line said whole counted for `client` when
+    /// `counted` (a `say`, never a sound: #8158's [`Parts::said_take`]).
+    fn say_to_voice_counted(
+        &mut self,
+        client: &str,
+        re: u64,
+        line: Value,
+        counted: bool,
+    ) -> Result<Value, Error> {
         let Some(path) = self.say.clone() else {
             return Err(not_here("the voice"));
         };
@@ -1175,6 +1212,7 @@ impl Lamp {
         let number = self.next_say;
         self.next_say += 1;
         let says = Arc::clone(&self.says);
+        let said = counted.then(|| Arc::clone(&self.said));
         says.lock()
             .expect("says")
             .entry(client.clone())
@@ -1210,6 +1248,16 @@ impl Lamp {
             }
             let (how, why) = result;
             forget_say(&says, &client, number);
+            // Counted before its `done` is sent, so a run that waited for
+            // the `done` ends with it counted.
+            if let Some(said) = said.filter(|_| how == "finished") {
+                let mut said = said.lock().expect("said");
+                let kept = said.entry(client.clone()).or_default();
+                kept.count += 1;
+                if kept.first.is_none() {
+                    kept.first = line["text"].as_str().map(said_first);
+                }
+            }
             let mut done = json!({"ev": "done", "re": re, "how": how});
             if let Some(why) = why {
                 done["why"] = json!(why);
@@ -1651,6 +1699,18 @@ impl Parts for Lamp {
 
     fn asking(&mut self, connection: Option<u64>) {
         self.asking = connection;
+    }
+
+    fn said_take(&mut self, client: &str) -> u32 {
+        self.said_take_first(client).0
+    }
+
+    fn said_take_first(&mut self, client: &str) -> (u32, Option<String>) {
+        self.said
+            .lock()
+            .expect("said")
+            .remove(client)
+            .map_or((0, None), |said| (said.count, said.first))
     }
 
     fn state(&self, kind: StateKind) -> Value {
@@ -2491,6 +2551,74 @@ mod tests {
                 json!({"ev": "done", "re": 14, "how": "finished"})
             )
         );
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    /// #8180: a run's first finished say is kept on one line, at most
+    /// [`SAID_FIRST_CHARS`] characters, for its end's `said_first`.
+    #[test]
+    fn a_runs_first_say_is_kept_on_one_line_capped() {
+        assert_eq!(
+            said_first("  The tide is\nlow at  six. "),
+            "The tide is low at six."
+        );
+        let long = "é".repeat(SAID_FIRST_CHARS + 30);
+        assert_eq!(said_first(&long).chars().count(), SAID_FIRST_CHARS);
+        assert_eq!(said_first("short"), "short");
+    }
+
+    /// #8158: a `say` the voice said whole is counted for its client until
+    /// taken, once; one dropped is not, nor the hum (a `sound`), so a skill
+    /// run's `run` step is told only of the words it had said.
+    #[test]
+    fn a_say_said_whole_is_counted_for_its_client_until_taken() {
+        let dir = dir("said");
+        let path = dir.join("say.sock");
+        let listener = std::os::unix::net::UnixListener::bind(&path).unwrap();
+        let told: Arc<Mutex<Vec<(String, Value)>>> = Arc::default();
+        let sink = told.clone();
+        let events: Events =
+            Arc::new(move |client, event| sink.lock().unwrap().push((client.to_owned(), event)));
+        let voice = std::thread::spawn(move || {
+            for answer in [
+                r#"{"outcome":"spoken"}"#,
+                r#"{"outcome":"dropped","why":"expired"}"#,
+                r#"{"outcome":"spoken"}"#,
+            ] {
+                let (stream, _) = listener.accept().unwrap();
+                let mut line = String::new();
+                BufReader::new(&stream).read_line(&mut line).unwrap();
+                let mut out = &stream;
+                writeln!(out, "{answer}").unwrap();
+            }
+        });
+        let mut lamp = Lamp::new(None, None, Some(path), "boot".into(), events);
+        let wait_for = |n: usize| {
+            for _ in 0..500 {
+                if told.lock().unwrap().len() >= n {
+                    return;
+                }
+                std::thread::sleep(Duration::from_millis(10));
+            }
+            panic!("no done");
+        };
+        assert_eq!(lamp.said_take("c_9"), 0);
+        lamp.act("c_9", 1, &op(r#"{"id":1,"op":"say","text":"One."}"#), 0)
+            .unwrap();
+        wait_for(1);
+        lamp.act("c_9", 2, &op(r#"{"id":2,"op":"say","text":"Two."}"#), 0)
+            .unwrap();
+        wait_for(2);
+        // The hum: said, but no say of the client's.
+        lamp.act("c_9", 3, &op(r#"{"id":3,"op":"sound","name":"hum"}"#), 0)
+            .unwrap();
+        wait_for(3);
+        voice.join().unwrap();
+        assert_eq!(told.lock().unwrap()[2].1["how"], "finished");
+        assert_eq!(lamp.said_take("c_8"), 0, "another client's none");
+        // #8180: with the first finished say's words.
+        assert_eq!(lamp.said_take_first("c_9"), (1, Some("One.".to_owned())));
+        assert_eq!(lamp.said_take("c_9"), 0, "taken once");
         let _ = std::fs::remove_dir_all(&dir);
     }
 

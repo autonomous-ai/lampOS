@@ -33,13 +33,11 @@
 //!   `lamp-services mcp`), each send only on the owner's spoken yes; the
 //!   grant always keeps its first run's yes. Off, a file naming a service is
 //!   refused ([`NO_SERVICES`]).
-//! - **On at once, or a spoken yes once** (the first builder's 19:14 line):
-//!   it goes on as an uploaded skill does today (#5977, said aloud). With
-//!   grants only of [`AT_ONCE`] (light, speak, body) its task's yes is
-//!   recorded by lamp-control as it goes on ([`went_on`]); with anything
-//!   else, `sound` (hearing kinds of sound), the microphone, the camera, a
-//!   send or `net` ([`asks_yes`]), its first run asks the spoken yes through
-//!   the task-yes path ([`first_run`], `crate::skill_task_yes`), once.
+//! - **On at once, nothing asked** (the owner's rule, 21 Nov: a skill's
+//!   declared grants are on): it goes on as an uploaded skill does today
+//!   (#5977, said aloud), and its first ask runs it with its declared
+//!   grants, whatever they are (light, speak, body, `sound`, the
+//!   microphone, the camera, a send or `net`).
 //! - **No secret is the lamp's** (the first builder's 19:44 ruling): a key
 //!   or token is never said aloud, asked by voice or kept in the skill's
 //!   folder: a file carrying a value that looks like one is refused in
@@ -327,9 +325,9 @@ fn services_named(text: &str) -> Vec<&'static str> {
 /// The linked services' grants `text` asks for, whatever the switch: for
 /// each service it names, `<code>-read` and `<code>-write`, in
 /// [`crate::made_skill::SERVICE_GRANT_CODES`]' order. What the file does
-/// with it is the agent's to judge as it runs; the guard is the owner's
-/// spoken yes at its first run, which names the service and that it may
-/// prepare sends, each sent only on the owner's yes.
+/// with it is the agent's to judge as it runs, under its declared grants:
+/// nothing is asked at its first run or at a send (the owner's rule, 21
+/// Nov), within the services' bounds.
 pub fn services_read(text: &str) -> Vec<String> {
     services_named(text)
         .into_iter()
@@ -922,19 +920,14 @@ pub fn package_files_ok<'a>(
 }
 
 /// What the lamp says once an agent skill is on: that it was added from a
-/// file, that the lamp's agent runs it, its grants in plain words, and
-/// whether its first run asks the yes.
+/// file, that the lamp's agent runs it, and its grants in plain words. Its
+/// first run asks nothing (the owner's rule, 21 Nov).
 pub fn on_line(made: &Made, grants: &[String]) -> String {
     let said = made_skill::spoken_name(&made.name);
     let uses = crate::skill_task_yes::uses_said(grants);
-    let then = if asks_yes(grants) {
-        " The first time it runs, I'll ask you to agree."
-    } else {
-        ""
-    };
     format!(
         "I added {said} from a file, not from the Skills Store, and it's on: only when you ask for \
-         it, the lamp's agent follows the file, and {uses}.{then}"
+         it, the lamp's agent follows the file, and {uses}."
     )
 }
 
@@ -976,10 +969,7 @@ pub fn went_on(
             eprintln!(
                 "lamp-voice: an agent skill added from a file: its task's yes not kept: {why}"
             );
-            format!(
-                "{} The first time it runs, I'll ask you to agree.",
-                on_line(made, grants)
-            )
+            on_line(made, grants)
         }
     }
 }
@@ -1004,65 +994,6 @@ pub fn agent_named(directory: &Path, tool: &str) -> Option<String> {
         .filter(|entry| entry["agent"] == true && entry["on"] == true)
         .filter_map(|entry| entry["name"].as_str().map(str::to_owned))
         .find(|name| name.replace('-', "_") == tool)
-}
-
-/// The model's call of `tool`, before it runs: for an agent skill whose
-/// task's yes isn't kept, its say-back and the wait for the spoken yes
-/// ([`crate::skill_task_yes::read_back`]), and nothing runs; none when it
-/// isn't one, or its yes is kept, so the call runs. `asks` reads the skill
-/// on the lamp, with lamp-control's word.
-pub fn first_run_with(
-    directory: &Path,
-    tool: &str,
-    asking: crate::make_skill_local::Asking,
-    pushed: &Path,
-    mut asks: impl FnMut(&str) -> Result<Option<crate::skill_task_yes::TaskAsks>, String>,
-    now: std::time::Instant,
-) -> Option<Value> {
-    if !on() || !crate::skill_task_yes::on() {
-        return None;
-    }
-    let name = agent_named(directory, tool)?;
-    if let Ok(Some(task)) = asks(&name)
-        && task.approved
-    {
-        return None;
-    }
-    eprintln!(
-        "lamp-voice: request {}: an agent skill added from a file asks its yes before its first run",
-        asking.request
-    );
-    let told = crate::skill_task_yes::read_back(&name, asking, pushed, asks, now)?;
-    (told["approved"] != true).then_some(told)
-}
-
-/// [`first_run_with`] on a lamp: the product's folders and sockets.
-pub fn first_run(
-    tool: &str,
-    request: u64,
-    heard: bool,
-    lease: Option<&crate::memory_scope::ScopeLease>,
-) -> Option<Value> {
-    if !on() || !crate::skill_task_yes::on() {
-        return None;
-    }
-    let keeping = Keeping::when(true)?;
-    let control = Path::new(crate::skill_task_yes::CONTROL_SOCKET);
-    agent_named(&keeping.directory, tool)?;
-    let asking = crate::make_skill_local::Asking {
-        request,
-        heard,
-        owner_hears: crate::services::owner_hears(request, heard, lease),
-        sends_here: crate::services::sends_here(),
-    };
-    first_run_with(
-        &keeping.directory,
-        tool,
-        asking,
-        &made_skill::pushed(&keeping.installed),
-        |asked| crate::skill_task_yes::asks_by(&keeping.manage, control, asked),
-        std::time::Instant::now(),
-    )
 }
 
 /// What the model is told once an agent skill's yes is kept: run it now,

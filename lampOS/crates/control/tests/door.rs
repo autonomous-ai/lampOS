@@ -2865,6 +2865,13 @@ impl lamp_control::runs::SkillYes for FakeYes {
             None => Err("no such skill".to_owned()),
         }
     }
+
+    fn try_grants(
+        &self,
+        asked: &[String],
+    ) -> Result<std::collections::BTreeSet<lamp_control::protocol::Grant>, String> {
+        lamp_control::task_yes::try_grants_of(asked)
+    }
 }
 
 fn the_owners_yes() -> Arc<FakeYes> {
@@ -2977,6 +2984,8 @@ async fn no_token_a_wrong_one_and_an_ended_one_are_refused() {
     assert_eq!(run_hello(&mut open, Some(&token)).await["ok"], true);
     let ended = admin(&lamp, json!({"end": {"run": "r2"}})).await;
     assert_eq!(ended["ended"], true, "{ended}");
+    // #8158: the end says how many of the run's says were said whole.
+    assert_eq!(ended["said"], 0, "{ended}");
     assert!(
         agent_next(&mut open).await.is_none(),
         "the run's connection closed with it"
@@ -2988,6 +2997,37 @@ async fn no_token_a_wrong_one_and_an_ended_one_are_refused() {
         admin(&lamp, json!({"end": {"run": "r2"}})).await["ended"],
         false
     );
+}
+
+/// #8157: a make's tried run is minted the draft's own grants, as the
+/// make's skill, marked tried; its end tells how many lines it said. A try
+/// beside a skill or an ask, or with a grant the lamp doesn't name, is
+/// refused.
+#[tokio::test]
+async fn a_tried_run_is_minted_the_drafts_grants_and_its_end_tells_its_says() {
+    let lamp = lamp("run-try").await;
+    let path = run_socket(&lamp, my_uid(&lamp)).await;
+    let minted = admin(
+        &lamp,
+        json!({"mint": {"try": ["net", "speak", "light"], "run": "try-1"}}),
+    )
+    .await;
+    assert_eq!(minted["skill"], "make-try", "{minted}");
+    assert_eq!(minted["tried"], true, "{minted}");
+    assert_eq!(minted["grants"], json!(["light", "speak"]), "{minted}");
+    let token = minted["token"].as_str().unwrap().to_owned();
+    let mut socket = agent_connect(&path).await.unwrap();
+    assert_eq!(run_hello(&mut socket, Some(&token)).await["ok"], true);
+    let ended = admin(&lamp, json!({"end": {"run": "try-1"}})).await;
+    assert_eq!(ended, json!({"ended": true, "said": 0}), "{ended}");
+    for bad in [
+        json!({"mint": {"try": ["speak"], "skill": "booth", "run": "try-2"}}),
+        json!({"mint": {"try": ["fly"], "run": "try-2"}}),
+        json!({"mint": {"try": "speak", "run": "try-2"}}),
+    ] {
+        let refused = admin(&lamp, bad.clone()).await;
+        assert!(refused["error"].is_string(), "{bad} {refused}");
+    }
 }
 
 #[tokio::test]
