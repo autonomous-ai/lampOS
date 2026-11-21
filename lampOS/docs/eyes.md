@@ -1875,7 +1875,8 @@ With the switch:
   description, names checked or not, says that a question of whether the
   lamp knows or remembers them ("Do you remember me?", "Did you remember my
   face?", "Do you know my face?") is no ask: answer it from who you see now,
-  never with this call. Before that line it says every clear ask to
+  never with this call. With names checked (`LAMP_NAMES=checked`, as in the
+  product), before that line it says every clear ask to
   remember them is a call in any turn, also when their face was kept
   earlier in the conversation (the handler answers that it already knows
   them, below) and before they said their name (with an empty name, told
