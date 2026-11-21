@@ -3904,7 +3904,7 @@ fn remember_on() -> bool {
 /// grant the checked words go to the voice and its word is the answer.
 #[tokio::test]
 async fn an_apps_fact_over_its_socket_needs_the_grant_and_is_answered_by_the_voice() {
-    use lamp_control::app_remember::Tell;
+    use lamp_msgs::app_fact::AppRemember;
     let lamp = lamp("app-remember").await;
     let path = app_socket(&lamp, "apps.sock", is_demo, apps_on).await;
     lamp.shared.set_remember_on(remember_on);
@@ -3913,12 +3913,13 @@ async fn an_apps_fact_over_its_socket_needs_the_grant_and_is_answered_by_the_voi
     lamp.shared.set_private(Arc::new(move || {
         reads.load(std::sync::atomic::Ordering::SeqCst)
     }));
-    let told = Arc::new(std::sync::Mutex::new(Vec::<Tell>::new()));
+    let told = Arc::new(std::sync::Mutex::new(Vec::<AppRemember>::new()));
     let into = told.clone();
-    lamp.shared.set_remember_sink(Arc::new(move |tell| {
-        into.lock().unwrap().push(tell);
-        true
-    }));
+    lamp.shared
+        .set_remember_sink(Arc::new(move |fact: &AppRemember| {
+            into.lock().unwrap().push(fact.clone());
+            true
+        }));
     let hello =
         || json!({"id": 1, "op": "hello", "client": "c_0", "sig": STANDARD.encode([0u8; 64])});
     // Without the grant: refused, nothing told.
@@ -3965,7 +3966,7 @@ async fn an_apps_fact_over_its_socket_needs_the_grant_and_is_answered_by_the_voi
         .unwrap();
     let start = std::time::Instant::now();
     let fact_told = loop {
-        if let Some(Tell::Remember(fact)) = told.lock().unwrap().pop() {
+        if let Some(fact) = told.lock().unwrap().pop() {
             break fact;
         }
         assert!(start.elapsed() < Duration::from_secs(5), "not told");
