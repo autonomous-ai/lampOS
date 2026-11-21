@@ -2056,6 +2056,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "lamp-checked-replace"
+version = "0.1.0"
+dependencies = [
+ "getrandom 0.4.3",
+ "rustix",
+]
+
+[[package]]
 name = "lamp-cloud"
 version = "0.1.0"
 dependencies = [
@@ -2584,6 +2592,7 @@ version = "0.1.0"
 dependencies = [
  "axum",
  "lamp-bus",
+ "lamp-checked-replace",
  "lamp-ipc",
  "lamp-keeper",
  "lamp-local-time",
@@ -2712,6 +2721,7 @@ version = "0.1.0"
 dependencies = [
  "getrandom 0.4.3",
  "lamp-bus",
+ "lamp-checked-replace",
  "lamp-ipc",
  "lamp-msgs",
  "nix 0.29.0",
@@ -2766,6 +2776,7 @@ dependencies = [
  "httparse",
  "lamp-actions",
  "lamp-bus",
+ "lamp-checked-replace",
  "lamp-controls",
  "lamp-gemini",
  "lamp-local-time",

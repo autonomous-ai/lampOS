@@ -200,7 +200,9 @@ fn own_ids() -> (String, String) {
 /// own ids, `curl -o` by writing the stand-in Node bytes, `tar` by putting
 /// a Node of `node` there, `npm ci` by putting the package at `package`,
 /// `install -d` by making the folder; `fail_on` makes the first command
-/// holding it fail; the rest with nothing.
+/// holding it fail; `main_pid`, what `systemctl show -p MainPID` prints of
+/// the gateway's unit (`""`, none running, by default); the rest with
+/// nothing.
 struct Runs {
     root: PathBuf,
     log: Rc<RefCell<Vec<String>>>,
@@ -209,6 +211,8 @@ struct Runs {
     fail_on: Option<&'static str>,
     /// What the failing command answers.
     error: &'static str,
+    /// The gateway's `MainPID`: `""` or `"0"` when none runs.
+    main_pid: &'static str,
 }
 
 impl Runs {
@@ -220,6 +224,7 @@ impl Runs {
             package: VERSION,
             fail_on: None,
             error: "refused",
+            main_pid: "",
         }
     }
     fn runner(&self) -> impl FnMut(&[String]) -> Result<String, String> + '_ {
@@ -230,7 +235,9 @@ impl Runs {
                 return Err(self.error.to_owned());
             }
             let (uid, gid) = own_ids();
-            if line == "id -g lampos" {
+            if line == format!("systemctl show -p MainPID --value -- {UNIT}") {
+                Ok(format!("{}\n", self.main_pid))
+            } else if line == "id -g lampos" {
                 Ok(format!("{gid}\n"))
             } else if argv[0] == "id" {
                 Ok(format!("{uid}\n"))
@@ -856,6 +863,105 @@ fn a_failed_install_takes_the_entry_points_out_and_stops_the_gateway() {
     }
 }
 
+/// #8225 (lamp-52e6, 21 Nov 15:39): the install's `gateway` block check
+/// joined the running gateway, which restarted under it, and the check was
+/// killed ("...: Killed" from `runuser`). A check ended by a signal or past
+/// its bound gave no verdict: the live config stays as it was, nothing is
+/// taken out, the record is not `failed`/`config`, and the line says the
+/// next round tries again. A check that ran and exited non-zero is still a
+/// refusal: `failed`/`config`, the entry points taken out.
+#[test]
+fn an_install_check_killed_or_timed_out_takes_nothing_out_and_a_refusal_still_fails() {
+    let theirs = r#"{"models": {"mode": "merge"}}"#;
+    let set_up = || {
+        let lamp = Lamp::new();
+        fs::write(lamp.unit(), UNIT_TEXT).unwrap();
+        fs::create_dir_all(lamp.at(STATE)).unwrap();
+        fs::write(lamp.at(CONFIG), theirs).unwrap();
+        fs::write(lamp.at(WRAPPER), "old").unwrap();
+        fs::write(lamp.at(NS), "old").unwrap();
+        fs::write(lamp.at(SKILL_START), "old").unwrap();
+        write(&lamp.records(), OpenclawInstall::installed(1));
+        lamp.ask();
+        lamp
+    };
+    let check = "runuser -u lampos -- env OPENCLAW_CONFIG_PATH=/x /usr/local/bin/openclaw config validate --json";
+    for error in [
+        leak(format!("{check}: Killed")),
+        leak(format!("{check}: some output\nTerminated")),
+        leak(format!(
+            "{check}: update query ended with signal: 9 (SIGKILL)"
+        )),
+        leak(format!(
+            "{check}: did not end within 90 s: it ran on, or a child it left held its output"
+        )),
+        "OpenClaw's own config check refused it (status killed): ",
+        "OpenClaw's own config check ran past 60 s",
+    ] {
+        let lamp = set_up();
+        let runs = Runs {
+            fail_on: Some("config validate --json"),
+            error,
+            ..Runs::new(&lamp)
+        };
+        let mut lines = Vec::new();
+        let said = install_with(
+            lamp.root(),
+            &lamp.records(),
+            &mut runs.runner(),
+            &mut || 7,
+            &mut |line: &str| lines.push(line.to_owned()),
+            &kit(),
+        )
+        .unwrap()
+        .unwrap();
+        assert_eq!(said.install, "installed", "{error}: {said:?}");
+        assert_eq!(lamp.said(), Some(said), "{error}");
+        assert_eq!(
+            fs::read_to_string(lamp.at(CONFIG)).unwrap(),
+            theirs,
+            "{error}"
+        );
+        for path in [WRAPPER, NS, SKILL_START] {
+            assert!(lamp.at(path).exists(), "{path} taken out on {error}");
+        }
+        assert!(
+            !runs
+                .lines()
+                .iter()
+                .any(|line| line == &format!("systemctl stop {UNIT}")),
+            "{error}"
+        );
+        assert!(
+            lines.iter().any(
+                |line| line.contains("OpenClaw's config check did not finish (")
+                    && line
+                        .contains("): not checked now, kept as it was; the next round tries again")
+            ),
+            "{error}: {lines:#?}"
+        );
+        assert!(
+            !lines.iter().any(|line| line.contains("refused it:")),
+            "{error}: {lines:#?}"
+        );
+    }
+
+    // OpenClaw's own verdict: a refusal, as before.
+    let lamp = set_up();
+    let runs = Runs {
+        fail_on: Some("config validate --json"),
+        error: "models.mode: Unrecognized key",
+        ..Runs::new(&lamp)
+    };
+    let said = install(&lamp, &runs, 8).unwrap();
+    assert_eq!(
+        (said.install.as_str(), said.error.as_deref()),
+        ("failed", Some("config"))
+    );
+    assert_eq!(fs::read_to_string(lamp.at(CONFIG)).unwrap(), theirs);
+    assert!(!lamp.at(WRAPPER).exists() && !lamp.at(NS).exists());
+}
+
 /// Off: a round asks the one-shot to stop the gateway and take the entry
 /// points out; once they are gone, the round takes the unit out itself.
 #[test]
@@ -1330,6 +1436,161 @@ fn the_gateway_block_is_set_in_a_config_that_lacks_it_and_other_keys_are_kept() 
     );
 }
 
+/// #7868: the install's `gateway` block is checked by OpenClaw's own
+/// `config validate --json` before it lands, as `lampos` in OpenClaw's
+/// namespace, on a file beside the config, never the live one. Refused,
+/// the install fails with OpenClaw's words, the config stays byte for
+/// byte and nothing is left beside it; taken, the block is in place.
+#[test]
+fn a_gateway_block_openclaws_own_check_refuses_never_lands() {
+    let lamp = Lamp::new();
+    fs::create_dir_all(lamp.at(STATE)).unwrap();
+    fs::write(lamp.at(NS), "").unwrap();
+    let theirs = r#"{"models": {"mode": "merge"}}"#;
+    fs::write(lamp.at(CONFIG), theirs).unwrap();
+    let refusing = Runs {
+        fail_on: Some("config validate --json"),
+        error: "models.mode: Unrecognized key",
+        ..Runs::new(&lamp)
+    };
+    let error = gateway_config(lamp.root(), &mut refusing.runner(), &mut quiet()).unwrap_err();
+    assert!(error.contains("Unrecognized key"), "{error}");
+    assert_eq!(fs::read_to_string(lamp.at(CONFIG)).unwrap(), theirs);
+    assert_eq!(fs::read_dir(lamp.at(STATE)).unwrap().count(), 1);
+    let check = refusing
+        .lines()
+        .into_iter()
+        .find(|line| line.contains("config validate --json"))
+        .unwrap();
+    let (uid, gid) = own_ids();
+    assert!(
+        check.starts_with(&format!(
+            "{AS_LAMPOS}LAMP_NS_UID={uid} LAMP_NS_GID={gid} OPENCLAW_CONFIG_PATH={STATE}/.openclaw.json."
+        )) && check.ends_with(&format!(
+            ".new LAMP_HERMES_TOKEN=lamp-config-check /usr/bin/unshare --map-root-user --mount --pid --fork --kill-child --mount-proc --propagation private {NS} config validate --json"
+        )),
+        "{check}"
+    );
+
+    let taking = Runs::new(&lamp);
+    gateway_config(lamp.root(), &mut taking.runner(), &mut quiet()).unwrap();
+    let config: serde_json::Value =
+        serde_json::from_slice(&fs::read(lamp.at(CONFIG)).unwrap()).unwrap();
+    assert_eq!(config["models"], serde_json::json!({"mode": "merge"}));
+    assert_eq!(config["gateway"]["port"], 18789);
+    assert_eq!(fs::read_dir(lamp.at(STATE)).unwrap().count(), 1);
+    assert!(
+        taking.position("config validate --json")
+            < taking.position(&format!("chown -h lampos:lampos {CONFIG}"))
+    );
+}
+
+/// Whether `folder`'s lock (an exclusive `flock` on the folder) is held
+/// by another writer just now.
+fn folder_lock_held(folder: &Path) -> bool {
+    use rustix::fs::{FlockOperation, Mode, OFlags};
+    let dir = rustix::fs::open(
+        folder,
+        OFlags::RDONLY | OFlags::DIRECTORY | OFlags::CLOEXEC,
+        Mode::empty(),
+    )
+    .unwrap();
+    match rustix::fs::flock(&dir, FlockOperation::NonBlockingLockExclusive) {
+        Ok(()) => false,
+        Err(rustix::io::Errno::WOULDBLOCK) => true,
+        Err(error) => panic!("flock: {error}"),
+    }
+}
+
+/// Seventh's P2 on #7872: `openclaw.json` has two read-merge-check-rename
+/// writers (this one and lamp-tasks' provider merge), and a rename landing
+/// inside the other's check drops the other's block. So the `gateway`
+/// block's write holds the state folder's lock from before its read
+/// through OpenClaw's own check to the rename, and lets it go after.
+#[test]
+fn a_gateway_block_write_holds_the_state_folders_lock_through_its_check() {
+    let lamp = Lamp::new();
+    fs::create_dir_all(lamp.at(STATE)).unwrap();
+    fs::write(lamp.at(NS), "").unwrap();
+    let runs = Runs::new(&lamp);
+    let mut inner = runs.runner();
+    let mut held = None;
+    let mut runner = |argv: &[String]| {
+        if argv.join(" ").contains("config validate --json") {
+            held = Some(folder_lock_held(&lamp.at(STATE)));
+        }
+        inner(argv)
+    };
+    assert!(gateway_config(lamp.root(), &mut runner, &mut quiet()).unwrap());
+    assert_eq!(
+        held,
+        Some(true),
+        "the state folder was not locked through the check"
+    );
+    assert!(
+        !folder_lock_held(&lamp.at(STATE)),
+        "the lock outlived the write"
+    );
+}
+
+/// #7868 (the first builder, 02:02): OpenClaw 2026.11.2 refuses a `config
+/// validate` run in namespaces other than its running gateway's
+/// (`GatewayLockNamespaceError`, #7268). With the gateway's unit holding a
+/// `MainPID`, the check runs as `lampos` through [`WRAPPER`], which joins
+/// that gateway (never `LAMP_OPENCLAW_GATEWAY`, no stand-in token: the
+/// wrapper passes the forwarder's own); with none running (`0`, as at a
+/// first install), in namespaces of its own as before, since there is no
+/// lock to clash with.
+#[test]
+fn a_gateway_block_check_joins_the_running_gateway_and_runs_alone_with_none() {
+    let lamp = Lamp::new();
+    fs::create_dir_all(lamp.at(STATE)).unwrap();
+    fs::write(lamp.at(NS), "").unwrap();
+    let check_of = |main_pid: &'static str| {
+        let _ = fs::remove_file(lamp.at(CONFIG));
+        let runs = Runs {
+            main_pid,
+            ..Runs::new(&lamp)
+        };
+        gateway_config(lamp.root(), &mut runs.runner(), &mut quiet()).unwrap();
+        let lines = runs.lines();
+        let check = lines
+            .iter()
+            .position(|line| line.contains("config validate --json"))
+            .unwrap();
+        assert_eq!(
+            lines[..check]
+                .iter()
+                .filter(|line| line.contains("MainPID"))
+                .count(),
+            1,
+            "{lines:#?}"
+        );
+        lines[check].clone()
+    };
+    let joined = check_of("4242");
+    let (prefix, suffix) = joined
+        .split_once(".new ")
+        .unwrap_or_else(|| panic!("{joined}"));
+    assert!(
+        prefix.starts_with(&format!(
+            "{AS_LAMPOS}OPENCLAW_CONFIG_PATH={STATE}/.openclaw.json."
+        )),
+        "{joined}"
+    );
+    assert_eq!(suffix, format!("{WRAPPER} config validate --json"));
+    assert!(!joined.contains("LAMP_OPENCLAW_GATEWAY"), "{joined}");
+    assert!(!joined.contains("LAMP_HERMES_TOKEN"), "{joined}");
+
+    let alone = check_of("0");
+    assert!(
+        alone.ends_with(&format!(
+            ".new LAMP_HERMES_TOKEN=lamp-config-check /usr/bin/unshare --map-root-user --mount --pid --fork --kill-child --mount-proc --propagation private {NS} config validate --json"
+        )),
+        "{alone}"
+    );
+}
+
 /// (the owner on #6226: every lamp has 6 GB) The gateway is always on with
 /// the switch on: once OpenClaw is there the round enables it (the
 /// `multi-user.target.wants` link `systemctl enable` makes) and starts it,
@@ -1365,6 +1626,223 @@ fn the_switch_on_enables_and_starts_the_gateway_and_off_disables_and_stops_it() 
     after_round_off(lamp.root(), &lamp.records(), &mut systemd, &mut quiet());
     assert!(fs::symlink_metadata(lamp.at(WANTS)).is_err(), "disabled");
     assert_eq!(systemd.asked[..2], ["reload", "stop-gateway"]);
+}
+
+/// OpenClaw installed (the one-shot run, recorded), then the round after it.
+fn installed_openclaw() -> Lamp {
+    let lamp = Lamp::new();
+    lamp.harness_there();
+    round(&lamp, &mut Fake::default(), true, 1);
+    assert_eq!(
+        install(&lamp, &Runs::new(&lamp), 2).unwrap().install,
+        "installed"
+    );
+    round(&lamp, &mut Fake::default(), true, 3);
+    lamp
+}
+
+/// A round whose commands `runs` answers, and the lines it said.
+fn round_saying(lamp: &Lamp, systemd: &mut Fake, runs: &Runs) -> Vec<String> {
+    let mut said = Vec::new();
+    after_round(
+        lamp.root(),
+        &lamp.records(),
+        sk(true),
+        systemd,
+        &mut runs.runner(),
+        30,
+        Ok(crate::hermes_schedule::Window::Reached),
+        &mut |line: &str| said.push(line.to_owned()),
+    );
+    said
+}
+
+/// Harness's one-shot run with this build's own pins over the OpenClaw
+/// there, and the lines it said.
+fn one_shot_saying(lamp: &Lamp, runs: &Runs) -> Vec<String> {
+    let mut said = Vec::new();
+    install_with(
+        lamp.root(),
+        &lamp.records(),
+        &mut runs.runner(),
+        &mut || 40,
+        &mut |line: &str| said.push(line.to_owned()),
+        &Kit::BUILT,
+    )
+    .unwrap();
+    said
+}
+
+fn config_of(lamp: &Lamp) -> serde_json::Value {
+    serde_json::from_slice(&fs::read(lamp.at(CONFIG)).unwrap()).unwrap()
+}
+
+/// The `gateway` block the install writes, with the lamp's token.
+fn installs_block(lamp: &Lamp) -> serde_json::Value {
+    let token = fs::read_to_string(lamp.at(GATEWAY_TOKEN)).unwrap();
+    serde_json::json!({
+        "mode": "local",
+        "bind": "loopback",
+        "port": 18789,
+        "auth": {"mode": "token", "token": token.trim()},
+    })
+}
+
+/// A round over a `gateway` block not as the install writes it: it writes
+/// nothing of OpenClaw's itself, as `lamp-update.service`'s sandbox never
+/// lets it write OpenClaw's state folder (`ProtectSystem=strict`, and a
+/// round never changes its own unit, `the_updaters_own_sandbox_is_still_the_7071_images`
+/// in main.rs): `openclaw.json` stays byte for byte, no command runs, and
+/// Harness's one-shot is asked and started.
+fn a_round_asks_the_one_shot(lamp: &Lamp) {
+    let before = fs::read(lamp.at(CONFIG)).ok();
+    let runs = Runs::new(lamp);
+    let mut systemd = Fake::default();
+    round_saying(lamp, &mut systemd, &runs);
+    assert_eq!(
+        fs::read(lamp.at(CONFIG)).ok(),
+        before,
+        "the round writes it not"
+    );
+    assert!(
+        !runs
+            .lines()
+            .iter()
+            .any(|line| line.contains("config validate") || line.contains("chown")),
+        "{:#?}",
+        runs.lines()
+    );
+    assert!(lamp.asked().is_some(), "the one-shot is asked");
+    assert!(systemd.asked.contains(&"start"), "and started");
+}
+
+/// #7868 (the first builder, 20:11): a reset whose cut was not taken
+/// removes `openclaw.json`, and a lamp with OpenClaw installed runs no
+/// install, so each round checks the `gateway` block, as #7879 checks the
+/// gateway's unit. Removed, the next round asks Harness's one-shot (the
+/// round's own sandbox can't write it), which installs nothing: it writes
+/// the block again, checked by OpenClaw's own `config validate --json`
+/// before the gateway's `try-restart`, every other key kept. The round
+/// after it, finding it as written, asks nothing.
+#[test]
+fn a_gateway_block_removed_with_openclaw_installed_comes_back_at_the_next_round() {
+    let lamp = installed_openclaw();
+    let mut config = config_of(&lamp);
+    let block = config.as_object_mut().unwrap().remove("gateway").unwrap();
+    assert_eq!(block, installs_block(&lamp));
+    config["models"] = serde_json::json!({"mode": "merge"});
+    fs::write(lamp.at(CONFIG), config.to_string()).unwrap();
+
+    a_round_asks_the_one_shot(&lamp);
+    let runs = Runs::new(&lamp);
+    let said = one_shot_saying(&lamp, &runs);
+    let config = config_of(&lamp);
+    assert_eq!(config["gateway"], installs_block(&lamp));
+    assert_eq!(config["models"], serde_json::json!({"mode": "merge"}));
+    assert!(
+        runs.position("config validate --json")
+            < runs.position(&format!("systemctl try-restart -- {UNIT}")),
+        "{:#?}",
+        runs.lines()
+    );
+    assert!(
+        !runs
+            .lines()
+            .iter()
+            .any(|line| line.contains("curl") || line.contains(NPM_CI_ENV)),
+        "nothing installed: {:#?}",
+        runs.lines()
+    );
+    assert_eq!(lamp.said().unwrap().install, "installed");
+    assert!(
+        said.iter()
+            .any(|line| line.contains("gateway block") && line.contains("written again")),
+        "{said:#?}"
+    );
+
+    let again = Runs::new(&lamp);
+    let mut systemd = Fake::default();
+    round_saying(&lamp, &mut systemd, &again);
+    assert_eq!(lamp.asked(), None, "nothing asked");
+    assert!(!systemd.asked.contains(&"start"), "no one-shot");
+}
+
+/// #7868: a `gateway` block not as the install writes it (another port, a
+/// changed token) is written again by the one-shot the next round asks, a
+/// key of OpenClaw's own in it kept, and the gateway restarted on it.
+#[test]
+fn a_gateway_block_not_as_the_install_writes_it_is_written_again() {
+    let lamp = installed_openclaw();
+    let mut config = config_of(&lamp);
+    config["gateway"]["port"] = serde_json::json!(1);
+    config["gateway"]["auth"]["token"] = serde_json::json!("changed");
+    config["gateway"]["controlUi"] = serde_json::json!({"enabled": false});
+    fs::write(lamp.at(CONFIG), config.to_string()).unwrap();
+
+    a_round_asks_the_one_shot(&lamp);
+    let runs = Runs::new(&lamp);
+    one_shot_saying(&lamp, &runs);
+    let mut wanted = installs_block(&lamp);
+    wanted["controlUi"] = serde_json::json!({"enabled": false});
+    assert_eq!(config_of(&lamp)["gateway"], wanted);
+    assert!(
+        runs.position("config validate --json")
+            < runs.position(&format!("systemctl try-restart -- {UNIT}"))
+    );
+}
+
+/// #7868: OpenClaw's own check refusing the `gateway` block leaves
+/// `openclaw.json` byte for byte with nothing beside it, restarts nothing,
+/// and says so in one line with no values: OpenClaw's words naming the
+/// gateway's token never reach the journal. The next round asks again.
+#[test]
+fn a_gateway_block_a_round_finds_refused_by_openclaws_check_restarts_nothing() {
+    let lamp = installed_openclaw();
+    let mut config = config_of(&lamp);
+    config.as_object_mut().unwrap().remove("gateway");
+    let before = config.to_string();
+    fs::write(lamp.at(CONFIG), &before).unwrap();
+    let beside = fs::read_dir(lamp.at(STATE)).unwrap().count();
+    let token = installs_block(&lamp)["auth"]["token"]
+        .as_str()
+        .unwrap()
+        .to_owned();
+
+    a_round_asks_the_one_shot(&lamp);
+    let refusing = Runs {
+        fail_on: Some("config validate --json"),
+        error: leak(format!("gateway.auth.token: Invalid input \"{token}\"")),
+        main_pid: "4242",
+        ..Runs::new(&lamp)
+    };
+    let said = one_shot_saying(&lamp, &refusing);
+    assert_eq!(fs::read_to_string(lamp.at(CONFIG)).unwrap(), before);
+    assert_eq!(fs::read_dir(lamp.at(STATE)).unwrap().count(), beside);
+    assert_eq!(
+        refusing
+            .lines()
+            .iter()
+            .filter(|line| line.contains("config validate --json"))
+            .count(),
+        1,
+        "a refusal of the text is never tried again"
+    );
+    assert!(
+        !refusing
+            .lines()
+            .iter()
+            .any(|line| line.contains(&format!("restart -- {UNIT}"))),
+        "{:#?}",
+        refusing.lines()
+    );
+    let line = said
+        .iter()
+        .find(|line| line.contains("gateway block") && line.contains("not written again"))
+        .unwrap_or_else(|| panic!("{said:#?}"));
+    assert!(!line.contains(&token), "{line}");
+    assert!(line.contains("the gateway not restarted"), "{line}");
+
+    a_round_asks_the_one_shot(&lamp);
 }
 
 /// The app's tap (#6240, V2's ask of 12 Nov) is a deliberate try again, as
@@ -1562,7 +2040,18 @@ fn lamp_update_reads_no_gateway_runs_switch() {
 fn the_one_path_writes_nothing_to_openclaws_shared_config() {
     let source = include_str!("../openclaw_install.rs");
     let code = source.split("\n#[cfg(test)]").next().unwrap();
-    assert_eq!(code.matches("on(root, CONFIG)").count(), 1);
+    // The writer, and (#7868) a round's read-only check of the `gateway`
+    // block, which writes nothing.
+    assert_eq!(code.matches("on(root, CONFIG)").count(), 2);
+    let reader = code
+        .split_once("fn gateway_block_due(")
+        .unwrap()
+        .1
+        .split_once("\n}\n")
+        .unwrap()
+        .0;
+    assert!(reader.contains("fs::read(on(root, CONFIG))"));
+    assert!(!reader.contains("write") && !reader.contains("replace"));
     let writer = code
         .split_once("fn gateway_config(")
         .unwrap()
@@ -3227,4 +3716,88 @@ fn a_gateway_started_for_openclaw_gets_agent_mains_entry_at_once() {
         Vec::<String>::new(),
         "settled: nothing run"
     );
+}
+
+/// #7868 (the first builder, 02:02, point 3), as #7268's `write_waiting`:
+/// the one-shot's check of the `gateway` block joins the running gateway,
+/// and one just (re)started may not be there to join yet (the wrapper's
+/// "is not running in its own namespaces", or "'node': No such file or
+/// directory"). Only that refusal is tried again, a bounded number of
+/// times; then the block lands and the gateway is restarted on it. Past
+/// the last try it is not written and the next round asks again.
+#[test]
+fn a_gateway_block_the_gateway_was_not_there_to_check_is_tried_again() {
+    let no_gateway = "openclaw: its gateway (lamp-openclaw-gateway.service) is not running in its own namespaces; nothing runs without it";
+    for (refusals, lands) in [(2, true), (100, false)] {
+        let lamp = installed_openclaw();
+        let mut config = config_of(&lamp);
+        config.as_object_mut().unwrap().remove("gateway");
+        let before = config.to_string();
+        fs::write(lamp.at(CONFIG), &before).unwrap();
+        a_round_asks_the_one_shot(&lamp);
+        let runs = Runs {
+            main_pid: "4242",
+            ..Runs::new(&lamp)
+        };
+        let mut inner = runs.runner();
+        let mut checks = 0;
+        let mut said = Vec::new();
+        install_with(
+            lamp.root(),
+            &lamp.records(),
+            &mut |argv: &[String]| {
+                let answer = inner(argv);
+                if argv.join(" ").contains("config validate --json") {
+                    checks += 1;
+                    if checks <= refusals {
+                        return Err(no_gateway.to_owned());
+                    }
+                }
+                answer
+            },
+            &mut || 40,
+            &mut |line: &str| said.push(line.to_owned()),
+            &Kit::BUILT,
+        )
+        .unwrap();
+        drop(inner);
+        let restarted = runs
+            .lines()
+            .iter()
+            .any(|line| line.contains(&format!("try-restart -- {UNIT}")));
+        if lands {
+            assert_eq!(checks, 3, "{said:#?}");
+            assert_eq!(config_of(&lamp)["gateway"], installs_block(&lamp));
+            assert!(restarted);
+        } else {
+            assert!((2..=20).contains(&checks), "bounded: {checks}");
+            assert_eq!(fs::read_to_string(lamp.at(CONFIG)).unwrap(), before);
+            assert!(!restarted);
+            assert!(
+                said.iter().any(|line| line.contains("not written again")),
+                "{said:#?}"
+            );
+        }
+    }
+}
+
+/// The words lamp-tasks' and the one-shot's retry look for
+/// (`lamp_checked_replace::NO_GATEWAY`) are the words the installed
+/// wrapper says when it finds no gateway to join, so a reworded wrapper
+/// can't turn every retry into a final refusal (#7872's P3).
+#[test]
+fn the_wrappers_no_gateway_words_are_the_ones_the_retry_looks_for() {
+    for text in [
+        wrapper_text(),
+        wrapper_text_for(Shown {
+            one_path: true,
+            ..Shown::default()
+        }),
+    ] {
+        let line = text
+            .lines()
+            .find(|line| line.contains("lamp-openclaw-gateway.service) is not running"))
+            .expect("the wrapper's no-gateway line");
+        assert!(line.contains(lamp_checked_replace::NO_GATEWAY), "{line}");
+    }
 }

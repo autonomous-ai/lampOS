@@ -688,7 +688,69 @@ pub fn remove_installed_apps(root: &Path) -> io::Result<Vec<PathBuf>> {
 /// without Hermes or OpenClaw removes nothing; nothing is followed through
 /// a link. Run again after a cut, it finishes what is left.
 pub fn forget_agents(root: &Path) -> io::Result<usize> {
-    walk_agents(root, true, &mut Vec::new())
+    forget_agents_checked(root, &mut |file| openclaw_check(root, file), &mut |line| {
+        eprintln!("{line}")
+    })
+}
+
+/// [`forget_agents`], with `check` run on the new `openclaw.json` before
+/// it is renamed into place (#7868), and what the reset says to the
+/// journal given to `say`.
+pub fn forget_agents_checked(
+    root: &Path,
+    check: &mut dyn FnMut(&Path) -> Result<(), String>,
+    say: &mut dyn FnMut(&str),
+) -> io::Result<usize> {
+    walk_agents(root, true, &mut Vec::new(), check, say)
+}
+
+/// OpenClaw's own check of the reset's cut of `openclaw.json` in `file`
+/// (#7868): lamp-update's ([`lamp_update::openclaw_install::validate_argv`],
+/// `config validate --json` as `lampos`, with the file's own ids), joined
+/// to OpenClaw's gateway through its wrapper when the gateway's unit has a
+/// `MainPID`, else in OpenClaw's namespace of its own, bounded by
+/// [`lamp_checked_replace::VALIDATE_WITHIN`]. With no
+/// OpenClaw namespace script under `root`, OpenClaw can't run and the cut
+/// is written unchecked, said.
+fn openclaw_check(root: &Path, file: &Path) -> Result<(), String> {
+    use std::os::unix::fs::MetadataExt;
+    let ns = lamp_update::openclaw_install::NS;
+    if fs::symlink_metadata(root.join(ns.trim_start_matches('/'))).is_err() {
+        eprintln!("lamp-setup: reset: OpenClaw's openclaw.json cut unchecked: no {ns}");
+        return Ok(());
+    }
+    let owner = fs::metadata(file).map_err(|error| format!("{}: {error}", file.display()))?;
+    let main_pid = &lamp_update::openclaw_install::MAIN_PID;
+    let joined = std::process::Command::new("/usr/bin/systemctl")
+        .args(&main_pid[1..])
+        .stdin(std::process::Stdio::null())
+        .stderr(std::process::Stdio::null())
+        .output()
+        .is_ok_and(|out| {
+            out.status.success()
+                && lamp_update::openclaw_install::has_main_pid(&String::from_utf8_lossy(
+                    &out.stdout,
+                ))
+        });
+    let argv = cut_check_argv(
+        &file.to_string_lossy(),
+        &owner.uid().to_string(),
+        &owner.gid().to_string(),
+        joined,
+    );
+    lamp_checked_replace::validate(
+        &argv,
+        &[("PATH", "/usr/sbin:/usr/bin:/sbin:/bin")],
+        lamp_checked_replace::VALIDATE_WITHIN,
+    )
+}
+
+/// The command [`openclaw_check`] runs on the cut in `file`, owned by
+/// `uid`:`gid`: `joined` (the gateway's unit has a `MainPID`), through
+/// OpenClaw's wrapper into the running gateway; else in OpenClaw's
+/// namespace of its own (`lamp_update::openclaw_install::validate_argv`).
+pub fn cut_check_argv(file: &str, uid: &str, gid: &str, joined: bool) -> Vec<String> {
+    lamp_update::openclaw_install::validate_argv(uid, gid, file, joined)
 }
 
 /// What [`forget_agents`] would do under `root`, one step an entry, with
@@ -697,11 +759,17 @@ pub fn forget_agents(root: &Path) -> io::Result<usize> {
 /// the reset. Nothing is followed through a link.
 pub fn plan_agents(root: &Path) -> io::Result<Vec<AgentStep>> {
     let mut steps = Vec::new();
-    walk_agents(root, false, &mut steps)?;
+    walk_agents(root, false, &mut steps, &mut |_| Ok(()), &mut |_| {})?;
     Ok(steps)
 }
 
-fn walk_agents(root: &Path, act: bool, steps: &mut Vec<AgentStep>) -> io::Result<usize> {
+fn walk_agents(
+    root: &Path,
+    act: bool,
+    steps: &mut Vec<AgentStep>,
+    check: &mut dyn FnMut(&Path) -> Result<(), String>,
+    say: &mut dyn FnMut(&str),
+) -> io::Result<usize> {
     if !root.is_absolute() {
         return Err(io::Error::new(
             io::ErrorKind::InvalidInput,
@@ -788,6 +856,10 @@ fn walk_agents(root: &Path, act: bool, steps: &mut Vec<AgentStep>) -> io::Result
         cut_hermes_config,
         yaml_keys,
         steps,
+        CutCheck {
+            check: &mut |_| Ok(()),
+            say: &mut |_| {},
+        },
     )?);
     removed += usize::from(kept.cut(
         OPENCLAW_STATE,
@@ -795,6 +867,7 @@ fn walk_agents(root: &Path, act: bool, steps: &mut Vec<AgentStep>) -> io::Result
         cut_openclaw_config,
         json_keys,
         steps,
+        CutCheck { check, say },
     )?);
     for shell in [".bashrc", ".profile"] {
         removed += usize::from(kept.cut(
@@ -803,6 +876,10 @@ fn walk_agents(root: &Path, act: bool, steps: &mut Vec<AgentStep>) -> io::Result
             |_| Some(HERMES_SHELL_TEXT.as_bytes().to_vec()),
             |_| Vec::new(),
             steps,
+            CutCheck {
+                check: &mut |_| Ok(()),
+                say: &mut |_| {},
+            },
         )?);
     }
     Ok(removed)
@@ -894,6 +971,13 @@ fn json_keys(text: &[u8]) -> Vec<String> {
     }
 }
 
+/// What a kept file's cut is checked by before it lands, and what it says
+/// when the check does not take it (#7868, [`Kept::cut`]).
+struct CutCheck<'a> {
+    check: &'a mut dyn FnMut(&Path) -> Result<(), String>,
+    say: &'a mut dyn FnMut(&str),
+}
+
 /// The kept settings files' cut, acted on or only listed.
 struct Kept<'a> {
     root: &'a Path,
@@ -905,11 +989,17 @@ impl Kept<'_> {
     /// to the lamp's own keys, in place, its owner and mode kept; whether it
     /// changed. A file that is not a regular one, is too large, or that
     /// `cut` can't read (`None`) is removed: a reset fails toward wiping.
-    /// The cut is written beside it as `NAME.cut` and renamed over it, so a
-    /// cut stopped half-way leaves the old file whole and the leftover, a
-    /// name the folder does not keep, is removed by the next run. A missing
-    /// folder or file is nothing to do. `keys` names the top-level keys for
-    /// the step listed, never their values.
+    /// The cut is written beside it (`lamp_checked_replace`, the one checked
+    /// replace) and renamed over it, so a cut stopped half-way leaves the
+    /// old file whole and the leftover, a name the folder does not keep, is
+    /// removed by the next run. `check` runs on the new file first (#7868:
+    /// OpenClaw's own config check for `openclaw.json`): not taken
+    /// (refused, past its time, not started), nothing is left beside it,
+    /// the old file is removed too, as a file `cut` can't read is, so no
+    /// person's key outlives the reset, `say` gets why (never a value),
+    /// and the reset goes on. A missing folder or file is nothing to do.
+    /// `keys` names the top-level keys for the step listed, never their
+    /// values.
     fn cut(
         &self,
         folder: &str,
@@ -917,8 +1007,10 @@ impl Kept<'_> {
         cut: fn(&[u8]) -> Option<Vec<u8>>,
         keys: fn(&[u8]) -> Vec<String>,
         steps: &mut Vec<AgentStep>,
+        CutCheck { check, say }: CutCheck<'_>,
     ) -> io::Result<bool> {
         use std::io::Read;
+        use std::os::fd::AsFd;
         let folder = self.root.join(folder.trim_start_matches('/'));
         let path = folder.join(name);
         let dir = match open_dir(&folder) {
@@ -935,6 +1027,21 @@ impl Kept<'_> {
         };
         // Listed again below with what is done to it.
         steps.retain(|step| *step != AgentStep::Keep(path.clone()));
+        // Seventh's P2 on #7872: held from the read to the rename, as
+        // lamp-tasks' and lamp-update's writers of `openclaw.json` hold it.
+        // Not had in time, as a check not taken: removed.
+        if self.act
+            && let Err(error) =
+                lamp_checked_replace::lock(dir.as_fd(), lamp_checked_replace::LOCK_WITHIN)
+        {
+            steps.push(AgentStep::Remove(path));
+            remove_at(&dir, name, true)?;
+            say(&format!(
+                "lamp-setup: reset: {} removed: its cut was not taken: {error}",
+                folder.join(name).display()
+            ));
+            return Ok(true);
+        }
         let regular =
             rustix::fs::FileType::from_raw_mode(stat.st_mode) == rustix::fs::FileType::RegularFile;
         if !regular || stat.st_size as u64 > MOST_KEPT {
@@ -972,30 +1079,35 @@ impl Kept<'_> {
         if !self.act {
             return Ok(true);
         }
-        let staged = format!("{name}.cut");
-        match rustix::fs::unlinkat(&dir, staged.as_str(), AtFlags::empty()) {
-            Ok(()) | Err(rustix::io::Errno::NOENT) => {}
-            Err(error) => return Err(error.into()),
+        let mut refused = None;
+        let written = lamp_checked_replace::replace_checked_in(
+            dir.as_fd(),
+            &folder,
+            OsStr::new(name),
+            &new,
+            Mode::from_raw_mode(stat.st_mode),
+            Some((
+                rustix::fs::Uid::from_raw(stat.st_uid),
+                rustix::fs::Gid::from_raw(stat.st_gid),
+            )),
+            &mut |file| check(file).inspect_err(|why| refused = Some(why.clone())),
+        );
+        match (written, refused) {
+            (Ok(()), _) => Ok(true),
+            (Err(_), Some(why)) => {
+                // A reset fails toward wiping: the person's keys never
+                // outlive it. lamp-update's next round has Harness's
+                // one-shot write the `gateway` block again into a config
+                // that has none, with no install run (#7868).
+                remove_at(&dir, name, true)?;
+                say(&format!(
+                    "lamp-setup: reset: {} removed: its cut was not taken: {why}",
+                    folder.join(name).display()
+                ));
+                Ok(true)
+            }
+            (Err(error), None) => Err(error),
         }
-        let mode = Mode::from_raw_mode(stat.st_mode);
-        let out = rustix::fs::openat(
-            &dir,
-            staged.as_str(),
-            OFlags::WRONLY | OFlags::CREATE | OFlags::EXCL | OFlags::NOFOLLOW | OFlags::CLOEXEC,
-            mode,
-        )?;
-        rustix::fs::fchown(
-            &out,
-            Some(rustix::fs::Uid::from_raw(stat.st_uid)),
-            Some(rustix::fs::Gid::from_raw(stat.st_gid)),
-        )?;
-        rustix::fs::fchmod(&out, mode)?;
-        let mut out = File::from(out);
-        out.write_all(&new)?;
-        out.sync_all()?;
-        rustix::fs::renameat(&dir, staged.as_str(), &dir, name)?;
-        rustix::fs::fsync(&dir)?;
-        Ok(true)
     }
 }
 
@@ -1994,6 +2106,16 @@ fn stop_agents(plan: &Plan, effects: &mut impl Effects) -> io::Result<Vec<String
 }
 
 fn finish(plan: &Plan, effects: &mut impl Effects, steps: &mut Vec<Step>) -> io::Result<()> {
+    // Before the plan's wipes (#7868, the first builder, 02:02): OpenClaw's
+    // check of the cut joins a running gateway through OpenClaw's wrapper,
+    // which exits without lamp-cloud's forwarder token, wiped below.
+    let forgotten = effects.forget_agents()?;
+    if forgotten > 0 {
+        eprintln!(
+            "lamp-setup: reset: removed {forgotten} of Hermes's and OpenClaw's per-person files"
+        );
+        steps.push(Step::AgentsForgotten);
+    }
     for path in &plan.wipe {
         if path.file_name() == Some(WIFI_FILE.as_ref()) {
             for copy in WIFI_COPIES {
@@ -2020,13 +2142,6 @@ fn finish(plan: &Plan, effects: &mut impl Effects, steps: &mut Vec<Step>) -> io:
             "lamp-setup: reset: removed {apps} Store app entries (code, data, marks, staged packages)"
         );
         steps.push(Step::InstalledAppsRemoved);
-    }
-    let forgotten = effects.forget_agents()?;
-    if forgotten > 0 {
-        eprintln!(
-            "lamp-setup: reset: removed {forgotten} of Hermes's and OpenClaw's per-person files"
-        );
-        steps.push(Step::AgentsForgotten);
     }
     // Already gone after `reset`; this covers a journal found without one.
     if remove_if_present(&plan.marker)? {

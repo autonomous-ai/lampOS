@@ -2976,6 +2976,82 @@ them) (`crates/tasks/src/openclaw_config.rs`):
   below) stays. A skill's run still execs it, and `security: "full"` allows
   that exec too, so a run needs no grant of its own.
 
+**OpenClaw checks the text before it lands** (#7108; on 15 Nov a merge
+OpenClaw 2026.11.2 refused, 78/CONFIG, took lamp-52e6's gateway down): a
+changed text goes to a new 0600 file beside `openclaw.json`, and OpenClaw's
+own `config validate --json` runs on it through lamp-update's wrapper
+`/usr/local/bin/openclaw` (`openclaw_config::validate`), pointed at that
+file by `OPENCLAW_CONFIG_PATH`, never the live one, joined to the running
+gateway's namespaces as the wrapper's every other call is (never
+`LAMP_OPENCLAW_GATEWAY=on`: OpenClaw 2026.11.2 refuses a check in
+namespaces of its own while its gateway runs, `GatewayLockNamespaceError`,
+#7268's ROW FAIL on lamp-52e6), in OpenClaw's own environment, at most 60 s. Only
+status 0 renames it into place (`hermes_config::replace_checked`).
+Refused (or past 60 s), the new file is removed, `openclaw.json` stays byte
+for byte, and the journal line says "OpenClaw's settings not written: ...
+OpenClaw's own config check refused it (status 1): <OpenClaw's words>".
+With no wrapper at `/usr/local/bin/openclaw` (OpenClaw not installed) the
+text is written as before, with a journal line "written unchecked". A
+wrapper that can't run OpenClaw (no forwarder token, no Node) refuses, so
+nothing is written until lamp-tasks' next start. With no gateway running
+the wrapper fails closed too, and lamp-tasks can start before the gateway
+(at a boot, or an update that restarts both: #7268's HOLD), so that
+refusal alone (the wrapper's "is not running in its own namespaces", or
+"'node': No such file or directory" from a gateway just started) is tried
+again after 5, 10, 20, 40 s and then 60 s four times, 5 min 15 s in all
+(`openclaw_config::GATEWAY_WAITS`), each wait one journal line "OpenClaw's
+settings wait for its gateway to check them; tried again in N s"; nothing
+is written before the gateway checks it. A check ended by a signal before
+OpenClaw gave a verdict ("status killed": on lamp-52e6, lamp-tasks and the
+gateway restarted together and the check raced the gateway's own start,
+#7268's FINDING), or one killed past its 60 s bound
+(`lamp_checked_replace::VALIDATE_WITHIN`, "ran past"; #8225,
+`lamp_checked_replace::check_did_not_finish`), is tried again over the same waits, each one journal line
+"OpenClaw's settings were not checked, OpenClaw's check was killed before
+it answered; tried again in N s", no value of the file in it. Past the last wait it is not
+written until lamp-tasks' next start, the journal line saying the last
+refusal; a text OpenClaw refuses is never
+tried again. The write runs on a thread of its own, so lamp-tasks' start
+never waits for it.
+The checked replace and the bounded check live in `crates/checked-replace`
+(`lamp_checked_replace`, #7868), which the other two writers of
+`openclaw.json` go through too: lamp-update's install (its `gateway`
+block, docs/install.md; a round that finds the block missing or
+different has Harness's one-shot write it again, #7868) and lamp-setup's
+reset (its cut to `gateway`, docs/setup.md). Both check with
+`openclaw_install::validate_argv`: when `lamp-openclaw-gateway.service`
+has a `MainPID` (its gateway runs), through the wrapper, joined to the
+gateway's namespaces as lamp-tasks' check is; with no gateway running (as
+at a first install) there is no lock to clash with, so it runs in
+`openclaw-ns` of its own as before. `GATEWAY_WAITS`, `NO_GATEWAY`,
+`NODE_NOT_READY` and `gateway_not_there` now live in
+`lamp_checked_replace` (lamp-tasks re-exports them in `openclaw_config`,
+lamp-update re-exports `NODE_NOT_READY` in `openclaw_install`, and a test
+pins `NO_GATEWAY` to the wrapper's no-gateway line), and lamp-update's
+one-shot uses the same schedule: only a refusal because
+the gateway was not there to check is tried again, never a refusal of the
+text.
+All three writers of `openclaw.json` (lamp-tasks' `write_checked`,
+lamp-update's `gateway_config`, lamp-setup's reset cut) hold one lock
+from before their read until after their rename (Seventh's P2 on
+#7872): an exclusive `flock` on OpenClaw's state folder
+(`/var/lib/lampos-openclaw/state`) itself, taken through
+`lamp_checked_replace::hold` / `lock`. Without it, one writer's rename
+landing inside the other's check (seconds) dropped the other's block, and
+lamp-tasks' provider block stayed lost until its next start. The folder,
+not a lock file beside `openclaw.json`: nothing to create or own, every
+writer already opens the folder for its rename (so no unit changes), and
+the reset, which removes every name the state folder does not keep, cannot
+split it. The wait is bounded (`LOCK_WITHIN`, 90 s, over the check's
+60 s); past it the write fails with "another writer held the folder's lock
+past 90 s", as a check that could not run does (lamp-tasks: not written
+until its next start; lamp-update: the install fails `config`, a round's
+one-shot asks again next round; the reset: the file is removed). Tests:
+`the_state_folders_lock_is_held_from_the_read_through_the_check_to_the_rename`
+(lamp-tasks), `a_gateway_block_write_holds_the_state_folders_lock_through_its_check`
+(lamp-update), `a_cut_of_openclaws_config_holds_the_state_folders_lock_through_its_check`
+(lamp-setup).
+
 ## Harness's hooks inside the lamp's agent namespace (#6530)
 
 Harness's hooks for an engine (`harness hook hermes session-start`,

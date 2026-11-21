@@ -142,6 +142,10 @@ struct Fake {
     /// `lampos`'s own manager, as [`reset::agent_manager_unit`] reads it
     /// from `/etc/passwd`; none: no such user.
     manager: Option<String>,
+    /// A file the plan wipes, lamp-cloud's forwarder token on a lamp, and
+    /// whether it was there when [`reset::forget_agents`] ran.
+    token: Option<PathBuf>,
+    token_at_forget: Option<bool>,
 }
 impl Effects for Fake {
     fn run(&mut self, argv: &[String]) -> io::Result<()> {
@@ -248,6 +252,7 @@ impl Effects for Fake {
     }
     fn forget_agents(&mut self) -> io::Result<usize> {
         self.calls.borrow_mut().push("agents".into());
+        self.token_at_forget = self.token.as_ref().map(|token| token.exists());
         Ok(self.agents)
     }
     fn agent_manager(&mut self) -> Option<String> {
@@ -319,9 +324,9 @@ fn a_reset_stops_wipes_removes_the_marker_and_reboots_in_that_order() {
             "show",
             "list-units",
             "stop",
+            "agents",
             "skills",
             "apps",
-            "agents",
             "sync",
             "sync",
             "reboot"
@@ -790,7 +795,7 @@ fn a_failed_stop_reboots_at_once_into_setup_which_finishes_the_wipe() {
     assert!(!steps.contains(&Step::Rebooting));
     assert_eq!(
         *start.calls.borrow(),
-        ["list-units", "skills", "apps", "agents", "sync", "sync"]
+        ["list-units", "agents", "skills", "apps", "sync", "sync"]
     );
     // Nothing left to finish.
     assert!(
@@ -3302,6 +3307,119 @@ fn a_reset_cuts_the_agents_kept_settings_to_the_lamps_keys() {
     assert_eq!(fs::read(root.path("outside")).unwrap(), b"{}");
 }
 
+/// #7868: the reset's cut of `openclaw.json` is checked by OpenClaw's own
+/// config check on a file beside it, the old file's owner and mode, before
+/// it is renamed into place. A check that does not take it (refused, past
+/// its time, or not started) leaves no person's key behind: a reset fails
+/// toward wiping, so the file is removed, nothing is left beside it, the
+/// reset goes on, and the journal says it was removed and why, never a key
+/// (lamp-update's next install writes the `gateway` block again). Taken,
+/// the cut lands.
+#[test]
+fn a_cut_openclaws_own_check_does_not_take_is_removed() {
+    let theirs =
+        r#"{"gateway":{"port":18789},"models":{"providers":{"other":{"apiKey":"sk-person"}}}}"#;
+    let cut = reset::cut_openclaw_config(theirs.as_bytes()).unwrap();
+    for why in [
+        "OpenClaw's own config check refused it (status 1): gateway.port: Unrecognized key",
+        "OpenClaw's own config check ran past 60 s",
+        "OpenClaw's config check did not start: No such file or directory",
+    ] {
+        let root = Root::new();
+        let state = root.path("var/lib/lampos-openclaw/state");
+        fs::create_dir_all(&state).unwrap();
+        let json = state.join("openclaw.json");
+        fs::write(&json, theirs).unwrap();
+        fs::set_permissions(&json, fs::Permissions::from_mode(0o640)).unwrap();
+        let checked = RefCell::new(Vec::new());
+        let mut refuse = |file: &Path| {
+            assert_eq!(file.parent(), Some(state.as_path()));
+            assert_ne!(file, json.as_path());
+            assert_eq!(
+                fs::metadata(file).unwrap().permissions().mode() & 0o7777,
+                0o640
+            );
+            checked.borrow_mut().push(fs::read(file).unwrap());
+            Err(why.to_owned())
+        };
+        let mut said = Vec::new();
+        let removed = reset::forget_agents_checked(&root.0, &mut refuse, &mut |line| {
+            said.push(line.to_owned())
+        })
+        .unwrap();
+        assert_eq!(*checked.borrow(), std::slice::from_ref(&cut), "{why}");
+        assert!(fs::symlink_metadata(&json).is_err(), "{why}");
+        assert_eq!(fs::read_dir(&state).unwrap().count(), 0, "{why}");
+        assert!(removed > 0, "{why}");
+        let line = said
+            .iter()
+            .find(|line| line.contains("openclaw.json"))
+            .unwrap_or_else(|| panic!("no journal line: {said:?}"));
+        assert!(line.contains("removed") && line.contains(why), "{line}");
+        assert!(
+            said.iter().all(|line| !line.contains("sk-person")),
+            "{said:?}"
+        );
+    }
+
+    let root = Root::new();
+    let state = root.path("var/lib/lampos-openclaw/state");
+    fs::create_dir_all(&state).unwrap();
+    let json = state.join("openclaw.json");
+    fs::write(&json, theirs).unwrap();
+    let mut take = |_: &Path| Ok(());
+    assert!(reset::forget_agents_checked(&root.0, &mut take, &mut |_| {}).unwrap() > 0);
+    assert_eq!(fs::read(&json).unwrap(), cut);
+    assert_eq!(fs::read_dir(&state).unwrap().count(), 1);
+}
+
+/// Whether `folder`'s lock (an exclusive `flock` on the folder) is held
+/// by another writer just now.
+fn folder_lock_held(folder: &Path) -> bool {
+    use rustix::fs::{FlockOperation, Mode, OFlags};
+    let dir = rustix::fs::open(
+        folder,
+        OFlags::RDONLY | OFlags::DIRECTORY | OFlags::CLOEXEC,
+        Mode::empty(),
+    )
+    .unwrap();
+    match rustix::fs::flock(&dir, FlockOperation::NonBlockingLockExclusive) {
+        Ok(()) => false,
+        Err(rustix::io::Errno::WOULDBLOCK) => true,
+        Err(error) => panic!("flock: {error}"),
+    }
+}
+
+/// Seventh's P2 on #7872: lamp-tasks and lamp-update each read, merge,
+/// check and rename `openclaw.json`; the reset's cut is a third such
+/// writer. It holds the state folder's lock, as they do, from before its
+/// read through OpenClaw's own check to the rename, and lets it go after.
+#[test]
+fn a_cut_of_openclaws_config_holds_the_state_folders_lock_through_its_check() {
+    let root = Root::new();
+    let state = root.path("var/lib/lampos-openclaw/state");
+    fs::create_dir_all(&state).unwrap();
+    let json = state.join("openclaw.json");
+    let theirs = r#"{"gateway":{"port":18789},"models":{}}"#;
+    fs::write(&json, theirs).unwrap();
+    let mut held = None;
+    let mut take = |_: &Path| {
+        held = Some(folder_lock_held(&state));
+        Ok(())
+    };
+    assert!(reset::forget_agents_checked(&root.0, &mut take, &mut |_| {}).unwrap() > 0);
+    assert_eq!(
+        held,
+        Some(true),
+        "the state folder was not locked through the check"
+    );
+    assert!(!folder_lock_held(&state), "the lock outlived the cut");
+    assert_eq!(
+        fs::read(&json).unwrap(),
+        reset::cut_openclaw_config(theirs.as_bytes()).unwrap()
+    );
+}
+
 /// Every path under `at`, with a file's bytes or a link's target, never
 /// followed.
 fn snapshot(at: &Path, found: &mut Vec<(PathBuf, Vec<u8>)>) {
@@ -3482,9 +3600,9 @@ fn a_resumed_reset_stops_the_openclaw_gateway_before_finishing() {
         [
             "list-units",
             "stop",
+            "agents",
             "skills",
             "apps",
-            "agents",
             "sync",
             "sync"
         ]
@@ -3642,9 +3760,9 @@ fn a_resumed_reset_stops_the_agents_user_manager_and_starts_it_after() {
         [
             "list-units",
             "stop",
+            "agents",
             "skills",
             "apps",
-            "agents",
             "sync",
             "sync",
             "start"
@@ -3652,33 +3770,85 @@ fn a_resumed_reset_stops_the_agents_user_manager_and_starts_it_after() {
     );
 }
 
-/// The agents' files go after the plan's wipes and the skills, said by no
-/// name, before the marker and the journal.
+/// #7868 (the first builder, 02:02): the agents' files go after the skills
+/// and before the plan's wipes, said by no name, then the marker and the
+/// journal. OpenClaw's check of the reset's cut of `openclaw.json` joins a
+/// running gateway through OpenClaw's wrapper, which exits without
+/// lamp-cloud's forwarder token, so it runs while the token is there; the
+/// token is still gone after, so the reset forgets what it did before.
 #[test]
-fn the_reset_forgets_the_agents_after_the_plans_wipes() {
+fn the_reset_forgets_the_agents_before_the_plans_wipes_take_the_token() {
     let root = Root::new();
-    let plan = lamp(&root);
+    let mut plan = lamp(&root);
+    let token = root.path("lampos-cloud/hermes-token");
+    fs::create_dir_all(root.path("lampos-cloud")).unwrap();
+    fs::write(&token, b"synthetic forwarder token").unwrap();
+    plan.wipe.push(root.path("lampos-cloud"));
     let mut fake = Fake {
         agents: 3,
+        token: Some(token.clone()),
         ..Fake::default()
     };
     let steps = reset::reset(&plan, &mut fake).unwrap();
+    assert_eq!(fake.token_at_forget, Some(true), "checked with the token");
+    assert!(!token.exists(), "and the token wiped after");
     let at = steps
         .iter()
         .position(|step| *step == Step::AgentsForgotten)
         .expect("the agents forgotten said");
     assert_eq!(
-        steps[..at]
+        steps[at + 1..]
             .iter()
             .filter(|step| matches!(step, Step::Wiped(_)))
             .count(),
         plan.wipe.len()
     );
-    assert_eq!(steps[at + 1..].first(), Some(&Step::JournalRemoved));
+    assert!(
+        !steps[..at]
+            .iter()
+            .any(|step| matches!(step, Step::Wiped(_)))
+    );
+    assert!(steps[at + 1..].contains(&Step::JournalRemoved));
     assert_eq!(
         serde_json::to_value(&steps[at]).unwrap(),
         serde_json::json!({"step": "agents_forgotten"})
     );
     let steps = reset::reset(&lamp(&Root::new()), &mut Fake::default()).unwrap();
     assert!(!steps.contains(&Step::AgentsForgotten));
+}
+
+/// #7868 (the Reviewer-lead's HOLD at fdc40d5c50): OpenClaw 2026.11.2
+/// refuses a `config validate` from namespaces other than its running
+/// gateway's (`GatewayLockNamespaceError`, #7268), and a cut not taken
+/// removes `openclaw.json`. So with the gateway's unit holding a `MainPID`
+/// the reset's check runs as `lampos` through OpenClaw's wrapper, which
+/// joins that gateway (no `LAMP_OPENCLAW_GATEWAY`, no stand-in token);
+/// with none running, in OpenClaw's namespace of its own, with the cut
+/// file's owner's ids.
+#[test]
+fn the_cuts_check_joins_a_running_gateway_and_runs_alone_with_none() {
+    let file = "/var/lib/lampos-openclaw/state/.openclaw.json.x.new";
+    let joined = reset::cut_check_argv(file, "1001", "1002", true).join(" ");
+    assert!(
+        joined.ends_with(&format!(
+            " OPENCLAW_CONFIG_PATH={file} {} config validate --json",
+            lamp_update::openclaw_install::WRAPPER
+        )),
+        "{joined}"
+    );
+    assert!(joined.starts_with("runuser -u lampos -- env "), "{joined}");
+    assert!(!joined.contains("unshare"), "{joined}");
+    assert!(!joined.contains("LAMP_OPENCLAW_GATEWAY"), "{joined}");
+    assert!(!joined.contains("LAMP_HERMES_TOKEN"), "{joined}");
+
+    let alone = reset::cut_check_argv(file, "1001", "1002", false).join(" ");
+    assert!(
+        alone.contains("LAMP_NS_UID=1001 LAMP_NS_GID=1002 ")
+            && alone.contains(" /usr/bin/unshare ")
+            && alone.ends_with(&format!(
+                "{} config validate --json",
+                lamp_update::openclaw_install::NS
+            )),
+        "{alone}"
+    );
 }

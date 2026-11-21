@@ -2447,7 +2447,80 @@ As root, on a lamp with the base image (`crates/update/src/install.rs`):
      `<state>/openclaw.json` with only its `gateway` block
      (`mode: "local"`, `bind: "loopback"`, token auth). lamp-tasks merges
      the rest in at its start (docs/tasks.md, "OpenClaw's settings on the
-     lamp").
+     lamp"). The block is checked by OpenClaw before it lands (#7868), as
+     lamp-tasks' writes are (#7108): the new text goes to a new 0600 file
+     beside `openclaw.json`, made `lampos`'s, and OpenClaw's own `config
+     validate --json` runs on it as `lampos` (`openclaw_install::validate_argv`),
+     pointed at that file by `OPENCLAW_CONFIG_PATH`, never the live one.
+     Where it runs depends on the gateway: OpenClaw 2026.11.2 refuses a
+     check from namespaces other than its running gateway's
+     (`GatewayLockNamespaceError`, #7268's ROW FAIL on lamp-52e6). So when
+     `systemctl show -p MainPID --value -- lamp-openclaw-gateway.service`
+     prints a number other than `0`, it runs through the wrapper
+     `/usr/local/bin/openclaw`, which joins that gateway's namespaces (never
+     `LAMP_OPENCLAW_GATEWAY`; the wrapper passes the forwarder's token). With
+     no gateway running (as at a first install, before its first start)
+     there is no lock to clash with, and it runs inside `openclaw-ns` of its
+     own, as the install's `--version` does, with a stand-in
+     `LAMP_HERMES_TOKEN` (the check reads the file and calls no provider).
+     Only status 0 renames it into place
+     (`lamp_checked_replace::replace_checked`), the state folder's lock
+     (`lamp_checked_replace::hold`, a `flock` on the folder, at most 90 s,
+     shared with lamp-tasks' and the reset's writes, docs/tasks.md) held
+     from the read to the rename. Refused, the new file is
+     removed, `openclaw.json` stays byte for byte, and the install fails
+     with error `config` and OpenClaw's words ("... OpenClaw's own config
+     check refused it: ..."), so the gateway is not restarted onto it. A
+     check that did not finish is no refusal (#8225: on lamp-52e6 the
+     gateway the check had joined restarted under it, and `runuser` said
+     "Killed"): one ended by a signal or past its bound
+     (`lamp_checked_replace::check_did_not_finish`) leaves `openclaw.json`
+     byte for byte too, takes nothing out (wrapper, `openclaw-ns`,
+     `skill-start` stay), puts the record back as it was before the
+     install (`absent` with none), and says "OpenClaw is not installed
+     now: ...openclaw.json: OpenClaw's config check did not finish (<why>):
+     not checked now, kept as it was; the next round tries again"; the
+     next round asks the install again. With no `openclaw-ns` there the
+     block is written unchecked, said. The
+     install sets only the block's own keys (`mode`, `bind`, `port`,
+     `auth.mode`, `auth.token`), keeping any other key in it or beside it.
+   - **The `gateway` block, each round (#7868):** a reset whose cut was
+     not taken removes `openclaw.json` (docs/setup.md), and a lamp with
+     OpenClaw recorded as installed runs no install, so nothing else would
+     write the block again. So each round with the switch on and OpenClaw
+     there (as it checks the gateway's unit, #7879) reads the block
+     (`gateway_block_due`), and only reads it: `lamp-update.service` is
+     `ProtectSystem=strict` without OpenClaw's folder in its
+     `ReadWritePaths`, and no round changes its own unit, so a shipped lamp
+     keeps its image's sandbox. As the install writes it, nothing runs.
+     Missing or different (the block's own keys; a token not made yet
+     too), the round asks Harness's one-shot and starts it, as for
+     OpenClaw's launcher; the one-shot (`ProtectSystem=full`) installs
+     nothing ("already at ...: nothing installed") and writes the block
+     again by the install's own code (`gateway_block`, then
+     `gateway_config`), through the same OpenClaw check, then
+     `systemctl try-restart -- lamp-openclaw-gateway.service` restarts a
+     running gateway on it (one not running is started by the round's
+     usual start). The ask waits for OpenClaw's window, as every ask
+     does. One journal line, with no value of the config:
+     "...openclaw.json's gateway block was not as lamp-update writes it:
+     written again, checked by OpenClaw, and the gateway restarted if it
+     ran". Refused, `openclaw.json` stays byte for byte, nothing is
+     restarted, and the line says "... not written again, the gateway not
+     restarted: <OpenClaw's words, masked>"; the next round asks again. A
+     check that did not finish (#8225, above) is the same, its words
+     "OpenClaw's config check did not finish (<why>): not checked now,
+     kept as it was; the next round tries again".
+     The one-shot's check joins the running gateway (above), and a gateway
+     just (re)started may not be there to join yet: only that refusal (the
+     wrapper's "is not running in its own namespaces", or "'node': No such
+     file or directory") is tried again, after 5, 10, 20, 40 s and then 60
+     s four times, 5 min 15 s at most (`lamp_checked_replace::GATEWAY_WAITS`,
+     lamp-tasks' schedule since #7268), each wait one line
+     "...openclaw.json's gateway block waits for OpenClaw's gateway to check
+     it; tried again in N s"; past the last it is refused as above. A
+     refusal of the text is never tried again.
+     No switch of its own: it only keeps what the install writes.
    - **From a pinned lockfile, inside the namespace:** the tree is never
      resolved freely. The build carries `crates/update/openclaw/package.json`
      (`openclaw` at 2026.11.2 exactly) and its `package-lock.json` (made
@@ -2666,7 +2739,8 @@ As root, on a lamp with the base image (`crates/update/src/install.rs`):
      byte. lamp-update never writes OpenClaw's shared
      `openclaw.json` for a skill's run and never changes `tools.exec` (lamp-tasks does, #7245): its
      one write of that file is the install's own `gateway` block (the
-     gateway's token, above), with any switch.
+     gateway's token, above), with any switch, written again by the
+     one-shot a round asks when it is missing or different (#7868, above).
    - **Records:** `openclaw-install.json` (the record), `openclaw-ask.json`
      (the ask) and `openclaw.lock` (one install at a time), beside
      Hermes's in lamp-update's records.

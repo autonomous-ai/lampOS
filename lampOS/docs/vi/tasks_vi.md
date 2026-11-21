@@ -3671,6 +3671,85 @@ là phần của một coder khác trong #6226; thiết kế:
   skill-start vẫn được giữ. Lần chạy kỹ năng vẫn exec nó, và `security:
   "full"` cũng cho phép exec đó, nên lần chạy không cần quyền riêng nào.
 
+**OpenClaw kiểm tra văn bản trước khi nó vào chỗ** (#7108; ngày 15/11 một
+lần merge mà OpenClaw 2026.11.2 từ chối, 78/CONFIG, đã làm gateway của
+lamp-52e6 chết): văn bản đã đổi được ghi vào một file mới 0600 cạnh
+`openclaw.json`, và `config validate --json` của chính OpenClaw chạy trên
+file đó qua wrapper `/usr/local/bin/openclaw` của lamp-update
+(`openclaw_config::validate`), trỏ tới file đó bằng `OPENCLAW_CONFIG_PATH`,
+không bao giờ file đang dùng, nhập vào namespace của gateway đang chạy như
+mọi lần gọi khác của wrapper (không bao giờ `LAMP_OPENCLAW_GATEWAY=on`:
+OpenClaw 2026.11.2 từ chối lần kiểm tra trong namespace riêng khi gateway
+của nó đang chạy, `GatewayLockNamespaceError`, ROW FAIL của #7268 trên
+lamp-52e6), trong môi trường riêng của OpenClaw, tối đa 60 s. Chỉ status 0 mới rename nó vào chỗ
+(`hermes_config::replace_checked`). Bị từ chối (hoặc quá 60 s) thì file mới
+bị xóa, `openclaw.json` giữ nguyên từng byte, và dòng nhật ký nói
+"OpenClaw's settings not written: ... OpenClaw's own config check refused
+it (status 1): <lời của OpenClaw>". Không có wrapper ở
+`/usr/local/bin/openclaw` (OpenClaw chưa cài) thì văn bản được ghi như
+trước, kèm dòng nhật ký "written unchecked". Wrapper không chạy được
+OpenClaw (không có token của forwarder, không có Node) thì từ chối, nên
+không ghi gì cho tới lần lamp-tasks khởi động sau. Không có gateway đang chạy
+thì wrapper cũng đóng an toàn, và lamp-tasks có thể khởi động trước gateway
+(lúc boot, hoặc một lần cập nhật khởi động lại cả hai: HOLD của #7268), nên
+riêng lần từ chối đó ("is not running in its own namespaces" của wrapper,
+hoặc "'node': No such file or directory" từ một gateway vừa khởi động) được
+thử lại sau 5, 10, 20, 40 s rồi 60 s bốn lần, tổng 5 phút 15 s
+(`openclaw_config::GATEWAY_WAITS`), mỗi lần chờ một dòng nhật ký
+"OpenClaw's settings wait for its gateway to check them; tried again in N
+s"; không ghi gì trước khi gateway kiểm tra nó. Lần kiểm tra bị một signal
+kết thúc trước khi OpenClaw trả lời ("status killed": trên lamp-52e6,
+lamp-tasks và gateway khởi động lại cùng lúc và lần kiểm tra đua với lúc
+gateway tự khởi động, FINDING của #7268), hoặc bị kill vì quá giới hạn 60 s
+(`lamp_checked_replace::VALIDATE_WITHIN`, "ran past"; #8225,
+`lamp_checked_replace::check_did_not_finish`), cũng được thử lại theo cùng các lần
+chờ đó, mỗi lần một dòng nhật ký "OpenClaw's settings were not checked,
+OpenClaw's check was killed before it answered; tried again in N s", không
+có giá trị nào của file. Quá lần chờ cuối thì không
+ghi cho tới lần lamp-tasks khởi động sau, dòng nhật ký nói lần từ chối cuối; văn bản bị OpenClaw từ chối thì
+không bao giờ thử lại. Việc ghi chạy trên một thread riêng, nên lamp-tasks
+khởi động không bao giờ phải chờ nó.
+Phần thay file có kiểm tra và lần kiểm tra có giới hạn thời gian nằm ở
+`crates/checked-replace` (`lamp_checked_replace`, #7868), và hai chỗ ghi
+`openclaw.json` còn lại cũng đi qua đó: bản cài của lamp-update (khối
+`gateway`, docs/install.md; vòng cập nhật nào thấy khối này thiếu hoặc
+khác thì nhờ one-shot của Harness ghi lại, #7868) và lần reset của
+lamp-setup (cắt còn
+`gateway`, docs/setup.md). Hai chỗ đó kiểm tra bằng
+`openclaw_install::validate_argv`: khi unit
+`lamp-openclaw-gateway.service` có `MainPID` (gateway đang chạy) thì chạy
+qua wrapper, nhập vào namespace của gateway như lamp-tasks; không có
+gateway nào chạy (như lúc cài lần đầu) thì không có lock nào để va chạm,
+nên chạy trong `openclaw-ns` riêng như trước. `GATEWAY_WAITS`,
+`NO_GATEWAY`, `NODE_NOT_READY` và `gateway_not_there` giờ nằm ở
+`lamp_checked_replace` (lamp-tasks vẫn xuất lại chúng trong
+`openclaw_config`, lamp-update xuất lại `NODE_NOT_READY` trong
+`openclaw_install`, và một test ghim `NO_GATEWAY` vào dòng không có gateway
+của wrapper), và one-shot của lamp-update cũng dùng cùng lịch chờ đó:
+chỉ lần từ chối vì gateway chưa có ở đó để kiểm tra mới được thử lại, văn
+bản bị OpenClaw từ chối thì không.
+Cả ba chỗ ghi `openclaw.json` (`write_checked` của lamp-tasks,
+`gateway_config` của lamp-update, lần cắt khi reset của lamp-setup) giữ
+một lock từ trước lúc đọc tới sau lúc rename (P2 của Seventh trên #7872):
+một `flock` độc quyền trên chính thư mục state của OpenClaw
+(`/var/lib/lampos-openclaw/state`), lấy qua `lamp_checked_replace::hold` /
+`lock`. Không có nó, lần rename của chỗ này rơi vào giữa lần kiểm tra của
+chỗ kia (vài giây) sẽ làm mất khối của chỗ kia, và khối provider của
+lamp-tasks mất cho tới lần nó khởi động sau. Lock trên thư mục, không phải
+file lock cạnh `openclaw.json`: không có gì phải tạo hay đổi chủ, chỗ ghi
+nào cũng đã mở thư mục này để rename (nên không đổi unit nào), và lần
+reset, vốn xoá mọi tên mà thư mục state không giữ, không thể tách đôi nó.
+Thời gian chờ có giới hạn (`LOCK_WITHIN`, 90 s, trên 60 s của lần kiểm
+tra); quá thời gian đó thì lần ghi thất bại với "another writer held the
+folder's lock past 90 s", như một lần kiểm tra không chạy được (lamp-tasks:
+không ghi cho tới lần khởi động sau; lamp-update: bản cài thất bại
+`config`, one-shot của vòng cập nhật hỏi lại ở vòng sau; reset: file bị
+xoá). Test:
+`the_state_folders_lock_is_held_from_the_read_through_the_check_to_the_rename`
+(lamp-tasks), `a_gateway_block_write_holds_the_state_folders_lock_through_its_check`
+(lamp-update), `a_cut_of_openclaws_config_holds_the_state_folders_lock_through_its_check`
+(lamp-setup).
+
 ## Hook của Harness bên trong namespace agent của đèn (#6530)
 
 Hook của Harness cho một engine (`harness hook hermes session-start`,
