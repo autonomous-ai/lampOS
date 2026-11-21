@@ -1023,12 +1023,7 @@ fn on_the_lamp(command: &str, options: &BTreeMap<String, String>) -> ExitCode {
                 // A new build taken from GitHub while the CDN is down
                 // (#7728) confirms on GitHub too, the CDN read first.
                 if matches!(confirmed, Ok(own::Confirm::NotProven(_)))
-                    && config.channel_url == lamp_update::cdn_feed::CDN
-                    && lamp_update::switches::update_switch(
-                        &config.root,
-                        lamp_update::cdn_feed::SWITCH,
-                        std::env::var_os(lamp_update::cdn_feed::SWITCH).as_deref(),
-                    )
+                    && lamp_update::cdn_feed::falls_back(&config, true)
                     && lamp_update::cdn_feed::due(
                         &config.on(&config.records),
                         lamp_update::records::unix_ms(),
@@ -1125,6 +1120,7 @@ fn on_the_lamp(command: &str, options: &BTreeMap<String, String>) -> ExitCode {
             std::env::var_os(lamp_update::cdn_feed::SWITCH).as_deref(),
         );
     let mut cdn_feed_said = String::new();
+    let falls_back = lamp_update::cdn_feed::falls_back(&config, command == "serve");
     // The agents' switches (#5197, #5978, #6226), read in the one place the
     // image's pre-install reads them too (#7274): only a `serve` that acts
     // takes a product lamp's defaults.
@@ -1379,7 +1375,7 @@ fn on_the_lamp(command: &str, options: &BTreeMap<String, String>) -> ExitCode {
                     .as_mut()
                     .map(|asked| asked as &mut dyn lamp_update::update_now::NowAsk),
             };
-            if cdn_feed {
+            if falls_back {
                 // On the CDN feed, GitHub after an hour of CDN failures
                 // (#7728): the CDN first on every round, never sticky.
                 let mut say = |line: &str| eprintln!("lamp-update: {line}");

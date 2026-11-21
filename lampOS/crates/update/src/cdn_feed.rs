@@ -234,6 +234,16 @@ pub fn on_github(config: &Config) -> Config {
     }
 }
 
+/// Whether `config`'s rounds, and its own confirm, fall back to
+/// [`GITHUB_STABLE`] after an hour of CDN failures: a `serve` (`serve`)
+/// that acts, on [`CDN`].
+pub fn falls_back(config: &Config, serve: bool) -> bool {
+    serve
+        && config.apply
+        && config.channel_url == CDN
+        && crate::switches::update_switch(&config.root, SWITCH, std::env::var_os(SWITCH).as_deref())
+}
+
 /// A round on `config`'s feed. On [`CDN`], a round that cannot read it
 /// (out of reach, or no build published there) starts or keeps the clock
 /// in `records`; once that clock reaches [`FALLBACK_AFTER_MS`] the same
@@ -632,6 +642,58 @@ mod tests {
             Outcome::UpToDate(14923),
         );
         assert!(!records.join(DOWN_SINCE).exists());
+    }
+
+    #[test]
+    fn a_product_unit_lamp_on_the_cdn_falls_back_with_the_switch_unset() {
+        // The product unit's own feed, and no switch in its environment or
+        // under its root.
+        assert!(
+            include_str!("../../../deploy/product/lamp-update.service")
+                .contains(&format!("serve --channel-url {CDN} "))
+        );
+        let folder = tempfile::tempdir().unwrap();
+        let records = folder.path();
+        let config = Config {
+            root: folder.path().into(),
+            ..following(CDN)
+        };
+        assert!(!crate::switches::update_switch(
+            &config.root,
+            SWITCH,
+            std::env::var_os(SWITCH).as_deref()
+        ));
+        // The round falls back (main.rs: `round_on` when this holds), and so
+        // does its own confirm, done again on GitHub once `due`.
+        assert!(falls_back(&config, true));
+        let t0 = 1_800_000_000_000;
+        for minutes in [0, 59] {
+            let (_, read) = round_at(records, &config, t0 + minutes * MINUTE, down());
+            assert_eq!(read, [CDN], "{minutes}");
+        }
+        assert!(!due(records, t0 + 59 * MINUTE));
+        assert!(due(records, t0 + 60 * MINUTE));
+        let (outcome, read) = round_at(records, &config, t0 + 60 * MINUTE, down());
+        assert_eq!(outcome, Outcome::Switched(14923));
+        assert_eq!(read, [CDN, GITHUB_STABLE]);
+        // Never sticky: the CDN read again, the CDN only.
+        let (_, read) = round_at(records, &config, t0 + 61 * MINUTE, Outcome::UpToDate(14923));
+        assert_eq!(read, [CDN]);
+        assert!(!due(records, t0 + 61 * MINUTE));
+        // Only a serve that acts, only on the CDN.
+        assert!(!falls_back(&config, false));
+        let dry = Config {
+            apply: false,
+            ..config.clone()
+        };
+        assert!(!falls_back(&dry, true));
+        for url in [GITHUB_STABLE, CANARY] {
+            let other = Config {
+                channel_url: url.into(),
+                ..config.clone()
+            };
+            assert!(!falls_back(&other, true), "{url}");
+        }
     }
 
     #[test]
