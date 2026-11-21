@@ -1039,6 +1039,21 @@ pub const NAME_SIGN_TIED_ENVIRONMENT: &str = "LAMP_NAME_SIGN_TIED";
 /// and open a window (#8114's shapes 5-7, #8136).
 pub const NAME_FACE_OR_WORDS_ENVIRONMENT: &str = "LAMP_NAME_FACE_OR_WORDS";
 
+/// `on` exactly, off unless set (#8114, the first builder's 08:54 and 08:57):
+/// a line whose call word is another person's name ("Hey, Lance.", "Dan,
+/// are you done?") is never the lamp's call, however sure lamp-name is,
+/// unless a face is turned to the lamp; and `LAMP_NAME_NEAR` never puts the
+/// lamp's name in such a word's place ([`crate::attention::called_by_another_name`]).
+pub const NAME_NOT_ANOTHERS_ENVIRONMENT: &str = "LAMP_NAME_NOT_ANOTHERS";
+
+/// [`NAME_NOT_ANOTHERS_ENVIRONMENT`] from this worker's environment, read once.
+pub(crate) fn not_anothers_on() -> bool {
+    static ON: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
+    *ON.get_or_init(|| {
+        std::env::var(NAME_NOT_ANOTHERS_ENVIRONMENT).is_ok_and(|value| value == "on")
+    })
+}
+
 /// Where the worker reads whether a hearing of the lamp's name inside one
 /// line's sound stays with that line, never counting for the one begun
 /// after it (`on`, and nothing else;
@@ -3097,7 +3112,7 @@ pub const NAME_NEAR_LEAST: f32 = 0.5;
 /// Words the speech to text wrote for "Lamp" at a line's start on
 /// lamp-4ace in 22 Oct's played rounds that the shape in
 /// [`sounds_like_the_name`] misses (`LAMP_NAME_NEAR`).
-const HEARD_FOR_THE_NAME: [&str; 5] = ["louvre", "month", "life", "light", "length"];
+pub(crate) const HEARD_FOR_THE_NAME: [&str; 5] = ["louvre", "month", "life", "light", "length"];
 
 /// People's names of the name's shape, that a colleague may call at a desk
 /// ("Lynn, pass me that"), English and Vietnamese: never the lamp's
@@ -3228,8 +3243,22 @@ fn named_near(
     if word.eq_ignore_ascii_case(net::key_terms::NAME) || word.eq_ignore_ascii_case("lamb") {
         return (text, false);
     }
+    // `LAMP_NAME_NOT_ANOTHERS` (#8114): another person's name stays theirs,
+    // whatever lamp-name heard; a face turned keeps the shape's own rule.
+    let (heard_near, turned_near) = near(window);
+    if not_anothers_on() && !turned_near && crate::attention::called_by_another_name(&text) {
+        if heard_near.is_some_and(|score| score >= NAME_NEAR_LEAST) {
+            eprintln!(
+                "lamp-voice second: request {request}: its first word, set off, is another person's name, and no face is turned to the lamp: not the lamp's name, however near lamp-name heard it (LAMP_NAME_NOT_ANOTHERS, #8114)"
+            );
+        }
+        return (
+            text,
+            heard_near.is_some_and(|score| score >= NAME_NEAR_LEAST),
+        );
+    }
     let like = like_the_name(word);
-    let (heard, turned) = near(window);
+    let (heard, turned) = (heard_near, turned_near);
     let near_enough = heard.filter(|score| *score >= NAME_NEAR_LEAST);
     let named = match (like, near_enough) {
         (LikeTheName::AsHeard, Some(score)) => Some(format!(
@@ -3323,7 +3352,7 @@ fn a_sentence_of_its_own(text: &str, start: usize, end: usize) -> bool {
 
 /// Words a line often opens with, set off, that are said, not a wake heard
 /// as another word ([`wake_heard_as`]): "Yes, please.", "Well, …", "Dạ, …".
-const OPENS_SET_OFF: &[&str] = &[
+pub(crate) const OPENS_SET_OFF: &[&str] = &[
     "yes",
     "yeah",
     "yep",
@@ -3558,7 +3587,7 @@ fn addresses_the_name(text: &str) -> bool {
 /// lamp's (the reviewer-lead's HOLD on `0990f0a27`: "Tomorrow, I see the
 /// dentist at 3" must keep its day): time and day words, verbs a request
 /// opens with, and discourse words, English and Vietnamese, NFC lower case.
-const NOT_A_NAME: &[&str] = &[
+pub(crate) const NOT_A_NAME: &[&str] = &[
     // Time and day.
     "today",
     "tomorrow",
