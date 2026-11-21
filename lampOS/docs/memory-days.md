@@ -1143,11 +1143,16 @@ is `lamp_msgs::app_fact`; the store's side is `crates/memory/src/app_facts.rs`.
   forget everything. Nothing writes it to disk, the thread, the journal or
   memory.
 - **The journal** says the op, the person's id and the count, never a word.
-- **No switch here.** Nothing sends these ops yet: the door's `apps.remember`
-  and `apps.context` and their writer come in their own PR, behind its
-  switch, off until the first builder's privacy read and the ROW. An older
-  memory answers `unknown_op`. "Refused while Lamp is private" (the physical
-  privacy switch, the first builder's point 4) is the door's check.
+- **No switch here.** The writer is the door's `apps.remember` (C166,
+  [apps.md](apps.md), "What an app tells Lamp's memory"), behind its own
+  switch `LAMP_APP_REMEMBER` in lamp-control, off until the first builder's
+  privacy read and the ROW. lamp-control checks the app's grant, its words
+  (`app_fact::tidy`), the privacy switch and three a minute, and tells the
+  voice on `apps/remember`; the voice picks the person with `app_fact::whose`
+  and no person asked (the owner's memory ids) and sends `remember_app_fact`
+  with source `app:<name>`. An app's remove sends `forget_app_facts` for its
+  source the same way (`apps/forget_facts`). `apps.context` is not built yet.
+  An older memory answers `unknown_op`, told to the app as `unavailable`.
 
 The bounds are the thread's, none this store's own:
 

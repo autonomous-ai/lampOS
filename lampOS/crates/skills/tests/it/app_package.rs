@@ -318,6 +318,13 @@ fn grants_are_the_doors_fourteen_and_nothing_else() {
             "{grant}"
         );
     }
+    // A manifest may ask `remember`; one without it reads as before.
+    assert!(changed(|m, _| m["grants"] = json!(["remember", "hear"])).is_ok());
+    assert!(changed(|m, _| m["grants"] = json!(["hear"])).is_ok());
+    refused(
+        changed(|m, _| m["grants"] = json!(["remember", "remember", "hear"])),
+        "twice",
+    );
 }
 
 #[test]
@@ -629,7 +636,10 @@ fn the_name_rules_are_the_texts_and_a_clip_may_be_quiet() {
     assert!(!app_package::app_name_ok(&"a".repeat(25)));
     assert!(!app_package::app_name_ok("-a"));
     assert!(!app_package::app_name_ok("a_b"));
-    assert_eq!(app_package::GRANTS.len(), 14);
+    assert_eq!(app_package::GRANTS.len(), 15);
+    // `remember` is an app's own grant (apps.remember), never the door's plain
+    // one a computer is paired with: the last in the list.
+    assert_eq!(app_package::GRANTS[14], app_package::REMEMBER_GRANT);
 }
 
 #[test]

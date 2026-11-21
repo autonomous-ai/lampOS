@@ -218,6 +218,11 @@ impl Session {
         self.app.as_ref().map(|app| app.name.as_str())
     }
 
+    /// The installed app this connection is, as the socket named it.
+    pub fn app_peer(&self) -> Option<&crate::app_socket::AppPeer> {
+        self.app.as_ref()
+    }
+
     /// Whether this connection is an app that has the `speak` grant: its
     /// `say` counts as taking a trigger offered it (`Live::took_by_say`).
     pub fn app_may_speak(&self) -> bool {
@@ -1760,7 +1765,7 @@ impl Door {
                 re,
                 json!({
                     "lamp": self.lamp_info(),
-                    "grants": app.grants,
+                    "grants": app.said_grants(),
                     "limits": limits,
                     "app": app.name,
                     "version": app.version,
@@ -4331,10 +4336,32 @@ mod tests {
     fn app_peer(grants: &[Grant]) -> crate::app_socket::AppPeer {
         crate::app_socket::AppPeer {
             name: "demo".to_owned(),
+            title: "Demo".to_owned(),
             version: "1.2.3".to_owned(),
             client: crate::app_socket::app_client("demo"),
             grants: grants.iter().copied().collect(),
+            remember: false,
         }
+    }
+
+    /// `remember` is an app's own grant: said in hello beside the door's,
+    /// never one the door's ops read.
+    #[test]
+    fn an_apps_hello_says_its_remember_grant() {
+        let mut door = Door::new("lamp-75c9", "Lamp", PIN, Clients::default(), None);
+        let mut fake = Fake::default();
+        let mut peer = app_peer(&[Grant::Speak, Grant::Light]);
+        peer.remember = true;
+        let (mut session, _) = door.open_app(peer);
+        let hello =
+            json!({"id": 1, "op": "hello", "client": "c_0", "sig": crate::runs::hello_sig()})
+                .to_string();
+        let outcome = door.handle(&mut session, &hello, &mut fake, S, 2);
+        assert_eq!(
+            reply(&outcome)["grants"],
+            json!(["light", "speak", "remember"])
+        );
+        assert!(session.app_peer().is_some_and(|app| app.remember));
     }
 
     #[test]

@@ -388,12 +388,21 @@ fn a_panels_revision_goes_on_across_runs_and_a_remove_starts_it_again() {
 
 #[test]
 fn the_apps_grant_list_is_the_doors_plain_grants() {
-    // `lamp_skills::app_package::GRANTS` copies the door's by hand.
+    // `lamp_skills::app_package::GRANTS` copies the door's by hand, then
+    // `remember`, an app's own grant that no door op reads.
     let doors: Vec<String> = crate::protocol::Grant::ALL
         .iter()
         .map(|grant| json!(grant).as_str().unwrap().to_owned())
         .collect();
-    let mut apps: Vec<String> = GRANTS.iter().map(|grant| (*grant).to_owned()).collect();
+    assert_eq!(
+        GRANTS.last(),
+        Some(&lamp_skills::app_package::REMEMBER_GRANT)
+    );
+    assert!(crate::protocol::Grant::from_wire(lamp_skills::app_package::REMEMBER_GRANT).is_none());
+    let mut apps: Vec<String> = GRANTS[..GRANTS.len() - 1]
+        .iter()
+        .map(|grant| (*grant).to_owned())
+        .collect();
     let mut doors = doors;
     apps.sort();
     doors.sort();

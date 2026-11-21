@@ -89,6 +89,13 @@ fn a_peer_is_the_installed_manifests_and_a_service_grant_is_refused() {
     assert!(peer_for(&apps, "demo", true).is_err());
     install(&apps, "odd", json!(["gmail"]), json!([]));
     assert!(peer_for(&apps, "odd", false).is_err());
+    // `remember` is the app's own grant, beside the door's; none without it.
+    assert!(!peer.remember && peer.title == "T");
+    install(&apps, "coach", json!(["speak", "remember"]), json!([]));
+    let coach = peer_for(&apps, "coach", false).unwrap();
+    assert!(coach.remember);
+    assert_eq!(coach.grants.len(), 1);
+    assert_eq!(coach.said_grants(), ["speak", "remember"]);
     let _ = std::fs::remove_dir_all(&apps);
 }
 
