@@ -783,6 +783,7 @@ mod tests {
                 picks.fetch_add(1, Ordering::AcqRel);
                 picked.clone()
             }),
+            make_pick: None,
             turn,
             checked: false,
         }));

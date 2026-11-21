@@ -1363,18 +1363,20 @@ pub fn answer_with(
         Err((code, why)) => return refusal(code, &why),
     };
     let runner = match gateway {
-        Some(gateway) if make.one_path => match (gateway.pick)() {
-            // The lamp's agent isn't Hermes, but its Harness target isn't
-            // known yet (right after boot): said at once, never a Hermes make.
-            Ok(MakeAgent::Hermes) if make.engine.as_deref().is_some_and(|e| e != "Hermes") => {
-                return refusal(NOT_READY, NOT_READY_LINE);
+        Some(gateway) if make.one_path => {
+            match gateway.make_pick.as_ref().unwrap_or(&gateway.pick)() {
+                // The lamp's agent isn't Hermes, but its Harness target isn't
+                // known yet (right after boot): said at once, never a Hermes make.
+                Ok(MakeAgent::Hermes) if make.engine.as_deref().is_some_and(|e| e != "Hermes") => {
+                    return refusal(NOT_READY, NOT_READY_LINE);
+                }
+                Ok(MakeAgent::Hermes) => hermes,
+                Ok(MakeAgent::Gateway(_)) => {
+                    return answer_on_gateway(&make, work, gateway, started);
+                }
+                Err(why) => return refusal("run_failed", &why),
             }
-            Ok(MakeAgent::Hermes) => hermes,
-            Ok(MakeAgent::Gateway(_)) => {
-                return answer_on_gateway(&make, work, gateway, started);
-            }
-            Err(why) => return refusal("run_failed", &why),
-        },
+        }
         _ => hermes,
     };
     if let Err(why) = runner.ready() {
@@ -1539,8 +1541,15 @@ impl MakeTurn for crate::skill_task::HarnessRunner {
 /// make is one turn through [`MakeTurn`], never a second runner. No token
 /// and no skill-start claim: a make has no grants and no script.
 pub struct MakeGateway {
-    /// Which agent a make with `"one_path":true` goes to now.
+    /// Which agent a live ask (`crate::voice_ask`) goes to now, and a make
+    /// with no [`Self::make_pick`].
     pub pick: Box<dyn Fn() -> Result<MakeAgent, String> + Send + Sync>,
+    /// Which agent a make with `"one_path":true` goes to now (#8151's
+    /// parity): as [`Self::pick`], and a default agent with no gateway
+    /// whose kept session takes the make is [`MakeAgent::Gateway`] too, its
+    /// make typed into that pane as OpenClaw's
+    /// ([`crate::skill_task::HarnessRunner::make_pick`]). `None`: `pick`.
+    pub make_pick: Option<Box<dyn Fn() -> Result<MakeAgent, String> + Send + Sync>>,
     /// The make's one turn ([`MakeTurn`], the seam).
     pub turn: Arc<dyn MakeTurn + Send + Sync>,
     /// Whether the make gets the guide's `lamp-skills pack` check (#7245):
@@ -1564,19 +1573,10 @@ impl MakeGateway {
     /// With `runner` (its `makes` on) as both the pick and the turn.
     pub fn of(runner: Arc<crate::skill_task::HarnessRunner>) -> Self {
         let looks = runner.clone();
+        let makes = runner.clone();
         Self {
-            pick: Box::new(move || match looks.make_agent()? {
-                Some((engine, true)) => Ok(MakeAgent::Gateway(engine)),
-                // Hermes lamps unchanged (#7245's done-when): the lamp's
-                // Hermes, and with Harness not set up (no gateway agent
-                // can be reached), as without the field, with no Harness
-                // check.
-                Some((crate::harness::EngineKind::Hermes, false)) | None => Ok(MakeAgent::Hermes),
-                Some((engine, false)) => Err(format!(
-                    "the lamp's default agent ({}) is neither a gateway agent nor the lamp's Hermes, so a make is not handed to it and nothing was started",
-                    engine.argument()
-                )),
-            }),
+            make_pick: Some(Box::new(move || agent_of(makes.make_pick()?))),
+            pick: Box::new(move || agent_of(looks.make_agent()?)),
             turn: runner,
             checked: crate::openclaw_config::v1_tools_on(
                 std::env::var(crate::openclaw_config::V1_TOOLS_SWITCH)
@@ -1584,6 +1584,22 @@ impl MakeGateway {
                     .as_deref(),
             ),
         }
+    }
+}
+
+/// The agent a make or an ask goes to, from what the runner picked
+/// (`(engine, typed into a pane)`).
+fn agent_of(picked: Option<(crate::harness::EngineKind, bool)>) -> Result<MakeAgent, String> {
+    match picked {
+        Some((engine, true)) => Ok(MakeAgent::Gateway(engine)),
+        // Hermes lamps unchanged (#7245's done-when): the lamp's Hermes, and
+        // with Harness not set up (no gateway agent can be reached), as
+        // without the field, with no Harness check.
+        Some((crate::harness::EngineKind::Hermes, false)) | None => Ok(MakeAgent::Hermes),
+        Some((engine, false)) => Err(format!(
+            "the lamp's default agent ({}) is neither a gateway agent nor the lamp's Hermes, so a make is not handed to it and nothing was started",
+            engine.argument()
+        )),
     }
 }
 
@@ -2848,6 +2864,7 @@ mod tests {
         let make = MakeLine::parse(line).unwrap();
         let gateway = |ended: Result<u64, String>| MakeGateway {
             pick: Box::new(|| Ok(MakeAgent::Gateway(crate::harness::EngineKind::Openclaw))),
+            make_pick: None,
             turn: Arc::new(CutTurn {
                 answer: "```skill.toml\nkind = \"installable\"\n```",
                 ended,

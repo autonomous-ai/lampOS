@@ -2985,7 +2985,19 @@ yet on a lamp.
   (`one_path_home_check`; the list is root's text, `lampos` can change
   neither), and shows it read-write at its own path; the rest (the skills,
   lamp-skills' and lamp-control's sockets, a run's own network with the
-  model bridge, the pushed skills) is as above. With the switch on, a
+  model bridge) is as above. With `LAMP_SKILL_TASKS` on too, it shows
+  every agent the same two folders read-only, when there, with OpenClaw
+  gateway's own lines (`openclaw_install::RUNS_EDITS`, applied by
+  `wrapper::one_path_start_edits`, #8151's parity): the pushed skills
+  `/var/lib/lampOS/skills-dev` always, not only with `LAMP_NS_NET=run`,
+  and the skill-start launcher's socket folder `/run/lampos-skill-start`
+  (`Q=/run/lampos-skill-start` on its own line right after lamp-control's
+  line, which stays byte for byte the one lamp-tasks reads), staged
+  before `/run` is hidden and moved back read-only. So the lamp's Hermes,
+  which has no gateway, runs a skill's run in its kept session through
+  `skill-start <run-id>` as OpenClaw's gateway does (`docs/tasks.md`, "A
+  Hermes skill run through the skill-start door"). `admin.sock` is never
+  shown. With the switch on, a
   round writes every other engine's wrapper as the one run path's
   (`wrapper::text_for`), and Hermes's install writes `/usr/local/bin/hermes`
   as the one run path's with Hermes's data and `agent-ns`, and takes

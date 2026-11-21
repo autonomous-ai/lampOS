@@ -5697,16 +5697,17 @@ fn hermes_keep_open_step(one: &OneSession, fake: &Fake, looks: &mut Looks) {
     one.look(looks, Instant::now(), None, &place_now);
 }
 
-/// #8151: Hermes's spoken tasks share the one session as OpenClaw's do;
-/// a skill run stays per run for Hermes (its wrapper reads the run's token
-/// file once at its own start); any other engine shares nothing.
+/// #8151 and its parity: Hermes's spoken tasks and skill runs share the
+/// one session as OpenClaw's do (a run through the skill-start door); any
+/// other engine shares nothing.
 #[test]
-fn hermes_shares_the_session_but_its_skill_runs_keep_their_own() {
+fn hermes_shares_the_session_and_its_skill_runs_as_openclaw() {
     assert!(shares(EngineKind::Openclaw));
     assert!(shares(EngineKind::Hermes));
     assert!(!shares(EngineKind::Claude));
     assert!(skill_runs_share(EngineKind::Openclaw));
-    assert!(!skill_runs_share(EngineKind::Hermes));
+    assert!(skill_runs_share(EngineKind::Hermes));
+    assert!(!skill_runs_share(EngineKind::Claude));
 }
 
 /// #8151: three tasks in a row on a Hermes lamp go into one kept session:

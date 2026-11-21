@@ -4896,11 +4896,40 @@ exactly, the default when unset), every task and run is its own
   lamp's default agent is OpenClaw or Hermes (`one_session::shares`); any
   other engine keeps the per-task path. A Hermes lamp's spoken tasks go
   into its one session as an OpenClaw lamp's do (`lamp-one-hermes`; see
-  "The kept session"). Skill runs share it on OpenClaw only
-  (`one_session::skill_runs_share`): a Hermes run's wrapper reads the
-  run's token file once, at its own start, in a namespace of that run's,
-  so a kept Hermes started once can't take a later run's token, and each
-  Hermes skill run keeps its own pane.
+  "The kept session"). Skill runs share it on both
+  (`one_session::skill_runs_share`), through the same skill-start door
+  (#8151's parity, "A Hermes skill run through the skill-start door"
+  below).
+- **A Hermes skill run through the skill-start door (#8151's parity).**
+  The lamp's Hermes has no gateway, so its run is not a gateway turn; it
+  goes through OpenClaw's launcher all the same. lamp-tasks makes the run
+  live for the launcher (its token held in memory, never in a file) and
+  types `Run /usr/local/lib/lampos/skill-start <run-id> once` into the
+  kept Hermes pane, whose approvals are off in its folder. Hermes's
+  terminal runs the launcher; the launcher claims the run once over
+  `/run/lampos-skill-start/start.sock` (the same peer checks as for
+  OpenClaw's gateway: Hermes's namespace drops to `lampos` in a nested
+  user namespace, as OpenClaw's does) and its fence runs the run's script
+  with the token on fd 3. A run granted `net` gets its own egress socket,
+  relayed by the fence, as OpenClaw's (`LAMP_TASKS_GATEWAY_NET`). There is
+  no switch and no engine's name in the choice: the door is taken by what
+  is installed (`HarnessRunner::through_door`):
+  - lamp-tasks' one session, Harness called as the person;
+  - the agent namespace showing `/run/lampos-skill-start`
+    (`skill_task::AGENT_NS_START_LINE` right after lamp-control's line,
+    written by lamp-update's `agent_ns::wrapper::one_path_start_edits`);
+  - the launcher at `/usr/local/lib/lampos/skill-start`;
+  - a run with its own script (a fixed write has none) and no keys file;
+  - for `net`, the launcher's fence relay.
+  Otherwise the run keeps its own pane as before, its token file written
+  before it starts, with one journal line: `skill task <id>: its own pane,
+  not the skill-start door: <why>`. A door run whose kept session doesn't
+  take it (no reply) has its live start ended, never claimable, its token
+  file written and its own words sent in its own pane (`skill task <id>:
+  the kept session didn't take it; its own pane, its token file
+  written`). Hermes's per-run wrapper reads only a token file, so the door
+  is for the kept session only. OpenClaw's exec allow-list
+  (`SkillStartAllowed`) is read only for a gateway agent.
 - **Opened at start, when the agent is ready.** With the switch on (and
   `LAMP_SKILL_TASKS` and `LAMP_SKILL_DEFAULT_AGENT`), a thread of
   lamp-tasks (`one-session`) ticks every 2 s. It opens the pane only once
@@ -5415,11 +5444,27 @@ in and signed out, and on 0.6.60, signed in (#7507's ROW).
     too. `HERMES_NONINTERACTIVE=1` (#7781,
     "Hermes asks nothing at its first start") keeps its first start from
     asking anything.
-  - **Skill runs and makes** still run per run (above, and `MakeHermes`).
-    A known gap: Hermes's wrapper reads each run's token file once, at its
-    own start, in that run's namespace, so a kept Hermes started once
-    can't take a later run's token; until it can, a Hermes skill run keeps
-    its own pane (`skill_runs_share`).
+  - **Skill runs** go into the kept session through the skill-start door
+    ("A Hermes skill run through the skill-start door"); one the door
+    can't take keeps its own pane.
+  - **Makes** with `"one_path":true` are typed into the kept session too,
+    as OpenClaw's gateway makes are (#8151's parity): with the session up
+    and Harness called as the person, `MakeGateway`'s make pick
+    (`HarnessRunner::make_pick`, from `kept_make`) is the lamp's Hermes in
+    its pane, and the journal says `make: handed to hermes in the lamp's
+    kept session`. A make has no token and no skill script, so it needs no
+    door. With no kept session (Harness called as an agent, or none open),
+    the make runs in the lamp's Hermes namespace (`MakeHermes`) as before.
+    A live ask keeps its own pick (`MakeGateway::pick`), unchanged: the
+    lamp's Hermes on the make runner. lamp-tasks makes its Harness project
+    folder (0700) before the pane's folder in it, as a make makes no run
+    folder.
+  - **`LAMP_MAKE_AGENT_NET=held`** holds only `MakeHermes` off the network,
+    on OpenClaw as on Hermes: `MakeHandOvers::lamp` reads it once
+    (`crates/tasks/src/skill_make.rs:1971`) and passes it only to
+    `lamp_runner(home, held)` (`:1980`); `MakeGateway::lamp(home, harness)`
+    (`:1981`) has no such argument, so a make typed into the kept pane
+    keeps the pane's network on both.
 - **Rotation and removal.** OpenClaw's kept session is not rotated by
   count (its gateway compacts the session itself, `agents.defaults.compaction`);
   a rotation, where one is due, is `ensure --fresh`. A cancel, an ask no one
