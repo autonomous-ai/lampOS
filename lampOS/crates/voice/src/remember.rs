@@ -264,6 +264,13 @@ pub fn said_no_told(subject: Option<&str>) -> String {
     kept_told("they said no", subject)
 }
 
+/// What the lamp says itself, with no model round, to a no that is only a
+/// no to the one-face forget question (#8185,
+/// `known_faces::only_refuses`): nothing is forgotten. In the owner's
+/// language only from its clip rendered ahead; until then the model is
+/// told [`said_no_told`] and answers.
+pub const KEPT_IT_LINE: &str = "Okay, I'll keep it.";
+
 /// [`said_no_told`] for an answer asked about once more
 /// ([`FORGET_ASKED_AGAIN`]) and still not clear: nothing was forgotten.
 pub fn still_unclear_told(subject: Option<&str>) -> String {
@@ -290,7 +297,8 @@ fn kept_told(why: &str, subject: Option<&str>) -> String {
 pub const FORGET_ASKED_AGAIN: &str = "(For you to know: their answer was not clear, so nothing was forgotten and it is still kept. Ask them once more, in a few words, \"Should I forget it?\", and then stop. Do not say what was asked about, do not say it is forgotten, and do not call forget now. If they then say yes, call forget then, naming nothing else.)";
 
 /// Phrases an answer to the one-face forget question may forget by, beside
-/// [`PHRASES`] (#8165): "No, I don't need it.", "No, drop it."
+/// [`PHRASES`] (#8165): "No, I don't need it.", "No, drop it.", and "No, I
+/// don't want it." (#8185).
 const ANSWER_PHRASES: &[&[&str]] = &[
     &["drop", "it"],
     &["drop", "that"],
@@ -298,6 +306,9 @@ const ANSWER_PHRASES: &[&[&str]] = &[
     &["don't", "need"],
     &["dont", "need"],
     &["do", "not", "need"],
+    &["don't", "want"],
+    &["dont", "want"],
+    &["do", "not", "want"],
 ];
 
 /// Whether a forget word or phrase of `said` is negated in its clause
@@ -2180,6 +2191,33 @@ pub fn asks_about_forgetting(answer: &str, name: &str) -> bool {
         }
     }
     false
+}
+
+/// Whether `answer` asks about the forget `name` ([`asks_about_forgetting`])
+/// in its last question, and that question offers nothing else: no "or",
+/// "hay" or "hoặc" in it (the second read's P2 on #8215). "Shall I forget
+/// what you kept about the umbrella?" does; "…, or keep it?" and "Shall I
+/// forget it? Or shall I set a reminder instead?" don't, so a plain yes to
+/// them is the model's to judge. Only then does a plain yes run the held
+/// one-face forget in code (`second_provider::OneFaceAnswer::PlainYes`).
+pub fn offers_only_forgetting(answer: &str, name: &str) -> bool {
+    const OR: &[&str] = &["or", "hay", "ho\u{1eb7}c"];
+    let mut sentence = String::new();
+    let mut last = None;
+    for c in answer.chars() {
+        sentence.push(c);
+        match c {
+            '?' | '\u{ff1f}' => last = Some(std::mem::take(&mut sentence)),
+            '.' | '!' | '\u{2026}' | '\u{3002}' => sentence.clear(),
+            _ => {}
+        }
+    }
+    last.is_some_and(|question| {
+        asks_about_forgetting(&question, name)
+            && !crate::known_faces::lower_words(&question)
+                .iter()
+                .any(|word| OR.contains(&word.as_str()))
+    })
 }
 
 /// Whether `question` has the lamp offer to forget: a forget word after
@@ -6285,7 +6323,11 @@ mod one_kept_tests {
             held.contains("If they say yes within 30 seconds, call forget then"),
             "{held}"
         );
-        assert!(held.contains("only that call runs it"), "{held}");
+        // #8215's P3: a plain yes may have run it already, before the call.
+        assert!(
+            held.contains("unless you are told it has already run"),
+            "{held}"
+        );
         assert!(!held.contains("Do not call forget"), "{held}");
         assert!(!held.contains("couldn't see"), "{held}");
     }
@@ -6305,7 +6347,7 @@ pub fn one_face_forget_asks(subject: &str) -> Value {
     json!({
         "forgotten": false,
         "held": format!(
-            "Not done yet: this waits for their yes. Ask them once, in a few words and in the language they spoke, whether you should forget what you kept about {} (for example \"Shall I forget what you kept about your bike lock code?\" or \"Mình có nên quên điều đã giữ về mã khóa xe của bạn không?\"), and then stop. Do not say what was kept, its details, or anything you know about it. If they say yes within 30 seconds, call forget then, naming nothing else: only that call runs it. A no or nothing keeps it. Do not say it is forgotten until that forget has run.",
+            "Not done yet: this waits for their yes. Ask them once, in a few words and in the language they spoke, whether you should forget what you kept about {} (for example \"Shall I forget what you kept about your bike lock code?\" or \"Mình có nên quên điều đã giữ về mã khóa xe của bạn không?\"), and then stop. Do not say what was kept, its details, or anything you know about it. If they say yes within 30 seconds, call forget then, naming nothing else, unless you are told it has already run: it runs only on their yes. A no or nothing keeps it. Do not say it is forgotten until that forget has run.",
             cut_at_a_word(subject, WHAT_WENT_BYTES)
         )
     })
@@ -16144,6 +16186,28 @@ fn owner_forgets_rows_of(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// The second read's P2 on #8215: a plain yes runs the one-face forget
+    /// in code only when the lamp's last question offered it alone.
+    #[test]
+    fn offers_only_forgetting_reads_the_last_question_with_no_or() {
+        for alone in [
+            "Shall I forget what you kept about the umbrella?",
+            "Got it. Shall I forget what you kept about the umbrella?",
+            "Shall I forget what you kept about the umbrella? Just say yes.",
+        ] {
+            assert!(offers_only_forgetting(alone, FORGET), "{alone}");
+        }
+        for not in [
+            "Shall I forget what you kept about the umbrella, or keep it?",
+            "Shall I forget what you kept about the umbrella? Or shall I set a reminder instead?",
+            "Shall I forget what you kept about the umbrella? And shall I dim the light?",
+            "Okay, I'll keep it.",
+            "",
+        ] {
+            assert!(!offers_only_forgetting(not, FORGET), "{not}");
+        }
+    }
     use std::{
         io::{BufRead, BufReader, Write},
         os::unix::net::UnixListener,

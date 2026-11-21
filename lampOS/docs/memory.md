@@ -1012,7 +1012,8 @@ subject in their own words, in their language ("Shall I forget what you
 kept about your bike lock code?"). The kept text is never told to the model
 or said: the speaker was not seen (the Reviewer-lead's P2 on #6673). The
 held note tells the model that if they say yes within 30 s it calls
-`forget`, naming nothing else, and that only that call runs it
+`forget`, naming nothing else, unless it is told the forget already ran (a
+plain yes runs it before the model is asked, #8185)
 (`remember::one_face_forget_asks`; #8059: it used to say "Do not call forget
 again for their yes", so on stable a yes ran nothing).
 Only their yes on a later line within 30 s
@@ -1036,7 +1037,34 @@ place exactly as held, by its kept id and words, never the model's raw
 call (`second_provider::agree_held_forget`, `Taken::Agrees`). A line the
 model answers with no `forget` runs nothing and the thing stays kept; a
 `forget` naming another thing is that other forget, and the held one is
-kept. **A no keeps it whatever the model calls** (#8165: on lamp-06c1 "No."
+kept. **A plain yes runs it before round 1** (#8185, the owner's 21 Nov
+"Yes, build it"): a line that is a yes and nothing else, no question and at
+most six words of *yes, yeah, yep, yup, sure, ok, okay, go ahead, do it,
+please do* with *please, lamp, hey* (`agent_tasks::plain_yes_with`), from the
+same person in time, seen saying it or in the private room, runs the held
+forget by its kept id before the model is asked, but only when the lamp's
+last question offered that forget alone, with no "or" in it
+(`remember::offers_only_forgetting`, `HeldForget::offered_alone`; after
+"…, or keep it?" or "Or shall I set a reminder instead?" the yes is the
+model's call) (`Taken::Runs`), so it runs
+though the model calls no `forget`; round 1 is told it ran
+(`after_forget::context`), and a model `forget` of it on that line is
+answered `remember::HELD_FORGET_RAN` and runs nothing more. Any other yes
+("Sure, forget it.", "Loan. Yes.") stays the model's call as above. **A no
+that is only a no is answered by the lamp itself** (#8185): a refusal
+(below) with no question, at most six words, each a no, a keep word, a
+negated forget word or a word beside them ("No.", "Lamp, no.", "No, keep
+it.", "Don't.", "No, don't forget it.", `known_faces::only_refuses`) drops
+the hold, deletes nothing and is answered "Okay, I'll keep it."
+(`remember::KEPT_IT_LINE`) with no model round. In the owner's language
+the line is said only from its clip rendered ahead as the worker starts
+(`language::FIXED_LINES`); until then the model is told
+`remember::said_no_told` beside the line and answers. A no carrying
+anything else ("No, turn the lights on.") goes to the model with that
+note, so no request is lost. A privacy switch change drops the held
+question, as it drops a waiting write (`Engine::privacy`, the person's
+ruling on #8215): a yes after it runs nothing in code and goes to the
+model as any line. **A no keeps it whatever the model calls** (#8165: on lamp-06c1 "No."
 ran the forget, the model calling it anyway), a keep-side backstop to the
 model's judgment whose words only ever keep (`second_provider::one_face_answer`):
 a no (a no word outside a pleasantry, "No.", "No, keep it.", "Don't.",

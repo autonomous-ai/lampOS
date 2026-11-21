@@ -5555,6 +5555,17 @@ impl Engine {
             // A write read back and waiting for its send goes too
             // (Thirteen's P2 on #5968).
             crate::services::forget_waiting();
+            // And a keep or forget held for their yes, the one-face forget
+            // question among them: a yes after the switch answers nothing
+            // in code (the person's ruling on #8215).
+            if let Ok(mut hold) = self.shared.held_forget.lock()
+                && let Some(held) = hold.held.take()
+            {
+                eprintln!(
+                    "lamp-voice second: dropped a held forget ({}, held in request {}): the privacy switch changed; it is kept",
+                    held.call.name, held.request
+                );
+            }
             if self.shared.remember_speaker {
                 crate::remember_speaker::forget();
                 if let Some(eyes) = &self.shared.enrollment_sight {
@@ -7955,6 +7966,12 @@ impl Engine {
             (
                 shared.keep_at_once && shared.language.is_some(),
                 crate::keep_at_once::KEPT,
+            ),
+            // The one-face forget's "Okay, I'll keep it." (#8185), the same
+            // way: in the owner's language only from its clip.
+            (
+                shared.one_face_reads && shared.language.is_some(),
+                crate::remember::KEPT_IT_LINE,
             ),
             // The make's opening for a bare make_skill call (#7554), in
             // every language, so its first audio never waits on the voice.
@@ -15134,6 +15151,13 @@ struct HeldForget {
     /// counts as asking about it when it offers that word
     /// ([`settle_held_forget`]). `None` for every other held call.
     near: Option<String>,
+    /// The lamp's answer that asked about it offered only this forget: its
+    /// last question, with no "or" in it
+    /// ([`crate::remember::offers_only_forgetting`], the second read's P2
+    /// on #8215). Only then is a plain yes run in code
+    /// ([`OneFaceAnswer::PlainYes`]); "…, or keep it?" or a question after
+    /// it leaves the yes to the model.
+    offered_alone: bool,
 }
 
 /// The one kept thing of a person's a named forget asks to remove, by its
@@ -15864,6 +15888,13 @@ enum Taken {
     /// (`known_faces::unclear_answer_to_keep`): held on for this turn, which
     /// the model is told to ask once more ([`crate::remember::KEEP_ASKED_AGAIN`]).
     AskAgain,
+    /// A held one-face forget's answer that is only a no
+    /// ([`OneFaceAnswer::OnlyNo`], #8185): dropped, it is kept, and the
+    /// lamp says [`crate::remember::KEPT_IT_LINE`] itself with no model
+    /// round ([`kept_line_clip`]). Where that line is not rendered ahead in
+    /// the owner's language, as [`Taken::OnForget`] with the said-no note,
+    /// told to the model beside the line too.
+    KeptAtOnce(net::ToolCall, String),
 }
 
 /// What a held forget `name` dropped for `why` tells the model (#7478): a
@@ -15926,7 +15957,11 @@ impl Taken {
             Taken::NotTheirs => Some(crate::remember::not_theirs_told(crate::remember::THAT_YES)),
             Taken::AskAgain => Some(crate::remember::KEEP_ASKED_AGAIN.to_owned()),
             // Told only on the model's forget call ([`told_on_forget`]).
-            Taken::Nothing | Taken::Runs(..) | Taken::Agrees(_) | Taken::OnForget(..) => None,
+            Taken::Nothing
+            | Taken::Runs(..)
+            | Taken::Agrees(_)
+            | Taken::OnForget(..)
+            | Taken::KeptAtOnce(..) => None,
         }
     }
 }
@@ -16074,27 +16109,54 @@ fn a_yes_held(shared: &Shared) -> bool {
 /// and the words here only stop a forget.
 #[derive(Debug, PartialEq)]
 enum OneFaceAnswer {
-    /// A yes, or anything else: the model's forget call on the line, naming
-    /// nothing else, runs it ([`Taken::Agrees`]).
+    /// A plain yes and nothing else (`agent_tasks::plain_yes_with`: "Yes.",
+    /// "Yeah, go ahead.", "Okay lamp, please do."; #8185): it runs before
+    /// round 1, as a one-face yes did before the model judged it
+    /// ([`Taken::Runs`]), so it runs though the model calls no forget.
+    PlainYes,
+    /// Any other yes, or anything else: the model's forget call on the
+    /// line, naming nothing else, runs it ([`Taken::Agrees`]).
     ModelsCall,
     /// A no with no forget word, or with every forget word negated ("No,
     /// don't forget it.", `known_faces::refuses`): kept, whatever the model
     /// calls.
     Refuses,
+    /// A [`Self::Refuses`] that is only a no ("No.", "Lamp, no.", "No, keep
+    /// it.", "No, don't forget it.", `known_faces::only_refuses`; #8185):
+    /// kept, and answered by the lamp with no model round
+    /// ([`Taken::KeptAtOnce`]).
+    OnlyNo,
     /// Forget said and taken back in one line: a forget word negated and one
     /// not ("Forget it… no wait, don't delete it."). Kept, and asked once
     /// more.
     Unclear,
 }
 
-/// [`OneFaceAnswer`] of the line `said`.
-fn one_face_answer(said: &str) -> OneFaceAnswer {
-    if crate::known_faces::refuses(said) {
+/// [`OneFaceAnswer`] of the line `said`, a plain yes only where the lamp's
+/// question offered the forget alone (`offered_alone`,
+/// [`HeldForget::offered_alone`]).
+fn one_face_answer(said: &str, offered_alone: bool) -> OneFaceAnswer {
+    if offered_alone && crate::agent_tasks::plain_yes_with(said, &[], &[]) {
+        OneFaceAnswer::PlainYes
+    } else if crate::known_faces::only_refuses(said) {
+        OneFaceAnswer::OnlyNo
+    } else if crate::known_faces::refuses(said) {
         OneFaceAnswer::Refuses
     } else if crate::remember::negates_a_forget(said) && crate::remember::forgets_unnegated(said) {
         OneFaceAnswer::Unclear
     } else {
         OneFaceAnswer::ModelsCall
+    }
+}
+
+/// [`crate::remember::KEPT_IT_LINE`]'s clip, if it can be said now
+/// ([`Taken::KeptAtOnce`]): in English, empty, said by the voice as the
+/// turn's piece; in the owner's language, only its clip rendered ahead
+/// ([`FixedClips`]), as `LAMP_KEEP_ANSWERS_AT_ONCE`'s line is.
+fn kept_line_clip(shared: &Shared) -> Option<Vec<i16>> {
+    match shared.language {
+        None => Some(Vec::new()),
+        Some(_) => shared.fixed_clips.kept(crate::remember::KEPT_IT_LINE),
     }
 }
 
@@ -16243,7 +16305,22 @@ fn take_held_forget(
                 } else {
                     "the private room"
                 };
-                match one_face_answer(said) {
+                match one_face_answer(said, held.offered_alone) {
+                    OneFaceAnswer::PlainYes => {
+                        eprintln!(
+                            "lamp-voice second: request {request}: their plain yes runs the one-face forget held in request {} before round 1 ({how}, LAMP_PERSON_SCOPE_ONE_FACE_READS)",
+                            held.request
+                        );
+                        Taken::Runs(held.call, None, true)
+                    }
+                    OneFaceAnswer::OnlyNo => {
+                        eprintln!(
+                            "lamp-voice second: request {request}: dropped a held one-face forget (held in request {}): their line is only a no ({how}); it is kept, and the lamp says so itself (LAMP_PERSON_SCOPE_ONE_FACE_READS)",
+                            held.request
+                        );
+                        let note = crate::remember::said_no_told(kept_subject(&held.call));
+                        Taken::KeptAtOnce(held.call, note)
+                    }
                     OneFaceAnswer::ModelsCall => {
                         eprintln!(
                             "lamp-voice second: request {request}: the one-face forget held in request {} runs on the model's forget call on this line, naming nothing else ({how})",
@@ -16940,6 +17017,7 @@ fn hold_forget_as(
         asked_again: false,
         one_face,
         near: None,
+        offered_alone: false,
     });
     Holding::Held
 }
@@ -17141,6 +17219,8 @@ fn settle_held_forget(shared: &Shared, request: u64, answer: Option<&str>) {
             } =>
         {
             held.asked = true;
+            held.offered_alone = held.call.name != crate::remember::REMEMBER
+                && crate::remember::offers_only_forgetting(answer, &held.call.name);
             return;
         }
         // With `LAMP_NAMES_RECORD_TOLD` (#5141 row 7, lamp-0c4e, 3 Nov): a
@@ -18069,6 +18149,10 @@ async fn answer(
     // A one-face or spelling forget dropped on this line, and its note, told
     // only on the model's call to that forget ([`Taken::OnForget`]).
     let mut held_forget_dropped = None;
+    // A held one-face forget's answer that is only a no, said by the lamp
+    // with no model round: its clip, empty for English said by the voice
+    // ([`Taken::KeptAtOnce`]).
+    let mut kept_at_once = None;
     let (mut held_forget_runs, unseen_yes) = match take_held_forget(
         shared,
         request,
@@ -18103,6 +18187,23 @@ async fn answer(
             held_forget_dropped = Some((call, note));
             (None, None)
         }
+        // Only a no (#8185): the lamp's own line, with no model round,
+        // when it can be said now; else the model is told they said no,
+        // beside the line and on its forget call.
+        Taken::KeptAtOnce(call, note) => match kept_line_clip(shared) {
+            Some(clip) => {
+                kept_at_once = Some(clip);
+                (None, None)
+            }
+            None => {
+                eprintln!(
+                    "lamp-voice second: request {request}: \"{}\" is not rendered ahead in the owner's language yet; the model answers their no",
+                    crate::remember::KEPT_IT_LINE
+                );
+                held_forget_dropped = Some((call, note.clone()));
+                (None, Some(note))
+            }
+        },
         told @ (Taken::Unseen(_) | Taken::Unknown(_) | Taken::NotTheirs | Taken::AskAgain) => {
             (None, told.told())
         }
@@ -18332,6 +18433,7 @@ async fn answer(
     let prepared_for = prepared
         .filter(|_| {
             held_forget_runs.is_none()
+                && kept_at_once.is_none()
                 && unseen_yes.is_none()
                 && held_save_runs.is_none()
                 && held_save_dropped.is_none()
@@ -18420,6 +18522,28 @@ async fn answer(
             );
             shared.emit(ProviderOutput::OwnWordsSaid { request }).await;
             queue.push(words).await?;
+            return Ok(());
+        }
+        // Only a no to the one-face forget question (#8185): kept, and the
+        // lamp says so itself, with no model round.
+        if let Some(clip) = kept_at_once {
+            let line = shared.fixed(crate::remember::KEPT_IT_LINE);
+            eprintln!(
+                "lamp-voice second: request {request}: their no keeps the one-face forget's thing; \"{line}\" said{} with no chat asked (LAMP_PERSON_SCOPE_ONE_FACE_READS)",
+                if clip.is_empty() {
+                    ""
+                } else {
+                    " from its clip rendered ahead"
+                }
+            );
+            // The lamp's own words, as its other own lines are: no model
+            // answered this turn.
+            shared.emit(ProviderOutput::OwnWordsSaid { request }).await;
+            if clip.is_empty() {
+                queue.push(line.to_owned()).await?;
+            } else {
+                queue.push_clip(line, clip).await?;
+            }
             return Ok(());
         }
         // The memory's note asked as the line began, waited for here, never
@@ -21829,7 +21953,11 @@ async fn answer(
                     && forget_asker(scope.as_ref()).is_some();
                 // Their yes to the one-face forget held, the model's call
                 // already made the held one ([`agree_held_forget`]): it runs.
-                let agreed = call.name == crate::remember::FORGET
+                // Not once the held forget ran before round 1 (#8185): the
+                // model's own forget of it then is told it ran, never run
+                // again.
+                let agreed = !held_forget_ran
+                    && call.name == crate::remember::FORGET
                     && scope
                         .as_ref()
                         .is_some_and(|scope| scope.agreed_forget(&call.args));
