@@ -479,16 +479,24 @@ mod tests {
     }
 
     /// The most `clip` asks the base (base yaw) to change its speed from
-    /// one step to the next, counts a second a second: its largest second
-    /// difference over the step's time squared.
-    fn base_bend(clip: &Clip) -> f32 {
-        let step_s = f32::from(clip.step_ms) / 1_000.0;
-        clip.frames
-            .windows(3)
-            .map(|three| {
-                let bend =
-                    i32::from(three[2][2]) - 2 * i32::from(three[1][2]) + i32::from(three[0][2]);
-                bend.unsigned_abs() as f32 / (step_s * step_s)
+    /// one step to the next, counts a second a second, played under
+    /// `ceiling` (`Limits::clip_ceiling`; `None` is as recorded): each
+    /// step's speed is its counts over its own time, which the ceiling may
+    /// have stretched (`Clip::step_within_us`), and the change between two
+    /// steps is over the mean of their times. With even steps this is the
+    /// second difference over the step's time squared.
+    fn base_bend(clip: &Clip, ceiling: Option<f32>) -> f32 {
+        let step_s = |frame: usize| match ceiling {
+            None => f32::from(clip.step_ms) / 1_000.0,
+            Some(ceiling) => clip.step_within_us(frame, ceiling) as f32 / 1e6,
+        };
+        let speed = |frame: usize| {
+            f32::from(clip.frames[frame + 1][2] - clip.frames[frame][2]) / step_s(frame)
+        };
+        (1..clip.frames.len().saturating_sub(1))
+            .map(|frame| {
+                (speed(frame) - speed(frame - 1)).abs()
+                    / ((step_s(frame - 1) + step_s(frame)) / 2.0)
             })
             .fold(0.0, f32::max)
     }
@@ -509,13 +517,15 @@ mod tests {
     fn no_level_bends_the_base_harder_than_level_one_does() {
         let bar = crate::clips::ALL
             .iter()
-            .map(|clip| base_bend(clip))
+            .map(|clip| base_bend(clip, None))
             .fold(0.0, f32::max);
         assert!((7_600.0..7_800.0).contains(&bar), "{bar}");
         assert!(bar <= BASE_BEND && BASE_BEND - bar < 1.0, "{bar}");
         for level in 2..=5 {
             for clip in crate::clips::ALL {
-                let bend = base_bend(livelier(clip, level));
+                // Played as it is played: each step stretched under the
+                // servo's 1,000, which makes some steps uneven (#8183).
+                let bend = base_bend(livelier(clip, level), Some(1_000.0));
                 assert!(
                     bend <= bar + 0.5,
                     "{} at level {level}: {bend} c/s^2 against {bar}",
@@ -622,7 +632,7 @@ mod tests {
     fn level_five_plays_clips_bigger_and_quicker_never_past_the_reach_or_the_servo() {
         let reach = crate::body::GESTURE_REACH;
         let ceiling = Some(1_000.0);
-        let (mut grown, mut full_pace) = (0, 0);
+        let (mut grown, mut full_pace, mut slowed) = (0, 0, vec![]);
         for clip in crate::clips::ALL {
             let (one, three, five) = (farthest(clip), livelier(clip, 3), livelier(clip, 5));
             assert_eq!(five.name, clip.name);
@@ -640,6 +650,9 @@ mod tests {
             );
             assert!(three.step_ms <= clip.step_ms, "{}", clip.name);
             full_pace += usize::from(five.step_ms == quick);
+            if five.step_ms != quick {
+                slowed.push(clip.name);
+            }
             // A base held to its own size where even the clip's own pace
             // would bend it past `BASE_BEND` ('headshake', 'dance_chill').
             let base_held = farthest(five)[2] == one[2];
@@ -683,6 +696,21 @@ mod tests {
         assert!(grown >= 60, "{grown}");
         // 13 of the 21 play at the full x1.5 (#8153, the base held).
         assert!(full_pace >= 13, "{full_pace}");
+        // The other 8 at a slower step, the base held under `BASE_BEND`
+        // (docs/body.md says the same list).
+        assert_eq!(
+            slowed,
+            [
+                "headshake",
+                "curious",
+                "confused",
+                "scanning",
+                "dance_chill",
+                "dance_hype",
+                "dance_waltz",
+                "dance_jazz"
+            ]
+        );
         // The same clip at the same level is the same one, made once.
         assert!(std::ptr::eq(
             livelier(&crate::clips::NOD, 5),

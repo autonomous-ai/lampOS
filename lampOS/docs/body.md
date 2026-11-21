@@ -1504,10 +1504,13 @@ the voice, Expression and lamp-skills (each with `energy_in::EnergyIn`, the body
   x1.5 asked the base for about 11,200 and the base rang for half a second (row-8155b, 21 Nov).
   `energy::sized` first plays such a clip at a slower step, never slower than its own, and where even
   its own pace would ask more, keeps the base at the clip's own size while the head and arm still
-  grow (headshake, dance_chill). At level 5, 13 clips play at the full x1.5 step; curious,
-  dance_jazz, scanning, confused, dance_chill and dance_hype take 0.8 to 0.99 of their level-1 time,
-  and headshake 1.02 (its own step, the larger head stretched under the servo's speed)
-  (`energy::tests::no_level_bends_the_base_harder_than_level_one_does`).
+  grow (headshake, dance_chill). At level 5, 13 clips play at the full x1.5 step; dance_waltz at a
+  slower one still takes 0.72 of its level-1 time, curious, dance_jazz, scanning, confused,
+  dance_chill and dance_hype 0.8 to 0.99, and headshake 1.02 (its own step, the larger head
+  stretched under the servo's speed). The bend is measured as the clip is played, each step at its
+  own time once the servo's speed has stretched it, so a step stretched next to one that is not
+  counts as it is (`energy::tests::no_level_bends_the_base_harder_than_level_one_does`, the slowed
+  list in `level_five_plays_clips_bigger_and_quicker_never_past_the_reach_or_the_servo`).
 
   Level 5 against V1 (#6893's bar), peak to peak in counts over the window V2 kept of V1's
   `excited.csv` and `happy_wiggle.csv` (`energy::tests::level_five_sizes_excited_and_happy_against_v1`,
@@ -1518,7 +1521,7 @@ the voice, Expression and lamp-skills (each with `energy_in::EnergyIn`, the body
   | excited | head pitch | 146 | 133 | 0.91 | |
   | excited | shoulder | 299 | 361 | 1.21 | |
   | excited | elbow | 502 | 326 | 0.65 | the tip cap, x1.27 |
-  | happy | head pitch | 268 | 220 | 0.82 | the reach |
+  | happy | head pitch | 268 | 220 | 0.82 | |
   | happy | base yaw | 697 | 240 | 0.34 | x1.6 of a base cut to 0.22 of V1 |
   | happy | shoulder | 178 | 274 | 1.54 | over V1: x1.6 of 0.96 of V1 |
   | happy | elbow | 516 | 360 | 0.70 | the reach |
