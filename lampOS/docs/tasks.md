@@ -4693,7 +4693,29 @@ file:
   (`gateway::SERVING_WITHIN`, of the run's 14 minutes) until the port
   answers and then the gateway's own approvals read succeeds
   (`openclaw approvals get --gateway --json`, lamp-update's `#@fence-get`,
-  `gateway::Serving`), run at most every 3 s, each bounded at 20 s. If
+  `gateway::Serving`), each bounded at 20 s. One read is in flight at a
+  time for all of lamp-tasks: a run that finds another's read running
+  waits for it and takes its outcome, and after a failed read the next
+  waits 3 s, then 6, 12 and at most 15 s (`gateway::READ_EVERY`,
+  `READ_MOST`, never past the run's deadline), so the Node CLI each read
+  starts does not slow the gateway's own start on the lamp (#7174);
+  a read that succeeds sets the wait back to none. **Told while it
+  waits (#7354):** a run the person just asked for by voice is handed
+  over with `"tell_getting_ready": true` (lamp-skills,
+  `task::asking_getting_ready`; lamp-tasks takes it off the line before
+  reading it, `skill_task::TELL_GETTING_READY`). Once the agent's start-up
+  wait passes 5 s (`skill_task::GETTING_READY_AFTER`,
+  `skill_task::startup_wait`), lamp-tasks writes one
+  `{"event":"getting_ready"}` line on the run's connection, before its
+  answer, at most once a run. lamp-skills reads past it to the answer
+  (`hand_over_telling`) and says "One moment, I'm getting ready."
+  (`task::GETTING_READY_LINE`) once, as exact words through the say
+  service, on a thread of its own. It never names the agent, and nothing
+  says ready: the run's own answer follows as before. A trigger's, a
+  schedule's or the app's run doesn't ask, and a wait that ends sooner
+  writes nothing. The hook is any engine's start-up wait; today only
+  OpenClaw's gateway has one (a Hermes run is one `hermes chat -q`, with
+  none). If
   it doesn't, nothing is sent ("tasks: the OpenClaw Gateway answered on
   127.0.0.1:18789 but did not serve its approvals read
   (exec.approvals.get) before the readiness or run deadline; the hand-over is not sent", or "did
