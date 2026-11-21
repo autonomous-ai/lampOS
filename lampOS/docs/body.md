@@ -1590,7 +1590,8 @@ the voice, Expression and lamp-skills (each with `energy_in::EnergyIn`, the body
   The time is under V1's by level 5's 1.5 pace, or less where the base holds the step (dance_hype at
   its own); the moves are all of V1's, no joint past V1's swing. A skill waits for a
   gesture's end as long as the longest level plays it (`energy::longest_us`). A longer clip holds
-  a new energy level and the next gesture (a fill, a matched cue) until it ends, as any gesture.
+  a new energy level until it ends; a fill or a matched cue asked while it plays is dropped
+  ("dropped: another gesture plays", as for any gesture: `--arbitration` is off in the product).
 - **Pause nod.** Expression's pause clip waits `pause_cooldown_us`: the catalogue's cooldown at level 1,
   else the level's gap, never longer than the catalogue's and never under 3 s.
 - **Music.** A skill trigger with `lively = true` (Music sway, [skills.md](skills.md)): its cooldown at
