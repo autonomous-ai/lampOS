@@ -5876,11 +5876,45 @@ light = { dim = 1 }
 
     /// A manage helper at `socket` that puts on whatever made skill it is
     /// asked for, once: the line it was asked.
+    /// How long a test helper waits for the call it stands in for.
+    pub(crate) const ACCEPT_WITHIN: std::time::Duration = std::time::Duration::from_secs(60);
+
+    /// A test helper's accept, bounded by [`ACCEPT_WITHIN`]: a make that
+    /// never calls the helper (its chat ran out under a loaded host) fails
+    /// its test plainly, never hangs its join with the helper still in
+    /// `accept` (Heron's hour at 0% CPU on #8180, sampled: two joins, seven
+    /// helpers in `accept`).
+    pub(crate) fn accept_within(
+        listener: &std::os::unix::net::UnixListener,
+    ) -> std::os::unix::net::UnixStream {
+        listener.set_nonblocking(true).unwrap();
+        let deadline = std::time::Instant::now() + ACCEPT_WITHIN;
+        loop {
+            match listener.accept() {
+                Ok((stream, _)) => {
+                    // An accepted socket keeps the listener's non-blocking
+                    // mode on macOS: the helper reads it blocking.
+                    stream.set_nonblocking(false).unwrap();
+                    return stream;
+                }
+                Err(error) if error.kind() == std::io::ErrorKind::WouldBlock => {
+                    assert!(
+                        std::time::Instant::now() < deadline,
+                        "no call to the test helper's socket within {} s",
+                        ACCEPT_WITHIN.as_secs()
+                    );
+                    std::thread::sleep(std::time::Duration::from_millis(5));
+                }
+                Err(error) => panic!("test helper accept: {error}"),
+            }
+        }
+    }
+
     pub(crate) fn manage_helper(socket: &Path) -> std::thread::JoinHandle<Value> {
         use std::io::BufRead;
         let listener = std::os::unix::net::UnixListener::bind(socket).unwrap();
         std::thread::spawn(move || {
-            let (stream, _) = listener.accept().unwrap();
+            let stream = accept_within(&listener);
             let mut line = String::new();
             std::io::BufReader::new(&stream)
                 .read_line(&mut line)
@@ -6621,7 +6655,7 @@ light = { dim = 1 }
         // The manage helper, gated: the person's no comes while it puts the
         // skill on, before it answers.
         let helper = std::thread::spawn(move || {
-            let (stream, _) = listener.accept().unwrap();
+            let stream = crate::make_skill_local::tests::accept_within(&listener);
             let mut line = String::new();
             std::io::BufReader::new(&stream)
                 .read_line(&mut line)

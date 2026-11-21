@@ -904,7 +904,7 @@ mod tests {
             let mut off: Vec<String> = Vec::new();
             let mut asked = Vec::new();
             for _ in 0..2 {
-                let (stream, _) = listener.accept().unwrap();
+                let stream = crate::make_skill_local::tests::accept_within(&listener);
                 let mut line = String::new();
                 std::io::BufReader::new(&stream)
                     .read_line(&mut line)
