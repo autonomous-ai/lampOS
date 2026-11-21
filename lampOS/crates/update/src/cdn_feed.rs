@@ -484,11 +484,25 @@ mod tests {
     }
 
     #[test]
-    fn the_switch_is_off_unless_set_and_the_product_file_does_not_set_it() {
+    fn the_switch_is_off_unless_set_and_the_product_file_sets_it_on() {
         let folder = tempfile::tempdir().unwrap();
         assert!(!crate::switches::update_switch(folder.path(), SWITCH, None));
         let product = include_str!("../../../deploy/product/settings/update.env");
-        assert!(!product.contains(SWITCH));
+        assert!(crate::models::file_says_on(product.as_bytes(), SWITCH));
+        // A lamp in a home takes it from the carried file, its unit not setting it.
+        let at = folder
+            .path()
+            .join(manifest::UPDATE_ENV.trim_start_matches('/'));
+        fs::create_dir_all(at.parent().unwrap()).unwrap();
+        fs::write(&at, product).unwrap();
+        assert!(crate::switches::update_switch(folder.path(), SWITCH, None));
+        // Its environment set off still holds it off.
+        assert!(!crate::switches::update_switch(
+            folder.path(),
+            SWITCH,
+            Some("off".as_ref())
+        ));
+        fs::remove_file(&at).unwrap();
         assert!(crate::switches::update_switch(
             folder.path(),
             SWITCH,

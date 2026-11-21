@@ -888,7 +888,8 @@ pub const MODELS_SETTING: (&str, &str) = (
 );
 
 /// lamp-update's own switch file a build carries (`manifest::UPDATE_ENV`,
-/// from updater 12, #6607): `LAMP_APP_ENGINES` and `LAMP_SKILL_TASKS` on.
+/// from updater 12, #6607): `LAMP_APP_ENGINES`, `LAMP_SKILL_TASKS`,
+/// `LAMP_SKILL_DEFAULT_AGENT`, `LAMP_UPDATE_NOW` and `LAMP_UPDATE_CDN_FEED` on.
 /// Read by lamp-update itself, so a lamp in a home takes them with no change
 /// to its own unit. Install doesn't write it: the product unit it writes
 /// sets both, which wins over the file.
