@@ -500,8 +500,9 @@ Environment=LAMP_MADE_SKILL_SAID=on
 # #7445, docs/skills.md "Turned off and on by voice": a turn-off by voice is never a remove
 Environment=LAMP_MADE_SKILL_OFF_SAID=on
 # The make flow's five switches (the first builder's DEFAULT-ON, 19 Nov 21:42, on #7814; docs/switches.md): a make
-# the lamp can't build itself goes to its agent as a task, or is told why not (#7234); made code that only lights,
-# speaks or moves goes on at once; an ask for a skill the lamp has but is off turns that one on; "make a skill" is
+# the lamp can't build itself goes to its agent as a task, or is told why not (#7234); a made skill goes on at once,
+# its declared grants (camera, microphone, net, ...) live with no yes at its try and its runs (#8180; the same line
+# in lamp-control, whose mint and check give them; off brings back every yes); an ask for a skill the lamp has but is off turns that one on; "make a skill" is
 # listened for, and a thing to do on a repeat is a skill to make, never a reminder. Passed to the second route as
 # each row says. LAMP_SKILL_WRITTEN follows #7977 (the written-note size bound) in its own pull request.
 Environment=LAMP_MAKE_NO_CANNOT=on
