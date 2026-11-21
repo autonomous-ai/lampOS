@@ -3953,13 +3953,24 @@ Dù đèn chạy agent nào (OpenClaw hay Hermes; không chỗ nào ở đây g�
   báo là thất bại và không giữ gì. Lần thử đạt thêm `made_skill::TRIED_SAID`
   ("I tried it once and it worked.") vào lời đọc lại, và khi đã bật, đèn
   nói một câu kèm điều lượt thử nói đầu tiên (#8180, `made_skill::tried_line`,
-  từ `said_first` của make_try): "Made it, and I tried it: <what it said>.
-  Say 'remove it' to undo." (lời trên một dòng, tối đa 120 ký tự, bỏ dấu
-  `.`, `!` hay `?` ở cuối), hoặc "Made <name>, and I tried it. Say 'remove
-  it' to undo." khi nó không nói gì dùng được; trong
+  từ `said_first` của make_try), trước hết nêu những gì nó dùng, vì không
+  hỏi đồng ý (HOLD của Heron trên #8180): "Made it. It uses the camera and
+  the internet, and I tried it: <what it said>. Say 'remove it' to undo."
+  (lời trên một dòng, tối đa 120 ký tự, bỏ dấu `.`, `!` hay `?` ở cuối),
+  hoặc "Made <name>. It uses the camera and the internet, and I tried it.
+  Say 'remove it' to undo." khi nó không nói gì dùng được. Phần dùng được
+  nói ngắn (`made_skill::uses_briefly`): the camera, the microphone, the
+  internet (`net`), notes, everything the lamp says (`speech`), your
+  <service> khi đọc, "sends to <service>" khi ghi, messages to your phone,
+  known faces và who is at the lamp. Skill không dùng gì ngoài giọng, đèn
+  và thân thì không nêu: "Made it, and I tried it: <what it said>. Say
+  'remove it' to undo.", hoặc "Made <name>, and I tried it. Say 'remove
+  it' to undo."; trong
   `make_no_asks::made_line`, câu xong-và-bật của lần tạo dài (`long_make`)
-  và `make_skill_local::code_on_line`, và được ghi nhật ký ("lamp-voice: a
-  made skill is said on with its try: …"). Skill không có gì để thử giữ
+  và `make_skill_local::code_on_line`, và chỉ ghi nhật ký độ dài của câu,
+  không bao giờ ghi lời của lượt thử, vì đó có thể là thư hay điều camera
+  thấy ("lamp-voice: a made skill is said on with its try (N chars, uses
+  named)", hoặc "no uses named"). Skill không có gì để thử giữ
   câu cũ. Lần thử không làm được (lamp-tasks đang bận, không có token,
   hàng rào lỗi, lamp-tasks cũ không biết `make_try`, không có trả lời) thì
   đóng an toàn (#8180): ghi nhật ký kèm lý do, không giữ gì, và người dùng
