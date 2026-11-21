@@ -58,6 +58,8 @@ struct Run {
     pushes: Vec<Told>,
     /// The ended line's audio, by sequence, from its start to its End.
     line: Vec<u64>,
+    /// The detector, with the next line in hand.
+    detector: TurnDetector,
     /// Its last speech block, and the block that ended it.
     last_speech: u64,
     ended: u64,
@@ -174,6 +176,7 @@ impl Scene<'_> {
             ended,
             onset_us,
             next,
+            detector,
         }
     }
 }
@@ -305,4 +308,22 @@ fn the_carried_lead_holds_to_its_cap() {
         run.next[0].sequence,
         run.ended + 2 + u64::from(START_BLOCKS) + 1 - PRE_ROLL_BLOCKS as u64
     );
+}
+
+/// A name sign late from the ended line ("Lamp" begun 0.4 s into the 0.7 s
+/// call, its sign come after the next line began) never starts a call wait
+/// on the next line because its audio now reaches back into the carried
+/// quiet: the next line is judged from after the End, as with the switch
+/// off, so a short request isn't held the call's 2 s (the adversarial read
+/// on #7095).
+#[test]
+fn a_late_name_sign_from_the_ended_line_never_waits_the_next() {
+    let name_began_us = (50 + 41) * BLOCK_US;
+    for end_lead in [false, true] {
+        let mut run = Scene::measured().run(detector(end_lead, true, true, 60));
+        assert!(
+            !run.detector.name_heard(name_began_us),
+            "switch {end_lead}: the last line's name started a call wait on the next"
+        );
+    }
 }
