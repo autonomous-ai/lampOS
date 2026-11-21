@@ -130,6 +130,49 @@ mod tests {
         }
     }
 
+    /// #7987: on lamp-52e6 (build 15285, core-1126 request 4) "Hey Lamp,
+    /// what reminders do I have?" was heard with the lamp's name as another
+    /// word (round 1 `opening=misheard`, `forced=none`) and the model
+    /// answered in words. On a line that names the lamp, the force reads the
+    /// question past that word, as `LAMP_MAKE_SKILL_ASKED`'s does
+    /// (`second_provider::past_the_name_heard_as`); with no name heard, or
+    /// said to a person, the line is read as said and is not forced.
+    #[test]
+    fn a_question_past_the_lamps_name_heard_as_another_word_is_forced_on_a_named_line_alone() {
+        let forced = |said: &str| force()(&[Message::user(said)]).map(|forced| forced.name);
+        for said in [
+            "Hey, Lynn, what reminders do I have?",
+            "Lump, what reminders do I have?",
+            "Helen, what reminders do I have?",
+        ] {
+            // The shape round 1 journals as `opening=misheard`.
+            assert!(
+                crate::second_provider::wake_heard_as(said).is_some(),
+                "{said}"
+            );
+            crate::tools::make_skill_asked::heard_named(said, true);
+            assert_eq!(forced(said), Some(LIST), "{said}");
+            crate::tools::make_skill_asked::heard_named(said, false);
+            assert_eq!(forced(said), None, "{said} with no name heard");
+        }
+        let anna = "Hey, Anna, what reminders do I have?";
+        crate::tools::make_skill_asked::heard_named(anna, false);
+        assert_eq!(forced(anna), None, "{anna}");
+        // A line forced today stays forced, named or not; one past the name
+        // that is no plain question is not.
+        for (said, named) in [
+            ("Lamp, what reminders do I have?", false),
+            ("Hey Lamp, do I have any reminders?", true),
+            ("What are my reminders?", true),
+        ] {
+            crate::tools::make_skill_asked::heard_named(said, named);
+            assert_eq!(forced(said), Some(LIST), "{said}");
+        }
+        let set = "Hey, Lynn, set a reminder at nine.";
+        crate::tools::make_skill_asked::heard_named(set, true);
+        assert_eq!(forced(set), None, "{set}");
+    }
+
     /// The chat sends `tool_choice` naming `list_reminders` only on the
     /// first round of a plain question, and only when it is declared.
     #[test]
