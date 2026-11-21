@@ -235,10 +235,10 @@ and the V2 image's default (`scripts/imager/build-orangepi-v2.sh`) follow it
 from the first customer lamps on (26 Oct), and since #6256 (F2) through its
 CDN mirror, `--channel-url https://cdn.autonomous.ai/lampos/stable/` ("The
 stable build on the CDN"), so a lamp in China, which can't reach GitHub,
-updates too. With `LAMP_UPDATE_CDN_FEED=on`, a lamp on the CDN feed falls
-back to GitHub only after an hour of CDN failures, one round at a time
-("GitHub after an hour of CDN failures", below); otherwise the updater reads
-one feed. No round switches its own unit, so a lamp installed before keeps the
+updates too. Every lamp on the CDN feed, a product unit's too, switch or
+not, falls back to GitHub only after an hour of CDN failures, one round at a
+time ("GitHub after an hour of CDN failures", below); any other feed is read
+alone. No round switches its own unit, so a lamp installed before keeps the
 GitHub stable feed, unless `LAMP_UPDATE_CDN_FEED=on` moves it ("Moving a lamp
 to the CDN feed", below; off by default). A model has two sources (#7709, `install::model_urls`):
 `lamp-update install` and `lamp-keeper prepare` ask for a model of
@@ -382,10 +382,11 @@ unit's own `ExecStart`, so a lamp moved by hand to another feed (the
 canary, say) has the drop-in removed too. The GitHub stable feed keeps being promoted until
 the fleet has moved. Tests only (`cdn_feed::tests`): not yet shown on a lamp.
 
-**GitHub after an hour of CDN failures.** With the same switch on, a `serve`
-that acts and runs with `--channel-url https://cdn.autonomous.ai/lampos/stable/`
-(moved there, or a product unit's own) reads the CDN first on every round
-(`cdn_feed::round_on`). A round that can't read it (out of reach, or no
+**GitHub after an hour of CDN failures.** Every `serve` that acts and runs
+with `--channel-url https://cdn.autonomous.ai/lampos/stable/` (moved there,
+or a product unit's own), with `LAMP_UPDATE_CDN_FEED` set or not
+(`cdn_feed::falls_back`, the lead's call on #7728), reads the CDN first on
+every round (`cdn_feed::round_on`). A round that can't read it (out of reach, or no
 build published there) starts a clock: the unix ms of that first failure,
 kept in `/var/lib/lampos-update/cdn-down-since`, so a lamp-update started
 again (its own switch, a changed `update.env`, a restart) keeps counting. A
@@ -401,7 +402,7 @@ first again, and the unit and drop-in are not touched. A round that reads
 the CDN (any other outcome) removes the file and says `the CDN feed is read
 again`. A new lamp-update taken from GitHub this way confirms itself on
 GitHub too when its dry round on the CDN is not proven and the clock is
-past the hour. A refused build, a quiet wait or any other outcome on the
+past the hour, switch or not. A refused build, a quiet wait or any other outcome on the
 CDN is not a CDN failure and never reads GitHub. Tests only
 (`cdn_feed::tests`): not yet shown on a lamp.
 
