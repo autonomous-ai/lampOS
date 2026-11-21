@@ -9000,6 +9000,57 @@ fn no_other_lampos_unit_can_write_the_apps_socket_folder() {
     no_other_lampos_unit_can_write("/run/lampos-apps", None);
 }
 
+/// The owner's rule, 21 Nov: a skill's declared grants are minted from its
+/// folder as it is, with no yes kept, so whoever can write the skills'
+/// folders grants. Only the manage helper (root) writes them: no product
+/// unit that runs as `lampos` names either folder writable
+/// (`ReadWritePaths=`), the pushed folder is made root's, 0755
+/// (`lampos.conf`), and the helper runs as root.
+#[test]
+fn only_the_manage_helper_can_write_the_skills_folders() {
+    let covers = |folder: &str, path: &str| {
+        let path = path.trim_start_matches(['-', '+']).trim_end_matches('/');
+        !path.is_empty() && (folder == path || folder.starts_with(&format!("{path}/")))
+    };
+    let mut checked = 0;
+    for (name, text) in PRODUCT.iter() {
+        let service = section(text, "Service");
+        if !service.contains(&"User=lampos") {
+            continue;
+        }
+        checked += 1;
+        for paths in service
+            .iter()
+            .filter_map(|line| line.strip_prefix("ReadWritePaths="))
+        {
+            for path in paths.split_whitespace() {
+                for folder in ["/var/lib/lampOS/skills", "/var/lib/lampOS/skills-dev"] {
+                    assert!(
+                        !covers(folder, path),
+                        "{name} runs as lampos and names {folder} writable ({path})"
+                    );
+                }
+            }
+        }
+    }
+    assert!(checked > 10, "only {checked} lampos units checked");
+    let unit = |wanted: &str| {
+        PRODUCT
+            .iter()
+            .find(|(name, _)| *name == wanted)
+            .map(|(_, text)| *text)
+            .unwrap_or_else(|| panic!("{wanted} is not in the product"))
+    };
+    let manage = section(unit("lamp-skills-manage@.service"), "Service");
+    assert!(manage.contains(&"User=root"), "{manage:?}");
+    assert!(
+        install::TMPFILES
+            .lines()
+            .any(|line| line.trim() == "d /var/lib/lampOS/skills-dev 0755 root root -"),
+        "the pushed folder is root's, 0755"
+    );
+}
+
 fn no_other_lampos_unit_can_write(folder: &str, state_directory: Option<&str>) {
     let covers = |path: &str| {
         let path = path.trim_start_matches(['-', '+']).trim_end_matches('/');

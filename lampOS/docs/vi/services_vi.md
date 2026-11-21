@@ -2253,10 +2253,27 @@ kỹ năng do trigger khởi động, không có `each` và không có tool. Nó
 được nhận khi công tắc bật và với dịch vụ có trong bảng. Khi công tắc tắt
 trong `lamp-skills`, kỹ năng như vậy không được nạp.
 
-**Cài đặt không duyệt gì cả.** Việc bật một kỹ năng tự tạo, bằng
-`install_made` hay cách nào khác, không ghi lại sự đồng ý nào. Cho đến khi
-chủ đèn đồng ý, mỗi lần chạy bị từ chối với "not sent: waiting for the
-owner's yes".
+**Không chờ lời đồng ý nào** (quy tắc của chủ đèn, 21/11: các quyền và
+lần ghi kỹ năng đã khai báo đều bật, không hỏi gì). Một kỹ năng được cài
+dưới dạng gói mà `skill.toml` của nó khai báo lần ghi thì gửi lần ghi đó ở
+lần gửi đầu tiên: `lamp-services` tự đọc `skill.toml` đã cài
+(`skill_writes::package_writes`, không theo liên kết nào, tối đa 64 KiB và
+`STEPS_MOST` bước), và một nội dung là một trong các lần ghi chính gói đã
+khai báo được gắn ngay lúc đó (`Approvals::bind`) với SHA-256 của gói và
+liên kết hiện tại của dịch vụ, journal ghi "a skill's write bound to its
+link at its first send". Mọi thứ sau khi gắn vẫn như trước: kiểm tra liên
+kết, `STOPPED`, các giới hạn và nhật ký đã gửi. Một nội dung không thuộc
+các lần ghi của chính gói (người nhận khác, nội dung đổi một ký tự) bị từ
+chối, "not sent: this write is not one the skill's installed package
+declares" (`skill_writes::NOT_APPROVED`); một kỹ năng không được cài dưới
+dạng gói (đặt vào bằng tay, bản đẩy của nhà phát triển) bị từ chối, "not
+sent: the skill isn't on the lamp as an installed package"
+(`skill_writes::NOT_INSTALLED`); một dịch vụ chưa liên kết là `STOPPED`
+("… isn't linked; nothing was sent"). Kỹ năng được đẩy không bao giờ mang
+quyền dịch vụ (`no_grant` của lamp-control), nên không bao giờ tới bước
+này. Test `a_skills_own_write_goes_at_its_first_send_with_no_yes`. Lời đồng
+ý của chủ đèn bên dưới (`skill_write_approve`) vẫn gắn được một lần ghi
+trước lần gửi đầu tiên; không có gì chờ nó.
 
 **Sự đồng ý của chủ đèn** (`skill_write_approve`). Nó chỉ đến từ đường đồng ý
 của giọng nói, không bao giờ từ `lamp-skills`; ứng dụng không có lời đồng
@@ -2303,10 +2320,10 @@ bằng token của liên kết (`GET /repos/<owner>/<name>`, có trong danh sác
 đọc của GitHub) và giữ việc nó có công khai không; repository không đọc
 được thì tính là công khai. Câu trả lời của lời đồng ý là
 `{"approved": N, "public": ["owner/name", ...]}`, các repository ai cũng
-thấy, để giọng nói nói "anyone can see it". Repository được duyệt là riêng
+thấy, để giọng nói nói "anyone can see it". Repository được gắn là riêng
 tư thì được đọc lại ở mỗi lần gửi: nếu đã thành công khai, hoặc không đọc
-được, lần ghi chờ lời đồng ý mới (`WAITING`), vì lời đồng ý không bao gồm
-công khai.
+được, nó được gắn lại là công khai rồi gửi, và journal ghi lại điều đó
+(không chờ lời đồng ý nào).
 
 **Ai gửi.** Chính `lamp-skills`, như với việc đọc: `lamp-services` nhận
 cgroup của `lamp-skills.service` trên socket tools khi `LAMP_SKILL_READS`
@@ -2327,11 +2344,12 @@ người nhận hay nội dung:
    nhớ. Khởi động lại sẽ xoá nó, vì lần xoá đã không để lại liên kết nào.
    Lần xoá cũng xoá các phê duyệt, sổ giới hạn và nhật ký đã gửi, nên chủ
    đèn phải đồng ý lại.
-3. Hash của nội dung đã được duyệt cho kỹ năng đó. Nếu kỹ năng chưa có phê
-   duyệt nào, câu trả lời là `WAITING`. Một nội dung không thuộc các nội
-   dung đã duyệt (nội dung đổi một ký tự, người nhận khác) bị từ chối, "not
-   sent: this write is not the one the owner said yes to", và journal chỉ
-   nói đã có bao nhiêu lần bị từ chối kể từ khi khởi động.
+3. Hash của nội dung đã được gắn cho kỹ năng đó, hoặc, ở lần gửi đầu tiên,
+   một trong các lần ghi chính gói đã cài của nó khai báo, được gắn lúc đó
+   (ở trên). Một nội dung không phải cả hai (nội dung đổi một ký tự, người
+   nhận khác) bị từ chối, `NOT_APPROVED`, và journal chỉ nói đã có bao
+   nhiêu lần bị từ chối kể từ khi khởi động; không có gói thì là
+   `NOT_INSTALLED`.
 4. Nội dung thuộc một trong các loại ở trên, trên dịch vụ có danh sách ghi
    trong `catalog.rs`, không bao giờ là dịch vụ MCP.
 5. Dịch vụ, theo đúng mã của nó (không liên kết Gmail nào khác thay thế),
@@ -2407,10 +2425,14 @@ toàn bộ):
   quay lại mô hình tạo kỹ năng để sửa (`made_skill::write_from_request`).
 - **Nói lại trọn vẹn**, mọi người nhận và toàn bộ nội dung trích nguyên,
   với lần ghi GitHub thì repository của nó và "anyone who can see that
-  repo can see it" (để lời đồng ý bao gồm cả repo công khai), khi nào và
-  bao lâu một lần, kết thúc bằng "It waits for you to agree
-  before it sends anything." (`made_skill::WAITS_FOR_YES`): không có từ để
-  lặp lại, không có "yes".
+  repo can see it" (để người nghe biết repo công khai), khi nào và bao lâu
+  một lần, kết thúc bằng "It sends just that, on its own; nothing is
+  asked." (`made_skill::WAITS_FOR_YES`): không có từ để lặp lại, không có
+  "yes".
+- **Không chờ lời đồng ý nào** (quy tắc của chủ đèn, 21/11): lần tạo bật
+  ngay khi tạo xong và không bắt đầu chờ gì; lamp-services gắn lần ghi ở
+  lần gửi đầu tiên (ở trên). Khi đọc lại, đèn nói nó gửi gì và không hỏi
+  gì. Lời đồng ý bên dưới chỉ còn cho kỹ năng có mã chưa được bật ngay.
 - **Lời đồng ý.** Khi kỹ năng đã bật, nội dung chính xác các lần ghi của
   nó chờ trong bộ nhớ của giọng nói 120 s (`crate::skill_write_yes`). Một
   lời đồng ý bằng bất kỳ lời nào, do mô hình phán đoán, là một lệnh gọi
@@ -2493,13 +2515,13 @@ bởi một lượt chạy của kỹ năng trên Hermes của đèn, không ph�
   ý nào: lời đồng ý của chủ cho lệnh ghi là của chương trình này.
 - **Ở đây**, một lệnh gọi mang `fixed_write_run` chỉ đi qua cùng
   `skill_write` như lệnh gọi của `lamp-skills`
-  (`serve::Services::run_fixed_write`): lời đồng ý đã giữ của chủ khớp đúng
-  nội dung đó (lượt chạy đổi một trường nào bị từ chối "not sent: this write
-  is not the one the owner said yes to", không bao giờ bị giữ chờ lời đồng ý
-  nói ra), liên kết lúc đồng ý, giới hạn trong ngày (50 mỗi kỹ năng, 200 cho
+  (`serve::Services::run_fixed_write`): đúng nội dung đó đã được gắn cho kỹ
+  năng, hoặc lần ghi chính gói đã cài của nó khai báo, được gắn ở lần gửi
+  đầu tiên (lượt chạy đổi một trường nào bị từ chối `NOT_APPROVED`, không
+  bao giờ bị giữ), liên kết lúc gắn, giới hạn trong ngày (50 mỗi kỹ năng, 200 cho
   tất cả, 5 mỗi kỹ năng một giờ) và nhật ký đã gửi, và **một lần mỗi lượt chạy**: lần thử thứ hai,
   dù gửi gì, cũng bị từ chối ("not sent: a skill's fixed write is sent once
-  a run …"). Tác tử được báo "Sent, as the owner said yes to it." Mọi lệnh
+  a run …"). Tác tử được báo "Sent, as the skill declares it." (`mcp_server::SENT`) Mọi lệnh
   gọi khác của lượt đó bị từ chối, và khi công tắc tắt ở đây thì lệnh gọi
   như vậy bị từ chối và không gì được gửi.
 - **Gửi thẳng vẫn là đường dự phòng** (quyết định của first builder trên
@@ -2600,95 +2622,34 @@ lẫn lượt chạy đều không giữ token nào.
   Tối đa 256 văn bản bị cắt (`serve::RUN_CUTS_MOST`): một lần đọc có nhiều
   văn bản ngắn hơn thế bị từ chối là quá dài, không bao giờ duyệt lại cả
   kết quả cho từng văn bản.
-- **Một lần ghi** chỉ được chuẩn bị: cùng đường `service_write` như của
-  giọng nói, đọc lại và giữ 2 phút (`writes::HOLD`), mỗi lúc một lần. Lượt
-  chạy nhận `read_back`, `sent: false`, `held: true` và một `next` nói rằng
-  chưa gì được gửi, và **không có `send_id`**: không gì gửi được nó từ lượt
-  chạy, và lamp-control từ chối `send_id` hay `said` trước khi chúng đến đây
-  (chương trình này cũng vậy). Một lần ghi của lượt chạy trong khi một lần
-  ghi khác đang chờ lời đồng ý bị từ chối ("another write waits for the
-  person's yes"), nên nó không bao giờ làm rơi lần ghi của chính người
-  dùng. **Một lần ghi của lượt chạy có lời đọc lại không vừa một ghi chú
-  của giọng nói bị từ chối trước khi được giữ**
-  (`serve::run_read_back_room`): chỗ trống là `serve::RUN_NOTE_ROOM` (591
-  byte: 1.024 byte của ghi chú, `lamp_gemini::wire::MAX_NOTE_BYTES`, trừ
-  các chữ cố định, send id và thời gian còn lại của nó) trừ hai lần tên kỹ
-  năng và mã của dịch vụ, đếm như ghi chú viết nó, số byte của một chuỗi
-  JSON (một dòng mới hay một dấu ngoặc kép là hai, một chữ có dấu là hai
-  hoặc ba; `serve::run_read_back_bytes`). Vượt quá thì không gì được giữ,
-  và lượt chạy được báo chỗ trống tính bằng ký tự, độ dài của lời đọc lại
-  và cần rút ngắn ít nhất bao nhiêu ("nothing was prepared: the lamp reads
-  a write back to the owner in one go, and this read-back is 600
-  characters, over the 546 it can read out ... Shorten the text by at
-  least 54 characters and call service_write again", `serve::run_too_long`),
-  để tác tử rút ngắn nó và gọi lại. Công cụ `service_write` của nó nói
-  trước điều này, nêu 448 ký tự, chỗ trống cho tên kỹ năng và mã dịch vụ
-  dài nhất (`mcp_server::write_short`). Trước đây (lamp-9adf, bản dựng
-  13135), một thư liệt kê 10 tiêu đề thư chưa đọc đã được giữ, rồi chỉ bị
-  nói là quá dài, và lượt chạy kết thúc mà không gửi gì. Lần ghi chỉ được
-  gửi bằng đường gửi hiện có, lời đồng ý nói ra qua
-  cổng của giọng nói, và khi đó tính vào giới hạn của kỹ năng như lần ghi
-  của kỹ năng tự tạo (50 lần một ngày mỗi kỹ năng, 200 lần cho mọi kỹ năng,
-  `skill_writes::Ledger`): vượt quá thì "not sent".
-- **Giọng nói đọc lại nó** (`crates/voice/src/run_write_yes.rs`, với
-  `LAMP_SKILL_TASKS=on` cả trong `lamp-voice`). Bộ điều phối hỏi chương
-  trình này lần ghi đang giữ của lượt chạy, bằng lệnh riêng của giọng nói
-  trên socket tools, không bao giờ đưa cho mô hình: `run_write_waiting` trả
-  lời `{"waiting": {"send_id","service","skill","read_back","left_ms"}}`
-  hoặc `{"waiting": null}`, và không lấy đi gì (`Services::run_waiting`; bị
-  từ chối khi công tắc ở đây tắt, và với bất kỳ ai ngoài cgroup của giọng
-  nói). Hỏi nhiều nhất mỗi 3 giây, ngoài vòng lặp của bộ điều phối. Một lần
-  ghi còn ít nhất 30 giây giữ được nói một lần, như lượt viết của chính đèn
-  (`run_write_read_back`), dưới các cổng của tin công việc: có người ở đèn,
-  khoảng lặng đầu tiên sau bất kỳ lượt nào (người đang nói dở, hay đèn, thì
-  được chờ cho xong), không nợ câu trả lời nào, phòng không bận, và, khi
-  `LAMP_PRIVATE_ROOM` tắt, chỉ khi chủ đèn được thấy một mình (khuôn mặt
-  quen mà mắt nhận ra là của chủ đèn, chỉ một khuôn mặt trong tầm nhìn,
-  `services::owner_sees_alone`, như một lần đọc đầy đủ; nếu không thì không
-  nói và việc giữ lặng lẽ hết hạn); không bao giờ trong giờ yên lặng của đèn (`lamp_local_time::quiet_hours`; giờ
-  địa phương không biết thì coi là yên lặng, như với kỹ năng). Mô hình được
-  bảo nói nguyên văn lời đọc lại của chương trình này sau tên kỹ năng:
-  "Your <skill> skill wants to send: …. Shall I send it?", và không gọi gì.
-  Câu nói nằm trong ghi chú như một chuỗi JSON sau phần đầu mà worker đọc
-  trước, nên không gì lượt chạy viết ra (một `")`, một dòng mới, một phần
-  đầu giả) đóng được nó hay mở một ghi chú khác. Một lần ghi hết thời gian
-  giữ mà chưa được nói (không có ai, giờ yên lặng, hay còn dưới 30 giây khi
-  thấy) được kể một lần sau đó, khi đèn được nói: "Your <skill> skill wanted
-  to send a mail, but nobody was here to say yes, so nothing was sent." Chỉ
-  giữ trong bộ nhớ: khởi động lại không bao giờ kể lại.
-  Một lời đọc lại quá dài cho một ghi chú (1 024 byte) không bao giờ bị cắt:
-  đèn chỉ nói rằng kỹ năng muốn gửi một thứ quá dài để đọc ra, không gì chờ,
-  và việc giữ tự hết hạn. Đây chỉ là lớp chặn cuối: chương trình này từ
-  chối lần ghi như vậy trước khi giữ (ở trên), và bài kiểm thử của giọng
-  nói giữ `serve::run_read_back_room` khớp đúng ghi chú của nó
-  (`lamp_services_room_for_a_read_back_is_one_note_exactly`).
-- **Lời đồng ý.** Worker của giọng nói đọc lại chính xác ghi chú đó và giữ
-  lần ghi chờ được gửi như một lần ghi do chính mô hình của nó chuẩn bị
-  (`services::wait_for_run_yes`), request của ghi chú là request đọc lại,
-  hai phút của nó tính từ lúc chương trình này giữ. Vì vậy cổng của giọng
-  nói giữ nó (`services::gate`): nghe trực tiếp, một request sau, lời đọc
-  lại không bị cắt, trong thời gian giữ, kiểm tra giọng ở đuôi tiếng vọng,
-  chỉ tuyến thứ hai. Nó theo `LAMP_PRIVATE_ROOM` như một lần ghi do người
-  dùng chuẩn bị: bật thì ai trả lời cũng được (mọi câu nghe được là của chủ
-  đèn, `owner_seen_saying`); tắt thì chỉ lời đồng ý của chủ đèn, thấy khuôn
-  mặt họ nói, hoặc giọng họ đạt `same_voice::SERVICES_SAME_FROM` (0.55) trở
-  lên so với bản giọng của họ, người khác bị huỷ với `OTHER_VOICE`. Thêm vào đó, lần gửi của lượt chạy cần một lời đồng ý
-  đơn giản (`services::plain_yes`: "yes", "send it", "ừ, gửi đi", nhiều nhất
-  sáu từ và không gì khác), để không gì lượt chạy viết ra lái được mô hình
-  gửi đi; với bất kỳ câu nào khác nó bị huỷ ("a skill's write goes only on a
-  plain yes"). Lần gửi nêu SHA-256 của lời đọc lại mà đèn đã nói (`sha256`),
-  và chương trình này chỉ gửi lần ghi của lượt chạy khi đó là SHA của lời
-  đọc lại nó đang giữ (`serve::read_back_sha256`, nếu không thì
-  `RUN_NOT_SAID`, không gì được gửi). Một lời từ chối, một lời chờ, một
-  request khác được trả lời hay hết thời gian giữ: không gì được gửi. Một
-  lời từ chối đơn giản nói ra ("no", "don't send it", "cancel", "stop",
-  "không, đừng gửi", nhiều nhất sáu từ; "no, send it" thì không phải) bỏ nó
-  ngay (`services::run_declined`): lần ghi đang chờ của giọng nói, và việc
-  giữ của chương trình này qua đường huỷ hiện có (`send_id` với `said` khác
-  "send"), và mô hình được bảo chỉ nói "Okay, I won't send it." Mô
-  hình chỉ được báo "đã gửi" từ câu trả lời `sent: true` của chương trình
-  này (`services::answered`); vượt giới hạn của kỹ năng hay bị từ chối thì
-  "chưa gửi".
+- **Một lần ghi được gửi ngay** (quy tắc của chủ đèn, 21/11: quyền
+  `<code>-write` đã khai báo của lượt chạy là lời đồng ý của nó; không đọc
+  lại, không giữ gì). Lệnh gọi `service_write` của lượt chạy mang chính lần
+  ghi đi qua cùng các phép kiểm tra `service_write` như của giọng nói
+  (`writes::prepare`: các loại, một địa chỉ thường, độ dài, lớp bảo vệ và
+  danh sách ghi) và được gửi một lần, ngay lúc đó
+  (`serve::Services::run_write_now`): dịch vụ vẫn được liên kết dưới đúng
+  liên kết lúc chuẩn bị (nếu không thì `LINK_CHANGED`, không gì được gửi),
+  rồi được tính vào giới hạn của kỹ năng trước khi đi, mỗi lúc một lần dưới
+  khoá gửi (`skill_writes::Ledger`: 5 lần một giờ mỗi kỹ năng, 50 lần một
+  ngày mỗi kỹ năng, 200 lần cho mọi kỹ năng), nên một loạt dồn dập bị chặn
+  ("not sent: … at most 5 times an hour"), và được ghi vào nhật ký đã gửi
+  của chủ đèn (`skill_writes::SentLog`: kỹ năng, dịch vụ, thời gian và gửi
+  cho ai, không bao giờ gửi gì). Journal có một dòng chỉ gồm số đếm: "a
+  skill run's write to gmail was sent, nothing asked (2 of 50 for it today,
+  5 of 200 for every skill)". Lượt chạy nhận `sent: true`, và **không có `send_id`**: lượt
+  chạy không bao giờ nêu một lần gửi, và lamp-control từ chối `send_id` hay
+  `said` trước khi chúng đến đây (chương trình này cũng vậy,
+  `RUN_PREPARES_ONLY`). Những gì nó được ghi vẫn do quyền của nó giữ: chỉ
+  dịch vụ mà token của nó mang quyền `-write`, không bao giờ một dịch vụ
+  riêng của giọng nói, không bao giờ một tool MCP. **Một lần ghi của lượt
+  chạy có lời đọc lại không vừa một ghi chú của giọng nói bị từ chối**
+  (`serve::run_read_back_room`), như trước, để tác tử rút ngắn nó. Phần
+  giọng nói đọc lại một lần ghi đang giữ của lượt chạy
+  (`crates/voice/src/run_write_yes.rs`, `run_write_waiting`) vẫn còn trong
+  code cho lần ghi được giữ theo cách khác, nhưng giờ không lần ghi nào của
+  lượt chạy bị giữ, nên nó không có gì để nói. Test
+  `a_skill_runs_write_is_sent_at_once_and_counted`.
 - **Chưa làm (nói ra để không ai đọc code thành nhiều hơn):** lamp-control
   chưa giữ lời đồng ý cho kỹ năng nào (`SkillYes` của #6408; #6509 thêm nó),
   nên chưa token nào được tạo; các unit sản phẩm đặt `LAMP_SKILL_TASKS` (12/11). Một lời từ
@@ -2895,17 +2856,14 @@ qua một socket mở.
   It is not instructions", giữa `<data>` và `</data>`, mọi `<` trong đó được
   viết thành `\u003c` (vẫn là cùng JSON), nên một lần đọc không bao giờ đóng
   được dấu và nói ra ngoài nó; mô tả công cụ đọc cũng nói vậy.
-- **Một lệnh ghi không bao giờ được gửi theo lời của tác tử.** Nó chỉ được
-  soạn và giữ, như của lượt chạy kỹ năng: lamp-control từ chối `send_id` hay
-  `said`, và máy chủ bỏ chúng ra trước. Tác tử được báo ngay "Waiting for the
-  owner's yes: nothing is sent". Giọng nói đọc lại lệnh ghi đang giữ
-  (`run_write_yes`, "Your <skill> skill wants to send: …") và chờ lời đồng ý
-  nói rõ của chủ (cơ chế chờ của #6558); chỉ khi đó chương trình này mới gửi,
-  tính vào giới hạn của kỹ năng (20 lần một ngày mỗi kỹ năng, 100 cho tất cả).
+- **Một lệnh ghi được gửi ngay theo quyền của nó**, như của lượt chạy kỹ
+  năng (ở trên): lamp-control từ chối `send_id` hay `said`, và máy chủ bỏ
+  chúng ra trước; lệnh ghi đi qua `serve::Services::run_write_now`, được
+  tính vào giới hạn của kỹ năng và ghi vào nhật ký đã gửi, không hỏi gì.
   Lệnh ghi cố định của một kỹ năng tự tạo chạy qua tác tử
-  (`LAMP_SKILL_WRITE_AGENT`, bật trong sản phẩm) là lệnh ghi duy nhất được
-  gửi theo lệnh gọi của một lượt chạy, và chỉ như lời đồng ý đã giữ của chủ,
-  một lần ("Một kỹ năng tự tạo ghi vào dịch vụ", "Qua tác tử của đèn").
+  (`LAMP_SKILL_WRITE_AGENT`, bật trong sản phẩm) chỉ được gửi đúng như gói
+  của nó khai báo, một lần mỗi lượt chạy ("Một kỹ năng tự tạo ghi vào dịch
+  vụ", "Qua tác tử của đèn").
 - **Nhật ký** từ máy chủ chỉ ghi độ dài của lời từ chối; các phần nó gọi ghi
   dịch vụ và `what` hay `action`, không bao giờ ghi nội dung, địa chỉ hay
   tiêu đề.

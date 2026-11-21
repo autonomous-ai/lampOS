@@ -5288,7 +5288,9 @@ fn manifest(
             continue;
         }
         if let Some(write) = step.write {
-            steps.push(Step::Call(Call::ServiceWrite(Box::new(write.step()?))));
+            steps.push(Step::Call(Call::ServiceWrite(Box::new(
+                service_write::step(write)?,
+            ))));
             ons.resize(steps.len(), None);
             continue;
         }

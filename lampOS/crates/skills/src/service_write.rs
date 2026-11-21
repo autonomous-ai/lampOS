@@ -40,7 +40,7 @@
 //!   once ([`NOT_SENT_LINE`]). Off, the write goes as above, unchanged.
 use lamp_services::skill_writes;
 use serde::Deserialize;
-use serde_json::{Map, Value, json};
+use serde_json::{Value, json};
 use std::collections::BTreeSet;
 use std::path::Path;
 use std::sync::Mutex;
@@ -105,29 +105,10 @@ pub fn agent() -> bool {
 /// What a write step is told as it loads with the switch off.
 pub const OFF: &str = "write: a skill's writes are off on this lamp (LAMP_SKILL_WRITES is not on)";
 
-/// `write = { … }`, as the folder writes it: `service`, `action` and the
-/// action's own fields (`lamp_services::skill_writes::KINDS`).
-#[derive(Debug, Deserialize)]
-#[serde(deny_unknown_fields)]
-pub struct WriteFile {
-    service: String,
-    action: String,
-    to: Option<Vec<String>>,
-    cc: Option<Vec<String>>,
-    subject: Option<String>,
-    text: Option<String>,
-    title: Option<String>,
-    start: Option<String>,
-    end: Option<String>,
-    calendar: Option<String>,
-    attendees: Option<Vec<String>>,
-    repo: Option<String>,
-    number: Option<u64>,
-    team_id: Option<String>,
-    project: Option<String>,
-    workspace: Option<String>,
-    id: Option<String>,
-}
+/// `write = { … }`, as the folder writes it: `lamp-services`' one parser
+/// of a write step ([`skill_writes::WriteFile`]), which reads an installed
+/// package's own writes with it too.
+pub use lamp_services::skill_writes::WriteFile;
 
 /// A write step as loaded: its content, checked.
 #[derive(Clone, Debug, PartialEq)]
@@ -139,48 +120,15 @@ pub struct WriteStep {
     content: Value,
 }
 
-impl WriteFile {
-    /// The step, or why the folder's words are not one.
-    pub fn step(self) -> Result<WriteStep, String> {
-        let mut fields = Map::new();
-        let strings = [
-            ("subject", self.subject),
-            ("text", self.text),
-            ("title", self.title),
-            ("start", self.start),
-            ("end", self.end),
-            ("calendar", self.calendar),
-            ("repo", self.repo),
-            ("team_id", self.team_id),
-            ("project", self.project),
-            ("workspace", self.workspace),
-            ("id", self.id),
-        ];
-        for (key, value) in strings {
-            if let Some(value) = value {
-                fields.insert(key.into(), json!(value));
-            }
-        }
-        for (key, value) in [
-            ("to", self.to),
-            ("cc", self.cc),
-            ("attendees", self.attendees),
-        ] {
-            if let Some(value) = value {
-                fields.insert(key.into(), json!(value));
-            }
-        }
-        if let Some(number) = self.number {
-            fields.insert("number".into(), json!(number));
-        }
-        let content = skill_writes::content(&self.service, &self.action, &fields);
-        skill_writes::check(&content).map_err(|why| format!("write: {why}"))?;
-        Ok(WriteStep {
-            service: self.service,
-            action: self.action,
-            content,
-        })
-    }
+/// The step `file` makes, or why the folder's words are not one.
+pub fn step(file: WriteFile) -> Result<WriteStep, String> {
+    let content = file.content()?;
+    let named = |key: &str| content[key].as_str().unwrap_or_default().to_owned();
+    Ok(WriteStep {
+        service: named("service"),
+        action: named("action"),
+        content,
+    })
 }
 
 impl WriteStep {
@@ -224,7 +172,7 @@ const MOST_FILE_BYTES: u64 = 64 * 1024;
 
 /// The fixed write of the skill in `folder`, read from its `skill.toml`
 /// alone, whatever this process's switches: its only `[[do]]` step a
-/// `write` and nothing beside it, its content checked ([`WriteFile::step`]);
+/// `write` and nothing beside it, its content checked ([`step`]);
 /// none otherwise, or for a file that is a link. lamp-control names a fixed
 /// write's run's one grant from it (`lamp_control::task_yes::KeptYes`),
 /// as `lamp-services` holds its send to the owner's kept yes.
@@ -258,9 +206,8 @@ pub fn fixed_write_of(folder: &Path) -> Option<WriteStep> {
     step.get("write")?
         .clone()
         .try_into::<WriteFile>()
-        .ok()?
-        .step()
         .ok()
+        .and_then(|file| self::step(file).ok())
 }
 
 /// Why the lamp's agent didn't run a fixed write to its end.
@@ -413,7 +360,7 @@ mod tests {
     fn file(text: &str) -> Result<WriteStep, String> {
         toml::from_str::<WriteFile>(text)
             .map_err(|error| error.to_string())
-            .and_then(WriteFile::step)
+            .and_then(step)
     }
 
     #[test]

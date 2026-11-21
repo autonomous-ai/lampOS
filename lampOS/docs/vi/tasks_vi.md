@@ -1766,17 +1766,17 @@ sang runner chung của #6510 bước 2 mà không cần luật mới.
   `LAMP_MADE_CODE_ON_AT_ONCE` bật trong lamp-control
   (`lamp_skills::no_yes_switch_on`; bật trong sản phẩm), kỹ năng được tạo trên
   đèn không cần lời đồng ý (#8180, `lamp_voice::made_skill::grants_need_no_yes`,
-  hiện chỉ đúng với `SkillSource::Made`, theo `lamp_skills::source_of`:
-  `made: here` và được cài với bản ghi cài đặt không từ Store, nên thư mục
-  cài bằng tay không phải Made):
+  đúng với mọi `SkillSource` của `lamp_skills::source_of` từ quy tắc của chủ
+  đèn, 21/11: kỹ năng tự tạo, kỹ năng từ Store, kỹ năng được đẩy lên đều như
+  nhau; thư mục có nguồn gốc mà lần nạp từ chối một task,
+  `lamp_skills::task::origin_refuses`, không được cấp gì):
   lamp-control tạo token từ các quyền khai báo trong thư mục của nó
   (`task_yes::KeptYes::grants`, `no_yes_grants`; bỏ `net`, và các quy tắc
   bên dưới, trong đó `net` không bao giờ đi cùng quyền riêng tư, vẫn giữ)
   và trả lời kiểm tra của nó `{"agreed": true}` cho thư mục đúng như hiện
   tại (SHA-256 và các quyền khai báo, `task_yes::agreed_with_no_yes`), nên
-  `net` của nó không hỏi gì. Kỹ năng từ Store, được đẩy lên hay khác vẫn
-  cần lời đồng ý đã giữ, và khi tắt công tắc thì kỹ năng được tạo cũng vậy,
-  đúng như trước. Tắt: `net` bị từ chối trước khi có token.
+  `net` của nó không hỏi gì. Khi tắt công tắc, kỹ năng vẫn cần lời đồng ý
+  đã giữ, đúng như trước. Tắt: `net` bị từ chối trước khi có token.
 - **Điều lần chạy có `net` không bao giờ giữ, và giới hạn của nó** (P1 và các
   P3 của Heron trên #7590, quyết định 23:22 của người xây dựng đầu tiên):
   - `net` không bao giờ được cấp cùng một quyền riêng tư: quyền đọc hay ghi
@@ -2632,8 +2632,10 @@ Token bị kết thúc khi lần chạy kết thúc, dù kết thúc thế nào 
 bị huỷ, tới hạn chót hay khi lamp-tasks dừng), cùng với lượt nhận của
 launcher, và thư mục `skill-<run id>` của lần chạy bị xoá, nên một lượt
 sau trong cùng phiên không còn giữ pass nào. Một lần ghi vào dịch vụ liên
-kết vẫn chờ lời đồng ý nói ra của chủ đèn: lamp-services chỉ gửi đúng thứ
-chủ đèn đã đồng ý, một lần mỗi lần chạy.
+kết được gửi ngay theo quyền `<code>-write` của nó, không hỏi gì (quy tắc
+của chủ đèn, 21/11), trong giới hạn của các kỹ năng và được ghi vào nhật ký
+đã gửi của chủ đèn ([services_vi.md](services_vi.md), "Lượt chạy của một kỹ năng
+trên Hermes của đèn").
 
 Việc tiếp theo: #7260 (proposal: in the one session, a skill's run keeps the reach of its grants).
 
