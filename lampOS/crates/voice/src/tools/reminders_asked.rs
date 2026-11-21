@@ -10,7 +10,9 @@
 //! such a line's first chat round must call `list_reminders`
 //! (`tool_choice`). A line with any other word (a set, a cancel, a move, a
 //! timer, a story), a round after a call, and `list_reminders` not
-//! declared are asked as before. Off, nothing is forced.
+//! declared are asked as before. Its question may be one word short, one
+//! word lost or misheard, but never "reminders" and never with a word that
+//! changes the ask (#7987). Off, nothing is forced.
 use crate::known_faces::lower_words;
 use crate::second_provider::net::{Force, Forced, Message};
 
@@ -50,31 +52,76 @@ const AROUND: &[&str] = &[
     "can", "could", "would", "you", "tell", "me", "set", "for", "today", "tonight", "tomorrow",
 ];
 
+/// The words a question's tolerated word ([`one_short`]) is never: the
+/// one that makes it a reminders question, and "my" ("what are
+/// reminders?" asks what they are).
+const KEPT: &[&str] = &["reminders", "my"];
+
+/// Words that change the ask. A line one word short ([`one_short`]) that
+/// holds any of them anywhere is asked as before: a set, a cancel, a timer,
+/// a need, a "not", a second clause.
+const DENY: &[&str] = &[
+    "remind", "reminder", "set", "add", "make", "cancel", "delete", "remove", "clear", "stop",
+    "snooze", "move", "change", "edit", "timer", "timers", "alarm", "alarms", "like", "love",
+    "hate", "need", "want", "should", "would", "could", "must", "and", "then", "also", "but", "or",
+    "not", "don't", "no", "never", "after", "before", "instead", "every",
+];
+
 /// Whether a line is only a plain question about the person's reminders:
-/// exactly one question ([`ASKS`]) and no word but those [`AROUND`].
+/// exactly one question ([`ASKS`]) and no word but those [`AROUND`]; or,
+/// with no word of [`DENY`] in it, the same with one word of its question
+/// lost or misheard ([`one_short`], #7987).
 pub fn asks_for_reminders(said: &str) -> bool {
     let words = lower_words(said);
-    let mut asked = false;
-    let mut at = 0;
-    while at < words.len() {
-        let found = ASKS.iter().find(|ask| {
-            ask.iter()
-                .enumerate()
-                .all(|(next, word)| words.get(at + next).is_some_and(|said| said == word))
-        });
-        if let Some(ask) = found {
-            if asked {
-                return false;
-            }
-            asked = true;
-            at += ask.len();
-        } else if AROUND.contains(&words[at].as_str()) {
-            at += 1;
-        } else {
-            return false;
-        }
+    reads(&words, false, false)
+        || (!words.iter().any(|word| DENY.contains(&word.as_str())) && reads(&words, false, true))
+}
+
+/// Whether `words` read as [`asks_for_reminders`] says, `asked` once a
+/// question is past and `spare` while one word short may still be taken.
+fn reads(words: &[String], asked: bool, spare: bool) -> bool {
+    let Some(first) = words.first() else {
+        return asked;
+    };
+    if let Some(ask) = ASKS.iter().find(|ask| starts(words, ask)) {
+        return !asked && reads(&words[ask.len()..], true, spare);
     }
-    asked
+    if AROUND.contains(&first.as_str()) {
+        return reads(&words[1..], asked, spare);
+    }
+    spare && !asked && one_short(words).any(|taken| reads(&words[taken..], true, false))
+}
+
+/// Whether `words` open with `ask`.
+fn starts(words: &[String], ask: &[&str]) -> bool {
+    words.len() >= ask.len() && ask.iter().zip(words).all(|(word, said)| said == word)
+}
+
+/// How many of `words`' first words make a question of 4 words or more
+/// heard one word short: one of its words lost ("what reminders do have")
+/// or heard as another ("what reminders do I halve"), the word never one
+/// of [`KEPT`]. On lamp-52e6 at the gate's Mac volume 45 (20-21 Nov) the
+/// 7-word "Hey Lamp, what reminders do I have?" was heard whole in about
+/// 17 of 60 plays, mostly as 6 words, and a 6-word line was not forced.
+fn one_short(words: &[String]) -> impl Iterator<Item = usize> + '_ {
+    ASKS.iter()
+        .filter(|ask| ask.len() >= 4)
+        .flat_map(move |ask| {
+            (0..ask.len())
+                .filter(|&at| !KEPT.contains(&ask[at]))
+                .flat_map(move |at| {
+                    let lost = [&ask[..at], &ask[at + 1..]].concat();
+                    let lost = starts(words, &lost).then_some(lost.len());
+                    let misheard = (words.len() >= ask.len()
+                        && ask
+                            .iter()
+                            .zip(words)
+                            .enumerate()
+                            .all(|(next, (word, said))| next == at || said == word))
+                    .then_some(ask.len());
+                    lost.into_iter().chain(misheard)
+                })
+        })
 }
 
 /// The force the second route's chat is given with the switch on
