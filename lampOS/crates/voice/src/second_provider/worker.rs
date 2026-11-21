@@ -5142,6 +5142,16 @@ pub fn serve(
                 heeding.attention.need_a_face_or_words(true);
             }
         }
+        // Another person's name in the call's place is theirs
+        // (`LAMP_NAME_NOT_ANOTHERS=on`, #8114).
+        if crate::second_provider::not_anothers_on() {
+            eprintln!(
+                "lamp-voice second: a line whose call word is another person's name (\"Hey, Lance.\", \"Dan, are you done?\") is never the lamp's call by its sound, and LAMP_NAME_NEAR never puts the lamp's name in its place, unless a face is turned to the lamp (LAMP_NAME_NOT_ANOTHERS)"
+            );
+            if let Ok(mut heeding) = heeding.lock() {
+                heeding.attention.hold_anothers_name(true);
+            }
+        }
         // A hearing at the line's start is no second sign of its own on a
         // line said to a person ("Ma'am, …"), and a conversation going on
         // gives back only that start (`LAMP_NAME_SAID_TO_A_PERSON=on`, #3945).
@@ -12285,6 +12295,11 @@ impl Heeding {
             if self.attention.name_dropped_by_near() {
                 eprintln!(
                     "lamp-voice second: request {request}: its name, heard only in the room's sound (began {} ms into the line{soft_lead}), counts for nothing: LAMP_NAME_NEAR ruled the line not the name, or its one word, with no face turned, doesn't sound like the name, and that verdict wins over every second sign; the model is not told it was heard (LAMP_NAME_SIGN_TIED, #8092)",
+                    name_into_ms.map_or_else(|| "?".to_owned(), |ms| ms.to_string())
+                );
+            } else if self.attention.name_dropped_as_anothers() {
+                eprintln!(
+                    "lamp-voice second: request {request}: its name, heard only in the room's sound (began {} ms into the line{soft_lead}), counts for nothing: its call word is another person's name and no face is turned to the lamp; the model is not told it was heard (LAMP_NAME_NOT_ANOTHERS, #8114)",
                     name_into_ms.map_or_else(|| "?".to_owned(), |ms| ms.to_string())
                 );
             } else if self.attention.name_dropped_as_unsure() {
