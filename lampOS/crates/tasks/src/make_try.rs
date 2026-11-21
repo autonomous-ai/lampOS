@@ -187,6 +187,10 @@ pub struct Ran {
     /// The `say`s of its run the voice said whole, from lamp-control; none
     /// when an older lamp-control didn't say.
     pub said: Option<u32>,
+    /// The first of those `say`s' words, one line of at most 120
+    /// characters (lamp-control's `said_first`, #8180); none when nothing
+    /// was said or an older lamp-control didn't say.
+    pub said_first: Option<String>,
 }
 
 /// The last `most` bytes of `text`, on a character's edge, in one line.
@@ -336,6 +340,7 @@ impl Tries {
             );
         }
         let mut said = 0u32;
+        let mut said_first = None;
         for (n, script) in plan.scripts.iter().enumerate() {
             let run = runs.join(format!("run-{n}"));
             if let Err(error) = std::fs::create_dir_all(&run) {
@@ -366,8 +371,15 @@ impl Tries {
                 return json!({"ok": true, "tried": true, "passed": false, "why": why});
             }
             said = said.saturating_add(ran.said.unwrap_or(0));
+            said_first = said_first.or(ran.said_first);
         }
-        json!({"ok": true, "tried": true, "passed": true, "said": said})
+        // #8180: what the try said first, for the person's one line.
+        match said_first {
+            Some(first) => {
+                json!({"ok": true, "tried": true, "passed": true, "said": said, "said_first": first})
+            }
+            None => json!({"ok": true, "tried": true, "passed": true, "said": said}),
+        }
     }
 }
 
@@ -474,9 +486,10 @@ impl Launch for FenceLaunch {
         // out closed.
         drop(cgroup);
         drop(way_out);
-        let said = self.tokens.end_said(&id);
+        let (said, said_first) = self.tokens.end_said_first(&id);
         let mut ran = ran?;
         ran.said = said;
+        ran.said_first = said_first;
         Ok(ran)
     }
 }
@@ -528,6 +541,7 @@ pub fn run_fence(
         stdout: stdout.join().unwrap_or_default(),
         stderr: stderr.join().unwrap_or_default(),
         said: None,
+        said_first: None,
     })
 }
 
@@ -745,6 +759,25 @@ mod tests {
         );
     }
 
+    /// #8180: a passed try's answer carries the first thing it said
+    /// (`said_first`), for the person's one line; none said, none told.
+    #[test]
+    fn a_passed_try_tells_what_it_said_first() {
+        let spoke = Ran {
+            code: Some(0),
+            said: Some(2),
+            said_first: Some("Bitcoin is at 61,000 dollars.".into()),
+            ..Ran::default()
+        };
+        let (_work, tries, _) = tries(spoke);
+        let answered = tries.answer(&line(RUN_TOML, &["scripts/main.py"]));
+        assert_eq!(
+            answered,
+            json!({"ok": true, "tried": true, "passed": true, "said": 2,
+                "said_first": "Bitcoin is at 61,000 dollars."})
+        );
+    }
+
     #[test]
     fn a_silent_run_step_fails_its_try_with_words_for_the_repair() {
         let silent = Ran {
@@ -897,6 +930,9 @@ mod tests {
         fn end_said(&self, _: &str) -> Option<u32> {
             Some(2)
         }
+        fn end_said_first(&self, run: &str) -> (Option<u32>, Option<String>) {
+            (self.end_said(run), Some("The tide is low at six.".into()))
+        }
     }
 
     /// The fence's launch mints a tried run's token for the draft's own
@@ -938,6 +974,8 @@ mod tests {
             .unwrap();
         assert_eq!(ran.code, Some(0));
         assert_eq!(ran.said, Some(2));
+        // #8180: and what it said first, from lamp-control's end.
+        assert_eq!(ran.said_first.as_deref(), Some("The tide is low at six."));
         assert!(ran.stdout.contains("scripts/main.py"), "{}", ran.stdout);
         assert_eq!(minted.lock().unwrap()[0], vec!["speak".to_owned()]);
         // Net with no egress of the lamp's: refused before any token.

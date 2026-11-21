@@ -2535,6 +2535,7 @@ fn admin_answer(
     // alone, checked by lamp-skills, taken back by a remove.
     let folder = shared.task_yes.lock().expect("task_yes").clone();
     if let Some(answer) = crate::task_yes::answer(
+        std::path::Path::new(crate::task_yes::SKILLS),
         folder.as_deref(),
         &asked,
         from_the_voice,
@@ -2698,12 +2699,17 @@ fn admin_answer(
                 // not): a make's tried run (#8157) and a `run` step (#8158)
                 // need one. Taken whether or not the run was still live, so
                 // no count outlives it.
-                let said = shared
+                let (said, first) = shared
                     .parts
                     .lock()
                     .expect("parts")
-                    .said_take(&crate::runs::run_client(run));
-                json!({"ended": ended, "said": said})
+                    .said_take_first(&crate::runs::run_client(run));
+                // #8180: and the first finished say's words, for a make's
+                // try to tell the person what it did.
+                match first {
+                    Some(first) => json!({"ended": ended, "said": said, "said_first": first}),
+                    None => json!({"ended": ended, "said": said}),
+                }
             }
             None => json!({"error": "end: a run, as text"}),
         };
