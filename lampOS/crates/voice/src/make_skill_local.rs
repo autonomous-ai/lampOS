@@ -5908,6 +5908,30 @@ light = { dim = 1 }
         }
     }
 
+    /// [`accept_within`] for a stub chat on TCP: the same bound, so a make
+    /// that never calls it fails plainly instead of hanging its join.
+    pub(crate) fn accept_within_tcp(listener: &std::net::TcpListener) -> std::net::TcpStream {
+        listener.set_nonblocking(true).unwrap();
+        let deadline = std::time::Instant::now() + ACCEPT_WITHIN;
+        loop {
+            match listener.accept() {
+                Ok((stream, _)) => {
+                    stream.set_nonblocking(false).unwrap();
+                    return stream;
+                }
+                Err(error) if error.kind() == std::io::ErrorKind::WouldBlock => {
+                    assert!(
+                        std::time::Instant::now() < deadline,
+                        "no call to the test chat's socket within {} s",
+                        ACCEPT_WITHIN.as_secs()
+                    );
+                    std::thread::sleep(std::time::Duration::from_millis(5));
+                }
+                Err(error) => panic!("test chat accept: {error}"),
+            }
+        }
+    }
+
     /// A manage helper at `socket` that puts on whatever made skill it is
     /// asked for, once: the line it was asked.
     pub(crate) fn manage_helper(socket: &Path) -> std::thread::JoinHandle<Value> {
@@ -6013,7 +6037,7 @@ light = { dim = 1 }
         let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
         let url = format!("http://{}/v1/", listener.local_addr().unwrap());
         let held = std::thread::spawn(move || {
-            let (socket, _) = listener.accept().unwrap();
+            let socket = accept_within_tcp(&listener);
             std::thread::sleep(JUDGE_WITHIN + Duration::from_secs(1));
             drop(socket);
         });
