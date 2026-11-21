@@ -908,8 +908,8 @@ phần của kho nằm ở `crates/memory/src/app_facts.rs`.
 - **Nhật ký** ghi thao tác, id của người và số lượng, không bao giờ một lời.
 - **Không có công tắc ở đây.** Bên ghi là `apps.remember` ở cửa (C166,
   [apps.md](../apps.md), "What an app tells Lamp's memory"), sau công tắc
-  riêng `LAMP_APP_REMEMBER` trong lamp-control, tắt cho đến khi first builder
-  đọc phần riêng tư và có ROW. lamp-control kiểm tra quyền của app, lời của nó
+  riêng `LAMP_APP_REMEMBER` trong lamp-control, `on` trong
+  `lamp-control.service` của sản phẩm (DEFAULT-ON của first builder trên row bật công tắc). lamp-control kiểm tra quyền của app, lời của nó
   (`app_fact::tidy`), công tắc riêng tư và giới hạn ba lần một phút, rồi báo
   cho voice trên `apps/remember`; voice thử các id trí nhớ của chủ, id của
   khuôn mặt trước, mỗi id qua `app_fact::whose`, chuyển sang id kế khi gặp
