@@ -5818,6 +5818,28 @@ pub fn one_face_forget_target(
     one_face_target_of(client, call, said, person, lease)
 }
 
+/// The first id of the one app's facts that every entry `about` matches is
+/// ([`one_app_group`], #8228): `None` when a kept thing or an observation
+/// matches too, or two apps' facts, or their words don't name the app.
+fn app_group_pick(entries: &[(u64, String)], facts: &AppFacts, about: &str) -> Option<u64> {
+    let found: Vec<u64> = entries
+        .iter()
+        .filter(|(_, text)| names_about(text, about))
+        .map(|(id, _)| *id)
+        .collect();
+    let subjects: Vec<Vec<String>> = about_subjects(about).into_iter().map(|(_, w)| w).collect();
+    let group = one_app_group(
+        found.iter().map(|id| {
+            facts
+                .iter()
+                .find(|(fact, _, _)| fact == id)
+                .map(|(_, text, source)| (text.as_str(), source.as_str()))
+        }),
+        &subjects,
+    );
+    group.then(|| found.iter().copied().min()).flatten()
+}
+
 /// [`one_face_forget_target`] with `client`, the days memory taking ids.
 fn one_face_target_of(
     client: &DaysClient,
@@ -5826,14 +5848,23 @@ fn one_face_target_of(
     person: &str,
     lease: &crate::memory_scope::ScopeLease,
 ) -> Result<(u64, String), ForgetNotAsked> {
-    let (want, _) = forget_want(call, said)?;
+    let (want, said_subject) = forget_want(call, said)?;
     let (entries, app_facts) = client.kept_listing(person, &want, lease)?;
     // An app's fact is a kept thing of theirs too.
     let kept = client.kept_ids(person, lease).map(|mut kept| {
-        kept.extend(app_facts);
+        kept.extend(app_facts.iter().map(|(id, _, _)| *id));
         kept
     });
-    let (id, subject) = one_face_pick_among(call, said, &entries, kept.as_deref())?;
+    let (id, subject) = match one_face_pick_among(call, said, &entries, kept.as_deref()) {
+        // One app's facts alone, the app named (#8228): asked about once in
+        // their words, the yes takes them all ([`agreed_forget_app_facts`]).
+        Err(ForgetNotAsked::SeveralMatch(ForgetWant::About(about), _))
+            if let Some(first) = app_group_pick(&entries, &app_facts, &about) =>
+        {
+            (first, said_subject)
+        }
+        picked => picked?,
+    };
     let line = client
         .context
         .lock()
@@ -5905,7 +5936,8 @@ impl DaysClient {
     /// `person`'s kept things, by id and text, for [`one_face_pick`], and
     /// their own app facts after them (#7415, Friday's on #8228: alone in
     /// front of the lamp, "forget what Gym Coach said" must reach one), with
-    /// those facts' ids, kept things too ([`one_kept_among`]): an error for
+    /// those facts by id, text and source, kept things too
+    /// ([`one_kept_among`]): an error for
     /// a failed listing, or one that may be cut when `want` matches by what
     /// it is about. App facts only for a known person (`p-`), never the
     /// room's; only for this forget's pick, never told.
@@ -5914,19 +5946,26 @@ impl DaysClient {
         person: &str,
         want: &ForgetWant,
         lease: &crate::memory_scope::ScopeLease,
-    ) -> Result<(Listing, Vec<u64>), ForgetNotAsked> {
+    ) -> Result<(Listing, AppFacts), ForgetNotAsked> {
+        // One deadline for this listing and the app facts' pages after it,
+        // so the lookup before the question waits no longer than before
+        // (two `ASK_DEADLINE`s with [`Self::kept_ids`]; rule 7, Friday's on
+        // #8228).
+        let until = Instant::now() + crate::tools::ASK_DEADLINE;
+        let left = || {
+            until
+                .checked_duration_since(Instant::now())
+                .filter(|left| !left.is_zero())
+        };
         let list = for_person(
             json!({"op":"kept","max_bytes":ABOUT_BYTES,"observations":true}),
             Some(person),
         );
-        let answer = exchange_within(
-            &self.socket,
-            &list,
-            crate::tools::ASK_DEADLINE,
-            Some(lease),
-            ABOUT_ANSWER_BYTES,
-        )
-        .ok_or(ForgetNotAsked::ListingFailed("no answer"))?;
+        let answer = left()
+            .and_then(|left| {
+                exchange_within(&self.socket, &list, left, Some(lease), ABOUT_ANSWER_BYTES)
+            })
+            .ok_or(ForgetNotAsked::ListingFailed("no answer"))?;
         let entries = kept_entries(&answer)?;
         // A listing that may be cut may miss a second match: by what it is
         // about, only a whole one picks.
@@ -5940,20 +5979,13 @@ impl DaysClient {
         if !lamp_msgs::known::is_person_id(person) {
             return Ok((entries, vec![]));
         }
-        let until = Instant::now() + crate::tools::ASK_DEADLINE;
-        let left = || {
-            until
-                .checked_duration_since(Instant::now())
-                .filter(|left| !left.is_zero())
-        };
         let facts = match self.app_facts_listed(person, &left, Some(lease)) {
             Ok(facts) => facts,
             Err(Listed::Cut) => return Err(ForgetNotAsked::ListingMayBeCut),
             Err(_) => return Err(ForgetNotAsked::ListingFailed("app facts: no answer")),
         };
-        let ids = facts.iter().map(|(id, _)| *id).collect();
-        entries.extend(facts);
-        Ok((entries, ids))
+        entries.extend(facts.iter().map(|(id, text, _)| (*id, text.clone())));
+        Ok((entries, facts))
     }
 }
 
@@ -6043,6 +6075,222 @@ pub fn agreed_forget_observations(
         );
     }
     told
+}
+
+/// A person's app facts as memory lists them: id, kept text and source
+/// (`app:<name>`; empty from a memory that does not give it).
+type AppFacts = Vec<(u64, String, String)>;
+
+/// `person`'s own app facts (#7415), by id, text and source, for a forget
+/// about a thing alone (the several-face one, the one-face forget's
+/// [`DaysClient::kept_listing`] and its yes, [`agreed_forget_app_facts`]),
+/// from memory's `kept {app_facts}` listing at `socket`, page by page below
+/// the oldest id listed, until a page with room for the longest fact left,
+/// at most [`APP_FACT_PAGES`]. Never listed for the hits note or anywhere
+/// else. An older memory refuses the field (`bad_request`) and holds no app
+/// facts: none. [`Listed::Gone`] for no answer, [`Listed::Cut`] past the
+/// pages.
+fn app_facts_listed(
+    socket: &Path,
+    person: &str,
+    left: &impl Fn() -> Option<Duration>,
+    lease: Option<&crate::memory_scope::ScopeLease>,
+) -> Result<AppFacts, Listed> {
+    let mut all = vec![];
+    let mut before: Option<u64> = None;
+    for _ in 0..APP_FACT_PAGES {
+        let mut list = for_person(
+            json!({"op":"kept","max_bytes":ABOUT_BYTES,"app_facts":true}),
+            Some(person),
+        );
+        if let Some(before) = before {
+            list["before_id"] = json!(before);
+        }
+        let Some(answer) =
+            left().and_then(|left| exchange_within(socket, &list, left, lease, ABOUT_ANSWER_BYTES))
+        else {
+            return Err(Listed::Gone);
+        };
+        if before.is_none() && answer["ok"] == false && answer["error"] == "bad_request" {
+            eprintln!(
+                "lamp-voice provider: an older memory lists no app facts; a forget about looks in the rest"
+            );
+            return Ok(all);
+        }
+        let entries = kept_entries(&answer).map_err(|_| Listed::Gone)?;
+        let listed: usize = entries.iter().map(|(_, text)| text.len()).sum();
+        let oldest = entries.iter().map(|(id, _)| *id).min();
+        let sources = answer["entries"]
+            .as_array()
+            .into_iter()
+            .flatten()
+            .map(|entry| entry["source"].as_str().unwrap_or_default().to_owned());
+        all.extend(
+            entries
+                .into_iter()
+                .zip(sources)
+                .map(|((id, text), source)| (id, text, source)),
+        );
+        // Whole: the store stops only at a fact that does not fit.
+        let Some(oldest) =
+            oldest.filter(|_| listed.saturating_add(lamp_msgs::app_fact::KEPT_BYTES) > ABOUT_BYTES)
+        else {
+            return Ok(all);
+        };
+        before = Some(oldest);
+    }
+    Err(Listed::Cut)
+}
+
+/// The app's title in an app fact's kept form, `Noted by the app <title>,
+/// <day>: "<words>"` (`lamp_msgs::app_fact`).
+fn app_title(text: &str) -> Option<&str> {
+    let rest = text.strip_prefix("Noted by the app ")?;
+    let (head, _) = rest.split_once(": \"")?;
+    let (title, _) = head.rsplit_once(", ")?;
+    Some(title).filter(|title| !title.trim().is_empty())
+}
+
+/// Whether `words` (a forget's, as [`about_words`] folds them) name the app
+/// `title`: every word of it, case and plural aside ([`about_same`]).
+fn names_app(words: &[String], title: &str) -> bool {
+    let title = about_words(title);
+    !title.is_empty()
+        && title
+            .iter()
+            .all(|word| words.iter().any(|said| about_same(word, said)))
+}
+
+/// Whether `matched`, every match of a forget about a thing, is one app's
+/// own facts that `subjects` name the app of (#8228, the first builder's
+/// 20:34): all app facts, one source, its title in their words. Then the
+/// forget takes that group whole; a mix with kept things or observations,
+/// or two apps' facts, is not one.
+fn one_app_group<'a>(
+    matched: impl IntoIterator<Item = Option<(&'a str, &'a str)>>,
+    subjects: &[Vec<String>],
+) -> bool {
+    let mut one: Option<(&str, &str)> = None;
+    let mut any = false;
+    for fact in matched {
+        let Some((text, source)) = fact else {
+            return false;
+        };
+        let Some(title) = app_title(text).filter(|_| !source.is_empty()) else {
+            return false;
+        };
+        match one {
+            None => one = Some((source, title)),
+            Some(group) if group == (source, title) => {}
+            Some(_) => return false,
+        }
+        any = true;
+    }
+    any && one.is_some_and(|(_, title)| subjects.iter().any(|words| names_app(words, title)))
+}
+
+/// After the one-face forget their yes agreed to (#5627) forgot app fact
+/// `told`'s id, the other facts of the same app that their words `about`
+/// name the app of and match ([`one_app_group`], #8228) go with it, each by
+/// its id: "forget what Gym Coach said" takes all of that app's facts for
+/// them. Only after a by-id forget the memory confirmed, in `person`'s scope
+/// alone; `group` is what was listed before it, the asked fact among them.
+/// The answer counts them.
+pub fn agreed_forget_app_facts(
+    socket: &Path,
+    told: (Value, bool),
+    group: &[u64],
+    person: &str,
+    deadline: Duration,
+    lease: &crate::memory_scope::ScopeLease,
+) -> (Value, bool) {
+    if group.is_empty() || !told.1 || told.0["forgotten"] != true || !lease.is_current() {
+        return told;
+    }
+    let until = Instant::now() + deadline;
+    let mut removed = 0u64;
+    for id in group {
+        let Some(budget) = until
+            .checked_duration_since(Instant::now())
+            .filter(|left| !left.is_zero())
+        else {
+            break;
+        };
+        let forget = for_person(
+            json!({"op":"forget","id":id,"selective":true}),
+            Some(person),
+        );
+        if bounded_exchange_scoped(socket, &forget, budget, Some(lease))
+            .is_some_and(|answer| answer["ok"] == true && answer["removed"].as_u64() != Some(0))
+        {
+            removed += 1;
+        }
+    }
+    eprintln!(
+        "lamp-voice provider: an agreed forget took {removed} more fact(s) of the same app with it"
+    );
+    let (mut told, answered) = told;
+    told["count"] = json!(1 + removed);
+    if removed < group.len() as u64 {
+        told["all"] = json!(false);
+    }
+    (told, answered)
+}
+
+/// The other facts of the app whose fact `id` is, for the yes to a one-face
+/// forget of it ([`agreed_forget_app_facts`]): those `about` matches, when
+/// it names that app ([`one_app_group`]); none when `id` is no app fact of
+/// `person`'s, or their words don't name its app.
+pub fn agreed_app_group(
+    socket: &Path,
+    id: u64,
+    about: &Value,
+    person: &str,
+    deadline: Duration,
+    lease: &crate::memory_scope::ScopeLease,
+) -> Vec<u64> {
+    let Some(about) = about
+        .as_str()
+        .map(str::trim)
+        .filter(|about| !about.is_empty())
+    else {
+        return vec![];
+    };
+    if !lamp_msgs::known::is_person_id(person) {
+        return vec![];
+    }
+    let until = Instant::now() + deadline;
+    let left = || {
+        until
+            .checked_duration_since(Instant::now())
+            .filter(|left| !left.is_zero())
+    };
+    let Ok(facts) = app_facts_listed(socket, person, &left, Some(lease)) else {
+        return vec![];
+    };
+    let Some((_, text, source)) = facts.iter().find(|(fact, _, _)| *fact == id) else {
+        return vec![];
+    };
+    let subjects: Vec<Vec<String>> = about_subjects(about).into_iter().map(|(_, w)| w).collect();
+    let group: Vec<&(u64, String, String)> = facts
+        .iter()
+        .filter(|(_, other, from)| from == source && names_about(other, about))
+        .collect();
+    if !one_app_group(
+        group
+            .iter()
+            .map(|(_, text, from)| Some((text.as_str(), from.as_str()))),
+        &subjects,
+    ) || !group.iter().any(|(fact, _, _)| *fact == id)
+        || app_title(text).is_none()
+    {
+        return vec![];
+    }
+    group
+        .into_iter()
+        .map(|(fact, _, _)| *fact)
+        .filter(|fact| *fact != id)
+        .collect()
 }
 
 /// The entries (id, text) of a kept listing's `answer`, for
@@ -10602,9 +10850,10 @@ enum Listed {
     /// The store refused the listing (#3113): an older lamp-memory refuses
     /// `observations`, a field it doesn't know, with `bad_request`.
     Refused,
-    /// The ids that match, of a whole listing, and the subjects none
-    /// matched, by their index.
-    Whole(Vec<u64>, Vec<usize>),
+    /// The ids that match, of a whole listing, the subjects none matched,
+    /// by their index, and whether the matches are one app's facts its
+    /// words name ([`one_app_group`], #8228).
+    Whole(Vec<u64>, Vec<usize>, bool),
 }
 
 /// An older lamp-memory, updated after the voice, refuses the listing's
@@ -12685,24 +12934,24 @@ impl DaysClient {
         let too_much = || (json!({"forgotten": false, "note": ABOUT_TOO_MUCH}), true);
         let refused = older_memory_refused;
         let mut scope = person;
-        let (mut matching, mut missed) = match self.about_matching(scope, &words, left, lease, true)
-        {
-            Listed::Gone => return (gone(), false),
-            Listed::Cut => return too_much(),
-            Listed::Refused => return refused(),
-            Listed::Whole(matching, missed) => (matching, missed),
-        };
+        let (mut matching, mut missed, mut group) =
+            match self.about_matching(scope, &words, left, lease, true) {
+                Listed::Gone => return (gone(), false),
+                Listed::Cut => return too_much(),
+                Listed::Refused => return refused(),
+                Listed::Whole(matching, missed, group) => (matching, missed, group),
+            };
         // Kept before the lamp knew who was talking: the room's, which
         // recall gives them too. Never for a forget named in what was
         // heard (#3113): only the asker's own scope.
         let before = matching.is_empty() && person.is_some() && !named;
         if before {
             scope = None;
-            (matching, missed) = match self.about_matching(None, &words, left, lease, true) {
+            (matching, missed, group) = match self.about_matching(None, &words, left, lease, true) {
                 Listed::Gone => return (gone(), false),
                 Listed::Cut => return too_much(),
                 Listed::Refused => return refused(),
-                Listed::Whole(matching, missed) => (matching, missed),
+                Listed::Whole(matching, missed, group) => (matching, missed, group),
             };
         }
         // What none was found for, in their words.
@@ -12758,7 +13007,7 @@ impl DaysClient {
                         true,
                     );
                 }
-                if matching.len() > ABOUT_MOST {
+                if matching.len() > ABOUT_MOST && !group {
                     return (json!({"forgotten": false, "note": ABOUT_ASK_WHICH}), true);
                 }
                 context.uncertain_writes = context.uncertain_writes.saturating_add(1);
@@ -12917,20 +13166,35 @@ impl DaysClient {
         // a known person's own scope holds any (the writer's `whose`), so
         // never the room's. Not past [`ABOUT_MOST`] matches of their own:
         // that forget asks which, whatever the app facts.
+        let mut group = false;
         if app_facts
             && matching.len() <= ABOUT_MOST
             && let Some(person) = scope.filter(|scope| lamp_msgs::known::is_person_id(scope))
-            && let Err(listed) =
-                self.app_facts_matching(person, subjects, &left, lease, &mut matching, &mut found)
         {
-            return listed;
+            let own = matching.len();
+            match self.app_facts_matching(person, subjects, &left, lease, &mut matching, &mut found)
+            {
+                // One app's facts alone, the app named (#8228): taken whole,
+                // past [`ABOUT_MOST`] too, as the one-face forget takes them.
+                Ok(matched) => {
+                    group = own == 0
+                        && one_app_group(
+                            matched
+                                .iter()
+                                .map(|(_, text, source)| Some((text.as_str(), source.as_str()))),
+                            subjects,
+                        );
+                }
+                Err(listed) => return listed,
+            }
         }
         let missed = (0..subjects.len()).filter(|index| !found[*index]).collect();
-        Listed::Whole(matching, missed)
+        Listed::Whole(matching, missed, group)
     }
 
     /// `person`'s own app facts (#7415) that are about one of `subjects`,
-    /// added to `matching` (and `found`), from [`Self::app_facts_listed`].
+    /// added to `matching` (and `found`), from [`Self::app_facts_listed`];
+    /// those matched, with their texts and sources.
     fn app_facts_matching(
         &self,
         person: &str,
@@ -12939,63 +13203,25 @@ impl DaysClient {
         lease: Option<&crate::memory_scope::ScopeLease>,
         matching: &mut Vec<u64>,
         found: &mut [bool],
-    ) -> Result<(), Listed> {
-        for (id, text) in self.app_facts_listed(person, left, lease)? {
+    ) -> Result<AppFacts, Listed> {
+        let mut matched = vec![];
+        for (id, text, source) in self.app_facts_listed(person, left, lease)? {
             if about_hits(&text, subjects, found) && !matching.contains(&id) {
                 matching.push(id);
+                matched.push((id, text, source));
             }
         }
-        Ok(())
+        Ok(matched)
     }
 
-    /// `person`'s own app facts (#7415), by id and text, for a forget about
-    /// a thing alone (this one and the one-face forget's
-    /// [`Self::kept_listing`]), from memory's `kept {app_facts}` listing,
-    /// page by page below the oldest id listed, until a page with room for
-    /// the longest fact left, at most [`APP_FACT_PAGES`]. Never listed for
-    /// the hits note or anywhere else. An older memory refuses the field
-    /// (`bad_request`) and holds no app facts: none. [`Listed::Gone`] for no
-    /// answer, [`Listed::Cut`] past the pages.
+    /// [`app_facts_listed`] on this client's memory.
     fn app_facts_listed(
         &self,
         person: &str,
         left: &impl Fn() -> Option<Duration>,
         lease: Option<&crate::memory_scope::ScopeLease>,
-    ) -> Result<Vec<(u64, String)>, Listed> {
-        let mut all = vec![];
-        let mut before: Option<u64> = None;
-        for _ in 0..APP_FACT_PAGES {
-            let mut list = for_person(
-                json!({"op":"kept","max_bytes":ABOUT_BYTES,"app_facts":true}),
-                Some(person),
-            );
-            if let Some(before) = before {
-                list["before_id"] = json!(before);
-            }
-            let Some(answer) = left().and_then(|left| {
-                exchange_within(&self.socket, &list, left, lease, ABOUT_ANSWER_BYTES)
-            }) else {
-                return Err(Listed::Gone);
-            };
-            if before.is_none() && answer["ok"] == false && answer["error"] == "bad_request" {
-                eprintln!(
-                    "lamp-voice provider: an older memory lists no app facts; a forget about looks in the rest"
-                );
-                return Ok(all);
-            }
-            let entries = kept_entries(&answer).map_err(|_| Listed::Gone)?;
-            let listed: usize = entries.iter().map(|(_, text)| text.len()).sum();
-            let oldest = entries.iter().map(|(id, _)| *id).min();
-            all.extend(entries);
-            // Whole: the store stops only at a fact that does not fit.
-            let Some(oldest) = oldest
-                .filter(|_| listed.saturating_add(lamp_msgs::app_fact::KEPT_BYTES) > ABOUT_BYTES)
-            else {
-                return Ok(all);
-            };
-            before = Some(oldest);
-        }
-        Err(Listed::Cut)
+    ) -> Result<AppFacts, Listed> {
+        app_facts_listed(&self.socket, person, left, lease)
     }
 
     /// A recall or search: the room's alone, or for someone known theirs
@@ -21532,6 +21758,192 @@ mod tests {
         assert_eq!(told["records"], 1, "{told}");
         drop(client);
         let _ = std::fs::remove_file(&socket);
+    }
+
+    /// The first builder's HOLD on #8228 (7065252839) and Friday's
+    /// (7065295883), on the real memory: words naming an app take all of
+    /// that app's facts for the person. One face in view, three Gym Coach
+    /// facts: "forget what the gym coach said" asks once and the yes takes
+    /// all three; a guest's ask takes none; a single fact still works; a
+    /// plain kept thing matching beside an app fact stays SeveralMatch(2)
+    /// and is never pulled into the group. Several faces (the forget about),
+    /// nine facts of the app go together past the eight a forget about
+    /// takes.
+    #[test]
+    fn words_naming_an_app_take_all_its_facts_one_face_or_not() {
+        use lamp_memory::{
+            Server,
+            days::Days,
+            store::{LocalTime as StoreTime, Options},
+        };
+        let owner_request = scoped_request(Some("Owner"), 9_201);
+        let owner_lease = owner_request.lease();
+        let owner = owner_lease.scope().unwrap().person().unwrap().to_owned();
+        let guest_request = scoped_request(Some("Guest"), 9_202);
+        let guest_lease = guest_request.lease();
+        let guest = guest_lease.scope().unwrap().person().unwrap().to_owned();
+        let root = std::env::temp_dir().join(format!("lamp-app-group-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&root);
+        std::fs::create_dir_all(&root).unwrap();
+        let days = Days::open(
+            Options {
+                dir: root.join("store"),
+                keep_days: 30,
+                local: StoreTime::Offset(420),
+            },
+            NOW,
+        )
+        .unwrap();
+        let socket = root.join("m.sock");
+        let server = Server::bind(&socket).unwrap();
+        let stop = server.stopper();
+        let worker = std::thread::spawn(move || {
+            let mut days = days;
+            server.run(&mut days, &mut || NOW, &mut |_| {}).unwrap();
+        });
+        let ask = |line: Value| {
+            let answer = bounded_exchange(&socket, &line, Duration::from_secs(2))
+                .expect("the memory answers");
+            assert_eq!(answer["ok"], true, "{line}: {answer}");
+            answer
+        };
+        for (person, n) in [(&owner, 1), (&guest, 2)] {
+            ask(
+                json!({"op":"append","person":person,"at_unix_ms":NOW - 600_000 + n,"heard":"hello","said":"Hi"}),
+            );
+        }
+        let at = std::cell::Cell::new(NOW - 500_000);
+        let coach = |text: &str| {
+            at.set(at.get() + 1_000);
+            ask(json!({"op": lamp_msgs::app_fact::REMEMBER_OP, "person": &owner,
+                "source": "app:gym-coach", "name": "Gym Coach", "at_unix_ms": at.get(), "text": text}))
+                ["id"]
+                .as_u64()
+                .unwrap()
+        };
+        let listed = || {
+            ask(json!({"op":"kept","person":&owner,"app_facts":true}))["entries"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .map(|entry| entry["id"].as_u64().unwrap())
+                .collect::<Vec<_>>()
+        };
+        let client = DaysClient::new(socket.clone()).unwrap();
+        client.forget_all.store(true, Ordering::Release);
+        client.forget_about.store(true, Ordering::Release);
+        let named = call(FORGET, json!({}));
+        let said = "Lamp, forget what the gym coach said.";
+        // The one-face yes: the forget by the asked id, then the rest of
+        // the app's group, as tools.rs runs them.
+        let yes = |id: u64, subject: &str| {
+            let group = agreed_app_group(
+                &socket,
+                id,
+                &json!(subject),
+                &owner,
+                Duration::from_secs(2),
+                &owner_lease,
+            );
+            let told = client.run_at(
+                &call(FORGET, json!({"source_id": id})),
+                FIRST_READ,
+                NOW,
+                Some(&EAST),
+                Some(&owner),
+            );
+            (
+                group.clone(),
+                agreed_forget_app_facts(
+                    &socket,
+                    told,
+                    &group,
+                    &owner,
+                    Duration::from_secs(2),
+                    &owner_lease,
+                ),
+            )
+        };
+
+        // Three facts: a guest takes none; the owner's yes takes all three.
+        let three = [
+            coach("squats 3x10 zorblax"),
+            coach("lunges 2x8 zorblax"),
+            coach("plank 60 s zorblax"),
+        ];
+        assert!(matches!(
+            one_face_target_of(&client, &named, said, &guest, &guest_lease),
+            Err(ForgetNotAsked::NoMatch(_))
+        ));
+        assert_eq!(listed(), three);
+        let (id, subject) =
+            one_face_target_of(&client, &named, said, &owner, &owner_lease).unwrap();
+        assert_eq!(id, three[0]);
+        assert!(!subject.contains("zorblax"), "{subject}");
+        let (group, (told, answered)) = yes(id, &subject);
+        assert_eq!(group, three[1..]);
+        assert!(answered, "{told}");
+        assert_eq!(told["count"], 3, "{told}");
+        assert!(listed().is_empty());
+
+        // One fact: still that one alone.
+        let one = coach("rows 4x12 zorblax");
+        let (id, subject) =
+            one_face_target_of(&client, &named, said, &owner, &owner_lease).unwrap();
+        assert_eq!(id, one);
+        let (group, (told, _)) = yes(id, &subject);
+        assert!(group.is_empty(), "{group:?}");
+        assert_eq!(told["forgotten"], true, "{told}");
+        assert!(listed().is_empty());
+
+        // A plain kept thing beside an app fact: two match, nothing picked,
+        // and the group never pulls the kept thing in.
+        let fact = coach("deadlift 3x5 zorblax");
+        let plain = ask(
+            json!({"op":"remember","person":&owner,"at_unix_ms":NOW - 1_000,
+            "text":"The gym coach Dana said to rest on Sundays."}),
+        )["id"]
+            .as_u64()
+            .unwrap();
+        assert_eq!(
+            one_face_target_of(&client, &named, said, &owner, &owner_lease),
+            Err(ForgetNotAsked::SeveralMatch(
+                ForgetWant::About("gym coach".into()),
+                2
+            ))
+        );
+        let group = agreed_app_group(
+            &socket,
+            fact,
+            &json!("gym coach"),
+            &owner,
+            Duration::from_secs(2),
+            &owner_lease,
+        );
+        assert!(!group.contains(&plain), "{group:?}");
+        assert!(group.is_empty(), "{group:?}");
+        ask(json!({"op":"forget","person":&owner,"id":plain}));
+        ask(json!({"op":"forget","person":&owner,"id":fact}));
+
+        // Several faces: nine of the app's facts go together, past eight.
+        let nine: Vec<u64> = (1..=9)
+            .map(|n| coach(&format!("set {n} zorblax")))
+            .collect();
+        assert_eq!(listed(), nine);
+        let (told, answered) = client.run_at(
+            &call(FORGET, json!({"about": "what the gym coach said"})),
+            FIRST_READ,
+            NOW,
+            Some(&EAST),
+            Some(&owner),
+        );
+        assert!(answered, "{told}");
+        assert_eq!(told["count"], 9, "{told}");
+        assert!(listed().is_empty());
+        drop(client);
+        stop.stop();
+        worker.join().unwrap();
+        let _ = std::fs::remove_dir_all(&root);
     }
 
     /// Friday's one-face follow-up on #8228 (7063377782): alone in front of

@@ -884,16 +884,25 @@ phần của kho nằm ở `crates/memory/src/app_facts.rs`.
     giờ đẩy các điều chính người đó đã giữ ra khỏi 16 KiB của nó; `recall`
     (theo lời hay theo ngày) và `search` tìm thấy nó như mọi điều đã giữ,
     cùng dấu của nó: «hôm nay tôi tập gì?» được trả lời từ đó. Không có
-    phần byte riêng. Được liệt kê riêng bằng `kept {app_facts:true}` (với
+    phần byte riêng. Được liệt kê riêng bằng `kept {app_facts:true}`, mỗi
+    mục kèm `source` của nó (với
     `before_id`, một trang dưới id đó; `bad_request` khi có `observations`,
     hoặc `before_id` mà không có `app_facts`), chỉ cho lệnh quên về một
     chuyện: `forget {about}` của voice đọc các điều app của chính người đó
     theo cách này, từng trang (tối đa 24, quá thì "quá nhiều để xem hết"),
     và khớp chúng theo cùng các từ như các điều họ đã giữ, nên «quên điều
-    gym coach đã nói» lấy được một điều. Lệnh quên một khuôn mặt (#5627),
+    gym coach đã nói» lấy được chúng. Lệnh quên một khuôn mặt (#5627),
     khi chỉ người đó trong tầm nhìn, liệt kê chúng cùng cách bên cạnh các
-    điều họ đã giữ: một điều khớp là điều được hỏi, và lời đồng ý của họ quên
-    nó theo id; hơn một điều thì hỏi điều nào. Không bao giờ của căn phòng, không
+    điều họ đã giữ, trong cùng 1,5 s (`tools::ASK_DEADLINE`) với danh sách
+    điều đã giữ, nên việc tìm trước câu hỏi chờ tối đa 3 s cùng danh sách id:
+    một điều khớp là điều được hỏi, và lời đồng ý của họ quên nó theo id;
+    hơn một điều thì hỏi điều nào. **Các điều của một app là một nhóm**
+    (#8228): khi mọi điều khớp đều là điều app cùng một nguồn và lời nói nêu
+    tên app đó (tiêu đề trong "Noted by the app <tiêu đề>", không kể hoa
+    thường), lệnh quên một khuôn mặt hỏi một lần bằng lời của họ và lời đồng
+    ý quên từng điều theo id, còn lệnh quên về một chuyện lấy hết, kể cả quá
+    8 điều. Lẫn điều đã giữ với điều app, hoặc điều của hai app, vẫn hỏi
+    điều nào. Không bao giờ của căn phòng, không
     bao giờ của người khác; trí nhớ cũ từ chối trường này và lệnh quên tìm
     ở phần còn lại.
   - **Lượt ban đêm không bao giờ đọc nó**, nên không đoạn, mẫu hay chương

@@ -2531,12 +2531,39 @@ fn run_call_with_scope(
                                         args: json!({"source_id": call.args["source_id"]}),
                                         ..call.clone()
                                     };
+                                    // One app's facts its words name go
+                                    // together (#8228): listed before the
+                                    // forget of the one asked about.
+                                    let group = match (
+                                        call.args["source_id"].as_u64(),
+                                        call.args.get("about"),
+                                    ) {
+                                        (Some(id), Some(about)) => {
+                                            crate::remember::agreed_app_group(
+                                                socket,
+                                                id,
+                                                about,
+                                                &person,
+                                                deadline.saturating_sub(started.elapsed()),
+                                                lease,
+                                            )
+                                        }
+                                        _ => vec![],
+                                    };
                                     let told = crate::remember::run_scoped_for(
                                         socket,
                                         &by_id,
                                         deadline.saturating_sub(started.elapsed()),
                                         lease,
                                         &person,
+                                    );
+                                    let told = crate::remember::agreed_forget_app_facts(
+                                        socket,
+                                        told,
+                                        &group,
+                                        &person,
+                                        deadline.saturating_sub(started.elapsed()),
+                                        lease,
                                     );
                                     match call.args.get("about") {
                                         Some(about) => {
@@ -8084,6 +8111,9 @@ mod tests {
             let served = std::thread::spawn(move || {
                 let mut asked = vec![];
                 for answer in [
+                    // #8228: their app facts first, for the app group the
+                    // yes takes with it; none, and not in `asked`.
+                    b"{\"ok\":true,\"entries\":[]}\n".as_slice(),
                     by_id,
                     b"{\"ok\":true,\"removed\":2}\n".as_slice(),
                     // #8038: their observations, then their kept things
@@ -8108,7 +8138,10 @@ mod tests {
                         .read_line(&mut line)
                         .unwrap();
                     stream.write_all(answer).unwrap();
-                    asked.push(serde_json::from_str::<Value>(&line).unwrap());
+                    let line = serde_json::from_str::<Value>(&line).unwrap();
+                    if !(line["op"] == "kept" && line["app_facts"] == true) {
+                        asked.push(line);
+                    }
                 }
                 asked
             });

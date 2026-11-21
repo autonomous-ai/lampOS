@@ -783,12 +783,21 @@ fn legacy(store: &mut Days, request: Request) -> Result<Value> {
                         "app_facts lists app facts alone, without observations",
                     ));
                 }
-                let entries = store.kept_app_facts(
+                let facts = store.kept_app_facts(
                     &person,
                     max_bytes.unwrap_or(4096).min(16384) as usize,
                     before_id,
                 )?;
-                return Ok(value(Response::Kept { entries }));
+                let (entries, sources): (Vec<_>, Vec<_>) = facts.into_iter().unzip();
+                let mut answer = value(Response::Kept { entries });
+                // Each fact's source (`app:<name>`), so a forget about an
+                // app's words takes that app's facts together (#8228).
+                if let Some(entries) = answer["entries"].as_array_mut() {
+                    for (entry, source) in entries.iter_mut().zip(sources) {
+                        entry["source"] = json!(source);
+                    }
+                }
+                return Ok(answer);
             }
             if before_id.is_some() {
                 return Err(Error::new("bad_request", "before_id pages app_facts only"));
