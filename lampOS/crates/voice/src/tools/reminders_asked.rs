@@ -136,6 +136,100 @@ mod tests {
         }
     }
 
+    /// #7987: on lamp-52e6 at the gate's Mac volume 45, "Hey Lamp, what
+    /// reminders do I have?" was heard as all 7 words in about 17 of 60
+    /// plays, mostly as 6. Every 6-word hearing is forced unless the word
+    /// lost is "reminders"; a 5-word hearing only when one of the two lost
+    /// is "Hey" or "Lamp", or "do" (which leaves "what reminders I have").
+    #[test]
+    fn a_plain_question_one_word_short_is_still_forced() {
+        let words = ["Hey", "Lamp,", "what", "reminders", "do", "I", "have?"];
+        let without = |lost: &[usize]| {
+            words
+                .iter()
+                .enumerate()
+                .filter(|(at, _)| !lost.contains(at))
+                .map(|(_, word)| *word)
+                .collect::<Vec<_>>()
+                .join(" ")
+        };
+        // Indices into `words`: 0 Hey, 1 Lamp, 2 what, 3 reminders, 4 do,
+        // 5 I, 6 have.
+        for lost in 0..words.len() {
+            let said = without(&[lost]);
+            assert_eq!(asks_for_reminders(&said), lost != 3, "{said}");
+        }
+        let forced_two: &[[usize; 2]] = &[
+            [0, 1],
+            [0, 2],
+            [0, 4],
+            [0, 5],
+            [0, 6],
+            [1, 2],
+            [1, 4],
+            [1, 5],
+            [1, 6],
+            [2, 4],
+            [4, 5],
+            [4, 6],
+        ];
+        for first in 0..words.len() {
+            for second in first + 1..words.len() {
+                let said = without(&[first, second]);
+                assert_eq!(
+                    asks_for_reminders(&said),
+                    forced_two.contains(&[first, second]),
+                    "{said}"
+                );
+            }
+        }
+        // A word misheard as another, the other phrases one word short.
+        for said in [
+            "Hey Lamp, what reminders do I halve?",
+            "Hey Lamp, what reminders to I have?",
+            "Hey Lamp, what reminders do eye have?",
+            "Hey Lamp, do I have reminders?",
+            "Hey Lamp, are there reminders?",
+        ] {
+            assert!(asks_for_reminders(said), "{said}");
+        }
+    }
+
+    /// One word short never forces a line that asks something else: the
+    /// word lost or misheard is never "reminders" or "my", never one that
+    /// changes the ask (a set, a cancel, a timer, a need, a "not"), never a
+    /// word outside the question (a person's name, "to set"), and never a
+    /// second one.
+    #[test]
+    fn one_word_short_never_forces_another_ask() {
+        for said in [
+            "Remind me what I have.",
+            "What reminders do I have to set?",
+            "Cancel reminders do I have?",
+            "Cancel what reminders do I have?",
+            "What timers do I have?",
+            "What alarms do I have?",
+            "Do you like reminders?",
+            "What reminders do I need?",
+            "What reminders should I have?",
+            "What reminders do I set?",
+            "What reminders don't I have?",
+            "What reminder do I have?",
+            "What are reminders?",
+            "What are your reminders?",
+            "Delete my reminders.",
+            "Hey Anna, what reminders do I have?",
+            "Hey Lamp, what reminders do I have, Anna?",
+            "Hey Lamp, reminders do have?",
+            "What reminders do halve?",
+            "What reminders do I halve, please, Sam?",
+            "Reminders do I have? Reminders do I have?",
+            "What reminders do I have and what reminders do have?",
+        ] {
+            assert!(!asks_for_reminders(said), "{said}");
+        }
+    }
+
     /// The chat sends `tool_choice` naming `list_reminders` only on the
     /// first round of a plain question, and only when it is declared.
     #[test]
