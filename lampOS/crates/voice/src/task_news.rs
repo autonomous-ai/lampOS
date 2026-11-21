@@ -1545,6 +1545,29 @@ fn read_once_with(
                     });
                 }
             }
+            // A start that timed out, still being checked (lamp-tasks'
+            // `start_checking`, #8170): said as being checked, never as
+            // failed, and once settled told by what became of it.
+            if checking_hand_over(item, now) {
+                let key = format!("{store}:{id}:checking");
+                if !retelling.contains(&key)
+                    && !told.contains(&key)
+                    && !offered.contains(&key)
+                    && let Some(task) = ask(socket, &json!({"op":"get_task","id":id}))
+                    && !crate::made_skill::is_brief(task["text"].as_str().unwrap_or_default())
+                    && let Some(note) = note_checking(&words, &task)
+                {
+                    news.push(News {
+                        key,
+                        note,
+                        until: None,
+                        progress: None,
+                        finished: None,
+                        also: Vec::new(),
+                    });
+                }
+                continue;
+            }
             // Work the person said yes to that never reached its agent is
             // news too: the lamp said it was handing it over.
             if let Some(failed) = failed_hand_over(item, now) {
@@ -1711,6 +1734,8 @@ fn failed_hand_over(item: &Value, now: &BootClock) -> Option<bool> {
     let dispatch = &item["dispatch"];
     let unsure = match dispatch["state"].as_str()? {
         "not_sent" => false,
+        // Still being checked (#8170): never a failure ([`checking_hand_over`]).
+        "uncertain" if dispatch["code"].as_str() == Some(START_CHECKING) => return None,
         "uncertain" => true,
         _ => return None,
     };
@@ -1721,6 +1746,34 @@ fn failed_hand_over(item: &Value, now: &BootClock) -> Option<bool> {
     (finished["boot_id"].as_str() == Some(now.boot_id.as_str())
         && now.ms.saturating_sub(finished["monotonic_ms"].as_u64()?) <= JUST_MS)
         .then_some(unsure)
+}
+
+/// lamp-tasks' code for a new start that timed out and is being checked
+/// (#8170): its dispatch stays `uncertain`, and it is never sent again.
+const START_CHECKING: &str = "start_checking";
+
+/// Whether a task the person said yes to is a start that timed out, being
+/// checked (#8170), ended within the last [`JUST_MS`] of this boot.
+fn checking_hand_over(item: &Value, now: &BootClock) -> bool {
+    let dispatch = &item["dispatch"];
+    let finished = &dispatch["finished"];
+    dispatch["state"].as_str() == Some("uncertain")
+        && dispatch["code"].as_str() == Some(START_CHECKING)
+        && !dispatch["confirmed"].is_null()
+        && finished["boot_id"].as_str() == Some(now.boot_id.as_str())
+        && finished["monotonic_ms"]
+            .as_u64()
+            .is_some_and(|ms| now.ms.saturating_sub(ms) <= JUST_MS)
+}
+
+/// A start being checked ([`checking_hand_over`]), fitted to one written
+/// turn as a failed one is ([`note_failed`]).
+fn note_checking(words: &NewsWords, task: &Value) -> Option<String> {
+    let (asked, _) = quoted(asked_text(task)?, MOST_TASK_CHARS);
+    let who = who(task);
+    fitted(&asked, "", false, |asked, _, _| {
+        unprompted(&fill(&words.checking, &[("asked", asked), ("who", who)]))
+    })
 }
 
 /// The earlier session of the person's that a task they said yes to went
@@ -1839,8 +1892,14 @@ fn note_failed(
         // The lamp's kept session got stuck under it and is being restarted
         // (#7906 sign 5): ended at once, the person asks again later.
         Some("one_session_stuck") => Some(&words.failed_stuck),
+        // A start that timed out, checked, and never begun (#8170).
+        Some("not_started") => Some(&words.failed_not_started),
         _ => None,
     };
+    // ...or checked, and not sure it began (#8170): never said as failed.
+    if unsure && code == Some("start_unsure") {
+        return say(&words.start_unsure, "");
+    }
     if let Some(line) = refused
         && !unsure
     {
@@ -3790,6 +3849,56 @@ mod tests {
         // A short one is as before: nothing cut.
         let short = note_failed(&own(), &task("claude", json!([])), false, FOLDER).unwrap();
         assert!(short.contains("Suggest three 'friendly' names for a desk lamp"));
+    }
+
+    /// #8170: a start that timed out and is being checked is never told
+    /// as failed: it is said as being checked, with no retry offered. Once
+    /// settled, not started is said plainly, and not sure never as failed.
+    #[test]
+    fn a_start_being_checked_is_never_told_as_failed() {
+        let item = |code: &str, ms: u64| {
+            json!({"id":3,"observations":0,"dispatch":{"state":"uncertain","code":code,
+                "confirmed":{"boot_id":"boot-a"},
+                "finished":{"boot_id":"boot-a","monotonic_ms":ms}}})
+        };
+        let checking = item("start_checking", NOW - 5_000);
+        assert_eq!(failed_hand_over(&checking, &now()), None);
+        assert!(checking_hand_over(&checking, &now()));
+        assert!(!checking_hand_over(
+            &item("start_checking", NOW - JUST_MS - 1),
+            &now()
+        ));
+        assert!(!checking_hand_over(
+            &item("start_unsure", NOW - 5_000),
+            &now()
+        ));
+        assert_eq!(
+            failed_hand_over(&item("start_unsure", NOW - 5_000), &now()),
+            Some(true)
+        );
+        let task = task("claude", json!([]));
+        let said = note_checking(&own(), &task).unwrap();
+        // The ruling's honest line (#8240, 04:16): not sure yet, told if it
+        // does; never "did not start" before the window ends.
+        assert!(said.contains("not sure yet whether it started"), "{said}");
+        assert!(said.contains("I'll tell you if it does."), "{said}");
+        assert!(
+            said.contains("never that it did not start or failed"),
+            "{said}"
+        );
+        assert!(!said.contains("offer to try again"), "{said}");
+        let unsure = note_failed(&own(), &task, true, Some("start_unsure")).unwrap();
+        assert!(unsure.contains("not sure"), "{unsure}");
+        assert!(unsure.contains("never that it failed"), "{unsure}");
+        assert!(!unsure.contains("did not reach"), "{unsure}");
+        let never = note_failed(&own(), &task, false, Some("not_started")).unwrap();
+        assert!(never.contains("did not start"), "{never}");
+        assert!(never.contains("fifteen minutes"), "{never}");
+        // The built-in words are the skill's own.
+        let built_in = NewsWords::built_in();
+        assert_eq!(own().checking, built_in.checking);
+        assert_eq!(own().failed_not_started, built_in.failed_not_started);
+        assert_eq!(own().start_unsure, built_in.start_unsure);
     }
 
     /// #560, V1's third lesson: Harness accepted work and its agent never

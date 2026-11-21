@@ -555,9 +555,10 @@ fn every_skill_folder_says_its_kind_and_version() {
     );
     // Meal check is 1.0.1 for its `[present.budget]` (#5207), and 1.1.0 for
     // its `[[while]]` on humans/doing (#6543), so the Store's package reaches
-    // a lamp that has the one before.
+    // a lamp that has the one before. Task news is 1.1.0 for its
+    // `checking`, `failed_not_started` and `start_unsure` words (#8170).
     for skill in &skills {
-        let version = if skill.name == "meal-check" {
+        let version = if matches!(skill.name.as_str(), "meal-check" | "task-news") {
             "1.1.0"
         } else {
             "1.0.0"

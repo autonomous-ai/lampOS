@@ -258,6 +258,21 @@ pub struct NewsWords {
     /// built-in words.
     #[serde(default = "failed_stuck")]
     pub failed_stuck: String,
+    /// A new start that timed out, being checked (lamp-tasks'
+    /// `start_checking`, #8170): `{asked}` and `{who}`. Never said as
+    /// failed, and no retry offered. A skill without it says the built-in
+    /// words.
+    #[serde(default = "checking")]
+    pub checking: String,
+    /// ...checked, and never begun (`not_started`): said plainly as not
+    /// started. A skill without it says the built-in words.
+    #[serde(default = "failed_not_started")]
+    pub failed_not_started: String,
+    /// ...checked, and not sure (`start_unsure`: two sessions fit, or the
+    /// computer could not be read): never said as failed. A skill without
+    /// it says the built-in words.
+    #[serde(default = "start_unsure")]
+    pub start_unsure: String,
     /// A hand-over that went into an earlier session of the person's, by
     /// its name (lamp-tasks' `serve --reply-named`, #5535): `{asked}`,
     /// `{who}` and `{session}`, so a wrong one is heard at once. A skill
@@ -392,6 +407,21 @@ fn failed_stuck() -> String {
     )
 }
 
+/// [`NewsWords::checking`]'s words, built in (#8170).
+fn checking() -> String {
+    "The work the person asked you to hand over, \"{asked}\", was slow to start with {who}, and you are not sure yet whether it started: it can still begin there in the next few minutes. Tell them that honestly in one or two plain, light sentences with no technical words, such as \"I'm not sure it started yet. I'll tell you if it does.\": never that it did not start or failed, and do not offer to start it again.".into()
+}
+
+/// [`NewsWords::failed_not_started`]'s words, built in (#8170).
+fn failed_not_started() -> String {
+    "The work the person asked you to hand over, \"{asked}\", did not start: you watched for it for fifteen minutes, and {who} never began it. Tell them that in one plain, light sentence, with no technical words, and that they can ask you again.".into()
+}
+
+/// [`NewsWords::start_unsure`]'s words, built in (#8170).
+fn start_unsure() -> String {
+    "The work the person asked you to hand over, \"{asked}\", may have started with {who}, but you are not sure: you could not tell which session on their computer it is. Tell them that in one plain, light sentence, with no technical words, never that it failed, and that they can look on their computer before asking again, so it doesn't run twice.".into()
+}
+
 /// [`NewsWords::joined_reopened`]'s words, built in.
 fn joined_reopened() -> String {
     "It was closed, and you reopened it for this with its earlier conversation: begin with \"I reopened that session\".".into()
@@ -460,6 +490,9 @@ impl NewsWords {
             failed_closed_soon: failed_closed_soon(),
             failed_not_ready: failed_not_ready(),
             failed_stuck: failed_stuck(),
+            checking: checking(),
+            failed_not_started: failed_not_started(),
+            start_unsure: start_unsure(),
             joined: joined(),
             joined_asked: joined_asked(),
             joined_reopened: joined_reopened(),
@@ -558,6 +591,13 @@ impl NewsWords {
                     &["asked", "who"],
                 ),
                 ("failed_stuck", &self.failed_stuck, &["asked", "who"]),
+                ("checking", &self.checking, &["asked", "who"]),
+                (
+                    "failed_not_started",
+                    &self.failed_not_started,
+                    &["asked", "who"],
+                ),
+                ("start_unsure", &self.start_unsure, &["asked", "who"]),
                 ("joined_reopened", &self.joined_reopened, &[]),
                 ("joined_fresh", &self.joined_fresh, &[]),
                 ("joined", &self.joined, &["asked", "session", "who"]),
@@ -650,6 +690,9 @@ impl NewsWords {
                 ("failed_closed_soon", note(&self.failed_closed_soon, &[])),
                 ("failed_not_ready", note(&self.failed_not_ready, &[])),
                 ("failed_stuck", note(&self.failed_stuck, &[])),
+                ("checking", note(&self.checking, &[])),
+                ("failed_not_started", note(&self.failed_not_started, &[])),
+                ("start_unsure", note(&self.start_unsure, &[])),
                 ("answered", note(&self.answered, &done)),
                 ("answered_cut", note(&self.answered_cut, &done)),
                 (
