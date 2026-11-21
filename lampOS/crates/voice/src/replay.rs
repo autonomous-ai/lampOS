@@ -158,6 +158,7 @@ fn verdict(case: &Case) -> String {
         | Said::InConversation
         | Said::PoseUnread
         | Said::AnswerNoLook
+        | Said::CutInNoLook
         | Said::ToTheLamp => "answered".to_owned(),
     }
 }
