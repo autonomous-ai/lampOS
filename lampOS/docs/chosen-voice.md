@@ -27,7 +27,10 @@ The reason never holds the value sent.
 
 `system.info` says `"character_energy_supported": true` whenever
 `character.set` is taken, so the app shows the energy picker only to a lamp
-that keeps it.
+that keeps it. With it, `"character": {"energy_alone": true}` (#7566) says
+the lamp takes `{"energy"}` alone and keeps the words, so the app sends a
+picked level at once; a lamp without the field keeps the app's "save the
+words first" path.
 
 ## Energy
 
