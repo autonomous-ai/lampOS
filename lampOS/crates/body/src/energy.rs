@@ -207,14 +207,20 @@ pub fn clip_size(name: &str, level: u8) -> f32 {
 /// (or as much of it as [`WHOLE_TRIM`] keeps), never shorter than the
 /// clip itself; any other clip is itself.
 pub fn longer(clip: &'static Clip, level: u8) -> Clip {
-    let Some(whole) = crate::clips::WHOLE
+    match window(clip, level) {
+        Some((whole, first, last)) => span(whole, first, last),
+        None => *clip,
+    }
+}
+
+/// The frames of its recording a cut clip plays at `level`, first and
+/// last, or none where it plays the clip itself.
+fn window(clip: &'static Clip, level: u8) -> Option<(&'static crate::clips::Whole, usize, usize)> {
+    let whole = crate::clips::WHOLE
         .iter()
-        .find(|whole| whole.cut.name == clip.name && whole.cut.frames == clip.frames)
-    else {
-        return *clip;
-    };
+        .find(|whole| whole.cut.name == clip.name && whole.cut.frames == clip.frames)?;
     if taken(level) == 1 {
-        return *clip;
+        return None;
     }
     let (first, last) = whole_kept(whole);
     let share = f32::from(taken(level) - 1) / 4.0;
@@ -225,10 +231,16 @@ pub fn longer(clip: &'static Clip, level: u8) -> Clip {
     let (first, last) = (toward(whole.from, first), toward(whole.to, last));
     // Never shorter than level 1: a stretch no longer than the clip
     // (excited's, its bounce played twice, below level 5) keeps the clip.
-    if last - first < clip.frames.len() {
-        return *clip;
+    (last - first >= clip.frames.len()).then_some((whole, first, last))
+}
+
+/// The frames of `clip` as `level` plays it ([`livelier`]) that are the
+/// stretch V2 cut: all of them where it plays the clip itself.
+pub fn cut_frames(clip: &'static Clip, level: u8) -> std::ops::RangeInclusive<usize> {
+    match window(clip, level) {
+        Some((whole, first, _)) => whole.from - first..=whole.to - first,
+        None => 0..=clip.frames.len() - 1,
     }
-    span(whole, first, last)
 }
 
 /// The frames of `whole`'s recording level 5 plays: all of them, or as
@@ -994,5 +1006,36 @@ mod tests {
             );
         }
         assert_eq!(whole, crate::clips::WHOLE.len());
+    }
+
+    /// Seventh's HOLD P2 on #8201: a longer clip is not a smaller one.
+    /// Over the stretch V2 cut, each joint swings, peak to peak, no less at
+    /// a level than at the level under it (a count of rounding), for every
+    /// built-in clip and level 2 to 5: surprised's elbow and excited's
+    /// shoulder and elbow sized from all of their recording swung less at
+    /// 5 than at 4.
+    #[test]
+    fn the_swing_over_the_cut_never_drops_below_the_level_under_it() {
+        for clip in crate::clips::ALL {
+            for level in 2..=5 {
+                let (now, under) = (livelier(clip, level), livelier(clip, level - 1));
+                let (here, there) = (cut_frames(clip, level), cut_frames(clip, level - 1));
+                for joint in 0..5 {
+                    let swing = |played: &Clip, frames: std::ops::RangeInclusive<usize>| {
+                        let at = played.frames[frames]
+                            .iter()
+                            .map(|frame| i32::from(frame[joint]));
+                        at.clone().max().unwrap() - at.min().unwrap()
+                    };
+                    let (now, under) = (swing(now, here.clone()), swing(under, there.clone()));
+                    assert!(
+                        now + 1 >= under,
+                        "{} joint {joint}: {now} at level {level}, {under} at {}",
+                        clip.name,
+                        level - 1
+                    );
+                }
+            }
+        }
     }
 }
