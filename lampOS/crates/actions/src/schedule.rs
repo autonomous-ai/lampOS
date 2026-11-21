@@ -53,7 +53,7 @@ macro_rules! list_before {
 }
 macro_rules! list_asked {
     () => {
-        "Any question about their reminders or timers (what is set, when due or set), in any wording or language, even one that sounds a word short, is answered only after calling this in that turn, not recall. set_day/set_clock say when each was set, as 'yesterday at 09:00'; if null, say you don't know when. Never list reminders unasked."
+        "Any question about their own reminders or timers at any point, in any wording or language, even one that sounds a word short, is answered only after calling this in that turn, not recall or lamp_help. set_day/set_clock say when each was set, as 'yesterday at 09:00'; if null, say you don't know when. Never list reminders unasked."
     };
 }
 macro_rules! list_asked_before {
@@ -74,8 +74,12 @@ pub const LIST_BEFORE: &str = list_before!();
 /// set, is answered from this list, not from memory, and the list is never
 /// read out unasked (rule 8). Any such question, in any wording or language,
 /// even one heard a word short, is answered only after the call in that turn
-/// (#7987: the exact phrases' forced call stays as it is). On both routes:
-/// they declare the same catalog.
+/// (#7987: the exact phrases' forced call stays as it is). Their own
+/// reminders and timers, at any point in a conversation, are this, not
+/// faq's `lamp_help`, which tells how reminders work (#8181: in gate 1126
+/// a 2nd line's reminders question went there); "(what is set, when due or
+/// set)" left to fit 1,024 bytes. On both routes: they declare the same
+/// catalog.
 pub const LIST_ASKED: &str = list_asked!();
 /// What it adds for reminders already said (29e7, 2 Nov: four said late,
 /// then gone, and six minutes later "I don't see either still set").
