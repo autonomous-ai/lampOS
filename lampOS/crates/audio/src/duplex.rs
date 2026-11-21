@@ -328,6 +328,9 @@ pub struct Interruption {
     commits_late: bool,
     /// `LAMP_CUT_IN_STALE_ONSET=on`: see [`Self::count_unknown_onsets`].
     unknown_onsets: bool,
+    /// Blocks since the lamp's sound last fell still ([`Heard::Still`])
+    /// while it had something to yield: a pause in the reply.
+    since_still: u16,
     /// One flag per block of the last [`LATE_YIELD_WINDOW_BLOCKS`]: whether
     /// it was heard plainly as a person over the lamp ([`Hearing::plain`]),
     /// or unknown past the reply's start ([`LATE_YIELD_OVER_BLOCKS`]),
@@ -403,6 +406,7 @@ impl Interruption {
             over_bed: false,
             commits_late: false,
             unknown_onsets: false,
+            since_still: u16::MAX,
             over_window: [0; 3],
             over_at: 0,
             over_count: 0,
@@ -438,6 +442,17 @@ impl Interruption {
     /// heard Unknown for 7 blocks mid-reply has not been measured. At a
     /// reply's start and after a resume, Unknown is the lamp's own first
     /// word against the last alignment and still counts for nothing.
+    ///
+    /// With it, too, a reply going on after a pause in which its sound fell
+    /// still has begun again for the onset, as one going on after a resume
+    /// has: [`Confirmation::early_onset_blocks`] in a row for
+    /// [`Confirmation::early_blocks`] after the last still block. Unknown
+    /// still counts there, past the reply's own start. On lamp-52e6 on
+    /// 21 Nov (row-8159d run 1 try 15) the story's own voice, 63 blocks after
+    /// a 9-block pause, was heard Over plainly for 7 blocks (the render
+    /// explaining none of it at an alignment under 20 blocks old) and made a
+    /// yield; its resume restarted the reply's first blocks, and the
+    /// "Wait, hold on." that followed was never yielded to.
     pub fn count_unknown_onsets(&mut self) {
         self.unknown_onsets = true;
     }
@@ -632,6 +647,11 @@ impl Interruption {
         } else {
             0
         };
+        self.since_still = if speaking && heard == Heard::Still {
+            0
+        } else {
+            self.since_still.saturating_add(1)
+        };
         // Unknown counts only past the reply's first blocks (#7413).
         let past_start = self.spoken > self.rule.early_blocks;
         let person = match heard {
@@ -794,10 +814,14 @@ impl Interruption {
     }
 
     /// Consecutive [`Heard::Over`] blocks that make the lamp yield as things
-    /// stand: more while it has only just begun to speak.
+    /// stand: more while it has only just begun to speak, and with
+    /// [`Self::count_unknown_onsets`] while it has only just gone on after a
+    /// pause.
     pub fn onset_needed(&self) -> u8 {
         let rule = &self.rule;
-        if self.spoken <= rule.early_blocks {
+        if self.spoken <= rule.early_blocks
+            || (self.unknown_onsets && self.since_still <= rule.early_blocks)
+        {
             rule.early_onset_blocks.max(rule.onset_blocks)
         } else {
             rule.onset_blocks
