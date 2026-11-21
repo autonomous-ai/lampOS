@@ -3643,9 +3643,12 @@ runs its script itself: no agent, no Harness, no prompt
   grants than the line's (`net` aside, lamp-tasks' own) is ended at once and
   nothing runs. A line for a skill that names keys is refused before any
   token (`skill_run::NO_KEYS_HERE`): use a `do.task`.
-- **`net`**: the same path as a net task's, given by the grant alone with
-  no yes asked (#8180, the dev's ruling: a made skill's declared grants are
-  live; `skill_run::answer` no longer asks `Tokens::net_agreed`).
+- **`net`**: the same path and check as a net task's (`skill_run::answer`
+  asks `Tokens::net_agreed` before any token): lamp-control agrees for the
+  owner's kept yes naming `net` for the folder as it is, or, with
+  `LAMP_MADE_CODE_ON_AT_ONCE` on (the product's lamp-control unit), for a
+  skill made on the lamp with no yes (#8180, below); not agreed, refused
+  `no_token` (`skill_run::NO_NET_YES`), no token and no egress socket.
   With `LAMP_TASK_NET` on, `DirectRunner::egress` makes the run's own egress
   socket `skill-<run id>` (`egress::Grant::lamp`: the public web on ports
   80 and 443 only), served until the run's bound, and puts an `O_PATH`
@@ -4445,16 +4448,20 @@ one runner (a fresh home per run, the token as a file) with no new rules:
   keeps it, else `no_token` and nothing runs. The mint already held the
   yes to the folder lamp-control hashed itself and its declared grants,
   and a skill has one yes, so an agreed check is the owner's yes to `net`
-  for the folder as it is. A skill made on the lamp needs no yes (#8180,
+  for the folder as it is. With `LAMP_MADE_CODE_ON_AT_ONCE` on in
+  lamp-control (`lamp_skills::no_yes_switch_on`; on in the product), a skill
+  made on the lamp needs no yes (#8180,
   `lamp_voice::made_skill::grants_need_no_yes`, true for
-  `SkillSource::Made` only today, of `lamp_skills::source_of`):
+  `SkillSource::Made` only today, of `lamp_skills::source_of`: `made: here`
+  and put on with an install record not from the Store, so a folder put on
+  by hand is not Made):
   lamp-control mints its token from its folder's declared grants
   (`task_yes::KeptYes::grants`, `no_yes_grants`; `net` left out, and the
   rules below, `net` never beside a private grant among them, still hold)
   and answers its check `{"agreed": true}` for its folder as it is (its
   SHA-256 and declared grants, `task_yes::agreed_with_no_yes`), so its
   `net` asks nothing. A Store, pushed or other skill still needs its kept
-  yes. Off, `net` is refused as an unknown grant
+  yes, and with the switch off so does a made one, exactly as before. Off, `net` is refused as an unknown grant
   (`bad_request`) before any token.
 - **What a `net` run never holds, and its bounds** (Heron's P1 and P3s on
   #7590, the first builder's 23:22 calls):
