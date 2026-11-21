@@ -1064,6 +1064,7 @@ What a person would notice with each switch on, one plain line per switch counte
 | `LAMP_SECOND_REMEMBER_ASKED` | Asking the lamp to remember your face while giving your name saves them straight away. |
 | `LAMP_NAMES_RENAME_ASKED` | If the lamp knows you and you tell it another name, it asks before calling you by the new one. |
 | `LAMP_NAME_LEARN_FIX` | The lamp learns your name if you cut in, it lost sight of you, you spelled it, or just said yes. |
+| `LAMP_NAME_NOT_ANOTHERS` | Calling a colleague named Lance, Dan or Tam near the lamp doesn't make it answer. |
 | `LAMP_FACE_NO_ASK` | Tell the lamp your name as it sees you, or add a photo: it knows your face, never asking. |
 | `LAMP_FACE_SAVE_KNOWN_ONLY` | Someone stepping up just after a person the lamp knows walked away is asked before their face is kept. |
 | `LAMP_FACE_LEARN_LATER` | A lamp that knows nobody yet asks your name once after you say hi, and knows your face when you answer. |
