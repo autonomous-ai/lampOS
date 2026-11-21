@@ -44,9 +44,10 @@ pub const NOT_READY: &str = "openclaw_gateway_not_ready";
 static WANTED_AT_UNIX_MS: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
 
 /// How long a need of OpenClaw keeps it "in use" for lamp-update (#8105):
-/// the first builder's hold, so a person working with OpenClaw keeps its
-/// Gateway between their turns.
-pub const IN_USE_HOLD: Duration = Duration::from_secs(30 * 60);
+/// 4 h, the first builder's 15:33 rule for a cold start over 2 min (three
+/// on lamp-e82d served RPCs at 220-241 s), so a person using OpenClaw
+/// through a day waits for its start at most once or twice.
+pub const IN_USE_HOLD: Duration = Duration::from_secs(4 * 60 * 60);
 
 fn now_unix_ms() -> u64 {
     std::time::SystemTime::now()
