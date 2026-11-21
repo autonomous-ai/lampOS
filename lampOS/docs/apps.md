@@ -250,23 +250,38 @@ is designed and not built.
   `app_fact::tidy` refuses (links, markup and double quotes left out, runs of
   space made one; nothing left, or over 280 characters: refused, never cut);
   `private` while the privacy switch is on (or its lease lapsed, or lamp-control
-  has no reading of it); `rate` past three a minute an app (`retry_ms`; the
-  minute holds across the app's reconnects; only a remove forgets it, and a
-  refused ask is not counted). Then memory's own: `refused` with the code in its
-  words, `not_known` (Lamp knows nobody yet), `forgotten`, `too_many` (20 an app
-  a day) or `bad_time`; `unavailable` when the voice or memory gave no word
-  within 2.5 s (it may not be kept).
+  has no reading of it); `unavailable` ("Lamp is still forgetting this app's
+  earlier facts") while a forget from the app's remove is still pending, so a
+  reinstall's new facts are never forgotten with the old; `rate` past three a
+  minute an app (`retry_ms`; the minute holds across the app's reconnects; only
+  a remove forgets it, and a refused ask is not counted). Then memory's own, as
+  `refused`: "Lamp did not keep it" for `not_known` and `forgotten` alike, so an
+  app learns nothing of the person's own forgets (the journals keep the exact
+  code), "at most 20 facts an app a day (too_many)", or `bad_time`;
+  `unavailable` when the voice or memory gave no word within 2.5 s (it may not
+  be kept).
 - **Whose and how.** The door tells the voice on `apps/remember`
   (`AppRemember`: the door's ask number, the app's checked name, its manifest's
   title as `app_fact::name`, the tidied words, the wall time). The voice picks
-  the person with `app_fact::whose` and no person asked: the lamp's known person
-  by the owner's memory ids (`person::owner_ids`, the typed name's and the
-  face's), never another person and never the room; with none, `not_known`. It
-  sends memory's `remember_app_fact` with source `app:<name>` and says how it
-  went on `apps/remembered`, which is the app's answer. The journals say the
+  the person from the owner's memory ids alone (each passed through
+  `app_fact::whose`): never another person and never the room; with none,
+  `not_known`. The owner may go by two ids (a typed "Minh Nguyen" whose face was
+  kept as "Minh"), so the face's (`known_faces::owner_now`) is tried first, as
+  the person's own memory is keyed by it, then each other in turn while memory
+  answers `not_known` (`app_remember::owners_face_first`, `keep`). It sends
+  memory's `remember_app_fact` with source `app:<name>` and says how it went on
+  `apps/remembered`, which is the app's answer. The journals say the
   app and the outcome, never a word of the fact.
-- **A remove forgets.** `app_forget` (the helper's remove) also tells the voice
-  `apps/forget_facts`, whatever `LAMP_APP_REMEMBER` says now, and the voice
-  sends memory's `forget_app_facts` for `app:<name>`: every fact of the app goes,
-  with what was made from them. The person's own forgets take them as any kept
-  thing.
+- **A remove forgets, and the forget holds.** `app_forget` (the helper's
+  remove) first marks the app in `--state-dir`'s `app-facts-forget.json` (0600;
+  a mark that can't be written refuses the op, so the helper asks again), then
+  lamp-control's own thread sends memory's `forget_app_facts` for `app:<name>`
+  on memory's forget socket (`/run/lampos-memory/forget.sock`, which takes it
+  and `forget_person` only), at once and every 30 s, until memory answers `ok`;
+  only then is the mark let go (`app_facts_forget.rs`). The voice and the bus
+  are no part of it, and a mark left by a restart is tried at the start. A
+  memory with no Days store (`unknown_op`) keeps no app facts and counts as
+  done. Every fact of the app goes, with what was made from them, whatever
+  `LAMP_APP_REMEMBER` says now. The person's own forgets take them as any
+  kept thing. An update whose manifest drops `remember` forgets nothing: the
+  app's facts stay until its remove, the person's forget or their 90 days.

@@ -1132,8 +1132,10 @@ is `lamp_msgs::app_fact`; the store's side is `crates/memory/src/app_facts.rs`.
     newer one's place. The 90 days run from `kept_day` too.
 - **`forget_app_facts {source}`** removes every fact of that source, found by
   its mark, with what was made from them, as a `forget {id}` of each would;
-  nothing said goes. For the app removed, the computer revoked or the grant
-  turned off: `{ok:true, removed}`. A person's own forgets take app facts as
+  nothing said goes. For the app removed (lamp-control sends it on the forget
+  socket until it is answered `ok`) or the computer revoked: `{ok:true,
+  removed}`. An app update that drops the `remember` grant sends nothing: its
+  facts stay until its remove, the person's forget or their 90 days. A person's own forgets take app facts as
   any kept thing: one thing, a forget about a thing, forget everything, and
   forgetting the person.
 - **Context lines are never kept.** `app_fact::ContextLines` holds one line a
@@ -1148,10 +1150,13 @@ is `lamp_msgs::app_fact`; the store's side is `crates/memory/src/app_facts.rs`.
   switch `LAMP_APP_REMEMBER` in lamp-control, off until the first builder's
   privacy read and the ROW. lamp-control checks the app's grant, its words
   (`app_fact::tidy`), the privacy switch and three a minute, and tells the
-  voice on `apps/remember`; the voice picks the person with `app_fact::whose`
-  and no person asked (the owner's memory ids) and sends `remember_app_fact`
-  with source `app:<name>`. An app's remove sends `forget_app_facts` for its
-  source the same way (`apps/forget_facts`). `apps.context` is not built yet.
+  voice on `apps/remember`; the voice tries the owner's memory ids, the face's
+  first, each through `app_fact::whose`, moving to the next on `not_known`,
+  and sends `remember_app_fact` with source `app:<name>`. An app's remove
+  sends `forget_app_facts` for its source from lamp-control on the forget
+  socket (`--forget-socket`, which takes it beside `forget_person`), kept as a
+  pending mark and tried every 30 s until memory answers `ok`. `apps.context`
+  is not built yet.
   An older memory answers `unknown_op`, told to the app as `unavailable`.
 
 The bounds are the thread's, none this store's own:
