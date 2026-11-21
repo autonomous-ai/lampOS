@@ -11,15 +11,17 @@
 //! (`app_fact::whose`: the lamp's known person, never another, never the
 //! room) and sends memory's `remember_app_fact`; how it went comes back on
 //! `apps/remembered` and is the app's answer, or [`UNANSWERED`] past
-//! [`WITHIN`]. An app removed (`app_forget`) has its facts forgotten
-//! (`apps/forget_facts`, memory's `forget_app_facts`), whatever the switch.
+//! [`WITHIN`]. An app removed (`app_forget`) has its facts forgotten on
+//! memory's forget socket, held as a pending mark until memory says it was
+//! done ([`crate::app_facts_forget`]), whatever the switch; while one is
+//! pending, the app's new facts wait ([`FORGETTING`]).
 //!
 //! Behind `LAMP_STORE_APPS` like the whole socket, and its own switch
 //! [`ENVIRONMENT`], off until the first builder's privacy read and the ROW
 //! (Friday's 16:47 on #7415).
 use crate::app_yes::Live;
 use crate::protocol::{Error, ErrorCode};
-use lamp_msgs::app_fact::{self, AppFactsForget, AppRemember, AppRemembered};
+use lamp_msgs::app_fact::{self, AppRemember, AppRemembered};
 use serde_json::{Map, Value, json};
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
@@ -42,6 +44,14 @@ pub const OFF: &str = "remembering is off on this lamp";
 pub const NO_GRANT: &str = "apps.remember needs the remember grant";
 /// What the app is told while the lamp is private.
 pub const PRIVATE: &str = "the lamp is private: nothing is kept now";
+/// What the app is told while its facts from before a remove are still
+/// being forgotten (a reinstall's new facts would go with them).
+pub const FORGETTING: &str = "Lamp is still forgetting this app's earlier facts; try again later";
+/// What the app is told when memory did not keep it for the person: one
+/// word for `not_known` and `forgotten` alike, so an app learns nothing of
+/// the person's own forgets (Friday's P3 on #8203). The journal keeps the
+/// exact code.
+pub const NOT_KEPT: &str = "Lamp did not keep it";
 /// What the app is told when no word came in time, or the voice is not
 /// reachable: it may not have been kept.
 pub const UNANSWERED: &str = "Lamp's memory did not answer, so it may not be kept";
@@ -67,6 +77,8 @@ pub struct Gates {
     pub granted: bool,
     /// The privacy switch (or its lease lapsed): none counts as private.
     pub private: bool,
+    /// A forget of the app's facts from a remove is still pending.
+    pub forgetting: bool,
 }
 
 /// An `apps.remember` as the door judged it.
@@ -136,6 +148,9 @@ pub fn ask(
     if gates.private {
         return Some(refuse(re, ErrorCode::Private, PRIVATE));
     }
+    if gates.forgetting {
+        return Some(refuse(re, ErrorCode::Unavailable, FORGETTING));
+    }
     if let Err(wait) = live.may_remember(name, now) {
         let mut error = Error::new(ErrorCode::Rate, "three a minute");
         error.retry_ms = Some(wait.as_millis().max(1) as u64);
@@ -149,14 +164,7 @@ pub fn ask(
 pub fn answer_of(re: u64, outcome: &str) -> Value {
     let (code, why) = match outcome {
         app_fact::KEPT => return crate::protocol::ok(re, json!({"kept": true})),
-        "not_known" => (
-            ErrorCode::Refused,
-            "Lamp knows nobody to keep it for yet (not_known)",
-        ),
-        "forgotten" => (
-            ErrorCode::Refused,
-            "the person had Lamp forget everything since then (forgotten)",
-        ),
+        "not_known" | "forgotten" => (ErrorCode::Refused, NOT_KEPT),
         "too_many" => (
             ErrorCode::Refused,
             "at most 20 facts an app a day (too_many)",
@@ -167,52 +175,28 @@ pub fn answer_of(re: u64, outcome: &str) -> Value {
     crate::protocol::refused(Some(re), &Error::new(code, why))
 }
 
-/// What lamp-control tells the voice.
-#[derive(Clone, Debug, PartialEq)]
-pub enum Tell {
-    Remember(AppRemember),
-    Forget(AppFactsForget),
-}
+/// How an app's fact reaches the voice (`apps/remember`): whether it was
+/// sent.
+pub type Sink = Arc<dyn Fn(&AppRemember) -> bool + Send + Sync>;
 
-/// How [`Tell`] reaches the voice (`apps/remember`, `apps/forget_facts`):
-/// whether it was sent.
-pub type Sink = Arc<dyn Fn(Tell) -> bool + Send + Sync>;
-
-/// Starts the bus side: the sink that publishes [`Tell`], and the thread
-/// that hands each `apps/remembered` to the ask that waits for it. With the
-/// apps on and a bus; each part that can't start is said and the rest goes
-/// on (with no sink, an ask is answered [`UNANSWERED`] and a remove forgets
-/// nothing of memory's).
+/// Starts the bus side: the sink that publishes an app's fact, and the
+/// thread that hands each `apps/remembered` to the ask that waits for it.
+/// With the apps on and a bus; each part that can't start is said and the
+/// rest goes on (with no sink, an ask is answered [`UNANSWERED`]).
 pub fn start(bus: &lamp_bus::Bus, shared: Arc<crate::server::Shared>) {
-    let remember =
-        bus.publisher_declared(AppRemember::TOPIC, &AppRemember::declaration(), "control");
-    let forget = bus.publisher_declared(
-        AppFactsForget::TOPIC,
-        &AppFactsForget::declaration(),
-        "control",
-    );
-    match (remember, forget) {
-        (Ok(remember), Ok(forget)) => {
-            let (remember, forget) = (Mutex::new(remember), Mutex::new(forget));
-            shared.set_remember_sink(Arc::new(move |tell: Tell| {
-                let sent = match &tell {
-                    Tell::Remember(fact) => remember
+    match bus.publisher_declared(AppRemember::TOPIC, &AppRemember::declaration(), "control") {
+        Ok(remember) => {
+            let remember = Mutex::new(remember);
+            shared.set_remember_sink(Arc::new(move |fact: &AppRemember| {
+                let sent =
+                    remember
                         .lock()
                         .map_err(|_| "poisoned".to_owned())
                         .and_then(|mut publisher| {
                             publisher
                                 .publish_json(lamp_ipc::monotonic_us(), fact)
                                 .map_err(|error| error.to_string())
-                        }),
-                    Tell::Forget(gone) => forget
-                        .lock()
-                        .map_err(|_| "poisoned".to_owned())
-                        .and_then(|mut publisher| {
-                            publisher
-                                .publish_json(lamp_ipc::monotonic_us(), gone)
-                                .map_err(|error| error.to_string())
-                        }),
-                };
+                        });
                 match sent {
                     Ok(_) => true,
                     Err(error) => {
@@ -222,9 +206,7 @@ pub fn start(bus: &lamp_bus::Bus, shared: Arc<crate::server::Shared>) {
                 }
             }));
         }
-        (Err(error), _) | (_, Err(error)) => {
-            eprintln!("lamp-control: no app's fact is told to the voice: {error}");
-        }
+        Err(error) => eprintln!("lamp-control: no app's fact is told to the voice: {error}"),
     }
     match bus.subscribe(AppRemembered::TOPIC, "control") {
         Ok(mut subscriber) => {
@@ -269,6 +251,7 @@ mod tests {
         on: true,
         granted: true,
         private: false,
+        forgetting: false,
     };
 
     fn code(ask: Option<Ask>) -> String {
@@ -314,6 +297,18 @@ mod tests {
             )),
             "private"
         );
+        let waits = with(
+            Gates {
+                forgetting: true,
+                ..ALL
+            },
+            &mut live,
+        );
+        let Some(Ask::Refused(waits)) = waits else {
+            panic!()
+        };
+        assert_eq!(waits["error"]["code"], "unavailable");
+        assert_eq!(waits["error"]["why"], FORGETTING);
         // None of those counted: three still go in the minute.
         for _ in 0..MOST_A_MINUTE {
             assert!(matches!(with(ALL, &mut live), Some(Ask::Keep { .. })));
@@ -413,15 +408,13 @@ mod tests {
             answer_of(3, app_fact::KEPT),
             json!({"re": 3, "ok": true, "kept": true})
         );
-        let refused = answer_of(3, "not_known");
-        assert_eq!(refused["ok"], false);
-        assert_eq!(refused["error"]["code"], "refused");
-        assert!(
-            refused["error"]["why"]
-                .as_str()
-                .unwrap()
-                .ends_with("(not_known)")
-        );
+        // One word for not_known and forgotten: nothing of the person's forgets.
+        for code in ["not_known", "forgotten"] {
+            let refused = answer_of(3, code);
+            assert_eq!(refused["ok"], false);
+            assert_eq!(refused["error"]["code"], "refused");
+            assert_eq!(refused["error"]["why"], NOT_KEPT);
+        }
         assert_eq!(answer_of(3, "too_many")["error"]["code"], "refused");
         for other in [app_fact::UNAVAILABLE, "unknown_op", "storage"] {
             assert_eq!(answer_of(3, other)["error"]["code"], "unavailable");

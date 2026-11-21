@@ -261,10 +261,15 @@ pub struct Shared {
     /// Whether `apps.remember` is on (`LAMP_APP_REMEMBER`), as the app
     /// socket reads it.
     remember_on: Mutex<fn() -> bool>,
-    /// How an app's fact, and an app's facts forgotten, reach the voice
-    /// (`apps/remember`, `apps/forget_facts`, [`crate::app_remember::start`]):
-    /// none until the bus side is started.
+    /// How an app's fact reaches the voice (`apps/remember`,
+    /// [`crate::app_remember::start`]): none until the bus side is started.
     remember_sink: Mutex<Option<crate::app_remember::Sink>>,
+    /// Memory's forget socket, for a removed app's facts
+    /// ([`crate::app_facts_forget::SOCKET`] unless a test says another).
+    forget_socket: Mutex<PathBuf>,
+    /// The kick of the thread that forgets removed apps' facts
+    /// ([`crate::app_facts_forget::start`]): none until it is started.
+    facts_forget: Mutex<Option<std::sync::mpsc::Sender<()>>>,
     /// The `apps.remember` asks waiting for the voice's word
     /// (`apps/remembered`), by the door's own number for each.
     remember_waiting: Mutex<HashMap<u64, RememberWaiting>>,
@@ -474,6 +479,8 @@ impl Shared {
             apps_on: Mutex::new(crate::app_yes::on),
             remember_on: Mutex::new(crate::app_remember::on),
             remember_sink: Mutex::new(None),
+            forget_socket: Mutex::new(PathBuf::from(crate::app_facts_forget::SOCKET)),
+            facts_forget: Mutex::new(None),
             remember_waiting: Mutex::new(HashMap::new()),
             remember_next: AtomicU64::new(1),
             private: Mutex::new(None),
@@ -740,6 +747,8 @@ impl Shared {
                 apps_on: Mutex::new(crate::app_yes::on),
                 remember_on: Mutex::new(crate::app_remember::on),
                 remember_sink: Mutex::new(None),
+                forget_socket: Mutex::new(PathBuf::from(crate::app_facts_forget::SOCKET)),
+                facts_forget: Mutex::new(None),
                 remember_waiting: Mutex::new(HashMap::new()),
                 remember_next: AtomicU64::new(1),
                 private: Mutex::new(None),
@@ -1090,8 +1099,21 @@ impl Shared {
         *self.took_sink.lock().expect("took_sink") = Some(sink);
     }
 
-    /// How an app's fact and an app's facts forgotten are told to the voice
-    /// (`apps/remember`, `apps/forget_facts`).
+    /// Where memory's forget socket is, for a test.
+    pub fn set_forget_socket(&self, socket: PathBuf) {
+        *self.forget_socket.lock().expect("forget_socket") = socket;
+    }
+
+    /// Starts the thread that forgets removed apps' facts, with the pending
+    /// marks in `state` (`--state-dir`): those left by a restart are tried at
+    /// once.
+    pub fn start_facts_forget(&self, state: PathBuf, every: Duration) {
+        let socket = self.forget_socket.lock().expect("forget_socket").clone();
+        *self.facts_forget.lock().expect("facts_forget") =
+            crate::app_facts_forget::start(state, socket, every);
+    }
+
+    /// How an app's fact is told to the voice (`apps/remember`).
     pub fn set_remember_sink(&self, sink: crate::app_remember::Sink) {
         *self.remember_sink.lock().expect("remember_sink") = Some(sink);
     }
@@ -1123,6 +1145,12 @@ impl Shared {
             on: (*self.remember_on.lock().expect("remember_on"))(),
             granted: app.remember,
             private: self.is_private(),
+            forgetting: self
+                .task_yes
+                .lock()
+                .expect("task_yes")
+                .clone()
+                .is_some_and(|state| crate::app_facts_forget::pending(&state).contains(&app.name)),
         }
     }
 
@@ -1164,7 +1192,7 @@ impl Shared {
             text,
             at_unix_ms: wall_ms(),
         };
-        if !sink(crate::app_remember::Tell::Remember(fact)) {
+        if !sink(&fact) {
             self.remember_waiting
                 .lock()
                 .expect("remember_waiting")
@@ -2373,6 +2401,13 @@ fn forget_app_op(
     if !lamp_skills::app_package::app_name_ok(name) {
         return json!({"refused": "bad request: name is not an app's name"});
     }
+    // Kept on disk before anything else of it goes, so a refusal here is
+    // asked again and a cut remove still forgets the app's facts.
+    if let Some(state) = state
+        && let Err(why) = crate::app_facts_forget::mark(state, name)
+    {
+        return json!({"refused": why});
+    }
     if let Some(state) = state
         && let Err(why) = crate::app_yes::forget_settings(state, name)
     {
@@ -2382,23 +2417,20 @@ fn forget_app_op(
     shared.apps.lock().expect("apps").1.forget_app(name);
     shared.door.lock().expect("door").forget_data(&client);
     shared.close_client(&client, CLOSED_REMOVED);
-    // Its facts in Lamp's memory go too (`forget_app_facts` by its source),
-    // whatever `LAMP_APP_REMEMBER` says now: one kept while it was on.
-    let sink = shared.remember_sink.lock().expect("remember_sink").clone();
-    let facts = sink.is_some_and(|sink| {
-        sink(crate::app_remember::Tell::Forget(
-            lamp_msgs::app_fact::AppFactsForget {
-                app: name.to_owned(),
-            },
-        ))
-    });
-    eprintln!(
-        "lamp-control: app {name} removed: its settings, panel and notes are gone, its connections closed{}",
-        if facts {
-            ", its facts' forget told to the voice"
-        } else {
-            ", no voice to forget its facts"
+    // Its facts in Lamp's memory go too: marked first, then asked of
+    // memory's forget socket by the thread until memory says it was done
+    // (`app_facts_forget`), whatever `LAMP_APP_REMEMBER` says now.
+    let facts = match state {
+        Some(_) => {
+            if let Some(kick) = shared.facts_forget.lock().expect("facts_forget").as_ref() {
+                let _ = kick.send(());
+            }
+            "its facts' forget marked"
         }
+        None => "no state folder to mark its facts' forget in",
+    };
+    eprintln!(
+        "lamp-control: app {name} removed: its settings, panel and notes are gone, its connections closed, {facts}"
     );
     json!({"ok": true})
 }
@@ -3397,8 +3429,7 @@ mod tests {
     /// wait, and unanswered at once with no way to the voice.
     #[test]
     fn an_apps_fact_goes_to_the_voice_and_its_word_is_the_answer() {
-        use crate::app_remember::Tell;
-        use lamp_msgs::app_fact::{AppRemembered, KEPT};
+        use lamp_msgs::app_fact::{AppRemember, AppRemembered, KEPT};
         let (shared, _lines, _inbox, _newest) = stalled_keeping(None);
         let coach = crate::app_socket::AppPeer {
             name: "gym-coach".into(),
@@ -3415,10 +3446,10 @@ mod tests {
             .remember_fact(&coach, 1, "squats".into(), outbox.downgrade(), long)
             .expect("answered now");
         assert_eq!(now["error"]["code"], "unavailable", "{now}");
-        let told = Arc::new(Mutex::new(Vec::<Tell>::new()));
+        let told = Arc::new(Mutex::new(Vec::<AppRemember>::new()));
         let into = told.clone();
-        shared.set_remember_sink(Arc::new(move |tell| {
-            into.lock().unwrap().push(tell);
+        shared.set_remember_sink(Arc::new(move |fact: &AppRemember| {
+            into.lock().unwrap().push(fact.clone());
             true
         }));
         let text = "20 Nov 16:47: squats 3×10, 6 too shallow";
@@ -3427,7 +3458,7 @@ mod tests {
                 .remember_fact(&coach, 7, text.into(), outbox.downgrade(), long)
                 .is_none()
         );
-        let Some(Tell::Remember(fact)) = told.lock().unwrap().pop() else {
+        let Some(fact) = told.lock().unwrap().pop() else {
             panic!("told the voice")
         };
         assert_eq!(fact.app, "gym-coach");
@@ -3459,7 +3490,7 @@ mod tests {
                 .remember_fact(&coach, 8, "squats".into(), outbox.downgrade(), long)
                 .is_none()
         );
-        let Some(Tell::Remember(second)) = told.lock().unwrap().pop() else {
+        let Some(second) = told.lock().unwrap().pop() else {
             panic!()
         };
         shared.remembered(&went("gym-coach", second.ask, "not_known"));
@@ -3480,7 +3511,7 @@ mod tests {
                 )
                 .is_none()
         );
-        let Some(Tell::Remember(third)) = told.lock().unwrap().pop() else {
+        let Some(third) = told.lock().unwrap().pop() else {
             panic!()
         };
         let start = std::time::Instant::now();
@@ -3534,59 +3565,92 @@ mod tests {
         assert!(!shared.remember_gates(&coach).on);
     }
 
-    /// A removed app's facts are forgotten: `app_forget` tells the voice
-    /// `apps/forget_facts` for its name, whatever `LAMP_APP_REMEMBER` says.
+    /// A removed app's facts are forgotten: `app_forget` marks the app
+    /// before anything else of it goes, whatever `LAMP_APP_REMEMBER` says;
+    /// with memory down (the voice and the bus no part of it) the mark stays
+    /// and the app's new facts wait, and once memory is reachable the thread
+    /// forgets them and lets the mark go.
     #[test]
-    fn app_forget_forgets_the_apps_facts() {
-        use crate::app_remember::Tell;
-        let (shared, _lines, _inbox, _newest) = stalled_keeping(None);
-        let told = Arc::new(Mutex::new(Vec::<Tell>::new()));
-        let into = told.clone();
-        shared.set_remember_sink(Arc::new(move |tell| {
-            into.lock().unwrap().push(tell);
-            true
-        }));
+    fn app_forget_forgets_the_apps_facts_even_with_memory_down() {
+        use std::io::{BufRead as _, Write as _};
+        let state = std::env::temp_dir().join(format!("lc-fafm-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&state);
+        std::fs::create_dir_all(&state).unwrap();
+        let (shared, _lines, _inbox, _newest) = stalled_keeping(Some(&state));
+        *shared.task_yes.lock().unwrap() = Some(state.clone());
+        let socket = state.join("f.sock");
+        shared.set_forget_socket(socket.clone());
         shared.set_remember_on(|| false);
         let refused = forget_app_op(
             &shared,
             "gym-coach",
             crate::app_yes::Peer::Cloud,
             true,
-            None,
+            Some(&state),
         );
         assert!(refused.get("refused").is_some());
-        assert!(
-            told.lock().unwrap().is_empty(),
-            "a refused forget tells nothing"
-        );
+        assert!(crate::app_facts_forget::pending(&state).is_empty());
+        shared.start_facts_forget(state.clone(), Duration::from_millis(20));
         let done = forget_app_op(
             &shared,
             "gym-coach",
             crate::app_yes::Peer::Helper,
             true,
-            None,
+            Some(&state),
         );
         assert_eq!(done, json!({"ok": true}));
+        std::thread::sleep(Duration::from_millis(100));
+        assert!(crate::app_facts_forget::pending(&state).contains("gym-coach"));
+        let coach = crate::app_socket::AppPeer {
+            name: "gym-coach".into(),
+            title: "Gym Coach".into(),
+            version: "1.0.4".into(),
+            client: crate::app_socket::app_client("gym-coach"),
+            grants: Default::default(),
+            remember: true,
+        };
+        assert!(shared.remember_gates(&coach).forgetting);
+        // Memory comes back: the facts go with no second remove.
+        let listener = std::os::unix::net::UnixListener::bind(&socket).unwrap();
+        let (asked, lines) = std::sync::mpsc::channel();
+        std::thread::spawn(move || {
+            for stream in listener.incoming().flatten() {
+                let mut line = String::new();
+                if std::io::BufReader::new(&stream)
+                    .read_line(&mut line)
+                    .is_ok()
+                {
+                    let _ = asked.send(line);
+                    let mut stream = stream;
+                    let _ = writeln!(stream, "{}", json!({"ok": true, "removed": 1}));
+                }
+            }
+        });
+        let begun = std::time::Instant::now();
+        while !crate::app_facts_forget::pending(&state).is_empty() {
+            assert!(begun.elapsed() < Duration::from_secs(5), "never forgotten");
+            std::thread::sleep(Duration::from_millis(10));
+        }
+        let line: Value =
+            serde_json::from_str(&lines.recv_timeout(Duration::from_secs(5)).unwrap()).unwrap();
         assert_eq!(
-            *told.lock().unwrap(),
-            vec![Tell::Forget(lamp_msgs::app_fact::AppFactsForget {
-                app: "gym-coach".into()
-            })]
+            line,
+            json!({"op": "forget_app_facts", "source": "app:gym-coach"})
         );
+        assert!(!shared.remember_gates(&coach).forgetting);
+        let _ = std::fs::remove_dir_all(&state);
     }
 
-    /// On a real bus: a fact is said on `apps/remember`, the voice's
-    /// `apps/remembered` is the app's answer, and a remove is said on
-    /// `apps/forget_facts`.
+    /// On a real bus: a fact is said on `apps/remember`, and the voice's
+    /// `apps/remembered` is the app's answer.
     #[test]
     fn the_bus_side_tells_a_fact_and_answers_the_voices_word() {
-        use lamp_msgs::app_fact::{AppFactsForget, AppRemember, AppRemembered, KEPT};
+        use lamp_msgs::app_fact::{AppRemember, AppRemembered, KEPT};
         let base = std::env::temp_dir().join(format!("lampos-remember-bus-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&base);
         let bus = lamp_bus::Bus::new(base.join("bus")).unwrap();
         let (shared, _lines, _inbox, _newest) = stalled_keeping(None);
         let mut facts = bus.subscribe(AppRemember::TOPIC, "test").unwrap();
-        let mut forgets = bus.subscribe(AppFactsForget::TOPIC, "test").unwrap();
         crate::app_remember::start(&bus, shared.clone());
         let coach = crate::app_socket::AppPeer {
             name: "gym-coach".into(),
@@ -3641,23 +3705,6 @@ mod tests {
             assert!(start.elapsed() < Duration::from_secs(5), "not answered");
         };
         assert_eq!(answer, json!({"re": 3, "ok": true, "kept": true}));
-        assert_eq!(
-            forget_app_op(
-                &shared,
-                "gym-coach",
-                crate::app_yes::Peer::Helper,
-                true,
-                None
-            ),
-            json!({"ok": true})
-        );
-        let gone: AppFactsForget = forgets
-            .recv(Duration::from_secs(5))
-            .unwrap()
-            .expect("apps/forget_facts said")
-            .parse()
-            .unwrap();
-        assert_eq!(gone.app, "gym-coach");
         let _ = std::fs::remove_dir_all(&base);
     }
 
