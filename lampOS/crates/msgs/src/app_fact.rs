@@ -276,6 +276,16 @@ impl ContextLines {
             .map(|(name, line, _)| context_note(name, line))
             .collect()
     }
+
+    /// The live lines' own words at `now`, unquoted, by source; a line past
+    /// its time goes. For the voice's check that a keep holds none of them.
+    pub fn live_lines(&mut self, now: u64) -> Vec<String> {
+        self.lines.retain(|_, (_, _, until)| *until > now);
+        self.lines
+            .values()
+            .map(|(_, line, _)| line.clone())
+            .collect()
+    }
 }
 
 /// An installed app's fact, checked and tidied at the door, for the voice

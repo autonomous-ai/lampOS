@@ -172,12 +172,24 @@ pub fn livelier(clip: &'static Clip, level: u8) -> &'static Clip {
     })
 }
 
+/// The hardest the base (base yaw) of a built-in clip is asked to change
+/// its speed from one step to the next at any level, counts a second a
+/// second: the most level 1 asks of it ('headshake', 20 counts in two 51 ms
+/// steps, 7,689.4, rounded up), which every lamp plays today. The base carries the
+/// lamp's weight: on lamp-52e6 'curious' at x1.6 the size and x1.5 the
+/// pace asked about 11,200 and the base rang (#8153, row-8155b).
+pub const BASE_BEND: f32 = 7_690.0;
+
 /// `clip` with each joint `size` times as far, held to the gesture's reach
 /// (`crate::body::GESTURE_REACH`), and its frames `pace` times as quick,
 /// the step rounded up to a whole millisecond. Its frames are kept for good.
+/// Held so the base never changes speed harder than [`BASE_BEND`]: the
+/// step is first made no quicker than that allows, never slower than the
+/// clip's own; where even the clip's own pace would ask more, the base
+/// keeps the clip's own size (the head and the arm still grow).
 pub fn sized(clip: &Clip, size: f32, pace: f32) -> Clip {
     let reach = crate::body::GESTURE_REACH;
-    let gain: [f32; 5] = std::array::from_fn(|joint| {
+    let mut gain: [f32; 5] = std::array::from_fn(|joint| {
         let most = clip
             .frames
             .iter()
@@ -190,20 +202,41 @@ pub fn sized(clip: &Clip, size: f32, pace: f32) -> Clip {
             size.min(reach[joint] / f32::from(most))
         }
     });
-    let frames: Vec<[i16; 5]> = clip
-        .frames
-        .iter()
-        .map(|frame| {
-            std::array::from_fn(|joint| {
-                (f32::from(frame[joint]) * gain[joint])
-                    .round()
-                    .clamp(-reach[joint], reach[joint]) as i16
+    let made = |gain: [f32; 5]| -> Vec<[i16; 5]> {
+        clip.frames
+            .iter()
+            .map(|frame| {
+                std::array::from_fn(|joint| {
+                    (f32::from(frame[joint]) * gain[joint])
+                        .round()
+                        .clamp(-reach[joint], reach[joint]) as i16
+                })
             })
-        })
-        .collect();
+            .collect()
+    };
+    // The quickest step, ms, at which the base bends no harder than BASE_BEND.
+    let quickest = |frames: &[[i16; 5]]| -> u16 {
+        let bend = frames
+            .windows(3)
+            .map(|three| {
+                (i32::from(three[2][2]) - 2 * i32::from(three[1][2]) + i32::from(three[0][2]))
+                    .unsigned_abs()
+            })
+            .max()
+            .unwrap_or(0);
+        (1_000.0 * (bend as f32 / BASE_BEND).sqrt()).ceil() as u16
+    };
+    let mut frames = made(gain);
+    if quickest(&frames) > clip.step_ms && gain[2] > 1.0 {
+        gain[2] = 1.0;
+        frames = made(gain);
+    }
+    let step_ms = ((f32::from(clip.step_ms) / pace).ceil() as u16)
+        .max(quickest(&frames))
+        .min(clip.step_ms);
     Clip {
         name: clip.name,
-        step_ms: (f32::from(clip.step_ms) / pace).ceil() as u16,
+        step_ms,
         frames: frames.leak(),
     }
 }
@@ -445,6 +478,125 @@ mod tests {
         })
     }
 
+    /// The most `clip` asks the base (base yaw) to change its speed from
+    /// one step to the next, counts a second a second, played under
+    /// `ceiling` (`Limits::clip_ceiling`; `None` is as recorded): each
+    /// step's speed is its counts over its own time, which the ceiling may
+    /// have stretched (`Clip::step_within_us`), and the change between two
+    /// steps is over the mean of their times. With even steps this is the
+    /// second difference over the step's time squared.
+    fn base_bend(clip: &Clip, ceiling: Option<f32>) -> f32 {
+        let step_s = |frame: usize| match ceiling {
+            None => f32::from(clip.step_ms) / 1_000.0,
+            Some(ceiling) => clip.step_within_us(frame, ceiling) as f32 / 1e6,
+        };
+        let speed = |frame: usize| {
+            f32::from(clip.frames[frame + 1][2] - clip.frames[frame][2]) / step_s(frame)
+        };
+        (1..clip.frames.len().saturating_sub(1))
+            .map(|frame| {
+                (speed(frame) - speed(frame - 1)).abs()
+                    / ((step_s(frame - 1) + step_s(frame)) / 2.0)
+            })
+            .fold(0.0, f32::max)
+    }
+
+    /// #8153 follow-up, row-8155b on lamp-52e6 (out-8155b-1121-0322,
+    /// L5-talk, 1795206564): 'curious' at level 5 rang the base, its
+    /// position every 80 ms 91, 115, 81, 182, 168, 87, 82, 108, 107, 73,
+    /// with every commanded step under the servo's 1,000 c/s. The base
+    /// carries the lamp's weight; x1.6 the size at x1.5 the pace asks it to
+    /// change speed 1.6 x 1.5^2 = 3.6 times as hard as level 1 does
+    /// ('curious' about 11,200 c/s^2 against 3,200), and the jump in the
+    /// trace sits where the clip's base speeds up most (frames 24 to 27).
+    /// The bar: no level asks the base of any built-in clip to change speed
+    /// harder than level 1 already asks of it somewhere (the most over
+    /// `clips::ALL`, 'headshake', about 7,700 c/s^2), which every lamp
+    /// plays today.
+    #[test]
+    fn no_level_bends_the_base_harder_than_level_one_does() {
+        let bar = crate::clips::ALL
+            .iter()
+            .map(|clip| base_bend(clip, None))
+            .fold(0.0, f32::max);
+        assert!((7_600.0..7_800.0).contains(&bar), "{bar}");
+        assert!(bar <= BASE_BEND && BASE_BEND - bar < 1.0, "{bar}");
+        for level in 2..=5 {
+            for clip in crate::clips::ALL {
+                // Played as it is played: each step stretched under the
+                // servo's 1,000, which makes some steps uneven (#8183).
+                let bend = base_bend(livelier(clip, level), Some(1_000.0));
+                assert!(
+                    bend <= bar + 0.5,
+                    "{} at level {level}: {bend} c/s^2 against {bar}",
+                    clip.name
+                );
+            }
+        }
+    }
+
+    /// #6893 / #8153: level 5 is judged against V1 (the lead's bar), joint by
+    /// joint, on the two clips the issue names. V1's peak to peak, counts,
+    /// over the window V2 kept of `hal/recordings/excited.csv` (2.70 to
+    /// 4.70 s) and `happy_wiggle.csv` (1.10 to 5.10 s), converted with the
+    /// ranges in `hal/calibration/robots/hal_follower/hal.json` (as
+    /// `tools/generate_clips.py` does; Sixth's #8153 table, 20 Nov 20:53,
+    /// recomputed from the CSVs 21 Nov). The tolerance is 25% of V1's: a
+    /// joint outside it is a known gap, listed with what holds it, so that
+    /// closing or opening one fails here and is said.
+    #[test]
+    fn level_five_sizes_excited_and_happy_against_v1() {
+        // (clip, joint, V1 p-p, level 5 p-p / V1 within 0.01, a known gap)
+        let lines: [(&Clip, usize, u16, f32, Option<&str>); 7] = [
+            (&crate::clips::EXCITED, 0, 146, 0.91, None),
+            (&crate::clips::EXCITED, 3, 299, 1.21, None),
+            (
+                &crate::clips::EXCITED,
+                4,
+                502,
+                0.65,
+                Some("the tip cap, x1.27"),
+            ),
+            (&crate::clips::HAPPY, 0, 268, 0.82, None),
+            (
+                &crate::clips::HAPPY,
+                2,
+                697,
+                0.34,
+                Some("x1.6 of a base cut to 0.22 of V1"),
+            ),
+            (
+                &crate::clips::HAPPY,
+                3,
+                178,
+                1.54,
+                Some("over V1: x1.6 of 0.96 of V1"),
+            ),
+            (&crate::clips::HAPPY, 4, 516, 0.70, Some("the reach, 360")),
+        ];
+        let peak_to_peak = |clip: &Clip, joint: usize| {
+            let at = clip.frames.iter().map(|frame| frame[joint]);
+            at.clone().max().unwrap() - at.min().unwrap()
+        };
+        // V1's excited has no base yaw, nor does the clip at any level.
+        assert_eq!(peak_to_peak(livelier(&crate::clips::EXCITED, 5), 2), 0);
+        for (clip, joint, v1, pinned, gap) in lines {
+            let five = peak_to_peak(livelier(clip, 5), joint);
+            let share = f32::from(five as u16) / f32::from(v1);
+            assert!(
+                (share - pinned).abs() <= 0.01,
+                "{} joint {joint}: {five} against V1 {v1}, {share:.2}",
+                clip.name
+            );
+            assert_eq!(
+                (share - 1.0).abs() > 0.25,
+                gap.is_some(),
+                "{} joint {joint}: {five} against V1 {v1}, {share:.2}",
+                clip.name
+            );
+        }
+    }
+
     /// #8153: level 1 plays every clip as recorded, the very clip; the clip
     /// size and pace lie evenly from x1 at level 1 to x1.6 and x1.5 at 5.
     #[test]
@@ -480,17 +632,30 @@ mod tests {
     fn level_five_plays_clips_bigger_and_quicker_never_past_the_reach_or_the_servo() {
         let reach = crate::body::GESTURE_REACH;
         let ceiling = Some(1_000.0);
-        let mut grown = 0;
+        let (mut grown, mut full_pace, mut slowed) = (0, 0, vec![]);
         for clip in crate::clips::ALL {
             let (one, three, five) = (farthest(clip), livelier(clip, 3), livelier(clip, 5));
             assert_eq!(five.name, clip.name);
             assert_eq!(five.frames.len(), clip.frames.len(), "{}", clip.name);
             assert_eq!(five.frames[0], [0; 5]);
             assert_eq!(five.frames[five.frames.len() - 1], [0; 5]);
-            // The pace: a step 1/1.5 of its time, rounded up to a whole ms.
+            // The pace: a step 1/1.5 of its time, rounded up to a whole ms,
+            // or slower where the base would bend past `BASE_BEND`, never
+            // slower than the clip's own.
             let quick = (f32::from(clip.step_ms) / 1.5).ceil() as u16;
-            assert_eq!(five.step_ms, quick, "{}", clip.name);
-            assert!(three.step_ms < clip.step_ms && three.step_ms > five.step_ms);
+            assert!(
+                quick <= five.step_ms && five.step_ms <= clip.step_ms,
+                "{}",
+                clip.name
+            );
+            assert!(three.step_ms <= clip.step_ms, "{}", clip.name);
+            full_pace += usize::from(five.step_ms == quick);
+            if five.step_ms != quick {
+                slowed.push(clip.name);
+            }
+            // A base held to its own size where even the clip's own pace
+            // would bend it past `BASE_BEND` ('headshake', 'dance_chill').
+            let base_held = farthest(five)[2] == one[2];
             for joint in 0..5 {
                 let (at_three, at_five) = (farthest(three)[joint], farthest(five)[joint]);
                 let size = CLIP_SIZE_CAP
@@ -504,7 +669,7 @@ mod tests {
                     clip.name
                 );
                 assert!(
-                    (f32::from(at_five) - wanted).abs() <= 1.0,
+                    (f32::from(at_five) - wanted).abs() <= 1.0 || (joint == 2 && base_held),
                     "{} joint {joint}: {at_five} against {wanted}",
                     clip.name
                 );
@@ -529,6 +694,23 @@ mod tests {
             }
         }
         assert!(grown >= 60, "{grown}");
+        // 13 of the 21 play at the full x1.5 (#8153, the base held).
+        assert!(full_pace >= 13, "{full_pace}");
+        // The other 8 at a slower step, the base held under `BASE_BEND`
+        // (docs/body.md says the same list).
+        assert_eq!(
+            slowed,
+            [
+                "headshake",
+                "curious",
+                "confused",
+                "scanning",
+                "dance_chill",
+                "dance_hype",
+                "dance_waltz",
+                "dance_jazz"
+            ]
+        );
         // The same clip at the same level is the same one, made once.
         assert!(std::ptr::eq(
             livelier(&crate::clips::NOD, 5),

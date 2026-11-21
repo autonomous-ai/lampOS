@@ -5587,9 +5587,87 @@ added (even from a file), kept to turn back on ... Never remove for this,
 even one that starts only when they say its words. Call it at once. Ask
 nothing first.",
 `turn_on`'s the same of back on, and `remove`'s says "delete or
-remove a skill for good, never to turn one off, pause or stop it". A call
-that carries a turn-off is read before the remove, so a turn-off never
-becomes a remove. **A turn off acts at once** (#7562's rows on lamp-9adf,
+remove a skill for good, never to turn one off, pause or stop it".
+A call that carries a turn-off is read before the remove, so a turn-off
+never becomes a remove. **A change never removes** (#7975, lamp-9adf, 19
+Nov: "change rain check to seven thirty" was called as a remove, and the
+skill went), and **a change changes the skill in place** (#8008, lamp-9adf,
+20 Nov 01:30 and 01:33: each change was made as a new skill,
+`morning-umbrella-reminder-2` and `-3`, and three fired; the first
+builder's ruling, 01:38). `change_skill`, a function of its own beside
+`make_skill`, offered and routed wherever `make_skill` is ("Change a skill
+the person made, when they ask to change it (its time, its words, what it
+does): changed in place, never made as a new skill and never removed. In
+the same breath, before the call, say in a few words that you'll change
+it. Then say exactly the line you are told."), names the skill as heard
+(`name`: "The skill to change, as they named it. Unsure which: ask."),
+with `request`, the change in their words; whether a line asks a change
+is the model's to judge (the 13 Nov rule). It is run as `make_skill`'s
+call with `change` (`made_change::as_make`): the second route's stream
+reads it so (its `name` first a change's, so no make opening is said),
+so a change keeps a make's held opening, queue and said line, and it is
+given back in the model's history as the `change_skill` call it made
+(`as_asked`); Live's call is read so at its route. `crate::made_change`
+does the rest:
+- **Which skill**: only the owner's ask, read first, so a guest hears no
+  skill of theirs named (Twelve's P2 1). Then the person's made skill
+  found by that name as a remove finds one (`made_remove::found`). Several
+  as near, or none by that name while they made some, makes nothing: the
+  model asks which in one short question naming them (at most four). One
+  they didn't make changes nothing.
+- **Re-made in place**: the make is asked for the old skill's said-back
+  description with the change after it, the change winning
+  (`merged_request`); the making model writes the merge. The skill kept is
+  given the old one's name, never `name-2` or the model's own name
+  (`made_skill::ChangeAs`, read by `free_name` and the agent task's keep),
+  and its index entry says which it changes (`changes`). It goes on as
+  any make does (`LAMP_MAKE_NO_ASKS`' at once, a clash asked with the
+  switch off, its `clash_id` kept, or a yes for one that sends), but it
+  never turns another skill off: with `LAMP_MAKE_NO_ASKS` on, no skill
+  doing the same thing is replaced (a near twin, `-2`, stays on), and words
+  that would start another of theirs refuse it with why (Twelve's P2 2).
+  The manage helper puts it in the old one's folder, so its on/off state
+  (lamp-skills' `off` file, by name) is kept. Once it is on
+  (`put_on_within`), the old entry is taken out of the index and kept
+  under the new one's `old`, with `replaced_at_ms` and `was_off`, its
+  package with it (`made_skill::packages_named`): one skill. An older
+  version kept by an earlier change goes then, its package deleted
+  (Twelve's P2 3), so only the latest is kept. Never a second
+  skill, never a remove. Its make's own "remove it" record is dropped.
+  Made and not on, nothing of it is kept and the old one stays: "I
+  couldn't change NAME: WHY. It stays as it was."
+- **Told once**: "Changed NAME. Say 'put it back' to undo." (with "It
+  stays off." for one that was off).
+- **Put it back, for a week** (the shape of #7765's remake, so both share
+  one undo): `make_skill`'s `undo`, when the change is the latest thing
+  done (`latest_changed`, after every record `make_no_asks` keeps), "last"
+  or the skill's name, puts the old version back on in place by its
+  SHA-256 (`made_change::put_back`, the owner's ask only) and deletes the
+  new one's package: "Your old NAME is back." (told off, "It stays off.",
+  when it is turned off). A put-on that fails leaves
+  the new one on. After 7 days (`UNDO_FOR`) the old package is deleted
+  (`drop_old`, at `make_no_asks`' hourly purge and at each change); the
+  owner's "forget everything" clears it with `make_no_asks`' keep, and a
+  remove takes it with the skill.
+
+A change adds nothing to `make_skill`'s parameters, which the product holds
+to `PRODUCT_MOST_PARAMETERS_BYTES` (3,750 of the link's 4,096, #8002; 3,737
+with the product's switches on, as before #8008): its own function's
+parameters are 233 bytes and its description 277, within the link's
+bounds by themselves, and the product's own functions are 51 (55 with
+the route's 4, within `second_provider::MAX_TOOLS`' 64).
+Tests: `a_change_is_never_a_remove`,
+`a_change_skill_call_is_read_as_make_skills_and_given_back_as_made`,
+`a_change_skill_call_runs_as_make_skills_change`, and in `made_change`'s
+`a_change_remakes_the_named_skill_in_place_never_a_second`,
+`a_change_keeps_off_and_put_it_back_restores_the_old_version`,
+`a_changed_skills_old_version_goes_after_a_week`,
+`a_change_never_removes_and_asks_which_when_unsure`,
+`a_new_make_with_no_change_is_unchanged`,
+`the_tool_takes_a_change_within_the_bound`, `a_guests_change_names_no_skill`,
+`a_change_never_turns_off_a_twin`,
+`two_changes_then_forget_everything_leave_no_old_package` and
+`a_change_that_clashes_keeps_its_question`. **A turn off acts at once** (#7562's rows on lamp-9adf,
 18 Nov, second route, DeepSeek: "Lamp, turn off my space facts skill."
 was answered "Do you want it off? If yes, tell me…", "nothing running to
 switch off" for a skill started only by its words, and "Remove space

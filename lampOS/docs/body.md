@@ -1495,8 +1495,36 @@ the voice, Expression and lamp-skills (each with `energy_in::EnergyIn`, the body
   level 5 the clips' worst frame is 3.3 to 21.46 mm off the axis (greeting 21.46, surprised and
   sleepy 21.42, excited 21.33; level 1: 3.1 to 17.99), so seven clips come within 85% of 22 mm and
   are said in the journal as V1 said them (`tipping.close`), and the farthest back is 15.93 mm
-  (dance_groove). The fastest joint of 15 of the 21 clips reaches the servo's 1,000 counts a second
-  (level 1: headshake alone), and each clip takes about 0.7 of its level-1 time.
+  (dance_groove). The fastest joint of 13 of the 21 clips reaches the servo's 1,000 counts a second
+  (level 1: headshake alone), and 14 clips take 0.68 to 0.75 of their level-1 time.
+
+  The base (base yaw) carries the lamp's weight, so a level never asks it to change speed from one
+  step to the next harder than level 1 already asks of it in some clip: `energy::BASE_BEND`, 7,690
+  counts a second a second (headshake's 7,689.4, rounded up). On lamp-52e6 'curious' at x1.6 and
+  x1.5 asked the base for about 11,200 and the base rang for half a second (row-8155b, 21 Nov).
+  `energy::sized` first plays such a clip at a slower step, never slower than its own, and where even
+  its own pace would ask more, keeps the base at the clip's own size while the head and arm still
+  grow (headshake, dance_chill). At level 5, 13 clips play at the full x1.5 step; dance_waltz at a
+  slower one still takes 0.72 of its level-1 time, curious, dance_jazz, scanning, confused,
+  dance_chill and dance_hype 0.8 to 0.99, and headshake 1.02 (its own step, the larger head
+  stretched under the servo's speed). The bend is measured as the clip is played, each step at its
+  own time once the servo's speed has stretched it, so a step stretched next to one that is not
+  counts as it is (`energy::tests::no_level_bends_the_base_harder_than_level_one_does`, the slowed
+  list in `level_five_plays_clips_bigger_and_quicker_never_past_the_reach_or_the_servo`).
+
+  Level 5 against V1 (#6893's bar), peak to peak in counts over the window V2 kept of V1's
+  `excited.csv` and `happy_wiggle.csv` (`energy::tests::level_five_sizes_excited_and_happy_against_v1`,
+  within 25% of V1 or a known gap):
+
+  | clip | joint | V1 | level 5 | share | held by |
+  |---|---|---|---|---|---|
+  | excited | head pitch | 146 | 133 | 0.91 | |
+  | excited | shoulder | 299 | 361 | 1.21 | |
+  | excited | elbow | 502 | 326 | 0.65 | the tip cap, x1.27 |
+  | happy | head pitch | 268 | 220 | 0.82 | |
+  | happy | base yaw | 697 | 240 | 0.34 | x1.6 of a base cut to 0.22 of V1 |
+  | happy | shoulder | 178 | 274 | 1.54 | over V1: x1.6 of 0.96 of V1 |
+  | happy | elbow | 516 | 360 | 0.70 | the reach |
 
   **Where V1 stays out of reach, and why.** V1 played its recordings at their recorded speed with
   no servo ceiling: its emotion clips peak at a median of about 2,000 counts a second (excited's

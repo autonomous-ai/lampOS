@@ -83,10 +83,14 @@ impl Message {
         message.tool_calls = calls
             .iter()
             .map(|call| {
+                // A change read as `make_skill`'s is given back as the
+                // `change_skill` call the model made (#8008).
+                let (name, args) = crate::made_change::as_asked(&call.name, &call.args)
+                    .unwrap_or_else(|| (call.name.clone(), call.args.clone()));
                 let mut asked = json!({
                     "id": call.id,
                     "type": "function",
-                    "function": {"name": call.name, "arguments": call.args.to_string()},
+                    "function": {"name": name, "arguments": args.to_string()},
                 });
                 // Given back as it came: Gemini's thought signature rides
                 // here, and a call sent back without it is refused.
@@ -148,6 +152,17 @@ pub enum ChatEvent {
     /// carried its results (`annotations`, OpenRouter's web plugin). Once.
     Searched,
     Done,
+}
+
+/// A streamed call's name as the voice reads it: `change_skill` is
+/// `make_skill`'s call with `change` (#8008, [`crate::made_change::as_make`]),
+/// so a change keeps a make's held opening, queue and said line.
+fn as_make_name(name: &str) -> String {
+    if name == crate::made_change::FUNCTION {
+        crate::made_skill::MAKE.to_owned()
+    } else {
+        name.to_owned()
+    }
 }
 
 /// The lamp's tools as OpenAI function declarations.
@@ -1092,12 +1107,17 @@ impl Deltas {
             }
             if !pending.named && !pending.name.is_empty() && !pending.arguments.is_empty() {
                 pending.named = true;
-                out.push(ChatEvent::Calling(pending.name.clone()));
+                out.push(ChatEvent::Calling(as_make_name(&pending.name)));
             }
             if pending.named && !pending.argued {
                 if let Some(first) = first_argument(&pending.arguments) {
                     pending.argued = true;
-                    out.push(ChatEvent::Argued(pending.name.clone(), first));
+                    let first = if pending.name == crate::made_change::FUNCTION {
+                        crate::made_change::as_make_argument(&first).to_owned()
+                    } else {
+                        first
+                    };
+                    out.push(ChatEvent::Argued(as_make_name(&pending.name), first));
                 } else if pending.arguments.len() > FIRST_ARGUMENT_WITHIN {
                     pending.argued = true;
                 }
@@ -1118,6 +1138,12 @@ impl Deltas {
                     serde_json::from_str(&call.arguments)
                         .map_err(|_| Error::Protocol("tool call arguments"))?
                 };
+                // `change_skill` is read as the `make_skill` call it is run
+                // as ([`crate::made_change::as_make`]).
+                let (name, args) = match crate::made_change::as_make(&call.name, &args) {
+                    Some(made) => (crate::made_skill::MAKE.to_owned(), made),
+                    None => (call.name, args),
+                };
                 Ok(ToolCall {
                     // Its result is matched to it by id: one is made for a
                     // call that came without.
@@ -1126,7 +1152,7 @@ impl Deltas {
                     } else {
                         call.id
                     },
-                    name: call.name,
+                    name,
                     args,
                     extra: call.extra,
                 })
@@ -1346,6 +1372,48 @@ mod tests {
                 ChatEvent::Text("lo.".into()),
                 ChatEvent::Done
             ]
+        );
+    }
+
+    /// #8008: a `change_skill` call is read as the `make_skill` call it is
+    /// run as, as it streams and whole (its `name` first a change's, never
+    /// a new make's), and given back in the history as the model made it.
+    #[test]
+    fn a_change_skill_call_is_read_as_make_skills_and_given_back_as_made() {
+        let recorded = r#"data: {"choices":[{"delta":{"tool_calls":[{"index":0,"id":"call_c","type":"function","function":{"name":"change_skill","arguments":"{\"name\": \"rain"}}]}}]}
+
+data: {"choices":[{"delta":{"tool_calls":[{"index":0,"function":{"arguments":" check\", \"request\": \"at seven thirty\"}"}}]}}]}
+
+data: {"choices":[{"delta":{},"finish_reason":"tool_calls"}]}
+
+data: [DONE]
+"#;
+        let made = ToolCall {
+            id: "call_c".into(),
+            name: crate::made_skill::MAKE.into(),
+            args: json!({"change": "rain check", "request": "at seven thirty"}),
+            extra: None,
+        };
+        assert_eq!(
+            events(recorded),
+            [
+                ChatEvent::Calling(crate::made_skill::MAKE.into()),
+                ChatEvent::Argued(crate::made_skill::MAKE.into(), "change".into()),
+                ChatEvent::ToolCalls(vec![made.clone()]),
+                ChatEvent::Done
+            ]
+        );
+        assert_eq!(
+            crate::make_skill_local::new_make_argument("change"),
+            Some(false)
+        );
+        let history = Message::assistant_calls(None, &[made]);
+        let asked = &history.tool_calls[0]["function"];
+        assert_eq!(asked["name"], crate::made_change::FUNCTION);
+        let args: Value = serde_json::from_str(asked["arguments"].as_str().unwrap()).unwrap();
+        assert_eq!(
+            args,
+            json!({"name": "rain check", "request": "at seven thirty"})
         );
     }
 
