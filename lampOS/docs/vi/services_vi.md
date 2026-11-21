@@ -1581,6 +1581,11 @@ cầu; ở mọi chỗ khác, ai nói cũng được.
   minutes. Say it was not sent." Nhật ký ghi tên từng điều kiện không đạt ("a
   send cancelled: …": send_id khác, không phải yêu cầu sau yêu cầu đọc lại,
   không có dịch vụ, chuẩn bị quá lâu rồi), và mỗi lời từ chối kèm lời nó đưa.
+  send_id của chính nó trong cùng yêu cầu đã chuẩn bị nó (mô hình chuẩn bị
+  và gửi trên một câu "Yes." trước khi ai nghe phần đọc lại; C124 trên
+  lamp-06c1, 16/11) không hủy: bản ghi vẫn chờ như đã chuẩn bị, mô hình được
+  báo `NOT_YET`, và câu đồng ý sau phần đọc lại mới gửi. Không gì được gửi
+  sớm hơn.
 - **Một phần đọc lại bị cắt vẫn không gửi gì.** Phần đọc lại không được bị
   một câu nói hay một lệnh Stop cắt ngang (`Thread::heard_only` →
   `services::lamp_cut`), và câu của người đó không được bắt đầu trước khi

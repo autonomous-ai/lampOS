@@ -857,14 +857,27 @@ pub fn observer_at(base: &str, model: &str, key: &str) -> io::Result<crate::reme
 /// model's whole answer read as [`crate::remember::observe_output`]. A job
 /// given its day (`"today"`, `LAMP_MEMORY_EVENTS`) is asked for an event's
 /// day too ([`crate::remember::observe_prompt`]); any other as before.
-async fn ask_observations(
-    chat: &crate::second_provider::net::Chat,
-    input: &serde_json::Value,
-) -> Option<serde_json::Value> {
+/// The observation pass's system prompt for `input`: the day's line with
+/// `"today"`, the summary's with `"summary"`, and [`OBSERVE_KEPT`] with
+/// `"kept"` (C40).
+///
+/// [`OBSERVE_KEPT`]: crate::remember::OBSERVE_KEPT
+fn observe_system_prompt(input: &serde_json::Value) -> String {
     let mut prompt = crate::remember::observe_prompt(input.get("today").is_some()).into_owned();
     if input.get("summary").is_some() {
         prompt.push_str(crate::remember::OBSERVE_SUMMARY);
     }
+    if input.get("kept").is_some() {
+        prompt.push_str(crate::remember::OBSERVE_KEPT);
+    }
+    prompt
+}
+
+async fn ask_observations(
+    chat: &crate::second_provider::net::Chat,
+    input: &serde_json::Value,
+) -> Option<serde_json::Value> {
+    let prompt = observe_system_prompt(input);
     let mut stream = chat
         .send(&[Message::system(prompt), Message::user(input.to_string())])
         .await
@@ -2980,6 +2993,12 @@ pub fn serve(
         );
         crate::skill_write_yes::approve_force()
     });
+    // The round after a live figure was held must call the lookup its note
+    // names (`LAMP_LIVE_FACT_CHECKED`, #7605).
+    let task_yes = first_force(
+        crate::live_fact::force_when(crate::live_fact::on()),
+        task_yes,
+    );
     let net = match first_force(
         task_yes,
         first_force(
@@ -4817,6 +4836,16 @@ pub fn serve(
         });
         read
     }));
+    // A live figure said with no lookup behind it ("around $4,050 an
+    // ounce" to "the gold price today?"; `LAMP_LIVE_FACT_CHECKED=on`,
+    // #7605): held, and asked again with the lookup required.
+    let live_facts = crate::live_fact::on();
+    if live_facts {
+        eprintln!(
+            "lamp-voice second: a live figure (a price, rate, score or the weather) said with no lookup in its turn is not said; asked again with the lookup required (LAMP_LIVE_FACT_CHECKED)"
+        );
+    }
+    engine = engine.checking_live_facts(live_facts);
     engine = engine.waiting_on_one_path(
         crate::make_skill_agent::one_path_on().then_some(crate::make_skill_agent::LONG_WAIT_AFTER),
     );
@@ -6346,8 +6375,14 @@ pub(crate) fn named_asks(place: crate::agent_tasks::Place) -> crate::second_prov
 /// is told to ask them to spell it. A name in a later line is the model's,
 /// as before: the thread's messages don't say whether the line before was
 /// the same person's, and in a room another's ask would file this one's
-/// name on the face at the lamp (reviewer-three's P2 on #3298).
+/// name on the face at the lamp (reviewer-three's P2 on #3298). Read past
+/// the lamp's name too (`second_provider::forced_past_the_name`, #8022).
 pub(crate) fn remember_asks() -> crate::second_provider::net::Force {
+    crate::second_provider::forced_past_the_name(remember_asks_as_said())
+}
+
+/// [`remember_asks`] on the line as said.
+fn remember_asks_as_said() -> crate::second_provider::net::Force {
     use crate::known_faces::{asks_to_remember, gives_a_name};
     Arc::new(|messages: &[Message]| {
         let last = messages.last().filter(|message| message.role == "user")?;
@@ -15644,6 +15679,16 @@ mod tests {
                 }
             }
         }
+    }
+
+    /// C40: the pass is told `OBSERVE_KEPT` only for a job given `"kept"`.
+    #[test]
+    fn the_observation_prompt_tells_kept_only_with_kept() {
+        let plain = observe_system_prompt(&serde_json::json!({"job":"j"}));
+        assert!(!plain.contains(crate::remember::OBSERVE_KEPT));
+        let kept =
+            observe_system_prompt(&serde_json::json!({"job":"j","kept":[{"id":1,"text":"x"}]}));
+        assert!(kept.ends_with(crate::remember::OBSERVE_KEPT));
     }
 
     #[test]

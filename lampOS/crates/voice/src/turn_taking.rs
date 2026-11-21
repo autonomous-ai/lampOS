@@ -196,6 +196,21 @@ pub fn cut_in_late_yield() -> bool {
     std::env::var(CUT_IN_LATE_YIELD_ENVIRONMENT).ok().as_deref() == Some("on")
 }
 
+/// The voice's environment switch, with `on`, for a person heard
+/// `Unknown` past a reply's start to count toward the run that makes the
+/// lamp yield ([`Interruption::count_unknown_onsets`], #7413); off unless
+/// set.
+pub const CUT_IN_STALE_ONSET_ENVIRONMENT: &str = "LAMP_CUT_IN_STALE_ONSET";
+
+/// Whether the voice's environment says `on` for
+/// [`CUT_IN_STALE_ONSET_ENVIRONMENT`].
+pub fn cut_in_stale_onset() -> bool {
+    std::env::var(CUT_IN_STALE_ONSET_ENVIRONMENT)
+        .ok()
+        .as_deref()
+        == Some("on")
+}
+
 /// What one yield's evidence window held, with `LAMP_CUT_IN_COUNTS_REAL=on`.
 /// The window is bounded: the consecutive `Over` blocks that made the yield
 /// (its onset run, 7 or 10 blocks) and every block heard while the yield is
@@ -596,6 +611,14 @@ impl PlaybackMask {
     pub fn cut_in_late_yield(&mut self) {
         if let Some(duplex) = self.duplex.as_mut() {
             duplex.interruption.commit_late_yields();
+        }
+    }
+    /// `LAMP_CUT_IN_STALE_ONSET=on`: a block heard `Unknown` past the
+    /// reply's start counts toward the yield's onset run. See
+    /// `Interruption::count_unknown_onsets`. Only with ears.
+    pub fn cut_in_stale_onset(&mut self) {
+        if let Some(duplex) = self.duplex.as_mut() {
+            duplex.interruption.count_unknown_onsets();
         }
     }
     /// For the record of the latest yield's commit or resume: whether it

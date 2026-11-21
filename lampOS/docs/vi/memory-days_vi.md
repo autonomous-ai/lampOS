@@ -195,7 +195,7 @@ và «My gym locker code is 441.» bị giữ lại thành id mới; «someone»
 giờ bị đổi, `days::digit_text`), là chính điều đã giữ đó, không ghi
 thêm dòng nào. Một lời sửa có `once` mà nêu đúng điều đã giữ bằng cùng chữ như
 vậy (`Days::restates`) cũng là điều đó được nói lại: không có bản mới, và nó
-mang thời điểm được nói lại («last said»). Lời sửa (`replaces`) luôn ghi bản mới; câu của người khác, hoặc
+mang thời điểm được nói lại («last said»). Nói lại bằng chữ khác (C81 trên lamp-06c1, 16/11: «Locker number is 441.» rồi «Gym locker number is 441.» thành id thứ hai): `remember` của giọng nhận `again` (một id), do mô hình xét nghĩa, không danh sách chữ; với `once`, một id đã cho xem kèm chữ của nó, không có `replaces`, và câu không phải chỉ của họ theo luật một mặt, giọng gửi điều đã giữ đó bằng đúng chữ đã cho xem, kèm id làm `replaces`, nên `Days::restates` trả `existing` và giữ thời điểm nói lại. Id của mô hình không được tin một mình (P2 của Twelve trên #8023): câu giữ phải nêu đúng các con số của điều đã giữ, và câu nghe được không nêu số khác (`same_numbers`, «four four one» đọc là «441»; một phép kiểm sự kiện, không phải danh sách chữ), nên «my locker is 512 now» được giữ như đã nói. Khi đã nhận, điều đã giữ vẫn được cho xem bằng chữ đã lưu, nên lần nói thứ ba cũng tìm thấy. Lời sửa (`replaces`) luôn ghi bản mới; câu của người khác, hoặc
 điều đã quên hay đã bị thay, không tính là cùng một điều. Unit sản phẩm bật công
 tắc này từ 28/10: trên lamp-06c1, khi không có nó, một câu nói lại đã được giữ
 lần thứ hai (lượt chạy của Friday, #3504). Vẫn còn nợ một lần kiểm tra trên
@@ -1671,6 +1671,25 @@ cắt, không điều nào khớp; chỉ id và số lượng, không bao giờ 
 quên; `remember::ForgetNotAsked`, hàng của Thirteen trên
 #5627). Vậy TV nói «quên cái ô của tôi» chỉ được hỏi lại, không
 bao giờ chạy.
+**Một yêu cầu quên không bao giờ tự thành một ký ức** (#8038, lamp-06c1,
+20/11: lượt quan sát giữ lại «họ muốn đèn quên mái chèo kayak» từ một lệnh
+quên đang giữ chờ, và mọi lệnh quên sau đó của điều ấy khớp hai hàng). Trên
+đường thứ hai, mọi `forget` hay `forget_everything` mô hình gọi đều đánh dấu
+yêu cầu ấy không ghi vào journal và được đếm là một lệnh quên cho lượt quan
+sát (`remember::forget_called`), dù kết quả ra sao: chạy, giữ chờ lời «có»,
+hỏi lại một lần, hay bị từ chối trước khi tới bộ nhớ. Quyết định theo lời gọi,
+không bao giờ theo lời nói, như việc điều phối của đường Live đã làm. Khi chọn
+trên câu một khuôn mặt, một quan sát khớp cạnh đúng một điều đã giữ không phải
+lần khớp thứ hai (`remember::one_kept_among`, theo loại của các hàng từ một
+lượt liệt kê `kept` thứ hai không có quan sát), và lời «có» của họ cho lệnh
+quên ấy xoá luôn các quan sát đó theo id
+(`remember::agreed_forget_observations`). Một lệnh quên không được hỏi vì hai
+hàng khớp, không hàng nào khớp, hay không nêu một điều nào thì được báo đúng
+nguyên nhân ấy (`remember::FORGET_SEVERAL_MATCH`, `FORGET_NO_MATCH`,
+`FORGET_NAME_ONE`), và journal ghi «forget not run: <lý do>»; không bao giờ
+báo «không thấy ai đang nói», vì khuôn mặt họ có trong khung. Nguyên nhân của
+chính đèn (forget-all tắt, liệt kê thất bại hay có thể bị cắt) bị từ chối như
+trước.
 **Cũng không gì mang tính xoá bỏ, hay làm thay họ ngoài việc lưu và nhớ lại**
 (lần đọc riêng tư trên #5592): một `remember` sửa một điều đã giữ theo id
 (`replaces`, `remember::corrects`) bị từ chối như lệnh quên, và khi không có
@@ -1686,7 +1705,7 @@ trừ khi phòng riêng (`LAMP_PRIVATE_ROOM`) đã cho mọi câu một chủ. L
 sát sau cuộc trò chuyện không bao giờ cho nghỉ một điều đã giữ của cuộc trò
 chuyện có một lượt trao đổi như vậy được ghi vào: với `LAMP_MEMORY_REPLACES`,
 các đề xuất của nó tới `tidy_apply` không có `"replaces"`, được giữ như thường
-(`Conversation::filed`, `remember::job_replacing`; P2 của Thirteen trên #5592). Một điều mới
+(`Conversation::filed`, `remember::job_replacing`; P2 của Thirteen trên #5592). Khi không có lượt một mặt như vậy, lượt quan sát được cho xem các điều đã giữ của người đó mà phiên đã cho xem, theo id (`"kept"`, `remember::OBSERVE_KEPT`), và mô hình nêu id của điều mà lời họ thay đổi (C40 trên lamp-06c1, 16/11: «swapped my black helmet for a bright orange one» để «my bicycle helmet is black» vẫn được giữ). Giọng chỉ gửi id của mô hình khi nó là một trong các id đã cho xem và không đề xuất nào khác nêu nó; nếu không, như trước, theo bộ so khớp lời sửa. Trong phạm vi của căn phòng (không có người được biết), lượt quan sát không bao giờ được cho `"kept"` và id của mô hình không bao giờ được gửi. Một điều mới
 được giữ như thường vẫn được ghi. Câu mà thấy mặt họ nói thì như trước. Các giới hạn riêng tư vẫn giữ: có mặt thứ hai,
 mặt lạ, không có mặt, giọng khác trước câu hoặc nghe thấy khi câu được xét
 (`another voice in the conversation`), thì là của căn phòng, cả việc ghi; câu

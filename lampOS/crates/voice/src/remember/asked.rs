@@ -161,8 +161,14 @@ pub fn asks_to_keep(said: &str) -> bool {
 
 /// The force the second route's chat is given with the switch on
 /// (`second_provider::net::Chat::forcing`): a request whose last message is
-/// a person's line that asks to keep something must call `remember`.
+/// a person's line that asks to keep something must call `remember`, read
+/// past the lamp's name too (`second_provider::forced_past_the_name`).
 pub(crate) fn force() -> crate::second_provider::net::Force {
+    crate::second_provider::forced_past_the_name(as_said())
+}
+
+/// [`force`] on the line as said.
+fn as_said() -> crate::second_provider::net::Force {
     std::sync::Arc::new(|messages: &[crate::second_provider::net::Message]| {
         let last = messages.last().filter(|message| message.role == "user")?;
         asks_to_keep(last.words()?).then_some(crate::second_provider::net::Forced {

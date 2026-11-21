@@ -2025,6 +2025,8 @@ struct Shared {
     nudge_claims: bool,
     /// [`Engine::reading_made_names`] (#7683).
     made_names: Option<MadeNames>,
+    /// [`Engine::checking_live_facts`] (#7605).
+    live_facts: bool,
     /// With the make's one run path ([`Engine::waiting_on_one_path`],
     /// #7371): how long after its waiting line a make with no answer yet
     /// says [`crate::make_skill_agent::LONG_WAIT_LINE`], once; none is
@@ -3416,6 +3418,32 @@ pub(crate) fn past_the_name_heard_as(said: &str, named: bool) -> Option<&str> {
             .then(|| wake_heard_as(said))
             .flatten()
             .map(|(_, rest)| rest)
+    })
+}
+
+/// [`past_the_name_heard_as`] for a person's line as the first round's
+/// forces see it, `named` as `answer` kept it by the line's exact words
+/// (`crate::tools::make_skill_asked::heard_named`): a force sees only the
+/// messages.
+pub(crate) fn past_the_name(said: &str) -> Option<&str> {
+    past_the_name_heard_as(said, crate::tools::make_skill_asked::named(said))
+}
+
+/// `force` read on the person's line as said or, when that forces nothing,
+/// on the line past the lamp's name ([`past_the_name`]): "Hey Lamp. Remind
+/// me in ten minutes to stretch.", or "Hey, Lynn, remind me …" on a line
+/// that names the lamp. On lamp-52e6 on 20 Nov (#8022) the gates' timer
+/// and reminder asks said `calls=none`. Every first-round force that reads
+/// its ask at the line's opening goes through this one reading, so none
+/// drifts from another; a line said to a person ("Hey, Anna, …") is read
+/// as said. The line past the name is asked alone: these forces read only
+/// the last message.
+pub(crate) fn forced_past_the_name(force: net::Force) -> net::Force {
+    Arc::new(move |messages: &[Message]| {
+        force(messages).or_else(|| {
+            let last = messages.last().filter(|message| message.role == "user")?;
+            force(&[Message::user(past_the_name(last.words()?)?)])
+        })
     })
 }
 
@@ -5300,6 +5328,7 @@ impl Engine {
                 keep_whole: false,
                 nudge_claims: false,
                 made_names: None,
+                live_facts: false,
                 one_path_wait: None,
                 run_on_after: None,
                 no_words_again: false,
@@ -6815,6 +6844,19 @@ impl Engine {
     pub fn reading_made_names(mut self, made: Option<MadeNames>) -> Self {
         if let Some(shared) = Arc::get_mut(&mut self.shared) {
             shared.made_names = made;
+        }
+        self
+    }
+
+    /// `LAMP_LIVE_FACT_CHECKED=on` ([`crate::live_fact`], #7605): a
+    /// sentence of a reply stating a live figure ("around $4,050 an
+    /// ounce") that no lookup in the turn found is not said, judged by the
+    /// reply's own words; the model is asked again once with the lookup
+    /// required, then the lamp says it couldn't look it up. Before any turn
+    /// only.
+    pub fn checking_live_facts(mut self, on: bool) -> Self {
+        if let Some(shared) = Arc::get_mut(&mut self.shared) {
+            shared.live_facts = on;
         }
         self
     }
@@ -17028,7 +17070,15 @@ fn ask_once_forget(
         Ok(target) => target,
         Err(why) => {
             eprintln!("{}", one_face_forget_not_asked(request, &why));
-            return None;
+            // Told the real cause when what they name can put it right,
+            // never "I couldn't see who was talking": their face was in
+            // view (#8038). A cause of the lamp's own is refused as before.
+            let told = why.told()?;
+            eprintln!(
+                "lamp-voice second: request {request}: {} not run: {why} (LAMP_PERSON_SCOPE_ONE_FACE_READS)",
+                call.name
+            );
+            return Some(serde_json::json!({ "error": told }));
         }
     };
     let held = net::ToolCall {
@@ -17480,17 +17530,32 @@ fn keep_quietly(
     crate::keep_quietly::Quiet::new(&in_talk, &before, line).for_person(person)
 }
 
+/// The last notes a round is asked with, in order: the lamp's own make
+/// line's ask again ([`crate::make_skill_agent::BEGUN_AGAIN_NOTE`]) when
+/// `begun`, then a held live figure's note (#7605). The live note is last,
+/// so its lookup is forced while it is the last message
+/// ([`crate::live_fact::force`]); before another note, nothing is forced.
+fn last_notes(begun: bool, live: Option<String>) -> Vec<Message> {
+    begun
+        .then(|| Message::system(crate::make_skill_agent::BEGUN_AGAIN_NOTE))
+        .into_iter()
+        .chain(live.map(Message::system))
+        .collect()
+}
+
 /// A sentence of an answer as [`crate::keep_quietly::Quiet`] lets it go
 /// (journalled when it leaves one out), then as `hold` does; one said is
 /// counted as said.
 fn said_quietly(
+    live: &mut crate::live_fact::Hold,
     quiet: &mut crate::keep_quietly::Quiet,
     hold: &mut crate::remember::OfferHold,
     sentence: String,
     remembered: bool,
     request: u64,
 ) -> Option<String> {
-    let sentence = quiet.say(sentence);
+    // A live figure no lookup backs is held first (#7605).
+    let sentence = quiet.say(live.pass(sentence)?);
     if let Some(line) = quiet.take_line(request) {
         eprintln!("{line}");
     }
@@ -18939,6 +19004,18 @@ async fn answer(
         if made_said {
             turn_called.push((crate::made_skill::MAKE.to_owned(), Value::Null));
         }
+        // A live figure said with no lookup behind it (#7605,
+        // `LAMP_LIVE_FACT_CHECKED`): judged a sentence at a time by the
+        // reply's own words, never the person's (the reviewer-lead's HOLD
+        // on #7719); a lookup carried from a cut answer's finished rounds is
+        // the turn's own when it found something. Never a quoted line or a
+        // reminder's ring.
+        let mut live = crate::live_fact::Hold::new(
+            shared.live_facts && !quoted && !matches!(asked, Asker::Reminder { .. }),
+            request,
+            &rounds,
+        );
+        let mut live_note: Option<String> = None;
         // Whether a claim with no call (or a step word alone, with the
         // switch) was asked again once already, and whether the next round
         // is told one went unsaid beside other calls.
@@ -19109,10 +19186,12 @@ async fn answer(
             }
             // After other calls ran beside the lamp's own make line: this
             // round is the one asked again, timed from here.
-            if std::mem::take(&mut begun_note) {
-                messages.push(Message::system(crate::make_skill_agent::BEGUN_AGAIN_NOTE));
+            let begun_told = std::mem::take(&mut begun_note);
+            if begun_told {
                 begun_again_at = Some(Instant::now());
             }
+            messages.extend(last_notes(begun_told, live_note.take()));
+            live.begin_round();
             if words_round {
                 past_cap_from = queue.pieces;
                 eprintln!(
@@ -19675,6 +19754,7 @@ async fn answer(
                         }
                         for sentence in split.push(&held) {
                             if let Some(sentence) = said_quietly(
+                                &mut live,
                                 &mut quiet,
                                 &mut offer_hold,
                                 sentence,
@@ -19931,6 +20011,7 @@ async fn answer(
                         if sentences.is_empty()
                             && !queue.started
                             && queue.made_not_on.is_none()
+                            && !live.watching()
                             && !crate::remember::may_offer_a_keep(split.pending())
                             && !crate::onboarding::may_open_a_step(split.pending())
                         {
@@ -19940,6 +20021,7 @@ async fn answer(
                         }
                         for sentence in sentences {
                             if let Some(sentence) = said_quietly(
+                                &mut live,
                                 &mut quiet,
                                 &mut offer_hold,
                                 sentence,
@@ -19961,10 +20043,13 @@ async fn answer(
                         calls = asked;
                     }
                     ChatEvent::Reasoning(details) => reasoning = Some(details),
-                    ChatEvent::Searched => eprintln!(
-                        "lamp-voice second: request {request} chat round {round} searched the web in {} ms",
-                        began.elapsed().as_millis()
-                    ),
+                    ChatEvent::Searched => {
+                        live.searched();
+                        eprintln!(
+                            "lamp-voice second: request {request} chat round {round} searched the web in {} ms",
+                            began.elapsed().as_millis()
+                        )
+                    }
                     ChatEvent::Done => break,
                 }
             }
@@ -20056,6 +20141,7 @@ async fn answer(
                         (None, None, None) => {
                             for sentence in split.push(&held_for_a_claim(&mut action_held, held)) {
                                 if let Some(sentence) = said_quietly(
+                                    &mut live,
                                     &mut quiet,
                                     &mut offer_hold,
                                     sentence,
@@ -20144,6 +20230,7 @@ async fn answer(
                     (None, None) => {
                         for sentence in split.push(&held_for_a_claim(&mut action_held, held)) {
                             if let Some(sentence) = said_quietly(
+                                &mut live,
                                 &mut quiet,
                                 &mut offer_hold,
                                 sentence,
@@ -20252,6 +20339,7 @@ async fn answer(
                         if decline_held.is_none()
                             && let Some(rest) = split.finish()
                             && let Some(rest) = said_quietly(
+                                &mut live,
                                 &mut quiet,
                                 &mut offer_hold,
                                 rest,
@@ -20390,6 +20478,7 @@ async fn answer(
                     }
                     for sentence in split.push(&piece) {
                         if let Some(sentence) = said_quietly(
+                            &mut live,
                             &mut quiet,
                             &mut offer_hold,
                             sentence,
@@ -20449,7 +20538,9 @@ async fn answer(
                             queue.announce().await?;
                         }
                         for sentence in split.push(&piece) {
-                            if let Some(sentence) = offer_hold.say(sentence, remember_ran) {
+                            if let Some(sentence) = live.pass(sentence)
+                                && let Some(sentence) = offer_hold.say(sentence, remember_ran)
+                            {
                                 queue.push(sentence).await?;
                             }
                         }
@@ -20497,6 +20588,7 @@ async fn answer(
                     let rest = held.split_off(end);
                     for sentence in split.push(&held_for_a_claim(&mut action_held, held)) {
                         if let Some(sentence) = said_quietly(
+                            &mut live,
                             &mut quiet,
                             &mut offer_hold,
                             sentence,
@@ -20595,8 +20687,14 @@ async fn answer(
                     // ("Yes, Pip is kept.") go out now, whatever becomes of
                     // the claim after them (Second's P2 at c60b1a7b21).
                     if let Some(rest) = split.finish()
-                        && let Some(rest) =
-                            said_quietly(&mut quiet, &mut offer_hold, rest, remember_ran, request)
+                        && let Some(rest) = said_quietly(
+                            &mut live,
+                            &mut quiet,
+                            &mut offer_hold,
+                            rest,
+                            remember_ran,
+                            request,
+                        )
                     {
                         queue.push(rest).await?;
                     }
@@ -20664,6 +20762,7 @@ async fn answer(
                 } else {
                     for sentence in split.push(&held_for_a_claim(&mut action_held, held)) {
                         if let Some(sentence) = said_quietly(
+                            &mut live,
                             &mut quiet,
                             &mut offer_hold,
                             sentence,
@@ -20893,7 +20992,9 @@ async fn answer(
                 match unmade {
                     None => {
                         for sentence in split.push(&held) {
-                            if let Some(sentence) = offer_hold.say(sentence, remember_ran) {
+                            if let Some(sentence) = live.pass(sentence)
+                                && let Some(sentence) = offer_hold.say(sentence, remember_ran)
+                            {
                                 queue.push(sentence).await?;
                             }
                         }
@@ -21161,8 +21262,14 @@ async fn answer(
                     .any(|call| call.name == crate::remember::REMEMBER);
             if shared.look_by_call && calls.iter().any(|call| call.name == LOOK_CALL) {
                 if let Some(rest) = split.finish()
-                    && let Some(rest) =
-                        said_quietly(&mut quiet, &mut offer_hold, rest, remember_ran, request)
+                    && let Some(rest) = said_quietly(
+                        &mut live,
+                        &mut quiet,
+                        &mut offer_hold,
+                        rest,
+                        remember_ran,
+                        request,
+                    )
                 {
                     queue.push(rest).await?;
                 }
@@ -21177,8 +21284,14 @@ async fn answer(
                 return Ok(());
             }
             if let Some(rest) = split.finish()
-                && let Some(rest) =
-                    said_quietly(&mut quiet, &mut offer_hold, rest, remember_ran, request)
+                && let Some(rest) = said_quietly(
+                    &mut live,
+                    &mut quiet,
+                    &mut offer_hold,
+                    rest,
+                    remember_ran,
+                    request,
+                )
             {
                 queue.push(rest).await?;
             }
@@ -21200,6 +21313,73 @@ async fn answer(
                             .to_owned(),
                     )
                     .await?;
+            }
+            // A live figure said with no lookup answered in the turn
+            // (#7605: lamp-9adf, 18 Nov, "around $4,050 an ounce" to "what
+            // is the gold price today?" with `calls=none`): its sentence and
+            // the rest of its round were not said, nor are they kept as the
+            // lamp's words (`LAMP_LIVE_FACT_CHECKED`).
+            if let Some((lookup, held)) = live.take() {
+                text.clear();
+                let looking_now = calls
+                    .iter()
+                    .any(|call| crate::live_fact::is_lookup(&call.name));
+                if looking_now {
+                    // Said ahead of its lookup: the next round speaks from
+                    // what it finds.
+                    eprintln!(
+                        "lamp-voice second: request {request} chat round {round}: {held} sentence(s) gave a live figure before its lookup ran: not said, no note (LAMP_LIVE_FACT_CHECKED)"
+                    );
+                } else {
+                    // The lookup the note names, if declared: the weather's
+                    // for the weather, else the search's.
+                    let declared =
+                        |name: &str| shared.services.declares(&messages, &[], name) != Some(false);
+                    let tool = [lookup, crate::live_fact::Lookup::Search]
+                        .into_iter()
+                        .map(crate::live_fact::Lookup::name)
+                        .find(|name| declared(name));
+                    match tool {
+                        Some(tool) if !calls.is_empty() => {
+                            eprintln!(
+                                "lamp-voice second: request {request} chat round {round}: {held} sentence(s) gave a live figure no lookup backs: not said, its {} other call(s) run, the next round must call {tool} (LAMP_LIVE_FACT_CHECKED)",
+                                calls.len()
+                            );
+                            live.asking_again();
+                            live_note = Some(crate::live_fact::note(tool));
+                        }
+                        Some(tool) if round < MAX_ROUNDS && !live.asked_again => {
+                            eprintln!(
+                                "lamp-voice second: request {request} chat round {round}: {held} sentence(s) gave a live figure no lookup backs ({} call(s) in the turn): not said, asked again with {tool} required (LAMP_LIVE_FACT_CHECKED)",
+                                turn_called.len()
+                            );
+                            live.asking_again();
+                            messages.push(Message::system(crate::live_fact::note(tool)));
+                            continue;
+                        }
+                        _ if calls.is_empty() => {
+                            eprintln!(
+                                "lamp-voice second: request {request} chat round {round}: {held} sentence(s) gave a live figure no lookup backs, {}: said it couldn't look it up (LAMP_LIVE_FACT_CHECKED)",
+                                if tool.is_none() {
+                                    "no lookup declared"
+                                } else {
+                                    "after its ask again"
+                                }
+                            );
+                            live.could_not();
+                            queue
+                                .push(shared.fixed(crate::live_fact::COULD_NOT_LINE).to_owned())
+                                .await?;
+                            return Ok(());
+                        }
+                        // No lookup declared, beside other calls: those run,
+                        // and their next round is judged the same way.
+                        _ => eprintln!(
+                            "lamp-voice second: request {request} chat round {round}: {held} sentence(s) gave a live figure no lookup backs, none declared: not said, its {} other call(s) run (LAMP_LIVE_FACT_CHECKED)",
+                            calls.len()
+                        ),
+                    }
+                }
             }
             // The round's words held while a made skill is not on (#7270):
             // unsaid beside its yes's call, whose answer the next round
@@ -21449,6 +21629,14 @@ async fn answer(
             let dropped_told = held_forget_dropped.take().and_then(|(held, note)| {
                 told_on_forget(request, round, &heard_words, &held, &calls).map(|id| (id, note))
             });
+            // A forget the model called, whatever becomes of it below
+            // (held for their yes, asked about once, refused): its
+            // exchange is kept out of the journal and the conversation it
+            // was asked in is observed by no pass, as for one the memory
+            // answers (#8038: decided by the call, never by the words).
+            for call in &calls {
+                crate::remember::forget_called(request, &call.name);
+            }
             // A skill's call answered with `"look": true`, by its name, with
             // its arguments and its note for the picture
             // (`LAMP_SECOND_SKILL_LOOK`).
@@ -22225,6 +22413,8 @@ async fn answer(
                         .unwrap_or(&call.name),
                     &answer.told,
                 ));
+                // A lookup that answered backs the turn's live figures (#7605).
+                live.ran(&call.name, &answer.told);
                 if crate::remember::is_forget(&call.name) {
                     context_epoch = shared.send_content_epoch.load(Ordering::Acquire);
                     messages = after_forget::context(

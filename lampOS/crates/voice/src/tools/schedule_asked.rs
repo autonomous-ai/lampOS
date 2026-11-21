@@ -402,8 +402,14 @@ fn starts_a_time(word: &str) -> bool {
 /// The force the second route's chat is given with the switch on
 /// (`second_provider::net::Chat::forcing`): a request whose last message is
 /// a person's line that plainly asks for a timer or a reminder must call
-/// the function that sets it.
+/// the function that sets it, read past the lamp's name too
+/// (`second_provider::forced_past_the_name`).
 pub(crate) fn force() -> crate::second_provider::net::Force {
+    crate::second_provider::forced_past_the_name(as_said())
+}
+
+/// [`force`] on the line as said.
+fn as_said() -> crate::second_provider::net::Force {
     std::sync::Arc::new(|messages: &[crate::second_provider::net::Message]| {
         let last = messages.last().filter(|message| message.role == "user")?;
         asks_to_set(last.words()?).map(|name| crate::second_provider::net::Forced {

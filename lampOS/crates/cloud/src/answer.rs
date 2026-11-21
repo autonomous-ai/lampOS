@@ -688,6 +688,12 @@ pub fn answer(lamp: &mut impl Lamp, kind: &str, data: &Value) -> Result<Option<V
             // an `energy` and `voice.get` says it, whenever they are taken.
             if on(lamp, "character.set") {
                 info["character_energy_supported"] = json!(true);
+                // `character.energy_alone` (#7566, the first builder's 23:23):
+                // `character.set` takes `{"energy"}` alone and keeps the
+                // words, so the app sends a picked level at once. A field,
+                // not a `can` kind: it's a new way to send a kind `can`
+                // lists. Missing, the app keeps "save the words first".
+                info["character"] = json!({"energy_alone": true});
             }
             // `make_skill_most_chars` (#7245, 19 Nov): the most characters
             // of words `skills.make` takes, 2,000, and
@@ -1806,6 +1812,9 @@ pub mod tests {
             .unwrap()
             .unwrap();
         assert_eq!(told["character_energy_supported"], true);
+        // #7566: the level alone is taken, said with the same switches.
+        assert!(info.get("character").is_none(), "{info}");
+        assert_eq!(told["character"], json!({"energy_alone": true}));
         assert!(answer(&mut will, "onboarding.page", &json!({"page": "create"})).is_ok());
         assert!(
             answer(

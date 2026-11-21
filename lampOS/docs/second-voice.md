@@ -236,6 +236,7 @@ each line plays exactly as before.
 | The second route's lines when a wordless cut-in is picked up again | `cut_in_wordless::BRIDGE` ("Anyway,"), `AGAIN` ("Oops, cut off again. Anyway,"), `PAUSE` ("It's a bit noisy here, so I'll pause. Just say 'Lamp' when you want me to go on.") | rendered ahead as the stop line; the first two then the cut answer's rest (`LAMP_CUT_IN_WORDLESS_RESUMES`, the memory owner's call, 5 Nov; on in the product, #7413) | the owner's words, rendered ahead (`language::fixed_in`); the rest in the answer's own words |
 | The second route's line when a line by name gets no words twice | `second_provider::NO_WORDS_LINE` ("Sorry, I lost my words there. Could you ask me again?") | said as the turn's text (`LAMP_NO_WORDS_AGAIN`, off in the product) | the owner's words (`language::fixed_in`) |
 | The second route's line when a reply claims again an action no call made | `action_claim::NOT_DONE_LINE` ("Sorry, I didn't do that. Could you ask me again?") | said as the turn's text (`LAMP_ACTION_CLAIM_CHECKED`, on in the product, #5215) | the owner's words (`language::fixed_in`) |
+| The second route's line when a live figure could not be looked up | `live_fact::COULD_NOT_LINE` ("Sorry, I couldn't look that up just now.") | said as the turn's text (`LAMP_LIVE_FACT_CHECKED`, off, #7605) | the owner's words (`language::fixed_in`) |
 | The second route's line when an answer to the lamp's own question gets no words | `second_provider::ANSWER_AGAIN_LINE` ("Sorry, could you say that again?") | said as the turn's text (`LAMP_ANSWER_ASK_AGAIN`, off in the product) | the owner's words (`language::fixed_in`) |
 | The second route's word when each sentence of a reply was an offer to keep left out | `keep_quietly::GOT_IT` ("Got it.") | said as the turn's text (`LAMP_KEEP_QUIETLY`, on in the product, a known person's own scope) | the owner's words (`language::fixed_in`) |
 | The second route's answer to a plain keep (`LAMP_KEEP_ANSWERS_AT_ONCE`, C59) | `keep_at_once::KEPT` ("Okay, I'll remember that.") | said as the turn's text, at once, with no second chat round | rendered ahead by this route's voice as the wordless cut-in lines are, played from that clip as the turn's piece; not rendered yet, the turn asks round 2 as without the switch |
@@ -4518,6 +4519,53 @@ after a take-over, but now for every turn:
   outside the ask costs one more chat round. Not judged: "It's safe to
   unplug me." (a reply opening "It's" is decided at its first word), claims
   in a later sentence, other languages.
+- **With `LAMP_LIVE_FACT_CHECKED=on` (off; #7605), a live figure is never
+  said with no lookup behind it.** On lamp-9adf (18 Nov, build 13929) "what
+  is the gold price today?" got "around $4,050 an ounce" with `calls=none`,
+  and Da Nang's weather "right now" and "tomorrow" was answered from Ho Chi
+  Minh City's of earlier turns. `crate::live_fact` judges each sentence of
+  a reply by its own words alone, never the person's line (the
+  reviewer-lead's HOLD on #7719), one at a time (`said_quietly`, before the
+  keep-quietly and offer holds). The first that states a live figure
+  (`live_fact::states_figure`: a price, digits with a currency sign or word
+  or a gold unit, "$4,050 an ounce"; degrees or wind beside a weather word,
+  a live marker such as today, now, tomorrow or this evening, or a weather
+  opening such as "It's" or "Expect"; a percent or points beside a market's
+  word, up, down, rate, index and the like, or a live marker; a score "2-1"
+  beside a result's word, won, lost, leads and the like, never "beat", or a live marker;
+  or a weather condition with a capitalized place; number words count with
+  their unit, "sixty-seven dollars"; never a time, a date, a count, a
+  recipe's grams or oven heat, a boiling point or "100% sure") that no
+  lookup in the turn found (`live_fact::found`: a `web_search` or
+  `fetch_page` answer with results, a page's words or a price backs any
+  figure, a `weather` answer with the weather backs only the weather's
+  figures; an error or an empty search, `{"results": []}`, backs nothing;
+  the chat's own search backs any; a cut answer's carried lookup counts
+  only when its answer found something; another turn's never) is held with
+  the rest of its round, and the round's words are not kept. A quoted line
+  and a reminder's ring are not judged. With no call, the model is asked
+  once with `live_fact::note`, whose round must call the lookup it names
+  (`live_fact::force`, `tool_choice`; `weather` when the held words speak
+  of weather and it is declared, else `web_search`); a second such reply,
+  the last round, or no lookup declared is said as
+  `live_fact::COULD_NOT_LINE`. Beside other calls those run and the next
+  round gets the note, told last, after the make line's ask again
+  (`last_notes`), so its lookup is forced. Said in the round that calls a
+  lookup, no note. In a reply that also makes a false action claim, the
+  action claim's ask again is taken first and that round's live sentences
+  are dropped with no note of their own; a later round's figure gets its
+  own ask again, so one turn may be asked again twice, within
+  `MAX_ROUNDS`. A doubted keep's take-back is said before the live block,
+  so its ask again never skips it. Until a search has found something,
+  the first words wait for their sentence's end (no clause or first-words
+  split), on every turn with the switch on. The journal says `N
+  sentence(s) gave a live figure no lookup backs …: not said, asked again
+  with T required (LAMP_LIVE_FACT_CHECKED)` and, once the ask again
+  speaks, `the live figure's ask again said its first words N ms after it
+  was asked`, or `… ended in the line that it couldn't look it up N ms
+  after it was asked`: the extra round's time. English only. Tests:
+  `second_provider::tests::live_fact::*`, `live_fact::tests::*` and
+  `held_forget::a_take_back_is_said_before_a_held_live_figure_asks_again`.
 - **With `LAMP_ACTION_CLAIM_WORDED=on` too, a claim the model words its own
   way is held the same way** (off; #5215's open shape: on 10441, 5 Nov
   04:24, "Hey Lamp, keep the light on until ten." got `calls=none` and

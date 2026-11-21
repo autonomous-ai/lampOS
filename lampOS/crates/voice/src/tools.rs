@@ -2509,14 +2509,27 @@ fn run_call_with_scope(
                                         &person,
                                     );
                                     match call.args.get("about") {
-                                        Some(about) => crate::remember::agreed_forget_exchanges(
-                                            socket,
-                                            told,
-                                            about,
-                                            &person,
-                                            deadline.saturating_sub(started.elapsed()),
-                                            lease,
-                                        ),
+                                        Some(about) => {
+                                            let told = crate::remember::agreed_forget_exchanges(
+                                                socket,
+                                                told,
+                                                about,
+                                                &person,
+                                                deadline.saturating_sub(started.elapsed()),
+                                                lease,
+                                            );
+                                            // And the observations naming
+                                            // it that the ask matched beside
+                                            // it (#8038).
+                                            crate::remember::agreed_forget_observations(
+                                                socket,
+                                                told,
+                                                about,
+                                                &person,
+                                                deadline.saturating_sub(started.elapsed()),
+                                                lease,
+                                            )
+                                        }
                                         None => told,
                                     }
                                 }
@@ -7670,7 +7683,15 @@ mod tests {
             listener.set_nonblocking(true).unwrap();
             let served = std::thread::spawn(move || {
                 let mut asked = vec![];
-                for answer in [by_id, b"{\"ok\":true,\"removed\":2}\n".as_slice()] {
+                for answer in [
+                    by_id,
+                    b"{\"ok\":true,\"removed\":2}\n".as_slice(),
+                    // #8038: their observations, then their kept things
+                    // alone, then the observation naming it forgotten.
+                    b"{\"ok\":true,\"entries\":[{\"id\":5,\"at_unix_ms\":1,\"text\":\"Wants the lamp to forget the recheck party.\"},{\"id\":6,\"at_unix_ms\":1,\"text\":\"Likes green tea.\"},{\"id\":7,\"at_unix_ms\":1,\"text\":\"The recheck party is on Friday.\"}]}\n".as_slice(),
+                    b"{\"ok\":true,\"entries\":[{\"id\":7,\"at_unix_ms\":1,\"text\":\"The recheck party is on Friday.\"}]}\n".as_slice(),
+                    b"{\"ok\":true,\"removed\":1}\n".as_slice(),
+                ] {
                     let until = Instant::now() + Duration::from_millis(500);
                     let mut stream = loop {
                         match listener.accept() {
@@ -7718,8 +7739,15 @@ mod tests {
             assert_eq!(asked[0]["person"], json!(nell), "{told}");
             assert!(asked[0].get("about").is_none(), "by its id: {asked:?}");
             if confirmed {
-                assert_eq!(asked.len(), 2, "{asked:?} {told}");
+                assert_eq!(asked.len(), 5, "{asked:?} {told}");
                 assert_eq!(asked[1]["op"], json!("exchanges_forget"), "{asked:?}");
+                // #8038: only the observation naming it goes, by its id,
+                // theirs; never a kept thing or another observation.
+                assert_eq!(asked[2]["observations"], json!(true), "{asked:?}");
+                assert_eq!(asked[3]["observations"], json!(false), "{asked:?}");
+                assert_eq!(asked[4]["op"], json!("forget"), "{asked:?}");
+                assert_eq!(asked[4]["id"], json!(5), "{asked:?}");
+                assert_eq!(asked[4]["person"], json!(nell), "{asked:?}");
                 assert_eq!(asked[1]["person"], json!(nell), "theirs only: {asked:?}");
                 assert_eq!(
                     asked[1]["about"],

@@ -1508,6 +1508,13 @@ on #6009, below): there the asker's voice; anywhere else, whoever says it.
   it was not sent." The journal names each check that failed ("a send
   cancelled: …": another send_id, not a later request than the read-back's,
   no service, prepared too long ago), and every refusal the words it gave.
+  Its own send_id in the very request that prepared it (the model prepared
+  and sent on one "Yes." before anyone heard the read-back; C124 on
+  lamp-06c1, 16 Nov) is no cancel: the write keeps waiting as prepared, the
+  model is told `NOT_YET` ("Not sent yet: it still waits. … read its
+  read_back to them in full now and stop; send it … only when they agree
+  after that."), and the yes after its read-back sends it. Nothing is sent
+  sooner.
 - **A cut read-back still sends nothing.** The read-back must not have been
   cut by a line or a Stop (`Thread::heard_only` → `services::lamp_cut`), and
   the person's line must not have begun before the read-back could have been
