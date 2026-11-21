@@ -4501,6 +4501,87 @@ mod tests {
         }
     }
 
+    /// #8182 (gate 1126): with `LAMP_TIMER_ASKS_HOW_LONG`, a timer or
+    /// reminder whose heard line gave no length or time is never set from a
+    /// length the model chose: the model is told to ask, briefly, and the
+    /// schedule is never asked; the second route's at-once line never says
+    /// it is set. A line that gives one sets what the call says. Off, a
+    /// call goes as before.
+    #[test]
+    fn a_timer_whose_length_was_not_heard_asks_and_sets_nothing() {
+        let set = |name: &str, args: Value| ToolCall {
+            id: "1".into(),
+            name: name.into(),
+            args,
+        };
+        crate::reminders::set_asks_here(Some(true));
+        for (heard, call, ask) in [
+            (
+                "Set a timer for please.",
+                set("set_timer", json!({"text":"Timer","seconds":600})),
+                "For how long?",
+            ),
+            (
+                "Remind me tomorrow to call the bank.",
+                set("set_reminder", json!({"text":"Call the bank","time":"09:00"})),
+                "What time?",
+            ),
+        ] {
+            // No executive listens: a call that reached it would be told
+            // the executive is unavailable, never this refusal.
+            let dir = schedule_directory("how-long-refused");
+            crate::stop_scope::set_heard_here(Some(Some(heard)));
+            let (_, (told, answered)) =
+                run_call_with_scope(&Route::Schedule(dir.clone()), &call, 1, true, None);
+            crate::stop_scope::set_heard_here(None);
+            let error = told["error"].as_str().unwrap_or_default();
+            assert!(error.contains(ask), "{heard}: {told}");
+            assert!(error.starts_with("Nothing was set"), "{told}");
+            assert!(!answered);
+            assert_eq!(
+                crate::second_provider::timer_line(
+                    &[crate::second_provider::net::ToolCall {
+                        id: call.id.clone(),
+                        name: call.name.clone(),
+                        args: call.args.clone(),
+                        extra: None,
+                    }],
+                    &[told],
+                    false
+                ),
+                None
+            );
+            std::fs::remove_dir_all(dir).unwrap();
+        }
+        for (on, heard, seconds) in [
+            (true, "Set a timer for one minute.", 60),
+            (true, "Set a timer for ten minutes.", 600),
+            (true, "Set a timer for 5 minutes.", 300),
+            (true, "Remind me in an hour to stretch.", 3_600),
+            (false, "Set a timer for please.", 600),
+        ] {
+            let dir = schedule_directory("how-long-set");
+            let served = executive(
+                &dir,
+                b"{\"ok\":true,\"result\":{\"status\":\"committed\",\"clock\":\"04:00\"}}\n",
+                Duration::ZERO,
+            );
+            crate::reminders::set_asks_here(Some(on));
+            crate::stop_scope::set_heard_here(Some(Some(heard)));
+            let call = set("set_timer", json!({"text":"Timer","seconds":seconds}));
+            let (_, (told, answered)) =
+                run_call_with_scope(&Route::Schedule(dir.clone()), &call, 1, true, None);
+            crate::stop_scope::set_heard_here(None);
+            assert!(answered, "{heard}: {told}");
+            assert_eq!(told["status"], "committed");
+            let asked = served.join().unwrap();
+            assert_eq!(asked["name"], "set_timer");
+            assert_eq!(asked["args"]["seconds"], seconds, "{heard}");
+            std::fs::remove_dir_all(dir).unwrap();
+        }
+        crate::reminders::set_asks_here(None);
+    }
+
     #[test]
     fn lost_or_unsendable_schedule_results_are_unknown_and_are_never_retried() {
         for (name, reply) in [
