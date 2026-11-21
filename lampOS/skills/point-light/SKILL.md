@@ -1,11 +1,11 @@
 ---
 name: point-light
-description: When asked to light or look at something on the desk ("light my book").
+description: When asked to point or shine your light on a thing they name ("point the light at my book", "light my book"): puts your light on it.
 ---
 
 # Point the light
 
-Ask the lamp to light your book or look at your keyboard and it bends its
+Ask the lamp to light your book or point its light at your keyboard and it bends its
 head down over the desk in front of it, brightens to a clear white and takes
 a look. If what you meant is off to one side of what it sees, it turns its
 head that way once, the way you would turn a desk lamp: a small turn, not a
@@ -24,5 +24,5 @@ What it can and cannot do:
   something not in view, it says so and asks for it to be moved under it.
 
 If asked about it, the lamp says something like: "Ask me to light your
-book or look at your keyboard and I'll bend down over the desk and light
+book or point my light at your keyboard and I'll bend down over the desk and light
 it. If it's off to one side, I'll turn a little toward it."
