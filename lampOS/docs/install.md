@@ -950,9 +950,11 @@ that keeps `--channel-url .../lampos-stable/` on GitHub, since no round
 rewrites lamp-update's unit; with `LAMP_UPDATE_CDN_FEED=on` (off unless set,
 #7728) its own lamp-update moves it to the CDN with the drop-in
 `lamp-update.service.d/zz-cdn-feed.conf`, only once the CDN's signed
-envelope is read and checked, and keeps the GitHub feed otherwise; on the
-CDN feed a round reads GitHub only after an hour of CDN failures, never
-sticking ([updates.md](updates.md), "Moving a lamp to the CDN feed").
+envelope is read and checked, and keeps the GitHub feed otherwise
+([updates.md](updates.md), "Moving a lamp to the CDN feed"). On the CDN
+feed, a product unit's own too and with the switch unset, a round reads
+GitHub only after an hour of CDN failures, never sticking (updates.md,
+"GitHub after an hour of CDN failures").
 
 As root, on a lamp with the base image (`crates/update/src/install.rs`):
 

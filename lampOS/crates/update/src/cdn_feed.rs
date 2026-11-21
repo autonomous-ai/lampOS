@@ -15,7 +15,8 @@
 //! reloads systemd. Any failure leaves the drop-in as it was, so the lamp
 //! keeps the feed it had.
 //!
-//! On the CDN feed, with the same switch, every round reads the CDN first;
+//! On the CDN feed, switch or not (a product unit follows it from its
+//! install, [`falls_back`]), every round reads the CDN first;
 //! once the CDN has failed for an hour ([`DOWN_SINCE`] in the records) a
 //! round that fails on it is done again on [`GITHUB_STABLE`]
 //! ([`round_on`]). Nothing sticks: the next round reads the CDN first.
@@ -236,12 +237,10 @@ pub fn on_github(config: &Config) -> Config {
 
 /// Whether `config`'s rounds, and its own confirm, fall back to
 /// [`GITHUB_STABLE`] after an hour of CDN failures: a `serve` (`serve`)
-/// that acts, on [`CDN`].
+/// that acts, on [`CDN`]: every such lamp, a product unit's too, with
+/// [`SWITCH`] or without it (the lead, #7728).
 pub fn falls_back(config: &Config, serve: bool) -> bool {
-    serve
-        && config.apply
-        && config.channel_url == CDN
-        && crate::switches::update_switch(&config.root, SWITCH, std::env::var_os(SWITCH).as_deref())
+    serve && config.apply && config.channel_url == CDN
 }
 
 /// A round on `config`'s feed. On [`CDN`], a round that cannot read it
