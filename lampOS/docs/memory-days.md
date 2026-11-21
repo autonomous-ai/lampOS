@@ -1128,7 +1128,10 @@ is `lamp_msgs::app_fact`; the store's side is `crates/memory/src/app_facts.rs`.
     a thing only: the voice's `forget {about}` reads the person's own app
     facts that way, page by page (at most 24, else "too much to look
     through"), and matches them by the same words as their kept things, so
-    "forget what the gym coach said" takes one. Never the room's, never
+    "forget what the gym coach said" takes one. The one-face forget (#5627),
+    with the person alone in view, lists them the same way beside their kept
+    things: one match is the one it asks about, and their yes forgets it by
+    its id; more than one asks which. Never the room's, never
     another person's; an older memory refuses the field and the forget looks
     in the rest.
   - **Never read by the nightly pass**, so no episode, pattern or chapter
