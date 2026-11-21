@@ -106,6 +106,25 @@ pub(crate) fn cannot_ring(
     (sets && on && fresh()).then(|| serde_json::json!({ "error": CANNOT_RING }))
 }
 
+#[cfg(test)]
+thread_local! {
+    /// [`lamp_actions::schedule::ASKS_HOW_LONG_SWITCH`] as a test of this
+    /// thread sets it.
+    static ASKS_HERE: std::cell::Cell<Option<bool>> = const { std::cell::Cell::new(None) };
+}
+
+/// The switch for this test's thread alone.
+#[cfg(test)]
+pub(crate) fn set_asks_here(on: Option<bool>) {
+    ASKS_HERE.with(|here| here.set(on));
+}
+
+/// The refusal for a `set_timer` or `set_reminder` whose `request`'s own
+/// heard line gives no length or time (#8182).
+pub(crate) fn when_not_heard(_name: &str, _request: u64, _heard: bool) -> Option<serde_json::Value> {
+    None
+}
+
 /// Whether a call was told [`cannot_ring`]'s refusal: nothing was set.
 pub(crate) fn is_cannot_ring(told: &serde_json::Value) -> bool {
     told["error"] == CANNOT_RING
