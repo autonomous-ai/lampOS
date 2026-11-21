@@ -66,9 +66,45 @@ pub fn wanted_within(hold: Duration, now_unix_ms: u64) -> bool {
     at != 0 && now_unix_ms.saturating_sub(at) <= hold.as_millis() as u64
 }
 
-/// [`wanted_within`] the [`IN_USE_HOLD`], now.
+/// The lamp's Harness panes at the last good read (#8105, the first
+/// builder's 15:33): 0 none read yet, 1 one is on OpenClaw, 2 none is. A
+/// failed read leaves it as it was.
+static PANES_ON_OPENCLAW: std::sync::atomic::AtomicU8 = std::sync::atomic::AtomicU8::new(0);
+
+/// How often the lamp's own panes are read for [`panes_read`].
+pub const PANES_EVERY: Duration = Duration::from_secs(60);
+
+/// Whether a pane in `listed` runs OpenClaw, by Harness's own `agent`
+/// field: a pane whose agent can't be read counts as OpenClaw, and a
+/// stopped pane runs nothing.
+pub fn panes_on_openclaw(listed: &[crate::harness::Listed]) -> bool {
+    listed.iter().any(|pane| {
+        pane.state != "stopped"
+            && pane
+                .agent
+                .as_deref()
+                .is_none_or(|agent| agent == "openclaw")
+    })
+}
+
+/// Takes a read of the lamp's own panes: one on OpenClaw marks it wanted
+/// and keeps it in use while it's listed; a failed read keeps the last.
+pub fn panes_read(read: &Result<Vec<crate::harness::Listed>, String>) {
+    let Ok(listed) = read else {
+        return;
+    };
+    let on = panes_on_openclaw(listed);
+    if on {
+        mark_wanted();
+    }
+    PANES_ON_OPENCLAW.store(if on { 1 } else { 2 }, std::sync::atomic::Ordering::Release);
+}
+
+/// [`wanted_within`] the [`IN_USE_HOLD`], now, or a pane on OpenClaw at the
+/// last good read of the lamp's panes.
 pub fn in_use() -> bool {
     wanted_within(IN_USE_HOLD, now_unix_ms())
+        || PANES_ON_OPENCLAW.load(std::sync::atomic::Ordering::Acquire) == 1
 }
 
 /// What the part's targets read of OpenClaw: whether the Harness on the
@@ -1259,6 +1295,44 @@ mod tests {
         assert!(wanted_within(IN_USE_HOLD, now + 60_000));
         assert!(!wanted_within(Duration::from_secs(60), now + 10 * 60_000));
         assert!(in_use());
+    }
+
+    /// #8105 (the first builder's 15:33): a pane is OpenClaw's by Harness's
+    /// `agent`, an unreadable agent counts as OpenClaw, a stopped pane
+    /// doesn't, and a failed read keeps the last good one.
+    #[test]
+    fn a_pane_on_openclaw_keeps_it_in_use() {
+        let pane = |agent: Option<&str>, state: &str| crate::harness::Listed {
+            agent_id: "11111111-1111-4111-8111-111111111111".into(),
+            state: state.into(),
+            last_active_unix_ms: None,
+            about: None,
+            agent: agent.map(str::to_owned),
+        };
+        assert!(!panes_on_openclaw(&[]));
+        assert!(!panes_on_openclaw(&[pane(Some("hermes"), "idle")]));
+        assert!(panes_on_openclaw(&[
+            pane(Some("hermes"), "idle"),
+            pane(Some("openclaw"), "working")
+        ]));
+        assert!(panes_on_openclaw(&[pane(None, "idle")]));
+        assert!(!panes_on_openclaw(&[pane(Some("openclaw"), "stopped")]));
+        panes_read(&Ok(vec![pane(Some("openclaw"), "idle")]));
+        assert_eq!(
+            PANES_ON_OPENCLAW.load(std::sync::atomic::Ordering::Acquire),
+            1
+        );
+        panes_read(&Err("harness_failed".into()));
+        assert_eq!(
+            PANES_ON_OPENCLAW.load(std::sync::atomic::Ordering::Acquire),
+            1
+        );
+        assert!(in_use());
+        panes_read(&Ok(vec![pane(Some("hermes"), "idle")]));
+        assert_eq!(
+            PANES_ON_OPENCLAW.load(std::sync::atomic::Ordering::Acquire),
+            2
+        );
     }
 
     /// #7246: the approvals read's JSON allows the launcher only with an

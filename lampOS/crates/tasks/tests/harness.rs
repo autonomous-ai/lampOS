@@ -4324,12 +4324,14 @@ fn a_listing_is_read_for_state_last_activity_and_the_line_and_nothing_else() {
                 about: Some(
                     "Read the brief / Wrote three names to names.md / All 3 tests pass".into()
                 ),
+                agent: None,
             },
             Listed {
                 agent_id: "33333333-3333-4333-8333-333333333333".into(),
                 state: "idle".into(),
                 last_active_unix_ms: None,
                 about: None,
+                agent: None,
             },
         ]
     );

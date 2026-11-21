@@ -754,6 +754,7 @@ mod tests {
             state: state.into(),
             last_active_unix_ms: Some(1_791_964_800_000),
             about: about.map(str::to_owned),
+            agent: None,
         }
     }
     const RUN: u64 = 1_791_964_000_000;
