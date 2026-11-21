@@ -498,7 +498,8 @@ impl TurnDetector {
             && self.active
             && !self.abandoned
             && !self.waited
-            && began_us.saturating_add(CALL_BEFORE_US) >= self.began_us.max(self.carried_through_us)
+            && began_us.saturating_add(CALL_BEFORE_US)
+                >= self.began_us.max(self.carried_through_us)
             && self.speech_blocks <= CALL_SPEECH_BLOCKS;
         if applies {
             self.waiting = true;
