@@ -10,7 +10,10 @@
 //! retries nor says so (lamp-c0a4), so before `harness new openclaw`
 //! lamp-tasks waits until the Gateway takes a connection and answers, at
 //! most [`READY_WITHIN`]; else the hand-over is not sent, with
-//! [`NOT_READY`], and the person is told it failed.
+//! [`NOT_READY`], and the person is told it failed. With
+//! `LAMP_OPENCLAW_GATEWAY_BY_DEFAULT` on, a launch is first held in the
+//! queue until the Gateway serves ([`cold_answers`]), at most
+//! [`COLD_WITHIN`].
 use std::io::{Read, Write};
 use std::net::{Ipv4Addr, SocketAddr, TcpStream};
 use std::path::{Path, PathBuf};
@@ -28,8 +31,8 @@ pub const PORT: u16 = 18789;
 /// How long a launch waits for a Gateway not answering yet before it is
 /// given up: its own start after a boot or a restart (27-50 s on lamp-c0a4
 /// with two plugins). A Gateway stopped by `LAMP_OPENCLAW_GATEWAY_BY_DEFAULT`
-/// starts colder (port 107-112 s, RPCs 220-241 s on lamp-e82d, #8105): a
-/// launch's wait for that comes before the switch is on.
+/// starts colder (port 107-112 s, RPCs 220-241 s on lamp-e82d, #8105): the
+/// launch is held in the queue for that ([`COLD_WITHIN`]) before this wait.
 pub const READY_WITHIN: Duration = Duration::from_secs(60);
 /// Between two looks at the port while it is waited for.
 const READY_EVERY: Duration = Duration::from_millis(250);
@@ -137,24 +140,89 @@ pub const COLD_WITHIN: Duration = Duration::from_secs(480);
 /// Between two looks at the port while a launch is held for it.
 const COLD_EVERY: Duration = Duration::from_secs(1);
 
-/// Whether lamp-update is asking (within two of [`PANES_EVERY`] of its last
-/// ask): it asks only with `LAMP_OPENCLAW_GATEWAY_BY_DEFAULT` on, so a
-/// launch is held for a cold Gateway only then, and off is as before.
-pub fn update_asking() -> bool {
-    let asked = UPDATE_ASKED_AT_MS.load(std::sync::atomic::Ordering::Acquire);
-    asked != 0 && (mono_ms() + 1).saturating_sub(asked) <= 2 * PANES_EVERY.as_millis() as u64
+/// Whether lamp-update has asked since this process started: it asks only
+/// with `LAMP_OPENCLAW_GATEWAY_BY_DEFAULT` on, every 10 s, so a launch is held
+/// for a cold Gateway only then, and off is as before. Kept for the
+/// process's life once set (Twelve on #8234: a round that pauses the asks
+/// is just when the Gateway may be cold).
+static UPDATE_EVER_ASKED: AtomicBool = AtomicBool::new(false);
+
+/// How long after this process starts a launch on OpenClaw waits for
+/// lamp-update's first ask before it is taken as off: two of its 10 s looks
+/// and a little more.
+pub const FIRST_ASK_WITHIN: Duration = Duration::from_secs(30);
+
+/// Whether a launch on OpenClaw may be held for a cold Gateway (#8105).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Asking {
+    /// lamp-update has asked: the switch is on.
+    Yes,
+    /// Not yet, within [`FIRST_ASK_WITHIN`] of the start: held, unmarked,
+    /// until it asks or that time passes.
+    NotYet,
+    /// Not asked in [`FIRST_ASK_WITHIN`]: the switch is off.
+    No,
 }
 
-/// The port's last answer for a held launch, looked at most every
+/// Sets whether lamp-update has asked, alone (no fresh ask, so no pane
+/// read): for tests only, which share this process.
+#[doc(hidden)]
+pub fn asked_for_tests(asked: bool) {
+    UPDATE_EVER_ASKED.store(asked, std::sync::atomic::Ordering::Release);
+}
+
+/// [`Asking`] now.
+pub fn update_asking() -> Asking {
+    if UPDATE_EVER_ASKED.load(std::sync::atomic::Ordering::Acquire) {
+        Asking::Yes
+    } else if mono_ms() < FIRST_ASK_WITHIN.as_millis() as u64 {
+        Asking::NotYet
+    } else {
+        Asking::No
+    }
+}
+
+/// How a held launch's Gateway is looked at: [`Serving::lamp`]'s read,
+/// port then the approvals RPC once per Gateway start, so a launch is sent
+/// only once the Gateway serves (#7170's 17:43, Twelve on #8234). Run on a
+/// thread of its own; replaced in tests ([`look_cold_with`]).
+type ColdLook = Box<dyn FnMut() -> bool + Send>;
+static COLD_LOOK: std::sync::OnceLock<std::sync::Mutex<ColdLook>> = std::sync::OnceLock::new();
+
+fn cold_look() -> &'static std::sync::Mutex<ColdLook> {
+    COLD_LOOK.get_or_init(|| {
+        let mut serving = Serving::lamp();
+        std::sync::Mutex::new(Box::new(move || {
+            serving.ready_until(Instant::now() + SERVING_LOOK_WITHIN, &|| false)
+        }))
+    })
+}
+
+/// The last look's answer for a held launch, looked at most every
 /// [`COLD_EVERY`] by a thread of its own, so the store's loop never waits on
-/// a connection: `true` once it answered.
+/// a look: `true` once the Gateway served.
 static COLD_ANSWERS: AtomicBool = AtomicBool::new(false);
-/// Until when (as [`WANTED_AT_MS`]) the port is looked at for a held launch.
+/// Until when (as [`WANTED_AT_MS`]) the Gateway is looked at for a held
+/// launch.
 static COLD_LOOK_UNTIL_MS: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
 
-/// Whether the Gateway answered at the last look for a held launch, and
-/// asks for looks for a few more seconds: the first ask starts the looking
-/// thread, which looks at once.
+/// One look's bound: the port, then a read of at most [`READ_WITHIN`].
+const SERVING_LOOK_WITHIN: Duration = Duration::from_secs(25);
+
+/// Puts `look` in place of [`Serving::lamp`]'s read for held launches: for
+/// tests only.
+#[doc(hidden)]
+pub fn look_cold_with(look: ColdLook) {
+    *cold_look()
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner) = look;
+}
+
+/// Whether the Gateway served at the last look for a held launch; looks
+/// go on while held launches ask, and stop 5 s after the last ask. A
+/// Gateway that served this start (the kept listener's inode, as skill
+/// runs keep it) is taken as serving at once, so a warm launch is never
+/// held a tick (Twelve on #8234).
 pub fn cold_answers() -> bool {
     static LOOKER: std::sync::OnceLock<()> = std::sync::OnceLock::new();
     COLD_LOOK_UNTIL_MS.store(
@@ -167,21 +235,36 @@ pub fn cold_answers() -> bool {
             .spawn(|| {
                 loop {
                     let until = COLD_LOOK_UNTIL_MS.load(std::sync::atomic::Ordering::Acquire);
-                    if mono_ms() < until {
-                        COLD_ANSWERS.store(answers(PORT), std::sync::atomic::Ordering::Release);
-                    } else {
-                        COLD_ANSWERS.store(false, std::sync::atomic::Ordering::Release);
-                    }
+                    let served = mono_ms() < until
+                        && (cold_look()
+                            .lock()
+                            .unwrap_or_else(std::sync::PoisonError::into_inner))(
+                        );
+                    COLD_ANSWERS.store(served, std::sync::atomic::Ordering::Release);
                     thread::sleep(COLD_EVERY);
                 }
             });
     });
-    COLD_ANSWERS.load(std::sync::atomic::Ordering::Acquire)
+    COLD_ANSWERS.load(std::sync::atomic::Ordering::Acquire) || served_this_start()
+}
+
+/// Whether the Gateway listening now is the one whose approvals read last
+/// succeeded ([`SERVED`]): served this start, so warm.
+fn served_this_start() -> bool {
+    SERVED
+        .get()
+        .and_then(|served| {
+            *served
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner)
+        })
+        .is_some_and(|inode| listener_here() == Some(inode))
 }
 
 /// lamp-update asked whether OpenClaw is in use (`Route::UpdateRead`).
 pub fn update_asked() {
     UPDATE_ASKED_AT_MS.store(mono_ms() + 1, std::sync::atomic::Ordering::Release);
+    UPDATE_EVER_ASKED.store(true, std::sync::atomic::Ordering::Release);
 }
 
 /// Whether the lamp's panes are to be read now, the last read at `last`:

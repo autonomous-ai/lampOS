@@ -4513,3 +4513,74 @@ fn forget_sessions_removes_the_index_of_the_sessions_the_lamp_started() {
         "{answer}"
     );
 }
+
+/// #8105 (Twelve on #8234): through the store's loop, with lamp-update
+/// asking, a task on OpenClaw is held while its Gateway doesn't serve, and
+/// the task queued behind it with it; neither is launched until the look
+/// says it serves, then both go. A port alone is not enough: the look is
+/// the serving read.
+#[test]
+fn a_task_on_openclaw_is_held_in_the_queue_until_its_gateway_serves() {
+    let serving = Arc::new(AtomicBool::new(false));
+    let looked = Arc::new(std::sync::atomic::AtomicU64::new(0));
+    {
+        let serving = serving.clone();
+        let looked = looked.clone();
+        lamp_tasks::gateway::look_cold_with(Box::new(move || {
+            looked.fetch_add(1, Ordering::SeqCst);
+            serving.load(Ordering::SeqCst)
+        }));
+    }
+    // Asked, with no fresh ask: no pane read starts in the other tests
+    // sharing this process.
+    lamp_tasks::gateway::asked_for_tests(true);
+    let mut s = Running::unstarted(false, false, false, false);
+    s.config.targets.insert(
+        "claw".into(),
+        Target {
+            machine_id: "0123456789abcdef0123456789abcdef".into(),
+            project: "project".into(),
+            engine: EngineKind::Openclaw,
+        },
+    );
+    s.start();
+    let ask = |target: &str| {
+        let prepared = s.ask(json!({"op":"prepare","guard":s.guard(),"text":"Private scripted task","target":target}));
+        assert_eq!(prepared["ok"], true, "{prepared}");
+        assert_eq!(s.trusted(s.confirmation(&prepared))["ok"], true);
+        prepared
+    };
+    let claw = ask("claw");
+    let coding = ask("coding");
+    // Held: the look runs, nothing is launched, the Codex task waits behind.
+    let start = Instant::now();
+    while looked.load(Ordering::SeqCst) < 2 {
+        assert!(
+            start.elapsed() < Duration::from_secs(5),
+            "the gateway was never looked at"
+        );
+        thread::sleep(Duration::from_millis(20));
+    }
+    assert_eq!(s.counts.launches.load(Ordering::SeqCst), 0);
+    assert_eq!(
+        s.ask(json!({"op":"get_task","id":claw["id"]}))["task"]["dispatch"]["state"],
+        "queued"
+    );
+    // It serves: the held task goes, then the one behind it.
+    serving.store(true, Ordering::SeqCst);
+    s.wait(&claw["id"], |v| {
+        v["task"]["dispatch"]["state"] == "accepted"
+    });
+    // The scripted Harness gives every launch the same agent, so the second
+    // ends `reused_remote_id`: what counts is that it was sent.
+    s.wait(&coding["id"], |v| {
+        v["task"]["dispatch"]["state"] != "queued"
+    });
+    lamp_tasks::gateway::asked_for_tests(false);
+    assert_eq!(s.counts.launches.load(Ordering::SeqCst), 2);
+    assert_eq!(
+        s.counts.launched_on.lock().unwrap()[0].1,
+        EngineKind::Openclaw,
+        "the held task went first"
+    );
+}
