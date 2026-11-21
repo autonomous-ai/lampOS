@@ -1,6 +1,6 @@
 ---
 name: point-light
-description: When asked to point or shine your light on a thing they name ("point the light at my book", "light my book"): puts your light on it.
+description: When asked to point or shine your light on a thing they name on the desk ("point the light at my book", "light my book"): puts your light on it.
 ---
 
 # Point the light
