@@ -92,7 +92,19 @@ fn the_energy_is_kept_with_the_words_and_restarts_nothing() {
         }
     );
 
-    // The old string form, as an older lamp-cloud sends it: worked out.
+    // The old string form, as an older lamp-cloud sends it: the chosen 2
+    // stays (#7566, the first builder's 18:36); with none chosen it is
+    // worked out.
+    let (reply, _) = answer(r#"{"character": "calm and quiet"}"#, &config, true);
+    assert_eq!(reply["done"]["energy"], 2);
+    assert_eq!(
+        kept(),
+        lamp_msgs::Energy {
+            level: 2,
+            chosen: true
+        }
+    );
+    answer(r#"{"character": {"text": ""}}"#, &config, true);
     let (reply, _) = answer(r#"{"character": "calm and quiet"}"#, &config, true);
     assert_eq!(reply["done"]["energy"], 1);
     assert_eq!(
@@ -112,6 +124,90 @@ fn the_energy_is_kept_with_the_words_and_restarts_nothing() {
 /// chosen, restarting nothing; with no words kept it is kept all the same;
 /// an empty text still clears both; a level out of 1..5, or neither text nor
 /// level, is refused with nothing written.
+/// #7566 (the first builder's 18:36): a level the owner chose stays
+/// through a save of words alone; a derived one is derived again from the
+/// new words; a save with an energy sets it as chosen; and empty words clear
+/// both.
+#[test]
+fn a_chosen_level_stays_through_a_save_of_words_alone() {
+    let root = Root::new();
+    let config = root.config();
+    let words = change::beside_language(&config, "character");
+    let energy = change::beside_language(&config, "energy");
+    let kept = || lamp_msgs::chosen_voice::energy_kept(&energy);
+    let lively = "energetic, bouncy and playful";
+    let derived = lamp_msgs::chosen_voice::energy_of(lively);
+    assert_ne!(derived, 2, "the test's words derive a level other than 2");
+
+    // Derived: new words alone derive it again.
+    answer(
+        r#"{"character": {"text": "calm and quiet"}}"#,
+        &config,
+        true,
+    );
+    assert!(!kept().chosen);
+    let (reply, _) = answer(
+        &json!({"character": {"text": lively}}).to_string(),
+        &config,
+        true,
+    );
+    assert_eq!(reply, json!({"done": {"text": lively, "energy": derived}}));
+    assert_eq!(
+        kept(),
+        lamp_msgs::Energy {
+            level: derived,
+            chosen: false
+        }
+    );
+
+    // Chosen: the level alone, then new words alone keep it.
+    answer(r#"{"character": {"energy": 2}}"#, &config, true);
+    let (reply, _) = answer(
+        &json!({"character": {"text": lively}}).to_string(),
+        &config,
+        true,
+    );
+    assert_eq!(reply, json!({"done": {"text": lively, "energy": 2}}));
+    assert_eq!(
+        kept(),
+        lamp_msgs::Energy {
+            level: 2,
+            chosen: true
+        }
+    );
+
+    // Words with an energy set it as chosen, as before.
+    answer(
+        r#"{"character": {"text": "calm and quiet", "energy": 3}}"#,
+        &config,
+        true,
+    );
+    assert_eq!(
+        kept(),
+        lamp_msgs::Energy {
+            level: 3,
+            chosen: true
+        }
+    );
+
+    // Empty words clear both, so the owner can start over.
+    answer(r#"{"character": {"text": ""}}"#, &config, true);
+    assert!(!words.exists());
+    assert!(!energy.exists());
+    answer(
+        &json!({"character": {"text": lively}}).to_string(),
+        &config,
+        true,
+    );
+    assert_eq!(
+        kept(),
+        lamp_msgs::Energy {
+            level: derived,
+            chosen: false
+        }
+    );
+}
+
 #[test]
 fn the_movement_level_alone_keeps_the_words() {
     let root = Root::new();
