@@ -1150,8 +1150,8 @@ is `lamp_msgs::app_fact`; the store's side is `crates/memory/src/app_facts.rs`.
 - **The journal** says the op, the person's id and the count, never a word.
 - **No switch here.** The writer is the door's `apps.remember` (C166,
   [apps.md](apps.md), "What an app tells Lamp's memory"), behind its own
-  switch `LAMP_APP_REMEMBER` in lamp-control, off until the first builder's
-  privacy read and the ROW. lamp-control checks the app's grant, its words
+  switch `LAMP_APP_REMEMBER` in lamp-control, `on` in the product's
+  `lamp-control.service` (the first builder's DEFAULT-ON on the switch-on row). lamp-control checks the app's grant, its words
   (`app_fact::tidy`), the privacy switch and three a minute, and tells the
   voice on `apps/remember`; the voice tries the owner's memory ids, the face's
   first, each through `app_fact::whose`, moving to the next on `not_known`,

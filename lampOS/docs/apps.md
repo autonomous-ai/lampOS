@@ -11,7 +11,7 @@ lamp. It is in English only ([the docs rule](../AGENTS.md)).
 `lamp_skills::app_package`, with tests) and the yes ops in lamp-control (piece
 3a, `app_yes.rs`) and the app socket with `phrases.set` (pieces 3b-1 and 3b-2a, `app_socket.rs`, [control.md](control.md)). The app socket's `app.trigger` and its 3 s hold are built too
 (piece 3b-2b, `app_triggers.rs`). `apps.remember` and the `remember` grant are built behind
-`LAMP_APP_REMEMBER` (C166, `app_remember.rs`; below). Designed and not yet built: lamp-cloud's `apps.*` kinds
+`LAMP_APP_REMEMBER` (C166, `app_remember.rs`; below), `on` in the product's `lamp-control.service`. Designed and not yet built: lamp-cloud's `apps.*` kinds
 (piece 4), the installer (`lamp-apps-manage`, eighth's). Everything behind
 the one switch **`LAMP_STORE_APPS`**, off unless set and `on` in the product's control, cloud and apps units (#7956). A lamp that has the
 format probe refuses an app package in words ("format 2 is not one this lamp
@@ -356,10 +356,11 @@ as its source, and sets a live context line that is never kept. The memory's
 side is built ([memory-days.md](memory-days.md), "An app's facts and context
 lines"; `lamp_msgs::app_fact`). **`apps.remember` is built** (C166:
 lamp-control's `app_remember.rs`, the voice's `app_remember.rs`), behind its
-own switch `LAMP_APP_REMEMBER` (lamp-control; off, in no unit, until the first
-builder's privacy read and the ROW) inside `LAMP_STORE_APPS`. **`apps.context`
-is built** too (lamp-control's `app_context.rs`, the voice's `app_context.rs`),
-behind the same two switches and, at the voice, `LAMP_APP_MEMORY`.
+own switch `LAMP_APP_REMEMBER` (lamp-control; `on` in the product's
+`lamp-control.service`, the first builder's DEFAULT-ON on the switch-on row)
+inside `LAMP_STORE_APPS`. **`apps.context` is built** too (lamp-control's
+`app_context.rs`, the voice's `app_context.rs`), behind the same two switches
+and, at the voice, `LAMP_APP_MEMORY`.
 
 - **The grant.** `remember` is an app's own grant, beside the door's 14 and
   never a computer's: a manifest may ask it (`lamp_skills::app_package::GRANTS`,
