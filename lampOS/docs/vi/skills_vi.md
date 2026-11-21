@@ -3950,9 +3950,10 @@ Dù đèn chạy agent nào (OpenClaw hay Hermes; không chỗ nào ở đây g�
   (`make_skill_agent::try_made`, `"op":"make_try"`; [tasks_vi.md](tasks_vi.md),
   "Lần chạy thử của kỹ năng được tạo") và chỉ được giữ khi lần thử đạt: mỗi
   script thoát 0 trong 30 s, script của bước `run` đã nói ít nhất một câu
-  bằng `lamp.say`, script của bước `task` có in ra gì đó. Lần thử không thay
-  đổi gì ngoài đời: lamp-control trả lời lệnh ghi dịch vụ liên kết của lần
-  chạy thử như đã xong và không bao giờ gửi; lệnh đọc thì chạy thật. Lần thử
+  bằng `lamp.say`, script của bước `task` có in ra gì đó. Lần thử là một lần
+  chạy thật (#8180): nó có mọi quyền kỹ năng khai báo (trong đó có `net`,
+  camera và microphone, không hỏi gì), và các thao tác của nó, kể cả lệnh
+  ghi dịch vụ liên kết, được làm thật như lúc kỹ năng chạy. Lần thử
   thất bại bị từ chối là `made_skill::NOT_TRIED_PASSED` kèm lời của
   lamp-tasks, gửi lại agent như một lần sửa (tối đa hai), rồi lần tạo được
   báo là thất bại và không giữ gì. Lần thử đạt thêm `made_skill::TRIED_SAID`
@@ -4101,12 +4102,10 @@ run = "scripts/main.py"
   (`task::run_failed_line`), ở mức ưu tiên nói của kỹ năng; nếu do một
   trigger khởi động, đèn không nói gì. Nhật ký luôn ghi lý do, không bao
   giờ ghi đầu ra của script.
-- **`net`**: được cấp như một task có `net` hôm nay, với cùng lời đồng ý
-  (lời đồng ý của chủ sở hữu nêu `net` cho thư mục như hiện tại,
-  `LAMP_TASK_NET` bật): socket egress riêng của lần chạy, chỉ web công khai
-  trên cổng 80 và 443, qua `HTTPS_PROXY` (`127.0.0.1:3128`) trong hàng rào
-  của nó ([tasks_vi.md](tasks_vi.md), "Bước `run` của một kỹ năng"). Không
-  có lời đồng ý đó thì bị từ chối trước khi chạy gì.
+- **`net`**: được cấp chỉ bởi quyền, không hỏi gì (#8180; `LAMP_TASK_NET`
+  bật): socket egress riêng của lần chạy, chỉ web công khai trên cổng 80 và
+  443, qua `HTTPS_PROXY` (`127.0.0.1:3128`) trong hàng rào của nó
+  ([tasks_vi.md](tasks_vi.md), "Bước `run` của một kỹ năng").
 - **Không được cấp**: khóa (`secrets`): kỹ năng cần khóa dùng `do.task`;
   lamp-tasks từ chối bước `run` của kỹ năng đó, bằng lời.
 - **Giới hạn riêng**: script chạy với giới hạn bộ nhớ (768 MiB không gian
