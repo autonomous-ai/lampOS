@@ -163,7 +163,8 @@ impl Scene<'_> {
         }
         let next = next.expect("the verb did not start a line");
         assert!(
-            next.windows(2).all(|pair| pair[1].sequence == pair[0].sequence + 1),
+            next.windows(2)
+                .all(|pair| pair[1].sequence == pair[0].sequence + 1),
             "the next line's audio has a gap"
         );
         Run {
@@ -222,7 +223,10 @@ fn with_the_switch_off_nothing_changes_and_on_only_the_next_start_does() {
             Scene::measured().run(detector)
         };
         let off = Scene::measured().run(detector(false, first_words, soft, 60));
-        assert_eq!(off.pushes, before.pushes, "first words {first_words} soft {soft}");
+        assert_eq!(
+            off.pushes, before.pushes,
+            "first words {first_words} soft {soft}"
+        );
         let after: Vec<u64> = (off.ended + 1..=off.ended + 2 + u64::from(START_BLOCKS)).collect();
         let next: Vec<u64> = off.next.iter().map(|f| f.sequence).collect();
         assert_eq!(next, after);
