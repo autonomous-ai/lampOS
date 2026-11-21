@@ -920,7 +920,6 @@ impl Door {
             None => self.runs.end(run),
         }?;
         self.clients.end_run(&ended.client);
-        self.forget_tried_notes(&ended);
         Some(ended)
     }
 
@@ -929,23 +928,8 @@ impl Door {
         let ended = self.runs.expire(now_us);
         for run in &ended {
             self.clients.end_run(&run.client);
-            self.forget_tried_notes(run);
         }
         ended
-    }
-
-    /// A make's tried run ended (#8157): any notes it has on the lamp are
-    /// forgotten, in memory and on disk, its run's own (`<c_run>.json`) and
-    /// its skill's (`LAMP_MADE_NOTES`). Its `notes.set` is stubbed, so
-    /// there should be none; this holds it whatever kept them.
-    fn forget_tried_notes(&self, run: &crate::runs::Run) {
-        if !run.tried {
-            return;
-        }
-        if let Some(notes) = &self.notes {
-            notes.forget(&run.client);
-            notes.forget(&crate::runs::skill_notes_client(&run.skill));
-        }
     }
 
     /// The run `token` holds now.
@@ -1282,17 +1266,9 @@ impl Door {
             return refuse(ErrorCode::NoHello, "say hello first".to_owned());
         };
         // A skill run's linked services: off, nothing else is looked at.
-        // A make's tried run's write is stubbed below, linked services on
-        // or not (#8157).
-        let tried = session.run_socket
-            && self
-                .runs
-                .of_client(&client, now_us)
-                .is_some_and(|run| run.tried);
-        let tried_write = tried && matches!(op, Op::ServiceWrite { .. });
-        if matches!(op, Op::ServiceRead { .. } | Op::ServiceWrite { .. })
-            && self.services.is_none()
-            && !tried_write
+        // A make's tried run's ops are done live within its grants, as its
+        // real run's (#8180).
+        if matches!(op, Op::ServiceRead { .. } | Op::ServiceWrite { .. }) && self.services.is_none()
         {
             return refuse(ErrorCode::Off, crate::services::OFF.to_owned());
         }
@@ -1317,29 +1293,6 @@ impl Door {
                 .any(|grant| matches!(grant, Grant::Camera | Grant::Microphone | Grant::Speaker))
         {
             return refuse(ErrorCode::Refused, LOCAL_ONLY.to_owned());
-        }
-        // A make's tried run (#8157) changes nothing in the world: an op
-        // that changes what the lamp keeps is answered from a stub, a
-        // sensor's capture, a turn or skills are refused, and the rest
-        // (`protocol::in_try`'s live ones) go on as for any run.
-        if tried {
-            match protocol::in_try(&op) {
-                protocol::InTry::Live => {}
-                protocol::InTry::Refused => {
-                    eprintln!(
-                        "lamp-control: a make's tried run asked {}: refused, a try never gets it",
-                        journal::op_name(&op)
-                    );
-                    return refuse(ErrorCode::Refused, protocol::TRIED_REFUSED.to_owned());
-                }
-                protocol::InTry::Stubbed => {
-                    eprintln!(
-                        "lamp-control: a make's tried run asked {}: answered from the stub, nothing changed",
-                        journal::op_name(&op)
-                    );
-                    return ok(re, protocol::tried_stub(&op).unwrap_or_default());
-                }
-            }
         }
         if let Op::ServiceRead { service, args } | Op::ServiceWrite { service, args } = &op {
             // Its grant is held (above); and it is a skill run's, by the run
@@ -4964,12 +4917,58 @@ mod tests {
         let _ = std::fs::remove_dir_all(&dir);
     }
 
-    /// #8157: a make's tried run changes nothing in the world. Its
-    /// `service.write` is answered as if done from the stub and never
-    /// reaches lamp-services; its `service.read` goes there live.
+    /// #8180 (the dev's ruling): a make's tried run's ops are done live
+    /// within its grants, as its real run's: it speaks, plays a sound,
+    /// moves, lights, and captures from the camera, the microphone and
+    /// the speaker stream; none is stubbed or refused for being a try.
     #[test]
-    fn a_tried_runs_write_is_stubbed_and_its_read_is_live() {
+    fn a_tried_runs_ops_are_live_within_its_grants() {
+        let grants = [
+            Grant::Speak,
+            Grant::Body,
+            Grant::Light,
+            Grant::Camera,
+            Grant::Microphone,
+            Grant::Speaker,
+        ];
+        let frames = [
+            json!({"op": "say", "text": "hello"}),
+            json!({"op": "sound", "name": "hum"}),
+            json!({"op": "gesture", "name": "nod"}),
+            json!({"op": "light", "colour": "warm", "level": 2, "for_ms": 1000}),
+            json!({"op": "camera.snapshot"}),
+            json!({"op": "microphone.stream", "on": true}),
+            json!({"op": "speaker.stream", "on": true}),
+        ];
+        for frame in frames {
+            let (mut door, mut session, mut fake) = run_door(&grants, None);
+            door.mark_tried("r1");
+            let mut sent = frame.clone();
+            sent["id"] = json!(7);
+            let outcome = door.handle(&mut session, &sent.to_string(), &mut fake, S, 1);
+            let answered = reply(&outcome);
+            assert_eq!(answered["ok"], true, "{frame} {answered}");
+            assert!(!answered.to_string().contains("\"tried\""), "{answered}");
+            let op = frame["op"].as_str().unwrap();
+            assert!(
+                fake.did.iter().any(|did| did.ends_with(&format!(" {op}"))),
+                "{frame}: done by the lamp's parts {:?}",
+                fake.did
+            );
+        }
+    }
+
+    /// #8180: a make's tried run's `service.write` goes on to
+    /// lamp-services live, as its real run's, and with linked services off
+    /// it is off, as any run's: no stub answers it.
+    #[test]
+    fn a_tried_runs_write_is_sent_live_as_a_runs() {
         use std::io::{BufRead as _, Write as _};
+        let (mut door, mut session, mut fake) =
+            run_door(&[service("gmail", protocol::Access::Write)], None);
+        door.mark_tried("r1");
+        let off = door.handle(&mut session, &write_frame("gmail"), &mut fake, S, 1);
+        assert_eq!(code_of(&off), Some("off"), "{off:?}");
         let dir =
             std::env::temp_dir().join(format!("lamp-control-run-tried-{}", std::process::id()));
         let _ = std::fs::create_dir_all(&dir);
@@ -4982,191 +4981,24 @@ mod tests {
             std::io::BufReader::new(&stream)
                 .read_line(&mut line)
                 .unwrap();
-            writeln!(stream, r#"{{"ok":true,"result":{{"messages":[]}}}}"#).unwrap();
+            writeln!(stream, r#"{{"ok":true,"result":{{"sent":true}}}}"#).unwrap();
             serde_json::from_str::<Value>(&line).unwrap()
         });
-        let (mut door, mut session, mut fake) = run_door(
-            &[
-                service("gmail", protocol::Access::Read),
-                service("gmail", protocol::Access::Write),
-            ],
-            Some(socket),
-        );
+        let (mut door, mut session, mut fake) =
+            run_door(&[service("gmail", protocol::Access::Write)], Some(socket));
         door.mark_tried("r1");
-        // The write: answered at once from the stub, nothing sent.
         let outcome = door.handle(&mut session, &write_frame("gmail"), &mut fake, S, 1);
-        assert!(outcome.later.is_none(), "{outcome:?}");
-        assert_eq!(reply(&outcome)["ok"], true, "{outcome:?}");
-        assert_eq!(reply(&outcome)["result"]["sent"], false, "{outcome:?}");
-        assert_eq!(reply(&outcome)["result"]["tried"], true, "{outcome:?}");
-        // The read: sent on to lamp-services, live; the one line it got.
-        let outcome = door.handle(&mut session, &read_frame("gmail"), &mut fake, S, 1);
-        outcome.later.expect("answered off the lock").reply();
+        let answered = outcome.later.expect("sent on to lamp-services").reply();
+        assert!(!answered.to_string().contains("\"tried\""), "{answered}");
         let line = served.join().unwrap();
-        assert_eq!(line["name"], "service_read", "{line}");
+        assert_eq!(line["name"], "service_write", "{line}");
         let _ = std::fs::remove_dir_all(&dir);
     }
 
-    /// #8180: what each op of a make's tried run must be, written apart
-    /// from `protocol::in_try` and as exhaustive (no catch-all), so a new
-    /// `Op` doesn't compile until it is placed in both.
-    fn tried_should_be(op: &Op) -> protocol::InTry {
-        use protocol::InTry::{Live, Refused, Stubbed};
-        match op {
-            // The short live list: plumbing, showing, speaking, reading.
-            Op::Pair { .. } | Op::Hello { .. } | Op::Stop {} => Live,
-            Op::Subscribe { .. } | Op::Unsubscribe { .. } | Op::Get { .. } => Live,
-            Op::LeaseTake { .. } | Op::LeaseRenew { .. } | Op::LeaseRelease { .. } => Live,
-            Op::Say { .. } | Op::Sound { .. } | Op::Light { .. } | Op::Look { .. } => Live,
-            Op::Express { .. } | Op::Gesture { .. } | Op::Move { .. } => Live,
-            Op::Play { .. } | Op::Joints { .. } => Live,
-            Op::SoundList {} | Op::NotesGet { .. } | Op::NotesList { .. } => Live,
-            Op::ServiceRead { .. } => Live,
-            // What the lamp keeps: answered from the stub.
-            Op::ServiceWrite { .. } | Op::NotesSet { .. } | Op::NotesDelete { .. } => Stubbed,
-            Op::SoundUpload { .. } | Op::SoundRemove { .. } | Op::Volume { .. } => Stubbed,
-            Op::ListenSet { .. } | Op::TurnEnd {} => Stubbed,
-            // A sensor's capture, a turn, skills: refused.
-            Op::CameraSnapshot {} | Op::CameraStream { .. } | Op::Pose { .. } => Refused,
-            Op::MicrophoneStream { .. } | Op::SpeakerStream { .. } | Op::TurnStart { .. } => {
-                Refused
-            }
-            Op::SkillPush { .. } | Op::SkillList {} | Op::SkillRemove { .. } => Refused,
-        }
-    }
-
-    /// The wire name of every `Op` variant, read from protocol.rs's own
-    /// `enum Op` (each carries a serde rename).
-    fn every_op_name() -> std::collections::BTreeSet<String> {
-        let source = include_str!("protocol.rs");
-        let start = source.find("pub enum Op {").expect("enum Op");
-        let body = &source[start..];
-        let body = &body[..body.find("\n}\n").expect("end of enum Op")];
-        body.lines()
-            .filter_map(|line| line.trim().strip_prefix("#[serde(rename = \""))
-            .map(|rest| rest.split('"').next().unwrap().to_owned())
-            .collect()
-    }
-
-    /// #8180 (Heron's HOLD 2): a make's tried run, op by op, over every
-    /// `Op`: each is answered from the stub (`"tried": true`, nothing kept),
-    /// refused with `protocol::TRIED_REFUSED`, or on the short live list.
-    /// The table names every variant, read from protocol.rs, so an op added
-    /// and not placed fails here as well as at the compile.
+    /// #8180: a make's tried run's notes are real notes: what it keeps
+    /// stays on the lamp after its end, as an untried run's.
     #[test]
-    fn every_op_of_a_tried_run_is_stubbed_refused_or_live() {
-        let wav = "UklGRg==";
-        let frames = [
-            json!({"op": "pair", "name": "x", "key": "a", "proof": "b"}),
-            json!({"op": "hello", "client": "c_0", "sig": "a"}),
-            json!({"op": "subscribe", "events": []}),
-            json!({"op": "unsubscribe", "events": []}),
-            json!({"op": "get", "state": []}),
-            json!({"op": "lease.take", "parts": ["light"], "for_ms": 1000}),
-            json!({"op": "lease.renew", "lease": "l", "for_ms": 1000}),
-            json!({"op": "lease.release", "lease": "l"}),
-            json!({"op": "express", "feeling": "happy"}),
-            json!({"op": "gesture", "name": "nod"}),
-            json!({"op": "look", "at": "face"}),
-            json!({"op": "move", "step_ms": 50, "frames": [[0, 0, 0, 0, 0]]}),
-            json!({"op": "play", "name": "wave"}),
-            json!({"op": "joints", "lease": "l", "targets": {"yaw": 1.0}, "within_ms": 500}),
-            json!({"op": "light", "colour": "warm", "level": 2, "for_ms": 1000}),
-            json!({"op": "say", "text": "hello"}),
-            json!({"op": "sound", "name": "hum"}),
-            json!({"op": "sound.upload", "name": "bell", "sha256": "a".repeat(64),
-                "size": 6, "part": 0, "parts": 1, "data": wav}),
-            json!({"op": "sound.list"}),
-            json!({"op": "sound.remove", "name": "bell"}),
-            json!({"op": "notes.set", "key": "k", "value": {"n": 1}}),
-            json!({"op": "notes.get", "key": "k"}),
-            json!({"op": "notes.delete", "key": "k"}),
-            json!({"op": "notes.list"}),
-            json!({"op": "turn.start"}),
-            json!({"op": "turn.end"}),
-            json!({"op": "listen.set", "on": false}),
-            json!({"op": "stop"}),
-            json!({"op": "skill.push", "name": "s", "sha256": "a".repeat(64), "size": 1,
-                "part": 0, "parts": 1, "data": "AA=="}),
-            json!({"op": "volume", "to": 90}),
-            json!({"op": "skill.list"}),
-            json!({"op": "skill.remove", "name": "s"}),
-            json!({"op": "camera.snapshot"}),
-            json!({"op": "camera.stream", "on": true}),
-            json!({"op": "pose", "jpeg": "AA=="}),
-            json!({"op": "microphone.stream", "on": true}),
-            json!({"op": "service.read", "service": "gmail", "args": {}}),
-            json!({"op": "service.write", "service": "gmail", "args": {"action": "send"}}),
-            json!({"op": "speaker.stream", "on": true}),
-        ];
-        let named: std::collections::BTreeSet<String> = frames
-            .iter()
-            .map(|frame| frame["op"].as_str().unwrap().to_owned())
-            .collect();
-        assert_eq!(named, every_op_name(), "every Op is in the table, once");
-        assert_eq!(named.len(), frames.len());
-        let grants = [
-            Grant::Body,
-            Grant::Light,
-            Grant::Speak,
-            Grant::Look,
-            Grant::Hear,
-            Grant::Sound,
-            Grant::Skills,
-            Grant::Air,
-            Grant::Device,
-            Grant::Camera,
-            Grant::Microphone,
-            Grant::Speaker,
-            Grant::Notes,
-            Grant::Speech,
-            service("gmail", protocol::Access::Read),
-            service("gmail", protocol::Access::Write),
-        ];
-        let notes =
-            std::env::temp_dir().join(format!("lamp-control-tried-ops-{}", std::process::id()));
-        let _ = std::fs::remove_dir_all(&notes);
-        for frame in frames {
-            let op: Op = serde_json::from_value(frame.clone()).expect("an op");
-            let class = protocol::in_try(&op);
-            assert_eq!(class, tried_should_be(&op), "{frame}");
-            // Every grant the op could need is held (even ones a try is
-            // never minted), so only the try decides.
-            let (door, mut session, mut fake) = run_door(&grants, None);
-            let mut door = door.with_notes_folder(notes.clone());
-            door.mark_tried("r1");
-            let mut sent = frame.clone();
-            sent["id"] = json!(7);
-            let outcome = door.handle(&mut session, &sent.to_string(), &mut fake, S, 1);
-            let answered = outcome.send.first().cloned().unwrap_or(Value::Null);
-            let stub = answered["ok"] == true && answered.to_string().contains("\"tried\":true");
-            let refused_tried = answered["error"]["why"] == protocol::TRIED_REFUSED;
-            match class {
-                protocol::InTry::Stubbed => {
-                    assert!(stub, "{frame} {answered}");
-                    assert!(outcome.later.is_none(), "{frame}: nothing sent on");
-                    assert!(fake.did.is_empty(), "{frame}: no part asked {:?}", fake.did);
-                }
-                protocol::InTry::Refused => {
-                    assert!(refused_tried, "{frame} {answered}");
-                    assert_eq!(answered["error"]["code"], "refused", "{frame} {answered}");
-                }
-                protocol::InTry::Live => {
-                    assert!(!stub && !refused_tried, "{frame} {answered}");
-                }
-            }
-        }
-        // Nothing of a try's was kept: no note on disk.
-        let kept = std::fs::read_dir(&notes).map_or(0, |dir| dir.count());
-        assert_eq!(kept, 0, "a tried run's notes.set kept nothing");
-        let _ = std::fs::remove_dir_all(&notes);
-    }
-
-    /// #8180 (the Reviewer-lead's P2): a tried run's end forgets any notes
-    /// its client or the try's skill has on the lamp, on disk too; an
-    /// untried run's are kept.
-    #[test]
-    fn a_tried_runs_end_forgets_its_notes() {
+    fn a_tried_runs_notes_are_kept_after_its_end() {
         let folder =
             std::env::temp_dir().join(format!("lamp-control-tried-notes-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&folder);
@@ -5185,26 +5017,12 @@ mod tests {
                 .and_then(|step| step.wait());
             assert!(kept.is_ok(), "{kept:?}");
             let file = crate::notes::Notes::path(&folder, &client).unwrap();
-            assert!(file.exists(), "{}", file.display());
             if tried {
                 door.mark_tried("r1");
             }
             assert!(door.end_run("r1", None).is_some());
-            assert_eq!(file.exists(), !tried, "tried {tried}");
+            assert!(file.exists(), "tried {tried}: {}", file.display());
             let _ = std::fs::remove_dir_all(&folder);
         }
-    }
-
-    /// #8157: a tried run's write is stubbed with linked services off too;
-    /// an untried run's is still off.
-    #[test]
-    fn a_tried_runs_write_is_stubbed_with_services_off() {
-        let (mut door, mut session, mut fake) =
-            run_door(&[service("gmail", protocol::Access::Write)], None);
-        let off = door.handle(&mut session, &write_frame("gmail"), &mut fake, S, 1);
-        assert_eq!(code_of(&off), Some("off"), "{off:?}");
-        door.mark_tried("r1");
-        let stubbed = door.handle(&mut session, &write_frame("gmail"), &mut fake, S, 1);
-        assert_eq!(reply(&stubbed)["result"]["sent"], false, "{stubbed:?}");
     }
 }

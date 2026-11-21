@@ -3753,9 +3753,9 @@ runs its script itself: no agent, no Harness, no prompt
   grants than the line's (`net` aside, lamp-tasks' own) is ended at once and
   nothing runs. A line for a skill that names keys is refused before any
   token (`skill_run::NO_KEYS_HERE`): use a `do.task`.
-- **`net`**: the same path and the same yes as a net task's
-  (`Tokens::net_agreed`: the owner's yes naming `net` for the folder as it
-  is; without it, `no_token`, `skill_run::NO_NET_YES`, before any token).
+- **`net`**: the same path as a net task's, given by the grant alone with
+  no yes asked (#8180, the dev's ruling: a made skill's declared grants are
+  live; `skill_run::answer` no longer asks `Tokens::net_agreed`).
   With `LAMP_TASK_NET` on, `DirectRunner::egress` makes the run's own egress
   socket `skill-<run id>` (`egress::Grant::lamp`: the public web on ports
   80 and 443 only), served until the run's bound, and puts an `O_PATH`
@@ -4179,24 +4179,27 @@ made once and whole"); `lamp_tasks::make_try`.
   and its helpers), at most 4. No script step: `{"ok":true,"tried":false}`.
 - **How**: the skill's files are written to a `make-try-*` folder of the
   make's work folder (swept with the makes' at start), a token is minted on
-  lamp-control's admin socket for the draft's own grants less `net`,
-  `camera` and `microphone` (`{"mint":{"try":[...],"run"}}`,
-  `Tokens::mint_try`), and lamp-tasks starts itself as
+  lamp-control's admin socket for the draft's own grants, the camera and
+  the microphone among them (`{"mint":{"try":[...],"run"}}`,
+  `Tokens::mint_try`; lamp-control drops `net`), and lamp-tasks starts itself as
   `lamp-tasks make-try-fence` (`make_try::fence_main`) with the grant on
   stdin: it becomes a run step's own fence (`make_try::fence_args`, built by
   the same `skill_run::fence_args`, #8180): all of `skill_run::HIDDEN`
   covered, `/run` and with it lamp-control's `admin.sock` among them, only
-  the skill's folder, the run's folder and `control.sock` shown again, and
+  the skill's folder, the run's folder and `control.sock` shown again (with
+  `net`, lamp-tasks' relay too, as a run step's), and
   the run step's caps (`skill_run::CAPS_EDIT`, its process cap among them)
   and its own cgroup (`run_cgroup`, made before its token: none on Linux,
   no token and `not_tried`); fd 4 a sink in place of the launcher's socket. No agent takes part.
-- **What a try runs without** (`make_try::TRIED_WITHOUT`, #8180): `net` (no
-  egress socket is ever made, so a fetch fails as offline and nothing is
-  sent), `camera` and `microphone` (lamp-control refuses to mint them for a
-  try too). The answer names them (`"without":["net"]`), and a failed try's
-  `why` says it was tried without them, so the repair writes a script that
-  says its failure line and exits 0, which passes. Each script runs once, at
-  most 30 s (`TRY_WITHIN`), then is killed; its output is kept up to 8 KiB.
+- **Its grants, as the run's** (#8180, the dev's ruling): every grant the
+  draft declares is given to its try, with nothing asked. A draft granted
+  `net` gets a run step's own egress socket, `make-try-<run id>`
+  (`make_try::FenceLaunch::egress`, `egress::Grant::lamp`, with
+  `LAMP_TASK_NET` on), opened before its token and served until the try's
+  bound, on fd 5 of its fence (`make_try::fence_main`), with no yes waited
+  for; with `LAMP_TASK_NET` off it is not tried (`not_tried`). Each script
+  runs once, at most 30 s (`TRY_WITHIN`), then is killed; its output is
+  kept up to 8 KiB.
 - **Judged** (`make_try::judged`): exit 0 in time; a `run` step's script
   said at least one line (`said` from lamp-control's `end` answer,
   `Tokens::end_said`; an older lamp-control that doesn't say is not held
@@ -4205,12 +4208,10 @@ made once and whole"); `lamp_tasks::make_try`.
   `{"ok":true,"tried":true,"passed":false,"why"}` (the words go to the
   voice's repair); a try that couldn't start (no token, no fence) is
   refused `not_tried`.
-- **Nothing is sent or kept**: lamp-control marks the token tried; its
-  `service.write` is answered `{"result":{"sent":false,"tried":true}}` and
-  never reaches lamp-services, linked services on or not; every other op
-  that changes kept state is answered from the stub too, and a capture is
-  refused ([control.md](control.md), "A make's tried run"); its reads go on
-  live.
+- **Live, as the run**: lamp-control marks the token tried, and each of its
+  ops is done live within its grants, as a skill run's: it speaks, plays,
+  moves, lights, captures, and its `service.write` is sent to lamp-services;
+  the notes it keeps stay ([control.md](control.md), "A make's tried run").
 - **The say count** (for #8158's `run` step too): lamp-control counts each
   of a run client's `say`s the voice said whole (`done` with
   `how: finished`; one dropped for privacy or expiry, or a `sound`, is not
@@ -4226,14 +4227,17 @@ Tests: `a_run_step_tries_its_script_and_a_task_each_of_its_scripts`,
 `a_skill_that_sends_is_tried_with_its_own_grants`,
 `the_fence_launch_mints_a_tried_token_and_reads_its_says`,
 `a_fence_that_runs_past_its_limit_is_ended`,
-`a_draft_granted_net_is_tried_with_no_way_out_and_told_so`,
+`a_try_is_given_every_grant_its_draft_declares`,
+`a_try_granted_net_camera_and_microphone_gets_each_with_no_yes`,
 `a_tried_runs_fence_is_a_run_steps_with_no_admin_socket_and_its_caps`;
+lamp-tasks' run step's `a_net_run_step_gets_its_egress_socket_with_no_yes`,
 lamp-tasks' run step's `a_run_steps_script_has_its_own_memory_and_cpu_caps`
 and, on Linux,
 `a_script_past_its_process_cap_fails_its_run_while_another_task_answers`;
 lamp-control's
-`a_tried_runs_write_is_stubbed_and_its_read_is_live`,
-`a_tried_runs_write_is_stubbed_with_services_off`,
+`a_tried_runs_ops_are_live_within_its_grants`,
+`a_tried_runs_write_is_sent_live_as_a_runs`,
+`a_tried_runs_notes_are_kept_after_its_end`,
 `a_runs_says_are_counted_to_its_end`,
 `a_runs_says_are_counted_and_a_tried_run_is_marked`,
 `a_tried_runs_grants_are_the_drafts_own` and

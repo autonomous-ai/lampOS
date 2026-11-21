@@ -1008,10 +1008,10 @@ lamp-tasks tự chạy script: không agent, không Harness, không prompt
   dòng (trừ `net`, quyền của chính lamp-tasks) thì bị kết thúc ngay và không
   gì chạy. Dòng của kỹ năng nêu khóa bị từ chối trước khi có token
   (`skill_run::NO_KEYS_HERE`): hãy dùng `do.task`.
-- **`net`**: cùng đường và cùng lời đồng ý như task có `net`
-  (`Tokens::net_agreed`: lời đồng ý của chủ sở hữu nêu `net` cho thư mục như
-  hiện tại; không có thì `no_token`, `skill_run::NO_NET_YES`, trước khi có
-  token). Khi `LAMP_TASK_NET` bật, `DirectRunner::egress` tạo socket egress
+- **`net`**: cùng đường như task có `net`, được cấp chỉ bởi quyền, không
+  hỏi lời đồng ý nào (#8180, quyết định của dev: quyền đã khai báo của kỹ
+  năng được tạo là thật; `skill_run::answer` không còn hỏi
+  `Tokens::net_agreed`). Khi `LAMP_TASK_NET` bật, `DirectRunner::egress` tạo socket egress
   riêng của lần chạy `skill-<run id>` (`egress::Grant::lamp`: chỉ web công
   khai trên cổng 80 và 443), phục vụ đến hết giới hạn của lần chạy, và đặt
   một descriptor `O_PATH` của nó lên fd 5 của hàng rào. Hàng rào là hàng rào
@@ -1386,24 +1386,26 @@ tạo một lần và trọn vẹn"); `lamp_tasks::make_try`.
 - **Cách làm**: tệp của kỹ năng được ghi vào thư mục `make-try-*` trong thư
   mục làm việc của lần tạo (được dọn cùng các thư mục tạo khi khởi động), một
   token được tạo trên socket admin của lamp-control cho đúng quyền của bản
-  nháp trừ `net`, `camera` và `microphone` (`{"mint":{"try":[...],"run"}}`,
-  `Tokens::mint_try`), và lamp-tasks tự khởi động thành
+  nháp, trong đó có camera và microphone (`{"mint":{"try":[...],"run"}}`,
+  `Tokens::mint_try`; lamp-control bỏ `net`), và lamp-tasks tự khởi động thành
   `lamp-tasks make-try-fence` (`make_try::fence_main`) với grant ở stdin: nó
   trở thành hàng rào của bước run (`make_try::fence_args`, dựng bởi cùng
   `skill_run::fence_args`, #8180): che toàn bộ `skill_run::HIDDEN`, trong đó
   có `/run` và cùng với nó `admin.sock` của lamp-control, chỉ cho thấy lại
-  thư mục kỹ năng, thư mục lần chạy và `control.sock`, cùng các giới hạn của
+  thư mục kỹ năng, thư mục lần chạy và `control.sock` (có `net` thì cả relay
+  của lamp-tasks, như bước run), cùng các giới hạn của
   bước run (`skill_run::CAPS_EDIT`, gồm giới hạn số tiến trình) và cgroup
   riêng (`run_cgroup`, tạo trước token: trên Linux không có thì không token
   và `not_tried`); fd 4 là nơi
   bỏ đi thay cho socket của launcher. Không agent nào tham gia.
-- **Lần thử chạy thiếu gì** (`make_try::TRIED_WITHOUT`, #8180): `net` (không
-  bao giờ tạo socket egress, nên lệnh tải thất bại như khi ngoại tuyến và
-  không gì được gửi), `camera` và `microphone` (lamp-control cũng từ chối
-  tạo chúng cho lần thử). Câu trả lời nêu tên chúng (`"without":["net"]`),
-  và `why` của lần thử thất bại nói nó được thử khi thiếu chúng, để lần sửa
-  viết script nói câu báo lỗi rồi thoát 0, như vậy là đạt. Mỗi script chạy một
-  lần, tối đa 30 s (`TRY_WITHIN`), rồi bị dừng; đầu ra giữ tối đa 8 KiB.
+- **Quyền như lần chạy thật** (#8180, quyết định của dev): mọi quyền bản
+  nháp khai báo đều được cấp cho lượt thử, không hỏi gì. Bản nháp có `net`
+  được socket egress riêng như bước run, `make-try-<run id>`
+  (`make_try::FenceLaunch::egress`, `egress::Grant::lamp`, khi
+  `LAMP_TASK_NET` bật), mở trước token và phục vụ đến hết giới hạn của lượt
+  thử, trên fd 5 của hàng rào (`make_try::fence_main`), không chờ lời đồng
+  ý nào; `LAMP_TASK_NET` tắt thì không thử (`not_tried`). Mỗi script chạy
+  một lần, tối đa 30 s (`TRY_WITHIN`), rồi bị dừng; đầu ra giữ tối đa 8 KiB.
 - **Đánh giá** (`make_try::judged`): thoát 0 đúng hạn; script của bước `run`
   đã nói ít nhất một câu (`said` trong câu trả lời `end` của lamp-control,
   `Tokens::end_said`; lamp-control cũ không báo thì không bị tính là lỗi);
@@ -1412,12 +1414,11 @@ tạo một lần và trọn vẹn"); `lamp_tasks::make_try`.
   `{"ok":true,"tried":true,"passed":false,"why"}` (lời này về lần sửa của
   voice); lần thử không khởi động được (không token, không hàng rào) bị từ
   chối `not_tried`.
-- **Không gửi, không giữ gì**: lamp-control đánh dấu token là chạy thử; lệnh
-  `service.write` của nó được trả lời `{"result":{"sent":false,"tried":true}}`
-  và không bao giờ tới lamp-services, dù dịch vụ liên kết bật hay tắt; mọi
-  lệnh khác làm đổi trạng thái được giữ cũng được trả lời từ stub, lệnh thu
-  camera hay micro bị từ chối ([control_vi.md](control_vi.md), "Lần chạy thử
-  của một lần tạo"); lệnh đọc chạy thật.
+- **Chạy thật, như lần chạy**: lamp-control đánh dấu token là chạy thử, và
+  mỗi thao tác của nó được làm thật trong phạm vi quyền, như lần chạy của
+  một skill: nói, phát âm thanh, cử động, bật đèn, thu hình và tiếng, và
+  `service.write` được gửi tới lamp-services; ghi chú nó giữ vẫn còn
+  ([control_vi.md](control_vi.md), "Lần chạy thử của một lần tạo").
 - **Số câu đã nói** (cũng cho bước `run` của #8158): lamp-control đếm mỗi
   `say` của client một lần chạy mà giọng đã nói trọn (`done` với
   `how: finished`; câu bị bỏ vì riêng tư hay hết hạn, hoặc một `sound`,
@@ -1433,14 +1434,17 @@ Kiểm thử: `a_run_step_tries_its_script_and_a_task_each_of_its_scripts`,
 `a_skill_that_sends_is_tried_with_its_own_grants`,
 `the_fence_launch_mints_a_tried_token_and_reads_its_says`,
 `a_fence_that_runs_past_its_limit_is_ended`,
-`a_draft_granted_net_is_tried_with_no_way_out_and_told_so`,
+`a_try_is_given_every_grant_its_draft_declares`,
+`a_try_granted_net_camera_and_microphone_gets_each_with_no_yes`,
 `a_tried_runs_fence_is_a_run_steps_with_no_admin_socket_and_its_caps`; của
-bước run trong lamp-tasks `a_run_steps_script_has_its_own_memory_and_cpu_caps`
+bước run trong lamp-tasks `a_net_run_step_gets_its_egress_socket_with_no_yes`,
+`a_run_steps_script_has_its_own_memory_and_cpu_caps`
 và, trên Linux,
 `a_script_past_its_process_cap_fails_its_run_while_another_task_answers`;
 của lamp-control
-`a_tried_runs_write_is_stubbed_and_its_read_is_live`,
-`a_tried_runs_write_is_stubbed_with_services_off`,
+`a_tried_runs_ops_are_live_within_its_grants`,
+`a_tried_runs_write_is_sent_live_as_a_runs`,
+`a_tried_runs_notes_are_kept_after_its_end`,
 `a_runs_says_are_counted_to_its_end`,
 `a_runs_says_are_counted_and_a_tried_run_is_marked`,
 `a_tried_runs_grants_are_the_drafts_own` và
