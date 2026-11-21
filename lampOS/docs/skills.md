@@ -6768,13 +6768,12 @@ the same code for both writers.
   `lamp-skills-manage@` (lamp-9adf, 18 Nov 21:37: the helper, without it,
   refused a kept bitcoin-price skill "a grant the lamp doesn't have: net").
   The switch off, `net` stays only beside the lamp's own `scripts/agent.py`.
-  `code_held` still refuses `net` beside a private grant (`camera`, `look`
-  and the like; the skill's own `notes` may sit beside it, the first
-  builder's ruling on #7850, 19 Nov 07:20), in the repair's words "one skill can't do both: make it
-  two skills", as lamp-skills refuses it at load, so no such code is said
-  back and given a yes that never goes on (Twelve's P2 on #7780).
+  `code_held` keeps `net` beside any grant, `camera`, `look`, the
+  microphone and the skill's own `notes` among them (#7901, the settled
+  design: a made skill's declared grants are all on, nothing blocked).
   Tests: `make_skill_local::tests::with_gateway_net_an_openclaw_net_skill_kept_is_put_on_by_the_helper`,
-  `made_skill::tests::with_gateway_net_code_granted_net_beside_a_private_grant_is_refused`.
+  `make_skill_local::tests::with_gateway_net_a_make_granted_net_beside_the_camera_and_notes_is_kept`,
+  `made_skill::tests::with_gateway_net_code_granted_net_beside_the_camera_or_notes_is_kept`.
 - **The agent's own `cannot:` is never said as it wrote it.** The lamp says
   its own line, "I couldn't make that one." (`make_skill_agent::CANNOT_LINE`);
   with `LAMP_MAKE_NO_CANNOT=on` its words are dropped all the same and the
@@ -8170,15 +8169,13 @@ bytes, as above):
   the like: a bare "API" or "URL" is not enough), never
   more (`upload_agent::grants_read`). `net` needs `LAMP_TASK_NET=on` (on
   in the product, #7200); off, such a file is refused ("it reaches the internet, which a skill's
-  task can't on this lamp"). `net` never sits beside the camera, the
-  microphone, what the lamp says, its notes, `look` (whether someone is
-  there; the first builder's ruling on #7590) or a linked service's grant
-  (Heron's P1 on #7590): such a file is refused, nothing kept ("it reaches
-  the internet and also uses the camera, and one skill can't do both: make
-  it two skills"), as is a kept `skill.toml` naming the pair; docs/tasks.md,
-  "What a `net` run never holds, and its bounds". `air` may sit beside
-  `net`, and the say-back then adds "so its air readings can go to the
-  internet".
+  task can't on this lamp"). `net` may sit beside any grant: the camera,
+  the microphone, what the lamp says, its notes, `look` or a linked
+  service's grant (#7901, the settled design: all of a skill's declared
+  grants are on, nothing blocked), in a file and in a kept `skill.toml`
+  alike; docs/tasks.md, "What a `net` run may hold, and its bounds".
+  With `air` beside `net`, the say-back adds "so its air readings can go
+  to the internet".
 - **A linked service it uses gets that service's grants** (the owner's
   ruling, 13 Nov: anything that touches the connectors goes to the lamp's
   agent end to end), as a voice-made service skill's `do.task` carries
