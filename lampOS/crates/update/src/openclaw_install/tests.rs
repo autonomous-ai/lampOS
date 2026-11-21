@@ -963,6 +963,12 @@ fn an_install_stops_lamp_tasks_and_starts_it_once_the_restarted_gateway_answers(
         ]
     );
     assert_eq!((ADD_TRIES, ADD_AGAIN), (40, Duration::from_millis(1)));
+    // #8138: lamp-tasks started again, its stop's record is taken out, so
+    // no later look starts it a second time.
+    assert!(
+        !lamp.records().join(TASKS_STOPPED).exists(),
+        "the stop's record taken out once lamp-tasks is started"
+    );
 
     // lamp-tasks not running: left so, the gateway still waited for.
     let lamp = Lamp::new();
@@ -1195,6 +1201,65 @@ fn serve_starts_lamp_tasks_again_within_a_look_of_a_cut_off_install() {
     assert_eq!(refuses.1, 3);
     assert_eq!(lines.len(), 1, "{lines:#?}");
     assert!(lamp.records().join(TASKS_STOPPED).exists());
+}
+
+/// #8138: an install whose stop of lamp-tasks can't be recorded (the
+/// record's path not writable) does not stop lamp-tasks at all: it runs
+/// on through the gateway's restart, as before #8138, so no stop is ever
+/// left that nothing brings back. The install still goes on.
+#[test]
+fn a_stop_that_cannot_be_recorded_leaves_lamp_tasks_running() {
+    let lamp = Lamp::new();
+    fs::write(lamp.unit(), UNIT_TEXT).unwrap();
+    lamp.ask();
+    // A folder where the record's file would go: it can't be written.
+    fs::create_dir_all(lamp.records().join(TASKS_STOPPED)).unwrap();
+    let runs = Runs::new(&lamp);
+    let (said, lines) = install_health_refused(&lamp, &runs, 0);
+    assert_eq!(said.install, "installed", "{:#?}", runs.lines());
+    assert!(
+        !runs
+            .lines()
+            .iter()
+            .any(|line| line == &format!("systemctl stop {TASKS_UNIT}")
+                || line == &format!("systemctl start {TASKS_UNIT}")),
+        "{:#?}",
+        runs.lines()
+    );
+    assert!(
+        lines
+            .iter()
+            .any(|line| line.contains("its stop not recorded")),
+        "{lines:#?}"
+    );
+}
+
+/// #8138: a round with the switch off brings lamp-tasks back too, when an
+/// install cut off left it stopped ([`tasks_back`] in
+/// [`after_round_off`]): started once, the record taken out.
+#[test]
+fn the_switch_off_round_starts_lamp_tasks_left_stopped_by_a_cut_off_install() {
+    let lamp = Lamp::new();
+    lamp.harness_there();
+    fs::write(lamp.unit(), UNIT_TEXT).unwrap();
+    fs::create_dir_all(lamp.records()).unwrap();
+    fs::write(lamp.records().join(TASKS_STOPPED), "").unwrap();
+    let mut systemd = Fake {
+        active: Some("inactive"),
+        ..Fake::default()
+    };
+    after_round_off(lamp.root(), &lamp.records(), &mut systemd, &mut quiet());
+    assert_eq!(
+        systemd
+            .asked
+            .iter()
+            .filter(|asked| **asked == "start-tasks")
+            .count(),
+        1,
+        "{:?}",
+        systemd.asked
+    );
+    assert!(!lamp.records().join(TASKS_STOPPED).exists());
 }
 
 /// Off: a round asks the one-shot to stop the gateway and take the entry
