@@ -40,7 +40,10 @@ body's movement only: the voice and what it says do not change with it.
 one that does not read, or no `lamp-cloud` is level 1.
 
 The owner may pick it (`"energy"` in `character.set`, kept as `chosen`), and a
-pick always wins. Otherwise root's helper works it out from the words once, when
+pick always wins. **A picked level stays until the owner picks another or clears
+the words** (#7566, the first builder's 18:36): a save of new words with no
+`energy` keeps a `chosen` level as it is, for every client and app version.
+Otherwise root's helper works it out from the words once, when
 they are kept (`lamp_msgs::chosen_voice::energy_of`, kept as `derived`), from a
 fixed table, no model asked: start at 1, add each word's weight found as a whole
 word or phrase (lowercase), hold to 1 to 5. The table is the fallback while
