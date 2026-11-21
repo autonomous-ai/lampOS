@@ -1169,7 +1169,8 @@ is `lamp_msgs::app_fact`; the store's side is `crates/memory/src/app_facts.rs`.
   pending mark and tried every 30 s until memory answers `ok`. `apps.context`
   is not built yet.
   An older memory answers `unknown_op`, told to the app as `unavailable`.
-- **The voice's side (`LAMP_APP_MEMORY`, off by default; App Only's part of
+- **The voice's side (`LAMP_APP_MEMORY`, `on` in the product's
+  `lamp-voice.service` with #8228's switch-on; App Only's part of
   the 16:45 split, `crates/voice/src/app_context.rs`).** Built on #7900's
   short-lived note: lamp-voice holds the `ContextLines` in its own RAM
   (`app_context::set` / `clear` / `clear_all`, for the door's writer) and,
