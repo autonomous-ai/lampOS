@@ -59,6 +59,11 @@ const STDOUT_LIMIT: usize = 64 * 1024;
 /// `ps` lists every harness on a machine with its progress line: more than
 /// one agent's answer, so it is given more room, still bounded.
 pub const PS_STDOUT_LIMIT: usize = 256 * 1024;
+/// How long one hand-over is given in all ([`CliConfig::launch_timeout`]),
+/// unless set otherwise. A start that ran out of it is checked for once more
+/// within the same again before it is said not started
+/// ([`crate::start_check`], #8170).
+pub const LAUNCH_TIMEOUT: Duration = Duration::from_secs(60);
 /// No more harnesses than this are taken from one `ps` reply.
 pub const MOST_LISTED: usize = 256;
 /// A progress line longer than this is cut, at a whole character. Harness
@@ -206,7 +211,7 @@ impl EngineKind {
     /// the computer ("Devin cannot start with a first message", Harness
     /// 0.5.6, 29 Oct). Its task is typed in with `harness reply` once it is
     /// idle ([`Cli::first_message`]).
-    fn typed_after(self) -> bool {
+    pub(crate) fn typed_after(self) -> bool {
         matches!(self, Self::Devin)
     }
 }
@@ -1302,7 +1307,7 @@ impl CliConfig {
     pub fn new(executable: PathBuf) -> Self {
         Self {
             executable,
-            launch_timeout: Duration::from_secs(60),
+            launch_timeout: LAUNCH_TIMEOUT,
             read_timeout: Duration::from_secs(10),
             environment: ENVIRONMENT
                 .iter()
@@ -4102,6 +4107,37 @@ impl Cli {
             return Err("status_failed".into());
         }
         parse_ps_names(&reply.stdout).map_err(str::to_string)
+    }
+
+    /// Each harness on one machine with its name, folder, state and last
+    /// activity, from one `ps` ([`crate::start_check`], #8170: a start that
+    /// timed out looked for by the lamp's own name for it). A read only.
+    pub fn started(&self, machine: &str) -> Result<Vec<crate::start_check::Started>, String> {
+        if !machine_id(machine) {
+            return Err("invalid_machine".into());
+        }
+        let _guard = self.operation.try_lock().map_err(|_| "busy".to_string())?;
+        let reply = self
+            .run_bounded(
+                &[
+                    "ps".into(),
+                    "--machine".into(),
+                    machine.into(),
+                    "--json".into(),
+                ],
+                self.config.read_timeout,
+                PS_STDOUT_LIMIT,
+            )
+            .map_err(|error| error.code.to_string())?;
+        if !reply.success {
+            return Err("status_failed".into());
+        }
+        crate::start_check::parse(&reply.stdout).map_err(str::to_string)
+    }
+
+    /// The launch's own bound ([`CliConfig::launch_timeout`]).
+    pub fn launch_timeout(&self) -> Duration {
+        self.config.launch_timeout
     }
 
     /// The agents live in `folder` on one machine, from one `ps` (#6432: a

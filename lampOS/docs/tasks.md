@@ -567,6 +567,93 @@ launch. An outstanding speech claim becomes uncertain. Accepted, pending,
 uncertain and reported-spoken history remains. Old confirmations and speech
 attestations cannot cross the newly generated service session.
 
+### A start that timed out, settled (#8170, always on)
+
+On lamp-06c1 on 21 Nov a hand-over's `harness new` ran out of its bound
+("uncertain timeout (no exit, 62.4 s)"), yet the work ran on the computer:
+the lamp kept it `uncertain`, never followed or closed it, and its session
+stayed open there. Now such a start is settled (`lamp-tasks`
+`start_check`, `engine::check_due` / `settle_start`):
+
+- **Which starts.** A new start whose `new` timed out (`timeout`) and whose
+  words went with `new` itself (`--task`): not a named session's, a cloud
+  agent's, Devin's (its words typed after) or OpenClaw's (its first prompt
+  proved apart), which stay as before. Its dispatch stays `uncertain` with
+  code `start_checking`, never back to `prepared` or `queued`, and is never
+  sent again by itself.
+- **Looked for.** On the next round, then at most every 10 s
+  (`WATCH_CONFIRM_MS`), one `harness ps --machine <id> --json` on the
+  Harness worker (`Cli::started`, `read_timeout`), never on the voice's
+  path: the voice's requests are answered by the store's owner meanwhile.
+  1. **By the lamp's own name for that start.** Every start is sent with
+     `--name <launch name>` (`lamp-<32 hex>`), which no person gives. One
+     row of that name is it: `accepted` with that agent, followed, told
+     and closed (`--close-told`) as any other. Two of that name, or one
+     another task has: not sure.
+  2. **No fallback.** Harness 0.6.79's `ps --json` lists no time a
+     harness was made (`lastActive` is its last activity, so the person's
+     harness worked in since the ask would look new), and the rows before
+     the `new` aren't read: no row is ever taken but by the lamp's own name
+     for that start.
+  3. **Not by its name, but a row that could be it:** a row in a folder of
+     the target's last part that the lamp doesn't know (not another task's,
+     not in the session index, not named by another start of the lamp's),
+     in any state, could be the lamp's start, titled ("its name until the
+     agent titles its session", `harness new --help`). Looked for again
+     until the launch's own bound (`launch_timeout`, 60 s) has passed
+     again since its end, then `uncertain` with `start_unsure` for good,
+     never "not started", and nothing taken.
+  4. **Nothing that could be it:** `not_sent` with `not_started` once that
+     bound has passed since its end. In another boot, where its end isn't
+     dated, any miss is `start_unsure`, never `not_started`: a start that
+     ran and was titled would otherwise be asked again and run twice. A
+     list that can't be read settles nothing until 10 minutes after its end
+     (`WATCH_EARLY_FOR_MS`), or in another boot after three looks
+     (`CLOSE_TRIES`): then `start_unsure`.
+- **Never twice.** While a start to a target is `start_checking`, a
+  `prepare` to that target is refused `start_checking`: the voice tells the
+  person it is still checking whether that work started and that nothing
+  was sent again (`agent_tasks::START_CHECKING_HELD`), never that it failed.
+- **What the person hears.** Task news says a start being checked as being
+  checked (`checking`, key `<store>:<task>:checking`), never failed and
+  with no retry offered; once settled, a found one's news as any task's,
+  `not_started` plainly as not started (`failed_not_started`), and
+  `start_unsure` as not sure it started, with a look at their computer
+  before asking again (`start_unsure`). The linked record
+  (`LAMP_SERVICE_RECORDS_TASKS`) stays `prepared` while checked, follows a
+  found one as any, is `failed` for `not_started` and `no_result` for
+  `start_unsure`. Its work record shows it `queued` while checked, never
+  `failed`.
+- **A harness the person started is never taken:** only a row of the
+  lamp's own `lamp-<32 hex>` name for that start is, and no person gives
+  one. Theirs in the same folder makes the start not sure, never taken.
+- **Latency.** A check takes the place of a round's read on the one
+  Harness worker, bounded as that read is (`read_timeout`, 10 s), and only
+  while a start is checked (10 minutes at most after it timed out); a
+  launch queued is always sent before a check begins. A launch asked
+  during a check waits for it: `harness ps --json` took 4.3 to 4.8 s on
+  the test Mac (three runs), 10 s at most.
+- **Journal.** One line a settle (`tasks: task <id>: the start that timed
+  out is …`), never its words, folder or a harness's name.
+
+Tests: `start_check`'s `a_start_listed_by_the_lamps_own_name_is_the_one`,
+`two_of_its_name_are_neither_taken`, `a_harness_the_person_started_is_never_taken`,
+`with_nothing_that_could_be_it_the_start_is_not_listed`,
+`a_list_is_read_as_harness_writes_it`; `runtime`'s
+`a_start_missed_by_its_name_is_not_sure_unless_dated_and_nothing_could_be_it`; `engine`'s
+`a_start_that_timed_out_is_checked_and_never_sent_again`,
+`a_start_being_checked_settles_once_found_not_started_or_unsure`,
+`the_same_ask_while_a_start_is_checked_is_held`,
+`only_a_new_start_that_timed_out_is_checked`; `tests/runtime.rs`'
+`a_start_that_timed_out_and_ran_is_found_tracked_and_closed_never_sent_twice`,
+`a_start_that_timed_out_and_never_ran_is_not_started_after_a_bounded_wait`,
+`harnesses_in_its_folder_without_its_name_are_never_taken`; the
+voice's `task_news::a_start_being_checked_is_never_told_as_failed`,
+`agent_tasks::a_hand_over_held_while_a_start_is_checked_is_said_so` and
+`task_rows::outcomes_from_the_task`. ROW owed: C151's re-run on lamp-06c1,
+a start slowed past the timeout found, followed and closed, from both
+journals.
+
 `cancel` only cancels a prepared or queued local task before its attempt.
 It returns `remote_cancelled:false`. There is no remote cancel. The product
 runs the watch (`--watch`, the default) and closes a told harness
@@ -6720,7 +6807,9 @@ record, through the voice's linked outbox
   observation (`get_task`), `done` (idle), `failed` (failed, or a
   hand-over never sent) or `cancelled` (stopped), each change once. A
   question back (`needs-input`), work going on, or an unsure hand-over
-  writes nothing. Every row of a task carries its hand-over time as
+  writes nothing; a start that timed out is `failed` once found never
+  begun (`not_started`) and `no_result` when not sure it began
+  (`start_unsure`, #8170), never `failed` while it is checked. Every row of a task carries its hand-over time as
   `deed_unix_ms`, so a forget after it wins over a late outcome in the
   memory too.
 - **Bounded.** At most 16 tasks are followed, the oldest let go first, each

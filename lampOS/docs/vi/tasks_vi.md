@@ -284,7 +284,9 @@ bản ghi liên kết, qua hộp chờ liên kết của voice
   (`get_task`), `done` (idle), `failed` (failed, hay lần giao không bao giờ
   được gửi) hoặc `cancelled` (stopped), mỗi thay đổi một lần. Một câu hỏi
   ngược lại (`needs-input`), việc đang chạy, hay lần giao chưa chắc thì
-  không ghi gì. Mọi dòng của một việc mang thời điểm giao làm
+  không ghi gì; một lần bắt đầu bị hết giờ là `failed` khi đã kiểm và thấy
+  chưa bao giờ chạy (`not_started`), và `no_result` khi không chắc nó đã
+  chạy (`start_unsure`, #8170), không bao giờ `failed` trong lúc đang kiểm. Mọi dòng của một việc mang thời điểm giao làm
   `deed_unix_ms`, nên lần quên sau đó cũng thắng kết quả đến muộn trong
   memory.
 - **Có giới hạn.** Theo dõi tối đa 16 việc, việc cũ nhất bị bỏ trước, mỗi
@@ -3963,6 +3965,95 @@ của giọng nói và `lamp-tasks --reply-named`):
   - Chưa chạy trên đèn: mở lại theo id một phiên cũ hơn 7 ngày (Harness
     0.6.12 nói `resume <id>` và `show <id>` tới được phiên đó), và thời gian
     thêm của một lần `show`.
+
+## Một lần bắt đầu bị hết giờ, được làm rõ (#8170, luôn bật)
+
+Trên lamp-06c1 ngày 21/11, `harness new` của một lần giao hết thời hạn
+("uncertain timeout (no exit, 62.4 s)"), nhưng việc vẫn chạy trên máy tính:
+đèn giữ nó ở `uncertain`, không theo dõi, không đóng, và phiên vẫn mở ở đó.
+Nay một lần bắt đầu như vậy được làm rõ (`lamp-tasks` `start_check`,
+`engine::check_due` / `settle_start`):
+
+- **Lần nào.** Một lần bắt đầu mới có `new` hết giờ (`timeout`) và lời nhờ
+  đi cùng chính `new` (`--task`): không phải phiên được gọi tên, agent
+  cloud, Devin (lời gõ sau) hay OpenClaw (lời đầu được chứng minh riêng),
+  những lần đó giữ như trước. Dispatch ở `uncertain` với mã
+  `start_checking`, không quay về `prepared` hay `queued`, và không bao giờ
+  tự gửi lại.
+- **Tìm.** Ở vòng kế tiếp, rồi tối đa mỗi 10 giây (`WATCH_CONFIRM_MS`), một
+  `harness ps --machine <id> --json` trên worker Harness (`Cli::started`,
+  `read_timeout`), không bao giờ trên đường của giọng nói: yêu cầu của
+  giọng nói vẫn được chủ store trả lời trong lúc đó.
+  1. **Theo tên đèn đặt cho lần bắt đầu đó.** Mỗi lần bắt đầu được gửi với
+     `--name <tên launch>` (`lamp-<32 hex>`), không người nào đặt tên như
+     vậy. Một dòng có tên đó là nó: `accepted` với agent đó, được theo dõi,
+     kể và đóng (`--close-told`) như mọi việc khác. Hai dòng cùng tên, hay
+     một dòng việc khác đang giữ: không chắc.
+  2. **Không có đường dự phòng.** `ps --json` của Harness 0.6.79 không
+     liệt kê lúc một harness được tạo (`lastActive` là lần hoạt động cuối,
+     nên harness người dùng làm việc từ lúc nhờ trông như mới), và các dòng
+     trước `new` không được đọc: không dòng nào bị lấy, trừ dòng mang đúng
+     tên đèn đặt cho lần bắt đầu đó.
+  3. **Không có tên đó, nhưng có dòng có thể là nó:** một dòng trong thư
+     mục có phần cuối là của target mà đèn không biết (không của việc khác,
+     không trong session index, không mang tên của một lần bắt đầu khác của
+     đèn), ở bất kỳ trạng thái nào, có thể là lần bắt đầu của đèn đã có
+     tiêu đề ("cho tới khi agent đặt tiêu đề cho phiên", `harness new
+     --help`). Tìm lại cho tới khi thời hạn của chính lần giao
+     (`launch_timeout`, 60 giây) đã qua thêm một lần từ lúc nó kết thúc,
+     rồi `uncertain` với `start_unsure` mãi mãi, không bao giờ "chưa bắt
+     đầu", và không lấy dòng nào.
+  4. **Không có gì có thể là nó:** `not_sent` với `not_started` khi thời
+     hạn đó đã qua từ lúc kết thúc. Ở lần khởi động khác, khi không biết
+     lúc nó kết thúc, mọi lần không thấy là `start_unsure`, không bao giờ
+     `not_started`: nếu không, một lần bắt đầu đã chạy và có tiêu đề sẽ bị
+     nhờ lại và chạy hai lần. Một danh sách không đọc được thì không làm rõ
+     gì cho tới 10 phút sau khi kết thúc (`WATCH_EARLY_FOR_MS`), hoặc ở lần
+     khởi động khác sau ba lần tìm (`CLOSE_TRIES`): rồi `start_unsure`.
+- **Không bao giờ hai lần.** Khi một lần bắt đầu tới một target đang ở
+  `start_checking`, `prepare` tới target đó bị từ chối `start_checking`:
+  giọng nói nói với người dùng rằng đèn vẫn đang kiểm việc đó đã bắt đầu
+  chưa và không gửi lại gì (`agent_tasks::START_CHECKING_HELD`), không bao
+  giờ nói là thất bại.
+- **Người dùng nghe gì.** Task news nói một lần bắt đầu đang kiểm là đang
+  kiểm (`checking`, khoá `<store>:<task>:checking`), không bao giờ là thất
+  bại và không đề nghị thử lại; khi đã rõ, việc tìm được kể như mọi việc,
+  `not_started` nói thẳng là chưa bắt đầu (`failed_not_started`), và
+  `start_unsure` là không chắc đã bắt đầu, nên xem máy tính trước khi nhờ
+  lại (`start_unsure`). Bản ghi liên kết (`LAMP_SERVICE_RECORDS_TASKS`) giữ
+  `prepared` khi đang kiểm, theo dõi việc tìm được như mọi việc, là
+  `failed` với `not_started` và `no_result` với `start_unsure`. Bản ghi
+  công việc của nó hiện `queued` khi đang kiểm, không bao giờ `failed`.
+- **Harness người dùng tự mở không bao giờ bị lấy:** chỉ dòng mang đúng tên
+  `lamp-<32 hex>` đèn đặt cho lần bắt đầu đó mới bị lấy, và không người nào
+  đặt tên như vậy. Harness của họ trong cùng thư mục làm lần bắt đầu thành
+  không chắc, không bao giờ bị lấy.
+- **Độ trễ.** Một lần kiểm thay chỗ lần đọc của một vòng trên worker Harness
+  duy nhất, có giới hạn như lần đọc đó (`read_timeout`, 10 giây), và chỉ khi
+  có một lần bắt đầu đang kiểm (tối đa 10 phút sau khi hết giờ); một lần
+  giao đã xếp hàng luôn được gửi trước khi lần kiểm bắt đầu. Một lần giao
+  được nhờ trong lúc kiểm phải chờ nó: `harness ps --json` mất 4,3 tới 4,8
+  giây trên Mac thử (ba lần chạy), tối đa 10 giây.
+- **Nhật ký.** Một dòng mỗi lần làm rõ (`tasks: task <id>: the start that
+  timed out is …`), không bao giờ có lời nhờ, thư mục hay tên harness.
+
+Test: `start_check` `a_start_listed_by_the_lamps_own_name_is_the_one`,
+`two_of_its_name_are_neither_taken`, `a_harness_the_person_started_is_never_taken`,
+`with_nothing_that_could_be_it_the_start_is_not_listed`,
+`a_list_is_read_as_harness_writes_it`; `runtime`
+`a_start_missed_by_its_name_is_not_sure_unless_dated_and_nothing_could_be_it`; `engine`
+`a_start_that_timed_out_is_checked_and_never_sent_again`,
+`a_start_being_checked_settles_once_found_not_started_or_unsure`,
+`the_same_ask_while_a_start_is_checked_is_held`,
+`only_a_new_start_that_timed_out_is_checked`; `tests/runtime.rs`
+`a_start_that_timed_out_and_ran_is_found_tracked_and_closed_never_sent_twice`,
+`a_start_that_timed_out_and_never_ran_is_not_started_after_a_bounded_wait`,
+`harnesses_in_its_folder_without_its_name_are_never_taken`; của giọng
+nói `task_news::a_start_being_checked_is_never_told_as_failed`,
+`agent_tasks::a_hand_over_held_while_a_start_is_checked_is_said_so` và
+`task_rows::outcomes_from_the_task`. ROW còn nợ: chạy lại C151 trên
+lamp-06c1, một lần bắt đầu chậm quá thời hạn được tìm, theo dõi và đóng, từ
+cả hai nhật ký.
 
 ## Đóng harness của chính đèn khi việc xong, chờ kể tin tối đa một phút (#6530)
 

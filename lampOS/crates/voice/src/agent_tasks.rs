@@ -4483,6 +4483,13 @@ pub const NOT_SET_UP: &str =
 /// wouldn't go through just now … want me to try again?".
 pub const NO_HARNESS: &str = "I can't hand work on to another computer yet: that isn't set up on this lamp. It can be set up later.";
 
+/// What the model is told when the tasks part holds a hand-over because a
+/// start to that computer timed out and is still being checked
+/// (`start_checking`, #8170): nothing is sent again meanwhile, so the work
+/// never runs twice, and the person hears it is being checked, never that
+/// it failed.
+pub const START_CHECKING_HELD: &str = "I'm still checking whether the work you asked for a moment ago started there, so I haven't sent anything again. Say so plainly in a few words, never that it failed, and that I'll tell them once I know.";
+
 /// What the model is told when the tasks part refuses a hand-over because
 /// its task targets were written for a newer build, or name what this one
 /// doesn't know (`targets_newer`, #1505): hand-overs stay off until the
@@ -4949,6 +4956,9 @@ fn run_for_asked(
                     let told = match code {
                         Some("no_harness") => NO_HARNESS.to_owned(),
                         Some("targets_newer") => TARGETS_NEWER.to_owned(),
+                        // A start there that timed out is still being
+                        // checked (#8170): held, never a failure.
+                        Some("start_checking") => START_CHECKING_HELD.to_owned(),
                         // The lamp's engine named is off or not installed
                         // there (#6492): said plainly, never retried on the
                         // another engine.
@@ -14717,6 +14727,49 @@ pub(crate) mod tests {
     /// none, or a name not among the lamp's engines, sends no `engine` and
     /// says the lamp's default; an `engine` for a computer is ignored; and
     /// `engine_not_here` is said plainly, never retried on another engine.
+    /// #8170: a hand-over the tasks part holds while a start that timed out
+    /// is checked is said as being checked, never as failed, and is never
+    /// sent again by the voice.
+    #[test]
+    fn a_hand_over_held_while_a_start_is_checked_is_said_so() {
+        let _one = ONE_AT_A_TIME
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        let directory = std::env::temp_dir().join(format!("agent-checking-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&directory);
+        std::fs::create_dir_all(&directory).unwrap();
+        let status =
+            json!({"ok":true,"store_id":"s1","revision":0,"summary":{"session_id":"sess"}});
+        let seen = tasks_part(
+            &directory,
+            vec![
+                ("request.sock", status.clone()),
+                ("request.sock", json!({"ok":false,"error":"start_checking"})),
+                // Answers a retry would get, if one were ever sent.
+                ("request.sock", status),
+                (
+                    "request.sock",
+                    json!({"ok":true,"id":7,"prepared_digest":"abc","revision":1}),
+                ),
+            ],
+        );
+        let at = place(&directory, false);
+        let call = ToolCall {
+            id: "c".into(),
+            name: START.into(),
+            args: json!({"task":"Write a poem"}),
+        };
+        let told = run(&at, &call, 3, true, PEER_WAIT).0;
+        assert_eq!(told, json!({"error": START_CHECKING_HELD}));
+        assert!(!START_CHECKING_HELD.contains("try again"));
+        let mut prepares = 0;
+        while let Ok(line) = seen.recv_timeout(Duration::from_millis(200)) {
+            prepares += usize::from(line["op"] == "prepare");
+        }
+        assert_eq!(prepares, 1, "never sent again");
+        let _ = std::fs::remove_dir_all(&directory);
+    }
+
     #[test]
     fn a_named_lamp_engine_goes_with_the_prepare_and_is_said() {
         let _one = ONE_AT_A_TIME
