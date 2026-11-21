@@ -122,8 +122,9 @@ pub const SOFT_START_LEAD_BLOCKS: usize = 30;
 /// own (the name's first sign came too late for the call's wait), a request
 /// said straight after it lost its first word: on lamp-52e6 on 14 November
 /// "Hey Lamp, play me something to relax." was heard as "Hey, Lamp. Me
-/// something to relax.", and the next line was measured beginning 20 ms
-/// before its verb, where a word needs about 100 ms ([`SOFT_START_ENVIRONMENT`]).
+/// something to relax.", and offline, on relax.wav ("Hey Lamp, please
+/// play…"), the line after the name was measured beginning 20 ms before
+/// "please", where a word needs about 100 ms ([`SOFT_START_ENVIRONMENT`]).
 pub const END_LEAD_ENVIRONMENT: &str = "LAMP_END_KEEPS_REACH_BACK";
 
 /// Whether the voice's environment says `on`.
@@ -981,7 +982,12 @@ impl TurnDetector {
 
     /// A changed DSP history must not relabel an old inactive prefix. Preserve
     /// sequence validation and an already active utterance across planned AEC resets.
+    /// The quiet a line in hand keeps for the next pre-roll
+    /// (`LAMP_END_KEEPS_REACH_BACK`) is dropped either way: it is the old
+    /// history too, and the next start must never lead with it (El's read
+    /// of #8243).
     pub fn discard_inactive_prefix(&mut self) {
+        self.trailing.clear();
         if !self.active {
             self.prefix.clear();
             self.scores.clear();
@@ -1678,6 +1684,51 @@ mod tests {
             count(push(&mut detector, 0.0), &mut seen);
         }
         assert_eq!(seen, (1, 1));
+    }
+
+    /// El's read of #8243: a capture-lineage change while a line is in hand
+    /// (`discard_inactive_prefix`) drops the quiet it kept, so the start
+    /// right after its End never leads with audio from before the change.
+    #[test]
+    fn a_lineage_change_drops_the_kept_quiet() {
+        let mut detector = TurnDetector::default();
+        detector.keep_end_leads(true);
+        let mut sequence = 0;
+        let mut push = |detector: &mut TurnDetector, probability: f32| {
+            sequence += 1;
+            let activity = detector.push(
+                ObservedAudio {
+                    sequence,
+                    captured_at_us: sequence * 10_000,
+                    samples: [0; CAPTURE_SAMPLES],
+                },
+                probability,
+            );
+            (sequence, activity)
+        };
+        for _ in 0..50 {
+            push(&mut detector, 1.0);
+        }
+        let mut changed_at = 0;
+        for _ in 0..u32::from(END_SILENCE_BLOCKS) - 5 {
+            changed_at = push(&mut detector, 0.0).0;
+        }
+        assert!(detector.active);
+        detector.discard_inactive_prefix();
+        let mut ended = false;
+        for _ in 0..5 {
+            ended |= matches!(push(&mut detector, 0.0).1, Activity::End(_));
+        }
+        assert!(ended, "the line did not end");
+        let start = loop {
+            if let (_, Activity::Start(frames)) = push(&mut detector, 1.0) {
+                break frames;
+            }
+        };
+        assert!(
+            start.iter().all(|frame| frame.sequence > changed_at),
+            "the start leads with quiet from before the change"
+        );
     }
 
     /// #7095 (`LAMP_END_KEEPS_REACH_BACK=on`): however long a held line's

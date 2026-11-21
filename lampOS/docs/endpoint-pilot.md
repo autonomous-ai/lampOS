@@ -1115,8 +1115,9 @@ Off unless `LAMP_END_KEEPS_REACH_BACK=on` in the voice's environment
   comes late, the line ends at the window, and a request said straight
   after it starts on its own. On lamp-52e6 on 14 November "Hey Lamp, play
   me something to relax." was heard as "Hey, Lamp. Me something to relax."
-  twice. The next line was measured beginning 20 ms before its verb, and a
-  word needs about 100 ms of lead (the soft start's evidence in
+  twice. Offline, on relax.wav ("Hey Lamp, please play…", the "please"
+  workaround clip), the line after the name was measured beginning 20 ms
+  before "please", and a word needs about 100 ms of lead (the soft start's evidence in
   [duplex-listening.md](duplex-listening.md)).
 - **With the switch:** when a line ends, its trailing quiet becomes the
   next line's pre-roll, each block with its own score and whether it was
@@ -1139,11 +1140,26 @@ Off unless `LAMP_END_KEEPS_REACH_BACK=on` in the voice's environment
     is sent twice: at the end of the line that ended, and at the front of
     the next one.
   - Not after a line a hand Stop abandoned: what came before the Stop never
-    starts a new request. A reset, a capture gap or a cleared pre-roll drops
-    the carried quiet with the rest.
+    starts a new request. A reset, a capture gap, a cleared pre-roll or a
+    capture-lineage change (a DSP epoch or privacy generation change, even
+    while the line is in hand) drops the carried quiet with the rest.
+  - What it does not cover: every let-go (the keeper's pause, a busy room's
+    hold, the lamp's own line, body motion, the answer's wait, asker-first)
+    and a masked start clear the carried lead with the rest of the line's
+    candidate. A line let go and started again further into the words still
+    has no lead; this switch fixes only a thin lead after a bare call.
 - **What it costs:** up to 600 ms of the ended line's quiet in front of the
   next line, so the next line's first block can be read before the last
-  line's End.
+  line's End. Its one cap:
+
+  | Name | Value | Why | Latency |
+  |---|---|---|---|
+  | `END_LEAD_BLOCKS` | 600 ms, the existing 300 + 300, no new number | the furthest an ordinary start reaches back (a soft start's); it also bounds the kept quiet's memory to 60 blocks | none: the blocks are in memory and go out in the start's first burst |
+
+  A body-motion let-go (`LAMP_MOTION_KEEPS_ANSWER`, on in lamp-4ace's unit
+  only) judges a move from the next line's first block, which can now be
+  in the ended line's tail: a row on lamp-4ace may show a `body_moved`
+  let-go the product wouldn't.
 - **Tests** (`crates/voice/tests/it/end_lead.rs`, no audio: a constructed
   run of speech and quiet blocks with the measured timings):
   - `a_line_right_after_a_bare_call_begins_100_ms_before_its_verb`: "Hey
@@ -1152,11 +1168,19 @@ Off unless `LAMP_END_KEEPS_REACH_BACK=on` in the voice's environment
     begins at least 100 ms before the verb; without it, 20 ms.
   - `with_the_switch_off_nothing_changes_and_on_only_the_next_start_does`;
   - `the_carried_lead_never_holds_the_ended_lines_speech`;
-  - `the_carried_lead_holds_to_its_cap`.
+  - `the_carried_lead_holds_to_its_cap`;
+  - `a_late_name_sign_from_the_ended_line_never_waits_the_next`;
+  - in `activity.rs`: `the_kept_trailing_quiet_stays_within_its_bound` and
+    `a_lineage_change_drops_the_kept_quiet`.
 - **The row** before it is switched on: the original 7-word clip ("Hey
   Lamp, play me something to relax.", no "please"), 8 plays at the Mac's
   100 and 8 at 45, with the comma-less "Hey Lamp play …" as the control.
   It runs first on stable with the switch off, where a miss shows the race.
+  It is switched on only with "play" heard 8 of 8 at each level. Each
+  play keeps the journal's `call_wait`, `floor_held`, `input_let_go_*`,
+  `input_candidate_rejected`, `input_prefix_sanitized` and `voice/heard`
+  lines: a miss with the switch on that shows a let-go or a masked start
+  is that path, not this fix.
 
 ## Pilot acceptance and rollback rule
 
