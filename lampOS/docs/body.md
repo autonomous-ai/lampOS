@@ -1490,7 +1490,7 @@ the voice, Expression and lamp-skills (each with `energy_in::EnergyIn`, the body
   half a millimetre under the 22 mm at which a clip is refused at play time, because a mood's lean
   at play time (listening, speaking) adds to the stand pose the host check uses; and none leaning
   the lamp back past 16 mm (`energy::CLIP_SIZE_CAP`,
-  `cog::every_built_in_clip_at_level_five_passes_v1s_rule`; no bound moved): greeting 1.54,
+  `cog::every_built_in_clip_at_every_level_passes_v1s_rule`; no bound moved): greeting 1.54,
   surprised 1.27, sleepy 1.44, excited 1.27 and dance_groove 1.59 (its lean back). On the host at
   level 5 the clips' worst frame is 3.3 to 21.46 mm off the axis (greeting 21.46, surprised and
   sleepy 21.42, excited 21.33; level 1: 3.1 to 17.99), so seven clips come within 85% of 22 mm and
@@ -1535,6 +1535,43 @@ the voice, Expression and lamp-skills (each with `energy_in::EnergyIn`, the body
   way of the pose. Excited and surprised stop at 1.27 because V1's own tip rule (`cog`, 22 mm, kept
   0.5 mm clear) leaves them no room at 1.6. Closing any of these needs a servo, reach or tip bound
   raised, which #8153 does not do.
+- **Clip length (#8153).** Thirteen built-in clips are a stretch V2 cut from a V1 recording (2 to
+  9 s, "Gestures" below); the generator also writes all of each recording at the cut's size and
+  frame time (`clips::WHOLE`, `NAME_WHOLE`, never played as it is). Above level 1 such a clip is
+  lengthened toward it (`energy::longer`): evenly from the cut at level 1 to all of the recording
+  at level 5, taken from the first frame kept so it begins at nothing and, ended before the
+  recording does, brought back to nothing over its last ten frames, never shorter than the clip
+  itself, then sized and paced as above. The size, the reach, the servo's 1,000 counts a second
+  and V1's tip rule are as above, none raised: a recording that would cross the tip rule (21.5 mm)
+  or the lean back (16 mm) at its level-5 size is trimmed to as much as stays inside
+  (`energy::WHOLE_TRIM`, found on the host by
+  `cog::level_five_keeps_as_much_of_each_recording_as_v1s_rule_allows`), and every frame of every
+  clip at levels 2 to 5 is checked against both
+  (`cog::every_built_in_clip_at_every_level_passes_v1s_rule`; at level 5 the worst is 21.46 mm off
+  the axis, greeting, and 14.75 mm back, dance_hype). The other eight clips are already all of
+  their recording. Level 1 plays the clip itself. Level 5 on the host
+  (`energy::level_five_plays_each_clip_for_all_of_its_v1_recording`; played seconds at the 1.5
+  pace, each step stretched under the servo's speed):
+
+  | clip | level 1, s | V1, s (rows) | level 5, s (rows) | trimmed by |
+  |---|---|---|---|---|
+  | acknowledge | 1.95 | 5.00 (101) | 4.18 (101) | none |
+  | curious | 3.00 | 9.95 (200) | 6.80 (200) | none |
+  | happy | 4.00 | 12.95 (260) | 8.81 (260) | none |
+  | caring | 5.00 | 9.95 (200) | 5.62 (166) | rows 0 to 165: the tip rule |
+  | surprised | 2.00 | 5.95 (120) | 4.10 (120) | none |
+  | confused | 3.00 | 7.95 (160) | 5.45 (160) | none |
+  | excited | 4.00 | 11.95 (240) | 3.06 (84) | rows 16 to 99: the lean back; one bounce at 5, the clip's two below it |
+  | scanning | 9.00 | 17.95 (360) | 11.25 (332) | rows 28 to 359: the tip rule |
+  | dance_chill | 9.00 | 10.00 (201) | 6.80 (201) | none |
+  | dance_groove | 8.00 | 15.95 (320) | 10.88 (320) | none |
+  | dance_hype | 7.00 | 15.95 (320) | 11.20 (320) | none |
+  | dance_waltz | 9.54 | 10.00 (201) | 7.26 (201) | none |
+  | dance_jazz | 9.00 | 11.95 (240) | 8.13 (240) | none |
+
+  The time is under V1's by level 5's 1.5 pace; the moves are all of V1's. A skill waits for a
+  gesture's end as long as the longest level plays it (`energy::longest_us`). A longer clip holds
+  a new energy level and the next gesture (a fill, a matched cue) until it ends, as any gesture.
 - **Pause nod.** Expression's pause clip waits `pause_cooldown_us`: the catalogue's cooldown at level 1,
   else the level's gap, never longer than the catalogue's and never under 3 s.
 - **Music.** A skill trigger with `lively = true` (Music sway, [skills.md](skills.md)): its cooldown at
@@ -2139,7 +2176,8 @@ each is the most active stretch of its recording of the length given, begun at i
 into the reach the test below allows (at most 80% of the recording), ended at nothing over its last half second and
 slowed under the same speeds. They are what skills and expressions ask for by name. Filmed from the iMac on
 lamp-4ace at 10:4x: `acknowledge`, `curious`, `happy`, `excited` and `caring` read from the front; `surprised`,
-`confused` and `sleepy` are small there.
+`confused` and `sleepy` are small there. Above energy level 1 those cut from a longer recording are
+lengthened toward all of it ("Clip length (#8153)" above, `clips::WHOLE`).
 
 | Clip | From | Lasts | Mostly |
 | --- | --- | --- | --- |

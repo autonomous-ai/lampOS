@@ -164,7 +164,7 @@ pub fn livelier(clip: &'static Clip, level: u8) -> &'static Clip {
     };
     MADE[index][usize::from(level) - 2].get_or_init(|| {
         sized(
-            clip,
+            &longer(clip, level),
             clip_size(clip.name, level),
             of(level).clip_pace,
         )
@@ -204,7 +204,8 @@ pub fn clip_size(name: &str, level: u8) -> f32 {
 /// A built-in clip as long as `level` plays it, before its size and pace
 /// (#8153): one cut from its recording (`crate::clips::WHOLE`) is lengthened
 /// toward all of it, evenly from the cut at level 1 to the whole at level 5
-/// (or as much of it as [`WHOLE_TRIM`] keeps); any other clip is itself.
+/// (or as much of it as [`WHOLE_TRIM`] keeps), never shorter than the
+/// clip itself; any other clip is itself.
 pub fn longer(clip: &'static Clip, level: u8) -> Clip {
     let Some(whole) = crate::clips::WHOLE
         .iter()
@@ -221,7 +222,13 @@ pub fn longer(clip: &'static Clip, level: u8) -> Clip {
         let reach = (end as f32 - cut as f32) * share;
         (cut as f32 + reach).round() as usize
     };
-    span(whole, toward(whole.from, first), toward(whole.to, last))
+    let (first, last) = (toward(whole.from, first), toward(whole.to, last));
+    // Never shorter than level 1: a stretch no longer than the clip
+    // (excited's, its bounce played twice, below level 5) keeps the clip.
+    if last - first < clip.frames.len() {
+        return *clip;
+    }
+    span(whole, first, last)
 }
 
 /// The frames of `whole`'s recording level 5 plays: all of them, or as
@@ -346,9 +353,14 @@ pub const CLIP_SIZE_CAP: [(&str, f32); 5] = [
 /// as [`CLIP_SIZE_CAP`] (no frame past 21.5 mm off the base's axis, none
 /// leaning the lamp back past 16 mm): its recording's first and last frame
 /// kept, and the bound that held it. Found on the host
-/// (`cog::every_built_in_clip_at_every_level_passes_v1s_rule`): a frame
-/// more on the trimmed side crosses it. The rest play all of it.
-pub const WHOLE_TRIM: [(&str, usize, usize, &str); 0] = [];
+/// (`cog::level_five_keeps_as_much_of_each_recording_as_v1s_rule_allows`,
+/// which cuts the crossing frames off from all of it and finds exactly
+/// these). The rest play all of it.
+pub const WHOLE_TRIM: [(&str, usize, usize, &str); 3] = [
+    ("caring", 0, 165, "the tip rule, 21.5 mm off the axis"),
+    ("excited", 16, 99, "the lean back, 16 mm"),
+    ("scanning", 28, 359, "the tip rule, 21.5 mm off the axis"),
+];
 
 /// One level's rate of clips started of themselves (#6893).
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -690,6 +702,12 @@ mod tests {
         }
     }
 
+    /// How far `clip` swings `joint`, peak to peak.
+    fn spread(clip: &Clip, joint: usize) -> i32 {
+        let at = clip.frames.iter().map(|frame| i32::from(frame[joint]));
+        at.clone().max().unwrap() - at.min().unwrap()
+    }
+
     /// #8153: level 1 plays every clip as recorded, the very clip; the clip
     /// size and pace lie evenly from x1 at level 1 to x1.6 and x1.5 at 5.
     #[test]
@@ -769,11 +787,19 @@ mod tests {
                     "{} joint {joint}: {at_five} against {wanted}",
                     clip.name
                 );
+                // Each level plays its own stretch of the recording, taken
+                // from its own first frame, so its farthest from the pose is
+                // not comparable with level 1's (happy's yaw 160 at 3 and
+                // 144 at 5; caring's elbow 333 at 1 and 307 at 5, taken
+                // from the recording's first frame): its swing, peak to
+                // peak, is never under level 1's.
                 let level_one = farthest(clip)[joint];
                 assert!(
-                    level_one <= at_three && at_three <= at_five,
-                    "{} joint {joint}: {level_one} {at_three} {at_five}",
-                    clip.name
+                    spread(clip, joint) <= spread(five, joint) && (at_three > 0 || level_one == 0),
+                    "{} joint {joint}: {} against {}",
+                    clip.name,
+                    spread(clip, joint),
+                    spread(five, joint)
                 );
                 grown += usize::from(at_five > level_one);
             }
@@ -913,7 +939,10 @@ mod tests {
             let seconds = |row: &str| row.split(',').next().unwrap().parse::<f64>().unwrap();
             let v1_s = seconds(rows[rows.len() - 1]) - seconds(rows[0]);
             let trim = WHOLE_TRIM.iter().find(|(name, ..)| *name == clip.name);
-            let kept = trim.map_or(rows.len(), |(_, first, last, _)| last - first + 1);
+            // Trimmed to no longer than the clip itself, the clip is kept.
+            let kept = trim.map_or(rows.len(), |(_, first, last, _)| {
+                (last - first + 1).max(clip.frames.len())
+            });
             let five = livelier(clip, 5);
             assert_eq!(
                 five.frames.len(),
@@ -926,36 +955,32 @@ mod tests {
                 assert!(*first > 0 || *last < rows.len() - 1, "{}", clip.name);
                 assert!(!why.is_empty(), "{}", clip.name);
             }
-            // Each level longer than the one under it, for a clip cut.
+            // Each level longer than the one under it, for a clip cut, or
+            // the clip itself where that would be shorter (excited below 5).
             let lengths: Vec<usize> = (1..=5)
                 .map(|level| livelier(clip, level).frames.len())
                 .collect();
-            if crate::clips::WHOLE
+            if kept == clip.frames.len() {
+                assert!(
+                    lengths.iter().all(|length| *length == kept),
+                    "{} {lengths:?}",
+                    clip.name
+                );
+            } else if crate::clips::WHOLE
                 .iter()
                 .any(|whole| whole.cut.name == clip.name)
             {
                 whole += 1;
-                let cut = crate::clips::WHOLE
-                    .iter()
-                    .find(|whole| whole.cut.name == clip.name)
-                    .unwrap();
                 assert_eq!(lengths[0], clip.frames.len(), "{}", clip.name);
                 assert!(
-                    lengths[1] > cut.to - cut.from + 1,
-                    "{} {lengths:?}",
-                    clip.name
-                );
-                assert!(
-                    lengths.windows(2).skip(1).all(|pair| pair[0] < pair[1]),
+                    lengths
+                        .windows(2)
+                        .all(|pair| pair[0] < pair[1] || pair[1] == lengths[0]),
                     "{} {lengths:?}",
                     clip.name
                 );
             } else {
-                assert!(
-                    lengths.iter().all(|length| *length == rows.len()),
-                    "{} {lengths:?}",
-                    clip.name
-                );
+                unreachable!("{}: {kept} frames of {} rows", clip.name, rows.len());
             }
             eprintln!(
                 "length {:<13} level 1 {:5.2} s, V1 {v1_s:5.2} s ({} rows), level 5 {:5.2} s ({kept} rows){}",
