@@ -7159,6 +7159,7 @@ mod tests {
         let step = |quiet| lamp_skills::task::TaskStep {
             task: "Sum up this morning's mail".into(),
             words: "Sum up this morning's mail".into(),
+            summary: None,
             run: "scripts/main.py".into(),
             quiet,
             direct: false,
@@ -7337,6 +7338,7 @@ mod tests {
         let task = Call::Task(Box::new(lamp_skills::task::TaskStep {
             task: "Find the bitcoin price".into(),
             words: "Find the bitcoin price".into(),
+            summary: None,
             run: "scripts/main.py".into(),
             quiet: None,
             direct: false,
@@ -7430,6 +7432,7 @@ mod tests {
         let task = Call::Task(Box::new(lamp_skills::task::TaskStep {
             task: "Check my mail".into(),
             words: "Check my mail".into(),
+            summary: None,
             run: "scripts/main.py".into(),
             quiet: None,
             direct: false,
@@ -9096,6 +9099,7 @@ mod tests {
             Call::Task(Box::new(lamp_skills::task::TaskStep {
                 task: "Read my unread mail.".into(),
                 words: "Read my unread mail.".into(),
+                summary: None,
                 run: "scripts/mail.sh".into(),
                 quiet: None,
                 direct: false,
@@ -9219,6 +9223,7 @@ mod tests {
         let task = Call::Task(Box::new(lamp_skills::task::TaskStep {
             task: lamp_skills::core_agent::PILOTS[0].tasks[0].task.into(),
             words: lamp_skills::core_agent::PILOTS[0].tasks[0].task.into(),
+            summary: None,
             run: lamp_skills::core_agent::RUN.into(),
             quiet: None,
             direct: false,
@@ -9277,6 +9282,7 @@ mod tests {
             Call::Task(Box::new(lamp_skills::task::TaskStep {
                 task: "Start a study block.".into(),
                 words: "Start a study block.".into(),
+                summary: None,
                 run: "scripts/study.sh".into(),
                 quiet: None,
                 direct: false,

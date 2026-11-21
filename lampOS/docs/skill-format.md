@@ -38,7 +38,9 @@ is refused: script skills are a later format, except the `scripts/` of a skill w
 `task = { task, run }` or a `run = "scripts/main.py"` step (format 2, with its top-level `grants`;
 skills.md, "A skill's task" and "A skill's `run` step"): `lamp skill check` holds that as the lamp
 does, and a push may carry it. `lamp-skills pack` refuses a
-task whose words are empty, longer than 120 characters or not plain (#7874).
+task whose words are empty, longer than 1000 characters or 1500 bytes or not plain, or whose optional `summary` (the
+one line said back for it; without it, the task's first sentence) is longer than 120
+characters or not plain (#7874).
 
 **`SKILL.md`** starts with front matter between two `---` lines. Two keys
 are read and both are required:

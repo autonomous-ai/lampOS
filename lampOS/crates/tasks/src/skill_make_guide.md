@@ -142,8 +142,14 @@ A skill does nothing that would surprise the person who asked for it.
   aloud to the owner, word for word (about 400 characters at most), so it
   is only the spoken summary; a lone dash (-) is said as nothing, the
   answer when a script has said it with `lamp.say` already.
-- The `task` words are read back whole for the owner's yes: one plain
-  sentence a person understands, at most 120 characters.
+- Write the `task` words in full: everything the run must do, plain, on
+  one line, at most 1000 characters and 1500 bytes (about 500 characters
+  in Korean). Beside them give `summary = "..."`: one plain line of at
+  most 120 characters a person understands when it is said back, as
+  `task = { task = "...", summary = "...", run = "scripts/main.py" }`.
+  Without a summary the lamp says the task's first sentence. The full
+  words stay in the skill and are what the run is given. Nothing waits
+  for a yes: the skill goes on as made.
 - **A linked service** (mail, a calendar, GitHub): `grants =
   ["<code>-read"]` to read it, or `"<code>-write"` to send with it. The
   script reads it itself with `await lamp.service_read(service, args)`
