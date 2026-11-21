@@ -6695,9 +6695,13 @@ in Piper's voice, `LAMP_SPOKEN_TO=off` as lamp-name didn't take Piper's
     clears it, so the note goes with it);
   - "yes, and also …" isn't shown cleanly yet.
 
-### Kept in the person's memory (linked records, slice 3, off unless `LAMP_SERVICE_RECORDS_TASKS=on`)
+### Kept in the person's memory (linked records, slice 3, `LAMP_SERVICE_RECORDS_TASKS`, on in the product)
 
-Beside `LAMP_SERVICE_RECORDS`, on the second route only, work handed over
+On in the product since 20 Nov (`lamp-voice.service`), by the product
+owner's rule of 18 Nov that everything is on by default
+(https://github.com/autonomous-ai/lampOS/issues/6811#issuecomment-6977525471); off in code
+unless `LAMP_SERVICE_RECORDS_TASKS=on`. Beside `LAMP_SERVICE_RECORDS`, on
+the second route only, work handed over
 on the lamp owner's heard yes is kept in their Days memory as one linked
 record, through the voice's linked outbox
 ([memory-days.md](memory-days.md#the-voices-linked-outbox-slice-2-under-lamp_service_records))
@@ -6746,7 +6750,7 @@ Tests: `service_records::task_rows`'s
 `followed_is_bounded_in_number_and_time`, `a_look_writes_what_settled`,
 `off_nothing_is_kept_or_followed`; and `agent_tasks`'s
 `a_hand_over_on_the_owners_yes_is_their_task_row` and the yes taken in
-code. Not yet played on a lamp.
+code. Not yet played on a lamp: its ROW is owed on lamp-06c1.
 
 ### One yes for a read-back said in words (#5169; on in the product for a yes to a words-only read-back, #6547 A)
 
