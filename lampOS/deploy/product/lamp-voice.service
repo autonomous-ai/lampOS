@@ -216,6 +216,9 @@ Environment=LAMP_LIGHT_TOLD=on
 Environment=LAMP_ACTION_CLAIM_CHECKED=on
 # #7730, docs/switches.md; first builder, 18 Nov ("Space facts is off." with no call on lamp-9adf)
 Environment=LAMP_SKILL_CLAIM_CHECKED=on
+# LAMP_LIVE_FACT_CHECKED: its why and rules are its row in docs/switches.md (#7605, #7719). A live figure (a price,
+# a rate, a score, the weather) said with no lookup in its turn is asked again with the lookup required.
+Environment=LAMP_LIVE_FACT_CHECKED=on
 # The owner's line is told which services are linked in the app, so "what can you do with my calendar?"
 # is answered from it, not as the app's job (#5523).
 Environment=LAMP_SERVICES_TOLD=on
