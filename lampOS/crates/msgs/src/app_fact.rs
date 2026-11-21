@@ -23,9 +23,11 @@
 //! No switch here: the door's `apps.remember` (lamp-control) is behind its
 //! own, `LAMP_APP_REMEMBER`, off until the first builder's privacy read and
 //! the ROW (Friday's 16:47 on #7415). The door tells the voice on the bus
-//! ([`AppRemember`], [`AppFactsForget`]); the voice picks the person
-//! ([`whose`]), sends [`REMEMBER_OP`] or [`FORGET_OP`] to memory and says how
-//! it went ([`AppRemembered`]).
+//! ([`AppRemember`]); the voice picks the person (the owner's ids, the
+//! face's first, each tried in turn past `not_known`), sends [`REMEMBER_OP`]
+//! to memory and says how it went ([`AppRemembered`]). A removed app's
+//! [`FORGET_OP`] goes from lamp-control to memory's forget socket, kept as a
+//! pending mark until memory says it was done.
 
 /// Memory's request that keeps one: `{"op": REMEMBER_OP, "person",
 /// "source", "name", "at_unix_ms", "text"}`. Linked to no exchange:
@@ -359,42 +361,10 @@ impl AppRemembered {
     }
 }
 
-/// An app removed: the voice sends [`FORGET_OP`] for its source
-/// (`apps/forget_facts`, lamp-control to the voice).
-#[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
-#[serde(deny_unknown_fields)]
-pub struct AppFactsForget {
-    pub app: String,
-}
-
-impl AppFactsForget {
-    pub const TYPE: &str = "lamp_msgs/AppFactsForget";
-    pub const VERSION: u32 = 1;
-    pub const TOPIC: &str = "apps/forget_facts";
-
-    pub fn declaration() -> lamp_bus::Declaration {
-        lamp_bus::Declaration::new(Self::TYPE, Self::VERSION, lamp_bus::Kind::Event)
-    }
-
-    /// The source to forget: `app:<app>`.
-    pub fn source(&self) -> Option<Source> {
-        crate::app_triggers::name_ok(&self.app)
-            .then(|| Source::parse(&format!("app:{}", self.app)))
-            .flatten()
-    }
-
-    pub fn check(&self) -> Result<(), crate::Invalid> {
-        self.source()
-            .map(|_| ())
-            .ok_or_else(|| crate::Invalid("an app's facts forget names an app".into()))
-    }
-}
-
 pub fn app_fact_topics() -> Vec<(&'static str, lamp_bus::Declaration)> {
     vec![
         (AppRemember::TOPIC, AppRemember::declaration()),
         (AppRemembered::TOPIC, AppRemembered::declaration()),
-        (AppFactsForget::TOPIC, AppFactsForget::declaration()),
     ]
 }
 
@@ -551,8 +521,8 @@ mod tests {
         assert!(lines.live(2_001).is_empty());
     }
 
-    /// The bus's three: a fact checked as the door tidied it, an outcome one
-    /// code, a forget by an app's name.
+    /// The bus's two: a fact checked as the door tidied it, an outcome one
+    /// code.
     #[test]
     fn the_bus_messages_hold_only_checked_words() {
         let fact = |name: &str, text: &str| AppRemember {
@@ -588,11 +558,6 @@ mod tests {
         };
         assert!(went(KEPT).check().is_ok() && went("not_known").check().is_ok());
         assert!(went("").check().is_err() && went("Not known").check().is_err());
-        let forget = AppFactsForget {
-            app: "gym-coach".into(),
-        };
-        assert_eq!(forget.source().unwrap().as_str(), "app:gym-coach");
-        assert!(AppFactsForget { app: "a:b".into() }.check().is_err());
-        assert_eq!(app_fact_topics().len(), 3);
+        assert_eq!(app_fact_topics().len(), 2);
     }
 }
