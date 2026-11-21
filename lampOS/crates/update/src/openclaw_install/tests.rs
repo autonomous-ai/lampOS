@@ -23,7 +23,8 @@ struct Fake {
     reloads_fail: usize,
     /// How many times the gateway's loaded unit was shown.
     shown: usize,
-    /// The gateway's own `ActiveState` (#8105), when a test reads it.
+    /// The gateway's own `ActiveState` (#8105); none set: `inactive`, as a
+    /// lamp's first round finds it.
     gateway: Option<&'static str>,
 }
 
@@ -36,9 +37,7 @@ const LOADED_AS_WRITTEN: &str = "DropInPaths=\n\
 impl Systemd for Fake {
     fn states(&mut self, units: &[String]) -> Result<Vec<UnitState>, String> {
         if units == [UNIT] {
-            let active = self
-                .gateway
-                .expect("the gateway's state read with none set");
+            let active = self.gateway.unwrap_or("inactive");
             self.asked.push("gateway-state");
             return Ok(vec![UnitState {
                 unit: UNIT.to_owned(),
@@ -70,6 +69,11 @@ impl Systemd for Fake {
             assert_eq!(unit, harness_install::UNIT);
             self.asked.push("stop");
         }
+        Ok(())
+    }
+    fn reset_failed(&mut self, unit: &str) -> Result<(), String> {
+        assert_eq!(unit, UNIT, "a round resets only the gateway");
+        self.asked.push("reset-failed");
         Ok(())
     }
     fn start_unit(&mut self, unit: &str) -> Result<(), String> {
@@ -953,6 +957,8 @@ fn the_gateway_starts_again_after_its_own_supervisor_restart() {
 /// stable since 11 Nov) gets the new text from its next round: the bytes
 /// differ, so the round writes it whole and reloads systemd, which a
 /// running gateway's restart policy follows with no restart of its own.
+/// OpenClaw isn't installed here, so nothing is started; a gateway left
+/// down on a lamp with it: `a_round_starts_a_gateway_left_down_only_while_it_is_wanted`.
 #[test]
 fn an_earlier_on_failure_unit_is_written_again_by_the_next_round() {
     let lamp = Lamp::new();
@@ -963,6 +969,71 @@ fn an_earlier_on_failure_unit_is_written_again_by_the_next_round() {
     round_said(&lamp, &mut systemd);
     assert_eq!(fs::read_to_string(lamp.unit()).unwrap(), UNIT_TEXT);
     assert_eq!(systemd.asked, ["reload"], "reloaded, nothing restarted");
+}
+
+/// #8238 (the first builder's 21:56, Migrate's and Twelve's HOLDs): a
+/// gateway the bug already left down is started by the next round while
+/// [`gateway_wanted`] says wanted (always with the switch off), one past its
+/// start limit after its `reset-failed`, said once; never while not wanted
+/// (#8105's stop), and a running one gets nothing.
+#[test]
+fn a_round_starts_a_gateway_left_down_only_while_it_is_wanted() {
+    let lamp = Lamp::new();
+    lamp.harness_there();
+    round(&lamp, &mut Fake::default(), true, 1);
+    assert_eq!(
+        install(&lamp, &Runs::new(&lamp), 2).unwrap().install,
+        "installed"
+    );
+    let hermes = Said {
+        default: Some("hermes".to_owned()),
+        openclaw_in_use: Some(false),
+    };
+    let at = |gateway: Gateway, state: &'static str, at: u64| {
+        let mut systemd = Fake {
+            gateway: Some(state),
+            ..Fake::default()
+        };
+        let mut said = Vec::new();
+        after_round_with(
+            lamp.root(),
+            &lamp.records(),
+            sk(true),
+            gateway,
+            &mut systemd,
+            &mut Runs::new(&lamp).runner(),
+            at,
+            Ok(crate::hermes_schedule::Window::Reached),
+            &mut |line: &str| said.push(line.to_owned()),
+        );
+        (systemd.asked, said)
+    };
+    let off = gateway_wanted(false, None);
+    let (asked, _) = at(off, "inactive", 3);
+    assert!(
+        asked.ends_with(&["gateway-state", "start-gateway"]),
+        "{asked:?}"
+    );
+    let (asked, said) = at(off, "failed", 4);
+    assert!(
+        asked.ends_with(&["gateway-state", "reset-failed", "start-gateway"]),
+        "{asked:?}"
+    );
+    assert_eq!(
+        said.iter()
+            .filter(|line| line.contains("reset-failed"))
+            .count(),
+        1,
+        "{said:?}"
+    );
+    let (asked, _) = at(off, "active", 5);
+    assert!(!asked.contains(&"start-gateway"), "{asked:?}");
+    // The switch on, OpenClaw neither the default nor in use: left down.
+    let (asked, _) = at(gateway_wanted(true, Some(hermes)), "inactive", 6);
+    assert!(!asked.contains(&"start-gateway"), "{asked:?}");
+    let (asked, _) = at(gateway_wanted(true, None), "failed", 7);
+    assert!(!asked.contains(&"start-gateway"), "{asked:?}");
+    assert!(!asked.contains(&"reset-failed"), "{asked:?}");
 }
 
 /// (#6226) npm hung 38 min at its extract on lamp-c0a4 with no output
@@ -1372,7 +1443,7 @@ fn the_gateway_block_is_set_in_a_config_that_lacks_it_and_other_keys_are_kept() 
 /// (the owner on #6226: every lamp has 6 GB) The gateway is always on with
 /// the switch on: once OpenClaw is there the round enables it (the
 /// `multi-user.target.wants` link `systemctl enable` makes) and starts it,
-/// each round after only starts it (a no-op when it runs); the switch off
+/// each round after only starts it when it is down; the switch off
 /// disables and stops it.
 #[test]
 fn the_switch_on_enables_and_starts_the_gateway_and_off_disables_and_stops_it() {
@@ -1395,10 +1466,14 @@ fn the_switch_on_enables_and_starts_the_gateway_and_off_disables_and_stops_it() 
         fs::read_link(lamp.at(WANTS)).unwrap(),
         Path::new("/etc/systemd/system/lamp-openclaw-gateway.service")
     );
-    assert_eq!(systemd.asked, ["reload", "start-gateway"]);
+    assert_eq!(systemd.asked, ["reload", "gateway-state", "start-gateway"]);
     let mut systemd = Fake::default();
     round(&lamp, &mut systemd, true, 4);
-    assert_eq!(systemd.asked, ["start-gateway"], "enabled once");
+    assert_eq!(
+        systemd.asked,
+        ["gateway-state", "start-gateway"],
+        "enabled once"
+    );
 
     let mut systemd = Fake::default();
     after_round_off(lamp.root(), &lamp.records(), &mut systemd, &mut quiet());
