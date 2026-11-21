@@ -13512,6 +13512,10 @@ mod tests {
     #[test]
     fn source_of_made_needs_its_install_record() {
         use lamp_voice::made_skill::SkillSource;
+        // `asks` is a trigger only with LAMP_MADE_SKILL_ASKS (on in the
+        // product); without it the folder doesn't load and every source
+        // below would be Other for the wrong reason.
+        lamp_voice::made_skill::set_asks_here(Some(true));
         let dir = tempfile::tempdir().unwrap();
         let folder = made_here(
             dir.path(),
