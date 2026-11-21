@@ -8256,7 +8256,7 @@ only after calling this in that turn", in it the probe refuses to run).
 Six lines ask about a reminder ("what did I ask you to remind me about?",
 "when is my reminder?", "when did I set that reminder?", "do I have any
 reminders for tomorrow?", "Hey Lamp, what reminders do I?", a question heard
-a word short that is none of `LAMP_REMINDERS_ASKED`'s phrases, and "Mình có
+a word short, which `LAMP_REMINDERS_ASKED` forces too since #7987, and "Mình có
 những lời nhắc nào?", the same question in Vietnamese; #7987) and are right
 with `list_reminders` first; four
 are right with anything else (a memory question, a new reminder, yesterday's

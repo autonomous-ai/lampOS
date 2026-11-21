@@ -789,9 +789,13 @@ this in that turn, not recall; and never list reminders unasked (rule 8).
 The wording and language part is #7987's: on lamp-52e6 (gate 1079) "Hey
 Lamp, what reminders do I have?" heard as 6 of its 7 words was not one of
 `LAMP_REMINDERS_ASKED`'s exact phrases, so no call was forced, and the
-model answered with no call. The exact phrases' forced call stays as it
-is (no new phrases, no one-word tolerance); every other line is the
-model's choice, which this text makes. The description as it was before is
+model answered with no call. The forced call then took the exact phrases
+only; since #7987's second fix it also takes a phrase of 4 words or more
+heard one word short (one word lost or misheard, never "reminders" or
+"my", never beside a word that changes the ask), after the gate's Mac
+volume 45 heard the 7-word line whole in about 17 of 60 plays (switches.md,
+`LAMP_REMINDERS_ASKED`). Every other line is the model's choice, which
+this text makes. The description as it was before is
 kept as `LIST_DESCRIBED_BEFORE`, for the probe's old arm. Both routes
 declare the same catalog, so the Live route and the second route are told
 the same.
