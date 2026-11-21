@@ -3284,9 +3284,32 @@ impl OneSession {
         );
         let opened = self.open(harness, place, until, ended);
         // Ready once open and known to take input (#8138 review (5)): a
-        // session still warming stays `starting` until it is confirmed.
-        if opened.is_ok() && self.lock().pane.as_ref().is_none_or(|pane| pane.confirmed) {
-            self.agent.session(crate::agent::Session::Ready);
+        // session still warming reads `starting` until it is confirmed
+        // ([`OneSession::confirm`]). A fresh session open ends a fault's
+        // `recovering` and a failed open's `error` too, so a warming one
+        // confirmed later reads `ready` (#8138 HOLD 2); never a fault seen
+        // on this very session meanwhile (its replacement due).
+        if opened.is_ok() {
+            let (confirmed, fault_due) = {
+                let inner = self.lock();
+                let agent = inner.pane.as_ref().map(|pane| &pane.agent);
+                (
+                    inner.pane.as_ref().is_none_or(|pane| pane.confirmed),
+                    inner
+                        .restart_due
+                        .as_ref()
+                        .is_some_and(|(due, _)| Some(due) == agent),
+                )
+            };
+            if !fault_due {
+                self.agent.update(|facts| {
+                    facts.session = if confirmed {
+                        crate::agent::Session::Ready
+                    } else {
+                        crate::agent::Session::Opening
+                    };
+                });
+            }
         }
         opened
     }

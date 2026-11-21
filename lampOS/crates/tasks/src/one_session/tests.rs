@@ -4844,6 +4844,47 @@ fn a_warming_session_reads_starting_and_is_never_replaced_for_its_refusal() {
     assert_eq!(one.readiness().state(), (Readiness::Ready, None));
 }
 
+/// #8138 HOLD 2: after a fault, the fresh session opened in its place but
+/// still warming reads `starting` (a fresh session is open), and once it
+/// is confirmed taking input reads `ready` and takes a spoken task; never
+/// stuck at `recovering` until another fault or a restart.
+#[test]
+fn a_fresh_session_confirmed_after_a_fault_reads_ready_and_takes_a_task() {
+    use lamp_msgs::Readiness;
+    let dir = tempfile::tempdir().unwrap();
+    let (one, fake) = kept_on(dir.path());
+    one.open_if_due(&fake, &place());
+    assert_eq!(one.readiness().state(), (Readiness::Ready, None));
+    // A fault: the session replaced fresh.
+    one.watched_event(&agent_of(1), WatchEvent::Held);
+    assert_eq!(
+        one.readiness().state(),
+        (Readiness::Recovering, Some("held"))
+    );
+    one.restart_if_due(&fake);
+    // The fresh session's first words refused through the whole window:
+    // open, not yet confirmed.
+    fake.takes
+        .lock()
+        .unwrap()
+        .extend(std::iter::repeat_n(Took::EngineNotReady, 1000));
+    one.open_if_due(&fake, &place());
+    let fresh = one.agent().expect("a fresh session open");
+    assert_ne!(fresh, agent_of(1));
+    assert_eq!(
+        one.readiness().state(),
+        (Readiness::Starting, Some("session_starting"))
+    );
+    fake.takes.lock().unwrap().clear();
+    one.watched_event(&fresh, WatchEvent::Idle);
+    assert_eq!(one.readiness().state(), (Readiness::Ready, None));
+    assert_eq!(one.agent.refusal("openclaw"), None);
+    assert!(matches!(
+        spoken_launch(&one, &fake, &spoken("lamp-1")),
+        Some(LaunchOutcome::Joined { .. })
+    ));
+}
+
 /// #8001, kept by #8138 review (5): a session `ensure` made new is in its
 /// first words' window: its replies are held the whole 60 s, never the
 /// short hold, never probed; its refusal ends the task, and the session

@@ -5703,7 +5703,11 @@ backoffs, a spoken task's 3 put-backs, a skill run's words typed again,
   (`one_session_not_started`) but does not replace the session: the agent
   reads `starting` again until it is confirmed. `NOT_RUNNING` (dead) or a
   whole hold not taken (a late delivery would run a task told not done)
-  is a fault even while warming: closed `--now`, recovered fresh.
+  is a fault even while warming: closed `--now`, recovered fresh. A fresh
+  session open after a fault or failed opens ends their `recovering` or
+  `error`: still warming it reads `starting`, and `ready` once confirmed
+  (HOLD 2 on #8138); never over a fault seen on that same session
+  meanwhile, nor over a lasting hold (below).
 - **A hand-over refused ends the task at the first sign, before any
   recovery.** The kept session's first reply of a hand-over is held 10 s
   (`REPLY_KEPT_FIRST_HELD`). Its first `ENGINE_NOT_READY` ends the task

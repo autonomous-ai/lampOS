@@ -2949,7 +2949,11 @@ nay.
   việc đó có báo (`one_session_not_started`) nhưng không thay phiên: agent
   đọc `starting` lại cho tới khi được xác nhận. `NOT_RUNNING` (chết) hoặc
   cả lần giữ không được nhận (một lần giao muộn sẽ chạy việc đã báo là
-  không làm) là lỗi kể cả khi đang ấm: close `--now`, phục hồi mới.
+  không làm) là lỗi kể cả khi đang ấm: close `--now`, phục hồi mới. Một
+  phiên mới được mở sau một lỗi hoặc các lần mở lỗi kết thúc `recovering`
+  hay `error` của chúng: còn đang ấm thì nó đọc `starting`, và `ready` khi
+  được xác nhận (HOLD 2 trên #8138); không bao giờ đè lên một lỗi thấy trên
+  chính phiên đó trong lúc ấy, hay lên một lần giữ lâu dài (dưới đây).
 - **Một lần giao bị từ chối kết thúc việc ngay ở dấu hiệu đầu, trước mọi
   phục hồi.** Reply đầu tiên của một lần giao vào phiên được giữ được giữ
   10 s (`REPLY_KEPT_FIRST_HELD`). `ENGINE_NOT_READY` đầu tiên kết thúc việc
