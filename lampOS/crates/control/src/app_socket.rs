@@ -104,9 +104,26 @@ pub fn app_client(name: &str) -> String {
 #[derive(Clone, Debug, PartialEq)]
 pub struct AppPeer {
     pub name: String,
+    /// The manifest's title: the name an app's fact is kept with.
+    pub title: String,
     pub version: String,
     pub client: String,
+    /// The door's grants the manifest asks.
     pub grants: BTreeSet<Grant>,
+    /// The manifest asks `remember`, an app's own grant beside the door's
+    /// (`apps.remember`, [`crate::app_remember`]).
+    pub remember: bool,
+}
+
+impl AppPeer {
+    /// The grants `hello` says: the door's, then `remember` when asked.
+    pub fn said_grants(&self) -> Vec<String> {
+        let mut said: Vec<String> = self.grants.iter().map(|grant| grant.wire()).collect();
+        if self.remember {
+            said.push(lamp_skills::app_package::REMEMBER_GRANT.to_owned());
+        }
+        said
+    }
 }
 
 /// The installed app `name`: its manifest's version and grants. `Err` is why
@@ -121,7 +138,12 @@ pub fn peer_for(apps: &Path, name: &str, net_unit: bool) -> Result<AppPeer, Stri
         return Err("the unit does not match the manifest's net".to_owned());
     }
     let mut grants = BTreeSet::new();
+    let mut remember = false;
     for grant in &manifest.grants {
+        if grant == lamp_skills::app_package::REMEMBER_GRANT {
+            remember = true;
+            continue;
+        }
         let grant: Grant = serde_json::from_value(json!(grant))
             .map_err(|_| format!("a grant this lamp does not know: {grant}"))?;
         if grant.is_service() {
@@ -131,9 +153,11 @@ pub fn peer_for(apps: &Path, name: &str, net_unit: bool) -> Result<AppPeer, Stri
     }
     Ok(AppPeer {
         name: name.to_owned(),
+        title: manifest.title,
         version: manifest.version,
         client: app_client(name),
         grants,
+        remember,
     })
 }
 

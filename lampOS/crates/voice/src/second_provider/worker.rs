@@ -3272,6 +3272,14 @@ pub fn serve(
         }
         crate::known_faces::keep_owner_fresh(owner_file.clone(), owner_faces.clone());
     }
+    // An installed app's facts (`apps/remember`, #7415 C166): kept for the
+    // owner, as `person::owner_ids` names them, with the bus and memory;
+    // nothing comes unless lamp-control's `LAMP_APP_REMEMBER` is on. The
+    // owner kept fresh as above (once a process).
+    if let (Some(root), Some(memory)) = (files.bus_root.as_deref(), socket.clone()) {
+        crate::known_faces::keep_owner_fresh(owner_file.clone(), owner_faces.clone());
+        crate::app_remember::start(root, memory, crate::person::owner_ids);
+    }
     let another_voice = Arc::new(std::sync::atomic::AtomicBool::new(false));
     let another_voice_told = another_voice.clone();
     // Whether anything tracks it: set where the one-face rule takes the flag.

@@ -3895,6 +3895,112 @@ async fn an_apps_say_takes_a_trigger_only_when_the_door_accepts_it() {
     assert_eq!(*told.lock().unwrap(), vec![("demo".to_owned(), 6)]);
 }
 
+fn remember_on() -> bool {
+    true
+}
+
+/// `apps.remember` over the app socket (#7415, C166): refused without the
+/// grant, while private, for bad words and over three a minute; with the
+/// grant the checked words go to the voice and its word is the answer.
+#[tokio::test]
+async fn an_apps_fact_over_its_socket_needs_the_grant_and_is_answered_by_the_voice() {
+    use lamp_control::app_remember::Tell;
+    let lamp = lamp("app-remember").await;
+    let path = app_socket(&lamp, "apps.sock", is_demo, apps_on).await;
+    lamp.shared.set_remember_on(remember_on);
+    let private = Arc::new(std::sync::atomic::AtomicBool::new(false));
+    let reads = private.clone();
+    lamp.shared.set_private(Arc::new(move || {
+        reads.load(std::sync::atomic::Ordering::SeqCst)
+    }));
+    let told = Arc::new(std::sync::Mutex::new(Vec::<Tell>::new()));
+    let into = told.clone();
+    lamp.shared.set_remember_sink(Arc::new(move |tell| {
+        into.lock().unwrap().push(tell);
+        true
+    }));
+    let hello =
+        || json!({"id": 1, "op": "hello", "client": "c_0", "sig": STANDARD.encode([0u8; 64])});
+    // Without the grant: refused, nothing told.
+    let mut socket = agent_connect(&path).await.unwrap();
+    agent_next(&mut socket).await.unwrap();
+    assert_eq!(app_ask(&mut socket, hello()).await["ok"], true);
+    let fact = json!({"id": 2, "op": "apps.remember", "text": "squats 3x10"});
+    let none = app_ask(&mut socket, fact.clone()).await;
+    assert_eq!(none["error"]["code"], "no_grant", "{none}");
+    assert_eq!(
+        none["error"]["why"],
+        lamp_control::app_remember::NO_GRANT,
+        "{none}"
+    );
+    drop(socket);
+    // With it (the manifest read at each connection).
+    install_app(
+        &lamp.dir.join("apps"),
+        "demo",
+        json!(["speak", "light", "hear", "remember"]),
+    );
+    let mut socket = agent_connect(&path).await.unwrap();
+    agent_next(&mut socket).await.unwrap();
+    let said = app_ask(&mut socket, hello()).await;
+    let grants: Vec<String> = serde_json::from_value(said["grants"].clone()).unwrap();
+    assert!(grants.contains(&"remember".to_owned()), "{said}");
+    let early = app_ask(
+        &mut socket,
+        json!({"id": 3, "op": "apps.remember", "text": "x".repeat(281)}),
+    )
+    .await;
+    assert_eq!(early["error"]["code"], "bad_request", "{early}");
+    private.store(true, std::sync::atomic::Ordering::SeqCst);
+    let hidden = app_ask(&mut socket, fact.clone()).await;
+    assert_eq!(hidden["error"]["code"], "private", "{hidden}");
+    private.store(false, std::sync::atomic::Ordering::SeqCst);
+    assert!(told.lock().unwrap().is_empty(), "nothing refused was told");
+    let text = "20 Nov 16:47: squats 3×10, 6 too shallow";
+    socket
+        .send(Message::text(
+            json!({"id": 4, "op": "apps.remember", "text": text}).to_string(),
+        ))
+        .await
+        .unwrap();
+    let start = std::time::Instant::now();
+    let fact_told = loop {
+        if let Some(Tell::Remember(fact)) = told.lock().unwrap().pop() {
+            break fact;
+        }
+        assert!(start.elapsed() < Duration::from_secs(5), "not told");
+        tokio::time::sleep(Duration::from_millis(5)).await;
+    };
+    assert_eq!(
+        (fact_told.app.as_str(), fact_told.name.as_str()),
+        ("demo", "T")
+    );
+    assert_eq!(fact_told.text, text);
+    lamp.shared.remembered(&lamp_msgs::app_fact::AppRemembered {
+        ask: fact_told.ask,
+        app: "demo".into(),
+        outcome: lamp_msgs::app_fact::KEPT.into(),
+    });
+    let kept = agent_next(&mut socket).await.expect("the voice's word");
+    assert_eq!(kept, json!({"re": 4, "ok": true, "kept": true}));
+    // Three a minute: two more go, the fourth is the rate.
+    for id in [5, 6] {
+        socket
+            .send(Message::text(
+                json!({"id": id, "op": "apps.remember", "text": "squats"}).to_string(),
+            ))
+            .await
+            .unwrap();
+    }
+    let over = app_ask(
+        &mut socket,
+        json!({"id": 7, "op": "apps.remember", "text": "squats"}),
+    )
+    .await;
+    assert_eq!(over["re"], 7, "{over}");
+    assert_eq!(over["error"]["code"], "rate", "{over}");
+}
+
 #[tokio::test]
 async fn the_ops_only_an_app_has_are_not_the_doors_on_any_other_socket() {
     let lamp = lamp("app-sock-door").await;

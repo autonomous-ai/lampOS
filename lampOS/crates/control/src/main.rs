@@ -714,6 +714,19 @@ fn serve(arguments: &[String], admin: PathBuf) -> Result<(), String> {
         // took back (piece 3b-2b), with the apps on and a bus.
         if let (true, Some(bus)) = (lamp_control::app_yes::on(), &bus) {
             lamp_control::app_triggers::start(bus, shared.clone());
+            // An app's facts for Lamp's memory to the voice and its word
+            // back, and a removed app's forget; `apps.remember` is refused
+            // while the lamp is private, read as the speaker reads it.
+            shared.set_private(lamp_control::speaker::gates(Some(watch.clone())).0);
+            lamp_control::app_remember::start(bus, shared.clone());
+            eprintln!(
+                "lamp-control: apps.remember is {}",
+                if lamp_control::app_remember::on() {
+                    "on (LAMP_APP_REMEMBER)"
+                } else {
+                    "off (LAMP_APP_REMEMBER)"
+                }
+            );
         }
         if let Some(bus) = &bus {
             server::watch_bus(bus, watch, shared.clone())

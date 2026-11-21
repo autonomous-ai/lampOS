@@ -10,7 +10,8 @@ lamp. It is in English only ([the docs rule](../AGENTS.md)).
 **Status, honestly.** Built: the package format and its reader (piece 1,
 `lamp_skills::app_package`, with tests) and the yes ops in lamp-control (piece
 3a, `app_yes.rs`) and the app socket with `phrases.set` (pieces 3b-1 and 3b-2a, `app_socket.rs`, [control.md](control.md)). The app socket's `app.trigger` and its 3 s hold are built too
-(piece 3b-2b, `app_triggers.rs`). Designed and not yet built: lamp-cloud's `apps.*` kinds
+(piece 3b-2b, `app_triggers.rs`). `apps.remember` and the `remember` grant are built behind
+`LAMP_APP_REMEMBER` (C166, `app_remember.rs`; below). Designed and not yet built: lamp-cloud's `apps.*` kinds
 (piece 4), the installer (`lamp-apps-manage`, eighth's). Everything behind
 the one switch **`LAMP_STORE_APPS`**, off unless set. A lamp that has the
 format probe refuses an app package in words ("format 2 is not one this lamp
@@ -81,7 +82,7 @@ english-lessons/skills/english-tutor/skill.toml
 | `version` | `MAJOR.MINOR.PATCH` |
 | `min_build` | the lamp build's sequence number (the part before the `+` in `lamp.build`), 1 or more; a lamp below it refuses to install |
 | `runtime` | `name` is `python3` (the only one in v1); `entry` is a dotted module path (`a.b.c`), and `src/a/b/c.py` or `src/a/b/c/__init__.py` must be in the package. It is run isolated (`-I`: no `PYTHONPATH`, no working directory on the path), which a bare `python3 -I -m <entry>` cannot do (it never finds `<app>/src`; run on 18 Nov), so the unit runs `python3 -I -c 'import runpy, sys; sys.path[:0] = sys.argv[1:3]; runpy.run_module(sys.argv[3], run_name="__main__", alter_sys=True)' <app>/src <the lamp's SDK folder> <entry>`: the app's `src` first, then the folder the lamp keeps `lampos` in, then the module as `__main__` (checked 18 Nov with a module that imports a package from the second entry). Where the lamp keeps the SDK is the installer's (`lamp-apps-manage`), not the manifest's |
-| `grants` | names from the door's 14 only (`body`, `light`, `speak`, `look`, `hear`, `sound`, `skills`, `air`, `device`, `camera`, `microphone`, `speaker`, `notes`, `speech`), no duplicates. No service's name, and not `net` or `logs`. What the owner says yes to is this list as the app showed it |
+| `grants` | names from the door's 14 (`body`, `light`, `speak`, `look`, `hear`, `sound`, `skills`, `air`, `device`, `camera`, `microphone`, `speaker`, `notes`, `speech`) and the app's own `remember` (`apps.remember`, below), no duplicates. No service's name, and not `net` or `logs`. What the owner says yes to is this list as the app showed it |
 | `net`, `logs` | top-level booleans, default `false`, never inside `grants` |
 | `npu` | optional: the lamp's NPU ops the app uses, from `pose` only today (`lamp_skills::app_package::NPU_OPS`), no repeats; each needs the grant it rides (`pose`: `camera`). With it, the lamp's NPU service fetches that op's model when the app is installed, not at its first ask (npu.md, "When the model is fetched"). A lamp built before this field refuses a manifest that has it, so an app that names it sets `min_build` to a build that reads it |
 | `phrases` | at most 16; each at most 64 bytes (the socket's `phrases.set` counts characters) with at least 8 letters, no repeats; needs `hear` |
@@ -198,6 +199,7 @@ its grants allow, each refused `no_grant` without its grant, plus:
 | `app.took` | `turn`: the id of an `app.trigger`, 1 to 64 characters; ten a second at most | `{"ok":true,"taken":true}` when the turn was offered this app and is within 3 s; `{"ok":true,"taken":false}` when it was not counted (late, never offered, or already taken): the voice has let the model answer, so the app must not speak for that line; over the rate `{"ok":false,"error":{"code":"rate","why":"ten a second","retry_ms":N}}` |
 | `app.settings.get` | none; ten a second at most | `{"ok":true,"settings":{key: value,…}}`, every key with its current value; over the rate `{"ok":false,"error":{"code":"rate","why":"ten reads a second","retry_ms":N}}` |
 | `app.panel.set` | `title` 1 to 40, `lines` at most 6 of at most 80, no control characters; one a minute | `{"ok":true,"rev":N}`; over the rate `{"ok":false,"error":{"code":"rate","why":"one panel a minute","retry_ms":N}}`, and the minute holds across the app's reconnects |
+| `apps.remember` | `text`: one fact for the lamp's known person, at most 280 characters once tidied, no other field; needs `remember` and `LAMP_APP_REMEMBER`; never while private; three a minute | `{"ok":true,"kept":true}` once memory kept it; refusals and the voice's side below, "What an app tells Lamp's memory" |
 
 Events (`{"ev":…}`): `phrase.heard` `{phrase}` (never what was said),
 `app.trigger` `{trigger, phrase, turn}` (a manifest trigger; the words around
@@ -220,12 +222,51 @@ offered while 16 are already waiting is not sent. When the owner stops, updates 
 comes first. Errors are the door's codes; with `LAMP_STORE_APPS` off every op
 is refused `off`.
 
-### What an app tells Lamp's memory (`apps.remember`, `apps.context`, designed)
+### What an app tells Lamp's memory (`apps.remember` built, `apps.context` designed)
 
 Agreed on #7415 (the first builder's yes of 19 Nov 16:45): an app with the
 `remember` grant keeps a fact for the lamp's known person, marked with the app
 as its source, and sets a live context line that is never kept. The memory's
 side is built ([memory-days.md](memory-days.md), "An app's facts and context
-lines"; `lamp_msgs::app_fact`); the two ops at this socket, the grant and
-their writer are not built yet, and come behind their own switch, refused
-while the physical privacy switch is on.
+lines"; `lamp_msgs::app_fact`). **`apps.remember` is built** (C166:
+lamp-control's `app_remember.rs`, the voice's `app_remember.rs`), behind its
+own switch `LAMP_APP_REMEMBER` (lamp-control; off, in no unit, until the first
+builder's privacy read and the ROW) inside `LAMP_STORE_APPS`. `apps.context`
+is designed and not built.
+
+- **The grant.** `remember` is an app's own grant, beside the door's 14 and
+  never a computer's: a manifest may ask it (`lamp_skills::app_package::GRANTS`,
+  `REMEMBER_GRANT`; the apps helper's `APP_GRANTS`), and it is granted at
+  install with nothing more asked, as every grant is (the owner's 18 Nov rule).
+  `hello` lists it after the door's grants. A manifest without it reads as
+  before; a lamp built before it refuses a manifest that asks it, so such an
+  app sets `min_build` to a build that reads it.
+- **The op**, on the app socket only, after `hello`:
+  `{"id", "op": "apps.remember", "text"}`, no other field (the app never names
+  whose it is). Answered `{"ok":true,"kept":true}` once memory kept it.
+  Refused, in this order: `off` (`LAMP_STORE_APPS`, then `LAMP_APP_REMEMBER`
+  off: "remembering is off on this lamp"); `no_grant` ("apps.remember needs the
+  remember grant"); `bad_request` for another field, no text, or words that
+  `app_fact::tidy` refuses (links, markup and double quotes left out, runs of
+  space made one; nothing left, or over 280 characters: refused, never cut);
+  `private` while the privacy switch is on (or its lease lapsed, or lamp-control
+  has no reading of it); `rate` past three a minute an app (`retry_ms`; the
+  minute holds across the app's reconnects; only a remove forgets it, and a
+  refused ask is not counted). Then memory's own: `refused` with the code in its
+  words, `not_known` (Lamp knows nobody yet), `forgotten`, `too_many` (20 an app
+  a day) or `bad_time`; `unavailable` when the voice or memory gave no word
+  within 2.5 s (it may not be kept).
+- **Whose and how.** The door tells the voice on `apps/remember`
+  (`AppRemember`: the door's ask number, the app's checked name, its manifest's
+  title as `app_fact::name`, the tidied words, the wall time). The voice picks
+  the person with `app_fact::whose` and no person asked: the lamp's known person
+  by the owner's memory ids (`person::owner_ids`, the typed name's and the
+  face's), never another person and never the room; with none, `not_known`. It
+  sends memory's `remember_app_fact` with source `app:<name>` and says how it
+  went on `apps/remembered`, which is the app's answer. The journals say the
+  app and the outcome, never a word of the fact.
+- **A remove forgets.** `app_forget` (the helper's remove) also tells the voice
+  `apps/forget_facts`, whatever `LAMP_APP_REMEMBER` says now, and the voice
+  sends memory's `forget_app_facts` for `app:<name>`: every fact of the app goes,
+  with what was made from them. The person's own forgets take them as any kept
+  thing.

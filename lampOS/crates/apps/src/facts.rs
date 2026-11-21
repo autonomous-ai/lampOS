@@ -24,6 +24,10 @@ pub const DOOR_GRANTS: &[&str] = &[
     "speech",
 ];
 
+/// An app's own grants beyond the door's, which no computer is paired with:
+/// `remember` (`apps.remember`, `lamp_skills::app_package::REMEMBER_GRANT`).
+pub const APP_GRANTS: &[&str] = &["remember"];
+
 /// The most characters of an app's title (it is spoken: "stop the <title> app").
 pub const MOST_TITLE: usize = 40;
 
@@ -68,7 +72,7 @@ pub fn check(app: &dyn AppFacts, build: Option<u64>) -> Result<(), String> {
     }
     let mut seen: Vec<&str> = Vec::new();
     for grant in app.grants() {
-        if !DOOR_GRANTS.contains(&grant.as_str()) {
+        if !DOOR_GRANTS.contains(&grant.as_str()) && !APP_GRANTS.contains(&grant.as_str()) {
             return Err(format!("not a grant an app may ask: {grant:?}"));
         }
         if seen.contains(&grant.as_str()) {

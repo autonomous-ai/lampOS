@@ -10,7 +10,7 @@ use serde::{Deserialize, Serialize};
 use std::time::Duration;
 
 /// An app's name as a manifest gives it (`^[a-z][a-z0-9-]{0,23}$`).
-fn name_ok(name: &str) -> bool {
+pub(crate) fn name_ok(name: &str) -> bool {
     let mut chars = name.chars();
     name.len() <= 24
         && chars.next().is_some_and(|c| c.is_ascii_lowercase())
