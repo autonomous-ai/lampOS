@@ -16,8 +16,12 @@
 //!   agent's answer, which stays in `lamp-tasks` (`get_observation`).
 //! - **When.** `prepared` at the hand-over; then, from the task's newest
 //!   observation, `done` (idle), `failed` (failed, or never sent) or
-//!   `cancelled` (stopped). A question back (`needs-input`) or work going on
-//!   writes nothing. Each change is written once.
+//!   `cancelled` (stopped); a start that timed out and was checked
+//!   (lamp-tasks' `start_check`, #8170) is followed as any once found,
+//!   `failed` once found never begun, and `no_result` when not sure it
+//!   began, never `failed` while it is checked. A question back
+//!   (`needs-input`) or work going on writes nothing. Each change is
+//!   written once.
 //! - **Deed time.** Every row of a task carries its hand-over time, so a
 //!   forget after the hand-over wins over a late outcome in the memory too.
 //! - **Bounded.** At most [`FOLLOWED_MOST`] tasks are followed, oldest let
@@ -217,8 +221,14 @@ pub fn handed_over(
 /// sent) and its status. None while work goes on, at a question back, or
 /// with an unsure hand-over.
 pub fn outcome(task: &Value) -> Option<(u64, Status)> {
-    if task["task"]["dispatch"]["state"].as_str() == Some("not_sent") {
-        return Some((0, Status::Failed));
+    let dispatch = &task["task"]["dispatch"];
+    match (dispatch["state"].as_str(), dispatch["code"].as_str()) {
+        (Some("not_sent"), _) => return Some((0, Status::Failed)),
+        // A start that timed out, checked, and not sure it began (#8170):
+        // no result known, never failed. While it is checked
+        // (`start_checking`), nothing: its row stays `prepared`.
+        (Some("uncertain"), Some("start_unsure")) => return Some((0, Status::NoResult)),
+        _ => {}
     }
     let newest = task["observations"]
         .as_array()?
@@ -557,6 +567,23 @@ mod tests {
         );
         assert_eq!(outcome(&task_answer("uncertain", &[])), None);
         assert_eq!(outcome(&json!({})), None);
+        // #8170: a start that timed out, being checked, writes nothing (its
+        // row stays `prepared`, never `failed`); not sure it began, no
+        // result; found, as any accepted task.
+        let with_code = |state: &str, code: &str| {
+            let mut answer = task_answer(state, &[]);
+            answer["task"]["dispatch"]["code"] = json!(code);
+            answer
+        };
+        assert_eq!(outcome(&with_code("uncertain", "start_checking")), None);
+        assert_eq!(
+            outcome(&with_code("uncertain", "start_unsure")),
+            Some((0, Status::NoResult))
+        );
+        assert_eq!(
+            outcome(&with_code("not_sent", "not_started")),
+            Some((0, Status::Failed))
+        );
     }
 
     /// A forget of the person's everything lets their tasks go, so a later

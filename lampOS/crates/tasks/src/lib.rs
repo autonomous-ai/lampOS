@@ -29,6 +29,7 @@ pub mod skill_make;
 pub mod skill_run;
 pub mod skill_start;
 pub mod skill_task;
+pub mod start_check;
 pub mod steps;
 pub mod store;
 pub mod voice_ask;
