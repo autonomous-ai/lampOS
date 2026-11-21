@@ -75,7 +75,7 @@ in 10 min: a start is refused at 9 or more. A make leg (A, B, D, K) can take up 
   empty, (3) the run-* leaf is exactly 536870912 / 469762048 / 0 / "100000 100000" / 72 and is gone after, (4) the
   price run answers.
 - **7170**: CHECK (7170-1) ssh is back after one reboot (within 300 s), (7170-2) port 18789 is listening (within
-  300 s), (7170-3) D's task skill is asked within 30 s of the port, (7170-4) `[lamp-tasks] skill start: run R's
+  300 s), (7170-3) D's task skill (or, with D VOID for lack of linked mail, leg A's made skill when it is a task step) is asked within 30 s of the port, (7170-4) `[lamp-tasks] skill start: run R's
   script started`. `STARTUP unit->port X s, port->approvals Y s, unit->approvals Z s` is in logs/boot-times.txt.
   "Approvals" is the time lamp-tasks' own `openclaw approvals get --gateway` first succeeded, marked by the
   allow-list add that follows it. After the reboot, the leg prints the mute it reads. A muted lamp is lifted again

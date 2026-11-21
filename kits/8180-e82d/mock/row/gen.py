@@ -182,5 +182,8 @@ case("7170.fail-noport", "D", boot=True, over={"out/boot.lamp.sh.port": "PORT NO
 case("7170.fail-notsent", "D", boot=True, over={"j/7170.MAILASK": j([(1, T + "skill task task-t1: started on the lamp's default agent"), (5, NOTSENT)])})
 case("7170.fail-noboot", "D", boot=True, over={"cmd/bootid": "boot-1\n"})
 case("7170.void", " ", boot=True)
+# No linked mail (D VOID): the run asked is leg A's made skill when it is a task step, by its own clip.
+case("7170.pass-from-A", "A", boot=True, over={"out/made.lamp.sh.A": made("week-day", "task", "speak"), "j/7170.WEEKASK": PASS["j/7170.MAILASK"]})
+case("7170.void-A-is-a-run", "A", boot=True)
 case("7170.void-muted", "D", boot=True, over={"out/boot.lamp.sh.after": PASS["out/boot.lamp.sh.after"].replace("MUTEBOOT muted=False", "MUTEBOOT muted=True")})
 case("7170.pass-muted-yes", "D", boot=True, env={"MIC_YES": "yes"}, over={"out/boot.lamp.sh.after": PASS["out/boot.lamp.sh.after"].replace("MUTEBOOT muted=False", "MUTEBOOT muted=True"), "out/micon.lamp.sh": "RECORD_KEPT the person's record from this ROW's first micon stays\nMUTE LIFTED OK after 4s\n"})
