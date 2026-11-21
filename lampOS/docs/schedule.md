@@ -817,7 +817,20 @@ its `when` say it is "not for their own reminders or timers", which are
 lamp"). Test:
 `list_reminders_and_lamp_help_say_which_is_for_their_own_reminders`
 (`crates/voice/src/tools/reminders_asked.rs`). Whether the model calls
-`list_reminders` mid-conversation is a played row's.
+`list_reminders` mid-conversation is a played row's. That line was 7 of
+7 words heard and still not forced, and the journal could not say which
+word fell outside the exact phrases. So with `LAMP_REMINDERS_ASKED` on, a
+person's line with a word of "remind" in it that the force refuses, as
+said and past the lamp's name (`second_provider::forced_past_the_name`),
+now says why, right after round 1's line, in counts only: `request N:
+round 1: not forced to list_reminders: read=<as_said|past_name>
+refused=<no_ask|outside|two_asks> words=N asks=N outside=N
+first_outside_at=<N|none>`, `read` the reading reported (`past_name` when
+the line opens with the lamp's name, the one the force tries last),
+`no_ask` for none of
+the phrases, `outside` for a word in no phrase and not among the words
+around them, `two_asks` for two phrases. Never a word. Test:
+`a_refused_reminders_line_says_why_in_counts_only`.
 
 Each listed item now says when it was set: `set_day` (`today`,
 `yesterday`, or its `YYYY-MM-DD`) and `set_clock` (its local `HH:MM`), so
