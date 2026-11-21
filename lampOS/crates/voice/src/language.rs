@@ -533,6 +533,17 @@ const FIXED_LINES: &[(&str, [&str; 4])] = &[
             "알겠어요, 기억해 둘게요.",
         ],
     ),
+    // What the second route says at once for a no that is only a no to the
+    // one-face forget question (#8185), from its clip rendered ahead.
+    (
+        crate::remember::KEPT_IT_LINE,
+        [
+            "Được, mình sẽ giữ lại.",
+            "わかった、残しておくね。",
+            "好的，我会留着。",
+            "알겠어요, 그대로 둘게요.",
+        ],
+    ),
     // The first stand's ask and its "here I go", sent to the say service as
     // text (Fourth's finding on #4710). In another language than English it
     // asks for the touch alone, never the spoken yes.

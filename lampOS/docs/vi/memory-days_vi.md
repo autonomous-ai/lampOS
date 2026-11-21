@@ -1657,7 +1657,22 @@ nêu thứ gì khác, là lời «có», và lệnh quên đang giữ chạy tha
 giữ, theo id và lời đã giữ, không bao giờ theo lệnh gốc của mô hình
 (`second_provider::agree_held_forget`). Câu mà mô hình không gọi `forget` thì
 không chạy gì và điều ấy vẫn được giữ; một `forget` nêu thứ khác là lệnh quên
-khác ấy. Một lời «có» sau 30 giây ấy được ghi
+khác ấy. **Một lời «có» trơn chạy nó trước vòng 1** (#8185): câu chỉ là lời
+«có», không hỏi, tối đa sáu từ (*yes, yeah, yep, yup, sure, ok, okay, go ahead,
+do it, please do*, kèm *please, lamp, hey*; `agent_tasks::plain_yes_with`)
+chạy lệnh quên đang giữ dù mô hình không gọi `forget`, chỉ khi câu hỏi cuối
+của đèn chỉ đề nghị quên điều ấy, không có «hay/or»
+(`remember::offers_only_forgetting`), vòng 1 được báo là đã
+chạy, và `forget` của mô hình trên câu ấy chỉ được trả lời
+`remember::HELD_FORGET_RAN`. **Một lời «không» chỉ là «không»**
+(`known_faces::only_refuses`: «No.», «Lamp, no.», «No, keep it.», «No, don't
+forget it.») được đèn tự trả lời «Okay, I'll keep it.»
+(`remember::KEPT_IT_LINE`) không cần vòng mô hình, không xoá gì; bằng ngôn ngữ
+của chủ chỉ từ clip đã dựng sẵn, chưa có thì mô hình được báo
+`remember::said_no_told`. Lời «không» kèm yêu cầu khác («No, turn the lights
+on.») vẫn đến mô hình. Khi công tắc riêng tư đổi, câu hỏi đang giữ bị bỏ
+(`Engine::privacy`), như một lệnh ghi đang chờ: lời «có» sau đó không chạy gì
+trong code và đến mô hình như mọi câu. Một lời «có» sau 30 giây ấy được ghi
 journal là "too late", dù lúc đó câu là của ai; một lời không phải của họ ghi
 lý do sau "not the same person": "no one known on the line" (không ai được
 nhận ra trên câu), "theirs, in a later session" (của họ, ở phiên sau) hoặc
