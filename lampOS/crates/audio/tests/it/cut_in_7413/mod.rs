@@ -111,8 +111,10 @@ const TRIES: [(&str, usize); 4] = [
 #[test]
 fn cut_ins_heard_unknown_past_the_replys_start_yield_only_with_the_switch() {
     for (name, yields_at) in [
-        ("q-cutin-h_t8", 554),
-        ("8159d_r1_t10", 423),
+        // Both 3 blocks later than Unknown alone made them: each came within
+        // 120 blocks of a pause in the story, so the onset is 10 there.
+        ("q-cutin-h_t8", 557),
+        ("8159d_r1_t10", 426),
         ("8159d_r2_t4", 319),
     ] {
         let blocks = trail(name);
