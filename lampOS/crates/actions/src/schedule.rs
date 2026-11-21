@@ -116,10 +116,29 @@ pub fn is_tool(name: &str) -> bool {
     NAMES.contains(&name)
 }
 
+/// `on` only (#8182), in lamp-actions' unit and lamp-voice's: a timer or a
+/// reminder whose length or time the person's words did not give is never
+/// guessed. Off unless set.
+pub const ASKS_HOW_LONG_SWITCH: &str = "LAMP_TIMER_ASKS_HOW_LONG";
+
+/// Whether [`ASKS_HOW_LONG_SWITCH`] is `on` in this process's environment.
+pub fn asks_how_long_from_environment() -> bool {
+    std::env::var_os(ASKS_HOW_LONG_SWITCH).as_deref() == Some(OsStr::new("on"))
+}
+
 /// The existing provider's small Schema vocabulary. Runtime validation below
 /// is stricter than a model schema; byte limits and unknown fields are checked.
 pub fn catalog() -> Vec<Function> {
-    catalog_with(every_from_environment())
+    asking_how_long(
+        catalog_with(every_from_environment()),
+        asks_how_long_from_environment(),
+    )
+}
+
+/// `catalog` with [`ASKS_HOW_LONG_SWITCH`] on (`on`): `set_timer` and
+/// `set_reminder` say to ask for a length or time not given.
+pub fn asking_how_long(catalog: Vec<Function>, _on: bool) -> Vec<Function> {
+    catalog
 }
 
 /// [`catalog`] with [`EVERY_SWITCH`] on (`every`) or off: off, it is the
@@ -1442,6 +1461,28 @@ mod tests {
         match parse("repeat_reminder", &args, every)? {
             Call::Set { when, .. } => Ok(when),
             _ => Err(Failure::BadArguments),
+        }
+    }
+
+    /// `LAMP_TIMER_ASKS_HOW_LONG` (#8182): on, `set_timer` says to ask "For
+    /// how long?" and `set_reminder` "What time?" when the words gave none,
+    /// and never to choose one; off, the catalog is as it was, byte for byte.
+    #[test]
+    fn set_timer_and_set_reminder_say_to_ask_only_with_the_switch() {
+        let off = asking_how_long(catalog_with(false), false);
+        assert_eq!(
+            serde_json::to_string(&off).unwrap(),
+            serde_json::to_string(&catalog_with(false)).unwrap()
+        );
+        let on = asking_how_long(catalog_with(false), true);
+        let said = |name| on.iter().find(|f| f.name == name).unwrap().description;
+        assert!(said("set_timer").contains("For how long?"), "{}", said("set_timer"));
+        assert!(said("set_timer").contains("never choose one"));
+        assert!(said("set_reminder").contains("What time?"), "{}", said("set_reminder"));
+        for (was, now) in catalog_with(false).iter().zip(&on) {
+            if !matches!(was.name, "set_timer" | "set_reminder") {
+                assert_eq!(was.description, now.description);
+            }
         }
     }
 
