@@ -1,27 +1,25 @@
 //! The writer of an installed app's facts (#7415, C166, `docs/apps.md`,
 //! "What an app tells Lamp's memory"). lamp-control checks an app's
 //! `apps.remember` (its grant, its words, the lamp not private, the rate,
-//! `LAMP_APP_REMEMBER`) and tells it here on `apps/remember`; the voice picks
-//! whose it is, the lamp's known person by the owner's memory ids
-//! (`lamp_msgs::app_fact::whose` with no person asked: never another person,
-//! never the room), sends memory's `remember_app_fact` with the app as its
-//! source (`app:<name>`), and says how it went on `apps/remembered`. A
-//! removed app (`apps/forget_facts`) has every fact of its source forgotten
-//! (`forget_app_facts`).
+//! `LAMP_APP_REMEMBER`) and tells it here on `apps/remember`; the voice keeps
+//! it for the lamp's known person, never another and never the room, and
+//! says how it went on `apps/remembered`. The owner may go by two memory ids
+//! (a typed "Minh Nguyen" whose face was kept as "Minh", 30 Oct): the face's
+//! is tried first, as the person's own memory is keyed by it, then each other
+//! in turn while memory answers `not_known` ([`owners_face_first`], [`keep`]).
+//! A removed app's facts are lamp-control's to forget, on memory's forget
+//! socket.
 //!
 //! No switch of its own: nothing is told here unless lamp-control's
-//! `LAMP_APP_REMEMBER` is on (a remove's forget aside, which takes only
-//! what an app kept). The journal says the app and how it went, never a
-//! word of the fact.
-use lamp_msgs::app_fact::{self, AppFactsForget, AppRemember, AppRemembered};
+//! `LAMP_APP_REMEMBER` is on. The journal says the app and how it went,
+//! never a word of the fact.
+use lamp_msgs::app_fact::{self, AppRemember, AppRemembered};
 use serde_json::{Value, json};
 use std::path::{Path, PathBuf};
 use std::time::Duration;
 
 /// How long memory may take with one fact: inside lamp-control's 2.5 s wait.
 const MEMORY_WITHIN: Duration = Duration::from_millis(1_500);
-/// How long memory may take with a removed app's forget.
-const FORGET_WITHIN: Duration = Duration::from_secs(5);
 
 /// Memory's request that keeps `fact` for `person`.
 pub fn remember_line(fact: &AppRemember, person: &str) -> Option<Value> {
@@ -36,19 +34,31 @@ pub fn remember_line(fact: &AppRemember, person: &str) -> Option<Value> {
     }))
 }
 
-/// Memory's request that forgets every fact of the removed app.
-pub fn forget_line(gone: &AppFactsForget) -> Option<Value> {
-    let source = gone.source()?;
-    Some(json!({"op": app_fact::FORGET_OP, "source": source.as_str()}))
+/// The owner's memory ids, the face's first (`known_faces::owner_now`, the
+/// id the person's own memory is kept under once their face is), then the
+/// typed name's and any other (`person::owner_ids`), each once.
+pub fn owners_face_first() -> Vec<String> {
+    let mut ids: Vec<String> = crate::known_faces::owner_now()
+        .map(|name| crate::known_faces::memory_person(&name))
+        .into_iter()
+        .collect();
+    for id in crate::person::owner_ids() {
+        if !ids.contains(&id) {
+            ids.push(id);
+        }
+    }
+    ids
 }
 
 /// How `fact` went, for the lamp's known person among `owners` (the
-/// owner's memory ids, `person::owner_ids`), `memory` asked with one line
-/// (none: not reached or no answer in time).
+/// owner's memory ids, [`owners_face_first`]): each known id is tried in
+/// turn while memory answers `not_known` (it holds nothing of that id), and
+/// the first other answer is the outcome. `memory` asks one line (none: not
+/// reached or no answer in time).
 pub fn keep(
     fact: &AppRemember,
     owners: &[String],
-    memory: impl FnOnce(&Value) -> Option<Value>,
+    mut memory: impl FnMut(&Value) -> Option<Value>,
 ) -> AppRemembered {
     let went = |outcome: &str| AppRemembered {
         ask: fact.ask,
@@ -58,34 +68,43 @@ pub fn keep(
     if fact.check().is_err() {
         return went("bad_request");
     }
-    let person = match app_fact::whose(None, owners) {
-        Ok(person) => person,
-        Err(refused) => return went(refused.code()),
-    };
-    let Some(line) = remember_line(fact, &person) else {
-        return went("bad_source");
-    };
-    let Some(answer) = memory(&line) else {
-        return went(app_fact::UNAVAILABLE);
-    };
-    if answer.get("ok") == Some(&json!(true)) {
-        return went(app_fact::KEPT);
+    // `whose` with each id asked: only the lamp's known person, never the room.
+    let known: Vec<String> = owners
+        .iter()
+        .filter_map(|id| app_fact::whose(Some(id), owners).ok())
+        .collect();
+    if known.is_empty() {
+        return went(app_fact::Refused::NotKnown.code());
     }
-    // Memory's own code, when it is one word; any other is unavailable.
-    let code = answer
-        .get("error")
-        .and_then(Value::as_str)
-        .filter(|code| {
-            (1..=32).contains(&code.len())
-                && code.bytes().all(|b| b.is_ascii_lowercase() || b == b'_')
-        })
-        .unwrap_or(app_fact::UNAVAILABLE);
-    went(code)
+    for person in &known {
+        let Some(line) = remember_line(fact, person) else {
+            return went("bad_source");
+        };
+        let Some(answer) = memory(&line) else {
+            return went(app_fact::UNAVAILABLE);
+        };
+        if answer.get("ok") == Some(&json!(true)) {
+            return went(app_fact::KEPT);
+        }
+        // Memory's own code, when it is one word; any other is unavailable.
+        let code = answer
+            .get("error")
+            .and_then(Value::as_str)
+            .filter(|code| {
+                (1..=32).contains(&code.len())
+                    && code.bytes().all(|b| b.is_ascii_lowercase() || b == b'_')
+            })
+            .unwrap_or(app_fact::UNAVAILABLE);
+        if code != app_fact::Refused::NotKnown.code() {
+            return went(code);
+        }
+    }
+    went(app_fact::Refused::NotKnown.code())
 }
 
-/// Starts the writer on the bus at `root`, memory at `memory`: one thread
-/// for the facts and one for the removed apps' forgets. `owners` gives the
-/// owner's memory ids at each fact. A part that can't start is said.
+/// Starts the writer on the bus at `root`, memory at `memory`, on a thread
+/// of its own. `owners` gives the owner's memory ids at each fact
+/// ([`owners_face_first`]). A part that can't start is said.
 pub fn start(root: &Path, memory: PathBuf, owners: fn() -> Vec<String>) {
     let Ok(bus) = lamp_bus::Bus::new(root) else {
         eprintln!("lamp-voice: no app's fact is kept: the bus can't be reached");
@@ -95,7 +114,6 @@ pub fn start(root: &Path, memory: PathBuf, owners: fn() -> Vec<String>) {
     let said = bus.publisher_declared(AppRemembered::TOPIC, &AppRemembered::declaration(), "voice");
     match (facts, said) {
         (Ok(mut facts), Ok(mut said)) => {
-            let memory = memory.clone();
             let spawned = std::thread::Builder::new()
                 .name("app-remember".into())
                 .spawn(move || {
@@ -136,47 +154,6 @@ pub fn start(root: &Path, memory: PathBuf, owners: fn() -> Vec<String>) {
         (Err(error), _) | (_, Err(error)) => {
             eprintln!("lamp-voice: no app's fact is kept: {error}");
         }
-    }
-    match bus.subscribe(AppFactsForget::TOPIC, "voice") {
-        Ok(mut gone) => {
-            let spawned = std::thread::Builder::new()
-                .name("app-facts-forget".into())
-                .spawn(move || {
-                    loop {
-                        match gone.recv(Duration::from_secs(1)) {
-                            Ok(Some(message)) => {
-                                let Some((app, line)) = message
-                                    .parse::<AppFactsForget>()
-                                    .ok()
-                                    .and_then(|gone| Some((gone.app.clone(), forget_line(&gone)?)))
-                                else {
-                                    continue;
-                                };
-                                let removed = crate::tools::exchange(&memory, &line, FORGET_WITHIN)
-                                    .filter(|answer| answer.get("ok") == Some(&json!(true)))
-                                    .and_then(|answer| answer.get("removed").and_then(Value::as_u64));
-                                match removed {
-                                    Some(removed) => eprintln!(
-                                        "lamp-voice: app {app} removed: {removed} of its facts forgotten"
-                                    ),
-                                    None => eprintln!(
-                                        "lamp-voice: app {app} removed: its facts could not be forgotten now"
-                                    ),
-                                }
-                            }
-                            Ok(None) => {}
-                            Err(error) => {
-                                eprintln!("lamp-voice: apps/forget_facts can't be read: {error}");
-                                std::thread::sleep(Duration::from_secs(1));
-                            }
-                        }
-                    }
-                });
-            if let Err(error) = spawned {
-                eprintln!("lamp-voice: a removed app's facts are not forgotten: {error}");
-            }
-        }
-        Err(error) => eprintln!("lamp-voice: a removed app's facts are not forgotten: {error}"),
     }
 }
 
@@ -250,7 +227,8 @@ mod tests {
     #[test]
     fn memorys_word_is_the_outcome() {
         let owners = [OWNER.to_owned()];
-        let with = |answer: Option<Value>| keep(&fact("squats"), &owners, |_| answer).outcome;
+        let with =
+            |answer: Option<Value>| keep(&fact("squats"), &owners, |_| answer.clone()).outcome;
         assert_eq!(
             with(Some(
                 json!({"ok": false, "error": "too_many", "message": "m"})
@@ -268,20 +246,57 @@ mod tests {
         );
     }
 
+    /// The owner by two ids (a typed "Minh Nguyen", a face kept as "Minh"):
+    /// memory holds only the face's, so the typed one's `not_known` moves on
+    /// to it, and the fact is kept where the person's own recall looks.
     #[test]
-    fn a_removed_apps_facts_are_forgotten_by_its_source() {
-        assert_eq!(
-            forget_line(&AppFactsForget {
-                app: "gym-coach".into()
-            }),
-            Some(json!({"op": "forget_app_facts", "source": "app:gym-coach"}))
+    fn a_fact_goes_to_the_owner_id_memory_holds() {
+        const FACE: &str = "p-fedcba9876543210";
+        let asked = RefCell::new(Vec::<String>::new());
+        let memory = |line: &Value| {
+            let person = line["person"].as_str().unwrap().to_owned();
+            asked.borrow_mut().push(person.clone());
+            Some(if person == FACE {
+                json!({"ok": true, "id": 3})
+            } else {
+                json!({"ok": false, "error": "not_known", "message": "m"})
+            })
+        };
+        let went = keep(
+            &fact("squats"),
+            &[OWNER.to_owned(), FACE.to_owned()],
+            memory,
         );
-        assert_eq!(forget_line(&AppFactsForget { app: "a:b".into() }), None);
+        assert_eq!(went.outcome, app_fact::KEPT);
+        assert_eq!(*asked.borrow(), [OWNER, FACE]);
+        // The face's first: asked once, kept at once.
+        asked.borrow_mut().clear();
+        let went = keep(
+            &fact("squats"),
+            &[FACE.to_owned(), OWNER.to_owned()],
+            memory,
+        );
+        assert_eq!(went.outcome, app_fact::KEPT);
+        assert_eq!(*asked.borrow(), [FACE]);
+        // Neither held: not_known after both; another refusal stops there.
+        let none = keep(&fact("squats"), &[OWNER.to_owned()], |_| {
+            Some(json!({"ok": false, "error": "not_known"}))
+        });
+        assert_eq!(none.outcome, "not_known");
+        let mut tries = 0;
+        let stopped = keep(
+            &fact("squats"),
+            &[OWNER.to_owned(), FACE.to_owned()],
+            |_| {
+                tries += 1;
+                Some(json!({"ok": false, "error": "too_many"}))
+            },
+        );
+        assert_eq!((stopped.outcome.as_str(), tries), ("too_many", 1));
     }
 
     /// On a real bus with a memory that answers: a fact told on
-    /// `apps/remember` is kept and said on `apps/remembered`; a removed app's
-    /// forget reaches memory.
+    /// `apps/remember` is kept and said on `apps/remembered`.
     #[test]
     fn on_a_real_bus_a_fact_is_kept_and_said() {
         use std::io::{BufRead as _, Write as _};
@@ -297,11 +312,7 @@ mod tests {
                 let mut line = String::new();
                 if reader.read_line(&mut line).is_ok() {
                     let line: Value = serde_json::from_str(&line).unwrap();
-                    let answer = if line["op"] == app_fact::FORGET_OP {
-                        json!({"ok": true, "removed": 2})
-                    } else {
-                        json!({"ok": true, "id": 1})
-                    };
+                    let answer = json!({"ok": true, "id": 1});
                     let _ = lines.send(line);
                     let mut stream = stream;
                     let _ = writeln!(stream, "{answer}");
@@ -331,30 +342,6 @@ mod tests {
         let line = asked.recv_timeout(Duration::from_secs(5)).unwrap();
         assert_eq!(line["person"], OWNER);
         assert_eq!(line["source"], "app:gym-coach");
-        let mut forget = bus
-            .publisher_declared(
-                AppFactsForget::TOPIC,
-                &AppFactsForget::declaration(),
-                "control",
-            )
-            .unwrap();
-        forget
-            .publish_json(
-                lamp_ipc::monotonic_us(),
-                &AppFactsForget {
-                    app: "gym-coach".into(),
-                },
-            )
-            .unwrap();
-        let begun = std::time::Instant::now();
-        loop {
-            let line = asked.recv_timeout(Duration::from_secs(5)).unwrap();
-            if line["op"] == app_fact::FORGET_OP {
-                assert_eq!(line["source"], "app:gym-coach");
-                break;
-            }
-            assert!(begun.elapsed() < Duration::from_secs(5));
-        }
         let _ = std::fs::remove_dir_all(&base);
     }
 }
