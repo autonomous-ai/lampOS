@@ -19,6 +19,8 @@
 //! - **Apart from the person's own list.** Never in `kept` (`kept_with`), so
 //!   a busy app never pushes the person's own kept things out of the hits
 //!   note; found by `recall` and `search` as any kept thing, with its mark.
+//!   Listed alone by `kept {app_facts}` (`Days::kept_app_facts`), for a
+//!   forget about a thing only.
 //!   Never read by the nightly pass, so no episode, pattern or chapter is
 //!   made from one without its mark or outlives its days.
 //! - **Forget.** `forget_app_facts {source}` removes every fact of that
@@ -519,6 +521,94 @@ mod tests {
         let after = note(&mut store, ANN, COACH, NOW + 8, "squats");
         assert_eq!(after["error"], "forgotten", "{after}");
         assert!(facts(&mut store, ANN, NOW + 8).is_empty());
+    }
+
+    /// `kept {app_facts}`, a forget about a thing's listing alone: the
+    /// person's own app facts by the ids a `forget {id}` takes, a page below
+    /// `before_id`; never another person's, never their own kept things, and
+    /// the plain `kept` (the hits note's) still without them.
+    #[test]
+    fn kept_app_facts_lists_only_the_persons_own_app_facts() {
+        let (_scratch, mut store) = Scratch::new("kept-app-facts");
+        talk(&mut store, ANN, NOW);
+        talk(&mut store, BOB, NOW);
+        let own = send(
+            &mut store,
+            json!({"op":"remember","person":ANN,"at_unix_ms":NOW+1,"text":"Sister's wedding is on Saturday."}),
+            NOW + 1,
+        );
+        assert_eq!(own["ok"], true, "{own}");
+        let squats = note(&mut store, ANN, COACH, NOW + 2, "squats 3x10");
+        let lunges = note(&mut store, ANN, COACH, NOW + 3, "lunges 2x8");
+        let bobs = note(&mut store, BOB, COACH, NOW + 4, "squats 5x5");
+        assert_eq!(bobs["ok"], true, "{bobs}");
+        let listed = |store: &mut Days, request: Value| -> Vec<(u64, String)> {
+            let answer = send(store, request.clone(), NOW + 5);
+            assert_eq!(answer["ok"], true, "{request}: {answer}");
+            answer["entries"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .map(|e| {
+                    (
+                        e["id"].as_u64().unwrap(),
+                        e["text"].as_str().unwrap().to_owned(),
+                    )
+                })
+                .collect()
+        };
+        let all = listed(
+            &mut store,
+            json!({"op":"kept","person":ANN,"max_bytes":16384,"app_facts":true}),
+        );
+        let ids: Vec<u64> = all.iter().map(|(id, _)| *id).collect();
+        assert_eq!(
+            ids,
+            [
+                squats["id"].as_u64().unwrap(),
+                lunges["id"].as_u64().unwrap()
+            ]
+        );
+        assert!(all[0].1.contains("squats 3x10") && all[1].1.contains("lunges 2x8"));
+        let page = listed(
+            &mut store,
+            json!({"op":"kept","person":ANN,"app_facts":true,"before_id":lunges["id"]}),
+        );
+        assert_eq!(page.len(), 1);
+        assert_eq!(page[0].0, squats["id"].as_u64().unwrap());
+        assert_eq!(
+            kept(&mut store, ANN, NOW + 5),
+            ["Sister's wedding is on Saturday."]
+        );
+        let theirs = listed(
+            &mut store,
+            json!({"op":"kept","person":BOB,"app_facts":true}),
+        );
+        assert_eq!(theirs.len(), 1);
+        assert!(theirs[0].1.contains("squats 5x5"));
+        for bad in [
+            json!({"op":"kept","person":ANN,"app_facts":true,"observations":true}),
+            json!({"op":"kept","person":ANN,"before_id":3}),
+        ] {
+            assert_eq!(
+                send(&mut store, bad.clone(), NOW + 5)["error"],
+                "bad_request",
+                "{bad}"
+            );
+        }
+        // Its id is the one a forget takes; the other stays.
+        let forgot = send(
+            &mut store,
+            json!({"op":"forget","person":ANN,"id":squats["id"],"selective":true}),
+            NOW + 6,
+        );
+        assert_eq!(forgot["ok"], true, "{forgot}");
+        let left = listed(
+            &mut store,
+            json!({"op":"kept","person":ANN,"app_facts":true}),
+        );
+        assert_eq!(left.len(), 1);
+        assert!(left[0].1.contains("lunges 2x8"));
     }
 
     /// 20 a source a day by memory's clock: a backdated `at` never gets

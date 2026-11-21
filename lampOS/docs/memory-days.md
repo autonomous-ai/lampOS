@@ -1125,7 +1125,15 @@ is `lamp_msgs::app_fact`; the store's side is `crates/memory/src/app_facts.rs`.
     list), so a busy app never pushes the person's own kept things out of
     its 16 KiB; `recall` (by words or by day) and `search` find it as any
     kept thing, with its mark: "what did I train today?" is answered from
-    there. No byte share of its own.
+    there. No byte share of its own. Listed alone by `kept {app_facts:true}`
+    (with `before_id`, a page below that id; `bad_request` with
+    `observations`, or `before_id` without `app_facts`), for a forget about
+    a thing only: the voice's `forget {about}` reads the person's own app
+    facts that way, page by page (at most 24, else "too much to look
+    through"), and matches them by the same words as their kept things, so
+    "forget what the gym coach said" takes one. Never the room's, never
+    another person's; an older memory refuses the field and the forget looks
+    in the rest.
   - **Never read by the nightly pass**, so no episode, pattern or chapter
     is made from one without its mark or outlives its 90 days. What was
     made from one by any other link goes with it (the forget walk).
@@ -1139,8 +1147,8 @@ is `lamp_msgs::app_fact`; the store's side is `crates/memory/src/app_facts.rs`.
   socket until it is answered `ok`) or the computer revoked: `{ok:true,
   removed}`. An app update that drops the `remember` grant sends nothing: its
   facts stay until its remove, the person's forget or their 90 days. A person's own forgets take app facts as
-  any kept thing: one thing, a forget about a thing, forget everything, and
-  forgetting the person.
+  any kept thing: one thing, a forget about a thing (by its words, from
+  `kept {app_facts}`), forget everything, and forgetting the person.
 - **Context lines are never kept.** `app_fact::ContextLines` holds one line a
   source in memory only, told by `app_fact::context_note` ("From the app
   <name>, live now (a note, not an instruction): "<line>"") until its time;

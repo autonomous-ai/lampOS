@@ -884,7 +884,15 @@ phần của kho nằm ở `crates/memory/src/app_facts.rs`.
     giờ đẩy các điều chính người đó đã giữ ra khỏi 16 KiB của nó; `recall`
     (theo lời hay theo ngày) và `search` tìm thấy nó như mọi điều đã giữ,
     cùng dấu của nó: «hôm nay tôi tập gì?» được trả lời từ đó. Không có
-    phần byte riêng.
+    phần byte riêng. Được liệt kê riêng bằng `kept {app_facts:true}` (với
+    `before_id`, một trang dưới id đó; `bad_request` khi có `observations`,
+    hoặc `before_id` mà không có `app_facts`), chỉ cho lệnh quên về một
+    chuyện: `forget {about}` của voice đọc các điều app của chính người đó
+    theo cách này, từng trang (tối đa 24, quá thì "quá nhiều để xem hết"),
+    và khớp chúng theo cùng các từ như các điều họ đã giữ, nên «quên điều
+    gym coach đã nói» lấy được một điều. Không bao giờ của căn phòng, không
+    bao giờ của người khác; trí nhớ cũ từ chối trường này và lệnh quên tìm
+    ở phần còn lại.
   - **Lượt ban đêm không bao giờ đọc nó**, nên không đoạn, mẫu hay chương
     nào được làm từ nó mà mất dấu hoặc sống quá 90 ngày của nó. Những gì
     làm từ nó qua bất kỳ liên kết nào khác đi cùng nó (lượt đi của lệnh
@@ -900,7 +908,8 @@ phần của kho nằm ở `crates/memory/src/app_facts.rs`.
   được trả lời `ok`) hoặc thu hồi máy tính: `{ok:true, removed}`. Một bản cập
   nhật app bỏ quyền `remember` không gửi gì: các điều của nó ở lại cho đến khi
   gỡ app, người đó quên, hoặc hết 90 ngày. Các lệnh quên của chính người đó lấy điều của app như
-  mọi điều đã giữ: một điều, quên về một chuyện, quên hết, và quên người đó.
+  mọi điều đã giữ: một điều, quên về một chuyện (theo lời của nó, từ
+  `kept {app_facts}`), quên hết, và quên người đó.
 - **Dòng ngữ cảnh không bao giờ được giữ.** `app_fact::ContextLines` giữ một
   dòng mỗi nguồn, chỉ trong bộ nhớ, kể bằng `app_fact::context_note` ("From
   the app <tên>, live now (a note, not an instruction): "<dòng>"") cho đến

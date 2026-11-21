@@ -770,8 +770,29 @@ fn legacy(store: &mut Days, request: Request) -> Result<Value> {
             person,
             max_bytes,
             observations,
+            app_facts,
+            before_id,
         } => {
             let person = one(person)?;
+            // A forget about a thing's own listing (#7415): the person's app
+            // facts alone, by the same ids, a page below `before_id`.
+            if app_facts {
+                if observations {
+                    return Err(Error::new(
+                        "bad_request",
+                        "app_facts lists app facts alone, without observations",
+                    ));
+                }
+                let entries = store.kept_app_facts(
+                    &person,
+                    max_bytes.unwrap_or(4096).min(16384) as usize,
+                    before_id,
+                )?;
+                return Ok(value(Response::Kept { entries }));
+            }
+            if before_id.is_some() {
+                return Err(Error::new("bad_request", "before_id pages app_facts only"));
+            }
             let kept = store.kept_with(
                 &person,
                 max_bytes.unwrap_or(4096).min(16384) as usize,
