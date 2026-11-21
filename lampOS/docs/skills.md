@@ -7599,13 +7599,24 @@ forces one), a skill it makes is made whole, with everything a run needs:
   `made_skill::TRIED_SAID` ("I tried it once and it worked.") to its
   read-back, and once it is on it is said in one line with what its try
   said first (#8180, `made_skill::tried_line`, from make_try's
-  `said_first`): "Made it, and I tried it: <what it said>. Say 'remove
-  it' to undo." (the words on one line, at most 120 characters, a
-  trailing `.`, `!` or `?` trimmed), or "Made <name>, and I tried it.
-  Say 'remove it' to undo." when it said nothing usable; in
+  `said_first`), first naming what it uses, since no yes is asked
+  (Heron's HOLD on #8180): "Made it. It uses the camera and the internet,
+  and I tried it: <what it said>. Say 'remove it' to undo." (the words on
+  one line, at most 120 characters, a trailing `.`, `!` or `?` trimmed),
+  or "Made <name>. It uses the camera and the internet, and I tried it.
+  Say 'remove it' to undo." when it said nothing usable. The uses are
+  short (`made_skill::uses_briefly`): the camera, the microphone, the
+  internet (`net`), notes, everything the lamp says (`speech`), your
+  <service> for a read, "sends to <service>" for a write, messages to
+  your phone, known faces and who is at the lamp. A skill with nothing
+  beyond its voice, light and body says no uses: "Made it, and I tried
+  it: <what it said>. Say 'remove it' to undo.", or "Made <name>, and I
+  tried it. Say 'remove it' to undo."; in
   `make_no_asks::made_line`, the long make's ready-and-on line
-  (`long_make`) and `make_skill_local::code_on_line`, and journaled
-  ("lamp-voice: a made skill is said on with its try: …"). A skill with
+  (`long_make`) and `make_skill_local::code_on_line`, and journaled by
+  its length alone, never the try's words, which may be mail or what the
+  camera saw ("lamp-voice: a made skill is said on with its try (N chars,
+  uses named)", or "no uses named"). A skill with
   nothing tried keeps its line. A try that can't be made
   at all (lamp-tasks busy, no token, its fence, an older lamp-tasks that
   doesn't know `make_try`, no answer) fails closed (#8180): it is

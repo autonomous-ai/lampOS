@@ -11127,9 +11127,13 @@ fn note_tried(sha256: &str, first: Option<String>) {
 }
 
 /// The one line said of a made skill on (#8180, the first builder's
-/// ruling): what its try did, with the undo: "Made it, and I tried it:
-/// <what it said>. Say 'remove it' to undo.", or "Made <name>, and I
-/// tried it. Say 'remove it' to undo." when it said nothing usable;
+/// ruling): what it uses ([`uses_briefly`]), then what its try did, with
+/// the undo: "Made it. It uses the camera and the internet, and I tried
+/// it: <what it said>. Say 'remove it' to undo.", or "Made <name>. It uses
+/// …, and I tried it. Say 'remove it' to undo." when it said nothing
+/// usable. With nothing beyond its voice, light and body, "Made it, and I
+/// tried it: …" with no uses (Heron's HOLD on #8180: no yes is asked, so
+/// this line is where the person learns what it uses);
 /// `extra`, a sentence of its own when not empty, before the undo. None
 /// for a made skill that wasn't tried (no script). Journaled.
 pub fn tried_line(made: &Made, extra: &str) -> Option<String> {
@@ -11146,15 +11150,82 @@ pub fn tried_line(made: &Made, extra: &str) -> Option<String> {
         };
         line.trim_end_matches(['.', '!', '?', ' ']).to_owned()
     });
-    let line = match words.filter(|words| !words.is_empty()) {
-        Some(words) => format!("Made it, and I tried it: {words}.{extra} Say 'remove it' to undo."),
-        None => format!(
-            "Made {}, and I tried it.{extra} Say 'remove it' to undo.",
-            spoken_name(&made.name)
-        ),
+    // With usable words, "Made it" and the words; without, its name.
+    let (what, words) = match words.filter(|words| !words.is_empty()) {
+        Some(words) => ("it".to_owned(), format!(": {words}")),
+        None => (spoken_name(&made.name), String::new()),
     };
-    eprintln!("lamp-voice: a made skill is said on with its try: {line}");
+    let uses =
+        uses_briefly(&made.uses).map_or_else(String::new, |uses| format!(". It uses {uses}"));
+    let line = format!("Made {what}{uses}, and I tried it{words}.{extra} Say 'remove it' to undo.");
+    // Never the try's words, which may be mail or what the camera saw
+    // (the Reviewer-lead's P2 on #8180): only the line's length.
+    eprintln!("{}", tried_journal(&line, !uses.is_empty()));
     Some(line)
+}
+
+/// What [`tried_line`] journals of its line: its length and whether it
+/// named what the skill uses, never its words.
+fn tried_journal(line: &str, uses_named: bool) -> String {
+    format!(
+        "lamp-voice: a made skill is said on with its try ({} chars, {})",
+        line.chars().count(),
+        if uses_named {
+            "uses named"
+        } else {
+            "no uses named"
+        }
+    )
+}
+
+/// What a made skill uses beyond its voice, light and body, short, for
+/// [`tried_line`]: "the camera and the internet"; None when nothing more.
+fn uses_briefly(uses: &Uses) -> Option<String> {
+    let mut said: Vec<String> = Vec::new();
+    let mut say = |part: String| {
+        if !said.contains(&part) {
+            said.push(part);
+        }
+    };
+    let has = |grant: &str| uses.grants.iter().any(|kept| kept == grant);
+    if uses.camera || has("camera") {
+        say("the camera".to_owned());
+    }
+    if uses.listens() || has("microphone") {
+        say("the microphone".to_owned());
+    }
+    if has(crate::skill_task_yes::NET.0) {
+        say("the internet".to_owned());
+    }
+    if has("notes") {
+        say("notes".to_owned());
+    }
+    if has("speech") {
+        say("everything the lamp says".to_owned());
+    }
+    for code in &uses.reads {
+        say(format!("your {}", service_name(code)));
+    }
+    for (code, write) in uses.grants.iter().filter_map(|grant| service_grant(grant)) {
+        say(if write {
+            format!("sends to {}", service_name(code))
+        } else {
+            format!("your {}", service_name(code))
+        });
+    }
+    for code in &uses.writes {
+        say(format!("sends to {}", service_name(code)));
+    }
+    if uses.messages {
+        say("messages to your phone".to_owned());
+    }
+    if uses.known_faces {
+        say("known faces".to_owned());
+    }
+    if uses.who {
+        say("who is at the lamp".to_owned());
+    }
+    (!said.is_empty()).then(|| and_list(&said))
 }
 
 /// [`note_tried`] for a test's package.
@@ -20600,6 +20671,94 @@ task = { task = "take a photo and send it to the app", run = "scripts/main.py" }
             crate::make_no_asks::made_line(&made(&"4".repeat(64)), ""),
             "Made tide times. Say 'remove it' to undo."
         );
+    }
+
+    /// Heron's HOLD on #8180: with no yes asked, the tried line names what
+    /// the skill uses before what its try said, with words and without;
+    /// one that only speaks gets nothing more.
+    #[test]
+    fn a_tried_skill_line_names_what_it_uses() {
+        let made = |sha256: &str, uses: Uses| Made {
+            name: "sky-watch".into(),
+            version: "1.0.0".into(),
+            sha256: sha256.into(),
+            description: "Watches the sky.".into(),
+            uses,
+            package: PathBuf::from("/nowhere"),
+        };
+        let camera_net = || Uses {
+            code: true,
+            grants: vec!["camera".into(), "net".into()],
+            ..Uses::default()
+        };
+        let speak = || Uses {
+            code: true,
+            speak: true,
+            grants: vec!["speak".into()],
+            ..Uses::default()
+        };
+        note_tried_here(&"5".repeat(64), Some("Clear skies tonight.".into()));
+        note_tried_here(&"6".repeat(64), None);
+        assert_eq!(
+            tried_line(&made(&"5".repeat(64), camera_net()), "").as_deref(),
+            Some(
+                "Made it. It uses the camera and the internet, and I tried it: \
+                 Clear skies tonight. Say 'remove it' to undo."
+            )
+        );
+        assert_eq!(
+            tried_line(&made(&"6".repeat(64), camera_net()), "").as_deref(),
+            Some(
+                "Made sky watch. It uses the camera and the internet, and I tried it. \
+                 Say 'remove it' to undo."
+            )
+        );
+        for sha in ["5", "6"] {
+            let line = tried_line(&made(&sha.repeat(64), speak()), "").unwrap();
+            assert!(
+                !line.contains("the camera") && !line.contains("the internet"),
+                "{line}"
+            );
+            assert!(!line.contains("It uses"), "{line}");
+        }
+        assert_eq!(
+            tried_line(&made(&"5".repeat(64), speak()), "").as_deref(),
+            Some("Made it, and I tried it: Clear skies tonight. Say 'remove it' to undo.")
+        );
+        assert_eq!(
+            tried_line(&made(&"6".repeat(64), speak()), "").as_deref(),
+            Some("Made sky watch, and I tried it. Say 'remove it' to undo.")
+        );
+        // Journaled by length alone, never the try's words.
+        let journal = tried_journal(
+            "Made it. It uses the camera, and I tried it: Your mail.",
+            true,
+        );
+        assert_eq!(
+            journal,
+            "lamp-voice: a made skill is said on with its try (55 chars, uses named)"
+        );
+        assert!(!journal.contains("mail"), "{journal}");
+        // The rest named, short: the microphone, notes, a service it sends
+        // to, messages and who.
+        let more = Uses {
+            code: true,
+            topics: vec!["voice/heard".into()],
+            grants: vec!["notes".into(), "gmail-write".into()],
+            messages: true,
+            who: true,
+            ..Uses::default()
+        };
+        let line = tried_line(&made(&"5".repeat(64), more), "").unwrap();
+        for part in [
+            "the microphone",
+            "notes",
+            "sends to ",
+            "messages to your phone",
+            "who is at the lamp",
+        ] {
+            assert!(line.contains(part), "{part}: {line}");
+        }
     }
 
     /// #8157: a passed try is told in the read-back; a failed one is
