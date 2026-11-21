@@ -409,43 +409,34 @@ fn a_run_step_gets_its_skills_grants_and_nothing_more() {
     assert_eq!(*runner.2.borrow(), 0);
 }
 
-/// A run step granted `net` runs with its way out only with the owner's
-/// yes naming net for its folder as it is, the same yes as a net task's:
-/// without it, refused before any token and its runner never runs; with
-/// it, its token names the skill's other grants (net is lamp-tasks' own)
-/// and its run is granted net. Keys stay refused.
+/// #8180 (the dev's ruling): a run step granted `net` runs with its way
+/// out by its grant alone, with no yes asked: lamp-control having no yes
+/// that names net, its token names the skill's other grants (net is
+/// lamp-tasks' own) and its run is granted net. Keys stay refused.
 #[test]
-fn a_net_run_step_gets_its_egress_socket_only_with_its_yes() {
+fn a_net_run_step_gets_its_egress_socket_with_no_yes() {
     let place = Place::new();
     let mut hand = place.hand("exit 0\n");
     hand.grants.push(crate::skill_task::NET_GRANT.into());
-    let control = |net_yes| Control {
+    let runner = ends(Ok(0), true);
+    let no_yes = Control {
         grants: vec!["speak".into()],
         said: Some(1),
-        net_yes,
+        net_yes: false,
         ..Control::default()
     };
-    let runner = ends(Ok(0), true);
-    let no = control(false);
     assert_eq!(
-        answer(&hand, &no, &runner, false),
-        refusal("no_token", NO_NET_YES)
-    );
-    assert!(no.minted.borrow().is_empty());
-    assert_eq!(*runner.2.borrow(), 0);
-    let yes = control(true);
-    assert_eq!(
-        answer(&hand, &yes, &runner, false),
+        answer(&hand, &no_yes, &runner, false),
         json!({"ok": true, "id": 0, "said": 1})
     );
     assert_eq!(*runner.3.borrow(), [true]);
     assert_eq!(
-        answer(&hand, &yes, &runner, true),
+        answer(&hand, &no_yes, &runner, true),
         refusal("bad_request", NO_KEYS_HERE)
     );
     // A run step not granted net is never granted it.
     let plain = place.hand("exit 0\n");
-    assert_eq!(answer(&plain, &yes, &runner, false)["ok"], true);
+    assert_eq!(answer(&plain, &no_yes, &runner, false)["ok"], true);
     assert_eq!(*runner.3.borrow(), [true, false]);
 }
 
