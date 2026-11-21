@@ -34008,6 +34008,73 @@ mod tests {
         );
     }
 
+    /// #8175 (#7069's row P on lamp-52e6, 15 Nov): "Lamp, point the light
+    /// at my book" took `take_a_look`, though `point_light` was offered in
+    /// round 1 through `use_skill`. Nothing in code picks between them: a
+    /// spoken turn's round 1 offers both, and their descriptions say which
+    /// is which. `take_a_look`'s says a lit thing is point_light's only
+    /// when point-light is offered (installed and on); point-light's says it
+    /// puts the light on a thing the person names, and never that it looks.
+    #[test]
+    fn round_one_offers_point_light_beside_the_look_and_their_lines_tell_them_apart() {
+        let shipped = include_str!("../../../../skills/point-light/SKILL.md")
+            .lines()
+            .find_map(|line| line.strip_prefix("description: "))
+            .unwrap();
+        let dir = std::env::temp_dir().join(format!("second-point-light-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        std::fs::write(
+            dir.join(crate::tools::CATALOG_FILE),
+            serde_json::json!({"tools": [{"name": "point_light", "description": shipped}]})
+                .to_string(),
+        )
+        .unwrap();
+        let settings = crate::tools::Settings {
+            skills: Some(dir.clone()),
+            use_skill: true,
+            ..Default::default()
+        };
+        let told = chat_tools(&settings, &[], true);
+        let skill = told
+            .iter()
+            .find(|tool| tool.name == crate::use_skill::NAME)
+            .expect("use_skill in round 1");
+        assert_eq!(
+            skill.parameters.as_ref().unwrap()["properties"]["skill"]["enum"],
+            serde_json::json!(["point_light"])
+        );
+        // Point-light's line puts the light on a named thing, and never looks.
+        assert!(!shipped.contains("look"), "{shipped}");
+        assert!(shipped.contains("a thing they name"), "{shipped}");
+        let look = |told: &[lamp_gemini::Tool]| {
+            told.iter()
+                .find(|tool| tool.name == crate::second_provider::LOOK_CALL)
+                .expect("take_a_look in round 1")
+                .description
+                .clone()
+        };
+        let pointed = look(&told);
+        assert!(pointed.starts_with(&look_tool().description), "{pointed}");
+        assert!(pointed.contains("point_light"), "{pointed}");
+        assert!(pointed.contains("a thing they name"), "{pointed}");
+        // Its own function, with use_skill off: the same.
+        let own = chat_tools(
+            &crate::tools::Settings {
+                use_skill: false,
+                ..settings.clone()
+            },
+            &[],
+            true,
+        );
+        assert!(own.iter().any(|tool| tool.name == "point_light"));
+        assert_eq!(look(&own), pointed);
+        std::fs::remove_dir_all(&dir).ok();
+        // Not installed, or off: the look's description as before.
+        let none = chat_tools(&crate::tools::Settings::default(), &[], true);
+        assert_eq!(look(&none), look_tool().description);
+        assert!(!look(&none).contains("point_light"));
+    }
+
     /// #1712, lamp-4ace 19 Oct: "Hey Lamp, how are you today?" heard as
     /// "Hey, Lynn. How are you today?", and "Lamp, what time is it?" as
     /// "Lynn, what time is it?", were held as said to someone else. As the
