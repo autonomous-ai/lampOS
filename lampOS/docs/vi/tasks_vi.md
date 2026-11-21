@@ -1008,10 +1008,13 @@ lamp-tasks tự chạy script: không agent, không Harness, không prompt
   dòng (trừ `net`, quyền của chính lamp-tasks) thì bị kết thúc ngay và không
   gì chạy. Dòng của kỹ năng nêu khóa bị từ chối trước khi có token
   (`skill_run::NO_KEYS_HERE`): hãy dùng `do.task`.
-- **`net`**: cùng đường như task có `net`, được cấp chỉ bởi quyền, không
-  hỏi lời đồng ý nào (#8180, quyết định của dev: quyền đã khai báo của kỹ
-  năng được tạo là thật; `skill_run::answer` không còn hỏi
-  `Tokens::net_agreed`). Khi `LAMP_TASK_NET` bật, `DirectRunner::egress` tạo socket egress
+- **`net`**: cùng đường và cùng kiểm tra như task có `net`
+  (`skill_run::answer` hỏi `Tokens::net_agreed` trước khi có token):
+  lamp-control đồng ý khi lời đồng ý đã giữ của chủ đèn có `net` cho thư mục
+  đúng như hiện tại, hoặc, khi `LAMP_MADE_CODE_ON_AT_ONCE` bật (trong unit
+  lamp-control của sản phẩm), cho kỹ năng được tạo trên đèn mà không cần lời
+  đồng ý (#8180, ở dưới); không đồng ý thì bị từ chối `no_token`
+  (`skill_run::NO_NET_YES`), không token và không socket egress. Khi `LAMP_TASK_NET` bật, `DirectRunner::egress` tạo socket egress
   riêng của lần chạy `skill-<run id>` (`egress::Grant::lamp`: chỉ web công
   khai trên cổng 80 và 443), phục vụ đến hết giới hạn của lần chạy, và đặt
   một descriptor `O_PATH` của nó lên fd 5 của hàng rào. Hàng rào là hàng rào
@@ -1754,16 +1757,21 @@ sang runner chung của #6510 bước 2 mà không cần luật mới.
   token, nên sau khi tạo token lamp-tasks hỏi lamp-control
   (`task_yes_check` với SHA-256 thư mục và các quyền của dòng): chỉ khi
   lời đồng ý có `net` cho thư mục đúng như hiện tại thì lần chạy mới có
-  lối ra, nếu không thì `no_token` và không chạy gì. Kỹ năng được tạo trên
+  lối ra, nếu không thì `no_token` và không chạy gì. Khi
+  `LAMP_MADE_CODE_ON_AT_ONCE` bật trong lamp-control
+  (`lamp_skills::no_yes_switch_on`; bật trong sản phẩm), kỹ năng được tạo trên
   đèn không cần lời đồng ý (#8180, `lamp_voice::made_skill::grants_need_no_yes`,
-  hiện chỉ đúng với `SkillSource::Made`, theo `lamp_skills::source_of`):
+  hiện chỉ đúng với `SkillSource::Made`, theo `lamp_skills::source_of`:
+  `made: here` và được cài với bản ghi cài đặt không từ Store, nên thư mục
+  cài bằng tay không phải Made):
   lamp-control tạo token từ các quyền khai báo trong thư mục của nó
   (`task_yes::KeptYes::grants`, `no_yes_grants`; bỏ `net`, và các quy tắc
   bên dưới, trong đó `net` không bao giờ đi cùng quyền riêng tư, vẫn giữ)
   và trả lời kiểm tra của nó `{"agreed": true}` cho thư mục đúng như hiện
   tại (SHA-256 và các quyền khai báo, `task_yes::agreed_with_no_yes`), nên
   `net` của nó không hỏi gì. Kỹ năng từ Store, được đẩy lên hay khác vẫn
-  cần lời đồng ý đã giữ. Tắt: `net` bị từ chối trước khi có token.
+  cần lời đồng ý đã giữ, và khi tắt công tắc thì kỹ năng được tạo cũng vậy,
+  đúng như trước. Tắt: `net` bị từ chối trước khi có token.
 - **Điều lần chạy có `net` không bao giờ giữ, và giới hạn của nó** (P1 và các
   P3 của Heron trên #7590, quyết định 23:22 của người xây dựng đầu tiên):
   - `net` không bao giờ được cấp cùng một quyền riêng tư: quyền đọc hay ghi

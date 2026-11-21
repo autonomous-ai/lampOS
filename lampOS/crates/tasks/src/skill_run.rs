@@ -21,14 +21,17 @@
 //!   environment of `PATH`, `HOME` (its run's folder), the socket, the SDK
 //!   and its one-run token only, read from a pipe. Never as lamp-skills,
 //!   never with any of its rights.
-//! - **`net`**: the way out a net task gets today, given by the grant
-//!   alone with nothing asked (#8180, the dev's ruling: a made skill's
-//!   declared grants are live; [`NET_SWITCH`] on): its own
+//! - **`net`**: the way out a net task gets today, with the same check
+//!   (`crate::skill_task::Tokens::net_agreed`, [`NET_SWITCH`] on):
+//!   lamp-control agrees for the owner's kept yes naming it, or, with
+//!   `LAMP_MADE_CODE_ON_AT_ONCE` on (the product's), for a made skill's
+//!   folder as it is with no yes (#8180, `lamp_control::task_yes`). Its own
 //!   egress socket `skill-<run id>` ([`crate::egress::Grant`], the public
 //!   web on ports 80 and 443 only) on fd 5 of its fence, which
 //!   [`crate::gateway::FENCE_NET_EDITS`] relay to (`HTTPS_PROXY`
 //!   `127.0.0.1:3128`), lamp-tasks' relay alone shown again under `/opt`
-//!   ([`RELAY_EDITS`]). Keys are never given ([`NO_KEYS_HERE`]).
+//!   ([`RELAY_EDITS`]). Not agreed: refused before any token. Keys are
+//!   never given ([`NO_KEYS_HERE`]).
 //! - **Its bounds**: its own cgroup ([`crate::run_cgroup`], #8180: a real
 //!   total of memory, CPU and tasks for the whole run, refused on Linux
 //!   without it), and its own caps ([`CAPS_EDIT`]: [`SCRIPT_MEMORY_KB`] of
@@ -78,6 +81,9 @@ pub const UNSHARE: &str = "/usr/bin/unshare";
 /// What lamp-tasks says of a run step whose script ended well but said
 /// nothing aloud.
 pub const SAID_NOTHING: &str = "its script ended well but nothing it asked lamp.say for was said";
+/// What a run step granted `net` is told when lamp-control doesn't agree
+/// to net for its folder as it is: a net task's words.
+pub const NO_NET_YES: &str = "the owner's yes for this skill's folder as it is doesn't name net, so its run doesn't reach the internet";
 /// What a run step whose skill names keys is told: none is given.
 pub const NO_KEYS_HERE: &str =
     "a run step's script is given no keys: a skill that names keys runs its script as a task";
@@ -560,7 +566,8 @@ impl Runner for DirectRunner {
 
 /// lamp-tasks' answer to a `run` step's hand-over, `hand` checked: its
 /// token minted as a task's, held to exactly the skill's grants (`net`
-/// by its grant alone, #8180), the script
+/// only as lamp-control agrees, as a net task's: the owner's yes naming
+/// it, or a made skill's with `LAMP_MADE_CODE_ON_AT_ONCE` on, #8180), the script
 /// run through `runner` within [`RUN_WITHIN`], the token ended and its
 /// said count read ([`Tokens::end_said`]): `{"ok":true,"id":0,"said":N}`
 /// for a run that ended well and said something, else the refusal.
@@ -573,8 +580,14 @@ pub fn answer(
     if keys_named {
         return refusal("bad_request", NO_KEYS_HERE);
     }
-    // `net` gets its way out by its grant alone (#8180): no yes is asked.
+    // `net` gets its way out only with lamp-control agreeing for this
+    // folder as it is, as a net task's: the owner's yes naming it, or a
+    // made skill's with `LAMP_MADE_CODE_ON_AT_ONCE` on (#8180), no yes
+    // kept. Refused here: no token is minted and no egress socket made.
     let net = hand.grants.iter().any(|grant| grant == NET_GRANT);
+    if net && !tokens.net_agreed(&hand.skill, &hand.sha256, &hand.grants) {
+        return refusal("no_token", NO_NET_YES);
+    }
     let handed = Instant::now();
     let run_id = crate::skill_task::run_id();
     let minted = match tokens.mint(&hand.skill, &run_id) {
