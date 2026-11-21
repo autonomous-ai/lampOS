@@ -5874,8 +5874,6 @@ light = { dim = 1 }
         assert!(served.join().is_err(), "authenticated timeout was ignored");
     }
 
-    /// A manage helper at `socket` that puts on whatever made skill it is
-    /// asked for, once: the line it was asked.
     /// How long a test helper waits for the call it stands in for.
     pub(crate) const ACCEPT_WITHIN: std::time::Duration = std::time::Duration::from_secs(60);
 
@@ -5910,6 +5908,8 @@ light = { dim = 1 }
         }
     }
 
+    /// A manage helper at `socket` that puts on whatever made skill it is
+    /// asked for, once: the line it was asked.
     pub(crate) fn manage_helper(socket: &Path) -> std::thread::JoinHandle<Value> {
         use std::io::BufRead;
         let listener = std::os::unix::net::UnixListener::bind(socket).unwrap();
