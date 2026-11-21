@@ -640,8 +640,13 @@ pub const TRY_WITHIN: Duration = Duration::from_secs(4 * 30 + 30);
 /// A made skill's tried run (#8157), as lamp-tasks answered it.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Tried {
-    /// Each script ran and passed; a `run` step's said `said` lines.
-    Passed { said: u32 },
+    /// Each script ran and passed; a `run` step's said `said` lines, the
+    /// first of them `said_first` (#8180, lamp-control's words, one line
+    /// of at most 120 characters).
+    Passed {
+        said: u32,
+        said_first: Option<String>,
+    },
     /// The skill has no script: nothing to try.
     Nothing,
     /// A script failed its try: lamp-tasks' words, for a repair.
@@ -664,6 +669,11 @@ pub fn tried_of(answer: &Value) -> Tried {
                 .as_u64()
                 .and_then(|said| u32::try_from(said).ok())
                 .unwrap_or(0),
+            said_first: answer["said_first"]
+                .as_str()
+                .map(str::trim)
+                .filter(|first| !first.is_empty())
+                .map(str::to_owned),
         },
         (Some(true), Some(false)) => Tried::Failed(
             answer["why"]
@@ -1919,15 +1929,20 @@ pub(crate) mod tests {
     fn a_tried_runs_answer_is_read_as_passed_failed_nothing_or_not_tried() {
         assert_eq!(
             tried_of(&json!({"ok": true, "tried": true, "passed": true, "said": 2})),
-            Tried::Passed { said: 2 }
+            Tried::Passed {
+                said: 2,
+                said_first: None
+            }
         );
-        // #8180: what the try ran without (`net`, `camera`, ...) is read
-        // past, never a reason to call the answer unreadable.
+        // #8180: the first thing the try said, read for the person's line.
         assert_eq!(
             tried_of(
-                &json!({"ok": true, "tried": true, "passed": true, "said": 1, "without": ["net", "camera"]})
+                &json!({"ok": true, "tried": true, "passed": true, "said": 1, "said_first": "Low tide at six."})
             ),
-            Tried::Passed { said: 1 }
+            Tried::Passed {
+                said: 1,
+                said_first: Some("Low tide at six.".into())
+            }
         );
         assert_eq!(
             tried_of(&json!({"ok": true, "tried": false})),
@@ -1971,7 +1986,13 @@ pub(crate) mod tests {
             .unwrap();
             serde_json::from_str::<Value>(&line).unwrap()
         });
-        assert_eq!(try_made(&dir, "x", &files), Tried::Passed { said: 1 });
+        assert_eq!(
+            try_made(&dir, "x", &files),
+            Tried::Passed {
+                said: 1,
+                said_first: None
+            }
+        );
         let line = served.join().unwrap();
         assert_eq!(line["op"], "make_try");
         assert_eq!(line["name"], "x");

@@ -1410,7 +1410,9 @@ tạo một lần và trọn vẹn"); `lamp_tasks::make_try`.
   đã nói ít nhất một câu (`said` trong câu trả lời `end` của lamp-control,
   `Tokens::end_said`; lamp-control cũ không báo thì không bị tính là lỗi);
   script của task có in ra gì đó. Trả lời
-  `{"ok":true,"tried":true,"passed":true,"said":N}` hoặc
+  `{"ok":true,"tried":true,"passed":true,"said":N,"said_first":TEXT}`
+  (`said_first`, #8180: lời của câu nói trọn đầu tiên từ `end` của
+  lamp-control, `Tokens::end_said_first`, bỏ đi khi không có) hoặc
   `{"ok":true,"tried":true,"passed":false,"why"}` (lời này về lần sửa của
   voice); lần thử không khởi động được (không token, không hàng rào) bị từ
   chối `not_tried`.
@@ -1423,7 +1425,9 @@ tạo một lần và trọn vẹn"); `lamp_tasks::make_try`.
   `say` của client một lần chạy mà giọng đã nói trọn (`done` với
   `how: finished`; câu bị bỏ vì riêng tư hay hết hạn, hoặc một `sound`,
   không được đếm; `Parts::said_take`) và trả lời `{"end":{"run"}}` trên
-  socket admin bằng `{"ended":BOOL,"said":N}`. `lamp.say` của script phải
+  socket admin bằng `{"ended":BOOL,"said":N}`, và `"said_first"`, lời của
+  câu đầu tiên như vậy trên một dòng, tối đa 120 ký tự
+  (`Parts::said_take_first`, #8180), khi có câu được nói. `lamp.say` của script phải
   chờ câu nói xong (`wait=True`), nếu không script có thể thoát trước khi
   câu được nói và câu đó bị bỏ.
 
@@ -1750,8 +1754,16 @@ sang runner chung của #6510 bước 2 mà không cần luật mới.
   token, nên sau khi tạo token lamp-tasks hỏi lamp-control
   (`task_yes_check` với SHA-256 thư mục và các quyền của dòng): chỉ khi
   lời đồng ý có `net` cho thư mục đúng như hiện tại thì lần chạy mới có
-  lối ra, nếu không thì `no_token` và không chạy gì. Tắt: `net` bị từ chối
-  trước khi có token.
+  lối ra, nếu không thì `no_token` và không chạy gì. Kỹ năng được tạo trên
+  đèn không cần lời đồng ý (#8180, `lamp_voice::made_skill::grants_need_no_yes`,
+  hiện chỉ đúng với `SkillSource::Made`, theo `lamp_skills::source_of`):
+  lamp-control tạo token từ các quyền khai báo trong thư mục của nó
+  (`task_yes::KeptYes::grants`, `no_yes_grants`; bỏ `net`, và các quy tắc
+  bên dưới, trong đó `net` không bao giờ đi cùng quyền riêng tư, vẫn giữ)
+  và trả lời kiểm tra của nó `{"agreed": true}` cho thư mục đúng như hiện
+  tại (SHA-256 và các quyền khai báo, `task_yes::agreed_with_no_yes`), nên
+  `net` của nó không hỏi gì. Kỹ năng từ Store, được đẩy lên hay khác vẫn
+  cần lời đồng ý đã giữ. Tắt: `net` bị từ chối trước khi có token.
 - **Điều lần chạy có `net` không bao giờ giữ, và giới hạn của nó** (P1 và các
   P3 của Heron trên #7590, quyết định 23:22 của người xây dựng đầu tiên):
   - `net` không bao giờ được cấp cùng một quyền riêng tư: quyền đọc hay ghi

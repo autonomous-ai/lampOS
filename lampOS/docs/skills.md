@@ -4323,28 +4323,21 @@ gone ([switches.md](switches.md)). What happens:
      here in chat: a made skill goes on at once, and whether it worked or
      not the lamp just says so, with no confirming; `on` only, off unless
      set; on in the product's `lamp-voice` (the make flow's switch-on, the first builder's DEFAULT-ON, 19 Nov 21:42 on #7814); in `lamp-voice` passed to both routes, read
-     only with `LAMP_MADE_SCRIPTS=on`, `made_skill::code_on_at_once`). The
-     first builder's ruling on #6059 (19:14, and the first builder's 19:44 line: "sound"
-     is the lamp's own sounds and voice) draws the line
-     (`made_skill::code_goes_on_at_once`): code whose grants are only its
-     light, its voice and sounds or its head and arm
-     (`made_skill::CODE_AT_ONCE_GRANTS`: `light`, `speak`, `body`; a timer
-     is a trigger and needs no grant) goes on at once; code with any other
-     grant, above all the camera, the microphone and `sound`, which is
-     hearing kinds of sound, not playing them
-     (`made_skill::CODE_YES_GRANTS`), code that knows who is at the lamp
-     (`who`, `known_faces`: identity is the camera's privacy, the first
-     builder at 20:16; lamp-control has no grant for it), or any send (a write, messages to the
-     phone) keeps its spoken yes exactly as with the switch off. Such a
-     make, by voice or from the app's MAKE IT
-     (`app_make::put_on_line`), goes on as it is made, through the yes's
-     own path (`make_skill_local::code_on_at_once`, then `code_on_here`
-     and `code_approve`): exactly that package by its SHA-256
-     (`made_skill::put_on_agreed`, the manage helper's same pack checks
-     and cap), then, with `LAMP_SKILL_TASKS=on`, its task's yes recorded
-     by lamp-control (`task_yes_record`) for its folder as it went on and
-     the grants said, as a spoken yes records it, so its first run asks
-     nothing. It is said as made and on, what it does and what its code
+     only with `LAMP_MADE_SCRIPTS=on`, `made_skill::code_on_at_once`). A
+     made skill's code goes on at once whatever it declares (#8180, the
+     dev's ruling, `made_skill::code_goes_on_at_once`): the camera, the
+     microphone, `net`, hearing (`sound`), who is at the lamp and sends
+     among them; only a task for the lamp's agent (`uses.agent_task`)
+     still waits for its spoken yes. Such a make, by voice or from the
+     app's MAKE IT (`app_make::put_on_line`), goes on as it is made:
+     exactly that package by its SHA-256 (`make_skill_local::code_on_at_once`,
+     `made_skill::put_on_agreed`, the manage helper's same pack checks and
+     cap). No yes is recorded at the keep: a made skill's source needs
+     none (`made_skill::grants_need_no_yes`, true for `SkillSource::Made`
+     only today, of `lamp_skills::source_of`), so lamp-control mints its
+     run step's and task's tokens from its folder's declared grants and
+     agrees its task check, `net` among them (docs/tasks.md), and its
+     first run asks nothing. Store and pushed skills keep their yes. It is said as made and on, what it does and what its code
      may use, the code itself never read out ("I made photo booth, and
      it's on: … The lamp's model wrote its code, and that code may use
      its light."; `made_skill::code_said` without `RUNS_AFTER_YES`); a
@@ -4361,11 +4354,9 @@ gone ([switches.md](switches.md)). What happens:
      `with_the_switch_a_voice_code_make_goes_on_at_once_and_its_first_run_asks_nothing`,
      `with_the_switch_a_code_make_not_made_or_not_on_says_so_plainly`,
      `with_the_switch_a_send_still_waits_for_its_yes`,
-     `with_the_switch_a_voice_code_make_with_the_camera_still_waits_for_its_yes`,
-     `with_the_switch_a_voice_code_make_knowing_who_is_there_still_waits_for_its_yes`,
-     `the_grants_that_go_on_at_once_never_hold_the_camera_or_the_microphone`,
+     `with_the_switch_a_code_make_with_the_camera_mic_or_who_goes_on_at_once`,
+     `with_the_switch_every_grant_goes_on_at_once`,
      `app_make::tests::with_the_switch_an_app_make_with_code_goes_on_at_once`,
-     `app_make::tests::with_the_switch_an_app_make_with_the_camera_still_waits_for_its_yes`,
      and, off, `a_made_skill_with_code_waits_for_a_later_yes_and_goes_on_by_its_sha256`.
    - **What runs it** is #6305's `do.task`: `lamp-skills` loads a
      `made: here` skill's task only with `LAMP_MADE_SCRIPTS=on`, and only
@@ -7240,14 +7231,14 @@ the same code for both writers.
     left to `ready_untold` in the app's list and to "Is my skill ready?",
     the skill off. The worker acts on that turn's note
     (`long_make::told_here`): one line, "Your <name> skill is ready and on.
-    Say 'remove it' to undo." (`long_make::ready_on_line`), no yes asked
+    Say 'remove it' to undo." (`long_make::ready_on_line`), or, for a
+    skill whose try passed, the try's line (`made_skill::tried_line`, below), no yes asked
     (the first builder, 18 Nov 18:41), with the link ask for a service it reads that isn't linked yet,
     as a finished make's line has it. One with code while the lamp runs no
     skill's code (`LAMP_MADE_SCRIPTS` off) is said ready and off, why
     plainly, never on. One with code that keeps its yes as a finished
-    make's does (`made_skill::code_goes_on_at_once` false: it sends, or the
-    camera, the microphone or hearing, or `LAMP_MADE_CODE_ON_AT_ONCE` off)
-    (so every skill with code in the product, where that switch is off) is
+    make's does (`made_skill::code_goes_on_at_once` false: a task for the
+    lamp's agent, or `LAMP_MADE_CODE_ON_AT_ONCE` off) is
     said ready and read back as an app make's is
     (`make_skill_local::app_code_asked`): "Your <name> skill is ready." and
     `made_skill::on_line`, word for word, with what its code may use, its
@@ -7313,9 +7304,7 @@ the same code for both writers.
   `a_long_make_with_code_is_said_on_in_one_line_with_no_yes_and_never_on_while_off`,
   `a_long_make_not_put_on_once_heard_is_told_why`,
   `a_long_make_on_already_is_told_with_nothing_asked_again`,
-  `a_long_make_that_sends_is_told_ready_and_stays_off_with_no_yes_recorded`,
   `a_not_on_mark_for_a_skill_removed_in_the_app_goes_quietly`,
-  `a_second_code_make_waits_for_the_firsts_yes_before_it_is_told`,
   `a_long_make_is_not_told_over_a_quick_makes_awaited_yes`,
   `a_long_make_is_not_told_over_an_open_clash_ask` and
   `long_make`'s own;
@@ -7605,7 +7594,16 @@ forces one), a skill it makes is made whole, with everything a run needs:
   go back to the agent as one of its repairs (at most two), then the make
   is told failed and nothing is kept. A passed try adds
   `made_skill::TRIED_SAID` ("I tried it once and it worked.") to its
-  read-back; the person's yes is asked as before. A try that can't be made
+  read-back, and once it is on it is said in one line with what its try
+  said first (#8180, `made_skill::tried_line`, from make_try's
+  `said_first`): "Made it, and I tried it: <what it said>. Say 'remove
+  it' to undo." (the words on one line, at most 120 characters, a
+  trailing `.`, `!` or `?` trimmed), or "Made <name>, and I tried it.
+  Say 'remove it' to undo." when it said nothing usable; in
+  `make_no_asks::made_line`, the long make's ready-and-on line
+  (`long_make`) and `make_skill_local::code_on_line`, and journaled
+  ("lamp-voice: a made skill is said on with its try: …"). A skill with
+  nothing tried keeps its line. A try that can't be made
   at all (lamp-tasks busy, no token, its fence, an older lamp-tasks that
   doesn't know `make_try`, no answer) fails closed (#8180): it is
   journaled with why, nothing is kept, and the person hears
