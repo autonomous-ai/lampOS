@@ -128,6 +128,57 @@ fn panes_fresh(read_at: u64, now_ms: u64) -> bool {
     read_at != 0 && (now_ms + 1).saturating_sub(read_at) <= 2 * PANES_EVERY.as_millis() as u64
 }
 
+/// The most a launch on OpenClaw is held in the queue for a Gateway that
+/// isn't answering, while lamp-update may have stopped it (#8105): about
+/// twice the slowest of three cold starts on lamp-e82d (RPCs at 220-241 s,
+/// the first builder's 14:49).
+pub const COLD_WITHIN: Duration = Duration::from_secs(480);
+
+/// Between two looks at the port while a launch is held for it.
+const COLD_EVERY: Duration = Duration::from_secs(1);
+
+/// Whether lamp-update is asking (within two of [`PANES_EVERY`] of its last
+/// ask): it asks only with `LAMP_OPENCLAW_GATEWAY_BY_DEFAULT` on, so a
+/// launch is held for a cold Gateway only then, and off is as before.
+pub fn update_asking() -> bool {
+    let asked = UPDATE_ASKED_AT_MS.load(std::sync::atomic::Ordering::Acquire);
+    asked != 0 && (mono_ms() + 1).saturating_sub(asked) <= 2 * PANES_EVERY.as_millis() as u64
+}
+
+/// The port's last answer for a held launch, looked at most every
+/// [`COLD_EVERY`] by a thread of its own, so the store's loop never waits on
+/// a connection: `true` once it answered.
+static COLD_ANSWERS: AtomicBool = AtomicBool::new(false);
+/// Until when (as [`WANTED_AT_MS`]) the port is looked at for a held launch.
+static COLD_LOOK_UNTIL_MS: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+
+/// Whether the Gateway answered at the last look for a held launch, and
+/// asks for looks for a few more seconds: the first ask starts the looking
+/// thread, which looks at once.
+pub fn cold_answers() -> bool {
+    static LOOKER: std::sync::OnceLock<()> = std::sync::OnceLock::new();
+    COLD_LOOK_UNTIL_MS.store(
+        mono_ms() + 1 + 5 * COLD_EVERY.as_millis() as u64,
+        std::sync::atomic::Ordering::Release,
+    );
+    LOOKER.get_or_init(|| {
+        let _ = thread::Builder::new()
+            .name("tasks-gateway-look".into())
+            .spawn(|| {
+                loop {
+                    let until = COLD_LOOK_UNTIL_MS.load(std::sync::atomic::Ordering::Acquire);
+                    if mono_ms() < until {
+                        COLD_ANSWERS.store(answers(PORT), std::sync::atomic::Ordering::Release);
+                    } else {
+                        COLD_ANSWERS.store(false, std::sync::atomic::Ordering::Release);
+                    }
+                    thread::sleep(COLD_EVERY);
+                }
+            });
+    });
+    COLD_ANSWERS.load(std::sync::atomic::Ordering::Acquire)
+}
+
 /// lamp-update asked whether OpenClaw is in use (`Route::UpdateRead`).
 pub fn update_asked() {
     UPDATE_ASKED_AT_MS.store(mono_ms() + 1, std::sync::atomic::Ordering::Release);
