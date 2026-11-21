@@ -5615,6 +5615,32 @@ pub const DANCE_JAZZ_WHOLE: Clip = Clip {
 /// Every clip there is.
 pub const ALL: [&Clip; 21] = [&NOD, &HEADSHAKE, &GREETING, &LAUGH, &SHY, &STRETCHING, &IDLE, &ACKNOWLEDGE, &CURIOUS, &HAPPY, &CARING, &SURPRISED, &CONFUSED, &SLEEPY, &EXCITED, &SCANNING, &DANCE_CHILL, &DANCE_GROOVE, &DANCE_HYPE, &DANCE_WALTZ, &DANCE_JAZZ];
 
+/// V1's swing of each clip's joints, peak to peak, counts, over all of its recording as V1 played it,
+/// before any gain or roll moved: the most level 5 swings it (#8153, `energy::livelier`).
+pub const V1_SWING: [(&str, [u16; 5]); 21] = [
+    ("nod", [276, 2, 1, 359, 531]),
+    ("headshake", [168, 768, 471, 44, 13]),
+    ("greeting", [306, 82, 24, 628, 666]),
+    ("laugh", [418, 7, 0, 278, 75]),
+    ("shy", [185, 55, 143, 192, 463]),
+    ("stretching", [248, 2, 0, 657, 753]),
+    ("idle", [105, 210, 19, 174, 151]),
+    ("acknowledge", [349, 0, 343, 829, 1167]),
+    ("curious", [492, 980, 800, 449, 660]),
+    ("happy", [314, 0, 697, 228, 627]),
+    ("caring", [385, 10, 4, 484, 699]),
+    ("surprised", [425, 11, 3, 861, 685]),
+    ("confused", [165, 726, 0, 635, 793]),
+    ("sleepy", [144, 17, 5, 191, 425]),
+    ("excited", [154, 2, 1, 337, 676]),
+    ("scanning", [422, 1099, 660, 632, 339]),
+    ("dance_chill", [191, 162, 394, 218, 645]),
+    ("dance_groove", [272, 52, 99, 300, 469]),
+    ("dance_hype", [310, 175, 454, 218, 401]),
+    ("dance_waltz", [56, 138, 412, 50, 226]),
+    ("dance_jazz", [165, 641, 0, 314, 525]),
+];
+
 /// Each clip cut from its recording, with all of the recording and where the cut lies in it (#8153).
 pub const WHOLE: [Whole; 13] = [
     Whole { cut: &ACKNOWLEDGE, whole: &ACKNOWLEDGE_WHOLE, from: 27, to: 59 },

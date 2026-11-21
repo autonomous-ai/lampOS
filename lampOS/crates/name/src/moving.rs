@@ -28,8 +28,9 @@ use std::time::{Duration, Instant};
 pub const TAIL: Duration = Duration::from_millis(800);
 /// The longest a gesture is taken to play without its end heard: the
 /// longest clip at any energy level (`lamp_body::energy::longest_us`,
-/// `scanning` at about 11.3 s, #8153) and more.
-pub const LONGEST: Duration = Duration::from_secs(15);
+/// `dance_hype` at about 16 s, all of its recording at its own step, #8153)
+/// and more.
+pub const LONGEST: Duration = Duration::from_secs(17);
 /// `LAMP_NAME_MOVING_LEAST=on`'s bar.
 pub const DEFAULT_MOVING_LEAST: f32 = 0.99;
 /// What lamp-body plays of its own at rest, and says on `body/gesture` as it

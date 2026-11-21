@@ -1477,6 +1477,21 @@ the voice, Expression and lamp-skills (each with `energy_in::EnergyIn`, the body
   the anti-tip check at play time see the clip as played. Level 1, a move from a file, a shift at
   rest and the call's glance are played as they are, so level 1 is today exactly.
 
+  Level 5 is almost V1 and never past it (the lead, 21 Nov): no joint swings, peak to peak over
+  all a level plays, past V1's own swing of it over all of its recording (`clips::V1_SWING`, which
+  the generator writes from `hal/recordings`), and no safety bound is loosened for it. Each
+  joint's gain is the least of the level's size; what takes the farthest frame of the stretch V2
+  cut, as that level plays it, to the reach (the rest of a longer recording held at the reach);
+  what swings the joint as far as V1 did (never under x1: a joint the generator's own gains already
+  took past V1 keeps level 1's size, grown no further: excited's and dance_jazz's head pitch,
+  confused's, dance_waltz's elbow, and the base yaw that confused and dance_jazz carry for V1's
+  head roll); and the base's hold below. A level takes no more than any level above it would, so
+  over the stretch V2 cut no joint swings less at a level than at the one under it
+  (`energy::tests::level_five_swings_no_joint_past_v1`,
+  `the_swing_over_the_cut_never_drops_below_the_level_under_it`). At level 5 V1's swing holds
+  sleepy on every joint, happy's head and shoulder, excited's shoulder, dance_chill's base, and
+  dance_hype's and dance_waltz's shoulder.
+
   | level | clip size x | clip pace x |
   |---|---|---|
   | 1 | 1.0 | 1.0 |
@@ -1485,18 +1500,21 @@ the voice, Expression and lamp-skills (each with `energy_in::EnergyIn`, the body
   | 4 | 1.45 | 1.375 |
   | 5 | 1.6 | 1.5 |
 
-  Five clips are held under that size, each at the largest gain (to 0.01) that keeps it inside V1's
+  Three clips are held under that size, each at the largest gain (to 0.01) that keeps it inside V1's
   anti-tip rule on the deployed lamps' stand with a margin: no frame past 21.5 mm off the axis,
   half a millimetre under the 22 mm at which a clip is refused at play time, because a mood's lean
   at play time (listening, speaking) adds to the stand pose the host check uses; and none leaning
   the lamp back past 16 mm (`energy::CLIP_SIZE_CAP`,
   `cog::every_built_in_clip_at_every_level_passes_v1s_rule`; no bound moved): greeting 1.54,
-  surprised 1.27, sleepy 1.44, excited 1.27 and dance_groove 1.59 (its lean back). On the host at
-  level 5 the clips' worst frame is 3.3 to 21.46 mm off the axis (greeting 21.46, surprised and
-  sleepy 21.42, excited 21.33; level 1: 3.1 to 17.99), so seven clips come within 85% of 22 mm and
-  are said in the journal as V1 said them (`tipping.close`), and the farthest back is 15.93 mm
-  (dance_groove). The fastest joint of 13 of the 21 clips reaches the servo's 1,000 counts a second
-  (level 1: headshake alone), and 14 clips take 0.68 to 0.75 of their level-1 time.
+  surprised 1.27 and dance_groove 1.59 (its lean back), found on the clips as cut; sleepy (1.44)
+  and excited (1.27) were held too until V1's swing held them under it. On the host at level 5,
+  at the length played ("Clip length" below), the clips' worst frame is 3.9 to 21.46 mm off the
+  axis (greeting 21.46, scanning 21.40, excited 20.13; level 1: 3.1 to 17.99), so seven clips
+  come within 85% of 22 mm and are said in the journal as V1 said them (`tipping.close`), and the
+  farthest back is 13.40 mm (laugh). The fastest joint of 13 of the 21 clips as cut reaches the
+  servo's 1,000 counts a second (#8183's count; level 1: headshake alone). The eight clips not cut
+  from a longer recording take 0.68 to 0.76 of their level-1 time (headshake 1.02, below); the
+  others are lengthened ("Clip length" below).
 
   The base (base yaw) carries the lamp's weight, so a level never asks it to change speed from one
   step to the next harder than level 1 already asks of it in some clip: `energy::BASE_BEND`, 7,690
@@ -1504,36 +1522,36 @@ the voice, Expression and lamp-skills (each with `energy_in::EnergyIn`, the body
   x1.5 asked the base for about 11,200 and the base rang for half a second (row-8155b, 21 Nov).
   `energy::sized` first plays such a clip at a slower step, never slower than its own, and where even
   its own pace would ask more, keeps the base at the clip's own size while the head and arm still
-  grow (headshake, dance_chill). At level 5, 13 clips play at the full x1.5 step; dance_waltz at a
-  slower one still takes 0.72 of its level-1 time, curious, dance_jazz, scanning, confused,
-  dance_chill and dance_hype 0.8 to 0.99, and headshake 1.02 (its own step, the larger head
-  stretched under the servo's speed). The bend is measured as the clip is played, each step at its
+  grow (headshake, dance_chill). At level 5, 15 clips play at the full x1.5 step; headshake,
+  acknowledge, curious, dance_chill, dance_hype and dance_waltz at a slower one, headshake and
+  dance_hype at their own (headshake 1.02 of its level-1 time, the larger head stretched under the
+  servo's speed; dance_hype all of its recording, 15.97 s). The bend is measured as the clip is played, each step at its
   own time once the servo's speed has stretched it, so a step stretched next to one that is not
   counts as it is (`energy::tests::no_level_bends_the_base_harder_than_level_one_does`, the slowed
   list in `level_five_plays_clips_bigger_and_quicker_never_past_the_reach_or_the_servo`).
 
-  Level 5 against V1 (#6893's bar), peak to peak in counts over the window V2 kept of V1's
-  `excited.csv` and `happy_wiggle.csv` (`energy::tests::level_five_sizes_excited_and_happy_against_v1`,
-  within 25% of V1 or a known gap):
+  Level 5 against V1 (#6893's bar), peak to peak in counts over all of V1's `excited.csv` and
+  `happy_wiggle.csv`, which level 5 plays (`energy::tests::level_five_sizes_excited_and_happy_against_v1`:
+  none past V1 but where level 1's own gain is, none under 0.75 of V1 but a known gap):
 
   | clip | joint | V1 | level 5 | share | held by |
   |---|---|---|---|---|---|
-  | excited | head pitch | 146 | 133 | 0.91 | |
-  | excited | shoulder | 299 | 361 | 1.21 | |
-  | excited | elbow | 502 | 326 | 0.65 | the tip cap, x1.27 |
-  | happy | head pitch | 268 | 220 | 0.82 | |
-  | happy | base yaw | 697 | 240 | 0.34 | x1.6 of a base cut to 0.22 of V1 |
-  | happy | shoulder | 178 | 274 | 1.54 | over V1: x1.6 of 0.96 of V1 |
-  | happy | elbow | 516 | 360 | 0.70 | the reach |
+  | excited | head pitch | 154 | 207 | 1.34 | over V1: level 1's own gain, 1.35 of V1, not grown |
+  | excited | shoulder | 337 | 337 | 1.00 | V1 |
+  | excited | elbow | 676 | 450 | 0.67 | the reach, 360 |
+  | happy | head pitch | 314 | 314 | 1.00 | V1 |
+  | happy | base yaw | 697 | 246 | 0.35 | x1.6 of a base cut to 0.22 of V1 |
+  | happy | shoulder | 228 | 228 | 1.00 | V1 |
+  | happy | elbow | 627 | 488 | 0.78 | |
 
   **Where V1 stays out of reach, and why.** V1 played its recordings at their recorded speed with
   no servo ceiling: its emotion clips peak at a median of about 2,000 counts a second (excited's
   elbow 1,579 in the stretch kept, 1,923 over the whole clip). Level 5 stops at the servo's 1,000,
   the speed the servos are written to follow (`Tuning::SERVO_SPEED_CAP`), so V1's fastest flicks
   come out slower and longer. Its size stops at the gesture's reach: happy's base yaw swung 697
-  counts in V1 and swings 240 at level 5, about a third, because the reach holds yaw to 250 either
-  way of the pose. Excited and surprised stop at 1.27 because V1's own tip rule (`cog`, 22 mm, kept
-  0.5 mm clear) leaves them no room at 1.6. Closing any of these needs a servo, reach or tip bound
+  counts in V1 and swings 246 at level 5, about a third, because the reach holds yaw to 250 either
+  way of the pose. Surprised stops at 1.27 because V1's own tip rule (`cog`, 22 mm, kept 0.5 mm
+  clear) leaves it no room at 1.6. Closing any of these needs a servo, reach or tip bound
   raised, which #8153 does not do.
 - **Clip length (#8153).** Thirteen built-in clips are a stretch V2 cut from a V1 recording (2 to
   9 s, "Gestures" below); the generator also writes all of each recording at the cut's size and
@@ -1548,28 +1566,29 @@ the voice, Expression and lamp-skills (each with `energy_in::EnergyIn`, the body
   `cog::level_five_keeps_as_much_of_each_recording_as_v1s_rule_allows`), and every frame of every
   clip at levels 2 to 5 is checked against both
   (`cog::every_built_in_clip_at_every_level_passes_v1s_rule`; at level 5 the worst is 21.46 mm off
-  the axis, greeting, and 14.75 mm back, dance_hype). The other eight clips are already all of
+  the axis, greeting, and 13.40 mm back, laugh). The other eight clips are already all of
   their recording. Level 1 plays the clip itself. Level 5 on the host
   (`energy::level_five_plays_each_clip_for_all_of_its_v1_recording`; played seconds at the 1.5
   pace, each step stretched under the servo's speed):
 
   | clip | level 1, s | V1, s (rows) | level 5, s (rows) | trimmed by |
   |---|---|---|---|---|
-  | acknowledge | 1.95 | 5.00 (101) | 4.18 (101) | none |
-  | curious | 3.00 | 9.95 (200) | 6.80 (200) | none |
-  | happy | 4.00 | 12.95 (260) | 8.81 (260) | none |
+  | acknowledge | 1.95 | 5.00 (101) | 4.37 (101) | none |
+  | curious | 3.00 | 9.95 (200) | 8.36 (200) | none |
+  | happy | 4.00 | 12.95 (260) | 8.94 (260) | none |
   | caring | 5.00 | 9.95 (200) | 5.62 (166) | rows 0 to 165: the tip rule |
-  | surprised | 2.00 | 5.95 (120) | 4.10 (120) | none |
-  | confused | 3.00 | 7.95 (160) | 5.45 (160) | none |
-  | excited | 4.00 | 11.95 (240) | 3.06 (84) | rows 16 to 99: the lean back; one bounce at 5, the clip's two below it |
+  | surprised | 2.00 | 5.95 (120) | 4.16 (120) | none |
+  | confused | 3.00 | 7.95 (160) | 5.41 (160) | none |
+  | excited | 4.00 | 11.95 (240) | 8.53 (240) | none; the clip's bounce twice below level 5 |
   | scanning | 9.00 | 17.95 (360) | 11.25 (332) | rows 28 to 359: the tip rule |
-  | dance_chill | 9.00 | 10.00 (201) | 6.80 (201) | none |
+  | dance_chill | 9.00 | 10.00 (201) | 8.00 (201) | none |
   | dance_groove | 8.00 | 15.95 (320) | 10.88 (320) | none |
-  | dance_hype | 7.00 | 15.95 (320) | 11.20 (320) | none |
-  | dance_waltz | 9.54 | 10.00 (201) | 7.26 (201) | none |
+  | dance_hype | 7.00 | 15.95 (320) | 15.97 (320) | none; at its own step, the base held |
+  | dance_waltz | 9.54 | 10.00 (201) | 8.40 (201) | none |
   | dance_jazz | 9.00 | 11.95 (240) | 8.13 (240) | none |
 
-  The time is under V1's by level 5's 1.5 pace; the moves are all of V1's. A skill waits for a
+  The time is under V1's by level 5's 1.5 pace, or less where the base holds the step (dance_hype at
+  its own); the moves are all of V1's, no joint past V1's swing. A skill waits for a
   gesture's end as long as the longest level plays it (`energy::longest_us`). A longer clip holds
   a new energy level and the next gesture (a fill, a matched cue) until it ends, as any gesture.
 - **Pause nod.** Expression's pause clip waits `pause_cooldown_us`: the catalogue's cooldown at level 1,

@@ -133,7 +133,7 @@ def emit(const, name, step_ms, off, doc):
     out.append('};')
     out.append('')
 
-names, wholes = [], []
+names, wholes, swings = [], [], []
 for name, (rec, scale, seconds) in list(KEPT.items()) + list(NEW.items()):
     if name in REWORKED:
         rec, seconds = REWORKED[name][0], REWORKED[name][1]
@@ -155,6 +155,9 @@ for name, (rec, scale, seconds) in list(KEPT.items()) + list(NEW.items()):
     hi = [round(max(o[i] for o in off)) for i in range(5)]
     const = name.upper()
     names.append(const)
+    # V1's swing of each joint, peak to peak, over all of its recording as V1 played it, before any gain or roll
+    # moved: the most level 5 may swing it (#8153, the lead: level 5 is almost V1, `energy::livelier`).
+    swings.append((name, [round(max(f[i] for f in frames_all) - min(f[i] for f in frames_all)) for i in range(5)]))
     cut = f', {t[0] - float(load(rec)[1][0]):.2f} s to {t[-1] - float(load(rec)[1][0]):.2f} s of it' if seconds else ''
     size = f'gains {gains} by joint' if name in REWORKED else f'{scale:.2f} of its size'
     emit(const, name, step_ms, off, [f'/// `{rec}.csv` (sha256 {digest[:16]}){cut}, {size}, {n} frames {step_ms} ms apart:',
@@ -175,6 +178,13 @@ for name, (rec, scale, seconds) in list(KEPT.items()) + list(NEW.items()):
         print(f'{"":12} whole {len(whole)} frames, the cut {a} to {b - 1}  lo {wlo} hi {whi}', file=sys.stderr)
 out.append('/// Every clip there is.')
 out.append('pub const ALL: [&Clip; ' + str(len(names)) + '] = [' + ', '.join('&' + c for c in names) + '];')
+out.append('')
+out.append("/// V1's swing of each clip's joints, peak to peak, counts, over all of its recording as V1 played it,")
+out.append('/// before any gain or roll moved: the most level 5 swings it (#8153, `energy::livelier`).')
+out.append('pub const V1_SWING: [(&str, [u16; 5]); ' + str(len(swings)) + '] = [')
+for name, swing in swings:
+    out.append(f'    ("{name}", [' + ', '.join(str(v) for v in swing) + ']),')
+out.append('];')
 out.append('')
 out.append('/// Each clip cut from its recording, with all of the recording and where the cut lies in it (#8153).')
 out.append('pub const WHOLE: [Whole; ' + str(len(wholes)) + '] = [')
