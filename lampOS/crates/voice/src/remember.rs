@@ -3114,6 +3114,10 @@ const ABOUT_BYTES: usize = 16_384;
 const KEPT_TEXT_BYTES: usize = 300;
 /// A listing's answer, JSON around its texts: well over [`ABOUT_BYTES`].
 const ABOUT_ANSWER_BYTES: usize = 48 * 1024;
+/// The most pages of a person's app facts (#7415, `kept {app_facts}`) one
+/// forget about a thing reads: each holds [`ABOUT_BYTES`] less the longest
+/// kept fact, so 24 hold 200 of the longest, one app's most, past it.
+const APP_FACT_PAGES: usize = 24;
 
 /// Only the exact value `on`, with the Days client: a session opened for
 /// someone known may be told one open thread of theirs to ask about, once
@@ -6030,6 +6034,24 @@ pub fn one_kept_of(
     want: &ForgetWant,
 ) -> Result<(u64, String), ForgetNotAsked> {
     one_kept_among(entries, None, want)
+}
+
+/// Whether `text` has every word of one of `subjects`, each the same word or
+/// its plural ([`about_same`]), as a forget about matches; each subject it
+/// has is marked in `found`.
+fn about_hits(text: &str, subjects: &[Vec<String>], found: &mut [bool]) -> bool {
+    let has = kept_words(text);
+    let mut hit = false;
+    for (subject, words) in subjects.iter().enumerate() {
+        if words
+            .iter()
+            .all(|word| has.iter().any(|kept| about_same(word, kept)))
+        {
+            found[subject] = true;
+            hit = true;
+        }
+    }
+    hit
 }
 
 /// Whether `text`, a kept thing's or an observation's, is one `want` names
@@ -11582,7 +11604,7 @@ impl DaysClient {
                                 .checked_duration_since(Instant::now())
                                 .filter(|left| !left.is_zero())
                         };
-                        match self.about_matching(person, &[], left, lease) {
+                        match self.about_matching(person, &[], left, lease, false) {
                             Listed::Gone => return (gone(), false),
                             Listed::Refused => return older_memory_refused(),
                             Listed::Cut | Listed::Whole(..) => {}
@@ -12614,7 +12636,8 @@ impl DaysClient {
         let too_much = || (json!({"forgotten": false, "note": ABOUT_TOO_MUCH}), true);
         let refused = older_memory_refused;
         let mut scope = person;
-        let (mut matching, mut missed) = match self.about_matching(scope, &words, left, lease) {
+        let (mut matching, mut missed) = match self.about_matching(scope, &words, left, lease, true)
+        {
             Listed::Gone => return (gone(), false),
             Listed::Cut => return too_much(),
             Listed::Refused => return refused(),
@@ -12626,7 +12649,7 @@ impl DaysClient {
         let before = matching.is_empty() && person.is_some() && !named;
         if before {
             scope = None;
-            (matching, missed) = match self.about_matching(None, &words, left, lease) {
+            (matching, missed) = match self.about_matching(None, &words, left, lease, true) {
                 Listed::Gone => return (gone(), false),
                 Listed::Cut => return too_much(),
                 Listed::Refused => return refused(),
@@ -12786,13 +12809,16 @@ impl DaysClient {
     }
 
     /// The ids of `scope`'s kept things and observations that have every
-    /// one of `words`, from the store's whole listing of them (#3113).
+    /// one of `words`, from the store's whole listing of them (#3113); with
+    /// `app_facts`, a known person's own app facts too (#7415,
+    /// [`Self::app_facts_matching`]).
     fn about_matching(
         &self,
         scope: Option<&str>,
         subjects: &[Vec<String>],
         left: impl Fn() -> Option<Duration>,
         lease: Option<&crate::memory_scope::ScopeLease>,
+        app_facts: bool,
     ) -> Listed {
         // What was noticed of them too (#3113): "my favourite colour" kept
         // without being asked is found by its name.
@@ -12827,20 +12853,7 @@ impl DaysClient {
                 return Listed::Gone;
             };
             listed = listed.saturating_add(text.len());
-            // Every word of one subject, each the same word or its plural
-            // ([`about_same`]); any of the subjects.
-            let has = kept_words(text);
-            let mut hit = false;
-            for (subject, words) in subjects.iter().enumerate() {
-                if words
-                    .iter()
-                    .all(|word| has.iter().any(|kept| about_same(word, kept)))
-                {
-                    found[subject] = true;
-                    hit = true;
-                }
-            }
-            if hit {
+            if about_hits(text, subjects, &mut found) {
                 matching.push(id);
             }
         }
@@ -12850,8 +12863,77 @@ impl DaysClient {
         if listed.saturating_add(KEPT_TEXT_BYTES) > ABOUT_BYTES {
             return Listed::Cut;
         }
+        // The person's own app facts, which the listing above (the hits
+        // note's) never has: "forget what the gym app said" takes one. Only
+        // a known person's own scope holds any (the writer's `whose`), so
+        // never the room's. Not past [`ABOUT_MOST`] matches of their own:
+        // that forget asks which, whatever the app facts.
+        if app_facts
+            && matching.len() <= ABOUT_MOST
+            && let Some(person) = scope.filter(|scope| lamp_msgs::known::is_person_id(scope))
+            && let Err(listed) =
+                self.app_facts_matching(person, subjects, &left, lease, &mut matching, &mut found)
+        {
+            return listed;
+        }
         let missed = (0..subjects.len()).filter(|index| !found[*index]).collect();
         Listed::Whole(matching, missed)
+    }
+
+    /// `person`'s own app facts (#7415) that are about one of `subjects`,
+    /// added to `matching` (and `found`), from memory's `kept {app_facts}`
+    /// listing, page by page below the oldest id listed, until a page with
+    /// room for the longest fact left, at most [`APP_FACT_PAGES`]. Never
+    /// listed for the hits note or anywhere else. An older memory refuses
+    /// the field (`bad_request`) and holds no app facts: nothing is added.
+    fn app_facts_matching(
+        &self,
+        person: &str,
+        subjects: &[Vec<String>],
+        left: &impl Fn() -> Option<Duration>,
+        lease: Option<&crate::memory_scope::ScopeLease>,
+        matching: &mut Vec<u64>,
+        found: &mut [bool],
+    ) -> Result<(), Listed> {
+        let mut before: Option<u64> = None;
+        for _ in 0..APP_FACT_PAGES {
+            let mut list = for_person(
+                json!({"op":"kept","max_bytes":ABOUT_BYTES,"app_facts":true}),
+                Some(person),
+            );
+            if let Some(before) = before {
+                list["before_id"] = json!(before);
+            }
+            let Some(answer) = left().and_then(|left| {
+                exchange_within(&self.socket, &list, left, lease, ABOUT_ANSWER_BYTES)
+            }) else {
+                return Err(Listed::Gone);
+            };
+            if before.is_none() && answer["ok"] == false && answer["error"] == "bad_request" {
+                eprintln!(
+                    "lamp-voice provider: an older memory lists no app facts; a forget about looks in the rest"
+                );
+                return Ok(());
+            }
+            let entries = kept_entries(&answer).map_err(|_| Listed::Gone)?;
+            let mut listed = 0usize;
+            let mut oldest = None;
+            for (id, text) in &entries {
+                listed = listed.saturating_add(text.len());
+                oldest = Some(oldest.map_or(*id, |oldest: u64| oldest.min(*id)));
+                if about_hits(text, subjects, found) && !matching.contains(id) {
+                    matching.push(*id);
+                }
+            }
+            // Whole: the store stops only at a fact that does not fit.
+            let Some(oldest) = oldest
+                .filter(|_| listed.saturating_add(lamp_msgs::app_fact::KEPT_BYTES) > ABOUT_BYTES)
+            else {
+                return Ok(());
+            };
+            before = Some(oldest);
+        }
+        Err(Listed::Cut)
     }
 
     /// A recall or search: the room's alone, or for someone known theirs
@@ -21390,6 +21472,102 @@ mod tests {
         let _ = std::fs::remove_file(&socket);
     }
 
+    /// Friday's P2 on #8228: a spoken forget by words reaches the owner's
+    /// app fact (#7415), which the hits note's `kept` listing never has, in
+    /// the real memory: a known guest's forget about the same words and the
+    /// owner's forget about something else leave it; the owner's "forget
+    /// what the gym coach said" takes it, and recall no longer finds it.
+    #[test]
+    fn a_forget_about_by_words_takes_the_owners_app_fact() {
+        use lamp_memory::{
+            Server,
+            days::Days,
+            store::{LocalTime as StoreTime, Options, Person},
+        };
+        const OWNER: &str = "p-0123456789abcdef";
+        const GUEST: &str = "p-fedcba9876543210";
+        let root = std::env::temp_dir().join(format!(
+            "lamp-remember-app-fact-forget-{}",
+            std::process::id()
+        ));
+        let _ = std::fs::remove_dir_all(&root);
+        std::fs::create_dir_all(&root).unwrap();
+        let mut days = Days::open(
+            Options {
+                dir: root.join("store"),
+                keep_days: 30,
+                local: StoreTime::Offset(420),
+            },
+            NOW,
+        )
+        .unwrap();
+        for (person, n) in [(OWNER, 1), (GUEST, 2)] {
+            let said = lamp_memory::days_protocol::answer(
+                &mut days,
+                json!({"op":"append","person":person,"at_unix_ms":NOW - 60_000 + n,"heard":"hello","said":"Hi"})
+                    .to_string()
+                    .as_bytes(),
+                NOW,
+            );
+            assert!(said.line.contains("\"ok\":true"), "{}", said.line);
+        }
+        let fact = days
+            .remember_app_fact(
+                &Person::new(OWNER).unwrap(),
+                "app:gym-coach",
+                "Gym Coach",
+                NOW - 1_000,
+                "squats 3x10 with zorblax tempo",
+            )
+            .unwrap();
+        let socket = root.join("m.sock");
+        let server = Server::bind(&socket).unwrap();
+        let stop = server.stopper();
+        let worker = std::thread::spawn(move || {
+            server.run(&mut days, &mut || NOW, &mut |_| {}).unwrap();
+        });
+        let ask = |line: Value| {
+            bounded_exchange(&socket, &line, Duration::from_secs(2)).expect("the memory answers")
+        };
+        let listed = || {
+            ask(json!({"op":"kept","person":OWNER,"app_facts":true}))["entries"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .map(|entry| entry["id"].as_u64().unwrap())
+                .collect::<Vec<_>>()
+        };
+        assert_eq!(listed(), [fact]);
+        let forget = |about: &str, person: &str| {
+            let client = DaysClient::new(socket.clone()).unwrap();
+            client.forget_about.store(true, Ordering::Release);
+            let (told, answered) = client.run_at(
+                &call(FORGET, json!({"about": about})),
+                FIRST_READ,
+                NOW,
+                Some(&EAST),
+                Some(person),
+            );
+            assert!(answered, "{told}");
+            told
+        };
+        let guests = forget("what the gym coach said", GUEST);
+        assert_ne!(guests["forgotten"], true, "{guests}");
+        assert_eq!(listed(), [fact], "a guest never reaches the owner's");
+        let other = forget("lunges", OWNER);
+        assert_ne!(other["forgotten"], true, "{other}");
+        assert_eq!(listed(), [fact], "a forget about another thing leaves it");
+        let told = forget("what the gym coach said", OWNER);
+        assert_eq!(told["forgotten"], true, "{told}");
+        assert_eq!(told["count"], 1, "{told}");
+        assert!(listed().is_empty());
+        let recalled = ask(json!({"op":"search","person":OWNER,"query":"zorblax","limit":5}));
+        assert_eq!(recalled["entries"], json!([]), "{recalled}");
+        stop.stop();
+        worker.join().unwrap();
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
     /// The services' forgets a forget about `about` by `speaker` sent the
     /// memory, private room `room`, the owner's typed name "Owner Example"
     /// (the first owner id) and their face kept as "Owner" (the second).
@@ -28249,6 +28427,12 @@ mod tests {
         (socket, served)
     }
 
+    /// Whether `request` is a forget about's listing of the person's app
+    /// facts (`kept {app_facts}`, #7415), which the fakes answer empty.
+    pub(super) fn is_app_facts_listing(request: &Value) -> bool {
+        request["op"] == "kept" && request["app_facts"] == true
+    }
+
     /// [`memory`], giving back the request lines exactly as they came.
     /// [`memory`] that gives up waiting [`MEMORY_WITHIN`] after it starts
     /// and gives back what it read by then: a request a test waits for and
@@ -28336,6 +28520,16 @@ mod tests {
                     .read_line(&mut line)
                     .unwrap();
                 let request: Value = serde_json::from_str(&line).unwrap();
+                // A forget about's listing of the person's app facts (#7415)
+                // is answered empty, neither counted nor given back, so the
+                // fakes written before it, whose `kept` answers are the
+                // person's own list, read what they did. App facts are
+                // tested against the real memory
+                // (`a_forget_about_by_words_takes_the_owners_app_fact`).
+                if is_app_facts_listing(&request) {
+                    let _ = stream.write_all(b"{\"ok\":true,\"entries\":[]}\n");
+                    continue;
+                }
                 let wrote = stream.write_all(format!("{}\n", answer(&request)).as_bytes());
                 if (!records_on && request["op"] == "service_records_forget")
                     || (!contacts_on && request["op"] == "service_contacts_forget")
@@ -34633,6 +34827,12 @@ mod tests {
                         break;
                     }
                     let request: Value = serde_json::from_str(&line).unwrap();
+                    // As the other helper's: the app facts listing answered
+                    // empty, neither counted nor given back.
+                    if super::is_app_facts_listing(&request) {
+                        let _ = stream.write_all(b"{\"ok\":true,\"entries\":[]}\n");
+                        continue;
+                    }
                     stream
                         .write_all(format!("{}\n", answer(&request)).as_bytes())
                         .unwrap();

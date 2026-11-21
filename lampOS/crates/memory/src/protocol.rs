@@ -143,6 +143,14 @@ pub enum Request {
         /// it.
         #[serde(default)]
         observations: bool,
+        /// The Days store's (#7415): only the person's own app facts, for
+        /// a forget about a thing, never the hits note's list; with
+        /// `before_id`, those below it, a page of them. Not with
+        /// `observations`. The legacy store, which keeps none, ignores it.
+        #[serde(default)]
+        app_facts: bool,
+        #[serde(default)]
+        before_id: Option<u64>,
     },
     Recall {
         #[serde(default)]
@@ -1181,6 +1189,8 @@ mod tests {
                 person: Who::Unsaid,
                 max_bytes: Some(900),
                 observations: false,
+                app_facts: false,
+                before_id: None,
             }
         );
         // #3113: the Days store's; the legacy store lists kept things alone.
@@ -1190,6 +1200,8 @@ mod tests {
                 person: Who::Unsaid,
                 max_bytes: None,
                 observations: true,
+                app_facts: false,
+                before_id: None,
             }
         );
         assert_eq!(
