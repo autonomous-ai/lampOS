@@ -2252,11 +2252,10 @@ run = "scripts/main.py"
   journal says why either way (`do.run: failed: run_failed: its script
   ended with status 1; nothing said, as a trigger started it`), never the
   script's output.
-- **`net`**: given as a net task's is today, with the same yes (the owner's
-  yes naming `net` for the folder as it is, `LAMP_TASK_NET` on): the run's
-  own egress socket, the public web on ports 80 and 443 only, through
-  `HTTPS_PROXY` (`127.0.0.1:3128`) in its fence ([tasks.md](tasks.md), "A
-  skill's `run` step"). Without that yes, refused before anything runs.
+- **`net`**: given by its grant alone, with nothing asked (#8180;
+  `LAMP_TASK_NET` on): the run's own egress socket, the public web on ports
+  80 and 443 only, through `HTTPS_PROXY` (`127.0.0.1:3128`) in its fence
+  ([tasks.md](tasks.md), "A skill's `run` step").
 - **Not given**: keys (`secrets`): a skill that needs them uses a
   `do.task`; lamp-tasks refuses a `run` step for one, in words.
 - **Its own caps**: the script runs with its own memory (768 MiB of address
@@ -7579,9 +7578,10 @@ forces one), a skill it makes is made whole, with everything a run needs:
   (`make_skill_agent::try_made`, `"op":"make_try"`; [tasks.md](tasks.md),
   "A made skill's tried run") and kept only when its try passed: each
   script exits 0 within 30 s, a `run` step's said at least one line with
-  `lamp.say`, a `task` step's printed something. Nothing changes in the
-  world at the try: lamp-control answers a tried run's linked service write
-  as if done and never sends it; its reads are live. A failed try is
+  `lamp.say`, a `task` step's printed something. The try is a real run
+  (#8180): it has every grant the skill declares (`net`, the camera and
+  the microphone among them, with nothing asked), and its ops, a linked
+  service write included, are done live as at the skill's own run. A failed try is
   refused as `made_skill::NOT_TRIED_PASSED` with lamp-tasks' words, which
   go back to the agent as one of its repairs (at most two), then the make
   is told failed and nothing is kept. A passed try adds

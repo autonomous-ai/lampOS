@@ -172,15 +172,10 @@ pub struct Run {
     /// ([`FixedWrite::covers`]), so the run's words never carry it.
     pub fixed_write: Option<FixedWrite>,
     /// A make's tried run (#8157, [`Runs::mark_tried`]): minted for a
-    /// draft's own grants before it is kept. Its `service.write` is
-    /// answered as if done from a stub ([`TRIED_WRITE`]) and never reaches
-    /// lamp-services, so the try changes nothing in the world.
+    /// draft's own grants before it is kept. Its ops are done live within
+    /// those grants, as its real run's (#8180).
     pub tried: bool,
 }
-
-/// What a tried run's `service.write` is answered (#8157): as if done,
-/// nothing sent.
-pub const TRIED_WRITE: &str = "tried at the make: not sent";
 
 /// A skill's fixed write as lamp-control read it from the skill's own file
 /// at the mint (`lamp_skills::service_write::fixed_write_of`): `service`,

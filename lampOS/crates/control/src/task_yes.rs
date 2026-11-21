@@ -293,10 +293,10 @@ pub const TRIES_OFF: &str = "a make's tried run is off on this lamp (LAMP_SKILL_
 pub const MOST_TRY_GRANTS: usize = 16;
 
 /// The grants of a make's tried run (#8157): each one the lamp names, once,
-/// never `skills` (a try puts nothing on the lamp) and never `camera` or
-/// `microphone` (a try captures nothing; lamp-tasks drops them before it
-/// asks and tells the make its try ran without them); `net` is no token's
-/// grant (lamp-tasks gives a try no way out) and is dropped here.
+/// never `skills` (a try puts nothing on the lamp); the camera and the
+/// microphone are minted as any other (#8180: a try has its declared
+/// grants, as its run); `net` is no token's grant (lamp-tasks gives the
+/// try its own way out) and is dropped here.
 pub fn try_grants_of(asked: &[String]) -> Result<BTreeSet<Grant>, String> {
     if asked.len() > MOST_TRY_GRANTS {
         return Err(format!("try: at most {MOST_TRY_GRANTS} grants"));
@@ -308,11 +308,6 @@ pub fn try_grants_of(asked: &[String]) -> Result<BTreeSet<Grant>, String> {
         }
         match serde_json::from_value::<Grant>(Value::String(grant.clone())) {
             Ok(Grant::Skills) => return Err("try: a tried run never puts skills on".into()),
-            Ok(Grant::Camera | Grant::Microphone) => {
-                return Err(format!(
-                    "try: a tried run never gets {grant}: it runs without the lamp's sensors"
-                ));
-            }
             Ok(parsed) => {
                 if !grants.insert(parsed) {
                     return Err(format!("try: {grant} is listed twice"));
@@ -1390,8 +1385,8 @@ mod tests {
     }
 
     /// #8157: a make's tried run is minted the draft's own grants, each
-    /// once; `net` is lamp-tasks' way out, not a token's; never `skills`,
-    /// `camera` or `microphone`.
+    /// once; `net` is lamp-tasks' way out, not a token's; never `skills`;
+    /// the camera and the microphone minted as any other (#8180).
     #[test]
     fn a_tried_runs_grants_are_the_drafts_own() {
         let asked = |grants: &[&str]| {
@@ -1402,11 +1397,11 @@ mod tests {
         assert!(grants.contains(&Grant::Speak));
         assert!(asked(&["speak", "speak"]).is_err());
         assert!(asked(&["skills"]).is_err());
-        // #8180: a try captures nothing: no camera, no microphone.
-        for sensor in ["camera", "microphone"] {
-            let refused = asked(&["speak", sensor]).unwrap_err();
-            assert!(refused.contains(sensor), "{refused}");
-        }
+        // #8180: a try is minted the camera and the microphone it declares.
+        let sensed = asked(&["speak", "camera", "microphone", "net"]).unwrap();
+        assert!(sensed.contains(&Grant::Camera), "{sensed:?}");
+        assert!(sensed.contains(&Grant::Microphone), "{sensed:?}");
+        assert_eq!(sensed.len(), 3, "net is no token's: {sensed:?}");
         assert!(asked(&["fly"]).is_err());
         assert!(asked(&[]).unwrap().is_empty());
     }

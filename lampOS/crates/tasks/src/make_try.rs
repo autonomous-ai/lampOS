@@ -16,12 +16,13 @@
 //!   started by lamp-tasks itself, never by an agent: whichever agent made
 //!   the skill (OpenClaw or Hermes), its try is the same. Its token is
 //!   lamp-control's, minted for the draft's own grants and marked tried
-//!   (`{"mint":{"try":[...]}}`): every op that changes kept state is
-//!   answered from a stub and never done, its reads are live.
-//! - **What a try runs without** ([`TRIED_WITHOUT`], #8180): `net` (no
-//!   egress socket is made: a fetch fails as offline), `camera` and
-//!   `microphone` are never given to a try. The answer names them
-//!   (`"without"`), and a failed try's words say so for the repair.
+//!   (`{"mint":{"try":[...]}}`, the run `make-try`); each op it is granted
+//!   is done live, as at the skill's real run (#8180).
+//! - **Its grants, as the run's** (#8180): every grant the draft declares
+//!   is given to its try, the camera and the microphone among them, with
+//!   nothing asked. A draft granted `net` gets a run step's own egress
+//!   socket (`make-try-<run id>`, [`crate::egress::Grant`], on fd 5 of its
+//!   fence, `crate::skill_task::NET_SWITCH` on), with no yes waited for.
 //! - **Judged** ([`judged`]): each script exits 0 within [`TRY_WITHIN`];
 //!   a `run` step's script said at least one line through `lamp.say` (the
 //!   run's say count, lamp-control's `end` answer's `"said"`); a task's
@@ -94,25 +95,9 @@ pub struct Plan {
     pub kind: Kind,
     /// Each script's path in the skill's folder.
     pub scripts: Vec<String>,
-    /// The skill's grants its try is given: its `skill.toml`'s, less
-    /// [`TRIED_WITHOUT`].
+    /// The skill's grants, as its `skill.toml` names them: all given to
+    /// its try (#8180).
     pub grants: Vec<String>,
-    /// Those of its grants its try runs without ([`TRIED_WITHOUT`]).
-    pub without: Vec<String>,
-}
-
-/// The grants a try never gets (#8180): `net` (the try reaches nothing
-/// outside the lamp, so nothing is sent), and the camera and microphone
-/// (nothing is captured before the person's yes). lamp-control refuses
-/// to mint the camera or microphone for a try too.
-pub const TRIED_WITHOUT: [&str; 3] = ["net", "camera", "microphone"];
-
-/// What a failed try's words add when it ran without some of its grants.
-pub fn without_words(without: &[String]) -> String {
-    format!(
-        "it was tried without {}: a fetch fails as offline and nothing is captured, so its script says its failure line with lamp.say and exits 0",
-        without.join(", ")
-    )
 }
 
 /// Whether `path` is a script's own path in its folder: `scripts/...`,
@@ -184,14 +169,10 @@ pub fn plan(toml: &str, files: &BTreeMap<String, String>) -> Result<Option<Plan>
     if scripts.len() > MOST_SCRIPTS {
         return Err(format!("at most {MOST_SCRIPTS} scripts are tried"));
     }
-    let (without, grants) = grants
-        .into_iter()
-        .partition(|grant| TRIED_WITHOUT.contains(&grant.as_str()));
     Ok(Some(Plan {
         kind,
         scripts,
         grants,
-        without,
     }))
 }
 
@@ -382,67 +363,54 @@ impl Tries {
                     .map_or("unknown".to_owned(), |said| said.to_string()),
             );
             if let Err(why) = judged(plan.kind, script, &ran) {
-                let why = match plan.without.is_empty() {
-                    true => why,
-                    false => format!("{why}; {}", without_words(&plan.without)),
-                };
-                let mut answered = json!({"ok": true, "tried": true, "passed": false, "why": why});
-                if !plan.without.is_empty() {
-                    answered["without"] = json!(plan.without);
-                }
-                return answered;
+                return json!({"ok": true, "tried": true, "passed": false, "why": why});
             }
             said = said.saturating_add(ran.said.unwrap_or(0));
         }
-        let mut answered = json!({"ok": true, "tried": true, "passed": true, "said": said});
-        if !plan.without.is_empty() {
-            answered["without"] = json!(plan.without);
-        }
-        answered
+        json!({"ok": true, "tried": true, "passed": true, "said": said})
     }
 }
 
 /// The lamp's launch: a token from lamp-control for the draft's grants,
-/// marked tried; never an egress socket; then lamp-tasks itself started as
-/// [`FENCE_ARG`], which becomes a run step's fence ([`fence_args`]), the
-/// script run in it with only the SDK, the socket and the token.
+/// marked tried; its own egress socket when granted `net`, as a run
+/// step's; then lamp-tasks itself started as [`FENCE_ARG`], which becomes
+/// a run step's fence ([`fence_args`]), the script run in it with only the
+/// SDK, the socket, the token and, granted `net`, its way out.
 pub struct FenceLaunch {
     pub tokens: Box<dyn Tokens + Send + Sync>,
     /// The program started as the fence: lamp-tasks' own.
     pub program: PathBuf,
+    /// The egress a draft granted `net` gets (`crate::egress::Grant::lamp`,
+    /// `crate::skill_task::NET_SWITCH` on), as a run step's; None: such a
+    /// try is not started.
+    pub egress: Option<crate::egress::Grant>,
     /// Where each try's own cgroup is made (#8180,
     /// [`crate::run_cgroup`]); none on Linux: the try is refused.
     pub cgroups: crate::run_cgroup::RunCgroups,
 }
 
 impl FenceLaunch {
-    /// The lamp's: lamp-control's tokens, this program.
+    /// The lamp's: lamp-control's tokens, this program, the lamp's egress
+    /// with `LAMP_TASK_NET` on.
     pub fn lamp() -> Self {
+        let net = std::env::var(crate::skill_task::NET_SWITCH).ok().as_deref() == Some("on");
         Self {
             tokens: Box::new(crate::skill_task::ControlTokens::default()),
             program: std::env::current_exe()
                 .unwrap_or_else(|_| PathBuf::from(crate::gateway::RELAY)),
+            egress: net.then(crate::egress::Grant::lamp),
             cgroups: crate::run_cgroup::RunCgroups::Lamp,
         }
     }
 }
 
-/// What a launch asked for a grant of [`TRIED_WITHOUT`] is told: [`plan`]
-/// never asks one.
-pub const NEVER_IN_A_TRY: &str =
-    "a make's tried run is never given net, the camera or the microphone";
-
 /// A make's tried run's fence's `unshare` arguments: a run step's
 /// (`crate::skill_run::fence_args`), every path of
-/// `crate::skill_run::HIDDEN` covered, with no way out whatever `grant`
-/// says. Never the token.
+/// `crate::skill_run::HIDDEN` covered, its way out when `grant` names an
+/// egress socket. Never the token.
 pub fn fence_args(grant: &crate::skill_start::Grant) -> Vec<std::ffi::OsString> {
-    let grant = crate::skill_start::Grant {
-        egress: None,
-        ..grant.clone()
-    };
     let hidden: Vec<&Path> = crate::skill_run::HIDDEN.iter().map(Path::new).collect();
-    crate::skill_run::fence_args(&grant, &hidden)
+    crate::skill_run::fence_args(grant, &hidden)
 }
 
 /// `reader` read whole on a thread of its own, at most
@@ -464,14 +432,30 @@ impl Launch for FenceLaunch {
         grants: &[String],
         within: Duration,
     ) -> Result<Ran, String> {
-        // No way out and no capture, before any token is minted.
-        if grants
-            .iter()
-            .any(|grant| TRIED_WITHOUT.contains(&grant.as_str()))
-        {
-            return Err(NEVER_IN_A_TRY.into());
-        }
         let id = crate::skill_task::run_id();
+        let net = grants
+            .iter()
+            .any(|grant| grant == crate::skill_task::NET_GRANT);
+        let until = Instant::now() + within + Duration::from_secs(5);
+        // Granted `net`: its own egress socket before its token, as a run
+        // step's (#8180), with no yes waited for; not made, no try.
+        let way_out = match (net, &self.egress) {
+            (false, _) => None,
+            (true, Some(egress)) => Some(
+                egress
+                    .open(
+                        &format!("{}try-{id}", crate::skill_make::FOLDER_HEAD),
+                        until,
+                    )
+                    .map_err(|error| format!("the try's way out was not made: {}", error.kind()))?,
+            ),
+            (true, None) => {
+                return Err(format!(
+                    "a draft granted net is tried only with {} on",
+                    crate::skill_task::NET_SWITCH
+                ));
+            }
+        };
         // Its own cgroup before its token: none, no token and no try.
         let cgroup = self.cgroups.for_run(&id)?;
         let Minted { token, .. } = self.tokens.mint_try(grants, &id)?;
@@ -483,11 +467,13 @@ impl Launch for FenceLaunch {
             socket: crate::skill_task::CONTROL_SOCKET.into(),
             pythonpath: crate::skill_task::SDK_PYTHONPATH.into(),
             token: token.secret().to_owned(),
-            egress: None,
+            egress: way_out.as_ref().map(|served| served.path().to_owned()),
         };
         let ran = run_fence(&self.program, &grant, within, cgroup.as_ref());
-        // What is left of the try killed and its cgroup removed.
+        // What is left of the try killed, its cgroup removed and its way
+        // out closed.
         drop(cgroup);
+        drop(way_out);
         let said = self.tokens.end_said(&id);
         let mut ran = ran?;
         ran.said = said;
@@ -547,8 +533,8 @@ pub fn run_fence(
 
 /// `lamp-tasks make-try-fence`: the grant read from stdin, then this
 /// process becomes a run step's fence ([`fence_args`], fd 4 a sink in
-/// place of the launcher's socket, no egress socket ever). Returns only
-/// with why it did not.
+/// place of the launcher's socket, its egress socket on fd 5 when the
+/// grant names one). Returns only with why it did not.
 pub fn fence_main() -> (i32, String) {
     let mut line = String::new();
     if std::io::stdin().read_line(&mut line).is_err() {
@@ -558,15 +544,19 @@ pub fn fence_main() -> (i32, String) {
         Ok(grant) => grant,
         Err(_) => return (1, "the grant can't be read".into()),
     };
-    if grant.egress.is_some() {
-        return (1, NEVER_IN_A_TRY.into());
-    }
+    let egress = match &grant.egress {
+        None => None,
+        Some(path) => match crate::skill_start::egress_fd(path) {
+            Ok(fd) => Some(fd),
+            Err(error) => return (1, format!("the try's egress socket: {error}")),
+        },
+    };
     let sink = match std::fs::OpenOptions::new().write(true).open("/dev/null") {
         Ok(sink) => std::os::fd::OwnedFd::from(sink),
         Err(error) => return (1, format!("no /dev/null: {error}")),
     };
     let args = fence_args(&grant);
-    match crate::skill_start::exec_fence_with(&grant, sink, None, args) {
+    match crate::skill_start::exec_fence_with(&grant, sink, egress, args) {
         Ok(never) => match never {},
         Err(error) => (1, format!("the try's fence was not started: {error}")),
     }
@@ -599,8 +589,7 @@ mod tests {
             Some(Plan {
                 kind: Kind::Run,
                 scripts: vec!["scripts/main.py".into()],
-                grants: vec!["speak".into()],
-                without: vec!["net".into()],
+                grants: vec!["net".into(), "speak".into()],
             })
         );
         let task = plan_of(TASK_TOML, &["scripts/main.py", "scripts/fetch_mail.py"]).unwrap();
@@ -738,11 +727,14 @@ mod tests {
         let answered = tries.answer(&line(RUN_TOML, &["scripts/main.py"]));
         assert_eq!(
             answered,
-            json!({"ok": true, "tried": true, "passed": true, "said": 1, "without": ["net"]})
+            json!({"ok": true, "tried": true, "passed": true, "said": 1})
         );
         assert_eq!(
             asked.lock().unwrap()[0],
-            ("scripts/main.py".to_owned(), vec!["speak".to_owned()])
+            (
+                "scripts/main.py".to_owned(),
+                vec!["net".to_owned(), "speak".to_owned()]
+            )
         );
         assert_eq!(std::fs::read_dir(work.path()).unwrap().count(), 0);
         // Nothing to try for a skill with no script.
@@ -788,56 +780,48 @@ mod tests {
         );
     }
 
-    /// #8180 (Heron 1, the Reviewer-lead's second P1): a draft granted
-    /// `net`, `camera` or `microphone` is tried without them: its launch is
-    /// never asked for them, so no egress socket is made, and its answer
-    /// and a failed try's words for the repair say it ran without them. A
-    /// net script that says its failure line and exits 0 passes.
+    /// #8180 (the dev's ruling): a draft's try is given every grant it
+    /// declares, as its real run is: `net`, the camera, the microphone,
+    /// its voice and sounds, its body and light are all asked of its
+    /// launch, none dropped, and its answer names nothing it ran without.
     #[test]
-    fn a_draft_granted_net_is_tried_with_no_way_out_and_told_so() {
+    fn a_try_is_given_every_grant_its_draft_declares() {
         let spoke = Ran {
             code: Some(0),
             said: Some(1),
             ..Ran::default()
         };
-        let (_work, passing, asked) = tries(spoke);
-        let answered = passing.answer(&line(RUN_TOML, &["scripts/main.py"]));
-        assert_eq!(answered["passed"], true, "{answered}");
-        assert_eq!(answered["without"], json!(["net"]), "{answered}");
-        assert_eq!(asked.lock().unwrap()[0].1, vec!["speak".to_owned()]);
-        // Offline, its fetch failed and it said nothing: told why.
-        let silent = Ran {
-            code: Some(1),
-            stderr: "urllib.error.URLError: Network is unreachable".into(),
-            said: Some(0),
-            ..Ran::default()
-        };
-        let (_work, failing, asked) = tries(silent);
-        let capture = RUN_TOML.replace(
+        let (_work, tries, asked) = tries(spoke);
+        let all = RUN_TOML.replace(
             "[\"net\", \"speak\"]",
-            "[\"camera\", \"net\", \"microphone\", \"speak\"]",
+            "[\"body\", \"camera\", \"light\", \"microphone\", \"net\", \"notes\", \"speak\", \"speaker\"]",
         );
-        let answered = failing.answer(&line(&capture, &["scripts/main.py"]));
-        assert_eq!(answered["passed"], false, "{answered}");
+        let answered = tries.answer(&line(&all, &["scripts/main.py"]));
         assert_eq!(
-            answered["without"],
-            json!(["camera", "net", "microphone"]),
-            "{answered}"
+            answered,
+            json!({"ok": true, "tried": true, "passed": true, "said": 1})
         );
-        let why = answered["why"].as_str().unwrap();
-        assert!(
-            why.contains("tried without camera, net, microphone"),
-            "{why}"
+        assert_eq!(
+            asked.lock().unwrap()[0].1,
+            [
+                "body",
+                "camera",
+                "light",
+                "microphone",
+                "net",
+                "notes",
+                "speak",
+                "speaker"
+            ]
+            .map(str::to_owned)
         );
-        assert!(why.contains("lamp.say"), "{why}");
-        assert_eq!(asked.lock().unwrap()[0].1, vec!["speak".to_owned()]);
     }
 
     /// #8180 (the Reviewer-lead's first P1, Heron 3): a try's fence is a run
     /// step's, from the same builder: all of `skill_run::HIDDEN` covered
     /// (`/run`, and with it lamp-control's `admin.sock`), only
-    /// `control.sock` shown again, never a way out, and the run step's
-    /// caps, its process cap among them.
+    /// `control.sock` shown again, and the run step's caps, its process
+    /// cap among them; granted `net`, the run step's way out as well.
     #[test]
     fn a_tried_runs_fence_is_a_run_steps_with_no_admin_socket_and_its_caps() {
         let grant = crate::skill_start::Grant {
@@ -850,38 +834,46 @@ mod tests {
             token: "secret".into(),
             egress: Some("/run/lampos-tasks/egress/x.sock".into()),
         };
-        let args = fence_args(&grant);
         let hidden: Vec<&Path> = crate::skill_run::HIDDEN.iter().map(Path::new).collect();
         let plain = crate::skill_start::Grant {
             egress: None,
             ..grant.clone()
         };
-        assert_eq!(args, crate::skill_run::fence_args(&plain, &hidden));
-        for path in crate::skill_run::HIDDEN {
-            assert!(args.iter().any(|arg| arg == path), "{path} hidden");
-        }
-        let text = args
-            .iter()
-            .map(|arg| arg.to_string_lossy().into_owned())
-            .collect::<Vec<_>>()
-            .join("\n");
-        assert!(Path::new(crate::skill_task::ADMIN_SOCKET).starts_with("/run"));
-        assert!(!text.contains("admin.sock"), "{text}");
-        assert!(!text.contains("secret"), "never the token");
-        assert!(!text.contains("net-relay") && !text.contains("HTTPS_PROXY"));
-        assert!(!text.contains("x.sock"));
-        // lamp-control's socket alone shown again, as a run step's.
-        for (_, to) in crate::skill_run::CONTROL_EDITS {
-            assert!(text.contains(to.trim_end()), "{to}");
-        }
-        for cap in [
-            "ulimit -c 0 ||",
-            "ulimit -v 786432 ||",
-            "ulimit -t 30 ||",
-            "prlimit --nproc=64:64 --pid $$ ||",
-            "exec nice -n 10 unshare --user",
-        ] {
-            assert_eq!(text.matches(cap).count(), 1, "{cap}\n{text}");
+        let text_of = |args: &[std::ffi::OsString]| {
+            args.iter()
+                .map(|arg| arg.to_string_lossy().into_owned())
+                .collect::<Vec<_>>()
+                .join("\n")
+        };
+        for (grant, net) in [(&plain, false), (&grant, true)] {
+            let args = fence_args(grant);
+            assert_eq!(args, crate::skill_run::fence_args(grant, &hidden));
+            for path in crate::skill_run::HIDDEN {
+                assert!(args.iter().any(|arg| arg == path), "{path} hidden");
+            }
+            let text = text_of(&args);
+            assert!(Path::new(crate::skill_task::ADMIN_SOCKET).starts_with("/run"));
+            assert!(!text.contains("admin.sock"), "{text}");
+            assert!(!text.contains("secret"), "never the token");
+            // Its way out exactly when granted net, as a run step's.
+            assert_eq!(text.contains("net-relay"), net, "{text}");
+            assert_eq!(text.contains("HTTPS_PROXY"), net, "{text}");
+            // lamp-control's socket alone shown again, as a run step's
+            // (with net, lamp-tasks' relay lines go between).
+            for (_, to) in crate::skill_run::CONTROL_EDITS {
+                for line in to.lines() {
+                    assert!(text.contains(line), "{line}");
+                }
+            }
+            for cap in [
+                "ulimit -c 0 ||",
+                "ulimit -v 786432 ||",
+                "ulimit -t 30 ||",
+                "prlimit --nproc=64:64 --pid $$ ||",
+                "exec nice -n 10 unshare --user",
+            ] {
+                assert_eq!(text.matches(cap).count(), 1, "{cap}\n{text}");
+            }
         }
     }
 
@@ -908,9 +900,10 @@ mod tests {
     }
 
     /// The fence's launch mints a tried run's token for the draft's own
-    /// grants, refuses `net`, `camera` or `microphone` before any token
-    /// (no egress socket exists to open), and reads the run's say count at
-    /// its end.
+    /// grants (the camera and microphone among them, #8180), gives one
+    /// granted `net` its own egress socket with no yes asked, refuses
+    /// `net` without the lamp's egress before any token, and reads the
+    /// run's say count at its end.
     #[test]
     fn the_fence_launch_mints_a_tried_token_and_reads_its_says() {
         let minted = Arc::new(Mutex::new(Vec::new()));
@@ -929,6 +922,7 @@ mod tests {
                 minted: minted.clone(),
             }),
             program,
+            egress: None,
             cgroups: crate::run_cgroup::RunCgroups::Fake(dir.path().join("cgroup")),
         };
         std::fs::create_dir(dir.path().join("cgroup")).unwrap();
@@ -946,17 +940,16 @@ mod tests {
         assert_eq!(ran.said, Some(2));
         assert!(ran.stdout.contains("scripts/main.py"), "{}", ran.stdout);
         assert_eq!(minted.lock().unwrap()[0], vec!["speak".to_owned()]);
-        for never in TRIED_WITHOUT {
-            let refused = launch.launch(
-                &skill,
-                dir.path(),
-                "scripts/main.py",
-                &[never.to_owned(), "speak".to_owned()],
-                TRY_WITHIN,
-            );
-            assert_eq!(refused.unwrap_err(), NEVER_IN_A_TRY);
-        }
-        assert_eq!(minted.lock().unwrap().len(), 1, "no token for them");
+        // Net with no egress of the lamp's: refused before any token.
+        let net = launch.launch(
+            &skill,
+            dir.path(),
+            "scripts/main.py",
+            &["net".to_owned(), "speak".to_owned()],
+            TRY_WITHIN,
+        );
+        assert!(net.unwrap_err().contains("LAMP_TASK_NET"));
+        assert_eq!(minted.lock().unwrap().len(), 1, "no token for it");
         // #8180: the try ran in its own cgroup, joined by its fence's
         // process before its exec, and the cgroup was ended with it.
         let ended: Vec<_> = std::fs::read_dir(dir.path().join("cgroup"))
@@ -975,6 +968,63 @@ mod tests {
         assert_eq!(joined, "0");
     }
 
+    /// #8180 (the dev's ruling): a try granted `net`, the camera and the
+    /// microphone is minted all of them, and its fence is handed its own
+    /// egress socket (`make-try-<run id>`) with no yes asked, the socket
+    /// served while it runs and gone after.
+    #[test]
+    fn a_try_granted_net_camera_and_microphone_gets_each_with_no_yes() {
+        use std::os::unix::fs::DirBuilderExt;
+        let minted = Arc::new(Mutex::new(Vec::new()));
+        let dir = tempfile::tempdir().unwrap();
+        let program = dir.path().join("fence.sh");
+        // The stand-in fence prints its grant line and whether the
+        // socket it names is there while it runs.
+        std::fs::write(
+            &program,
+            "#!/bin/sh\nread -r line\necho \"$line\"\np=$(echo \"$line\" | sed -n 's/.*\"egress\":\"\\([^\"]*\\)\".*/\\1/p')\n[ -S \"$p\" ] && echo served\n",
+        )
+        .unwrap();
+        use std::os::unix::fs::PermissionsExt as _;
+        std::fs::set_permissions(&program, std::fs::Permissions::from_mode(0o755)).unwrap();
+        let egress = dir.path().join("egress");
+        std::fs::DirBuilder::new()
+            .mode(0o700)
+            .create(&egress)
+            .unwrap();
+        std::fs::create_dir(dir.path().join("cgroup")).unwrap();
+        let launch = FenceLaunch {
+            tokens: Box::new(TriedTokens {
+                minted: minted.clone(),
+            }),
+            program,
+            egress: Some(crate::egress::Grant {
+                dir: egress.clone(),
+                ..crate::egress::Grant::lamp()
+            }),
+            cgroups: crate::run_cgroup::RunCgroups::Fake(dir.path().join("cgroup")),
+        };
+        let grants = ["camera", "microphone", "net", "speak"].map(str::to_owned);
+        let ran = launch
+            .launch(
+                &dir.path().join("skill"),
+                dir.path(),
+                "scripts/main.py",
+                &grants,
+                TRY_WITHIN,
+            )
+            .unwrap();
+        assert_eq!(minted.lock().unwrap()[0], grants);
+        let line: Value = serde_json::from_str(ran.stdout.lines().next().unwrap()).unwrap();
+        let socket = line["egress"].as_str().expect("an egress socket");
+        assert!(
+            Path::new(socket).starts_with(&egress) && socket.contains("make-try-task-"),
+            "{socket}"
+        );
+        assert!(ran.stdout.contains("served"), "{}", ran.stdout);
+        assert!(!Path::new(socket).exists(), "gone after the try");
+    }
+
     /// #8180: a try whose own cgroup can't be made is refused before any
     /// token is minted, so it is not tried (`not_tried`, nothing kept).
     #[test]
@@ -986,6 +1036,7 @@ mod tests {
                 minted: minted.clone(),
             }),
             program: dir.path().join("never-started"),
+            egress: None,
             cgroups: crate::run_cgroup::RunCgroups::Fake(dir.path().join("no-such-root")),
         };
         let refused = launch.launch(
