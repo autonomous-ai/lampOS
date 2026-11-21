@@ -11694,9 +11694,18 @@ impl Heeding {
                     .as_mut()
                     .and_then(|voices| voices.likeness_so_far(request))
                     .is_some_and(|likeness| likeness < crate::same_voice::DIFFERENT_BELOW));
+        // `LAMP_NAME_SIGN_TIED` (#8092): only with eyes to give a look.
+        let looks_needed = self.attention.second_sign_tied() && self.eyes.is_some();
         let line = crate::said_to_me::Line {
             heard,
-            name_heard: !signs.names.is_empty(),
+            // With looks needed, in the window a hearing under
+            // `attention::NEAR_SCORE` is no name, so the no-look hold is
+            // read (Fifth's P3 on #8093: #7891 heard the name at 0.939 in
+            // meeting talk); words calling the lamp still name it
+            // (`said_to_me::named`).
+            name_heard: signs.names.iter().any(|(_, score)| {
+                !(looks_needed && signs.going_on) || *score >= crate::attention::NEAR_SCORE
+            }),
             going_on: signs.going_on,
             // A read-back asks for an answer, however its last sentence
             // reads (`services::answer_awaited`).
@@ -11709,8 +11718,7 @@ impl Heeding {
                 at > self.said_until_us.unwrap_or_default()
                     && monotonic_us().saturating_sub(at) <= crate::room_told::BUSY_ENDS_AFTER_US
             }),
-            // `LAMP_NAME_SIGN_TIED` (#8092): only with eyes to give a look.
-            looks_needed: self.attention.second_sign_tied() && self.eyes.is_some(),
+            looks_needed,
             look_free_answered: self.look_free_used,
             ..Default::default()
         };
@@ -29912,6 +29920,48 @@ mod tests {
             None,
             "a yes awaited"
         );
+    }
+
+    /// Fifth's P3 on #8093 (#8092, a meeting): in a conversation's window, a
+    /// line with no look and only a weak false hearing of the name in its
+    /// sound (#7891 saw 0.939) stood as named, so `LAMP_NAME_SIGN_TIED`'s
+    /// no-look hold was never read; it was answered and renewed the window.
+    /// With the switch, a hearing under `attention::NEAR_SCORE` is no name
+    /// for `said_to_me`: held, so not played and renewing nothing. A hearing
+    /// at `NEAR_SCORE` or more, or words calling the lamp, still stand; the
+    /// switch off, as before.
+    #[test]
+    fn with_the_sign_tied_a_weak_hearing_in_the_window_is_no_name_without_a_look() {
+        let _one = crate::provider_worker::tests::one_thread();
+        let judged = |tied: bool, score: f32, words: &str| {
+            // Eyes on, nobody in view: no look.
+            let eyes = Arc::new(crate::speaking_faces::SpeakingFaces::default());
+            let now_us = monotonic_us();
+            let mut heeding = product_heeding(eyes);
+            heeding.attention.tie_the_second_sign(tied);
+            let signs = super::Signs {
+                going_on: true,
+                turned: Some(false),
+                names: vec![(now_us + 2_000_000, score)],
+                ..turned_signs(crate::room_told::Room::Busy)
+            };
+            let verdict = heeding.heed_signs(5, (now_us, now_us + 3_400_000), words, signs);
+            *crate::room_told::room().lock().unwrap() = crate::room_told::RoomTold::new();
+            verdict
+        };
+        let meeting = "We should move the review to Thursday then.";
+        assert!(judged(true, 0.94, meeting).is_some(), "a weak hearing");
+        assert_eq!(
+            judged(true, crate::attention::NEAR_SCORE, meeting),
+            None,
+            "a near hearing"
+        );
+        assert_eq!(
+            judged(true, 0.94, "Lamp, what time is it now?"),
+            None,
+            "its words call the lamp"
+        );
+        assert_eq!(judged(false, 0.94, meeting), None, "off");
     }
 
     /// #7891, talking to a screen or a call while facing the lamp, and a
