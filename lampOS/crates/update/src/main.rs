@@ -1110,8 +1110,9 @@ fn on_the_lamp(command: &str, options: &BTreeMap<String, String>) -> ExitCode {
         app_check = app_check
             .map(|check| check.with_now(lamp_update::update_now::Marks::under(&config.root)));
     }
-    // The GitHub stable feed moved to its CDN mirror (#7728): off unless set,
-    // here or in the carried /etc/lampOS/update.env; only a `serve` that acts.
+    // An old lamp's GitHub stable feed moved to its CDN mirror (#7728): off
+    // unless set, here or in the carried /etc/lampOS/update.env; only a
+    // `serve` that acts. Its GitHub fallback is not this switch's.
     let cdn_feed = config.apply
         && command == "serve"
         && lamp_update::switches::update_switch(
@@ -1120,6 +1121,8 @@ fn on_the_lamp(command: &str, options: &BTreeMap<String, String>) -> ExitCode {
             std::env::var_os(lamp_update::cdn_feed::SWITCH).as_deref(),
         );
     let mut cdn_feed_said = String::new();
+    // Every lamp on the CDN feed, switch or not: GitHub after an hour of
+    // CDN failures (#7728).
     let falls_back = lamp_update::cdn_feed::falls_back(&config, command == "serve");
     // The agents' switches (#5197, #5978, #6226), read in the one place the
     // image's pre-install reads them too (#7274): only a `serve` that acts
