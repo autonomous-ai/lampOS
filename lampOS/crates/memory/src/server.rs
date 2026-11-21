@@ -16,7 +16,8 @@
 //!
 //! A second socket, the app's narrow one (`--forget-socket`, `docs/memory.md`
 //! "Forgetting a person"), can be opened beside it for one group: mode 0660,
-//! and it takes `forget_person` only ([`protocol::narrow`]). Both are
+//! and it takes `forget_person` and an app's `forget_app_facts` only
+//! ([`protocol::narrow`]). Both are
 //! served in turn by the same loop, so the store still does one thing at a
 //! time. A `forget_person` from either is told on `memory/forgot` as a
 //! `forget_all` is.
@@ -126,7 +127,8 @@ impl LinkedDrops {
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum Door {
     Main,
-    /// The app's: `forget_person` only.
+    /// The app's and lamp-control's: `forget_person` and an app's
+    /// `forget_app_facts` only.
     Forget,
     /// `linked.sock`: `linked_record` only.
     Linked,
@@ -327,7 +329,8 @@ impl Server {
     }
 
     /// Open the app's narrow socket too, mode 0660 and owned by the group
-    /// `group` (a gid): it takes `forget_person` only. The same care as the
+    /// `group` (a gid): it takes `forget_person` and an app's
+    /// `forget_app_facts` only. The same care as the
     /// main socket: a stale one is replaced, and it is never at its path
     /// with any other mode.
     pub fn forget_socket(mut self, socket: &Path, group: u32) -> io::Result<Self> {

@@ -455,3 +455,39 @@ fn the_narrow_socket_takes_forget_person_only_and_refuses_the_rest_untouched() {
     assert!(!scratch.path("f.sock").exists());
     assert!(!scratch.path("m.sock").exists());
 }
+
+/// lamp-control's removal of an installed app (#7415 C166): the narrow socket
+/// takes `forget_app_facts` for its `app:` source, and only that app's facts
+/// go; the person's own and another app's stay.
+#[test]
+fn the_narrow_socket_forgets_a_removed_apps_facts_and_nothing_else() {
+    let scratch = Scratch::new("app-facts");
+    fs::create_dir_all(scratch.path("b")).unwrap();
+    let lamp = Lamp::start(&scratch, Days::open(scratch.options(), NOON).unwrap());
+    seed(&lamp, P1, R1, "zebrafish", true);
+    for (source, text) in [("app:gym-coach", "squats 3x10"), ("app:other", "a walk")] {
+        let kept = lamp.ask(json!({
+            "op": "remember_app_fact", "person": P1, "source": source,
+            "name": "Coach", "at_unix_ms": NOON, "text": text
+        }));
+        assert_eq!(kept["ok"], true, "{kept}");
+    }
+    let gone =
+        lamp.ask_narrow(&json!({"op":"forget_app_facts","source":"app:gym-coach"}).to_string());
+    assert_eq!(gone, json!({"ok":true,"removed":1}));
+    // Again: nothing left of it, and still ok (a retry is safe).
+    let again =
+        lamp.ask_narrow(&json!({"op":"forget_app_facts","source":"app:gym-coach"}).to_string());
+    assert_eq!(again, json!({"ok":true,"removed":0}));
+    let refused =
+        lamp.ask_narrow(&json!({"op":"forget_app_facts","source":"computer:x"}).to_string());
+    assert_eq!(refused["error"], "bad_source", "{refused}");
+    let other = lamp.ask_narrow(&json!({"op":"forget_app_facts","source":"app:other"}).to_string());
+    assert_eq!(other, json!({"ok":true,"removed":1}));
+    assert_ne!(
+        whole(&lamp, P1, "zebrafish", true)["kept"]["entries"],
+        json!([]),
+        "the person's own kept thing stays"
+    );
+    lamp.stop();
+}
