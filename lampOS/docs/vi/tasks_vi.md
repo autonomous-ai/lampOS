@@ -2213,7 +2213,10 @@ một byte (`crates/tasks/src/one_session.rs`).
   xuất: khi không còn gì giữ nó, luồng `one-session` đóng nó `--now`, xoá
   phiên OpenClaw và id đã giữ của nó (`dropped <id> (Harness takes no
   reply here (reply_off))`), và không mở pane nào nữa cho tới khi
-  lamp-tasks khởi động lại. Mọi lần từ chối reply khác
+  lamp-tasks khởi động lại. `REPLY_OFF` ngay ở lời đầu của một phiên giữ
+  mới (lời nhắc của chính lần mở) cũng được ghi nhận như vậy ngay, nên
+  agent của đèn đọc `ready` ngay, không bao giờ `starting` tới hết cửa sổ
+  khởi động. Mọi lần từ chối reply khác
   (`reply_failed`, pane bận, mất hoặc chưa sẵn sàng) vẫn như trước: không
   có phiên thứ hai. Lời giao đầu cho Devin (`Cli::first_message`) cũng cần
   cài đặt này, như reply của một phiên.

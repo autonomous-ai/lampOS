@@ -3735,6 +3735,12 @@ impl OneSession {
                 self.confirm();
                 input
             }
+            // Harness takes no reply here already at the first words: noted
+            // at once, so the agent reads `ready` (the per-task way).
+            Took::NotSent(code) if code == "reply_off" => {
+                self.no_reply_here();
+                return None;
+            }
             other => {
                 eprintln!(
                     "tasks: one session: the kept session's first words not taken: {other:?}"

@@ -4982,6 +4982,9 @@ exactly, the default when unset), every task and run is its own
   `one-session` thread closes it `--now`, deletes its OpenClaw session
   and its kept id (`dropped <id> (Harness takes no reply here
   (reply_off))`), and opens no pane again until lamp-tasks starts again.
+  A `REPLY_OFF` already at a new kept session's first words (the open's
+  own prompt) is noted the same way at once, so the lamp's agent reads
+  `ready` at once, never `starting` until the start window ends.
   Any other refused reply (`reply_failed`, a busy, gone or not
   ready pane) is as before: no second session.
 - **A spoken task's turn.** The store watches the pane as a session the

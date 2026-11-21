@@ -4924,6 +4924,26 @@ fn reply_off_reads_ready_and_lets_lamp_tasks_through() {
     assert_eq!(one.agent.refusal("openclaw"), None);
 }
 
+/// #8138 mock M6: `reply_off` already at a new kept session's first words
+/// (the open's own prompt): noted at once as for a task's reply, so the
+/// lamp's agent reads `ready` (the per-task way) rather than `starting`
+/// until the start window ends, refusing every ask meanwhile.
+#[test]
+fn reply_off_at_the_first_words_reads_ready_at_once() {
+    use lamp_msgs::Readiness;
+    let dir = tempfile::tempdir().unwrap();
+    let (one, fake) = kept_on(dir.path());
+    fake.takes
+        .lock()
+        .unwrap()
+        .push_back(Took::NotSent("reply_off".into()));
+    one.open_if_due(&fake, &place());
+    assert!(!one.takes_reply(), "{:?}", fake.calls());
+    one.drop_if_due(&fake);
+    assert_eq!(one.readiness().state(), (Readiness::Ready, None));
+    assert_eq!(one.agent.refusal("openclaw"), None);
+}
+
 /// #8138 review (8): Harness reading the kept session `installing` (an
 /// OTA installing OpenClaw): the lamp's agent `installing` until it reads
 /// otherwise.
