@@ -240,7 +240,8 @@ not, falls back to GitHub only after an hour of CDN failures, one round at a
 time ("GitHub after an hour of CDN failures", below); any other feed is read
 alone. No round switches its own unit, so a lamp installed before keeps the
 GitHub stable feed, unless `LAMP_UPDATE_CDN_FEED=on` moves it ("Moving a lamp
-to the CDN feed", below; off by default). A model has two sources (#7709, `install::model_urls`):
+to the CDN feed", below; on in the product by the carried
+`/etc/lampOS/update.env`). A model has two sources (#7709, `install::model_urls`):
 `lamp-update install` and `lamp-keeper prepare` ask for a model of
 `deploy/product/models.json` (a GitHub release URL) at the CDN's
 sequence-free copy `lampos/models/<release>/<name>` first, then at GitHub; a
@@ -338,16 +339,22 @@ only, never for a pull request or a tag. The `lampos-cdn-probe` workflow,
 run by hand on `lamp-voice`, writes one file under `lampos/_probe/`, reads it
 back with `gcloud` and through the CDN, and deletes it.
 
-### Moving a lamp to the CDN feed (`LAMP_UPDATE_CDN_FEED`, off)
+### Moving a lamp to the CDN feed (`LAMP_UPDATE_CDN_FEED`, on)
 
 A lamp installed before #6589 follows
 `--channel-url https://github.com/autonomous-ai/lampOS/releases/download/lampos-stable/`,
 and no round rewrites lamp-update's unit. With `LAMP_UPDATE_CDN_FEED=on`
 (#7728; in lamp-update's environment, or, not set there, in the carried
-`/etc/lampOS/update.env`, which does not set it: off unless set), a `serve`
-that acts does this after every round, an up-to-date or unreachable one too,
-so the build that carries it moves the lamp itself, not one build later (the
-rule #7018 gives a new unit) (`cdn_feed::move_to_cdn`):
+`/etc/lampOS/update.env`, which turns it on in the product, so a lamp in a
+home takes it from the file every round carries: off unless set), a `serve`
+that acts does this after every round, an up-to-date or unreachable one too
+(`cdn_feed::move_to_cdn`). It is read with lamp-update's other switches
+(`switches::update_switches`, "The update switch file"), so the round that
+first carries the file turning it on leaves them differing from the
+start's, lamp-update starts itself again in its own place
+(`switches::restart_for`), and on that start it moves: the build that
+carries it moves the lamp itself, not one build later (the rule #7018
+gives a new unit):
 
 1. It reads lamp-update's own `ExecStart` from the unit and its `.conf`
    drop-ins in name order, the last one winning and an empty `ExecStart=`
@@ -380,7 +387,11 @@ the next round. Removing the drop-in and `systemctl daemon-reload` put the
 GitHub feed back by hand. While the drop-in is there it wins over the
 unit's own `ExecStart`, so a lamp moved by hand to another feed (the
 canary, say) has the drop-in removed too. The GitHub stable feed keeps being promoted until
-the fleet has moved. Tests only (`cdn_feed::tests`): not yet shown on a lamp.
+the fleet has moved. Shown on lamps as well as in `cdn_feed::tests`: on
+52e6 by kit-8054 (a round on the GitHub feed moved it, the next round was
+on the CDN), and on lamp-06c1, which took three promotes from the CDN by
+its own rounds, its lamp-update changing 0074158a872d → 80f8d01ce2b7 →
+7eb3e77d47e6 → 7b50d16e4820, with GitHub never read (#7814).
 
 **GitHub after an hour of CDN failures.** Every `serve` that acts and runs
 with `--channel-url https://cdn.autonomous.ai/lampos/stable/` (moved there,
@@ -403,8 +414,11 @@ the CDN (any other outcome) removes the file and says `the CDN feed is read
 again`. A new lamp-update taken from GitHub this way confirms itself on
 GitHub too when its dry round on the CDN is not proven and the clock is
 past the hour, switch or not. A refused build, a quiet wait or any other outcome on the
-CDN is not a CDN failure and never reads GitHub. Tests only
-(`cdn_feed::tests`): not yet shown on a lamp.
+CDN is not a CDN failure and never reads GitHub. Shown on a lamp as well
+as in `cdn_feed::tests`: on 52e6 by kit-8054, an hour of the CDN blocked
+gave one round on GitHub, and with it unblocked the next round read the
+CDN again; on lamp-06c1, three promotes taken from the CDN with no
+fallback line (#7814).
 
 ### The build and its identity
 
@@ -2665,7 +2679,8 @@ With `LAMP_UPDATE_APPLY=on` in `lamp-update.service`'s environment:
   `LAMP_SKILL_TASKS=on`, `LAMP_SKILL_DEFAULT_AGENT=on` (the one run
   path, #6685, read only with `LAMP_SKILL_TASKS` on) and
   `LAMP_UPDATE_NOW=on` (the owner's Update now, #7517, on any lamp, as
-  `LAMP_APP_ENGINES` is). No round rewrites lamp-update's own unit, so
+  `LAMP_APP_ENGINES` is), and `LAMP_UPDATE_CDN_FEED=on` (the move to the
+  CDN feed, #7728, on any lamp, as `LAMP_APP_ENGINES` is). No round rewrites lamp-update's own unit, so
   these lines in `lamp-update.service` never reached a lamp already in a
   home. lamp-update reads each switch at its start
   (`switches::update_switches`): set in its environment, `on` exactly, and

@@ -35,6 +35,7 @@ fn a_product_lamp_wants_all_three_by_the_builds_defaults() {
             one_path,
             now: false,
             gateway_by_default: false,
+            cdn_feed: false,
         };
         let wanted = wanted(true, switches, &none);
         assert!(wanted.harness.on);
@@ -99,6 +100,7 @@ fn an_image_with_none_asks_for_all_three_with_the_rounds_asks() {
         one_path: true,
         now: false,
         gateway_by_default: false,
+        cdn_feed: false,
     };
     let wanted = wanted(true, switches, &none);
     let asked = ask_missing(&root, &records, &wanted).unwrap();
@@ -183,6 +185,7 @@ fn openclaw_s_gateway_unit_is_written_as_a_round_writes_it() {
         one_path: true,
         now: false,
         gateway_by_default: false,
+        cdn_feed: false,
     };
     let wanted = wanted(true, switches, &none);
     assert_eq!(write_units(&root, &wanted), Ok(true));

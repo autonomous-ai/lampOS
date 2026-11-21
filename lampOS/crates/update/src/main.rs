@@ -1111,15 +1111,11 @@ fn on_the_lamp(command: &str, options: &BTreeMap<String, String>) -> ExitCode {
             .map(|check| check.with_now(lamp_update::update_now::Marks::under(&config.root)));
     }
     // An old lamp's GitHub stable feed moved to its CDN mirror (#7728): off
-    // unless set, here or in the carried /etc/lampOS/update.env; only a
-    // `serve` that acts. Its GitHub fallback is not this switch's.
-    let cdn_feed = config.apply
-        && command == "serve"
-        && lamp_update::switches::update_switch(
-            &config.root,
-            lamp_update::cdn_feed::SWITCH,
-            std::env::var_os(lamp_update::cdn_feed::SWITCH).as_deref(),
-        );
+    // unless set, here or in the carried /etc/lampOS/update.env (on in the
+    // product), read with the other switches, so the round that first
+    // carries the file starts lamp-update again and it moves in that round;
+    // only a `serve` that acts. Its GitHub fallback is not this switch's.
+    let cdn_feed = config.apply && command == "serve" && switches.cdn_feed;
     let mut cdn_feed_said = String::new();
     // Every lamp on the CDN feed, switch or not: GitHub after an hour of
     // CDN failures (#7728).
