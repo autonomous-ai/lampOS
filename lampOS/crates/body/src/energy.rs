@@ -771,7 +771,7 @@ mod tests {
                 clip.name
             );
             assert_eq!(
-                share > 1.01 || share < 0.75,
+                !(0.75..=1.01).contains(&share),
                 held.is_some(),
                 "{} joint {joint}: {five} against V1 {v1}, {share:.2}",
                 clip.name
@@ -1147,21 +1147,21 @@ mod tests {
                 .unwrap();
             let v1 = v1_swing_of(csv);
             let (long, five) = (longer(clip, 5), livelier(clip, 5));
-            for joint in 0..5 {
+            for (joint, &v1_joint) in v1.iter().enumerate() {
                 let (own, at_five) = (spread(&long, joint), spread(five, joint));
-                let bar = v1[joint].max(own);
+                let bar = v1_joint.max(own);
                 assert!(
                     at_five <= bar + 1,
                     "{} joint {joint}: {at_five} at level 5 against V1 {}, level 1's gains {own}",
                     clip.name,
-                    v1[joint]
+                    v1_joint
                 );
                 let wanted = (own as f32 * clip_size(clip.name, 5)).round() as i32;
                 if wanted > bar + 1 && own > 0 {
                     eprintln!(
                         "v1 cap {:<13} joint {joint}: V1 {} level 5 {at_five} (x{} would be {wanted})",
                         clip.name,
-                        v1[joint],
+                        v1_joint,
                         clip_size(clip.name, 5)
                     );
                 }
