@@ -1,8 +1,8 @@
 //! Bounded local sockets, one durable owner and one independent Harness worker.
 use crate::{
     engine::{
-        CLOSE_TRIES, Clock as ClockSample, CloseJob, Engine, Error as EngineError, LaunchJob,
-        ObservationJob, Watched,
+        CLOSE_TRIES, CheckJob, Clock as ClockSample, CloseJob, Engine, Error as EngineError,
+        LaunchJob, ObservationJob, StartSettled, WATCH_CONFIRM_MS, WATCH_EARLY_FOR_MS, Watched,
     },
     follow::{CliWatch, Follows, WatchLane},
     harness::{
@@ -15,6 +15,7 @@ use crate::{
     protocol::{Answer, MAX_LINE_BYTES, MAX_REPLY_BYTES, Request},
     readiness::{EARLY_REFUSALS, Known, engines_path, probe_line, read_engines, write_engines},
     sign_in::{By as SignInBy, Method as SignInMethod, Session as SignInSession, Starter},
+    start_check::{Pick, Started},
     store::Store,
 };
 use lamp_bus::{Bus, Publisher};
@@ -1283,6 +1284,18 @@ pub trait Adapter: Send + 'static {
         let _ = machine_id;
         Err("unsupported".into())
     }
+    /// Every harness on one machine with its name, folder, state and last
+    /// activity (`harness ps`), to settle a start that timed out (#8170).
+    /// An adapter without it says so, and such a start stays unsure.
+    fn started(&self, machine_id: &str) -> Result<Vec<Started>, String> {
+        let _ = machine_id;
+        Err("unsupported".into())
+    }
+    /// The launch's own bound: a start that timed out and is not listed
+    /// within as long again after it ended is not started (#8170).
+    fn launch_bound(&self) -> Duration {
+        crate::harness::LAUNCH_TIMEOUT
+    }
     /// A lane for `wait`, apart from this adapter's own (`serve
     /// --push-wait`); none when the adapter has no such thing.
     fn wait_lane(&self) -> Option<Arc<dyn WaitLane>> {
@@ -1422,6 +1435,12 @@ impl Adapter for Cli {
     fn status(&self, machine_id: &str) -> Result<Vec<Listed>, String> {
         Cli::status(self, machine_id)
     }
+    fn started(&self, machine_id: &str) -> Result<Vec<Started>, String> {
+        Cli::started(self, machine_id)
+    }
+    fn launch_bound(&self) -> Duration {
+        Cli::launch_timeout(self)
+    }
     fn close(&self, machine_id: &str, agent_id: &str) -> Result<Closed, String> {
         Cli::close(self, machine_id, agent_id)
     }
@@ -1526,6 +1545,18 @@ impl Adapter for Production {
         match self {
             Self::Cli(cli) => cli.status(machine_id),
             Self::Absent => Err("no_harness".into()),
+        }
+    }
+    fn started(&self, machine_id: &str) -> Result<Vec<Started>, String> {
+        match self {
+            Self::Cli(cli) => cli.started(machine_id),
+            Self::Absent => Err("no_harness".into()),
+        }
+    }
+    fn launch_bound(&self) -> Duration {
+        match self {
+            Self::Cli(cli) => cli.launch_timeout(),
+            Self::Absent => crate::harness::LAUNCH_TIMEOUT,
         }
     }
     fn close(&self, machine_id: &str, agent_id: &str) -> Result<Closed, String> {
@@ -1633,6 +1664,79 @@ fn close_told(adapter: &impl Adapter, job: &CloseJob) -> Result<Closed, String> 
         &job.machine_id,
         &job.agent_id,
         CLOSE_BUDGET.saturating_sub(began.elapsed()),
+    )
+}
+
+/// How one look settles a start that timed out (#8170,
+/// [`crate::start_check`]), or `None` to look again: `listed`, its machine's
+/// `ps`; `index`, the sessions the lamp started or typed into
+/// ([`crate::session_index`]), known as no part of this start; `failed`,
+/// the looks before this one that could not read the list.
+///
+/// - By the lamp's own name for it: started, and closed once told.
+/// - Two of its name: not sure.
+/// - No row of its name but one that could be it titled ([`Pick::Maybe`]):
+///   looked for again until it ended `bound` ago (the name of a slow start
+///   may still show), then not sure; in another boot, not sure at once.
+/// - Nothing that could be it: not started once it ended `bound` ago, else
+///   looked for again; in another boot, where its end can't be dated, not
+///   sure, never "not started" (Twelve's HOLD on #8240, item 2).
+/// - A list not read: looked for again until it ended
+///   [`WATCH_EARLY_FOR_MS`] ago, then not sure; in another boot, after
+///   [`CLOSE_TRIES`] looks that could not read it.
+fn start_settled(
+    job: &CheckJob,
+    listed: Result<Vec<Started>, String>,
+    bound: Duration,
+    index: &BTreeMap<String, Vec<crate::session_index::Indexed>>,
+    failed: u8,
+) -> Option<StartSettled> {
+    let bound_ms = u64::try_from(bound.as_millis()).unwrap_or(u64::MAX);
+    let Ok(rows) = listed else {
+        let given_up = match job.ended_ago_ms {
+            Some(ago) => ago >= WATCH_EARLY_FOR_MS,
+            None => failed.saturating_add(1) >= CLOSE_TRIES,
+        };
+        return given_up.then_some(StartSettled::Unsure);
+    };
+    let mut known: BTreeSet<String> = job.known.iter().cloned().collect();
+    known.extend(
+        index
+            .get(&job.launch.target.machine_id)
+            .into_iter()
+            .flatten()
+            .map(|entry| entry.id.clone()),
+    );
+    let past = job.ended_ago_ms.map(|ago| ago >= bound_ms);
+    match crate::start_check::pick(&rows, &job.launch, &known) {
+        Pick::Named(agent_id) => Some(StartSettled::Started { agent_id }),
+        Pick::Two => Some(StartSettled::Unsure),
+        Pick::Maybe => past.is_none_or(|past| past).then_some(StartSettled::Unsure),
+        Pick::None => match past {
+            Some(true) => Some(StartSettled::NotStarted),
+            Some(false) => None,
+            None => Some(StartSettled::Unsure),
+        },
+    }
+}
+
+/// The journal's line for a start that timed out, settled (#8170): never
+/// its words, its folder or a harness's name.
+fn check_line(job: &CheckJob, settled: &StartSettled) -> String {
+    let how = match settled {
+        StartSettled::Started { .. } => {
+            "found by the lamp's own name for it: followed, and closed once told"
+        }
+        StartSettled::NotStarted => {
+            "not listed on its computer by the bound: not started, never sent again"
+        }
+        StartSettled::Unsure => {
+            "not sure it started (not by its name, with a harness there that could be it, its end not dated, or its computer's list not read): none taken, never sent again"
+        }
+    };
+    format!(
+        "tasks: task {}: the start that timed out is {how}",
+        job.task_id
     )
 }
 
@@ -1823,6 +1927,8 @@ enum Job {
     Observe(ObservationJob),
     Status(String),
     Close(CloseJob),
+    /// A start that timed out, looked for on its computer (#8170).
+    Check(CheckJob),
     SignIn,
     Machines,
     /// `harness start` at a part's start (#5379, #6407), or `harness start
@@ -1837,6 +1943,7 @@ enum Outcome {
     Observe(ObservationJob, Result<Observation, String>),
     Status(String, Result<Vec<Listed>, String>),
     Close(CloseJob, Result<Closed, String>),
+    Check(CheckJob, Result<Vec<Started>, String>),
     SignIn(Result<(SignIn, Option<String>), String>),
     Machines(Result<Vec<AccountMachine>, String>),
     StartDaemon(bool, Result<(), String>),
@@ -1980,6 +2087,8 @@ type Switches = (
     bool,
     // The lane for looks at a named session (#6274).
     Option<Arc<dyn SessionLane>>,
+    // The launch's own bound ([`Adapter::launch_bound`], #8170).
+    Duration,
 );
 
 /// The most looks at a named session kept at once (#6274, [`Looks`]): the
@@ -2111,6 +2220,7 @@ fn owner<C: Clock>(
         engines_lane,
         mut restart_due,
         session_lane,
+        launch_bound,
     ): Switches,
 ) -> io::Result<()> {
     let mut looks = Looks::new(session_lane);
@@ -2154,6 +2264,11 @@ fn owner<C: Clock>(
     // since when, bounded by the queue's wait.
     let mut place_held: Option<(String, Instant)> = None;
     let mut gateway_held: Option<(String, Instant)> = None;
+    // Each start being checked (#8170) and when it was last looked for, on
+    // the boot clock: in memory only, so a start looks at once again.
+    let mut checked: BTreeMap<u64, u64> = BTreeMap::new();
+    // ...and how many of its looks could not read the list.
+    let mut check_fails: BTreeMap<u64, u8> = BTreeMap::new();
     // Declared before `waits`, so dropped after it, but still before the
     // engine: every `watch` child is killed and reaped when the owner ends,
     // however it ends.
@@ -2443,6 +2558,23 @@ fn owner<C: Clock>(
                     let uncounted = engine.close_uncounted(&job, &result, &now);
                     eprintln!("{}", close_line(&job, &result, uncounted));
                     engine.finish_close(&job, result, &now)
+                }
+                Outcome::Check(job, listed) => {
+                    checked.insert(job.task_id, now.monotonic_ms);
+                    let failed = check_fails.get(&job.task_id).copied().unwrap_or(0);
+                    if listed.is_err() {
+                        check_fails.insert(job.task_id, failed.saturating_add(1));
+                    }
+                    let index = crate::session_index::read(&session_index);
+                    match start_settled(&job, listed, launch_bound, &index, failed) {
+                        Some(settled) => {
+                            eprintln!("{}", check_line(&job, &settled));
+                            checked.remove(&job.task_id);
+                            check_fails.remove(&job.task_id);
+                            engine.settle_start(job.task_id, settled, &now)
+                        }
+                        None => Ok(()),
+                    }
                 }
                 Outcome::Machines(read) => {
                     if let Some(later) = set_up_later.as_ref()
@@ -3153,10 +3285,32 @@ fn owner<C: Clock>(
                     if watch {
                         engine.watch(&now).map_err(io::Error::other)?;
                     }
-                    let observe = engine
-                        .begin_observation(&now)
-                        .map_err(io::Error::other)?
-                        .map(Job::Observe);
+                    // A start that timed out is looked for first, on the
+                    // round after it ended and then every
+                    // [`WATCH_CONFIRM_MS`] (#8170). The lamp's one pane
+                    // (#7246) keeps its own unsure opens: such a start is
+                    // not sure at once, never looked for here.
+                    let check = engine.check_due(&now, &checked, WATCH_CONFIRM_MS);
+                    let check = match check {
+                        Some(job)
+                            if crate::one_session::LAMP.get().is_some_and(|one| {
+                                crate::one_session::for_the_pane(one, &job.launch).is_some()
+                            }) =>
+                        {
+                            engine
+                                .settle_start(job.task_id, StartSettled::Unsure, &now)
+                                .map_err(io::Error::other)?;
+                            None
+                        }
+                        check => check,
+                    };
+                    let observe = match check {
+                        Some(job) => Some(Job::Check(job)),
+                        None => engine
+                            .begin_observation(&now)
+                            .map_err(io::Error::other)?
+                            .map(Job::Observe),
+                    };
                     // A harness done and told is closed after launches and
                     // reads (#1390).
                     let observe = match observe {
@@ -5491,6 +5645,7 @@ pub fn serve_with_adapter<C: Clock, A: Adapter>(
         None
     };
     let session_lane = adapter.session_lane();
+    let launch_bound = adapter.launch_bound();
     let current = Arc::new(Mutex::new(Report {
         updated: Instant::now(),
         summary: engine.summary(),
@@ -5608,6 +5763,10 @@ pub fn serve_with_adapter<C: Clock, A: Adapter>(
                                 let result = close_told(&adapter, &job);
                                 Outcome::Close(job, result)
                             }
+                            Job::Check(job) => {
+                                let result = adapter.started(&job.launch.target.machine_id);
+                                Outcome::Check(job, result)
+                            }
                             Job::SignIn => Outcome::SignIn(adapter.signed_in_here()),
                             Job::Machines => Outcome::Machines(adapter.machines()),
                             Job::StartDaemon(false) => {
@@ -5663,6 +5822,7 @@ pub fn serve_with_adapter<C: Clock, A: Adapter>(
                     engines_lane,
                     restart_wanted,
                     session_lane,
+                    launch_bound,
                 ),
             )
         })?;
@@ -5950,6 +6110,85 @@ fn with_sign_in(
 #[cfg(test)]
 mod tests {
     use super::code_handed;
+
+    /// #8170, Twelve's HOLD on #8240, item 2: in another boot (no end
+    /// dated), a start missed by its name is never "not started": a
+    /// titled one of the lamp's could be any row. A list not read is
+    /// looked for again, then not sure. In this boot, nothing that could be
+    /// it is not started only past its bound.
+    #[test]
+    fn a_start_missed_by_its_name_is_not_sure_unless_dated_and_nothing_could_be_it() {
+        use super::{
+            CLOSE_TRIES, CheckJob, Duration, StartSettled, WATCH_EARLY_FOR_MS, start_settled,
+        };
+        use crate::start_check::Started;
+        use std::collections::BTreeMap;
+        let job = |ended_ago_ms| CheckJob {
+            task_id: 1,
+            launch: crate::harness::Launch {
+                name: "lamp-0123456789abcdef0123456789abcdef".into(),
+                prompt: "Write a short poem".into(),
+                target: crate::harness::Target {
+                    machine_id: "0123456789abcdef0123456789abcdef".into(),
+                    project: "project".into(),
+                    engine: crate::harness::EngineKind::Claude,
+                },
+                session: None,
+            },
+            ended_ago_ms,
+            known: Vec::new(),
+        };
+        let row = |name: &str, folder: &str| Started {
+            id: "11111111-1111-4111-8111-111111111111".into(),
+            name: Some(name.into()),
+            folder: Some(folder.into()),
+        };
+        let bound = Duration::from_secs(60);
+        let index = BTreeMap::new();
+        let titled = || Ok(vec![row("Short poem", "/Users/me/harnesses/project")]);
+        let elsewhere = || Ok(vec![row("my notes", "/Users/me/code/other")]);
+        let settle = |ago, listed, failed| start_settled(&job(ago), listed, bound, &index, failed);
+
+        // Another boot.
+        assert_eq!(settle(None, titled(), 0), Some(StartSettled::Unsure));
+        assert_eq!(settle(None, elsewhere(), 0), Some(StartSettled::Unsure));
+        assert_eq!(settle(None, Err("busy".into()), 0), None, "no second look");
+        assert_eq!(
+            settle(None, Err("busy".into()), CLOSE_TRIES - 1),
+            Some(StartSettled::Unsure)
+        );
+        // This boot: looked for again before the bound, then by what is listed.
+        assert_eq!(settle(Some(1_000), titled(), 0), None);
+        assert_eq!(settle(Some(1_000), elsewhere(), 0), None);
+        assert_eq!(
+            settle(Some(60_000), titled(), 0),
+            Some(StartSettled::Unsure)
+        );
+        assert_eq!(
+            settle(Some(60_000), elsewhere(), 0),
+            Some(StartSettled::NotStarted)
+        );
+        assert_eq!(settle(Some(60_000), Err("busy".into()), 9), None);
+        assert_eq!(
+            settle(Some(WATCH_EARLY_FOR_MS), Err("busy".into()), 0),
+            Some(StartSettled::Unsure)
+        );
+        // Its own name: the lamp's, at once, in either boot.
+        let named = || {
+            Ok(vec![row(
+                "lamp-0123456789abcdef0123456789abcdef",
+                "/x/project",
+            )])
+        };
+        for ago in [None, Some(1_000)] {
+            assert_eq!(
+                settle(ago, named(), 0),
+                Some(StartSettled::Started {
+                    agent_id: "11111111-1111-4111-8111-111111111111".into()
+                })
+            );
+        }
+    }
 
     /// #7930: the steps' reader is made only with `LAMP_TASKS_STEPS` exactly
     /// `on`, as before: off, unset or anything else, nothing is read, for

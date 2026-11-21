@@ -32,6 +32,19 @@ pub const ENGINE_UNKNOWN: &str = "engine_unknown";
 /// installed on the lamp, it takes no task, its switch is off, or it is
 /// known missing there. Refused, never moved to another engine.
 pub const ENGINE_NOT_HERE: &str = "engine_not_here";
+/// A new start whose `harness new` timed out (#8170, [`crate::start_check`]):
+/// its dispatch stays `uncertain` with this code while the lamp looks for
+/// it on the computer, never sent again. A hand-over to the same target is
+/// held meanwhile ([`Request::Prepare`] refused with this code), and the
+/// person is told it is being checked.
+pub const START_CHECKING: &str = "start_checking";
+/// ...not listed by the bound: `not_sent` with this code, said plainly as
+/// not started.
+pub const NOT_STARTED: &str = "not_started";
+/// ...two or more harnesses fit, or the list could not be read in time:
+/// `uncertain` with this code for good, neither taken, told as not sure it
+/// started.
+pub const START_UNSURE: &str = "start_unsure";
 pub const SPEECH_AGE_MS: u64 = 600_000;
 /// A close that failed is tried again this long after, at most
 /// [`CLOSE_TRIES`] times in all, each time after reading the agent again.
@@ -1284,6 +1297,42 @@ pub struct LaunchJob {
     pub task_id: u64,
     pub launch: Launch,
 }
+/// A start being checked (#8170, [`Engine::check_due`]): its launch, and
+/// how long ago in this boot it ended, none in another.
+/// `known`: every harness the store's other tasks have.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct CheckJob {
+    pub task_id: u64,
+    pub launch: Launch,
+    pub ended_ago_ms: Option<u64>,
+    pub known: Vec<String>,
+}
+/// How a start being checked settled ([`Engine::settle_start`]).
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum StartSettled {
+    /// Found by the lamp's own name for it: followed from now on, and
+    /// closed once told, as any task the lamp started.
+    Started { agent_id: String },
+    /// Not listed by the bound.
+    NotStarted,
+    /// Not sure: neither taken.
+    Unsure,
+}
+/// Whether a launch that timed out may be looked for (#8170): a new start
+/// with its words given to `new` itself (`--task`), never a named session,
+/// a cloud agent, Devin (its words typed after) or OpenClaw (its first
+/// prompt proved apart), whose timed-out launches stay as they were.
+fn checkable(launch: &Launch) -> bool {
+    launch.session.is_none()
+        && !launch.target.engine.cloud()
+        && !launch.target.engine.typed_after()
+        && launch.target.engine != EngineKind::Openclaw
+}
+/// Whether `task`'s start is being checked ([`START_CHECKING`]).
+fn checking(task: &Task) -> bool {
+    task.dispatch.state == DispatchState::Uncertain
+        && task.dispatch.code.as_deref() == Some(START_CHECKING)
+}
 /// A task the watch looks at, as progress reads it (`serve --progress`):
 /// accepted, nothing settled kept yet, and handed over less than a day ago
 /// in this boot or in an earlier one.
@@ -2072,6 +2121,20 @@ impl<P: Persistence> Engine<P> {
                     .get(target)
                     .ok_or_else(|| err("target", "Choose a provisioned target alias."))?
                     .clone();
+                // A start to this target that timed out is still being
+                // checked (#8170): a retry or the same ask again is held, so
+                // the work never runs twice; the person is told it is being
+                // checked.
+                if next
+                    .tasks
+                    .iter()
+                    .any(|task| checking(task) && task.target_alias == *target)
+                {
+                    return Err(err(
+                        START_CHECKING,
+                        "A start there is still being checked; nothing is sent again until it is settled.",
+                    ));
+                }
                 // The lamp's own target (#6492): an engine named runs on
                 // exactly that one or is refused, never moved to the other;
                 // none named, the lamp's default. Another target ignores it.
@@ -2453,6 +2516,88 @@ impl<P: Persistence> Engine<P> {
             })
     }
 
+    /// The first start being checked (#8170) not looked at in the last
+    /// `every_ms` of this boot (`looked`: each task's last look, on the
+    /// boot clock), with what a look needs. Asks nothing of the store.
+    pub fn check_due(
+        &self,
+        now: &Clock,
+        looked: &BTreeMap<u64, u64>,
+        every_ms: u64,
+    ) -> Option<CheckJob> {
+        let ago = |audit: Option<&Audit>| {
+            audit
+                .filter(|audit| audit.boot_id == now.boot_id)
+                .map(|audit| now.monotonic_ms.saturating_sub(audit.monotonic_ms))
+        };
+        let task = self.state.tasks.iter().find(|task| {
+            checking(task)
+                && looked
+                    .get(&task.id)
+                    .is_none_or(|at| now.monotonic_ms.saturating_sub(*at) >= every_ms)
+        })?;
+        Some(CheckJob {
+            task_id: task.id,
+            launch: task.launch.clone(),
+            ended_ago_ms: ago(task.dispatch.finished.as_ref()),
+            known: self
+                .state
+                .tasks
+                .iter()
+                .filter(|other| other.id != task.id)
+                .filter_map(|other| other.dispatch.agent_id.clone())
+                .collect(),
+        })
+    }
+
+    /// A start being checked, settled (#8170): found, followed from now on
+    /// as any task handed over (an agent another task has is not sure,
+    /// never shared); not started; or not sure. A task no longer being
+    /// checked is left as it is.
+    pub fn settle_start(
+        &mut self,
+        task_id: u64,
+        settled: StartSettled,
+        now: &Clock,
+    ) -> Result<(), Error> {
+        self.clock(now)?;
+        let index = find(&self.state, task_id)?;
+        if !checking(&self.state.tasks[index]) {
+            return Ok(());
+        }
+        let settled = match settled {
+            StartSettled::Started { agent_id: id, .. }
+                if !agent_id(&id)
+                    || self.state.tasks.iter().any(|task| {
+                        task.id != task_id && task.dispatch.agent_id.as_ref() == Some(&id)
+                    }) =>
+            {
+                StartSettled::Unsure
+            }
+            settled => settled,
+        };
+        let mut next = self.state.clone();
+        let at = next_audit(&mut next, now)?;
+        let task = &mut next.tasks[index];
+        match settled {
+            StartSettled::Started { agent_id: id } => {
+                task.dispatch.state = DispatchState::Accepted;
+                task.dispatch.agent_id = Some(id);
+                task.dispatch.code = None;
+            }
+            StartSettled::NotStarted => {
+                task.dispatch.state = DispatchState::NotSent;
+                task.dispatch.code = Some(NOT_STARTED.into());
+            }
+            StartSettled::Unsure => {
+                task.dispatch.code = Some(START_UNSURE.into());
+            }
+        }
+        task.dispatch.finished = Some(at.clone());
+        task.updated = at;
+        self.save(next)
+    }
+
     /// The returned job is permission for one invocation only. A caller that
     /// loses the return must reopen as uncertain, never obtain the job again.
     pub fn begin_launch(&mut self, now: &Clock) -> Result<Option<LaunchJob>, Error> {
@@ -2655,6 +2800,14 @@ impl<P: Persistence> Engine<P> {
             LaunchOutcome::NotSent { code: value } if code(&value) => {
                 task.dispatch.state = DispatchState::NotSent;
                 task.dispatch.code = Some(value);
+            }
+            // A new start that timed out may still have begun there
+            // (#8170): checked for, never sent again.
+            LaunchOutcome::Uncertain { code: value }
+                if value == "timeout" && checkable(&task.launch) =>
+            {
+                task.dispatch.state = DispatchState::Uncertain;
+                task.dispatch.code = Some(START_CHECKING.into());
             }
             LaunchOutcome::Uncertain { code: value } if code(&value) => {
                 task.dispatch.state = DispatchState::Uncertain;
@@ -2890,6 +3043,9 @@ impl<P: Persistence> Engine<P> {
                         Some(State::Queued)
                     }
                     DispatchState::Cancelled if this_boot(&task.updated) => Some(State::Cancelled),
+                    // A start that timed out, being checked (#8170): never
+                    // shown failed while it may be running.
+                    DispatchState::Uncertain if checking(task) => Some(State::Queued),
                     DispatchState::NotSent | DispatchState::Uncertain
                         if this_boot(&task.updated) =>
                     {
@@ -8078,5 +8234,176 @@ mod tests {
             engine.put_back_launch(second, &clock(6)).unwrap_err().code,
             "stale_job"
         );
+    }
+
+    /// #8170: a queued task whose `new` timed out, as lamp-06c1's on 21 Nov.
+    fn timed_out(engine: &mut Engine<Memory>, at: u64) -> u64 {
+        let id = queued(engine, at);
+        engine.begin_launch(&clock(at)).unwrap().unwrap();
+        engine
+            .finish_launch(
+                id,
+                LaunchOutcome::Uncertain {
+                    code: "timeout".into(),
+                },
+                &clock(at + 62_400),
+            )
+            .unwrap();
+        id
+    }
+    fn code_of(engine: &Engine<Memory>, id: u64) -> Option<String> {
+        engine.state.tasks[find(&engine.state, id).unwrap()]
+            .dispatch
+            .code
+            .clone()
+    }
+
+    /// #8170: a new start that timed out is being checked, never sent
+    /// again: no launch is begun for it, and a look is due at once, then
+    /// once every spacing, with its times in this boot.
+    #[test]
+    fn a_start_that_timed_out_is_checked_and_never_sent_again() {
+        let (mut engine, _) = opened();
+        let id = timed_out(&mut engine, 1_000);
+        assert_eq!(dispatch(&engine, id), DispatchState::Uncertain);
+        assert_eq!(code_of(&engine, id).as_deref(), Some(START_CHECKING));
+        assert!(engine.begin_launch(&clock(70_000)).unwrap().is_none());
+        let mut looked = BTreeMap::new();
+        let job = engine.check_due(&clock(70_000), &looked, 10_000).unwrap();
+        assert_eq!(job.task_id, id);
+        assert_eq!(job.ended_ago_ms, Some(70_000 - 63_400));
+        looked.insert(id, 70_000);
+        assert!(engine.check_due(&clock(75_000), &looked, 10_000).is_none());
+        assert!(engine.check_due(&clock(80_000), &looked, 10_000).is_some());
+        // In another boot, no times.
+        let later = Clock {
+            boot_id: "other-boot".into(),
+            monotonic_ms: 5,
+        };
+        let job = engine.check_due(&later, &BTreeMap::new(), 10_000).unwrap();
+        assert_eq!(job.ended_ago_ms, None);
+    }
+
+    /// Found, it is followed as any task handed over, and closed once
+    /// told; not found, not started; being checked, shown queued;
+    /// unsure, unsure for good. Each settles once.
+    #[test]
+    fn a_start_being_checked_settles_once_found_not_started_or_unsure() {
+        let (mut engine, _) = opened();
+        let found = timed_out(&mut engine, 1_000);
+        engine
+            .settle_start(
+                found,
+                StartSettled::Started {
+                    agent_id: AGENT.into(),
+                },
+                &clock(80_000),
+            )
+            .unwrap();
+        assert_eq!(dispatch(&engine, found), DispatchState::Accepted);
+        let task = &engine.state.tasks[find(&engine.state, found).unwrap()];
+        assert_eq!(task.dispatch.agent_id.as_deref(), Some(AGENT));
+        assert!(task.closable);
+        assert!(
+            engine
+                .check_due(&clock(90_000), &BTreeMap::new(), 0)
+                .is_none()
+        );
+        // Settled again: left as it is.
+        engine
+            .settle_start(found, StartSettled::NotStarted, &clock(90_000))
+            .unwrap();
+        assert_eq!(dispatch(&engine, found), DispatchState::Accepted);
+
+        // Being checked, it is on the work records as queued, never failed.
+        let checked = timed_out(&mut engine, 100_000);
+        let works = engine.works(&clock(170_000), None);
+        let work = works.iter().find(|work| work.task_id == checked).unwrap();
+        assert_eq!(work.state, Some(crate::works::State::Queued));
+        engine
+            .settle_start(checked, StartSettled::Unsure, &clock(180_000))
+            .unwrap();
+
+        let never = timed_out(&mut engine, 200_000);
+        engine
+            .settle_start(never, StartSettled::NotStarted, &clock(330_000))
+            .unwrap();
+        assert_eq!(dispatch(&engine, never), DispatchState::NotSent);
+        assert_eq!(code_of(&engine, never).as_deref(), Some(NOT_STARTED));
+
+        // An agent another task has is never shared: unsure.
+        let shared = timed_out(&mut engine, 400_000);
+        engine
+            .settle_start(
+                shared,
+                StartSettled::Started {
+                    agent_id: AGENT.into(),
+                },
+                &clock(480_000),
+            )
+            .unwrap();
+        assert_eq!(dispatch(&engine, shared), DispatchState::Uncertain);
+        assert_eq!(code_of(&engine, shared).as_deref(), Some(START_UNSURE));
+        assert!(
+            engine
+                .check_due(&clock(490_000), &BTreeMap::new(), 0)
+                .is_none()
+        );
+        assert!(engine.begin_launch(&clock(490_000)).unwrap().is_none());
+    }
+
+    /// While a start is checked, a retry or the same ask again to that
+    /// target is held, with its own code; once settled, it may be asked.
+    #[test]
+    fn the_same_ask_while_a_start_is_checked_is_held() {
+        let (mut engine, _) = opened();
+        let id = timed_out(&mut engine, 1_000);
+        let again = preparation(&engine, "Review this project without changing files.");
+        let refused = engine.handle(&again, &clock(70_000), false).unwrap_err();
+        assert_eq!(refused.code, START_CHECKING);
+        let reworded = preparation(&engine, "Please review the project again.");
+        assert_eq!(
+            engine
+                .handle(&reworded, &clock(70_000), false)
+                .unwrap_err()
+                .code,
+            START_CHECKING
+        );
+        engine
+            .settle_start(id, StartSettled::NotStarted, &clock(130_000))
+            .unwrap();
+        prepare(&mut engine, 130_000);
+    }
+
+    /// Only a new start whose words went with `new` is checked: a timeout
+    /// of any other code, or of a named session's or Devin's hand-over,
+    /// stays as it was.
+    #[test]
+    fn only_a_new_start_that_timed_out_is_checked() {
+        let (mut engine, _) = opened();
+        let id = queued(&mut engine, 1);
+        engine.begin_launch(&clock(1)).unwrap().unwrap();
+        engine
+            .finish_launch(
+                id,
+                LaunchOutcome::Uncertain {
+                    code: "route_uncertain".into(),
+                },
+                &clock(2),
+            )
+            .unwrap();
+        assert_eq!(code_of(&engine, id).as_deref(), Some("route_uncertain"));
+        assert!(engine.check_due(&clock(3), &BTreeMap::new(), 0).is_none());
+        for (engine_kind, session) in [
+            (EngineKind::Devin, None),
+            (EngineKind::Openclaw, None),
+            (EngineKind::DevinCloud, None),
+            (EngineKind::Codex, Some("docs".to_owned())),
+        ] {
+            let mut launch = engine.state.tasks[0].launch.clone();
+            launch.target.engine = engine_kind;
+            launch.session = session;
+            assert!(!checkable(&launch), "{engine_kind:?}");
+        }
     }
 }
