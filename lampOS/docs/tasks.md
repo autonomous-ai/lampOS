@@ -2576,6 +2576,18 @@ command's environment (`hold::with_data_dir`), and in the launcher's lines
 (`export HERMES_NONINTERACTIVE=1` just before `export ADAPTER_DATA_DIR=…`,
 written alike by lamp-tasks and `lamp-update harness-install`).
 
+**Hermes's shared metrics are off on every lamp (#8151).** Under
+`HERMES_NONINTERACTIVE` Hermes does not answer its telemetry question: it
+skips it (`offer_consent_before_chat` and `offer_consent_if_undecided`
+return before asking, `hermes_cli/observability/shared_metrics_consent.py`,
+Hermes d923a5e) and records nothing, so the shipped defaults hold, which
+are off (`config_defaults.py`: `enabled: False`, `send: False`). The lamp
+does not rely on that default: its merge of `config.yaml` (above) always
+writes the answer "No thanks" itself, so nothing is collected or sent to
+Hermes's makers on any lamp, and Hermes reads the question as answered
+(`consent_state`: `decided`, never asked again). Without `offer_version: 2`
+Hermes would read the same off answer as never seen and ask once more.
+
 **The pinned launcher (#5493).** The environment above reaches only the
 Harness commands lamp-tasks runs. A `harness logout` run by hand over ssh,
 without them, restarted the held daemon from its own environment, and the
@@ -2887,7 +2899,11 @@ forwarded on the lamp").
   `default_model: "deepseek-flash"`; and `approvals.mode: "manual"`, so
   Hermes asks before a dangerous command (lamp-tasks never says yes to it
   by itself). The values are quoted: PyYAML would read a bare `off` or `on`
-  as a boolean.
+  as a boolean. And always `telemetry.shared_metrics` as Hermes's own "No
+  thanks" (`hermes_config::SHARED_METRICS_OFF`, #8151): `enabled: false`,
+  `send: false`, `offer_version: 2`, plain YAML (Hermes reads `enabled is
+  True` and `offer_version != 2`), replacing whatever was there (a
+  person's `endpoint` included); a make's own home gets the same.
 - `.env`: one `LAMP_HERMES_TOKEN=<token>` line, the forwarder's local
   token, never the relay's key. Provider keys are taken out
   (`DEEPSEEK_API_KEY`, `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`,

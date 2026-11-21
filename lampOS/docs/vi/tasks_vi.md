@@ -3714,6 +3714,21 @@ dotenv, không đè giá trị đã có), trong môi trường của mọi lện
 HERMES_NONINTERACTIVE=1` ngay trước `export ADAPTER_DATA_DIR=…`, lamp-tasks và
 `lamp-update harness-install` ghi như nhau).
 
+**Shared metrics của Hermes tắt trên mọi đèn (#8151).** Với
+`HERMES_NONINTERACTIVE`, Hermes không trả lời câu hỏi telemetry của nó: nó bỏ
+qua câu hỏi (`offer_consent_before_chat` và `offer_consent_if_undecided` trả
+về trước khi hỏi, `hermes_cli/observability/shared_metrics_consent.py`,
+Hermes d923a5e) và không ghi lại gì, nên giá trị mặc định đi kèm vẫn giữ, mà
+chúng là tắt (`config_defaults.py`: `enabled: False`, `send: False`). Đèn
+không dựa vào giá trị mặc định đó: lần gộp `config.yaml` của nó luôn tự ghi
+câu trả lời "No thanks" (`hermes_config::SHARED_METRICS_OFF`: `enabled: false`,
+`send: false`, `offer_version: 2`, YAML thường, thay cho bất cứ gì đã có, kể
+cả `endpoint` một người đặt; home riêng của một lần make cũng vậy), nên trên
+mọi đèn không có gì được thu thập hay gửi cho bên làm ra Hermes, và Hermes coi
+câu hỏi là đã trả lời (`consent_state`: `decided`, không bao giờ hỏi lại).
+Thiếu `offer_version: 2`, Hermes sẽ coi chính câu trả lời tắt đó là chưa thấy
+và hỏi thêm một lần.
+
 ## Cài đặt của OpenClaw trên đèn (#6226)
 
 Khi `LAMP_OPENCLAW_ON_LAMP` bật, lamp-tasks lúc khởi động gộp những gì
