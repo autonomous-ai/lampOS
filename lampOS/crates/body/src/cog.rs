@@ -260,41 +260,72 @@ mod tests {
     /// pose here does not have.
     const L5_MM: f64 = 21.5;
 
-    /// #8153: every built-in clip as level 5 plays it (`energy::livelier`,
-    /// up to 1.6 times its size, `energy::CLIP_SIZE_CAP` where held), on
-    /// each deployed lamp's standing pose, keeps [`L5_MM`] under V1's rule:
-    /// no frame past 21.5 mm off the axis, half a millimetre inside the
-    /// 22 mm at which one is refused at play time, and none leaning the lamp
-    /// back past 16 mm. A frame within 85% of 22 mm is said, as V1 said it,
-    /// and still plays. Prints the worst
-    /// of each, for the record (`cargo test -- --nocapture`).
+    /// The farthest back `frames` lean the lamp on `stand`, mm, and at
+    /// which frame.
+    fn back_frame(stand: [u16; 5], frames: &[[i16; 5]]) -> (usize, f64) {
+        frames
+            .iter()
+            .map(|offsets| {
+                let pose: [u16; 5] = std::array::from_fn(|joint| {
+                    (i32::from(stand[joint]) + i32::from(offsets[joint])) as u16
+                });
+                lean_back_mm(by_id(pose))
+            })
+            .enumerate()
+            .fold(
+                (0, f64::MIN),
+                |most, (frame, mm)| if mm > most.1 { (frame, mm) } else { most },
+            )
+    }
+
+    /// The first bound `frames` cross on any deployed lamp's stand, and
+    /// at which frame: [`L5_MM`] off the axis, or [`LOOK_MM`] back.
+    fn crossed(frames: &[[i16; 5]]) -> Option<(usize, &'static str)> {
+        LAMPS.iter().find_map(|(_, stand, _)| {
+            let (frame, mm) = worst_frame(*stand, frames);
+            let (back_at, back) = back_frame(*stand, frames);
+            if mm > L5_MM {
+                Some((frame, "the tip rule, 21.5 mm off the axis"))
+            } else if back > LOOK_MM {
+                Some((back_at, "the lean back, 16 mm"))
+            } else {
+                None
+            }
+        })
+    }
+
+    /// #8153: every built-in clip as each level plays it (`energy::livelier`:
+    /// up to 1.6 times its size at level 5, `energy::CLIP_SIZE_CAP` where
+    /// held, and lengthened toward all of its V1 recording,
+    /// `energy::WHOLE_TRIM` where held), on each deployed lamp's standing
+    /// pose, keeps [`L5_MM`] under V1's rule on every frame: no frame past
+    /// 21.5 mm off the axis, half a millimetre inside the 22 mm at which
+    /// one is refused at play time, and none leaning the lamp back past
+    /// 16 mm. A frame within 85% of 22 mm is said, as V1 said it, and still
+    /// plays. Prints the worst of each at level 5, for the record
+    /// (`cargo test -- --nocapture`).
     #[test]
-    fn every_built_in_clip_at_level_five_passes_v1s_rule() {
+    fn every_built_in_clip_at_every_level_passes_v1s_rule() {
         let mut failed = Vec::new();
         for (lamp, stand, _) in LAMPS {
             for clip in clips::ALL {
-                let played = crate::energy::livelier(clip, 5);
-                let (frame, mm) = worst_frame(stand, played.frames);
-                let (_, before) = worst_frame(stand, clip.frames);
-                let back = played
-                    .frames
-                    .iter()
-                    .map(|offsets| {
-                        let pose: [u16; 5] = std::array::from_fn(|joint| {
-                            (i32::from(stand[joint]) + i32::from(offsets[joint])) as u16
-                        });
-                        lean_back_mm(by_id(pose))
-                    })
-                    .fold(f64::MIN, f64::max);
-                eprintln!(
-                    "cog L5 {lamp} {:<13} off axis {mm:5.2} mm (level 1 {before:5.2}), back {back:5.2} mm",
-                    clip.name
-                );
-                if mm > L5_MM || back > LOOK_MM {
-                    failed.push(format!(
-                        "{lamp} {} frame {frame}: {mm} back {back}",
-                        clip.name
-                    ));
+                for level in 2..=5 {
+                    let played = crate::energy::livelier(clip, level);
+                    let (frame, mm) = worst_frame(stand, played.frames);
+                    let (_, back) = back_frame(stand, played.frames);
+                    if level == 5 {
+                        let (_, before) = worst_frame(stand, clip.frames);
+                        eprintln!(
+                            "cog L5 {lamp} {:<13} off axis {mm:5.2} mm (level 1 {before:5.2}), back {back:5.2} mm",
+                            clip.name
+                        );
+                    }
+                    if mm > L5_MM || back > LOOK_MM {
+                        failed.push(format!(
+                            "{lamp} {} level {level} frame {frame}: {mm} back {back}",
+                            clip.name
+                        ));
+                    }
                 }
             }
         }
@@ -318,5 +349,58 @@ mod tests {
             });
             assert!(fails, "{name} passes at {}", cap + 0.01);
         }
+    }
+
+    /// #8153: `energy::WHOLE_TRIM` is what V1's rule leaves of each cut
+    /// clip's recording at level 5, and only that. From all of it, a frame
+    /// that crosses [`L5_MM`] or [`LOOK_MM`] on a deployed lamp's stand
+    /// (at the clip's level-5 size and pace) is cut off with every frame
+    /// beyond it on its side of the cut, one at a time once it lies inside
+    /// the cut's own frames (where the kept start moves the pose they are
+    /// taken from), until none does. A clip that needs none is not listed;
+    /// a listed one keeps exactly that, the bound named. Prints each
+    /// (`cargo test -- --nocapture`).
+    #[test]
+    fn level_five_keeps_as_much_of_each_recording_as_v1s_rule_allows() {
+        let mut found = Vec::new();
+        for whole in clips::WHOLE {
+            let size = crate::energy::clip_size(whole.cut.name, 5);
+            let pace = crate::energy::of(5).clip_pace;
+            let (mut first, mut last) = (0, whole.whole.frames.len() - 1);
+            let mut why = None;
+            while let Some((frame, bound)) = crossed(
+                crate::energy::sized(&crate::energy::span(&whole, first, last), size, pace).frames,
+            ) {
+                why = Some(bound);
+                let at = first + frame;
+                if at < whole.from {
+                    first = at + 1;
+                } else if at > whole.to {
+                    last = at - 1;
+                } else if first < whole.from {
+                    first += 1;
+                } else {
+                    assert!(
+                        last > whole.to,
+                        "{}: the cut itself crosses {bound}",
+                        whole.cut.name
+                    );
+                    last -= 1;
+                }
+            }
+            eprintln!(
+                "whole {:<13} rows {first} to {last} of {} (the cut {} to {}){}",
+                whole.cut.name,
+                whole.whole.frames.len(),
+                whole.from,
+                whole.to,
+                why.map_or(String::new(), |why| format!(": {why}"))
+            );
+            if let Some(why) = why {
+                found.push((whole.cut.name, first, last, why));
+            }
+        }
+        let listed: Vec<_> = crate::energy::WHOLE_TRIM.to_vec();
+        assert_eq!(listed, found);
     }
 }
