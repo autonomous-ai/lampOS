@@ -375,20 +375,8 @@ pub fn grants_of(grants: &[String]) -> Result<Vec<String>, String> {
         }
         kept.push(grant.clone());
     }
-    // `net` never beside a private grant (Heron's P1 on #7590): private
-    // data and a way out never share one run.
-    if let Some(private) = private_beside_net(&kept) {
-        return Err(format!(
-            "grants: \"net\" beside {private:?}: {NET_BESIDE_PRIVATE}"
-        ));
-    }
     Ok(kept)
 }
-
-/// A private grant beside `net` (`lamp_voice::skill_task_yes`): refused at
-/// load here, in the manage helper, in lamp-control's yes and in
-/// lamp-tasks' hand-over.
-pub use lamp_voice::skill_task_yes::{NET_BESIDE_PRIVATE, private_beside_net};
 
 /// The task grant that gives a run the public web (`LAMP_TASK_NET`,
 /// `lamp_voice::skill_task_yes::NET`): a grant here, in the manage helper
@@ -2142,7 +2130,6 @@ mod tests {
     fn an_agent_skill_from_a_file_carries_its_task_only_with_its_switch() {
         lamp_voice::skill_task_yes::set_net_here(Some(true));
         lamp_voice::upload_agent::set_on_here(Some(true));
-        // No camera: `net` never sits beside it (Heron's P1 on #7590).
         let card = "---\nname: web-glow\ndescription: Glows three times. Call it when the \
                     person says 'glow for me'.\n---\n\nFlash the light three times; send a \
                     note to the web API at https://images.example.invalid/ and say \
@@ -2199,20 +2186,18 @@ mod tests {
         lamp_voice::skill_task_yes::set_net_here(None);
     }
 
-    /// Heron's P1 on #7590: `net` never loads beside a private grant (a
-    /// service's read or write, the camera, the microphone, what the lamp
-    /// says, `look`); each of them alone still loads, and `net` beside the
-    /// lamp's voice, `air` or the skill's own notes does too (the first
-    /// builder's ruling on #7850, 19 Nov 07:20: "tell me if the price is
-    /// higher than yesterday").
+    /// #7901, the settled design: a made skill's declared grants are all
+    /// on, nothing refused beside `net`. `net` loads beside the camera, the
+    /// microphone, what the lamp says, `look`, a service's read or write,
+    /// `air` and the skill's own notes, in either order.
     #[test]
-    fn net_never_loads_beside_a_private_grant() {
+    fn net_loads_beside_the_camera_notes_and_every_other_grant() {
         lamp_voice::skill_task_yes::set_net_here(Some(true));
         set_agent_services_here(Some(true));
         let of = |grants: &[&str]| {
             grants_of(&grants.iter().map(|g| (*g).to_owned()).collect::<Vec<_>>())
         };
-        for private in [
+        for other in [
             "gmail-read",
             "gmail-write",
             "google_calendar-read",
@@ -2220,29 +2205,18 @@ mod tests {
             "microphone",
             "speech",
             "look",
+            "air",
+            "notes",
+            "speak",
+            "light",
         ] {
-            assert_eq!(of(&[private]).unwrap(), [private]);
-            for pair in [[private, "net"], ["net", private]] {
-                let why = of(&pair).unwrap_err();
-                assert!(why.contains(NET_BESIDE_PRIVATE), "{pair:?}: {why}");
+            for pair in [[other, "net"], ["net", other]] {
+                assert_eq!(of(&pair), Ok(pair.map(str::to_owned).to_vec()), "{pair:?}");
             }
-            assert!(of(&["speak", private, "net"]).is_err(), "{private}");
         }
-        assert_eq!(of(&["speak", "net"]).unwrap(), ["speak", "net"]);
-        assert_eq!(of(&["light", "net"]).unwrap(), ["light", "net"]);
-        // `air` may sit beside `net`; `look` may not (the first builder's
-        // ruling on #7590, 18 Nov 02:01).
-        assert_eq!(of(&["air", "net"]).unwrap(), ["air", "net"]);
-        // The skill's own notes may too (the first builder's ruling on
-        // #7850, 19 Nov 07:20).
-        assert_eq!(of(&["notes", "net"]).unwrap(), ["notes", "net"]);
         assert_eq!(
-            of(&["net", "speak", "notes"]).unwrap(),
-            ["net", "speak", "notes"]
-        );
-        assert!(
-            !NET_BESIDE_PRIVATE.contains("notes"),
-            "{NET_BESIDE_PRIVATE}"
+            of(&["net", "camera", "notes"]).unwrap(),
+            ["net", "camera", "notes"]
         );
         set_agent_services_here(None);
         lamp_voice::skill_task_yes::set_net_here(None);

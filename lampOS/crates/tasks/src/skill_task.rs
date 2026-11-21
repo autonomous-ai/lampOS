@@ -261,38 +261,6 @@ pub const GATEWAY_NET_SWITCH: &str = "LAMP_TASK_NET_GATEWAY";
 /// The task grant that gives the run the public web: never lamp-control's own,
 /// so never in a one-run token; checked by the owner's yes as any grant.
 pub const NET_GRANT: &str = "net";
-/// The grants that reach what is the person's own: a linked service's
-/// read or write (`*-read`, `*-write`), the camera, the microphone, what
-/// the lamp says, and `look` (whether someone is there, so whether the
-/// house is empty: the first builder's ruling on #7590, 18 Nov 02:01). A run granted [`NET_GRANT`] holds none of them (Heron's P1 on
-/// #7590): private data, untrusted text and a way out never share one run.
-/// `air` is not one: its readings show who is there only coarsely and
-/// slowly, and may go out (the yes says so). Nor are the skill's own
-/// `notes`, what it kept itself, so a net skill can compare a price with
-/// yesterday's (the first builder's ruling on #7850, 19 Nov 07:20). A skill that needs both is two skills. Checked here ([`HandOver::check`]), at load by lamp-skills and
-/// the upload, and by lamp-control's yes.
-pub const PRIVATE_GRANTS: [&str; 4] = ["camera", "microphone", "speech", "look"];
-/// Said when a skill's grants name [`NET_GRANT`] beside one of
-/// [`PRIVATE_GRANTS`] or a service's.
-pub const NET_BESIDE_PRIVATE: &str = "a skill that reaches the internet can't also use your linked services, the camera, the microphone or what the lamp says, or know whether someone is there: make it two skills";
-
-/// Whether `grant` is one a run granted [`NET_GRANT`] never holds:
-/// [`PRIVATE_GRANTS`], or any service's read or write.
-pub fn private_grant(grant: &str) -> bool {
-    PRIVATE_GRANTS.contains(&grant) || grant.ends_with("-read") || grant.ends_with("-write")
-}
-
-/// The first of `grants` that may not sit beside [`NET_GRANT`] there
-/// ([`private_grant`]), when `grants` names it; `None` otherwise.
-pub fn private_beside_net<S: AsRef<str>>(grants: &[S]) -> Option<&str> {
-    if !grants.iter().any(|grant| grant.as_ref() == NET_GRANT) {
-        return None;
-    }
-    grants
-        .iter()
-        .map(AsRef::as_ref)
-        .find(|grant| private_grant(grant))
-}
 /// An agent skill's `run` (`lamp_voice::upload_agent::INSTRUCTIONS`,
 /// `LAMP_UPLOAD_TO_AGENT`): a file added in the app, kept whole, which
 /// Hermes follows rather than runs.
@@ -507,9 +475,6 @@ impl HandOver {
             if !name_ok(grant) || !known || !seen.insert(grant) {
                 return Err("a grant is unknown, written twice or `skills`");
             }
-        }
-        if private_beside_net(&self.grants).is_some() {
-            return Err(NET_BESIDE_PRIVATE);
         }
         Ok(())
     }
@@ -8203,73 +8168,36 @@ mod tests {
         ));
     }
 
-    /// Heron's P1 on #7590: a hand-over granted `net` beside a private
-    /// grant (a service's read or write, the camera, the microphone, what
-    /// the lamp says, `look`) is refused, nothing minted or run; each of
-    /// them alone still passes, and `net` beside the lamp's voice, `air` or
-    /// the skill's own notes, too (the first builder's ruling on #7850,
-    /// 19 Nov 07:20).
+    /// #7901, the settled design: a made skill's declared grants are all
+    /// on, nothing refused beside `net`. A hand-over granted `net` beside
+    /// the camera, the microphone, what the lamp says, `look`, a service's
+    /// read or write, `air` or the skill's own notes passes the check.
     #[test]
-    fn a_hand_over_never_holds_net_beside_a_private_grant() {
+    fn a_hand_over_holds_net_beside_the_camera_notes_and_every_other_grant() {
         let parse = |grants: Value| {
             HandOver::parse_with(&line(|value| value["grants"] = grants), skills(), true)
         };
-        for private in [
+        for other in [
             "gmail-read",
             "gmail-write",
             "google_calendar-read",
             "camera",
             "microphone",
             "speech",
-            // Whether someone is there (the first builder's ruling on
-            // #7590, 18 Nov 02:01).
             "look",
+            "air",
+            "notes",
+            "speak",
         ] {
-            assert!(private_grant(private), "{private}");
-            assert!(parse(json!([private])).is_ok(), "{private}");
+            assert!(parse(json!([other])).is_ok(), "{other}");
             for pair in [
-                json!([private, NET_GRANT]),
-                json!([NET_GRANT, "light", private]),
+                json!([other, NET_GRANT]),
+                json!([NET_GRANT, "light", other]),
             ] {
-                let (code, why) = parse(pair.clone()).unwrap_err();
-                assert_eq!(
-                    (code, why.as_str()),
-                    ("bad_request", NET_BESIDE_PRIVATE),
-                    "{pair}"
-                );
+                assert!(parse(pair.clone()).is_ok(), "{pair}");
             }
         }
-        assert!(parse(json!(["speak", NET_GRANT])).is_ok());
-        assert!(parse(json!(["light", "speak", "body", NET_GRANT])).is_ok());
-        assert!(!private_grant("speak") && !private_grant(NET_GRANT) && !private_grant("air"));
-        // `air` stays allowed beside `net` (the same ruling): its yes says
-        // the readings can go to the internet.
-        assert!(parse(json!(["air", NET_GRANT])).is_ok());
-        // The skill's own notes are no private grant (the first builder's
-        // ruling on #7850, 19 Nov 07:20): a price compared with yesterday's.
-        assert!(!private_grant("notes"));
-        assert!(parse(json!(["notes", NET_GRANT])).is_ok());
-        assert!(parse(json!([NET_GRANT, "speak", "notes"])).is_ok());
-        // lamp-tasks refuses it before any token is asked for.
-        let tokens = FakeTokens {
-            net_yes: true,
-            ..FakeTokens::default()
-        };
-        let work = tempfile::tempdir().unwrap();
-        let (held, open) = (where_runner(), where_runner());
-        let agent = Agent {
-            net: Some(&open),
-            held: None,
-            work: Some(work.path()),
-            services: false,
-            keys: None,
-            direct: None,
-        };
-        let pair = line(|value| value["grants"] = json!(["camera", NET_GRANT]));
-        let told = answer_agent(&pair, true, skills(), &tokens, &held, &agent);
-        assert_eq!(told["error"], "bad_request", "{told}");
-        assert!(tokens.minted.borrow().is_empty());
-        assert!(open.started.borrow().is_empty() && held.started.borrow().is_empty());
+        assert!(parse(json!([NET_GRANT, "camera", "notes"])).is_ok());
     }
 
     /// LAMP_TASK_NET: a run granted `net` goes through the make's net

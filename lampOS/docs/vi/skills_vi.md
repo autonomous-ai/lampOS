@@ -3395,14 +3395,12 @@ cả hai người viết.
     `lamp-skills-manage@` (lamp-9adf, 18/11 21:37: thiếu nó, helper từ chối
     kỹ năng bitcoin-price đã lưu với "a grant the lamp doesn't have: net").
     Khi tắt, `net` chỉ đi cùng `scripts/agent.py` của chính đèn.
-    `code_held` vẫn từ chối `net` cùng một quyền riêng tư (`camera`, `look`
-    và tương tự; `notes` riêng của kỹ năng thì được đi cùng, quyết định
-    của người xây dựng đầu tiên trên #7850, 19/11 07:20), với lời sửa "one skill can't do both: make it two
-    skills", như lamp-skills từ chối lúc nạp, nên code như vậy không bao giờ
-    được đọc lại và nhận lời đồng ý mà rồi không bật được (P2 của Twelve
-    trên #7780). Test:
+    `code_held` giữ `net` cùng mọi quyền, kể cả `camera`, `look`, micro và
+    `notes` riêng của kỹ năng (#7901, thiết kế đã chốt: mọi quyền khai báo
+    của kỹ năng được tạo đều bật, không chặn gì). Test:
     `make_skill_local::tests::with_gateway_net_an_openclaw_net_skill_kept_is_put_on_by_the_helper`,
-    `made_skill::tests::with_gateway_net_code_granted_net_beside_a_private_grant_is_refused`.
+    `make_skill_local::tests::with_gateway_net_a_make_granted_net_beside_the_camera_and_notes_is_kept`,
+    `made_skill::tests::with_gateway_net_code_granted_net_beside_the_camera_or_notes_is_kept`.
   - **Một yêu cầu không quyền nào đáp ứng được** được nói lý do bằng lời
     thường, nêu thiếu gì rồi dừng, không bao giờ chỉ là "I couldn't make
     that one." (`Uncovered::line`). Không câu nào bảo người dùng làm điều họ
@@ -5670,9 +5668,9 @@ tệp được giữ nguyên là `scripts/SKILL.md`; kỹ năng là một công 
 thư mục và home mới mỗi lần chạy, dữ liệu Hermes của người dùng bị ẩn, token riêng của lần chạy). Quyền được đọc thận
 trọng từ tệp: `camera`, `light`, `speak`, `sound`, và `net` khi tệp có một liên
 kết `http(s)://`, một webhook, hoặc bảo gọi, lấy hay gửi tới một API web hay URL;
-chỉ nhắc "API" hay "URL" thì chưa đủ (cần `LAMP_TASK_NET=on`, bật trong sản phẩm, #7200). `net` không bao giờ đi cùng
-camera, micro, những gì đèn nói, ghi chú, `look` (có ai ở đó không; quyết định của người xây dựng đầu tiên trên #7590) hay quyền của dịch vụ liên kết (P1 của Heron trên #7590): tệp như vậy bị từ chối
-bằng lời rõ ràng, không giữ gì; kỹ năng cần cả hai thì là hai kỹ năng. `air` được đi cùng `net`, và lời nói lại khi đó thêm
+chỉ nhắc "API" hay "URL" thì chưa đủ (cần `LAMP_TASK_NET=on`, bật trong sản phẩm, #7200). `net` được đi cùng
+mọi quyền: camera, micro, những gì đèn nói, ghi chú, `look` hay quyền của dịch vụ liên kết (#7901, thiết kế đã chốt: mọi quyền khai báo
+của kỹ năng đều bật, không chặn gì), trong tệp cũng như trong `skill.toml` đã giữ. Khi `air` đi cùng `net`, lời nói lại thêm
 "so its air readings can go to the internet". Đèn nói lại các quyền khi bật.
 Chỉ đèn, giọng (kể cả âm thanh nó phát) và thân thì bật ngay (giọng nói ghi lời đồng ý với
 lamp-control); `sound` (nghe các loại âm thanh), micro, camera, gửi đi hoặc `net` thì hỏi lời đồng ý bằng

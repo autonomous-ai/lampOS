@@ -233,7 +233,7 @@ fn net_code_told() -> String {
          gives the run its web proxy, and it reaches only the public web on ports 80 and 443), \
          says what it found in a sentence or two with lamp.say (a plain spoken line when the \
          fetch fails), and then prints only \"{said}\", so the lamp's agent that ran it ends \
-         with a dash and it is heard once. \"{net}\" never sits beside camera, microphone, speech, look or a linked service's grant. Never \
+         with a dash and it is heard once. Never \
          {cannot} for it, never {needs_net} for it, and never a say telling the person to look \
          it up themselves.",
         net = crate::skill_task_yes::NET.0,
@@ -5190,6 +5190,15 @@ pub(crate) mod tests {
     use std::os::unix::fs::PermissionsExt;
     use std::path::{Path, PathBuf};
 
+    /// #7901, the settled design: the make is told no limit on what sits
+    /// beside `net`, so a web skill keeps its own notes or uses the camera.
+    #[test]
+    fn the_make_is_told_no_grant_is_kept_from_beside_net() {
+        let told = net_code_told();
+        assert!(!told.contains("never sits beside"), "{told}");
+        assert!(!told.contains("camera"), "{told}");
+    }
+
     /// #7679 (`LAMP_MAKE_QUEUE`): a make waiting its turn while a busy room
     /// talks on (13 more exchanges, past the thread's twelve) still runs
     /// with its own heard line, kept at the ask, never the newest words; and
@@ -5268,22 +5277,6 @@ pub(crate) mod tests {
             with_asker_kept(None, Some("ann".into()), || panic!("the make failed"))
         });
         assert_eq!(owner_for_make(None), None);
-    }
-
-    /// #7901: the make is told `net` never sits beside exactly the private
-    /// grants the check refuses, so it no longer drops a skill's own notes
-    /// from a web skill that keeps them.
-    #[test]
-    fn the_make_is_told_net_never_sits_beside_only_the_private_grants() {
-        let told = net_code_told();
-        let beside = told
-            .split("never sits beside ")
-            .nth(1)
-            .and_then(|rest| rest.split(" or a linked service's grant").next())
-            .expect("the never-beside list");
-        let named: Vec<&str> = beside.split(", ").collect();
-        assert_eq!(named, crate::skill_task_yes::PRIVATE_GRANTS, "{told}");
-        assert!(!named.contains(&"notes"), "{told}");
     }
 
     /// Heron's P1 on #6558: a voice make's write waits for the owner's yes
@@ -12491,6 +12484,64 @@ printf 'tar of %s' \"$name\" > \"$3/$name-1.0.0.tar\"\n",
         assert!(!net_code_by("Hermes"));
         crate::skill_task_yes::set_gateway_net_here(Some(false));
         assert!(!net_code_by("OpenClaw"));
+        crate::skill_task_yes::set_gateway_net_here(None);
+        made_skill::set_code_at_once_here(None);
+        net_make_here(None);
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    /// #7901, the settled design: an OpenClaw make's own code granted
+    /// `net` beside the camera and the skill's own notes is made and kept
+    /// with all its grants, waiting for the yes to its code as any made
+    /// code does; nothing is refused beside `net`.
+    #[test]
+    fn with_gateway_net_a_make_granted_net_beside_the_camera_and_notes_is_kept() {
+        if made_skill::a_python_here().is_none() {
+            eprintln!("skipped: no python3 here to parse a made script with");
+            return;
+        }
+        net_make_here(Some(true));
+        crate::skill_task_yes::set_gateway_net_here(Some(true));
+        made_skill::set_code_at_once_here(Some(false));
+        let (root, keeping) = keeping("net-camera-notes");
+        let toml = CODE_TOML
+            .replace(
+                "grants = [\"camera\"]",
+                "grants = [\"net\", \"speak\", \"camera\", \"notes\"]",
+            )
+            .replace("take a photo", "fetch the Bitcoin price from the web");
+        let main = net_code_main();
+        let answer = format!(
+            "```skill.toml\n{toml}```\n\n```SKILL.md\n{CODE_CARD}```\n\n```scripts/main.py\n{main}```\n"
+        );
+        let tasks = crate::make_skill_agent::tests::stub(
+            Some("openclaw"),
+            std::sync::Arc::new(move |_: &str| Some(answer.clone())),
+        );
+        let agent = crate::make_skill_agent::Agent {
+            one_path: true,
+            ..tasks.agent()
+        };
+        let (url, served) = service_sent(vec![(200, "internet: the Bitcoin price".to_owned())]);
+        let told = make_with_by(
+            0,
+            None,
+            BITCOIN,
+            &keeping,
+            chat_at(url),
+            NOW,
+            || None,
+            Some(&agent),
+        );
+        served.join().unwrap();
+        assert_eq!(told["made"], "photo-booth", "{told}");
+        assert_eq!(told["code_waits_for_yes"], true, "{told}");
+        let entry = &made_skill::entries(&keeping.directory)[0];
+        assert_eq!(
+            entry["uses"]["grants"],
+            json!(["net", "speak", "camera", "notes"]),
+            "{entry}"
+        );
         crate::skill_task_yes::set_gateway_net_here(None);
         made_skill::set_code_at_once_here(None);
         net_make_here(None);

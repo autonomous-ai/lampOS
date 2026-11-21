@@ -1775,29 +1775,24 @@ sang runner chung của #6510 bước 2 mà không cần luật mới.
   cài bằng tay không phải Made):
   lamp-control tạo token từ các quyền khai báo trong thư mục của nó
   (`task_yes::KeptYes::grants`, `no_yes_grants`; bỏ `net`, và các quy tắc
-  bên dưới, trong đó `net` không bao giờ đi cùng quyền riêng tư, vẫn giữ)
+  bên dưới vẫn giữ)
   và trả lời kiểm tra của nó `{"agreed": true}` cho thư mục đúng như hiện
   tại (SHA-256 và các quyền khai báo, `task_yes::agreed_with_no_yes`), nên
   `net` của nó không hỏi gì. Kỹ năng từ Store, được đẩy lên hay khác vẫn
   cần lời đồng ý đã giữ, và khi tắt công tắc thì kỹ năng được tạo cũng vậy,
   đúng như trước. Tắt: `net` bị từ chối trước khi có token.
-- **Điều lần chạy có `net` không bao giờ giữ, và giới hạn của nó** (P1 và các
-  P3 của Heron trên #7590, quyết định 23:22 của người xây dựng đầu tiên):
-  - `net` không bao giờ được cấp cùng một quyền riêng tư: quyền đọc hay ghi
-    của dịch vụ (`*-read`, `*-write`), `camera`, `microphone`, `speech` hay
-    `look` (có ai ở đó không, tức nhà có trống không: quyết định của người
-    xây dựng đầu tiên trên #7590, 18/11 02:01)
-    (`skill_task::PRIVATE_GRANTS`, `skill_task_yes::private_grant`). `air`
-    không thuộc số đó: nó được đi cùng `net`, và lời đồng ý khi đó nói rõ
-    ("…, so its air readings can go to the internet",
-    `skill_task_yes::AIR_BESIDE_NET`). `notes` riêng của kỹ năng cũng không
-    (quyết định của người xây dựng đầu tiên trên #7850, 19/11 07:20): một
-    kỹ năng có `net` được giữ giá hôm nay để so với ngày mai.
-    Cặp đó bị từ chối khi nạp (`grants_of` của lamp-skills), khi tải lên
-    (`upload_agent::files` và phần kiểm tra `skill.toml` đã giữ, nói rõ
-    bằng lời), trong lời đồng ý của lamp-control (`grants_ok`) và trong lần
-    giao của lamp-tasks (`HandOver::check`, `bad_request`, không tạo token).
-    Kỹ năng cần cả hai thì là hai kỹ năng.
+- **Điều lần chạy có `net` được giữ, và giới hạn của nó** (các P3 của Heron
+  trên #7590, quyết định 23:22 của người xây dựng đầu tiên; #7901):
+  - `net` được đi cùng mọi quyền (#7901, thiết kế đã chốt: mọi quyền khai
+    báo của kỹ năng được tạo đều bật, không hỏi, không chặn): quyền đọc hay
+    ghi của dịch vụ, `camera`, `microphone`, `speech`, `look`, `air` và
+    `notes` riêng của kỹ năng đều được đi cùng nó, và không quyền nào bị từ
+    chối khi nạp (`grants_of` của lamp-skills), khi tải lên
+    (`upload_agent::files`, `capped`), trong lời đồng ý của lamp-control
+    (`grants_ok`), trong lần giao của lamp-tasks (`HandOver::check`) hay lúc
+    tạo (`made_skill::code_held`, `make_no_cannot::covered`). Khi `air` đi
+    cùng `net`, lời đồng ý vẫn nói rõ ("…, so its air readings can go to the
+    internet", `skill_task_yes::AIR_BESIDE_NET`).
   - Lần chạy có `net` chỉ thấy thư mục kỹ năng của chính nó, không bao giờ
     thấy thư mục của kỹ năng khác: lamp-tasks ghi tên thư mục đó cạnh socket
     lối ra của lần chạy, trong thư mục riêng 0700 của nó,
