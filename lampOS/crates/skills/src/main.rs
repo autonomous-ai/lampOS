@@ -6051,7 +6051,24 @@ fn hand_task(
             // measuring a run's share of the day on a lamp. Numbers only.
             let metered = lamp_skills::relay_share::on();
             let before = metered.then(lamp_skills::relay_share::read_here).flatten();
-            let sent = hand_over(socket, line);
+            // Asked by voice just now: told once if its agent is still
+            // starting (#7354), on a thread of its own, so the answer is
+            // read as it comes.
+            let line = lamp_skills::task::asking_getting_ready(line, asked_at.is_some());
+            let sent = hand_over_telling(socket, &line, &mut || {
+                let (say_socket, skill) = (say_socket.clone(), skill.clone());
+                std::thread::spawn(move || {
+                    let asking = json!({
+                        "text": lamp_skills::task::GETTING_READY_LINE,
+                        "exact": true,
+                        "priority": lamp_skills::SAY_PRIORITY,
+                    });
+                    let outcome = say(&say_socket, "say", &skill, asking, &[], || {});
+                    eprintln!(
+                        "lamp-skills: skill:{skill}: do.task: told the lamp is getting ready: {outcome}"
+                    );
+                });
+            });
             if metered {
                 let after = lamp_skills::relay_share::read_here();
                 eprintln!(
@@ -6389,16 +6406,32 @@ impl Drop for Handing {
 /// connected, nothing was taken; a line written and no answer read, the
 /// run may have begun.
 fn hand_over(socket: &Path, line: &str) -> Result<String, lamp_skills::service_write::Unrun> {
+    hand_over_telling(socket, line, &mut || {})
+}
+
+/// [`hand_over`], the getting-ready notice lamp-tasks may write before the
+/// answer (#7354) given to `getting_ready`, at most once, and read past.
+fn hand_over_telling(
+    socket: &Path,
+    line: &str,
+    getting_ready: &mut dyn FnMut(),
+) -> Result<String, lamp_skills::service_write::Unrun> {
     use lamp_skills::service_write::Unrun;
     let _handing = Handing::begin();
     let stream = UnixStream::connect(socket)
         .map_err(|error| Unrun::NotTaken(format!("lamp-tasks couldn't be reached: {error}")))?;
-    let exchange = || -> io::Result<String> {
+    let mut exchange = || -> io::Result<String> {
         stream.set_write_timeout(Some(Duration::from_secs(5)))?;
         stream.set_read_timeout(Some(lamp_skills::task::RUN_MOST))?;
         (&stream).write_all(format!("{line}\n").as_bytes())?;
+        let mut reader = BufReader::new((&stream).take(16_384));
         let mut answer = String::new();
-        BufReader::new((&stream).take(8_192)).read_line(&mut answer)?;
+        reader.read_line(&mut answer)?;
+        if lamp_skills::task::is_getting_ready(&answer) {
+            getting_ready();
+            answer.clear();
+            reader.read_line(&mut answer)?;
+        }
         Ok(answer)
     };
     exchange().map_err(|error| Unrun::Unknown(format!("lamp-tasks' answer never came: {error}")))
