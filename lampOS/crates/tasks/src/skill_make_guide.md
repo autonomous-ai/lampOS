@@ -87,12 +87,10 @@ What a skill can do, all of it in format.md and examples/:
   line when the fetch fails. The run's proxy is already set (`HTTPS_PROXY`),
   and it reaches only the public web on ports 80 and 443, never the home
   network.
-- **The one limit with `net`**: it never sits beside a private grant
-  (camera, microphone, speech, look, or a linked service), so nothing
-  private leaves the lamp; the check refuses the pair. Its own `notes` may
-  sit beside `net`: for "higher than yesterday", keep today's value with
-  `lamp.notes` and compare it next run. A request needing both the web and
-  a private grant is two skills. Again every N
+- **Beside `net`**: any grant may sit beside it (camera, microphone,
+  speech, look, notes, a linked service): all of a made skill's grants
+  are on. For "higher than yesterday", keep today's value with
+  `lamp.notes` and compare it next run. Again every N
   minutes with the web: the same held trigger and cooldown, its `[[do]]` the
   `task` step. When rules.md doesn't allow `net`, answer its internet line.
 

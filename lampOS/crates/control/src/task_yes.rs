@@ -144,14 +144,6 @@ fn grants_ok(grants: &[String]) -> Result<(), String> {
             Err(_) => return Err(format!("grants: {grant:?} is not a grant")),
         }
     }
-    // `net` never beside a private grant (Heron's P1 on #7590): no yes is
-    // kept for a pair no run may hold.
-    if let Some(private) = lamp_skills::task::private_beside_net(grants) {
-        return Err(format!(
-            "grants: net beside {private}: {}",
-            lamp_skills::task::NET_BESIDE_PRIVATE
-        ));
-    }
     Ok(())
 }
 
@@ -842,14 +834,6 @@ mod tests {
             record(json!(["net", "net"]), &sha256)["error"],
             "grants: net is listed twice"
         );
-        // Never beside a private grant (Heron's P1 on #7590).
-        let refused = record(json!(["camera", "light", "net"]), &sha256);
-        assert!(
-            refused["error"]
-                .as_str()
-                .is_some_and(|why| why.contains(lamp_skills::task::NET_BESIDE_PRIVATE)),
-            "{refused}"
-        );
         assert_eq!(
             record(json!(["light", "speak", "net"]), &sha256),
             json!({"recorded": true})
@@ -1088,39 +1072,32 @@ mod tests {
         let _ = std::fs::remove_dir_all(&dir);
     }
 
-    /// Heron's P1 on #7590: no yes is kept for `net` beside a private
-    /// grant (the camera, the microphone, what the lamp says, `look`, a
-    /// service's read or write); each alone still is, and `net` beside the
-    /// lamp's voice, `air` or the skill's own notes, too (the first
-    /// builder's ruling on #7850, 19 Nov 07:20).
+    /// #7901, the settled design: a made skill's declared grants are all
+    /// on, nothing refused beside `net`. A yes is kept for `net` beside the
+    /// camera, the microphone, what the lamp says, `look`, `air` and the
+    /// skill's own notes, in either order.
     #[test]
-    fn no_yes_names_net_beside_a_private_grant() {
+    fn a_yes_names_net_beside_the_camera_notes_and_every_other_grant() {
         lamp_voice::skill_task_yes::set_net_here(Some(true));
         let of = |grants: &[&str]| {
             grants_ok(&grants.iter().map(|g| (*g).to_owned()).collect::<Vec<_>>())
         };
-        for private in ["camera", "microphone", "speech", "look"] {
-            assert_eq!(of(&[private]), Ok(()), "{private}");
-            for pair in [[private, "net"], ["net", private]] {
-                let why = of(&pair).unwrap_err();
-                assert!(
-                    why.contains(lamp_skills::task::NET_BESIDE_PRIVATE),
-                    "{pair:?}: {why}"
-                );
+        for other in [
+            "camera",
+            "microphone",
+            "speech",
+            "look",
+            "air",
+            "notes",
+            "speak",
+            "light",
+        ] {
+            assert_eq!(of(&[other]), Ok(()), "{other}");
+            for pair in [[other, "net"], ["net", other]] {
+                assert_eq!(of(&pair), Ok(()), "{pair:?}");
             }
         }
-        // A service's grant is never one of this part's own, with `net` or
-        // without it.
-        assert!(of(&["gmail-read", "net"]).is_err());
-        assert_eq!(of(&["speak", "net"]), Ok(()));
-        assert_eq!(of(&["light", "speak", "net"]), Ok(()));
-        // `air` may sit beside `net` (the first builder's ruling on #7590,
-        // 18 Nov 02:01); `look`, above, may not.
-        assert_eq!(of(&["air", "net"]), Ok(()));
-        // The skill's own notes may too (the first builder's ruling on
-        // #7850, 19 Nov 07:20).
-        assert_eq!(of(&["notes", "net"]), Ok(()));
-        assert_eq!(of(&["net", "speak", "notes"]), Ok(()));
+        assert_eq!(of(&["net", "camera", "notes"]), Ok(()));
         lamp_voice::skill_task_yes::set_net_here(None);
     }
 

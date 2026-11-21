@@ -5959,15 +5959,6 @@ fn code_held(
             }
         }
     }
-    // Never `net` beside a private grant (Heron's P1 on #7590), as
-    // lamp-skills refuses it at load: refused here in words, so no such
-    // code is said back and given a yes that never goes on (Twelve's P2
-    // on #7780).
-    if let Some(private) = crate::skill_task_yes::private_beside_net(&grants) {
-        return Err(scripts_not_held(&crate::upload_agent::net_beside_private(
-            private,
-        )));
-    }
     Ok(grants)
 }
 
@@ -18776,28 +18767,27 @@ task = { task = "take a photo and send it to the app", run = "scripts/main.py" }
         assert!(checked > 50, "{checked}");
     }
 
-    /// Twelve's P2 on #7780: with `LAMP_TASK_NET_GATEWAY` on, a made
-    /// skill's own code granted `net` beside a private grant is refused at
-    /// the check, in words its repair can act on, so it is never said back
-    /// and given a yes that lamp-skills then refuses at load. `net` alone,
-    /// or beside `speak` or the skill's own notes (the first builder's
-    /// ruling on #7850, 19 Nov 07:20), is still kept.
+    /// #7901, the settled design: with `LAMP_TASK_NET_GATEWAY` on, a made
+    /// skill's own code granted `net` beside the camera, `look`, the
+    /// microphone or the skill's own notes is kept at the check, as `net`
+    /// alone or beside `speak` is: a made skill's declared grants are all
+    /// on, nothing refused beside `net`.
     #[test]
-    fn with_gateway_net_code_granted_net_beside_a_private_grant_is_refused() {
+    fn with_gateway_net_code_granted_net_beside_the_camera_or_notes_is_kept() {
         set_scripts_here(Some(true));
         crate::skill_task_yes::set_net_here(Some(true));
         crate::skill_task_yes::set_gateway_net_here(Some(true));
         let with = |grants: &str| CODE_TOML.replace(r#"grants = ["camera", "light"]"#, grants);
-        let kept = put_on_cap(&with(r#"grants = ["net", "speak"]"#));
-        assert!(kept.is_ok(), "{:?}", kept.err());
-        let notes = put_on_cap(&with(r#"grants = ["net", "speak", "notes"]"#));
-        assert!(notes.is_ok(), "{:?}", notes.err());
-        for private in ["camera", "look", "microphone"] {
-            let refused = put_on_cap(&with(&format!(r#"grants = ["net", "speak", "{private}"]"#)))
-                .expect_err(private);
-            assert_eq!(refused.0, SCRIPTS_NOT_HELD, "{private}");
-            let repair = refused.1.unwrap_or_default();
-            assert!(repair.contains("one skill can't do both"), "{repair}");
+        for grants in [
+            r#"grants = ["net", "speak"]"#,
+            r#"grants = ["net", "speak", "notes"]"#,
+            r#"grants = ["net", "speak", "camera"]"#,
+            r#"grants = ["net", "speak", "look"]"#,
+            r#"grants = ["net", "speak", "microphone"]"#,
+            r#"grants = ["net", "camera", "notes"]"#,
+        ] {
+            let kept = put_on_cap(&with(grants));
+            assert!(kept.is_ok(), "{grants}: {:?}", kept.err());
         }
         crate::skill_task_yes::set_gateway_net_here(None);
         crate::skill_task_yes::set_net_here(None);

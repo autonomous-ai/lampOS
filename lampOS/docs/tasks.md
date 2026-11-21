@@ -4576,29 +4576,24 @@ one runner (a fresh home per run, the token as a file) with no new rules:
   by hand is not Made):
   lamp-control mints its token from its folder's declared grants
   (`task_yes::KeptYes::grants`, `no_yes_grants`; `net` left out, and the
-  rules below, `net` never beside a private grant among them, still hold)
+  rules below still hold)
   and answers its check `{"agreed": true}` for its folder as it is (its
   SHA-256 and declared grants, `task_yes::agreed_with_no_yes`), so its
   `net` asks nothing. A Store, pushed or other skill still needs its kept
   yes, and with the switch off so does a made one, exactly as before. Off, `net` is refused as an unknown grant
   (`bad_request`) before any token.
-- **What a `net` run never holds, and its bounds** (Heron's P1 and P3s on
-  #7590, the first builder's 23:22 calls):
-  - `net` is never granted beside a private grant: a service's read or
-    write (`*-read`, `*-write`), `camera`, `microphone`, `speech` or `look`
-    (whether someone is there, so whether the house is empty: the first
-    builder's ruling on #7590, 18 Nov 02:01) (`skill_task::PRIVATE_GRANTS`,
-    `skill_task_yes::private_grant`). `air` is not one: it may sit beside
-    `net`, and the yes then says so ("…, so its air readings can go to the
-    internet", `skill_task_yes::AIR_BESIDE_NET`). The skill's own `notes`
-    is not one either (the first builder's ruling on #7850, 19 Nov 07:20):
-    a net skill may keep today's price to compare with tomorrow's.
-    The pair is refused at load (lamp-skills' `grants_of`), at an upload
-    (`upload_agent::files` and its kept `skill.toml`'s check, said plainly:
-    "it reaches the internet and also reads your Gmail, and one skill can't
-    do both: make it two skills"), in lamp-control's yes (`grants_ok`) and
-    in lamp-tasks' hand-over (`HandOver::check`, `bad_request`, nothing
-    minted). A skill that needs both is two skills.
+- **What a `net` run may hold, and its bounds** (Heron's P3s on #7590,
+  the first builder's 23:22 calls; #7901):
+  - `net` may sit beside any grant (#7901, the settled design: a made
+    skill's declared grants are all on, nothing asked, nothing blocked):
+    a service's read or write, `camera`, `microphone`, `speech`, `look`,
+    `air` and the skill's own `notes` are all allowed beside it, and none
+    is refused at load (lamp-skills' `grants_of`), at an upload
+    (`upload_agent::files`, `capped`), in lamp-control's yes (`grants_ok`),
+    in lamp-tasks' hand-over (`HandOver::check`) or at the make
+    (`made_skill::code_held`, `make_no_cannot::covered`). With `air`
+    beside `net` the yes still says so ("…, so its air readings can go to
+    the internet", `skill_task_yes::AIR_BESIDE_NET`).
   - A `net` run sees only its own skill's folder, never another skill's:
     lamp-tasks names it beside the run's egress socket in its private 0700
     folder, `/run/lampos-tasks/egress/<egress name>.folder` (0600, made new
