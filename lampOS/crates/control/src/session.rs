@@ -89,6 +89,12 @@ pub trait Parts {
     fn said_take(&mut self, _client: &str) -> u32 {
         0
     }
+    /// [`Parts::said_take`] with the first finished say's words, one line
+    /// of at most `crate::parts::SAID_FIRST_CHARS` (#8180: what a make's
+    /// try is told it said). None kept by default.
+    fn said_take_first(&mut self, client: &str) -> (u32, Option<String>) {
+        (self.said_take(client), None)
+    }
 }
 
 /// A part's answer: now, or what to run off the door's lock for it.
