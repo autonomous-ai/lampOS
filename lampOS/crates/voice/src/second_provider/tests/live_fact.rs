@@ -52,6 +52,12 @@ struct Setup {
     cut: bool,
     /// Functions the chat declares none of.
     undeclared: &'static [&'static str],
+    /// Round 1's words held to its end as a line that may not be for the
+    /// lamp (`LAMP_DECLINE_SILENT`, `worker::DECLINE_NOTE`), with the
+    /// don't-know recall on and nothing kept fitting
+    /// (`LAMP_MEMORY_DONT_KNOW_RECALLS`): the round's end's don't-know
+    /// release says them.
+    declined: bool,
 }
 
 /// What a lookup finds here.
@@ -107,6 +113,12 @@ fn turns(setup: Setup, lines: Vec<(&str, Vec<Vec<net::Result<ChatEvent>>>)>) -> 
     .checking_live_facts(setup.on);
     if setup.cut {
         engine = engine.cutting_first_words(4);
+    }
+    if setup.declined {
+        engine = engine
+            .noting_whether_called(Arc::new(|_, _| Some(worker::DECLINE_NOTE)))
+            .declining_silently(true)
+            .recalling_before_a_dont_know(Arc::new(|_, _, _| None));
     }
     let mut labels = Vec::new();
     let runtime = tokio::runtime::Builder::new_current_thread()
@@ -340,7 +352,10 @@ fn with_the_action_claims_a_price_with_no_claim_is_held_the_same() {
     );
     assert!(went.said.concat().contains("4,061"), "{went:?}");
     assert_eq!(went.ran, ["set_timer", "web_search"]);
-    assert_eq!(went.notes, [crate::live_fact::note("web_search")]);
+    assert_eq!(
+        went.notes,
+        [crate::live_fact::note_after("web_search", "Timer set.")]
+    );
 }
 
 /// A quoted line (an add-on's, asked with no functions) and a due
@@ -522,7 +537,11 @@ fn the_weather_found_backs_no_price() {
         "{went:?}"
     );
     assert_eq!(went.ran, ["weather", "web_search"]);
-    assert_eq!(went.notes, [crate::live_fact::note("web_search")]);
+    // Told what it already said, so it goes on from it.
+    assert_eq!(
+        went.notes,
+        [crate::live_fact::note_after("web_search", rain)]
+    );
 }
 
 /// Beside other calls, those run, and the next round is told the note as
@@ -640,37 +659,234 @@ fn an_action_claim_and_a_live_figure_in_one_reply_ask_again_once_for_the_claim()
     assert!(went.notes.is_empty());
 }
 
-/// Until a search found something, the first words wait for their
-/// sentence's end (`live.watching()`): no clause or four-word cut, so a
-/// figure is judged whole. After a search found, and with the switch off,
-/// the cut is as before.
+/// The first words wait for their sentence's end only on a line asking a
+/// live fact, before a lookup found one (`live.holds_back`; the first
+/// builder on #8224, rule 7). Any other line is cut as with the switch off,
+/// so its first sound is unchanged, a timer's or a count's number
+/// included; on "the gold price today?" the price's sentence is judged
+/// whole, and its made-up figure never begins to be said. After a search
+/// found, the cut is as with the switch off.
 #[test]
-fn the_first_words_wait_for_the_sentence_only_while_watching() {
+fn the_first_words_wait_only_on_a_line_asking_a_live_fact() {
     let reply = "Sure, it was a gift from a friend of mine.";
-    let cut = |on, rounds: Vec<Vec<net::Result<ChatEvent>>>| {
+    let cut = |on, heard, rounds: Vec<Vec<net::Result<ChatEvent>>>| {
         turns(
             Setup {
                 on,
                 cut: true,
                 ..Setup::default()
             },
-            vec![("Where did my lamp come from?", rounds)],
+            vec![(heard, rounds)],
         )
     };
-    let on = cut(true, vec![streaming(reply)]);
-    assert_eq!(on.said, said(&[reply]), "{on:?}");
-    let off = cut(false, vec![streaming(reply)]);
-    assert!(off.said.len() > 1, "{off:?}");
+    let asked = "Where did my lamp come from?";
+    let on = cut(true, asked, vec![streaming(reply)]);
+    let off = cut(false, asked, vec![streaming(reply)]);
+    assert_eq!(on, off);
+    assert!(on.said.len() > 1, "{on:?}");
     assert_eq!(
-        off.said
+        on.said
             .iter()
             .map(|said| said.trim_start_matches("said:"))
             .collect::<String>(),
         reply
     );
+    // A timer or a count asked plainly: never waits, number and all.
+    for (line, reply) in [
+        (
+            "Lamp, set a timer for 5 minutes.",
+            "Your timer is set for 5 minutes.",
+        ),
+        (
+            "How many sessions did I do this week?",
+            "That's 3 sessions this week, nice work.",
+        ),
+    ] {
+        let on = cut(true, line, vec![streaming(reply)]);
+        assert_eq!(on, cut(false, line, vec![streaming(reply)]), "{line}");
+        assert!(on.said.len() > 1, "{on:?}");
+    }
+    // A live question: the made-up price is never cut, held whole, asked
+    // again.
+    let gold = || {
+        vec![
+            streaming(GOLD_MADE_UP),
+            calling("web_search"),
+            saying(GOLD_FOUND),
+        ]
+    };
+    let held = cut(true, GOLD, gold());
+    assert!(
+        held.said.iter().all(|said| !said.contains("4,050")),
+        "{held:?}"
+    );
+    assert!(held.said.concat().contains("4,061"), "{held:?}");
+    assert_eq!(held.notes, [crate::live_fact::note("web_search")]);
+    let off = cut(false, GOLD, gold());
+    assert!(off.said.concat().contains("4,050"), "{off:?}");
     // A search found: the cut is as with the switch off.
     let searched = || vec![calling("web_search"), streaming(reply)];
-    assert_eq!(cut(true, searched()), cut(false, searched()));
+    assert_eq!(cut(true, asked, searched()), cut(false, asked, searched()));
+}
+
+/// The live line's wait, end to end (Twelve's HOLD on #8224): on "the
+/// gold price today?" a reply whose figure comes after its fourth word
+/// says nothing of it before it is judged whole. Cut at four words, "The
+/// gold price today" would be said first, and the rest asked again: this
+/// fails when `asks_live` or `holds_back` is false.
+#[test]
+fn a_live_lines_figure_after_the_fourth_word_waits_for_its_sentence() {
+    let made_up = "The gold price today is around 4,050 dollars an ounce.";
+    let went = turns(
+        Setup {
+            on: true,
+            cut: true,
+            ..Setup::default()
+        },
+        vec![(
+            GOLD,
+            vec![
+                streaming(made_up),
+                calling("web_search"),
+                saying(GOLD_FOUND),
+            ],
+        )],
+    );
+    assert!(
+        went.said
+            .iter()
+            .all(|said| !said.contains("The gold price") && !said.contains("4,050")),
+        "{went:?}"
+    );
+    assert!(went.said.concat().contains("4,061"), "{went:?}");
+    assert_eq!(went.notes, [crate::live_fact::note("web_search")]);
+}
+
+/// A live line `asks_live` misses ("How much is an ounce of silver?")
+/// still never says part of a figure (Twelve's HOLD on #8224): the first
+/// four words, "Silver is about 31", end on a bare number, so the piece
+/// takes "dollars" too, and the figure is held and asked again. Off, it
+/// is said as it came.
+#[test]
+fn a_first_piece_never_ends_on_a_bare_number() {
+    let went = |on| {
+        turns(
+            Setup {
+                on,
+                cut: true,
+                ..Setup::default()
+            },
+            vec![(
+                "How much is an ounce of silver?",
+                vec![
+                    streaming("Silver is about 31 dollars an ounce."),
+                    calling("web_search"),
+                    saying("Silver is $32 an ounce today."),
+                ],
+            )],
+        )
+    };
+    let on = went(true);
+    assert!(on.said.iter().all(|said| !said.contains("31")), "{on:?}");
+    assert!(on.said.concat().contains("$32"), "{on:?}");
+    assert_eq!(on.notes, [crate::live_fact::note("web_search")]);
+    let off = went(false);
+    assert_eq!(
+        off.said.first().map(String::as_str),
+        Some("said:Silver is about 31")
+    );
+}
+
+/// #8224's lamp row (H2, the switch on): round 1's "In Hanoi right now" held
+/// no figure and was said at once (here on a line asking no live fact, whose
+/// first words are cut), its figure was held and asked again,
+/// and the reply asked again began "In Hanoi right now it's 20°C…": the
+/// lamp said "In Hanoi right now" twice. The words already said are taken
+/// off the reply asked again, and its note tells the model them. A reply
+/// asked again that begins otherwise, or that only shares part of a word
+/// ("nowadays"), is said whole.
+#[test]
+fn the_reply_asked_again_never_says_the_words_already_said_again() {
+    let opening = "In Hanoi right now";
+    let went = |again: &str| {
+        turns(
+            Setup {
+                on: true,
+                cut: true,
+                ..Setup::default()
+            },
+            vec![(
+                "Lamp, how does it look outside?",
+                vec![
+                    streaming("In Hanoi right now it's 20°C and cloudy."),
+                    calling("weather"),
+                    saying(again),
+                ],
+            )],
+        )
+    };
+    let note = crate::live_fact::note_after("weather", opening);
+    assert!(note.contains("\"In Hanoi right now\""), "{note}");
+    // The exact H2 case: only what follows the words said is said.
+    let h2 = went("In Hanoi right now it's 20°C with light rain.");
+    assert_eq!(
+        h2.said,
+        said(&[opening, " it's 20°C with light rain."]),
+        "{h2:?}"
+    );
+    assert_eq!(h2.notes, [note]);
+    assert_eq!(h2.ran, ["weather"]);
+    // Begun otherwise: nothing dropped.
+    let other = went("Hanoi is 20°C with light rain.");
+    assert_eq!(
+        other.said,
+        said(&[opening, " Hanoi is 20°C with light rain."]),
+        "{other:?}"
+    );
+    // A word that only begins as the last word said did: no cut mid-word.
+    let partial = went("In Hanoi right nowadays it's 20°C with light rain.");
+    assert_eq!(
+        partial.said,
+        said(&[
+            opening,
+            " In Hanoi right nowadays it's 20°C with light rain."
+        ]),
+        "{partial:?}"
+    );
+}
+
+/// The don't-know's release at the round's end (`second_provider.rs`'s
+/// `DontKnow::Pass` after round 1's words were held as a line that may not
+/// be for the lamp) judges its sentences too (Twelve's P3 on #7719): a
+/// made-up price followed by another sentence, so it leaves through that
+/// release and not the split's finish, is not said, and the model is asked
+/// again with the search required. Off, it is said.
+#[test]
+fn a_dont_know_released_at_the_rounds_end_holds_its_figure() {
+    let reply = format!("I'm not sure. {GOLD_MADE_UP} Prices move a lot.");
+    let went = |on| {
+        turns(
+            Setup {
+                on,
+                declined: true,
+                ..Setup::default()
+            },
+            vec![(
+                "Lamp, what gold price should I expect today?",
+                vec![saying(&reply), calling("web_search"), saying(GOLD_FOUND)],
+            )],
+        )
+    };
+    let on = went(true);
+    assert!(on.said.iter().all(|said| !said.contains("4,050")), "{on:?}");
+    assert!(on.said.concat().contains("4,061"), "{on:?}");
+    assert_eq!(on.ran, ["web_search"]);
+    assert_eq!(
+        on.notes,
+        [crate::live_fact::note_after("web_search", "I'm not sure.")]
+    );
+    let off = went(false);
+    assert!(off.said.concat().contains("4,050"), "{off:?}");
 }
 
 /// The notes' order (#7605): the live note is told after the make line's
@@ -695,9 +911,7 @@ fn the_live_note_is_told_after_the_begun_note() {
 
 /// True answers stand, word for word as with the switch off: a price this
 /// turn's search found, the weather of the place this turn fetched, a
-/// general question with no live figure, and the time asked "now". Only
-/// where they are cut may differ: until a search found something, a
-/// sentence is said whole, not from its first clause.
+/// general question with no live figure, and the time asked "now".
 #[test]
 fn true_answers_stand_as_without_the_switch() {
     type Rounds = fn() -> Vec<Vec<net::Result<ChatEvent>>>;

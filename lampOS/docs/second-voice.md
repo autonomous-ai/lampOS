@@ -236,7 +236,7 @@ each line plays exactly as before.
 | The second route's lines when a wordless cut-in is picked up again | `cut_in_wordless::BRIDGE` ("Anyway,"), `AGAIN` ("Oops, cut off again. Anyway,"), `PAUSE` ("It's a bit noisy here, so I'll pause. Just say 'Lamp' when you want me to go on.") | rendered ahead as the stop line; the first two then the cut answer's rest (`LAMP_CUT_IN_WORDLESS_RESUMES`, the memory owner's call, 5 Nov; on in the product, #7413) | the owner's words, rendered ahead (`language::fixed_in`); the rest in the answer's own words |
 | The second route's line when a line by name gets no words twice | `second_provider::NO_WORDS_LINE` ("Sorry, I lost my words there. Could you ask me again?") | said as the turn's text (`LAMP_NO_WORDS_AGAIN`, off in the product) | the owner's words (`language::fixed_in`) |
 | The second route's line when a reply claims again an action no call made | `action_claim::NOT_DONE_LINE` ("Sorry, I didn't do that. Could you ask me again?") | said as the turn's text (`LAMP_ACTION_CLAIM_CHECKED`, on in the product, #5215) | the owner's words (`language::fixed_in`) |
-| The second route's line when a live figure could not be looked up | `live_fact::COULD_NOT_LINE` ("Sorry, I couldn't look that up just now.") | said as the turn's text (`LAMP_LIVE_FACT_CHECKED`, off, #7605) | the owner's words (`language::fixed_in`) |
+| The second route's line when a live figure could not be looked up | `live_fact::COULD_NOT_LINE` ("Sorry, I couldn't look that up just now.") | said as the turn's text (`LAMP_LIVE_FACT_CHECKED`, on in the product, #7605) | the owner's words (`language::fixed_in`) |
 | The second route's line when an answer to the lamp's own question gets no words | `second_provider::ANSWER_AGAIN_LINE` ("Sorry, could you say that again?") | said as the turn's text (`LAMP_ANSWER_ASK_AGAIN`, off in the product) | the owner's words (`language::fixed_in`) |
 | The second route's word when each sentence of a reply was an offer to keep left out | `keep_quietly::GOT_IT` ("Got it.") | said as the turn's text (`LAMP_KEEP_QUIETLY`, on in the product, a known person's own scope) | the owner's words (`language::fixed_in`) |
 | The second route's answer to a plain keep (`LAMP_KEEP_ANSWERS_AT_ONCE`, C59) | `keep_at_once::KEPT` ("Okay, I'll remember that.") | said as the turn's text, at once, with no second chat round | rendered ahead by this route's voice as the wordless cut-in lines are, played from that clip as the turn's piece; not rendered yet, the turn asks round 2 as without the switch |
@@ -4519,7 +4519,7 @@ after a take-over, but now for every turn:
   outside the ask costs one more chat round. Not judged: "It's safe to
   unplug me." (a reply opening "It's" is decided at its first word), claims
   in a later sentence, other languages.
-- **With `LAMP_LIVE_FACT_CHECKED=on` (off; #7605), a live figure is never
+- **With `LAMP_LIVE_FACT_CHECKED=on` (on in the product; #7605), a live figure is never
   said with no lookup behind it.** On lamp-9adf (18 Nov, build 13929) "what
   is the gold price today?" got "around $4,050 an ounce" with `calls=none`,
   and Da Nang's weather "right now" and "tomorrow" was answered from Ho Chi
@@ -4539,8 +4539,12 @@ after a take-over, but now for every turn:
   lookup in the turn found (`live_fact::found`: a `web_search` or
   `fetch_page` answer with results, a page's words or a price backs any
   figure, a `weather` answer with the weather backs only the weather's
-  figures; an error or an empty search, `{"results": []}`, backs nothing;
-  the chat's own search backs any; a cut answer's carried lookup counts
+  figures; an error or an empty search, `{"results": []}`, backs nothing,
+  nor results whose every item has a blank title and text, nor a page
+  read with a status of 400 or more (`fetch_page` passes the page's
+  status on when it is one) or an error page's title such as "404 Not
+  Found"; one search or page that found backs every figure in the turn,
+  on any topic; the chat's own search (`ChatEvent::Searched`) backs any; a cut answer's carried lookup counts
   only when its answer found something; another turn's never) is held with
   the rest of its round, and the round's words are not kept. A quoted line
   and a reminder's ring are not judged. With no call, the model is asked
@@ -4558,7 +4562,32 @@ after a take-over, but now for every turn:
   `MAX_ROUNDS`. A doubted keep's take-back is said before the live block,
   so its ask again never skips it. Until a search has found something,
   the first words wait for their sentence's end (no clause or first-words
-  split), on every turn with the switch on. The journal says `N
+  split) only on a line that asks for a live fact (`live_fact::asks_live`:
+  a live marker such as today, now or tomorrow, a price, rate or score
+  word, or a weather word, never a place or a name alone, so "Hey, Lamp.
+  Set a timer for 5 minutes." and "Play Spotify." never wait; the first
+  builder on #8224, rule 7 and c7063146174, strict first). Only that wait
+  reads the person's line, a word list named as an allowed exception to
+  the rule against word lists, as `action_claim::WORDED` is: it decides
+  only when the first words are cut and fails safe. Every sentence is
+  still judged by its own words, and while a figure is judged a
+  first-words piece never ends on a bare number or number word
+  (`live_fact::is_number`): it takes the next word too, so "How much is an
+  ounce of silver?", which the list misses, never hears "Silver is about
+  31" before its unit. Any other line is cut as
+  with the switch off, a number in it or not ("Your timer is set for 5
+  minutes"), so its first sound is unchanged. A piece cut off before its
+  sentence's end leads the rest when that is judged ("The temperature in
+  Hanoi" said, "is 30 degrees." is still the weather's figure). The
+  reply asked again is told the words its held round already said
+  (`live_fact::note_after`; only words said past every hold count), and
+  when it begins with all of them from any said piece on (so an opening
+  it doesn't repeat, "Sure!", drops nothing else; case and marks folded,
+  whole words only) they are taken off, so they are
+  never said twice (#8224's row: "In Hanoi right now In Hanoi right now
+  it's 20°C"); another start, or a word only begun ("nowadays"), keeps
+  every word. The journal says `the reply asked again began with the N
+  word(s) already said: not said again`. The journal says `N
   sentence(s) gave a live figure no lookup backs …: not said, asked again
   with T required (LAMP_LIVE_FACT_CHECKED)` and, once the ask again
   speaks, `the live figure's ask again said its first words N ms after it

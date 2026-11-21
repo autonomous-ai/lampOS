@@ -29,8 +29,10 @@
 //!   `web_search` or `fetch_page` whose answer has results, a page's words
 //!   or a price backs any figure; a `weather` answer with the weather backs
 //!   only the weather's figures, never a price. An error or an empty search
-//!   (`{"results": []}`) backs nothing. So does the chat's own web search
-//!   (OpenRouter's plugin), which backs any. An early search counts only
+//!   (`{"results": []}`) backs nothing, nor results whose every item has a
+//!   blank title and text, nor a page read with a status of 400 or more
+//!   or an error page's title ("404 Not Found"). The chat's own web search
+//!   (OpenRouter's plugin, `ChatEvent::Searched`) backs any. An early search counts only
 //!   once the model's own `web_search` takes it. A cut answer's carried
 //!   lookup counts only when its answer found something. Another turn's
 //!   lookup is not this turn's: Ho Chi Minh City's weather fetched earlier
@@ -47,7 +49,14 @@
 //! note, and the next round speaks from what it found. Only English is
 //! matched, as the action claims are. Until a search found something, a
 //! reply's first words wait for their sentence's end (no clause or
-//! first-words cut), so a figure is judged whole. Off unless the
+//! first-words cut) only on a line the person asked for a live fact
+//! ([`asks_live`]: a live marker, a price, rate or score word or a weather
+//! word; the first builder on #8224, rule 7), so a figure
+//! is judged whole; any other line's are cut as with the switch off, even
+//! when they hold a number ("Your timer is set for 5 minutes"). A piece cut off
+//! before its sentence's end leads the rest of it when that is judged.
+//! A search or a page read backs every figure in the turn, and so does
+//! the chat's own search (`ChatEvent::Searched`), on no topic of its own. Off unless the
 //! environment says exactly `on`, and off the turn is as before.
 
 use serde_json::Value;
@@ -79,6 +88,22 @@ pub const NOTE_OPENS: &str = "(For you to know: your last reply gave a live figu
 pub fn note(tool: &str) -> String {
     format!(
         "{NOTE_OPENS} (a price, a rate, a score or the weather) that nothing in this turn looked up, so it was not said. Call {tool} now to look it up, and answer only from what it finds. An earlier turn's lookup, of another place or day, is not this one. If it finds nothing, say plainly that you couldn't look it up, and never give a figure you didn't find.)"
+    )
+}
+
+/// [`note`], told the words of the held round already said (`said`), so the
+/// reply asked again goes on from them and never says them again (#8224's
+/// lamp row: "In Hanoi right now" was said, and the reply asked again began
+/// with it once more).
+pub fn note_after(tool: &str, said: &str) -> String {
+    let said = said.trim();
+    let note = note(tool);
+    if said.is_empty() {
+        return note;
+    }
+    format!(
+        "{} You already said \"{said}\" out loud: go on from those words, and never say them again.)",
+        note.trim_end_matches(')')
     )
 }
 
@@ -347,6 +372,28 @@ const NOT_PLACES: [&str; 26] = [
     "OK",
 ];
 
+/// `text` after its first `n` words as [`words`] counts them, cut at a word's
+/// end, with the space and marks that follow it.
+fn after_words(text: &str, n: usize) -> &str {
+    let is_word = |c: char| c.is_alphanumeric() || matches!(c, '\'' | '\u{2019}' | '\u{2018}');
+    let mut count = 0;
+    let mut in_word = false;
+    for (at, c) in text.char_indices() {
+        if is_word(c) {
+            in_word = true;
+        } else if std::mem::replace(&mut in_word, false) {
+            count += 1;
+            if count == n {
+                return text[at..].trim_start_matches(|c: char| {
+                    c.is_whitespace()
+                        || matches!(c, ',' | ';' | ':' | '-' | '\u{2013}' | '\u{2014}')
+                });
+            }
+        }
+    }
+    if n == 0 { text } else { "" }
+}
+
 /// The words of `text`, lower case, curly apostrophes made straight.
 fn words(text: &str) -> Vec<String> {
     text.to_lowercase()
@@ -490,22 +537,142 @@ pub fn states_figure(sentence: &str) -> bool {
     condition && place
 }
 
-/// Whether a lookup's answer found something: no error, and results, a
-/// page's words, the weather or a price in it. An empty search
-/// (`{"results": []}`) backs nothing (Twelve's P2 on #7719).
+/// Words of the person's line that ask for a live fact: a price, a rate, a
+/// score or a market's figure. With [`LIVE_WORDS`], [`LIVE_PHRASES`] and
+/// [`WEATHER_WORDS`] they make a line one whose answer's first words wait
+/// ([`asks_live`]).
+const ASKING_WORDS: [&str; 14] = [
+    "price", "prices", "rate", "rates", "score", "scores", "stock", "stocks", "market", "markets",
+    "index", "exchange", "bitcoin", "gold",
+];
+
+/// Whether the person's line asks for a live fact, as #7605's done-when
+/// says, strict first (the first builder on #8224, rule 7): a live marker
+/// (today, now, current, latest, tomorrow, …), a price, rate or score
+/// word, or a weather word. A place alone counts for nothing (the first
+/// builder, c7063146174): "Hey, Lamp. Set a timer for 5 minutes.", "Ask
+/// Mom what she wants." and "Play Spotify." never wait, and a place-only
+/// line's figure is still caught by the sentence's own check. Only the
+/// first-words wait reads it ([`Hold::holds_back`]): every sentence of the
+/// reply is still judged by its own words alone, whatever the line.
+///
+/// A word list over the person's line, named as an allowed exception to
+/// the owner's rule against word lists, as `action_claim::WORDED` is: it
+/// decides only when the first words may be cut, never what is said, and
+/// it fails safe, since a line it misses is still judged sentence by
+/// sentence and its first piece never ends on a bare number
+/// ([`is_number`]).
+pub fn asks_live(line: &str) -> bool {
+    let lower = words(line);
+    let joined = format!(" {} ", lower.join(" "));
+    lower.iter().any(|word| {
+        let word = word.trim_end_matches("'s");
+        LIVE_WORDS.contains(&word)
+            || WEATHER_WORDS.contains(&word)
+            || CONDITIONS.contains(&word)
+            || ASKING_WORDS.contains(&word)
+    }) || LIVE_PHRASES
+        .iter()
+        .any(|phrase| joined.contains(&format!(" {phrase} ")))
+}
+
+/// Whether `word` is a bare number or a number word ("31", "$4,050",
+/// "thirty-one"): while the switch watches, a reply's first-words piece
+/// never ends on one, but takes the next word too, so "Silver is about
+/// 31" is never said without the unit that makes it a figure (Twelve's
+/// HOLD on #8224).
+pub fn is_number(word: &str) -> bool {
+    let word = bare(word).to_lowercase();
+    !word.is_empty()
+        && (word
+            .chars()
+            .any(|c| c.is_ascii_digit() || CURRENCY_SIGNS.contains(&c))
+            || word.split('-').all(|part| NUMBER_WORDS.contains(&part)))
+}
+
+/// Whether a lookup's answer found something: no error and no failed
+/// status, and results, a page's words, the weather or a price in it. An
+/// empty search (`{"results": []}`) backs nothing (Twelve's P2 on #7719),
+/// nor results whose every item has a blank title and text, nor a page
+/// read with a failed status or whose title is an error page's ("404 Not
+/// Found", "Access Denied"; Twelve's P3s on #7719).
 pub fn found(told: &Value) -> bool {
-    if told.get("error").is_some() {
+    if told.get("error").is_some() || failed_status(told) || error_page(told) {
         return false;
     }
     ["results", "content", "weather", "price"]
         .iter()
         .any(|key| match told.get(*key) {
             None | Some(Value::Null) => false,
+            Some(Value::Array(items)) if *key == "results" => items.iter().any(filled),
             Some(Value::Array(items)) => !items.is_empty(),
             Some(Value::String(text)) => !text.trim().is_empty(),
             Some(Value::Object(fields)) => !fields.is_empty(),
             Some(_) => true,
         })
+}
+
+/// Whether a search's result has words: a title, text or summary not blank.
+fn filled(item: &Value) -> bool {
+    match item {
+        Value::Object(fields) => ["title", "text", "summary", "content"].iter().any(|key| {
+            fields
+                .get(*key)
+                .and_then(Value::as_str)
+                .is_some_and(|text| !text.trim().is_empty())
+        }),
+        Value::String(text) => !text.trim().is_empty(),
+        Value::Null => false,
+        _ => true,
+    }
+}
+
+/// Whether an answer carries an HTTP status of 400 or more, as a number or
+/// as its digits (`status`, `status_code`).
+fn failed_status(told: &Value) -> bool {
+    ["status", "status_code", "statusCode"]
+        .iter()
+        .filter_map(|key| told.get(*key))
+        .any(|status| {
+            status
+                .as_u64()
+                .or_else(|| status.as_str().and_then(|text| text.trim().parse().ok()))
+                .is_some_and(|code| code >= 400)
+        })
+}
+
+/// Titles that make a page read an error page.
+const ERROR_TITLES: [&str; 8] = [
+    "not found",
+    "forbidden",
+    "access denied",
+    "bad gateway",
+    "bad request",
+    "service unavailable",
+    "too many requests",
+    "internal server error",
+];
+
+/// Whether a page read is an error page by its title: one of
+/// [`ERROR_TITLES`], or a short title (four words at most) with a 4xx or
+/// 5xx code in it ("404", "Error 503").
+fn error_page(told: &Value) -> bool {
+    if told.get("content").is_none() {
+        return false;
+    }
+    let title = told["title"].as_str().unwrap_or("").to_lowercase();
+    let title_words: Vec<&str> = title
+        .split(|c: char| !c.is_alphanumeric())
+        .filter(|word| !word.is_empty())
+        .collect();
+    ERROR_TITLES.iter().any(|error| title.contains(error))
+        || (title_words.len() <= 4
+            && title_words.iter().any(|word| {
+                word.len() == 3
+                    && word
+                        .parse::<u16>()
+                        .is_ok_and(|code| (400..600).contains(&code))
+            }))
 }
 
 /// A turn's live-figure hold ([`crate::live_fact`]).
@@ -522,11 +689,35 @@ pub(crate) struct Hold {
     weathered: bool,
     /// The sentences held this round, from the first with a figure.
     held: Vec<String>,
+    /// What was said of the sentence in hand, when its first words were cut
+    /// off before its end: the rest is judged with them, so "The
+    /// temperature in Hanoi" said keeps "is 30 degrees." a weather figure.
+    lead: String,
     /// Whether the turn was asked again once already.
     pub(crate) asked_again: bool,
     /// When it was asked again: the extra round's time is journalled once
     /// its first words pass, or when it ends in [`COULD_NOT_LINE`].
     asked_at: Option<std::time::Instant>,
+    /// Whether the person's line [`asks_live`]: only then do the first
+    /// words wait ([`Self::holds_back`]).
+    asked_live: bool,
+    /// What this round said, with the switch on: a round held keeps it as
+    /// [`Self::echo`] for the round asked again.
+    round_said: Vec<String>,
+    /// The held round's said words, as [`words`] folds them: the reply
+    /// asked again drops them where it begins with them all, whole words
+    /// only, so they are never said twice (#8224's lamp row).
+    echo: Vec<String>,
+    /// [`Self::echo`] as it was said, for the note and as the lead of what
+    /// follows it.
+    echo_said: String,
+    /// How many of [`Self::echo`]'s words the reply asked again has
+    /// repeated so far, its pieces kept in [`Self::echo_kept`] until it is
+    /// known whether they repeat them all.
+    echo_at: usize,
+    echo_kept: Vec<String>,
+    /// Where each said piece of [`Self::echo`] begins.
+    echo_starts: Vec<usize>,
     request: u64,
 }
 
@@ -561,10 +752,31 @@ impl Hold {
     }
 
     /// Whether sentences are judged before they are said: the switch is
-    /// on, and no search found anything yet. While it is, a reply's first
-    /// words wait for their sentence's end.
+    /// on, and no search found anything yet. While it is, on a line asking
+    /// a live fact, a reply's first words wait for their sentence's end
+    /// ([`Self::holds_back`]).
     pub(crate) fn watching(&self) -> bool {
         self.on && !self.searched
+    }
+
+    /// Whether the reply's first words wait for their sentence's end:
+    /// while [`Self::watching`], and only on a line that [`asks_live`]
+    /// (the first builder on #8224, rule 7). Any other line's are cut as
+    /// with the switch off, whatever number they hold.
+    pub(crate) fn holds_back(&self) -> bool {
+        self.watching() && self.asked_live
+    }
+
+    /// The person's line, `line`: whether it [`asks_live`].
+    #[cfg(test)]
+    pub(crate) fn asked(self, line: &str) -> Self {
+        self.asking_live(asks_live(line))
+    }
+
+    /// Whether the person's line [`asks_live`], read before it was moved.
+    pub(crate) fn asking_live(mut self, live: bool) -> Self {
+        self.asked_live = live;
+        self
     }
 
     /// Whether this turn's lookups back `sentence`'s figure.
@@ -575,11 +787,26 @@ impl Hold {
     /// A sentence as the hold lets it go: none once a figure is held this
     /// round.
     pub(crate) fn pass(&mut self, sentence: String) -> Option<String> {
-        if !self.held.is_empty() || (self.on && states_figure(&sentence) && !self.backs(&sentence))
-        {
-            self.held.push(sentence);
+        if !self.on {
+            return Some(sentence);
+        }
+        let sentence = self.unecho(sentence)?;
+        let judged = if self.lead.is_empty() {
+            sentence.clone()
+        } else {
+            format!("{} {}", self.lead, sentence.trim_start())
+        };
+        if !self.held.is_empty() || (states_figure(&judged) && !self.backs(&judged)) {
+            self.lead.clear();
+            self.held.push(judged);
             return None;
         }
+        // A piece cut off before its sentence's end leads the rest.
+        let ends = sentence
+            .trim_end()
+            .trim_end_matches(['"', '\'', '\u{201d}', '\u{2019}', ')'])
+            .ends_with(['.', '!', '?', '\u{2026}']);
+        self.lead = if ends { String::new() } else { judged };
         if let Some(at) = self.asked_at.take()
             && sentence.chars().any(char::is_alphanumeric)
         {
@@ -590,6 +817,87 @@ impl Hold {
             );
         }
         Some(sentence)
+    }
+
+    /// `sentence` was said, past every hold: kept as the round's, so a
+    /// reply asked again is told it and never says it again.
+    pub(crate) fn said(&mut self, sentence: &str) {
+        if self.on {
+            self.round_said.push(sentence.trim().to_owned());
+        }
+    }
+
+    /// `sentence` with the held round's said words taken off its start,
+    /// once the reply asked again has repeated them all, compared as
+    /// [`words`] folds them (case and marks), whole words only; a piece
+    /// that is all a part of them waits for the next to say whether they
+    /// repeat. Any other start is said as it came, with what waited.
+    fn unecho(&mut self, sentence: String) -> Option<String> {
+        if self.echo.is_empty() {
+            return Some(sentence);
+        }
+        let said = words(&sentence);
+        if self.echo_at == 0
+            && let Some(first) = said.first()
+            && let Some(start) = self
+                .echo_starts
+                .iter()
+                .copied()
+                .find(|start| self.echo.get(*start) == Some(first))
+        {
+            // The reply asked again repeats from this said piece on.
+            self.echo_at = start;
+        }
+        let left = &self.echo[self.echo_at..];
+        let matched = said
+            .iter()
+            .zip(left)
+            .take_while(|(word, echo)| word == echo)
+            .count();
+        if matched == said.len() && matched < left.len() {
+            self.echo_at += matched;
+            self.echo_kept.push(sentence);
+            return None;
+        }
+        if matched == left.len() {
+            let repeated = self
+                .echo_kept
+                .iter()
+                .map(|kept| words(kept).len())
+                .sum::<usize>()
+                + matched;
+            let lead = std::mem::take(&mut self.echo_said);
+            self.end_echo();
+            eprintln!(
+                "lamp-voice second: request {}: the reply asked again began with the {repeated} word(s) already said: not said again (LAMP_LIVE_FACT_CHECKED)",
+                self.request
+            );
+            let rest = after_words(&sentence, matched);
+            if !rest.chars().any(char::is_alphanumeric) {
+                return None;
+            }
+            // What was said leads the rest, when that is judged.
+            self.lead = lead;
+            return Some(rest.to_owned());
+        }
+        let mut came = std::mem::take(&mut self.echo_kept);
+        came.push(sentence);
+        self.end_echo();
+        Some(came.join(" "))
+    }
+
+    fn end_echo(&mut self) {
+        self.echo.clear();
+        self.echo_starts.clear();
+        self.echo_said.clear();
+        self.echo_at = 0;
+        self.echo_kept.clear();
+    }
+
+    /// The note to ask again with ([`note_after`]): `tool`, and the held
+    /// round's words already said.
+    pub(crate) fn note(&self, tool: &str) -> String {
+        note_after(tool, &self.echo_said)
     }
 
     /// A call answered: a lookup that found something backs the turn's
@@ -616,6 +924,18 @@ impl Hold {
             return None;
         }
         let held = std::mem::take(&mut self.held);
+        // What the round said before its hold: the reply asked again must
+        // not say it again.
+        self.end_echo();
+        self.echo_said = self.round_said.join(" ");
+        // Where each said piece's words begin: the reply asked again may
+        // repeat from any of them, so an opening it doesn't repeat ("Sure!")
+        // drops nothing else.
+        self.echo_starts.clear();
+        for piece in &self.round_said {
+            self.echo_starts.push(self.echo.len());
+            self.echo.extend(words(piece));
+        }
         let lookup = if held.iter().any(|sentence| speaks_of_weather(sentence)) {
             Lookup::Weather
         } else {
@@ -627,6 +947,8 @@ impl Hold {
     /// A new round: nothing held from the last.
     pub(crate) fn begin_round(&mut self) {
         self.held.clear();
+        self.lead.clear();
+        self.round_said.clear();
     }
 
     /// Asked again now.
@@ -788,6 +1110,173 @@ mod tests {
             Some("It's $4,050 an ounce.".into())
         );
         assert_eq!(off.take(), None);
+    }
+
+    /// The first words wait only on a line that asks for a live fact
+    /// (the first builder on #8224, rule 7), never for a number in the
+    /// reply: a timer or a count asked plainly never waits.
+    #[test]
+    fn the_first_words_wait_only_on_a_line_asking_a_live_fact() {
+        for line in [
+            "Lamp, what is the gold price today?",
+            "What's the weather like?",
+            "Is it going to rain?",
+            "What about Da Nang tomorrow?",
+            "How much is Bitcoin?",
+            "What's the latest score?",
+            "What's the exchange rate right now?",
+            "Will it be sunny in Hanoi?",
+        ] {
+            assert!(asks_live(line), "{line}");
+        }
+        for line in [
+            "Lamp, set a timer for 5 minutes.",
+            // Speech to text writes the call as its own sentence (Twelve's
+            // HOLD on #8224): no capital counts as a place.
+            "Hey, Lamp. Set a timer for 5 minutes.",
+            "Lamp. What's 12 times 3?",
+            "I\u{2019}m tired.",
+            "Ask Mom what she wants.",
+            "Play Spotify.",
+            "How many sessions did I do this week?",
+            "Tell me a joke.",
+            "Turn the light up.",
+            "I'm tired on Monday.",
+            "Where did my lamp come from?",
+            // Missed, and fails safe: the piece never ends on "31".
+            "How much is an ounce of silver?",
+        ] {
+            assert!(!asks_live(line), "{line}");
+        }
+        for number in ["31", "$4,050", "4.5", "thirty-one", "Twenty", "3%"] {
+            assert!(is_number(number), "{number}");
+        }
+        for word in ["about", "a", "one's", "Spotify", "dollars"] {
+            assert!(!is_number(word), "{word}");
+        }
+        let gold = "What's the gold price today?";
+        assert!(Hold::new(true, 1, &[]).asked(gold).holds_back());
+        assert!(
+            !Hold::new(true, 1, &[])
+                .asked("Set a timer for 5 minutes.")
+                .holds_back()
+        );
+        let mut found = Hold::new(true, 1, &[]).asked(gold);
+        found.ran(
+            crate::second_provider::net::search::NAME,
+            &serde_json::json!({"results": [{"title": "Gold", "text": "$4,061"}]}),
+        );
+        assert!(!found.holds_back());
+        assert!(!Hold::new(false, 1, &[]).asked(gold).holds_back());
+    }
+
+    /// A piece cut off before its sentence's end leads the rest when that
+    /// is judged: "The temperature in Hanoi" said keeps "is 30 degrees." a
+    /// weather figure, and a whole sentence leads nothing.
+    #[test]
+    fn a_cut_piece_leads_the_rest_of_its_sentence() {
+        let mut hold = Hold::new(true, 1, &[]);
+        assert_eq!(
+            hold.pass("The temperature in Hanoi".into()),
+            Some("The temperature in Hanoi".into())
+        );
+        assert_eq!(hold.pass("is 30 degrees.".into()), None);
+        assert_eq!(hold.take(), Some((Lookup::Weather, 1)));
+        hold.begin_round();
+        assert_eq!(hold.pass("Sure.".into()), Some("Sure.".into()));
+        assert_eq!(hold.pass("It is 30.".into()), Some("It is 30.".into()));
+    }
+
+    /// The held round's said words are taken off the reply asked again
+    /// once it repeats them all, across its pieces, case and marks folded;
+    /// a start that differs, or only begins a word, keeps every word.
+    #[test]
+    fn the_reply_asked_again_drops_only_the_words_said_whole() {
+        let held = |said: &[&str]| {
+            let mut hold = Hold::new(true, 1, &[]);
+            for said in said {
+                assert_eq!(hold.pass((*said).into()), Some((*said).into()));
+                hold.said(said);
+            }
+            assert_eq!(hold.pass("it's 20°C.".into()), None);
+            assert!(hold.take().is_some());
+            hold.begin_round();
+            hold.ran(
+                crate::second_provider::net::weather::NAME,
+                &serde_json::json!({"place": "Hanoi", "weather": "20 degrees"}),
+            );
+            hold
+        };
+        let mut hold = held(&["In Hanoi right now"]);
+        assert_eq!(
+            hold.note("weather"),
+            note_after("weather", "In Hanoi right now")
+        );
+        assert_eq!(hold.pass("in hanoi,".into()), None);
+        assert_eq!(
+            hold.pass("Right now, it's 20°C.".into()),
+            Some("it's 20°C.".into())
+        );
+        // Once dropped, later words are said as they come.
+        assert_eq!(hold.pass("In Hanoi.".into()), Some("In Hanoi.".into()));
+        // An opening the reply asked again doesn't repeat ("Sure!") keeps
+        // nothing else from dropping (Twelve's P3 on #8224).
+        let mut hold = held(&["Sure!", "In Hanoi right now"]);
+        assert_eq!(
+            hold.pass("In Hanoi right now, it's 20°C.".into()),
+            Some("it's 20°C.".into())
+        );
+        let mut hold = held(&["Sure!", "In Hanoi right now"]);
+        assert_eq!(
+            hold.pass("Sure! In Hanoi right now it's 20°C.".into()),
+            Some("it's 20°C.".into())
+        );
+        // Words passed but never said (a later hold kept them) are not
+        // counted as said.
+        let mut unsaid = Hold::new(true, 1, &[]);
+        assert!(unsaid.pass("In Hanoi right now".into()).is_some());
+        assert_eq!(unsaid.pass("it's 20°C.".into()), None);
+        assert!(unsaid.take().is_some());
+        assert_eq!(unsaid.note("weather"), note("weather"));
+        let mut hold = held(&["In Hanoi right now"]);
+        assert_eq!(hold.pass("In Hanoi".into()), None);
+        assert_eq!(
+            hold.pass("right nowadays it's 20°C.".into()),
+            Some("In Hanoi right nowadays it's 20°C.".into())
+        );
+        assert_eq!(note_after("weather", ""), note("weather"));
+        assert_eq!(
+            after_words("In Hanoi right now, it's 20°C.", 4),
+            "it's 20°C."
+        );
+        assert_eq!(after_words("In Hanoi right now", 4), "");
+    }
+
+    /// Results whose every item is blank, and a page with a failed status
+    /// or an error page's title, found nothing (Twelve's P3s on #7719).
+    #[test]
+    fn blank_results_and_error_pages_find_nothing() {
+        use serde_json::json;
+        for nothing in [
+            json!({"results": [{"title": "", "text": " ", "published": null}]}),
+            json!({"results": [{"title": "  "}, {"text": ""}]}),
+            json!({"title": "Gold", "content": "Gone.", "status": 404}),
+            json!({"title": "Gold", "content": "Gone.", "status_code": "503"}),
+            json!({"title": "404 Not Found", "content": "nginx"}),
+            json!({"title": "Page not found | Kitco", "content": "Sorry."}),
+            json!({"title": "Access Denied", "content": "You don't have permission."}),
+            json!({"title": "Error 500", "content": "Try later."}),
+        ] {
+            assert!(!found(&nothing), "{nothing}");
+        }
+        for something in [
+            json!({"results": [{"title": "", "text": "$4,061 an ounce"}]}),
+            json!({"results": [{"title": "Gold price today", "text": ""}]}),
+            json!({"title": "Gold price today", "content": "$4,061 an ounce."}),
+            json!({"title": "Top 500 companies by revenue in 2026", "content": "Walmart."}),
+        ] {
+            assert!(found(&something), "{something}");
+        }
     }
 
     /// A cut answer's carried lookup backs the turn only when its answer
