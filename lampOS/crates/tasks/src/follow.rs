@@ -487,8 +487,10 @@ mod tests {
         let mut follows = Follows::new(Some(lane.clone()));
         let tasks = watched(2);
         let now = Instant::now();
+        // Task 1's watch runs on its own thread: wait for its first event
+        // too, or the check below can read it before it is heard (#8199).
         settle(&mut follows, &tasks, now, |f| {
-            f.pushes.contains(&2) && !f.held.contains_key(&2)
+            f.pushes.contains(&2) && !f.held.contains_key(&2) && f.followed().contains(&1)
         });
         assert!(!follows.pushes.contains(&1));
         assert_eq!(follows.followed(), BTreeSet::from([1]));
