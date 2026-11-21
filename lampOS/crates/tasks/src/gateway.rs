@@ -78,6 +78,11 @@ pub fn wanted_within(hold: Duration, now_ms: u64) -> bool {
 /// failed read leaves it as it was.
 static PANES_ON_OPENCLAW: std::sync::atomic::AtomicU8 = std::sync::atomic::AtomicU8::new(0);
 
+/// When the panes were last read well, as [`WANTED_AT_MS`]: a reading older
+/// than two [`PANES_EVERY`] is unknown again (Twelve on #8223: a round that
+/// holds lamp-update's lock pauses its asks, and so the reads).
+static PANES_READ_AT_MS: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+
 /// When lamp-update last asked whether OpenClaw is in use, as
 /// [`WANTED_AT_MS`]: it asks only with `LAMP_OPENCLAW_GATEWAY_BY_DEFAULT`
 /// on, so the panes are read only then (Twelve's P1 on #8223).
@@ -114,6 +119,13 @@ pub fn panes_read(read: &Result<Vec<crate::harness::Listed>, String>) {
         mark_wanted();
     }
     PANES_ON_OPENCLAW.store(if on { 1 } else { 2 }, std::sync::atomic::Ordering::Release);
+    PANES_READ_AT_MS.store(mono_ms() + 1, std::sync::atomic::Ordering::Release);
+}
+
+/// Whether a reading made at `read_at` (as [`PANES_READ_AT_MS`]) is still
+/// fresh at `now_ms`.
+fn panes_fresh(read_at: u64, now_ms: u64) -> bool {
+    read_at != 0 && (now_ms + 1).saturating_sub(read_at) <= 2 * PANES_EVERY.as_millis() as u64
 }
 
 /// lamp-update asked whether OpenClaw is in use (`Route::UpdateRead`).
@@ -134,15 +146,23 @@ pub fn panes_due(last: Option<Instant>) -> bool {
 /// Whether OpenClaw is in use, as lamp-update hears it: yes within the
 /// [`IN_USE_HOLD`] of a need or with a pane on OpenClaw at the last good
 /// read; no with neither once the panes were read; unknown (`None`) before
-/// the first read, so a lamp-tasks just started never stops the Gateway
-/// under an open pane (Twelve on #8223).
+/// the first read or once the last is over two [`PANES_EVERY`] old, so a
+/// lamp-tasks just started, or a pause in the reads, never stops the
+/// Gateway under an open pane (Twelve on #8223). A pane on OpenClaw at the
+/// last read stays yes however old: it errs toward keeping it up.
 pub fn in_use_said() -> Option<bool> {
     if wanted_within(IN_USE_HOLD, mono_ms()) {
         return Some(true);
     }
     match PANES_ON_OPENCLAW.load(std::sync::atomic::Ordering::Acquire) {
         1 => Some(true),
-        2 => Some(false),
+        2 if panes_fresh(
+            PANES_READ_AT_MS.load(std::sync::atomic::Ordering::Acquire),
+            mono_ms(),
+        ) =>
+        {
+            Some(false)
+        }
         _ => None,
     }
 }
@@ -1369,6 +1389,17 @@ mod tests {
         assert!(body["openclaw_in_use"].is_boolean() || body["openclaw_in_use"].is_null());
         assert!(body.get("openclaw_in_use").is_some());
         assert!(panes_due(None));
+    }
+
+    /// #8105 (Twelve on #8223): a "none on OpenClaw" reading goes unknown
+    /// after two reads' worth of time.
+    #[test]
+    fn an_old_reading_of_the_panes_is_unknown() {
+        let now = mono_ms();
+        assert!(panes_fresh(now + 1, now));
+        assert!(panes_fresh(now + 1, now + 2 * 60_000));
+        assert!(!panes_fresh(now + 1, now + 2 * 60_000 + 1));
+        assert!(!panes_fresh(0, now));
     }
 
     /// #8105 (Twelve's P1 on #8223): the panes are read only while
