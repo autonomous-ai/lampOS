@@ -847,6 +847,7 @@ fn the_bodys_hand_counts_only_fresh_and_from_the_body() {
     let said = |pushed| Hand {
         pushed,
         since_us: u64::from(pushed) * 5_000_000,
+        moved: None,
     };
     body.publish_json(1, &said(true)).unwrap();
     let latest = bus.latest(Hand::TOPIC).unwrap();
@@ -867,6 +868,38 @@ fn the_bodys_hand_counts_only_fresh_and_from_the_body() {
         bus.latest(Hand::TOPIC).unwrap().as_ref(),
         now_unix_ms()
     ));
+}
+
+/// #5566: a hand the body says pressed the head without moving it is not a
+/// push for the head's touch; one that moved it is, and so is one from a
+/// body that does not say (`moved` absent), as before.
+#[test]
+fn a_hand_pressing_a_head_that_did_not_move_is_not_a_push() {
+    use lamp_controls::touch_runtime::pushed_now;
+    use lamp_msgs::Hand;
+    let root = Root::new();
+    let bus = Bus::new(&root.0).unwrap();
+    let mut body = bus
+        .publisher_declared(Hand::TOPIC, &Hand::declaration(), "body")
+        .unwrap();
+    body.expires_after(None);
+    for (at, moved, pushed) in [
+        (1, Some(false), false),
+        (2, Some(true), true),
+        (3, None, true),
+    ] {
+        body.publish_json(
+            at,
+            &Hand {
+                pushed: true,
+                since_us: 5_000_000,
+                moved,
+            },
+        )
+        .unwrap();
+        let latest = bus.latest(Hand::TOPIC).unwrap();
+        assert_eq!(pushed_now(latest.as_ref(), 0), pushed, "{moved:?}");
+    }
 }
 
 /// #1798: exercise the retained body message through Service, not just its
@@ -890,12 +923,19 @@ mod body_hand {
     }
 
     fn say(body: &mut lamp_bus::Publisher, at: u64, pushed: bool) {
+        say_moved(body, at, pushed, None);
+    }
+
+    /// A hand with the body's `moved` (#5566): absent is a body that does
+    /// not say it.
+    fn say_moved(body: &mut lamp_bus::Publisher, at: u64, pushed: bool, moved: Option<bool>) {
         body.publish_json(
             at,
             &Hand {
                 pushed,
                 // Body's monotonic origin is independent of Controls'.
                 since_us: if pushed { 5_000_000 } else { 0 },
+                moved,
             },
         )
         .unwrap();
@@ -1102,6 +1142,114 @@ mod body_hand {
         // 620 ms is both the 20 ms qualification boundary and a due body
         // poll. Reading body after GPIO would let one Stop escape here.
         spoiled(&run(&mut rig, 620_000..700_000, false, true), contact);
+    }
+
+    fn gestures(outputs: &[TouchOutput]) -> Vec<TouchGesture> {
+        events(outputs).iter().map(|event| event.gesture).collect()
+    }
+
+    /// #5566: a hand pressing the head while the body says the head did not
+    /// move is a hand on the head, not a push: a tap is a Tap, and a hand
+    /// that stays three seconds is a Hold that asks the lamp to sleep.
+    #[test]
+    fn a_hand_pressing_a_head_that_does_not_move_taps_strokes_and_holds() {
+        let mut rig = Rig::new(true);
+        run(&mut rig, 0..600_000, false, false);
+        let mut body = body(&rig);
+        say_moved(&mut body, 600_000, true, Some(false));
+        let mut tap = run(&mut rig, 600_000..800_000, false, true);
+        tap.extend(run(&mut rig, 800_000..1_000_000, false, false));
+        assert_eq!(gestures(&tap), [TouchGesture::Touch, TouchGesture::Tap]);
+        assert_eq!(events(&tap)[1].intent(false, true), Some(TouchIntent::Wake));
+        let hold = run(&mut rig, 1_000_000..4_030_000, false, true);
+        assert_eq!(
+            gestures(&hold),
+            [
+                TouchGesture::Touch,
+                TouchGesture::Stroke,
+                TouchGesture::Hold
+            ]
+        );
+        let hold = events(&hold);
+        assert_eq!(hold[2].intent(false, false), Some(TouchIntent::Sleep));
+    }
+
+    /// The same press said by a body that moved the head, or that does not
+    /// say whether it did, spoils the touch as before (#711).
+    #[test]
+    fn a_push_that_moved_the_head_or_does_not_say_still_spoils_it() {
+        for moved in [Some(true), None] {
+            let mut rig = Rig::new(true);
+            run(&mut rig, 0..600_000, false, false);
+            let mut body = body(&rig);
+            say_moved(&mut body, 600_000, true, moved);
+            let held = run(&mut rig, 600_000..4_000_000, false, true);
+            let contact = source(&held[0], TouchSource::Head).contact_id.unwrap();
+            spoiled(&held, contact);
+        }
+    }
+
+    /// Fifth's P3 on #5590: a contact the body first says only pressed
+    /// (`moved: false`) and then says moved (`moved: true`) is spoiled from
+    /// then on, and stays so when the body says not moved again: no Stroke,
+    /// no Hold, until a new contact.
+    #[test]
+    fn a_press_that_then_moves_the_head_spoils_its_contact() {
+        let mut rig = Rig::new(true);
+        run(&mut rig, 0..600_000, false, false);
+        let mut body = body(&rig);
+        say_moved(&mut body, 600_000, true, Some(false));
+        let pressed = run(&mut rig, 600_000..1_000_000, false, true);
+        assert_eq!(gestures(&pressed), [TouchGesture::Touch]);
+        let contact = source(&pressed[0], TouchSource::Head).contact_id.unwrap();
+        say_moved(&mut body, 1_000_000, true, Some(true));
+        spoiled(&run(&mut rig, 1_000_000..1_500_000, false, true), contact);
+        say_moved(&mut body, 1_500_000, true, Some(false));
+        spoiled(&run(&mut rig, 1_500_000..4_500_000, false, true), contact);
+    }
+
+    /// Two head pads under one pressing hand: Touch, then Hold at three
+    /// seconds, asking the lamp to sleep (#5566).
+    #[test]
+    fn a_hand_pressing_both_head_pads_without_moving_the_head_holds() {
+        let mut wiring = wiring();
+        wiring.head_pads.push(Pin {
+            name: "head2".into(),
+            line: 96,
+            active_low: true,
+            pull: Pull::Up,
+        });
+        let mut config = config(true);
+        config.head_pads.push("head2".into());
+        let mut rig = Rig::with_config(config, wiring);
+        let both = |rig: &mut Rig, times: Range<u64>, pressed: bool| -> Vec<TouchOutput> {
+            times
+                .step_by(10_000)
+                .map(|at| {
+                    let mut sample = rig.gpio_sample(at, false, false, pressed);
+                    sample.head_pads.push(PinLevel {
+                        name: "head2".into(),
+                        active: pressed,
+                    });
+                    rig.gpio.values.borrow_mut().push_back(Ok(sample));
+                    let output = rig.step(at);
+                    assert_eq!(rig.service.counts.rejected, 0);
+                    output
+                })
+                .collect()
+        };
+        assert!(events(&both(&mut rig, 0..600_000, false)).is_empty());
+        let mut body = body(&rig);
+        say_moved(&mut body, 600_000, true, Some(false));
+        let hold = both(&mut rig, 600_000..3_630_000, true);
+        let hold = events(&hold);
+        assert_eq!(
+            hold.first().map(|event| event.gesture),
+            Some(TouchGesture::Touch)
+        );
+        let last = hold.last().unwrap();
+        assert_eq!(last.gesture, TouchGesture::Hold, "{hold:?}");
+        assert_eq!(last.intent(false, false), Some(TouchIntent::Sleep));
     }
 }
 
