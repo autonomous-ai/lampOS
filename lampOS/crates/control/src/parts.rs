@@ -173,6 +173,26 @@ impl LightOut for lamp_bus::Publisher {
 /// the ring shows the person's light as before.
 pub const PAIR_CUE_HOLD_US: u64 = (LightPattern::PULSE_DEFAULT_MS as u64 + 500) * 1_000;
 
+/// The most characters of a run's first finished say kept for its end
+/// (`said_first`, #8180): what a make's try is told it said.
+pub const SAID_FIRST_CHARS: usize = 120;
+
+/// A client's finished says, until taken (#8158, #8180).
+#[derive(Debug, Default)]
+struct Said {
+    count: u32,
+    first: Option<String>,
+}
+
+/// `text` on one line, at most [`SAID_FIRST_CHARS`] characters.
+pub fn said_first(text: &str) -> String {
+    let line = text.split_whitespace().collect::<Vec<_>>().join(" ");
+    match line.char_indices().nth(SAID_FIRST_CHARS) {
+        Some((at, _)) => line[..at].to_owned(),
+        None => line,
+    }
+}
+
 /// The name a computer's `move` is given to the body, and said back on
 /// `body/gesture`.
 pub const MOVE_NAME: &str = "control";
@@ -224,8 +244,9 @@ pub struct Lamp {
     /// Each client's says still waiting on the voice, for its `stop`.
     says: Says,
     /// Each client's `say`s the voice said whole, until taken
-    /// ([`Parts::said_take`], #8158): a skill run's sign it said something.
-    said: Arc<Mutex<HashMap<String, u32>>>,
+    /// ([`Parts::said_take`], #8158): a skill run's sign it said something;
+    /// and the first one's words ([`Parts::said_take_first`], #8180).
+    said: Arc<Mutex<HashMap<String, Said>>>,
     /// The number the next say is kept under.
     next_say: u64,
     /// The microphone, the ears' blocks on the bus; none without the bus.
@@ -1245,11 +1266,12 @@ impl Lamp {
             // Counted before its `done` is sent, so a run that waited for
             // the `done` ends with it counted.
             if let Some(said) = said.filter(|_| how == "finished") {
-                *said
-                    .lock()
-                    .expect("said")
-                    .entry(client.clone())
-                    .or_default() += 1;
+                let mut said = said.lock().expect("said");
+                let kept = said.entry(client.clone()).or_default();
+                kept.count += 1;
+                if kept.first.is_none() {
+                    kept.first = line["text"].as_str().map(said_first);
+                }
             }
             let mut done = json!({"ev": "done", "re": re, "how": how});
             if let Some(why) = why {
@@ -1699,7 +1721,15 @@ impl Parts for Lamp {
     }
 
     fn said_take(&mut self, client: &str) -> u32 {
-        self.said.lock().expect("said").remove(client).unwrap_or(0)
+        self.said_take_first(client).0
+    }
+
+    fn said_take_first(&mut self, client: &str) -> (u32, Option<String>) {
+        self.said
+            .lock()
+            .expect("said")
+            .remove(client)
+            .map_or((0, None), |said| (said.count, said.first))
     }
 
     fn state(&self, kind: StateKind) -> Value {
@@ -2543,6 +2573,19 @@ mod tests {
         let _ = std::fs::remove_dir_all(&dir);
     }
 
+    /// #8180: a run's first finished say is kept on one line, at most
+    /// [`SAID_FIRST_CHARS`] characters, for its end's `said_first`.
+    #[test]
+    fn a_runs_first_say_is_kept_on_one_line_capped() {
+        assert_eq!(
+            said_first("  The tide is\nlow at  six. "),
+            "The tide is low at six."
+        );
+        let long = "é".repeat(SAID_FIRST_CHARS + 30);
+        assert_eq!(said_first(&long).chars().count(), SAID_FIRST_CHARS);
+        assert_eq!(said_first("short"), "short");
+    }
+
     /// #8158: a `say` the voice said whole is counted for its client until
     /// taken, once; one dropped is not, nor the hum (a `sound`), so a skill
     /// run's `run` step is told only of the words it had said.
@@ -2592,7 +2635,8 @@ mod tests {
         voice.join().unwrap();
         assert_eq!(told.lock().unwrap()[2].1["how"], "finished");
         assert_eq!(lamp.said_take("c_8"), 0, "another client's none");
-        assert_eq!(lamp.said_take("c_9"), 1);
+        // #8180: with the first finished say's words.
+        assert_eq!(lamp.said_take_first("c_9"), (1, Some("One.".to_owned())));
         assert_eq!(lamp.said_take("c_9"), 0, "taken once");
         let _ = std::fs::remove_dir_all(&dir);
     }

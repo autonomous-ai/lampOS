@@ -736,6 +736,12 @@ pub trait Tokens {
         self.end(run);
         None
     }
+    /// [`Tokens::end_said`] with the first finished say's words
+    /// (lamp-control's `end` answer's `"said_first"`, #8180: what a make's
+    /// try tells the person it did); none when not known.
+    fn end_said_first(&self, run: &str) -> (Option<u32>, Option<String>) {
+        (self.end_said(run), None)
+    }
 }
 
 /// No lamp-control token: every run is refused.
@@ -826,13 +832,20 @@ impl Tokens for ControlTokens {
     }
 
     fn end_said(&self, run: &str) -> Option<u32> {
+        self.end_said_first(run).0
+    }
+
+    fn end_said_first(&self, run: &str) -> (Option<u32>, Option<String>) {
         match self.ask(&json!({"end": {"run": run}})) {
-            Ok(answer) => answer["said"]
-                .as_u64()
-                .and_then(|said| u32::try_from(said).ok()),
+            Ok(answer) => (
+                answer["said"]
+                    .as_u64()
+                    .and_then(|said| u32::try_from(said).ok()),
+                answer["said_first"].as_str().map(str::to_owned),
+            ),
             Err(why) => {
                 eprintln!("[lamp-tasks] skill task: ending run {run}: {why}");
-                None
+                (None, None)
             }
         }
     }

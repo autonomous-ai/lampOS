@@ -1000,27 +1000,22 @@ sau:
      đèn chỉ nói vậy, không cần xác nhận; chỉ `on`, tắt nếu không đặt;
      bật trong `lamp-voice` của sản phẩm (lần bật của luồng tạo kỹ năng, DEFAULT-ON của người xây dựng đầu tiên, 19/11 lúc 21:42 trên #7814); trong `lamp-voice` được truyền cho
      cả hai route, chỉ được đọc khi `LAMP_MADE_SCRIPTS=on`,
-     `made_skill::code_on_at_once`). Phán quyết của first builder trên
-     #6059 (19:14, và dòng 19:44 của builder đầu tiên: "sound" là âm thanh và giọng
-     nói của chính đèn) vạch ranh giới (`made_skill::code_goes_on_at_once`):
-     mã chỉ có các quyền ánh sáng của đèn, giọng nói và âm thanh của nó
-     hoặc đầu và tay của nó (`made_skill::CODE_AT_ONCE_GRANTS`: `light`,
-     `speak`, `body`; hẹn giờ là một trigger và không cần quyền) được bật
-     ngay; mã có bất kỳ quyền nào khác, trước hết là camera, micro và
-     `sound`, là quyền nghe các loại âm thanh chứ không phải phát chúng
-     (`made_skill::CODE_YES_GRANTS`), mã biết ai đang ở bên đèn (`who`,
-     `known_faces`: danh tính là quyền riêng tư của camera, first builder
-     lúc 20:16; lamp-control không có quyền nào cho nó), hoặc bất kỳ lần gửi nào (một lần ghi,
-     tin nhắn tới điện thoại) vẫn giữ lời đồng ý bằng giọng nói đúng như khi
-     công tắc tắt. Một lần tạo như vậy, bằng giọng nói hay từ MAKE IT của
-     ứng dụng (`app_make::put_on_line`), được bật ngay khi tạo xong, qua đúng đường của lời đồng ý
-     (`make_skill_local::code_on_at_once`, rồi `code_on_here` và
-     `code_approve`): đúng package đó theo SHA-256 của nó
-     (`made_skill::put_on_agreed`, cùng các bước kiểm tra pack và giới hạn
-     của helper quản lý), rồi, khi `LAMP_SKILL_TASKS=on`, lamp-control ghi
-     lời đồng ý cho task của nó (`task_yes_record`) theo thư mục lúc vừa
-     bật và các quyền đã nói, như một lời đồng ý bằng giọng nói ghi, nên
-     lần chạy đầu không hỏi gì. Đèn nói là đã tạo và đã bật, nó làm gì và
+     `made_skill::code_on_at_once`). Mã của một kỹ năng được tạo được bật
+     ngay dù nó khai báo gì (#8180, quyết định của dev,
+     `made_skill::code_goes_on_at_once`): kể cả camera, micro, `net`, nghe
+     (`sound`), biết ai đang ở bên đèn và các lần gửi; chỉ task cho agent của
+     đèn (`uses.agent_task`) vẫn chờ lời đồng ý bằng giọng nói. Một lần tạo
+     như vậy, bằng giọng nói hay từ MAKE IT của ứng dụng
+     (`app_make::put_on_line`), được bật ngay khi tạo xong: đúng package đó
+     theo SHA-256 của nó (`make_skill_local::code_on_at_once`,
+     `made_skill::put_on_agreed`, cùng các bước kiểm tra pack và giới hạn của
+     helper quản lý). Không ghi lời đồng ý nào lúc giữ: nguồn của kỹ năng
+     được tạo không cần (`made_skill::grants_need_no_yes`, hiện chỉ đúng với
+     `SkillSource::Made`, theo `lamp_skills::source_of`), nên lamp-control
+     tạo token cho bước run và task của nó từ các quyền khai báo trong thư
+     mục và đồng ý kiểm tra task của nó, kể cả `net` (docs/vi/tasks_vi.md),
+     và lần chạy đầu không hỏi gì. Kỹ năng từ Store và được đẩy lên vẫn giữ
+     lời đồng ý. Đèn nói là đã tạo và đã bật, nó làm gì và
      mã của nó được dùng gì, bản thân mã không bao giờ được đọc ra ("I made
      photo booth, and it's on: … The lamp's model wrote its code, and that
      code may use its light."; `made_skill::code_said` không có
@@ -1037,11 +1032,9 @@ sau:
      `with_the_switch_a_voice_code_make_goes_on_at_once_and_its_first_run_asks_nothing`,
      `with_the_switch_a_code_make_not_made_or_not_on_says_so_plainly`,
      `with_the_switch_a_send_still_waits_for_its_yes`,
-     `with_the_switch_a_voice_code_make_with_the_camera_still_waits_for_its_yes`,
-     `with_the_switch_a_voice_code_make_knowing_who_is_there_still_waits_for_its_yes`,
-     `the_grants_that_go_on_at_once_never_hold_the_camera_or_the_microphone`,
+     `with_the_switch_a_code_make_with_the_camera_mic_or_who_goes_on_at_once`,
+     `with_the_switch_every_grant_goes_on_at_once`,
      `app_make::tests::with_the_switch_an_app_make_with_code_goes_on_at_once`,
-     `app_make::tests::with_the_switch_an_app_make_with_the_camera_still_waits_for_its_yes`,
      và, khi tắt, `a_made_skill_with_code_waits_for_a_later_yes_and_goes_on_by_its_sha256`.
    - **Cái chạy nó** là `do.task` của #6305: `lamp-skills` chỉ nạp task của
      một kỹ năng `made: here` khi `LAMP_MADE_SCRIPTS=on`, và chỉ khi nó được
@@ -3756,13 +3749,14 @@ cả hai người viết.
     cho `ready_untold` trong danh sách của app và câu "Skill của tôi xong
     chưa?", skill vẫn tắt. Worker xử lý ghi chú của lượt đó
     (`long_make::told_here`): một câu, "Your <name> skill is ready and on.
-    Say 'remove it' to undo." (`long_make::ready_on_line`), không hỏi đồng
+    Say 'remove it' to undo." (`long_make::ready_on_line`), hoặc, với skill
+    có lượt thử đạt, câu của lượt thử (`made_skill::tried_line`, bên dưới), không hỏi đồng
     ý (first builder, 18/11 18:41), kèm lời nhắc liên kết cho dịch vụ nó đọc mà chưa liên kết, như
     câu của lần tạo xong. Skill có code khi đèn không chạy code của skill
     (`LAMP_MADE_SCRIPTS` tắt) được nói là xong và tắt, nói rõ lý do, không
     bao giờ nói là bật. Skill có code vẫn cần câu đồng ý như lần tạo xong
-    (`made_skill::code_goes_on_at_once` sai: nó gửi đi, hoặc dùng camera,
-    micro hay nghe, hoặc `LAMP_MADE_CODE_ON_AT_ONCE` tắt; nên mọi skill có
+    (`made_skill::code_goes_on_at_once` sai: task cho agent của đèn, hoặc
+    `LAMP_MADE_CODE_ON_AT_ONCE` tắt; nên mọi skill có
     code trong sản phẩm, nơi switch đó tắt) được nói là xong và đọc lại như
     lần tạo của app (`make_skill_local::app_code_asked`): "Your <name> skill
     is ready." và `made_skill::on_line`, từng chữ, kèm thứ code của nó được
@@ -4106,8 +4100,16 @@ Dù đèn chạy agent nào (OpenClaw hay Hermes; không chỗ nào ở đây g�
   thất bại bị từ chối là `made_skill::NOT_TRIED_PASSED` kèm lời của
   lamp-tasks, gửi lại agent như một lần sửa (tối đa hai), rồi lần tạo được
   báo là thất bại và không giữ gì. Lần thử đạt thêm `made_skill::TRIED_SAID`
-  ("I tried it once and it worked.") vào lời đọc lại; vẫn hỏi người dùng đồng
-  ý như trước. Lần thử không làm được (lamp-tasks đang bận, không có token,
+  ("I tried it once and it worked.") vào lời đọc lại, và khi đã bật, đèn
+  nói một câu kèm điều lượt thử nói đầu tiên (#8180, `made_skill::tried_line`,
+  từ `said_first` của make_try): "Made it, and I tried it: <what it said>.
+  Say 'remove it' to undo." (lời trên một dòng, tối đa 120 ký tự, bỏ dấu
+  `.`, `!` hay `?` ở cuối), hoặc "Made <name>, and I tried it. Say 'remove
+  it' to undo." khi nó không nói gì dùng được; trong
+  `make_no_asks::made_line`, câu xong-và-bật của lần tạo dài (`long_make`)
+  và `make_skill_local::code_on_line`, và được ghi nhật ký ("lamp-voice: a
+  made skill is said on with its try: …"). Skill không có gì để thử giữ
+  câu cũ. Lần thử không làm được (lamp-tasks đang bận, không có token,
   hàng rào lỗi, lamp-tasks cũ không biết `make_try`, không có trả lời) thì
   đóng an toàn (#8180): ghi nhật ký kèm lý do, không giữ gì, và người dùng
   nghe `made_skill::NOT_TRIED_LINE` ("I made it, but the lamp couldn't try

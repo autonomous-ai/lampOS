@@ -144,6 +144,10 @@ pub const NOTHING_TO_UNDO: &str = "nothing that can be undone was done to a skil
 /// The one line said of a made skill on: its name, the undo. `extra`, a
 /// sentence of its own when not empty, goes between.
 pub fn made_line(made: &Made, extra: &str) -> String {
+    // #8180: a tried skill is said with what its try did.
+    if let Some(line) = made_skill::tried_line(made, extra) {
+        return line;
+    }
     format!(
         "Made {}.{extra} Say 'remove it' to undo.",
         made_skill::spoken_name(&made.name)
