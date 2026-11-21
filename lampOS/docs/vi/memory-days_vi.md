@@ -930,7 +930,8 @@ phần của kho nằm ở `crates/memory/src/app_facts.rs`.
   (`--forget-socket`, nhận nó cạnh `forget_person`), giữ một dấu chờ và thử lại
   mỗi 30 giây cho đến khi trí nhớ trả lời `ok`. `apps.context` chưa được xây. Trí nhớ
   cũ trả lời `unknown_op`, báo cho app là `unavailable`.
-- **Phía giọng nói (`LAMP_APP_MEMORY`, mặc định tắt; phần của App Only theo
+- **Phía giọng nói (`LAMP_APP_MEMORY`, `on` trong `lamp-voice.service` của
+  sản phẩm từ lần bật công tắc ở #8228; phần của App Only theo
   cách chia 16:45, `crates/voice/src/app_context.rs`).** Dựa trên ghi chú
   ngắn hạn của #7900: lamp-voice giữ `ContextLines` trong RAM của chính nó
   (`app_context::set` / `clear` / `clear_all`, cho bên ghi ở cửa) và, ở mỗi
