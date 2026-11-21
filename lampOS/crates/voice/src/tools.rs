@@ -2766,6 +2766,11 @@ fn run_call_with_scope(
             ("the lamp's own model", (told, true))
         }
         Route::Schedule(directory) => {
+            // A length or time the line did not give is asked for, never
+            // set as the model chose it (#8182, `LAMP_TIMER_ASKS_HOW_LONG`).
+            if let Some(told) = crate::reminders::when_not_heard(&call.name, request, heard) {
+                return ("the schedule through the executive", (told, false));
+            }
             let caller = schedule_whose::caller(lease, &call.name);
             let (mut told, answered) = ask_schedule_for(directory, call, deadline, Some(&caller));
             // A reminder its known creator set, or cancelled, is their

@@ -3117,6 +3117,8 @@ fn second_route_worker_environment(
         crate::second_provider::worker::WHILE_THEY_APPLY_ENVIRONMENT,
         crate::second_provider::SAID_ONCE_ENVIRONMENT,
         crate::second_provider::SAY_WITH_CALL_ENVIRONMENT,
+        // A timer or reminder whose length or time was not heard is asked (#8182).
+        lamp_actions::schedule::ASKS_HOW_LONG_SWITCH,
         // A plain keep answered at once, with no second round (C59).
         crate::keep_at_once::ENVIRONMENT,
         // A claimed action no call made is never said as it is (#5215).
@@ -3516,6 +3518,7 @@ mod tests {
             crate::second_provider::worker::WHILE_THEY_APPLY_ENVIRONMENT,
             crate::second_provider::SAID_ONCE_ENVIRONMENT,
             crate::second_provider::SAY_WITH_CALL_ENVIRONMENT,
+            lamp_actions::schedule::ASKS_HOW_LONG_SWITCH,
             crate::keep_at_once::ENVIRONMENT,
             crate::action_claim::ENVIRONMENT,
             crate::action_claim::WORDED_ENVIRONMENT,
