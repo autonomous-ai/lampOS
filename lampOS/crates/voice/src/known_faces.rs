@@ -2354,7 +2354,9 @@ pub const DEADLINE: Duration = Duration::from_secs(6);
 pub(crate) const FRESH: Duration = lamp_msgs::known::FRESH;
 const MOST_NAME_BYTES: usize = 120;
 
-/// With [`FaceSwitches::face_question`], before [`QUESTION_NOT_ASK`]: a
+/// With [`FaceSwitches::face_question`] and names checked, before
+/// [`QUESTION_NOT_ASK`] (unchecked, the description asks for a told name,
+/// so this would contradict it): a
 /// clear ask is a call in any turn, also after their face was kept earlier
 /// in the conversation, or before they said their name (#8053, row-8053q on
 /// lamp-52e6, 21 Nov: such asks called it 17 of 30 after a save, and an ask
@@ -2417,7 +2419,7 @@ pub fn tools_for(switches: FaceSwitches) -> Vec<Tool> {
                  given for somebody else."
             }
             .to_owned()
-                + if switches.face_question {
+                + if switches.face_question && checked {
                     ASK_IS_A_CALL
                 } else {
                     ""
@@ -8253,7 +8255,11 @@ mod tests {
             assert!(on.ends_with(QUESTION_NOT_ASK), "{on}");
             assert!(on.contains("\"Do you remember me?\""), "{on}");
             assert!(!off.contains("Do you remember me"), "{off}");
-            assert_eq!(on, format!("{off}{ASK_IS_A_CALL}{QUESTION_NOT_ASK}"));
+            // Unchecked, the description asks for a told name, so the
+            // nameless call is not offered (Seventh's read on #8218).
+            let call = if checked { ASK_IS_A_CALL } else { "" };
+            assert_eq!(on, format!("{off}{call}{QUESTION_NOT_ASK}"));
+            assert_eq!(on.contains(ASK_IS_A_CALL), checked, "{on}");
             // #8053: an ask is a call in any turn, after a save or before
             // a name, and a question still never is (it comes last).
             assert!(ASK_IS_A_CALL.contains("every clear ask"), "{on}");
