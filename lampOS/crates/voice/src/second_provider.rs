@@ -19275,6 +19275,12 @@ async fn answer(
                     services.forced(asked, without),
                 );
                 eprintln!("{line}");
+                // Which check refused a reminders line its force (#8181).
+                if crate::tools::reminders_asked::on()
+                    && let Some(line) = crate::tools::reminders_asked::declined_line(request, asked)
+                {
+                    eprintln!("{line}");
+                }
             }
             let mut stream = match prepared.take() {
                 // The skill the heard words named: its call alone, at once.
