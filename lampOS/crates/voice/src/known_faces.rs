@@ -2283,6 +2283,20 @@ pub const DEADLINE: Duration = Duration::from_secs(6);
 pub(crate) const FRESH: Duration = lamp_msgs::known::FRESH;
 const MOST_NAME_BYTES: usize = 120;
 
+/// With [`FaceSwitches::face_question`] and names checked, before
+/// [`QUESTION_NOT_ASK`] (unchecked, the description asks for a told name,
+/// so this would contradict it): a
+/// clear ask is a call in any turn, also after their face was kept earlier
+/// in the conversation, or before they said their name (#8053, row-8053q on
+/// lamp-52e6, 21 Nov: such asks called it 17 of 30 after a save, and an ask
+/// with no name 0 of 3 to 3 of 3 by line after a greeting). Both are
+/// answered here before any look: a face known by that name is told so
+/// ([`face_question_first`]), and no name is told [`NO_NAME`]
+/// ([`run_switched`]). Never judged by words here.
+const ASK_IS_A_CALL: &str = " Call it for every clear ask to remember them, in any turn: also when you kept \
+     their face earlier in this conversation (it tells you if you already know them), and before they have \
+     said their name (call it with an empty name: it says there was no name, so then ask for it).";
+
 /// With [`FaceSwitches::face_question`], at the end of [`REMEMBER`]'s
 /// description, checked or not: a question whether the lamp knows them is
 /// no ask. The model's call is never judged by its words here.
@@ -2334,6 +2348,11 @@ pub fn tools_for(switches: FaceSwitches) -> Vec<Tool> {
                  given for somebody else."
             }
             .to_owned()
+                + if switches.face_question && checked {
+                    ASK_IS_A_CALL
+                } else {
+                    ""
+                }
                 + if switches.face_question {
                     QUESTION_NOT_ASK
                 } else {
@@ -8079,7 +8098,56 @@ mod tests {
             assert!(on.ends_with(QUESTION_NOT_ASK), "{on}");
             assert!(on.contains("\"Do you remember me?\""), "{on}");
             assert!(!off.contains("Do you remember me"), "{off}");
-            assert_eq!(on, format!("{off}{QUESTION_NOT_ASK}"));
+            // Unchecked, the description asks for a told name, so the
+            // nameless call is not offered (Seventh's read on #8218).
+            let call = if checked { ASK_IS_A_CALL } else { "" };
+            assert_eq!(on, format!("{off}{call}{QUESTION_NOT_ASK}"));
+            assert_eq!(on.contains(ASK_IS_A_CALL), checked, "{on}");
+            // #8053: an ask is a call in any turn, after a save or before
+            // a name, and a question still never is (it comes last).
+            assert!(ASK_IS_A_CALL.contains("every clear ask"), "{on}");
+            assert!(ASK_IS_A_CALL.contains("kept their face earlier"), "{on}");
+            assert!(ASK_IS_A_CALL.contains("empty name"), "{on}");
+            assert!(!off.contains("every clear ask"), "{off}");
+            assert!(on.find(ASK_IS_A_CALL) < on.find(QUESTION_NOT_ASK), "{on}");
+        }
+    }
+
+    /// #8053: the description says a call before their name is told there
+    /// was no name, so the model asks for it ([`ASK_IS_A_CALL`]). An empty or blank name, with the
+    /// switch on, is told [`NO_NAME`] here and nothing reaches the eyes:
+    /// no look, nothing kept, as with it off.
+    #[test]
+    fn with_face_question_a_call_with_no_name_is_told_to_ask_and_sends_nothing() {
+        let switches = |face_question: bool| FaceSwitches {
+            checked: true,
+            rename_yes: true,
+            name_learn_fix: true,
+            face_question,
+            ..FaceSwitches::default()
+        };
+        for args in [json!({"name": ""}), json!({"name": "  "}), json!({})] {
+            for on in [true, false] {
+                let (socket, sent) = eyes(vec![]);
+                let call = ToolCall {
+                    id: "1".into(),
+                    name: REMEMBER.into(),
+                    args: args.clone(),
+                };
+                let (told, _) = run_switched(
+                    &socket,
+                    &call,
+                    switches(on),
+                    &Said::now("Please remember my face."),
+                    None,
+                    &mut None,
+                );
+                let sent = sent.join().unwrap();
+                let _ = std::fs::remove_dir_all(socket.parent().unwrap());
+                assert_eq!(told["error"], NO_NAME, "{args} {told}");
+                assert!(refused_here(&told), "{told}");
+                assert!(sent.is_empty(), "{sent:?}");
+            }
         }
     }
 
