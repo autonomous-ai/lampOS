@@ -770,7 +770,9 @@ sau:
      `lamp.notes.set(key, value)` và `lamp.notes.get(key)` (quyền `notes`,
      `made_skill::SCRIPT_NOTES_SDK`): một ghi chú nhỏ giữ trong kho notes
      của lamp-control dưới client riêng của kỹ năng
-     (`runs::skill_notes_client`), lần chạy sau đọc lại được; không bao giờ
+     (`runs::skill_notes_client`; lamp-control giữ ghi chú của mọi lần chạy
+     của mọi kỹ năng ở đó, có bật công tắc hay không, #7775), lần chạy sau
+     đọc lại được; không bao giờ
      là một tệp người dùng mở được. Lời nhắc nói rõ SDK có hai lệnh đó, nên
      kỹ năng như vậy làm được, và khi `LAMP_MADE_SKILL_ASKS` cũng bật, một
      kỹ năng khởi động bằng chính lời người dùng nói là khởi động bằng
@@ -782,7 +784,8 @@ sau:
      một tệp người dùng mở được: lời đọc lại nói rõ nó giữ gì và khi nào đọc
      lại. Gỡ một kỹ năng (`task_yes_forget`) xóa ghi chú của nó; một câu
      "forget everything" được nghe sẽ gửi lamp-control `notes_forget_skills`,
-     xóa ghi chú của mọi kỹ năng tự tạo. Một quyền ghi chú viết dưới tên
+     xóa ghi chú của mọi kỹ năng tự tạo, công tắc này tắt hay bật đều vậy
+     (#7775: ghi chú luôn được giữ). Một quyền ghi chú viết dưới tên
      khác (`note`, hoặc `notes` hay `note` rồi `-`, `_` hoặc `:` và một từ, hoa
      hay thường, như `notes-write`; danh sách trên một hay nhiều dòng, có thể
      kèm chú thích) được viết lại thành `notes` trên một dòng trước khi kiểm

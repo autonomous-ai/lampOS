@@ -1265,6 +1265,15 @@ a revoke that deletes everything.
 - **Whose.** The computer is always the one the connection proved at `hello`
   (its id), never a field of a request, so no computer can name another's keys,
   and a re-paired computer is a new id that sees nothing of the old one's.
+  A skill's run (by the run socket) is the exception: its client is new each
+  run, so its notes are its **skill's**, kept under the skill's notes client
+  (`n_` and 16 hex of the digest of the name its token was minted for,
+  `runs::skill_notes_client`, #7245), shared by every run of that skill and
+  by no other skill, with no switch (#7775). The bounds and answers below are
+  the same, the bounds counted for the skill; the rates stay each run's own
+  (its session's client); two runs of one skill at once share its one write
+  at a time (`busy`). A run past its time but not yet swept is refused
+  (`no_grant`, "the run has ended"), never kept under its own run's client.
 - **The bounds, refused whole (nothing is partly kept).** A key is 1 to 64
   bytes of `A-Z a-z 0-9 . _ : -` (`bad_request` otherwise; a prefix is up to 64
   of them). A value is any JSON, at most 16,384 bytes serialized
@@ -1303,7 +1312,13 @@ a revoke that deletes everything.
   refused ("the lamp could not keep the note"). They are read the first time a
   computer uses them and kept in memory after. A file that cannot be read (or is
   another version's) is set aside as `<client>.json.bad`, said once in the
-  journal without a word of it, and the notes start empty.
+  journal without a word of it, and the notes start empty. A skill's are
+  `notes/n_<16 hex>.json`, one file however many runs; the `n_` start is no
+  paired computer's (`c_`), so no skill's name can reach a computer's file.
+  A skill's remove (`task_yes_forget`) deletes its file, so a skill made
+  again under the same name starts empty. Files a skill's runs left as
+  `notes/<run's client>.json` before #7775 are left as they are: by name they
+  can't be told from a computer's, and no run reads them again.
 - **A revoke deletes them**, file and memory (and a `.bad` or a `.tmp` beside it), with the computer's clips. A grant taken back by a re-pairing without `notes` does not: its ops are refused (`no_grant`) and its notes stay on the lamp, kept for if the grant comes back, until a revoke.
 - **The journal** says the op and counts and sizes, never a key or a value;
   nothing else on the lamp reads the notes, and no event says they changed.

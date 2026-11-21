@@ -5963,12 +5963,10 @@ pub fn forget_all_notes_by(control: &Path) -> Result<(), String> {
     }
 }
 
-/// [`forget_all_notes_by`] off the voice's turn, with [`notes_on`] alone:
-/// off, nothing is sent. A failure is journaled.
+/// [`forget_all_notes_by`] off the voice's turn, whatever [`notes_on`]
+/// says: lamp-control keeps every skill run's notes with no switch (#7775),
+/// so "forget everything" takes them either way. A failure is journaled.
 pub fn forget_all_notes_soon() {
-    if !notes_on() {
-        return;
-    }
     let control = control_socket();
     std::thread::spawn(move || {
         if let Err(why) = forget_all_notes_by(&control) {
@@ -12277,11 +12275,11 @@ mod tests {
         let _ = std::fs::remove_file(&socket);
     }
 
-    // #7245: "forget everything" heard asks lamp-control once to forget
-    // every made skill's notes with LAMP_MADE_NOTES on, and never with it
-    // off.
+    // #7245, #7775: "forget everything" heard asks lamp-control once to
+    // forget every skill's notes, with LAMP_MADE_NOTES off as on (a skill
+    // run's notes are kept with no switch).
     #[test]
-    fn forget_everything_asks_control_once_only_with_notes_on() {
+    fn forget_everything_asks_control_once_whatever_the_notes_switch() {
         use std::io::{BufRead as _, Write as _};
         let socket =
             std::env::temp_dir().join(format!("lamp-voice-7245-soon-{}.sock", std::process::id()));
@@ -12312,8 +12310,8 @@ mod tests {
         set_notes_here(Some(false));
         forget_all_notes_soon();
         assert_eq!(
-            read_for(Duration::from_millis(300)),
-            Vec::<serde_json::Value>::new()
+            read_for(Duration::from_millis(1500)),
+            [serde_json::json!({"notes_forget_skills": true})]
         );
         set_notes_here(Some(true));
         forget_all_notes_soon();
