@@ -12,11 +12,28 @@ use std::{
 struct Fake {
     asked: Vec<&'static str>,
     start: Option<Result<(), String>>,
+    /// The one-shot's `ActiveState`, read only to bring lamp-tasks back
+    /// after a cut-off move (#8138).
+    active: Option<&'static str>,
 }
 
 impl Systemd for Fake {
-    fn states(&mut self, _: &[String]) -> Result<Vec<UnitState>, String> {
-        unreachable!("Harness's unit asks no unit states")
+    fn states(&mut self, units: &[String]) -> Result<Vec<UnitState>, String> {
+        assert_eq!(units, [UNIT], "only the one-shot's state is read");
+        let active = self
+            .active
+            .expect("the one-shot's state read with none set");
+        self.asked.push("state");
+        Ok(vec![UnitState {
+            unit: UNIT.to_owned(),
+            active: active.to_owned(),
+            ..UnitState::default()
+        }])
+    }
+    fn start_unit(&mut self, unit: &str) -> Result<(), String> {
+        assert_eq!(unit, "lamp-tasks.service", "only lamp-tasks is started");
+        self.asked.push("start-tasks");
+        Ok(())
     }
     fn self_recovery_ready(&mut self) -> Result<(), String> {
         unreachable!()
@@ -1957,12 +1974,175 @@ fn the_one_shot_moves_an_older_harness_to_the_pin() {
     assert!(log[keep].starts_with("runuser -u lampos -- env HOME=/var/lib/lampos-tasks "));
     assert!(!log.iter().any(|line| line.ends_with(PUT_BACK)), "{log:?}");
     assert_eq!(log.last().unwrap(), "systemctl restart lamp-tasks.service");
+    // Started again: the stop's record is taken out (#8138).
+    assert!(!lamp.records().join(TasksStop::Move.record()).exists());
     assert!(
         lines.iter().any(|line| line
             == &format!(
                 "Harness moved from 0.4.25 to the pinned {}",
                 product::VERSION
             )),
+        "{lines:?}"
+    );
+}
+
+/// A move cut off between its stop of lamp-tasks and its start (#8138):
+/// the watch's `systemctl stop`, the unit's timeout or a crash ends the
+/// one-shot just as it stops Harness's daemon, so `systemctl stop
+/// lamp-tasks` ran and no start did.
+fn move_cut_off_after_the_stop(lamp: &Lamp) {
+    asked_to_move(lamp, "0.4.25");
+    let log: Rc<RefCell<Vec<String>>> = Rc::default();
+    let mut inner = mover(log.clone(), "0.4.25", product::VERSION, Ok(String::new()));
+    let mut run = |argv: &[String]| {
+        // The one-shot ends here: nothing after it runs.
+        assert!(
+            !argv.join(" ").ends_with("/usr/local/bin/harness stop"),
+            "the one-shot is cut off"
+        );
+        inner(argv)
+    };
+    let cut = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+        moved(lamp, &mut run, &mut Vec::new())
+    }));
+    assert!(cut.is_err(), "cut off");
+    let log = log.borrow().clone();
+    assert!(
+        log.contains(&"systemctl stop lamp-tasks.service".to_owned())
+            && !log
+                .iter()
+                .any(|line| line.contains("start lamp-tasks.service")),
+        "{log:#?}"
+    );
+}
+
+/// #8138 (the first builder's follow-up (c) on #8162): a Harness move cut
+/// off between its stop of lamp-tasks and its start leaves lamp-tasks
+/// stopped, and the next rounds never start it (the move stays
+/// `installing` for [`STUCK_AFTER`], and its kept copy then holds any
+/// later move). The next round starts it again once the one-shot is no
+/// longer at work (never while it runs or is being stopped), said once;
+/// a round after that starts nothing.
+#[test]
+fn a_cut_off_move_never_leaves_lamp_tasks_stopped_after_the_next_round() {
+    let lamp = Lamp::new();
+    move_cut_off_after_the_stop(&lamp);
+    let round = |systemd: &mut Fake, at: u64| {
+        after_round(
+            lamp.root(),
+            &lamp.records(),
+            &Ok(Some(product::built_in())),
+            systemd,
+            at,
+            &mut quiet(),
+        );
+    };
+    for at_work in ["active", "activating", "deactivating"] {
+        let mut systemd = Fake {
+            active: Some(at_work),
+            ..Fake::default()
+        };
+        round(&mut systemd, 10);
+        assert!(
+            !systemd.asked.contains(&"start-tasks"),
+            "{at_work}: {:?}",
+            systemd.asked
+        );
+    }
+    let mut systemd = Fake {
+        active: Some("failed"),
+        ..Fake::default()
+    };
+    round(&mut systemd, 11);
+    assert_eq!(
+        systemd
+            .asked
+            .iter()
+            .filter(|asked| **asked == "start-tasks")
+            .count(),
+        1,
+        "{:?}",
+        systemd.asked
+    );
+    let mut systemd = Fake {
+        active: Some("inactive"),
+        ..Fake::default()
+    };
+    round(&mut systemd, 12);
+    assert!(
+        !systemd.asked.contains(&"start-tasks"),
+        "started once: {:?}",
+        systemd.asked
+    );
+}
+
+/// #8138: `serve`'s look between rounds (every
+/// [`crate::openclaw_install::KEEP_EVERY`], 10 s) brings lamp-tasks back
+/// after a cut-off move without waiting for a round: nothing while the
+/// one-shot is at work, then one start, said once.
+#[test]
+fn serve_starts_lamp_tasks_again_within_a_look_of_a_cut_off_move() {
+    let lamp = Lamp::new();
+    move_cut_off_after_the_stop(&lamp);
+    for at_work in ["active", "activating", "deactivating"] {
+        let mut systemd = Fake {
+            active: Some(at_work),
+            ..Fake::default()
+        };
+        tasks_back(&lamp.records(), &mut systemd, &mut quiet());
+        assert!(
+            !systemd.asked.contains(&"start-tasks"),
+            "{at_work}: {:?}",
+            systemd.asked
+        );
+    }
+    let mut lines = Vec::new();
+    let mut systemd = Fake {
+        active: Some("inactive"),
+        ..Fake::default()
+    };
+    for _ in 0..2 {
+        tasks_back(&lamp.records(), &mut systemd, &mut |line: &str| {
+            lines.push(line.to_owned())
+        });
+    }
+    assert_eq!(systemd.asked, ["state", "start-tasks"]);
+    assert_eq!(
+        lines,
+        [
+            "lamp-tasks.service started again: Harness's move ended while it was stopped for the move (#8138)"
+        ]
+    );
+}
+
+/// #8138: a stop of lamp-tasks that can't be recorded is not made, and
+/// Harness is not moved at this round: no stop is left that nothing
+/// brings back.
+#[test]
+fn a_move_whose_stop_cannot_be_recorded_stops_nothing() {
+    let lamp = Lamp::new();
+    asked_to_move(&lamp, "0.4.25");
+    // A folder where the record goes: it can't be written.
+    fs::create_dir(lamp.records().join(TasksStop::Move.record())).unwrap();
+    let log: Rc<RefCell<Vec<String>>> = Rc::default();
+    let mut run = mover(log.clone(), "0.4.25", product::VERSION, Ok(String::new()));
+    let mut lines = Vec::new();
+    let said = moved(&lamp, &mut run, &mut lines);
+    assert_eq!(
+        (said.install.as_str(), said.version.as_deref()),
+        ("installed", Some("0.4.25")),
+        "{lines:?}"
+    );
+    let log = log.borrow().clone();
+    assert!(
+        !log.iter()
+            .any(|line| line == "systemctl stop lamp-tasks.service" || line.ends_with(" stop")),
+        "{log:#?}"
+    );
+    assert!(
+        lines
+            .iter()
+            .any(|line| line.contains("its stop of lamp-tasks.service not recorded")),
         "{lines:?}"
     );
 }

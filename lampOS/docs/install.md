@@ -1542,9 +1542,22 @@ As root, on a lamp with the base image (`crates/update/src/install.rs`):
          with the same 6 h bound for a task: if it is, it records `installed` at that version and a later round
          moves it. Then it stops `lamp-tasks.service` and runs `harness
          stop` (lamp-tasks starts the new daemon when it starts again).
-         Either stop failing, or `id -u` failing first, is "not now" in the
+         The stop of lamp-tasks is recorded first in lamp-update's records
+         (`harness-tasks-stopped`, #8138), and the record is taken out
+         once lamp-tasks is started again; a record that can't be written
+         stops nothing and is "not now" in the same way. Either stop
+         failing, or `id -u` failing first, is "not now" in the
          same way, with `systemctl start lamp-tasks.service` (a running one
-         is left as it is). A bus that can't be opened counts as in use. Then it keeps the Harness that is there: as
+         is left as it is). **A move cut off** after that stop (the
+         install watch's `systemctl stop`, the unit's timeout, a crash)
+         never starts lamp-tasks again, and `Restart=on-failure` does not
+         bring back a clean stop; the next rounds would not either (the
+         move stays `installing` for 30 min, and its kept copy then holds
+         every later move). `serve` starts it, as for OpenClaw's install
+         (below, "The install's restart order"): with the record there and
+         this one-shot read `inactive` or `failed`, within about 10 s of
+         its end, said once as `lamp-tasks.service started again:
+         Harness's move ended while it was stopped for the move (#8138)`. A bus that can't be opened counts as in use. Then it keeps the Harness that is there: as
          `lampos`, the folder of the `cli.js` its launcher runs, the
          launcher, `~/.harness/runtime/current-{node,tmux,grid}` and the
          `~/.local/bin/tmux` link are copied to
@@ -2585,13 +2598,17 @@ As root, on a lamp with the base image (`crates/update/src/install.rs`):
      says once `lamp-tasks.service started again: OpenClaw's install
      ended while it was stopped for the gateway's restart (#8138)`. It
      looks every 10 s between rounds (the thread of
-     `LAMP_OPENCLAW_GATEWAY_BY_DEFAULT`, which runs with OpenClaw on
-     whatever that switch says; the switch only decides whether it also
-     keeps the gateway) and once at each round's OpenClaw step, so
+     `LAMP_OPENCLAW_GATEWAY_BY_DEFAULT`, which runs on every `serve`
+     that acts, OpenClaw on or off, whatever that switch says; the
+     switch only decides whether it also keeps the gateway) and once at
+     each round's Harness and OpenClaw steps (the switch-off one too), so
      lamp-tasks is back within about 10 s of the one-shot's end, or at
      the end of a round under way. A start that fails keeps the record
      and is tried again at the next look, its line said only when the
-     error changes.
+     error changes. Harness's own move stops lamp-tasks in the same
+     one-shot and is brought back by the same look, with a record of
+     its own (`harness-tasks-stopped`, above, "The move";
+     `harness_install::TasksStop`).
 
      A restart that fails still starts lamp-tasks again; the install is
      then `failed` with `gateway` and, as every failed install, stops the

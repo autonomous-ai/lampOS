@@ -2084,11 +2084,13 @@ pub const TASKS_UNIT: &str = "lamp-tasks.service";
 
 /// The record of a stop of [`TASKS_UNIT`] by [`tasks_stopped`] not yet
 /// followed by its start (#8138, the first builder's HOLD 1 on #8162),
-/// in the records folder: written before the stop, taken out once
-/// lamp-tasks is started again. One still there after the one-shot has
-/// ended (cut off by the watch's `systemctl stop`, its timeout or a
-/// crash) is how `serve` knows to start lamp-tasks ([`tasks_back`]).
-pub const TASKS_STOPPED: &str = "openclaw-tasks-stopped";
+/// in the records folder: [`harness_install::TasksStop::Gateway`]'s, one
+/// of the one-shot's stops [`tasks_back`] brings back.
+pub const TASKS_STOPPED: &str = harness_install::TasksStop::Gateway.record();
+
+/// The one look that brings lamp-tasks back after any cut-off stop of
+/// Harness's one-shot, OpenClaw's install or Harness's move (#8138).
+pub use harness_install::tasks_back;
 
 /// [`TASKS_UNIT`] stopped when it is active: whether it was, so it is
 /// started again after the gateway's restart ([`tasks_started`]). One not
@@ -2100,7 +2102,7 @@ fn tasks_stopped(records: &Path, run: &mut Runner, say: &mut dyn FnMut(&str)) ->
     if run(&["systemctl", "is-active", "--quiet", TASKS_UNIT].map(str::to_owned)).is_err() {
         return false;
     }
-    if let Err(error) = write_whole(&records.join(TASKS_STOPPED), b"", 0o600) {
+    if let Err(error) = harness_install::TasksStop::Gateway.recorded(records) {
         say(&format!(
             "{TASKS_UNIT} not stopped while {UNIT} restarts: its stop not recorded: {error}"
         ));
@@ -2124,50 +2126,10 @@ fn tasks_started(records: &Path, run: &mut Runner, ran: bool, say: &mut dyn FnMu
     }
     match run(&["systemctl", "start", TASKS_UNIT].map(str::to_owned)) {
         Ok(_) => {
-            let _ = fs::remove_file(records.join(TASKS_STOPPED));
+            harness_install::TasksStop::Gateway.ended(records);
             say(&format!("{TASKS_UNIT} started again"));
         }
         Err(why) => say(&format!("{TASKS_UNIT} not started again: {why}")),
-    }
-}
-
-/// lamp-tasks brought back after an install cut off while it was stopped
-/// (#8138, the first builder's HOLD 1 on #8162): with [`TASKS_STOPPED`]
-/// there and Harness's one-shot not at work (its `ActiveState` read as
-/// `inactive` or `failed`: never while it runs, is frozen or is being
-/// stopped, so never mid-install), [`TASKS_UNIT`] started and the record
-/// taken out, said once. `serve` looks every [`KEEP_EVERY`] between
-/// rounds, and each round once. A start that fails keeps the record, so
-/// the next look tries again; its line is said only when the error
-/// changes (kept in the record), never every look.
-pub fn tasks_back(records: &Path, systemd: &mut dyn Systemd, say: &mut dyn FnMut(&str)) {
-    let stopped = records.join(TASKS_STOPPED);
-    let Ok(said) = fs::read(&stopped) else {
-        return;
-    };
-    let ended = systemd
-        .states(&[harness_install::UNIT.to_owned()])
-        .ok()
-        .and_then(|states| states.into_iter().next())
-        .is_some_and(|state| state.active == "inactive" || state.active == "failed");
-    if !ended {
-        return;
-    }
-    match systemd.start_unit(TASKS_UNIT) {
-        Ok(()) => {
-            let _ = fs::remove_file(&stopped);
-            say(&format!(
-                "{TASKS_UNIT} started again: OpenClaw's install ended while it was stopped for the gateway's restart (#8138)"
-            ));
-        }
-        Err(why) => {
-            if said != why.as_bytes() {
-                say(&format!(
-                    "{TASKS_UNIT} not started again after OpenClaw's install ended: {why}"
-                ));
-                let _ = write_whole(&stopped, why.as_bytes(), 0o600);
-            }
-        }
     }
 }
 

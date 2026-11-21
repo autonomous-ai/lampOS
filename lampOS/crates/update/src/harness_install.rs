@@ -425,6 +425,8 @@ pub fn after_round_when(
     in_use: &mut dyn FnMut() -> Option<&'static str>,
     say: &mut dyn FnMut(&str),
 ) -> Option<HarnessInstall> {
+    // #8138: a move cut off while lamp-tasks was stopped.
+    tasks_back(records, systemd, say);
     let before = record(records);
     if present(root) {
         if let (Some(said), Ok(Some(pin))) = (&before, pin)
@@ -1147,7 +1149,13 @@ fn upgrade(
         ));
         return write(records, left(now_unix_ms()));
     }
+    // The stop of lamp-tasks recorded first (#8138): one that can't be
+    // recorded is not made, so a move cut off never leaves a stop that
+    // nothing brings back ([`tasks_back`]).
     let stopped = install::uid_of(run, USER).and_then(|uid| {
+        TasksStop::Move
+            .recorded(records)
+            .map_err(|error| format!("its stop of lamp-tasks.service not recorded: {error}"))?;
         run(&["systemctl", "stop", "lamp-tasks.service"].map(str::to_owned))?;
         run(&install::harness_argv(USER, HARNESS_HOME, &uid, &["stop"]))
     });
@@ -1158,8 +1166,9 @@ fn upgrade(
         ));
         // `start`, not `restart`: lamp-tasks may never have been stopped
         // (`id -u` failing first), and a running one is left as it is.
-        if let Err(why) = run(&["systemctl", "start", "lamp-tasks.service"].map(str::to_owned)) {
-            say(&format!("lamp-tasks.service not started again: {why}"));
+        match run(&["systemctl", "start", "lamp-tasks.service"].map(str::to_owned)) {
+            Ok(_) => TasksStop::Move.ended(records),
+            Err(why) => say(&format!("lamp-tasks.service not started again: {why}")),
         }
         return write(records, left(now_unix_ms()));
     }
@@ -1209,8 +1218,11 @@ fn upgrade(
     };
     let said = write(records, said);
     launcher::after_install(root, run, say);
-    if let Err(why) = run(&["systemctl", "restart", "lamp-tasks.service"].map(str::to_owned)) {
-        say(&format!("lamp-tasks.service not started again: {why}"));
+    // Started again: the stop's record taken out; a start that fails
+    // leaves it, for [`tasks_back`] (#8138).
+    match run(&["systemctl", "restart", "lamp-tasks.service"].map(str::to_owned)) {
+        Ok(_) => TasksStop::Move.ended(records),
+        Err(why) => say(&format!("lamp-tasks.service not started again: {why}")),
     }
     said
 }
@@ -1334,6 +1346,100 @@ fn lock(records: &Path) -> Result<fs::File, String> {
         |_| io::Error::new(ErrorKind::WouldBlock, "another Harness install is at work").to_string(),
     )?;
     Ok(file)
+}
+
+/// Why [`UNIT`] stopped `lamp-tasks.service`, each with a record of its
+/// own in lamp-update's records (#8138): written before the stop, taken
+/// out once lamp-tasks is started again. One still there once the
+/// one-shot has ended (cut off by the install watch's `systemctl stop`,
+/// its timeout or a crash) is how `serve` knows to start lamp-tasks
+/// ([`tasks_back`]). Both stops are made inside [`UNIT`], so its state
+/// alone says whether one may still be under way.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum TasksStop {
+    /// OpenClaw's install, around its gateway's restart
+    /// (`openclaw_install::steps`).
+    Gateway,
+    /// Harness's own move to a newer pin ([`upgrade`]).
+    Move,
+}
+
+impl TasksStop {
+    const ALL: [TasksStop; 2] = [TasksStop::Gateway, TasksStop::Move];
+
+    /// The record's name in lamp-update's records.
+    pub const fn record(self) -> &'static str {
+        match self {
+            TasksStop::Gateway => "openclaw-tasks-stopped",
+            TasksStop::Move => "harness-tasks-stopped",
+        }
+    }
+
+    /// What ended while lamp-tasks was stopped, as its lines say it.
+    const fn what(self) -> (&'static str, &'static str) {
+        match self {
+            TasksStop::Gateway => ("OpenClaw's install", "the gateway's restart"),
+            TasksStop::Move => ("Harness's move", "the move"),
+        }
+    }
+
+    /// The stop recorded, before it is made; an error means it is not.
+    pub(crate) fn recorded(self, records: &Path) -> io::Result<()> {
+        write_whole(&records.join(self.record()), b"", 0o600)
+    }
+
+    /// lamp-tasks started again: the record taken out.
+    pub(crate) fn ended(self, records: &Path) {
+        let _ = fs::remove_file(records.join(self.record()));
+    }
+}
+
+/// lamp-tasks brought back after a one-shot cut off while it had stopped
+/// it (#8138, the first builder's HOLD 1 and follow-up (c) on #8162):
+/// with a [`TasksStop`] record there and [`UNIT`] not at work (its
+/// `ActiveState` read as `inactive` or `failed`: never while it runs, is
+/// frozen or is being stopped, so never mid-install or mid-move),
+/// `lamp-tasks.service` started and the record taken out, said once.
+/// `serve` looks every `openclaw_install::KEEP_EVERY` between rounds, and
+/// each round once. A start that fails keeps the record, so the next look
+/// tries again; its line is said only when the error changes (kept in the
+/// record), never every look. With no record, systemd is asked nothing.
+pub fn tasks_back(records: &Path, systemd: &mut dyn Systemd, say: &mut dyn FnMut(&str)) {
+    const TASKS: &str = "lamp-tasks.service";
+    let mut ended = None;
+    for cause in TasksStop::ALL {
+        let stopped = records.join(cause.record());
+        let Ok(said) = fs::read(&stopped) else {
+            continue;
+        };
+        let at_rest = *ended.get_or_insert_with(|| {
+            systemd
+                .states(&[UNIT.to_owned()])
+                .ok()
+                .and_then(|states| states.into_iter().next())
+                .is_some_and(|state| state.active == "inactive" || state.active == "failed")
+        });
+        if !at_rest {
+            return;
+        }
+        let (what, for_what) = cause.what();
+        match systemd.start_unit(TASKS) {
+            Ok(()) => {
+                cause.ended(records);
+                say(&format!(
+                    "{TASKS} started again: {what} ended while it was stopped for {for_what} (#8138)"
+                ));
+            }
+            Err(why) => {
+                if said != why.as_bytes() {
+                    say(&format!(
+                        "{TASKS} not started again after {what} ended: {why}"
+                    ));
+                    let _ = write_whole(&stopped, why.as_bytes(), 0o600);
+                }
+            }
+        }
+    }
 }
 
 pub mod busy;

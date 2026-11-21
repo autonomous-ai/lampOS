@@ -1216,16 +1216,17 @@ fn on_the_lamp(command: &str, options: &BTreeMap<String, String>) -> ExitCode {
     // A round asks once more for its own OpenClaw step. One lock is held by
     // the round for its whole run and by the thread for each look, so the
     // two never touch the gateway at once (Twelve's P3 on #8116). The same
-    // thread runs with OpenClaw on whatever that switch says, for #8138: a
-    // lamp-tasks an install stopped and never started again (the one-shot
-    // cut off) is started within KEEP_EVERY of the one-shot's end
-    // (openclaw::tasks_back), never during a round.
+    // thread runs on every serve that acts, OpenClaw on or off, whatever
+    // that switch says, for #8138: a lamp-tasks an OpenClaw install or a
+    // Harness move stopped and never started again (the one-shot cut off)
+    // is started within KEEP_EVERY of the one-shot's end
+    // (harness_install::tasks_back), never during a round.
     let gateway_by_default = matches!(openclaw, Some((true, _))) && switches.gateway_by_default;
     let tasks_app_socket = config
         .root
         .join(lamp_update::openclaw_install::TASKS_APP_SOCKET.trim_start_matches('/'));
     let gateway_lock = std::sync::Arc::new(std::sync::Mutex::new(()));
-    if matches!(openclaw, Some((true, _))) {
+    if openclaw.is_some() {
         use lamp_update::openclaw_install as openclaw;
         if gateway_by_default {
             say(
@@ -1245,7 +1246,7 @@ fn on_the_lamp(command: &str, options: &BTreeMap<String, String>) -> ExitCode {
                 loop {
                     // A round holds the lock: this look is skipped.
                     if let Ok(_look) = gateway_lock.try_lock() {
-                        openclaw::tasks_back(&records, &mut systemd, &mut said);
+                        lamp_update::harness_install::tasks_back(&records, &mut systemd, &mut said);
                         if gateway_by_default {
                             let gateway =
                                 openclaw::gateway_wanted(true, openclaw::said_default(&socket));
