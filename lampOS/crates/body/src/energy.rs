@@ -163,12 +163,11 @@ pub fn livelier(clip: &'static Clip, level: u8) -> &'static Clip {
         return clip;
     };
     MADE[index][usize::from(level) - 2].get_or_init(|| {
-        let row = of(level);
-        let size = CLIP_SIZE_CAP
-            .iter()
-            .find(|(name, _)| *name == clip.name)
-            .map_or(row.clip_size, |(_, cap)| row.clip_size.min(*cap));
-        sized(clip, size, row.clip_pace)
+        sized(
+            clip,
+            clip_size(clip.name, level),
+            of(level).clip_pace,
+        )
     })
 }
 
@@ -179,6 +178,90 @@ pub fn livelier(clip: &'static Clip, level: u8) -> &'static Clip {
 /// lamp's weight: on lamp-52e6 'curious' at x1.6 the size and x1.5 the
 /// pace asked about 11,200 and the base rang (#8153, row-8155b).
 pub const BASE_BEND: f32 = 7_690.0;
+
+/// The longest a built-in clip plays at any level, each step stretched
+/// under the servo's top speed (`Tuning::SERVO_SPEED_CAP`, the product
+/// unit's `--servo-speed`), or as recorded: how long one asking for it
+/// waits for its end (#8153: level 5 plays a cut clip for all of its
+/// recording, longer than level 1).
+pub fn longest_us(clip: &'static Clip) -> u64 {
+    let ceiling = Some(f32::from(crate::body::Tuning::SERVO_SPEED_CAP));
+    (1..=5)
+        .map(|level| livelier(clip, level).duration_within_us(ceiling))
+        .fold(clip.duration_us(), u64::max)
+}
+
+/// A built-in clip's size at `level`: the level's `clip_size`, less where
+/// [`CLIP_SIZE_CAP`] holds it.
+pub fn clip_size(name: &str, level: u8) -> f32 {
+    let size = of(level).clip_size;
+    CLIP_SIZE_CAP
+        .iter()
+        .find(|(cap, _)| *cap == name)
+        .map_or(size, |(_, cap)| size.min(*cap))
+}
+
+/// A built-in clip as long as `level` plays it, before its size and pace
+/// (#8153): one cut from its recording (`crate::clips::WHOLE`) is lengthened
+/// toward all of it, evenly from the cut at level 1 to the whole at level 5
+/// (or as much of it as [`WHOLE_TRIM`] keeps); any other clip is itself.
+pub fn longer(clip: &'static Clip, level: u8) -> Clip {
+    let Some(whole) = crate::clips::WHOLE
+        .iter()
+        .find(|whole| whole.cut.name == clip.name && whole.cut.frames == clip.frames)
+    else {
+        return *clip;
+    };
+    if taken(level) == 1 {
+        return *clip;
+    }
+    let (first, last) = whole_kept(whole);
+    let share = f32::from(taken(level) - 1) / 4.0;
+    let toward = |cut: usize, end: usize| {
+        let reach = (end as f32 - cut as f32) * share;
+        (cut as f32 + reach).round() as usize
+    };
+    span(whole, toward(whole.from, first), toward(whole.to, last))
+}
+
+/// The frames of `whole`'s recording level 5 plays: all of them, or as
+/// many as [`WHOLE_TRIM`] keeps.
+pub fn whole_kept(whole: &crate::clips::Whole) -> (usize, usize) {
+    WHOLE_TRIM
+        .iter()
+        .find(|(name, ..)| *name == whole.cut.name)
+        .map_or((0, whole.whole.frames.len() - 1), |(_, first, last, _)| {
+            (*first, *last)
+        })
+}
+
+/// Frames `first` to `last` of `whole`'s recording as a clip: taken from
+/// the first of them, so it begins at nothing, and, ended before the
+/// recording does, brought back to nothing over its last ten frames as the
+/// generator ends a cut (`tools/generate_clips.py`). At the cut's frame
+/// time. Its frames are kept for good.
+pub fn span(whole: &crate::clips::Whole, first: usize, last: usize) -> Clip {
+    let start = whole.whole.frames[first];
+    let mut frames: Vec<[i16; 5]> = whole.whole.frames[first..=last]
+        .iter()
+        .map(|frame| std::array::from_fn(|joint| frame[joint] - start[joint]))
+        .collect();
+    let count = frames.len();
+    let end = frames[count - 1];
+    let tail = 10.min(count - 1);
+    for step in 0..=tail {
+        let share = step as f32 / tail.max(1) as f32;
+        for joint in 0..5 {
+            let eased = (f32::from(end[joint]) * share).round() as i16;
+            frames[count - 1 - tail + step][joint] -= eased;
+        }
+    }
+    Clip {
+        name: whole.cut.name,
+        step_ms: whole.whole.step_ms,
+        frames: frames.leak(),
+    }
+}
 
 /// `clip` with each joint `size` times as far, held to the gesture's reach
 /// (`crate::body::GESTURE_REACH`), and its frames `pace` times as quick,
@@ -247,7 +330,7 @@ pub fn sized(clip: &Clip, size: f32, pace: f32) -> Clip {
 /// frame past 21.5 mm off the base's axis (22 mm is refused at play time,
 /// and a mood's lean then may add to the stand's), none leaning the lamp
 /// back past 16 mm
-/// (`crate::cog`, `every_built_in_clip_at_level_five_passes_v1s_rule`).
+/// (`crate::cog`, `every_built_in_clip_at_every_level_passes_v1s_rule`).
 /// Found on the host over all 21 clips at level 5; the rest take x1.6.
 pub const CLIP_SIZE_CAP: [(&str, f32); 5] = [
     ("greeting", 1.54),
@@ -256,6 +339,16 @@ pub const CLIP_SIZE_CAP: [(&str, f32); 5] = [
     ("excited", 1.27),
     ("dance_groove", 1.59),
 ];
+
+/// The cut clips level 5 does not play for all of their recording (#8153),
+/// each as long as V1's anti-tip rule lets it be at its level-5 size on the
+/// deployed lamps' standing poses, with the same half millimetre to spare
+/// as [`CLIP_SIZE_CAP`] (no frame past 21.5 mm off the base's axis, none
+/// leaning the lamp back past 16 mm): its recording's first and last frame
+/// kept, and the bound that held it. Found on the host
+/// (`cog::every_built_in_clip_at_every_level_passes_v1s_rule`): a frame
+/// more on the trimmed side crosses it. The rest play all of it.
+pub const WHOLE_TRIM: [(&str, usize, usize, &str); 0] = [];
 
 /// One level's rate of clips started of themselves (#6893).
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -634,9 +727,12 @@ mod tests {
         let ceiling = Some(1_000.0);
         let (mut grown, mut full_pace, mut slowed) = (0, 0, vec![]);
         for clip in crate::clips::ALL {
-            let (one, three, five) = (farthest(clip), livelier(clip, 3), livelier(clip, 5));
+            // Sized against the clip as long as level 5 plays it (#8153,
+            // `longer`): the cut clip itself for one not cut.
+            let long = longer(clip, 5);
+            let (one, three, five) = (farthest(&long), livelier(clip, 3), livelier(clip, 5));
             assert_eq!(five.name, clip.name);
-            assert_eq!(five.frames.len(), clip.frames.len(), "{}", clip.name);
+            assert_eq!(five.frames.len(), long.frames.len(), "{}", clip.name);
             assert_eq!(five.frames[0], [0; 5]);
             assert_eq!(five.frames[five.frames.len() - 1], [0; 5]);
             // The pace: a step 1/1.5 of its time, rounded up to a whole ms,
@@ -673,13 +769,13 @@ mod tests {
                     "{} joint {joint}: {at_five} against {wanted}",
                     clip.name
                 );
+                let level_one = farthest(clip)[joint];
                 assert!(
-                    one[joint] <= at_three && at_three <= at_five,
-                    "{} joint {joint}: {} {at_three} {at_five}",
-                    clip.name,
-                    one[joint]
+                    level_one <= at_three && at_three <= at_five,
+                    "{} joint {joint}: {level_one} {at_three} {at_five}",
+                    clip.name
                 );
-                grown += usize::from(at_five > one[joint]);
+                grown += usize::from(at_five > level_one);
             }
             // Played at a 20 ms tick under the servo's ceiling, no joint
             // goes faster than it.
@@ -716,5 +812,162 @@ mod tests {
             livelier(&crate::clips::NOD, 5),
             livelier(&crate::clips::NOD, 5)
         ));
+    }
+
+    /// `hal/recordings/NAME.csv` of each built-in clip (#8153), as the
+    /// generator names them (`tools/generate_clips.py`).
+    const RECORDINGS: [(&str, &str); 21] = [
+        ("nod", include_str!("../../../../hal/recordings/nod.csv")),
+        (
+            "headshake",
+            include_str!("../../../../hal/recordings/headshake.csv"),
+        ),
+        (
+            "greeting",
+            include_str!("../../../../hal/recordings/greeting.csv"),
+        ),
+        (
+            "laugh",
+            include_str!("../../../../hal/recordings/laugh.csv"),
+        ),
+        ("shy", include_str!("../../../../hal/recordings/shy.csv")),
+        (
+            "stretching",
+            include_str!("../../../../hal/recordings/stretching.csv"),
+        ),
+        ("idle", include_str!("../../../../hal/recordings/idle.csv")),
+        (
+            "acknowledge",
+            include_str!("../../../../hal/recordings/acknowledge.csv"),
+        ),
+        (
+            "curious",
+            include_str!("../../../../hal/recordings/curious.csv"),
+        ),
+        (
+            "happy",
+            include_str!("../../../../hal/recordings/happy_wiggle.csv"),
+        ),
+        ("caring", include_str!("../../../../hal/recordings/sad.csv")),
+        (
+            "surprised",
+            include_str!("../../../../hal/recordings/shock.csv"),
+        ),
+        (
+            "confused",
+            include_str!("../../../../hal/recordings/confused.csv"),
+        ),
+        (
+            "sleepy",
+            include_str!("../../../../hal/recordings/sleepy.csv"),
+        ),
+        (
+            "excited",
+            include_str!("../../../../hal/recordings/excited.csv"),
+        ),
+        (
+            "scanning",
+            include_str!("../../../../hal/recordings/scanning.csv"),
+        ),
+        (
+            "dance_chill",
+            include_str!("../../../../hal/recordings/music_chill.csv"),
+        ),
+        (
+            "dance_groove",
+            include_str!("../../../../hal/recordings/music_groove.csv"),
+        ),
+        (
+            "dance_hype",
+            include_str!("../../../../hal/recordings/music_hype.csv"),
+        ),
+        (
+            "dance_waltz",
+            include_str!("../../../../hal/recordings/music_waltz.csv"),
+        ),
+        (
+            "dance_jazz",
+            include_str!("../../../../hal/recordings/music_jazz.csv"),
+        ),
+    ];
+
+    /// #8153 (the lead, 20 Nov): level 5 plays each built-in clip for all
+    /// of its V1 recording, not only the stretch V2 cut (2 to 9 s): its
+    /// frames are the recording's rows, every one, unless `WHOLE_TRIM` names
+    /// the bound that trims it, and then exactly the rows it keeps. Levels
+    /// 2 to 4 step from the cut toward it, each longer than the level under
+    /// it; level 1 is the clip itself (`level_one_plays_every_clip_as_recorded`).
+    /// Its time is the rows at the clip's frame time over the level's 1.5
+    /// pace, each step stretched under the servo's 1,000 counts a second.
+    /// Prints a line a clip (`cargo test -- --nocapture`).
+    #[test]
+    fn level_five_plays_each_clip_for_all_of_its_v1_recording() {
+        let ceiling = Some(1_000.0);
+        let mut whole = 0;
+        for clip in crate::clips::ALL {
+            let (_, csv) = RECORDINGS
+                .iter()
+                .find(|(name, _)| *name == clip.name)
+                .unwrap();
+            let rows: Vec<&str> = csv.lines().skip(1).filter(|row| !row.is_empty()).collect();
+            let seconds = |row: &str| row.split(',').next().unwrap().parse::<f64>().unwrap();
+            let v1_s = seconds(rows[rows.len() - 1]) - seconds(rows[0]);
+            let trim = WHOLE_TRIM.iter().find(|(name, ..)| *name == clip.name);
+            let kept = trim.map_or(rows.len(), |(_, first, last, _)| last - first + 1);
+            let five = livelier(clip, 5);
+            assert_eq!(
+                five.frames.len(),
+                kept,
+                "{}: {} rows",
+                clip.name,
+                rows.len()
+            );
+            if let Some((_, first, last, why)) = trim {
+                assert!(*first > 0 || *last < rows.len() - 1, "{}", clip.name);
+                assert!(!why.is_empty(), "{}", clip.name);
+            }
+            // Each level longer than the one under it, for a clip cut.
+            let lengths: Vec<usize> = (1..=5)
+                .map(|level| livelier(clip, level).frames.len())
+                .collect();
+            if crate::clips::WHOLE
+                .iter()
+                .any(|whole| whole.cut.name == clip.name)
+            {
+                whole += 1;
+                let cut = crate::clips::WHOLE
+                    .iter()
+                    .find(|whole| whole.cut.name == clip.name)
+                    .unwrap();
+                assert_eq!(lengths[0], clip.frames.len(), "{}", clip.name);
+                assert!(
+                    lengths[1] > cut.to - cut.from + 1,
+                    "{} {lengths:?}",
+                    clip.name
+                );
+                assert!(
+                    lengths.windows(2).skip(1).all(|pair| pair[0] < pair[1]),
+                    "{} {lengths:?}",
+                    clip.name
+                );
+            } else {
+                assert!(
+                    lengths.iter().all(|length| *length == rows.len()),
+                    "{} {lengths:?}",
+                    clip.name
+                );
+            }
+            eprintln!(
+                "length {:<13} level 1 {:5.2} s, V1 {v1_s:5.2} s ({} rows), level 5 {:5.2} s ({kept} rows){}",
+                clip.name,
+                clip.duration_us() as f64 / 1e6,
+                rows.len(),
+                five.duration_within_us(ceiling) as f64 / 1e6,
+                trim.map_or(String::new(), |(_, first, last, why)| format!(
+                    ", rows {first} to {last}: {why}"
+                )),
+            );
+        }
+        assert_eq!(whole, crate::clips::WHOLE.len());
     }
 }
