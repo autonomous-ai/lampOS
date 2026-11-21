@@ -589,7 +589,12 @@ pub fn wrapper_text_for(shown: Shown) -> String {
 /// turn finished), only `MemoryMax=2500M` as a guard, and Node's own heap
 /// limit left as it is. Its CPU caps are sane values, not measured yet:
 /// below the lamp's services (`Nice`, `CPUWeight`, `CPUQuota`), started
-/// again on failure, given up on after five starts in ten minutes.
+/// again whenever it exits, given up on after five starts in ten minutes.
+/// `Restart=always`, not `on-failure` (#8238): OpenClaw answers a change of
+/// its `gateway` keys with a "full process restart (supervisor restart)"
+/// that exits 0, and leaves the start to its supervisor; `on-failure` took
+/// that as done and left the gateway down. A `systemctl stop` (every stop
+/// lamp-update and lamp-setup make) still stops it.
 pub const UNIT_TEXT: &str = "\
 # lamp-openclaw-gateway: OpenClaw's gateway on the lamp, which Harness's OpenClaw panes talk to (lampOS/docs/install.md,
 # \"OpenClaw on the lamp\", #6226). Written by a round of lamp-update with LAMP_OPENCLAW_ON_LAMP on, enabled and always
@@ -609,7 +614,7 @@ Group=lampos
 Environment=HOME=/var/lib/lampos-openclaw OPENCLAW_STATE_DIR=/var/lib/lampos-openclaw/state LAMP_OPENCLAW_GATEWAY=on
 WorkingDirectory=/var/lib/lampos-openclaw/state
 ExecStart=/usr/local/bin/openclaw gateway run
-Restart=on-failure
+Restart=always
 RestartSec=10
 StandardInput=null
 SyslogIdentifier=lamp-openclaw-gateway

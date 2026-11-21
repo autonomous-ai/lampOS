@@ -997,7 +997,8 @@ fn the_switch_off_stops_the_gateway_and_takes_everything_out() {
 }
 
 /// The gateway's unit: through the wrapper as `lampos`, from OpenClaw's
-/// state, started again on failure, below the lamp's services with caps.
+/// state, started again whenever it exits, below the lamp's services with
+/// caps.
 #[test]
 fn the_gateway_unit_runs_through_the_wrapper_as_lampos_with_caps() {
     let lines: Vec<&str> = UNIT_TEXT.lines().collect();
@@ -1006,7 +1007,8 @@ fn the_gateway_unit_runs_through_the_wrapper_as_lampos_with_caps() {
         "Group=lampos",
         "ExecStart=/usr/local/bin/openclaw gateway run",
         "WorkingDirectory=/var/lib/lampos-openclaw/state",
-        "Restart=on-failure",
+        "Restart=always",
+        "RestartSec=10",
         "Nice=10",
         "CPUQuota=100%",
         "Environment=HOME=/var/lib/lampos-openclaw OPENCLAW_STATE_DIR=/var/lib/lampos-openclaw/state LAMP_OPENCLAW_GATEWAY=on",
@@ -1027,6 +1029,43 @@ fn the_gateway_unit_runs_through_the_wrapper_as_lampos_with_caps() {
     );
     assert_eq!(UNIT, "lamp-openclaw-gateway.service");
     assert!(UNIT_TEXT.contains(&format!("port {PORT}")));
+}
+
+/// #8238: OpenClaw 2026.11.2 answers a change of its `gateway` keys with a
+/// "full process restart (supervisor restart)" that exits 0, which
+/// `Restart=on-failure` took as done and left the gateway down (lamp-52e6,
+/// 21 Nov 21:18). The unit starts it again on any exit; a crash loop still
+/// stops at the start limit (in `[Unit]`, where systemd reads it), and a
+/// `systemctl stop` (every stop lamp-update and lamp-setup make) still
+/// stops it, as systemd never restarts a unit stopped by a job.
+#[test]
+fn the_gateway_starts_again_after_its_own_supervisor_restart() {
+    for text in [UNIT_TEXT.to_owned(), unit_text_for(one_path())] {
+        let restart: Vec<&str> = text
+            .lines()
+            .filter(|line| line.starts_with("Restart="))
+            .collect();
+        assert_eq!(restart, ["Restart=always"], "{text}");
+        let unit = &text[..text.find("[Service]").unwrap()];
+        assert!(unit.contains("\nStartLimitIntervalSec=600\n"), "{text}");
+        assert!(unit.contains("\nStartLimitBurst=5\n"), "{text}");
+    }
+}
+
+/// #8238: a lamp running the earlier unit (`Restart=on-failure`, on
+/// stable since 11 Nov) gets the new text from its next round: the bytes
+/// differ, so the round writes it whole and reloads systemd, which a
+/// running gateway's restart policy follows with no restart of its own.
+#[test]
+fn an_earlier_on_failure_unit_is_written_again_by_the_next_round() {
+    let lamp = Lamp::new();
+    let earlier = UNIT_TEXT.replace("Restart=always\n", "Restart=on-failure\n");
+    assert_ne!(earlier, UNIT_TEXT);
+    fs::write(lamp.unit(), &earlier).unwrap();
+    let mut systemd = Fake::default();
+    round_said(&lamp, &mut systemd);
+    assert_eq!(fs::read_to_string(lamp.unit()).unwrap(), UNIT_TEXT);
+    assert_eq!(systemd.asked, ["reload"], "reloaded, nothing restarted");
 }
 
 /// (#6226) npm hung 38 min at its extract on lamp-c0a4 with no output
