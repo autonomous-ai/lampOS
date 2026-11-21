@@ -150,6 +150,9 @@ Environment=LAMP_EYES_WHO_SOCKET=/run/lampos-eyes/who.sock
 # Memory's narrow socket (A8, #6852; cloud.md "The faces it knows"): face.remove forgets the person's memories
 # too, never reading them. Asked only with LAMP_FACES_PAGE=on; lamp-memory.service opens it for this group.
 Environment=LAMP_MEMORY_FORGET_SOCKET=/run/lampos-memory/forget.sock
+# The app's faces page (#2192, #6852; cloud.md "The faces it knows"): face.list, the names the eyes keep, names only,
+# and face.remove, the person off all of the lamp (the eyes' forget, then memory's on the socket above).
+Environment=LAMP_FACES_PAGE=on
 # The owner's dev monitor from the app (#5883, #6401; cloud.md "The dev monitor"): monitor.set/get/link in `can`, so the
 # app shows its switch. The monitor itself stays off until the owner turns it on in the app. On for every lamp: the lead's call (16 Nov).
 Environment=LAMP_APP_MONITOR=on
