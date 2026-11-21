@@ -163,8 +163,9 @@ pub fn livelier(clip: &'static Clip, level: u8) -> &'static Clip {
         return clip;
     };
     MADE[index][usize::from(level) - 2].get_or_init(|| {
-        sized(
+        sized_from(
             &longer(clip, level),
+            clip,
             clip_size(clip.name, level),
             of(level).clip_pace,
         )
@@ -290,9 +291,18 @@ pub fn span(whole: &crate::clips::Whole, first: usize, last: usize) -> Clip {
 /// clip's own; where even the clip's own pace would ask more, the base
 /// keeps the clip's own size (the head and the arm still grow).
 pub fn sized(clip: &Clip, size: f32, pace: f32) -> Clip {
+    sized_from(clip, clip, size, pace)
+}
+
+/// [`sized`], each joint's gain taken from `gauge`'s frames (#8153,
+/// Seventh's P2 on #8201): a clip lengthened toward its recording keeps
+/// the gain of the stretch V2 cut, so the gesture is no smaller for being
+/// longer; where the rest of the recording reaches farther, it is held at
+/// the gesture's reach.
+pub fn sized_from(clip: &Clip, gauge: &Clip, size: f32, pace: f32) -> Clip {
     let reach = crate::body::GESTURE_REACH;
     let mut gain: [f32; 5] = std::array::from_fn(|joint| {
-        let most = clip
+        let most = gauge
             .frames
             .iter()
             .map(|frame| frame[joint].unsigned_abs())
