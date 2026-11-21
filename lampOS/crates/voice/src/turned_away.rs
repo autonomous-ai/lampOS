@@ -1,5 +1,5 @@
 //! A line turned to another person ends the conversation for that line, on
-//! the second route in a busy room (#3882), off unless `LAMP_TURNED_AWAY=on`.
+//! the second route in any room (#3882), off unless `LAMP_TURNED_AWAY=on`.
 //!
 //! On lamp-4ace on 27 October, on stable 7632, in the busy scenes, after a
 //! conversation with the lamp, two people talked to each other and the lamp
@@ -25,6 +25,10 @@
 //! The signs are in English and Vietnamese, the second route's two
 //! languages.
 //!
+//! Not only in a busy room: on lamp-06c1 on 28 October, with the product's
+//! switches, the room was judged busy in 1 round of 6, and desk talk was
+//! let out as going on in the quiet room's window all the same.
+//!
 //! Only a line let out as the conversation going on alone is held: no name,
 //! no call, nobody turned to the lamp, not said close to it, and not an
 //! answer to the lamp's own question. A real follow-up ("And what about
@@ -38,7 +42,7 @@ pub const FLAG: &str = "--turned-away";
 
 /// Why the rule holds such a line, as its journal says it after "held
 /// back: ".
-pub const HELD: &str = "a busy room: a conversation with the lamp is going on, but the line turns to someone else: a role called, an object asked for, or an errand";
+pub const HELD: &str = "a conversation with the lamp is going on, but the line turns to someone else: a role called, an object asked for, or an errand";
 
 /// Words that call a person by a role at a line's start, before a comma.
 /// The lamp is never called by these: it is called by its name.
