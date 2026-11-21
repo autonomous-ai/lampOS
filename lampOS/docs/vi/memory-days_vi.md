@@ -1983,7 +1983,13 @@ số ít) bị quên như `forget {id}` của một lượt nói, cùng những 
 `{ok:true,removed}`, số lượt nói. Tất cả bị xóa trong một giao dịch, lần
 lượt từng lượt như lệnh quên riêng của nó: một lần commit, nên quên sau một
 cuộc nói dài vẫn trả lời kịp (lamp-06c1, 21/11: ~101 lượt khớp mất ~15 s khi
-mỗi lượt một commit), và lỗi giữa chừng thì không xóa gì. Lượt nói của phòng là của mọi người trong
+mỗi lượt một commit), và lỗi giữa chừng thì không xóa gì. Ghi chú trò
+chuyện và mục ban đêm của một lượt còn giữ quá hạn các lượt nói của chúng
+(qua `origins`) được tìm từ những gì bị xóa, qua chỉ mục của `origins`, không
+bằng cách nối mọi ghi chú và mục ban đêm của người đó: phép nối ấy chạy mỗi
+lượt một lần và tăng theo mỗi ghi chú còn giữ. `origins` được điền một lần
+cho cả loạt, không phải mỗi lượt. Cùng các dòng bị xóa, cùng thứ tự, cùng số
+đếm và cùng các lượt được báo. Lượt nói của phòng là của mọi người trong
 nhà và không bao giờ bị chạm tới (phòng, phạm vi quy tắc hay id khác bị từ
 chối `bad_person`); bộ nhớ cũ trả `unknown_op` và voice đi tiếp. Không gửi
 khi các điều đã giữ chưa xong: bộ nhớ không trả lời hay từ chối danh sách,

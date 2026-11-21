@@ -2049,7 +2049,13 @@ with what derives from it (its talk notes), never a kept thing (#3113):
 `{ok:true,removed}`, the count of exchanges. All of them go in one
 transaction, each in turn as its own forget would: one commit, so a forget
 after a long talk answers in time (lamp-06c1, 21 Nov: ~101 matching turns
-took ~15 s at one commit each), and a failure part way removes none. The room's exchanges are
+took ~15 s at one commit each), and a failure part way removes none. A
+turn's talk notes and nightly items kept past their exchanges' expiry (by
+`origins`) are found from what goes, through the `origins` index, not by
+joining every talk note and nightly item the person has: that join ran once
+a turn and grew with every one kept. `origins` is filled once for the lot,
+not once a turn. The same rows go, in the same order, with the same count
+and the same exchanges told. The room's exchanges are
 everyone's in the house and are never reached (the room, a rules scope or
 any other id is refused `bad_person`); an older memory answers
 `unknown_op` and the voice goes on. It is not sent when the kept things
