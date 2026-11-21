@@ -4094,7 +4094,9 @@ made once and whole"); `lamp_tasks::make_try`.
   said at least one line (`said` from lamp-control's `end` answer,
   `Tokens::end_said`; an older lamp-control that doesn't say is not held
   against it); a task's script printed something. Answered
-  `{"ok":true,"tried":true,"passed":true,"said":N}` or
+  `{"ok":true,"tried":true,"passed":true,"said":N,"said_first":TEXT}`
+  (`said_first`, #8180: the first finished say's words from lamp-control's
+  `end`, `Tokens::end_said_first`, left out when none) or
   `{"ok":true,"tried":true,"passed":false,"why"}` (the words go to the
   voice's repair); a try that couldn't start (no token, no fence) is
   refused `not_tried`.
@@ -4106,7 +4108,9 @@ made once and whole"); `lamp_tasks::make_try`.
   of a run client's `say`s the voice said whole (`done` with
   `how: finished`; one dropped for privacy or expiry, or a `sound`, is not
   counted; `Parts::said_take`) and answers an admin `{"end":{"run"}}` with
-  `{"ended":BOOL,"said":N}`. A script's `lamp.say` waits for its line
+  `{"ended":BOOL,"said":N}`, and `"said_first"`, the first such say's
+  words on one line, at most 120 characters (`Parts::said_take_first`,
+  #8180), when one was said. A script's `lamp.say` waits for its line
   (`wait=True`), or it may exit before the line is said and its say is
   dropped.
 
@@ -4441,7 +4445,16 @@ one runner (a fresh home per run, the token as a file) with no new rules:
   keeps it, else `no_token` and nothing runs. The mint already held the
   yes to the folder lamp-control hashed itself and its declared grants,
   and a skill has one yes, so an agreed check is the owner's yes to `net`
-  for the folder as it is. Off, `net` is refused as an unknown grant
+  for the folder as it is. A skill made on the lamp needs no yes (#8180,
+  `lamp_voice::made_skill::grants_need_no_yes`, true for
+  `SkillSource::Made` only today, of `lamp_skills::source_of`):
+  lamp-control mints its token from its folder's declared grants
+  (`task_yes::KeptYes::grants`, `no_yes_grants`; `net` left out, and the
+  rules below, `net` never beside a private grant among them, still hold)
+  and answers its check `{"agreed": true}` for its folder as it is (its
+  SHA-256 and declared grants, `task_yes::agreed_with_no_yes`), so its
+  `net` asks nothing. A Store, pushed or other skill still needs its kept
+  yes. Off, `net` is refused as an unknown grant
   (`bad_request`) before any token.
 - **What a `net` run never holds, and its bounds** (Heron's P1 and P3s on
   #7590, the first builder's 23:22 calls):

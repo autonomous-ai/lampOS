@@ -2435,68 +2435,12 @@ mod tests {
         assert_eq!(turn, note);
         assert!(!crate::skill_write_yes::awaited(now));
         assert!(crate::skill_write_yes::waiting_note(6, now).is_none());
-        let recorded = crate::make_skill_local::tasks_recorded_here();
-        let [kept] = recorded.as_slice() else {
-            panic!("{recorded:?}")
-        };
-        assert_eq!(
-            (kept.skill.as_str(), kept.sha256.as_str()),
-            ("photo-booth", folder.as_str())
-        );
-        assert_eq!(kept.grants, Some(vec!["light".to_owned()]));
+        // #8180: no yes is recorded at the keep: lamp-control mints its
+        // run's token from its folder's grants (`grants_need_no_yes`).
+        assert!(crate::make_skill_local::tasks_recorded_here().is_empty());
+        let _ = &folder;
         crate::make_skill_local::set_tasks_here(None);
         crate::skill_task_yes::set_on_here(None);
-        made_skill::set_code_at_once_here(None);
-        made_skill::set_scripts_here(None);
-        let _ = fs::remove_dir_all(&root);
-    }
-
-    /// `LAMP_MADE_CODE_ON_AT_ONCE` on: an app's make whose code uses the
-    /// camera keeps its spoken yes, exactly as with the switch off: left
-    /// off, said back with its wait, kept as asked, and awaited on the
-    /// second route.
-    #[test]
-    fn with_the_switch_an_app_make_with_the_camera_still_waits_for_its_yes() {
-        use crate::make_skill_local::tests::{
-            CODE_TOML, chat_at, code_answer_of, keeping, service,
-        };
-        made_skill::set_scripts_here(Some(true));
-        made_skill::set_code_at_once_here(Some(true));
-        let (root, keeping) = keeping("app-code-at-once-camera");
-        let at = now_unix_ms();
-        let brief = begin(&keeping.directory, "make me a photo booth", "r1", at).unwrap();
-        let (url, served) = service(vec![(200, code_answer_of(CODE_TOML))]);
-        let mut said = Vec::new();
-        make_here(&keeping, &brief, "r1", at, chat_at(url), |line| {
-            said.push(line.to_owned())
-        });
-        assert_eq!(served.join().unwrap(), 1);
-        let [line] = said.as_slice() else {
-            panic!("{said:?}")
-        };
-        assert!(line.ends_with(made_skill::RUNS_AFTER_YES.trim()), "{line}");
-        assert!(!line.contains("it's on"), "{line}");
-        let entry = &made_skill::entries(&keeping.directory)[0];
-        assert_ne!(entry["on"], true, "{entry}");
-        assert!(entry["code_asked_at_unix_ms"].as_u64().is_some(), "{entry}");
-        assert_eq!(
-            status(&keeping.directory, Some("r1"), at)["state"],
-            "not_kept"
-        );
-        let now = std::time::Instant::now();
-        let note = say_note(line).unwrap();
-        let turn = crate::make_skill_local::app_code_asked(
-            &keeping.directory,
-            5,
-            note.clone(),
-            now_unix_ms(),
-            now,
-            || true,
-        );
-        assert!(turn.len() > note.len(), "{turn}");
-        assert!(crate::skill_write_yes::awaited(now));
-        let id = turn.rsplit('"').nth(1).unwrap().to_owned();
-        crate::skill_write_yes::drop_wait(&id);
         made_skill::set_code_at_once_here(None);
         made_skill::set_scripts_here(None);
         let _ = fs::remove_dir_all(&root);

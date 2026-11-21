@@ -1777,48 +1777,47 @@ pub(crate) fn set_code_at_once_here(on: Option<bool>) {
     CODE_AT_ONCE_HERE.with(|here| here.set(on));
 }
 
-/// The grants a made skill's code may hold and still go on at once with
-/// [`CODE_AT_ONCE_ENVIRONMENT`] (the first builder's ruling on #6059,
-/// 19:14, and his 19:44 line: "sound" is the lamp's own sounds and voice):
-/// its light, its voice and sounds (`speak`) and its head and arm; a timer
-/// is a trigger and needs no grant. Any other grant keeps the spoken yes
-/// ([`CODE_YES_GRANTS`] among them).
-pub const CODE_AT_ONCE_GRANTS: [&str; 3] = ["light", "speak", "body"];
+/// Where a skill on the lamp came from, as far as its grants' yes goes
+/// (#8180): made on the lamp (by voice or in the app), from the Store,
+/// pushed from the owner's computer, or anything else (the lamp's own, a
+/// file added, an app's written skill).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum SkillSource {
+    Made,
+    Store,
+    Pushed,
+    Other,
+}
 
-/// The grants that always keep a made skill's code to its spoken yes, the
-/// switch on or off (the same ruling): the camera, the microphone and
-/// `sound`, which is hearing, not playing (lamp-control's grant: "can hear
-/// kinds of sound, never words"; hearing keeps its yes, the 19:44 line). A
-/// send (a write, or messages to the phone) keeps it too
-/// ([`code_goes_on_at_once`]).
-pub const CODE_YES_GRANTS: [&str; 3] = ["camera", "microphone", "sound"];
+/// Whether a skill from `source` is given its declared grants with no
+/// yes asked or recorded (#8180, the dev's ruling): lamp-control mints
+/// its run's token from its folder's own declared grants
+/// (`lamp_control::task_yes::KeptYes`), and its task's yes check is
+/// agreed for its folder as it is, `net` among them. Made skills only
+/// today; widening it to another source is this one line.
+pub fn grants_need_no_yes(source: SkillSource) -> bool {
+    matches!(source, SkillSource::Made)
+}
 
-/// Whether code granted `grants` may go on at once: the switch on and
-/// every grant one of [`CODE_AT_ONCE_GRANTS`] (none at all is one).
-pub fn grants_go_on_at_once(grants: &[String]) -> bool {
+/// Whether code granted `grants` may go on at once: the switch on
+/// ([`CODE_AT_ONCE_ENVIRONMENT`]), whatever it declares (#8180, the dev's
+/// ruling: a made skill's declared grants are given at once, nothing
+/// asked; the camera, the microphone, `net` and sends among them).
+pub fn grants_go_on_at_once(_grants: &[String]) -> bool {
     code_on_at_once()
-        && grants
-            .iter()
-            .all(|grant| CODE_AT_ONCE_GRANTS.contains(&grant.as_str()))
 }
 
 /// Whether the made skill `made`, with code of its own, goes on at once
-/// ([`CODE_AT_ONCE_ENVIRONMENT`]): its grants within
-/// [`CODE_AT_ONCE_GRANTS`] ([`grants_go_on_at_once`]), and no send, no
-/// camera, no microphone and no knowing who is at the lamp (`who`,
-/// `known_faces`: identity is the camera's privacy, the first builder at
-/// 20:16 on #6659) in what it uses. lamp-control has no grant for who is
-/// there (`look` is "never who"), so these are its `uses`. Anything else
-/// waits for the spoken yes, exactly as with the switch off.
+/// ([`CODE_AT_ONCE_ENVIRONMENT`]): whatever it declares and uses (#8180):
+/// no yes is recorded at the keep; its run step's and task's tokens,
+/// `net` among them, are minted from its folder's declared grants
+/// ([`grants_need_no_yes`]), so they ask nothing. A task for the lamp's agent
+/// ([`Uses::agent_task`]) still waits for the spoken yes: it is not code
+/// the lamp's model wrote.
 pub fn code_goes_on_at_once(made: &Made) -> bool {
     made.uses.code
-        && made.uses.writes.is_empty()
-        && !made.uses.messages
-        && !made.uses.camera
-        && !made.uses.listens()
-        && !made.uses.who
-        && !made.uses.known_faces
         && !made.uses.agent_task
+        && grants_need_no_yes(SkillSource::Made)
         && grants_go_on_at_once(&made.uses.grants)
 }
 
@@ -7029,10 +7028,9 @@ fn said_plainly(table: &toml::Table, reads: bool, general: bool) -> Result<Strin
             .flatten()
             .filter_map(|grant| grant.as_str().map(str::to_owned))
             .collect();
-        // Its wait said unless it goes on at once: grants within
-        // [`CODE_AT_ONCE_GRANTS`] and nothing it reaches beside them
-        // (the camera, the microphone, who is in view, a message).
-        let at_once = grants_go_on_at_once(&grants) && !writes && reaches_plainly(table).is_empty();
+        // Its wait said unless it goes on at once (#8180: whatever it
+        // declares or reaches, with the switch on).
+        let at_once = grants_go_on_at_once(&grants);
         // A task for the lamp's agent (`LAMP_MAKE_NO_CANNOT`): said as one,
         // and it always waits for the yes.
         if agent_task(table) {
@@ -10867,9 +10865,14 @@ fn packed_and_kept(
         }
         tried_said(crate::make_skill_agent::try_made(&tasks, &name, &files))
     });
-    let said = tried.and_then(|line| {
-        said.map(|description| match line {
-            Some(line) => format!("{description} {line}"),
+    // #8180: what the try said first, for the one line said once it's on.
+    let mut tried_first = None;
+    let said = tried.and_then(|tried| {
+        said.map(|description| match tried {
+            Some(first) => {
+                tried_first = Some(first);
+                format!("{description} {TRIED_SAID}")
+            }
             None => description,
         })
     });
@@ -10887,6 +10890,9 @@ fn packed_and_kept(
             .directory
             .join(format!(".{name}-{version}-{}.tar.new", &sha256[..12]));
         fs::write(&new, &bytes).map_err(unkept)?;
+        if let Some(first) = tried_first.take() {
+            note_tried(&sha256, first);
+        }
         let made = Made {
             name,
             version,
@@ -10999,16 +11005,73 @@ pub const NOT_TRIED_LINE: &str = "I made it, but the lamp couldn't try it out, s
 /// What a made skill's read-back adds after its tried run passed (#8157).
 pub const TRIED_SAID: &str = "I tried it once and it worked.";
 
-/// A made skill's tried run (#8157) as its keep takes it: passed, its
-/// read-back's line; failed, refused with lamp-tasks' words for a repair;
-/// nothing to try, kept as before; a try that couldn't be made (journaled)
-/// fails closed: nothing kept, [`NOT_TRIED_LINE`] said (#8180).
-fn tried_said(tried: crate::make_skill_agent::Tried) -> Result<Option<String>, Refused> {
+/// What each made skill's passed try said first, by its package's
+/// SHA-256 (#8180): `Some` its words, `None` a try that said nothing
+/// usable. A made skill with nothing tried has no entry.
+static TRIED_FIRST: std::sync::Mutex<std::collections::BTreeMap<String, Option<String>>> =
+    std::sync::Mutex::new(std::collections::BTreeMap::new());
+
+/// The most of a try's words said in [`tried_line`].
+pub const TRIED_WORDS_MOST: usize = 120;
+
+/// The package `sha256`'s passed try, what it said first kept for
+/// [`tried_line`]; at most 64 kept, the oldest first gone.
+fn note_tried(sha256: &str, first: Option<String>) {
+    let mut kept = TRIED_FIRST.lock().unwrap_or_else(|held| held.into_inner());
+    if kept.len() >= 64 {
+        kept.clear();
+    }
+    kept.insert(sha256.to_owned(), first);
+}
+
+/// The one line said of a made skill on (#8180, the first builder's
+/// ruling): what its try did, with the undo: "Made it, and I tried it:
+/// <what it said>. Say 'remove it' to undo.", or "Made <name>, and I
+/// tried it. Say 'remove it' to undo." when it said nothing usable;
+/// `extra`, a sentence of its own when not empty, before the undo. None
+/// for a made skill that wasn't tried (no script). Journaled.
+pub fn tried_line(made: &Made, extra: &str) -> Option<String> {
+    let first = TRIED_FIRST
+        .lock()
+        .unwrap_or_else(|held| held.into_inner())
+        .get(&made.sha256)
+        .cloned()?;
+    let words = first.map(|first| {
+        let line = first.split_whitespace().collect::<Vec<_>>().join(" ");
+        let line = match line.char_indices().nth(TRIED_WORDS_MOST) {
+            Some((at, _)) => &line[..at],
+            None => line.as_str(),
+        };
+        line.trim_end_matches(['.', '!', '?', ' ']).to_owned()
+    });
+    let line = match words.filter(|words| !words.is_empty()) {
+        Some(words) => format!("Made it, and I tried it: {words}.{extra} Say 'remove it' to undo."),
+        None => format!(
+            "Made {}, and I tried it.{extra} Say 'remove it' to undo.",
+            spoken_name(&made.name)
+        ),
+    };
+    eprintln!("lamp-voice: a made skill is said on with its try: {line}");
+    Some(line)
+}
+
+/// [`note_tried`] for a test's package.
+#[cfg(test)]
+pub(crate) fn note_tried_here(sha256: &str, first: Option<String>) {
+    note_tried(sha256, first);
+}
+
+/// A made skill's tried run (#8157) as its keep takes it: passed, what it
+/// said first (#8180, for [`tried_line`]); failed, refused with lamp-tasks'
+/// words for a repair; nothing to try, kept as before; a try that couldn't
+/// be made (journaled) fails closed: nothing kept, [`NOT_TRIED_LINE`] said
+/// (#8180).
+fn tried_said(tried: crate::make_skill_agent::Tried) -> Result<Option<Option<String>>, Refused> {
     use crate::make_skill_agent::Tried;
     match tried {
-        Tried::Passed { said } => {
+        Tried::Passed { said, said_first } => {
             eprintln!("lamp-voice: a made skill passed its tried run ({said} line(s) said)");
-            Ok(Some(TRIED_SAID.to_owned()))
+            Ok(Some(said_first))
         }
         Tried::Nothing => Ok(None),
         Tried::Failed(why) => {
@@ -20368,6 +20431,56 @@ task = { task = "take a photo and send it to the app", run = "scripts/main.py" }
         set_reactions_here(None);
     }
 
+    /// #8180 (the first builder's ruling): a made skill that was tried is
+    /// said on in one line with what its try said first, capped, and its
+    /// undo; one whose try said nothing usable, with its name; one never
+    /// tried, by the line it had.
+    #[test]
+    fn a_tried_skill_is_said_on_with_what_its_try_said() {
+        let made = |sha256: &str| Made {
+            name: "tide-times".into(),
+            version: "1.0.0".into(),
+            sha256: sha256.into(),
+            description: "Says the tide.".into(),
+            uses: Uses::default(),
+            package: PathBuf::from("/nowhere"),
+        };
+        note_tried_here(&"1".repeat(64), Some("  The tide is\nlow at six. ".into()));
+        assert_eq!(
+            tried_line(&made(&"1".repeat(64)), "").as_deref(),
+            Some("Made it, and I tried it: The tide is low at six. Say 'remove it' to undo.")
+        );
+        let long = "word ".repeat(60);
+        note_tried_here(&"2".repeat(64), Some(long));
+        let line = tried_line(&made(&"2".repeat(64)), "").unwrap();
+        let words = line
+            .strip_prefix("Made it, and I tried it: ")
+            .and_then(|rest| rest.strip_suffix(". Say 'remove it' to undo."))
+            .unwrap();
+        assert!(words.chars().count() <= TRIED_WORDS_MOST, "{line}");
+        // Said nothing usable: the fallback, with its name.
+        for nothing in [None, Some("  ".to_owned())] {
+            note_tried_here(&"3".repeat(64), nothing);
+            assert_eq!(
+                tried_line(&made(&"3".repeat(64)), CODE_RUNS_NOWHERE_YET).as_deref(),
+                Some(
+                    "Made tide times, and I tried it. But this lamp doesn't run its code yet. \
+                     Say 'remove it' to undo."
+                )
+            );
+        }
+        // Never tried: no line of a try.
+        assert_eq!(tried_line(&made(&"4".repeat(64)), ""), None);
+        assert_eq!(
+            crate::make_no_asks::made_line(&made(&"1".repeat(64)), ""),
+            "Made it, and I tried it: The tide is low at six. Say 'remove it' to undo."
+        );
+        assert_eq!(
+            crate::make_no_asks::made_line(&made(&"4".repeat(64)), ""),
+            "Made tide times. Say 'remove it' to undo."
+        );
+    }
+
     /// #8157: a passed try is told in the read-back; a failed one is
     /// refused with lamp-tasks' words, which go to a repair; nothing to
     /// try keeps it as before; a try that couldn't be made keeps nothing.
@@ -20375,8 +20488,11 @@ task = { task = "take a photo and send it to the app", run = "scripts/main.py" }
     fn a_tried_run_is_told_or_goes_to_a_repair() {
         use crate::make_skill_agent::Tried;
         assert_eq!(
-            tried_said(Tried::Passed { said: 1 }),
-            Ok(Some(TRIED_SAID.to_owned()))
+            tried_said(Tried::Passed {
+                said: 1,
+                said_first: Some("Low tide at six.".into())
+            }),
+            Ok(Some(Some("Low tide at six.".to_owned())))
         );
         assert_eq!(tried_said(Tried::Nothing), Ok(None));
         // Fail closed (the Reviewer-lead's P2 on #8180): a try that

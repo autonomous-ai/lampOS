@@ -420,6 +420,12 @@ impl crate::runs::SkillYes for KeptYes {
         if !name_ok(skill) {
             return Err(format!("{skill:?} is not a skill's name"));
         }
+        // #8180: a skill whose source needs no yes
+        // (`lamp_voice::made_skill::grants_need_no_yes`, made skills today)
+        // is minted its folder's declared grants as it is, with no yes kept.
+        if let Some(grants) = no_yes_grants(&self.skills, skill) {
+            return grants;
+        }
         if !yeses(&self.state).iter().any(|yes| yes.name == skill) {
             // A core variant of the lamp's own skills is pre-approved, with
             // no grant (the first builder's 08:57): never a pushed folder.
@@ -464,6 +470,47 @@ impl crate::runs::SkillYes for KeptYes {
         }
         crate::runs::FixedWrite::of(self.fixed_write_step(skill)?.content())
     }
+}
+
+/// The skill `name`'s folder under `skills` ([`folder_of`]) when its
+/// source needs no yes (#8180, `lamp_voice::made_skill::grants_need_no_yes`
+/// of `lamp_skills::source_of`): its declared grants as the token's, `net`
+/// left out (lamp-tasks' own); none for any other source.
+fn no_yes_folder(skills: &Path, name: &str) -> Option<(std::path::PathBuf, Vec<String>)> {
+    let folder = folder_of(skills, name);
+    if !std::fs::symlink_metadata(&folder).is_ok_and(|meta| meta.is_dir())
+        || !lamp_skills::grants_need_no_yes(lamp_skills::source_of(&folder))
+    {
+        return None;
+    }
+    let declared = lamp_skills::load_with(&folder, false).ok()?.grants;
+    Some((folder, declared))
+}
+
+/// [`no_yes_folder`]'s grants as a token's, checked as a kept yes's are.
+fn no_yes_grants(skills: &Path, name: &str) -> Option<Result<BTreeSet<Grant>, String>> {
+    let (_, declared) = no_yes_folder(skills, name)?;
+    Some(grants_ok(&declared).and_then(|()| {
+        declared
+            .iter()
+            .filter(|grant| *grant != lamp_skills::task::NET_GRANT)
+            .map(|grant| {
+                serde_json::from_value::<Grant>(Value::String(grant.clone()))
+                    .map_err(|_| format!("grants: {grant:?} is not a grant"))
+            })
+            .collect()
+    }))
+}
+
+/// Whether the task yes check for `name`, hashed `sha256` and declaring
+/// `grants`, is agreed with no yes kept (#8180): its source needs none and
+/// its folder under `skills` is exactly that, as it is now.
+pub fn agreed_with_no_yes(skills: &Path, name: &str, sha256: &str, grants: &[String]) -> bool {
+    let set = |grants: &[String]| grants.iter().cloned().collect::<BTreeSet<_>>();
+    no_yes_folder(skills, name).is_some_and(|(folder, declared)| {
+        set(&declared) == set(grants)
+            && lamp_skills::task::folder_sha256(&folder).is_ok_and(|now| now == sha256)
+    })
 }
 
 /// The yeses in `state` written whole: beside it, synced, renamed over;
@@ -568,6 +615,7 @@ pub fn peer_is_voice_with(pid: Option<i32>, read: &dyn Fn(&str) -> Option<String
 /// `state`, from a peer that is the voice or not, with the switch `on`, at
 /// `now_ms`; none for any other request.
 pub fn answer(
+    skills: &Path,
     state: Option<&Path>,
     asked: &Map<String, Value>,
     from_the_voice: bool,
@@ -610,6 +658,10 @@ pub fn answer(
         return Some(json!({"error": why}));
     }
     if key == CHECK {
+        // #8180: a made skill's folder as it is is agreed with no yes kept.
+        if agreed_with_no_yes(skills, &asked.name, &asked.sha256, &asked.grants) {
+            return Some(json!({"agreed": true}));
+        }
         return Some(
             match verdict(state, &asked.name, &asked.sha256, &asked.grants) {
                 Verdict::Agreed(_) => json!({"agreed": true}),
@@ -671,12 +723,23 @@ mod tests {
         let state = Some(dir.as_path());
         let sha256 = "ab".repeat(32);
         let grants = json!(["camera", "light"]);
-        let check = |value: Value| answer(state, &asked(CHECK, value), false, true, 0).unwrap();
+        let check = |value: Value| {
+            answer(
+                Path::new("/nonexistent-skills"),
+                state,
+                &asked(CHECK, value),
+                false,
+                true,
+                0,
+            )
+            .unwrap()
+        };
         assert_eq!(
             check(booth(&sha256, grants.clone())),
             json!({"agreed": false, "why": "waiting"})
         );
         let refused = answer(
+            Path::new("/nonexistent-skills"),
             state,
             &asked(RECORD, booth(&sha256, grants.clone())),
             false,
@@ -687,6 +750,7 @@ mod tests {
         assert_eq!(refused["error"], NOT_THE_VOICE);
         assert!(yeses(dir.as_path()).is_empty());
         let kept = answer(
+            Path::new("/nonexistent-skills"),
             state,
             &asked(RECORD, booth(&sha256, grants.clone())),
             true,
@@ -722,7 +786,14 @@ mod tests {
         assert_eq!(mode & 0o777, 0o600);
         // Taken back by any peer.
         assert_eq!(
-            answer(state, &asked(FORGET, json!("photo-booth")), false, true, 0),
+            answer(
+                Path::new("/nonexistent-skills"),
+                state,
+                &asked(FORGET, json!("photo-booth")),
+                false,
+                true,
+                0
+            ),
             Some(json!({"forgot": true}))
         );
         assert_eq!(
@@ -744,6 +815,7 @@ mod tests {
         std::fs::create_dir_all(&state).unwrap();
         let record = |grants: Value, sha256: &str| {
             answer(
+                Path::new("/nonexistent-skills"),
                 Some(state.as_path()),
                 &asked(
                     RECORD,
@@ -831,6 +903,7 @@ mod tests {
             |grants: Value| json!({"name": "bitcoin-daily", "sha256": sha256, "grants": grants});
         let check = || {
             answer(
+                Path::new("/nonexistent-skills"),
                 st,
                 &asked(CHECK, line(json!(["net", "speak"]))),
                 false,
@@ -838,7 +911,16 @@ mod tests {
                 0,
             )
         };
-        let record = |grants: Value| answer(st, &asked(RECORD, line(grants)), true, true, 5);
+        let record = |grants: Value| {
+            answer(
+                Path::new("/nonexistent-skills"),
+                st,
+                &asked(RECORD, line(grants)),
+                true,
+                true,
+                5,
+            )
+        };
         assert_eq!(check(), Some(json!({"agreed": false, "why": "waiting"})));
         assert_eq!(record(json!(["speak"])), Some(json!({"recorded": true})));
         assert_eq!(check(), Some(json!({"agreed": false, "why": "changed"})));
@@ -859,6 +941,101 @@ mod tests {
             BTreeSet::from([Grant::Speak])
         );
         lamp_voice::skill_task_yes::set_net_here(None);
+    }
+
+    /// #8180 (the dev's ruling): a skill made on the lamp
+    /// (`lamp_skills::source_of` is `Made`, which
+    /// `lamp_voice::made_skill::grants_need_no_yes` holds needs no yes) is
+    /// minted its folder's declared grants with no yes kept, the camera
+    /// and microphone among them, and its task check (lamp-tasks' `net`
+    /// check) is agreed for its folder as it is; a skill of any other
+    /// source still needs its kept yes.
+    #[test]
+    fn a_made_skill_is_minted_its_declared_grants_with_no_yes() {
+        use crate::runs::SkillYes as _;
+        use lamp_voice::made_skill::{SkillSource, grants_need_no_yes};
+        assert!(grants_need_no_yes(SkillSource::Made));
+        for other in [SkillSource::Store, SkillSource::Pushed, SkillSource::Other] {
+            assert!(!grants_need_no_yes(other), "{other:?}");
+        }
+        lamp_voice::skill_task_yes::set_net_here(Some(true));
+        let dir = folder("made-no-yes");
+        let state = dir.join("state");
+        let skills = dir.join("skills");
+        std::fs::create_dir_all(&state).unwrap();
+        let made = |name: &str, grants: &str, here: bool| {
+            let folder = task_skill(&skills, name, grants);
+            let mark = if here { "made: here\n" } else { "" };
+            std::fs::write(
+                folder.join("SKILL.md"),
+                format!("---\nname: {name}\ndescription: Takes a photo for me.\n{mark}---\n"),
+            )
+            .unwrap();
+            let toml = std::fs::read_to_string(folder.join("skill.toml")).unwrap();
+            std::fs::write(
+                folder.join("skill.toml"),
+                format!("kind = \"installable\"\n{toml}"),
+            )
+            .unwrap();
+            folder
+        };
+        let booth = made("photo-booth", r#"["camera", "microphone", "speak"]"#, true);
+        let tide = made("tide-times", r#"["net", "speak"]"#, true);
+        let other = made("desk-glow", r#"["light"]"#, false);
+        assert_eq!(lamp_skills::source_of(&booth), SkillSource::Made);
+        assert_eq!(lamp_skills::source_of(&other), SkillSource::Other);
+        let kept = KeptYes {
+            state: state.clone(),
+            skills: skills.clone(),
+            on: true,
+            write_agent: false,
+            services_to_agent: false,
+        };
+        assert_eq!(
+            kept.grants("photo-booth").unwrap(),
+            BTreeSet::from([Grant::Camera, Grant::Microphone, Grant::Speak])
+        );
+        assert_eq!(
+            kept.grants("tide-times").unwrap(),
+            BTreeSet::from([Grant::Speak])
+        );
+        assert_eq!(kept.grants("desk-glow").unwrap_err(), NO_YES);
+        let st = Some(state.as_path());
+        let check = |name: &str, sha256: &str, grants: Value| {
+            answer(
+                &skills,
+                st,
+                &asked(
+                    CHECK,
+                    json!({"name": name, "sha256": sha256, "grants": grants}),
+                ),
+                false,
+                true,
+                0,
+            )
+            .unwrap()
+        };
+        let sha256 = lamp_skills::task::folder_sha256(&tide).unwrap();
+        assert_eq!(
+            check("tide-times", &sha256, json!(["net", "speak"])),
+            json!({"agreed": true})
+        );
+        // Not its folder as it is, or not its grants: not agreed.
+        assert_eq!(
+            check("tide-times", &"a".repeat(64), json!(["net", "speak"]))["agreed"],
+            false
+        );
+        assert_eq!(
+            check("tide-times", &sha256, json!(["speak"]))["agreed"],
+            false
+        );
+        let sha256 = lamp_skills::task::folder_sha256(&other).unwrap();
+        assert_eq!(
+            check("desk-glow", &sha256, json!(["light"]))["agreed"],
+            false
+        );
+        lamp_voice::skill_task_yes::set_net_here(None);
+        let _ = std::fs::remove_dir_all(&dir);
     }
 
     /// Heron's P1 on #7590: no yes is kept for `net` beside a private
@@ -924,6 +1101,7 @@ mod tests {
         let sha256 = "ab".repeat(32);
         let record = |grants: Value| {
             answer(
+                Path::new("/nonexistent-skills"),
                 Some(state.as_path()),
                 &asked(
                     RECORD,
@@ -980,6 +1158,7 @@ mod tests {
         let sha256 = lamp_skills::task::folder_sha256(&booth).unwrap();
         let said = |grants: Value| {
             answer(
+                Path::new("/nonexistent-skills"),
                 Some(state.as_path()),
                 &asked(
                     RECORD,
@@ -1188,6 +1367,7 @@ mod tests {
         assert_eq!(kept.grants("photo-booth").unwrap_err(), NO_YES);
         let sha256 = lamp_skills::task::folder_sha256(&booth).unwrap();
         let recorded = answer(
+            Path::new("/nonexistent-skills"),
             Some(state.as_path()),
             &asked(
                 RECORD,
@@ -1265,6 +1445,7 @@ mod tests {
         let state = Some(dir.as_path());
         let sha256 = "ab".repeat(32);
         let off = answer(
+            Path::new("/nonexistent-skills"),
             state,
             &asked(RECORD, booth(&sha256, json!(["light"]))),
             true,
@@ -1284,12 +1465,30 @@ mod tests {
             ),
             (json!({"name": "x"}), "task_yes_record"),
         ] {
-            let refused = answer(state, &asked(RECORD, value), true, true, 0).unwrap();
+            let refused = answer(
+                Path::new("/nonexistent-skills"),
+                state,
+                &asked(RECORD, value),
+                true,
+                true,
+                0,
+            )
+            .unwrap();
             let refused = refused["error"].as_str().unwrap().to_owned();
             assert!(refused.contains(why), "{refused}");
         }
         assert!(yeses(dir.as_path()).is_empty());
-        assert!(answer(state, &asked("clients", json!(true)), true, true, 0).is_none());
+        assert!(
+            answer(
+                Path::new("/nonexistent-skills"),
+                state,
+                &asked("clients", json!(true)),
+                true,
+                true,
+                0
+            )
+            .is_none()
+        );
     }
 
     /// The voice and lamp-skills ask with these very names, and the voice's

@@ -3724,6 +3724,36 @@ fn started_by_words(asks: &[String], tool: Option<&String>, made: bool) -> bool 
     !asks.is_empty() && tool.is_none() && made && lamp_voice::made_skill::asks_on()
 }
 
+/// The one predicate of which skills need no yes for their grants, and
+/// its sources (#8180), from lamp-voice, for lamp-control's mint.
+pub use lamp_voice::made_skill::{SkillSource, grants_need_no_yes};
+
+/// Where the skill in `folder` came from, as far as its grants' yes goes
+/// (#8180, `lamp_voice::made_skill::grants_need_no_yes`): pushed (under
+/// [`PUSHED_DIR`] or with a [`PUSHED_FROM`] record), from the Store (its
+/// [`package::INSTALLED_FROM`] record says so), made on this lamp
+/// ([`made_on_the_lamp`]), else other; a folder that doesn't load is other.
+pub fn source_of(folder: &Path) -> lamp_voice::made_skill::SkillSource {
+    use lamp_voice::made_skill::SkillSource;
+    if folder.starts_with(PUSHED_DIR) || folder.join(PUSHED_FROM).exists() {
+        return SkillSource::Pushed;
+    }
+    if package::installed_from(folder).is_some_and(|installed| installed.from_store) {
+        return SkillSource::Store;
+    }
+    let (Ok(skill), Ok(card)) = (
+        load_with(folder, false),
+        fs::read_to_string(folder.join("SKILL.md")),
+    ) else {
+        return SkillSource::Other;
+    };
+    if made_on_the_lamp(folder, skill.kind, &card) {
+        SkillSource::Made
+    } else {
+        SkillSource::Other
+    }
+}
+
 /// Whether the skill in `dir` (of `kind`, its `SKILL.md` `card`) was made
 /// on this lamp, by voice or in the app: installable, never pushed (no
 /// [`PUSHED_FROM`] record, not under [`PUSHED_DIR`]), its front matter
