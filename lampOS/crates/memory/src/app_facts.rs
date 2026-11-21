@@ -570,6 +570,19 @@ mod tests {
             ]
         );
         assert!(all[0].1.contains("squats 3x10") && all[1].1.contains("lunges 2x8"));
+        let sources = send(
+            &mut store,
+            json!({"op":"kept","person":ANN,"app_facts":true}),
+            NOW + 5,
+        );
+        assert!(
+            sources["entries"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .all(|entry| entry["source"] == COACH),
+            "{sources}"
+        );
         let page = listed(
             &mut store,
             json!({"op":"kept","person":ANN,"app_facts":true,"before_id":lunges["id"]}),
