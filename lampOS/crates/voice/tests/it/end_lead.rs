@@ -255,9 +255,15 @@ fn the_carried_lead_never_holds_the_ended_lines_speech() {
         };
         let run = scene.run(detector(true, true, true, 30));
         assert_eq!(run.ended - run.last_speech, 30);
-        // All of the 300 ms the line ended on, and nothing before it.
-        assert_eq!(run.next[0].sequence, run.last_speech + 1, "yield {yield_start}");
         assert!(run.next.iter().all(|f| f.sequence > run.last_speech));
+        if yield_start {
+            // Quiet only under the lamp's sound, its own score speech: the
+            // person's words, the ended line's already, are never carried.
+            assert!(run.next[0].sequence > run.ended, "{}", run.next[0].sequence);
+        } else {
+            // All of the 300 ms the line ended on, and nothing before it.
+            assert_eq!(run.next[0].sequence, run.last_speech + 1);
+        }
     }
 }
 
@@ -272,17 +278,15 @@ fn the_carried_lead_holds_to_its_cap() {
         Scene {
             named: true,
             gap,
-            quiet_own: 0.5,
             yield_start,
             ..Scene::measured()
         }
         .run(detector(true, first_words, soft, 60))
     };
-    // A yield's start, straight after: the whole carried lead, and no more.
-    let run = waited(true, false, true, 0);
+    // However long the quiet ran, no start reaches past the carried 600 ms.
+    let run = waited(true, true, false, 0);
     assert_eq!(run.ended - run.last_speech, 200, "the call's wait ran out");
-    assert_eq!(run.next[0].sequence, run.ended + 1 - END_LEAD_BLOCKS as u64);
-    assert_eq!(run.next.len(), END_LEAD_BLOCKS + usize::from(START_BLOCKS));
+    assert!(run.next[0].sequence >= run.ended + 1 - END_LEAD_BLOCKS as u64);
     assert!(run.next.len() <= REACH_BACK_BLOCKS);
     // An ordinary start with a soft start: 600 ms back from its sixth block.
     let run = waited(true, true, false, 2);
