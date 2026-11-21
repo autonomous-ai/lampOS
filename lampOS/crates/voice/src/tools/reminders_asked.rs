@@ -124,6 +124,88 @@ fn one_short(words: &[String]) -> impl Iterator<Item = usize> + '_ {
         })
 }
 
+/// How a line refused by [`asks_for_reminders`] reads, read on past where
+/// it stops: counts and a place, never a word.
+#[derive(Debug, Default)]
+struct Read {
+    words: usize,
+    /// The questions ([`ASKS`]) found in it.
+    asks: usize,
+    /// Its words in no question found and not [`AROUND`].
+    outside: usize,
+    /// The first of them, counted from 1.
+    first_outside: Option<usize>,
+}
+
+fn read(words: &[String]) -> Read {
+    let mut read = Read {
+        words: words.len(),
+        ..Read::default()
+    };
+    let mut at = 0;
+    while at < words.len() {
+        let found = ASKS.iter().find(|ask| {
+            ask.iter()
+                .enumerate()
+                .all(|(next, word)| words.get(at + next).is_some_and(|said| said == word))
+        });
+        if let Some(ask) = found {
+            read.asks += 1;
+            at += ask.len();
+        } else {
+            if !AROUND.contains(&words[at].as_str()) {
+                read.outside += 1;
+                read.first_outside.get_or_insert(at + 1);
+            }
+            at += 1;
+        }
+    }
+    read
+}
+
+/// Why round 1 of `request` was not forced to [`LIST`] (#8181): for a
+/// person's last line with a word of "remind" in it that [`force`]
+/// refuses, as said and past the lamp's name, a journal line saying which
+/// reading it reports (`past_name` when the line opens with the lamp's
+/// name, the reading the force tries last, else `as_said`) and which check
+/// refused it there (`no_ask`: none of [`ASKS`]; `two_asks`; `outside`: a
+/// word in no question and not [`AROUND`]), with its counts and the first
+/// such word's place. In gate 1126 a 2nd line's reminders question said
+/// `forced=none` with 7 of 7 words heard, and the journal could not say
+/// which word fell outside. Counts only, never a word. `None` for a line
+/// the force forces, or one with no word of "remind" (most lines).
+pub(crate) fn declined_line(request: u64, messages: &[Message]) -> Option<String> {
+    let said = messages
+        .last()
+        .filter(|message| message.role == "user")?
+        .words()?;
+    if force()(messages).is_some()
+        || !lower_words(said)
+            .iter()
+            .any(|word| word.starts_with("remind"))
+    {
+        return None;
+    }
+    let (reading, text) = match crate::second_provider::past_the_name(said) {
+        Some(past) => ("past_name", past),
+        None => ("as_said", said),
+    };
+    let read = read(&lower_words(text));
+    let refused = match read.asks {
+        0 => "no_ask",
+        1 => "outside",
+        _ => "two_asks",
+    };
+    Some(format!(
+        "lamp-voice second: request {request}: round 1: not forced to {LIST}: read={reading} refused={refused} words={} asks={} outside={} first_outside_at={} ({ENVIRONMENT})",
+        read.words,
+        read.asks,
+        read.outside,
+        read.first_outside
+            .map_or("none".to_owned(), |at| at.to_string()),
+    ))
+}
+
 /// The force the second route's chat is given with the switch on
 /// (`second_provider::net::Chat::forcing`): a request whose last message is
 /// a person's plain question about their reminders must call
@@ -314,6 +396,55 @@ mod tests {
         );
         let set = vec![Message::user("Remind me to call Sam at six.")];
         assert_eq!(choice(&listed, &set), None);
+    }
+
+    /// A reminders line the force refuses says which check refused it and
+    /// where, in counts, never a word (#8181); a forced line, a line with
+    /// no word of "remind" and a round after a call say nothing.
+    #[test]
+    fn a_refused_reminders_line_says_why_in_counts_only() {
+        let line = |said: &str| {
+            declined_line(
+                7,
+                &[Message::system("You are a lamp."), Message::user(said)],
+            )
+        };
+        for (said, why) in [
+            (
+                "Hey, Lamp. What reminders do I have, Sam?",
+                "read=past_name refused=outside words=6 asks=1 outside=1 first_outside_at=6",
+            ),
+            (
+                "Hey, Lamp. What reminder do I have?",
+                "read=past_name refused=no_ask words=5 asks=0 outside=5 first_outside_at=1",
+            ),
+            (
+                "What reminders do I have? Do I have any reminders?",
+                "read=as_said refused=two_asks words=10 asks=2 outside=0 first_outside_at=none",
+            ),
+            (
+                "Remind me to call Sam at six.",
+                "read=as_said refused=no_ask words=7 asks=0 outside=6 first_outside_at=1",
+            ),
+        ] {
+            assert_eq!(
+                line(said).as_deref(),
+                Some(
+                    format!(
+                        "lamp-voice second: request 7: round 1: not forced to list_reminders: {why} (LAMP_REMINDERS_ASKED)"
+                    )
+                    .as_str()
+                ),
+                "{said}"
+            );
+        }
+        // Forced, as said or past the name: nothing to say.
+        assert_eq!(line("Hey, Lamp. What reminders do I have?"), None);
+        assert_eq!(line("Hey, Lamb. What reminders do I have?"), None);
+        assert_eq!(line("Turn the light blue."), None);
+        let mut after_a_call = vec![Message::user("What reminder do I have?")];
+        after_a_call.push(Message::tool("1", "{}"));
+        assert_eq!(declined_line(7, &after_a_call), None);
     }
 
     /// A question about the person's own reminders that the force does not
