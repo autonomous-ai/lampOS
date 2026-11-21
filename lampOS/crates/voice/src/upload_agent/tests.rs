@@ -34,8 +34,7 @@ fn photobooth() -> String {
     card
 }
 
-/// [`photobooth`] with no camera, which `net` never sits beside (Heron's
-/// P1 on #7590): three countdowns said and flashed on the light, a strip
+/// [`photobooth`] with no camera: three countdowns said and flashed on the light, a strip
 /// made by an image API and posted to a chat by a bot API. About 4 KB.
 fn strip_booth() -> String {
     let mut card = String::from(
@@ -86,7 +85,7 @@ fn switches(agent: bool, net: bool) {
 /// phrases, one task that runs the file, kept whole as its instructions,
 /// and the grants light, speak and net read from it; said back with them,
 /// and its first run asks the yes. The owner's photobooth, the camera and
-/// net in one file, is refused in plain words (Heron's P1 on #7590).
+/// net in one file, is kept too (#7901: nothing is refused beside `net`).
 #[test]
 fn a_booth_file_becomes_an_agent_skill_with_light_speak_and_net() {
     switches(true, true);
@@ -136,18 +135,18 @@ fn a_booth_file_becomes_an_agent_skill_with_light_speak_and_net() {
     assert_eq!(said, line);
     let _ = std::fs::remove_dir_all(&root);
     // The owner's photobooth: the camera and the internet in one file,
-    // refused in plain words, nothing kept.
-    let why = super::files(&photobooth()).unwrap_err().0;
-    assert_eq!(why, net_beside_private("camera"));
-    assert_eq!(
-        why,
-        "it reaches the internet and also uses the camera, and one skill can't do both: make it \
-         two skills"
+    // kept with both (#7901, the settled design).
+    let (_, booth) = super::files(&photobooth()).unwrap();
+    assert!(
+        booth.iter().any(|grant| grant == "camera") && booth.iter().any(|grant| grant == "net"),
+        "{booth:?}"
     );
     let (root, keeping) = crate::make_skill_local::tests::keeping("agent-booth-camera");
-    let refused = take(&place(&root), &keeping, None, &photobooth(), NOW).unwrap_err();
-    assert_eq!(refused.0, why);
-    assert!(made_skill::entries(&keeping.directory).is_empty());
+    let made = take(&place(&root), &keeping, None, &photobooth(), NOW).unwrap();
+    assert_eq!(
+        made_skill::agent_grants(&keeping.directory, &made.sha256).unwrap(),
+        booth
+    );
     let _ = std::fs::remove_dir_all(&root);
     switches(false, false);
 }
@@ -682,12 +681,11 @@ fn an_uploaded_files_trigger_phrases_are_its_asks_only_with_their_switch() {
     made_skill::set_asks_here(None);
 }
 
-/// Heron's P1 on #7590: a file that reads a linked service and reaches the
-/// internet is refused in plain words, nothing kept; so is a kept
-/// `skill.toml` naming the pair. The voice's private grants and words are
-/// lamp-tasks' own.
+/// #7901, the settled design: a file that reads a linked service and
+/// reaches the internet is kept with both; so is a kept `skill.toml`
+/// naming the camera or a service's read beside `net`.
 #[test]
-fn a_file_reading_a_service_and_reaching_the_internet_is_refused() {
+fn a_file_reading_a_service_and_reaching_the_internet_is_kept() {
     switches(true, true);
     crate::made_skill::set_agent_services_here(Some(true));
     let card = "---\nname: mail-digest\ndescription: Posts a digest of my mail. Call it when the \
@@ -697,55 +695,27 @@ fn a_file_reading_a_service_and_reaching_the_internet_is_refused() {
         grants_read(card),
         ["speak", "net", "gmail-read", "gmail-write"]
     );
-    let why = files(card).unwrap_err().0;
-    assert_eq!(
-        why,
-        "it reaches the internet and also reads your Gmail, and one skill can't do both: make it \
-         two skills"
-    );
+    let (_, grants) = files(card).unwrap();
     let (root, keeping) = keeping("agent-mail-net");
+    let made = take(&place(&root), &keeping, None, card, NOW).unwrap();
     assert_eq!(
-        take(&place(&root), &keeping, None, card, NOW)
-            .unwrap_err()
-            .0,
-        why
+        made_skill::agent_grants(&keeping.directory, &made.sha256).unwrap(),
+        grants
     );
-    assert!(made_skill::entries(&keeping.directory).is_empty());
     let _ = std::fs::remove_dir_all(&root);
-    // A kept `skill.toml` naming the pair loads nowhere.
     let (kept, _) = files(&strip_booth()).unwrap();
-    assert!(capped(&kept.toml).is_ok());
     for private in ["camera", "gmail-read"] {
         let toml = kept.toml.replace(
             "grants = [\"light\", \"speak\", \"net\"]",
             &format!("grants = [\"light\", \"{private}\", \"net\"]"),
         );
         assert_ne!(toml, kept.toml);
-        assert_eq!(capped(&toml).unwrap_err().0, net_beside_private(private));
+        assert!(
+            capped(&toml).is_ok(),
+            "{private}: {:?}",
+            capped(&toml).err()
+        );
     }
     crate::made_skill::set_agent_services_here(None);
     switches(false, false);
-    assert_eq!(
-        crate::skill_task_yes::PRIVATE_GRANTS,
-        lamp_tasks::skill_task::PRIVATE_GRANTS
-    );
-    assert_eq!(
-        crate::skill_task_yes::NET_BESIDE_PRIVATE,
-        lamp_tasks::skill_task::NET_BESIDE_PRIVATE
-    );
-    for grant in [
-        "gmail-read",
-        "figma-write",
-        "camera",
-        "notes",
-        "speak",
-        "net",
-        "look",
-    ] {
-        assert_eq!(
-            crate::skill_task_yes::private_grant(grant),
-            lamp_tasks::skill_task::private_grant(grant),
-            "{grant}"
-        );
-    }
 }

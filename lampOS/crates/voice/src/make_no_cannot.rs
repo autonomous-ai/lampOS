@@ -240,9 +240,6 @@ const MOST_NAME_CHARS: usize = 40;
 pub enum Uncovered {
     /// The internet, with `LAMP_TASK_NET` off.
     NetOff,
-    /// The internet beside a private grant (the camera, a linked
-    /// service's): one skill never holds both (Heron's P1 on #7590).
-    NetPrivate,
     /// A linked service, with `LAMP_AGENT_SERVICES` off.
     ServicesOff,
     /// A service the lamp doesn't know.
@@ -277,7 +274,6 @@ impl Uncovered {
     pub fn class(&self) -> &'static str {
         match self {
             Self::NetOff => "net_off",
-            Self::NetPrivate => "net_private",
             Self::ServicesOff => "services_off",
             Self::ServiceUnknown => "service_unknown",
             Self::TasksOff => "tasks_off",
@@ -297,11 +293,6 @@ impl Uncovered {
             Self::NetOff => format!(
                 "{CANT_MAKE_YET} it needs the internet, and skills on this lamp can't use the \
                  internet yet."
-            ),
-            Self::NetPrivate => format!(
-                "{CANT_MAKE_YET} it needs the internet and also your camera or your linked \
-                 services, and one skill can't have both, to keep them private. Ask me for two \
-                 skills instead."
             ),
             Self::ServicesOff => format!(
                 "{CANT_MAKE_YET} it needs your linked services, and skills on this lamp can't \
@@ -797,11 +788,6 @@ pub fn covered(asked: &[String], only_asked: bool) -> Result<Vec<String>, Uncove
             return Err(Uncovered::ServiceUnknown);
         }
         return Err(Uncovered::Other);
-    }
-    // Never the internet beside a private grant: no such skill loads, so
-    // none is said back or asks a yes (Heron's P1 on #7590).
-    if crate::skill_task_yes::private_beside_net(&grants).is_some() {
-        return Err(Uncovered::NetPrivate);
     }
     Ok(grants)
 }
@@ -1696,21 +1682,20 @@ mod tests {
             covered(&grants(&["speak", "net"]), true),
             Ok(grants(&["speak", "net"]))
         );
-        // Never beside a private grant (Heron's P1 on #7590): refused before
-        // any say-back, so no yes ever names the pair.
+        // #7901, the settled design: nothing is refused beside `net`.
         made_skill::set_agent_services_here(Some(true));
-        for private in ["camera", "gmail-read", "gmail-write"] {
+        for other in ["camera", "gmail-read", "gmail-write"] {
             assert_eq!(
-                covered(&grants(&[private, "net"]), true),
-                Err(Uncovered::NetPrivate),
-                "{private}"
+                covered(&grants(&[other, "net"]), true),
+                Ok(grants(&[other, "net"])),
+                "{other}"
             );
             assert_eq!(
-                covered(&grants(&["net", "speak", private]), true),
-                Err(Uncovered::NetPrivate),
-                "{private}"
+                covered(&grants(&["net", "speak", other]), true),
+                Ok(grants(&["net", "speak", other])),
+                "{other}"
             );
-            assert_eq!(covered(&grants(&[private]), true), Ok(grants(&[private])));
+            assert_eq!(covered(&grants(&[other]), true), Ok(grants(&[other])));
         }
         made_skill::set_agent_services_here(None);
         crate::skill_task_yes::set_net_here(Some(false));
@@ -1881,7 +1866,6 @@ mod tests {
     fn each_reason_is_plain_and_never_the_bare_line() {
         for uncovered in [
             Uncovered::NetOff,
-            Uncovered::NetPrivate,
             Uncovered::ServicesOff,
             Uncovered::ServiceUnknown,
             Uncovered::TasksOff,
