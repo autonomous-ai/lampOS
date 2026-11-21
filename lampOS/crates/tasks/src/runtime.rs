@@ -818,20 +818,24 @@ enum PlaceWait {
 /// last look; `held` the task held and since when.
 fn gateway_wait(
     next: Option<&Launch>,
-    asking: bool,
+    asking: crate::gateway::Asking,
     answers: impl FnOnce() -> bool,
     held: &mut Option<(String, Instant)>,
     now: Instant,
     cap: Duration,
 ) -> PlaceWait {
-    let Some(next) = next.filter(|next| asking && next.target.engine == EngineKind::Openclaw)
+    use crate::gateway::Asking;
+    let Some(next) =
+        next.filter(|next| asking != Asking::No && next.target.engine == EngineKind::Openclaw)
     else {
         if let Some((name, _)) = held.take() {
             eprintln!("tasks: {name}: held for OpenClaw's gateway no longer");
         }
         return PlaceWait::Go;
     };
-    crate::gateway::mark_wanted();
+    if asking == Asking::Yes {
+        crate::gateway::mark_wanted();
+    }
     if answers() {
         if let Some((name, since)) = held.take() {
             eprintln!(
@@ -846,15 +850,14 @@ fn gateway_wait(
             if now.saturating_duration_since(*since) < cap {
                 return PlaceWait::Hold;
             }
-            eprintln!(
-                "tasks: {}: OpenClaw's gateway didn't answer in {} s; not sent",
-                next.name,
-                cap.as_secs()
-            );
-            *held = None;
+            // `held` is cleared by the caller once the give-up is written,
+            // so a tick with a launch in flight gives up on the next one.
             PlaceWait::GiveUp
         }
         _ => {
+            if let Some((name, _)) = held.take() {
+                eprintln!("tasks: {name}: held for OpenClaw's gateway no longer");
+            }
             eprintln!(
                 "tasks: {}: held until OpenClaw's gateway answers (at most {} s)",
                 next.name,
@@ -3085,6 +3088,12 @@ fn owner<C: Clock>(
                 && gateway_hold == PlaceWait::GiveUp
                 && let Some(job) = engine.begin_launch(&now).map_err(io::Error::other)?
             {
+                if let Some((name, _)) = gateway_held.take() {
+                    eprintln!(
+                        "tasks: {name}: OpenClaw's gateway didn't serve in {} s; not sent",
+                        crate::gateway::COLD_WITHIN.as_secs()
+                    );
+                }
                 engine
                     .finish_launch(
                         job.task_id,
@@ -8286,23 +8295,44 @@ mod tests {
         let mut held = None;
         // The switch off, or another engine: on as before, never held.
         assert_eq!(
-            gateway_wait(Some(&openclaw), false, || false, &mut held, start, cap),
+            gateway_wait(
+                Some(&openclaw),
+                crate::gateway::Asking::No,
+                || false,
+                &mut held,
+                start,
+                cap
+            ),
             PlaceWait::Go
         );
         assert_eq!(
-            gateway_wait(Some(&hermes), true, || false, &mut held, start, cap),
+            gateway_wait(
+                Some(&hermes),
+                crate::gateway::Asking::Yes,
+                || false,
+                &mut held,
+                start,
+                cap
+            ),
             PlaceWait::Go
         );
         assert!(held.is_none());
         // Cold: held, and still held within the cap.
         assert_eq!(
-            gateway_wait(Some(&openclaw), true, || false, &mut held, start, cap),
+            gateway_wait(
+                Some(&openclaw),
+                crate::gateway::Asking::Yes,
+                || false,
+                &mut held,
+                start,
+                cap
+            ),
             PlaceWait::Hold
         );
         assert_eq!(
             gateway_wait(
                 Some(&openclaw),
-                true,
+                crate::gateway::Asking::Yes,
                 || false,
                 &mut held,
                 start + cap / 2,
@@ -8314,7 +8344,7 @@ mod tests {
         assert_eq!(
             gateway_wait(
                 Some(&openclaw),
-                true,
+                crate::gateway::Asking::Yes,
                 || true,
                 &mut held,
                 start + cap / 2,
@@ -8323,11 +8353,50 @@ mod tests {
             PlaceWait::Go
         );
         assert!(held.is_none());
-        // Past the cap: given up.
-        let mut late = None;
-        gateway_wait(Some(&openclaw), true, || false, &mut late, start, cap);
+        // Not asked yet, just after the start: held, unmarked.
+        let mut early = None;
         assert_eq!(
-            gateway_wait(Some(&openclaw), true, || false, &mut late, start + cap, cap),
+            gateway_wait(
+                Some(&openclaw),
+                crate::gateway::Asking::NotYet,
+                || false,
+                &mut early,
+                start,
+                cap
+            ),
+            PlaceWait::Hold
+        );
+        // Past the cap: given up, and given up again on the next tick until
+        // the caller clears `held` (a launch in flight that tick).
+        let mut late = None;
+        gateway_wait(
+            Some(&openclaw),
+            crate::gateway::Asking::Yes,
+            || false,
+            &mut late,
+            start,
+            cap,
+        );
+        assert_eq!(
+            gateway_wait(
+                Some(&openclaw),
+                crate::gateway::Asking::Yes,
+                || false,
+                &mut late,
+                start + cap,
+                cap
+            ),
+            PlaceWait::GiveUp
+        );
+        assert_eq!(
+            gateway_wait(
+                Some(&openclaw),
+                crate::gateway::Asking::Yes,
+                || false,
+                &mut late,
+                start + cap,
+                cap
+            ),
             PlaceWait::GiveUp
         );
         assert_eq!(cap, Duration::from_secs(480));
