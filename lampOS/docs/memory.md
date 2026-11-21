@@ -5459,8 +5459,8 @@ with `LAMP_FACE_STICKY=on` in the voice (on in the product unit;
 `process::carried_journal_worker_environment`). A line carried as its
 person's and read as theirs (`LAMP_CONVERSATION_CARRIED_MEMORY`, their face
 the one face in view through it) is journalled in their record, not kept out
-(`worker::keep_out_scoped`), and the journal says so with the request and a
-count, no words and no name. No forget runs on it, it is never summarised,
+(`worker::keep_out_scoped`), and the journal says so once per request, not
+once per output event, with the request and a count, no words and no name. No forget runs on it, it is never summarised,
 and "never forgets" stays. A line held by `LAMP_FACE_GAP_HOLD`'s 12 s is
 still kept out.
 - **Why a line is the room's.** Whatever the switch, a heard line admitted as

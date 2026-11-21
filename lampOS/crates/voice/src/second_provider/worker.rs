@@ -500,9 +500,33 @@ pub fn carried_journal_on() -> bool {
     *ON.get_or_init(|| std::env::var(CARRIED_JOURNAL_ENVIRONMENT).ok().as_deref() == Some("on"))
 }
 
-/// Carried lines journalled as their person's since the worker started
-/// ([`keep_out_scoped`]), for the journal's count.
+/// Requests whose carried line was journalled as their person's since the
+/// worker started ([`keep_out_scoped`]), for the journal's count.
 static CARRIED_JOURNALLED: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+
+/// The last request whose carried line was journalled as its person's
+/// ([`keep_out_scoped`]), so its journal line prints once per request, not
+/// once per output event (#7814: one carried answer printed it 49 times in
+/// 0.75 s). `u64::MAX` before the first.
+static CARRIED_JOURNALLED_LAST: std::sync::atomic::AtomicU64 =
+    std::sync::atomic::AtomicU64::new(u64::MAX);
+
+/// Whether `request` is a new one for `last`, the last request seen, which
+/// it then becomes: a request's events after its first give false.
+pub(crate) fn first_for_request(last: &std::sync::atomic::AtomicU64, request: u64) -> bool {
+    last.swap(request, std::sync::atomic::Ordering::Relaxed) != request
+}
+
+/// The journal's count for `request`'s carried line, bumped in `count`, on
+/// its first event only ([`first_for_request`] on `last`); `None` after.
+pub(crate) fn carried_journalled_once(
+    last: &std::sync::atomic::AtomicU64,
+    count: &std::sync::atomic::AtomicU64,
+    request: u64,
+) -> Option<u64> {
+    first_for_request(last, request)
+        .then(|| count.fetch_add(1, std::sync::atomic::Ordering::Relaxed) + 1)
+}
 
 /// The journal's line for a carried line journalled as its person's: the
 /// request and the count so far, no words and no name.
@@ -15189,8 +15213,13 @@ pub(crate) fn keep_out_scoped(lease: &crate::memory_scope::ScopeLease, journal: 
         crate::remember::held_by_gap(lease.key().request);
         return true;
     }
-    if carried {
-        let count = CARRIED_JOURNALLED.fetch_add(1, std::sync::atomic::Ordering::Relaxed) + 1;
+    if carried
+        && let Some(count) = carried_journalled_once(
+            &CARRIED_JOURNALLED_LAST,
+            &CARRIED_JOURNALLED,
+            lease.key().request,
+        )
+    {
         eprintln!("{}", carried_journalled_line(lease.key().request, count));
     }
     false
