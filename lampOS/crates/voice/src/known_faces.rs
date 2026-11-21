@@ -4244,10 +4244,41 @@ pub fn keep_owner_fresh(file: Option<PathBuf>, socket: Option<PathBuf>) {
     STARTED.call_once(|| keep_owner_fresh_now(file, socket));
 }
 
+/// The names of everyone the eyes know, as last read for
+/// `LAMP_NAME_NOT_ANOTHERS` (#8114, the first builder's 10:52): a word
+/// written for the lamp's name that is one of them ("Lynn") calls that
+/// person, not the lamp. Empty until read, or without the switch.
+static FACE_NAMES: std::sync::Mutex<Vec<String>> = std::sync::Mutex::new(Vec::new());
+
+/// How many owner refreshes ([`OWNER_EVERY`]) pass between reads of
+/// [`FACE_NAMES`]: about a minute.
+const FACE_NAMES_EVERY: u32 = 6;
+
+/// The names in [`FACE_NAMES`]: those the eyes knew at the last read. Never
+/// waits.
+pub fn names_kept() -> Vec<String> {
+    FACE_NAMES
+        .try_lock()
+        .map(|names| names.clone())
+        .unwrap_or_default()
+}
+
 fn keep_owner_fresh_now(file: Option<PathBuf>, socket: Option<PathBuf>) {
     std::thread::spawn(move || {
         let mut count_tries = 0;
+        let mut tick: u32 = 0;
         loop {
+            // The faces' names for `LAMP_NAME_NOT_ANOTHERS`, about once a
+            // minute; eyes that don't answer keep the last read.
+            if crate::second_provider::not_anothers_on()
+                && tick.is_multiple_of(FACE_NAMES_EVERY)
+                && let Some(Some(names)) = socket.as_deref().and_then(names_reached)
+            {
+                *FACE_NAMES
+                    .lock()
+                    .unwrap_or_else(|poisoned| poisoned.into_inner()) = names;
+            }
+            tick = tick.wrapping_add(1);
             if count_tries < OWNER_COUNT_TRIES {
                 count_tries = if owner_counted(file.as_deref(), socket.as_deref()) {
                     OWNER_COUNT_TRIES
