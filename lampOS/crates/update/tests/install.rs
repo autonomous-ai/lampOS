@@ -1996,6 +1996,26 @@ fn the_product_forgets_what_was_just_kept() {
     );
 }
 
+/// An app's live context line is told in the product (#8228, beside
+/// LAMP_APP_REMEMBER in lamp-control): `LAMP_APP_MEMORY=on`, once, in the
+/// voice's unit.
+#[test]
+fn the_product_tells_an_apps_live_line() {
+    let voice = install::PRODUCT
+        .iter()
+        .find(|(unit, _)| *unit == "lamp-voice.service")
+        .unwrap()
+        .1;
+    let service = section(voice, "Service");
+    assert_eq!(
+        service
+            .iter()
+            .filter(|line| line.starts_with("Environment=LAMP_APP_MEMORY="))
+            .collect::<Vec<_>>(),
+        [&"Environment=LAMP_APP_MEMORY=on"]
+    );
+}
+
 /// The memory's corrections, forget-about and recall v2 are on in the
 /// product (#2510, #2176): each passed its check on lamp-06c1 on 4 Nov
 /// (build 10012): "green now, not violet" with `replaces`, both bicycle
