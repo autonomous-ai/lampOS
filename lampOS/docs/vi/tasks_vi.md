@@ -1924,7 +1924,22 @@ skill-start (`crates/tasks/src/skill_start.rs`), không bao giờ qua một file
   (`gateway::READ_EVERY`, `READ_MOST`, không bao giờ quá hạn chót của lần
   chạy), để CLI Node mà mỗi lần đọc khởi động không làm chậm chính quá
   trình khởi động của gateway trên lamp (#7174); một lần đọc thành
-  công đưa thời gian chờ về không. Nếu không, không gì được gửi ("tasks: the OpenClaw Gateway
+  công đưa thời gian chờ về không. **Được báo trong lúc chờ (#7354):** một
+  lần chạy người dùng vừa hỏi bằng giọng nói được giao kèm
+  `"tell_getting_ready": true` (lamp-skills, `task::asking_getting_ready`;
+  lamp-tasks bỏ trường này khỏi dòng trước khi đọc,
+  `skill_task::TELL_GETTING_READY`). Khi việc chờ agent khởi động quá 5 s
+  (`skill_task::GETTING_READY_AFTER`, `skill_task::startup_wait`),
+  lamp-tasks ghi một dòng `{"event":"getting_ready"}` lên kết nối của lần
+  chạy, trước câu trả lời, tối đa một lần mỗi lần chạy. lamp-skills đọc qua
+  dòng đó tới câu trả lời (`hand_over_telling`) và nói "One moment, I'm
+  getting ready." (`task::GETTING_READY_LINE`) một lần, đúng nguyên văn qua
+  say service, trên một luồng riêng. Câu này không bao giờ nêu tên agent,
+  và không có gì nói là đã sẵn sàng: câu trả lời của lần chạy vẫn đến như
+  trước. Lần chạy của trigger, lịch hay ứng dụng không yêu cầu, và việc
+  chờ kết thúc sớm hơn thì không ghi gì. Điểm móc là việc chờ khởi động
+  của bất kỳ engine nào; hiện chỉ gateway của OpenClaw có (một lần chạy
+  Hermes là một `hermes chat -q`, không có việc chờ này). Nếu không, không gì được gửi ("tasks: the OpenClaw Gateway
   answered on 127.0.0.1:18789 but did not serve its approvals read
   (exec.approvals.get) before the readiness or run deadline; the hand-over is not sent", hoặc
   "did not answer on 127.0.0.1:18789" khi cổng không bao giờ trả lời), và
