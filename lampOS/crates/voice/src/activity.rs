@@ -293,6 +293,11 @@ pub struct TurnDetector {
     /// End they become the next pre-roll. Empty otherwise.
     end_lead: bool,
     trailing: VecDeque<(ObservedAudio, Option<f32>, bool)>,
+    /// The capture time of the last block carried from an ended line into
+    /// the pre-roll: a line begun inside that lead is judged by
+    /// [`Self::name_heard`] from after it, as before the carry, so the last
+    /// line's late name sign never starts a call wait on this one.
+    carried_through_us: u64,
     start_count: u16,
     silence_count: u16,
     end_silence_blocks: u16,
@@ -352,6 +357,7 @@ impl Default for TurnDetector {
             next_lamp_silent: false,
             end_lead: false,
             trailing: VecDeque::new(),
+            carried_through_us: 0,
             start_count: 0,
             silence_count: 0,
             end_silence_blocks: END_SILENCE_BLOCKS,
@@ -492,7 +498,7 @@ impl TurnDetector {
             && self.active
             && !self.abandoned
             && !self.waited
-            && began_us.saturating_add(CALL_BEFORE_US) >= self.began_us
+            && began_us.saturating_add(CALL_BEFORE_US) >= self.began_us.max(self.carried_through_us)
             && self.speech_blocks <= CALL_SPEECH_BLOCKS;
         if applies {
             self.waiting = true;
@@ -662,7 +668,12 @@ impl TurnDetector {
             // pre-roll (`LAMP_END_KEEPS_REACH_BACK=on`): the line keeps the
             // block as before, and a speech block lets go of what was kept.
             if self.end_lead {
-                if speech {
+                // Quiet by its own score too: a block masked under the
+                // lamp's sound but scored speech by itself is the person's
+                // words, already the line's, and a yield's reach-back by its
+                // own score would say them again.
+                let own_speech = own.is_some_and(|own| own >= SILENCE_PROBABILITY);
+                if speech || own_speech {
                     self.trailing.clear();
                 } else {
                     if self.trailing.len() == END_LEAD_BLOCKS {
@@ -776,6 +787,9 @@ impl TurnDetector {
             PRE_ROLL_BLOCKS
         };
         let skip = trailing.len().saturating_sub(kept);
+        if let Some((last, _, _)) = trailing.back() {
+            self.carried_through_us = last.captured_at_us;
+        }
         for (frame, own, silent) in trailing.into_iter().skip(skip) {
             if self.prefix.len() == kept {
                 self.prefix.pop_front();
