@@ -173,9 +173,18 @@ pub fn asked_for_tests(asked: bool) {
 
 /// [`Asking`] now.
 pub fn update_asking() -> Asking {
-    if UPDATE_EVER_ASKED.load(std::sync::atomic::Ordering::Acquire) {
+    asking_at(
+        UPDATE_EVER_ASKED.load(std::sync::atomic::Ordering::Acquire),
+        mono_ms(),
+    )
+}
+
+/// [`Asking`] with lamp-update having asked or not, `now_ms` into this
+/// process.
+fn asking_at(ever_asked: bool, now_ms: u64) -> Asking {
+    if ever_asked {
         Asking::Yes
-    } else if mono_ms() < FIRST_ASK_WITHIN.as_millis() as u64 {
+    } else if now_ms < FIRST_ASK_WITHIN.as_millis() as u64 {
         Asking::NotYet
     } else {
         Asking::No
@@ -190,12 +199,13 @@ type ColdLook = Box<dyn FnMut() -> bool + Send>;
 static COLD_LOOK: std::sync::OnceLock<std::sync::Mutex<ColdLook>> = std::sync::OnceLock::new();
 
 fn cold_look() -> &'static std::sync::Mutex<ColdLook> {
-    COLD_LOOK.get_or_init(|| {
-        let mut serving = Serving::lamp();
-        std::sync::Mutex::new(Box::new(move || {
-            serving.ready_until(Instant::now() + SERVING_LOOK_WITHIN, &|| false)
-        }))
-    })
+    COLD_LOOK.get_or_init(|| std::sync::Mutex::new(serving_look(Serving::lamp())))
+}
+
+/// A held launch's look through `serving`: true only once it serves, its
+/// port then its approvals read, never at the port alone.
+fn serving_look(mut serving: Serving) -> ColdLook {
+    Box::new(move || serving.ready_until(Instant::now() + SERVING_LOOK_WITHIN, &|| false))
 }
 
 /// The last look's answer for a held launch, looked at most every
@@ -1534,6 +1544,52 @@ mod tests {
         assert!(panes_fresh(now + 1, now + 2 * 60_000));
         assert!(!panes_fresh(now + 1, now + 2 * 60_000 + 1));
         assert!(!panes_fresh(0, now));
+    }
+
+    /// #8105 (Twelve on #8234): a held launch's default look is the serving
+    /// read: the port answering with the approvals read failing is not
+    /// served; the read succeeding then is.
+    #[test]
+    fn a_held_launchs_look_waits_for_the_serving_read_not_the_port() {
+        let port = Fake {
+            ready_from: Some(1),
+            ..Fake::default()
+        };
+        let read = Fake {
+            ready_from: Some(3),
+            ..Fake::default()
+        };
+        let mut look = serving_look(Serving::new(Box::new(port), Box::new(read.clone())));
+        assert!(!look(), "the port answers, the read fails: held");
+        assert!(*read.looks.lock().unwrap() >= 1, "the read was made");
+        let mut served = false;
+        for _ in 0..10 {
+            if look() {
+                served = true;
+                break;
+            }
+            thread::sleep(READ_EVERY);
+        }
+        assert!(served, "the read succeeds: released");
+    }
+
+    /// #8105 (Twelve on #8234): once lamp-update has asked, it stays asked
+    /// past the first 30 s with no new ask; never asked is "not yet" within
+    /// them and off after.
+    #[test]
+    fn lamp_updates_ask_is_kept_for_the_process() {
+        update_asked();
+        assert!(UPDATE_EVER_ASKED.load(std::sync::atomic::Ordering::Acquire));
+        let later = FIRST_ASK_WITHIN.as_millis() as u64 + 60_000;
+        assert_eq!(
+            asking_at(
+                UPDATE_EVER_ASKED.load(std::sync::atomic::Ordering::Acquire),
+                later
+            ),
+            Asking::Yes
+        );
+        assert_eq!(asking_at(false, 0), Asking::NotYet);
+        assert_eq!(asking_at(false, later), Asking::No);
     }
 
     /// #8105 (Twelve's P1 on #8223): the panes are read only while

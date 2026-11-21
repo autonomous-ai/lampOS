@@ -837,11 +837,13 @@ fn gateway_wait(
         crate::gateway::mark_wanted();
     }
     if answers() {
-        if let Some((name, since)) = held.take() {
-            eprintln!(
-                "tasks: {name}: OpenClaw's gateway answers after {} s; sent",
+        match held.take() {
+            Some((name, since)) if name == next.name => eprintln!(
+                "tasks: {name}: OpenClaw's gateway serves after {} s; sent",
                 now.saturating_duration_since(since).as_secs()
-            );
+            ),
+            Some((name, _)) => eprintln!("tasks: {name}: held for OpenClaw's gateway no longer"),
+            None => {}
         }
         return PlaceWait::Go;
     }
