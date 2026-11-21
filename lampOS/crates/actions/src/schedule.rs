@@ -137,9 +137,26 @@ pub fn catalog() -> Vec<Function> {
 
 /// `catalog` with [`ASKS_HOW_LONG_SWITCH`] on (`on`): `set_timer` and
 /// `set_reminder` say to ask for a length or time not given.
-pub fn asking_how_long(catalog: Vec<Function>, _on: bool) -> Vec<Function> {
+pub fn asking_how_long(mut catalog: Vec<Function>, on: bool) -> Vec<Function> {
+    if on {
+        for function in &mut catalog {
+            match function.name {
+                "set_timer" => function.description = SET_TIMER_ASKS,
+                "set_reminder" => function.description = SET_REMINDER_ASKS,
+                _ => {}
+            }
+        }
+    }
     catalog
 }
+
+/// `set_timer`'s description with [`ASKS_HOW_LONG_SWITCH`] on: off's, and
+/// to ask for a length the words did not give.
+const SET_TIMER_ASKS: &str = "Set a timer or a relative reminder only when asked. For a duration from now, such as 'in two minutes', 'in ten minutes', or 'in an hour', use this tool with the requested label and whole seconds (120, 600, or 3600 respectively); never round to a clock time. If the person's words give no length, never choose one: set nothing and ask only, in a few words, 'For how long?', then set it from their answer. Confirm the returned time only after durable success. If the outcome is unknown, list current reminders before asking again. If they change the time of one already set, cancel that one before setting the new one; never leave both.";
+
+/// `set_reminder`'s with the switch on: off's, and to ask for a time the
+/// words did not give.
+const SET_REMINDER_ASKS: &str = "Set one reminder at a requested local clock time, such as 'at nine tomorrow morning'. For relative times from now, use set_timer with the requested label and whole seconds instead; do not round to HH:MM. If the person's words give no time, never choose one: set nothing and ask only, in a few words, 'What time?', then set it from their answer. Ask for missing or ambiguous intent; never calculate a Unix timestamp.";
 
 /// [`catalog`] with [`EVERY_SWITCH`] on (`every`) or off: off, it is the
 /// catalog as it was, byte for byte.

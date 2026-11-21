@@ -1186,7 +1186,10 @@ order is kept. A written turn is the same from the chat on.
     refused, failed or held, calls that differ with one of them unchanged,
     two timers, a reminder at a day and
     time, or a round with words of its own. Those turns go on as without the
-    switch.
+    switch. A timer or reminder refused because the line gave no length or
+    time (`LAMP_TIMER_ASKS_HOW_LONG`, #8182) is such a refused call: the
+    model's round asks "For how long?" and nothing says "Timer set."
+    ([schedule.md](schedule.md#a-length-or-time-not-heard-is-asked-lamp_timer_asks_how_long)).
 
   **Tried and dropped: the model's words with the call.** The switch first
   also asked the model to say its few words in the same reply as the call.
