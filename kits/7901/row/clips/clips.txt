@@ -1,0 +1,5 @@
+MAKEA	Hey Lamp, make a skill that checks the price of coffee beans online and keeps notes of the prices it found.	1.0
+RUN	Hey Lamp, run the coffee price skill.	1.0
+MAKEC	Hey Lamp, make a skill that looks at my desk with the camera and searches online for what it sees.	1.0
+RUNC	Hey Lamp, run the desk skill.	1.0
+YES	Yes, go ahead.	1.0
