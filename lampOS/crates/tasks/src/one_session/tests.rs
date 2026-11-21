@@ -5083,16 +5083,28 @@ fn a_lasting_hold_reads_error_with_its_why_and_opens_no_fresh_session() {
     );
 }
 
-/// #8138 (review P2): a spoken task held under a lasting hold is ended at
-/// once, told, but the pane is kept: no close, no fresh session, the agent
-/// still `error` with its why. A first `idle` from a pane opened after the
-/// hold never clears it; the held pane read idle again does.
+/// The kept session's `close-kept ... --now` calls so far.
+fn closes_now(fake: &Fake) -> usize {
+    fake.calls()
+        .iter()
+        .filter(|call| call.starts_with("close-kept ") && call.ends_with(" --now"))
+        .count()
+}
+
+/// #8138 (review P2, follow-up (a)): a spoken task held under a lasting
+/// hold is ended at once and told; its pane is closed `--now` and resumed
+/// with its conversation, never replaced by a fresh session (one would be
+/// held the same), and no more closes or opens follow while the hold
+/// stands. The agent stays `error` with its why: the resumed pane's first
+/// `idle` is no proof; read held again, then idle, it is.
 #[test]
-fn a_spoken_task_under_a_lasting_hold_keeps_the_pane_and_the_error() {
+fn a_spoken_task_under_a_lasting_hold_opens_no_fresh_session_and_keeps_the_error() {
     use crate::harness::Hold;
     use lamp_msgs::Readiness;
     let dir = tempfile::tempdir().unwrap();
     let (one, fake) = kept_on(dir.path());
+    // As a real Harness: a closed kept session is resumed by name.
+    *fake.closed_resumes.lock().unwrap() = true;
     one.open_if_due(&fake, &place());
     assert!(matches!(
         spoken_launch(&one, &fake, &spoken("lamp-1")),
@@ -5103,37 +5115,177 @@ fn a_spoken_task_under_a_lasting_hold_keeps_the_pane_and_the_error() {
     assert_eq!(one.take_turn_broken().as_deref(), Some("lamp-1"));
     // The store ended it told, then lets the pane go unanswered.
     one.release_unanswered("lamp-1");
-    one.drop_if_due(&fake);
-    one.restart_if_due(&fake);
-    one.open_if_due(&fake, &place());
+    for _ in 0..3 {
+        one.drop_if_due(&fake);
+        one.restart_if_due(&fake);
+        one.open_if_due(&fake, &place());
+    }
     assert_eq!(
         (
-            fake.count("close-kept"),
+            closes_now(&fake),
             fake.count("close"),
+            fresh_ensures(&fake),
             fake.count("ensure")
         ),
-        (0, 0, ensures),
+        (1, 0, 0, ensures + 1),
         "{:?}",
         fake.calls()
     );
+    // Resumed: the same session, its conversation kept.
     assert_eq!(one.agent(), Some(agent_of(1)));
+    assert!(dir.path().join(TOKEN_FILE).exists());
     assert!(one.free());
     assert_eq!(
         one.readiness().state(),
         (Readiness::Error, Some("held_approval"))
     );
-    // A pane opened after the hold: its watch's first `idle` is no proof.
-    let born = one.lock().pane.as_ref().unwrap().born;
-    one.lock().pane.as_mut().unwrap().born = Instant::now();
+    // The resumed pane, opened after the hold: its watch's first `idle`
+    // is no proof.
     one.watched_event_at(&agent_of(1), WatchEvent::Idle, true);
     assert_eq!(
         one.readiness().state(),
         (Readiness::Error, Some("held_approval"))
     );
+    // Read held again, no close and no open for it.
+    thread::sleep(Duration::from_millis(2));
+    one.watched_event(&agent_of(1), WatchEvent::Held(Hold::Approval));
+    one.restart_if_due(&fake);
+    one.open_if_due(&fake, &place());
+    assert_eq!(
+        (closes_now(&fake), fake.count("ensure")),
+        (1, ensures + 1),
+        "{:?}",
+        fake.calls()
+    );
     // The pane that was held, read idle: cleared.
-    one.lock().pane.as_mut().unwrap().born = born;
     one.watched_event_at(&agent_of(1), WatchEvent::Idle, true);
     assert_eq!(one.readiness().state(), (Readiness::Ready, None));
+}
+
+/// #8138 follow-up (a), the rule settled with the lead: a task the person
+/// was told didn't happen never happens later. Under a lasting hold the
+/// spoken task's words, already handed to Harness, wait in the pane for it
+/// to be able to send. Once its turn ends told, the pane is closed `--now`
+/// (Harness 0.6.78 has no verb that clears a held input), and nothing is
+/// typed while the hold stands: no queued spoken task, no skill run. Then
+/// approval is given (the watch reads it at work, then idle): the held
+/// task's words are never typed again, and the pane is never closed twice.
+#[test]
+fn words_held_by_a_lasting_hold_never_run_after_it_clears() {
+    use crate::harness::Hold;
+    use lamp_msgs::Readiness;
+    let dir = tempfile::tempdir().unwrap();
+    let (one, fake) = kept_on(dir.path());
+    *fake.closed_resumes.lock().unwrap() = true;
+    one.open_if_due(&fake, &place());
+    assert!(matches!(
+        spoken_launch(&one, &fake, &spoken("lamp-1")),
+        Some(LaunchOutcome::Joined { .. })
+    ));
+    let replies = fake.count("reply-kept");
+    one.watched_event(&agent_of(1), WatchEvent::Held(Hold::Approval));
+    assert_eq!(one.take_turn_broken().as_deref(), Some("lamp-1"));
+    one.release_unanswered("lamp-1");
+    one.drop_if_due(&fake);
+    one.open_if_due(&fake, &place());
+    // The pane that holds lamp-1's words is closed `--now`: Harness's held
+    // input goes with its process.
+    assert_eq!(closes_now(&fake), 1, "{:?}", fake.calls());
+    // A spoken task queued before the hold, and a skill run: nothing typed
+    // while it stands; the spoken one ends told at once.
+    assert_eq!(
+        spoken_launch(&one, &fake, &spoken("lamp-2")),
+        Some(LaunchOutcome::NotSent {
+            code: STUCK_ENDED.into()
+        })
+    );
+    let turn = one.enter("skill-1", Kind::Skill, far(), &|| false).unwrap();
+    assert!(matches!(
+        turn.send(&fake, &place(), "Run the skill.", far(), &|| false),
+        Sent::NotTyped(_)
+    ));
+    drop(turn);
+    assert_eq!(fake.count("reply-kept"), replies, "{:?}", fake.calls());
+    // Approval given: the watch reads the session at work, then idle.
+    one.watched_event(&agent_of(1), WatchEvent::Working);
+    one.watched_event(&agent_of(1), WatchEvent::Idle);
+    assert_eq!(one.readiness().state(), (Readiness::Ready, None));
+    for _ in 0..3 {
+        one.drop_if_due(&fake);
+        one.restart_if_due(&fake);
+        one.open_if_due(&fake, &place());
+    }
+    // The held words never typed again: no reply since the hold, and no
+    // second close.
+    assert_eq!(
+        (fake.count("reply-kept"), closes_now(&fake)),
+        (replies, 1),
+        "{:?}",
+        fake.calls()
+    );
+    // The next ask, once cleared, is typed as usual.
+    assert!(matches!(
+        spoken_launch(&one, &fake, &spoken("lamp-3")),
+        Some(LaunchOutcome::Joined { .. })
+    ));
+    assert!(fake.asked.lock().unwrap()[&agent_of(1)].starts_with("New task lamp-3:\n"));
+}
+
+/// #8138 follow-up (a): a hand-over refused under a lasting hold (which
+/// the refusal itself may have met) opens no fresh session. Words not
+/// taken within the whole hold may wait in the pane: it is closed `--now`
+/// and resumed. `ENGINE_NOT_READY` typed nothing: no close.
+#[test]
+fn a_hand_over_refused_under_a_lasting_hold_opens_no_fresh_session() {
+    use crate::harness::Hold;
+    use lamp_msgs::Readiness;
+    let dir = tempfile::tempdir().unwrap();
+    let (one, fake) = kept_on(dir.path());
+    *fake.closed_resumes.lock().unwrap() = true;
+    one.open_if_due(&fake, &place());
+    one.watched_event(&agent_of(1), WatchEvent::Held(Hold::SignInRefused));
+    let ensures = fake.count("ensure");
+    let turn = one.enter("lamp-1", Kind::Spoken, far(), &|| false).unwrap();
+    assert!(matches!(
+        turn.refused_at_hand_over(&agent_of(1), &Took::Timeout),
+        Sent::NotTyped(_)
+    ));
+    drop(turn);
+    for _ in 0..3 {
+        one.drop_if_due(&fake);
+        one.restart_if_due(&fake);
+        one.open_if_due(&fake, &place());
+    }
+    assert_eq!(
+        (
+            closes_now(&fake),
+            fresh_ensures(&fake),
+            fake.count("ensure")
+        ),
+        (1, 0, ensures + 1),
+        "{:?}",
+        fake.calls()
+    );
+    assert_eq!(one.agent(), Some(agent_of(1)));
+    let turn = one.enter("lamp-2", Kind::Spoken, far(), &|| false).unwrap();
+    assert!(matches!(
+        turn.refused_at_hand_over(&agent_of(1), &Took::EngineNotReady),
+        Sent::NotTyped(_)
+    ));
+    drop(turn);
+    one.drop_if_due(&fake);
+    one.restart_if_due(&fake);
+    one.open_if_due(&fake, &place());
+    assert_eq!(
+        (closes_now(&fake), fake.count("ensure")),
+        (1, ensures + 1),
+        "{:?}",
+        fake.calls()
+    );
+    assert_eq!(
+        one.readiness().state(),
+        (Readiness::Error, Some("held_sign_in"))
+    );
 }
 
 /// #8138 review 2 (2): `done` then `stopped` on a spoken turn: its end is

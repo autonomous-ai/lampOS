@@ -3032,8 +3032,27 @@ nay.
   từ chối đăng nhập của nó (`harness::Hold`) là một lần giữ lâu dài, không
   phải lỗi: `error` với `held_approval` hoặc `held_sign_in`, lượt nói vẫn
   được kết thúc ngay, nhưng không mở phiên mới (phiên mới cũng sẽ bị giữ
-  như vậy, và "ready again" sẽ được nói giữa các lần lỗi): việc nói bị kết
-  thúc như vậy nhả pane mà vẫn giữ nó, không close (`release_unanswered`).
+  như vậy, và "ready again" sẽ được nói giữa các lần lỗi). Một việc mà
+  người dùng đã được báo là không làm thì không bao giờ được làm sau đó
+  (follow-up (a) trên #8138), nhưng Harness đã nhận lời của việc bị kết
+  thúc và giữ chúng cho tới khi pane gửi được, nên chúng sẽ chạy khi lần
+  giữ được gỡ. Harness 0.6.78 không có lệnh nào xoá một input hay bản nháp
+  đang bị giữ (các lệnh CLI của nó là `ps`, `show`, `reply`, `route`,
+  `resume`, `tell`, `wait`, `watch`, `close`, `delete`, `ensure` và `new`;
+  việc tự xoá bằng Ctrl+U một tin nhắn OpenClaw bị từ chối là việc nội
+  bộ), nên pane được đóng `--now` (`release_unanswered`, `close_held`) và
+  lời của nó mất theo tiến trình của nó. Bản ghi phiên được giữ, cuộc hội
+  thoại và token vẫn được giữ (`drop_resumes`), nên lần mở sau là một
+  `ensure` thường, tiếp tục phiên đó: không phiên mới, không lời đầu tiên.
+  Khi lần giữ còn đó, không gì được gõ vào pane (`Turn::send`): một việc
+  nói đang xếp hàng kết thúc ngay `not_sent` `one_session_stuck`, có báo,
+  một lượt chạy skill thất bại bằng lời, và một lần giao bị từ chối dưới
+  lần giữ không mở phiên mới (một `TIMEOUT`, mà lời có thể còn chờ trong
+  pane, đóng `--now` và tiếp tục theo cùng cách; `ENGINE_NOT_READY` và
+  `NOT_RUNNING` không gõ gì). Prepare và confirm vốn đã từ chối
+  `agent_not_ready`. Một phiên được tiếp tục dưới lần giữ không bao giờ bị
+  `show` lúc mở coi là kẹt (`settled`), và các lần mở thất bại vẫn giữ lý
+  do của lần giữ.
   Một `ensure` sau khi mất watch vẫn để nó `error`, và chỉ bằng chứng thật
   mới đọc `ready`: một dòng watch đọc nó đang làm việc, hoặc rảnh sau dòng
   đầu tiên của watch; một `idle` ở dòng đầu chỉ tính từ chính pane đã bị

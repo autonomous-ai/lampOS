@@ -216,6 +216,11 @@ const STARTING_SPENT: &str = "the kept session did not take the words after its 
 pub const STUCK_ENDED: &str = "one_session_stuck";
 /// [`Turn::send`]'s why for [`STUCK_ENDED`].
 const STUCK_CLOSED: &str = "sign 5 closed the stuck kept session; ended, asked again later";
+/// [`Turn::send`]'s why when the lamp's agent is under a lasting hold
+/// ([`crate::agent::LASTING_HOLDS`], #8138 follow-up (a)): nothing is typed
+/// while it stands, so no words can wait in the pane and run once the
+/// person clears it; a spoken task ends at once [`STUCK_ENDED`], told.
+const LASTING_HELD: &str = "the lamp's agent is held until the person clears it; nothing typed";
 /// Between two looks at a pane `wait` read idle but whose turn is not this
 /// task's yet, or a busy pane before its words are typed again.
 pub const TURN_LOOK: Duration = Duration::from_millis(500);
@@ -923,6 +928,12 @@ struct Inner {
     /// cancel's close that failed (#7906). A new token on the same name
     /// could be refused `NAME_TAKEN`; the next `ensure` is `--fresh`.
     drop_keeps_token: bool,
+    /// #8138 follow-up (a): the due removal is a lasting hold's close
+    /// ([`OneSession::close_held`]): closed `--now`, so the words Harness
+    /// still holds for it never run once the hold clears, but its kept
+    /// record, conversation and token are kept, so the next open resumes
+    /// it (no fresh session, no first words) rather than making a new one.
+    drop_resumes: bool,
     /// A removal under way ([`OneSession::drop_pane_as`]): the pane taken,
     /// its close, its OpenClaw session's delete and its token's removal
     /// not all done yet.
@@ -1378,6 +1389,11 @@ pub fn spoken_launch(
         Sent::NotTyped(why) if why == STUCK_CLOSED => Some(LaunchOutcome::NotSent {
             code: STUCK_ENDED.into(),
         }),
+        // #8138 follow-up (a): held until the person clears it: ended at
+        // once, told, never put back to be typed once the hold clears.
+        Sent::NotTyped(why) if why == LASTING_HELD => Some(LaunchOutcome::NotSent {
+            code: STUCK_ENDED.into(),
+        }),
         // `busy`, as a full queue: never a second session.
         Sent::NotTyped(_) => Some(LaunchOutcome::NotSent {
             code: "busy".into(),
@@ -1806,7 +1822,12 @@ impl OneSession {
 
     /// [`OneSession::drop_pane_as`]'s removal itself.
     fn drop_pane_now(&self, harness: &dyn PaneHarness, why: &str, token: bool) {
-        let pane = self.lock().pane.take();
+        // A lasting hold's close (follow-up (a)) is for the kept session
+        // only; a pane of `harness new` is dropped as any other.
+        let (pane, resumes) = {
+            let mut inner = self.lock();
+            (inner.pane.take(), std::mem::take(&mut inner.drop_resumes))
+        };
         if pane.is_some() {
             // #8138: none open until the next look opens one.
             self.agent.session_from(
@@ -1840,9 +1861,23 @@ impl OneSession {
                 let mut inner = self.lock();
                 inner.drop_due = Some(why.to_owned());
                 inner.drop_now |= now;
+                inner.drop_resumes |= resumes;
                 // An unanswered turn's close stays one (`take_due` cleared
                 // it): the close that succeeds keeps the token.
                 inner.drop_keeps_token |= !token;
+                return;
+            }
+            // #8138 follow-up (a): a lasting hold's close. Its process is
+            // gone, and with it the words Harness held for it; the record,
+            // the conversation and the token stay, so the next open is a
+            // plain `ensure` that resumes it: no fresh session, no first
+            // words typed while the hold stands.
+            if resumes {
+                self.lock().reopen_why = Some("a lasting hold's close".into());
+                eprintln!(
+                    "tasks: one session: closed the kept session {} --now ({why}); the words it held never run; resumed with its conversation at the next open (#8138)",
+                    short(&agent)
+                );
                 return;
             }
             self.kept_closed(&agent, kind);
@@ -2102,20 +2137,26 @@ impl OneSession {
     /// conversation ([`OneSession::drop_if_due`]); the next look opens
     /// it again.
     pub fn release_unanswered(&self, id: &str) {
-        // #8138 (review P2): a spoken task ended by a lasting hold (the
-        // device waiting for approval, the sign-in refused) lets the pane
-        // go as a turn answered: a fresh session would be held the same,
-        // and its first `idle` read as the hold cleared.
+        // #8138 (review P2, follow-up (a)): a spoken task ended by a
+        // lasting hold (the device waiting for approval, the sign-in
+        // refused). Harness already took its words for the pane and holds
+        // them until the pane can send, so they could run once the hold
+        // clears, after the person was told the task wasn't done. Harness
+        // 0.6.78 has no verb that clears a held input, so the pane is
+        // closed `--now`, and resumed with its conversation: never a fresh
+        // session (one would be held the same), never the words again.
         if self.agent.facts().session.lasting() {
-            let held = {
-                let inner = self.lock();
-                inner.held_spoken && inner.holder.as_deref() == Some(id)
-            };
-            if held {
+            let mut inner = self.lock();
+            if inner.held_spoken
+                && inner.holder.as_deref() == Some(id)
+                && inner.closing_for.is_none()
+            {
+                inner.closing_for = Some(id.to_owned());
+                drop(inner);
                 eprintln!(
-                    "tasks: one session: {id}'s turn ended under a lasting hold; the pane is kept, no fresh session (#8138)"
+                    "tasks: one session: {id}'s turn ended under a lasting hold; the pane is closed --now so its words never run, and resumed (#8138)"
                 );
-                self.release(id);
+                self.close_held(&format!("{id}'s turn ended under a lasting hold"));
             }
             return;
         }
@@ -2126,6 +2167,19 @@ impl OneSession {
             inner.drop_now = true;
             eprintln!("tasks: one session: {id}'s turn ended unanswered; the pane is closed next");
         }
+    }
+
+    /// #8138 follow-up (a): the kept session closed `--now` at the next
+    /// look, because words Harness took for it may wait there under a
+    /// lasting hold; its record, conversation and token kept, so the open
+    /// after is a plain resume ([`Inner::drop_resumes`]). A task waiting
+    /// in [`OneSession::enter`] waits for the close.
+    fn close_held(&self, why: &str) {
+        let mut inner = self.lock();
+        inner.drop_due = Some(why.to_owned());
+        inner.drop_now = true;
+        inner.drop_resumes = true;
+        inner.drop_keeps_token = true;
     }
 
     /// A spoken task's answer, read by the store, counted toward the
@@ -3913,6 +3967,13 @@ impl OneSession {
         loop {
             match self.pane_sign(harness, &place.machine, agent) {
                 Seen::Died(why) => return Some((why, true)),
+                // #8138 follow-up (a): a session resumed under a lasting
+                // hold is not stuck: the person clears it, and the watch
+                // reads it. Replaced, it would be a fresh session held the
+                // same, with first words typed into it.
+                Seen::Starting | Seen::Unknown if self.agent.facts().session.lasting() => {
+                    return None;
+                }
                 Seen::Starting => {}
                 // No verdict: past the bound, kept as it is, unless Harness
                 // could not confirm its resume.
@@ -4153,9 +4214,14 @@ impl OneSession {
         };
         inner.next_open = Some(Instant::now() + after);
         drop(inner);
+        // A lasting hold's why stays (#8138 follow-up (a)): it says what
+        // only the person can clear, and keeps nothing typed meanwhile.
         if slow {
-            self.agent
-                .session(crate::agent::Session::Failed("open_failed"));
+            self.agent.update(|facts| {
+                if !facts.session.lasting() {
+                    facts.session = crate::agent::Session::Failed("open_failed");
+                }
+            });
         }
         format!("{why}; tried again in {} s", after.as_secs())
     }
@@ -4557,7 +4623,24 @@ impl Turn<'_> {
         // for the try after its refusal with no sign of a frozen engine.
         let mut probed: Option<String> = None;
         let mut rest: Option<Duration> = None;
+        // #8138 follow-up (a): a reply of this send not taken within its
+        // first, short hold: its words may wait in the pane.
+        let mut maybe_in = false;
         loop {
+            // #8138 follow-up (a): never typed while a lasting hold stands
+            // (a queued spoken task, a skill run, a retry of this one): the
+            // words would wait in the pane and run once the person clears
+            // it. Words of this send that may be there already are cleared
+            // with the pane's close `--now` ([`OneSession::close_held`]).
+            if self.one.agent.facts().session.lasting() {
+                if maybe_in {
+                    self.one.close_held(&format!(
+                        "{}'s words may wait under a lasting hold",
+                        self.id
+                    ));
+                }
+                return self.fallback(LASTING_HELD);
+            }
             let agent = if self.opens {
                 self.one.ensure(harness, place, until, ended)
             } else {
@@ -4628,6 +4711,7 @@ impl Turn<'_> {
                     // today's hold, so a slow but healthy hand-over (8.4 s
                     // at first use on lamp-c0a4) is never cut.
                     Took::Timeout if probe => {
+                        maybe_in = true;
                         rest = Some(REPLY_KEPT_HELD.saturating_sub(held));
                     }
                     // #8138 (the lead's decision 3): the FIRST refusal of a
@@ -4834,6 +4918,26 @@ impl Turn<'_> {
     }
 
     fn refused_at_hand_over(&self, agent: &str, took: &Took) -> Sent {
+        // #8138 follow-up (a): refused under a lasting hold, which the
+        // refusal may itself have met: no fresh session (one would be held
+        // the same). Words not taken within the whole hold may wait in the
+        // pane and run once the hold clears, so it is closed `--now` and
+        // resumed with its conversation; `ENGINE_NOT_READY` and
+        // `NOT_RUNNING` typed nothing.
+        if self.one.agent.facts().session.lasting() {
+            if *took == Took::Timeout {
+                self.one.close_held(&format!(
+                    "{}'s words may wait under a lasting hold",
+                    self.id
+                ));
+            }
+            eprintln!(
+                "tasks: one session: {}: {} refused the hand-over under a lasting hold ({took:?}); the task ends now, no fresh session (#8138)",
+                self.id,
+                short(agent)
+            );
+            return self.fallback(LASTING_HELD);
+        }
         let (code, why, told) = match took {
             Took::EngineNotReady => (
                 "engine_not_ready",

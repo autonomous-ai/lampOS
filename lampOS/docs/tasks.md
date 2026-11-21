@@ -5790,8 +5790,26 @@ backoffs, a spoken task's 3 put-backs, a skill run's words typed again,
   Gateway refused its sign-in (`harness::Hold`) is a lasting hold, not a
   fault: `error` with `held_approval` or `held_sign_in`, a spoken turn
   still ended at once, but no fresh session (it would be held the same,
-  and "ready again" would be said between failures): the spoken task so
-  ended lets the pane go kept, with no close (`release_unanswered`). An
+  and "ready again" would be said between failures). A task the person
+  was told didn't happen must never happen later (follow-up (a) on
+  #8138), yet Harness has already taken the ended task's words and holds
+  them until the pane can send, so they would run once the hold clears.
+  Harness 0.6.78 has no verb that clears a held input or draft (its CLI's
+  verbs are `ps`, `show`, `reply`, `route`, `resume`, `tell`, `wait`,
+  `watch`, `close`, `delete`, `ensure` and `new`; its own Ctrl+U clear of
+  a refused OpenClaw message is internal), so the pane is closed `--now`
+  (`release_unanswered`, `close_held`) and its words go with its process.
+  Its kept record, conversation and token are kept (`drop_resumes`), so
+  the next open is a plain `ensure` that resumes it: no fresh session and
+  no first words. While the hold stands nothing is typed into the pane
+  (`Turn::send`): a queued spoken task ends at once `not_sent`
+  `one_session_stuck`, told, a skill run fails in words, and a hand-over
+  refused under the hold opens no fresh session (a `TIMEOUT`, whose words
+  may wait there, closes `--now` and resumes the same way;
+  `ENGINE_NOT_READY` and `NOT_RUNNING` typed nothing). Prepare and confirm
+  already refuse `agent_not_ready`. A session resumed under the hold is
+  never judged stuck by its open's `show` (`settled`), and failed opens
+  keep the hold's why. An
   `ensure` after the watch is lost leaves it `error`, and only real
   evidence reads `ready`: a watch line reading it at work, or idle past
   the watch's first line; a first `idle` only from the pane that was
