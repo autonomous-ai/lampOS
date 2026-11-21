@@ -10,7 +10,9 @@
 //! such a line's first chat round must call `list_reminders`
 //! (`tool_choice`). A line with any other word (a set, a cancel, a move, a
 //! timer, a story), a round after a call, and `list_reminders` not
-//! declared are asked as before. Off, nothing is forced.
+//! declared are asked as before. On a line that names the lamp, the
+//! question is also read past the lamp's name heard as another word
+//! ("Hey, Lynn, what reminders do I have?", #7987). Off, nothing is forced.
 use crate::known_faces::lower_words;
 use crate::second_provider::net::{Force, Forced, Message};
 
@@ -77,14 +79,29 @@ pub fn asks_for_reminders(said: &str) -> bool {
     asked
 }
 
+/// What [`force`] reads of a person's line: whether it is a plain question
+/// about the person's reminders ([`asks_for_reminders`]) as said or, on a
+/// line that names the lamp (`make_skill_asked::named`, as round 1's
+/// journal reads it), past the lamp's name heard as another word
+/// (`second_provider::past_the_name_heard_as`, the reading
+/// `LAMP_MAKE_SKILL_ASKED`'s force shares): "Hey, Lynn, what reminders do I
+/// have?" (#7987, lamp-52e6, build 15285, `opening=misheard`). Said to a
+/// person ("Hey, Anna, …"), the line names nothing, and is read as said.
+pub fn reminders_asked(said: &str) -> bool {
+    let named = crate::tools::make_skill_asked::named(said);
+    asks_for_reminders(said)
+        || crate::second_provider::past_the_name_heard_as(said, named)
+            .is_some_and(asks_for_reminders)
+}
+
 /// The force the second route's chat is given with the switch on
 /// (`second_provider::net::Chat::forcing`): a request whose last message is
-/// a person's plain question about their reminders must call
+/// a person's plain question about their reminders ([`reminders_asked`]) must call
 /// [`LIST`], which the chat forces only when it is declared.
 pub(crate) fn force() -> Force {
     std::sync::Arc::new(|messages: &[Message]| {
         let last = messages.last().filter(|message| message.role == "user")?;
-        asks_for_reminders(last.words()?).then_some(Forced {
+        reminders_asked(last.words()?).then_some(Forced {
             name: LIST,
             only: None,
             fields: None,

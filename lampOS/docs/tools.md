@@ -464,9 +464,19 @@ asked as before. On lamp-52e6 on 9 Nov (build 10972) "Lamp, what reminders
 do I have?" was answered in words with no call in 2 of 8 asks, memory
 telling nothing; the journal tagged those lines with
 `attention::about_its_work`, which takes any line with "reminder" in it and
-so is too wide to force a call on. Host tests:
+so is too wide to force a call on. On a line that names the lamp, the
+question is also read past the lamp's name heard as another word
+(`tools::reminders_asked::reminders_asked`, through
+`second_provider::past_the_name_heard_as`, the reading
+`LAMP_MAKE_SKILL_ASKED`'s force shares): on lamp-52e6 (build 15285,
+core-1126 request 4) "Hey Lamp, what reminders do I have?" was heard with
+the name as another word, round 1 said `opening=misheard forced=none`, and
+the model answered in words (#7987). "Hey, Lynn, what reminders do I
+have?" is forced on such a line; said to a person ("Hey, Anna, …", no name
+heard) it is read as said and not forced. Host tests:
 `a_plain_question_about_reminders_is_told_apart`,
-`a_plain_question_forces_list_reminders_only_when_offered`.
+`a_plain_question_forces_list_reminders_only_when_offered`,
+`a_question_past_the_lamps_name_heard_as_another_word_is_forced_on_a_named_line_alone`.
 
 Actions validates arguments before IPC, owns Schedule's CAS guards, and calls
 the socket selected by `LAMP_SCHEDULE_SOCKET` (enabled default

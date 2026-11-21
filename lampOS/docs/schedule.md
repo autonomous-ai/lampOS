@@ -791,7 +791,10 @@ Lamp, what reminders do I have?" heard as 6 of its 7 words was not one of
 `LAMP_REMINDERS_ASKED`'s exact phrases, so no call was forced, and the
 model answered with no call. The exact phrases' forced call stays as it
 is (no new phrases, no one-word tolerance); every other line is the
-model's choice, which this text makes. The description as it was before is
+model's choice, which this text makes. Later (#7987, lamp-52e6 build
+15285) the forced call also reads the phrases past the lamp's name heard
+as another word, on a line that names the lamp ("Hey, Lynn, what reminders
+do I have?", [tools.md](tools.md)); still no new phrases. The description as it was before is
 kept as `LIST_DESCRIBED_BEFORE`, for the probe's old arm. Both routes
 declare the same catalog, so the Live route and the second route are told
 the same.
