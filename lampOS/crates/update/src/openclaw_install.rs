@@ -1340,7 +1340,10 @@ fn gateway_idle(root: &Path, systemd: &mut dyn Systemd, say: &mut dyn FnMut(&str
 
 /// The gateway always on with OpenClaw there (the owner on #6226): enabled
 /// at boot by [`WANTS`] (made when missing, as `systemctl enable` does,
-/// systemd then reloaded) and started (a no-op when it runs).
+/// systemd then reloaded) and started when it is down (#8238): `inactive`
+/// (an exit the unit took as done) or `failed` (past its start limit),
+/// whose `reset-failed` comes first and is said. Running, or a state
+/// systemd doesn't say, it is left as it is.
 fn gateway_on(root: &Path, systemd: &mut dyn Systemd, say: &mut dyn FnMut(&str)) {
     let wants = on(root, WANTS);
     let target = format!("/{}/{UNIT}", crate::writer_unit::FOLDER);
@@ -1362,6 +1365,16 @@ fn gateway_on(root: &Path, systemd: &mut dyn Systemd, say: &mut dyn FnMut(&str))
             }
             Err(error) => say(&format!("{UNIT} not enabled: {error}")),
         }
+    }
+    match gateway_state(systemd).as_deref() {
+        Some("inactive") => {}
+        Some("failed") => match systemd.reset_failed(UNIT) {
+            Ok(()) => say(&format!(
+                "{UNIT} failed: reset-failed, so it can be started again (#8238)"
+            )),
+            Err(why) => say(&format!("{UNIT} failed, and not reset-failed: {why}")),
+        },
+        _ => return,
     }
     if let Err(why) = systemd.start_unit(UNIT) {
         say(&format!("{UNIT} not started: {why}"));

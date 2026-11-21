@@ -2554,7 +2554,11 @@ As root, on a lamp with the base image (`crates/update/src/install.rs`):
      (supervisor restart)" that exits 0, and `Restart=on-failure` (the
      unit until then) left it down. A `systemctl stop` still stops it; a
      lamp with the earlier unit gets this one from its next round, which
-     writes the changed text and reloads systemd. With `LAMP_OPENCLAW_GATEWAY_BY_DEFAULT=on` (#8105, off until
+     writes the changed text and reloads systemd. Each supervisor restart
+     counts toward `StartLimitBurst=5`, so five `gateway` key changes in
+     ten minutes end it `failed`; a round that wants it starts a gateway
+     it finds `inactive` or `failed` (a `failed` one after its
+     `reset-failed`, said once), which brings it back. With `LAMP_OPENCLAW_GATEWAY_BY_DEFAULT=on` (#8105, off until
      its row) it runs only while OpenClaw is the lamp's default agent, as
      lamp-tasks says it on its app socket: `serve` asks every 10 s and
      each round once, enables and starts it for `openclaw`, disables and
