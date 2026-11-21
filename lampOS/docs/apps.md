@@ -11,7 +11,8 @@ lamp. It is in English only ([the docs rule](../AGENTS.md)).
 `lamp_skills::app_package`, with tests) and the yes ops in lamp-control (piece
 3a, `app_yes.rs`) and the app socket with `phrases.set` (pieces 3b-1 and 3b-2a, `app_socket.rs`, [control.md](control.md)). The app socket's `app.trigger` and its 3 s hold are built too
 (piece 3b-2b, `app_triggers.rs`). Designed and not yet built: lamp-cloud's `apps.*` kinds
-(piece 4), the installer (`lamp-apps-manage`, eighth's). Everything behind
+(piece 4), the installer (`lamp-apps-manage`, eighth's), and the views an
+app gives the phone ("App views" below, behind `LAMP_APP_VIEWS` as well). Everything behind
 the one switch **`LAMP_STORE_APPS`**, off unless set. A lamp that has the
 format probe refuses an app package in words ("format 2 is not one this lamp
 reads (1)"); an older lamp refuses it with its parser's "unknown field". Either
@@ -229,3 +230,233 @@ side is built ([memory-days.md](memory-days.md), "An app's facts and context
 lines"; `lamp_msgs::app_fact`); the two ops at this socket, the grant and
 their writer are not built yet, and come behind their own switch, refused
 while the physical privacy switch is on.
+
+## App views: screens the phone draws (`views`, designed, not built)
+
+**Designed, not built** (#7415; the first builder's direction of 21 Nov, 09:37,
+the Store's three asks beside it). Nothing below is in the code yet: no
+`views` or `ops` field in `AppManifest`, no op on the app socket, no kind in
+lamp-cloud and no screen in the phone's app. A lamp today refuses a manifest
+with either field ("unknown field"). The design waits for the first builder's
+read before any code.
+
+An app may give the phone up to 8 **views**: typed screens the phone's app
+draws itself on the app's page, from small JSON the app's own op returns. Three
+kinds: `list`, `chart` over time and `form`. No downloaded code runs on the
+phone, so the Store checks a data shape, not a page. A plan editor is a `form`
+with a `rows` field. A real app that needs a fourth kind brings its case.
+
+### In the manifest
+
+Two optional top-level fields; a lamp built before them refuses them, so an app
+that names them sets `min_build` to a build that reads them (as `npu`).
+
+| field | rule |
+|---|---|
+| `ops` | the names the app answers on its socket: at most 16, each `^[a-z][a-z0-9_]{0,31}$`, no repeats. Required (non-empty) when `views` is there |
+| `views` | at most **8**, each `{id, kind, title, op, …}`: `id` `^[a-z][a-z0-9_]{0,31}$` and unique; `kind` `list`, `chart` or `form`; `title` 1 to 40 on one line; `op` one of the manifest's `ops`. The kind's own fields below, and no other |
+
+**The op rule (the Store's check, and the reader's).** A view's `op` must be
+one of the app's own `ops`; a package naming an undeclared op, an unknown kind,
+a field its kind does not have, or more than 8 views is refused, by the Store's
+review and again by `read_app_package_bytes`. Two views may share an op; the
+op is told which view asks.
+
+A view's own fields in the manifest:
+
+- `list`: optional `empty`, up to 80 characters (shown when there are no items).
+- `chart`: `style` `line` or `bar` (required); optional `unit` up to 16; optional
+  `goal_label` up to 24.
+- `form`: `fields`, 1 to 16 (below), and `submit`, the button's words, 1 to 24.
+
+### Each kind's answer
+
+The op answers one JSON object, at most **32 KiB** as sent (the app's
+serialised `data`). lamp-control checks every answer against its view's kind
+and these limits before it leaves the lamp: an answer too big, of the wrong
+shape or late is refused whole, and the phone shows one plain line, "*Title*
+couldn't be shown: the app's answer wasn't one Lamp can read." (too big, bad)
+or "*Title* didn't answer in time." (late), with Try again. Never part of an
+answer, never one cut short. Text everywhere is one line with no control
+characters, U+2028, U+2029 or bidi marks (the panel's rule).
+
+**`list`**: `{"sections": [{"title"?, "items": [...]}]}`, or `{"items": [...]}`
+for one section with no title.
+
+| field | type | rule |
+|---|---|---|
+| `sections` | array | 1 to 12; a section's `title` optional, 1 to 40 |
+| `items` | array | at most **200** in the whole answer, across sections |
+| item `title` | text | required, 1 to 60 |
+| item `subtitle` | text | optional, up to 80 |
+| item `value` | text | optional, up to 24 (shown at the right: "42 kg", "3 × 10") |
+| item `badge` | text | optional, up to 16 ("New", "PR") |
+
+**`chart`** (over time only): `{"series": [...], "goal"?: number, "range"?: text}`.
+
+| field | type | rule |
+|---|---|---|
+| `series` | array | 1 to **4**; each `{label, points}`, `label` 1 to 24 and unique |
+| `points` | array | 0 to **92** a series (a quarter of days), each `{"x": "YYYY-MM-DD", "y": number}`; `x` a real date, strictly increasing; `y` finite |
+| `goal` | number | optional, finite: a flat line, named by the view's `goal_label` |
+| `range` | text | optional, up to 40, said under the title ("18 to 24 Nov") |
+
+The `style` and `unit` are the manifest's, never the answer's, so the Store
+reviews what the chart means.
+
+**`form`**: its fields are in the manifest, so the Store reviews them and
+lamp-control checks values against them **before** the app sees them, as it
+does settings. A field: `key` `^[a-z0-9_]{1,32}$` and unique, `label` 1 to 40,
+optional `hint` up to 120, and its type:
+
+| type | fields | a value is |
+|---|---|---|
+| `text` | `max` 1 to 200 (required) | text of at most `max` |
+| `number` | `min` below `max`, finite; optional `unit` up to 16; optional `step` above 0 | a number from `min` to `max` |
+| `toggle` | none | true or false |
+| `choice` | `options`, 2 to 16 of `{value, label}` (the settings' rule) | one of the values |
+| `rows` | `columns`, 1 to 4 fields of `text`, `number` or `choice` (no `rows` in `rows`); `max_rows` 1 to 50 | an array of at most `max_rows` objects, each with every column's key |
+
+On open the op answers `{"values": {key: value, …}}` (keys it leaves out start
+empty, or at `min`, or off; any value checked as on submit). On the submit
+button lamp-control sends the op the checked values; the op answers
+`{"ok": true, "said"?: text up to 80}` or `{"refused": text 1 to 120}`, and the
+phone shows the words as written. A value that fails the manifest is refused by
+lamp-control with the key and why, as `apps.settings.set` is, and the app never
+sees it.
+
+### The flow
+
+The phone reaches the lamp one way, at home or away: lamp-cloud's kinds on the
+lamp's own account channel over the broker (cloud.md, "The device API"; there
+is no separate local path for apps). So a view opened at the gym takes the same
+path as one opened at the desk.
+
+1. **Phone → broker → lamp-cloud** (phone: App Only; carrying the kinds and the
+   grant check: **Backend**, with Backend3's check that the asker holds the lamp
+   and that the app and view are the installed ones). New kinds, only with
+   `LAMP_APP_VIEWS=on`: `apps.view` `{"id", "view"}` and `apps.view.submit`
+   `{"id", "view", "values"}`; `apps.list`'s rows carry `views` (from the
+   installed manifest) and `can` names both kinds only then. Who may ask: the
+   lamp's own account channel only (`online::commanded`), as every `apps.*`.
+2. **lamp-cloud → lamp-control** (lamp side: Eighth, or App Only): the admin
+   op `{"app_view": NAME, "view": ID}` or with `"values"`, lamp-cloud's cgroup
+   alone, beside `app_state`. lamp-control checks the app is installed and
+   running (a socket up), the view is in its manifest, and a submit's values.
+3. **lamp-control → the app** on its socket: the event
+   `{"ev": "app.view", "ask": "<id>", "view", "op", "values"?}` (`values` only
+   on a submit); the app answers with the op `app.answer`
+   `{"ask", "data"}`, or `{"ask", "refused": text}`. An `ask` not offered,
+   answered twice or late is refused `bad_request` and dropped. The SDK's side
+   (`lamp.on_view(op, handler)`, its fake lamp) is Migrate's.
+4. lamp-control checks the answer (kind, limits, 32 KiB) and returns it to
+   lamp-cloud, which sends `success` `{"id", "view", "kind", "data"}` or
+   `failure` with the plain words, adding no check of its own.
+
+A stopped app answers "*Title* isn't running." with Start; the lamp offline,
+the phone's usual "Lamp can't be reached".
+
+**Time (CLAUDE.md rule 7).** Tap to feedback: the view's skeleton (title and
+the kind's empty frame) at once, under 100 ms, with no wait on the lamp. Tap to
+data: under **1 s** at home, under **2 s** away, from the phone's send to its
+draw, measured on the row. The app has **2 s** to answer an `app.view`
+(lamp-control's bound; a fixed answer is expected in under 100 ms), lamp-cloud
+waits at most its `CONTROL_WAIT` (5 s), and the phone gives up at 8 s with the
+"didn't answer in time" line. At most 4 asks wait per app and 10 a second
+(`rate` with `retry_ms`), a submit at most one a second; a second open of a
+view while one waits joins it, not a second ask.
+
+**Fresh, not pushed.** The phone asks on open, on pull-to-refresh and after a
+submit (the form and every view of the same op); nothing is pushed in v1, and
+the phone keeps no copy once the page closes. The last answer asked wins on
+screen; an older one landing later is dropped.
+
+### Privacy and grants
+
+- A view's data is whatever the app's op returns: what the app already holds
+  within its grants and its own data folder. A view asks for no grant and adds
+  none; the owner's yes is the install's, unchanged.
+- An app removed takes its views with it: they leave `apps.list`, `app_forget`
+  drops any ask in flight, and the phone shows nothing kept.
+- No log carries a view's data or a form's values: lamp-control and lamp-cloud
+  say the app, the view, the outcome, the bytes and the milliseconds only, and
+  so does Backend's step.
+
+### The switch
+
+`LAMP_APP_VIEWS`, `on` exactly, off unless set, with `LAMP_STORE_APPS`; read
+by lamp-cloud (the kinds, `can`, `views` in `apps.list`) and lamp-control
+(`app_view`, `app.view`, `app.answer`), set alike in both. In no unit. Off: the
+kinds are "not on this lamp", `app.answer` is `off`, and an app with `views`
+still installs and runs, its views not shown. Its row in
+[switches.md](switches.md), added with the code, not before (that page is a
+census of the code), reads: "the views an installed app gives the phone (list,
+chart over time, form) … off until the views row passes".
+
+### Owners
+
+- The phone's views: App Only.
+- The lamp side (the `ops` and `views` fields, the op check, `app_view`, the
+  socket's `app.view` and `app.answer`): Eighth, or App Only.
+- The Store's schema check, with a test package for each refusal: Backend3.
+- The cloud step (carrying `apps.view` and `apps.view.submit` between the phone
+  and the lamp, with Backend3's grant check): Backend.
+- The SDK's docs, `views` template and `lamp app check`: Migrate, after #8198.
+
+### The row, and what is not in v1
+
+**The row** (lamp-0c89 and a test iPhone, both switches on, gym-coach with its
+views): each view opened at home and away (the phone on mobile data), first
+open and again, with the times; the plan saved and read back; a refused value
+and an app's own refusal shown as words; a fixture app's too-big, bad and late
+answers each shown as one plain line; the app stopped, then removed, its views
+gone; the switch off, no views; the journal and Backend's logs holding no view
+data.
+
+**Not in v1:** web views (#7415's proposal of 21 Nov, declined), images, push
+or live updates, charts other than over time (no pie, no scatter), and views
+on the lamp's own screen.
+
+### Worked example: gym-coach
+
+```json
+{
+  "ops": ["week", "sessions", "plan"],
+  "views": [
+    { "id": "this_week", "kind": "chart", "title": "This week", "op": "week",
+      "style": "bar", "unit": "min", "goal_label": "Daily goal" },
+    { "id": "sessions", "kind": "list", "title": "Sessions", "op": "sessions",
+      "empty": "No sessions yet. Say \"start my workout\"." },
+    { "id": "my_plan", "kind": "form", "title": "My plan", "op": "plan",
+      "submit": "Save plan",
+      "fields": [
+        { "key": "days", "type": "number", "label": "Days a week", "min": 1, "max": 7, "step": 1 },
+        { "key": "routine", "type": "rows", "label": "Routine", "max_rows": 20,
+          "columns": [
+            { "key": "exercise", "type": "text", "label": "Exercise", "max": 40 },
+            { "key": "sets", "type": "number", "label": "Sets", "min": 1, "max": 10, "step": 1 },
+            { "key": "reps", "type": "number", "label": "Reps", "min": 1, "max": 50, "step": 1 }
+          ] }
+      ] }
+  ]
+}
+```
+
+The phone opens "This week"; the app is sent
+`{"ev": "app.view", "ask": "a17", "view": "this_week", "op": "week"}` and answers:
+
+```json
+{ "op": "app.answer", "ask": "a17", "data": {
+  "range": "18 to 24 Nov",
+  "goal": 20,
+  "series": [{ "label": "Workout", "points": [
+    { "x": "2026-11-18", "y": 25 }, { "x": "2026-11-19", "y": 0 },
+    { "x": "2026-11-20", "y": 18 }, { "x": "2026-11-21", "y": 30 } ] }]
+} }
+```
+
+"Sessions" answers `{"sections": [{"title": "This week", "items": [{"title":
+"Legs", "subtitle": "Fri 21 Nov, 07:10", "value": "30 min", "badge": "PR"}]}]}`;
+"My plan" opens with `{"values": {"days": 3, "routine": [{"exercise": "Squat",
+"sets": 3, "reps": 10}]}}`, and a save answers `{"ok": true, "said": "Plan
+saved: 3 days a week."}`.
