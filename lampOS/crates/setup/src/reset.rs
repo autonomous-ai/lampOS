@@ -324,6 +324,11 @@ pub trait Effects {
     fn agent_manager(&mut self) -> Option<String> {
         agent_manager_unit(&fs::read_to_string(PASSWD).ok()?)
     }
+    /// Before the wipe, while the lamp's keys are still on it: with the
+    /// voice's `LAMP_HISTORY_FORGET=on`, the lamp's whole history deleted on
+    /// the account, bounded ([`crate::history_forget`]). By default
+    /// nothing.
+    fn forget_history(&mut self) {}
 }
 
 /// The product's skills folder (`lamp_update::product_skills::FOLDER`).
@@ -1291,6 +1296,18 @@ impl Effects for System {
     fn forget_agents(&mut self) -> io::Result<usize> {
         forget_agents(Path::new("/"))
     }
+    fn forget_history(&mut self) {
+        use crate::history_forget as history;
+        let argv = history::ENVIRONMENT_ARGV.map(str::to_owned);
+        let environment = self.read(&argv).unwrap_or_default();
+        let outcome = history::before_wipe(
+            &environment,
+            Path::new(history::SECOND_CONFIG),
+            history::WITHIN,
+            history::post,
+        );
+        eprintln!("lamp-setup: reset: {}", outcome.said());
+    }
 }
 
 /// `argv` run and killed with its children once `most` has passed
@@ -1994,6 +2011,10 @@ fn stop_agents(plan: &Plan, effects: &mut impl Effects) -> io::Result<Vec<String
 }
 
 fn finish(plan: &Plan, effects: &mut impl Effects, steps: &mut Vec<Step>) -> io::Result<()> {
+    // The account's history first, while the lamp's keys are on it (the
+    // first builder's ruling on #8125): bounded, and the wipe goes on
+    // whatever it came to.
+    effects.forget_history();
     for path in &plan.wipe {
         if path.file_name() == Some(WIFI_FILE.as_ref()) {
             for copy in WIFI_COPIES {

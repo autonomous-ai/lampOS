@@ -3702,6 +3702,43 @@ fn the_product_tells_each_exchange_once() {
     }
 }
 
+/// The account's conversation history (#7771): the save
+/// (`LAMP_HISTORY_SEND`) and the forget that deletes from it
+/// (`LAMP_HISTORY_FORGET`) are on together, never the save alone (the first
+/// builder's ruling on #7957), with the Days memory and the second route
+/// they need.
+#[test]
+fn the_product_saves_history_only_with_its_forget() {
+    let voice = install::PRODUCT
+        .iter()
+        .find(|(unit, _)| *unit == "lamp-voice.service")
+        .unwrap()
+        .1;
+    let service = section(voice, "Service");
+    for line in [
+        "Environment=LAMP_HISTORY_SEND=on",
+        "Environment=LAMP_HISTORY_FORGET=on",
+        "Environment=LAMP_MEMORY_DAYS=on",
+        "Environment=LAMP_VOICE_ROUTE=second",
+    ] {
+        assert_eq!(
+            service.iter().filter(|set| **set == line).count(),
+            1,
+            "the voice lacks {line}"
+        );
+    }
+    for name in ["LAMP_HISTORY_SEND", "LAMP_HISTORY_FORGET"] {
+        assert_eq!(
+            service
+                .iter()
+                .filter(|set| set.starts_with(&format!("Environment={name}=")))
+                .count(),
+            1,
+            "the voice sets {name} more than once"
+        );
+    }
+}
+
 /// The privacy slide is the lamp's sleep and wake in the product (#5182, the
 /// lead's yes on 6 Nov): with the restart guard's own switch beside it, so a
 /// slide closed after a fault lays the lamp down too.

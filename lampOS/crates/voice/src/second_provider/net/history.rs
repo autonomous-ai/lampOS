@@ -493,6 +493,117 @@ mod tests {
         task.abort();
     }
 
+    /// The Reviewer-lead's HOLD on #8125, end to end: the app removes a
+    /// person (lamp-cloud's `forget_person` on the memory's forget socket,
+    /// which never passes the voice). The real memory keeps their whole
+    /// history; its `memory/forgot` on the bus has the voice's worker read
+    /// it, onto the real queue, and the sender deletes that person's whole
+    /// history from the account.
+    #[tokio::test]
+    async fn a_person_removed_in_the_app_is_deleted_from_the_account() {
+        let server = fake(vec![Say::Answer(200, r#"{"deleted_count":2}"#)]).await;
+        let queue = queue("removed");
+        let dir = std::env::temp_dir().join(format!("lamp-history-removed-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        let store = lamp_memory::days::Days::open(
+            lamp_memory::store::Options {
+                dir: dir.join("memory"),
+                keep_days: 30,
+                local: lamp_memory::store::LocalTime::Offset(0),
+            },
+            1_760_356_800_000,
+        )
+        .unwrap();
+        let store = Arc::new(Mutex::new(store));
+        let ask = |store: &Mutex<lamp_memory::days::Days>, line: &Value| -> Value {
+            let answer = lamp_memory::days_protocol::answer(
+                &mut store.lock().unwrap(),
+                line.to_string().as_bytes(),
+                1_760_356_800_000,
+            );
+            serde_json::from_str(answer.line.trim()).unwrap()
+        };
+        for n in 1..=2 {
+            let kept = ask(
+                &store,
+                &json!({"op":"append","person":MINH,"at_unix_ms":1_760_356_800_000u64 + n,"heard":"h","said":"s"}),
+            );
+            assert_eq!(kept["ok"], true, "{kept}");
+        }
+        let asked = Arc::new(std::sync::atomic::AtomicUsize::new(0));
+        // One bell for the worker and the sender, as the product's
+        // `history_forget::queue()` gives both.
+        let bell = Arc::new(Notify::new());
+        let worker: &'static crate::history_forget::Worker = Box::leak(Box::new(
+            crate::history_forget::Worker::new(queue, bell.clone(), {
+                let (store, asked) = (store.clone(), asked.clone());
+                Arc::new(move |_: &std::path::Path, line: &Value| {
+                    asked.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+                    Some(ask(&store, line))
+                })
+            }),
+        ));
+        let root = dir.join("bus");
+        std::fs::create_dir_all(&root).unwrap();
+        let bus = lamp_bus::Bus::new(&root).unwrap();
+        let mut memory_bus = bus
+            .publisher_declared(
+                lamp_msgs::MemoryForgot::TOPIC,
+                &lamp_msgs::MemoryForgot::declaration(),
+                "memory",
+            )
+            .unwrap();
+        let stop: &'static std::sync::atomic::AtomicBool =
+            Box::leak(Box::new(std::sync::atomic::AtomicBool::new(false)));
+        let socket = std::path::Path::new("/nonexistent/memory.sock");
+        assert!(crate::history_forget::watch_removals_with(
+            worker, &root, socket, stop
+        ));
+        // Subscribed: its first read of what the memory kept is done.
+        let started = std::time::Instant::now();
+        while asked.load(std::sync::atomic::Ordering::SeqCst) == 0 {
+            assert!(started.elapsed() < Duration::from_secs(10));
+            tokio::time::sleep(Duration::from_millis(10)).await;
+        }
+        assert!(queue.pending().is_empty());
+        // The app's removal, as lamp-cloud sends it, then told on the bus.
+        let removed = ask(&store, &json!({"op":"forget_person","person":MINH}));
+        assert_eq!(removed["ok"], true, "{removed}");
+        memory_bus
+            .publish_json(
+                lamp_ipc::monotonic_us(),
+                &lamp_msgs::MemoryForgot {
+                    person: Some(MINH.into()),
+                },
+            )
+            .unwrap();
+        let task = tokio::spawn(task(delete_at(&server.url), "k".into(), queue, bell, FAST));
+        let started = std::time::Instant::now();
+        while server.seen.lock().unwrap().is_empty() {
+            assert!(
+                started.elapsed() < Duration::from_secs(10),
+                "{:?}",
+                queue.pending()
+            );
+            tokio::time::sleep(Duration::from_millis(10)).await;
+        }
+        assert!(until_empty(queue).await, "{:?}", queue.pending());
+        let seen: Vec<Value> = server
+            .seen
+            .lock()
+            .unwrap()
+            .iter()
+            .map(|seen| seen.2.clone())
+            .collect();
+        assert_eq!(seen, [json!({"all":true,"person":MINH})]);
+        // Queued, so the memory let it go.
+        let left = ask(&store, &json!({"op":"history_unsent","after":0}));
+        assert_eq!(left["all"], json!([]), "{left}");
+        stop.store(true, std::sync::atomic::Ordering::SeqCst);
+        task.abort();
+    }
+
     /// The first builder's privacy read on #8125, item 1: a forget while
     /// the server is down is kept, and reaches it after a restart.
     #[tokio::test]

@@ -1243,7 +1243,7 @@ most 2,000 a person, the one changed longest ago going first past it. An
 older memory answers `unknown_op`, so the voice sends them only with its
 switch on.
 
-## The account's history (the voice's `LAMP_HISTORY_SEND`, #7771, off)
+## The account's history (the voice's `LAMP_HISTORY_SEND`, #7771, on in the product)
 
 The product owner's decision of 18 Nov: a person's conversations with the lamp
 are kept on our server too. With `LAMP_HISTORY_SEND=on` (the second route only,
@@ -1316,7 +1316,14 @@ body `{"turns":[{"id","at","person","heard","said"}]}`.
   removals answered, what went was named on its way and nothing more is let
   go; when one timed out or was lost part way (the kept things' forgets or the
   exchanges forget), what went is not known, and it is taken as a forget
-  naming no ids, never as "nothing removed". A source forgotten
+  naming no ids, never as "nothing removed". A forget sent whole whose
+  answer the voice stopped waiting for (the memory still at it) or lost has
+  its delete queued once the memory is done, never only at the next start
+  (the first builder's call on #8125, item 2): with `LAMP_HISTORY_FORGET` on,
+  the forget worker reads what the memory kept of it (`history_forget::unanswered`,
+  as at a start), owed and read again every 5 s while the memory is busy, so
+  within about 5 s of the memory's late answer; while it is owed, no turn is
+  posted. With the switch off, its ids wait in the memory as above. A source forgotten
   outside the voice is taken as an unnamed forget of that person's.
 - **Nothing lost at a restart, and no words on disk:** only ids are kept, in
   `/var/lib/lampOS/voice/history-marks.json` (0600,
@@ -1355,12 +1362,19 @@ body `{"turns":[{"id","at","person","heard","said"}]}`.
   forget covering it came is deleted after its POST answers (the
   Reviewer-lead's must-fix on #8091). A reset or a forget of everyone
   deletes the lamp's whole history first (`{"all":true,"every_person":true}`;
+  a reset sends it from lamp-setup, its answer read before the lamp's keys
+  are wiped, within 10 s, a 401 taken as done, [setup.md](setup.md);
   one that missed the worker's hand-off is seen at the next read again by
   the memory's changed epoch),
-  and nothing is saved before it goes ([memory.md](memory.md)).
-- **Off in every unit:** by the first builder's rulings (#7935, and 17:09 on
-  #7957), the save goes on in the product only after the forget half
-  (`LAMP_HISTORY_FORGET`) is on, with its row. The setup sentence the issue
+  and nothing is saved before it goes ([memory.md](memory.md)). A person
+  removed in the app (`forget_person`, from lamp-cloud) has their whole
+  history deleted on the account too (`{"all":true,"person":<p- id>}`): the
+  memory keeps it in the removal's own transaction and the voice reads it on
+  `memory/forgot` or at its next start (the Reviewer-lead's HOLD on #8125).
+- **On in the product unit, with the forget half:** by the first builder's
+  rulings (#7935, and 17:09 on #7957), the save goes on only together with the
+  forget half (`LAMP_HISTORY_FORGET`), never alone; the unit sets both, and its
+  install test pins the pair. The setup sentence the issue
   first asked for was dropped by the product owner (18 Nov): the notice is in
   the privacy policy.
 
@@ -2053,14 +2067,26 @@ any other id is refused `bad_person`); an older memory answers
 were not settled: the memory lost or refusing the listing, too much to look
 through, or more than eight matching (the model asks which one). Some removed, the answer says how many
 (`exchanges`, never their words) and the conversation stops being
-journalled, as after a forgotten kept thing. Sent and not answered (a
-timeout or a lost answer; a refusal removed none), what was said about it
-is not known gone: the model is told `history: "not_reached"` beside the kept things'
-own result, never "forgot nothing". With nothing kept gone, the note says
-none of what is kept went and that it couldn't finish forgetting, and not
-to say nothing was there or that it is forgotten; with some gone, a
-`history_note` says so beside what went. One more local request inside
-the call's 1.5 s.
+journalled, as after a forgotten kept thing. With no answer (a refusal
+removed none), what was said about it is not known gone, never "forgot
+nothing", and the model is told one of two things beside the kept things'
+own result (the first builder's call on #8125, item 3):
+- **Sent whole, no answer in time:** the memory goes on with it after the
+  voice stops waiting (lamp-06c1, 20 Nov: a forget of about 100 turns
+  answered about 15 s after the call's 1.5 s), so `history:
+  "still_forgetting"`. With nothing kept gone, the note says to tell them
+  "I'm still forgetting that. It'll be gone in a moment.", never that it
+  couldn't, nor that nothing was there or that it is already forgotten; with
+  some gone, a `history_note` says what went and that the rest is still
+  going. Its delete on the account follows once the memory is done (below).
+- **The memory not reached at all** (not connected, the request not sent
+  whole, no time left, or closed with no answer): `history: "not_reached"`.
+  With nothing kept gone, the note says to tell them "I couldn't finish
+  forgetting that just now.", and not to say nothing was there or that it
+  is forgotten; with some gone, a `history_note` says what went and that it
+  couldn't finish.
+
+One more local request inside the call's 1.5 s.
 
 **Forget marks** (El's option 2 on #5333). Before the above, a topic
 forget matched kept things and observations only, so an exchange said

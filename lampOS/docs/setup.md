@@ -151,6 +151,22 @@ software, its releases, the update key, the touch calibration and other
 per-lamp facts (the servos' daily load and temperature peaks in
 `/var/lib/lampos-body/peaks`, #4501, among them), and physical privacy.
 
+**The account's history goes first** (#7771; the first builder's ruling on
+#8125): with `LAMP_HISTORY_FORGET=on` in `lamp-voice.service`'s environment
+(read with `systemctl show -p Environment --value`), every reset (the
+button's and setup's `reset-now`, and the resume after a power cut) posts
+the delete of the lamp's whole history, `{"all":true,"every_person":true}`,
+to the lamp's own cloud API with the relay key that `second.json` names, and
+reads its answer, before the first path is wiped
+(`reset::Effects::forget_history`, `history_forget::before_wipe`). At most
+10 s in all (`history_forget::WITHIN`), a failed try tried again after 1 s
+(`AGAIN`): a 2xx is done, a 401 means the key is already gone from the
+account and is never tried again, and anything else, a dead network
+included, is journalled and the reset goes on. The voice's own delete at its
+next start (the changed memory epoch) stays as the fallback, but with the
+new setup's key it can't reach the old account; the journal says so. Off,
+nothing is read or sent.
+
 Onboarding uses `/var/lib/lampOS/voice/onboarding/progress.json`; the privacy
 checkpoint and transient handoff files share its root-owned 0700 directory.
 The room sounds yes (#1722 item 1) is `/var/lib/lampOS/consent/room-sounds.json`,

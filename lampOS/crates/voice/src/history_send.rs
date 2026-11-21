@@ -1,13 +1,13 @@
 //! Each conversation turn the memory keeps, saved to the account's history
-//! store too (#7771, `LAMP_HISTORY_SEND=on`, off): the product owner's
+//! store too (#7771, `LAMP_HISTORY_SEND=on`): the product owner's
 //! decision of 18 Nov that a person's conversations are kept on the server,
 //! and Backend3's live store of 19 Nov, `POST /api/v1/ai/history/turns` with
 //! the lamp's own key (`x-api-key`). Sent only to the lamp's own cloud API,
 //! the relay host the second route's `llm_base_url` names ([`url`]); with a
 //! direct provider's base nothing is sent. The second route only: a Live
-//! route turn is never saved. Off in every unit: by the first builder's
-//! rulings (#7935, and 17:09 on #7957) the save goes on in the product only
-//! after the forget half (`LAMP_HISTORY_FORGET`) is on, with its row.
+//! route turn is never saved. On in the product unit only together with
+//! the forget half (`LAMP_HISTORY_FORGET`), never alone: the first
+//! builder's rulings (#7935, and 17:09 on #7957).
 //!
 //! **What is sent:** only an exchange the Days memory wrote (`append_linked`
 //! answered with its id), in a known person's scope (`p-…`) or the room's,
