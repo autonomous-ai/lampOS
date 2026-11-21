@@ -1124,6 +1124,45 @@ Nov the gates' timer asks said `calls=none`): its own name set off by a stop
 the lamp, its name heard as another word ("Hey, Lynn, remind me …"). A line
 said to a person ("Hey, Anna, remind me …") is read as said.
 
+### A length or time not heard is asked (`LAMP_TIMER_ASKS_HOW_LONG`)
+
+In gate 1126 (lamp-52e6, 21 Nov, #8182) the core timer line asked for one
+minute; speech to text kept its words but lost the number and the unit, the
+model set a ten-minute timer on its own, and the lamp said when it would
+ring. With `LAMP_TIMER_ASKS_HOW_LONG=on` (`lamp_actions::schedule::ASKS_HOW_LONG_SWITCH`,
+off unless set; it must be set in lamp-actions' unit and lamp-voice's):
+
+- **The descriptions say so.** `set_timer` says that when the person's words
+  give no length it sets nothing and asks only "For how long?", then sets it
+  from the answer; `set_reminder` the same with "What time?"
+  (`schedule::asking_how_long`). Off, the catalog is as it was, byte for byte.
+- **The second route refuses the call.** A `set_timer` or `set_reminder`
+  whose request's own heard line (`thread::heard_in_own_line`) has no digit
+  and no word of `reminders::WHEN_WORDS` (the numbers one to twenty and the
+  tens, "hundred", "half", "quarter", the units second, minute and hour with
+  their short forms, "noon", "midnight", "o'clock") is never sent
+  to the schedule (`reminders::when_not_heard`): the model is told `Nothing
+  was set: the person's words gave no length or time for it, … Ask only this,
+  in a few words: "For how long?"` (or `"What time?"`), and the journal says
+  `request N: set_timer refused, its line gave no length or time`. The rule
+  only checks that a length was said; it chooses no tool and reads no length.
+  The person's answer ("One minute.", "Ten.") is a line of its own that gives
+  one, so its call is set as the model makes it. A second call in the same
+  request is refused the same way, so the model's rounds end in the ask; each
+  new line is judged by its own words. A typed text, a line whose words are
+  not known, and an owner's language other than English check nothing.
+  Because the refusal is an error, `LAMP_SECOND_SAY_WITH_CALL`'s at-once line
+  never says "Timer set." for it (`second_provider::timer_line` needs a
+  committed answer). `LAMP_SCHEDULE_ASKED` forces a call only on a line with
+  its time, which passes.
+
+Test: `a_timer_whose_length_was_not_heard_asks_and_sets_nothing`
+(lamp-voice `tools.rs`: no length asks and sets nothing, "one minute" sets
+60 s, "ten minutes" 600 s) and
+`set_timer_and_set_reminder_say_to_ask_only_with_the_switch` (lamp-actions).
+Lamp check owed: 10 timer lines with the length cut from the clip all ask,
+and 10 whole ones set what was said, from the journal.
+
 ## First's Voice integration contract
 
 Exactly one logical consumer must own delivery. There is no claim/lease API to

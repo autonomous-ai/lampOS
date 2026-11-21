@@ -119,10 +119,61 @@ pub(crate) fn set_asks_here(on: Option<bool>) {
     ASKS_HERE.with(|here| here.set(on));
 }
 
+/// Whether [`lamp_actions::schedule::ASKS_HOW_LONG_SWITCH`] is on here.
+fn asks_how_long() -> bool {
+    #[cfg(test)]
+    if let Some(on) = ASKS_HERE.with(std::cell::Cell::get) {
+        return on;
+    }
+    lamp_actions::schedule::asks_how_long_from_environment()
+}
+
+/// The words that state a length or a clock time when no digit does:
+/// numbers, units and a clock's names. Not a list for choosing a tool: it
+/// only says whether the line gave any length at all ("a minute", "ten
+/// minutes", "at nine", "at noon"); "o'clock" is read as "clock". "am"
+/// and "pm" are left out: "I am" is no time, and "4 pm" has its digit.
+const WHEN_WORDS: [&str; 44] = [
+    "one", "two", "three", "four", "five", "six", "seven", "eight", "nine", "ten", "eleven",
+    "twelve", "thirteen", "fourteen", "fifteen", "sixteen", "seventeen", "eighteen", "nineteen",
+    "twenty", "thirty", "forty", "fifty", "sixty", "ninety", "hundred", "half", "quarter",
+    "second", "seconds", "sec", "secs", "minute", "minutes", "min", "mins", "hour", "hours",
+    "hr", "hrs", "noon", "midnight", "clock", "oclock",
+];
+
+/// Whether `heard` gives a length or a time: a digit, or a word of
+/// [`WHEN_WORDS`].
+fn gives_when(heard: &str) -> bool {
+    heard.chars().any(|c| c.is_ascii_digit())
+        || heard
+            .split(|c: char| !c.is_alphabetic())
+            .any(|word| WHEN_WORDS.contains(&word.to_lowercase().as_str()))
+}
+
 /// The refusal for a `set_timer` or `set_reminder` whose `request`'s own
-/// heard line gives no length or time (#8182).
-pub(crate) fn when_not_heard(_name: &str, _request: u64, _heard: bool) -> Option<serde_json::Value> {
-    None
+/// heard line gives no length or time (#8182, gate 1126: speech to text
+/// kept "set a timer" and lost "one minute", and the model set ten): the
+/// model is told to ask once, in a few words, and the answer's line, which
+/// gives one, sets it. With [`lamp_actions::schedule::ASKS_HOW_LONG_SWITCH`]
+/// on, in English only (the words are English), and only for a line a
+/// person said: a typed text, or a line not known, checks nothing.
+pub(crate) fn when_not_heard(name: &str, request: u64, heard: bool) -> Option<serde_json::Value> {
+    let ask = match name {
+        "set_timer" => "For how long?",
+        "set_reminder" => "What time?",
+        _ => return None,
+    };
+    if !asks_how_long() || crate::messages::is_text(request) || crate::language::from_environment().is_some() {
+        return None;
+    }
+    let words = crate::stop_scope::heard_words(request, heard)?;
+    if gives_when(&words) {
+        return None;
+    }
+    eprintln!("lamp-voice: request {request}: {name} refused, its line gave no length or time; the model is told to ask");
+    Some(serde_json::json!({
+        "error": format!("Nothing was set: the person's words gave no length or time for it, so it may have been lost in hearing. Never choose one. Ask only this, in a few words: \"{ask}\", and set it from their answer.")
+    }))
 }
 
 /// Whether a call was told [`cannot_ring`]'s refusal: nothing was set.
