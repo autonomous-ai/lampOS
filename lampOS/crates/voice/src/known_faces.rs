@@ -4254,6 +4254,14 @@ static FACE_NAMES: std::sync::Mutex<Vec<String>> = std::sync::Mutex::new(Vec::ne
 /// [`FACE_NAMES`]: about a minute.
 const FACE_NAMES_EVERY: u32 = 6;
 
+/// Sets [`FACE_NAMES`] as a read of the eyes would, for tests.
+#[cfg(test)]
+pub(crate) fn keep_names_for_test(names: Vec<String>) {
+    *FACE_NAMES
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner()) = names;
+}
+
 /// The names in [`FACE_NAMES`]: those the eyes knew at the last read. Never
 /// waits.
 pub fn names_kept() -> Vec<String> {

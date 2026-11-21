@@ -932,6 +932,17 @@ pub(crate) fn called_by_another_name(heard: &str) -> bool {
 /// the lamp, as any other person's name does. In a home with no face of
 /// that name the stand-in calls the lamp, as before.
 pub(crate) fn called_by_another_name_among(heard: &str, known: &[String]) -> bool {
+    // "Thank you, Dan.": "Thank" is no word set off, so "Thank you" is passed
+    // over first (Twelve's P3 on #8198 and #8207).
+    let trimmed = heard.trim_start();
+    if trimmed.len() > "thank you".len()
+        && trimmed.is_char_boundary("thank you".len())
+        && trimmed[.."thank you".len()].eq_ignore_ascii_case("thank you")
+    {
+        let rest = trimmed["thank you".len()..].trim_start_matches([',', ' ']);
+        return rest.len() < trimmed.len() - "thank you".len()
+            && called_by_another_name_among(rest, known);
+    }
     let Some((start, end)) = crate::second_provider::first_word_set_off(heard) else {
         return false;
     };
@@ -942,17 +953,13 @@ pub(crate) fn called_by_another_name_among(heard: &str, known: &[String]) -> boo
         let rest = heard[end..].trim_start_matches([',', ' ']);
         return rest.len() < heard.len() - end && called_by_another_name_among(rest, known);
     }
-    if opener == "thank" {
-        let rest = heard[end..].trim_start();
-        if let Some(rest) = rest.strip_prefix("you") {
-            return called_by_another_name_among(rest.trim_start_matches([',', ' ']), known);
-        }
-    }
     let word = &heard[start..end];
     let lower = word.to_lowercase();
     // A stand-in that is the name of a face the lamp knows is that person's.
     if word.chars().all(char::is_alphabetic)
-        && (STAND_INS.contains(&lower.as_str()) || STAND_ALONE_INS.contains(&lower.as_str()))
+        && (STAND_INS.contains(&lower.as_str())
+            || STAND_ALONE_INS.contains(&lower.as_str())
+            || STAND_INS_WITH_A_SIGN.contains(&lower.as_str()))
         && known.iter().any(|name| name.trim().to_lowercase() == lower)
     {
         return true;
@@ -7907,6 +7914,24 @@ mod tests {
         ] {
             assert!(!called_by_another_name_among(line, &known), "{line}");
         }
+    }
+
+    /// #8114 (Twelve's P3 on #8207): the rule reads the faces' names the
+    /// eyes gave (`known_faces::names_kept`) through the call the weighing
+    /// makes; "Lin" is a stand-in no other test names a face.
+    #[test]
+    fn a_known_face_named_as_a_stand_in_is_read_through_the_weighing() {
+        crate::known_faces::keep_names_for_test(vec!["Lin".to_owned()]);
+        let mut attention = Attention::default();
+        attention.ask_a_second_sign_of_the_name(true);
+        attention.tie_the_second_sign(true);
+        attention.hold_anothers_name(true);
+        attention.began_at(5, 1, 10_000_000);
+        attention.name_heard_scored(10_200_000, 1.0);
+        attention.heard("Lin, are you done?");
+        assert!(attention.weigh_the_name(None, false));
+        assert!(attention.name_dropped_as_anothers());
+        assert!(called_by_another_name("Thank you, Lin."), "Thank you, …");
     }
 
     /// #8114: with `LAMP_NAME_NOT_ANOTHERS=on`, a hearing of the name in the
