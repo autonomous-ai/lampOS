@@ -328,6 +328,77 @@ pub fn on(value: Option<&str>) -> bool {
     value == Some("on")
 }
 
+/// The hand-over line's ask for a getting-ready notice (#7354): with it
+/// `true`, a run whose agent's start-up wait passes [`GETTING_READY_AFTER`]
+/// gets one [`GETTING_READY_EVENT`] line on its connection before the
+/// answer. Taken off the line before it is read as a [`HandOver`].
+pub const TELL_GETTING_READY: &str = "tell_getting_ready";
+
+/// The one interim line a run's connection may carry before its answer.
+pub const GETTING_READY_EVENT: &str = "getting_ready";
+
+/// How long an agent's start-up wait goes before the person who asked is
+/// told the lamp is getting ready (#7354, the first builder's "about 5 s").
+pub const GETTING_READY_AFTER: Duration = Duration::from_secs(5);
+
+/// A connection's getting-ready notice, given once ([`tell_getting_ready`]).
+pub type Notice = Box<dyn FnOnce()>;
+
+thread_local! {
+    /// This connection's getting-ready notice, while its run is answered on
+    /// this thread ([`with_getting_ready`]); taken at its first use.
+    static GETTING_READY: std::cell::RefCell<Option<Notice>> =
+        const { std::cell::RefCell::new(None) };
+}
+
+/// `body` with `notice` as this thread's getting-ready notice, taken away
+/// after it however it ends.
+pub fn with_getting_ready<T>(notice: Option<Notice>, body: impl FnOnce() -> T) -> T {
+    struct Clear;
+    impl Drop for Clear {
+        fn drop(&mut self) {
+            GETTING_READY.with(|notice| notice.borrow_mut().take());
+        }
+    }
+    GETTING_READY.with(|slot| *slot.borrow_mut() = notice);
+    let _clear = Clear;
+    body()
+}
+
+/// The getting-ready notice given, at most once a connection: none when
+/// the hand-over didn't ask for it.
+pub fn tell_getting_ready() {
+    if let Some(notice) = GETTING_READY.with(|notice| notice.borrow_mut().take()) {
+        notice();
+    }
+}
+
+/// `cancelled` for an agent's start-up wait that began at `began`, which
+/// also gives the getting-ready notice once that wait passes
+/// [`GETTING_READY_AFTER`] (#7354). Any engine's start-up wait takes it;
+/// today only OpenClaw's Gateway has one (a Hermes run is one
+/// `hermes chat -q`, with none).
+pub fn startup_wait<'a>(
+    began: std::time::Instant,
+    cancelled: &'a dyn Fn() -> bool,
+) -> impl Fn() -> bool + 'a {
+    startup_wait_after(began, GETTING_READY_AFTER, cancelled)
+}
+
+/// [`startup_wait`], the notice given once the wait passes `after`.
+fn startup_wait_after<'a>(
+    began: std::time::Instant,
+    after: Duration,
+    cancelled: &'a dyn Fn() -> bool,
+) -> impl Fn() -> bool + 'a {
+    move || {
+        if began.elapsed() >= after {
+            tell_getting_ready();
+        }
+        cancelled()
+    }
+}
+
 /// One `do.task` handed over by lamp-skills, as its line says it.
 #[derive(Clone, Debug, Deserialize, PartialEq, Eq)]
 #[serde(deny_unknown_fields)]
@@ -3803,9 +3874,10 @@ impl Runner for HarnessRunner {
                     .is_some_and(|stop| stop.load(Ordering::Acquire))
         };
         let until = began + run.deadline;
+        let waiting = startup_wait(std::time::Instant::now(), &stopped);
         if engine == EngineKind::Openclaw
             && let Some(gateway) = gateway.as_mut()
-            && let Err(why) = gateway.before_launch_until(until, &stopped)
+            && let Err(why) = gateway.before_launch_until(until, &waiting)
         {
             eprintln!("tasks: {why}; the hand-over is not sent");
             return Err(format!(
@@ -4667,6 +4739,7 @@ impl HandOvers {
             return;
         }
         let place = Place(running);
+        let (line, notice) = getting_ready_asked(line, stream);
         let agent = Agent {
             net: self.net.as_deref().map(|net| net as &dyn Runner),
             held: self.held.as_deref().map(|held| held as &dyn Runner),
@@ -4677,14 +4750,16 @@ impl HandOvers {
                 .as_deref()
                 .map(|keys| keys as &dyn crate::skill_keys::Keys),
         };
-        let answered = answer_agent(
-            &line,
-            true,
-            &self.skills,
-            &*self.tokens,
-            &*self.runner,
-            &agent,
-        );
+        let answered = with_getting_ready(notice, || {
+            answer_agent(
+                &line,
+                true,
+                &self.skills,
+                &*self.tokens,
+                &*self.runner,
+                &agent,
+            )
+        });
         drop(place);
         // The outcome's code only: never the line, the task's words or the
         // token.
@@ -4738,6 +4813,30 @@ pub(crate) fn read_line_within(stream: &UnixStream, most: usize) -> Result<Vec<u
     } else {
         Err(refusal("bad_request", "not one whole line"))
     }
+}
+
+/// The hand-over `line` with [`TELL_GETTING_READY`] taken off, and, when it
+/// was `true`, the notice that writes one [`GETTING_READY_EVENT`] line on
+/// `stream` (#7354). A line that isn't a JSON object, or doesn't ask, is
+/// left as it is, with no notice.
+fn getting_ready_asked(line: Vec<u8>, stream: &UnixStream) -> (Vec<u8>, Option<Notice>) {
+    let Ok(Value::Object(mut fields)) = serde_json::from_slice::<Value>(&line) else {
+        return (line, None);
+    };
+    let Some(asked) = fields.remove(TELL_GETTING_READY) else {
+        return (line, None);
+    };
+    let line = Value::Object(fields).to_string().into_bytes();
+    let notice = (asked == Value::Bool(true))
+        .then(|| stream.try_clone().ok())
+        .flatten()
+        .map(|stream| {
+            Box::new(move || {
+                write_answer(&stream, &json!({"event": GETTING_READY_EVENT}));
+                eprintln!("[lamp-tasks] skill task: the agent's start-up wait passed 5 s: told getting ready");
+            }) as Notice
+        });
+    (line, notice)
 }
 
 /// `answer` and a newline; a caller already gone is only said.
@@ -4940,6 +5039,58 @@ pub fn swept_without_harness(project: &Path, runs: &Path, end: &dyn Fn(&str)) ->
 
 #[cfg(test)]
 mod tests {
+    /// #7354: a hand-over asking for the getting-ready notice has the ask
+    /// taken off its line, and its run's start-up wait past the bound writes
+    /// one `{"event":"getting_ready"}` line on its connection, however often
+    /// the wait looks after; a wait that ends sooner, or a line that didn't
+    /// ask, writes nothing.
+    #[test]
+    fn a_slow_startup_wait_tells_its_asker_once_and_a_fast_one_never() {
+        use std::io::Read;
+        let ask = |asked: Option<bool>| {
+            let mut line = json!({"op": "skill_task", "skill": "melon"});
+            if let Some(asked) = asked {
+                line[TELL_GETTING_READY] = json!(asked);
+            }
+            line.to_string().into_bytes()
+        };
+        let never = || false;
+        for (asked, slow, told) in [
+            (Some(true), true, true),
+            (Some(true), false, false),
+            (Some(false), true, false),
+            (None, true, false),
+        ] {
+            let (ours, theirs) = UnixStream::pair().unwrap();
+            let (line, notice) = getting_ready_asked(ask(asked), &ours);
+            let line: Value = serde_json::from_slice(&line).unwrap();
+            assert!(line.get(TELL_GETTING_READY).is_none(), "{line}");
+            assert_eq!(line["skill"], "melon");
+            let after = if slow {
+                Duration::ZERO
+            } else {
+                Duration::from_secs(60)
+            };
+            with_getting_ready(notice, || {
+                let waiting = startup_wait_after(std::time::Instant::now(), after, &never);
+                for _ in 0..5 {
+                    assert!(!waiting());
+                }
+            });
+            // Out of its connection, the notice is gone.
+            tell_getting_ready();
+            drop(ours);
+            let mut said = String::new();
+            (&theirs).read_to_string(&mut said).unwrap();
+            let want = if told {
+                "{\"event\":\"getting_ready\"}\n"
+            } else {
+                ""
+            };
+            assert_eq!(said, want, "asked {asked:?}, slow {slow}");
+        }
+    }
+
     use super::*;
     use std::cell::RefCell;
 
