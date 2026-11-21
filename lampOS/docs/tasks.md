@@ -5867,9 +5867,14 @@ waiting after "I'll look into that":
   the latest `why`). Lasting states keep their own lines, never "in a
   moment": `not_installed` says the lamp's not-set-up line, and `error`
   with why `signed_out` says "I've been signed out. Please set me up again
-  in the app."; neither counts for "ready again". `starting` (with why
-  `tasks_restarting` too), `installing`, `recovering` and any other
-  `error` get the problem line. Nothing is prepared, so no read-back and no "I'll
+  in the app."; neither counts for "ready again". A wait of minutes or
+  more is never told "in a moment" either: `installing` (minutes to an
+  hour) says "I'm being updated right now; ask me again later."
+  (`UPDATING_LINE`), and any other `error` (the Gateway down 6 min or
+  more, opens failed past their tries, a lasting hold) "I'm having a
+  problem right now; ask me again later." (`LATER_LINE`); both count for
+  "ready again". `starting` (with why `tasks_restarting` too) and
+  `recovering` get the problem line. Nothing is prepared, so no read-back and no "I'll
   look into that" comes first; the model says the line in the person's
   language. Work for a computer is never held to the lamp's readiness.
 - **A handed-over task that fails is told as not done.** `not_sent` with

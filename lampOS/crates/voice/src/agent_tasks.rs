@@ -16354,7 +16354,13 @@ pub(crate) mod tests {
         let refused_before = crate::agent_ready::REFUSED_HERE.with(std::cell::Cell::get);
         let refused_at_once = |told: &Value| {
             let error = told["error"].as_str().unwrap_or_default();
-            assert!(error.contains(crate::agent_ready::PROBLEM_LINE), "{told}");
+            // `error` is a wait of minutes or more: "later", never "in a
+            // moment" (#8138, C4).
+            assert!(
+                error.contains(crate::agent_ready::PROBLEM_LINE)
+                    || error.contains(crate::agent_ready::LATER_LINE),
+                "{told}"
+            );
             assert!(!told.to_string().contains("look into"), "{told}");
             assert!(told.get("prepared").is_none(), "{told}");
         };
@@ -16366,6 +16372,11 @@ pub(crate) mod tests {
         ] {
             let (told, took) = run_with(Some(state), json!({"task":"Write a poem"}), 3);
             refused_at_once(&told);
+            assert_eq!(
+                told.to_string().contains(crate::agent_ready::LATER_LINE),
+                state == lamp_msgs::Readiness::Error,
+                "{told}"
+            );
             assert!(took < Duration::from_millis(200), "{took:?}");
             assert!(PENDING.lock().unwrap().is_none());
         }

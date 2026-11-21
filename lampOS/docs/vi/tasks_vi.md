@@ -3111,8 +3111,13 @@ bao giờ phải chờ sau câu "I'll look into that":
   bao giờ "in a moment": `not_installed` nói câu "chưa được thiết lập" sẵn
   có của đèn, và `error` với why `signed_out` nói "I've been signed out.
   Please set me up again in the app."; cả hai không tính cho "ready
-  again". `starting` (cả với why `tasks_restarting`), `installing`,
-  `recovering` và mọi `error` khác nhận câu báo lỗi. Không có gì được chuẩn
+  again". Một lần chờ từ vài phút trở lên cũng không bao giờ được nói "in a
+  moment": `installing` (vài phút tới một giờ) nói "I'm being updated right
+  now; ask me again later." (`UPDATING_LINE`), và mọi `error` khác
+  (Gateway sập từ 6 phút trở lên, các lần mở lỗi quá số lần thử, một lần
+  giữ lâu dài) nói "I'm having a problem right now; ask me again later."
+  (`LATER_LINE`); cả hai tính cho "ready again". `starting` (cả với why
+  `tasks_restarting`) và `recovering` nhận câu báo lỗi. Không có gì được chuẩn
   bị, nên không có câu đọc
   lại hay "I'll look into that" nào đi trước; model nói câu đó bằng ngôn
   ngữ của người dùng. Việc cho máy tính không bao giờ bị giữ theo trạng

@@ -29,6 +29,15 @@ use std::{
 /// their task: no engine, no technical words, nothing promised later.
 pub const PROBLEM_LINE: &str = "I'm having a problem right now; ask me again in a moment.";
 
+/// [`PROBLEM_LINE`] for a wait of minutes or more (`error` other than
+/// signed out: the Gateway down 6 min or more, opens failed past their
+/// tries, a hold only the person can clear): never "in a moment".
+pub const LATER_LINE: &str = "I'm having a problem right now; ask me again later.";
+
+/// What the person hears while the lamp's own agent is being installed or
+/// updated (`installing`: minutes to an hour).
+pub const UPDATING_LINE: &str = "I'm being updated right now; ask me again later.";
+
 /// What the person hears when a task already handed to the lamp's own
 /// agent ended on a fault (`one_session_stuck`, `one_session_not_started`,
 /// `agent_broken`): told as not done, and never done later.
@@ -167,8 +176,10 @@ pub const SIGNED_OUT_WHY: &str = "signed_out";
 /// What the model is told when a task for the lamp's own agent is refused
 /// in `state` with `why` (#8138): not installed, the not-set-up line;
 /// signed out, the lamp's signed-out line ([`crate::language::SIGNED_OUT`]);
-/// any other ([`Readiness::Starting`] with `tasks_restarting` among them),
-/// [`refusal`]'s problem line, noted for the ready-again line.
+/// `installing`, [`UPDATING_LINE`]; any other `error`, [`LATER_LINE`]; any
+/// other ([`Readiness::Starting`] with `tasks_restarting` among them),
+/// [`refusal`]'s problem line. All but the first two are noted for the
+/// ready-again line.
 pub fn refused(state: Readiness, why: Option<&str>) -> Value {
     // Lasting states keep their existing lines, never "in a moment".
     if state == Readiness::NotInstalled {
@@ -181,7 +192,11 @@ pub fn refused(state: Readiness, why: Option<&str>) -> Value {
         )});
     }
     note_refused();
-    refusal()
+    match state {
+        Readiness::Installing => refusal_with(UPDATING_LINE),
+        Readiness::Error => refusal_with(LATER_LINE),
+        _ => refusal(),
+    }
 }
 
 /// [`refused`] for lamp-tasks' `agent_not_ready` `answer`: its `readiness`
@@ -208,8 +223,13 @@ pub fn refused_by(answer: &Value) -> Value {
 /// because it is not ready: [`PROBLEM_LINE`] at once, nothing handed over
 /// and nothing done later.
 pub fn refusal() -> Value {
+    refusal_with(PROBLEM_LINE)
+}
+
+/// [`refusal`] with `line` in place of [`PROBLEM_LINE`].
+fn refusal_with(line: &str) -> Value {
     json!({"error": format!(
-        "Nothing was handed over: you can't take work right now, and it will not be done later. Tell them at once in these words, and nothing more: \"{PROBLEM_LINE}\""
+        "Nothing was handed over: you can't take work right now, and it will not be done later. Tell them at once in these words, and nothing more: \"{line}\""
     )})
 }
 
@@ -268,11 +288,15 @@ pub fn status_entry() -> Option<Value> {
         Readiness::Off | Readiness::NotInstalled => {
             "Your own helper is not set up on this lamp; say so plainly if asked."
         }
-        Readiness::Installing | Readiness::Starting => {
-            "You are still getting ready to take work; say so plainly if asked."
+        Readiness::Installing => {
+            "You are being updated and can't take work now; if asked, say so plainly and to ask again later."
         }
-        Readiness::Recovering | Readiness::Error => {
+        Readiness::Starting => "You are still getting ready to take work; say so plainly if asked.",
+        Readiness::Recovering => {
             "You can't take work right now; if asked, say you're having a problem right now and to ask again in a moment, with no technical words."
+        }
+        Readiness::Error => {
+            "You can't take work right now; if asked, say you're having a problem right now and to ask again later, with no technical words."
         }
     };
     Some(json!({"state": state, "next": next}))
@@ -431,9 +455,7 @@ mod tests {
         for (state, why) in [
             (Readiness::Starting, Some("tasks_restarting")),
             (Readiness::Starting, None),
-            (Readiness::Recovering, Some("deaf")),
-            (Readiness::Error, Some("launch_failed")),
-            (Readiness::Installing, None),
+            (Readiness::Recovering, Some("stuck")),
         ] {
             let (told, noted) = said(state, why);
             assert!(
@@ -462,10 +484,61 @@ mod tests {
         assert!(by(json!({"ok":false,"error":"agent_not_ready"})).contains(PROBLEM_LINE));
     }
 
+    /// #8138 review (C4): a wait of minutes or more is never told "in a
+    /// moment": `installing` (an install takes minutes to an hour) gets the
+    /// updating line, and `error` (the Gateway down 6 min or more, opens
+    /// failed past their tries, a hold only the person can clear) the
+    /// problem line with "later"; `starting` and `recovering` keep "in a
+    /// moment". All are noted for the ready-again line.
+    #[test]
+    fn a_long_wait_is_never_told_in_a_moment() {
+        let said = |state: Readiness, why: Option<&str>| {
+            let before = REFUSED_HERE.with(std::cell::Cell::get);
+            let told = refused(state, why)["error"].as_str().unwrap().to_owned();
+            assert!(
+                REFUSED_HERE.with(std::cell::Cell::get) > before,
+                "{state:?}"
+            );
+            told
+        };
+        assert!(said(Readiness::Installing, Some("installing")).contains(UPDATING_LINE));
+        for why in [
+            "gateway_down",
+            "open_failed",
+            "stuck_again",
+            "held_approval",
+        ] {
+            assert!(
+                said(Readiness::Error, Some(why)).contains(LATER_LINE),
+                "{why}"
+            );
+        }
+        for (state, why) in [
+            (Readiness::Installing, Some("installing")),
+            (Readiness::Error, Some("gateway_down")),
+        ] {
+            assert!(!said(state, why).contains("in a moment"), "{state:?}");
+        }
+        assert!(said(Readiness::Recovering, Some("held")).contains(PROBLEM_LINE));
+        assert!(said(Readiness::Starting, None).contains(PROBLEM_LINE));
+        for state in [Readiness::Installing, Readiness::Error] {
+            LATEST_HERE.with(|here| *here.borrow_mut() = Some(read(state)));
+            let next = status_entry().unwrap()["next"].as_str().unwrap().to_owned();
+            assert!(!next.contains("in a moment"), "{state:?}: {next}");
+        }
+        LATEST_HERE.with(|here| *here.borrow_mut() = None);
+    }
+
     /// The lines carry no engine or technical words.
     #[test]
     fn the_lines_name_no_engine() {
-        for line in [PROBLEM_LINE, NOT_DONE_LINE, READY_AGAIN_LINE] {
+        for line in [
+            PROBLEM_LINE,
+            LATER_LINE,
+            UPDATING_LINE,
+            NOT_DONE_LINE,
+            READY_AGAIN_LINE,
+        ] {
             for word in [
                 "OpenClaw", "Hermes", "agent", "session", "gateway", "Harness",
             ] {
