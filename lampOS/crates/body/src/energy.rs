@@ -1018,6 +1018,81 @@ mod tests {
         assert_eq!(whole, crate::clips::WHOLE.len());
     }
 
+    /// V1's swing of each joint, peak to peak, counts, over all of `csv`
+    /// (a `hal/recordings` file): the generator's units, lerobot's -100 to
+    /// 100 over each joint's range in counts (`tools/generate_clips.py`'s
+    /// RANGE, from `hal/calibration/robots/hal_follower/hal.json`), in the
+    /// clip's joint order. Read here from the files, not from the
+    /// generated `clips::V1_SWING`, so that table is checked too.
+    fn v1_swing_of(csv: &str) -> [i32; 5] {
+        let ranges = [
+            ("wrist_pitch", 1464.0, 3071.0),
+            ("wrist_roll", 621.0, 3254.0),
+            ("base_yaw", 847.0, 3275.0),
+            ("base_pitch", 0.0, 4095.0),
+            ("elbow_pitch", 0.0, 4095.0),
+        ];
+        let mut lines = csv.lines();
+        let header: Vec<&str> = lines.next().unwrap().split(',').collect();
+        let rows: Vec<Vec<f64>> = lines
+            .filter(|line| !line.is_empty())
+            .map(|line| line.split(',').map(|v| v.parse().unwrap()).collect())
+            .collect();
+        std::array::from_fn(|joint| {
+            let (name, lo, hi) = ranges[joint];
+            let column = header
+                .iter()
+                .position(|title| *title == format!("{name}.pos"))
+                .unwrap();
+            let counts = rows
+                .iter()
+                .map(|row| (row[column].clamp(-100.0, 100.0) + 100.0) / 200.0 * (hi - lo) + lo);
+            let (most, least) = counts.fold((f64::MIN, f64::MAX), |(most, least), at| {
+                (most.max(at), least.min(at))
+            });
+            (most - least).round() as i32
+        })
+    }
+
+    /// The lead's rule (#8153, via V2, 21 Nov): level 5 is almost V1, and no
+    /// safety bound is loosened for it. At level 5 no joint of any built-in
+    /// clip swings, peak to peak over all it plays, past V1's swing of that
+    /// joint over all of its recording (`v1_swing_of`), a count of rounding;
+    /// except a joint the generator's own gains already took past V1, which
+    /// level 5 grows no further than level 1's gains play it over the same
+    /// stretch (`longer`, unscaled), so it is never smaller than level 1.
+    /// Prints each joint the cap holds (`cargo test -- --nocapture`).
+    #[test]
+    fn level_five_swings_no_joint_past_v1() {
+        for clip in crate::clips::ALL {
+            let (_, csv) = RECORDINGS
+                .iter()
+                .find(|(name, _)| *name == clip.name)
+                .unwrap();
+            let v1 = v1_swing_of(csv);
+            let (long, five) = (longer(clip, 5), livelier(clip, 5));
+            for joint in 0..5 {
+                let (own, at_five) = (spread(&long, joint), spread(five, joint));
+                let bar = v1[joint].max(own);
+                assert!(
+                    at_five <= bar + 1,
+                    "{} joint {joint}: {at_five} at level 5 against V1 {}, level 1's gains {own}",
+                    clip.name,
+                    v1[joint]
+                );
+                let wanted = (own as f32 * clip_size(clip.name, 5)).round() as i32;
+                if wanted > bar + 1 && own > 0 {
+                    eprintln!(
+                        "v1 cap {:<13} joint {joint}: V1 {} level 5 {at_five} (x{} would be {wanted})",
+                        clip.name,
+                        v1[joint],
+                        clip_size(clip.name, 5)
+                    );
+                }
+            }
+        }
+    }
+
     /// Seventh's HOLD P2 on #8201: a longer clip is not a smaller one.
     /// Over the stretch V2 cut, each joint swings, peak to peak, no less at
     /// a level than at the level under it (a count of rounding), for every
