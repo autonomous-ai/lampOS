@@ -83,8 +83,9 @@ use crate::hermes_config::{read_or_empty, replace_checked};
 /// (`lamp_update::openclaw_install::WRAPPER`), the one way OpenClaw runs
 /// on the lamp; [`validate`] runs its own config check through it.
 pub const VALIDATOR: &str = "/usr/local/bin/openclaw";
-/// The longest OpenClaw's config check runs before it counts as a
-/// refusal (`lamp_checked_replace::VALIDATE_WITHIN`).
+/// The longest OpenClaw's config check runs before it is killed, not a
+/// refusal but tried again as a killed check is
+/// (`lamp_checked_replace::VALIDATE_WITHIN`, #8225).
 pub use lamp_checked_replace::VALIDATE_WITHIN;
 
 /// OpenClaw's settings file, in its state folder.
@@ -456,16 +457,16 @@ pub fn validate(validator: &Path, file: &Path) -> Result<(), String> {
 }
 
 // Shared with lamp-update's one-shot (#7868), which can't take lamp-tasks.
-pub use lamp_checked_replace::{GATEWAY_WAITS, NO_GATEWAY, NODE_NOT_READY, gateway_not_there};
-
-/// What [`validate`] says of a check ended by a signal, OpenClaw's verdict
-/// never given: #7268's FINDING, a check racing the gateway's own start
-/// when both restart together.
-pub const KILLED: &str = "(status killed)";
+// `KILLED`: a check ended by a signal, #7268's FINDING, a check racing the
+// gateway's own start when both restart together.
+pub use lamp_checked_replace::{
+    GATEWAY_WAITS, KILLED, NO_GATEWAY, NODE_NOT_READY, check_did_not_finish, gateway_not_there,
+};
 
 /// [`write_checked`] tried again after each of `waits` while OpenClaw's
 /// gateway is not there to check the text ([`gateway_not_there`]) or the
-/// check was killed before it answered ([`KILLED`]), each wait said in one
+/// check was killed before it answered, by a signal ([`KILLED`]) or past
+/// [`VALIDATE_WITHIN`] ([`check_did_not_finish`], #8225), each wait said in one
 /// line with no value of the file; anything else (written, right already,
 /// refused for its text) ends it at once, and past the last wait the
 /// refusal is returned.
@@ -484,7 +485,8 @@ pub fn write_waiting(
     loop {
         match write_checked(state_dir, port, workspace, skills, v1, validator) {
             Err(error)
-                if gateway_not_there(&error.to_string()) || error.to_string().contains(KILLED) =>
+                if gateway_not_there(&error.to_string())
+                    || check_did_not_finish(&error.to_string()) =>
             {
                 let Some(wait) = waits.next() else {
                     return Err(error);
