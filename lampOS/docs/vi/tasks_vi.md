@@ -2213,7 +2213,10 @@ một byte (`crates/tasks/src/one_session.rs`).
   xuất: khi không còn gì giữ nó, luồng `one-session` đóng nó `--now`, xoá
   phiên OpenClaw và id đã giữ của nó (`dropped <id> (Harness takes no
   reply here (reply_off))`), và không mở pane nào nữa cho tới khi
-  lamp-tasks khởi động lại. Mọi lần từ chối reply khác
+  lamp-tasks khởi động lại. `REPLY_OFF` ngay ở lời đầu của một phiên giữ
+  mới (lời nhắc của chính lần mở) cũng được ghi nhận như vậy ngay, nên
+  agent của đèn đọc `ready` ngay, không bao giờ `starting` tới hết cửa sổ
+  khởi động. Mọi lần từ chối reply khác
   (`reply_failed`, pane bận, mất hoặc chưa sẵn sàng) vẫn như trước: không
   có phiên thứ hai. Lời giao đầu cho Devin (`Cli::first_message`) cũng cần
   cài đặt này, như reply của một phiên.
@@ -2493,9 +2496,11 @@ khi đăng xuất, và với 0.6.60 khi đăng nhập (ROW của #7507).
   `harness new`) trong lúc một việc nói đứng đầu chờ pane trong store được
   tính vào cùng giới hạn của việc đó: quá giới hạn, store giao việc đi mà
   không chờ pane (`pane_turn`), và việc kết thúc theo cùng cách, không có
-  reply và không có ensure riêng của nó. Backoff riêng của các lần mở (5 s
-  nhân đôi, `OPEN_RETRY_FIRST`; 60 s nhân đôi cho `ENGINE_NOT_READY`) không
-  đổi. Kết thúc của
+  reply và không có ensure riêng của nó. Từ #8138, `NOT_RUNNING`,
+  `ENGINE_NOT_READY` đầu tiên hoặc `TIMEOUT` quá cả thời gian giữ của một
+  lần giao kết thúc việc ngay, không trả lại, và các lần mở lỗi được thử
+  cách 2 s 3 lần, rồi mỗi 60 s (xem "Một trạng thái sẵn sàng cho agent
+  riêng của đèn" bên dưới). Kết thúc của
   lượt là `harness wait lamp-one-openclaw --after <inputId>` (0 rảnh, rồi
   `show` lấy câu trả lời; 3 có câu hỏi; 4 đã mất; 1 kèm một dòng `failed`,
   lần khởi chạy thất bại của Harness 0.6.74). Phiên được giữ đã mất
@@ -2508,9 +2513,8 @@ khi đăng xuất, và với 0.6.60 khi đăng nhập (ROW của #7507).
   ghi nó vào journal) chỉ khi một trong các dòng đang chờ nói `failed`; mọi
   exit 1 khác vẫn là `wait_failed`. Một `wait --after` của lượt (hoặc `wait`
   của một pane) nói `failed` thì đi theo thang phục hồi ngay trong lượt đó,
-  như một engine đã chết: resume thường, giữ cuộc hội thoại khi OpenClaw vẫn
-  còn giữ nó, nếu không thì một phiên mới (`replace_kept`), lời của tác vụ
-  được gõ lại một lần khi chưa có tool nào chạy. Lời đầu tiên của một phiên
+  như một engine đã chết: từ #8138 việc kết thúc ngay và phiên được thay
+  mới sau đó, không bao giờ gõ lại. Lời đầu tiên của một phiên
   giữ mới mà trả về `failed` cũng vậy, trong giới hạn của lần mở. Trước
   0.6.74 `wait` nói `failed` với exit 4. Một harness chưa từng khởi động vẫn
   thoát mã 4.
@@ -2521,6 +2525,22 @@ khi đăng xuất, và với 0.6.60 khi đăng nhập (ROW của #7507).
   hiệu 1). Một reply bị từ chối `NOT_IDLE` ("is starting") giữ tác vụ trong
   hàng đợi và gõ nó khi phiên rảnh. Một dòng trạng thái bận giờ đọc là
   `working`; dấu hiệu W vẫn cần hai lần nhìn và bản ghi đứng yên 600 s.
+- **Harness 0.6.77 cho OpenClaw (openharness#4509, có trong bản ghim 0.6.78, #8138).**
+  Một tin nhắn OpenClaw từ chối khi lịch sử của nó đang lỗi được xoá (chỉ
+  khi đó là chữ Harness tự gõ) và gửi lại một lần sau `/session`. `held`
+  nói lý do bằng một câu (`namedState`): thiết bị đang chờ được duyệt,
+  Gateway từ chối đăng nhập, hoặc không có Gateway nào chạy. `wait` và
+  `watch` báo `starting`, `failed` và `held` ngay (khoảng 3 s, trước đây
+  một lần chạy kết thúc không có lượt mới mất 33 s, tới 60 s). Một lần khởi
+  chạy được xác nhận trong khoảng 0.3-0.6 s, và việc daemon Harness khởi
+  động lại giữa lúc gõ tác vụ đầu tiên và lúc OpenClaw xác nhận không còn
+  làm mất nó. 0.6.76 và 0.6.78 không đổi gì cho OpenClaw.
+- **Cài hoặc cập nhật OpenClaw (#8138, lamp-update).** lamp-update dừng
+  lamp-tasks trước khi khởi động lại gateway của OpenClaw, chờ tới khi
+  gateway trả lời `health` (tối đa 40 lần gọi, cách nhau 3 s), rồi mới
+  khởi động lại lamp-tasks, để phiên được giữ mở trên một gateway nhận
+  được nó; một lần khởi động lại thất bại cũng khởi động lại lamp-tasks
+  (install.md, "The install's restart order").
 - **Reply khi đã đăng nhập, có xác nhận.** Với Harness có xác nhận reply, mọi
   reply vào một phiên của người dùng (pane duy nhất của `harness new`,
   `--reply-named`, một phiên resumed, một tin nhắn đầu tiên) chỉ được tính là
@@ -2646,7 +2666,10 @@ khi đăng xuất, và với 0.6.60 khi đăng nhập (ROW của #7507).
     (một exec dài) không bao giờ bị cắt mà để cho hạn chót của lần chạy;
     số tool của `show`, `lastActive` của `ps` hay chữ trên pane không bao
     giờ được dùng cho việc này.
-  - **Dấu hiệu 5, reply bị từ chối `ENGINE_NOT_READY` liên tiếp.** Thấy
+  - **Dấu hiệu 5, reply bị từ chối `ENGINE_NOT_READY` liên tiếp (đã được
+    #8138 thay: lần từ chối đầu của một lần giao kết thúc việc và thay
+    phiên; cách đếm, resume trơn và `show` D/W của #8001 lúc từ chối đã
+    bỏ).** Thấy
     trên lamp-c0a4 (19/11): tiến trình OpenClaw của phiên được giữ bị đóng
     băng, `show` vẫn `idle`, nên không lượt nào được nhận và dấu hiệu 1 và
     4 không bao giờ bắt đầu; mỗi `harness reply` bị từ chối
@@ -2691,8 +2714,9 @@ khi đăng xuất, và với 0.6.60 khi đăng nhập (ROW của #7507).
     (`CONFIRM_MS`, 120 s từ lúc prepare việc) làm nó hết hạn mà không ai
     nghe, nên nó nằm chờ tới giới hạn 480 s của lamp-voice (lamp-c0a4,
     19/11 21:47-21:55). Việc đang chờ kết thúc với một câu ngắn "hãy hỏi
-    lại", được Task news báo một lần (`failed_stuck`: "I can't handle that
-    right now; please ask me again in a few minutes."); việc đóng và mở lại
+    lại", được Task news báo một lần là chưa làm được (`failed_stuck`,
+    #8138: "I couldn't finish that; something went wrong. Ask me again in a
+    moment."), không bao giờ làm lại sau đó; việc đóng và mở lại
     vẫn diễn ra như trên, và việc tiếp theo đi vào phiên đã mở lại.
     Bên cạnh giới hạn của #7895: một lần từ chối `ENGINE_NOT_READY` không
     bao giờ tiêu một trong `STARTING_RESUMES_MOST` (3) lần thử của một việc
@@ -2781,8 +2805,10 @@ khi đăng xuất, và với 0.6.60 khi đăng nhập (ROW của #7507).
   `--fresh`, không bao giờ thử close mãi. Mọi đường đều close trước rồi mới
   xoá hội thoại. Số lần
   thử có giới hạn theo số lần thay liên tiếp không có câu trả lời nào xen
-  giữa: lần đầu thay ngay; từ lần thứ hai (`REPLACE_MOST`, 2) lần mở tiếp
-  theo chờ 5 s, rồi 10 s, nhân đôi mỗi lần thêm, tối đa 300 s. Một lượt có
+  giữa: mỗi lần thay ngay cho tới lần thứ ba (`REPLACE_MOST`, 3, =
+  `OPEN_QUICK_TRIES`); từ lần đó lần mở tiếp theo chờ 60 s
+  (`OPEN_SLOW_RETRY`) và agent của đèn đọc `error` (`stuck_again`), không
+  nhân đôi (#8138). Một lượt có
   câu trả lời thì đếm lại từ đầu. Close lỗi của một lượt bị huỷ cũng giữ
   token. Các trường của openharness#4484 (đề xuất; thiếu trường nào thì như
   hiện nay): `state: "stopped"` của `ensure` được thay ngay, không cần
@@ -2800,8 +2826,13 @@ khi đăng xuất, và với 0.6.60 khi đăng nhập (ROW của #7507).
   Trường hợp xấu nhất từ lúc kẹt tới phiên mới là khoảng 120 s cộng một lần
   `ensure`. Journal: `<id> is gone or stuck
   (<why>); closed, forgotten and replaced with a fresh session (#7906)`.
+- **Đã được #8138 thay: phiên mới trước, việc kết thúc, không bao giờ
+  làm lại.** `revive_or_replace` và `restart_or_replace` nay luôn thay
+  phiên mới, và một lượt hỏng kết thúc ngay và không bao giờ được gõ lại
+  (xem "Một trạng thái sẵn sàng cho agent riêng của đèn" bên dưới). Phần
+  sau là thang của #7906 như trước đây:
 - **Cách mở lại nhẹ nhất trước, và không mất việc (#7906, quy tắc của
-  chủ đèn).** `OneSession::revive_or_replace` là một thang:
+  chủ đèn).** `OneSession::revive_or_replace` từng là một thang:
   - **(a)** Phiên được giữ mà engine hoặc pane đã chết (shell trơn,
     `stopped`, mất) trong khi bản ghi của OpenClaw vẫn giữ hội thoại của nó
     (hoặc không đọc được bản ghi) thì được buông mà không close, không
@@ -2845,6 +2876,169 @@ khi đăng xuất, và với 0.6.60 khi đăng nhập (ROW của #7507).
   `one_session_not_started` của #7919 qua Task news, không bao giờ cả hai.
   Câu này được nghe cùng câu trả lời, không phải ngay lúc thay phiên.
 
+### Một trạng thái sẵn sàng cho agent riêng của đèn (#8138, khi `LAMP_TASKS_ONE_SESSION=on`)
+
+Các quyết định của lead trên #8138 (20/11) đổi cách phiên được giữ được
+báo, kết thúc và phục hồi. Chỗ nào ở trên nói khác (2 lần từ chối trong
+60 s của dấu hiệu 5, resume trơn của bậc (a), các backoff nhân đôi, 3 lần
+trả lại của một việc nói, lời của lần chạy kỹ năng được gõ lại,
+`RESTARTED_LINE` sau một lần làm lại), thì mục này là điều code làm hiện
+nay.
+
+- **Một giá trị, `tasks/agent`.** lamp-tasks tính trạng thái sẵn sàng của
+  agent riêng của đèn (`crate::agent`, `lamp_msgs::AgentReadiness`, giá
+  trị được giữ) và phát nó lúc khởi động và mỗi khi `state` hoặc `why`
+  đổi, khi một phiên bật; tắt thì nó được phát một lần lúc khởi động là
+  `off`, để một giá trị giữ lại từ lần dừng trước không bao giờ còn lại. Cùng giá trị đó được trả lời trên mọi route của socket (của
+  voice, của app, route chỉ đọc của lamp-update) bởi `{"op":"agent"}` →
+  `{"ok":true,"agent":{"engine","state","why","since_unix_ms",
+  "read_unix_ms"}}`. Journal: `tasks: agent: <cũ> -> <mới> (<why>)`. Khi
+  lamp-tasks dừng (SIGTERM) nó phát giá trị thêm một lần là `starting` với
+  `why` `tasks_restarting` (`Agent::stopping`, `TASKS_RESTARTING`), để
+  voice và app không bao giờ tin một `ready` cũ được giữ khi nó đang tắt.
+- **Các quy tắc (`agent::state_of`), quy tắc đầu tiên đúng thì dùng:**
+
+  | Đầu vào | Trạng thái | `why` |
+  |---|---|---|
+  | Một phiên tắt, hoặc không có engine mặc định | `off` | — |
+  | `ensure` hoặc `show` của Harness lần cuối đọc phiên được giữ là `installing` (một OTA đang cài OpenClaw; `OneSession::saw_state`) | `installing` | `installing` |
+  | Không có chương trình Harness trên đèn | `not_installed` | `harness_missing` |
+  | Engine mặc định được biết là không có trên đèn (lần nhìn máy) | `not_installed` | `engine_missing` |
+  | Engine mặc định được biết là chưa đăng nhập trên đèn | `error` | `signed_out` |
+  | Mặc định khác OpenClaw (Hermes: lamp-tasks không có phiên riêng), hoặc Harness không nhận reply ở đây (`reply_off`: mọi việc đi đường mỗi việc một pane) | `ready` | — |
+  | Gateway không trả lời, dưới 360 s (`GATEWAY_START_WITHIN`: khởi động nguội mất 27-50 s trên lamp-c0a4, 185-322 s trên lamp-9b34, #7174), chưa có phiên nào mở từ lúc khởi động | `starting` | `gateway_starting` |
+  | Gateway không trả lời, dưới 360 s, sau khi đã có phiên mở | `recovering` | `gateway_down` |
+  | Gateway không trả lời từ 360 s trở lên | `error` | `gateway_down` |
+  | Các lần mở lỗi quá `OPEN_QUICK_TRIES`, hoặc `REPLACE_MOST` phiên hỏng liên tiếp | `error` | `open_failed` / `stuck_again` |
+  | Thấy một lỗi (dưới đây), cho tới khi một phiên mới được mở | `recovering` | mã của lỗi |
+  | Chưa có phiên và chưa đọc được Harness | `starting` | `harness_starting` |
+  | Đang mở, hoặc đã mở nhưng chưa được xác nhận nhận input (dưới đây) | `starting` | `session_starting` |
+  | Đã mở, đã xác nhận, và rảnh | `ready` | — |
+  | Đang một lượt (lời đã được nhận; watch của Harness đọc `working`) | `working` | — |
+
+  Việc Harness tự đăng xuất không phải `error`: đèn đăng xuất vẫn chạy
+  agent của nó (#6407). Mã lỗi (`one_session::fault_code`):
+  `engine_not_ready`, `not_running`, `held`, `launch_failed`,
+  `engine_exited`, `conversation_gone`, `session_gone`, `gateway_down`,
+  `watch_lost`, `daemon_restarted`, `cancelled`, `asked_something`,
+  `stuck`.
+- **Từ chối ở prepare (`agent_not_ready`).** Khi một phiên bật, một
+  `prepare` cho target riêng của đèn (`lamp`, không nêu phiên) trên engine
+  mặc định của đèn bị từ chối ngay ở mọi trạng thái trừ `ready` và
+  `working`, không bao giờ ở `off`: `{"ok":false,"error":"agent_not_ready",
+  "message":...,"readiness":"<state>"}`, mỗi trạng thái một message cố
+  định. Nó nằm trong `EARLY_REFUSALS`, nên các máy được nhìn lại ngay.
+  Không giao việc, không gọi Harness: dưới 1 s rất xa. Việc cho các máy
+  tính khác của người dùng không đổi.
+- **Chỉ `ready` khi đã nhận input (khởi động ấm).** Một phiên OpenClaw mới
+  từ chối reply một lúc (~35 s đã thấy). Phiên được giữ là `starting` cho
+  tới khi được xác nhận nhận input: lời đầu của nó được nhận lúc mở,
+  `ensure` nói `confirmed: true` (hoặc một phiên đã chạy sẵn mà Harness
+  không nói là chưa xác nhận), một lần giao được nhận, hoặc watch đọc nó
+  `idle`/`done`; không có điều nào, thì 120 s sau khi nó được mở
+  (`OPEN_IDLE_WITHIN`, `confirm_if_warmed`) một lần `show` nhìn trước:
+  chạy, thì được xác nhận; chết hoặc vẫn `starting`, là lỗi và được thay
+  mới; không kết luận, nhìn lại sau 30 s. Vậy nó không bao giờ kẹt ở
+  `starting`, và không bao giờ được coi là chạy khi chưa nhìn. `prepare`
+  từ chối trong lúc khởi động ấm và không gì được giao cho phiên đang ấm
+  lên. Một lần giao bị phiên còn đang ấm từ chối `ENGINE_NOT_READY` (chưa
+  xác nhận, hoặc `ensure` tạo mới dưới 120 s trước, `made_new`) kết thúc
+  việc đó có báo (`one_session_not_started`) nhưng không thay phiên: agent
+  đọc `starting` lại cho tới khi được xác nhận. `NOT_RUNNING` (chết) hoặc
+  cả lần giữ không được nhận (một lần giao muộn sẽ chạy việc đã báo là
+  không làm) là lỗi kể cả khi đang ấm: close `--now`, phục hồi mới.
+- **Một lần giao bị từ chối kết thúc việc ngay ở dấu hiệu đầu, trước mọi
+  phục hồi.** Reply đầu tiên của một lần giao vào phiên được giữ được giữ
+  10 s (`REPLY_KEPT_FIRST_HELD`). `ENGINE_NOT_READY` đầu tiên kết thúc việc
+  ngay, `not_sent` `one_session_stuck` (`STUCK_ENDED`); `NOT_RUNNING`, hoặc
+  `TIMEOUT` sau cả 60 s giữ (`REPLY_KEPT_HELD`: một `TIMEOUT` của 10 s đầu
+  được thử thêm một lần với 50 s còn lại, vì một lần giao đầu chậm mà khoẻ
+  mất 8.4 s trên lamp-c0a4), kết thúc nó `one_session_not_started`
+  (`NOT_STARTED`). Từ lần từ chối đầu tới khi việc kết thúc: chỉ là lúc
+  lần từ chối trả về, không `show`, không close. Agent của đèn đọc
+  `recovering` cùng lúc, và việc thay phiên được để lại (`restart_due`)
+  cho luồng một phiên, làm khi lượt nhả pane (trong `KEEP_OPEN_EVERY`,
+  2 s). Một lần giao của lần chạy kỹ năng bị từ chối kết thúc cùng cách
+  (`NotTyped`). Cách đếm của dấu hiệu 5 (`KEPT_NOT_READY_REFUSALS` trong
+  `KEPT_NOT_READY_FOR`) và `show` tìm engine đóng băng của #8001 lúc từ
+  chối đã bỏ: lần từ chối đầu là đủ.
+- **Một lượt đã giao mà hỏng thì kết thúc ngay, không bao giờ chạy lại.**
+  Lượt của lần chạy kỹ năng mà phiên chết (shell trơn), launch lỗi (`wait`
+  `failed`), hoặc không chạy tiếp (dấu hiệu 4a: không có gì sau lần giao
+  trong 60 s, `TURN_START_WITHIN`; dấu hiệu 4b: bản ghi đứng yên 600 s với
+  dòng cuối của user hoặc kết quả tool, `TOOL_RESULT_STALL`) kết thúc bằng
+  một câu lỗi, token của lần chạy được kết thúc trước, trước close và mở
+  lại mà luồng một phiên làm sau. Các giới hạn đứng yên không đổi: một tin
+  nhắn đầu dài, ghi SKILL.md, model chậm hay thử lại 429 không thấy chuyển
+  động trong vài phút, nên giới hạn ngắn hơn sẽ kết thúc những lượt khoẻ.
+  Một lỗi thấy bên cạnh lượt (watch của Harness đọc `held`, `failed` hoặc
+  `stopped`; Gateway ngừng trả lời) kết thúc nó trong lần nhìn 100 ms của
+  watcher (`CANCEL_LOOK`). Lời của việc không bao giờ được gõ lại: việc
+  trả lại của `Turn::stuck` đã bỏ, và `RESTARTED_LINE` chỉ được nói cho
+  việc mà phiên được thay trước khi lời của nó được gõ. Một việc nói đã
+  nối vào store mà phiên hỏng dưới nó (watch đọc `held`, `failed` hoặc
+  `stopped`, hoặc Gateway bị đọc là sập khi nó đang được giữ) được store
+  kết thúc ngay `not_sent` `one_session_stuck` (`turn_broken`,
+  `Engine::end_broken`: bỏ agent và các lần đọc của nó, như một việc chưa
+  từng được giao), nên voice báo nó như báo một lần giao bị từ chối, rồi
+  phiên được thay mới. Kết thúc của lượt mà watch đọc trước (`done`, rồi
+  `stopped`) được đọc thay vào đó, không bao giờ bị kết thúc là kẹt: kết
+  thúc của nó được lấy trước mọi lỗi, và `end_broken` chờ khi một lần đọc
+  của việc đang được yêu cầu. Khi có launch, read hoặc close đang chạy, store thử
+  lại ở lượt sau (`put_turn_broken`); kết thúc của một lượt mà store chưa
+  đọc được cũng được giữ như vậy (`put_turn_end`).
+- **Phiên mới trước, không backoff mù.** Mọi lỗi đều thay phiên: close
+  `--now`, xoá bản ghi và hội thoại OpenClaw, và lần mở sau là `ensure
+  --fresh` (`OneSession::replace_kept`; `revive_or_replace` và
+  `restart_or_replace` không còn resume trước). Một lần mở lỗi được thử
+  lại sau 2 s (`OPEN_QUICK_GAP`), 3 lần liên tiếp (`OPEN_QUICK_TRIES`);
+  sau đó agent đọc `error` (`open_failed`) và được thử mỗi 60 s
+  (`OPEN_SLOW_RETRY`). Tương tự với 3 phiên hỏng liên tiếp mà không lượt
+  nào được trả lời (`REPLACE_MOST`, `stuck_again`). Một `ensure` bị từ
+  chối `ENGINE_NOT_READY` vẫn được thử mỗi 5 s trong 45 s (`ENGINE_RETRY`,
+  `ENGINE_RETRY_WITHIN`), rồi tính là một lần mở lỗi (backoff 60 s nhân
+  đôi tới 600 s đã bỏ).
+- **Mở ngay khi Gateway trả lời (#7321, #7741).** Luồng một phiên dò
+  Gateway của OpenClaw trên loopback (`gateway::answers`, một kết nối và
+  một byte, mỗi bước có giới hạn) mỗi 10 s khi nó trả lời
+  (`GATEWAY_LOOK_READY`) và mỗi 2 s khi không (`GATEWAY_LOOK_DOWN`); 2 lần
+  nhìn liên tiếp không trả lời (`GATEWAY_DOWN_LOOKS`) thì coi là sập. Sập:
+  không thử mở, và phiên đang mở được để lại để thay mới (nó mất
+  Gateway). Trả lời lại: mọi chờ còn lại (`next_open`, các bộ đếm liên
+  tiếp) bị xoá và lần nhìn sau mở ngay, cả lúc lamp-tasks khởi động, nên
+  một phiên được xin trong khoảng 2 s sau khi Gateway trả lời, và sẵn sàng
+  sau một `ensure` và lời đầu tiên của nó (~15 s đã thấy).
+- **Watch của Harness, trực tiếp (`OneSession::watch_kept`).** Một luồng
+  riêng giữ `harness watch <phiên được giữ> --json` (`Cli::watch`, trên
+  lane riêng) khi có phiên OpenClaw được giữ đang mở: `working`
+  (`background`, `needs_person`) là `working`; `idle`/`done` là `ready`
+  khi không lượt nào được giữ, và với lượt nói đang được giữ thì việc của
+  nó được store đọc ngay (`take_turn_end`, `Engine::push`), không chờ tới
+  giới hạn chờ (#8109); `held`, `failed`, `stopped` là lỗi (`recovering`,
+  thay phiên được để lại, lượt nói được kết thúc ngay, ở trên). `watch` nói
+  trạng thái hiện tại trước: dòng đầu đó không bao giờ được đọc là kết thúc
+  của một lượt của ta. Đèn giết watch khi gặp `done`; sau đó, khi không có
+  lượt nào của ta được giữ, nó không được chạy lại cho tới khi có một lần
+  giao hoặc qua 30 s (`WATCH_IDLE_REST`): một tiến trình con Node mỗi 30 s
+  khi rảnh, không phải mỗi 2-4 s. Khi có lượt được giữ, nó được chạy lại
+  sau 2 s (`WATCH_RETRY`), để `done` của một lượt trước không bao giờ che
+  kết thúc của lượt này. Kết thúc ở giới hạn riêng của nó, hoặc bị
+  huỷ khi có phiên khác mở, thì nó được chạy lại ngay. Một watch lỗi để trạng thái là không biết: khi không lượt
+  nào được giữ, phiên được buông (`recovering`, `watch_lost`) và được
+  ensure lại ở lần nhìn sau, phiên còn sống quay về như cũ, rồi được watch
+  lại sau 2 s (`WATCH_RETRY`). Sau 3 lần lỗi liên tiếp của cùng một phiên
+  (`WATCH_TRIES`, đếm theo agent id, nên một phiên được buông và ensure lại
+  ở giữa vẫn giữ số đếm), hoặc không có `watch` (exit 2), phiên đó không được
+  watch nữa cho tới khi có phiên khác mở hoặc daemon chạy lại; lần nhìn
+  `show` khi rảnh (mỗi 30 s, `KEEP_OPEN_WHILE_OPEN`) chỉ chạy khi không có
+  watch nào sống. Một watch là một tiến trình con Node (~130 MB trên đèn)
+  suốt lúc phiên mở.
+- **Chưa làm ở đây.** Lượt của một việc nói đã nối vào store mà đứng yên
+  không có sự kiện watch nào và Gateway vẫn trả lời thì vẫn để cho giới
+  hạn riêng của store. lamp-update đóng
+  phiên quanh lần cài OpenClaw, các câu "đang gặp vấn đề" và "đã sẵn sàng
+  lại" của voice và phần hiển thị của app là các phần khác của #8138.
+
 ### Giới hạn được chấp nhận cho thứ Hai: grant của kỹ năng đang chạy trong gateway
 
 Được chấp nhận cho đợt phát hành thứ Hai theo #6882 (a) (first builder,
@@ -2874,6 +3068,53 @@ Hermes cũng mang token trong môi trường như vậy.
 Bản sửa là #7024 (P1): lamp-tasks tự khởi động script trong hàng rào, bên
 ngoài các namespace của gateway, với token từ lamp-tasks và không bao
 giờ qua launcher, và cũng vậy cho lần chạy của Hermes.
+
+## Agent của chính đèn chưa sẵn sàng: phía giọng nói (#8138)
+
+lamp-tasks phát trạng thái sẵn sàng của agent của chính đèn trên
+`tasks/agent` (`lamp_msgs::AgentReadiness`: `off`, `not_installed`,
+`installing`, `starting`, `ready`, `working`, `recovering`, `error`).
+lamp-voice (`crates/voice/src/agent_ready.rs`) dùng nó để người dùng không
+bao giờ phải chờ sau câu "I'll look into that":
+
+- **Từ chối ngay.** Provider worker theo dõi `tasks/agent`. Một lần gọi
+  `start_agent_task` cho agent của chính đèn (engine mặc định, hoặc engine
+  mà `tasks/agent` nêu) trong lúc giá trị mới nhất không phải `ready` hay
+  `working` (và không phải `off`) bị từ chối trước khi hỏi lamp-tasks bất
+  cứ điều gì, không chờ mạng: model được bảo nói ngay, và chỉ thế, "I'm
+  having a problem right now; ask me again in a moment." Lỗi
+  `agent_not_ready` của chính lamp-tasks lúc prepare (hoặc lúc confirm)
+  cũng được báo như vậy (đọc `readiness` và `why` từ câu trả lời, hoặc
+  `why` mới nhất). Các trạng thái lâu dài giữ câu riêng của chúng, không
+  bao giờ "in a moment": `not_installed` nói câu "chưa được thiết lập" sẵn
+  có của đèn, và `error` với why `signed_out` nói "I've been signed out.
+  Please set me up again in the app."; cả hai không tính cho "ready
+  again". `starting` (cả với why `tasks_restarting`), `installing`,
+  `recovering` và mọi `error` khác nhận câu báo lỗi. Không có gì được chuẩn
+  bị, nên không có câu đọc
+  lại hay "I'll look into that" nào đi trước; model nói câu đó bằng ngôn
+  ngữ của người dùng. Việc cho máy tính không bao giờ bị giữ theo trạng
+  thái của đèn.
+- **Việc đã giao mà hỏng được báo là chưa làm được.** `not_sent` với
+  `one_session_stuck`, `one_session_not_started` hoặc `agent_broken` được
+  Task news báo một lần (`failed_stuck`): "I couldn't finish that;
+  something went wrong. Ask me again in a moment." Ghi chú nói rằng việc
+  sẽ không được làm sau đó, và giọng nói không có đường "I restarted it and
+  did your request". Mỗi thay đổi của `tasks/agent` đánh thức bộ đọc của
+  Task news ngay và thêm một lần sau 2 s, nên lỗi được đọc ngay khi
+  lamp-tasks giữ nó, không trễ tới 10 s, và được báo cùng lúc như mọi tin
+  về việc.
+- **"Ready again", một lần.** Task news cũng theo dõi `tasks/agent`. Khi
+  agent đi từ một trạng thái không nhận việc sang `ready`, và trong 15 phút
+  qua có người bị từ chối (provider worker ghi vào `agent-refused`, cạnh
+  file những gì đã báo) hoặc một việc của nó hỏng như trên, câu "I'm ready
+  again; you can ask me now." được đưa ra một lần như tin về việc (khóa
+  `agent-ready-<since_unix_ms>`): nó chờ một lúc yên lặng như các tin khác,
+  không bao giờ được báo lại, và bị bỏ sau 5 phút. Không ai bị từ chối,
+  lúc giọng nói mới khởi động, hoặc với `working`, thì không nói gì.
+- **Khi được hỏi.** `harness_status` trả lời kèm `you`: trạng thái và một
+  dòng cho model (không bao giờ có engine hay `why`), nên câu "is your agent
+  OK?" được trả lời đúng sự thật. Mô tả của nó nêu câu hỏi đó.
 
 ## Giọng nói hỏi về việc nó đã giao (#7930)
 

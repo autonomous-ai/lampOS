@@ -119,7 +119,7 @@ use std::path::Path;
 
 use crate::harness::{
     Cli, Closed, EngineKind, Ensured, Launch, LaunchOutcome, PaneSeen, REPLY_KEPT_FIRST_HELD,
-    REPLY_KEPT_HELD, SessionSize, Target, Took, TurnRecord, Typed,
+    REPLY_KEPT_HELD, SessionSize, Target, Took, TurnRecord, Typed, WatchEnd, WatchEvent,
 };
 
 /// The switch, in lamp-tasks' own environment: `on` exactly ([`on`]).
@@ -223,16 +223,31 @@ pub const TURN_LOOK: Duration = Duration::from_millis(500);
 /// is ready before the first run; past it the pane is kept, and the first
 /// run waits for it to be idle.
 pub const OPEN_IDLE_WITHIN: Duration = Duration::from_secs(120);
-/// The first wait after an open failed, doubled at each failure in a row
-/// up to [`OPEN_RETRY_MOST`] (the daemon start's backoff style).
-pub const OPEN_RETRY_FIRST: Duration = Duration::from_secs(5);
+/// #8138, no blind doubling backoff: an open that failed is tried again
+/// after [`OPEN_QUICK_GAP`], [`OPEN_QUICK_TRIES`] times in a row; past
+/// them the lamp's agent reads `error` (`open_failed`) and the next try is
+/// [`OPEN_SLOW_RETRY`] later. The Gateway reading ready again (after it
+/// read down) tries at once, whatever is left of a wait.
+pub const OPEN_QUICK_TRIES: u32 = 3;
+/// Between two quick tries of an open that failed.
+pub const OPEN_QUICK_GAP: Duration = Duration::from_secs(2);
+/// Between two tries past [`OPEN_QUICK_TRIES`].
+pub const OPEN_SLOW_RETRY: Duration = Duration::from_secs(60);
 /// Between two `harness ensure` that said `ENGINE_NOT_READY` in a row
 /// (openharness#4393: the old engine still exiting after a crash)...
 pub const ENGINE_RETRY: Duration = Duration::from_secs(5);
-/// ...within this, before [`NOT_READY_FIRST`]'s backoff.
+/// ...within this, before the open counts as failed ([`OPEN_QUICK_TRIES`]).
 pub const ENGINE_RETRY_WITHIN: Duration = Duration::from_secs(45);
-/// The longest wait between two opens that failed.
-pub const OPEN_RETRY_MOST: Duration = Duration::from_secs(300);
+/// #8138: how often OpenClaw's Gateway is probed on loopback while it
+/// answers ([`crate::gateway::answers`], one connection and one byte, each
+/// bounded)...
+pub const GATEWAY_LOOK_READY: Duration = Duration::from_secs(10);
+/// ...and while it does not, so a session opens within this of the
+/// Gateway answering again (#7321, #7741).
+pub const GATEWAY_LOOK_DOWN: Duration = Duration::from_secs(2);
+/// Looks in a row that found the Gateway not answering before it is read
+/// down: one slow answer on a loaded lamp is not a restart.
+pub const GATEWAY_DOWN_LOOKS: u32 = 2;
 /// The pane's rotation, as Hermes' gateway rotates its sessions
 /// (`runtimes/hermes/rotation.go`, `rotateMaxTurns`, `rotateTokenThreshold`):
 /// a fresh pane after this many turns...
@@ -256,10 +271,11 @@ pub fn rotation_due(engine: EngineKind, turns: u64, tokens: u64) -> bool {
         _ => turns >= ROTATE_TURNS || tokens >= ROTATE_TOKENS,
     }
 }
-/// Stuck sessions replaced in a row with no turn answered between from
-/// which the next open waits a backoff: [`OPEN_RETRY_FIRST`] at this many,
-/// doubled at each more, at most [`OPEN_RETRY_MOST`].
-pub const REPLACE_MOST: u32 = 2;
+/// Broken sessions replaced in a row with no turn answered between from
+/// which the next open waits [`OPEN_SLOW_RETRY`] and the lamp's agent
+/// reads `error` (`stuck_again`), as [`OPEN_QUICK_TRIES`] failed opens do
+/// (#8138: no doubling).
+pub const REPLACE_MOST: u32 = OPEN_QUICK_TRIES;
 /// A `show` with no verdict on a pane refusing words ([`Seen::Unknown`]):
 /// looked at again after this, never counted as stuck.
 const UNKNOWN_LOOK_AGAIN: Duration = Duration::from_secs(10);
@@ -526,6 +542,35 @@ pub const NOT_READY_FIRST: Duration = Duration::from_secs(60);
 pub const KEPT_IDLE_MAX: Duration = Duration::from_secs(7 * 24 * 60 * 60);
 /// The longest wait between two looks with no agent ready.
 pub const NOT_READY_MOST: Duration = Duration::from_secs(600);
+/// #8138: a `watch` of the kept session that failed is started again
+/// after this...
+pub const WATCH_RETRY: Duration = Duration::from_secs(2);
+/// ...this many times in a row with no event between; then given up for
+/// that session, `show`'s look ([`KEEP_OPEN_WHILE_OPEN`]) the fallback.
+pub const WATCH_TRIES: u32 = 3;
+/// How often the watch's guard looks whether the session it watches is
+/// still the one open, and how often the watcher looks for one to watch.
+const WATCH_GUARD: Duration = Duration::from_millis(200);
+/// #8138 review (2): `harness watch` says the state now first, so an idle
+/// session whose last turn ended says `done` at once and the watch ends.
+/// Then (no turn of ours on it, or nothing said but that first state) it
+/// is not watched again until a turn is handed over, or this long: one
+/// `watch` child per 30 s while idle, not one per 2-4 s.
+pub const WATCH_IDLE_REST: Duration = Duration::from_secs(30);
+
+/// How long the watcher rests after one `watch` ([`OneSession::watch_round`]).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum WatchRest {
+    /// Watched again now.
+    None,
+    /// Nothing to watch: looked again in [`WATCH_GUARD`].
+    Guard,
+    /// [`WATCH_RETRY`].
+    Retry,
+    /// [`WATCH_IDLE_REST`], or until the next hand-over.
+    Idle,
+}
+
 /// What a run refused with a full queue is told, answered as lamp-tasks'
 /// `busy` (so lamp-skills' retry, #7239, still applies).
 pub const BUSY: &str =
@@ -657,6 +702,18 @@ pub trait PaneHarness {
     fn openclaw_turns<'a>(&'a self, _key: &str) -> Option<TurnReader<'a>> {
         None
     }
+    /// #8138: Harness's own `watch` on the pane `agent` ([`Cli::watch`] on
+    /// a lane of its own), each event handed to `on_event` as it comes;
+    /// [`WatchEnd::Missing`] with no `watch` to ask.
+    fn watch_pane(
+        &self,
+        _machine: &str,
+        _agent: &str,
+        _cancel: &AtomicBool,
+        _on_event: &mut dyn FnMut(WatchEvent),
+    ) -> WatchEnd {
+        WatchEnd::Missing
+    }
 }
 
 /// Whether `show`'s state (or its error) says the pane is gone: reopened,
@@ -738,6 +795,20 @@ impl PaneHarness for Cli {
         let key = key.to_owned();
         Some(Box::new(move || Cli::openclaw_turn(self, &key)))
     }
+    fn watch_pane(
+        &self,
+        machine: &str,
+        agent: &str,
+        cancel: &AtomicBool,
+        on_event: &mut dyn FnMut(WatchEvent),
+    ) -> WatchEnd {
+        // Its own adapter, as each task's watch (`follow`): a child that
+        // can't be cleaned up stops only it.
+        match self.lane() {
+            Ok(lane) => lane.watch(machine, agent, cancel, on_event),
+            Err(_) => WatchEnd::Failed("no_lane".into()),
+        }
+    }
 }
 
 /// The pane as it was opened.
@@ -775,10 +846,14 @@ struct Pane {
     /// When `ensure` made it new (#7906 sign 5): its first words may be
     /// refused `ENGINE_NOT_READY` within [`OPEN_IDLE_WITHIN`] of this.
     made_new: Option<Instant>,
-    /// When it was opened (any `ensure` result, or adopted): #8001 signal
-    /// D is never read within `open_idle_within` of this, its start
-    /// window.
-    opened: Instant,
+    /// #8138 review (5): known to take input (its first words taken, a
+    /// hand-over taken, `ensure`'s `confirmed`, the watch reading it idle,
+    /// or [`OPEN_IDLE_WITHIN`] passed since it was opened). Until then the
+    /// lamp's agent reads `starting`, so nothing is handed to a warming
+    /// session.
+    confirmed: bool,
+    /// When it was opened here, for [`Pane::confirmed`]'s last bound.
+    born: Instant,
 }
 impl Pane {
     fn new(agent: &str, place: &Place, kept: bool) -> Self {
@@ -795,7 +870,9 @@ impl Pane {
             checked_at_open: false,
             handed: None,
             made_new: None,
-            opened: Instant::now(),
+            // A pane of the old way has no warm-up of its own to wait for.
+            confirmed: !kept,
+            born: Instant::now(),
         }
     }
 
@@ -898,6 +975,22 @@ struct Inner {
     /// turn was taken since: no second W close, so a misread `working`
     /// never spends the plain resume and then the conversation.
     idle_w_spent: bool,
+    /// #8138 (#8109): the spoken task holding the pane whose turn
+    /// Harness's `watch` read ended (`done`, `idle`), or that it read
+    /// broken: the store reads it at once ([`OneSession::take_turn_end`]).
+    turn_ended: Option<String>,
+    /// #8138 review (3): the spoken task holding the pane whose session a
+    /// fault broke under it (the watch read `held`, `failed` or `stopped`,
+    /// or the Gateway stopped answering): the store ends it at once
+    /// `not_sent` [`STUCK_ENDED`] ([`OneSession::take_turn_broken`]).
+    turn_broken: Option<String>,
+    /// Hand-overs taken so far: a new one wakes the watch from its idle
+    /// rest ([`WATCH_IDLE_REST`]).
+    handovers: u64,
+    /// #8138: the kept session (its agent) whose `watch` failed
+    /// [`WATCH_TRIES`] times in a row with no event: not watched again
+    /// until another session or a daemon start; `show`'s look meanwhile.
+    watch_given_up: Option<String>,
 }
 
 /// [`OneSession::keep_open`]'s own: when it looks at the lamp next, and
@@ -915,6 +1008,12 @@ pub struct Looks {
     /// idle look, with its Gateway record then (session, seq), when that
     /// record was first seen, and how many looks since found it unmoved.
     idle_working: Option<((String, String, i64), Instant, u32)>,
+    /// #8138: the next Gateway look ([`OneSession::gateway_look`]), its
+    /// looks in a row that found it not answering, and whether it was read
+    /// down since it last answered.
+    gateway_next: Option<Instant>,
+    gateway_down: u32,
+    gateway_seen_down: bool,
 }
 
 /// A [`lamp_key`] ("<machine> <engine>") with both halves known, else
@@ -978,7 +1077,31 @@ pub struct OneSession {
     /// [`KEEP_OPEN_WHILE_OPEN`]; shorter in tests
     /// ([`OneSession::with_idle_look`]).
     idle_look: Duration,
+    /// The lamp's own agent's readiness (#8138, [`crate::agent`]), fed by
+    /// every open, hand-over, turn end and fault sign here.
+    agent: Arc<crate::agent::Agent>,
+    /// OpenClaw's Gateway probe (#8138): whether it answers now
+    /// ([`crate::gateway::answers`] on a lamp); `None`, not probed (tests,
+    /// unless set). While it reads not ready, no open is tried; once it
+    /// reads ready, the session opens at once.
+    gateway_probe: Option<GatewayProbe>,
+    /// Harness's `watch` on the kept session is live (#8138): an event came
+    /// on the watch now held. The `show` look ([`OneSession::idle_look`])
+    /// is the fallback only, while it is not.
+    watch_live: AtomicBool,
 }
+
+/// The lamp's agent tracked from now (#8138), its engine the one
+/// session's own until the lamp's default is read.
+fn track(facts: &mut crate::agent::Facts) {
+    facts.on = true;
+    if facts.engine.is_none() {
+        facts.engine = Some(crate::agent::SESSION_ENGINE.to_owned());
+    }
+}
+
+/// Whether OpenClaw's Gateway answers now ([`OneSession::with_gateway_probe`]).
+pub type GatewayProbe = Box<dyn Fn() -> bool + Send + Sync>;
 
 /// What a stuck session's replacement calls with why, for the journal and
 /// tests; the person's told line is [`Turn::restarted`]'s (#7906).
@@ -1323,6 +1446,27 @@ impl OneSession {
             .with_openclaw_db(crate::harness::openclaw_record_path(Path::new(
                 crate::runtime::OPENCLAW_STATE_DIR,
             )))
+            .with_agent(crate::agent::lamp())
+            .with_gateway_probe(Box::new(|| crate::gateway::answers(crate::gateway::PORT)))
+    }
+
+    /// The lamp's own agent's readiness this session feeds (#8138); tracked
+    /// (`on`) from now.
+    pub fn with_agent(mut self, agent: Arc<crate::agent::Agent>) -> Self {
+        agent.update(track);
+        self.agent = agent;
+        self
+    }
+
+    /// OpenClaw's Gateway probed with `probe` (#8138).
+    pub fn with_gateway_probe(mut self, probe: GatewayProbe) -> Self {
+        self.gateway_probe = Some(probe);
+        self
+    }
+
+    /// The readiness this session feeds (#8138).
+    pub fn readiness(&self) -> &Arc<crate::agent::Agent> {
+        &self.agent
     }
 
     pub fn new(queue_wait: Duration, look: Duration, open_idle_within: Duration) -> Self {
@@ -1344,6 +1488,13 @@ impl OneSession {
             dead_working: DEAD_WORKING,
             tool_stall: TOOL_RESULT_STALL,
             idle_look: KEEP_OPEN_WHILE_OPEN,
+            agent: {
+                let agent = Arc::new(crate::agent::Agent::default());
+                agent.update(track);
+                agent
+            },
+            gateway_probe: None,
+            watch_live: AtomicBool::new(false),
         }
     }
 
@@ -1596,6 +1747,9 @@ impl OneSession {
             eprintln!(
                 "tasks: one session: Harness takes no reply here (reply_off); each task gets its own pane"
             );
+            // #8138 review (1): no kept session to wait for: the lamp's
+            // agent is ready, its tasks going the per-task way.
+            self.agent.update(|facts| facts.per_task = true);
             self.drop_when_free("Harness takes no reply here (reply_off)");
         }
     }
@@ -1648,6 +1802,13 @@ impl OneSession {
     /// [`OneSession::drop_pane_as`]'s removal itself.
     fn drop_pane_now(&self, harness: &dyn PaneHarness, why: &str, token: bool) {
         let pane = self.lock().pane.take();
+        if pane.is_some() {
+            // #8138: none open until the next look opens one.
+            self.agent.session_from(
+                &[crate::agent::Session::Ready, crate::agent::Session::Working],
+                crate::agent::Session::Closed,
+            );
+        }
         let kept = self.kept();
         let program = pane
             .as_ref()
@@ -1914,9 +2075,19 @@ impl OneSession {
             inner.holder = None;
             inner.held_spoken = false;
             drop(inner);
+            self.turn_over();
             eprintln!("tasks: one session: {id}'s turn is done; the queue goes on");
             self.turned.notify_all();
         }
+    }
+
+    /// A turn let the pane go: the lamp's agent ready again, unless a
+    /// fault was seen meanwhile (#8138).
+    fn turn_over(&self) {
+        self.agent.session_from(
+            &[crate::agent::Session::Working],
+            crate::agent::Session::Ready,
+        );
     }
 
     /// The spoken task `id`'s turn ended without its answer: cancelled,
@@ -2092,7 +2263,14 @@ impl OneSession {
         if inner.pane.take().is_some() {
             inner.reopen_why = Some(why.to_owned());
             eprintln!("tasks: one session: let go: {why}");
+            self.agent.update(|facts| {
+                facts.session = crate::agent::Session::Recovering("daemon_restarted");
+            });
         }
+        // A new daemon: its watch is started again, and `show` looks until
+        // it is.
+        self.watch_live.store(false, Ordering::Release);
+        inner.watch_given_up = None;
         inner.next_open = None;
         inner.failed_opens = 0;
         inner.not_ready_opens = 0;
@@ -2130,8 +2308,6 @@ impl OneSession {
                 one: self,
                 id: id.to_owned(),
                 opens: true,
-                sent: Mutex::new(None),
-                retried: AtomicBool::new(false),
                 restarted: AtomicBool::new(false),
                 make: false,
             });
@@ -2173,8 +2349,6 @@ impl OneSession {
                     one: self,
                     id: id.to_owned(),
                     opens: true,
-                    sent: Mutex::new(None),
-                    retried: AtomicBool::new(false),
                     restarted: AtomicBool::new(false),
                     make: false,
                 });
@@ -2277,20 +2451,424 @@ impl OneSession {
         let mut looks = Looks::default();
         while !stop.load(Ordering::Acquire) {
             let key = key();
-            let signed_out =
-                crate::skill_task::harness_sign_in() == crate::skill_task::HarnessHere::SignedOut;
+            let here = crate::skill_task::harness_sign_in();
+            let signed_out = here == crate::skill_task::HarnessHere::SignedOut;
+            self.lamp_known(key.as_ref(), here);
+            self.confirm_if_warmed(&*harness);
+            self.gateway_look(&mut looks, Instant::now());
             self.remove_if_due(&looks, key.as_ref(), signed_out, &*harness);
             if self.lock().restart_due.is_some()
                 && let Some(harness) = harness()
             {
                 self.restart_if_due(&harness);
             }
-            self.idle_look(&mut looks, Instant::now(), &*harness);
+            // `show`'s look is the fallback while Harness's `watch` on the
+            // kept session is not live (#8138).
+            if !self.watch_live.load(Ordering::Acquire) {
+                self.idle_look(&mut looks, Instant::now(), &*harness);
+            }
             self.look(&mut looks, Instant::now(), key, &*place);
             let until = Instant::now() + KEEP_OPEN_EVERY;
             while Instant::now() < until && !stop.load(Ordering::Acquire) {
                 std::thread::sleep(Duration::from_millis(100));
             }
+        }
+    }
+
+    /// The lamp's default engine (`key`, [`lamp_key`]) and whether Harness
+    /// is here, for the lamp's agent's readiness (#8138). An engine not
+    /// known yet keeps the last, at first the one session's own.
+    pub fn lamp_known(&self, key: Option<&String>, here: crate::skill_task::HarnessHere) {
+        use crate::skill_task::HarnessHere;
+        let engine = key
+            .and_then(|key| key.split_once(' '))
+            .map(|(_, engine)| engine)
+            .filter(|engine| !engine.is_empty())
+            .map(str::to_owned);
+        self.agent.update(|facts| {
+            facts.harness = match here {
+                HarnessHere::Absent => crate::agent::Harness::Absent,
+                HarnessHere::Unknown => crate::agent::Harness::Unknown,
+                HarnessHere::SignedIn | HarnessHere::SignedOut => crate::agent::Harness::Here,
+            };
+            if engine.is_some() {
+                facts.engine = engine;
+            }
+        });
+    }
+
+    /// #8138: one look at OpenClaw's Gateway ([`OneSession::with_gateway_probe`]),
+    /// every [`GATEWAY_LOOK_READY`] while it answers and [`GATEWAY_LOOK_DOWN`]
+    /// while it does not; read down after [`GATEWAY_DOWN_LOOKS`] looks in a
+    /// row. Down with a session open: that session lost its Gateway (a
+    /// restart under it, an install or update), so the lamp's agent reads
+    /// `recovering` and the session is replaced fresh. Back up: the next
+    /// open is tried at once, whatever was left of a wait (#7321, #7741).
+    pub fn gateway_look(&self, looks: &mut Looks, now: Instant) {
+        let Some(probe) = &self.gateway_probe else {
+            return;
+        };
+        if self.agent.facts().engine.as_deref() != Some(crate::agent::SESSION_ENGINE) {
+            looks.gateway_down = 0;
+            self.agent
+                .update(|facts| facts.gateway = crate::agent::Gateway::Unknown);
+            return;
+        }
+        if looks.gateway_next.is_some_and(|next| now < next) {
+            return;
+        }
+        let up = probe();
+        looks.gateway_next = Some(
+            now + if up {
+                GATEWAY_LOOK_READY
+            } else {
+                GATEWAY_LOOK_DOWN
+            },
+        );
+        let was_down = looks.gateway_down >= GATEWAY_DOWN_LOOKS;
+        looks.gateway_down = if up {
+            0
+        } else {
+            looks.gateway_down.saturating_add(1)
+        };
+        let down = looks.gateway_down >= GATEWAY_DOWN_LOOKS;
+        if up {
+            self.agent
+                .update(|facts| facts.gateway = crate::agent::Gateway::Ready);
+            if was_down || looks.gateway_seen_down {
+                looks.gateway_seen_down = false;
+                eprintln!("tasks: one session: OpenClaw's Gateway answers again; opened at once");
+                let mut inner = self.lock();
+                inner.next_open = None;
+                inner.failed_opens = 0;
+                inner.not_ready_opens = 0;
+                inner.replaced_in_row = 0;
+                inner.woken = inner.woken.wrapping_add(1);
+                drop(inner);
+                // An open's failure past its quick tries is no longer said:
+                // tried again now.
+                self.agent.session_from(
+                    &[
+                        crate::agent::Session::Failed("open_failed"),
+                        crate::agent::Session::Failed("stuck_again"),
+                    ],
+                    crate::agent::Session::Recovering("gateway_back"),
+                );
+            }
+        } else if down && !was_down {
+            looks.gateway_seen_down = true;
+            eprintln!(
+                "tasks: one session: OpenClaw's Gateway does not answer ({} looks); no open until it does",
+                looks.gateway_down
+            );
+            let since = now - GATEWAY_LOOK_DOWN.saturating_mul(GATEWAY_DOWN_LOOKS - 1);
+            self.agent.update(|facts| {
+                if !matches!(facts.gateway, crate::agent::Gateway::Down(_)) {
+                    facts.gateway = crate::agent::Gateway::Down(since);
+                }
+            });
+            // A session open loses its Gateway: replaced fresh once it is
+            // back (the close now; the open waits for the Gateway).
+            let mut inner = self.lock();
+            if let Some(agent) = inner.pane.as_ref().map(|pane| pane.agent.clone())
+                && inner.restart_due.is_none()
+            {
+                inner.restart_due = Some((agent, "OpenClaw's Gateway stopped answering".into()));
+            }
+            // #8138 review (3): a spoken task handed over is ended at once,
+            // told, not left to the store's bounds.
+            if inner.held_spoken {
+                inner.turn_broken = inner.holder.clone();
+            }
+        }
+    }
+
+    /// Whether no open may be tried now: the Gateway probed and read down
+    /// (#8138: the open waits for it, then goes at once).
+    fn gateway_holds(&self, looks: &Looks) -> bool {
+        self.gateway_probe.is_some()
+            && looks.gateway_down >= GATEWAY_DOWN_LOOKS
+            && self.agent.facts().engine.as_deref() == Some(crate::agent::SESSION_ENGINE)
+    }
+
+    /// The kept OpenClaw session to watch now: its agent and machine.
+    fn watched(&self) -> Option<(String, String)> {
+        let inner = self.lock();
+        inner
+            .pane
+            .as_ref()
+            .filter(|pane| pane.kept && pane.place.engine == EngineKind::Openclaw)
+            .filter(|pane| inner.watch_given_up.as_deref() != Some(pane.agent.as_str()))
+            .map(|pane| (pane.agent.clone(), pane.place.machine.clone()))
+    }
+
+    /// #8138: Harness's `watch` on the kept session, held on a thread of
+    /// its own while `stop` is not set, the primary live source of its
+    /// state (Harness 0.6.77+ pushes `started`, `working`, `idle`, `done`,
+    /// `held`, `failed`, `stopped` at once): [`OneSession::watched_event`]
+    /// for each. Ended by Harness after `done` or its own bound, it is
+    /// started again at once; cancelled when another session is open. A
+    /// watch that fails (the daemon gone, the link lost) leaves the state
+    /// unknown: the lamp's agent reads `recovering` and the session is
+    /// ensured again and watched again ([`OneSession::watch_lost`]). With no
+    /// `watch` (an older Harness), or [`WATCH_TRIES`] failures in a row
+    /// with no event, `show`'s look stays the fallback.
+    pub fn watch_kept<H: PaneHarness>(
+        self: Arc<Self>,
+        harness: Box<dyn Fn() -> Option<H> + Send>,
+        stop: Arc<AtomicBool>,
+    ) {
+        // Failures in a row, per watched session (#8138 review (4)): a
+        // session ensured again comes back with its id, so the bound trips.
+        let mut failures = (String::new(), 0u32);
+        let rest = |for_: Duration, agent: Option<&str>| {
+            let until = Instant::now() + for_;
+            let handovers = self.lock().handovers;
+            while Instant::now() < until && !stop.load(Ordering::Acquire) {
+                // The idle rest ends at the next hand-over, or when another
+                // session is open.
+                if let Some(agent) = agent
+                    && (self.lock().handovers != handovers
+                        || self.agent().as_deref() != Some(agent))
+                {
+                    return;
+                }
+                std::thread::sleep(Duration::from_millis(50));
+            }
+        };
+        while !stop.load(Ordering::Acquire) {
+            match self.watch_next(&*harness, &stop, &mut failures) {
+                (WatchRest::None, _) => {}
+                (WatchRest::Guard, _) => rest(WATCH_GUARD, None),
+                (WatchRest::Retry, _) => rest(WATCH_RETRY, None),
+                (WatchRest::Idle, agent) => rest(WATCH_IDLE_REST, agent.as_deref()),
+            }
+        }
+    }
+
+    /// One pass of [`OneSession::watch_kept`]: the session to watch, if
+    /// any, watched once; how long to rest after, and the session watched.
+    /// `failures` is kept across passes, whatever is open between: a
+    /// session let go after a failed watch and ensured again is the same
+    /// id, so its count goes on (#8138 review (4)).
+    fn watch_next<H: PaneHarness>(
+        &self,
+        harness: &dyn Fn() -> Option<H>,
+        stop: &AtomicBool,
+        failures: &mut (String, u32),
+    ) -> (WatchRest, Option<String>) {
+        let Some((agent, machine)) = self.watched() else {
+            self.watch_live.store(false, Ordering::Release);
+            return (WatchRest::Guard, None);
+        };
+        let Some(cli) = harness() else {
+            return (WatchRest::Guard, None);
+        };
+        let rest = self.watch_round(&cli, &agent, &machine, stop, failures);
+        (rest, Some(agent))
+    }
+
+    /// One `watch` of the kept session `agent` until it ends, and how long
+    /// to rest before the next ([`OneSession::watch_kept`]). `failures` is
+    /// the failures in a row of the session it names.
+    fn watch_round(
+        &self,
+        cli: &dyn PaneHarness,
+        agent: &str,
+        machine: &str,
+        stop: &AtomicBool,
+        failures: &mut (String, u32),
+    ) -> WatchRest {
+        if failures.0 != agent {
+            *failures = (agent.to_owned(), 0);
+        }
+        let cancel = AtomicBool::new(false);
+        let done = AtomicBool::new(false);
+        let mut heard = 0u32;
+        let end = std::thread::scope(|scope| {
+            scope.spawn(|| {
+                while !done.load(Ordering::Acquire) {
+                    if stop.load(Ordering::Acquire) || self.agent().as_deref() != Some(agent) {
+                        cancel.store(true, Ordering::Release);
+                        return;
+                    }
+                    std::thread::sleep(Duration::from_millis(20).min(WATCH_GUARD));
+                }
+            });
+            let end = cli.watch_pane(machine, agent, &cancel, &mut |event| {
+                heard = heard.saturating_add(1);
+                self.watch_live.store(true, Ordering::Release);
+                // The first line is the state now, which may be an earlier
+                // turn's end: never this turn's (#8138 review (2)).
+                self.watched_event_at(agent, event, heard == 1);
+            });
+            done.store(true, Ordering::Release);
+            end
+        });
+        self.watch_live.store(false, Ordering::Release);
+        match end {
+            // Ended after `done`: no turn of ours on it, or nothing but the
+            // state it was in already: rested until a hand-over.
+            // Ended after `done`. With no turn of ours held: rested until a
+            // hand-over. With one held (its `done` may be an earlier turn's
+            // first line), watched again 2 s later, so the turn's own end
+            // is never missed (#8138 review 2).
+            WatchEnd::Settled => {
+                failures.1 = 0;
+                if self.lock().holder.is_none() {
+                    WatchRest::Idle
+                } else {
+                    WatchRest::Retry
+                }
+            }
+            // At its own bound: watched again now.
+            WatchEnd::Timeout => {
+                failures.1 = 0;
+                WatchRest::None
+            }
+            WatchEnd::Cancelled => WatchRest::None,
+            WatchEnd::Missing => {
+                eprintln!(
+                    "tasks: one session: Harness has no watch here; show's look stays the fallback"
+                );
+                self.lock().watch_given_up = Some(agent.to_owned());
+                WatchRest::None
+            }
+            WatchEnd::Stopped => {
+                self.watched_event(agent, WatchEvent::Stopped);
+                WatchRest::Retry
+            }
+            WatchEnd::Failed(code) => {
+                failures.1 = failures.1.saturating_add(1);
+                if failures.1 >= WATCH_TRIES {
+                    eprintln!(
+                        "tasks: one session: the kept session's watch failed {} times in a row ({code}); show's look stays the fallback",
+                        failures.1
+                    );
+                    self.lock().watch_given_up = Some(agent.to_owned());
+                    WatchRest::None
+                } else {
+                    self.watch_lost(agent, &code);
+                    WatchRest::Retry
+                }
+            }
+        }
+    }
+
+    /// #8138: one event of Harness's `watch` on the kept session `agent`.
+    /// `working` (or background work, or an ask of the person's) is on a
+    /// task; `idle` and `done` free again with no turn held, and end a
+    /// spoken turn's wait at once (#8109: the store reads it now, not at its
+    /// wait's bound); `held`, `failed` and `stopped` are faults: the lamp's
+    /// agent reads `recovering` at once, a spoken turn held is read now (so
+    /// its task ends told), and a fresh session replaces it once the pane
+    /// is let go.
+    pub fn watched_event(&self, agent: &str, event: WatchEvent) {
+        self.watched_event_at(agent, event, false);
+    }
+
+    /// [`OneSession::watched_event`], `first` the watch's first line: the
+    /// state the session was in already, never the end of a turn of ours.
+    fn watched_event_at(&self, agent: &str, event: WatchEvent, first: bool) {
+        let (holder, spoken) = {
+            let inner = self.lock();
+            if inner.pane.as_ref().is_none_or(|pane| pane.agent != agent) {
+                return;
+            }
+            (inner.holder.clone(), inner.held_spoken)
+        };
+        use crate::agent::Session;
+        match event {
+            WatchEvent::Started => {}
+            WatchEvent::Working | WatchEvent::Background | WatchEvent::NeedsPerson => {
+                self.agent
+                    .session_from(&[Session::Ready, Session::Working], Session::Working);
+            }
+            WatchEvent::Idle | WatchEvent::Done => {
+                // Idle: it takes input (#8138 review (5)).
+                self.confirm();
+                if spoken && !first {
+                    self.lock().turn_ended = holder;
+                } else if holder.is_none() {
+                    self.turn_over();
+                }
+            }
+            WatchEvent::Held | WatchEvent::Failed | WatchEvent::Stopped => {
+                let why = format!("Harness's watch says it is {}", event.name());
+                eprintln!("tasks: one session: {}: {why} (#8138)", short(agent));
+                self.recovering(match event {
+                    WatchEvent::Held => "held",
+                    WatchEvent::Failed => "launch_failed",
+                    _ => "session_gone",
+                });
+                let mut inner = self.lock();
+                // #8138 review (3): the spoken task handed over is ended at
+                // once, told, before the recovery; unless the watch read
+                // its turn's end first (`done` then `stopped`): its read
+                // decides, never ended stuck over its answer (review 2, 2).
+                if spoken && inner.turn_ended != holder {
+                    inner.turn_broken = holder;
+                }
+                if inner.restart_due.is_none() {
+                    inner.restart_due = Some((agent.to_owned(), why));
+                }
+            }
+        }
+    }
+
+    /// #8138: the kept session `agent`'s watch failed with `code`: its
+    /// state unknown, so the lamp's agent reads `recovering`, and with no
+    /// turn held the session is let go to be ensured again at the next look
+    /// (a live one comes back as it is) and watched again. A turn held keeps
+    /// it: its own wait reads its end.
+    pub fn watch_lost(&self, agent: &str, code: &str) {
+        eprintln!(
+            "tasks: one session: the kept session {}'s watch ended ({code}); ensured and watched again",
+            short(agent)
+        );
+        if self.lock().holder.is_none() {
+            self.gone(agent, "its watch was lost");
+        }
+    }
+
+    /// #8138: why the session `agent` is broken, when a fault seen beside
+    /// its turn left its replacement due ([`Inner::restart_due`]).
+    fn broken(&self, agent: &str) -> Option<String> {
+        self.lock()
+            .restart_due
+            .as_ref()
+            .filter(|(due, _)| due == agent)
+            .map(|(_, why)| why.clone())
+    }
+
+    /// #8138 (#8109): the spoken task whose turn Harness's `watch` read
+    /// ended or broken since the last call, for the store to read at once.
+    pub fn take_turn_end(&self) -> Option<String> {
+        self.lock().turn_ended.take()
+    }
+
+    /// #8138 review (3): the spoken task whose session broke under it
+    /// since the last call, for the store to end at once `not_sent`
+    /// [`STUCK_ENDED`].
+    pub fn take_turn_broken(&self) -> Option<String> {
+        self.lock().turn_broken.take()
+    }
+
+    /// A broken turn the store could not end yet (a job under way): kept
+    /// for the next call ([`OneSession::take_turn_broken`]).
+    pub fn put_turn_broken(&self, id: String) {
+        let mut inner = self.lock();
+        if inner.turn_broken.is_none() {
+            inner.turn_broken = Some(id);
+        }
+    }
+
+    /// A spoken turn's end the store could not read yet: kept for the
+    /// next call ([`OneSession::take_turn_end`]).
+    pub fn put_turn_end(&self, id: String) {
+        let mut inner = self.lock();
+        if inner.turn_ended.is_none() {
+            inner.turn_ended = Some(id);
         }
     }
 
@@ -2463,115 +3041,6 @@ impl OneSession {
         })
     }
 
-    /// #8001: after the kept session `agent` refused a
-    /// [`REPLY_KEPT_FIRST_HELD`] reply `ENGINE_NOT_READY` (nothing typed),
-    /// why its engine is frozen, read from one `show`, if either sign
-    /// holds. Signal D, idle but deaf (lamp-c0a4, 20 Nov: a SIGSTOP of the
-    /// TUI undone by SIGCONT within 50 ms leaves it alive, `/proc` state
-    /// `S`, yet refusing every reply): `show` reads it `idle`, no other
-    /// turn of lamp-tasks holds the pane (the turn `id` alone), the pane
-    /// is past its start window (`open_idle_within` since its open, as the
-    /// idle look), and the Gateway record is readable, whatever its last
-    /// row (an idle session after a finished turn ends with the
-    /// assistant's reply; ROW on lamp-c0a4, 20 Nov). Signal W:
-    /// `show` reads it `working` while no turn of ours is in it, its
-    /// Gateway record the same as `base` (read just before the reply).
-    /// A `TIMEOUT` (a ready engine that did not take the words yet) is
-    /// neither, and no `show` is asked. Journaled once a check.
-    fn frozen_at_hand_over(
-        &self,
-        harness: &dyn PaneHarness,
-        machine: &str,
-        agent: &str,
-        id: &str,
-        base: Option<&(String, i64)>,
-        took: &Took,
-    ) -> Option<String> {
-        if *took != Took::EngineNotReady {
-            return None;
-        }
-        let state = match harness.observe(machine, agent) {
-            Ok(seen) => seen.seen.state,
-            Err(_) => "unread".to_owned(),
-        };
-        let (frozen, deaf, reason) = match state.as_str() {
-            "idle" => match self.deaf_why_not(harness, agent, id) {
-                None => (
-                    Some(
-                        "Harness reads it idle, yet it refused the words: idle but deaf".to_owned(),
-                    ),
-                    true,
-                    "idle, no other turn, past its start window, its record read".to_owned(),
-                ),
-                Some(not) => (None, false, not),
-            },
-            "working" => {
-                let now = base.and_then(|_| self.records(harness, agent).and_then(|read| read()));
-                let w = match (base, now) {
-                    // The assistant's row last: a tool call or exec still
-                    // running.
-                    (Some(_), Some(now)) if now.last_role.as_deref() == Some("assistant") => None,
-                    (Some(base), Some(now))
-                        if (now.session.as_str(), now.seq) == (base.0.as_str(), base.1) =>
-                    {
-                        Some(
-                            "Harness reads it working with no turn of ours, and its Gateway record did not move"
-                                .to_owned(),
-                        )
-                    }
-                    _ => None,
-                };
-                let reason = if w.is_some() {
-                    "working, its Gateway record unmoved: signal W"
-                } else {
-                    "working, its Gateway record moving or unread"
-                };
-                (w, false, reason.to_owned())
-            }
-            _ => (None, false, "not idle".to_owned()),
-        };
-        eprintln!(
-            "tasks: one session: {} first reply refused ENGINE_NOT_READY; show {state}; deaf={} ({reason})",
-            short(agent),
-            if deaf { "yes" } else { "no" }
-        );
-        frozen
-    }
-
-    /// #8001 signal D's conditions past `show` reading the kept session
-    /// `agent` `idle`: `None` when all hold, else the first that does not.
-    fn deaf_why_not(&self, harness: &dyn PaneHarness, agent: &str, id: &str) -> Option<String> {
-        {
-            let inner = self.lock();
-            if inner.holder.as_deref().is_some_and(|holder| holder != id)
-                || inner.closing_for.is_some()
-                || inner.restart_due.is_some()
-            {
-                return Some("lamp-tasks holds another turn on it".into());
-            }
-            // No pane, or another agent's: never D (fails closed).
-            let Some(opened) = inner
-                .pane
-                .as_ref()
-                .filter(|pane| pane.agent == agent)
-                .map(|pane| pane.opened)
-            else {
-                return Some("no pane of this agent".into());
-            };
-            if opened.elapsed() < self.open_idle_within {
-                return Some("inside its start window".into());
-            }
-        }
-        // Any last row: an idle session after a finished turn always ends
-        // with the assistant's reply, and `show` idle already says no
-        // tool call is running (the record holds no cheap pending-call
-        // mark).
-        match self.records(harness, agent).and_then(|read| read()) {
-            None => Some("its Gateway record unread".into()),
-            Some(_) => None,
-        }
-    }
-
     /// [`OneSession::keep_open`]'s removals for good, with nothing held: a
     /// sign-out ([`signed_out`]), or the lamp's machine or default engine
     /// changed since the pane was opened (`key` against the look's).
@@ -2663,6 +3132,10 @@ impl OneSession {
             }
             inner.woken
         };
+        // #8138: no open while the Gateway is down; once it answers, at once.
+        if self.gateway_holds(looks) {
+            return;
+        }
         let changed = looks.key.as_ref() != Some(&key) || looks.woken != woken;
         if !changed && looks.next.is_some_and(|next| now < next) {
             return;
@@ -2799,7 +3272,23 @@ impl OneSession {
             }
             self.closed_by_us(&pane.agent, pane.place.engine, true);
         }
-        self.open(harness, place, until, ended)
+        // #8138: opening, unless a fault's why or a failed open's error is
+        // already said; ready once open.
+        self.agent.session_from(
+            &[
+                crate::agent::Session::Closed,
+                crate::agent::Session::Ready,
+                crate::agent::Session::Working,
+            ],
+            crate::agent::Session::Opening,
+        );
+        let opened = self.open(harness, place, until, ended);
+        // Ready once open and known to take input (#8138 review (5)): a
+        // session still warming stays `starting` until it is confirmed.
+        if opened.is_ok() && self.lock().pane.as_ref().is_none_or(|pane| pane.confirmed) {
+            self.agent.session(crate::agent::Session::Ready);
+        }
+        opened
     }
 
     fn open(
@@ -3089,10 +3578,16 @@ impl OneSession {
                 return Err(self.open_failed(&format!("harness ensure: {code}")));
             }
         };
+        self.saw_state(&ensured.state);
         let agent = ensured.agent_id.clone();
         let mut pane = Pane::new(&agent, place, true);
         pane.session = ensured.engine_session.clone();
         pane.checked_at_open = checked || ensured.result == "new";
+        // #8138 review (5): `ensure` confirmed it taking input, or it is a
+        // session already up that Harness did not say unconfirmed. A new
+        // one is confirmed by its first words taken.
+        pane.confirmed = ensured.confirmed == Some(true)
+            || (ensured.result != "new" && ensured.confirmed != Some(false));
         {
             let mut inner = self.lock();
             if ensured.result == "new" {
@@ -3236,7 +3731,16 @@ impl OneSession {
             took = harness.reply_kept(name, token, OPEN_PROMPT, REPLY_KEPT_HELD);
         }
         let input = match took {
-            Took::Taken(input) => input,
+            Took::Taken(input) => {
+                self.confirm();
+                input
+            }
+            // Harness takes no reply here already at the first words: noted
+            // at once, so the agent reads `ready` (the per-task way).
+            Took::NotSent(code) if code == "reply_off" => {
+                self.no_reply_here();
+                return None;
+            }
             other => {
                 eprintln!(
                     "tasks: one session: the kept session's first words not taken: {other:?}"
@@ -3330,7 +3834,11 @@ impl OneSession {
 
     /// One `show` of the pane `agent` for #7906's signs 1 and 2.
     fn pane_sign(&self, harness: &dyn PaneHarness, machine: &str, agent: &str) -> Seen {
-        match harness.observe(machine, agent) {
+        let seen = harness.observe(machine, agent);
+        if let Ok(seen) = &seen {
+            self.saw_state(&seen.seen.state);
+        }
+        match seen {
             Err(code) if code == "gone" => Seen::Died("Harness no longer has it".into()),
             Ok(seen) if seen.shell => {
                 Seen::Died("its engine exited; the pane is a plain shell".into())
@@ -3350,6 +3858,15 @@ impl OneSession {
         }
     }
 
+    /// #8138 review (8): Harness read the kept session `installing` (an
+    /// OTA installing OpenClaw) or not: the lamp's agent `installing` then.
+    fn saw_state(&self, state: &str) {
+        let installing = state == "installing";
+        if self.agent.facts().installing != installing {
+            self.agent.update(|facts| facts.installing = installing);
+        }
+    }
+
     /// #7906: the pane `agent` is gone or stuck (`why`), the one path every
     /// stuck sign takes. Closed `--now`,
     /// its id forgotten in the state file and its OpenClaw conversation
@@ -3363,6 +3880,7 @@ impl OneSession {
             "tasks: one session: {} is gone or stuck ({why}); closed, forgotten and replaced with a fresh session (#7906)",
             short(agent)
         );
+        self.recovering(fault_code(why));
         let engine = self
             .lock()
             .pane
@@ -3397,28 +3915,23 @@ impl OneSession {
         }
     }
 
-    /// One more stuck session reopened in a row ([`REPLACE_MOST`]): from
-    /// the second, the next open waits its backoff.
-    /// A revive (ladder (a)) counts too, and moves the bound one on, so
-    /// the ladder's plain (a) then (b) is not slowed, but no reopen,
-    /// whatever id it comes back with, goes on with no backoff.
+    /// One more broken session replaced in a row ([`REPLACE_MOST`]): from
+    /// that many, the next open waits [`OPEN_SLOW_RETRY`] and the lamp's
+    /// agent reads `error` (`stuck_again`); below it, the next open is at
+    /// once (#8138: fresh at once, no doubling backoff).
     fn count_replaced(&self) {
-        let (in_row, most) = {
+        let in_row = {
             let mut inner = self.lock();
             inner.replaced_in_row = inner.replaced_in_row.saturating_add(1);
-            let most = REPLACE_MOST + u32::from(inner.revived.is_some());
-            (inner.replaced_in_row, most)
+            inner.replaced_in_row
         };
-        // From the reopens in a row, not `failed_opens`, which the next
-        // `ensure` that answers resets: 5 s, doubled, at most 300 s.
-        if in_row >= most {
-            let after = OPEN_RETRY_FIRST
-                .saturating_mul(1 << (in_row - most).min(16))
-                .min(OPEN_RETRY_MOST);
-            self.lock().next_open = Some(Instant::now() + after);
+        if in_row >= REPLACE_MOST {
+            self.lock().next_open = Some(Instant::now() + OPEN_SLOW_RETRY);
+            self.agent
+                .session(crate::agent::Session::Failed("stuck_again"));
             eprintln!(
-                "tasks: one session: {in_row} stuck sessions in a row; the next open in {} s",
-                after.as_secs()
+                "tasks: one session: {in_row} broken sessions in a row; the next open in {} s",
+                OPEN_SLOW_RETRY.as_secs()
             );
         }
     }
@@ -3430,94 +3943,34 @@ impl OneSession {
         inner.revived = None;
         inner.not_ready_replies = None;
         inner.restarted = None;
+        drop(inner);
+        self.agent.session_from(
+            &[crate::agent::Session::Working],
+            crate::agent::Session::Ready,
+        );
     }
 
-    /// #7906 sign 5: the kept session `agent`'s reply refused
-    /// `ENGINE_NOT_READY`, counted. Why it is gone or stuck once
-    /// [`KEPT_NOT_READY_REFUSALS`] in a row span [`KEPT_NOT_READY_FOR`]
-    /// (never past `open_idle_within`, shorter in tests), each within twice
-    /// that of the one before: an old refusal (its task given up at its
-    /// run's end) never joins a later one. A session
-    /// `ensure` made new within `open_idle_within` is in its first words'
-    /// window: its refusals are not counted.
-    fn reply_not_ready(&self, agent: &str) -> Option<String> {
-        let mut inner = self.lock();
-        let made_new = inner
-            .pane
-            .as_ref()
-            .filter(|pane| pane.kept && pane.agent == agent)?
-            .made_new;
-        let now = Instant::now();
-        if made_new.is_some_and(|at| now.saturating_duration_since(at) < self.open_idle_within) {
-            return None;
-        }
-        let bound = KEPT_NOT_READY_FOR.min(self.open_idle_within);
-        let (first, count) = match inner.not_ready_replies {
-            Some((first, last, count))
-                if now.saturating_duration_since(last) <= bound.saturating_mul(2) =>
-            {
-                (first, count.saturating_add(1))
-            }
-            _ => (now, 1),
-        };
-        inner.not_ready_replies = Some((first, now, count));
-        let span = now.saturating_duration_since(first);
-        (count >= KEPT_NOT_READY_REFUSALS && span >= bound).then(|| {
-            format!(
-                "its replies refused ENGINE_NOT_READY {count} times in a row over {} s",
-                span.as_secs()
-            )
-        })
-    }
-
-    /// #7906, the owner's ladder, the lightest reopen first. (a) A kept
-    /// session whose engine or pane died (`died`) while OpenClaw's record
-    /// still holds its conversation (or can't be read): let go with no
-    /// close and no delete, so the next `ensure` is a plain resume that
-    /// keeps its memory, once. (b) Otherwise, or died again after that
-    /// resume: [`OneSession::replace_kept`], a fresh conversation. (c) The
-    /// backoff of [`REPLACE_MOST`]. Returns whether it was (a).
+    /// #7906's ladder, made fresh-first by #8138 (the lead's decision 4):
+    /// a broken session is closed and a fresh one opened
+    /// ([`OneSession::replace_kept`]), never resumed to keep its
+    /// conversation first (the agent's own memory is not kept; the
+    /// voice's is). `died` is kept for the journal's callers. Returns
+    /// whether it was a plain resume: never now.
     pub fn revive_or_replace(
         &self,
         harness: &dyn PaneHarness,
         machine: &str,
         agent: &str,
         why: &str,
-        died: bool,
+        _died: bool,
     ) -> bool {
-        // Keyed by the kept session's name and token, never its agent id:
-        // a resume that comes back with a new id is the same session.
-        let key = self
-            .kept_now(agent)
-            .map(|(name, token)| format!("{name}:{}", token.display()));
-        let revive = died
-            && key.is_some()
-            && self.lock().revived != key
-            && harness.session_held(&self.kept_session_key(agent)) != Some(false);
-        if !revive {
-            self.replace_kept(harness, machine, agent, why);
-            return false;
-        }
-        eprintln!(
-            "tasks: one session: {} died ({why}); OpenClaw still holds its conversation, so a plain resume first (#7906)",
-            short(agent)
-        );
-        self.lock().revived = key;
-        self.gone(agent, why);
-        // A resume counts toward the replacements in a row too, so no
-        // reopen loops with no backoff.
-        self.count_replaced();
-        true
+        self.replace_kept(harness, machine, agent, why);
+        false
     }
 
-    /// #7906 sign 5, the ladder for a kept session `agent` refusing
-    /// `ENGINE_NOT_READY` (`why`): its process frozen, not dead, so a plain
-    /// resume alone finds it `live` again. (a) Closed `--now`, its record
-    /// and OpenClaw conversation kept (never deleted), so the next plain
-    /// `ensure` starts a new process on the same conversation, its memory
-    /// kept; once, as [`OneSession::revive_or_replace`]'s. (b) Otherwise,
-    /// a close refused, or signs again after it:
-    /// [`OneSession::replace_kept`], `--fresh`. Returns whether it was (a).
+    /// #7906 sign 5's ladder, fresh-first since #8138: as
+    /// [`OneSession::revive_or_replace`], closed `--now` and replaced by a
+    /// fresh session. Returns whether it was a plain resume: never now.
     pub fn restart_or_replace(
         &self,
         harness: &dyn PaneHarness,
@@ -3525,7 +3978,7 @@ impl OneSession {
         agent: &str,
         why: &str,
     ) -> bool {
-        // #8001: this is the close a spoken task may have left due.
+        // #8001: this is the close a fault may have left due.
         {
             let mut inner = self.lock();
             if inner
@@ -3536,80 +3989,21 @@ impl OneSession {
                 inner.restart_due = None;
             }
         }
-        let kept = self.kept_now(agent);
-        let key = kept
-            .as_ref()
-            .map(|(name, token)| format!("{name}:{}", token.display()));
-        let restart = key.is_some()
-            && self.lock().revived != key
-            && harness.session_held(&self.kept_session_key(agent)) != Some(false);
-        let closed = match kept.filter(|_| restart) {
-            // Harness's own close, not `close_kept`'s: a close refused as
-            // its conversation already gone has nothing to resume, so
-            // `--fresh` below, never a plain resume.
-            Some((name, token)) => harness.close_kept(&name, &token, true),
-            None => Err("no plain resume left".into()),
-        };
-        if let Err(code) = closed {
-            if restart {
-                eprintln!(
-                    "tasks: one session: the frozen kept session {} not closed for a resume: {code}",
-                    short(agent)
-                );
-            }
-            self.replace_kept(harness, machine, agent, why);
-            return false;
-        }
-        eprintln!(
-            "tasks: one session: {} is stuck ({why}); closed, its conversation kept, and resumed in a new process (#7906)",
-            short(agent)
-        );
-        {
-            let mut inner = self.lock();
-            inner.revived = key;
-            inner.restarted = Some((agent.to_owned(), Instant::now()));
-        }
-        self.gone(agent, why);
-        self.count_replaced();
-        true
+        self.replace_kept(harness, machine, agent, why);
+        false
     }
 
-    /// Whether the kept session `agent`'s `NOT_IDLE` refusal counts toward
-    /// #7906 sign 5: after sign 5's close and resume, before any reply is
-    /// taken, nothing of ours runs in that new process, so `working` there
-    /// is the frozen one's, not a turn to wait out.
-    fn busy_after_restart(&self) -> bool {
-        self.restarted_now(&self.lock()).is_some()
-    }
-
-    /// How long after sign 5's close its mark ([`Inner::restarted`])
-    /// counts: twice sign 5's own bound, as a gap between its refusals.
-    fn restart_bound(&self) -> Duration {
-        KEPT_NOT_READY_FOR
-            .min(self.open_idle_within)
-            .saturating_mul(2)
-    }
-
-    /// Sign 5's closed agent, while within [`OneSession::restart_bound`].
+    /// Sign 5's closed agent while its mark counts: never set since #8138
+    /// (no plain resume), so always `None`.
     fn restarted_now<'a>(&self, inner: &'a Inner) -> Option<&'a str> {
-        inner
-            .restarted
-            .as_ref()
-            .filter(|(_, at)| at.elapsed() <= self.restart_bound())
-            .map(|(agent, _)| agent.as_str())
+        inner.restarted.as_ref().map(|(agent, _)| agent.as_str())
     }
 
-    /// `harness ensure` said the engine is not ready: the next open after
-    /// [`NOT_READY_FIRST`], doubled at each in a row up to
-    /// [`NOT_READY_MOST`], as with no agent ready.
+    /// `harness ensure` said the engine is not ready past its short
+    /// retries: a failed open ([`OneSession::open_failed`]); with the
+    /// Gateway not answering, the open waits for it instead (#8138).
     fn not_ready(&self, why: &str) -> String {
-        let mut inner = self.lock();
-        inner.not_ready_opens = inner.not_ready_opens.saturating_add(1);
-        let after = NOT_READY_FIRST
-            .saturating_mul(1 << (inner.not_ready_opens - 1).min(16))
-            .min(NOT_READY_MOST);
-        inner.next_open = Some(Instant::now() + after);
-        format!("{why}; tried again in {} s", after.as_secs())
+        self.open_failed(why)
     }
 
     /// The pane an uncertain `new` may have made: the agent `ps` lists
@@ -3638,13 +4032,24 @@ impl OneSession {
         }
     }
 
+    /// An open failed: tried again [`OPEN_QUICK_GAP`] later for the first
+    /// [`OPEN_QUICK_TRIES`] in a row, then every [`OPEN_SLOW_RETRY`], the
+    /// lamp's agent `error` (`open_failed`) meanwhile (#8138).
     fn open_failed(&self, why: &str) -> String {
         let mut inner = self.lock();
         inner.failed_opens = inner.failed_opens.saturating_add(1);
-        let after = OPEN_RETRY_FIRST
-            .saturating_mul(1 << (inner.failed_opens - 1).min(16))
-            .min(OPEN_RETRY_MOST);
+        let slow = inner.failed_opens >= OPEN_QUICK_TRIES;
+        let after = if slow {
+            OPEN_SLOW_RETRY
+        } else {
+            OPEN_QUICK_GAP
+        };
         inner.next_open = Some(Instant::now() + after);
+        drop(inner);
+        if slow {
+            self.agent
+                .session(crate::agent::Session::Failed("open_failed"));
+        }
         format!("{why}; tried again in {} s", after.as_secs())
     }
 
@@ -3707,7 +4112,106 @@ impl OneSession {
             inner.pane = None;
             inner.reopen_why = Some(why.to_owned());
             inner.next_open = None;
+            drop(inner);
+            self.recovering(fault_code(why));
         }
+    }
+
+    /// The lamp's agent recovering with `why` (#8138), unless its opens
+    /// already failed past their quick tries (`error` stays until one
+    /// opens).
+    fn recovering(&self, why: &'static str) {
+        self.agent.update(|facts| {
+            if !matches!(facts.session, crate::agent::Session::Failed(_)) {
+                facts.session = crate::agent::Session::Recovering(why);
+            }
+        });
+    }
+
+    /// #8138 review (5): the pane open now is known to take input: the
+    /// lamp's agent `ready` from `starting`.
+    fn confirm(&self) {
+        let mut inner = self.lock();
+        let Some(pane) = inner.pane.as_mut().filter(|pane| !pane.confirmed) else {
+            return;
+        };
+        pane.confirmed = true;
+        drop(inner);
+        self.agent.session_from(
+            &[crate::agent::Session::Opening],
+            crate::agent::Session::Ready,
+        );
+    }
+
+    /// A pane open [`OneSession::open_idle_within`] (120 s) and still not
+    /// confirmed (no watch, an older Harness, no hand-over): taken as up,
+    /// so the lamp's agent never stays `starting` for good.
+    pub fn confirm_if_warmed<H: PaneHarness>(&self, harness: &dyn Fn() -> Option<H>) {
+        let warmed = self
+            .lock()
+            .pane
+            .as_ref()
+            .filter(|pane| {
+                !pane.confirmed && pane.kept && pane.born.elapsed() >= self.open_idle_within
+            })
+            .map(|pane| (pane.agent.clone(), pane.place.machine.clone()));
+        let Some((agent, machine)) = warmed else {
+            return;
+        };
+        let Some(harness) = harness() else {
+            return;
+        };
+        // One `show` first (#8138 review 2, 3): never taken as up blind.
+        match self.pane_sign(&harness, &machine, &agent) {
+            Seen::Moving => {
+                eprintln!(
+                    "tasks: one session: the kept session was not confirmed taking input within {} s; show reads it up",
+                    self.open_idle_within.as_secs()
+                );
+                self.confirm();
+            }
+            Seen::Died(why) => self.broken_while_warming(&agent, why),
+            Seen::Starting => self.broken_while_warming(
+                &agent,
+                format!("still starting after {} s", self.open_idle_within.as_secs()),
+            ),
+            // No verdict: looked at again in 30 s.
+            Seen::Unknown => {
+                if let Some(pane) = self.lock().pane.as_mut().filter(|pane| pane.agent == agent) {
+                    pane.born = Instant::now()
+                        .checked_sub(self.open_idle_within.saturating_sub(KEEP_OPEN_WHILE_OPEN))
+                        .unwrap_or(pane.born);
+                }
+            }
+        }
+    }
+
+    /// A session never confirmed taking input that `show` reads dead or
+    /// still starting past its window: a fault, replaced fresh.
+    fn broken_while_warming(&self, agent: &str, why: String) {
+        eprintln!(
+            "tasks: one session: the kept session {} was never confirmed taking input: {why}; replaced fresh",
+            short(agent)
+        );
+        self.recovering(fault_code(&why));
+        let mut inner = self.lock();
+        if inner.restart_due.is_none() {
+            inner.restart_due = Some((agent.to_owned(), why));
+        }
+    }
+
+    /// #8138 review (5): whether the kept session `agent` is still warming
+    /// up: not confirmed yet, or `ensure` made it new within its first
+    /// words' window ([`OneSession::open_idle_within`]). A refusal then is
+    /// its warm-up, not a fault: the task ends, the session is kept.
+    fn warming(&self, agent: &str) -> bool {
+        self.lock().pane.as_ref().is_some_and(|pane| {
+            pane.agent == agent
+                && (!pane.confirmed
+                    || pane
+                        .made_new
+                        .is_some_and(|at| at.elapsed() < self.open_idle_within))
+        })
     }
 
     /// #7906 sign 3, the seam before a turn is handed to the kept session
@@ -3736,7 +4240,9 @@ impl OneSession {
     /// The kept session `agent` took a turn now, the Gateway's record at
     /// `base` just before (#7906 sign 4's start bound).
     fn handed_over(&self, agent: &str, base: Option<(String, i64)>) {
+        self.confirm();
         let mut inner = self.lock();
+        inner.handovers = inner.handovers.wrapping_add(1);
         inner.not_ready_replies = None;
         inner.restarted = None;
         inner.idle_w_spent = false;
@@ -3810,8 +4316,44 @@ impl OneSession {
     }
 }
 
+/// A short code for a fault's why, for the lamp's agent's readiness
+/// (#8138, [`lamp_msgs::AgentReadiness::why`]).
+pub fn fault_code(why: &str) -> &'static str {
+    let why = why.to_ascii_lowercase();
+    let has = |word: &str| why.contains(word);
+    if has("engine_not_ready") || has("engine not ready") {
+        "engine_not_ready"
+    } else if has("deaf") {
+        "deaf"
+    } else if has("launch failed") {
+        "launch_failed"
+    } else if has("held") {
+        "held"
+    } else if has("plain shell") || has("exited") {
+        "engine_exited"
+    } else if has("no longer holds") {
+        "conversation_gone"
+    } else if has("gateway") {
+        "gateway_down"
+    } else if has("not running") || has("did not take") || has("not_running") {
+        "not_running"
+    } else if has("cancelled") {
+        "cancelled"
+    } else if has("asked something") || has("asks something") {
+        "asked_something"
+    } else if has("watch") {
+        "watch_lost"
+    } else if has("stopped") || has("failed") || has("no longer has") || has("gone") {
+        "session_gone"
+    } else {
+        "stuck"
+    }
+}
+
 /// #7906's told line: said once to the asker of a task whose stuck session
-/// was replaced and that was done again in the new one ([`Turn::restarted`]).
+/// was replaced before its words were typed, so the task was done in the
+/// new one ([`Turn::restarted`]). Never a redo: a task handed over is not
+/// typed again after a recovery (#8138).
 pub const RESTARTED_LINE: &str = "The agent got stuck, so I restarted it and did your request.";
 
 /// The pane held by one run's turn; let go when dropped, and the next in
@@ -3823,11 +4365,6 @@ pub struct Turn<'a> {
     /// may not: it runs on the tasks-harness worker, so with no fresh pane
     /// it is put back and the one-session thread opens or rotates it.
     opens: bool,
-    /// The last words sent, where and within when, for one put-back after
-    /// the session died under the turn (#7906, [`Turn::stuck`]).
-    sent: Mutex<Option<(Place, String, Instant)>>,
-    /// That put-back used.
-    retried: AtomicBool,
     /// Its session was replaced while this task waited or was in flight,
     /// and the task went on in the new one ([`Turn::restarted`], #7906's
     /// told line).
@@ -3897,8 +4434,6 @@ impl Turn<'_> {
             return Sent::NoReply;
         }
         let text = hand_over(&self.id, words);
-        *self.sent.lock().unwrap_or_else(|e| e.into_inner()) =
-            Some((place.clone(), words.to_owned(), until));
         let mut reopened = false;
         let mut sized = false;
         // #7906 sign 1: since when the pane has refused the words (busy,
@@ -3910,9 +4445,6 @@ impl Turn<'_> {
         // hand-over (sign 3), and a refused hand-over's wait watched (sign 4).
         let mut checked: Option<String> = None;
         let mut refused: Option<(TurnWatch, Instant)> = None;
-        // #7906 sign 5's last step was a plain resume (ladder (a)): one
-        // more sign in this send is the `--fresh` (b), not a give-up.
-        let mut revived = false;
         // #8001: the agent whose first reply this send held
         // [`REPLY_KEPT_FIRST_HELD`], and the rest of [`REPLY_KEPT_HELD`]
         // for the try after its refusal with no sign of a frozen engine.
@@ -3977,37 +4509,6 @@ impl Turn<'_> {
                     rest.take().unwrap_or(REPLY_KEPT_HELD)
                 };
                 let took = harness.reply_kept(&name, &token, &text, held);
-                // #8001: a refusal of the short hold (nothing typed) looked
-                // at once for a frozen engine; with no sign, the reply is
-                // tried again at once with the rest of today's hold, and the
-                // refusal is not counted toward sign 5, so a slow but
-                // healthy hand-over waits as long as before.
-                let mut frozen = None;
-                if probe && matches!(took, Took::EngineNotReady | Took::Timeout) {
-                    frozen = self.one.frozen_at_hand_over(
-                        harness,
-                        &place.machine,
-                        &agent,
-                        &self.id,
-                        base.as_ref(),
-                        &took,
-                    );
-                    let Some(why) = &frozen else {
-                        rest = Some(REPLY_KEPT_HELD.saturating_sub(held));
-                        continue;
-                    };
-                    eprintln!(
-                        "tasks: one session: {}: {} refused its words within {} s and {why} (#8001)",
-                        self.id,
-                        short(&agent),
-                        held.as_secs()
-                    );
-                }
-                let took = if frozen.is_some() {
-                    Took::EngineNotReady
-                } else {
-                    took
-                };
                 match took {
                     Took::Taken(input) => {
                         self.one.lock().unstarted = None;
@@ -4015,51 +4516,41 @@ impl Turn<'_> {
                         self.one.handed_over(&agent, base);
                         return Sent::Typed(turns);
                     }
-                    // Busy, or its engine not ready yet: the task stays in
-                    // lamp-tasks' own queue, tried again until its end, or
-                    // until what it waits on stops moving (#7906 sign 4).
-                    Took::NotIdle | Took::EngineNotReady => {
-                        // #7906 sign 5, before the run's end is looked at:
-                        // a frozen engine's refusal can take Harness ~62 s,
-                        // past a spoken task's whole bound.
-                        // After its close and resume, a `NOT_IDLE` counts too.
-                        // #8001: a frozen engine seen at the short hold's
-                        // refusal is sign 5 at once.
-                        let stuck = frozen.or_else(|| {
-                            (took == Took::EngineNotReady
-                                || (took == Took::NotIdle && self.one.busy_after_restart()))
-                            .then(|| self.one.reply_not_ready(&agent))
-                            .flatten()
-                        });
-                        if let Some(why) = stuck {
-                            if replaced && !revived {
-                                return self
-                                    .fallback(&format!("the kept session ensured again: {why}"));
-                            }
-                            replaced = true;
-                            self.restarted.store(true, Ordering::Release);
-                            refused = None;
-                            refused_since = None;
-                            // A spoken task never waits for the close or the
-                            // reopen (#8001: a `close --now` of a stopped
-                            // TUI can take its whole 60 s): it ends now,
-                            // told once, and the one-session thread closes
-                            // and reopens the session for the next ask.
-                            if !self.opens {
-                                self.one.lock().restart_due = Some((agent.clone(), why));
-                                return self.fallback(STUCK_CLOSED);
-                            }
-                            revived =
-                                self.one
-                                    .restart_or_replace(harness, &place.machine, &agent, &why);
-                            continue;
-                        }
+                    // A ready engine that did not take the words within the
+                    // first, short hold: tried again once with the rest of
+                    // today's hold, so a slow but healthy hand-over (8.4 s
+                    // at first use on lamp-c0a4) is never cut.
+                    Took::Timeout if probe => {
+                        rest = Some(REPLY_KEPT_HELD.saturating_sub(held));
+                    }
+                    // #8138 (the lead's decision 3): the FIRST refusal of a
+                    // hand-over is a fault. This task ends now, told
+                    // (`one_session_stuck`, or `one_session_not_started`
+                    // when the words were never taken), BEFORE any close or
+                    // reopen: the lamp's agent reads `recovering` at once,
+                    // and the one-session thread replaces the session with
+                    // a fresh one once this turn lets the pane go. The task
+                    // is never typed again after the recovery.
+                    // #8138 review (5): `ENGINE_NOT_READY` from a session
+                    // still warming up: this task ends told, the session is
+                    // kept. `NOT_RUNNING` (dead) or a whole hold not taken
+                    // (a late delivery could run a task told not done) is a
+                    // fault even then: closed `--now`, recovered fresh.
+                    Took::EngineNotReady if self.one.warming(&agent) => {
+                        return self.refused_while_warming(&agent, &took);
+                    }
+                    Took::EngineNotReady | Took::NotRunning | Took::Timeout => {
+                        return self.refused_at_hand_over(&agent, &took);
+                    }
+                    // Busy: the task stays in lamp-tasks' own queue, tried
+                    // again until its end, or until what it waits on stops
+                    // moving (#7906 sign 4).
+                    Took::NotIdle => {
                         if ended() || Instant::now() >= until {
                             return self
                                 .fallback("the kept session stayed busy until the run's end");
                         }
-                        let busy = matches!(took, Took::NotIdle);
-                        if let Some(gone) = self.refused_stuck(harness, &agent, busy, &mut refused)
+                        if let Some(gone) = self.refused_stuck(harness, &agent, true, &mut refused)
                         {
                             if replaced {
                                 return self.fallback(&format!(
@@ -4083,27 +4574,6 @@ impl Turn<'_> {
                             continue;
                         }
                         std::thread::sleep(self.one.look);
-                    }
-                    // Not running, or not taken in Harness's bound: ensured
-                    // again once (a died pane comes back resumed).
-                    Took::NotRunning | Took::Timeout if !reopened => {
-                        reopened = true;
-                        // A spoken task is put back while the session is
-                        // ensured again, so a session that comes back
-                        // `resumed` but never takes words (`starting`, `No
-                        // session found` in OpenClaw's gateway) would take
-                        // it back forever (#7895): bounded, and the session
-                        // not let go for it once spent.
-                        if !self.opens && self.one.not_up(&self.id) {
-                            return self.fallback(STARTING_SPENT);
-                        }
-                        self.one.gone(
-                            &agent,
-                            "Harness did not take the words into the kept session",
-                        );
-                    }
-                    Took::NotRunning | Took::Timeout => {
-                        return self.fallback("the kept session ensured again did not take them");
                     }
                     Took::NotSent(code) if code == "reply_off" => {
                         self.one.no_reply_here();
@@ -4224,6 +4694,66 @@ impl Turn<'_> {
         }
     }
 
+    /// #8138: the kept session `agent` refused this task's hand-over
+    /// (`took`: `ENGINE_NOT_READY`, `NOT_RUNNING`, or not taken within the
+    /// whole hold). The task ends at once, before any close or reopen: the
+    /// lamp's agent reads `recovering`, the session's replacement is left
+    /// due for the one-session thread ([`OneSession::restart_if_due`], once
+    /// this turn lets the pane go, within [`KEEP_OPEN_EVERY`]), and the
+    /// task is told: [`STARTING_SPENT`] (`one_session_not_started`) when
+    /// the session is not running or did not take the words,
+    /// [`STUCK_CLOSED`] (`one_session_stuck`) when its engine refused them.
+    fn refused_while_warming(&self, agent: &str, took: &Took) -> Sent {
+        // Not confirmed taking input until it is again: `starting`.
+        if let Some(pane) = self
+            .one
+            .lock()
+            .pane
+            .as_mut()
+            .filter(|pane| pane.agent == agent)
+        {
+            pane.confirmed = false;
+        }
+        self.one.agent.session_from(
+            &[crate::agent::Session::Ready, crate::agent::Session::Working],
+            crate::agent::Session::Opening,
+        );
+        eprintln!(
+            "tasks: one session: {}: {} refused the hand-over while warming up ({took:?}); the task ends now, the session is kept (#8138)",
+            self.id,
+            short(agent)
+        );
+        self.fallback(STARTING_SPENT)
+    }
+
+    fn refused_at_hand_over(&self, agent: &str, took: &Took) -> Sent {
+        let (code, why, told) = match took {
+            Took::EngineNotReady => (
+                "engine_not_ready",
+                "its reply was refused ENGINE_NOT_READY",
+                STUCK_CLOSED,
+            ),
+            Took::NotRunning => (
+                "not_running",
+                "Harness says it is not running",
+                STARTING_SPENT,
+            ),
+            _ => (
+                "not_running",
+                "it did not take the words within Harness's hold",
+                STARTING_SPENT,
+            ),
+        };
+        self.one.recovering(code);
+        self.one.lock().restart_due = Some((agent.to_owned(), why.to_owned()));
+        eprintln!(
+            "tasks: one session: {}: {} refused the hand-over ({why}); the task ends now, and a fresh session is opened after (#8138)",
+            self.id,
+            short(agent)
+        );
+        self.fallback(told)
+    }
+
     /// #7906 sign 1 while the words are refused: once refused for
     /// `open_idle_within`, one `show`; a pane gone, a plain shell or still
     /// `starting` is replaced (once per send) and `true` is returned, so
@@ -4312,6 +4842,8 @@ impl Turn<'_> {
         });
         drop(inner);
         self.one.used(agent, place);
+        // #8138: on a task now; the next one queues.
+        self.one.agent.session(crate::agent::Session::Working);
         if turns > 1 {
             eprintln!(
                 "tasks: one session: reused ({}) for {}",
@@ -4491,9 +5023,9 @@ impl Turn<'_> {
                 Some((name, token)) => {
                     match self.watched_wait(harness, agent, (name, token), &input, cancel, &watch) {
                         Ok(waited) => waited,
-                        // #7906 sign 4: handed over, not moving: the one
-                        // replace path, with its put-back (no tool ran:
-                        // typed again once; a tool ran: not replayed).
+                        // #7906 sign 4: handed over, not moving: the task
+                        // ends with its failed line, never typed again
+                        // (#8138), and the session is replaced fresh after.
                         Err(gone) => {
                             let tools = match harness.observe(machine, agent) {
                                 Ok(seen) => seen.seen.tools,
@@ -4566,10 +5098,10 @@ impl Turn<'_> {
                 }
                 // Harness 0.6.74 (openharness#4499): `wait` exits 1, its
                 // row `failed`, when the session's launch failed. The
-                // ladder at once, as for a died engine (a plain resume
-                // keeping its conversation first, a fresh one last), the
-                // turn's words typed again once with no tool run: never
-                // a look later, never the task dropped silently.
+                // turn ends at once with its failed line, as for a died
+                // engine, never typed again, and the session is replaced
+                // fresh after (#8138): never a look later, never the task
+                // dropped silently.
                 Ok(Some(state)) if state == "failed" => {
                     return self.launch_failed(harness, machine, agent, cancel, before_close);
                 }
@@ -4617,56 +5149,39 @@ impl Turn<'_> {
         )
     }
 
-    /// #7906: the turn's session died under it. The owner's rule: never
-    /// lose the task. Reopened the lightest way
-    /// ([`OneSession::revive_or_replace`]) and, once, while the turn shows
-    /// no tool run (`tools`, `show`'s count: no side effect yet), its words
-    /// typed again into the session reopened, still holding the queue (the
-    /// tasks behind it keep their order) and its run's token. A turn that
-    /// had run a tool is not replayed: it ends saying so, so the person can
-    /// ask again. A second death ends it with its one line.
+    /// #7906's signs on a turn handed over (died, stalled, its launch
+    /// failed), as #8138 (the lead's decision 3) settles them: the task
+    /// ends at once with its one line, its run's token ended first (V2's
+    /// order on #6510), BEFORE any close or reopen, and it is never typed
+    /// again. The lamp's agent reads `recovering`, and the session's fresh
+    /// replacement is left due for the one-session thread
+    /// ([`OneSession::restart_if_due`]) once this turn lets the pane go.
+    /// `tools`, `show`'s count, says only whether the task had begun work.
     #[allow(clippy::too_many_arguments)]
     fn stuck(
         &self,
-        harness: &dyn PaneHarness,
-        machine: &str,
+        _harness: &dyn PaneHarness,
+        _machine: &str,
         agent: &str,
-        (why, died): (&str, bool),
+        (why, _died): (&str, bool),
         tools: u64,
-        cancel: &AtomicBool,
+        _cancel: &AtomicBool,
         before_close: &dyn Fn(),
     ) -> Ended {
-        let sent = self.sent.lock().unwrap_or_else(|e| e.into_inner()).clone();
-        let again = tools == 0
-            && !cancel.load(Ordering::Acquire)
-            && !self.retried.swap(true, Ordering::AcqRel);
-        if let (true, Some((place, words, until))) = (again, sent) {
-            self.one
-                .revive_or_replace(harness, machine, agent, why, died);
-            self.restarted.store(true, Ordering::Release);
-            eprintln!(
-                "tasks: one session: {}: its session died ({why}); its words typed again once into the reopened one (#7906)",
-                self.id
-            );
-            let ended = || cancel.load(Ordering::Acquire);
-            return match self.send(harness, &place, &words, until, &ended) {
-                Sent::Typed(_) => self.wait_end(harness, &place.machine, cancel, before_close),
-                _ => Ended::Failed(format!(
-                    "the lamp's agent session got stuck ({why}); it was restarted, but the task could not be handed to it again"
-                )),
-            };
-        }
-        // Ended here: the run's token first (V2's order on #6510).
         before_close();
-        self.one
-            .revive_or_replace(harness, machine, agent, why, died);
+        self.one.recovering(fault_code(why));
+        self.one.lock().restart_due = Some((agent.to_owned(), why.to_owned()));
+        eprintln!(
+            "tasks: one session: {}: its session broke ({why}); the task ends now, never run again, and a fresh session is opened after (#8138)",
+            self.id
+        );
         Ended::Failed(if tools > 0 {
             format!(
                 "the lamp's agent session got stuck ({why}) after the task had started work, so it was not run again; ask again"
             )
         } else {
             format!(
-                "the lamp's agent session got stuck again ({why}); it was restarted, but the task was not done"
+                "the lamp's agent session got stuck ({why}); the task was not done, and the session is being restarted; ask again"
             )
         })
     }
@@ -4714,6 +5229,17 @@ impl Turn<'_> {
                         }
                     }
                     if cancel.load(Ordering::Acquire) {
+                        cut.store(true, Ordering::Release);
+                        return;
+                    }
+                    // #8138: a fault seen beside the turn (Harness's watch
+                    // read it held, failed or stopped; the Gateway stopped
+                    // answering): the turn ends now, not at its stall bound.
+                    if let Some(why) = self.one.broken(agent) {
+                        *verdict
+                            .lock()
+                            .unwrap_or_else(std::sync::PoisonError::into_inner) =
+                            Some(KeptGone::NotMoving(why));
                         cut.store(true, Ordering::Release);
                         return;
                     }
@@ -4826,10 +5352,14 @@ impl Drop for Turn<'_> {
         if inner.held_spoken {
             return;
         }
-        if inner.holder.as_deref() == Some(self.id.as_str()) {
+        let ours = inner.holder.as_deref() == Some(self.id.as_str());
+        if ours {
             inner.holder = None;
         }
         drop(inner);
+        if ours {
+            self.one.turn_over();
+        }
         self.one.turned.notify_all();
     }
 }

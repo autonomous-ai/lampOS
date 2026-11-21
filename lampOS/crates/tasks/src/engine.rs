@@ -1420,8 +1420,18 @@ pub struct Engine<P: Persistence> {
     /// (#7019: [`crate::runtime::lamp_default`] is the build's order's
     /// first before a look, never the file's).
     lamp_default: Option<EngineKind>,
+    /// The lamp's own agent's readiness (#8138, [`crate::agent`]), with the
+    /// one session on: a `prepare` for the lamp's own default agent is
+    /// refused at once ([`crate::agent::NOT_READY`]) while it takes none.
+    agent: Option<std::sync::Arc<crate::agent::Agent>>,
 }
 impl<P: Persistence> Engine<P> {
+    /// The lamp's own agent's readiness that refuses its tasks at prepare
+    /// while it takes none (#8138).
+    pub fn set_agent(&mut self, agent: std::sync::Arc<crate::agent::Agent>) {
+        self.agent = Some(agent);
+    }
+
     /// The lamp's own engines now and its default (#6492), set by the part
     /// before each request: the default is kept only while it is in the
     /// order.
@@ -1647,6 +1657,7 @@ impl<P: Persistence> Engine<P> {
             starting: false,
             lamp_order: Vec::new(),
             lamp_default: None,
+            agent: None,
             kept_aside,
             set_aside,
             targets_newer: None,
@@ -2113,6 +2124,18 @@ impl<P: Persistence> Engine<P> {
                 {
                     return Err(err(code, message));
                 }
+                // The lamp's own agent not taking tasks now (#8138): refused
+                // at once, so the voice tells the person now, not after a
+                // hand-over that would wait in silence. A session the person
+                // named is another pane: not this agent's.
+                if let Some(state) = self
+                    .agent
+                    .as_ref()
+                    .filter(|_| lamp && session.is_none())
+                    .and_then(|agent| agent.refusal(target_value.engine.argument()))
+                {
+                    return Err(err(crate::agent::NOT_READY, crate::agent::message(state)));
+                }
                 let id = take(&mut next.next_task_id)?;
                 let launch = Launch {
                     name: task_label(&next.store_id, id),
@@ -2333,7 +2356,8 @@ impl<P: Persistence> Engine<P> {
         }
         Ok(response)
     }
-    fn active(&self) -> bool {
+    /// Whether a launch, read or close is under way (a job holds a task).
+    pub fn active(&self) -> bool {
         self.state.tasks.iter().any(|t| {
             t.dispatch.state == DispatchState::Attempting
                 || t.read
@@ -2365,6 +2389,70 @@ impl<P: Persistence> Engine<P> {
             .observations
             .last()
             .map(|seen| seen.data.answer.as_str())
+    }
+
+    /// The task launched as `name`, by its id (#8138: a spoken turn's end
+    /// Harness's watch read, for its read at once).
+    pub fn task_of_launch(&self, name: &str) -> Option<u64> {
+        self.state
+            .tasks
+            .iter()
+            .find(|task| task.launch.name == name)
+            .map(|task| task.id)
+    }
+
+    /// #8138 review (3): the spoken task launched as `name`, handed over
+    /// to the lamp's kept session that then broke under it, ended at once
+    /// `not_sent` with `code` (the voice tells it as a refusal before the
+    /// hand-over): never left to its watch's bounds, never typed again.
+    /// Only a task still handed over with no answer settled, and with no
+    /// job under way ([`Engine::active`]) nor a read of it asked for (its
+    /// turn's end pending, which decides): `Ok(false)`, tried again.
+    /// Its reads of the broken turn are dropped with its agent id, as a
+    /// `not_sent` task has none.
+    pub fn end_broken(&mut self, name: &str, code: &str, now: &Clock) -> Result<bool, Error> {
+        self.clock(now)?;
+        if self.active() {
+            return Ok(false);
+        }
+        let Some(index) = self.state.tasks.iter().position(|task| {
+            task.launch.name == name
+                && task.dispatch.state == DispatchState::Accepted
+                && !task.observations.iter().any(|seen| settled(&seen.data))
+        }) else {
+            return Ok(true);
+        };
+        if self.state.tasks[index]
+            .read
+            .as_ref()
+            .is_some_and(|read| matches!(read.state, ReadState::Requested | ReadState::Attempting))
+        {
+            return Ok(false);
+        }
+        let mut next = self.state.clone();
+        let at = next_audit(&mut next, now)?;
+        let task = &mut next.tasks[index];
+        task.dispatch.state = DispatchState::NotSent;
+        task.dispatch.agent_id = None;
+        task.dispatch.joined = None;
+        task.dispatch.joined_on = None;
+        task.dispatch.code = Some(code.to_owned());
+        task.dispatch.finished = Some(at.clone());
+        task.read = None;
+        task.observations.clear();
+        task.watch_idle = None;
+        task.background_since = None;
+        task.close = None;
+        task.closable = false;
+        task.updated = at;
+        // The last receipt kept for a retried request (an `observe` of
+        // this task, say) may name the read just dropped: no longer a
+        // retry to answer the same, so it is let go, as a new request's.
+        if next.check().is_err() {
+            next.last_receipt = None;
+        }
+        self.save(next)?;
+        Ok(true)
     }
 
     /// Whether the launch `name` ended with its answer: its agent's last
@@ -4134,6 +4222,71 @@ mod tests {
         (engine, id)
     }
 
+    /// #8138: a task for the lamp's own agent is refused at prepare while
+    /// it takes none (`agent_not_ready`, its state in the message), taken
+    /// once it is ready; another target, or another engine, is never.
+    #[test]
+    fn a_lamp_task_is_refused_at_prepare_while_its_agent_is_not_ready() {
+        use crate::agent::{Agent, Session};
+        let targets = BTreeMap::from([
+            (
+                crate::runtime::LAMP_TARGET.to_owned(),
+                Target {
+                    machine_id: "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb".into(),
+                    project: "lamp-project".into(),
+                    engine: EngineKind::Openclaw,
+                },
+            ),
+            (
+                "mac".to_owned(),
+                Target {
+                    machine_id: "cccccccccccccccccccccccccccccccc".into(),
+                    project: "mac-project".into(),
+                    engine: EngineKind::Claude,
+                },
+            ),
+        ]);
+        let mut engine =
+            Engine::open(Memory::default(), targets, STORE, SESSION, &clock(0)).unwrap();
+        let agent = std::sync::Arc::new(Agent::default());
+        agent.update(|facts| {
+            facts.on = true;
+            facts.engine = Some("openclaw".into());
+            facts.harness = crate::agent::Harness::Here;
+            facts.session = Session::Recovering("engine_not_ready");
+        });
+        engine.set_agent(agent.clone());
+        let prepare = |engine: &Engine<Memory>, target: &str, id: &str| Request::Prepare {
+            guard: guard(engine, id),
+            text: "Turn the light blue.".into(),
+            target: target.into(),
+            session: None,
+            engine: None,
+        };
+        let refused = engine
+            .handle(&prepare(&engine, "lamp", "p1"), &clock(1), false)
+            .unwrap_err();
+        assert_eq!(refused.code, crate::agent::NOT_READY);
+        assert_eq!(
+            crate::agent::state_of_message(refused.message),
+            Some(lamp_msgs::Readiness::Recovering)
+        );
+        assert!(crate::readiness::EARLY_REFUSALS.contains(&refused.code));
+        // The person's other computer: unchanged.
+        assert!(
+            engine
+                .handle(&prepare(&engine, "mac", "p2"), &clock(2), false)
+                .is_ok()
+        );
+        // Ready again: taken.
+        agent.update(|facts| facts.session = Session::Ready);
+        assert!(
+            engine
+                .handle(&prepare(&engine, "lamp", "p3"), &clock(3), false)
+                .is_ok()
+        );
+    }
+
     /// What `show` reads of a harness that has not begun its task.
     fn not_begun() -> Observation {
         Observation {
@@ -4426,6 +4579,95 @@ mod tests {
             .map(|w| w["id"].clone())
             .collect();
         assert_eq!(ids, [json!(later.to_string())]);
+    }
+
+    /// #8138 review (3): a spoken task handed over to the lamp's kept
+    /// session that broke under it is ended at once `not_sent` with its
+    /// code, a store the check takes, its agent and reads dropped; with a
+    /// job under way, not yet (`false`: kept and tried again); a task no
+    /// longer handed over is left as it is.
+    #[test]
+    fn a_handed_over_task_whose_session_broke_is_ended_not_sent_at_once() {
+        let (mut engine, _memory) = opened();
+        let id = queued(&mut engine, 0);
+        let other = queued(&mut engine, 0);
+        engine.begin_launch(&clock(0)).unwrap().unwrap();
+        engine
+            .finish_launch(
+                id,
+                LaunchOutcome::Joined {
+                    agent_id: AGENT.into(),
+                    session: None,
+                },
+                &clock(0),
+            )
+            .unwrap();
+        let name = engine.state.tasks[0].launch.name.clone();
+        // A job under way (the next launch): not yet.
+        engine.begin_launch(&clock(1)).unwrap().unwrap();
+        assert!(
+            !engine
+                .end_broken(&name, "one_session_stuck", &clock(1))
+                .unwrap()
+        );
+        assert_eq!(
+            engine.state.tasks[0].dispatch.state,
+            DispatchState::Accepted
+        );
+        engine
+            .finish_launch(
+                other,
+                LaunchOutcome::NotSent {
+                    code: "busy".into(),
+                },
+                &clock(2),
+            )
+            .unwrap();
+        // Its turn's end pending (a read asked for, not begun): that read
+        // decides.
+        engine
+            .handle(
+                &Request::Observe {
+                    guard: guard(&engine, "observe"),
+                    id,
+                },
+                &clock(3),
+                false,
+            )
+            .unwrap();
+        assert!(!engine.active());
+        assert!(
+            !engine
+                .end_broken(&name, "one_session_stuck", &clock(3))
+                .unwrap()
+        );
+        assert_eq!(
+            engine.state.tasks[0].dispatch.state,
+            DispatchState::Accepted
+        );
+        // Read, the agent still at work (no answer settled): ended now.
+        let job = engine.begin_observation(&clock(3)).unwrap().unwrap();
+        let mut working = data("");
+        working.state = "working".into();
+        engine.finish_observation(&job, working, &clock(3)).unwrap();
+        assert!(
+            engine
+                .end_broken(&name, "one_session_stuck", &clock(4))
+                .unwrap()
+        );
+        let task = &engine.state.tasks[0];
+        assert_eq!(task.dispatch.state, DispatchState::NotSent);
+        assert_eq!(task.dispatch.code.as_deref(), Some("one_session_stuck"));
+        assert_eq!(task.dispatch.agent_id, None);
+        assert!(task.observations.is_empty() && task.read.is_none());
+        assert!(engine.state.check().is_ok(), "{:?}", engine.state.check());
+        // Ended once: a second call leaves it.
+        assert!(
+            engine
+                .end_broken(&name, "one_session_stuck", &clock(6))
+                .unwrap()
+        );
+        assert_eq!(engine.state.tasks[0].dispatch.state, DispatchState::NotSent);
     }
 
     /// `serve --route`: a task the router typed into a session the person

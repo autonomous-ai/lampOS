@@ -828,6 +828,36 @@ impl TaskNews {
                 ),
             }
         }
+        if let Some(bus) = bus {
+            // The lamp's own agent (#8138): a change wakes the reader, so a
+            // task it ended on a fault is told at once, and its coming back
+            // is told once after someone was refused ([`follow_readiness`]).
+            match bus.subscribe_typed(
+                lamp_msgs::AgentReadiness::TOPIC,
+                "voice",
+                lamp_msgs::AgentReadiness::TYPE,
+            ) {
+                Ok(readiness) => {
+                    let (offer, wake, stopping) = (offer.clone(), told.clone(), stopping.clone());
+                    let refused = crate::agent_ready::refused_beside(&told_file);
+                    if let Err(error) = std::thread::Builder::new()
+                        .name("lamp-voice-agent-ready".into())
+                        .spawn(move || {
+                            follow_readiness(readiness, &offer, &wake, &stopping, &refused)
+                        })
+                    {
+                        eprintln!(
+                            "lamp-voice: task news cannot follow {}: {error}",
+                            lamp_msgs::AgentReadiness::TOPIC
+                        );
+                    }
+                }
+                Err(error) => eprintln!(
+                    "lamp-voice: task news cannot subscribe to {}: {error}",
+                    lamp_msgs::AgentReadiness::TOPIC
+                ),
+            }
+        }
         if let Some(bus) = bus.filter(|_| progress) {
             // Subscribed before this returns: nothing published after it is
             // missed, and `tasks/status`'s kept value comes first.
@@ -1444,6 +1474,91 @@ fn wake_on_settled(mut statuses: Subscriber, wake: &Sender<Wake>, stopping: &Ato
     }
 }
 
+/// After a change of the lamp's own agent, the reader is woken once more
+/// this much later: a task it ended may be kept a moment after the change.
+const READINESS_REWAKE: Duration = Duration::from_secs(2);
+
+/// Follow the lamp's own agent on `tasks/agent` (#8138): each change of its
+/// state wakes the reader (`wake`) at once and again
+/// [`READINESS_REWAKE`] later, so a task it ended on a fault is told the
+/// moment it is kept, not up to [`READ_EVERY`] later. When it comes back
+/// `ready` after being down, with someone refused (the provider worker's
+/// note in `refused`) or a task of its own failed
+/// ([`crate::agent_ready::note_failed`]) within
+/// [`crate::agent_ready::REFUSED_WITHIN_MS`], its ready-again line is
+/// offered once (`offer`), told at a quiet moment like other news and let
+/// go after [`crate::agent_ready::READY_AGAIN_FRESH`]. Ends when
+/// `stopping` is set or the reader has gone.
+fn follow_readiness(
+    mut readiness: Subscriber,
+    offer: &Sender<News>,
+    wake: &Sender<Wake>,
+    stopping: &AtomicBool,
+    refused: &Path,
+) {
+    let mut follow = crate::agent_ready::ReadyAgain::default();
+    let mut last = None;
+    let mut rewake_at: Option<Instant> = None;
+    while !stopping.load(Ordering::Relaxed) {
+        if rewake_at.is_some_and(|at| Instant::now() >= at) {
+            rewake_at = None;
+            if wake.send(Wake::Settled).is_err() {
+                return;
+            }
+        }
+        let message = match readiness.recv(SETTLED_WAIT) {
+            Ok(Some(message)) => message,
+            Ok(None) => continue,
+            Err(_) => {
+                std::thread::sleep(SETTLED_WAIT);
+                continue;
+            }
+        };
+        let Some(read) = crate::agent_ready::checked(message.parse().ok()) else {
+            continue;
+        };
+        if let Some(news) = readiness_news(&mut follow, &mut last, &read, refused) {
+            eprintln!(
+                "lamp-voice: the lamp's own agent is ready again after a refusal: told once at a quiet moment"
+            );
+            if offer.send(news).is_err() {
+                return;
+            }
+        }
+        if last.replace(read.state) != Some(read.state) {
+            rewake_at = Some(Instant::now() + READINESS_REWAKE);
+            if wake.send(Wake::Settled).is_err() {
+                return;
+            }
+        }
+    }
+}
+
+/// The ready-again news `read` brings, if due ([`follow_readiness`]):
+/// only on a change of state from `last`.
+fn readiness_news(
+    follow: &mut crate::agent_ready::ReadyAgain,
+    last: &mut Option<lamp_msgs::Readiness>,
+    read: &lamp_msgs::AgentReadiness,
+    refused: &Path,
+) -> Option<News> {
+    if *last == Some(read.state) {
+        return None;
+    }
+    let refused_ms =
+        crate::agent_ready::refused_at_ms(refused).max(crate::agent_ready::failed_at_ms());
+    follow
+        .seen(read.state, refused_ms, crate::agent_ready::unix_ms())
+        .then(|| News {
+            key: format!("agent-ready-{}", read.since_unix_ms),
+            note: crate::agent_ready::ready_again_note(),
+            until: Instant::now().checked_add(crate::agent_ready::READY_AGAIN_FRESH),
+            progress: None,
+            finished: None,
+            also: Vec::new(),
+        })
+}
+
 /// The boot and its clock as the tasks part keeps them (`CLOCK_BOOTTIME`,
 /// which `/proc/uptime` reads).
 #[derive(Clone, Debug)]
@@ -1579,6 +1694,11 @@ fn read_once_with(
                     && !crate::made_skill::is_brief(task["text"].as_str().unwrap_or_default())
                     && let Some(note) = note_failed(&words, &task, failed, code)
                 {
+                    // A fault of the lamp's own agent counts for its
+                    // ready-again line (#8138).
+                    if code.is_some_and(|code| crate::agent_ready::FAULT_CODES.contains(&code)) {
+                        crate::agent_ready::note_failed();
+                    }
                     news.push(News {
                         key,
                         note,
@@ -1836,9 +1956,10 @@ fn note_failed(
         // answer in time, or Harness is not running yet (#7282). Told so
         // at once, not as a hand-over that could not be started.
         Some("openclaw_gateway_not_ready" | "harness_not_running") => Some(&words.failed_not_ready),
-        // The lamp's kept session got stuck under it and is being restarted
-        // (#7906 sign 5): ended at once, the person asks again later.
-        Some("one_session_stuck") => Some(&words.failed_stuck),
+        // The lamp's own agent failed under it after the hand-over: stuck
+        // and restarted (#7906 sign 5), its session never started (#7919),
+        // or broken (#8138). Told at once as not done; never redone later.
+        Some(code) if crate::agent_ready::FAULT_CODES.contains(&code) => Some(&words.failed_stuck),
         _ => None,
     };
     if let Some(line) = refused
@@ -3540,19 +3661,81 @@ mod tests {
         }
     }
 
-    /// #7906 sign 5: a spoken task ended as the lamp's kept session got
-    /// stuck and was restarted under it (`one_session_stuck`) is told the
-    /// owner's line once, never as a plain failure.
+    /// #7906 sign 5, #8138: a task the lamp's own agent ended on a fault
+    /// after the hand-over (`one_session_stuck`, `one_session_not_started`,
+    /// `agent_broken`) is told once as not done, never as a plain failure,
+    /// never as done or redone later.
     #[test]
-    fn a_task_ended_by_a_stuck_restart_is_told_to_ask_again_in_a_few_minutes() {
+    fn a_task_ended_on_a_fault_of_the_lamps_agent_is_told_not_done() {
         let task = task("openclaw", json!([]));
-        let told = note_failed(&own(), &task, false, Some("one_session_stuck")).unwrap();
-        assert!(told.contains(crate::skill_words::STUCK_LINE), "{told}");
         assert_eq!(
             crate::skill_words::STUCK_LINE,
-            "I can't handle that right now; please ask me again in a few minutes."
+            "I couldn't finish that; something went wrong. Ask me again in a moment."
         );
-        assert_ne!(Some(told), note_failed(&own(), &task, false, None));
+        for code in [
+            "one_session_stuck",
+            "one_session_not_started",
+            "agent_broken",
+        ] {
+            let told = note_failed(&own(), &task, false, Some(code)).unwrap();
+            assert!(
+                told.contains(crate::skill_words::STUCK_LINE),
+                "{code}: {told}"
+            );
+            assert!(told.contains("will not be done later"), "{told}");
+            assert!(!told.contains("restarted it"), "{told}");
+            assert_ne!(Some(told), note_failed(&own(), &task, false, None));
+        }
+    }
+
+    /// #8138: the lamp's own agent back `ready` after being down is news
+    /// once, only when someone was refused meanwhile; ready at the start,
+    /// back with nobody refused, or the same state again, is no news.
+    #[test]
+    fn ready_again_is_news_once_and_only_after_a_refusal() {
+        use lamp_msgs::{AgentReadiness, Readiness};
+        let root = std::env::temp_dir().join(format!("lv-ready-again-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&root);
+        std::fs::create_dir_all(&root).unwrap();
+        let refused = root.join("agent-refused");
+        let read = |state: Readiness, since: u64| AgentReadiness {
+            engine: "openclaw".into(),
+            state,
+            why: None,
+            since_unix_ms: since,
+            read_unix_ms: since,
+        };
+        let mut follow = crate::agent_ready::ReadyAgain::default();
+        let mut last = None;
+        let mut step = |state: Readiness, since: u64| {
+            let news = readiness_news(&mut follow, &mut last, &read(state, since), &refused);
+            last = Some(state);
+            news
+        };
+        assert_eq!(step(Readiness::Ready, 1), None, "ready at the start");
+        assert_eq!(step(Readiness::Recovering, 2), None);
+        assert_eq!(step(Readiness::Ready, 3), None, "nobody was refused");
+        assert_eq!(step(Readiness::Recovering, 4), None);
+        std::fs::write(&refused, crate::agent_ready::unix_ms().to_string()).unwrap();
+        let news = step(Readiness::Ready, 5).expect("ready again after a refusal");
+        assert_eq!(news.key, "agent-ready-5");
+        assert!(
+            news.note.contains(crate::agent_ready::READY_AGAIN_LINE),
+            "{}",
+            news.note
+        );
+        assert!(
+            news.note.starts_with("(Nobody has spoken."),
+            "{}",
+            news.note
+        );
+        assert!(news.until.is_some());
+        assert_eq!(News::task_of(&news.key), None);
+        assert!(!retellable(&news.key));
+        assert_eq!(step(Readiness::Ready, 5), None, "the same state again");
+        assert_eq!(step(Readiness::Error, 6), None);
+        assert_eq!(step(Readiness::Ready, 7), None, "that refusal was answered");
+        std::fs::remove_dir_all(root).unwrap();
     }
 
     /// `LAMP_TASKS_RESUME_CLOSED` (openharness#3606): a named session that was

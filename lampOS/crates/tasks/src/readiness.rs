@@ -35,8 +35,15 @@ pub const STALE_AFTER_MS: u64 = 15 * 60 * 1000;
 pub const COMPUTER_OFFLINE: &str = "computer_offline";
 pub const ENGINE_MISSING: &str = "engine_missing";
 pub const ENGINE_NOT_SIGNED_IN: &str = "engine_not_signed_in";
-/// Every early refusal, so the service can look again at once after one.
-pub const EARLY_REFUSALS: [&str; 3] = [COMPUTER_OFFLINE, ENGINE_MISSING, ENGINE_NOT_SIGNED_IN];
+/// Every early refusal, so the service can look again at once after one;
+/// with the lamp's own agent not taking tasks now (#8138,
+/// [`crate::agent::NOT_READY`], its error JSON with `"readiness"`).
+pub const EARLY_REFUSALS: [&str; 4] = [
+    COMPUTER_OFFLINE,
+    ENGINE_MISSING,
+    ENGINE_NOT_SIGNED_IN,
+    crate::agent::NOT_READY,
+];
 
 /// One value as read, and when (Unix ms).
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]

@@ -45,12 +45,12 @@ pub const PRODUCT_DEFAULT: bool = true;
 
 /// The Harness manifest this build pins for a product lamp: a byte-for-byte
 /// copy of Harness's CDN manifest ([`ORIGIN`]) when it named [`VERSION`].
-pub const MANIFEST: &[u8] = include_bytes!("../../../../deploy/harness/cli-0.6.75.metadata.json");
+pub const MANIFEST: &[u8] = include_bytes!("../../../../deploy/harness/cli-0.6.78.metadata.json");
 /// [`MANIFEST`]'s SHA-256, checked by a test and again before each install.
 pub const MANIFEST_SHA256: &str =
-    "ef267d1ca368d18a78434c22f230d62c26b574ec8e93cc7bb3c10a4fc5c50c67";
+    "f144bab90687c96aaa7b3e1f605eca77a80328b7b03aaa0527d228c536bbb404";
 /// The Harness version [`MANIFEST`] names (its `cli.version`).
-pub const VERSION: &str = "0.6.75";
+pub const VERSION: &str = "0.6.78";
 /// Where [`MANIFEST`] was copied from: said, never fetched.
 pub const ORIGIN: &str =
     "https://storage.googleapis.com/s3-autonomous-upgrade-3/harness/cli/metadata.json";
@@ -229,6 +229,27 @@ mod tests {
             )),
             "{text}"
         );
+    }
+
+    /// #8138: the pin carries Harness 0.6.77's openharness#4509 (a first
+    /// task never lost across a daemon restart, held, failed and starting
+    /// pushed at once). 0.6.78 is the manifest Harness's CDN named on 20 Nov.
+    #[test]
+    fn the_pin_is_harness_0_6_78() {
+        assert_eq!(VERSION, "0.6.78");
+        assert_eq!(
+            MANIFEST_SHA256,
+            "f144bab90687c96aaa7b3e1f605eca77a80328b7b03aaa0527d228c536bbb404"
+        );
+        let text = std::str::from_utf8(MANIFEST).unwrap();
+        for line in [
+            "\"sha256\": \"6923602baaf911dd62b782479ba0c6ca70d99e195b10a67472c6437888f907ba\"",
+            "\"size\": 12846792",
+            "\"sha256\": \"bd9d5e34544b7f56c961a2d9668c8e8e2fcca04825cb7440601ceece94fadb38\"",
+            "\"size\": 128707",
+        ] {
+            assert!(text.contains(line), "{line} not in {text}");
+        }
     }
 
     /// The installer and the four manifests it reads are held to their

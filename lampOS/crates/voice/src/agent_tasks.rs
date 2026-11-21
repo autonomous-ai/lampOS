@@ -302,7 +302,7 @@ const HERMES: &str = "Hermes";
 const OPENCLAW: &str = "OpenClaw";
 /// What the model is told when the work was asked for on the lamp itself
 /// and the lamp has no target of its own (#5978): nothing goes elsewhere.
-const LAMP_NOT_SET_UP: &str = "Work can't be done here on the lamp itself: that isn't set up on this lamp, so nothing was handed over. Say so plainly in a few words.";
+pub(crate) const LAMP_NOT_SET_UP: &str = "Work can't be done here on the lamp itself: that isn't set up on this lamp, so nothing was handed over. Say so plainly in a few words.";
 
 /// Said when the tasks part answers `"lamp":"installing"` (#5978: Hermes on
 /// the lamp is switched on but not installed yet) and no target of the
@@ -2113,10 +2113,11 @@ fn status_description(lead_in: bool) -> String {
     format!(
         "How the lamp's Harness is now: whether it is signed in to the person's account, \
          which of their computers it can hand work to and which agents each has, and how \
-         many pieces of work are under way. Call it when the person asks whether Harness is \
-         signed in or working, which computers or agents the lamp can use, or whether it is \
-         set up (\"is Harness signed in?\", \"which computers do you have?\", \"what can \
-         you hand work to?\"), never on your own. It answers at once from what the lamp \
+         many pieces of work are under way, and whether you can take work yourself now. Call \
+         it when the person asks whether Harness is signed in or working, which computers or \
+         agents the lamp can use, whether it is set up, or whether your own agent is OK \
+         (\"is Harness signed in?\", \"which computers do you have?\", \"is your agent \
+         OK?\"), never on your own. It answers at once from what the lamp \
          last saw.{}",
         if lead_in {
             " In the same breath, before you call it, say in a few words that you are looking \
@@ -2853,6 +2854,8 @@ static TARGETS_SEEN: Mutex<Option<Vec<(String, String)>>> = Mutex::new(None);
 /// nobody. Only with [`WHO_FLAG`] or [`NAMES_FLAG`], once per process. A
 /// read that fails keeps what was known.
 pub fn start(place: &Place) {
+    // The lamp's own agent's readiness (#8138), whatever the switches.
+    crate::agent_ready::watch();
     if !(place.who || place.machine_names) || READING.set(()).is_err() {
         return;
     }
@@ -4740,6 +4743,20 @@ fn run_for_asked(
                     true,
                 );
             }
+            // The lamp's own agent, read on `tasks/agent` as taking no task
+            // now (#8138): refused at once, nothing asked of the tasks
+            // part, so the person hears it within a second.
+            // Not installed or signed out keep their own lines.
+            if on_the_lamp && let Some(read) = crate::agent_ready::refuses_now(engine.as_deref()) {
+                eprintln!(
+                    "lamp-voice provider: request {request}: the lamp's own agent is {:?}: refused at once, nothing prepared",
+                    read.state
+                );
+                return (
+                    crate::agent_ready::refused(read.state, read.why.as_deref()),
+                    true,
+                );
+            }
             let recorded;
             let task = if place.questions && is_question(task) {
                 recorded = format!("{task} {PAST_WORK}");
@@ -4946,6 +4963,11 @@ fn run_for_asked(
                     // the moment, so no "just now" for the model to offer a
                     // retry on.
                     let code = answer.get("error").and_then(Value::as_str);
+                    // The lamp's own agent is not ready (#8138): told at
+                    // once, nothing handed over, never "I'll look into it".
+                    if code == Some(crate::agent_ready::NOT_READY_CODE) {
+                        return (crate::agent_ready::refused_by(&answer), true);
+                    }
                     let told = match code {
                         Some("no_harness") => NO_HARNESS.to_owned(),
                         Some("targets_newer") => TARGETS_NEWER.to_owned(),
@@ -5095,6 +5117,22 @@ fn run_for_asked(
                         }),
                         true,
                     )
+                }
+                // The lamp's own agent went down since the read-back
+                // (#8138): told at once as at prepare.
+                Some(answer)
+                    if answer.get("error") == Some(&json!(crate::agent_ready::NOT_READY_CODE)) =>
+                {
+                    if let Ok(mut waiting) = PENDING.lock() {
+                        *waiting = None;
+                    }
+                    decided(
+                        request,
+                        pending.id,
+                        pending.engine.as_deref(),
+                        lamp_msgs::HandStage::Declined,
+                    );
+                    (crate::agent_ready::refused_by(&answer), true)
                 }
                 Some(_) => (json!({"error": "It could not be started just now."}), true),
                 None => (unreached(place), false),
@@ -6318,6 +6356,11 @@ fn harness_state(place: &Place, deadline: Duration) -> (Value, bool) {
     }
     if let Some(working) = working {
         answered["working"] = json!(working);
+    }
+    // You, the lamp's own agent, as `tasks/agent` last said (#8138): "is
+    // your agent OK?" answered truthfully.
+    if let Some(own) = crate::agent_ready::status_entry() {
+        answered["you"] = own;
     }
     (answered, true)
 }
@@ -16250,5 +16293,152 @@ pub(crate) mod tests {
         let (told, _) = run(&place, &call, 9, true, PEER_WAIT);
         assert_eq!(told["error"], NO_TAKEN_CONFIRM, "{told}");
         assert!(PENDING.lock().unwrap().is_none());
+    }
+
+    /// #8138: a task for the lamp's own agent while `tasks/agent` says it
+    /// takes none is refused at once, nothing asked of the tasks part, with
+    /// the problem line and never "I'll look into that"; lamp-tasks' own
+    /// `agent_not_ready` at prepare is told the same; a computer's work is
+    /// not held to the lamp's readiness.
+    #[test]
+    fn the_lamps_agent_not_ready_is_refused_at_once_with_the_problem_line() {
+        let _one = ONE_AT_A_TIME
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        *PENDING.lock().unwrap() = None;
+        let directory =
+            std::env::temp_dir().join(format!("agent-not-ready-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&directory);
+        std::fs::create_dir_all(&directory).unwrap();
+        let status =
+            json!({"ok":true,"store_id":"s1","revision":0,"summary":{"session_id":"sess"}});
+        let prepared = json!({"ok":true,"id":7,"prepared_digest":"abc","revision":1});
+        let seen = tasks_part(
+            &directory,
+            vec![
+                // The computer's work, prepared as ever.
+                ("request.sock", status.clone()),
+                ("request.sock", prepared),
+                // lamp-tasks refuses the lamp's own at prepare.
+                ("request.sock", status),
+                (
+                    "request.sock",
+                    json!({"ok":false,"error":"agent_not_ready","readiness":"recovering"}),
+                ),
+            ],
+        );
+        let at = place(&directory, false);
+        let readiness = |state: lamp_msgs::Readiness| lamp_msgs::AgentReadiness {
+            engine: "openclaw".into(),
+            state,
+            why: (!state.takes_tasks()).then(|| "stuck".to_owned()),
+            since_unix_ms: 1,
+            read_unix_ms: 2,
+        };
+        let run_with = |state: Option<lamp_msgs::Readiness>, args: Value, request: u64| {
+            crate::agent_ready::LATEST_HERE.with(|here| *here.borrow_mut() = state.map(readiness));
+            LAMP_THERE_HERE.with(|here| here.set(Some(true)));
+            lamp_engines_here(Some(&["openclaw"]));
+            let call = ToolCall {
+                id: "c".into(),
+                name: START.into(),
+                args,
+            };
+            let started = Instant::now();
+            let told = run(&at, &call, request, true, PEER_WAIT).0;
+            lamp_engines_here(None);
+            LAMP_THERE_HERE.with(|here| here.set(None));
+            crate::agent_ready::LATEST_HERE.with(|here| *here.borrow_mut() = None);
+            (told, started.elapsed())
+        };
+        let refused_before = crate::agent_ready::REFUSED_HERE.with(std::cell::Cell::get);
+        let refused_at_once = |told: &Value| {
+            let error = told["error"].as_str().unwrap_or_default();
+            assert!(error.contains(crate::agent_ready::PROBLEM_LINE), "{told}");
+            assert!(!told.to_string().contains("look into"), "{told}");
+            assert!(told.get("prepared").is_none(), "{told}");
+        };
+        // Read as down: refused at once, nothing sent.
+        for state in [
+            lamp_msgs::Readiness::Recovering,
+            lamp_msgs::Readiness::Starting,
+            lamp_msgs::Readiness::Error,
+        ] {
+            let (told, took) = run_with(Some(state), json!({"task":"Write a poem"}), 3);
+            refused_at_once(&told);
+            assert!(took < Duration::from_millis(200), "{took:?}");
+            assert!(PENDING.lock().unwrap().is_none());
+        }
+        assert!(
+            seen.recv_timeout(Duration::from_millis(200)).is_err(),
+            "nothing is asked of the tasks part"
+        );
+        // A computer's work goes on as ever.
+        let (computer, _) = run_with(
+            Some(lamp_msgs::Readiness::Recovering),
+            json!({"task":"Write a poem","where":"computer"}),
+            4,
+        );
+        assert_eq!(computer["prepared"], true, "{computer}");
+        *PENDING.lock().unwrap() = None;
+        // Read as ready, but lamp-tasks refuses: told the same.
+        let (told, _) = run_with(
+            Some(lamp_msgs::Readiness::Ready),
+            json!({"task":"Write a poem"}),
+            5,
+        );
+        refused_at_once(&told);
+        assert!(PENDING.lock().unwrap().is_none());
+        // Three refusals by the read, one by lamp-tasks: each noted.
+        assert_eq!(
+            crate::agent_ready::REFUSED_HERE.with(std::cell::Cell::get) - refused_before,
+            4
+        );
+        std::fs::remove_dir_all(directory).unwrap();
+    }
+
+    /// #8138: `harness_status` says how the lamp's own agent is, never its
+    /// engine or why, so "is your agent OK?" is answered truthfully.
+    #[test]
+    fn harness_status_says_whether_the_lamps_own_agent_takes_work() {
+        let _one = ONE_AT_A_TIME
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        let directory =
+            std::env::temp_dir().join(format!("agent-status-own-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&directory);
+        std::fs::create_dir_all(&directory).unwrap();
+        let _seen = tasks_part(
+            &directory,
+            vec![(
+                "request.sock",
+                json!({"ok":true,"store_id":"s1","revision":0,"signed_in":"yes","summary":{"session_id":"sess"}}),
+            )],
+        );
+        crate::agent_ready::LATEST_HERE.with(|here| {
+            *here.borrow_mut() = Some(lamp_msgs::AgentReadiness {
+                engine: "openclaw".into(),
+                state: lamp_msgs::Readiness::Recovering,
+                why: Some("deaf".into()),
+                since_unix_ms: 1,
+                read_unix_ms: 2,
+            })
+        });
+        let (told, _) = harness_state(&place(&directory, false), PEER_WAIT);
+        crate::agent_ready::LATEST_HERE.with(|here| *here.borrow_mut() = None);
+        assert_eq!(told["you"]["state"], "recovering", "{told}");
+        assert!(
+            told["you"]["next"]
+                .as_str()
+                .unwrap()
+                .contains("having a problem"),
+            "{told}"
+        );
+        let said = told.to_string();
+        assert!(
+            !said.contains("openclaw") && !said.contains("deaf"),
+            "{said}"
+        );
+        std::fs::remove_dir_all(directory).unwrap();
     }
 }

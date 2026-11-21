@@ -704,6 +704,47 @@ pub fn app_engine_default_operation(
     }))
 }
 
+/// The lamp's kept session's news for the store (#8138): a spoken task
+/// whose session broke under it ended at once `not_sent`
+/// [`crate::one_session::STUCK_ENDED`] (the voice tells it, as a refusal
+/// at the hand-over); a turn the watch read ended read now (#8109). Either
+/// one the store cannot take yet (a job under way) is kept for the next
+/// pass, never dropped.
+fn lamp_turn_news(
+    one: &crate::one_session::OneSession,
+    engine: &mut Engine<Store>,
+    now: &ClockSample,
+) -> Result<(), EngineError> {
+    // Its turn's end first: an answer read before a break seen after it
+    // (`done` then `stopped`) is never ended as stuck (`end_broken` skips a
+    // task whose read is asked for).
+    if let Some(name) = one.take_turn_end()
+        && let Some(id) = engine.task_of_launch(&name)
+    {
+        if engine.push(id, now)? {
+            eprintln!("tasks: {name}: its turn's end read at once (#8109)");
+        } else if engine.active() {
+            one.put_turn_end(name);
+        }
+    }
+    if let Some(name) = one.take_turn_broken() {
+        match engine.end_broken(&name, crate::one_session::STUCK_ENDED, now) {
+            Ok(true) => eprintln!(
+                "tasks: {name}: its session broke under it; ended at once ({})",
+                crate::one_session::STUCK_ENDED
+            ),
+            Ok(false) => one.put_turn_broken(name),
+            // Never the store's loop stopped for it: the task is left to
+            // its watch's bounds, as before #8138.
+            Err(error) => eprintln!(
+                "tasks: {name}: its session broke under it; not ended at once: {}",
+                error.code
+            ),
+        }
+    }
+    Ok(())
+}
+
 /// The one session's turn for the store (#7246): the spoken task holding
 /// the pane released once the store has its answer; then [`pane_turn`].
 fn one_session_holds(
@@ -1625,6 +1666,25 @@ pub const UPDATE_CALLER_UNIT: &str = "lamp-update.service";
 pub fn update_caller_may(caller: Option<&Caller>) -> bool {
     caller
         .is_some_and(|caller| caller.uid == 0 && caller.unit.as_deref() == Some(UPDATE_CALLER_UNIT))
+}
+
+/// `{"op":"agent"}`'s answer (#8138): `{"ok":true,"agent":<AgentReadiness>}`.
+pub fn agent_answer(agent: &crate::agent::Agent) -> Value {
+    json!({"ok": true, "agent": agent.readiness()})
+}
+
+/// A refusal's JSON, with `"readiness": <state>` added to an
+/// `agent_not_ready` one (#8138), read back from its fixed message
+/// ([`crate::agent::message`]), so the voice can tell the person why.
+pub fn with_readiness(mut body: Value) -> Value {
+    if body["error"] == crate::agent::NOT_READY
+        && let Some(state) = body["message"]
+            .as_str()
+            .and_then(crate::agent::state_of_message)
+    {
+        body["readiness"] = crate::agent::name(state).into();
+    }
+    body
 }
 
 /// What a request on the read-only route may be (#8105): the lamp's
@@ -2667,6 +2727,12 @@ fn owner<C: Clock>(
                         code: "timeout",
                         message: "The queued request expired before it started.",
                     }));
+                } else if let Request::Agent {} = &work.request {
+                    // The lamp's own agent (#8138): on every route, read
+                    // only.
+                    let _ = work
+                        .response
+                        .try_send(Ok(agent_answer(&crate::agent::lamp())));
                 } else if work.route == Route::UpdateRead && !update_read_may(&work.request) {
                     // lamp-update reads the lamp's default engine alone (#8105).
                     let _ = work.response.try_send(Err(EngineError {
@@ -3052,6 +3118,12 @@ fn owner<C: Clock>(
                 None => {
                     // An agent Harness's `watch` or `wait` says ended is
                     // read first, and its idle answer kept at once.
+                    // The lamp's kept session's turn too (#8138, #8109):
+                    // its watch read the spoken turn ended; one broken
+                    // under it is ended at once, told (#8138 review (3)).
+                    if let Some(one) = crate::one_session::LAMP.get() {
+                        lamp_turn_news(one, &mut engine, &now).map_err(io::Error::other)?;
+                    }
                     follows.push(&mut engine, &now).map_err(io::Error::other)?;
                     waits.push(&mut engine, &now).map_err(io::Error::other)?;
                     if watch {
@@ -4118,6 +4190,28 @@ fn keep_engines(targets: &Path, known: &Known, said: &mut String, targets_due: &
     }
 }
 
+/// The lamp's own agent's install and sign-in as the machines' looks know
+/// them (#8138): its default engine known not found on the lamp is
+/// `not_installed`, known signed out `error`; anything unknown says nothing.
+fn lamp_agent_known(agent: &crate::agent::Agent, lamp: Option<&crate::readiness::Computer>) {
+    let Some(engine) = agent
+        .facts()
+        .engine
+        .as_deref()
+        .and_then(crate::runtime::engine_named)
+    else {
+        return;
+    };
+    let refusal = lamp
+        .and_then(|lamp| lamp.refusal(engine))
+        .map(|(code, _)| code);
+    agent.update(|facts| {
+        facts.installed = (refusal == Some(crate::readiness::ENGINE_MISSING)).then_some(false);
+        facts.signed_in =
+            (refusal == Some(crate::readiness::ENGINE_NOT_SIGNED_IN)).then_some(false);
+    });
+}
+
 /// The engines file read again (`serve --engines-from-machines`, #5199):
 /// what is known of each target's computer, fresh now. A missing or bad
 /// file is nothing known, and nothing is refused from it.
@@ -4140,6 +4234,7 @@ fn look_at_engines(engine: &mut Engine<Store>, targets: &Path, said: &mut String
             format!("the engines file is not valid ({error}); nothing is refused from it"),
         ),
     };
+    lamp_agent_known(&crate::agent::lamp(), known.get(LAMP_TARGET));
     engine.set_readiness(known);
     if now != *said {
         eprintln!("tasks: {now}");
@@ -4669,7 +4764,7 @@ fn serve_client(mut stream: UnixStream, accepted: Instant, route: Route, owner: 
                         .and_then(|left| rx.recv_timeout(left).map_err(io::Error::other))
                     {
                         Ok(Ok(value)) => value,
-                        Ok(Err(error)) => refusal(error.code, error.message),
+                        Ok(Err(error)) => with_readiness(refusal(error.code, error.message)),
                         Err(_) => refusal(
                             "uncertain",
                             "No receipt arrived. Read status; retry only the exact guarded request because it may have committed.",
@@ -4954,6 +5049,7 @@ pub fn serve<C: Clock>(
         let _ = crate::one_session::LAMP.set(one.clone());
         let project = crate::skill_task::lamp_project(Path::new(&home));
         let slot = skill_harness.clone();
+        let watch_stop = stop.clone();
         let (one, stop) = (one.clone(), stop.clone());
         eprintln!("tasks: one session: on ({}=on)", crate::one_session::SWITCH);
         if let Err(error) = thread::Builder::new()
@@ -4977,6 +5073,31 @@ pub fn serve<C: Clock>(
             })
         {
             eprintln!("tasks: one session: its open not started: {error}");
+        }
+        // Harness's `watch` on the kept session (#8138), on a thread of its
+        // own: the live source of the lamp's agent's state.
+        let (watch_one, watch_slot) = (
+            crate::one_session::LAMP.get().cloned(),
+            skill_harness.clone(),
+        );
+        if let Some(watch_one) = watch_one
+            && let Err(error) = thread::Builder::new()
+                .name("one-session-watch".into())
+                .spawn(move || {
+                    watch_one.watch_kept(
+                        Box::new(move || {
+                            let harness = watch_slot.get()?;
+                            crate::harness::Cli::new(
+                                harness.config.clone(),
+                                harness.session.clone(),
+                            )
+                            .ok()
+                        }),
+                        watch_stop,
+                    )
+                })
+        {
+            eprintln!("tasks: one session: its watch not started: {error}");
         }
     }
     match std::env::var_os("HOME").map(PathBuf::from) {
@@ -5332,6 +5453,11 @@ pub fn serve_with_adapter<C: Clock, A: Adapter>(
     engine.close_told(config.close_told);
     // `LAMP_TASKS_ONE_SESSION` on (#7600), as `serve` opened it.
     engine.keep_untold(crate::one_session::LAMP.get().is_some());
+    // The lamp's own agent tracked with the one session on (#8138): its
+    // tasks refused at prepare while it takes none.
+    if crate::one_session::LAMP.get().is_some() {
+        engine.set_agent(crate::agent::lamp());
+    }
     engine.hermes_on_lamp(
         config
             .set_up_later
@@ -5436,6 +5562,16 @@ pub fn serve_with_adapter<C: Clock, A: Adapter>(
         None
     };
     let mut status_published = 0u64;
+    // `tasks/agent` (#8138): the lamp's own agent, tracked with the one
+    // session on. Off, `off` is published once at the start (the agent's
+    // value while untracked), so a `starting`/`tasks_restarting` kept from
+    // a stop before never stays (review 2, 4).
+    let mut agent_out = Some(bus.publisher_declared(
+        lamp_msgs::AgentReadiness::TOPIC,
+        &lamp_msgs::AgentReadiness::declaration(),
+        "tasks",
+    )?);
+    let mut agent_seen = None;
     // An OpenClaw task's own steps (#7267): with `LAMP_TASKS_STEPS=on` only,
     // on a thread of their own, never on this accept loop; off, no reader
     // and the topic is not touched, and a work record's step stays empty,
@@ -5643,6 +5779,14 @@ pub fn serve_with_adapter<C: Clock, A: Adapter>(
                 }
             }
         }
+        // The lamp's own agent (#8138): published at the start and on every
+        // change of its state or why, a kept value.
+        if let (Some(out), Some(value)) = (
+            agent_out.as_mut(),
+            crate::agent::lamp().changed(&mut agent_seen),
+        ) {
+            publish(out, &value, &mut errors);
+        }
         if let Ok(locked) = current.try_lock() {
             let report = locked.clone();
             drop(locked);
@@ -5801,6 +5945,10 @@ pub fn serve_with_adapter<C: Clock, A: Adapter>(
         thread::sleep(Duration::from_millis(5));
     }
     stop.store(true, Ordering::Release);
+    // #8138 review (7): never a kept `ready` while lamp-tasks is down.
+    if let (Some(out), Some(value)) = (agent_out.as_mut(), crate::agent::lamp().stopping()) {
+        publish(out, &value, &mut errors);
+    }
     drop(clients_tx);
     drop(owner_tx);
     for worker in workers {

@@ -194,6 +194,10 @@ pub enum Request {
     /// The lamp's default engine as it is now, and whether the app chose
     /// it (#6492), on the app's route only.
     AppEngineDefaultState {},
+    /// The lamp's own agent as a whole (#8138, [`crate::agent`]): the same
+    /// value as `tasks/agent`, on every route (the voice, the app, and
+    /// lamp-update's read-only one), read only.
+    Agent {},
 }
 
 /// A spoken yes or no.
@@ -305,6 +309,7 @@ impl Request {
             Self::AppSignInRelay { .. } => "app_sign_in_relay",
             Self::AppEngineDefault { .. } => "app_engine_default",
             Self::AppEngineDefaultState {} => "app_engine_default_state",
+            Self::Agent {} => "agent",
         }
     }
 }
@@ -339,6 +344,10 @@ mod tests {
         assert_eq!(progress, Request::GetProgress { id: 3 });
         assert!(!progress.trusted() && progress.guard().is_none());
         assert_eq!(progress.name(), "get_progress");
+        assert_eq!(
+            Request::parse(br#"{"op":"agent"}"#).unwrap(),
+            Request::Agent {}
+        );
         let now = Request::parse(br#"{"op":"tasks_now"}"#).unwrap();
         assert_eq!(now, Request::TasksNow {});
         assert!(!now.trusted() && now.guard().is_none() && now.session_id().is_none());
