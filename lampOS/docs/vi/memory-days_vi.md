@@ -1999,6 +1999,28 @@ giữ nào bị quên, rằng chưa quên xong, và không được nói là ch�
 là đã quên; có điều đã mất thì một `history_note` nói vậy bên cạnh những gì
 đã mất. Thêm một yêu cầu cục bộ trong 1,5 s của lệnh gọi.
 
+Quên theo id khi câu nói có nêu chủ đề (#8259; lamp-06c1, 22/11, chặng 15
+của #8125). "Quên những gì tôi nói về chiếc xe đạp" có thể được gọi bằng id
+mà recall đưa (`forget {source_id}`) thay vì bằng `about`; khi đó chỉ một
+điều đã giữ bị xóa, còn mọi lượt nói khác về xe đạp vẫn ở lại. Giờ voice đọc
+chủ đề từ chính câu người đó nói, cùng cách đọc mà lựa chọn một khuôn mặt
+dùng để hỏi (`remember::named_subject`, chủ đề của `forget_want` cho một id;
+không có danh sách từ nào khác), và đánh dấu lệnh gọi bằng nó (`heard_about`,
+đối số riêng của đèn, không bao giờ gửi cho bộ nhớ;
+`remember::heard_about_by_id`). Khi bộ nhớ xác nhận id đã mất, các lượt nói
+của chính người đã biết đó về chủ đề ấy cũng bị xóa, bằng cùng
+`exchanges_forget` mà quên theo chủ đề gửi
+(`DaysClient::forget_exchanges_about`), chỉ trong phạm vi của họ: không bao
+giờ trong phạm vi của phòng, không bao giờ của người khác. Mô hình được báo
+một con số (điều đã giữ, cùng `exchanges` bên cạnh), hoặc `history:
+"not_reached"` như trên; lịch sử của tài khoản chờ cả hai câu trả lời, như
+sau quên theo chủ đề. Việc này chạy sau lệnh quên theo id, trong cùng thời
+gian của lệnh gọi (không chờ thêm, không có giới hạn mới). Câu không nêu gì
+("quên cái đó đi"), id không có, quên trống và tuyến thứ hai rút lại điều
+nó vừa giữ thì chỉ chạy theo id, như trước. Quên theo chủ đề và lệnh quên
+một khuôn mặt đã được đồng ý (trong `memory.md`, vốn đã mang `about`) không
+đổi: lượt nói của chúng chỉ được hỏi một lần.
+
 Dấu quên (phương án 2 của El trên #5333): trước thay đổi trên, quên theo chủ
 đề chỉ khớp điều đã giữ và quan sát, nên một lượt nói chưa từng được giữ
 không có gì để khớp và vẫn còn 30 ngày; lượt đêm sẽ đọc và giữ nó kèm lời
