@@ -316,9 +316,10 @@ pub const EXAMPLES_FOLDER: &str = "examples";
 /// keeps a note, a say again every 30 minutes while someone stays, and a
 /// reminder set in the lamp's schedule, and a script that leads breaths
 /// with the light and the voice, and a reminder every 30 minutes started
-/// by words; a linked-service read started by words (the one-line stub,
-/// the `task` the work for the lamp's agent), and a `net` script that
-/// fetches one public value and says it. lamp-skills' `tests/it/make_check.rs` packs each with the
+/// by words; a linked-service read started by words (its helper script
+/// reads the calendar, the lamp's agent sums it up; #8157), and `run`
+/// steps whose script does the whole job and says it (a coin, breaths, a
+/// `net` script that fetches one public value). lamp-skills' `tests/it/make_check.rs` packs each with the
 /// real `lamp-skills pack`, so none can be one the check refuses.
 pub const MAKE_EXAMPLES: [(&str, &str); 25] = [
     (
@@ -1943,6 +1944,9 @@ pub struct MakeHandOvers {
     /// taken only with one of its switches on; `None`, refused `off` as
     /// any line that is not a make's.
     pub asks: Option<Arc<crate::voice_ask::Asks>>,
+    /// A made skill's tried run before the voice keeps it (#8157,
+    /// `"op":"make_try"`, `crate::make_try`); `None`, refused `off`.
+    pub tries: Option<Arc<crate::make_try::Tries>>,
 }
 
 impl MakeHandOvers {
@@ -1988,13 +1992,19 @@ impl MakeHandOvers {
                 news: Default::default(),
             })
         });
+        let work = runner.hermes.folder.clone();
         Self {
             socket: PathBuf::from(MAKE_SOCKET),
-            work: runner.hermes.folder.clone(),
+            work: work.clone(),
             runner,
             one_path: Some(gateway),
             caller: caller_may,
             asks,
+            tries: Some(Arc::new(crate::make_try::Tries {
+                work,
+                launch: Box::new(crate::make_try::FenceLaunch::lamp()),
+                busy: AtomicBool::new(false),
+            })),
         }
     }
 
@@ -2085,6 +2095,20 @@ impl MakeHandOvers {
                 return;
             }
         };
+        // A made skill's tried run (#8157): asked after its make's run has
+        // ended, with its own one place.
+        if crate::make_try::is_try(&line) {
+            let answered = match &self.tries {
+                Some(tries) => tries.answer(&line),
+                None => refusal("off", "a made skill's tried run is off on this lamp"),
+            };
+            eprintln!(
+                "{}",
+                journal_line(&answered).replace("skill make:", "make try:")
+            );
+            write_answer(stream, &answered);
+            return;
+        }
         // A live ask has its own one place, beside a make's.
         if crate::voice_ask::is_ask(&line) {
             let answered = match &self.asks {
@@ -2643,18 +2667,48 @@ mod tests {
         for told in [
             "## How a made skill runs",
             "`Run <skill-start> <run id>`",
-            "The agent sees only what the script prints.",
-            "the agent answers only a dash",
-            "`Said aloud through the lamp.`",
+            "The agent sees only what the script prints,",
+            "a lone dash (-) is said as nothing",
             "one plain sentence a person understands, at most 120 characters",
-            "print(\"The lamp's agent does this task with its lamp-services tools.\")",
-            "`services_connected`, `service_read`, `service_write`",
+            "`await lamp.service_read(service, args)`",
             "granted `net` and `speak`",
             "`HTTPS_PROXY`",
             "examples/agenda-count",
             "examples/exchange-rate, sun-times",
+            // #8157: two step kinds, scripts written at the make, a made
+            // SKILL.md's three sections, its tried run, its own folder.
+            "written exactly `run = \"scripts/main.py\"`",
+            "calls `lamp.say` for its success line and for its failure line",
+            "only when each start needs the lamp's agent to sum up or reason",
+            "Scripts are written at the make, never at a run",
+            "`## Uses`",
+            "`## Result`",
+            "`## Answer`",
+            "**Tried before it is kept**",
+            // #8180: a try is a real run, with every declared grant.
+            "The try is a real run: it has every grant the skill declares",
+            "never edit, patch or write the lamp's own skills",
         ] {
             assert!(flat.contains(told), "{told}");
+        }
+        // #8157: no linked-service stub, and no engine named: the guide is
+        // the same for whichever agent the lamp runs.
+        for never in [
+            "print(\"The lamp's agent does this task with its lamp-services tools.\")",
+            "Said aloud through the lamp.",
+            "OpenClaw",
+            "Hermes",
+        ] {
+            assert!(!flat.contains(never), "{never}");
+        }
+        // #8157: a script waits for each line it says, so it never exits
+        // before its say is said (a say dropped fails the run); each
+        // example's `lamp.say` does.
+        assert!(flat.contains("Always pass `wait=True`"), "{flat}");
+        for (path, text) in MAKE_EXAMPLES {
+            for line in text.lines().filter(|line| line.contains("lamp.say(")) {
+                assert!(line.contains("wait=True"), "{path}: {line}");
+            }
         }
         // Anything but a boolean is no make's line.
         let refused = answer(
@@ -3404,6 +3458,7 @@ mod tests {
             one_path: None,
             caller: |_| true,
             asks: None,
+            tries: None,
         }
         .start(true, stop.clone())
         .unwrap()
@@ -3447,6 +3502,7 @@ mod tests {
             one_path: None,
             caller: |_| true,
             asks: None,
+            tries: None,
         }
         .start(true, stop.clone())
         .unwrap()
@@ -3472,6 +3528,7 @@ mod tests {
             one_path: None,
             caller: |_| true,
             asks: None,
+            tries: None,
         }
         .start(false, Arc::default())
         .unwrap();

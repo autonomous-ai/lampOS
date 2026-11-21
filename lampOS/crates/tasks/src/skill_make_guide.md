@@ -48,13 +48,27 @@ What a skill can do, all of it in format.md and examples/:
   minutes (15 m to 24 h) whoever is there; started by words or a trigger;
   examples/water-breaks. Once in or at a time is the lamp's reminders', not
   a skill's.
-- **Its own code**: a `task` step running scripts/main.py, Python with the
-  lamp's `lampos` SDK. This is the widest thing a skill can do, so use it
-  whenever steps alone fall short: any call sdk.md lists (light, say,
-  gesture and the body, sounds, events with `lamp.on`, leases, notes, the
-  device, the air, the camera, the microphone, speech, linked services),
-  loops, waits, sums, several steps in order, and Python's own standard
-  library; examples/breathing-coach.
+- **Its own code**: scripts/main.py, Python with the lamp's `lampos` SDK.
+  This is the widest thing a skill can do, so use it whenever steps alone
+  fall short: any call sdk.md lists (light, say, gesture and the body,
+  sounds, events with `lamp.on`, leases, notes, the device, the air, the
+  camera, the microphone, speech, linked services), loops, waits, sums,
+  several steps in order, and Python's own standard library. Code runs in
+  one of two step kinds, chosen now, at the make:
+  - **`run`**: a `[[do]]` step written exactly `run = "scripts/main.py"`.
+    The script does the whole job and calls `lamp.say` for its success
+    line and for its failure line (the fetch failed, nothing was found, a
+    service isn't linked). The lamp runs it with no agent at all. This is
+    the kind to choose whenever the job is the same each time;
+    examples/exchange-rate, sun-times, breathing-coach.
+  - **`task`**: `task = { task = "...", run = "scripts/main.py" }`, only
+    when each start needs the lamp's agent to sum up or reason (sum up
+    today's mail, pick what matters in the calendar). Its helper scripts
+    (fetch the mail, read the calendar, filter) are written now too, each
+    its own file in scripts/, printing what the agent sums up;
+    examples/agenda-count.
+  Scripts are written at the make, never at a run: a run only runs what
+  you wrote here.
 - **Its `grants` must name every grant its code's calls need**, as sdk.md
   gives each call's grant: body, light, speak, look, hear, sound, air,
   device, camera, microphone, notes, speech, net, or a linked service's
@@ -65,10 +79,8 @@ What a skill can do, all of it in format.md and examples/:
   go on at once; the others the owner says yes to once.
 - **The internet, when rules.md allows `net`**: what only the web knows at
   the time it runs (a price, the weather, the news, a search) is the skill's
-  own code granted `net` beside `speak`: `grants = ["net", "speak"]`, and
-  scripts/main.py fetches it, says it with `lamp.say`, then prints only
-  `Said aloud through the lamp.`: the lamp's agent that ran it sees that,
-  ends its answer with a dash, and the person hears it once;
+  own code granted `net` beside `speak`: `grants = ["net", "speak"]`, a
+  `run` step, and scripts/main.py fetches it and says it with `lamp.say`;
   examples/exchange-rate. Light, body, sound, air and device may join them.
   Use Python's own `urllib.request` (no packages to install), a public HTTPS
   API that needs no key, a `timeout` of 15 s or less, and a plain spoken
@@ -90,9 +102,12 @@ How a skill runs, so its code fits:
   skill starts: by its words, its trigger, or its repeat. One run at a time;
   keep a run short (a fetch and a line or two). Only `notes` lasts from one
   run to the next, and a skill granted `net` has none.
-- What the person hears is what the code says with `lamp.say(text)` (said
-  exactly, within 900 bytes; `wait=True` to say lines in order). Anything
-  printed is not said.
+- What the person hears is what the code says with
+  `await lamp.say(text, wait=True)` (said exactly, within 900 bytes).
+  Always pass `wait=True`: it returns once the line is said, so lines come
+  in order and the script never exits before its last line is said (a
+  script that exits first has its line dropped, and its run fails).
+  Anything printed is not said.
 - Open the lamp with `lamp = await Lamp.local()`, `await` every call, and end
   with `await lamp.close()`; run blocking work such as a fetch with
   `await asyncio.to_thread(...)`. sdk.md lists every call, its grant, and its
@@ -115,30 +130,44 @@ A skill does nothing that would surprise the person who asked for it.
 
 ## How a made skill runs
 
-- At run, the lamp's agent is sent `Run <skill-start> <run id>` and the
-  skill's `task` words, as data. It runs that one command: the launcher runs
-  the step's `run` script in a fence, with the `lampos` SDK and the run's
-  grants alone. The agent sees only what the script prints.
-- The agent's last answer is said aloud to the owner, word for word (about
-  400 characters at most), and a lone dash (-) is said as nothing. So code
-  that says its result with `lamp.say` prints only `Said aloud through the
-  lamp.`, and the agent answers only a dash: the person hears it once.
+- **A `run` step**: the lamp runs scripts/main.py itself, in a fence, with
+  the `lampos` SDK and the skill's grants alone, and no agent. What the
+  person hears is what the script says with `lamp.say`: its success line,
+  or its failure line. Anything printed is not said.
+- **A `task` step**: the lamp's agent is sent `Run <skill-start> <run id>`
+  and the skill's `task` words, as data. It runs that one command: the
+  launcher runs the step's script in a fence, with the `lampos` SDK and the
+  run's grants alone. The agent sees only what the script prints, runs the
+  helper scripts `## Uses` names, and sums up. Its last answer is said
+  aloud to the owner, word for word (about 400 characters at most), so it
+  is only the spoken summary; a lone dash (-) is said as nothing, the
+  answer when a script has said it with `lamp.say` already.
 - The `task` words are read back whole for the owner's yes: one plain
-  sentence a person understands, at most 120 characters. For a
-  linked-service skill they are the work itself.
+  sentence a person understands, at most 120 characters.
 - **A linked service** (mail, a calendar, GitHub): `grants =
-  ["<code>-read"]` to read it, or `"<code>-write"` to send with it, and no
-  other grant. scripts/main.py is exactly this one line:
-  `print("The lamp's agent does this task with its lamp-services tools.")`.
-  At run, the agent does the `task` with its lamp-services tools
-  (`services_connected`, `service_read`, `service_write`) under the run's
-  token; a send goes only on the owner's spoken yes. The script never holds
-  a token. examples/agenda-count.
+  ["<code>-read"]` to read it, or `"<code>-write"` to send with it. The
+  script reads it itself with `await lamp.service_read(service, args)`
+  (sdk.md lists it and its args), or the skill's one step is the lamp's own
+  `read` step (format.md, "Reading a linked service") when a plain read
+  said aloud is enough. A `service_write` is only prepared: the owner's
+  spoken yes sends it, never the run. The script never holds a token.
+  examples/agenda-count.
 - **The public web**: the skill's own code granted `net` and `speak`, as
   "The internet" above says: urllib reaches the public web on ports 80 and
   443 through the run's proxy (`HTTPS_PROXY`), and the code says the result
   with `lamp.say`. It is kept only on a lamp whose net switches are on.
   examples/exchange-rate, sun-times.
+- **Tried before it is kept**: once its check passes, the lamp runs each
+  script once, in that same fence with the skill's own grants: a `run`
+  step's script, or each script of a `task` step. Each must exit 0 within
+  30 s; a `run` step's must say at least one line with `lamp.say`, and a
+  `task` step's must print something. The try is a real run: it has
+  every grant the skill declares (the internet, the camera, the microphone,
+  its voice, sounds, light and body), and what it says, shows, keeps or
+  sends is done for real, as at the skill's own run. So a script runs with
+  no arguments, does its one job once, handles a failed fetch or an
+  unlinked service by saying so, and ends. A failed try comes back to you
+  as a repair with its words.
 
 ## 2. Write a draft
 
@@ -146,13 +175,31 @@ Make the folder draft/NAME in this folder, NAME the skill's name: lowercase
 letters, digits and hyphens. Write in it, as rules.md says:
 
 - skill.toml: kind, version, permissions, the trigger, ask and its steps.
-- SKILL.md: front matter with name (NAME, the same as the folder) and a
-  one-line description, and always made: here (as the examples show; the
-  check needs it), then a few plain lines on what it does and when.
+- SKILL.md: front matter with name (NAME, the same as the folder), a
+  one-line description, a `when` line (when the voice's model should call
+  it, at most 200 bytes) and always made: here (as the examples show; the
+  check needs it), then a few plain lines on what it does and when, and,
+  for a skill with scripts, these three sections, each a `## ` heading with
+  lines under it, as the examples show:
+  - `## Uses`: each script and lamp-services tool it uses, and its
+    arguments;
+  - `## Result`: where each script's result is (what it prints, a file);
+  - `## Answer`: what is said aloud, in one to three plain sentences:
+    either a script says it with `lamp.say` and the agent's answer is a
+    lone `-`, or the agent's final answer is only the spoken summary.
+  Its `asks` in skill.toml are the words a person says to start it: one to
+  three short, plain phrases, so the voice finds it ("sunset time", "count
+  my meetings"). Never a question (no what, how, when, who, is or does) and
+  never a no: the lamp refuses such an ask, as a question is the model's to
+  answer.
 - scripts/main.py for a task step's code, as rules.md allows, using any
   call in sdk.md.
 - shows/NAME.toml only for a light show: every frame written out in order, as
   rules.md says. Within 30 frames and a minute nothing is left out.
+
+You write only in this folder, and only the draft you were given: never
+edit, patch or write the lamp's own skills, its other skills or any file
+outside draft/NAME and answer.md.
 
 ## 3. Check it with the lamp's own check
 

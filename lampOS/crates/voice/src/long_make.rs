@@ -1072,7 +1072,10 @@ pub fn told(
             eprintln!(
                 "lamp-voice: request {request}: a long make's skill is told ready and on, in one line; it goes on once heard whole"
             );
-            say_only(&format!("{}{link}", ready_on_with(&made.name, nowhere)))
+            // #8180: a tried skill is said with what its try did.
+            let ready = crate::made_skill::tried_line(&made, nowhere)
+                .unwrap_or_else(|| ready_on_with(&made.name, nowhere));
+            say_only(&format!("{ready}{link}"))
         }
         State::NotMade { name, why, .. } => {
             eprintln!(

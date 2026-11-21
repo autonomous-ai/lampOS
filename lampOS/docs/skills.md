@@ -317,6 +317,7 @@ must not leave a step silently undone)*.
 | `do.read` | no | A read of one of the owner's linked services (proposal #5288, `LAMP_SKILL_READS=on` in `lamp-skills` and `lamp-services`, on in the product units): `{ service, what, ... }`, any service with a fixed read (not the send-only `gmail-app`, the MCP services or Ahrefs), any of its fixed reads, never one that gives a whole text or a free-form one (a GraphQL `query`, `get` on any path, an MCP `call`; `lamp_services::spoken::skill_read_refused`, held again by `lamp-services` at its door), a calendar's `events` with `day = "today"` or `"tomorrow"` (`service_read::ReadFile`). The skill's only step, alone, in a skill a trigger starts, with no tool or `each`, and `[permissions] services = { <service> = "read" }` and `speak = true`. `lamp-skills` reads it itself through `lamp-services`' tools socket, once a local day, when the owner's known face is alone in view and steady 5 s, no voice was heard in the last minute and the lamp is not private, paused or in quiet hours (waiting up to 60 minutes, then skipping the day unsaid), and says the count and then each item's short line as exact text, judging the gate again before each; someone coming stops it with "I'll tell you the rest later." The journal keeps counts and the gate's outcome only ([services.md](services.md), "A made skill's read"). A read refused because the service isn't linked says nothing, unless `LAMP_SKILL_LINK_NOTE=on` (with `--state-dir`; on in the product unit, off unless set): then it says `lamp-services`' "<Service> isn't linked to this lamp yet. It can be linked in the app: open this lamp, then Settings, then Linked accounts." once, behind the same gate, kept per skill in the state folder's `link-noted` until a read succeeds again ([services.md](services.md), "Not linked at the run") |
 | `do.write` | no | A fixed write to one of the owner's linked services (#6066, `LAMP_SKILL_WRITES=on` in `lamp-skills`, its manage helper and `lamp-services`; on in the product since 11 Nov): `{ service, action, ... }`, a mail (`gmail` or `gmail-app` `send_mail`: `to`, `cc`, `subject`, `text`), a calendar event (`google_calendar` `create_event`), a GitHub issue or comment, a Linear issue, an Asana task or a Figma comment (`lamp_services::skill_writes::KINDS`); never a public post, a draft or an MCP tool call. Every field is fixed in the file and checked as it loads (`service_write::WriteFile`), nothing filled at run time. The skill's only step, alone, in a skill a trigger starts, with no tool or `each`, and `[permissions] services = { <service> = "write" }`; with the switch off the skill does not load. `lamp-skills` sends the step's exact content with the skill's name on `lamp-services`' tools socket (`skill_write`), which sends it only if the owner said yes to that content for that skill as installed (its package: an updated or removed skill waits for a new yes) under the same link (unlinking drops the yes) (given by the voice's yes path only, never by installing, and never in the app, which has no yes for it: "not sent: waiting for the owner's yes"), not signed out, at most 50 times a skill and 200 across every skill in any 24 hours, and 5 a skill in any hour. A link gone or another account's stops the skill's writes until `lamp-skills` restarts. **A write waiting for the yes spends nothing** (lamp-9adf, 12 Nov: an unapproved mail of the `wellbeing` group spent its hour, and an approved skill of the group was dropped, `its wellbeing group's hour is spent`). `lamp-skills` can't read the yes before it runs (only the voice asks `skill_writes_approved`), so the skill's trigger fires, the Policy is asked as before, and the write goes to `lamp-services`; when it comes back exactly "not sent: waiting for the owner's yes" (`service_write::waiting`), what its start spent is given back (`Engine::unwritten`): its place in its `[budget]` group's hour and its `gap`, its trigger's `cooldown`, its day's count for `most_a_day` and its `[rest]` watch (an unsent write is never counted as ignored), and it is no longer the group's last for `[stop]`. Only this time its trigger holds stays had: it comes again the next time its trigger holds, never at the trigger's next message, so a `present` trigger without `rearm` doesn't ask the Policy at every message. Nothing is seen or heard (the write is its skill's only step), and nothing is given back for any other refusal or a send. A once-a-day trigger's day stays claimed. The journal says `SKILL sent nothing: its group's hour, cooldown, day's count and rest are given back`. Test: `a_write_waiting_for_the_owners_yes_spends_nothing`. **Through the lamp's agent** (`LAMP_SKILL_WRITE_AGENT=on` with `LAMP_AGENT_SERVICES=on`, on in the product's `lamp-skills`, `lamp-tasks`, `lamp-control` and `lamp-services` units, each once; the owner's ruling, 13 Nov): `lamp-skills` never calls `lamp-services` for it, but hands it to lamp-tasks on the `do.task` socket (`--tasks-socket`) as a skill's run with its one grant, `<code>-write`, and its exact content (`service_write::hand`); the agent sends it through `service_write`, and `lamp-services` holds it to the same yes, link, bounds and sent-log, once a run. The agent's words name only the write's service and action, never its content (no recipient, subject or text in its argv or Harness's transcript): lamp-control gives its call the skill's write by the run's token ([tasks.md](tasks.md), "A made skill's fixed write on the lamp's Hermes"). The journal says what the run became ("handed to the lamp's agent: its run ended, task N"). When the agent couldn't take it (no folder, no `--tasks-socket`, lamp-tasks not reached, or refused before its agent began, Harness signed out or no Hermes among it: `service_write::NOT_TAKEN`), it is sent straight as above, with one journal line why (the first builder's ruling on #6823); once the run may have begun, never (`service_write::hand`: never two sends). A run Harness didn't make is asked once more by lamp-tasks once Harness answers (#7092, [tasks.md](tasks.md), "Not made"); made neither time, it comes back `not_made` (`service_write::Unrun::NotMade`): nothing is sent, straight or again, and the lamp says once, in exact words, "A skill's send didn't go: the lamp's agent couldn't start it, so nothing was sent." (`service_write::NOT_SENT_LINE`, on the say socket at the skill's say priority; the lamp's own line, so the skill needs no `say`), the journal saying `the lamp's agent's run was never made, asked once more, so nothing was sent and the owner is told`. Test: `a_write_whose_run_was_never_made_tells_the_owner_once`. A write sent through the agent and waiting for the yes is told only to the agent, so its start is not given back. Off, it goes as above. The journal keeps the outcome only, never a recipient or a text ([services.md](services.md), "A made skill's write") |
 | `do.task` | no | A task handed to the lamp's agent, its script in the skill's own `scripts/` (#6305, `LAMP_SKILL_TASKS=on` in `lamp-skills`, its manage helper, `lamp-voice` and `lamp-control`; on in every product unit): `{ task = "...", run = "scripts/main.py" }`, alone in its `[[do]]` table, one a skill, in an installable skill from the Skills Store or pushed by the owner's own computer only (a pushed one's task runs from its own folder, `/var/lib/lampOS/skills-dev/<name>`, under the same checks). Handed over only on the owner's yes to the skill's `grants` and its folder's SHA-256, kept by lamp-control (a changed script asks again; a run with none has the lamp ask for it aloud, once a folder a day), one at a time, at most 20 a skill and 100 in all in any 24 hours; the skill's other steps run at once beside it. Off, it loads and hands nothing over, and the journal says why (below, "A skill's task") |
+| `do.run` | no | A skill's own Python script run by lamp-tasks itself, with no agent and no Harness (#8158): `run = "scripts/main.py"`, alone in its `[[do]]` table, a plain `.py` file in the skill's own `scripts/`, and the skill's one task (never beside a `do.task`). Held to everything a `do.task` is (its `grants`, the owner's yes to them and the folder's SHA-256, first kind only, one at a time, the day's bounds, `LAMP_SKILL_TASKS`), run in its own fence for at most 30 s; it succeeds when the script exits 0 and something it asked `lamp.say` for was said (below, "A skill's `run` step") |
 
 A duration is a whole number and one of `ms`, `s`, `m` or `h` (`"5m"`).
 
@@ -2203,6 +2204,79 @@ task = { task = "Take a photo and send it to my phone", run = "scripts/main.py" 
   and the folder's SHA-256, #6304, minted from lamp-control's kept yes
   alone, `lamp_control::task_yes::yes_for_token`) and its result as Task
   news are #6306's and #6304's. The journal keeps the outcome, never the task's words.
+
+### A skill's `run` step (`do.run`, #8158)
+
+A `do.task` sends its script through the lamp's agent: on lamp-c0a4 a daily
+brief that only ran `scripts/main.py` took 43 s and 53 s, most of it the
+agent starting. A `run` step runs the skill's own script with no agent.
+
+```toml
+version = "1.0.0"
+grants = ["speak"]
+tool = "daily_brief"
+[permissions]
+speak = true
+[[do]]
+run = "scripts/main.py"
+```
+
+- **What starts it is unchanged**: the voice for words (the skill's name and
+  `asks`, then the model's `use_skill`), `lamp-skills` on the bus for
+  everything else, with its quiet hours, budget and cooldowns.
+- **The step** (`lamp_skills::task::TaskStep::run_step`): `run = "..."`
+  written exactly so, alone in its `[[do]]` table, one a skill (a skill has
+  a `run` step or a `do.task`, never both), a plain `.py` file inside the
+  skill's own `scripts/` (the same rule as a task's `run`, never a link).
+  It loads as a task with no words of its own (`task::RUN_WORDS`, "run its
+  own script", what the owner's yes read-back names), so every gate of a
+  `do.task` holds as above: the switch, first kind only, its `grants`
+  beside it, the owner's yes to them and the folder's SHA-256 (asked aloud
+  when there is none), off, paused or removed skills, one at a time a
+  skill, 20 a skill and 100 in all in any 24 hours.
+- **The hand-over**: the task's line with `"op": "skill_run"`
+  (`task::HandOver::line`), on lamp-tasks' socket, waited for at most 60 s
+  (`task::RUN_STEP_MOST`). It is never counted as a hand-over under way
+  (`HANDING`), so it never waits behind an agent's task, nor holds one back;
+  lamp-tasks runs one `run` step at a time, beside its agent's task
+  ([tasks.md](tasks.md), "A skill's `run` step").
+- **Success**: the script exited 0 within 30 s, and lamp-control said at
+  least one of its run's `lamp.say` lines whole (`{"ok":true,"said":N}`).
+  A script that does not wait for its say (`wait=True`) and exits at once
+  may have its say dropped with its connection, and then fails.
+- **Failure** (`task::run_outcome`): never run again for that trigger. Started
+  by the person's words (the voice marked the run as asked, a run now or the
+  model's call of its tool), the lamp says one fixed line,
+  "<spoken name> couldn't finish this time." (`task::run_failed_line`), at
+  the skill's say priority; started by a trigger, nothing is said. The
+  journal says why either way (`do.run: failed: run_failed: its script
+  ended with status 1; nothing said, as a trigger started it`), never the
+  script's output.
+- **`net`**: given by its grant alone, with nothing asked (#8180;
+  `LAMP_TASK_NET` on): the run's own egress socket, the public web on ports
+  80 and 443 only, through `HTTPS_PROXY` (`127.0.0.1:3128`) in its fence
+  ([tasks.md](tasks.md), "A skill's `run` step").
+- **Not given**: keys (`secrets`): a skill that needs them uses a
+  `do.task`; lamp-tasks refuses a `run` step for one, in words.
+- **Its own caps**: the script runs with its own memory (768 MiB of address
+  space), CPU time (30 s) and niceness (10) for each process, and at most 64
+  processes and threads for the whole run (#8180), never lamp-tasks' whole
+  budget; its real total is its own cgroup's: 512M of memory, no swap, one
+  core and 72 tasks for the whole run, in lamp-tasks.service's delegated
+  cgroup ([tasks.md](tasks.md), "Its own cgroup"); on a lamp without one it
+  is refused, never run without that total. Its try at the make gets the
+  same fence, caps and cgroup.
+- **Timing** (each hop, trigger to script): the fire's thread spawns the
+  hand-over thread; the folder is hashed (the skill's few files); the yes
+  asked of lamp-control (one local socket line); the ledger written; one
+  line to lamp-tasks; the token minted (one local socket line to
+  lamp-control); the fence made (`unshare`, a few mounts) and `python3`
+  started. No agent, no Harness, no network. The journal times the hand-over
+  (`do.run: handed over N ms after it came due`) and lamp-tasks the token,
+  the script's start (`skill run RUN: its script started N ms into its
+  run`) and the whole (`skill run RUN: hand-over to script start N ms`). Unit level, with a stand-in fence, a script's whole run takes
+  tens of milliseconds (`skill_run::tests`); on a lamp the target is a few
+  seconds from trigger to the first word, not measured yet.
 
 ### A core skill's line through the lamp's agent (`LAMP_CORE_VIA_AGENT`, a pilot, off)
 
@@ -4230,28 +4304,21 @@ gone ([switches.md](switches.md)). What happens:
      here in chat: a made skill goes on at once, and whether it worked or
      not the lamp just says so, with no confirming; `on` only, off unless
      set; on in the product's `lamp-voice` (the make flow's switch-on, the first builder's DEFAULT-ON, 19 Nov 21:42 on #7814); in `lamp-voice` passed to both routes, read
-     only with `LAMP_MADE_SCRIPTS=on`, `made_skill::code_on_at_once`). The
-     first builder's ruling on #6059 (19:14, and the first builder's 19:44 line: "sound"
-     is the lamp's own sounds and voice) draws the line
-     (`made_skill::code_goes_on_at_once`): code whose grants are only its
-     light, its voice and sounds or its head and arm
-     (`made_skill::CODE_AT_ONCE_GRANTS`: `light`, `speak`, `body`; a timer
-     is a trigger and needs no grant) goes on at once; code with any other
-     grant, above all the camera, the microphone and `sound`, which is
-     hearing kinds of sound, not playing them
-     (`made_skill::CODE_YES_GRANTS`), code that knows who is at the lamp
-     (`who`, `known_faces`: identity is the camera's privacy, the first
-     builder at 20:16; lamp-control has no grant for it), or any send (a write, messages to the
-     phone) keeps its spoken yes exactly as with the switch off. Such a
-     make, by voice or from the app's MAKE IT
-     (`app_make::put_on_line`), goes on as it is made, through the yes's
-     own path (`make_skill_local::code_on_at_once`, then `code_on_here`
-     and `code_approve`): exactly that package by its SHA-256
-     (`made_skill::put_on_agreed`, the manage helper's same pack checks
-     and cap), then, with `LAMP_SKILL_TASKS=on`, its task's yes recorded
-     by lamp-control (`task_yes_record`) for its folder as it went on and
-     the grants said, as a spoken yes records it, so its first run asks
-     nothing. It is said as made and on, what it does and what its code
+     only with `LAMP_MADE_SCRIPTS=on`, `made_skill::code_on_at_once`). A
+     made skill's code goes on at once whatever it declares (#8180, the
+     dev's ruling, `made_skill::code_goes_on_at_once`): the camera, the
+     microphone, `net`, hearing (`sound`), who is at the lamp and sends
+     among them; only a task for the lamp's agent (`uses.agent_task`)
+     still waits for its spoken yes. Such a make, by voice or from the
+     app's MAKE IT (`app_make::put_on_line`), goes on as it is made:
+     exactly that package by its SHA-256 (`make_skill_local::code_on_at_once`,
+     `made_skill::put_on_agreed`, the manage helper's same pack checks and
+     cap). No yes is recorded at the keep: a made skill's source needs
+     none (`made_skill::grants_need_no_yes`, true for `SkillSource::Made`
+     only today, of `lamp_skills::source_of`), so lamp-control mints its
+     run step's and task's tokens from its folder's declared grants and
+     agrees its task check, `net` among them (docs/tasks.md), and its
+     first run asks nothing. Store and pushed skills keep their yes. It is said as made and on, what it does and what its code
      may use, the code itself never read out ("I made photo booth, and
      it's on: … The lamp's model wrote its code, and that code may use
      its light."; `made_skill::code_said` without `RUNS_AFTER_YES`); a
@@ -4268,11 +4335,9 @@ gone ([switches.md](switches.md)). What happens:
      `with_the_switch_a_voice_code_make_goes_on_at_once_and_its_first_run_asks_nothing`,
      `with_the_switch_a_code_make_not_made_or_not_on_says_so_plainly`,
      `with_the_switch_a_send_still_waits_for_its_yes`,
-     `with_the_switch_a_voice_code_make_with_the_camera_still_waits_for_its_yes`,
-     `with_the_switch_a_voice_code_make_knowing_who_is_there_still_waits_for_its_yes`,
-     `the_grants_that_go_on_at_once_never_hold_the_camera_or_the_microphone`,
+     `with_the_switch_a_code_make_with_the_camera_mic_or_who_goes_on_at_once`,
+     `with_the_switch_every_grant_goes_on_at_once`,
      `app_make::tests::with_the_switch_an_app_make_with_code_goes_on_at_once`,
-     `app_make::tests::with_the_switch_an_app_make_with_the_camera_still_waits_for_its_yes`,
      and, off, `a_made_skill_with_code_waits_for_a_later_yes_and_goes_on_by_its_sha256`.
    - **What runs it** is #6305's `do.task`: `lamp-skills` loads a
      `made: here` skill's task only with `LAMP_MADE_SCRIPTS=on`, and only
@@ -7069,14 +7134,14 @@ the same code for both writers.
     left to `ready_untold` in the app's list and to "Is my skill ready?",
     the skill off. The worker acts on that turn's note
     (`long_make::told_here`): one line, "Your <name> skill is ready and on.
-    Say 'remove it' to undo." (`long_make::ready_on_line`), no yes asked
+    Say 'remove it' to undo." (`long_make::ready_on_line`), or, for a
+    skill whose try passed, the try's line (`made_skill::tried_line`, below), no yes asked
     (the first builder, 18 Nov 18:41), with the link ask for a service it reads that isn't linked yet,
     as a finished make's line has it. One with code while the lamp runs no
     skill's code (`LAMP_MADE_SCRIPTS` off) is said ready and off, why
     plainly, never on. One with code that keeps its yes as a finished
-    make's does (`made_skill::code_goes_on_at_once` false: it sends, or the
-    camera, the microphone or hearing, or `LAMP_MADE_CODE_ON_AT_ONCE` off)
-    (so every skill with code in the product, where that switch is off) is
+    make's does (`made_skill::code_goes_on_at_once` false: a task for the
+    lamp's agent, or `LAMP_MADE_CODE_ON_AT_ONCE` off) is
     said ready and read back as an app make's is
     (`make_skill_local::app_code_asked`): "Your <name> skill is ready." and
     `made_skill::on_line`, word for word, with what its code may use, its
@@ -7142,9 +7207,7 @@ the same code for both writers.
   `a_long_make_with_code_is_said_on_in_one_line_with_no_yes_and_never_on_while_off`,
   `a_long_make_not_put_on_once_heard_is_told_why`,
   `a_long_make_on_already_is_told_with_nothing_asked_again`,
-  `a_long_make_that_sends_is_told_ready_and_stays_off_with_no_yes_recorded`,
   `a_not_on_mark_for_a_skill_removed_in_the_app_goes_quietly`,
-  `a_second_code_make_waits_for_the_firsts_yes_before_it_is_told`,
   `a_long_make_is_not_told_over_a_quick_makes_awaited_yes`,
   `a_long_make_is_not_told_over_an_open_clash_ask` and
   `long_make`'s own;
@@ -7384,6 +7447,97 @@ the same code for both writers.
   Hermes's terminal passes the run's `LAMP_*` switches to the check it
   runs; and how long its answer takes
   there.
+
+##### A made skill is made once and whole (#8157)
+
+Whichever agent the lamp runs (OpenClaw or Hermes; nothing here names or
+forces one), a skill it makes is made whole, with everything a run needs:
+
+- **The guide** (`lamp_tasks::skill_make::GUIDE`,
+  `crates/tasks/src/skill_make_guide.md`) teaches two step kinds, chosen at
+  the make: a `run` step, written exactly `run = "scripts/main.py"`, whose
+  script does the whole job and says its success line and its failure line
+  with `lamp.say` (lamp-skills runs it with no agent; the key's schema and
+  runtime are #8158's), and a `task` step only when each start needs the
+  agent to sum up or reason, its helper scripts written at the make too.
+  Scripts are written at the make, never at a run. A linked service is read
+  by the script itself (`lamp.service_read`) or by the lamp's own `read`
+  step: the one-line hand-over script is no longer taught to the agent (the
+  rules it is given say so too, `make_skill_local::agents_own_scripts`;
+  DeepSeek's are as before). The agent writes only the draft it was given,
+  never the lamp's own skills or any other. The examples
+  (`crates/tasks/src/make_examples/`) show `run` steps (`coin-flip`,
+  `breathing-coach`, `exchange-rate`, `sun-times`) and a `task` with a
+  helper that reads the calendar (`agenda-count`). Every line is said with
+  `await lamp.say(text, wait=True)`, so a script never exits before its
+  line is said (one dropped is not counted, and its run fails).
+- **The voice reads a `run` step as it reads a `task` step**: code of its
+  own, held to its grants and its script among the files written
+  (`made_skill::code_step`, `task_run`), and read back for the yes plainly,
+  "it runs its own script" (`made_skill::RUN_STEP_SAID`), then what its
+  code may use.
+- **Its `SKILL.md`** has a `when` line and, for a skill with code, three
+  sections, each a `## ` heading with lines under it: `## Uses` (each
+  script or lamp-services tool and its arguments), `## Result` (where each
+  result is) and `## Answer` (what is said aloud, in one to three plain
+  sentences). The voice holds a skill the lamp's agent made with code to
+  them (`made_skill::sections_held`, refused as `made_skill::NO_SECTIONS`
+  with lines for a repair); never a built-in, Store, pushed or added
+  skill's, nor one DeepSeek made.
+- **A tried run before it is kept.** Once the voice's check has packed it,
+  a made skill with code is sent whole to lamp-tasks
+  (`make_skill_agent::try_made`, `"op":"make_try"`; [tasks.md](tasks.md),
+  "A made skill's tried run") and kept only when its try passed: each
+  script exits 0 within 30 s, a `run` step's said at least one line with
+  `lamp.say`, a `task` step's printed something. The try is a real run
+  (#8180): it has every grant the skill declares (`net`, the camera and
+  the microphone among them, with nothing asked), and its ops, a linked
+  service write included, are done live as at the skill's own run. A failed try is
+  refused as `made_skill::NOT_TRIED_PASSED` with lamp-tasks' words, which
+  go back to the agent as one of its repairs (at most two), then the make
+  is told failed and nothing is kept. A passed try adds
+  `made_skill::TRIED_SAID` ("I tried it once and it worked.") to its
+  read-back, and once it is on it is said in one line with what its try
+  said first (#8180, `made_skill::tried_line`, from make_try's
+  `said_first`), first naming what it uses, since no yes is asked
+  (Heron's HOLD on #8180): "Made it. It uses the camera and the internet,
+  and I tried it: <what it said>. Say 'remove it' to undo." (the words on
+  one line, at most 120 characters, a trailing `.`, `!` or `?` trimmed),
+  or "Made <name>. It uses the camera and the internet, and I tried it.
+  Say 'remove it' to undo." when it said nothing usable. The uses are
+  short (`made_skill::uses_briefly`): the camera, the microphone, the
+  internet (`net`), notes, everything the lamp says (`speech`), your
+  <service> for a read, "sends to <service>" for a write, messages to
+  your phone, known faces and who is at the lamp. A skill with nothing
+  beyond its voice, light and body says no uses: "Made it, and I tried
+  it: <what it said>. Say 'remove it' to undo.", or "Made <name>, and I
+  tried it. Say 'remove it' to undo."; in
+  `make_no_asks::made_line`, the long make's ready-and-on line
+  (`long_make`) and `make_skill_local::code_on_line`, and journaled by
+  its length alone, never the try's words, which may be mail or what the
+  camera saw ("lamp-voice: a made skill is said on with its try (N chars,
+  uses named)", or "no uses named"). A skill with
+  nothing tried keeps its line. A try that can't be made
+  at all (lamp-tasks busy, no token, its fence, an older lamp-tasks that
+  doesn't know `make_try`, no answer) fails closed (#8180): it is
+  journaled with why, nothing is kept, and the person hears
+  `made_skill::NOT_TRIED_LINE` ("I made it, but the lamp couldn't try it
+  out, so I didn't keep it. Please ask me again in a minute."). Only a
+  voice with no tasks folder at all (`LAMP_TASKS_DIR` unset, no tasks
+  part) keeps it untried. Not for a skill added from a file.
+- **Who wrote it** is always on its card and in its `made.json` entry:
+  `made_with: openclaw`, `hermes` (the engine the tasks part named for the
+  make) or `deepseek` (the lamp's own model), whatever
+  `LAMP_MAKE_REACTIONS_ONLY_DEEPSEEK` says; `made_by` stays who asked
+  (`voice`, `app`).
+
+Tests: `a_made_skill_always_says_the_engine_that_wrote_it`,
+`an_agents_skill_with_code_says_its_uses_result_and_answer`,
+`a_tried_run_is_told_or_goes_to_a_repair`,
+`a_tried_runs_answer_is_read_as_passed_failed_nothing_or_not_tried`,
+`a_made_skill_is_sent_whole_to_be_tried`,
+`the_agent_is_told_to_write_a_services_scripts_whole`, and lamp-tasks' and
+lamp-control's below.
 
 ##### A make while another is made waits its turn (`LAMP_MAKE_QUEUE=on`, off)
 

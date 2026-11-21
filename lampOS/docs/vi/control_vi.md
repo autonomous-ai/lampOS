@@ -83,6 +83,12 @@ chối và không token nào được cấp. Lời đồng ý được giữ mà
 lời đồng ý: token của nó không nêu quyền nào (`"grants": []`), nên lần chạy
 chỉ `hello` được, mọi thao tác cần quyền đều bị từ chối `no_grant`.
 
+### Lần chạy thử của một lần tạo
+
+(#8157, #8180) `{"mint": {"try": [QUYỀN...], "run": RUN_ID}}` cấp token cho bản nháp trước khi được giữ, dưới tên skill `make-try`, đánh dấu là chạy thử. Quyền là của chính bản nháp, mỗi quyền một lần, trong đó có camera và microphone (#8180: lượt thử có các quyền đã khai báo, như lần chạy thật); `net` bị bỏ (không phải quyền của token: lamp-tasks cho lượt thử đường ra ngoài riêng), còn `skills` làm việc cấp token bị từ chối (`task_yes::try_grants_of`). Mỗi thao tác của lượt thử được làm thật trong phạm vi quyền của nó, đúng như lần chạy của một skill: không thao tác nào bị trả lời từ bản giả hay bị từ chối vì là lượt thử, `service.write` được gửi tới lamp-services (tắt khi dịch vụ liên kết tắt, như mọi lần chạy), và ghi chú nó giữ vẫn còn sau khi nó kết thúc. Khi lần chạy kết thúc, `{"end": {"run": RUN_ID}}` trả lời `{"ended": BOOL, "said": N, "said_first": TEXT}`: `said_first` là lời của câu `say` đầu tiên được nói trọn của client lần chạy, trên một dòng, tối đa 120 ký tự (`parts::SAID_FIRST_CHARS`, `Parts::said_take_first`, #8180: điều lượt thử báo cho người dùng là nó đã làm), bỏ đi khi không có câu nào.
+
+### Token cho skill run: lệnh ghi cố định
+
 **Lượt chạy của một lệnh ghi cố định** (`LAMP_SKILL_WRITE_AGENT=on` trong
 lamp-control, đúng `on`, bật trong các unit lamp-control, lamp-skills, lamp-tasks và lamp-services của sản phẩm; quyết định của
 chủ đèn, 13/11): khi cấp token cho một skill không có lời đồng ý task nào mà

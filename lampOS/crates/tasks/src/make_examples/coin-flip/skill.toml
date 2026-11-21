@@ -1,7 +1,8 @@
-asks = ["flip a coin"]
+asks = ["flip a coin", "heads or tails"]
 kind = "installable"
 version = "1.0.0"
 grants = ["speak"]
 
+# The script does the whole job and says its own line: no agent at run.
 [[do]]
-task = { task = "flip a coin and say heads or tails", run = "scripts/main.py" }
+run = "scripts/main.py"

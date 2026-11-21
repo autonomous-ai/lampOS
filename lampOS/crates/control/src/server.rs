@@ -322,7 +322,16 @@ impl Shared {
     /// (`LAMP_SERVICES_TO_AGENT`), minted as the skill
     /// `lamp_services::VOICE_ASK_SKILL` for exactly the linked service
     /// grants asked ([`crate::runs::SkillYes::ask_grants`]), never another.
+    ///
+    /// `{"mint": {"try": ["speak", ...], "run", "expires_in_ms"?}}` instead
+    /// (#8157): a make's tried run of a draft, minted as
+    /// [`crate::task_yes::MAKE_TRY_SKILL`] for the draft's own grants
+    /// ([`crate::runs::SkillYes::try_grants`]) and marked tried: its
+    /// `service.write` is answered as if done and never sent.
     fn mint(&self, asked: &Value, now: u64) -> Value {
+        if let Some(tried) = asked.get("try") {
+            return self.mint_try(asked, tried, now);
+        }
         let ask = match asked.get("ask") {
             None => None,
             Some(Value::Array(grants)) => {
@@ -398,6 +407,60 @@ impl Shared {
         json!({"token": token, "run": run, "skill": skill, "grants": live.grants, "expires_in_ms": expires_in_ms})
     }
 
+    /// [`Shared::mint`]'s tried run (#8157).
+    fn mint_try(&self, asked: &Value, tried: &Value, now: u64) -> Value {
+        if asked.get("skill").is_some() || asked.get("ask").is_some() {
+            return json!({"error": "mint: a try alone, never with a skill or an ask"});
+        }
+        let Some(tried) = tried
+            .as_array()
+            .and_then(|grants| grants.iter().map(Value::as_str).collect::<Option<Vec<_>>>())
+        else {
+            return json!({"error": "mint: a try is a list of grants, as text"});
+        };
+        let tried: Vec<String> = tried.into_iter().map(str::to_owned).collect();
+        let Some(run) = asked["run"].as_str().filter(|run| crate::runs::plain(run)) else {
+            return json!({"error": "mint: a run of plain characters, at most 64"});
+        };
+        let for_ms = match asked.get("expires_in_ms") {
+            None | Some(Value::Null) => None,
+            Some(value) => match value.as_u64() {
+                Some(ms) if ms > 0 => Some(ms),
+                _ => return json!({"error": "mint: expires_in_ms is a whole number above 0"}),
+            },
+        };
+        let Some(yes) = self.yes.lock().expect("yes").clone() else {
+            return json!({"error": "skill runs are off on this lamp"});
+        };
+        let grants = match yes.try_grants(&tried) {
+            Ok(grants) => grants,
+            Err(why) => return json!({"error": why}),
+        };
+        let Some(token) = crate::runs::new_token(&ring::rand::SystemRandom::new()) else {
+            return json!({"error": "no token could be made"});
+        };
+        let skill = crate::task_yes::MAKE_TRY_SKILL;
+        let minted = {
+            let mut door = self.door.lock().expect("door");
+            let minted = door.mint_run(&token, run, skill, grants, for_ms, now);
+            if minted.is_ok() {
+                door.mark_tried(run);
+            }
+            minted
+        };
+        let live = match minted {
+            Ok(live) => live,
+            Err(why) => return json!({"error": why}),
+        };
+        self.close_client(&live.client, crate::runs::CLOSED_AGAIN);
+        let names = grant_names(&live.grants.iter().copied().collect::<Vec<_>>());
+        let expires_in_ms = live.until_us.saturating_sub(now) / 1_000;
+        eprintln!(
+            "lamp-control: run {run}: a make's tried run, a token for [{names}], its writes stubbed"
+        );
+        json!({"token": token, "run": run, "skill": skill, "grants": live.grants, "expires_in_ms": expires_in_ms, "tried": true})
+    }
+
     /// Ends a run: its connections close, what it asked for that still goes
     /// stops, as its `stop` would.
     fn end_run(&self, run: &str, serial: Option<u64>, now: u64, why: &str) -> bool {
@@ -416,7 +479,11 @@ impl Shared {
         let now = self.now_us();
         let ended = self.door.lock().expect("door").sweep_runs(now);
         for run in ended {
-            self.parts.lock().expect("parts").gone(&run.client, now);
+            let mut parts = self.parts.lock().expect("parts");
+            parts.gone(&run.client, now);
+            // Its said count is nobody's now.
+            parts.said_take(&run.client);
+            drop(parts);
             self.close_client(&run.client, crate::runs::CLOSED_ENDED);
             eprintln!(
                 "lamp-control: run {} of skill {}: its time is up",
@@ -2211,6 +2278,7 @@ fn admin_answer(
     // alone, checked by lamp-skills, taken back by a remove.
     let folder = shared.task_yes.lock().expect("task_yes").clone();
     if let Some(answer) = crate::task_yes::answer(
+        std::path::Path::new(crate::task_yes::SKILLS),
         folder.as_deref(),
         &asked,
         from_the_voice,
@@ -2367,7 +2435,25 @@ fn admin_answer(
     }
     if let Some(end) = asked.get("end") {
         return match end["run"].as_str() {
-            Some(run) => json!({"ended": shared.end_run(run, None, now, "ended")}),
+            Some(run) => {
+                let ended = shared.end_run(run, None, now, "ended");
+                // How many of its `say`s the voice said whole (`done` with
+                // `how: finished`; one dropped, for privacy or expiry, is
+                // not): a make's tried run (#8157) and a `run` step (#8158)
+                // need one. Taken whether or not the run was still live, so
+                // no count outlives it.
+                let (said, first) = shared
+                    .parts
+                    .lock()
+                    .expect("parts")
+                    .said_take_first(&crate::runs::run_client(run));
+                // #8180: and the first finished say's words, for a make's
+                // try to tell the person what it did.
+                match first {
+                    Some(first) => json!({"ended": ended, "said": said, "said_first": first}),
+                    None => json!({"ended": ended, "said": said}),
+                }
+            }
             None => json!({"error": "end: a run, as text"}),
         };
     }

@@ -1000,27 +1000,22 @@ sau:
      đèn chỉ nói vậy, không cần xác nhận; chỉ `on`, tắt nếu không đặt;
      bật trong `lamp-voice` của sản phẩm (lần bật của luồng tạo kỹ năng, DEFAULT-ON của người xây dựng đầu tiên, 19/11 lúc 21:42 trên #7814); trong `lamp-voice` được truyền cho
      cả hai route, chỉ được đọc khi `LAMP_MADE_SCRIPTS=on`,
-     `made_skill::code_on_at_once`). Phán quyết của first builder trên
-     #6059 (19:14, và dòng 19:44 của builder đầu tiên: "sound" là âm thanh và giọng
-     nói của chính đèn) vạch ranh giới (`made_skill::code_goes_on_at_once`):
-     mã chỉ có các quyền ánh sáng của đèn, giọng nói và âm thanh của nó
-     hoặc đầu và tay của nó (`made_skill::CODE_AT_ONCE_GRANTS`: `light`,
-     `speak`, `body`; hẹn giờ là một trigger và không cần quyền) được bật
-     ngay; mã có bất kỳ quyền nào khác, trước hết là camera, micro và
-     `sound`, là quyền nghe các loại âm thanh chứ không phải phát chúng
-     (`made_skill::CODE_YES_GRANTS`), mã biết ai đang ở bên đèn (`who`,
-     `known_faces`: danh tính là quyền riêng tư của camera, first builder
-     lúc 20:16; lamp-control không có quyền nào cho nó), hoặc bất kỳ lần gửi nào (một lần ghi,
-     tin nhắn tới điện thoại) vẫn giữ lời đồng ý bằng giọng nói đúng như khi
-     công tắc tắt. Một lần tạo như vậy, bằng giọng nói hay từ MAKE IT của
-     ứng dụng (`app_make::put_on_line`), được bật ngay khi tạo xong, qua đúng đường của lời đồng ý
-     (`make_skill_local::code_on_at_once`, rồi `code_on_here` và
-     `code_approve`): đúng package đó theo SHA-256 của nó
-     (`made_skill::put_on_agreed`, cùng các bước kiểm tra pack và giới hạn
-     của helper quản lý), rồi, khi `LAMP_SKILL_TASKS=on`, lamp-control ghi
-     lời đồng ý cho task của nó (`task_yes_record`) theo thư mục lúc vừa
-     bật và các quyền đã nói, như một lời đồng ý bằng giọng nói ghi, nên
-     lần chạy đầu không hỏi gì. Đèn nói là đã tạo và đã bật, nó làm gì và
+     `made_skill::code_on_at_once`). Mã của một kỹ năng được tạo được bật
+     ngay dù nó khai báo gì (#8180, quyết định của dev,
+     `made_skill::code_goes_on_at_once`): kể cả camera, micro, `net`, nghe
+     (`sound`), biết ai đang ở bên đèn và các lần gửi; chỉ task cho agent của
+     đèn (`uses.agent_task`) vẫn chờ lời đồng ý bằng giọng nói. Một lần tạo
+     như vậy, bằng giọng nói hay từ MAKE IT của ứng dụng
+     (`app_make::put_on_line`), được bật ngay khi tạo xong: đúng package đó
+     theo SHA-256 của nó (`make_skill_local::code_on_at_once`,
+     `made_skill::put_on_agreed`, cùng các bước kiểm tra pack và giới hạn của
+     helper quản lý). Không ghi lời đồng ý nào lúc giữ: nguồn của kỹ năng
+     được tạo không cần (`made_skill::grants_need_no_yes`, hiện chỉ đúng với
+     `SkillSource::Made`, theo `lamp_skills::source_of`), nên lamp-control
+     tạo token cho bước run và task của nó từ các quyền khai báo trong thư
+     mục và đồng ý kiểm tra task của nó, kể cả `net` (docs/vi/tasks_vi.md),
+     và lần chạy đầu không hỏi gì. Kỹ năng từ Store và được đẩy lên vẫn giữ
+     lời đồng ý. Đèn nói là đã tạo và đã bật, nó làm gì và
      mã của nó được dùng gì, bản thân mã không bao giờ được đọc ra ("I made
      photo booth, and it's on: … The lamp's model wrote its code, and that
      code may use its light."; `made_skill::code_said` không có
@@ -1037,11 +1032,9 @@ sau:
      `with_the_switch_a_voice_code_make_goes_on_at_once_and_its_first_run_asks_nothing`,
      `with_the_switch_a_code_make_not_made_or_not_on_says_so_plainly`,
      `with_the_switch_a_send_still_waits_for_its_yes`,
-     `with_the_switch_a_voice_code_make_with_the_camera_still_waits_for_its_yes`,
-     `with_the_switch_a_voice_code_make_knowing_who_is_there_still_waits_for_its_yes`,
-     `the_grants_that_go_on_at_once_never_hold_the_camera_or_the_microphone`,
+     `with_the_switch_a_code_make_with_the_camera_mic_or_who_goes_on_at_once`,
+     `with_the_switch_every_grant_goes_on_at_once`,
      `app_make::tests::with_the_switch_an_app_make_with_code_goes_on_at_once`,
-     `app_make::tests::with_the_switch_an_app_make_with_the_camera_still_waits_for_its_yes`,
      và, khi tắt, `a_made_skill_with_code_waits_for_a_later_yes_and_goes_on_by_its_sha256`.
    - **Cái chạy nó** là `do.task` của #6305: `lamp-skills` chỉ nạp task của
      một kỹ năng `made: here` khi `LAMP_MADE_SCRIPTS=on`, và chỉ khi nó được
@@ -3677,13 +3670,14 @@ cả hai người viết.
     cho `ready_untold` trong danh sách của app và câu "Skill của tôi xong
     chưa?", skill vẫn tắt. Worker xử lý ghi chú của lượt đó
     (`long_make::told_here`): một câu, "Your <name> skill is ready and on.
-    Say 'remove it' to undo." (`long_make::ready_on_line`), không hỏi đồng
+    Say 'remove it' to undo." (`long_make::ready_on_line`), hoặc, với skill
+    có lượt thử đạt, câu của lượt thử (`made_skill::tried_line`, bên dưới), không hỏi đồng
     ý (first builder, 18/11 18:41), kèm lời nhắc liên kết cho dịch vụ nó đọc mà chưa liên kết, như
     câu của lần tạo xong. Skill có code khi đèn không chạy code của skill
     (`LAMP_MADE_SCRIPTS` tắt) được nói là xong và tắt, nói rõ lý do, không
     bao giờ nói là bật. Skill có code vẫn cần câu đồng ý như lần tạo xong
-    (`made_skill::code_goes_on_at_once` sai: nó gửi đi, hoặc dùng camera,
-    micro hay nghe, hoặc `LAMP_MADE_CODE_ON_AT_ONCE` tắt; nên mọi skill có
+    (`made_skill::code_goes_on_at_once` sai: task cho agent của đèn, hoặc
+    `LAMP_MADE_CODE_ON_AT_ONCE` tắt; nên mọi skill có
     code trong sản phẩm, nơi switch đó tắt) được nói là xong và đọc lại như
     lần tạo của app (`make_skill_local::app_code_asked`): "Your <name> skill
     is ready." và `made_skill::on_line`, từng chữ, kèm thứ code của nó được
@@ -3980,6 +3974,94 @@ cả hai người viết.
   cho thấy terminal của Hermes chuyển các công tắc `LAMP_*` của lần chạy cho
   kiểm tra nó chạy; và câu trả lời mất bao lâu ở đó.
 
+### Một kỹ năng được tạo một lần và trọn vẹn (#8157)
+
+Dù đèn chạy agent nào (OpenClaw hay Hermes; không chỗ nào ở đây gọi tên hay
+ép một agent), kỹ năng nó tạo được tạo trọn vẹn, có mọi thứ một lần chạy cần:
+
+- **Hướng dẫn** (`lamp_tasks::skill_make::GUIDE`,
+  `crates/tasks/src/skill_make_guide.md`) dạy hai loại bước, chọn lúc tạo:
+  bước `run`, viết đúng `run = "scripts/main.py"`, có script làm trọn việc
+  và nói câu thành công lẫn câu thất bại bằng `lamp.say` (lamp-skills chạy
+  nó không cần agent; schema và runtime của khóa này thuộc #8158), và bước
+  `task` chỉ khi mỗi lần chạy cần agent tóm tắt hay suy luận, các script trợ
+  giúp của nó cũng được viết lúc tạo. Script được viết lúc tạo, không bao giờ
+  lúc chạy. Một dịch vụ liên kết được chính script đọc (`lamp.service_read`)
+  hoặc bước `read` của đèn: script chuyển giao một dòng không còn được dạy cho
+  agent (luật nó nhận cũng nói vậy, `make_skill_local::agents_own_scripts`;
+  của DeepSeek như trước). Agent chỉ viết bản nháp nó được giao, không bao giờ
+  sửa kỹ năng của đèn hay kỹ năng khác. Các ví dụ
+  (`crates/tasks/src/make_examples/`) có bước `run` (`coin-flip`,
+  `breathing-coach`, `exchange-rate`, `sun-times`) và một `task` có script
+  trợ giúp đọc lịch (`agenda-count`). Mỗi câu được nói bằng
+  `await lamp.say(text, wait=True)`, để script không bao giờ thoát trước khi
+  câu được nói (câu bị bỏ không được đếm, và lần chạy thất bại).
+- **Giọng đọc bước `run` như đọc bước `task`**: code riêng, giữ theo grant
+  của nó và script của nó phải nằm trong các file đã viết
+  (`made_skill::code_step`, `task_run`), và được đọc lại để xin đồng ý một
+  cách đơn giản, "it runs its own script" (`made_skill::RUN_STEP_SAID`),
+  rồi những gì code của nó được dùng.
+- **`SKILL.md` của nó** có dòng `when` và, với kỹ năng có code, ba mục, mỗi
+  mục một tiêu đề `## ` có dòng bên dưới: `## Uses` (mỗi script hay công cụ
+  lamp-services và đối số của nó), `## Result` (mỗi kết quả nằm ở đâu) và
+  `## Answer` (điều được nói to, một đến ba câu đơn giản). Voice giữ kỹ năng
+  agent của đèn tạo có code theo ba mục này (`made_skill::sections_held`, từ
+  chối là `made_skill::NO_SECTIONS` kèm dòng để sửa); không áp cho kỹ năng
+  có sẵn, của Store, được đẩy lên hay thêm từ tệp, cũng không cho kỹ năng
+  DeepSeek tạo.
+- **Một lần chạy thử trước khi giữ.** Khi kiểm tra của voice đã đóng gói nó,
+  kỹ năng có code được gửi trọn sang lamp-tasks
+  (`make_skill_agent::try_made`, `"op":"make_try"`; [tasks_vi.md](tasks_vi.md),
+  "Lần chạy thử của kỹ năng được tạo") và chỉ được giữ khi lần thử đạt: mỗi
+  script thoát 0 trong 30 s, script của bước `run` đã nói ít nhất một câu
+  bằng `lamp.say`, script của bước `task` có in ra gì đó. Lần thử là một lần
+  chạy thật (#8180): nó có mọi quyền kỹ năng khai báo (trong đó có `net`,
+  camera và microphone, không hỏi gì), và các thao tác của nó, kể cả lệnh
+  ghi dịch vụ liên kết, được làm thật như lúc kỹ năng chạy. Lần thử
+  thất bại bị từ chối là `made_skill::NOT_TRIED_PASSED` kèm lời của
+  lamp-tasks, gửi lại agent như một lần sửa (tối đa hai), rồi lần tạo được
+  báo là thất bại và không giữ gì. Lần thử đạt thêm `made_skill::TRIED_SAID`
+  ("I tried it once and it worked.") vào lời đọc lại, và khi đã bật, đèn
+  nói một câu kèm điều lượt thử nói đầu tiên (#8180, `made_skill::tried_line`,
+  từ `said_first` của make_try), trước hết nêu những gì nó dùng, vì không
+  hỏi đồng ý (HOLD của Heron trên #8180): "Made it. It uses the camera and
+  the internet, and I tried it: <what it said>. Say 'remove it' to undo."
+  (lời trên một dòng, tối đa 120 ký tự, bỏ dấu `.`, `!` hay `?` ở cuối),
+  hoặc "Made <name>. It uses the camera and the internet, and I tried it.
+  Say 'remove it' to undo." khi nó không nói gì dùng được. Phần dùng được
+  nói ngắn (`made_skill::uses_briefly`): the camera, the microphone, the
+  internet (`net`), notes, everything the lamp says (`speech`), your
+  <service> khi đọc, "sends to <service>" khi ghi, messages to your phone,
+  known faces và who is at the lamp. Skill không dùng gì ngoài giọng, đèn
+  và thân thì không nêu: "Made it, and I tried it: <what it said>. Say
+  'remove it' to undo.", hoặc "Made <name>, and I tried it. Say 'remove
+  it' to undo."; trong
+  `make_no_asks::made_line`, câu xong-và-bật của lần tạo dài (`long_make`)
+  và `make_skill_local::code_on_line`, và chỉ ghi nhật ký độ dài của câu,
+  không bao giờ ghi lời của lượt thử, vì đó có thể là thư hay điều camera
+  thấy ("lamp-voice: a made skill is said on with its try (N chars, uses
+  named)", hoặc "no uses named"). Skill không có gì để thử giữ
+  câu cũ. Lần thử không làm được (lamp-tasks đang bận, không có token,
+  hàng rào lỗi, lamp-tasks cũ không biết `make_try`, không có trả lời) thì
+  đóng an toàn (#8180): ghi nhật ký kèm lý do, không giữ gì, và người dùng
+  nghe `made_skill::NOT_TRIED_LINE` ("I made it, but the lamp couldn't try
+  it out, so I didn't keep it. Please ask me again in a minute."). Chỉ khi
+  voice không có thư mục tasks nào (`LAMP_TASKS_DIR` không đặt, không có
+  phần tasks) thì kỹ năng được giữ mà không thử. Không áp cho kỹ năng thêm
+  từ tệp.
+- **Ai đã viết nó** luôn có trên thẻ và trong mục `made.json`:
+  `made_with: openclaw`, `hermes` (engine phần tasks báo cho lần tạo) hoặc
+  `deepseek` (model riêng của đèn), bất kể `LAMP_MAKE_REACTIONS_ONLY_DEEPSEEK`;
+  `made_by` vẫn là người yêu cầu (`voice`, `app`).
+
+Kiểm thử: `a_made_skill_always_says_the_engine_that_wrote_it`,
+`an_agents_skill_with_code_says_its_uses_result_and_answer`,
+`a_tried_run_is_told_or_goes_to_a_repair`,
+`a_tried_runs_answer_is_read_as_passed_failed_nothing_or_not_tried`,
+`a_made_skill_is_sent_whole_to_be_tried`,
+`the_agent_is_told_to_write_a_services_scripts_whole`, và các kiểm thử của
+lamp-tasks, lamp-control bên dưới.
+
 ### Một lần tạo khi lần khác đang chạy sẽ chờ đến lượt (`LAMP_MAKE_QUEUE=on`, tắt)
 
 Trên lamp-9adf (stock 14083, #7679) một người tạo một kỹ năng, 47 giây sau
@@ -4055,6 +4137,77 @@ one-session thuộc #7595. Khi tắt, lần tạo thứ hai bị từ chối nh�
 từng byte. **Chưa thử trên đèn:** hai lần tạo liên tiếp bằng giọng nói, cả hai
 được làm theo thứ tự, lần thứ hai được báo là ngay sau và được nói lại sau
 lời đồng ý của lần đầu.
+
+### Bước `run` của một kỹ năng (`do.run`, #8158)
+
+Một `do.task` gửi script của nó qua agent của đèn: trên lamp-c0a4 một bản
+tin buổi sáng chỉ chạy `scripts/main.py` mất 43 s và 53 s, phần lớn là để
+agent khởi động. Bước `run` chạy script của chính kỹ năng mà không cần agent.
+
+```toml
+version = "1.0.0"
+grants = ["speak"]
+tool = "daily_brief"
+[permissions]
+speak = true
+[[do]]
+run = "scripts/main.py"
+```
+
+- **Cái khởi động nó không đổi**: giọng nói cho lời nói (tên kỹ năng và
+  `asks`, rồi `use_skill` của model), `lamp-skills` trên bus cho mọi thứ
+  khác, với giờ yên lặng, ngân sách và thời gian chờ của nó.
+- **Bước** (`lamp_skills::task::TaskStep::run_step`): `run = "..."` viết
+  đúng như vậy, một mình trong bảng `[[do]]`, một bước mỗi kỹ năng (một kỹ
+  năng có bước `run` hoặc `do.task`, không bao giờ cả hai), một file `.py`
+  thường trong `scripts/` của chính kỹ năng (cùng quy tắc với `run` của
+  task, không bao giờ là link). Nó được nạp như một task không có lời riêng
+  (`task::RUN_WORDS`, "run its own script", là điều mà lời đọc lại để chủ
+  nhân đồng ý nêu ra), nên mọi cổng của `do.task` vẫn giữ: công tắc, chỉ
+  loại đầu tiên, `grants` bên cạnh, lời đồng ý của chủ nhân cho các quyền
+  đó và SHA-256 của thư mục (được hỏi thành tiếng khi chưa có), kỹ năng
+  tắt, tạm dừng hay đã gỡ, một lần một lúc mỗi kỹ năng, 20 lần mỗi kỹ năng
+  và 100 lần tổng trong 24 giờ.
+- **Bàn giao**: dòng của task với `"op": "skill_run"` (`task::HandOver::line`),
+  trên socket của lamp-tasks, chờ tối đa 60 s (`task::RUN_STEP_MOST`).
+  Nó không bao giờ được tính là một bàn giao đang chạy (`HANDING`), nên
+  không chờ sau task của agent, cũng không giữ task đó lại; lamp-tasks chạy
+  một bước `run` một lúc, bên cạnh task của agent
+  ([tasks_vi.md](tasks_vi.md), "Bước `run` của một kỹ năng").
+- **Thành công**: script thoát với mã 0 trong vòng 30 s, và lamp-control đã
+  nói trọn ít nhất một dòng `lamp.say` của lần chạy (`{"ok":true,"said":N}`).
+  Một script không chờ câu nói của nó (`wait=True`) mà thoát ngay có thể bị
+  bỏ câu nói cùng kết nối, và khi đó là thất bại.
+- **Thất bại** (`task::run_outcome`): không bao giờ chạy lại cho lần kích
+  hoạt đó. Nếu được khởi động bằng lời của người dùng (giọng nói đánh dấu
+  lần chạy là được hỏi, chạy ngay hoặc model gọi tool của nó), đèn nói một
+  câu cố định, "<tên đọc lên> couldn't finish this time."
+  (`task::run_failed_line`), ở mức ưu tiên nói của kỹ năng; nếu do một
+  trigger khởi động, đèn không nói gì. Nhật ký luôn ghi lý do, không bao
+  giờ ghi đầu ra của script.
+- **`net`**: được cấp chỉ bởi quyền, không hỏi gì (#8180; `LAMP_TASK_NET`
+  bật): socket egress riêng của lần chạy, chỉ web công khai trên cổng 80 và
+  443, qua `HTTPS_PROXY` (`127.0.0.1:3128`) trong hàng rào của nó
+  ([tasks_vi.md](tasks_vi.md), "Bước `run` của một kỹ năng").
+- **Không được cấp**: khóa (`secrets`): kỹ năng cần khóa dùng `do.task`;
+  lamp-tasks từ chối bước `run` của kỹ năng đó, bằng lời.
+- **Giới hạn riêng**: script chạy với giới hạn bộ nhớ (768 MiB không gian
+  địa chỉ), thời gian CPU (30 s) và độ nice (10) cho mỗi tiến trình, và tối
+  đa 64 tiến trình và luồng cho cả lần chạy (#8180), không bao giờ dùng cả
+  ngân sách của lamp-tasks; tổng thật là cgroup riêng của nó: 512M bộ nhớ,
+  không swap, một nhân và 72 task cho cả lần chạy, trong cgroup được ủy quyền
+  của lamp-tasks.service ([tasks_vi.md](tasks_vi.md), "Cgroup riêng"); trên
+  đèn không có cgroup đó thì bị từ chối, không bao giờ chạy thiếu tổng đó.
+  Lần chạy thử lúc tạo có cùng hàng rào, giới hạn và cgroup.
+- **Thời gian** (từng chặng, từ trigger đến script): luồng của lần kích
+  hoạt tạo luồng bàn giao; thư mục được băm (vài file của kỹ năng); hỏi
+  lamp-control lời đồng ý (một dòng socket cục bộ); ghi sổ; một dòng tới
+  lamp-tasks; tạo token (một dòng socket cục bộ tới lamp-control); dựng
+  hàng rào (`unshare`, vài mount) và khởi động `python3`. Không agent, không
+  Harness. Nhật ký của lamp-tasks ghi cả chặng bàn giao đến lúc script bắt
+  đầu (`skill run RUN: hand-over to script start N ms`). Ở mức unit, với hàng rào thay thế, cả lần chạy một
+  script mất vài chục mili giây (`skill_run::tests`); trên đèn, mục tiêu là
+  vài giây từ trigger đến tiếng đầu tiên, chưa đo.
 
 ### Câu nói của một kỹ năng lõi qua agent của đèn (`LAMP_CORE_VIA_AGENT`, thử nghiệm, tắt)
 

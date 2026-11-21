@@ -3155,7 +3155,13 @@ for each run, and is answered once the run ends
   only the run id. A gateway agent's run (OpenClaw) gets no token file:
   its token goes through the skill-start launcher ("A skill's run on
   OpenClaw", below).
-- **The run:** one task for target `lamp`, its words the exact command
+- **The run:** one task for target `lamp`, its words first naming the
+  skill and its folder and telling the agent (whichever the lamp runs,
+  Hermes or OpenClaw: the words are the same) to read `<folder>/SKILL.md`
+  first and follow its `## Uses`, `## Result` and `## Answer` sections,
+  running the scripts already in its `scripts/` rather than working
+  anything out anew or reading the lamp's own files (#8158; on lamp-c0a4 a
+  made skill's agent had read the lamp's internals instead), then the exact command
   that runs the script from the skill's read-only folder,
   `PYTHONPATH=/usr/local/lib/lampos/sdk-python python3 <folder>/<run>`
   (the SDK's path in the command itself, so `lampos` imports whatever
@@ -3628,6 +3634,126 @@ whose script runs `curl https://example.com` gets a failure (no name
 resolves, no route), while the same run's model call is answered and its
 `control.sock` call works with its token.
 
+### A skill's `run` step, run here with no agent (#8158, `skill_run`)
+
+A skill's `run = "scripts/main.py"` step ([skills.md](skills.md), "A skill's
+`run` step") is handed over on the same socket as a `do.task`, with
+`"op":"skill_run"` and the same fields (its `task` the fixed "run its own
+script"), checked whole as a task's line is (`HandOver::parse`). lamp-tasks
+runs its script itself: no agent, no Harness, no prompt
+(`crate::skill_run`).
+
+- **Its place**: one `run` step at a time across the lamp, in a place of its
+  own beside the agent's task (`HandOvers::one`), so it never waits behind a
+  task that may run for minutes; a second is refused `busy`.
+- **Its token**: minted from lamp-control's kept yes for the skill's folder
+  and grants, exactly as a task's (`skill_run::answer`); a token naming other
+  grants than the line's (`net` aside, lamp-tasks' own) is ended at once and
+  nothing runs. A line for a skill that names keys is refused before any
+  token (`skill_run::NO_KEYS_HERE`): use a `do.task`.
+- **`net`**: the same path and check as a net task's (`skill_run::answer`
+  asks `Tokens::net_agreed` before any token): lamp-control agrees for the
+  owner's kept yes naming `net` for the folder as it is, or, with
+  `LAMP_MADE_CODE_ON_AT_ONCE` on (the product's lamp-control unit), for a
+  skill made on the lamp with no yes (#8180, below); not agreed, refused
+  `no_token` (`skill_run::NO_NET_YES`), no token and no egress socket.
+  With `LAMP_TASK_NET` on, `DirectRunner::egress` makes the run's own egress
+  socket `skill-<run id>` (`egress::Grant::lamp`: the public web on ports
+  80 and 443 only), served until the run's bound, and puts an `O_PATH`
+  descriptor of it on fd 5 of the fence. The fence is the gateway's net
+  fence (`gateway::FENCE_NET_EDITS`: `lo` up, `resolv.conf` naming
+  `127.0.0.1`, `lamp-tasks net-relay --egress /proc/self/fd/5`, fd 5 closed
+  before the script, `HTTPS_PROXY`/`HTTP_PROXY` `http://127.0.0.1:3128`),
+  with lamp-tasks' own program alone shown again under `/opt` for the relay
+  (`skill_run::RELAY_EDITS`). With the switch off, or off Linux, a net run
+  is refused before its fence starts (`not_started`). The socket is removed
+  when the run ends.
+- **Its fence** (`skill_run::DirectRunner`): `/usr/bin/unshare` with the
+  gateway run's arguments (`gateway::fence_args`: a user namespace with root
+  mapped, a network of `lo` alone, its own mount and PID namespaces,
+  `--kill-child`) and the gateway's fence text with two edits
+  (`skill_run::CONTROL_EDITS`): lamp-control's `control.sock` bound aside
+  before anything is hidden and moved back, alone, after. Every path of
+  `skill_run::HIDDEN` that is there (`/var`, `/run`, `/home`, `/opt`,
+  `/srv`, `/mnt`, `/media`, `/dev/shm`) is covered by an empty tmpfs, so no
+  part's state or socket (lamp-control's admin socket, lamp-tasks' own
+  sockets and state) is there; only the skill's folder, the run's own folder
+  (`/var/lib/lampos-tasks/runs/run-<id>`, 0700, removed when it ends) and
+  `control.sock` are shown again. The script then runs as lamp-tasks' own
+  uid in a nested user namespace (no capability over those mounts), with
+  `PATH`, `HOME`, `LAMP_CONTROL_SOCKET`, `PYTHONPATH` (the SDK) and its token,
+  read from a pipe on fd 3, never an argument. It reaches the lamp only
+  through `control.sock` with its token's grants: lamp-control refuses any
+  other (`no_grant`).
+- **Its bounds**: 30 s from the fence's start (`skill_run::RUN_WITHIN`), its
+  whole process group killed then; at most 64 KiB of output
+  (`skill_run::MOST_OUTPUT`), counted and thrown away (never journaled),
+  past which it is ended. The script has caps of its own, set in its fence
+  just before its exec, after its relay (`skill_run::CAPS_EDIT`), so a
+  runaway script never uses lamp-tasks' whole budget (`MemoryHigh`,
+  `CPUQuota` on lamp-tasks.service): no core file (`ulimit -c 0`), 768 MiB
+  of address space (`ulimit -v`, `SCRIPT_MEMORY_KB`, the per-script cap
+  #7520 gives a gateway agent's script), 30 s of CPU time (`ulimit -t`,
+  `SCRIPT_CPU_SECS`: at most one core on average over its run, as a gateway
+  agent's `CPUQuota=100%`) and niceness 10 (`nice -n`, `SCRIPT_NICE`, as a
+  gateway agent's `Nice=10`), each process's. The run as a whole holds at
+  most 64 processes and threads (`SCRIPT_PROCESSES`, #8180), its relay's
+  among them: `prlimit --nproc=64:64 --pid $$`, set in the fence's own user
+  namespace just before the script's nested one is made, so the kernel
+  counts it in that namespace alone (Linux 5.14 and later), never
+  lamp-tasks' or any other `lampos` process. Past it a fork or a thread
+  fails and the run ends `run_failed`. `prlimit`, not `ulimit -u`: a lamp's
+  `/bin/sh` is dash, whose flag is `-p`. These caps are a second line of
+  defence; the run's real total is its own cgroup's (next).
+- **Its own cgroup** (`run_cgroup`, #8180): lamp-tasks.service has
+  `Delegate=memory cpu pids` (`run_cgroup::DELEGATE`), so at `serve`'s start
+  lamp-tasks reads its cgroup from `/proc/self/cgroup` (the v2 `0::` line),
+  makes a leaf `serve` in it, moves every pid of the unit there (a cgroup
+  that hands controllers down holds no process), then writes
+  `+memory +cpu +pids` to its `cgroup.subtree_control`; stale `run-*`
+  cgroups are removed. Each run step and each make's tried run then gets
+  `run-<id>` with `memory.max` 512M (`RUN_MEMORY_MAX_MB`), `memory.high`
+  448M (`RUN_MEMORY_HIGH_MB`), `memory.swap.max` 0 whenever the kernel has
+  the file, `cpu.max` `100000 100000` (`RUN_CPU_MAX`, one core) and
+  `pids.max` 72 (`RUN_PIDS_MAX`: the script's 64 and 8 for the fence's own).
+  Where the totals come from: lamp-tasks.service measured 632 MiB at rest
+  and 1120 MiB at a Hermes task's peak (lamp-9adf, 12 Nov), so a run at its
+  512M beside that peak is 1632 MiB, under the unit's `MemoryHigh=2100M`;
+  its tasks, 126 + 72, under `TasksMax=512`; one core of the unit's
+  `CPUQuota=360%`. The fence's first process joins the cgroup just before
+  its exec (it writes `0` to the cgroup's `cgroup.procs`, in `pre_exec`),
+  so nothing of the run is ever outside it; past `memory.max` the kernel's
+  OOM killer ends the run's processes alone, never `serve` or Harness's
+  `wait` and `watch`es. When the run ends, however it ended (well, failed,
+  past its 30 s, cancelled), `1` is written to its `cgroup.kill` and the
+  cgroup removed. **Fail closed**: on Linux, with no delegated cgroup v2,
+  or a run's cgroup or any of its limits not made, the run (and a make's
+  try, which is then `not_tried`) is refused with
+  `run_cgroup::NO_CGROUP` ("the run's own memory and CPU bounds could not be
+  set, so it was not run"), the reason journaled
+  (`[lamp-tasks] run <id>: refused, no own cgroup: …`), never run without
+  its total; `serve` says at start which it is
+  (`[lamp-tasks] each run gets its own cgroup under …` or
+  `[lamp-tasks] runs have no own cgroup: …`). Off Linux (a developer's Mac,
+  its tests) a run goes on with the per-process caps alone.
+- **Its answer**: when the script ends, the token is ended with an admin
+  `end`, whose answer now carries `said` ([control.md](control.md), "The run
+  socket"): how many of the run's `say`s the voice said whole
+  (`Tokens::end_said`). Exit 0 and `said` at least 1 is
+  `{"ok":true,"id":0,"said":N}`; exit 0 and nothing said is `run_failed`
+  (`skill_run::SAID_NOTHING`); a failed exit, the 30 s limit or the output
+  cap is `run_failed` with the reason; a fence never made is `not_started`.
+  `skills/tasks` tells its end (`Ran` or `Failed`, no engine).
+- **Timing**: the journal says when the token was minted after the line
+  (`skill run RUN: SKILL handed over, token minted in N ms`), when the
+  script started (`its script started N ms into its run`), the two together
+  (`skill run RUN: hand-over to script start N ms`, what a lamp's ROW
+  reads) and its end. The
+  blocking hops are the mint (one local socket line), the fence's mounts and
+  `python3`'s start. Measured at unit level with a stand-in fence
+  (`skill_run::tests::a_script_that_ends_well_runs_in_its_own_folder_with_its_token`);
+  not yet on a lamp.
+
 ### Skills' runs and the voice's share of the day (#7342, `LAMP_SKILL_RUNS_VOICE_SHARE`, on in the product)
 
 A skill's run is an agent session. Its chats go through lamp-cloud's model
@@ -3939,6 +4065,89 @@ engine's own is left on `lampos`'s login `PATH` (a failed look keeps it); a
 line that stays true round after round is logged once. Skill runs still go
 to Hermes alone (`HarnessRunner`, above).
 
+### A made skill's tried run (`make_try`, #8157)
+
+Before the voice keeps a skill it made with code, whichever agent made it,
+it asks lamp-tasks to try it once ([skills.md](skills.md), "A made skill is
+made once and whole"); `lamp_tasks::make_try`.
+
+- **The line**, on the make socket, from lamp-voice alone as a make's:
+  `{"op":"make_try","name","files"}`, its files by their path in the
+  skill's folder (`skill.toml`, `SKILL.md`, `scripts/...`), at most 64.
+  One try at a time (another is refused `busy`), beside a make's place.
+- **What is tried** (`make_try::plan`): a `run` step's script; or, with a
+  `task` step and no `run` step, each `.py` under `scripts/` (the task's own
+  and its helpers), at most 4. No script step: `{"ok":true,"tried":false}`.
+- **How**: the skill's files are written to a `make-try-*` folder of the
+  make's work folder (swept with the makes' at start), a token is minted on
+  lamp-control's admin socket for the draft's own grants, the camera and
+  the microphone among them (`{"mint":{"try":[...],"run"}}`,
+  `Tokens::mint_try`; lamp-control drops `net`), and lamp-tasks starts itself as
+  `lamp-tasks make-try-fence` (`make_try::fence_main`) with the grant on
+  stdin: it becomes a run step's own fence (`make_try::fence_args`, built by
+  the same `skill_run::fence_args`, #8180): all of `skill_run::HIDDEN`
+  covered, `/run` and with it lamp-control's `admin.sock` among them, only
+  the skill's folder, the run's folder and `control.sock` shown again (with
+  `net`, lamp-tasks' relay too, as a run step's), and
+  the run step's caps (`skill_run::CAPS_EDIT`, its process cap among them)
+  and its own cgroup (`run_cgroup`, made before its token: none on Linux,
+  no token and `not_tried`); fd 4 a sink in place of the launcher's socket. No agent takes part.
+- **Its grants, as the run's** (#8180, the dev's ruling): every grant the
+  draft declares is given to its try, with nothing asked. A draft granted
+  `net` gets a run step's own egress socket, `make-try-<run id>`
+  (`make_try::FenceLaunch::egress`, `egress::Grant::lamp`, with
+  `LAMP_TASK_NET` on), opened before its token and served until the try's
+  bound, on fd 5 of its fence (`make_try::fence_main`), with no yes waited
+  for; with `LAMP_TASK_NET` off it is not tried (`not_tried`). Each script
+  runs once, at most 30 s (`TRY_WITHIN`), then is killed; its output is
+  kept up to 8 KiB.
+- **Judged** (`make_try::judged`): exit 0 in time; a `run` step's script
+  said at least one line (`said` from lamp-control's `end` answer,
+  `Tokens::end_said`; an older lamp-control that doesn't say is not held
+  against it); a task's script printed something. Answered
+  `{"ok":true,"tried":true,"passed":true,"said":N,"said_first":TEXT}`
+  (`said_first`, #8180: the first finished say's words from lamp-control's
+  `end`, `Tokens::end_said_first`, left out when none) or
+  `{"ok":true,"tried":true,"passed":false,"why"}` (the words go to the
+  voice's repair); a try that couldn't start (no token, no fence) is
+  refused `not_tried`.
+- **Live, as the run**: lamp-control marks the token tried, and each of its
+  ops is done live within its grants, as a skill run's: it speaks, plays,
+  moves, lights, captures, and its `service.write` is sent to lamp-services;
+  the notes it keeps stay ([control.md](control.md), "A make's tried run").
+- **The say count** (for #8158's `run` step too): lamp-control counts each
+  of a run client's `say`s the voice said whole (`done` with
+  `how: finished`; one dropped for privacy or expiry, or a `sound`, is not
+  counted; `Parts::said_take`) and answers an admin `{"end":{"run"}}` with
+  `{"ended":BOOL,"said":N}`, and `"said_first"`, the first such say's
+  words on one line, at most 120 characters (`Parts::said_take_first`,
+  #8180), when one was said. A script's `lamp.say` waits for its line
+  (`wait=True`), or it may exit before the line is said and its say is
+  dropped.
+
+Tests: `a_run_step_tries_its_script_and_a_task_each_of_its_scripts`,
+`a_try_passes_only_on_exit_0_in_time_and_for_a_run_step_a_say`,
+`a_tried_run_is_answered_and_its_folder_removed`,
+`a_silent_run_step_fails_its_try_with_words_for_the_repair`,
+`a_skill_that_sends_is_tried_with_its_own_grants`,
+`the_fence_launch_mints_a_tried_token_and_reads_its_says`,
+`a_fence_that_runs_past_its_limit_is_ended`,
+`a_try_is_given_every_grant_its_draft_declares`,
+`a_try_granted_net_camera_and_microphone_gets_each_with_no_yes`,
+`a_tried_runs_fence_is_a_run_steps_with_no_admin_socket_and_its_caps`;
+lamp-tasks' run step's `a_net_run_step_gets_its_egress_socket_with_no_yes`,
+lamp-tasks' run step's `a_run_steps_script_has_its_own_memory_and_cpu_caps`
+and, on Linux,
+`a_script_past_its_process_cap_fails_its_run_while_another_task_answers`;
+lamp-control's
+`a_tried_runs_ops_are_live_within_its_grants`,
+`a_tried_runs_write_is_sent_live_as_a_runs`,
+`a_tried_runs_notes_are_kept_after_its_end`,
+`a_runs_says_are_counted_to_its_end`,
+`a_runs_says_are_counted_and_a_tried_run_is_marked`,
+`a_tried_runs_grants_are_the_drafts_own` and
+`a_tried_run_is_minted_the_drafts_grants_and_its_end_tells_its_says`.
+
 ### A live spoken ask on the make socket (`voice_ask`, off unless set)
 
 The owner's rulings of 17 Nov: a linked service's live read, and an ask the
@@ -4247,7 +4456,20 @@ one runner (a fresh home per run, the token as a file) with no new rules:
   keeps it, else `no_token` and nothing runs. The mint already held the
   yes to the folder lamp-control hashed itself and its declared grants,
   and a skill has one yes, so an agreed check is the owner's yes to `net`
-  for the folder as it is. Off, `net` is refused as an unknown grant
+  for the folder as it is. With `LAMP_MADE_CODE_ON_AT_ONCE` on in
+  lamp-control (`lamp_skills::no_yes_switch_on`; on in the product), a skill
+  made on the lamp needs no yes (#8180,
+  `lamp_voice::made_skill::grants_need_no_yes`, true for
+  `SkillSource::Made` only today, of `lamp_skills::source_of`: `made: here`
+  and put on with an install record not from the Store, so a folder put on
+  by hand is not Made):
+  lamp-control mints its token from its folder's declared grants
+  (`task_yes::KeptYes::grants`, `no_yes_grants`; `net` left out, and the
+  rules below, `net` never beside a private grant among them, still hold)
+  and answers its check `{"agreed": true}` for its folder as it is (its
+  SHA-256 and declared grants, `task_yes::agreed_with_no_yes`), so its
+  `net` asks nothing. A Store, pushed or other skill still needs its kept
+  yes, and with the switch off so does a made one, exactly as before. Off, `net` is refused as an unknown grant
   (`bad_request`) before any token.
 - **What a `net` run never holds, and its bounds** (Heron's P1 and P3s on
   #7590, the first builder's 23:22 calls):

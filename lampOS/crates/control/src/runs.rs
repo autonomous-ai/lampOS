@@ -59,6 +59,12 @@ pub trait SkillYes: Send + Sync {
     fn ask_grants(&self, _asked: &[String]) -> Result<BTreeSet<Grant>, String> {
         Err(crate::task_yes::ASKS_OFF.to_owned())
     }
+    /// The grants of a make's tried run (#8157, `{"mint": {"try": [...]}}`):
+    /// the draft's own grants, as lamp-tasks read them from the draft it
+    /// tries, or why none is minted. None by default.
+    fn try_grants(&self, _asked: &[String]) -> Result<BTreeSet<Grant>, String> {
+        Err(crate::task_yes::TRIES_OFF.to_owned())
+    }
 }
 
 /// A lamp that keeps no such yes yet: every mint is refused in words.
@@ -165,6 +171,10 @@ pub struct Run {
     /// names none of its own content is given this write
     /// ([`FixedWrite::covers`]), so the run's words never carry it.
     pub fixed_write: Option<FixedWrite>,
+    /// A make's tried run (#8157, [`Runs::mark_tried`]): minted for a
+    /// draft's own grants before it is kept. Its ops are done live within
+    /// those grants, as its real run's (#8180).
+    pub tried: bool,
 }
 
 /// A skill's fixed write as lamp-control read it from the skill's own file
@@ -250,6 +260,7 @@ impl Runs {
             until_us: now_us.saturating_add(for_ms.saturating_mul(1000)),
             serial: self.serial,
             fixed_write: None,
+            tried: false,
         };
         self.by_token.insert(token_key(token), live.clone());
         Ok(live)
@@ -261,6 +272,15 @@ impl Runs {
         for live in self.by_token.values_mut() {
             if live.run == run {
                 live.fixed_write = Some(write.clone());
+            }
+        }
+    }
+
+    /// Marks live run `run` as a make's tried run ([`Run::tried`]).
+    pub fn mark_tried(&mut self, run: &str) {
+        for live in self.by_token.values_mut() {
+            if live.run == run {
+                live.tried = true;
             }
         }
     }
@@ -350,6 +370,18 @@ mod tests {
         assert!(runs.end("r1").is_some());
         assert!(runs.of(&token, 1).is_none());
         assert!(runs.end("r1").is_none());
+    }
+
+    #[test]
+    fn a_tried_run_is_marked() {
+        let mut runs = Runs::default();
+        let live = runs
+            .mint("a".repeat(43).as_str(), "r", "s", light(), None, 0)
+            .unwrap();
+        assert!(!live.tried);
+        runs.mark_tried("r");
+        let ended = runs.end("r").unwrap();
+        assert!(ended.tried);
     }
 
     #[test]

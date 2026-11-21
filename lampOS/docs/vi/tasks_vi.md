@@ -482,7 +482,12 @@ lần chạy, và được trả lời khi lần chạy kết thúc
   nhật ký, lỗi hay trạng thái của Harness; đường dẫn chỉ chứa run id. Lần
   chạy của một gateway agent (OpenClaw) không có file token: token của nó
   đi qua launcher skill-start ("Lần chạy kỹ năng trên OpenClaw", bên dưới).
-- **Lần chạy:** một việc cho đích `lamp`, lời của nó là việc của kỹ năng,
+- **Lần chạy:** một việc cho đích `lamp`, lời của nó trước hết nêu tên kỹ
+  năng và thư mục của nó, bảo agent (dù đèn chạy Hermes hay OpenClaw: lời
+  là như nhau) đọc `<folder>/SKILL.md` trước và làm theo các phần
+  `## Uses`, `## Result` và `## Answer`, chạy các script đã có trong
+  `scripts/` thay vì tự nghĩ lại từ đầu hay đọc file riêng của đèn (#8158),
+  rồi việc của kỹ năng,
   lệnh chính xác chạy script từ thư mục chỉ đọc của kỹ năng,
   `PYTHONPATH=/usr/local/lib/lampos/sdk-python python3 <folder>/<run>`
   (đường dẫn của SDK nằm ngay trong lệnh, để `lampos` import được dù shell
@@ -986,6 +991,122 @@ chạy của một kỹ năng có script chạy `curl https://example.com` thì 
 cùng lần chạy được trả lời và lệnh gọi `control.sock` của nó chạy được với
 token.
 
+### Bước `run` của một kỹ năng, chạy tại đây không cần agent (#8158, `skill_run`)
+
+Bước `run = "scripts/main.py"` của một kỹ năng ([skills_vi.md](skills_vi.md),
+"Bước `run` của một kỹ năng") được bàn giao trên cùng socket với `do.task`,
+với `"op":"skill_run"` và cùng các trường (`task` là câu cố định "run its
+own script"), được kiểm tra trọn như dòng của task (`HandOver::parse`).
+lamp-tasks tự chạy script: không agent, không Harness, không prompt
+(`crate::skill_run`).
+
+- **Chỗ của nó**: một bước `run` một lúc trên toàn đèn, ở một chỗ riêng bên
+  cạnh task của agent (`HandOvers::one`), nên không bao giờ chờ sau một task
+  có thể chạy nhiều phút; bước thứ hai bị từ chối `busy`.
+- **Token**: tạo từ lời đồng ý lamp-control giữ cho thư mục và các quyền của
+  kỹ năng, y như của task (`skill_run::answer`); token nêu quyền khác với
+  dòng (trừ `net`, quyền của chính lamp-tasks) thì bị kết thúc ngay và không
+  gì chạy. Dòng của kỹ năng nêu khóa bị từ chối trước khi có token
+  (`skill_run::NO_KEYS_HERE`): hãy dùng `do.task`.
+- **`net`**: cùng đường và cùng kiểm tra như task có `net`
+  (`skill_run::answer` hỏi `Tokens::net_agreed` trước khi có token):
+  lamp-control đồng ý khi lời đồng ý đã giữ của chủ đèn có `net` cho thư mục
+  đúng như hiện tại, hoặc, khi `LAMP_MADE_CODE_ON_AT_ONCE` bật (trong unit
+  lamp-control của sản phẩm), cho kỹ năng được tạo trên đèn mà không cần lời
+  đồng ý (#8180, ở dưới); không đồng ý thì bị từ chối `no_token`
+  (`skill_run::NO_NET_YES`), không token và không socket egress. Khi `LAMP_TASK_NET` bật, `DirectRunner::egress` tạo socket egress
+  riêng của lần chạy `skill-<run id>` (`egress::Grant::lamp`: chỉ web công
+  khai trên cổng 80 và 443), phục vụ đến hết giới hạn của lần chạy, và đặt
+  một descriptor `O_PATH` của nó lên fd 5 của hàng rào. Hàng rào là hàng rào
+  net của gateway (`gateway::FENCE_NET_EDITS`: bật `lo`, `resolv.conf` trỏ
+  `127.0.0.1`, `lamp-tasks net-relay --egress /proc/self/fd/5`, đóng fd 5
+  trước script, `HTTPS_PROXY`/`HTTP_PROXY` `http://127.0.0.1:3128`), với
+  chương trình của lamp-tasks được hiện lại một mình dưới `/opt` cho relay
+  (`skill_run::RELAY_EDITS`). Công tắc tắt, hoặc không phải Linux, thì lần
+  chạy có `net` bị từ chối trước khi hàng rào bắt đầu (`not_started`).
+  Socket bị xóa khi lần chạy kết thúc.
+- **Hàng rào** (`skill_run::DirectRunner`): `/usr/bin/unshare` với các đối số
+  của lần chạy gateway (`gateway::fence_args`: user namespace với root được
+  ánh xạ, mạng chỉ có `lo`, mount và PID namespace riêng, `--kill-child`) và
+  văn bản hàng rào của gateway với hai chỗ sửa (`skill_run::CONTROL_EDITS`):
+  `control.sock` của lamp-control được bind sang bên trước khi che, rồi
+  chuyển lại, một mình, sau đó. Mọi đường dẫn của `skill_run::HIDDEN` có mặt
+  (`/var`, `/run`, `/home`, `/opt`, `/srv`, `/mnt`, `/media`, `/dev/shm`) bị
+  che bằng một tmpfs rỗng, nên không còn trạng thái hay socket của phần nào
+  (socket admin của lamp-control, socket và trạng thái của lamp-tasks); chỉ
+  thư mục kỹ năng, thư mục riêng của lần chạy
+  (`/var/lib/lampos-tasks/runs/run-<id>`, 0700, xóa khi kết thúc) và
+  `control.sock` được hiện lại. Script chạy với uid của lamp-tasks trong một
+  user namespace lồng (không có quyền gì với các mount đó), với `PATH`,
+  `HOME`, `LAMP_CONTROL_SOCKET`, `PYTHONPATH` (SDK) và token, đọc từ pipe trên
+  fd 3, không bao giờ là đối số. Nó chỉ tới được đèn qua `control.sock` với
+  các quyền của token: lamp-control từ chối mọi quyền khác (`no_grant`).
+- **Giới hạn**: 30 s từ lúc hàng rào bắt đầu (`skill_run::RUN_WITHIN`), cả
+  nhóm tiến trình bị kill khi hết giờ; tối đa 64 KiB đầu ra
+  (`skill_run::MOST_OUTPUT`), chỉ đếm rồi bỏ (không ghi nhật ký), quá thì bị
+  dừng. Script có giới hạn của riêng nó, đặt trong hàng rào ngay trước khi
+  exec, sau relay (`skill_run::CAPS_EDIT`), nên script chạy mất kiểm soát
+  không bao giờ dùng cả ngân sách của lamp-tasks (`MemoryHigh`, `CPUQuota`
+  trên lamp-tasks.service): không file core (`ulimit -c 0`), 768 MiB không
+  gian địa chỉ (`ulimit -v`, `SCRIPT_MEMORY_KB`, giới hạn mỗi script mà #7520
+  cho script của agent gateway), 30 s thời gian CPU (`ulimit -t`,
+  `SCRIPT_CPU_SECS`: trung bình tối đa một nhân trong lần chạy, như
+  `CPUQuota=100%` của agent gateway) và độ nice 10 (`nice -n`,
+  `SCRIPT_NICE`, như `Nice=10` của agent gateway), cho mỗi tiến trình. Cả
+  lần chạy giữ tối đa 64 tiến trình và luồng (`SCRIPT_PROCESSES`, #8180),
+  tính cả relay: `prlimit --nproc=64:64 --pid $$`, đặt trong user namespace
+  của hàng rào ngay trước khi namespace lồng của script được tạo, nên kernel
+  chỉ đếm trong namespace đó (Linux 5.14 trở lên), không bao giờ đếm tiến
+  trình của lamp-tasks hay `lampos` khác. Quá mức thì fork hay tạo luồng thất
+  bại và lần chạy kết thúc `run_failed`. Dùng `prlimit`, không dùng
+  `ulimit -u`: `/bin/sh` của đèn là dash, cờ của nó là `-p`. Các giới hạn
+  này là lớp phòng thủ thứ hai; tổng thật của lần chạy là cgroup riêng của
+  nó (mục sau).
+- **Cgroup riêng** (`run_cgroup`, #8180): lamp-tasks.service có
+  `Delegate=memory cpu pids` (`run_cgroup::DELEGATE`), nên khi `serve` khởi
+  động, lamp-tasks đọc cgroup của mình từ `/proc/self/cgroup` (dòng v2
+  `0::`), tạo lá `serve` trong đó, chuyển mọi pid của unit vào đó (cgroup
+  trao controller xuống thì không giữ tiến trình nào), rồi ghi
+  `+memory +cpu +pids` vào `cgroup.subtree_control`; các cgroup `run-*` cũ
+  bị xóa. Mỗi bước run và mỗi lần chạy thử lúc tạo kỹ năng có `run-<id>` với
+  `memory.max` 512M (`RUN_MEMORY_MAX_MB`), `memory.high` 448M
+  (`RUN_MEMORY_HIGH_MB`), `memory.swap.max` 0 khi kernel có file đó,
+  `cpu.max` `100000 100000` (`RUN_CPU_MAX`, một nhân) và `pids.max` 72
+  (`RUN_PIDS_MAX`: 64 của script và 8 cho chính hàng rào). Các tổng này đến
+  từ: lamp-tasks.service đo được 632 MiB lúc nghỉ và 1120 MiB lúc đỉnh của
+  một task Hermes (lamp-9adf, 12/11), nên một lần chạy ở 512M cạnh đỉnh đó
+  là 1632 MiB, dưới `MemoryHigh=2100M` của unit; số task 126 + 72, dưới
+  `TasksMax=512`; một nhân trong `CPUQuota=360%` của unit. Tiến trình đầu
+  tiên của hàng rào vào cgroup ngay trước khi exec (ghi `0` vào
+  `cgroup.procs` của cgroup, trong `pre_exec`), nên không phần nào của lần
+  chạy nằm ngoài nó; quá `memory.max` thì OOM killer của kernel chỉ kết
+  thúc tiến trình của lần chạy, không bao giờ `serve` hay `wait` và `watch`
+  của Harness. Khi lần chạy kết thúc, dù thế nào (xong, lỗi, quá 30 s, bị
+  hủy), `1` được ghi vào `cgroup.kill` và cgroup bị xóa. **Đóng khi lỗi**:
+  trên Linux, không có cgroup v2 được ủy quyền, hay cgroup của lần chạy
+  hoặc bất kỳ giới hạn nào không tạo được, thì lần chạy (và lần chạy thử,
+  khi đó là `not_tried`) bị từ chối với `run_cgroup::NO_CGROUP` ("the run's
+  own memory and CPU bounds could not be set, so it was not run"), lý do ghi
+  nhật ký (`[lamp-tasks] run <id>: refused, no own cgroup: …`), không bao
+  giờ chạy thiếu tổng; `serve` nói lúc khởi động là trường hợp nào
+  (`[lamp-tasks] each run gets its own cgroup under …` hoặc
+  `[lamp-tasks] runs have no own cgroup: …`). Ngoài Linux (máy Mac của nhà
+  phát triển, các test), lần chạy chỉ có giới hạn mỗi tiến trình.
+- **Câu trả lời**: khi script kết thúc, token được kết thúc bằng `end` của
+  admin, mà câu trả lời giờ có `said`: số câu `say` của lần chạy mà giọng
+  nói đã nói trọn (`Tokens::end_said`). Thoát 0 và `said` ít nhất 1 là
+  `{"ok":true,"id":0,"said":N}`; thoát 0 mà không nói gì là `run_failed`
+  (`skill_run::SAID_NOTHING`); thoát lỗi, quá 30 s hay quá giới hạn đầu ra là
+  `run_failed` kèm lý do; hàng rào không dựng được là `not_started`.
+  `skills/tasks` báo kết thúc (`Ran` hoặc `Failed`, không engine).
+- **Thời gian**: nhật ký ghi lúc tạo token sau dòng bàn giao, lúc script
+  bắt đầu (`its script started N ms into its run`), cả hai cộng lại
+  (`skill run RUN: hand-over to script start N ms`, thứ ROW trên đèn đọc) và
+  lúc kết thúc. Các
+  chặng chặn là tạo token (một dòng socket cục bộ), các mount của hàng rào
+  và khởi động `python3`. Đã đo ở mức unit với hàng rào thay thế; chưa đo
+  trên đèn.
+
 ### Một lần tạo bằng giọng nói trong namespace của lần chạy kỹ năng (`skill_make`, #6643)
 
 Điều kiện của first builder trên #6643 (12/11 18:15): một lần tạo bằng giọng
@@ -1251,6 +1372,90 @@ còn báo engine đó đã cài hoặc không còn chương trình riêng nào c
 trên `PATH` đăng nhập của `lampos` (lần tìm thất bại thì giữ lại); một dòng
 vẫn đúng qua nhiều vòng chỉ được ghi log một lần. Lần chạy của kỹ năng vẫn
 chỉ tới Hermes (`HarnessRunner`, ở trên).
+
+### Lần chạy thử của kỹ năng được tạo (`make_try`, #8157)
+
+Trước khi voice giữ một kỹ năng có code nó đã tạo, dù agent nào tạo, nó nhờ
+lamp-tasks chạy thử một lần ([skills_vi.md](skills_vi.md), "Một kỹ năng được
+tạo một lần và trọn vẹn"); `lamp_tasks::make_try`.
+
+- **Dòng lệnh**, trên socket tạo kỹ năng, chỉ từ lamp-voice như một lần tạo:
+  `{"op":"make_try","name","files"}`, các tệp theo đường dẫn trong thư mục
+  kỹ năng (`skill.toml`, `SKILL.md`, `scripts/...`), tối đa 64. Mỗi lần một
+  lần thử (lần khác bị từ chối `busy`), bên cạnh chỗ của lần tạo.
+- **Thử gì** (`make_try::plan`): script của bước `run`; hoặc, với bước `task`
+  và không có bước `run`, mỗi tệp `.py` trong `scripts/` (của task và các
+  script trợ giúp), tối đa 4. Không có bước script: `{"ok":true,"tried":false}`.
+- **Cách làm**: tệp của kỹ năng được ghi vào thư mục `make-try-*` trong thư
+  mục làm việc của lần tạo (được dọn cùng các thư mục tạo khi khởi động), một
+  token được tạo trên socket admin của lamp-control cho đúng quyền của bản
+  nháp, trong đó có camera và microphone (`{"mint":{"try":[...],"run"}}`,
+  `Tokens::mint_try`; lamp-control bỏ `net`), và lamp-tasks tự khởi động thành
+  `lamp-tasks make-try-fence` (`make_try::fence_main`) với grant ở stdin: nó
+  trở thành hàng rào của bước run (`make_try::fence_args`, dựng bởi cùng
+  `skill_run::fence_args`, #8180): che toàn bộ `skill_run::HIDDEN`, trong đó
+  có `/run` và cùng với nó `admin.sock` của lamp-control, chỉ cho thấy lại
+  thư mục kỹ năng, thư mục lần chạy và `control.sock` (có `net` thì cả relay
+  của lamp-tasks, như bước run), cùng các giới hạn của
+  bước run (`skill_run::CAPS_EDIT`, gồm giới hạn số tiến trình) và cgroup
+  riêng (`run_cgroup`, tạo trước token: trên Linux không có thì không token
+  và `not_tried`); fd 4 là nơi
+  bỏ đi thay cho socket của launcher. Không agent nào tham gia.
+- **Quyền như lần chạy thật** (#8180, quyết định của dev): mọi quyền bản
+  nháp khai báo đều được cấp cho lượt thử, không hỏi gì. Bản nháp có `net`
+  được socket egress riêng như bước run, `make-try-<run id>`
+  (`make_try::FenceLaunch::egress`, `egress::Grant::lamp`, khi
+  `LAMP_TASK_NET` bật), mở trước token và phục vụ đến hết giới hạn của lượt
+  thử, trên fd 5 của hàng rào (`make_try::fence_main`), không chờ lời đồng
+  ý nào; `LAMP_TASK_NET` tắt thì không thử (`not_tried`). Mỗi script chạy
+  một lần, tối đa 30 s (`TRY_WITHIN`), rồi bị dừng; đầu ra giữ tối đa 8 KiB.
+- **Đánh giá** (`make_try::judged`): thoát 0 đúng hạn; script của bước `run`
+  đã nói ít nhất một câu (`said` trong câu trả lời `end` của lamp-control,
+  `Tokens::end_said`; lamp-control cũ không báo thì không bị tính là lỗi);
+  script của task có in ra gì đó. Trả lời
+  `{"ok":true,"tried":true,"passed":true,"said":N,"said_first":TEXT}`
+  (`said_first`, #8180: lời của câu nói trọn đầu tiên từ `end` của
+  lamp-control, `Tokens::end_said_first`, bỏ đi khi không có) hoặc
+  `{"ok":true,"tried":true,"passed":false,"why"}` (lời này về lần sửa của
+  voice); lần thử không khởi động được (không token, không hàng rào) bị từ
+  chối `not_tried`.
+- **Chạy thật, như lần chạy**: lamp-control đánh dấu token là chạy thử, và
+  mỗi thao tác của nó được làm thật trong phạm vi quyền, như lần chạy của
+  một skill: nói, phát âm thanh, cử động, bật đèn, thu hình và tiếng, và
+  `service.write` được gửi tới lamp-services; ghi chú nó giữ vẫn còn
+  ([control_vi.md](control_vi.md), "Lần chạy thử của một lần tạo").
+- **Số câu đã nói** (cũng cho bước `run` của #8158): lamp-control đếm mỗi
+  `say` của client một lần chạy mà giọng đã nói trọn (`done` với
+  `how: finished`; câu bị bỏ vì riêng tư hay hết hạn, hoặc một `sound`,
+  không được đếm; `Parts::said_take`) và trả lời `{"end":{"run"}}` trên
+  socket admin bằng `{"ended":BOOL,"said":N}`, và `"said_first"`, lời của
+  câu đầu tiên như vậy trên một dòng, tối đa 120 ký tự
+  (`Parts::said_take_first`, #8180), khi có câu được nói. `lamp.say` của script phải
+  chờ câu nói xong (`wait=True`), nếu không script có thể thoát trước khi
+  câu được nói và câu đó bị bỏ.
+
+Kiểm thử: `a_run_step_tries_its_script_and_a_task_each_of_its_scripts`,
+`a_try_passes_only_on_exit_0_in_time_and_for_a_run_step_a_say`,
+`a_tried_run_is_answered_and_its_folder_removed`,
+`a_silent_run_step_fails_its_try_with_words_for_the_repair`,
+`a_skill_that_sends_is_tried_with_its_own_grants`,
+`the_fence_launch_mints_a_tried_token_and_reads_its_says`,
+`a_fence_that_runs_past_its_limit_is_ended`,
+`a_try_is_given_every_grant_its_draft_declares`,
+`a_try_granted_net_camera_and_microphone_gets_each_with_no_yes`,
+`a_tried_runs_fence_is_a_run_steps_with_no_admin_socket_and_its_caps`; của
+bước run trong lamp-tasks `a_net_run_step_gets_its_egress_socket_with_no_yes`,
+`a_run_steps_script_has_its_own_memory_and_cpu_caps`
+và, trên Linux,
+`a_script_past_its_process_cap_fails_its_run_while_another_task_answers`;
+của lamp-control
+`a_tried_runs_ops_are_live_within_its_grants`,
+`a_tried_runs_write_is_sent_live_as_a_runs`,
+`a_tried_runs_notes_are_kept_after_its_end`,
+`a_runs_says_are_counted_to_its_end`,
+`a_runs_says_are_counted_and_a_tried_run_is_marked`,
+`a_tried_runs_grants_are_the_drafts_own` và
+`a_tried_run_is_minted_the_drafts_grants_and_its_end_tells_its_says`.
 
 ### Một yêu cầu nói trực tiếp trên socket tạo kỹ năng (`voice_ask`, tắt trừ khi bật)
 
@@ -1552,8 +1757,21 @@ sang runner chung của #6510 bước 2 mà không cần luật mới.
   token, nên sau khi tạo token lamp-tasks hỏi lamp-control
   (`task_yes_check` với SHA-256 thư mục và các quyền của dòng): chỉ khi
   lời đồng ý có `net` cho thư mục đúng như hiện tại thì lần chạy mới có
-  lối ra, nếu không thì `no_token` và không chạy gì. Tắt: `net` bị từ chối
-  trước khi có token.
+  lối ra, nếu không thì `no_token` và không chạy gì. Khi
+  `LAMP_MADE_CODE_ON_AT_ONCE` bật trong lamp-control
+  (`lamp_skills::no_yes_switch_on`; bật trong sản phẩm), kỹ năng được tạo trên
+  đèn không cần lời đồng ý (#8180, `lamp_voice::made_skill::grants_need_no_yes`,
+  hiện chỉ đúng với `SkillSource::Made`, theo `lamp_skills::source_of`:
+  `made: here` và được cài với bản ghi cài đặt không từ Store, nên thư mục
+  cài bằng tay không phải Made):
+  lamp-control tạo token từ các quyền khai báo trong thư mục của nó
+  (`task_yes::KeptYes::grants`, `no_yes_grants`; bỏ `net`, và các quy tắc
+  bên dưới, trong đó `net` không bao giờ đi cùng quyền riêng tư, vẫn giữ)
+  và trả lời kiểm tra của nó `{"agreed": true}` cho thư mục đúng như hiện
+  tại (SHA-256 và các quyền khai báo, `task_yes::agreed_with_no_yes`), nên
+  `net` của nó không hỏi gì. Kỹ năng từ Store, được đẩy lên hay khác vẫn
+  cần lời đồng ý đã giữ, và khi tắt công tắc thì kỹ năng được tạo cũng vậy,
+  đúng như trước. Tắt: `net` bị từ chối trước khi có token.
 - **Điều lần chạy có `net` không bao giờ giữ, và giới hạn của nó** (P1 và các
   P3 của Heron trên #7590, quyết định 23:22 của người xây dựng đầu tiên):
   - `net` không bao giờ được cấp cùng một quyền riêng tư: quyền đọc hay ghi

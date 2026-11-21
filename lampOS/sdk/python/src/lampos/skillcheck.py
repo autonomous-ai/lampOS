@@ -410,7 +410,8 @@ def _task(folder: Path, rules: dict[str, Any], report: Report) -> bool:
     hold, once; the task's words 1 to 500 bytes; its `run` a plain file in the
     skill's own `scripts/`. True when the skill has a task step."""
     steps = rules.get("do") if isinstance(rules.get("do"), list) else []
-    tasks = [step for step in steps if isinstance(step, dict) and "task" in step]
+    # A `run` step (#8158) is a task too: its script run with no agent.
+    tasks = [step for step in steps if isinstance(step, dict) and ("task" in step or "run" in step)]
     grants = rules.get("grants")
     if len(tasks) > 1:
         report.errors.append("skill.toml: do.task: a skill hands over one task, so it has one do.task step")
@@ -434,6 +435,15 @@ def _task(folder: Path, rules: dict[str, Any], report: Report) -> bool:
                 report.errors.append(f"skill.toml: grants: {grant!r} is listed twice")
             seen.append(grant)
     for step in tasks:
+        if "run" in step:
+            if set(step) != {"run"}:
+                report.errors.append("skill.toml: do.run is alone in its [[do]] table: the light, a cue or a say are steps of their own")
+            run = step.get("run")
+            if isinstance(run, str):
+                if not run.endswith(".py"):
+                    report.errors.append(f'skill.toml: do.run: {run!r} is a Python file, like "{TASK_SCRIPTS}/main.py"')
+                _task_run(folder, run, report)
+            continue
         if set(step) != {"task"}:
             report.errors.append("skill.toml: do.task is alone in its [[do]] table: the light, a cue or a say are steps of their own")
         task = step.get("task")

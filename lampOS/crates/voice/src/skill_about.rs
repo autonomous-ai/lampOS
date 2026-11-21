@@ -325,8 +325,9 @@ fn file_says(text: &str, present: bool) -> Option<(bool, bool)> {
         .and_then(toml::Value::as_array);
     let task = steps.is_some_and(|steps| {
         steps.iter().any(|step| {
+            // A `task` step, or a `run` step's own script (#8157).
             step.as_table()
-                .is_some_and(|step| step.contains_key("task"))
+                .is_some_and(|step| step.contains_key("task") || step.contains_key("run"))
         })
     });
     Some((enabled, task))

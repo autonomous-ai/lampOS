@@ -77,6 +77,20 @@ pub trait Parts {
     /// The connection the next `act` or `reply` is for, told just before
     /// it: a part that tells an action's end later sends it there alone.
     fn asking(&mut self, _connection: Option<u64>) {}
+    /// How many of `client`'s `say`s the voice said whole (`done` with
+    /// `how: finished`) since it was last asked, taken: a skill's `run`
+    /// step succeeds only when its run said at least one (#8158). A run's
+    /// count is taken when its token ends (the admin `end`), so it never
+    /// outlives the run. None counted by default.
+    fn said_take(&mut self, _client: &str) -> u32 {
+        0
+    }
+    /// [`Parts::said_take`] with the first finished say's words, one line
+    /// of at most `crate::parts::SAID_FIRST_CHARS` (#8180: what a make's
+    /// try is told it said). None kept by default.
+    fn said_take_first(&mut self, client: &str) -> (u32, Option<String>) {
+        (self.said_take(client), None)
+    }
 }
 
 /// A part's answer: now, or what to run off the door's lock for it.
@@ -796,6 +810,12 @@ impl Door {
         Ok(live)
     }
 
+    /// Marks live run `run` as a make's tried run
+    /// ([`crate::runs::Run::tried`], #8157).
+    pub fn mark_tried(&mut self, run: &str) {
+        self.runs.mark_tried(run);
+    }
+
     /// Marks live run `run` as a skill's fixed write's, `write`
     /// ([`crate::runs::Run::fixed_write`]).
     pub fn mark_fixed_write(&mut self, run: &str, write: &crate::runs::FixedWrite) {
@@ -1155,6 +1175,8 @@ impl Door {
             return refuse(ErrorCode::NoHello, "say hello first".to_owned());
         };
         // A skill run's linked services: off, nothing else is looked at.
+        // A make's tried run's ops are done live within its grants, as its
+        // real run's (#8180).
         if matches!(op, Op::ServiceRead { .. } | Op::ServiceWrite { .. }) && self.services.is_none()
         {
             return refuse(ErrorCode::Off, crate::services::OFF.to_owned());
@@ -4679,5 +4701,114 @@ mod tests {
         extra.insert("service".into(), json!("gmail"));
         assert_eq!(lines[4]["args"], Value::Object(extra), "{}", lines[4]);
         let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    /// #8180 (the dev's ruling): a make's tried run's ops are done live
+    /// within its grants, as its real run's: it speaks, plays a sound,
+    /// moves, lights, and captures from the camera, the microphone and
+    /// the speaker stream; none is stubbed or refused for being a try.
+    #[test]
+    fn a_tried_runs_ops_are_live_within_its_grants() {
+        let grants = [
+            Grant::Speak,
+            Grant::Body,
+            Grant::Light,
+            Grant::Camera,
+            Grant::Microphone,
+            Grant::Speaker,
+        ];
+        let frames = [
+            json!({"op": "say", "text": "hello"}),
+            json!({"op": "sound", "name": "hum"}),
+            json!({"op": "gesture", "name": "nod"}),
+            json!({"op": "light", "colour": "warm", "level": 2, "for_ms": 1000}),
+            json!({"op": "camera.snapshot"}),
+            json!({"op": "microphone.stream", "on": true}),
+            json!({"op": "speaker.stream", "on": true}),
+        ];
+        for frame in frames {
+            let (mut door, mut session, mut fake) = run_door(&grants, None);
+            door.mark_tried("r1");
+            let mut sent = frame.clone();
+            sent["id"] = json!(7);
+            let outcome = door.handle(&mut session, &sent.to_string(), &mut fake, S, 1);
+            let answered = reply(&outcome);
+            assert_eq!(answered["ok"], true, "{frame} {answered}");
+            assert!(!answered.to_string().contains("\"tried\""), "{answered}");
+            let op = frame["op"].as_str().unwrap();
+            assert!(
+                fake.did.iter().any(|did| did.ends_with(&format!(" {op}"))),
+                "{frame}: done by the lamp's parts {:?}",
+                fake.did
+            );
+        }
+    }
+
+    /// #8180: a make's tried run's `service.write` goes on to
+    /// lamp-services live, as its real run's, and with linked services off
+    /// it is off, as any run's: no stub answers it.
+    #[test]
+    fn a_tried_runs_write_is_sent_live_as_a_runs() {
+        use std::io::{BufRead as _, Write as _};
+        let (mut door, mut session, mut fake) =
+            run_door(&[service("gmail", protocol::Access::Write)], None);
+        door.mark_tried("r1");
+        let off = door.handle(&mut session, &write_frame("gmail"), &mut fake, S, 1);
+        assert_eq!(code_of(&off), Some("off"), "{off:?}");
+        let dir =
+            std::env::temp_dir().join(format!("lamp-control-run-tried-{}", std::process::id()));
+        let _ = std::fs::create_dir_all(&dir);
+        let socket = dir.join("call.sock");
+        let _ = std::fs::remove_file(&socket);
+        let listener = std::os::unix::net::UnixListener::bind(&socket).unwrap();
+        let served = std::thread::spawn(move || {
+            let (mut stream, _) = listener.accept().unwrap();
+            let mut line = String::new();
+            std::io::BufReader::new(&stream)
+                .read_line(&mut line)
+                .unwrap();
+            writeln!(stream, r#"{{"ok":true,"result":{{"sent":true}}}}"#).unwrap();
+            serde_json::from_str::<Value>(&line).unwrap()
+        });
+        let (mut door, mut session, mut fake) =
+            run_door(&[service("gmail", protocol::Access::Write)], Some(socket));
+        door.mark_tried("r1");
+        let outcome = door.handle(&mut session, &write_frame("gmail"), &mut fake, S, 1);
+        let answered = outcome.later.expect("sent on to lamp-services").reply();
+        assert!(!answered.to_string().contains("\"tried\""), "{answered}");
+        let line = served.join().unwrap();
+        assert_eq!(line["name"], "service_write", "{line}");
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    /// #8180: a make's tried run's notes are real notes: what it keeps
+    /// stays on the lamp after its end, as an untried run's.
+    #[test]
+    fn a_tried_runs_notes_are_kept_after_its_end() {
+        let folder =
+            std::env::temp_dir().join(format!("lamp-control-tried-notes-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&folder);
+        for tried in [true, false] {
+            let (door, _session, _fake) = run_door(&[Grant::Notes], None);
+            let mut door = door.with_notes_folder(folder.clone());
+            let client = door
+                .runs
+                .of(&"T".repeat(43), 1)
+                .expect("a live run")
+                .client
+                .clone();
+            let notes = door.notes().expect("notes");
+            let kept = notes
+                .set(&client, "k", &json!(1))
+                .and_then(|step| step.wait());
+            assert!(kept.is_ok(), "{kept:?}");
+            let file = crate::notes::Notes::path(&folder, &client).unwrap();
+            if tried {
+                door.mark_tried("r1");
+            }
+            assert!(door.end_run("r1", None).is_some());
+            assert!(file.exists(), "tried {tried}: {}", file.display());
+            let _ = std::fs::remove_dir_all(&folder);
+        }
     }
 }

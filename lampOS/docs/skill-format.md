@@ -35,8 +35,9 @@ A packaged skill adds `lamp-skill.json`, with `format: 1`, the skill's
 shares, the author's own, carrying their public key (`lamp-skills pack
 --key-file KEY --author`; skills.md, "A shared package"). A folder with a `run.py`, or any script,
 is refused: script skills are a later format, except the `scripts/` of a skill whose `[[do]]` has a
-`task = { task, run }` (format 2, with its top-level `grants`; skills.md, "A skill's task"): `lamp
-skill check` holds that as the lamp does, and a push may carry it. `lamp-skills pack` refuses a
+`task = { task, run }` or a `run = "scripts/main.py"` step (format 2, with its top-level `grants`;
+skills.md, "A skill's task" and "A skill's `run` step"): `lamp skill check` holds that as the lamp
+does, and a push may carry it. `lamp-skills pack` refuses a
 task whose words are empty, longer than 120 characters or not plain (#7874).
 
 **`SKILL.md`** starts with front matter between two `---` lines. Two keys
@@ -49,6 +50,22 @@ only when the model calls the skill's tool and when not, and any rule on
 what the lamp says as it calls. With `LAMP_USE_SKILL_SUMMARY=on` the voice
 lists it in place of the description (#6218, skills.md, "Tools for the
 model"); a longer one is left out with a journal line, and the skill loads as without it.
+
+**A made skill's `SKILL.md`** (#8157; made by the lamp's agent with
+code of its own, never a built-in, Store or pushed skill's) has three more
+sections, each a `## ` heading with lines under it, which the voice checks
+before it keeps it ([skills.md](skills.md), "A made skill is made once and
+whole"):
+- `## Uses`: each script or lamp-services tool it uses, and its arguments;
+- `## Result`: where each script's result is (what it prints, a file);
+- `## Answer`: what is said aloud, in one to three plain sentences: a
+  script says it with `lamp.say` and the agent answers a lone `-`, or the
+  agent's final answer is only the spoken summary.
+
+Its code is in one of two step kinds: `run = "scripts/main.py"`, a script
+that does the whole job and says its own lines, run with no agent (the key
+is #8158's), or `task = { task, run }` when each start needs the agent to
+sum up.
 
 Other front-matter lines and the body are for people.
 
@@ -216,6 +233,7 @@ it) or `if_choice` (the tool's values it runs for).
 | (none) | `stand = N`: a percent of the lamp's own stand, 1 to 100, kept until the next ask; tool only | `body` |
 | (none) | `rest = { op = "rest"\|"wake"\|"cancel", during, resettle }` | `body` |
 | (none) | `remind = { in = "25m", words = "…" }`, `remind = { at = "22:00", words = "…" }` or `remind = { every = "30m", words = "…" }`: one timer, reminder or repeating reminder (every 15 m to 24 h, until cancelled by voice) set in the lamp's schedule, said when due; its words fixed (at most 120 characters, one or two sentences); at most 3 a day, none stacked; never in a skill with a tool | `actions = ["set_timer"]` for `in`, `["set_reminder"]` for `at`, `["repeat_reminder"]` for `every` |
+| (none) | `run = "scripts/main.py"`: the skill's own Python script, a plain file in its `scripts/`, run by lamp-tasks with no agent in its own fence for at most 30 s; it succeeds when it exits 0 and something it asked `lamp.say` for was said, and a failure started by the person's words says "<name> couldn't finish this time."; alone in its `[[do]]`, the skill's one task, never beside a `task` (#8158; skills.md, "A skill's `run` step") | the top-level `grants`, as a `task`'s |
 | (none) | `read = { service, what, ... }`: a read of one of the owner's linked services, said to them alone behind its gate; the skill's only step, alone, from a trigger, no tool or `each`; only with `LAMP_SKILL_READS=on` ("Reading a linked service", below) | `speak` and `services = { <service> = "read" }` |
 
 Light values are the protocol's: colours `yellow`, `red`, `green`,

@@ -1032,7 +1032,7 @@ fn write_line(mut stream: &UnixStream, line: &str) -> io::Result<()> {
 /// A run's egress socket at `path` opened `O_PATH` (#7742): that socket
 /// alone, never through a link; anything else is refused.
 #[cfg(target_os = "linux")]
-fn egress_fd(path: &Path) -> io::Result<OwnedFd> {
+pub(crate) fn egress_fd(path: &Path) -> io::Result<OwnedFd> {
     use rustix::fs::{FileType, Mode, OFlags};
     let fd = rustix::fs::open(
         path,
@@ -1047,7 +1047,7 @@ fn egress_fd(path: &Path) -> io::Result<OwnedFd> {
 
 /// Off Linux no descriptor is sent: refused.
 #[cfg(not(target_os = "linux"))]
-fn egress_fd(_: &Path) -> io::Result<OwnedFd> {
+pub(crate) fn egress_fd(_: &Path) -> io::Result<OwnedFd> {
     Err(io::ErrorKind::Unsupported.into())
 }
 
@@ -1435,14 +1435,39 @@ fn place(fd: impl AsFd, at: i32) -> io::Result<OwnedFd> {
 }
 
 /// The run's fence exec'd: `unshare` with `crate::gateway::fence_args`,
-/// the token in a pipe on fd 3, the socket on fd 4, a run granted `net`'s
+/// the token in a pipe on fd 3, the socket on fd 4 (a make's tried run's,
+/// #8157: a sink, `crate::make_try::fence_main`), a run granted `net`'s
 /// egress socket on [`EGRESS_FD`] (#7742), an environment of
 /// `crate::gateway::SCRIPT_PATH` only.
-fn exec_fence(
+pub(crate) fn exec_fence(
     grant: &Grant,
-    stream: UnixStream,
+    stream: impl Into<OwnedFd>,
     egress: Option<OwnedFd>,
 ) -> io::Result<std::convert::Infallible> {
+    let hidden: Vec<&Path> = crate::gateway::HIDDEN.iter().map(Path::new).collect();
+    exec_fence_with(
+        grant,
+        stream,
+        egress,
+        crate::gateway::fence_args(
+            grant,
+            rustix::process::getuid().as_raw(),
+            rustix::process::getgid().as_raw(),
+            &hidden,
+        ),
+    )
+}
+
+/// [`exec_fence`] with the fence's own `unshare` arguments `args`: a
+/// make's tried run's are a run step's (`crate::make_try::fence_args`,
+/// #8180), which hide all of `crate::skill_run::HIDDEN` with its caps.
+pub(crate) fn exec_fence_with(
+    grant: &Grant,
+    stream: impl Into<OwnedFd>,
+    egress: Option<OwnedFd>,
+    args: Vec<std::ffi::OsString>,
+) -> io::Result<std::convert::Infallible> {
+    let stream: OwnedFd = stream.into();
     use std::os::unix::process::CommandExt;
     let (reader, writer) = rustix::pipe::pipe()?;
     let mut writer = std::fs::File::from(writer);
@@ -1466,14 +1491,8 @@ fn exec_fence(
         .as_ref()
         .map(|egress| place(egress, EGRESS_FD))
         .transpose()?;
-    let hidden: Vec<&Path> = crate::gateway::HIDDEN.iter().map(Path::new).collect();
     let error = std::process::Command::new("unshare")
-        .args(crate::gateway::fence_args(
-            grant,
-            rustix::process::getuid().as_raw(),
-            rustix::process::getgid().as_raw(),
-            &hidden,
-        ))
+        .args(args)
         .env_clear()
         .env("PATH", crate::gateway::SCRIPT_PATH)
         .exec();

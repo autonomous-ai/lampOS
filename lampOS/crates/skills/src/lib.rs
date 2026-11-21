@@ -1091,6 +1091,11 @@ struct StepFile {
     /// A task handed to the lamp's agent, its script in the skill's own
     /// `scripts/` ([`task`], #6305): alone in its `[[do]]` table.
     task: Option<task::TaskFile>,
+    /// `run = "scripts/main.py"` (#8158): the skill's own script run by
+    /// lamp-tasks itself, with no agent ([`task::TaskStep::run_step`]),
+    /// held to everything a `do.task` is; alone in its `[[do]]` table, and
+    /// a skill's one task.
+    run: Option<String>,
 }
 
 /// `propose = { ... }`: what an add-on suggests, as its folder writes it.
@@ -2595,7 +2600,7 @@ impl Skill {
     /// (`lamp_voice::made_skill::task_words_plain`).
     fn task_refuses(&self) -> Option<&'static str> {
         self.task_step()
-            .filter(|task| !lamp_voice::made_skill::task_words_plain(&task.words))
+            .filter(|task| !task.direct && !lamp_voice::made_skill::task_words_plain(&task.words))
             .map(|_| TASK_WORDS_NOT_PLAIN)
     }
 
@@ -3743,6 +3748,71 @@ fn checked_asks(asks: &[String], plain_tool: bool, by_words: bool) -> Result<(),
 /// reach "isn't a skill they made").
 fn started_by_words(asks: &[String], tool: Option<&String>, made: bool) -> bool {
     !asks.is_empty() && tool.is_none() && made && lamp_voice::made_skill::asks_on()
+}
+
+/// The one predicate of which skills need no yes for their grants, and
+/// its sources (#8180), from lamp-voice, for lamp-control's mint.
+pub use lamp_voice::made_skill::{SkillSource, grants_need_no_yes};
+
+thread_local! {
+    /// [`no_yes_switch_on`] as a test of this thread sets it (other
+    /// crates' tests too, so not only under `cfg(test)`).
+    static NO_YES_HERE: std::cell::Cell<Option<bool>> = const { std::cell::Cell::new(None) };
+}
+
+/// Whether a skill whose source needs no yes ([`grants_need_no_yes`]) is
+/// given its declared grants with none in this process (#8180): only with
+/// `LAMP_MADE_CODE_ON_AT_ONCE=on`
+/// (`lamp_voice::made_skill::CODE_AT_ONCE_ENVIRONMENT`), on in the product's
+/// lamp-voice and lamp-control units. Off, every skill's grants wait for
+/// the owner's kept yes, as before.
+pub fn no_yes_switch_on() -> bool {
+    if let Some(on) = NO_YES_HERE.with(std::cell::Cell::get) {
+        return on;
+    }
+    std::env::var(lamp_voice::made_skill::CODE_AT_ONCE_ENVIRONMENT)
+        .ok()
+        .as_deref()
+        == Some("on")
+}
+
+/// [`no_yes_switch_on`] for this test's thread alone: tests only.
+#[doc(hidden)]
+pub fn set_no_yes_switch_here(on: Option<bool>) {
+    NO_YES_HERE.with(|here| here.set(on));
+}
+
+/// Where the skill in `folder` came from, as far as its grants' yes goes
+/// (#8180, `lamp_voice::made_skill::grants_need_no_yes`): pushed (under
+/// [`PUSHED_DIR`] or with a [`PUSHED_FROM`] record), from the Store (its
+/// [`package::INSTALLED_FROM`] record says so), made on this lamp
+/// ([`made_on_the_lamp`]) and put on with an install record not from the
+/// Store, as [`made_by_ask`] requires, else other; a folder that doesn't
+/// load is other.
+pub fn source_of(folder: &Path) -> lamp_voice::made_skill::SkillSource {
+    use lamp_voice::made_skill::SkillSource;
+    if folder.starts_with(PUSHED_DIR) || folder.join(PUSHED_FROM).exists() {
+        return SkillSource::Pushed;
+    }
+    if package::installed_from(folder).is_some_and(|installed| installed.from_store) {
+        return SkillSource::Store;
+    }
+    let (Ok(skill), Ok(card)) = (
+        load_with(folder, false),
+        fs::read_to_string(folder.join("SKILL.md")),
+    ) else {
+        return SkillSource::Other;
+    };
+    // Made only once put on by the manage helper, with its install record
+    // (as [`made_by_ask`] holds it): a `made: here` folder put on by hand
+    // from a folder has none, so is never Made.
+    if made_on_the_lamp(folder, skill.kind, &card)
+        && package::installed_from(folder).is_some_and(|installed| !installed.from_store)
+    {
+        SkillSource::Made
+    } else {
+        SkillSource::Other
+    }
 }
 
 /// Whether the skill in `dir` (of `kind`, its `SKILL.md` `card`) was made
@@ -5150,6 +5220,7 @@ fn manifest(
                 && step.propose.is_none()
                 && step.remind.is_none()
                 && step.task.is_none()
+                && step.run.is_none()
                 && step.on.is_none()
                 && step.after.is_none()
                 && step.if_choice.is_none()
@@ -5167,7 +5238,12 @@ fn manifest(
     }
     // A task handed to the lamp's agent (#6305): one a skill, its grants
     // beside it and nowhere else, in an installable skill only.
-    let tasks = file.steps.iter().filter(|step| step.task.is_some()).count();
+    // A `run` step (#8158) is a task too: one a skill, its grants beside it.
+    let tasks = file
+        .steps
+        .iter()
+        .filter(|step| step.task.is_some() || step.run.is_some())
+        .count();
     // A core skill's line through the lamp's agent may hand one task for
     // each of its triggers' lines (`on`), its variant checked as read.
     let via_agent = file.via_agent;
@@ -5208,6 +5284,36 @@ fn manifest(
     for step in file.steps {
         if let Some(read) = step.read {
             steps.push(Step::Call(Call::ServiceRead(Box::new(read.step(quiet)?))));
+            ons.resize(steps.len(), None);
+            continue;
+        }
+        if let Some(run) = &step.run {
+            if step.task.is_some()
+                || step.body.is_some()
+                || step.light.is_some()
+                || step.say.is_some()
+                || step.sound.is_some()
+                || step.cue.is_some()
+                || step.rest.is_some()
+                || step.requested_audio.is_some()
+                || step.look.is_some()
+                || step.show.is_some()
+                || step.stand.is_some()
+                || step.propose.is_some()
+                || step.remind.is_some()
+                || step.write.is_some()
+                || step.on.is_some()
+                || step.after.is_some()
+                || step.if_choice.is_some()
+            {
+                return Err(
+                    "do.run is alone in its [[do]] table: the light, a cue or a say are steps of their own"
+                        .into(),
+                );
+            }
+            steps.push(Step::Call(Call::Task(Box::new(task::TaskStep::run_step(
+                dir, run, quiet,
+            )?))));
             ons.resize(steps.len(), None);
             continue;
         }
@@ -13398,6 +13504,55 @@ mod tests {
         folder
     }
 
+    /// The Reviewer-lead's P3 on #8180: a `made: here` folder is Made
+    /// (`source_of`, the no-yes mint's) only once put on with an install
+    /// record not from the Store, as [`made_by_ask`] holds it: one put on
+    /// by hand from a folder (`lamp-skills install <folder>`, no record) is
+    /// other, and one whose record is the Store's is the Store's.
+    #[test]
+    fn source_of_made_needs_its_install_record() {
+        use lamp_voice::made_skill::SkillSource;
+        // `asks` is a trigger only with LAMP_MADE_SKILL_ASKS (on in the
+        // product); without it the folder doesn't load and every source
+        // below would be Other for the wrong reason.
+        lamp_voice::made_skill::set_asks_here(Some(true));
+        let dir = tempfile::tempdir().unwrap();
+        let folder = made_here(
+            dir.path(),
+            "moon-glow",
+            "kind = \"installable\"\nversion = \"1.0.0\"\nasks = [\"moon glow\"]\n\
+             [permissions]\nlight = true\n[[do]]\nlight = { colour = \"blue\" }\n",
+        );
+        assert!(made_on_the_lamp(
+            &folder,
+            SkillKind::Installable,
+            &std::fs::read_to_string(folder.join("SKILL.md")).unwrap()
+        ));
+        assert_eq!(source_of(&folder), SkillSource::Other);
+        let mut installed = package::Installed {
+            sha256: "ab".repeat(32),
+            manifest: package::Manifest {
+                format: 1,
+                name: "moon-glow".into(),
+                version: "1.0.0".into(),
+                files: Vec::new(),
+            },
+            from_store: false,
+        };
+        let record = |installed: &package::Installed| {
+            std::fs::write(
+                folder.join(package::INSTALLED_FROM),
+                serde_json::to_vec(installed).unwrap(),
+            )
+            .unwrap();
+        };
+        record(&installed);
+        assert_eq!(source_of(&folder), SkillSource::Made);
+        installed.from_store = true;
+        record(&installed);
+        assert_eq!(source_of(&folder), SkillSource::Store);
+    }
+
     /// lamp-9adf, 16 Nov 15:36: "Lamp, moon time." ran a made skill whose
     /// own line came 20 s after the call, at the normal priority, which
     /// waits out the say service's 15 s quiet after a turn. Run now, its
@@ -14248,6 +14403,85 @@ mod tests {
             assert!(refused.contains("is not a grant"), "{name}: {refused}");
         }
         task::set_agent_services_here(None);
+    }
+
+    /// #8158: a `run = "scripts/main.py"` step loads as a task run with no
+    /// agent: held as a `do.task` is (one a skill, its grants beside it,
+    /// alone in its table, a plain file in its own `scripts/`), a Python
+    /// file, its words the fixed [`task::RUN_WORDS`] (never refused as a
+    /// made skill's task words), and handed over as `skill_run`.
+    #[test]
+    fn a_run_step_loads_as_a_task_with_no_agent() {
+        const BRIEF: &str = "version = \"1.0.0\"\ngrants = [\"speak\"]\n\
+            tool = \"daily_brief\"\n[permissions]\nspeak = true\n\
+            [[do]]\nrun = \"scripts/main.py\"\n";
+        let dir = tempfile::tempdir().unwrap();
+        let folder = task_skill(dir.path(), "daily-brief", BRIEF);
+        let skill = load(&folder).unwrap();
+        assert_eq!(skill.grants, ["speak"]);
+        let step = skill.task_step().unwrap();
+        assert!(step.direct);
+        assert_eq!(step.run, "scripts/main.py");
+        assert_eq!(step.task, task::RUN_WORDS);
+        assert_eq!(skill.made_refuses(), None);
+        let line: Value = serde_json::from_str(
+            &task::HandOver {
+                skill: "daily-brief",
+                step,
+                folder: &folder,
+                sha256: &"a".repeat(64),
+                grants: &skill.grants,
+            }
+            .line(),
+        )
+        .unwrap();
+        assert_eq!(line["op"], "skill_run");
+        assert_eq!(line["run"], "scripts/main.py");
+        // A `do.task` is handed over as before.
+        let booth = load(&task_skill(dir.path(), "photo-booth", PHOTO_BOOTH)).unwrap();
+        assert!(!booth.task_step().unwrap().direct);
+        let refused = |name: &str, toml: String, why: &str| {
+            let folder = task_skill(dir.path(), name, &toml);
+            let refused = load(&folder).unwrap_err();
+            assert!(refused.contains(why), "{name}: {refused}");
+        };
+        refused(
+            "run-not-alone",
+            BRIEF.replace("[[do]]\nrun", "[[do]]\nsay = \"Hi.\"\nrun"),
+            "do.run is alone in its [[do]] table",
+        );
+        refused(
+            "run-and-task",
+            format!("{BRIEF}[[do]]\ntask = {{ task = \"again\", run = \"scripts/main.py\" }}\n"),
+            "one do.task step",
+        );
+        refused(
+            "run-out-of-scripts",
+            BRIEF.replace("scripts/main.py", "../main.py"),
+            "do.run",
+        );
+        refused(
+            "run-missing",
+            BRIEF.replace("scripts/main.py", "scripts/other.py"),
+            "do.run",
+        );
+        let shell = task_skill(
+            dir.path(),
+            "run-shell",
+            &BRIEF.replace("main.py", "main.sh"),
+        );
+        std::fs::write(shell.join("scripts/main.sh"), "echo hi\n").unwrap();
+        let refused = load(&shell).unwrap_err();
+        assert!(refused.contains("is a Python file"), "{refused}");
+        let grants_alone = task_skill(
+            dir.path(),
+            "run-grants-alone",
+            &BRIEF.replace(
+                "[[do]]\nrun = \"scripts/main.py\"\n",
+                "[[do]]\nsay = \"Hi.\"\n",
+            ),
+        );
+        assert!(load(&grants_alone).unwrap_err().contains("only beside one"));
     }
 
     /// #6305: a `do.task` loads with its grants beside the skill's other

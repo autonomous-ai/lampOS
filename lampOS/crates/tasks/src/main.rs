@@ -233,6 +233,9 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
         report_every: REPORT_EVERY,
         daemon_retry_after: DAEMON_RETRY_AFTER,
     };
+    // Each run's own cgroup (#8180): serve into its leaf, the unit's
+    // controllers handed down; said once either way.
+    lamp_tasks::run_cgroup::set_up();
     let clock = SystemClock::new(boot_id.as_deref())?;
     let executable = executable.ok_or("--harness is required")?;
     let stop = Arc::new(AtomicBool::new(false));
@@ -279,6 +282,13 @@ fn main() {
             &args[1..],
         );
         println!("{line}");
+        std::process::exit(status);
+    }
+    // `lamp-tasks make-try-fence` (#8157): a made skill's tried run,
+    // started by lamp-tasks itself; the grant on stdin, then the fence.
+    if args.first().map(String::as_str) == Some(lamp_tasks::make_try::FENCE_ARG) {
+        let (status, why) = lamp_tasks::make_try::fence_main();
+        eprintln!("lamp-tasks make-try-fence: {why}");
         std::process::exit(status);
     }
     // `lamp-tasks net-relay ...` (#6306): inside a skill run's own network
