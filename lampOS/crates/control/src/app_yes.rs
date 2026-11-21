@@ -310,6 +310,10 @@ pub struct Live {
     offered: BTreeMap<(String, u64), Instant>,
     /// The turns taken (`app.took`) and not yet told to the voice.
     took_out: Vec<(String, u64)>,
+    /// When each app's last facts were sent (`apps.remember`), at most
+    /// [`crate::app_remember::MOST_A_MINUTE`] in a minute: kept across its
+    /// runs, as the panel's minute is. Only a remove forgets it.
+    remembered: BTreeMap<String, std::collections::VecDeque<Instant>>,
 }
 
 impl Live {
@@ -354,6 +358,26 @@ impl Live {
             }
         }
         self.reads.insert(name.to_owned(), now);
+        Ok(())
+    }
+
+    /// An app's `apps.remember` at `now`: sent, or how long until one may be
+    /// ([`crate::app_remember::MOST_A_MINUTE`] in any minute).
+    pub fn may_remember(&mut self, name: &str, now: Instant) -> Result<(), Duration> {
+        let minute = crate::app_remember::MINUTE;
+        let sent = self.remembered.entry(name.to_owned()).or_default();
+        while sent
+            .front()
+            .is_some_and(|at| now.saturating_duration_since(*at) >= minute)
+        {
+            sent.pop_front();
+        }
+        if sent.len() >= crate::app_remember::MOST_A_MINUTE
+            && let Some(first) = sent.front()
+        {
+            return Err(minute - now.saturating_duration_since(*first));
+        }
+        sent.push_back(now);
         Ok(())
     }
 
@@ -466,6 +490,7 @@ impl Live {
         self.took.remove(name);
         self.panel_last.remove(name);
         self.revs.remove(name);
+        self.remembered.remove(name);
     }
 
     /// An app's panel is gone with its run (it stopped).

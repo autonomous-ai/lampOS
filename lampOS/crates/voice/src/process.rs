@@ -235,6 +235,9 @@ pub struct Worker {
     // Only the optional ring owns a separate startup namespace. Channels drop
     // before this directory; peer paths are removed only after verified exit.
     ring_resources: Option<RingResources>,
+    /// Authority renewals skipped because this worker's control socket was
+    /// full (#8204): [`RenewalStall::skipped`].
+    pub renewal_stall: RenewalStall,
     /// A test fixture's own end of its child, run once Stop is sent: it closes
     /// the child's input and waits for the exit, so a busy host cannot make a
     /// fixture miss the 300 ms in `shutdown` (#1232).
@@ -244,6 +247,87 @@ pub struct Worker {
     /// to the coordinator. It never replaces the real child cleanup.
     #[cfg(test)]
     after_terminate: Option<Box<dyn FnOnce() + Send>>,
+}
+
+/// A worker's run of authority renewals refused as a full control socket
+/// (`WouldBlock`, #8204): a worker whose only thread waits (a one-face
+/// forget's listing on a frozen lamp-memory waited up to 1.5 s) stops
+/// reading, and the coordinator's 20 ms renewals fill its socket. Each is
+/// a renewal skipped, never an exit: the next tick sends a whole new
+/// snapshot, and the authority the worker holds lapses at its own lease
+/// (`MAX_AUTHORITY_LEASE_US`, 250 ms), so a skip never lengthens what the
+/// worker may do. One journal line when the run begins and one when a
+/// renewal is taken again, counts only. A run longer than
+/// [`RENEWAL_SKIPS_MOST_US`] is a worker that is not coming back: its
+/// refusal ends the voice as before, so it restarts (Twelve's HOLD on
+/// #8210).
+#[derive(Debug, Default)]
+pub struct RenewalStall {
+    /// When the run's first renewal was skipped, on the monotonic clock.
+    since_us: Option<u64>,
+    /// How many renewals the run has skipped.
+    skipped: u32,
+}
+
+/// The longest run of skipped renewals a worker's full control socket
+/// costs before its refusal ends the voice as before (the first builder's
+/// ruling on #8210): past #8204's 2 s of a worker not reading and the
+/// known real stalls (a one-face forget's two listings, up to 1.5 s each),
+/// while a worker deadlocked with its process alive still restarts the
+/// voice.
+pub const RENEWAL_SKIPS_MOST_US: u64 = 3_000_000;
+
+impl RenewalStall {
+    /// A renewal to `role`'s worker refused as a full socket at `now_us`:
+    /// said once, when the run begins. `false` once the run is longer than
+    /// [`RENEWAL_SKIPS_MOST_US`]: the refusal is then the error it was.
+    pub fn skip(&mut self, role: &str, now_us: u64) -> bool {
+        let since_us = *self.since_us.get_or_insert_with(|| {
+            eprintln!(
+                "lamp-voice: the {role} worker's control socket is full: its authority renewal is skipped, sent again on the next tick (#8204)"
+            );
+            now_us
+        });
+        self.skipped = self.skipped.saturating_add(1);
+        let over = now_us.saturating_sub(since_us) > RENEWAL_SKIPS_MOST_US;
+        if over {
+            eprintln!(
+                "lamp-voice: the {role} worker's control socket stayed full: {} renewals skipped over {} ms, past {} ms: it ends the voice (#8204)",
+                self.skipped,
+                now_us.saturating_sub(since_us) / 1_000,
+                RENEWAL_SKIPS_MOST_US / 1_000
+            );
+        }
+        !over
+    }
+
+    /// The run as if it began `us` before `now_us`, for a test that steps
+    /// past [`RENEWAL_SKIPS_MOST_US`] without waiting for it.
+    #[cfg(test)]
+    pub(crate) fn began_before(&mut self, now_us: u64, us: u64) {
+        if self.since_us.is_some() {
+            self.since_us = Some(now_us.saturating_sub(us));
+        }
+    }
+
+    /// A renewal to `role`'s worker taken at `now_us`: the run, if any, is
+    /// over and said with its counts.
+    pub fn delivered(&mut self, role: &str, now_us: u64) {
+        let Some(since_us) = self.since_us.take() else {
+            return;
+        };
+        eprintln!(
+            "lamp-voice: the {role} worker takes its authority again: {} renewals skipped over {} ms (#8204)",
+            self.skipped,
+            now_us.saturating_sub(since_us) / 1_000
+        );
+        self.skipped = 0;
+    }
+
+    /// Renewals skipped in the run going on: 0 when none is.
+    pub fn skipped(&self) -> u32 {
+        self.skipped
+    }
 }
 
 /// The voice starts a worker only in a role on its list, the one the records
@@ -305,6 +389,7 @@ impl Worker {
                 role: role.into(),
                 diagnostic_start: None,
                 ring_resources: None,
+                renewal_stall: RenewalStall::default(),
                 #[cfg(test)]
                 on_stop: None,
                 #[cfg(test)]
@@ -448,6 +533,7 @@ impl Worker {
                 role: role.into(),
                 diagnostic_start: None,
                 ring_resources: None,
+                renewal_stall: RenewalStall::default(),
                 #[cfg(test)]
                 on_stop: None,
                 #[cfg(test)]
@@ -533,6 +619,7 @@ impl Worker {
             role: role.into(),
             diagnostic_start: None,
             ring_resources: None,
+            renewal_stall: RenewalStall::default(),
             #[cfg(test)]
             on_stop: None,
             #[cfg(test)]
@@ -922,6 +1009,7 @@ mod fixture_tests {
                 role: role.into(),
                 diagnostic_start: None,
                 ring_resources: None,
+                renewal_stall: RenewalStall::default(),
                 on_stop: None,
                 after_terminate: None,
             };
@@ -982,6 +1070,7 @@ mod fixture_tests {
             role: "capture".into(),
             diagnostic_start: None,
             ring_resources: None,
+            renewal_stall: RenewalStall::default(),
             on_stop: None,
             after_terminate: None,
         };
@@ -1030,6 +1119,7 @@ mod fixture_tests {
             role: role.into(),
             diagnostic_start: None,
             ring_resources: None,
+            renewal_stall: RenewalStall::default(),
             on_stop: None,
             after_terminate: None,
         };
@@ -5446,6 +5536,7 @@ mod tests {
             role: "probe".into(),
             diagnostic_start: None,
             ring_resources: None,
+            renewal_stall: RenewalStall::default(),
             #[cfg(test)]
             on_stop: None,
             #[cfg(test)]

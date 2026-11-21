@@ -477,6 +477,7 @@ impl Adapter for Script {
             state: "working".into(),
             last_active_unix_ms: Some(LAST_ACTIVE_UNIX_MS),
             about: self.counts.about.lock().unwrap().clone(),
+            agent: None,
         }];
         if self.counts.theirs.load(Ordering::SeqCst) {
             listed.push(Listed {
@@ -484,6 +485,7 @@ impl Adapter for Script {
                 state: "idle".into(),
                 last_active_unix_ms: Some(LAST_ACTIVE_UNIX_MS),
                 about: None,
+                agent: None,
             });
         }
         Ok(listed)

@@ -65,6 +65,9 @@ struct Gate {
     /// Authority snapshots that lapsed in the queue while this worker was
     /// held up, since the last one installed.
     skipped_expired: u32,
+    /// The last fresh install before the first of [`Self::skipped_expired`],
+    /// for how long the worker was held up.
+    held_up_from_us: u64,
     /// `LAMP_PRIVACY_RIDES_STALL=on` (#5611): a lease lapsed by a stall of
     /// the controller under [`STALLED_CONTROL_US`] holds the route closed
     /// instead of ending it ([`Gate::holds`]).
@@ -91,6 +94,7 @@ impl Gate {
             highest_seen: 0,
             retired_through: 0,
             skipped_expired: 0,
+            held_up_from_us: now_us,
             rides_stall: false,
             held_since: None,
             retired_logged: Cell::new(0),
@@ -108,8 +112,20 @@ impl Gate {
             // there on 2026-10-16, #960): it lapsed in the queue. Fresher
             // ones follow it; the heartbeat in `drain` ends the route if
             // none comes.
+            // Read, it still proves the controller there (#8204, the first
+            // builder's ruling on #8210): the heartbeat is judged from the
+            // newest snapshot read, stale or not. A worker held up 2 s
+            // finds every snapshot queued meanwhile lapsed (the coordinator
+            // skipped its renewals while the socket was full), and its
+            // heartbeat otherwise expired before the next fresh one came.
+            // A lapsed snapshot grants nothing: the guard keeps the
+            // authority it had, which lapses at its own lease.
             Err(lamp_turn_owner::Error::ExpiredState) => {
+                if self.skipped_expired == 0 {
+                    self.held_up_from_us = self.last_control_us;
+                }
                 self.skipped_expired = self.skipped_expired.saturating_add(1);
+                self.last_control_us = now_us;
                 return Ok(());
             }
             Err(error) => return Err(io::Error::other(error)),
@@ -117,7 +133,7 @@ impl Gate {
         if self.skipped_expired > 0 {
             eprintln!(
                 "lamp-voice second: held up {} ms; {} lapsed authority snapshots skipped, going on",
-                now_us.saturating_sub(self.last_control_us) / 1_000,
+                now_us.saturating_sub(self.held_up_from_us) / 1_000,
                 self.skipped_expired
             );
             self.skipped_expired = 0;
@@ -3277,6 +3293,14 @@ pub fn serve(
             crate::known_faces::keep_faces_counted(bus);
         }
         crate::known_faces::keep_owner_fresh(owner_file.clone(), owner_faces.clone());
+    }
+    // An installed app's facts (`apps/remember`, #7415 C166): kept for the
+    // owner, by their memory ids with the face's first, with the bus and memory;
+    // nothing comes unless lamp-control's `LAMP_APP_REMEMBER` is on. The
+    // owner kept fresh as above (once a process).
+    if let (Some(root), Some(memory)) = (files.bus_root.as_deref(), socket.clone()) {
+        crate::known_faces::keep_owner_fresh(owner_file.clone(), owner_faces.clone());
+        crate::app_remember::start(root, memory, crate::app_remember::owners_face_first);
     }
     let another_voice = Arc::new(std::sync::atomic::AtomicBool::new(false));
     let another_voice_told = another_voice.clone();
@@ -23857,6 +23881,92 @@ mod tests {
         gate.install(installed_us, state, &mut engine).unwrap();
         assert!(gate.fresh(installed_us + 1_000).is_ok());
         (gate, owner, engine, parent, worker, directory, turn)
+    }
+
+    /// #8204 (Twelve's HOLD on #8210): the second worker held up 2 s on the
+    /// clock, its control socket full after 0.8 s of the coordinator's
+    /// 20 ms renewals (the rest skipped by the coordinator). Read then,
+    /// every snapshot queued has lapsed. The heartbeat was judged from the
+    /// last fresh install, 2 s back, past `STALLED_CONTROL_US`, and ended
+    /// the route and the voice. Judged from the newest snapshot read, the
+    /// route holds closed instead; the lapsed snapshots grant nothing, and
+    /// the next fresh renewal lets the conversation go on.
+    #[tokio::test]
+    async fn a_worker_held_up_2_s_behind_a_full_socket_goes_on_and_takes_no_lapsed_authority() {
+        let (mut gate, mut owner, mut engine, mut parent, mut worker, _directory, turn) =
+            stalled_controller(2_000_000, true);
+        let held = gate.guard.state().unwrap();
+        let installed_us = held.issued_at().as_micros();
+        // Its last look was then: the channel knows it was held up since.
+        assert!(
+            worker
+                .control
+                .receive_with::<Control>(|| installed_us)
+                .unwrap()
+                .is_none()
+        );
+        let at = MonoTime::from_micros;
+        // The coordinator renews every 20 ms through the whole stall, as
+        // its loop does: the turn stays the owner's. Its sends fill the
+        // socket after 0.8 s, and the rest are skipped (`send_authority`).
+        let mut renew = |owner: &mut Controller, stamp: u64, sent: bool| {
+            let until = at(stamp + 100_000);
+            owner
+                .set_capture(at(stamp), CaptureState::RetainingUntil(until))
+                .unwrap();
+            owner
+                .set_admission(at(stamp), AdmissionState::OpenUntil(until))
+                .unwrap();
+            let snapshot = owner.snapshot(at(stamp)).unwrap();
+            if sent {
+                parent
+                    .control
+                    .send_with(Control::Authority { snapshot }, || stamp)
+                    .unwrap();
+            }
+        };
+        // Up to now, 2 s or more after the install, on the clock the drain
+        // reads.
+        let read_us = monotonic_us();
+        assert!(read_us >= installed_us + 2_000_000);
+        let mut stamp = installed_us + 20_000;
+        while stamp < read_us {
+            renew(&mut owner, stamp, stamp <= installed_us + 800_000);
+            stamp += 20_000;
+        }
+        // Read 2 s on: no exit, and nothing lapsed is taken.
+        loop {
+            match gate.drain(&mut worker.control, &mut engine) {
+                Ok(Drain::Empty) => break,
+                Ok(Drain::Deferred) => {}
+                Ok(Drain::Stopped) => panic!("no Stop was sent"),
+                Err(error) => panic!("a 2 s stall ended the route: {error}"),
+            }
+        }
+        assert_eq!(
+            gate.guard.state().map(|state| state.revision()),
+            Some(held.revision()),
+            "a lapsed snapshot grants nothing"
+        );
+        assert!(
+            gate.holds(monotonic_us(), &mut engine),
+            "held closed on the lapsed authority: nothing taken or sent"
+        );
+        // The next tick's renewal, sent: the conversation goes on.
+        renew(&mut owner, monotonic_us(), true);
+        assert!(matches!(
+            gate.drain(&mut worker.control, &mut engine),
+            Ok(Drain::Empty)
+        ));
+        assert!(!gate.holds(monotonic_us(), &mut engine));
+        gate.fresh(monotonic_us()).unwrap();
+        assert_eq!(
+            gate.guard
+                .state()
+                .and_then(|state| state.owner())
+                .map(|owner| owner.turn()),
+            Some(turn)
+        );
     }
 
     /// A line's start for `request`, under `generation`.

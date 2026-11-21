@@ -20,9 +20,14 @@
 //! builder's 16:45 point 3); none is this module's own.
 
 //!
-//! No switch here: nothing sends these ops or sets a line until the door's
-//! two ops and their writer land, behind that writer's own switch, off until
-//! the first builder's privacy read and the ROW (Friday's 16:47 on #7415).
+//! No switch here: the door's `apps.remember` (lamp-control) is behind its
+//! own, `LAMP_APP_REMEMBER`, off until the first builder's privacy read and
+//! the ROW (Friday's 16:47 on #7415). The door tells the voice on the bus
+//! ([`AppRemember`]); the voice picks the person (the owner's ids, the
+//! face's first, each tried in turn past `not_known`), sends [`REMEMBER_OP`]
+//! to memory and says how it went ([`AppRemembered`]). A removed app's
+//! [`FORGET_OP`] goes from lamp-control to memory's forget socket, kept as a
+//! pending mark until memory says it was done.
 
 /// Memory's request that keeps one: `{"op": REMEMBER_OP, "person",
 /// "source", "name", "at_unix_ms", "text"}`. Linked to no exchange:
@@ -273,6 +278,96 @@ impl ContextLines {
     }
 }
 
+/// An installed app's fact, checked and tidied at the door, for the voice
+/// to keep for the lamp's known person (`apps/remember`, lamp-control to the
+/// voice). `ask` is the door's own number for the app's request, answered on
+/// [`AppRemembered`]; `app` the app's checked name (its source is
+/// `app:<app>`), `name` its manifest's title, `text` already [`tidy`].
+#[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct AppRemember {
+    pub ask: u64,
+    pub app: String,
+    pub name: String,
+    pub text: String,
+    pub at_unix_ms: u64,
+}
+
+impl AppRemember {
+    pub const TYPE: &str = "lamp_msgs/AppRemember";
+    pub const VERSION: u32 = 1;
+    pub const TOPIC: &str = "apps/remember";
+
+    pub fn declaration() -> lamp_bus::Declaration {
+        lamp_bus::Declaration::new(Self::TYPE, Self::VERSION, lamp_bus::Kind::Event)
+    }
+
+    /// The source it is kept under: `app:<app>`.
+    pub fn source(&self) -> Option<Source> {
+        Source::parse(&format!("app:{}", self.app))
+    }
+
+    pub fn check(&self) -> Result<(), crate::Invalid> {
+        if !crate::app_triggers::name_ok(&self.app) || self.source().is_none() {
+            return Err(crate::Invalid("an app's fact names an app".into()));
+        }
+        if self.name.len() > NAME_BYTES || name(&self.name) != self.name {
+            return Err(crate::Invalid("an app's fact has a fitting name".into()));
+        }
+        if tidy(&self.text, MOST_CHARS).as_deref() != Ok(self.text.as_str()) {
+            return Err(crate::Invalid("an app's fact is tidied words".into()));
+        }
+        Ok(())
+    }
+}
+
+/// How an [`AppRemember`] went, the voice to lamp-control
+/// (`apps/remembered`): `outcome` is [`KEPT`], or why not in one word
+/// (memory's or [`Refused::code`]'s error code, or [`UNAVAILABLE`]).
+#[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct AppRemembered {
+    pub ask: u64,
+    pub app: String,
+    pub outcome: String,
+}
+
+/// An [`AppRemembered`] that was kept.
+pub const KEPT: &str = "kept";
+/// An [`AppRemembered`] whose memory could not be reached or did not answer.
+pub const UNAVAILABLE: &str = "unavailable";
+
+impl AppRemembered {
+    pub const TYPE: &str = "lamp_msgs/AppRemembered";
+    pub const VERSION: u32 = 1;
+    pub const TOPIC: &str = "apps/remembered";
+
+    pub fn declaration() -> lamp_bus::Declaration {
+        lamp_bus::Declaration::new(Self::TYPE, Self::VERSION, lamp_bus::Kind::Event)
+    }
+
+    pub fn check(&self) -> Result<(), crate::Invalid> {
+        let code_ok = (1..=32).contains(&self.outcome.len())
+            && self
+                .outcome
+                .bytes()
+                .all(|b| b.is_ascii_lowercase() || b == b'_');
+        if !crate::app_triggers::name_ok(&self.app) || !code_ok {
+            return Err(crate::Invalid(
+                "how an app's fact went names the app and one code".into(),
+            ));
+        }
+        Ok(())
+    }
+}
+
+pub fn app_fact_topics() -> Vec<(&'static str, lamp_bus::Declaration)> {
+    vec![
+        (AppRemember::TOPIC, AppRemember::declaration()),
+        (AppRemembered::TOPIC, AppRemembered::declaration()),
+    ]
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -424,5 +519,45 @@ mod tests {
             .unwrap();
         lines.clear_all();
         assert!(lines.live(2_001).is_empty());
+    }
+
+    /// The bus's two: a fact checked as the door tidied it, an outcome one
+    /// code.
+    #[test]
+    fn the_bus_messages_hold_only_checked_words() {
+        let fact = |name: &str, text: &str| AppRemember {
+            ask: 1,
+            app: "gym-coach".into(),
+            name: name.into(),
+            text: text.into(),
+            at_unix_ms: 1,
+        };
+        let ok = fact("Gym Coach", "20 Nov 16:47: squats 3×10, 6 too shallow");
+        assert!(ok.check().is_ok());
+        assert_eq!(ok.source().unwrap().as_str(), "app:gym-coach");
+        assert!(fact("Gym Coach", "squats \"3x10\"").check().is_err());
+        assert!(fact("Gym Coach", "").check().is_err());
+        assert!(
+            fact("Gym Coach", &"a".repeat(MOST_CHARS + 1))
+                .check()
+                .is_err()
+        );
+        assert!(fact("Gym  Coach", "squats").check().is_err());
+        assert!(
+            AppRemember {
+                app: "Gym".into(),
+                ..ok.clone()
+            }
+            .check()
+            .is_err()
+        );
+        let went = |outcome: &str| AppRemembered {
+            ask: 1,
+            app: "gym-coach".into(),
+            outcome: outcome.into(),
+        };
+        assert!(went(KEPT).check().is_ok() && went("not_known").check().is_ok());
+        assert!(went("").check().is_err() && went("Not known").check().is_err());
+        assert_eq!(app_fact_topics().len(), 2);
     }
 }

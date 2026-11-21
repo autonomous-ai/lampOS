@@ -26,6 +26,10 @@ fn known_file(what: &str, eyes: &SpeakingFaces) -> std::path::PathBuf {
     path
 }
 
+/// How long a one-face forget's listing waits, and the marks it leaves
+/// at the wait's start and end ([`FORGET_STALL`]).
+type ForgetStall = (Duration, Arc<Mutex<Vec<Instant>>>);
+
 /// The eyes' boot the known file was written under.
 const BOOT: &str = "eyes";
 
@@ -76,6 +80,11 @@ thread_local! {
     /// forget whose line or `about` says "umbrella".
     static FORGET_TARGET: std::cell::Cell<Option<(u64, &'static str)>> =
         const { std::cell::Cell::new(None) };
+    /// How long [`FORGET_TARGET`]'s listing waits, as a frozen memory's
+    /// does (up to `tools::ASK_DEADLINE`), and where it marks its start and
+    /// end, for the next [`lines_known`] on this thread, once (#8204).
+    static FORGET_STALL: std::cell::RefCell<Option<ForgetStall>> =
+        const { std::cell::RefCell::new(None) };
     /// Added to each line's request in the next [`lines_known`] on this
     /// thread, once, for a test reading what is kept by request across the
     /// crate (`remember::kept_out`).
@@ -606,9 +615,15 @@ async fn lines_known(
     } else {
         failed_reader(engine, &path, seen)
     };
+    let stall = FORGET_STALL.with(|stall| stall.borrow_mut().take());
     let engine = match FORGET_TARGET.with(std::cell::Cell::take) {
         Some((id, text)) => engine.targeting_one_face_forgets(Arc::new(
             move |call: &net::ToolCall, said: &str, _: &str, _: &ScopeLease| {
+                if let Some((wait, marks)) = &stall {
+                    let began = Instant::now();
+                    std::thread::sleep(*wait);
+                    marks.lock().unwrap().extend([began, Instant::now()]);
+                }
                 (said.contains("umbrella")
                     || call.args["about"]
                         .as_str()
@@ -3941,6 +3956,95 @@ async fn a_named_one_face_forget_the_mouth_was_not_seen_saying_asks_once() {
     assert_eq!(forgets_ran(&got), Vec::<Value>::new(), "nothing removed");
     assert!(asked_about_umbrella(&got), "asked once: {:?}", got.rounds);
     assert!(!refused_by_one_face(&got), "not refused");
+}
+
+/// #8204: a named one-face forget whose listing waits 1.5 s, as a frozen
+/// lamp-memory's does (`tools::ASK_DEADLINE`), waits off the worker's
+/// thread: the runtime its control loop shares keeps reading the
+/// coordinator's 20 ms renewals through the wait, none refused as a full
+/// socket, and the forget is still asked about once. On the runtime's own
+/// thread it read none for 1.5 s, the coordinator's sends to the full
+/// socket were refused, and the voice ended.
+#[tokio::test]
+async fn a_one_face_forget_whose_listing_waits_keeps_the_control_loop_reading() {
+    let directory = crate::process::SessionDirectory::create().unwrap();
+    let (parent, worker) = (
+        crate::process::new_boot().unwrap(),
+        crate::process::new_boot().unwrap(),
+    );
+    let mut coordinator =
+        crate::transport::WorkerChannels::bind(&directory.path, "second", parent, worker, false)
+            .unwrap();
+    let mut control =
+        crate::transport::WorkerChannels::bind(&directory.path, "second", parent, worker, true)
+            .unwrap();
+    coordinator
+        .connect(&directory.path, "second", false)
+        .unwrap();
+    control.connect(&directory.path, "second", true).unwrap();
+    let marks: Arc<Mutex<Vec<Instant>>> = Arc::default();
+    FORGET_STALL.with(|stall| {
+        *stall.borrow_mut() = Some((Duration::from_millis(1_500), marks.clone()));
+    });
+    // The coordinator's renewals, every 20 ms, from a thread of its own.
+    let done = Arc::new(AtomicBool::new(false));
+    let renewing = {
+        let done = done.clone();
+        std::thread::spawn(move || {
+            let mut refused = 0u32;
+            let mut renewal = 0u64;
+            while !done.load(Ordering::Acquire) {
+                renewal += 1;
+                if coordinator.control.send(renewal).is_err() {
+                    refused += 1;
+                }
+                std::thread::sleep(Duration::from_millis(20));
+            }
+            refused
+        })
+    };
+    // The worker's control loop: on the runtime the turn runs on.
+    let read: Arc<Mutex<Vec<Instant>>> = Arc::default();
+    let reading = {
+        let read = read.clone();
+        tokio::spawn(async move {
+            loop {
+                while let Ok(Some(_)) = control.control.receive::<u64>() {
+                    read.lock().unwrap().push(Instant::now());
+                }
+                tokio::time::sleep(Duration::from_millis(10)).await;
+            }
+        })
+    };
+    let got = asked_once(
+        "ask-once-listing-waits",
+        vec![line(FORGET_UMBRELLA, vec![("f1", false)], 0)],
+        &[],
+        false,
+    )
+    .await;
+    reading.abort();
+    done.store(true, Ordering::Release);
+    let refused = renewing.join().unwrap();
+    assert!(asked_about_umbrella(&got), "asked once: {:?}", got.rounds);
+    let marks = marks.lock().unwrap().clone();
+    let [began, ended] = marks[..] else {
+        panic!("the listing waited once: {marks:?}");
+    };
+    // Inside the wait, past its first and before its last 100 ms: about 65
+    // renewals read on a free runtime, none on a blocked one.
+    let inside = read
+        .lock()
+        .unwrap()
+        .iter()
+        .filter(|at| **at > began + Duration::from_millis(100))
+        .filter(|at| **at + Duration::from_millis(100) < ended)
+        .count();
+    assert!(
+        inside >= 10,
+        "the control loop read {inside} renewals while the listing waited"
+    );
+    assert_eq!(refused, 0, "no renewal refused as a full socket");
 }
 
 /// #8038: a named one-face forget held for their yes is kept out of the

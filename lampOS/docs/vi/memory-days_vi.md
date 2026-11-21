@@ -894,8 +894,10 @@ phần của kho nằm ở `crates/memory/src/app_facts.rs`.
     chỗ của một điều mới hơn. 90 ngày cũng tính từ `kept_day`.
 - **`forget_app_facts {source}`** xoá mọi điều của nguồn đó, tìm theo dấu,
   cùng những gì làm ra từ chúng, như `forget {id}` từng điều; không lời nói
-  nào mất. Dùng khi gỡ app, thu hồi máy tính hoặc tắt quyền:
-  `{ok:true, removed}`. Các lệnh quên của chính người đó lấy điều của app như
+  nào mất. Dùng khi gỡ app (lamp-control gửi nó trên forget socket cho đến khi
+  được trả lời `ok`) hoặc thu hồi máy tính: `{ok:true, removed}`. Một bản cập
+  nhật app bỏ quyền `remember` không gửi gì: các điều của nó ở lại cho đến khi
+  gỡ app, người đó quên, hoặc hết 90 ngày. Các lệnh quên của chính người đó lấy điều của app như
   mọi điều đã giữ: một điều, quên về một chuyện, quên hết, và quên người đó.
 - **Dòng ngữ cảnh không bao giờ được giữ.** `app_fact::ContextLines` giữ một
   dòng mỗi nguồn, chỉ trong bộ nhớ, kể bằng `app_fact::context_note` ("From
@@ -904,11 +906,18 @@ phần của kho nằm ở `crates/memory/src/app_facts.rs`.
   khi quên hết. Không gì ghi nó xuống đĩa, vào mạch chuyện, nhật ký hay trí
   nhớ.
 - **Nhật ký** ghi thao tác, id của người và số lượng, không bao giờ một lời.
-- **Không có công tắc ở đây.** Chưa gì gửi các thao tác này: `apps.remember`
-  và `apps.context` ở cửa và bên ghi của chúng đến trong PR riêng, sau công
-  tắc của nó, tắt cho đến khi first builder đọc phần riêng tư và có ROW. Trí
-  nhớ cũ trả lời `unknown_op`. "Từ chối khi Lamp ở chế độ riêng tư" (công
-  tắc riêng tư vật lý, điểm 4 của first builder) là kiểm tra của cửa.
+- **Không có công tắc ở đây.** Bên ghi là `apps.remember` ở cửa (C166,
+  [apps.md](../apps.md), "What an app tells Lamp's memory"), sau công tắc
+  riêng `LAMP_APP_REMEMBER` trong lamp-control, tắt cho đến khi first builder
+  đọc phần riêng tư và có ROW. lamp-control kiểm tra quyền của app, lời của nó
+  (`app_fact::tidy`), công tắc riêng tư và giới hạn ba lần một phút, rồi báo
+  cho voice trên `apps/remember`; voice thử các id trí nhớ của chủ, id của
+  khuôn mặt trước, mỗi id qua `app_fact::whose`, chuyển sang id kế khi gặp
+  `not_known`, và gửi `remember_app_fact` với nguồn `app:<name>`. Khi gỡ một
+  app, lamp-control gửi `forget_app_facts` cho nguồn của nó trên forget socket
+  (`--forget-socket`, nhận nó cạnh `forget_person`), giữ một dấu chờ và thử lại
+  mỗi 30 giây cho đến khi trí nhớ trả lời `ok`. `apps.context` chưa được xây. Trí nhớ
+  cũ trả lời `unknown_op`, báo cho app là `unavailable`.
 
 Các giới hạn là của luồng thảo luận, không cái nào do kho này tự đặt:
 

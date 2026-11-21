@@ -593,11 +593,16 @@ pub fn too_long() -> Answer {
     }
 }
 
-/// What the app's narrow socket lets through: `{"op":"forget_person",
+/// What the narrow forget socket lets through: `{"op":"forget_person",
 /// "person":ID}` with those two keys only and the id of one person the eyes
-/// know, re-encoded so nothing else in the line reaches the store. Anything
-/// else is the refusal to send back, and the store is never asked.
+/// know (the app's removal of a person), or `{"op":"forget_app_facts",
+/// "source":SOURCE}` with those two keys only and an `app:` source
+/// (lamp-control's removal of an installed app, #7415 C166: every fact of
+/// the app goes, nothing else), each re-encoded so nothing else in the line
+/// reaches the store. Anything else is the refusal to send back, and the
+/// store is never asked.
 pub fn narrow(line: &[u8]) -> Result<Vec<u8>, Answer> {
+    const ONLY: &str = "this socket takes forget_person or forget_app_facts only";
     let refused = |error: &'static str, message: &str| {
         let refusal = refuse(error, message);
         Answer {
@@ -608,28 +613,48 @@ pub fn narrow(line: &[u8]) -> Result<Vec<u8>, Answer> {
             forgot: None,
         }
     };
-    let value: serde_json::Value = serde_json::from_slice(line)
-        .map_err(|_| refused("not_allowed", "this socket takes forget_person only"))?;
+    let value: serde_json::Value =
+        serde_json::from_slice(line).map_err(|_| refused("not_allowed", ONLY))?;
     let object = value
         .as_object()
-        .filter(|object| {
-            object.len() == 2
-                && object.get("op").and_then(serde_json::Value::as_str) == Some("forget_person")
-        })
-        .ok_or_else(|| refused("not_allowed", "this socket takes forget_person only"))?;
-    let person = object
-        .get("person")
-        .and_then(serde_json::Value::as_str)
-        .filter(|id| lamp_msgs::known::is_person_id(id))
-        .ok_or_else(|| {
-            refused(
-                "bad_person",
-                "forget_person takes the id of one person the eyes know",
+        .filter(|object| object.len() == 2)
+        .ok_or_else(|| refused("not_allowed", ONLY))?;
+    match object.get("op").and_then(serde_json::Value::as_str) {
+        Some("forget_person") => {
+            let person = object
+                .get("person")
+                .and_then(serde_json::Value::as_str)
+                .filter(|id| lamp_msgs::known::is_person_id(id))
+                .ok_or_else(|| {
+                    refused(
+                        "bad_person",
+                        "forget_person takes the id of one person the eyes know",
+                    )
+                })?;
+            Ok(serde_json::json!({"op": "forget_person", "person": person})
+                .to_string()
+                .into_bytes())
+        }
+        Some(lamp_msgs::app_fact::FORGET_OP) => {
+            let source = object
+                .get("source")
+                .and_then(serde_json::Value::as_str)
+                .and_then(lamp_msgs::app_fact::Source::parse)
+                .filter(|source| source.as_str().starts_with("app:"))
+                .ok_or_else(|| {
+                    refused(
+                        "bad_source",
+                        "forget_app_facts takes one installed app's source, app:<name>",
+                    )
+                })?;
+            Ok(
+                serde_json::json!({"op": lamp_msgs::app_fact::FORGET_OP, "source": source.as_str()})
+                    .to_string()
+                    .into_bytes(),
             )
-        })?;
-    Ok(serde_json::json!({"op": "forget_person", "person": person})
-        .to_string()
-        .into_bytes())
+        }
+        _ => Err(refused("not_allowed", ONLY)),
+    }
 }
 
 /// What `linked.sock` lets through (the linked-service memory plan, slice
@@ -784,7 +809,30 @@ mod tests {
             String::from_utf8(through).unwrap(),
             json!({"op":"forget_person","person":p1}).to_string()
         );
+        // An installed app's facts, by its `app:` source alone (#7415 C166).
+        let facts = narrow(br#"{"source":"app:gym-coach","op":"forget_app_facts"}"#)
+            .unwrap_or_else(|refused| panic!("{}", refused.line));
+        assert_eq!(
+            String::from_utf8(facts).unwrap(),
+            json!({"op":"forget_app_facts","source":"app:gym-coach"}).to_string()
+        );
         for (line, error) in [
+            (
+                json!({"op":"forget_app_facts","source":"computer:dev-1"}).to_string(),
+                "bad_source",
+            ),
+            (
+                json!({"op":"forget_app_facts","source":"gym-coach"}).to_string(),
+                "bad_source",
+            ),
+            (
+                json!({"op":"forget_app_facts","source":"app:x","also":1}).to_string(),
+                "not_allowed",
+            ),
+            (
+                json!({"op":"remember_app_fact","source":"app:x"}).to_string(),
+                "not_allowed",
+            ),
             (
                 json!({"op":"recall","person":p1}).to_string(),
                 "not_allowed",

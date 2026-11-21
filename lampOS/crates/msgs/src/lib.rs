@@ -2786,6 +2786,7 @@ pub fn declaration_of(topic: &str) -> Option<Declaration> {
         .chain(body_sound_topics())
         .chain(lamp_did_topics())
         .chain(app_trigger_topics())
+        .chain(app_fact::app_fact_topics())
         .chain(chat_topics())
         .chain(presence_topics())
         .chain(heat_topics())

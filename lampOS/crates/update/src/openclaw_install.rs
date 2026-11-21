@@ -1125,10 +1125,18 @@ pub enum Gateway {
     Unknown,
 }
 
-/// The lamp's default agent as lamp-tasks says it at `socket`: `None` when
-/// it does not answer (down, starting, its socket not there), `Some(None)`
-/// when it answers with no default, else the engine's name.
-pub fn said_default(socket: &Path) -> Option<Option<String>> {
+/// What lamp-tasks says on its read for lamp-update (#8105): the lamp's
+/// default engine (`None` when it has none), and whether OpenClaw is in
+/// use whatever the default (`None` from a lamp-tasks that doesn't say).
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub struct Said {
+    pub default: Option<String>,
+    pub openclaw_in_use: Option<bool>,
+}
+
+/// lamp-tasks' answer at `socket`, `None` when it does not answer (down,
+/// starting, its socket not there, or a refusal).
+pub fn said_default(socket: &Path) -> Option<Said> {
     use std::io::{BufRead, BufReader, Read, Write};
     let asked = || -> io::Result<String> {
         let mut stream = std::os::unix::net::UnixStream::connect(socket)?;
@@ -1144,33 +1152,43 @@ pub fn said_default(socket: &Path) -> Option<Option<String>> {
 
 /// lamp-tasks' answer read ([`said_default`]): `None` for a refusal or a
 /// line that is not its answer.
-fn default_of(reply: &str) -> Option<Option<String>> {
+fn default_of(reply: &str) -> Option<Said> {
     let reply: serde_json::Value = serde_json::from_str(reply.trim()).ok()?;
     if reply.get("ok").and_then(serde_json::Value::as_bool) != Some(true) {
         return None;
     }
-    Some(
-        reply
+    Some(Said {
+        default: reply
             .get("default")
             .and_then(serde_json::Value::as_str)
             .map(str::trim)
             .filter(|engine| !engine.is_empty())
             .map(str::to_owned),
-    )
+        openclaw_in_use: reply
+            .get("openclaw_in_use")
+            .and_then(serde_json::Value::as_bool),
+    })
 }
 
-/// The rule (#8105): with the switch off, always [`Gateway::Wanted`]; on,
-/// wanted only while lamp-tasks says `openclaw` is the default, not wanted
-/// while it says another, and unknown while it says none or can't be
-/// reached, so a lamp-tasks that is starting never stops the gateway.
-pub fn gateway_wanted(by_default: bool, said: Option<Option<String>>) -> Gateway {
+/// The rule (#8105): with the switch off, always [`Gateway::Wanted`]. On:
+/// wanted while OpenClaw is the default **or in use** (a launch or run
+/// waited for its Gateway within lamp-tasks' hold, the first builder's
+/// 15:29 on #8116); not wanted only while lamp-tasks says another default
+/// and OpenClaw not in use; unknown otherwise (no answer, or a lamp-tasks
+/// that doesn't say whether it's in use), so a guess never stops it.
+pub fn gateway_wanted(by_default: bool, said: Option<Said>) -> Gateway {
     if !by_default {
         return Gateway::Wanted;
     }
-    match said {
-        Some(Some(engine)) if engine == "openclaw" => Gateway::Wanted,
-        Some(Some(_)) => Gateway::NotWanted,
-        Some(None) | None => Gateway::Unknown,
+    let Some(said) = said else {
+        return Gateway::Unknown;
+    };
+    if said.default.as_deref() == Some("openclaw") || said.openclaw_in_use == Some(true) {
+        return Gateway::Wanted;
+    }
+    match (said.default, said.openclaw_in_use) {
+        (Some(_), Some(false)) => Gateway::NotWanted,
+        _ => Gateway::Unknown,
     }
 }
 

@@ -426,7 +426,10 @@ socket is refused before the eyes forget anything.
   which memory's user is in (A8, #6852). The main socket stays
   0600. A line on it must be exactly
   `{"op":"forget_person","person":ID}`, those two keys and an id of the
-  shape above; it is re-encoded before the store sees it
+  shape above, or `{"op":"forget_app_facts","source":"app:<name>"}`, those
+  two keys and an installed app's source (lamp-control's remove of an app,
+  #7415 C166, [memory-days.md](memory-days.md); another source is
+  `bad_source`); it is re-encoded before the store sees it
   (`protocol::narrow`). Anything else (`recall`, `search`, `kept`, `status`,
   `forget_all`, an extra key, non-JSON) is
   `{"ok":false,"error":"not_allowed",...}`, and a bad id `bad_person`,

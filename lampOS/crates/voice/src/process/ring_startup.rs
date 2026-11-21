@@ -191,6 +191,7 @@ impl Worker {
                 role: "ring".into(),
                 diagnostic_start: None,
                 ring_resources: Some(resources),
+                renewal_stall: RenewalStall::default(),
                 #[cfg(test)]
                 on_stop: None,
                 #[cfg(test)]
