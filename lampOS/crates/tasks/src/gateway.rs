@@ -147,20 +147,83 @@ const COLD_EVERY: Duration = Duration::from_secs(1);
 /// is just when the Gateway may be cold).
 static UPDATE_EVER_ASKED: AtomicBool = AtomicBool::new(false);
 
-/// How long after this process starts a launch on OpenClaw waits for
-/// lamp-update's first ask before it is taken as off: two of its 10 s looks
-/// and a little more.
-pub const FIRST_ASK_WITHIN: Duration = Duration::from_secs(30);
+/// lamp-update's switch file every build carries, and the switch in it
+/// (`lamp_update::switches::update_switch`): read here too, so a launch is
+/// held for a cold Gateway from a lamp-tasks start on, not only once
+/// lamp-update has asked (Twelve on #8234).
+pub const UPDATE_ENV: &str = "/etc/lampOS/update.env";
+pub const BY_DEFAULT_SWITCH: &str = "LAMP_OPENCLAW_GATEWAY_BY_DEFAULT";
+/// The most of the switch file read, as lamp-update reads it.
+const MOST_SWITCH_BYTES: usize = 4096;
+/// Between two reads of the switch file.
+const SWITCH_EVERY: Duration = Duration::from_secs(30);
+
+/// Whether `bytes`, a switch file, says `switch` is `on`, by lamp-update's
+/// rule (`lamp_update::models::file_says_on`): comments and blank lines
+/// skipped, the last value wins, any line that isn't `NAME=value` makes the
+/// whole file off, and so does a file over 4 KiB or not UTF-8.
+pub fn switch_file_says_on(bytes: &[u8], switch: &str) -> bool {
+    if bytes.len() > MOST_SWITCH_BYTES {
+        return false;
+    }
+    let Ok(text) = std::str::from_utf8(bytes) else {
+        return false;
+    };
+    let mut value = None;
+    for line in text.lines().map(str::trim) {
+        if line.is_empty() || line.starts_with('#') {
+            continue;
+        }
+        let Some((name, rest)) = line.split_once('=') else {
+            return false;
+        };
+        if name.is_empty()
+            || !name
+                .bytes()
+                .all(|byte| byte.is_ascii_alphanumeric() || byte == b'_')
+        {
+            return false;
+        }
+        if name == switch {
+            value = Some(rest);
+        }
+    }
+    value == Some("on")
+}
+
+/// [`BY_DEFAULT_SWITCH`] as [`UPDATE_ENV`] says it, read at most every
+/// [`SWITCH_EVERY`]: missing, not a regular file or unreadable is off.
+fn switch_on() -> bool {
+    use std::io::Read;
+    static READ: std::sync::Mutex<Option<(Instant, bool)>> = std::sync::Mutex::new(None);
+    let mut read = READ
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner);
+    if let Some((at, on)) = *read
+        && at.elapsed() < SWITCH_EVERY
+    {
+        return on;
+    }
+    let path = Path::new(UPDATE_ENV);
+    let mut bytes = Vec::new();
+    let on = std::fs::symlink_metadata(path).is_ok_and(|metadata| metadata.is_file())
+        && std::fs::File::open(path)
+            .and_then(|file| {
+                file.take(MOST_SWITCH_BYTES as u64 + 1)
+                    .read_to_end(&mut bytes)
+            })
+            .is_ok()
+        && switch_file_says_on(&bytes, BY_DEFAULT_SWITCH);
+    *read = Some((Instant::now(), on));
+    on
+}
 
 /// Whether a launch on OpenClaw may be held for a cold Gateway (#8105).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Asking {
-    /// lamp-update has asked: the switch is on.
+    /// The switch is on: its file says so, or lamp-update has asked.
     Yes,
-    /// Not yet, within [`FIRST_ASK_WITHIN`] of the start: held, unmarked,
-    /// until it asks or that time passes.
-    NotYet,
-    /// Not asked in [`FIRST_ASK_WITHIN`]: the switch is off.
+    /// Neither: off, as before.
     No,
 }
 
@@ -173,19 +236,16 @@ pub fn asked_for_tests(asked: bool) {
 
 /// [`Asking`] now.
 pub fn update_asking() -> Asking {
-    asking_at(
+    asking_of(
         UPDATE_EVER_ASKED.load(std::sync::atomic::Ordering::Acquire),
-        mono_ms(),
+        switch_on,
     )
 }
 
-/// [`Asking`] with lamp-update having asked or not, `now_ms` into this
-/// process.
-fn asking_at(ever_asked: bool, now_ms: u64) -> Asking {
-    if ever_asked {
+/// [`Asking`] with lamp-update having asked or not, else the switch file.
+fn asking_of(ever_asked: bool, file_on: impl FnOnce() -> bool) -> Asking {
+    if ever_asked || file_on() {
         Asking::Yes
-    } else if now_ms < FIRST_ASK_WITHIN.as_millis() as u64 {
-        Asking::NotYet
     } else {
         Asking::No
     }
@@ -1574,22 +1634,37 @@ mod tests {
     }
 
     /// #8105 (Twelve on #8234): once lamp-update has asked, it stays asked
-    /// past the first 30 s with no new ask; never asked is "not yet" within
-    /// them and off after.
+    /// with no new ask; never asked, the switch file decides.
     #[test]
     fn lamp_updates_ask_is_kept_for_the_process() {
         update_asked();
         assert!(UPDATE_EVER_ASKED.load(std::sync::atomic::Ordering::Acquire));
-        let later = FIRST_ASK_WITHIN.as_millis() as u64 + 60_000;
         assert_eq!(
-            asking_at(
+            asking_of(
                 UPDATE_EVER_ASKED.load(std::sync::atomic::Ordering::Acquire),
-                later
+                || false
             ),
             Asking::Yes
         );
-        assert_eq!(asking_at(false, 0), Asking::NotYet);
-        assert_eq!(asking_at(false, later), Asking::No);
+        assert_eq!(asking_of(false, || true), Asking::Yes);
+        assert_eq!(asking_of(false, || false), Asking::No);
+    }
+
+    /// #8105: the switch file is read by lamp-update's rule.
+    #[test]
+    fn the_switch_file_is_read_as_lamp_update_reads_it() {
+        let on = |text: &str| switch_file_says_on(text.as_bytes(), BY_DEFAULT_SWITCH);
+        assert!(on("LAMP_OPENCLAW_GATEWAY_BY_DEFAULT=on\n"));
+        assert!(on(
+            "# note\n\nLAMP_UPDATE_NOW=on\nLAMP_OPENCLAW_GATEWAY_BY_DEFAULT=on\n"
+        ));
+        assert!(!on(
+            "LAMP_OPENCLAW_GATEWAY_BY_DEFAULT=on\nLAMP_OPENCLAW_GATEWAY_BY_DEFAULT=off\n"
+        ));
+        assert!(!on("LAMP_OPENCLAW_GATEWAY_BY_DEFAULT=On\n"));
+        assert!(!on("LAMP_OPENCLAW_GATEWAY_BY_DEFAULT=on\ngarbled line\n"));
+        assert!(!on(""));
+        assert!(!on(&"#".repeat(5000)));
     }
 
     /// #8105 (Twelve's P1 on #8223): the panes are read only while
