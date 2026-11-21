@@ -7471,6 +7471,10 @@ fn conversation_with_gate_inner(
     // an ordinary start, the lamp silent, may begin at it. Off unless set;
     // only with first words kept.
     detector.keep_soft_starts(first_words && crate::activity::soft_start());
+    // A line that ends leaves its trailing quiet as the next line's
+    // pre-roll (`LAMP_END_KEEPS_REACH_BACK=on`, #7095): a request said
+    // straight after a bare "Hey Lamp," keeps its first word. Off unless set.
+    detector.keep_end_leads(crate::activity::end_keeps_reach_back());
     let hold = match (duplex, first_words) {
         (true, true) => Hold::DUPLEX.keeping_first_words(),
         (true, false) => Hold::DUPLEX,

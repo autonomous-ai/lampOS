@@ -110,6 +110,31 @@ pub fn soft_start() -> bool {
 /// it, so a reach along them stopped short (the first builder's A/B, 25 Oct).
 pub const SOFT_START_LEAD_BLOCKS: usize = 30;
 
+/// Where the coordinator reads whether a line that ends leaves its trailing
+/// quiet as the next line's pre-roll (`on`; off unless set, #7095): at most
+/// [`END_LEAD_BLOCKS`] of it, never a block from its last speech back, so a
+/// line that starts right after an End reaches back as any other start does,
+/// bounded as any other is.
+///
+/// Why: while a line is in hand its blocks go to it, not to the pre-roll,
+/// and a start drains the pre-roll, so a line started just after an End
+/// began no earlier than that End. When "Hey Lamp," ends as a line of its
+/// own (the name's first sign came too late for the call's wait), a request
+/// said straight after it lost its first word: on lamp-52e6 on 14 November
+/// "Hey Lamp, play me something to relax." was heard as "Hey, Lamp. Me
+/// something to relax.", and the next line was measured beginning 20 ms
+/// before its verb, where a word needs about 100 ms ([`SOFT_START_ENVIRONMENT`]).
+pub const END_LEAD_ENVIRONMENT: &str = "LAMP_END_KEEPS_REACH_BACK";
+
+/// Whether the voice's environment says `on`.
+pub fn end_keeps_reach_back() -> bool {
+    std::env::var(END_LEAD_ENVIRONMENT).ok().as_deref() == Some("on")
+}
+
+/// The most of an ended line's trailing quiet the next pre-roll keeps: 600
+/// ms, the usual 300 ms and a soft start's 300 ms more.
+pub const END_LEAD_BLOCKS: usize = PRE_ROLL_BLOCKS + SOFT_START_LEAD_BLOCKS;
+
 /// With `linear`, the detector reads the echo canceller's linear output in
 /// place of the processed block (#828): the residual suppressor that follows
 /// the canceller can take a person's "Stop." said over the lamp's own voice
@@ -262,6 +287,12 @@ pub struct TurnDetector {
     began_ordinarily: bool,
     /// Whether the next block pushed is heard with the lamp silent.
     next_lamp_silent: bool,
+    /// `LAMP_END_KEEPS_REACH_BACK=on` (#7095): the line in hand's quiet
+    /// blocks since its last speech, at most [`END_LEAD_BLOCKS`], each with
+    /// its own score and whether it was heard with the lamp silent; at its
+    /// End they become the next pre-roll. Empty otherwise.
+    end_lead: bool,
+    trailing: VecDeque<(ObservedAudio, Option<f32>, bool)>,
     start_count: u16,
     silence_count: u16,
     end_silence_blocks: u16,
@@ -319,6 +350,8 @@ impl Default for TurnDetector {
             soft_start: false,
             began_ordinarily: true,
             next_lamp_silent: false,
+            end_lead: false,
+            trailing: VecDeque::new(),
             start_count: 0,
             silence_count: 0,
             end_silence_blocks: END_SILENCE_BLOCKS,
@@ -407,6 +440,14 @@ impl TurnDetector {
     /// [`SOFT_START_LEAD_BLOCKS`] more ([`SOFT_START_ENVIRONMENT`]).
     pub fn keep_soft_starts(&mut self, on: bool) {
         self.soft_start = on;
+    }
+
+    /// `LAMP_END_KEEPS_REACH_BACK=on` (#7095): a line's trailing quiet, at
+    /// most [`END_LEAD_BLOCKS`] and none of its speech, is the next
+    /// pre-roll when it ends ([`END_LEAD_ENVIRONMENT`]).
+    pub fn keep_end_leads(&mut self, on: bool) {
+        self.end_lead = on;
+        self.trailing.clear();
     }
 
     /// Whether the last utterance started was an ordinary start: neither a
@@ -617,6 +658,19 @@ impl TurnDetector {
             if speech {
                 self.speech_blocks = self.speech_blocks.saturating_add(1);
             }
+            // The quiet since the line's last speech, kept for the next
+            // pre-roll (`LAMP_END_KEEPS_REACH_BACK=on`): the line keeps the
+            // block as before, and a speech block lets go of what was kept.
+            if self.end_lead {
+                if speech {
+                    self.trailing.clear();
+                } else {
+                    if self.trailing.len() == END_LEAD_BLOCKS {
+                        self.trailing.pop_front();
+                    }
+                    self.trailing.push_back((frame.clone(), own, lamp_silent));
+                }
+            }
             let mut decision = match self.confirmation.as_mut().filter(|_| !self.abandoned) {
                 Some(confirmation) => confirmation.observe(&frame.samples, speech),
                 None => (self.silence_count >= self.end_silence_blocks)
@@ -648,6 +702,7 @@ impl TurnDetector {
             // longer (`LAMP_SECOND_UNFINISHED_WAIT`).
             decision = self.hold_unfinished(decision, speech, quiet_before);
             if let Some(decision) = decision {
+                self.carry_end_lead();
                 self.active = false;
                 self.waiting = false;
                 self.unfinished = None;
@@ -703,6 +758,38 @@ impl TurnDetector {
             return Activity::Start(self.prefix.drain(..).collect());
         }
         Activity::Quiet
+    }
+
+    /// As the line in hand ends: its trailing quiet becomes the pre-roll
+    /// (`LAMP_END_KEEPS_REACH_BACK=on`), its last blocks if more than the
+    /// pre-roll keeps, with their scores and lamp-silent marks as a block
+    /// pushed between lines has them. Not for a line a hand Stop abandoned:
+    /// what came before the Stop never starts a new request.
+    fn carry_end_lead(&mut self) {
+        let trailing = std::mem::take(&mut self.trailing);
+        if self.abandoned || trailing.is_empty() {
+            return;
+        }
+        let kept = if self.first_words {
+            REACH_BACK_BLOCKS
+        } else {
+            PRE_ROLL_BLOCKS
+        };
+        let skip = trailing.len().saturating_sub(kept);
+        for (frame, own, silent) in trailing.into_iter().skip(skip) {
+            if self.prefix.len() == kept {
+                self.prefix.pop_front();
+                self.scores.pop_front();
+                self.lamp_silent.pop_front();
+            }
+            self.prefix.push_back(frame);
+            if self.first_words {
+                self.scores.push_back(own);
+                if self.soft_start {
+                    self.lamp_silent.push_back(silent);
+                }
+            }
+        }
     }
 
     fn validate(&mut self, frame: &ObservedAudio, probability: f32) -> Result<(), &'static str> {
@@ -832,6 +919,7 @@ impl TurnDetector {
         self.prefix.clear();
         self.scores.clear();
         self.lamp_silent.clear();
+        self.trailing.clear();
         self.start_count = 0;
         self.silence_count = 0;
         self.active_blocks = 0;
@@ -847,6 +935,7 @@ impl TurnDetector {
         self.prefix.clear();
         self.scores.clear();
         self.lamp_silent.clear();
+        self.trailing.clear();
         self.start_count = 0;
         self.silence_count = 0;
         self.active_blocks = 0;
