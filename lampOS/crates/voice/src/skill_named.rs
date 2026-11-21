@@ -398,6 +398,19 @@ pub fn own_words_of(ask: &str) -> usize {
     own_words(&lower_words(ask)).len()
 }
 
+/// How many words `heard`'s own ([`own_words`]) and `name`'s differ by,
+/// either way: 0 when they are the same words. For the journal alone.
+pub fn words_off(heard: &str, name: &str) -> usize {
+    let heard = lower_words(heard);
+    let heard = own_words(&heard);
+    let name = lower_words(name);
+    heard
+        .iter()
+        .filter(|word| !name.iter().any(|n| n == *word))
+        .count()
+        + name.iter().filter(|n| !heard.contains(&n.as_str())).count()
+}
+
 /// Whether two ask phrases are matched as the same ([`loose_ask`]): "Take
 /// a photo" and "take a photo".
 pub fn same_ask(one: &str, other: &str) -> bool {
@@ -905,6 +918,17 @@ impl Heard {
             .collect();
         let made: Vec<&str> = made.iter().map(String::as_str).collect();
         names_made(lamp_said, &made)
+    }
+
+    /// Whether the made skill `made` (its name, no [`MADE`]) is among the
+    /// made skills [`Self::heard`] reads (the tools file's `made_asks`),
+    /// for the made-skill miss line's count (`second_provider`, #8022):
+    /// listed is read, a one-word name too. Not [`Self::names_made`], which
+    /// counts only a name that alone would run it: on lamp-52e6 at 12:11 a
+    /// kept "applefile" read as 0, as if never loaded.
+    pub fn reads_made(&self, made: &str) -> bool {
+        crate::made_skill::asks_on()
+            && crate::tools::made_skill_asks(&self.settings).contains_key(made)
     }
 
     /// What the functions are read from: each skills folder's tools file
@@ -1610,6 +1634,37 @@ mod tests {
             "{}",
             shared_note(&three.1)
         );
+        crate::made_skill::set_asks_here(None);
+        std::fs::remove_dir_all(dir).ok();
+    }
+
+    /// #8022's kit-8043 ROW (lamp-52e6, 20 Nov 12:11): a skill made by
+    /// voice was kept, lamp-skills loaded it and the key terms took it 2 s
+    /// later, and its trigger 32 s on journaled "0 of them among the made
+    /// skills the heard words are read for". Its name was one word,
+    /// "applefile", as speech to text wrote the make. Its `made_asks`
+    /// written, the very next line is matched against it, and it counts as
+    /// read, whatever its name's length.
+    #[test]
+    fn a_skill_kept_is_read_on_the_next_line_and_counted_read() {
+        let dir = skills_folder("kept-made", on_a_lamp());
+        let kept = Heard::new(crate::tools::Settings {
+            skills: Some(dir.clone()),
+            use_skill: true,
+            ..Default::default()
+        });
+        crate::made_skill::set_asks_here(Some(true));
+        assert_eq!(kept.heard("apple file"), None);
+        assert!(!kept.reads_made("applefile"));
+        let mut tools = on_a_lamp();
+        tools[crate::tools::MADE_ASKS] = json!({ "applefile": ["apple file"] });
+        std::fs::write(dir.join(crate::tools::CATALOG_FILE), tools.to_string()).unwrap();
+        let run = (
+            crate::made_skill::MAKE.to_owned(),
+            json!({ crate::made_run::RUN: "applefile" }),
+        );
+        assert_eq!(kept.heard("apple file"), Some(run));
+        assert!(kept.reads_made("applefile"), "kept, so read");
         crate::made_skill::set_asks_here(None);
         std::fs::remove_dir_all(dir).ok();
     }

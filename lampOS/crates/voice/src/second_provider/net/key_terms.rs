@@ -27,10 +27,19 @@ pub const MOST: usize = 49;
 /// A term is at most this many characters: setup's own limit for a name
 /// (`person::MOST_CHARS`).
 pub const MOST_CHARS: usize = 64;
+/// At most this many of the made skills' names ([`made`]), after
+/// every other term.
+pub const MOST_MADE: usize = 16;
 /// How often the names are read again.
 pub const READ_EVERY: Duration = Duration::from_secs(60);
+/// How often the made skills' names are read again: a skill is
+/// often called the moment it is made (lamp-52e6, 20 Nov: its trigger's
+/// stream opened 44 s after lamp-skills loaded it), and the tools file is
+/// small, on tmpfs.
+pub const MADE_READ_EVERY: Duration = Duration::from_secs(2);
 
 static NAMES: OnceLock<Mutex<Vec<String>>> = OnceLock::new();
+static MADE: OnceLock<Mutex<Vec<String>>> = OnceLock::new();
 
 /// The names the lamp knows, as last read; none until
 /// [`start_from_environment`] has read them, or without the switch. Never
@@ -46,13 +55,16 @@ pub fn known() -> Vec<String> {
 /// (`fixed`), then the words of a skill's make with [`SKILL_ENVIRONMENT`]
 /// on ([`SKILL_TERMS`]), then the owner's place's names from the app, with
 /// `LAMP_OWNER_PLACE=on` (`crate::owner_place::terms`, #4333), then the
-/// names the lamp knows ([`known`]), each once.
+/// names the lamp knows ([`known`]), then, with [`SKILL_ENVIRONMENT`] on,
+/// at most [`MOST_MADE`] of the made skills' names ([`made`]),
+/// each once.
 pub fn listening(fixed: &[String]) -> Vec<String> {
-    listening_with(fixed, skill_terms_on())
+    listening_with(fixed, skill_terms_on(), &made())
 }
 
-/// [`listening`], with the words of a skill's make (`skill`) or without.
-fn listening_with(fixed: &[String], skill: bool) -> Vec<String> {
+/// [`listening`], with the words of a skill's make and the made skills'
+/// (`made`) with `skill`, or without.
+fn listening_with(fixed: &[String], skill: bool, made: &[String]) -> Vec<String> {
     gather(
         fixed
             .iter()
@@ -64,7 +76,10 @@ fn listening_with(fixed: &[String], skill: bool) -> Vec<String> {
                     .map(|term| (*term).to_owned()),
             )
             .chain(crate::owner_place::terms())
-            .chain(known()),
+            .chain(known())
+            // Last, and at most MOST_MADE, so made skills never push the
+            // owner's place or the names the lamp knows out of MOST.
+            .chain(made.iter().filter(|_| skill).take(MOST_MADE).cloned()),
     )
 }
 
@@ -74,7 +89,8 @@ fn listening_with(fixed: &[String], skill: bool) -> Vec<String> {
 /// nine, read me my new emails" was written four times without the word,
 /// "Make me a skew every real morning" and "Plan. Acne rescue s 9AM" among
 /// them, and the model then read the mail now and set a daily reminder of
-/// the words; typed in the app, the same ask made the skill.
+/// the words; typed in the app, the same ask made the skill. The made
+/// skills' names follow ([`made`], #8022).
 pub const SKILL_ENVIRONMENT: &str = "LAMP_SKILL_KEYTERM";
 
 /// The words listened for with [`SKILL_ENVIRONMENT`]: few, as Deepgram
@@ -89,6 +105,64 @@ pub fn skill_terms_on() -> bool {
 /// Whether the switch is on: `on`, and nothing else.
 pub fn on(value: Option<&str>) -> bool {
     value == Some("on")
+}
+
+/// The made skills' names, as last read; none until
+/// [`start_made_terms`] has read them, or without [`SKILL_ENVIRONMENT`].
+/// Never waits.
+pub fn made() -> Vec<String> {
+    MADE.get()
+        .and_then(|made| made.try_lock().ok().map(|made| made.clone()))
+        .unwrap_or_default()
+}
+
+/// Each made skill's name as said ("apple-file" as "apple file",
+/// `crate::skill_named::spoken`), from the tools files' `made_asks` the
+/// made-skill matcher reads (`crate::tools::made_skill_asks`); never its
+/// asks, which may hold most of a make's own words and pull a long make
+/// line apart (#8022, kit-8043 on lamp-52e6, 20 Nov 10:49). Only what is
+/// heard changes: the match stays exact. On lamp-52e6 on 20 Nov "Hey Lamp,
+/// apple file." on a clean clip was written as two other words.
+pub fn made_terms(settings: &crate::tools::Settings) -> Vec<String> {
+    gather(
+        crate::tools::made_skill_asks(settings)
+            .into_keys()
+            .map(|name| crate::skill_named::spoken(&name)),
+    )
+}
+
+/// With [`SKILL_ENVIRONMENT`] on, the made skills' names
+/// ([`made_terms`]) are read now and every [`MADE_READ_EVERY`] after, on a
+/// thread of their own, so no stream waits on a file. Once a process; a
+/// second call changes nothing.
+pub fn start_made_terms(settings: crate::tools::Settings) {
+    if !skill_terms_on() || MADE.get().is_some() {
+        return;
+    }
+    let made = MADE.get_or_init(|| Mutex::new(Vec::new()));
+    let started = std::thread::Builder::new()
+        .name("lamp-voice-made-terms".into())
+        .spawn(move || {
+            let mut said = None;
+            loop {
+                let read = made_terms(&settings);
+                // Said when the count changes: never the words.
+                if said != Some(read.len()) {
+                    eprintln!(
+                        "lamp-voice second: speech to text listens for {} made skills' names",
+                        read.len()
+                    );
+                    said = Some(read.len());
+                }
+                if let Ok(mut held) = made.lock() {
+                    *held = read;
+                }
+                std::thread::sleep(MADE_READ_EVERY);
+            }
+        });
+    if let Err(error) = started {
+        eprintln!("lamp-voice second: the made skills' words are not listened for: {error}");
+    }
 }
 
 /// With the switch on, the names are read now and every [`READ_EVERY`]
@@ -216,9 +290,9 @@ mod tests {
     fn the_words_of_a_skills_make_follow_the_units_own_with_the_switch() {
         let fixed = ["Hanoi", "Skill"].map(String::from);
         if NAMES.get().is_none() {
-            assert_eq!(listening_with(&fixed, false), fixed);
+            assert_eq!(listening_with(&fixed, false, &[]), fixed);
             assert_eq!(
-                listening_with(&fixed, true),
+                listening_with(&fixed, true, &[]),
                 ["Hanoi", "Skill", "make a skill", "new skill"]
             );
         }
@@ -228,13 +302,87 @@ mod tests {
         let full: Vec<String> = (0..crate::second_config::MOST_KEY_TERMS)
             .map(|n| format!("Place {}", char::from(b'a' + n as u8)))
             .collect();
-        let heard = listening_with(&full, true);
+        let heard = listening_with(&full, true, &[]);
         assert!(heard.len() <= MOST, "{}", heard.len());
         assert!(
             SKILL_TERMS
                 .iter()
                 .all(|term| heard.iter().any(|said| said == term))
         );
+    }
+
+    /// With the skill switch, the made skills' names as said, read from the
+    /// tools file the matcher reads (`made_asks`), never their asks, come
+    /// after every other term: lamp-52e6, 20 Nov, "Hey Lamp, apple file."
+    /// came back as two other words. Each once, within the bound; off,
+    /// none.
+    #[test]
+    fn the_made_skills_names_follow_every_other_term_with_the_switch() {
+        let dir = std::env::temp_dir().join(format!("lvs-key-terms-made-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        std::fs::write(
+            dir.join(crate::tools::CATALOG_FILE),
+            serde_json::json!({
+                "tools": [],
+                "made_asks": {
+                    "apple-file": ["open my apple file", "Skill"],
+                    "tech_news": [],
+                },
+            })
+            .to_string(),
+        )
+        .unwrap();
+        let settings = crate::tools::Settings {
+            skills: Some(dir.clone()),
+            ..Default::default()
+        };
+        let made = made_terms(&settings);
+        assert_eq!(made, ["apple file", "tech news"]);
+        let fixed = ["Hanoi"].map(String::from);
+        if NAMES.get().is_none() {
+            assert_eq!(listening_with(&fixed, false, &made), fixed);
+            assert_eq!(
+                listening_with(&fixed, true, &made),
+                [
+                    "Hanoi",
+                    "skill",
+                    "make a skill",
+                    "new skill",
+                    "apple file",
+                    "tech news",
+                ]
+            );
+        }
+        let full: Vec<String> = (0..crate::second_config::MOST_KEY_TERMS)
+            .map(|n| format!("Place {}", char::from(b'a' + n as u8)))
+            .collect();
+        let heard = listening_with(&full, true, &made);
+        assert!(heard.len() <= MOST, "{}", heard.len());
+        for term in ["apple file", "tech news"] {
+            assert_eq!(
+                heard.iter().filter(|said| *said == term).count(),
+                1,
+                "{term}"
+            );
+        }
+        // Many made skills: at most MOST_MADE of their words, all after
+        // every other term.
+        // Letters only, as every term is (`plain`): a digit drops it.
+        let many: Vec<String> = (0..30u8)
+            .map(|n| {
+                let (first, second) = (b'a' + n / 26, b'a' + n % 26);
+                format!("made skill {}{}", char::from(first), char::from(second))
+            })
+            .collect();
+        let heard = listening_with(&fixed, true, &many);
+        let first = heard.iter().position(|term| term.starts_with("made skill"));
+        assert_eq!(heard.len() - first.unwrap(), MOST_MADE);
+        assert!(
+            heard[first.unwrap()..]
+                .iter()
+                .all(|term| term.starts_with("made skill"))
+        );
+        std::fs::remove_dir_all(dir).ok();
     }
 
     #[test]

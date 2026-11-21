@@ -493,6 +493,30 @@ pub fn note_here(
     Some(note)
 }
 
+/// The skills made in the owner's conversation, the line's memory scope
+/// `lease`, within [`KEPT_FOR`] of `now` and still kept, as [`note_here`]
+/// reads them, by name: one turned off or on since is not. None with the
+/// switch off or for anyone else's line. A line that names one by its own
+/// words is the person's trigger for it, run in code past the lamp's
+/// question (`second_provider`'s `lamp_awaits_answer_for`, #8022).
+pub fn made_here(lease: Option<&crate::memory_scope::ScopeLease>, now: Instant) -> Vec<String> {
+    if !made_skill::off_said_on() {
+        return Vec::new();
+    }
+    let Some(person) = crate::services::owner_of(lease) else {
+        return Vec::new();
+    };
+    let mut events = with(|kept| kept.of(&person, now));
+    if let Some(directory) = made_directory() {
+        events = still_kept(events, &directory);
+    }
+    newest(&events)
+        .into_iter()
+        .filter(|event| event.done == Done::Made)
+        .map(|event| event.name.clone())
+        .collect()
+}
+
 /// The owner's "forget everything about me", marked by the second route's
 /// guard: what the lamp made and turned with them goes too, as their voice
 /// print does. Another person's forget, an unmarked one, or one whose

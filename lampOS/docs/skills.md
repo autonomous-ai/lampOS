@@ -8464,7 +8464,34 @@ grants, its code, or the lamp's own steps (the light, the head, a say).
    other question the made skill still starts in code ("What sort of
    name do you like?"; the lead's live test, 19 Nov 09:06: four "daily
    brief" lines after the lamp's "Want me to ...?" were each left to the
-   model, which called nothing). A run that speaks
+   model, which called nothing). A skill made in this conversation
+   (`just_made::made_here`: the owner's, within its 10 minutes, still
+   kept, not turned since) starts in code past any question, its make's
+   say-back or the lamp's answer to a first try naming it included: its
+   words are the person's trigger for it (the first builder's ruling on
+   #8022, 20 Nov 07:29; lamp-52e6, 14951, 07:25: "Hey Lamp, apple file."
+   right after the make and again 58 s later got `calls=none`). A held
+   yes, or a remove or turn the lamp's last turn ran, still waits. The
+   journal says which: "the lamp's last words asked something, but it is
+   the skill made in this conversation: called in code", or "not called
+   in code: made in this conversation, but the lamp's last turn removed or
+   turned a made skill"; and a line naming no skill while one was made in
+   this conversation says how many of those the made skills the heard
+   words are read for hold (the tools file's `made_asks`, as the matcher
+   reads it on the line, a one-word name too: on lamp-52e6 at 12:11 on
+   20 Nov a kept "applefile" was counted 0, its name being one word, not
+   for being read late) ("the heard words named no skill; 1 made in
+   this conversation, 0 of them among the made skills the heard words are
+   read for; 2 word(s) of its own, nearest: name, 1 word(s) off"), with
+   no word of the line and no skill's name; the words read are those past
+   the lamp's name, as the matcher reads them. With
+   `LAMP_SKILL_KEYTERM=on`, speech to text also listens for each made
+   skill's name as said, never its asks, which may hold most of a long
+   make's own words (`key_terms::made_terms`, the same `made_asks`, read
+   every 2 s, at most 16, after every other term), so the words come back
+   as said; the
+   match stays exact (#8022: on lamp-52e6 a clean "Hey Lamp, apple file."
+   was written as two other words). A run that speaks
    its own words (lamp-skills' `says`, `made_run::speaks_itself`) ends the
    turn there, with no round 2 and no line of the lamp's own, so the
    skill's say, at priority 8, is the first thing heard, about a second
