@@ -3703,13 +3703,16 @@ khởi động đều được cho `HERMES_NONINTERACTIVE=1`: nếu không, lầ
 của Hermes hỏi câu telemetry lần đầu, mà trong pane không ai trả lời được, nên
 phiên được giữ cứ ở `starting`, `show` báo trạng thái không rõ, `ensure` không
 nêu `engineSession` và mọi `harness reply` đều là `ENGINE_NOT_READY`
-(lamp-c0a4, #8151). Dòng này nằm trong `harness-hold.env` mỗi khi lamp-tasks
+(lamp-c0a4, #8151). Mỗi wrapper Hermes của đèn tự đặt biến này, ngay trước lệnh
+exec của Hermes, ở mọi thư mục: Harness khởi động một engine với môi trường theo
+danh sách riêng của nó, nên các bản dưới đây tới được Harness và daemon của nó
+nhưng không bao giờ tới Hermes (lamp-c0a4, 21/11: daemon có biến này, Hermes của
+phiên được giữ thì không, và đứng ở câu hỏi telemetry). Dòng này cũng nằm trong `harness-hold.env` mỗi khi lamp-tasks
 ghi file, giữ hay đã gỡ (file đã gỡ không có dòng giữ; daemon nạp nó bằng
 dotenv, không đè giá trị đã có), trong môi trường của mọi lệnh Harness
 (`hold::with_data_dir`), và trong các dòng của launcher (`export
 HERMES_NONINTERACTIVE=1` ngay trước `export ADAPTER_DATA_DIR=…`, lamp-tasks và
-`lamp-update harness-install` ghi như nhau). Các wrapper Hermes của đèn giữ
-nguyên môi trường được cho, nên biến này tới được Hermes.
+`lamp-update harness-install` ghi như nhau).
 
 ## Cài đặt của OpenClaw trên đèn (#6226)
 

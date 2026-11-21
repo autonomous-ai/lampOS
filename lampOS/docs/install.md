@@ -2040,9 +2040,11 @@ As root, on a lamp with the base image (`crates/update/src/install.rs`):
      `on_session_start` and `pre_llm_call` hooks
      (openharness `engines/hermes/contract.ts`), and
      `HERMES_NONINTERACTIVE` does not skip that question.
-     `HERMES_NONINTERACTIVE=1` (#7781), which lamp-tasks gives every
-     Harness command and Harness's env file, passes through every wrapper
-     and namespace unchanged. With the switch off, the
+     Every form of the wrapper (with the switch off or on, and the one
+     run path's) sets `HERMES_NONINTERACTIVE=1` itself before its exec
+     (#7781, #8151): Harness starts an engine with an environment of its
+     own list, so the copy lamp-tasks puts in Harness's env file and
+     commands never reaches Hermes (lamp-c0a4, 21 Nov). With the switch off, the
      wrapper has no run lines, and its own `unset T HERMES_YOLO_MODE`
      drops the variable for every start. With `LAMP_SKILL_DEFAULT_AGENT=on`
      as well, `/usr/local/bin/hermes` is not this wrapper but the one run

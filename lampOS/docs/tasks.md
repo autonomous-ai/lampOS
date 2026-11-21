@@ -2565,13 +2565,16 @@ starts is given `HERMES_NONINTERACTIVE=1`: Hermes's first start otherwise
 asks its first-run telemetry question, which no one can answer in a pane,
 so the kept session stays `starting`, `show` says state unknown, `ensure`
 names no `engineSession` and every `harness reply` is `ENGINE_NOT_READY`
-(lamp-c0a4, #8151). The line is in `harness-hold.env` whenever lamp-tasks
+(lamp-c0a4, #8151). Each of the lamp's Hermes wrappers sets it itself, just
+before Hermes's exec, in every folder: Harness starts an engine with an
+environment of its own list, so the copies below reach Harness and its
+daemon but never Hermes (lamp-c0a4, 21 Nov: the daemon had the variable, the
+kept Hermes did not, and sat at the telemetry question). The line is also in `harness-hold.env` whenever lamp-tasks
 writes it, held or lifted (the lifted file without the hold's line; the
 daemon loads it with dotenv, never over a value it has), in every Harness
 command's environment (`hold::with_data_dir`), and in the launcher's lines
 (`export HERMES_NONINTERACTIVE=1` just before `export ADAPTER_DATA_DIR=…`,
-written alike by lamp-tasks and `lamp-update harness-install`). The lamp's
-Hermes wrappers keep the environment they are given, so it reaches Hermes.
+written alike by lamp-tasks and `lamp-update harness-install`).
 
 **The pinned launcher (#5493).** The environment above reaches only the
 Harness commands lamp-tasks runs. A `harness logout` run by hand over ssh,
