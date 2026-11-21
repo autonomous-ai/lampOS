@@ -1313,6 +1313,33 @@ pub const NOT_READY_SAID: [&str; 2] = ["openclaw_gateway_not_ready", "harness_no
 /// [`lamp_voice::skill_words::NOT_READY_WITHIN_MS`] after the lamp started
 /// (`since_boot_ms`): its Gateway or Harness is broken, not starting, and
 /// the run's failure is told as before (El's P2 on #7351).
+/// What the person who just asked for a run by voice hears, once, when its
+/// agent's start-up wait passes about 5 s (#7354, the first builder's
+/// words): never the agent's name, and nothing says ready.
+pub const GETTING_READY_LINE: &str = "One moment, I'm getting ready.";
+
+/// The hand-over `line` asking lamp-tasks for its getting-ready notice
+/// (`tell_getting_ready`, #7354): only for a run the person just asked for
+/// by voice (`asked_by_voice`); otherwise, or for a line that isn't a JSON
+/// object, `line` as it is.
+pub fn asking_getting_ready(line: &str, asked_by_voice: bool) -> String {
+    match serde_json::from_str::<serde_json::Value>(line) {
+        Ok(serde_json::Value::Object(mut fields)) if asked_by_voice => {
+            fields.insert("tell_getting_ready".into(), serde_json::Value::Bool(true));
+            serde_json::Value::Object(fields).to_string()
+        }
+        _ => line.to_owned(),
+    }
+}
+
+/// Whether one line from lamp-tasks is its getting-ready notice
+/// (`{"event":"getting_ready"}`), not the run's answer.
+pub fn is_getting_ready(line: &str) -> bool {
+    serde_json::from_str::<serde_json::Value>(line.trim()).is_ok_and(|said| {
+        said.get("event").and_then(serde_json::Value::as_str) == Some("getting_ready")
+    })
+}
+
 pub fn not_ready_line(
     answer: &str,
     asked_by_voice: bool,
@@ -1330,6 +1357,26 @@ pub fn not_ready_line(
 
 #[cfg(test)]
 mod tests {
+    /// #7354: only a run asked by voice asks lamp-tasks for the
+    /// getting-ready notice, its line otherwise kept; only the notice's own
+    /// line is taken for it, never an answer.
+    #[test]
+    fn only_a_run_asked_by_voice_asks_to_be_told_getting_ready() {
+        let line = json!({"op": "skill_task", "skill": "melon"}).to_string();
+        let asked: serde_json::Value =
+            serde_json::from_str(&asking_getting_ready(&line, true)).unwrap();
+        assert_eq!(asked["tell_getting_ready"], true);
+        assert_eq!(asked["skill"], "melon");
+        assert_eq!(asking_getting_ready(&line, false), line);
+        assert_eq!(asking_getting_ready("not json", true), "not json");
+        assert!(is_getting_ready("{\"event\":\"getting_ready\"}\n"));
+        assert!(!is_getting_ready(
+            "{\"ok\":true,\"answer\":\"getting_ready\"}"
+        ));
+        assert!(!is_getting_ready("{\"ok\":false,\"error\":\"not_ready\"}"));
+        assert!(!GETTING_READY_LINE.to_lowercase().contains("openclaw"));
+    }
+
     use super::*;
     use serde_json::json;
 
