@@ -612,6 +612,36 @@ Two of the voice's start-up failures, found on lamp-52e6 and lamp-4ace on
   order, from another boot or stamped after now still ends it, as does a
   stale renewal with nothing fresh behind it; the 250 ms lease still ends it
   when the coordinator stops renewing.
+- **A worker's full control socket on an authority renewal (#8204).** On
+  lamp-06c1 (stock 15322, a frozen lamp-memory) a one-face forget's two
+  listings waited up to 1.5 s each (`tools::ASK_DEADLINE`) on the second
+  worker's only runtime thread, so its control loop read nothing. The
+  coordinator's 20 ms renewals filled its socket, the send returned
+  `WouldBlock`, and on the second route alone (a mandatory worker) the voice
+  exited 1 and came back muted by the restart guard. Now both halves hold.
+  The coordinator takes a `WouldBlock` on a worker's authority send as a
+  renewal skipped (`send_authority`, `RenewalStall`): never an error, with one
+  journal line when the run begins (`the second worker's control socket is
+  full: its authority renewal is skipped, sent again on the next tick`) and
+  one when a renewal is taken again (`… takes its authority again: N
+  renewals skipped over M ms`), counts only. The next tick sends a whole new
+  snapshot. A skip never lengthens what a worker may do: its last authority
+  lapses at its own 250 ms lease (`MAX_AUTHORITY_LEASE_US`), and a refused
+  send takes no sequence number, so the next arrives in order. A closed
+  socket or a peer gone still ends the voice as before. And the forget's
+  lookup (`remember::one_face_forget_target`) runs on `spawn_blocking`, so
+  the control loop keeps reading while it waits; the turn waits for it, so
+  the forget's answer goes out in its place. The skips are bounded
+  (`RENEWAL_SKIPS_MOST_US`, 3 s, the first builder's ruling on #8210): past
+  #8204's 2 s and the known real stalls, so a worker deadlocked with its
+  process alive still ends the voice as before (`… stayed full: N renewals
+  skipped over M ms, past 3000 ms: it ends the voice`), and the voice
+  restarts. On the worker's side, a stall of 2 s behind a full socket finds
+  every queued snapshot lapsed; its heartbeat (`STALLED_CONTROL_US`, 1.5 s)
+  is now judged from the newest snapshot read, stale or not, since reading
+  one proves the coordinator there. A lapsed snapshot still grants nothing:
+  the route holds closed on the authority it had (`LAMP_PRIVACY_RIDES_STALL`)
+  until the next fresh renewal, and the conversation goes on.
 - **The first direct capture-ready message while the speaker starts.** On
   build 6963 after setup, lamp-dbda reported `ref.c.speaker` sequence 1
   after 0, aged 143402 us against 100000 us, then restarted muted (#3530).

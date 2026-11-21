@@ -1,14 +1,14 @@
 use super::*;
 
-struct Peers {
-    speaker: WorkerChannels,
-    capture: WorkerChannels,
-    provider: WorkerChannels,
-    privacy: WorkerChannels,
-    ring: WorkerChannels,
+pub(super) struct Peers {
+    pub(super) speaker: WorkerChannels,
+    pub(super) capture: WorkerChannels,
+    pub(super) provider: WorkerChannels,
+    pub(super) privacy: WorkerChannels,
+    pub(super) ring: WorkerChannels,
 }
 
-fn fixture(directory: &SessionDirectory) -> (Rig, Peers) {
+pub(super) fn fixture(directory: &SessionDirectory) -> (Rig, Peers) {
     fixture_with_command(directory, "exec sleep 60")
 }
 

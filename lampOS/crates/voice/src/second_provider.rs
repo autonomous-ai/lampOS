@@ -17057,7 +17057,12 @@ fn told_on_forget(
 /// is refused as before, for any other call or line: a bare forget, two
 /// faces in view (the line is then nobody's by one face), a line held by a
 /// gap, or no one kept thing named ([`crate::remember::one_face_forget_target`]).
-fn ask_once_forget(
+/// The kept thing is looked up off the runtime's thread (#8204): its two
+/// listings wait up to `tools::ASK_DEADLINE` each on lamp-memory, and on
+/// that thread the worker's control loop read nothing meanwhile, so the
+/// coordinator's renewals filled its socket and the voice ended. The turn
+/// still waits for it, so the forget's answer goes out in its place.
+async fn ask_once_forget(
     shared: &Shared,
     request: u64,
     heard: bool,
@@ -17082,19 +17087,28 @@ fn ask_once_forget(
     if lease.kept_by_one_face().as_deref() != Some(asker.1.as_str()) {
         return None;
     }
-    let target = match &shared.forget_target {
-        Some(target) => target(call, said, &asker.1, lease),
-        None => crate::remember::one_face_forget_target(
-            &lamp_gemini::ToolCall {
-                id: call.id.clone(),
-                name: call.name.clone(),
-                args: call.args.clone(),
-            },
-            said,
-            &asker.1,
-            lease,
-        ),
+    let looking = {
+        let (target, call, said) = (shared.forget_target.clone(), call.clone(), said.to_owned());
+        let (person, lease) = (asker.1.clone(), lease.clone());
+        tokio::task::spawn_blocking(move || match target {
+            Some(target) => target(&call, &said, &person, &lease),
+            None => crate::remember::one_face_forget_target(
+                &lamp_gemini::ToolCall {
+                    id: call.id,
+                    name: call.name,
+                    args: call.args,
+                },
+                &said,
+                &person,
+                &lease,
+            ),
+        })
     };
+    let target = looking
+        .await
+        .unwrap_or(Err(crate::remember::ForgetNotAsked::ListingFailed(
+            "its lookup ended",
+        )));
     let (id, subject) = match target {
         Ok(target) => target,
         Err(why) => {
@@ -21805,6 +21819,7 @@ async fn answer(
                 // lamp-c0a4).
                 if let Some(told) =
                     ask_once_forget(shared, request, heard, &heard_words, call, scope.as_ref())
+                        .await
                 {
                     messages.push(Message::tool(call.id.clone(), told.to_string()));
                     continue;
