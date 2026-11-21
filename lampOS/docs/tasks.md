@@ -2996,7 +2996,9 @@ settings wait for its gateway to check them; tried again in N s"; nothing
 is written before the gateway checks it. A check ended by a signal before
 OpenClaw gave a verdict ("status killed": on lamp-52e6, lamp-tasks and the
 gateway restarted together and the check raced the gateway's own start,
-#7268's FINDING) is tried again over the same waits, each one journal line
+#7268's FINDING), or one killed past its 60 s bound
+(`lamp_checked_replace::VALIDATE_WITHIN`, "ran past"; #8225,
+`lamp_checked_replace::check_did_not_finish`), is tried again over the same waits, each one journal line
 "OpenClaw's settings were not checked, OpenClaw's check was killed before
 it answered; tried again in N s", no value of the file in it. Past the last wait it is not
 written until lamp-tasks' next start, the journal line saying the last

@@ -1690,6 +1690,11 @@ fn steps(
                 write(records, OpenclawInstall::new("absent", None, now_unix_ms()))
             });
     }
+    // #8225: what the record goes back to when OpenClaw's config check
+    // did not finish, so the next round asks again.
+    let unchecked = record(records)
+        .filter(|said| said.install != "installing")
+        .unwrap_or_else(|| OpenclawInstall::new("absent", None, now_unix_ms()));
     write(
         records,
         OpenclawInstall::new("installing", None, now_unix_ms()),
@@ -1864,8 +1869,16 @@ fn steps(
     {
         return fail("entry", why, say);
     }
-    if let Err(why) = gateway_config(root, run, say) {
-        return fail("config", why, say);
+    // #8225: a check a signal ended, or one past its bound, gave no
+    // verdict: nothing is taken out and the record goes back, so the next
+    // round tries again. Only OpenClaw's own refusal fails the install.
+    match gateway_config(root, run, say) {
+        Err(why) if why.contains(lamp_checked_replace::DID_NOT_FINISH) => {
+            say(&format!("OpenClaw is not installed now: {why}"));
+            return write(records, unchecked);
+        }
+        Err(why) => return fail("config", why, say),
+        Ok(_) => {}
     }
     match run(&in_namespace(&uid, &gid, false, &["--version"])) {
         Ok(said) => say(&format!(
@@ -2282,7 +2295,10 @@ pub fn runs_long_step(argv: &[String]) -> bool {
 /// file beside the config, `lampos`'s, before it is renamed into place
 /// (`lamp_checked_replace`, lamp-tasks' checked replace): refused, the
 /// config stays byte for byte, nothing is left beside it, and the install
-/// fails (`config`) with OpenClaw's words.
+/// fails (`config`) with OpenClaw's words. A check that did not finish (a
+/// signal, its bound: `lamp_checked_replace::check_did_not_finish`,
+/// #8225) is no refusal: the config stays too, and the error says
+/// [`NOT_CHECKED`].
 fn gateway_config(
     root: &Path,
     run: &mut Runner,
@@ -2349,10 +2365,15 @@ fn gateway_config(
         run(&validate_argv(uid, gid, &file, joined))
             .map(drop)
             .map_err(|why| {
-                format!(
-                    "OpenClaw's own config check refused it: {}",
-                    lamp_checked_replace::redact(&why)
-                )
+                let said = lamp_checked_replace::redact(&why);
+                if lamp_checked_replace::check_did_not_finish(&why) {
+                    format!(
+                        "{} ({said}): {NOT_CHECKED}",
+                        lamp_checked_replace::DID_NOT_FINISH
+                    )
+                } else {
+                    format!("OpenClaw's own config check refused it: {said}")
+                }
             })
     };
     lamp_checked_replace::replace_checked(
@@ -2364,6 +2385,10 @@ fn gateway_config(
     .map_err(|error| format!("{CONFIG}: {error}"))?;
     give_to_lampos(run, CONFIG).map(|()| true)
 }
+
+/// What a `gateway` block whose check did not finish says (#8225): on
+/// lamp-52e6 the gateway the check joined restarted under it, "Killed".
+const NOT_CHECKED: &str = "not checked now, kept as it was; the next round tries again";
 
 /// `wanted`'s keys set in `have`, an object's keys within each one, every
 /// other key of `have` kept; whether anything changed.

@@ -863,6 +863,105 @@ fn a_failed_install_takes_the_entry_points_out_and_stops_the_gateway() {
     }
 }
 
+/// #8225 (lamp-52e6, 21 Nov 15:39): the install's `gateway` block check
+/// joined the running gateway, which restarted under it, and the check was
+/// killed ("...: Killed" from `runuser`). A check ended by a signal or past
+/// its bound gave no verdict: the live config stays as it was, nothing is
+/// taken out, the record is not `failed`/`config`, and the line says the
+/// next round tries again. A check that ran and exited non-zero is still a
+/// refusal: `failed`/`config`, the entry points taken out.
+#[test]
+fn an_install_check_killed_or_timed_out_takes_nothing_out_and_a_refusal_still_fails() {
+    let theirs = r#"{"models": {"mode": "merge"}}"#;
+    let set_up = || {
+        let lamp = Lamp::new();
+        fs::write(lamp.unit(), UNIT_TEXT).unwrap();
+        fs::create_dir_all(lamp.at(STATE)).unwrap();
+        fs::write(lamp.at(CONFIG), theirs).unwrap();
+        fs::write(lamp.at(WRAPPER), "old").unwrap();
+        fs::write(lamp.at(NS), "old").unwrap();
+        fs::write(lamp.at(SKILL_START), "old").unwrap();
+        write(&lamp.records(), OpenclawInstall::installed(1));
+        lamp.ask();
+        lamp
+    };
+    let check = "runuser -u lampos -- env OPENCLAW_CONFIG_PATH=/x /usr/local/bin/openclaw config validate --json";
+    for error in [
+        leak(format!("{check}: Killed")),
+        leak(format!("{check}: some output\nTerminated")),
+        leak(format!(
+            "{check}: update query ended with signal: 9 (SIGKILL)"
+        )),
+        leak(format!(
+            "{check}: did not end within 90 s: it ran on, or a child it left held its output"
+        )),
+        "OpenClaw's own config check refused it (status killed): ",
+        "OpenClaw's own config check ran past 60 s",
+    ] {
+        let lamp = set_up();
+        let runs = Runs {
+            fail_on: Some("config validate --json"),
+            error,
+            ..Runs::new(&lamp)
+        };
+        let mut lines = Vec::new();
+        let said = install_with(
+            lamp.root(),
+            &lamp.records(),
+            &mut runs.runner(),
+            &mut || 7,
+            &mut |line: &str| lines.push(line.to_owned()),
+            &kit(),
+        )
+        .unwrap()
+        .unwrap();
+        assert_eq!(said.install, "installed", "{error}: {said:?}");
+        assert_eq!(lamp.said(), Some(said), "{error}");
+        assert_eq!(
+            fs::read_to_string(lamp.at(CONFIG)).unwrap(),
+            theirs,
+            "{error}"
+        );
+        for path in [WRAPPER, NS, SKILL_START] {
+            assert!(lamp.at(path).exists(), "{path} taken out on {error}");
+        }
+        assert!(
+            !runs
+                .lines()
+                .iter()
+                .any(|line| line == &format!("systemctl stop {UNIT}")),
+            "{error}"
+        );
+        assert!(
+            lines.iter().any(
+                |line| line.contains("OpenClaw's config check did not finish (")
+                    && line
+                        .contains("): not checked now, kept as it was; the next round tries again")
+            ),
+            "{error}: {lines:#?}"
+        );
+        assert!(
+            !lines.iter().any(|line| line.contains("refused it:")),
+            "{error}: {lines:#?}"
+        );
+    }
+
+    // OpenClaw's own verdict: a refusal, as before.
+    let lamp = set_up();
+    let runs = Runs {
+        fail_on: Some("config validate --json"),
+        error: "models.mode: Unrecognized key",
+        ..Runs::new(&lamp)
+    };
+    let said = install(&lamp, &runs, 8).unwrap();
+    assert_eq!(
+        (said.install.as_str(), said.error.as_deref()),
+        ("failed", Some("config"))
+    );
+    assert_eq!(fs::read_to_string(lamp.at(CONFIG)).unwrap(), theirs);
+    assert!(!lamp.at(WRAPPER).exists() && !lamp.at(NS).exists());
+}
+
 /// Off: a round asks the one-shot to stop the gateway and take the entry
 /// points out; once they are gone, the round takes the unit out itself.
 #[test]
