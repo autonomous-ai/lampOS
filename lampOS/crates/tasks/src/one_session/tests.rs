@@ -5072,6 +5072,68 @@ fn a_lasting_hold_reads_error_with_its_why_and_opens_no_fresh_session() {
     );
     one.restart_if_due(&fake);
     assert_eq!(fake.count("close-kept"), 1, "{:?}", fake.calls());
+    // The replacement says the same why (`fault_code` of the close's why).
+    assert_eq!(
+        fault_code("Harness's watch says it is held: no Gateway running"),
+        "held_no_gateway"
+    );
+    assert_eq!(
+        one.readiness().state(),
+        (Readiness::Recovering, Some("held_no_gateway"))
+    );
+}
+
+/// #8138 (review P2): a spoken task held under a lasting hold is ended at
+/// once, told, but the pane is kept: no close, no fresh session, the agent
+/// still `error` with its why. A first `idle` from a pane opened after the
+/// hold never clears it; the held pane read idle again does.
+#[test]
+fn a_spoken_task_under_a_lasting_hold_keeps_the_pane_and_the_error() {
+    use crate::harness::Hold;
+    use lamp_msgs::Readiness;
+    let dir = tempfile::tempdir().unwrap();
+    let (one, fake) = kept_on(dir.path());
+    one.open_if_due(&fake, &place());
+    assert!(matches!(
+        spoken_launch(&one, &fake, &spoken("lamp-1")),
+        Some(LaunchOutcome::Joined { .. })
+    ));
+    let ensures = fake.count("ensure");
+    one.watched_event(&agent_of(1), WatchEvent::Held(Hold::Approval));
+    assert_eq!(one.take_turn_broken().as_deref(), Some("lamp-1"));
+    // The store ended it told, then lets the pane go unanswered.
+    one.release_unanswered("lamp-1");
+    one.drop_if_due(&fake);
+    one.restart_if_due(&fake);
+    one.open_if_due(&fake, &place());
+    assert_eq!(
+        (
+            fake.count("close-kept"),
+            fake.count("close"),
+            fake.count("ensure")
+        ),
+        (0, 0, ensures),
+        "{:?}",
+        fake.calls()
+    );
+    assert_eq!(one.agent(), Some(agent_of(1)));
+    assert!(one.free());
+    assert_eq!(
+        one.readiness().state(),
+        (Readiness::Error, Some("held_approval"))
+    );
+    // A pane opened after the hold: its watch's first `idle` is no proof.
+    let born = one.lock().pane.as_ref().unwrap().born;
+    one.lock().pane.as_mut().unwrap().born = Instant::now();
+    one.watched_event_at(&agent_of(1), WatchEvent::Idle, true);
+    assert_eq!(
+        one.readiness().state(),
+        (Readiness::Error, Some("held_approval"))
+    );
+    // The pane that was held, read idle: cleared.
+    one.lock().pane.as_mut().unwrap().born = born;
+    one.watched_event_at(&agent_of(1), WatchEvent::Idle, true);
+    assert_eq!(one.readiness().state(), (Readiness::Ready, None));
 }
 
 /// #8138 review 2 (2): `done` then `stopped` on a spoken turn: its end is

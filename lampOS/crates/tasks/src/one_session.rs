@@ -991,6 +991,11 @@ struct Inner {
     /// [`WATCH_TRIES`] times in a row with no event: not watched again
     /// until another session or a daemon start; `show`'s look meanwhile.
     watch_given_up: Option<String>,
+    /// #8138 (C5, review P2): when the watch last read a lasting hold
+    /// ([`crate::agent::LASTING_HOLDS`]): a watch's first `idle` clears it
+    /// only on a pane opened before it, the one that was held; a pane
+    /// opened since must be seen at work, or idle after its first line.
+    lasting_since: Option<Instant>,
 }
 
 /// [`OneSession::keep_open`]'s own: when it looks at the lamp next, and
@@ -2097,6 +2102,23 @@ impl OneSession {
     /// conversation ([`OneSession::drop_if_due`]); the next look opens
     /// it again.
     pub fn release_unanswered(&self, id: &str) {
+        // #8138 (review P2): a spoken task ended by a lasting hold (the
+        // device waiting for approval, the sign-in refused) lets the pane
+        // go as a turn answered: a fresh session would be held the same,
+        // and its first `idle` read as the hold cleared.
+        if self.agent.facts().session.lasting() {
+            let held = {
+                let inner = self.lock();
+                inner.held_spoken && inner.holder.as_deref() == Some(id)
+            };
+            if held {
+                eprintln!(
+                    "tasks: one session: {id}'s turn ended under a lasting hold; the pane is kept, no fresh session (#8138)"
+                );
+                self.release(id);
+            }
+            return;
+        }
         let mut inner = self.lock();
         if inner.held_spoken && inner.holder.as_deref() == Some(id) && inner.closing_for.is_none() {
             inner.closing_for = Some(id.to_owned());
@@ -2784,11 +2806,23 @@ impl OneSession {
             // leaves `installing` behind.
             self.saw_state(event.name());
         }
-        if !matches!(
-            event,
-            WatchEvent::Started | WatchEvent::Held(_) | WatchEvent::Failed | WatchEvent::Stopped
-        ) {
-            // A lasting hold cleared: the session takes input again (C5).
+        // A lasting hold cleared: the session takes input again (C5). Only
+        // on evidence: at work, or idle past the watch's first line; a
+        // first `idle` only on the pane that was held, never on one opened
+        // since, which may not have met the hold yet (review P2).
+        let evidence = match event {
+            WatchEvent::Working | WatchEvent::Background | WatchEvent::NeedsPerson => true,
+            WatchEvent::Idle | WatchEvent::Done => {
+                let inner = self.lock();
+                !first
+                    || inner.lasting_since.is_some_and(|since| {
+                        inner.pane.as_ref().is_some_and(|pane| pane.born < since)
+                    })
+            }
+            _ => false,
+        };
+        if evidence && self.agent.facts().session.lasting() {
+            self.lock().lasting_since = None;
             self.agent.session_from(
                 &[
                     Session::Failed(crate::agent::LASTING_HOLDS[0]),
@@ -2815,6 +2849,7 @@ impl OneSession {
                 );
                 self.agent.session(Session::Failed(why));
                 let mut inner = self.lock();
+                inner.lasting_since = Some(Instant::now());
                 if spoken && inner.turn_ended != holder {
                     inner.turn_broken = holder;
                 }

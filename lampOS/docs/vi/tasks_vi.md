@@ -3032,9 +3032,12 @@ nay.
   từ chối đăng nhập của nó (`harness::Hold`) là một lần giữ lâu dài, không
   phải lỗi: `error` với `held_approval` hoặc `held_sign_in`, lượt nói vẫn
   được kết thúc ngay, nhưng không mở phiên mới (phiên mới cũng sẽ bị giữ
-  như vậy, và "ready again" sẽ được nói giữa các lần lỗi); một `ensure` sau
-  khi mất watch vẫn để nó `error`, và chỉ một dòng watch đọc nó đang làm
-  việc hoặc rảnh lại mới đọc `ready`. Mọi dòng watch trừ `started` cũng kết
+  như vậy, và "ready again" sẽ được nói giữa các lần lỗi): việc nói bị kết
+  thúc như vậy nhả pane mà vẫn giữ nó, không close (`release_unanswered`).
+  Một `ensure` sau khi mất watch vẫn để nó `error`, và chỉ bằng chứng thật
+  mới đọc `ready`: một dòng watch đọc nó đang làm việc, hoặc rảnh sau dòng
+  đầu tiên của watch; một `idle` ở dòng đầu chỉ tính từ chính pane đã bị
+  giữ, không bao giờ từ một pane mở sau đó. Mọi dòng watch trừ `started` cũng kết
   thúc `installing`. `watch` nói
   trạng thái hiện tại trước: dòng đầu đó không bao giờ được đọc là kết thúc
   của một lượt của ta. Đèn giết watch khi gặp `done`; sau đó, khi không có

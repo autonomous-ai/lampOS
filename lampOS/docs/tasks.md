@@ -5790,9 +5790,12 @@ backoffs, a spoken task's 3 put-backs, a skill run's words typed again,
   Gateway refused its sign-in (`harness::Hold`) is a lasting hold, not a
   fault: `error` with `held_approval` or `held_sign_in`, a spoken turn
   still ended at once, but no fresh session (it would be held the same,
-  and "ready again" would be said between failures); an `ensure` after the
-  watch is lost leaves it `error`, and only a watch line reading it at
-  work or idle again reads `ready`. Any watch line but `started` also
+  and "ready again" would be said between failures): the spoken task so
+  ended lets the pane go kept, with no close (`release_unanswered`). An
+  `ensure` after the watch is lost leaves it `error`, and only real
+  evidence reads `ready`: a watch line reading it at work, or idle past
+  the watch's first line; a first `idle` only from the pane that was
+  held, never from one opened since. Any watch line but `started` also
   ends `installing`. `watch` says the
   state now first: that first line is never read as the end of a turn of
   ours. The lamp kills the watch on `done`; after that, with no turn of
