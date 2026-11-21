@@ -229,6 +229,19 @@ mod tests {
         assert_eq!(rounded(130 * 60), "about 2 hours");
     }
 
+    /// #7694 (row-7694q): asked again 9 minutes later in the same thread,
+    /// the model said a1's "about six minutes" without calling; the
+    /// description tells it to call again on every such ask.
+    #[test]
+    fn every_ask_calls_again_never_answering_from_an_earlier_answer() {
+        let description = tool().description;
+        assert!(description.contains(
+            "Call it again on every such ask, even when you answered it earlier in the \
+             conversation: the time moves on, so an earlier answer is out of date; never \
+             answer from it."
+        ));
+    }
+
     #[test]
     fn the_switch_is_on_only_when_set() {
         assert_eq!(arguments(Some("on")), [FLAG]);
