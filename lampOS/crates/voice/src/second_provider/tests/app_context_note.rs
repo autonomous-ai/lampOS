@@ -1,8 +1,9 @@
 //! An app's live context line (`apps.context`, #7415) reaches the model:
 //! the line the door told on `apps/context` is in the owner's spoken turn's
-//! chat as a quoted note with its source (`app_context::notes_for`). A
-//! guest's or the room's turn never hears it (the Reviewer-lead's P3 on
-//! #8313), and once cleared (the app's session ended), while Lamp is private
+//! chat as a quoted note with its source (`app_context::notes_for`).
+//! Outside the private room a guest's or the room's turn never hears it (the
+//! Reviewer-lead's P3 on #8313); in the private room every spoken turn is the
+//! owner's, face or none (the Reviewer-lead's P2 on #8315). Once cleared (the app's session ended), while Lamp is private
 //! or with the switch off, nobody does.
 use super::*;
 use crate::memory_scope::{FaceCache, ScopeLease};
@@ -19,6 +20,8 @@ enum InView {
     Guest,
     /// Two faces, none known: the room's.
     Room,
+    /// No face in view (the dark, or the camera closed).
+    NoFace,
 }
 
 /// One spoken turn by `in_view`, with `before` done first and the privacy
@@ -53,6 +56,8 @@ async fn told(in_view: InView, before: impl FnOnce(), private: bool) -> Vec<Stri
     engine.privacy((!private, 1, true, 1));
     if in_view == InView::Room {
         cache.replace_seen(cache.begin_refresh(), None, Some(2));
+    } else if in_view == InView::NoFace {
+        cache.replace_seen(cache.begin_refresh(), None, Some(0));
     } else {
         let seen = crate::known_faces::FaceObservation::read(&path).unwrap();
         cache.replace_seen(cache.begin_refresh(), Some(seen), Some(1));
@@ -100,13 +105,22 @@ fn an_apps_live_line_is_told_on_the_owners_turn_until_cleared() {
         .unwrap();
     crate::app_context::set_on_for_test(true);
     crate::app_context::clear_all();
+    // Outside the private room: the owner's turn alone.
+    crate::person::set_private_room_for_test(Some(false));
     let words = runtime.block_on(told(InView::Owner, coach_line, false));
     assert!(words.iter().any(|w| w == LINE), "told: {words:?}");
     // A guest the eyes know, or the room: never the owner's app line.
-    for not_owner in [InView::Guest, InView::Room] {
+    for not_owner in [InView::Guest, InView::Room, InView::NoFace] {
         let words = runtime.block_on(told(not_owner, coach_line, false));
         assert!(!hears_the_coach(&words), "{words:?}");
     }
+    // The private room (`LAMP_PRIVATE_ROOM=on`, the product's): whoever
+    // speaks is the owner, so the owner in the dark, no face in view, hears
+    // their app's line (the Reviewer-lead's P2 on #8315).
+    crate::person::set_private_room_for_test(Some(true));
+    let words = runtime.block_on(told(InView::NoFace, coach_line, false));
+    assert!(words.iter().any(|w| w == LINE), "private room: {words:?}");
+    crate::person::set_private_room_for_test(Some(false));
     // Cleared at the app's session end: no longer told.
     let words = runtime.block_on(told(
         InView::Owner,
@@ -126,4 +140,5 @@ fn an_apps_live_line_is_told_on_the_owners_turn_until_cleared() {
     crate::app_context::set_on_for_test(false);
     let words = runtime.block_on(told(InView::Owner, || {}, false));
     assert!(!hears_the_coach(&words), "{words:?}");
+    crate::person::set_private_room_for_test(None);
 }

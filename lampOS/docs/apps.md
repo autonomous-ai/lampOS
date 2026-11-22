@@ -305,8 +305,10 @@ behind the same two switches and, at the voice, `LAMP_APP_MEMORY`.
     (subscriber `voice`, started once a process with `LAMP_APP_MEMORY` on)
     calls `app_context::set` or `clear` with its own privacy reading (none yet
     counts as private) and the journal says the app and what was done, never a
-    word. The line is told only on the owner's turn (a known person in view
-    who is the owner), never a guest's or the room's. App send to the voice holding the line is one bus hop: about 0.3 ms
+    word. The line is told only on the owner's turn: any spoken turn in the
+    private room (`LAMP_PRIVATE_ROOM=on`, whoever speaks is the owner), and
+    outside it only when the known person in view is the owner, never a
+    guest's or the room's. App send to the voice holding the line is one bus hop: about 0.3 ms
     in the door's bus test, under 100 ms asserted in the voice's.
   - **Gone with the session.** When the app's last connection closes (it
     stopped, was updated, crashed or was removed), lamp-control publishes the
