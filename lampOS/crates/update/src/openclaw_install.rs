@@ -1013,10 +1013,30 @@ pub fn after_round_with(
 ) -> Option<OpenclawInstall> {
     match crate::writer_unit::write_unit(root, UNIT, &unit_text_for(shown)) {
         Ok(written) => {
-            if written && let Err(why) = systemd.reload() {
-                say(&format!("{UNIT} written, but systemd not reloaded: {why}"));
+            let reloaded = match written.then(|| systemd.reload()) {
+                Some(Err(why)) => {
+                    say(&format!("{UNIT} written, but systemd not reloaded: {why}"));
+                    false
+                }
+                _ => written,
+            };
+            let restarted = loaded_as_written(systemd, say);
+            // #8320: a gateway showing lamp-control's socket, its unit just
+            // written anew (as by the round that ships `PartOf=`, which
+            // restarted lamp-control before this write), is try-restarted
+            // once, so its namespace binds the socket lamp-control has now.
+            // Only on a write (the next round finds the same bytes) and
+            // only a running one (a `failed` one is left to `gateway_on`).
+            if reloaded && !restarted && shown.tasks && shown.one_path {
+                match systemd.try_restart_gateway() {
+                    Ok(()) => say(&format!(
+                        "{UNIT} written anew: the gateway restarted, so it shows lamp-control's socket as it is now (#8320)"
+                    )),
+                    Err(why) => say(&format!(
+                        "{UNIT} written anew, the gateway not restarted: {why} (#8320)"
+                    )),
+                }
             }
-            loaded_as_written(systemd, say);
         }
         Err(why) => say(&format!("OpenClaw's gateway unit not written: {why}")),
     }
@@ -1430,15 +1450,16 @@ pub const QUOTA_READ_BACK: &str = "1s";
 /// drop-in is not lamp-update's: it is said and left as it is, with no
 /// reload or restart, as neither would take it out. Any check still failing
 /// is found again by the next round. No switch of its own: it only makes
-/// systemd run lamp-update's own unit as written.
-fn loaded_as_written(systemd: &mut dyn Systemd, say: &mut dyn FnMut(&str)) {
+/// systemd run lamp-update's own unit as written. Whether it asked for the
+/// gateway's `try-restart`.
+fn loaded_as_written(systemd: &mut dyn Systemd, say: &mut dyn FnMut(&str)) -> bool {
     let show = match systemd.gateway_unit_properties() {
         Ok(show) => show,
         Err(why) => {
             say(&format!(
                 "{UNIT}: what systemd loaded is not checked: {why}"
             ));
-            return;
+            return false;
         }
     };
     let field = |name: &str| {
@@ -1451,10 +1472,10 @@ fn loaded_as_written(systemd: &mut dyn Systemd, say: &mut dyn FnMut(&str)) {
             "{UNIT} has a drop-in lamp-update did not write, left as it is: {}",
             crate::world::clean_line(paths)
         ));
-        return;
+        return false;
     }
     let failed = match (field("NeedDaemonReload"), field("CPUQuotaPerSecUSec")) {
-        (Some("no"), Some(QUOTA_READ_BACK)) => return,
+        (Some("no"), Some(QUOTA_READ_BACK)) => return false,
         (Some("no"), quota) => format!(
             "its CPU cap reads back as {:?}, not {QUOTA_READ_BACK:?}",
             crate::world::clean_line(quota.unwrap_or("nothing"))
@@ -1472,13 +1493,13 @@ fn loaded_as_written(systemd: &mut dyn Systemd, say: &mut dyn FnMut(&str)) {
         say(&format!(
             "{UNIT} not loaded as written ({failed}), and systemd not reloaded: {why}"
         ));
-        return;
+        return false;
     }
     if !running {
         say(&format!(
             "{UNIT} not loaded as written ({failed}): systemd reloaded"
         ));
-        return;
+        return false;
     }
     match systemd.try_restart_gateway() {
         Ok(()) => say(&format!(
@@ -1488,6 +1509,7 @@ fn loaded_as_written(systemd: &mut dyn Systemd, say: &mut dyn FnMut(&str)) {
             "{UNIT} not loaded as written ({failed}): systemd reloaded, the gateway not restarted: {why}"
         )),
     }
+    true
 }
 
 /// The gateway disabled ([`WANTS`] taken out, systemd reloaded) and
