@@ -7335,8 +7335,9 @@ stands), and eyes that can't be reached at all name nobody, as before. Without a
   journal, at that first audio: `request N is told what the person was
   last seen doing`.
 - **How long the person at the desk has sat there (`LAMP_DESK_TIME=on`,
-  #7694; [`desk_time`](../crates/voice/src/desk_time.rs)):** off. The
-  owner, 18 Nov: the lamp said "take a sip of water, you've been at the
+  #7694; [`desk_time`](../crates/voice/src/desk_time.rs)):** off
+  unless set; on in the product's `lamp-voice` and `lamp-skills` (#7694's
+  switch-on, after row-7694s on lamp-52e6). The owner, 18 Nov: the lamp said "take a sip of water, you've been at the
   desk for a while", was asked "how long have I been at the desk?", and
   answered "I don't know. I don't track your time." Two parts, one switch:
   - **The nudge's reason stays in the conversation.** `lamp-skills`, with
