@@ -1171,7 +1171,11 @@ off unless set; it must be set in lamp-actions' unit and lamp-voice's):
   ask, which carries its own: "Set a timer for ten minutes." → "It rings at
   4:09. Anything else?" → "Set another timer." (or "Pasta.") asks "For how
   long?", and "What's five plus five?" → "Ten. Anything else?" lends "five"
-  to nothing (Fifth's HOLD on #8274). A typed text, a line whose words are
+  to nothing (Fifth's HOLD on #8274). A reply that names a timer, reminder,
+  alarm or countdown itself (`going_on_asks::names_a_schedule_item`: any of
+  those words but remind and the lamp) is a fresh ask and borrows nothing
+  either, even when the question named one: "Want another timer?" → "Set
+  another timer." asks "For how long?" (Sixth's P3 on #8321). A typed text, a line whose words are
   not known, and an owner's language other than English check nothing.
   Because the refusal is an error, `LAMP_SECOND_SAY_WITH_CALL`'s at-once line
   never says "Timer set." for it (`second_provider::timer_line` needs a
