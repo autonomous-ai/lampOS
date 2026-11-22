@@ -2593,7 +2593,11 @@ As root, on a lamp with the base image (`crates/update/src/install.rs`):
      first (`ExecStartPost=-+… systemctl reset-failed
      lamp-openclaw-gateway.service`, before the gateway's start, a missing
      gateway no error), so a lamp-control crash loop doesn't leave the gateway
-     at `start-limit-hit` once lamp-control is up again. The first round after this update rewrites the
+     at `start-limit-hit` once lamp-control is up again. The round that ships
+     a new unit text restarts lamp-control (when it changed) before it writes
+     the gateway's unit, so a round that writes that unit anew, with
+     lamp-control's socket shown, also try-restarts a running gateway once
+     (#8320); a round finding the same bytes restarts nothing. The first round after this update rewrites the
      namespace script and the unit and restarts the gateway once. It also shows the start socket folder
      `/run/lampos-skill-start` read-only (lamp-tasks makes its
      `start.sock` there; a socket still connects on a read-only mount;

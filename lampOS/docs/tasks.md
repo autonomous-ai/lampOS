@@ -4649,7 +4649,11 @@ file:
   it back first (`ExecStartPost=-+… systemctl reset-failed
   lamp-openclaw-gateway.service`, before the gateway's start, a missing
   gateway no error), so a lamp-control crash loop doesn't leave the gateway at
-  `start-limit-hit` once lamp-control is up again. The first round after this
+  `start-limit-hit` once lamp-control is up again. The round that ships a new
+  unit text restarts lamp-control (when it changed) before it writes the
+  gateway's unit, so a round that writes that unit anew, with lamp-control's
+  socket shown, also try-restarts a running gateway once (#8320); a round
+  finding the same bytes restarts nothing. The first round after this
   update rewrites the namespace script and the unit and restarts the gateway
   once.
 - **The socket.** The launcher sends the run id to
