@@ -1135,7 +1135,12 @@ off unless set; it must be set in lamp-actions' unit and lamp-voice's):
 - **The descriptions say so.** `set_timer` says that when the person's words
   give no length it sets nothing and asks only "For how long?", then sets it
   from the answer; `set_reminder` the same with "What time?"
-  (`schedule::asking_how_long`). Off, the catalog is as it was, byte for byte.
+  (`schedule::asking_how_long`). They fix the label question's words too,
+  when one is asked: "What's the timer for?" and "What should I remind you
+  about?", each naming the schedule, so a reply to it lends the asked line's
+  length or time (below; the Reviewer-lead's second P2 on #8274: a free
+  "What's it for?" lent nothing). Off, the catalog is as it was, byte for
+  byte.
 - **The second route refuses the call.** A `set_timer` or `set_reminder`
   whose request's own heard line (`thread::heard_in_own_line`), and the
   person's lines the lamp's questions just before it answered
