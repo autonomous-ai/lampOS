@@ -10708,19 +10708,7 @@ fn a_hermes_make_with_its_kept_session_up_is_typed_into_that_pane_not_make_herme
     use lamp_tasks::skill_make::MakeAgent;
     let mut rig = Rig::new();
     rig.config.as_person = true;
-    // The pane seen with the make's words taken (a make's header names no
-    // run id) and answered in its chat (a `cannot:` line, a make's answer).
-    rig.plan(json!({
-        "machines":{"default":true},
-        "new":{"default":true},
-        "wait":{"stdout":waited("idle", AGENT)},
-        "show":{"stdout":json!({
-            "id":AGENT,"state":"idle","ask":format!("{}\nRULES", lamp_tasks::one_session::header("")),
-            "answer":"cannot: the lamp has no camera","truncated":false,"tools":1
-        }).to_string()},
-        "reply":{"default":true},
-        "close":{"exit":0},
-    }));
+    kept_make_plan(&rig);
     let work = make_work(&rig);
     let mut runner = hermes_door_runner(&rig, false, false);
     runner.default_agent = false;
@@ -10797,6 +10785,78 @@ fn a_hermes_make_with_its_kept_session_up_is_typed_into_that_pane_not_make_herme
     assert_eq!(answered, json!({"ok": true, "answer": "HERMES"}));
     assert_eq!(hermes.0.load(Ordering::Acquire), 1);
     assert!(rig.calls().is_empty(), "Harness never asked");
+}
+
+/// The kept session's plan for a make: the pane seen with the make's words
+/// taken (a make's header names no run id) and answered in its chat with a
+/// `cannot:` line, a make's answer.
+fn kept_make_plan(rig: &Rig) {
+    rig.plan(json!({
+        "machines":{"default":true},
+        "new":{"default":true},
+        "wait":{"stdout":waited("idle", AGENT)},
+        "show":{"stdout":json!({
+            "id":AGENT,"state":"idle","ask":format!("{}\nRULES", lamp_tasks::one_session::header("")),
+            "answer":"cannot: the lamp has no camera","truncated":false,"tools":1
+        }).to_string()},
+        "reply":{"default":true},
+        "close":{"exit":0},
+    }));
+}
+
+/// #8213 (OpenClaw's side of the make parity): with OpenClaw's gateway the
+/// default and its kept session up, a one_path make that comes before any
+/// skill run (so lamp-tasks' Harness project folder isn't there yet) is
+/// typed into `lamp-one-openclaw`, never a `new` of its own, and answered.
+/// Before #8213 the pane's folder was made in a project no make makes, and
+/// the make failed with "the one session's folder not made".
+#[test]
+fn an_openclaw_make_before_any_run_is_typed_into_the_kept_pane() {
+    let mut rig = Rig::new();
+    rig.config.as_person = true;
+    kept_make_plan(&rig);
+    let work = make_work(&rig);
+    let mut runner = one_session_runner(&rig);
+    runner.default_agent = false;
+    runner.makes = true;
+    assert!(!runner.project.exists(), "no run has made the project yet");
+    let gateway = lamp_tasks::skill_make::MakeGateway::of(Arc::new(runner));
+    let hermes = MakeHermesStandIn::default();
+    let answered = lamp_tasks::skill_make::answer_with(
+        &make_line(Some(true), 20_000),
+        true,
+        &work,
+        &hermes,
+        Some(&gateway),
+        &mut || {},
+    );
+    assert_eq!(answered["ok"], json!(true), "{answered}");
+    assert_eq!(
+        answered["answer"],
+        json!("cannot: the lamp has no camera"),
+        "{answered}"
+    );
+    assert_eq!(hermes.0.load(Ordering::Acquire), 0, "never MakeHermes");
+    let calls = rig.calls();
+    let count = |verb: &str| calls.iter().filter(|call| call["args"][0] == verb).count();
+    assert_eq!(
+        (count("new"), count("reply"), count("close")),
+        (1, 1, 0),
+        "{calls:?}"
+    );
+    let new = calls.iter().find(|call| call["args"][0] == "new").unwrap();
+    assert_eq!(new["args"][1], "openclaw");
+    let named = new["args"]
+        .as_array()
+        .unwrap()
+        .windows(2)
+        .any(|pair| pair[0] == "--name" && pair[1] == "lamp-one-openclaw");
+    assert!(named, "the pane's fixed name: {new}");
+    let reply = calls
+        .iter()
+        .find(|call| call["args"][0] == "reply")
+        .unwrap();
+    assert_eq!(reply["args"][3], AGENT, "the one pane: {reply}");
 }
 
 /// #7245: the lamp's make runner with an OpenClaw gateway default, its
