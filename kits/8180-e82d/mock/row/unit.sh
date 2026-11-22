@@ -46,5 +46,8 @@ S
       ssh-other) export DENY=9 ERR="ssh: connect to host mock-lamp port 22: Connection refused" RC=255; o=$(run)
         v "another error: 1 try only" '[ "$(cat $W/sshn)" = 1 ] && echo "$o" | grep -q "rc=255" && echo "$o" | grep -q "Connection refused"';;
     esac;;
+  # the row's probe fixtures (C, H, P) load by the product's skill.toml rules (fixcheck.py cites them)
+  fixtures) o=$(python3 -I $KIT/mock/row/fixcheck.py $KIT/row/probe); rc=$?
+    v "grant-probe, slow-probe and fork-probe load: a tool and a [[do]] each" '[ $rc = 0 ] && [ "$(echo "$o" | grep -c " OK$")" = 3 ]';;
   *) echo "UNIT FAIL no such test $t";;
 esac

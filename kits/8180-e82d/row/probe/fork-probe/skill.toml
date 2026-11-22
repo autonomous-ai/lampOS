@@ -2,6 +2,12 @@ asks = ["fork probe"]
 kind = "installable"
 version = "1.0.0"
 grants = ["speak"]
+# A tool loads it: an installed skill's asks call its tool, and only a made-here one is started by its asks alone
+# (crates/skills/src/lib.rs:4521, :3723, :3800; the load test's BRIEF, lib.rs:14225).
+tool = "fork_probe"
+
+[permissions]
+speak = true
 
 # #8180 ROW leg P test fixture, removed by unrow: a run step that starts 120 child processes, past its run
 # cgroup's pids.max (72) and the fence's per-process cap (64); the rest must be refused while another run answers.

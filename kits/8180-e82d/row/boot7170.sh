@@ -5,7 +5,7 @@
 #   1. ONE normal `systemctl reboot` (no hand step; GATEd first), ssh back with a new boot id within BOOTWAIT (300) s.
 #   2. The mute after the reboot is read and reported. It is lifted again ONLY by the same yes path as micon (run.sh's
 #      MIC_YES=yes and this ROW's micon MUTE LIFTED OK), by the same micon.lamp.sh; else the leg is VOID.
-#   3. Poll (lamp side) until the gateway's port 18789 is listening (PORTWAIT, 300 s); within 30 s of that, MAILASK (or WEEKASK, leg A's task)
+#   3. Poll (lamp side) until the gateway's port 18789 is listening (PORTWAIT, 300 s); within 30 s of that, MAILASK (or DAYSASK, leg A's task)
 #      asks D's task skill to run, by the voice (the kit's run-asking way: a clip).
 #   4. The run's script start: "[lamp-tasks] skill start: run R's script started" (skill_start.rs) within RUNWAIT7170
 #      (420 s: lamp-tasks waits up to 240 s for the gateway to serve, gateway::SERVING_WITHIN).
@@ -34,7 +34,7 @@ RENEW || exit 1; VOLOK || exit 2
 # The run asked: leg D's mail task, or, where D was VOID (no linked mail), leg A's made skill when it is a task
 # step (it needs no service). Its own clip asks it. Neither: VOID.
 TS=; CLIP=
-for pick in D:MAILASK A:WEEKASK; do
+for pick in D:MAILASK A:DAYSASK; do
   TS=$(grep '^MADE ' $LG/made-${pick%%:*}.txt 2>/dev/null | grep ' kind=task ' | head -1 | awk '{print $2}')
   [ -n "$TS" ] && { CLIP=${pick#*:}; FROM=${pick%%:*}; break; }
 done

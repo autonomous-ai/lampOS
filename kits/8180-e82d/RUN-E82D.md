@@ -3,7 +3,7 @@
 This kit runs the legs half of #8180's ROW from the runner's Mac. It does not install, round or put back a build. You
 put #8180's build on the lamp before you start, and you put the lamp back to stable after the kit ends.
 
-Nothing here has run on a lamp yet. It has only been mocked: `mock/row/run-all.sh` runs 73 cases: every leg's PASS, FAIL and
+Nothing here has run on a lamp yet. It has only been mocked: `mock/row/run-all.sh` runs 83 cases: every leg's PASS, FAIL and
 VOID cases, plus run.sh itself, with stub ssh, scp, afplay and lock.
 
 ## Prerequisites
@@ -56,12 +56,16 @@ in 10 min: a start is refused at 9 or more. A make leg (A, B, D, K) can take up 
 
 ## Each leg's pass lines (row/logs/row-*.txt, boot7170.txt)
 - **A-E**: every make prints `MADELINE <"Made it, and I tried it: ..." / "Made <name>, and I tried it.">` from the
-  journal, or `none (not in the journal)`. A: the card has 3 of 3 sections, no stub, made_with = the engine, and the
-  try passed. B: `hand-over to script start N ms`, no agent session, and the first say <= 6 s after the clip.
+  journal, or `none (not in the journal)`. A (a days-left-in-the-year skill: no account and no net, so it runs on a
+  signed-out lamp): the card has 3 of 3 sections, no stub, made_with = the engine, the try passed having said at least
+  one line, the skill is kept, and DAYSASK starts its own run, which ends exit 0 having said, with a say after it. B: `hand-over to script start N ms`, no agent session, and the first say <= 6 s after the clip.
   C: lamp-control `refused: no_grant`. D: the prompt names SKILL.md first, no lamp files are read, and the answer
-  comes <= 45 s after the clip. E: the make runs on, READY is answered while it makes, and the switch is off again.
-- **K**: CHECK (K1) made and kept, (K2) the try's token names look or hear, (K3) the run's token names look/hear and
-  speak, (K4) the say was spoken, (K5) no yes asked.
+  comes <= 45 s after the clip. D needs a linked Google account; VOID without one (a mail make not kept is VOID,
+  and its LEG line says so). E: the make runs on, READY is answered while it makes, and the switch is off again.
+- **K**: CHECK (K1) made and kept, (K2) the try's token is exactly `[camera, speak]` (lamp-control: `a make's tried run,
+  a token for [speak, camera], its writes stubbed`), (K3) the run's token is exactly `[camera, speak]`, any order,
+  nothing more, (K4) the say was spoken, (K5) no yes asked. The camera's grant is `camera` and the mic's `microphone`;
+  `look` and `hear` are presence and own-phrase grants.
 - **H**: CHECK (H1) the old run-* leaf is gone, (H2) serve's new pid is in `serve`, memory/cpu/pids are in
   subtree_control and the unit root is empty, (H3) `each run gets its own cgroup under` is back with no
   `runs have no own cgroup` / `refused, no own cgroup` line, (H4) a fresh slow-probe run ends exit 0 with a say.

@@ -5,12 +5,13 @@
 # clips from the Mac speaker (afplay -v gain only; Mac volume read, <= 70; no volume is ever set, the lamp's speaker is
 # never touched). Verdicts from each leg's journal (logs/leg-<L>.journal.txt: lamp-voice, -tasks, -skills,
 # -skills-manage@, -control, -openclaw-gateway, -update) and read-only lamp scripts.
-#   A  WEEK make: SKILL.md has Uses/Result/Answer, no stub, made_with = engine (made.json + card), its
-#      tried run's journal lines (exit 0, said >= 1); then WEEKASK once: the run's time.
+#   A  DAYS make (days left in the year: no account, no net, so it runs signed out): SKILL.md has Uses/Result/Answer,
+#      no stub, made_with = engine (made.json + card), its tried run's journal lines (exit 0, said >= 1), kept; then
+#      DAYSASK once: the made skill's own run (or task) starts, ends exit 0 having said >= 1, and its say is spoken.
 #   B  PRICE make (a `run` step), then PRICEASK: "skill run R: hand-over to script start N ms", ended exit 0
 #      said >= 1, NO agent session (no "skill task" start/Harness/gateway line), clip end -> first say <= LIMIT_B s.
 #   C  grant-probe fixture (grants speak) asks the camera: lamp-control "refused: no_grant".
-#   D  MAIL make (a `task` step), then MAILASK: the task's prompt names <folder>/SKILL.md first, the agent's
+#   D  (needs a linked Google account; VOID without one) MAIL make (a `task` step), then MAILASK: the task's prompt names <folder>/SKILL.md first, the agent's
 #      session names no lamp file beyond its prompt's, clip end -> answer <= LIMIT_D s (about 30).
 #   E  LAMP_MAKE_MAY_RUN_ON=on by a /run drop-in: LONGMAKE runs on past its minute, READY is answered
 #      "still making" (journal: listed / asked-while-running-on), drop-in removed: RUNON OFF.
@@ -19,7 +20,7 @@
 #   G  kernel >= 5.14, prlimit in the image, lampos tasks > 64, and A's try and B's run both PASS;
 #      #8180's cgroup: during B's run a run-* leaf under lamp-tasks' cgroup with memory.max, memory.swap.max=0, cpu.max
 #      and pids.max set, gone after the run; serve's pid in its own leaf (serve or main); no 'no own cgroup' refusal.
-#   K  a camera-or-mic + speaker skill: made, tried, run; tokens name look/hear (+speak); said; no yes asked.
+#   K  a camera + speaker skill: made, tried, run; the try's and the run's tokens are exactly [camera, speak]; said; no yes.
 #   H  one lamp-tasks restart while slow-probe's script runs: old leaf gone, serve back, set-up line, fresh run.
 #   P  fork-probe past its process cap refused while B's price run answers.
 #   W  (#8130) tools.deny holds skill_workshop, the gateway accepts it, workshop-skills/ unchanged by the legs' makes/runs.
@@ -39,7 +40,7 @@ RENEW || exit 1; VOLOK || exit 2
 grep -q '^VERIFY PASS' $D/logs/verify.txt 2>/dev/null || { echo "no VERIFY PASS in row/logs/verify.txt: #8180's build is not verified running (../run.sh check)"; exit 1; }
 grep -q '^READY' $D/logs/ready.txt 2>/dev/null || { echo "no READY in row/logs/ready.txt (../run.sh check)"; exit 1; }
 grep -q '^SAVED OK' $LG/save.txt 2>/dev/null || { echo "no SAVED OK in row/logs/save.txt (../run.sh save first)"; exit 1; }
-for c in WEEK WEEKASK PRICE PRICEASK PROBE MAIL MAILASK LONGMAKE READY YES2 LOOK LOOKASK SLOW FORK NAMED; do [ -f $A/$c-el.wav ] || { echo "no clip $A/$c-el.wav: ../run.sh render (clips/TODO.txt)"; exit 1; }; done
+for c in DAYS DAYSASK PRICE PRICEASK PROBE MAIL MAILASK LONGMAKE READY YES2 LOOK LOOKASK SLOW FORK NAMED; do [ -f $A/$c-el.wav ] || { echo "no clip $A/$c-el.wav: ../run.sh render (clips/TODO.txt)"; exit 1; }; done
 # Leg N's switch off on ANY exit once it was asked on (logs/named-on.txt) and NAMED OFF not read since (MODE=off is
 # idempotent; 1 lamp-voice start).
 NOFF(){ LAMP "MODE=off" $D/named.lamp.sh > $LG/named-off.txt 2>&1; grep -q '^NAMED OFF' $LG/named-off.txt; }
@@ -130,21 +131,30 @@ TRYOK(){ local t; t=$(sed -n "1,${MK}p" $J | grep -E "$TRY"); [ -n "$t" ] || ret
 MADEWHY=; VA=FAIL VB=FAIL VC=FAIL VD=FAIL VE=FAIL VF=FAIL VG=FAIL VK=FAIL VW=FAIL VH=FAIL VP=FAIL VN=FAIL; MNB=; MKB=; MN=; MK=; RB=0; MADELINE=
 # Verdicts (and B's price skill) of earlier invocations of this ROW (run.sh save clears it): F, G and P read them.
 [ -f $LG/verdicts.env ] && . $LG/verdicts.env
-# ---- A: the week make, its card, its try, one run
-legA(){ local n0 e s
-  BEGIN A || return 1; quiet; MAKE WEEK || { END; return 0; }
+# ---- A: the days-left make (signed out: no account, no net), its card, its try, kept, one run that says its line
+legA(){ local n0 e s st rid
+  BEGIN A || return 1; quiet; MAKE DAYS || { END; return 0; }
   local why=; [ "$(echo "$ML" | field uses)$(echo "$ML" | field result)$(echo "$ML" | field answer)" = 111 ] || why="$why card lacks a heading (uses/result/answer=$(echo "$ML" | field uses)/$(echo "$ML" | field result)/$(echo "$ML" | field answer));"
   [ "$(echo "$ML" | field stub)" = 0 ] || why="$why the stub line is in its files;"
   [ "$(echo "$ML" | field prints)" = 0 ] || echo "  NOTE scripts/main.py has $(echo "$ML" | field prints) print( line(s) (not the stub; read it)"
   eng=$(echo "$ML" | field engine); [ "$(echo "$ML" | field fm_with)" = "$eng" ] && [ "$(echo "$ML" | field idx_with)" = "$eng" ] || why="$why made_with card=$(echo "$ML" | field fm_with) index=$(echo "$ML" | field idx_with), engine $eng;"
   TRYOK || why="$why no passed tried run (exit 0, said >= 1) before kept;"
   why="$why$MADEWHY"
-  sleep 10; quiet; n0=$(lines); PLAY WEEKASK
-  e=$(waitfor "skill run [^ ]+: ended in|skill task [^ ]+: (ended|its agent's answer)" $n0 ${RUNWAIT:-180})
-  s=$(waitfor "$SAY" $n0 ${RUNWAIT:-180})
-  [ -n "$e" ] && echo "  run end: $(show $e) ($(since $(ep $e) $PEND) s after the clip)" || echo "  NOTE no run/task end line for the ask (answered by the voice alone?)"
+  sleep 10; quiet; n0=$(lines); PLAY DAYSASK
+  st=$(waitfor "skill run [^ ]+: $MN handed over|skill task [^ ]+: started" $n0 ${RUNWAIT:-180})
+  rid=$(sed -n "${st:-1}p" $J | sed -n "s/.*skill run \([^ :]*\): $MN handed over.*/\1/p")
+  # a run step: its own end, whose "said N" counts its own says (a run's client is c_<hex>, runs.rs:118, so a say line
+  # does not name the run), and a say after its start; a task step: the task's end, a say after it
+  if [ -n "$rid" ]; then e=$(waitfor "skill run $rid: ended in" $st ${RUNWAIT:-180}); s=$(waitfor "$SAY" $st ${RUNWAIT:-180})
+  else e=$(waitfor "skill task [^ ]+: (ended|its agent's answer)" $n0 ${RUNWAIT:-180}); s=$(waitfor "$SAY" ${e:-$n0} ${RUNWAIT:-180}); fi
+  [ -n "$e" ] && echo "  run end: $(show $e) ($(since $(ep $e) $PEND) s after the clip)"
   [ -n "$s" ] && echo "  first say $(since $(ep $s) $PEND) s after the clip: $(show $s | cut -c1-160)"
   quiet; END
+  # its run says its line: the made skill's own start, its end exit 0 with a say (a task: its end), a say spoken
+  if [ -z "$st" ]; then why="$why DAYSASK started no run of $MN (answered by the voice alone?);"
+  elif [ -z "$e" ]; then why="$why no run/task end line for $MN's run;"
+  elif [ -n "$rid" ] && ! RUNOK $e; then why="$why its run did not end exit 0 having said: $(show $e | cut -c1-120);"
+  elif [ -z "$s" ]; then why="$why no say after its run started;"; fi
   [ -z "$why" ] && { VA=PASS; WHY="$MN kept, card 3/3, no stub, made_with $eng, try passed$( [ -n "$e" ] && echo ", run $(since $(ep $e) $PEND) s")"; } || WHY="$MN:$why"; }
 # ---- B: the price run step: no agent, hand-over ms, first say
 legB(){ local n0 h e s a lat
@@ -176,9 +186,10 @@ legC(){ local n0 e x
   sleep 8; x=$(tail -n +$(( n0 + 1 )) $J | grep -E "lamp-control: .*refused: no_grant"); tail -n +$(( n0 + 1 )) $J | grep -E "of skill grant-probe" | cut -c1-200 | sed 's/^/  /'
   quiet; END
   [ -n "$x" ] && { VC=PASS; WHY="$(echo "$x" | head -1 | cut -c1-200)"; } || WHY="no lamp-control 'refused: no_grant' line after the probe's ask"; }
-# ---- D: the mail task step: SKILL.md first, no lamp files, ~30 s
+# ---- D: the mail task step: SKILL.md first, no lamp files, ~30 s. An optional Google leg: its verdict says so.
+DNOTE="needs a linked Google account; VOID without one"
 legD(){ local n0 st e s t
-  BEGIN D || return 1; quiet; MAKE MAIL || { END; return 0; }
+  BEGIN D || return 1; quiet; MAKE MAIL || { END; WHY="$WHY ($DNOTE: a mail make not kept is VOID)"; VD=VOID; return 0; }
   [ "$(echo "$ML" | field kind)" = task ] || echo "  NOTE $MN is kind=$(echo "$ML" | field kind), not a task step"
   sleep 10; quiet; SSHR -n $H 'touch /tmp/t8180-markD'; n0=$(lines); PLAY MAILASK
   st=$(waitfor "skill task [^ ]+: started on the lamp's default agent|skill task [^ ]+: granted net" $n0 60) && echo "  $(show $st)"
@@ -266,26 +277,31 @@ legG(){ local k pl n cg sv up bad gone left nc
   else VG=PASS; WHY="serve in leaf $sv; $up run leaf/leaves in B's run with $(grep -m1 '^RUNLEAF +run-' $cg | grep -oE 'memory\.max=[^ ]+ .*pids\.max=[^ ]+' | cut -c1-140), gone after; kernel $k, prlimit at $pl, $n lampos tasks > 64, A and B passed"; fi; }
 
 # ---- K (21 Nov): a skill that uses the camera (or the mic) and the speaker: made, tried and run, no yes asked
+# A token's grants as lamp-control journals them (control/src/server.rs:404 a run's, :459 a try's, by grant_names
+# :2202): the wire names of protocol.rs's Grant (the camera is "camera", the mic "microphone"; "look" and "hear" are
+# presence and own-phrase grants, not the camera or the mic). K wants exactly KG, sorted, nothing more.
+KG=${KG:-camera,speak}
+GSET(){ grep -oE 'a token for \[[^]]*\]' | head -1 | sed 's/^a token for \[//; s/\]$//' | tr -d ' ' | tr ',' '\n' | sort | paste -sd, -; }
 legK(){ local n0 w tt rt s rb2 e k1 k2 k3 k4 k5
   BEGIN K || return 1; quiet; MAKE LOOK || { END; echo "CHECK (K1) made and kept: FAIL ($WHY)"; return 0; }
-  tt=$(sed -n "$(( MK0 + 1 )),${MK}p" $J | grep -E "a make's tried run, a token for \[[^]]*(look|hear)[^]]*\]" | head -1)
+  tt=$(sed -n "$(( MK0 + 1 )),${MK}p" $J | grep -E "a make's tried run, a token for \[" | head -1)
   sleep 10; quiet; n0=$(lines); PLAY LOOKASK
-  rt=$(waitfor "run [^ ]+ of skill $MN: a token for \[[^]]*(look|hear)[^]]*\]" $n0 ${RUNWAIT:-90})
+  rt=$(waitfor "run [^ ]+ of skill $MN: a token for \[" $n0 ${RUNWAIT:-90})
   e=$(waitfor "skill run [^ ]+: ended in|skill task [^ ]+: (ended|its agent's answer)" $n0 ${RUNWAIT:-90})
   s=$(waitfor "$SAY" $n0 ${RUNWAIT:-90}); rb2=$(tail -n +$(( n0 + 1 )) $J | grep -E "$READBACK|$YESOK" | head -1)
   [ -n "$rt" ] && echo "  $(show $rt)"; [ -n "$e" ] && echo "  $(show $e)"; [ -n "$s" ] && echo "  first say $(since $(ep $s) $PEND) s after the clip: $(show $s | cut -c1-140)"
   quiet; END
   k1=PASS; k2=FAIL; k3=FAIL; k4=FAIL; k5=FAIL
-  [ -n "$tt" ] && k2=PASS; [ -n "$rt" ] && echo "$(show $rt)" | grep -q speak && k3=PASS
+  [ -n "$tt" ] && [ "$(echo "$tt" | GSET)" = "$KG" ] && k2=PASS; [ -n "$rt" ] && [ "$(show $rt | GSET)" = "$KG" ] && k3=PASS
   [ -n "$s" ] && { [ -z "$e" ] || sed -n "${e}p" $J | grep -qvE "exited [1-9]|said 0"; } && k4=PASS
   [ "$RB" = 0 ] && [ -z "$rb2" ] && k5=PASS
   echo "CHECK (K1) $MN made, kept, its said-on line right: $k1 (kind $(echo "$ML" | field kind), grants $(echo "$ML" | field grants))"
-  echo "CHECK (K2) its try's token names look or hear: $k2 ${tt:+($(echo "$tt" | grep -oE 'a token for \[[^]]*\]'))}"
-  echo "CHECK (K3) its run's token names look or hear and speak: $k3 ${rt:+($(show $rt | grep -oE 'a token for \[[^]]*\]'))}"
+  echo "CHECK (K2) its try's token is exactly [$KG]: $k2 ${tt:+($(echo "$tt" | grep -oE 'a token for \[[^]]*\]'))}"
+  echo "CHECK (K3) its run's token is exactly [$KG]: $k3 ${rt:+($(show $rt | grep -oE 'a token for \[[^]]*\]'))}"
   echo "CHECK (K4) the run's say was spoken: $k4"
   echo "CHECK (K5) no yes asked (make or run): $k5"
   [ -n "$MADEWHY" ] && k1="FAIL:$MADEWHY"
-  [ "$k1$k2$k3$k4$k5" = PASSPASSPASSPASSPASS ] && { VK=PASS; WHY="$MN: try and run tokens with the camera/mic, said, no yes"; } || WHY="$MN: K1 $k1 K2 $k2 K3 $k3 K4 $k4 K5 $k5"; }
+  [ "$k1$k2$k3$k4$k5" = PASSPASSPASSPASSPASS ] && { VK=PASS; WHY="$MN: try and run tokens exactly [$KG], said, no yes"; } || WHY="$MN: K1 $k1 K2 $k2 K3 $k3 K4 $k4 K5 $k5"; }
 # ---- W (#8130, folded in): tools.deny holds skill_workshop, OpenClaw accepts the file, workshop-skills/ unchanged
 wpre(){ LAMP "MODE=hash" $D/wshop.lamp.sh > $LG/wshop-before.txt 2>&1; echo "  workshop before: $(grep '^WSHOP ' $LG/wshop-before.txt)"; }
 legW(){ local b a
@@ -394,7 +410,7 @@ echo "== row.sh $LEGS $TAILS on $LAMP $(date '+%F %T')" | tee $RT >> $LG/row.txt
 case " $LEGS $TAILS " in *" W "*) { RENEW || exit 1; wpre; } 2>&1 | tee -a $RT;; esac
 for g in $LEGS $TAILS; do RENEW || { echo "LOCK lost before leg $g: stop"; exit 1; }; WHY=
   case $g in A) legA; echo "LEG A $VA ($WHY)";; B) legB; MKB=$MK; [ "$VB" = PASS ] && MNB=$MN; echo "LEG B $VB ($WHY)"; printf 'MNB=%s\nMKB=%s\n' "$MNB" "$MKB" >> $LG/verdicts.env;; C) legC; echo "LEG C $VC ($WHY)";;
-    D) legD; echo "LEG D $VD ($WHY)";; E) legE; echo "LEG E $VE ($WHY)";; F) legF; echo "LEG F $VF ($WHY)";; G) legG; echo "LEG G $VG ($WHY)";;
+    D) legD; echo "LEG D $VD ($WHY) [$DNOTE]";; E) legE; echo "LEG E $VE ($WHY)";; F) legF; echo "LEG F $VF ($WHY)";; G) legG; echo "LEG G $VG ($WHY)";;
     K) legK; echo "LEG K $VK ($WHY)";; H) legH; echo "LEG H $VH ($WHY)";; P) legP; echo "LEG P $VP ($WHY)";; W) legW; echo "LEG W $VW ($WHY)";;
     N) legN; echo "LEG N $VN ($WHY)";; *) echo "no leg $g"; continue;; esac
   eval "echo V$g=\$V$g" >> $LG/verdicts.env

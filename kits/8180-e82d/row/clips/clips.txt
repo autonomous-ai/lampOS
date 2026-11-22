@@ -1,5 +1,5 @@
-WEEK	Hey Lamp, make a skill that tells me what's on my calendar this week.	1.0
-WEEKASK	Hey Lamp, what's on my calendar this week?	1.0
+DAYS	Hey Lamp, make a skill that tells me how many days are left in the year when I ask.	1.0
+DAYSASK	Hey Lamp, how many days are left in the year?	1.0
 PRICE	Hey Lamp, make a skill that tells me the bitcoin price when I ask.	1.0
 PRICEASK	Hey Lamp, what's the bitcoin price?	1.0
 PROBE	Hey Lamp, grant probe.	1.0

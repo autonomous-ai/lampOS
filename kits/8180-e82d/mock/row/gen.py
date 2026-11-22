@@ -33,12 +33,12 @@ ALLOW = "tasks: the OpenClaw Gateway's allow-list add for /usr/local/lib/lampos/
 NOTSENT = "lamp-tasks[905]: tasks: the OpenClaw Gateway answered on 127.0.0.1:18789 but did not serve its approvals read (exec.approvals.get) before the readiness or run deadline; the hand-over is not sent"
 def j(lines): return "\n".join("@+%.1f %s" % (t, l) for t, l in lines) + "\n"
 PASS = {
- # A: week make, tried run passes, said-on line with no uses (grants speak only), then the run
- "j/A.WEEK": j([(1, V + "request 101: a skill to make: asked"), (18, tryrun("make-try-task-a1", "speak")), (19, say("lamp-tasks-try-a1", 24)),
+ # A: days-left make (signed out), tried run passes, said-on line with no uses (grants speak only), then the run
+ "j/A.DAYS": j([(1, V + "request 101: a skill to make: asked"), (18, tryrun("make-try-task-a1", "speak")), (19, say("lamp-tasks-try-a1", 24)),
                 (20, tryline(0, 1)), (30, KEPT(29812)), (30.5, SAIDON(86, False)), (31, pieces(102, 86))]),
- "j/A.WEEKASK": j([(1, started("run-a2", "week-day")), (1.1, token("run-a2", "week-day", "speak")), (1.6, say("run-a2", 22)),
+ "j/A.DAYSASK": j([(1, started("run-a2", "days-left")), (1.1, token("run-a2", "days-left", "speak")), (1.6, say("run-a2", 22)),
                    (1.7, handover("run-a2", 412)), (1.8, ended("run-a2", "its script exited 0", 1)), (2, pieces(103, 22))]),
- "out/made.lamp.sh.A": made("week-day", "run", "speak"),
+ "out/made.lamp.sh.A": made("days-left", "run", "speak"),
  "out/fence.lamp.sh.A": fence(4101),
  # B: price make (net), said-on names uses, the run: hand-over, exit 0, first say < 6 s, no agent
  "j/B.PRICE": j([(1, V + "request 111: a skill to make: asked"), (18, tryrun("make-try-task-b1", "net, speak")), (19, say("lamp-tasks-try-b1", 30)),
@@ -64,11 +64,11 @@ PASS = {
  "j/E.LONGMAKE": j([(1, V + "request 131: a skill to make: asked"), (62, V2 + "request 131: the make has no answer 60 s after its waiting line: it runs on, its one line is said, and the turn ends"), (63, pieces(132, 40))]),
  "j/E.READY": j([(1, V + "a make asked while a long make runs on: told so, nothing made"), (2, pieces(133, 50))]),
  # K: camera + speaker skill
- "j/K.LOOK": j([(1, V + "request 141: a skill to make: asked"), (18, tryrun("make-try-task-k1", "speak, look")), (19, say("lamp-tasks-try-k1", 40)),
+ "j/K.LOOK": j([(1, V + "request 141: a skill to make: asked"), (18, tryrun("make-try-task-k1", "speak, camera")), (19, say("lamp-tasks-try-k1", 40)),
                 (20, tryline(0, 1)), (30, KEPT(29100)), (30.5, SAIDON(104, True)), (31, pieces(142, 104))]),
- "j/K.LOOKASK": j([(1, started("run-k2", "desk-look")), (1.1, token("run-k2", "desk-look", "speak, look")), (2, say("run-k2", 40)),
+ "j/K.LOOKASK": j([(1, started("run-k2", "desk-look")), (1.1, token("run-k2", "desk-look", "speak, camera")), (2, say("run-k2", 40)),
                    (2.1, handover("run-k2", 500)), (2.2, ended("run-k2", "its script exited 0", 1)), (2.3, pieces(143, 40))]),
- "out/made.lamp.sh.K": made("desk-look", "run", "look,speak"),
+ "out/made.lamp.sh.K": made("desk-look", "run", "camera,speak"),
  "out/fence.lamp.sh.K": fence(4404),
  # H: restart lamp-tasks mid slow-probe run
  "j/H.SLOW.1": j([(1, started("run-h1", "slow-probe")), (1.1, token("run-h1", "slow-probe", "speak"))]),
@@ -120,10 +120,16 @@ def case(name, legs, tails="", over=None, drop=(), env=None, boot=False):
     open(os.path.join(d, "expect"), "w").write(exp + "\n")
 # name: <leg>.<expected>[-variant]   (the expected verdict of the LAST leg in LEGS TAILS)
 case("A.pass", "A")
-case("A.fail-stub-try", "A", over={"out/made.lamp.sh.A": made("week-day", "run", "speak", stub=1),
-     "j/A.WEEK": PASS["j/A.WEEK"].replace("exit 0, 30 s limit, said 1", "exit 1, 30 s limit, said 0")})
-case("A.fail-saidon-long", "A", over={"j/A.WEEK": PASS["j/A.WEEK"].replace("(86 chars, no uses named)", "(412 chars, no uses named)")})
-case("A.fail-notkept", "A", over={"j/A.WEEK": j([(1, V + "request 101: a skill to make: asked"), (30, V + "a skill made here wasn't kept in 30100 ms: its try failed")])})
+case("A.fail-stub-try", "A", over={"out/made.lamp.sh.A": made("days-left", "run", "speak", stub=1),
+     "j/A.DAYS": PASS["j/A.DAYS"].replace("exit 0, 30 s limit, said 1", "exit 1, 30 s limit, said 0")})
+case("A.fail-saidon-long", "A", over={"j/A.DAYS": PASS["j/A.DAYS"].replace("(86 chars, no uses named)", "(412 chars, no uses named)")})
+case("A.fail-norun", "A", over={"j/A.DAYSASK": j([(2, pieces(103, 40))])})
+case("A.fail-runexit", "A", over={"j/A.DAYSASK": PASS["j/A.DAYSASK"].replace("its script exited 0", "its script exited 1")})
+case("A.fail-runsaid0", "A", over={"j/A.DAYSASK": PASS["j/A.DAYSASK"].replace("exited 0, said 1", "exited 0, said 0")})
+case("A.fail-otherskill", "A", over={"j/A.DAYSASK": PASS["j/A.DAYSASK"].replace("days-left", "week-day")})
+case("A.fail-nosay", "A", over={"j/A.DAYSASK": j([(1, started("run-a2", "days-left")), (1.1, token("run-a2", "days-left", "speak")), (1.7, handover("run-a2", 412)), (1.8, ended("run-a2", "its script exited 0", 1))])})
+case("A.fail-trysaid0", "A", over={"j/A.DAYS": PASS["j/A.DAYS"].replace("exit 0, 30 s limit, said 1", "exit 0, 30 s limit, said 0")})
+case("A.fail-notkept", "A", over={"j/A.DAYS": j([(1, V + "request 101: a skill to make: asked"), (30, V + "a skill made here wasn't kept in 30100 ms: its try failed")])})
 case("B.pass", "B")
 case("B.fail-latency", "B", over={"j/B.PRICEASK": PASS["j/B.PRICEASK"].replace("@+1.8 ", "@+9.0 ")})
 case("B.fail-agent", "B", over={"j/B.PRICEASK": PASS["j/B.PRICEASK"] + "@+2.5 " + T + "skill task task-b9: started on the lamp's default agent\n"})
@@ -136,6 +142,7 @@ case("C.pass", "C")
 case("C.fail", "C", over={"j/C.PROBE": j([(1, started("run-c1", "grant-probe")), (1.6, handover("run-c1", 300)), (1.8, ended("run-c1", "its script exited 0", 1))])})
 case("C.void", "C", over={"out/probe.lamp.sh": "PROBE install grant-probe exit 1: refused\nPROBE NOT INSTALLED\n"})
 case("D.pass", "D")
+case("D.void-nolink", "D", over={"j/D.MAIL": j([(1, V + "request 121: a skill to make: asked"), (40, V + "a skill made here wasn't kept in 39020 ms: its try failed")])})
 case("D.fail-lampfiles", "D", over={"out/task.lamp.sh": PASS["out/task.lamp.sh"].replace("lamp_paths=0", "lamp_paths=2")})
 case("D.fail-slow", "D", over={"j/D.MAILASK": PASS["j/D.MAILASK"].replace("@+21.0", "@+70.0")})
 case("E.pass", "E")
@@ -144,7 +151,10 @@ case("E.void", "E", over={"j/E.READY": j([(0.5, V + "a long make was made: kept 
 case("E.void-switch", "E", over={"out/runon.lamp.sh.on": "RUNON STILL 'off'\n"})
 case("K.pass", "K")
 case("K.fail-yes", "K", over={"j/K.LOOK": PASS["j/K.LOOK"] + "@+33 " + V + "a skill made here: read back: it waits for the person's yes\n"})
-case("K.fail-notoken", "K", over={"j/K.LOOKASK": PASS["j/K.LOOKASK"].replace("[speak, look]", "[speak]")})
+case("K.fail-notoken", "K", over={"j/K.LOOKASK": PASS["j/K.LOOKASK"].replace("[speak, camera]", "[speak]")})
+# the lamp's 21 Nov line named "look" where the old check wanted it: the token's real names are camera/microphone
+case("K.fail-oldname", "K", over={"j/K.LOOK": PASS["j/K.LOOK"].replace("[speak, camera]", "[speak, look]")})
+case("K.fail-extragrant", "K", over={"j/K.LOOKASK": PASS["j/K.LOOKASK"].replace("[speak, camera]", "[speak, camera, microphone]")})
 case("H.pass", "H")
 case("H.fail-nocgroup", "H", over={"out/restart-tasks.lamp.sh": PASS["out/restart-tasks.lamp.sh"].replace("J " + SETUP.split(": ", 1)[1], "J [lamp-tasks] runs have no own cgroup: memory not handed down: Permission denied (lamp-tasks.service needs Delegate=memory cpu pids); every run step and make's try is refused")})
 case("H.fail-leafleft", "H", over={"out/cgwatch.lamp.sh.H": cg(["run-h1"], gone=False)})
@@ -183,11 +193,11 @@ case("7170.fail-notsent", "D", boot=True, over={"j/7170.MAILASK": j([(1, T + "sk
 case("7170.fail-noboot", "D", boot=True, over={"cmd/bootid": "boot-1\n"})
 case("7170.void", " ", boot=True)
 # No linked mail (D VOID): the run asked is leg A's made skill when it is a task step, by its own clip.
-case("7170.pass-from-A", "A", boot=True, over={"out/made.lamp.sh.A": made("week-day", "task", "speak"), "j/7170.WEEKASK": PASS["j/7170.MAILASK"]})
+case("7170.pass-from-A", "A", boot=True, over={"out/made.lamp.sh.A": made("days-left", "task", "speak"), "j/7170.DAYSASK": PASS["j/7170.MAILASK"]})
 case("7170.void-A-is-a-run", "A", boot=True)
 case("7170.void-muted", "D", boot=True, over={"out/boot.lamp.sh.after": PASS["out/boot.lamp.sh.after"].replace("MUTEBOOT muted=False", "MUTEBOOT muted=True")})
 case("7170.pass-muted-yes", "D", boot=True, env={"MIC_YES": "yes"}, over={"out/boot.lamp.sh.after": PASS["out/boot.lamp.sh.after"].replace("MUTEBOOT muted=False", "MUTEBOOT muted=True"), "out/micon.lamp.sh": "RECORD_KEPT the person's record from this ROW's first micon stays\nMUTE LIFTED OK after 4s\n"})
 # U: one kit helper alone (unit.sh), against a fake lamp tree: the engine without an app choice, an old-stamped
 # mute, a refused ssh login
-for u in ("engine-env", "engine-app", "engine-none", "mute-oldstamp", "mute-timed", "mute-live", "mute-liveoff", "ssh-retry", "ssh-giveup", "ssh-other"):
+for u in ("engine-env", "engine-app", "engine-none", "mute-oldstamp", "mute-timed", "mute-live", "mute-liveoff", "ssh-retry", "ssh-giveup", "ssh-other", "fixtures"):
     case("U.pass-" + u, " ", env={"UNIT": u})
