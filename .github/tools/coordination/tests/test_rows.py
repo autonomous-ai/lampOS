@@ -67,6 +67,16 @@ class Row(unittest.TestCase):
         body = ("ROW #8180 %s on lamp-e82d build 15510: PASS\n\nLeg A was a FAIL on the kit; its rerun passed." % HEAD) + J
         self.assertEqual(rows([c("writer-a", body)], HEAD, W, "8180"), "row")
 
+    def test_a_mid_post_lamp_row_is_read_from_its_own_line(self):
+        # The Reviewer-lead's P2 on #8293: an earlier line naming a kit ("row-8053r") or saying PASS can't clear a
+        # mid-post "lamp row for #N: FAIL", and an earlier FAIL can't sink a mid-post PASS.
+        body = ("Sixth, 08:0x: kit row-8053r DRY PASS, then the real run.\n\n"
+                "lamp row for #8218 on lamp-52e6 build 12701: FAIL on leg 2") + J
+        self.assertEqual(rows([c("writer-a", body)], HEAD, W, "8218"), "none")
+        body = ("Sixth, 08:0x: the DRY run was a FAIL on the kit.\n\n"
+                "lamp row for #8218 on lamp-52e6 build 12701: PASS") + J
+        self.assertEqual(rows([c("writer-a", body)], HEAD, W, "8218"), "row")
+
     def test_failed_voided_and_fails_are_no_row(self):
         # 14 Nov (the second reader's P2 on #7041).
         for body in ("ROW #7041 abc FAILED on build 5", "ROW #7041 abc VOIDED", "ROW #7041 abc: FAILS the timer line",
