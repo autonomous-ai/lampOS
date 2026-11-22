@@ -4659,34 +4659,83 @@ mod tests {
             json!({"text":"Take my pills","time":"19:00"}),
         );
         let timer = set("set_timer", json!({"text":"Pasta","seconds":600}));
+        let label = "What should I remind you about?";
+        let anything_else = "It rings at 4:09. Anything else?";
+        let sum = "Ten. Anything else?";
         for (heard, asked, call, sets) in [
             (
                 "Take my pills.",
-                Some("Remind me at seven."),
+                Some(("Remind me at seven.", label)),
                 &reminder,
                 true,
             ),
-            ("Pasta.", Some("Set a timer for ten minutes."), &timer, true),
-            ("Ten minutes.", Some("Set a timer."), &timer, true),
+            // A reply that names the schedule itself still lends, when the
+            // lamp's question asked about the asked one (the Reviewer-lead's
+            // P2 on #8274): "remind", and "lamp" too.
+            (
+                "Remind me to take my pills.",
+                Some(("Remind me at seven.", label)),
+                &reminder,
+                true,
+            ),
+            (
+                "Charge the lamp.",
+                Some(("Remind me at seven.", label)),
+                &reminder,
+                true,
+            ),
+            (
+                "Pasta.",
+                Some(("Set a timer for ten minutes.", "What's the timer for?")),
+                &timer,
+                true,
+            ),
+            (
+                "Ten minutes.",
+                Some(("Set a timer.", "For how long?")),
+                &timer,
+                true,
+            ),
             // A fresh ask carries its own length (Fifth's HOLD on #8274):
-            // "It rings at 4:09. Anything else?" lends the old one nothing.
+            // "It rings at 4:09. Anything else?" lends the old one nothing,
+            // and only its last sentence is the question.
             (
                 "Set another timer.",
-                Some("Set a timer for ten minutes."),
+                Some(("Set a timer for ten minutes.", anything_else)),
+                &timer,
+                false,
+            ),
+            (
+                "Set another timer.",
+                Some((
+                    "Set a timer for ten minutes.",
+                    "Your timer rings at 4:09. Anything else?",
+                )),
+                &timer,
+                false,
+            ),
+            (
+                "Pasta.",
+                Some(("Set a timer for ten minutes.", anything_else)),
                 &timer,
                 false,
             ),
             (
                 "Set a timer for.",
-                Some("What's five plus five?"),
+                Some(("What's five plus five?", sum)),
                 &timer,
                 false,
             ),
             // An unrelated question's number lends nothing either.
-            ("Pasta.", Some("What's five plus five?"), &timer, false),
+            (
+                "Pasta.",
+                Some(("What's five plus five?", sum)),
+                &timer,
+                false,
+            ),
             (
                 "Take my pills.",
-                Some("Remind me tomorrow."),
+                Some(("Remind me tomorrow.", "What about?")),
                 &reminder,
                 false,
             ),
