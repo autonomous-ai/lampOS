@@ -4595,7 +4595,9 @@ one runner (a fresh home per run, the token as a file) with no new rules:
     the yes says what can go to the internet, one clause per grant ("…, so
     what the camera sees and its notes can go to the internet",
     `skill_task_yes::BESIDE_NET`; the Reviewer-lead's P2 on #7901), `air`
-    among them ("…, so its air readings can go to the internet").
+    among them ("…, so its air readings can go to the internet"), and
+    `sound` and `hear` ("what kinds of sound it hears", "when its phrases
+    are heard").
   - A `net` run sees only its own skill's folder, never another skill's:
     lamp-tasks names it beside the run's egress socket in its private 0700
     folder, `/run/lampos-tasks/egress/<egress name>.folder` (0600, made new
