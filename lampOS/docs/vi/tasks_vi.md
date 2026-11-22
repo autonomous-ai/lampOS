@@ -1857,7 +1857,12 @@ skill-start (`crates/tasks/src/skill_start.rs`), không bao giờ qua một file
   keeper, `Restart=on-failure` của chính nó) thì gateway restart theo, còn
   lamp-control stop thì gateway stop tới khi được khởi động lại (`gateway_on`
   của một round). Cái giá là gateway khởi động khoảng 60 s sau mỗi lần
-  lamp-control restart. Vòng đầu tiên sau bản cập nhật này ghi lại script
+  lamp-control restart. Vì mỗi lần khởi động đó tốn một trong
+  `StartLimitBurst=5` mỗi 600 s của gateway, unit của lamp-control trả lại lượt
+  đó trước (`ExecStartPost=-+… systemctl reset-failed
+  lamp-openclaw-gateway.service`, trước khi gateway khởi động, không có gateway
+  thì không lỗi), nên lamp-control crash loop không để gateway kẹt ở
+  `start-limit-hit` sau khi lamp-control chạy lại. Vòng đầu tiên sau bản cập nhật này ghi lại script
   namespace và unit, rồi khởi động lại gateway một lần.
 - **Socket.** Launcher gửi run id tới `/run/lampos-skill-start/start.sock`
   (0600). lamp-update sở hữu thư mục `/run/lampos-skill-start` (0755, của

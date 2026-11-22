@@ -3160,6 +3160,23 @@ fn the_gateway_restarts_with_lamp_control_when_it_shows_its_socket() {
     }
 }
 
+/// #8320 (the Reviewer-lead's P3 2): each lamp-control start restarts the
+/// gateway (`PartOf=`), so lamp-control gives the gateway its start count
+/// back first, as root, a missing gateway no error; else a lamp-control
+/// crash loop leaves the gateway at `start-limit-hit` once it is up again.
+#[test]
+fn lamp_control_gives_the_gateway_its_start_count_back() {
+    let control = include_str!("../../../../deploy/product/lamp-control.service");
+    let line = format!(
+        "ExecStartPost=-+/bin/sh -c '/usr/bin/systemctl reset-failed {UNIT} 2>/dev/null'"
+    );
+    assert_eq!(control.lines().filter(|l| *l == line).count(), 1, "{control}");
+    let service = control.find("[Service]").unwrap();
+    let install = control.find("[Install]").unwrap();
+    let at = control.find(&line).unwrap();
+    assert!(service < at && at < install);
+}
+
 /// A round of [`after_round`] with the switch on and the lines it said.
 fn round_said(lamp: &Lamp, systemd: &mut Fake) -> Vec<String> {
     let runs = Runs::new(lamp);

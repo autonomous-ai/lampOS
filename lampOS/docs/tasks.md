@@ -4644,7 +4644,12 @@ file:
   round's switch, `lamp-setup restart`, the keeper, its own
   `Restart=on-failure`) restarts the gateway, and a stop stops it until it is
   started again (a round's `gateway_on`). The cost is the gateway's start,
-  about 60 s, after each lamp-control restart. The first round after this
+  about 60 s, after each lamp-control restart. As each of those starts spends
+  one of the gateway's `StartLimitBurst=5` per 600 s, lamp-control's unit gives
+  it back first (`ExecStartPost=-+… systemctl reset-failed
+  lamp-openclaw-gateway.service`, before the gateway's start, a missing
+  gateway no error), so a lamp-control crash loop doesn't leave the gateway at
+  `start-limit-hit` once lamp-control is up again. The first round after this
   update rewrites the namespace script and the unit and restarts the gateway
   once.
 - **The socket.** The launcher sends the run id to
