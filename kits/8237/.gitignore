@@ -1,0 +1,4 @@
+row/logs/
+row/clips/*.wav
+row/clips/*-el.txt
+mock/work/

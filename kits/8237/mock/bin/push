@@ -1,0 +1,2 @@
+#!/bin/bash
+echo "PUSHCMD $*" >> $MOCK_LOG; [ $1 = push ] && echo 'PUSHED {"name": "desk-hello"}' || echo "REMOVED $2"

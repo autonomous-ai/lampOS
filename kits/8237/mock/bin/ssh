@@ -1,0 +1,10 @@
+#!/bin/bash
+# mock ssh: dispatch on the command. Lamp bodies by their "# BODY <name>" line -> fx/<case>/<name>.out, else default/.
+a="$*"; out(){ f=$MOCK_FX/$1; [ -f $f ] || f=$MOCK_FX/../../default/$1; [ -f $f ] && cat $f; }
+case "$a" in
+  *"journalctl -f"*) out journal-${LEG:-x}.txt; command sleep 30;;
+  *"journalctl -u"*) i=0; while [ $i -lt ${MOCK_STARTS:-0} ]; do echo "Started x"; i=$((i+1)); done;;
+  *sudo*) b=$(cat | sed -n 's/^# BODY \([a-z]*\)$/\1/p' | tail -1); echo "LAMP $b" >> $MOCK_LOG; out $b.out
+          [ $b = putback ] && [ -f $MOCK_FX/putback2.out ] && [ -f $MOCK_STATE/pb1 ] && { cat $MOCK_FX/putback2.out; exit 0; }; [ $b = putback ] && touch $MOCK_STATE/pb1;;
+  *) echo "SSH $a" >> $MOCK_LOG;;
+esac

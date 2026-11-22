@@ -1,0 +1,2 @@
+#!/bin/bash
+echo ${MOCK_VOL:-50}

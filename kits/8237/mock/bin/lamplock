@@ -1,0 +1,2 @@
+#!/bin/bash
+echo "LOCK $*" >> $MOCK_LOG; [ "$2" = try ] && [ -n "${MOCK_LOCKFAIL:-}" ] && { echo "held by other"; exit 1; }; exit 0

@@ -1,0 +1,11 @@
+# #8237 ROW test fixture, pushed from the runner's paired Mac (row/push.py) and removed at unrow. No shipped skill
+# under lampOS/skills carries a do.task (skills task.rs origin_refuses: only a Store or pushed skill, or one made with
+# code), so the kit pushes this one: a voice-asked run of it goes lamp-skills -> lamp-tasks -> the OpenClaw gateway.
+asks = ["desk hello"]
+kind = "installable"
+version = "1.0.0"
+tool = "desk_hello"
+grants = ["speak"]
+
+[[do]]
+task = { task = "Greet the person at the desk in one short sentence.", run = "scripts/main.py" }

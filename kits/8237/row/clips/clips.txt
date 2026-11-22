@@ -1,0 +1,2 @@
+RUN	Hey Lamp, desk hello.	1.0
+YES	Yes, go ahead.	1.0
