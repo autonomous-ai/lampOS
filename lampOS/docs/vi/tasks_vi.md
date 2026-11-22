@@ -1934,7 +1934,25 @@ skill-start (`crates/tasks/src/skill_start.rs`), không bao giờ qua một file
   chạy, trước câu trả lời, tối đa một lần mỗi lần chạy. lamp-skills đọc qua
   dòng đó tới câu trả lời (`hand_over_telling`) và nói "One moment, I'm
   getting ready." (`task::GETTING_READY_LINE`) một lần, đúng nguyên văn qua
-  say service, trên một luồng riêng. Câu này không bao giờ nêu tên agent,
+  say service, trên một luồng riêng (`hand_over_saying_getting_ready`).
+  Câu này được yêu cầu như câu trả lời cho cuộc trò chuyện đã yêu cầu lần
+  chạy (`"answers": true`): câu trả lời của chính lệnh gọi đã báo cho
+  giọng nói rằng lần chạy là của người dùng (`task_run`, được giữ dưới dạng
+  `MadeRunNow` trước khi việc giao bắt đầu), nên câu này đi qua cuộc trò
+  chuyện đang mở nhưng vẫn chờ câu trả lời của chính đèn, lời đèn đang nói
+  và bất kỳ ai đang nói, không bao giờ phát đè lên chúng. Câu này được rút
+  lại (`{"cancel":true}` của say service) khi câu trả lời của lần chạy được
+  đọc trước lúc giọng nói bắt đầu nói nó, nên nó không bao giờ được nói sau
+  câu trả lời; đã bắt đầu thì được nói trọn. `expires_in_ms` 20 s của nó
+  (`task::GETTING_READY_EXPIRES_MS`) chỉ là chốt chặn dự phòng (HOLD của
+  Jarvis trên #8237, first builder đồng ý). **Một lamp-tasks cũ hơn:** một
+  vòng cập nhật khởi động lại lamp-skills và lamp-tasks không theo thứ tự
+  cố định, và một lamp-tasks được đặt lại riêng cũng cũ hơn. Một lamp-tasks
+  từ trước #7354 từ chối trường này như một dòng nó không đọc được
+  (`bad_request`, "not a skill's task line", trước khi bất cứ gì được tạo
+  hay chạy), nên lamp-skills gửi lại dòng đó một lần nữa không kèm trường
+  (`task::without_getting_ready_if_refused`, `hand_over_asking`): việc chạy
+  đúng một lần, không có câu báo (HOLD của Twelve trên #8237). Câu này không bao giờ nêu tên agent,
   và không có gì nói là đã sẵn sàng: câu trả lời của lần chạy vẫn đến như
   trước. Lần chạy của trigger, lịch hay ứng dụng không yêu cầu, và việc
   chờ kết thúc sớm hơn thì không ghi gì. Điểm móc là việc chờ khởi động

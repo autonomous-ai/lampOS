@@ -4721,8 +4721,26 @@ file:
   answer, at most once a run. lamp-skills reads past it to the answer
   (`hand_over_telling`) and says "One moment, I'm getting ready."
   (`task::GETTING_READY_LINE`) once, as exact words through the say
-  service, on a thread of its own. It never names the agent, and nothing
-  says ready: the run's own answer follows as before. A trigger's, a
+  service, on a thread of its own (`hand_over_saying_getting_ready`).
+  It is asked as the answer to the conversation that asked for the run
+  (`"answers": true`): the call's own answer already told the voice the
+  run is the person's (`task_run`, kept as `MadeRunNow` before the
+  hand-over starts), so the line passes the open conversation but still
+  waits for the lamp's own reply, its speech and anyone speaking, never
+  playing over them. It is taken back (the say service's
+  `{"cancel":true}`) when the run's answer is read before the voice began
+  it, so it is never said after the answer; once begun it is left whole.
+  Its `expires_in_ms` of 20 s (`task::GETTING_READY_EXPIRES_MS`) is only
+  a backstop (Jarvis's HOLD on #8237, the first builder's yes). **An
+  earlier lamp-tasks:** an update round restarts lamp-skills and
+  lamp-tasks in no fixed order, and a lamp-tasks put back alone is
+  earlier too. One from before #7354 refuses the field as a line it can't
+  parse (`bad_request`, "not a skill's task line", before anything is
+  minted or run), so lamp-skills sends the line once more without it
+  (`task::without_getting_ready_if_refused`, `hand_over_asking`): the
+  task runs once, with no line (Twelve's HOLD on #8237). It never names
+  the agent, and nothing says ready: the run's own answer follows as
+  before. A trigger's, a
   schedule's or the app's run doesn't ask, and a wait that ends sooner
   writes nothing. The hook is any engine's start-up wait; today only
   OpenClaw's gateway has one (a Hermes run is one `hermes chat -q`, with
