@@ -4658,9 +4658,19 @@ mod tests {
         );
         let timer = set("set_timer", json!({"text":"Pasta","seconds":600}));
         for (heard, asked, call, sets) in [
-            ("Take my pills.", Some("Remind me at seven."), &reminder, true),
+            (
+                "Take my pills.",
+                Some("Remind me at seven."),
+                &reminder,
+                true,
+            ),
             ("Pasta.", Some("Set a timer for ten minutes."), &timer, true),
-            ("Take my pills.", Some("Remind me tomorrow."), &reminder, false),
+            (
+                "Take my pills.",
+                Some("Remind me tomorrow."),
+                &reminder,
+                false,
+            ),
             ("Set a timer for please.", None, &timer, false),
         ] {
             let dir = schedule_directory("how-long-asked");
