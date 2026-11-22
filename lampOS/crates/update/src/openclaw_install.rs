@@ -1020,7 +1020,7 @@ pub fn after_round_with(
     };
     let there = present(root, shown);
     if there {
-        keep_gateway(root, systemd, gateway, say);
+        keep_gateway(root, systemd, gateway, true, say);
     }
     // #6685: the entry recorded is added again every round with the
     // gateway up (an add of an entry there writes nothing), as a factory
@@ -1235,15 +1235,17 @@ pub fn gateway_wanted(by_default: bool, said: Option<Said>) -> Gateway {
 }
 
 /// The gateway kept as [`Gateway`] says, with OpenClaw there: wanted,
-/// [`gateway_on`]; not wanted, [`gateway_idle`]; unknown, nothing.
+/// [`gateway_on`] (`round`: a round's look, the only one that resets a
+/// `failed` gateway); not wanted, [`gateway_idle`]; unknown, nothing.
 pub fn keep_gateway(
     root: &Path,
     systemd: &mut dyn Systemd,
     gateway: Gateway,
+    round: bool,
     say: &mut dyn FnMut(&str),
 ) {
     match gateway {
-        Gateway::Wanted => gateway_on(root, systemd, say),
+        Gateway::Wanted => gateway_on(root, systemd, round, say),
         Gateway::NotWanted => gateway_idle(root, systemd, say),
         Gateway::Unknown => {}
     }
@@ -1288,18 +1290,22 @@ pub fn keep_between_rounds(
     let down = active
         .as_deref()
         .is_some_and(|active| active == "inactive" || active == "failed");
+    // A `failed` gateway (past its start limit) is left to the next round,
+    // which resets it (#8238): a reset every look would undo the limit
+    // that ends a crash loop.
+    let failed = active.as_deref() == Some("failed");
     let settled = match gateway {
-        Gateway::Wanted => enabled && up,
+        Gateway::Wanted => enabled && (up || failed),
         Gateway::NotWanted => !enabled && down,
         Gateway::Unknown => true,
     };
     if !settled {
-        if gateway == Gateway::Wanted {
+        if gateway == Gateway::Wanted && !failed {
             say(&format!(
                 "{UNIT} started: OpenClaw is the lamp's agent (#8105)"
             ));
         }
-        keep_gateway(root, systemd, gateway, say);
+        keep_gateway(root, systemd, gateway, false, say);
         if gateway == Gateway::Wanted && one_path && keep_run_entry(run, say) == Some(false) {
             say(&format!(
                 "agent {RUN_AGENT}'s allow-list entry not taken after the gateway started; the next round asks the one-shot"
@@ -1341,10 +1347,13 @@ fn gateway_idle(root: &Path, systemd: &mut dyn Systemd, say: &mut dyn FnMut(&str
 /// The gateway always on with OpenClaw there (the owner on #6226): enabled
 /// at boot by [`WANTS`] (made when missing, as `systemctl enable` does,
 /// systemd then reloaded) and started when it is down (#8238): `inactive`
-/// (an exit the unit took as done) or `failed` (past its start limit),
-/// whose `reset-failed` comes first and is said. Running, or a state
-/// systemd doesn't say, it is left as it is.
-fn gateway_on(root: &Path, systemd: &mut dyn Systemd, say: &mut dyn FnMut(&str)) {
+/// (an exit the unit took as done) or, on a round's look (`round`),
+/// `failed` (past its start limit), whose `reset-failed` comes first and is
+/// said. Only a round resets it, so `StartLimitBurst` still ends a crash
+/// loop between rounds, one reset per round. Running, or a state systemd
+/// doesn't say, it is left as it is: a down gateway whose state can't be
+/// read waits for the next look.
+fn gateway_on(root: &Path, systemd: &mut dyn Systemd, round: bool, say: &mut dyn FnMut(&str)) {
     let wants = on(root, WANTS);
     let target = format!("/{}/{UNIT}", crate::writer_unit::FOLDER);
     if fs::read_link(&wants).ok().as_deref() != Some(Path::new(&target)) {
@@ -1368,7 +1377,7 @@ fn gateway_on(root: &Path, systemd: &mut dyn Systemd, say: &mut dyn FnMut(&str))
     }
     match gateway_state(systemd).as_deref() {
         Some("inactive") => {}
-        Some("failed") => match systemd.reset_failed(UNIT) {
+        Some("failed") if round => match systemd.reset_failed(UNIT) {
             Ok(()) => say(&format!(
                 "{UNIT} failed: reset-failed, so it can be started again (#8238)"
             )),
@@ -1972,6 +1981,11 @@ fn steps(
     }
     // Always on (the owner on #6226): started now, or restarted so one
     // running an older OpenClaw runs the new one. The round enables it.
+    // A gateway past its start limit refuses a restart: its failed state
+    // is reset first (#8238), a no-op for any other.
+    if let Err(why) = run(&["systemctl", "reset-failed", UNIT].map(str::to_owned)) {
+        say(&format!("{UNIT} not reset-failed: {why}"));
+    }
     if let Err(why) = run(&["systemctl", "restart", UNIT].map(str::to_owned)) {
         return fail("gateway", format!("systemctl restart {UNIT}: {why}"), say);
     }
