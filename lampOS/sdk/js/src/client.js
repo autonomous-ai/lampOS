@@ -79,6 +79,9 @@ export const APP_SOCKET = '/run/lampos-apps/apps.sock';
 const PANEL_TITLE_MAX = 40;
 const PANEL_LINES_MAX = 6;
 const PANEL_LINE_MAX = 80;
+// How long an app's context line lasts unless it says (`context`): a minute. The lamp judges the line and its time
+// (at most 120 characters, 1 ms to 10 minutes), as it judges a fact's words (`remember`, 280 once tidied).
+const CONTEXT_FOR_MS = 60_000;
 
 function agentSocket() {
   const path = process.env.LAMPOS_AGENT_SOCKET || AGENT_SOCKET;
@@ -909,6 +912,28 @@ export class Lamp {
     if (/\p{Cc}/u.test(title) || lines.some((line) => /\p{Cc}/u.test(line))) throw bad('text, no control characters');
     if (lines.some((line) => line === '')) throw bad('a line is text, never empty (leave it out)');
     return (await this.request('app.panel.set', { title, lines: [...lines] })).rev;
+  }
+
+  // Keep one fact for the lamp's known person, marked with this app as its source (the manifest's `remember` grant).
+  // The lamp tidies the words first (links, markup and double quotes left out) and refuses, never cuts, what is left
+  // over 280 characters (`BadRequestError`). True once memory kept it. Refused `off`, `no_grant`, `private`,
+  // `unavailable`, `rate` (three a minute an app; `retryMs`) or `refused` (memory did not keep it).
+  async remember(text) { return Boolean((await this.request('apps.remember', { text })).kept); }
+
+  // Tell the voice a live line beside what the person says, for `forMs` (1 ms to 10 minutes), never kept: renew it
+  // while it holds ('set 2 of 3, 7 squats'). An empty line clears it (`clearContext`). The `remember` grant, as
+  // `remember`'s refusals, and `bad_request` for a line over 120 characters. Needs a lamp build with `apps.context`;
+  // an older one refuses it.
+  async context(line, { forMs = CONTEXT_FOR_MS } = {}) {
+    if (line === '') return this.clearContext();
+    await this.request('apps.context', { line, for_ms: forMs });
+    return undefined;
+  }
+
+  // Take this app's context line back at once (it goes by itself after its `forMs`).
+  async clearContext() {
+    await this.request('apps.context', { line: '' });
+    return undefined;
   }
 
   async get(...states) { return (await this.request('get', { state: states })).state ?? {}; }

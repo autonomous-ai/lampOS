@@ -599,6 +599,12 @@ class FakeLamp:
         self.app_panel: dict[str, Any] | None = None
         self._panel_rev = 0
         self._panel_at: float | None = None
+        # What the app told Lamp's memory: the facts kept (`apps.remember`, three a minute an app, as
+        # app_remember.rs; a refused ask is not counted) and the live context line (`apps.context`, `{line, for_ms}`
+        # or None once cleared). `refuse_next("apps.remember", code)` makes the next one refused with any code.
+        self.app_facts: list[str] = []
+        self.app_context: dict[str, Any] | None = None
+        self._remembered_at: list[float] = []
         self.app_path: str | None = None
         self._app_server = None
         self._app_dir: tempfile.TemporaryDirectory | None = None
@@ -1379,6 +1385,8 @@ class FakeLamp:
     def _needs(self, op: str, request: dict) -> list[str]:
         if op == "phrases.set":
             return ["hear"]
+        if op in ("apps.remember", "apps.context"):
+            return ["remember"]
         if op == "subscribe":
             return sorted({self.EVENT_GRANT[e] for e in request.get("events", []) if e in self.EVENT_GRANT})
         if op == "get":
@@ -1576,6 +1584,9 @@ class FakeLamp:
 
     async def _app_op(self, ws, request: dict) -> None:
         op, id_ = request["op"], request["id"]
+        if op in ("apps.remember", "apps.context"):
+            await self._app_memory(ws, request)
+            return
         if op == "phrases.set":
             phrases = request["phrases"]
             if any(sum(unicodedata.category(c)[0] in "LMN" for c in phrase) < 8 for phrase in phrases):
@@ -1606,6 +1617,38 @@ class FakeLamp:
             self._panel_rev += 1
             self.app_panel = {"title": request["title"], "lines": list(request["lines"]), "rev": self._panel_rev}
             await self._ok(ws, id_, rev=self._panel_rev)
+
+    async def _app_memory(self, ws, request: dict) -> None:
+        """`apps.remember` and `apps.context`, as lamp-control answers them: nothing while the lamp is private, a
+        fact's words at most 280 characters (the lamp tidies them first; this fake only strips them) and three facts
+        a minute; a context line at most 120 characters for 1 ms to 10 minutes, an empty line with no time its clear."""
+        op, id_ = request["op"], request["id"]
+        if self.state["lamp"]["private"]:
+            await self._refuse(ws, id_, "private", "Lamp is private")
+            return
+        if op == "apps.context":
+            line, for_ms = request.get("line"), request.get("for_ms")
+            if line == "" and for_ms is None:
+                self.app_context = None
+            elif not isinstance(line, str) or not line or len(line) > 120 or not (_whole(for_ms) and 1 <= for_ms <= 600_000):
+                await self._refuse(ws, id_, "bad_request", "a line of 1 to 120 characters for 1 to 600000 ms")
+                return
+            else:
+                self.app_context = {"line": line, "for_ms": for_ms}
+            await self._ok(ws, id_)
+            return
+        text = " ".join(str(request.get("text", "")).split())
+        if not text or len(text) > 280:
+            await self._refuse(ws, id_, "bad_request", "text: 1 to 280 characters once tidied")
+            return
+        now = self.clock()
+        self._remembered_at = [at for at in self._remembered_at if now - at < 60]
+        if len(self._remembered_at) >= 3:
+            await self._refuse(ws, id_, "rate", "three facts a minute", retry_ms=max(1, round((60 - (now - self._remembered_at[0])) * 1000)))
+            return
+        self._remembered_at.append(now)
+        self.app_facts.append(text)
+        await self._ok(ws, id_, kept=True)
 
     async def _tell_apps(self, event: str, only_phrase: str | None = None, **fields: Any) -> None:
         frame = json.dumps({"ev": event, "at": _now(), **fields})

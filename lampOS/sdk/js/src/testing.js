@@ -468,6 +468,12 @@ export class FakeLamp {
     this.appPanel = null;
     this.panelRev = 0;
     this.panelAt = null;
+    // What the app told Lamp's memory: the facts kept (`apps.remember`, three a minute an app, as app_remember.rs; a
+    // refused ask is not counted) and the live context line (`apps.context`, `{ line, forMs }` or null once cleared).
+    // `refuseNext('apps.remember', code)` makes the next one refused with any code.
+    this.appFacts = [];
+    this.appContext = null;
+    this.rememberedAt = [];
     this.localPath = null;
     this.localWs = new Set();
     this.tokens = new Map();
@@ -1149,6 +1155,7 @@ export class FakeLamp {
 
   needs(op, request) {
     if (op === 'phrases.set') return ['hear'];
+    if (op === 'apps.remember' || op === 'apps.context') return ['remember'];
     if (op === 'subscribe') return [...new Set((request.events ?? []).map((e) => FakeLamp.EVENT_GRANT[e]).filter(Boolean))];
     if (op === 'get') return [...new Set((request.state ?? []).map((s) => FakeLamp.STATE_GRANT[s]).filter(Boolean))];
     if (op === 'look') return ['face', 'hand'].includes(request.at) ? ['body', 'look'] : ['body'];
@@ -1248,6 +1255,7 @@ export class FakeLamp {
     const { op, id } = request;
     const bad = (why) => this.refuse(ws, id, 'bad_request', why);
     const text = (value) => typeof value === 'string' && !/\p{Cc}/u.test(value);
+    if (op === 'apps.remember' || op === 'apps.context') return this.appMemory(ws, request);
     if (op === 'phrases.set') {
       const { phrases } = request;
       if (!Array.isArray(phrases) || phrases.some((p) => typeof p !== 'string' || p.length < 1 || [...p].length > 64 || !text(p))) return bad('phrases: 1 to 64 characters each, no control characters');
@@ -1280,6 +1288,37 @@ export class FakeLamp {
     this.panelRev += 1;
     this.appPanel = { title, lines: [...lines], rev: this.panelRev };
     return this.ok(ws, id, { rev: this.panelRev });
+  }
+
+  // `apps.remember` and `apps.context`, as lamp-control answers them: nothing while the lamp is private, a fact's words
+  // at most 280 characters (the lamp tidies them first; this fake only strips them) and three facts a minute; a
+  // context line at most 120 characters for 1 ms to 10 minutes, an empty line with no time its clear.
+  appMemory(ws, request) {
+    const { op, id } = request;
+    const fields = Object.keys(request).filter((k) => !['id', 'op'].includes(k));
+    if (this.state.lamp.private) return this.refuse(ws, id, 'private', 'Lamp is private');
+    if (op === 'apps.context') {
+      const { line, for_ms: forMs } = request;
+      if (fields.some((k) => !['line', 'for_ms'].includes(k))) return this.refuse(ws, id, 'bad_request', 'line and for_ms only');
+      if (line === '' && forMs === undefined) {
+        this.appContext = null;
+        return this.ok(ws, id);
+      }
+      if (typeof line !== 'string' || !line || [...line].length > 120 || !Number.isInteger(forMs) || forMs < 1 || forMs > 600_000) {
+        return this.refuse(ws, id, 'bad_request', 'a line of 1 to 120 characters for 1 to 600000 ms');
+      }
+      this.appContext = { line, forMs };
+      return this.ok(ws, id);
+    }
+    if (fields.some((k) => k !== 'text')) return this.refuse(ws, id, 'bad_request', 'text only');
+    const text = typeof request.text === 'string' ? request.text.split(/\s+/u).filter(Boolean).join(' ') : '';
+    if (!text || [...text].length > 280) return this.refuse(ws, id, 'bad_request', 'text: 1 to 280 characters once tidied');
+    const at = this.clock();
+    this.rememberedAt = this.rememberedAt.filter((t) => at - t < 60_000);
+    if (this.rememberedAt.length >= 3) return this.refuse(ws, id, 'rate', 'three facts a minute', Math.max(1, Math.round(60_000 - (at - this.rememberedAt[0]))));
+    this.rememberedAt.push(at);
+    this.appFacts.push(text);
+    return this.ok(ws, id, { kept: true });
   }
 
   tellApps(event, fields = {}, { phrase } = {}) {

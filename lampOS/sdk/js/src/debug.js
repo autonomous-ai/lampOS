@@ -15,8 +15,9 @@ import { createHmac, randomBytes } from 'node:crypto';
 // the person's mail, calendar and the like: never logged.
 // An installed app's panel text (`title`, `lines`) and the owner's `settings` values are the app's own and the
 // person's: never logged; the keys that `changed` and a manifest `trigger`'s name are shown.
+// An app's context line (`apps.context` `line`) is what the person is doing now: never logged.
 // A `pose` answer's keypoints are where a person's body is in a picture: never logged.
-export const SECRET = new Set(['proof', 'sig', 'key', 'nonce', 'pin', 'fp', 'value', 'prefix', 'token', 'args', 'result', 'title', 'lines', 'settings', 'keypoints']);
+export const SECRET = new Set(['proof', 'sig', 'key', 'nonce', 'pin', 'fp', 'value', 'prefix', 'token', 'args', 'result', 'title', 'lines', 'line', 'settings', 'keypoints']);
 // Fields given only as a summary: a said text or a turn's prompt, a pushed
 // skill part's bytes, a camera picture.
 export const SUMMARISED = new Set(['text', 'prompt', 'data', 'jpeg']);

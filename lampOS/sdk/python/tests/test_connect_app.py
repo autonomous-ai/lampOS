@@ -10,6 +10,7 @@ import pytest
 
 from lampos import Lamp, LampError
 from lampos.client import APP_SOCKET_ENV
+from lampos.errors import BY_CODE
 from lampos.testing import FakeLamp
 
 
@@ -252,5 +253,100 @@ def test_an_empty_panel_line_is_refused_by_the_sdk_and_the_fake_alike():
                 with pytest.raises(LampError) as refused:
                     await lamp.request("app.panel.set", title="ok", lines=["a", "", "b"])
                 assert refused.value.code == "bad_request"
+
+    run(go())
+
+
+# What an app tells Lamp's memory: `remember` (apps.remember) and `context` (apps.context), with the `remember` grant.
+MEMORY_GRANTS = ("speak", "hear", "remember")
+MEMORY_REFUSALS = ("off", "no_grant", "bad_request", "private", "unavailable", "rate", "refused")
+
+
+def test_remember_keeps_a_fact_and_says_kept():
+    async def go():
+        async with FakeLamp(app=True, app_grants=MEMORY_GRANTS) as fake:
+            async with await Lamp.connect_app(path=fake.app_path) as lamp:
+                assert await lamp.remember("squats 3x10, the 6th too shallow") is True
+                assert fake.asked("apps.remember") == [{"text": "squats 3x10, the 6th too shallow"}]
+                assert fake.app_facts == ["squats 3x10, the 6th too shallow"]
+
+    run(go())
+
+
+def test_remember_and_context_need_the_remember_grant():
+    async def go():
+        async with FakeLamp(app=True) as fake:
+            async with await Lamp.connect_app(path=fake.app_path) as lamp:
+                for call in (lamp.remember("squats"), lamp.context("set 1 of 3")):
+                    with pytest.raises(BY_CODE["no_grant"]):
+                        await call
+
+    run(go())
+
+
+def test_each_memory_refusal_is_its_own_error():
+    async def go():
+        async with FakeLamp(app=True, app_grants=MEMORY_GRANTS) as fake:
+            async with await Lamp.connect_app(path=fake.app_path) as lamp:
+                for op, call in (("apps.remember", lambda: lamp.remember("squats")), ("apps.context", lambda: lamp.context("set 1 of 3"))):
+                    for code in MEMORY_REFUSALS:
+                        fake.refuse_next(op, code, f"the lamp says {code}", 1234 if code == "rate" else None)
+                        with pytest.raises(BY_CODE[code]) as refused:
+                            await call()
+                        assert (refused.value.code, refused.value.why) == (code, f"the lamp says {code}")
+                        assert refused.value.retry_ms == (1234 if code == "rate" else None)
+                assert fake.app_facts == [] and fake.app_context is None
+
+    run(go())
+
+
+def test_remember_is_three_a_minute_with_retry_ms():
+    async def go():
+        async with FakeLamp(app=True, app_grants=MEMORY_GRANTS) as fake:
+            async with await Lamp.connect_app(path=fake.app_path) as lamp:
+                for n in range(3):
+                    assert await lamp.remember(f"fact {n}")
+                with pytest.raises(BY_CODE["rate"]) as over:
+                    await lamp.remember("fact 3")
+                assert 0 < over.value.retry_ms <= 60_000
+                assert fake.app_facts == ["fact 0", "fact 1", "fact 2"]
+
+    run(go())
+
+
+def test_remember_is_refused_while_private_and_over_280():
+    async def go():
+        async with FakeLamp(app=True, app_grants=MEMORY_GRANTS) as fake:
+            async with await Lamp.connect_app(path=fake.app_path) as lamp:
+                with pytest.raises(BY_CODE["bad_request"]):
+                    await lamp.remember("x" * 281)
+                await fake.set_private(True)
+                with pytest.raises(BY_CODE["private"]):
+                    await lamp.remember("squats")
+                with pytest.raises(BY_CODE["private"]):
+                    await lamp.context("set 1 of 3")
+                assert fake.app_facts == []
+
+    run(go())
+
+
+def test_context_is_renewed_each_rep_and_cleared_at_the_end():
+    async def go():
+        async with FakeLamp(app=True, app_grants=MEMORY_GRANTS) as fake:
+            async with await Lamp.connect_app(path=fake.app_path) as lamp:
+                await lamp.context("set 2 of 3, 6 squats", for_ms=30_000)
+                await lamp.context("set 2 of 3, 7 squats", for_ms=30_000)
+                assert fake.app_context == {"line": "set 2 of 3, 7 squats", "for_ms": 30_000}
+                await lamp.context("set 3 of 3, 1 squat")
+                assert fake.app_context == {"line": "set 3 of 3, 1 squat", "for_ms": 60_000}
+                await lamp.clear_context()
+                assert fake.app_context is None
+                await lamp.context("again")
+                await lamp.context("")
+                assert fake.app_context is None
+                assert fake.asked("apps.context")[-1] == {"line": ""}
+                for line, for_ms in (("x" * 121, 1000), ("ok", 0), ("ok", 600_001)):
+                    with pytest.raises(BY_CODE["bad_request"]):
+                        await lamp.context(line, for_ms=for_ms)
 
     run(go())
