@@ -1139,6 +1139,112 @@ fn a_round_starts_a_gateway_left_down_only_while_it_is_wanted() {
     assert!(!asked.contains(&"reset-failed"), "{asked:?}");
 }
 
+/// #8238 (Thirteen's HOLD, the first builder's 05:02): with the switch on,
+/// the 10 s look between rounds leaves a `failed` gateway to the next
+/// round, which is the only one to reset it, so `StartLimitBurst` still
+/// ends a crash loop between rounds.
+#[test]
+fn only_a_round_resets_a_failed_gateway() {
+    let lamp = Lamp::new();
+    lamp.harness_there();
+    round(&lamp, &mut Fake::default(), true, 1);
+    assert_eq!(
+        install(&lamp, &Runs::new(&lamp), 2).unwrap().install,
+        "installed"
+    );
+    round(&lamp, &mut Fake::default(), true, 3);
+    let wanted = gateway_wanted(
+        true,
+        Some(Said {
+            default: Some("openclaw".to_owned()),
+            openclaw_in_use: Some(false),
+        }),
+    );
+    assert_eq!(wanted, Gateway::Wanted);
+    for _ in 0..2 {
+        let mut systemd = Fake {
+            gateway: Some("failed"),
+            active: Some("inactive"),
+            ..Fake::default()
+        };
+        let mut said = Vec::new();
+        keep_between_rounds(
+            lamp.root(),
+            &mut systemd,
+            wanted,
+            false,
+            &mut Runs::new(&lamp).runner(),
+            &mut |line: &str| said.push(line.to_owned()),
+        );
+        assert_eq!(systemd.asked, ["state", "gateway-state"]);
+        assert!(said.is_empty(), "{said:?}");
+    }
+    let mut systemd = Fake {
+        gateway: Some("failed"),
+        ..Fake::default()
+    };
+    after_round_with(
+        lamp.root(),
+        &lamp.records(),
+        sk(true),
+        wanted,
+        &mut systemd,
+        &mut Runs::new(&lamp).runner(),
+        4,
+        Ok(crate::hermes_schedule::Window::Reached),
+        &mut quiet(),
+    );
+    assert!(
+        systemd
+            .asked
+            .ends_with(&["gateway-state", "reset-failed", "start-gateway"]),
+        "{:?}",
+        systemd.asked
+    );
+}
+
+/// #8238 (the first builder's 04:59): a first install whose gateway hit
+/// its start limit (`failed`, which refuses a restart until reset) resets
+/// it before its restart, and is installed, not failed at "gateway".
+#[test]
+fn a_first_install_resets_a_gateway_past_its_start_limit_before_its_restart() {
+    let lamp = Lamp::new();
+    fs::write(lamp.unit(), UNIT_TEXT).unwrap();
+    lamp.ask();
+    let runs = Runs::new(&lamp);
+    let mut inner = runs.runner();
+    let mut reset = false;
+    let mut run = |argv: &[String]| {
+        let line = argv.join(" ");
+        reset |= line == format!("systemctl reset-failed {UNIT}");
+        if line == format!("systemctl restart {UNIT}") && !reset {
+            return Err(format!(
+                "Job for {UNIT} failed. See \"systemctl status\": start request repeated too quickly"
+            ));
+        }
+        inner(argv)
+    };
+    let said = install_with(
+        lamp.root(),
+        &lamp.records(),
+        &mut run,
+        &mut || 1,
+        &mut quiet(),
+        &kit(),
+    )
+    .unwrap()
+    .unwrap();
+    assert_eq!(
+        (said.install.as_str(), said.error.as_deref()),
+        ("installed", None)
+    );
+    drop(inner);
+    assert!(
+        runs.position(&format!("systemctl reset-failed {UNIT}"))
+            < runs.position(&format!("systemctl restart {UNIT}"))
+    );
+}
+
 /// (#6226) npm hung 38 min at its extract on lamp-c0a4 with no output
 /// flags: `npm ci` runs with `--loglevel=http` (and no install scripts),
 /// and each long step under a hard 20 min bound. One that runs past it
