@@ -1271,7 +1271,11 @@ mod tests {
                     let column = |played: &Clip| -> Vec<i16> {
                         played.frames.iter().map(|frame| frame[joint]).collect()
                     };
-                    if level == 5 && column(under) == column(clip) {
+                    // Nor may a joint where level 2 sits below level 1
+                    // (V2's (A) on #8307, pinned as `pinned_below_one`).
+                    if (level == 5 && column(under) == column(clip))
+                        || (level == 2 && BELOW_ONE.contains(&(clip.name, joint)))
+                    {
                         continue;
                     }
                     let now = swing(now, here.clone(), joint);
@@ -1291,6 +1295,17 @@ mod tests {
             }
         }
     }
+
+    /// Clip and joint where the capped level 2 sits below level 1, under the
+    /// floor's 10% (V2's (A) on #8307).
+    const BELOW_ONE: [(&str, usize); 6] = [
+        ("curious", 2),
+        ("happy", 3),
+        ("surprised", 0),
+        ("confused", 0),
+        ("confused", 2),
+        ("dance_hype", 3),
+    ];
 
     /// `clip` at `level` 2 to 4 capped as [`under_five`] caps it, but with
     /// no floor at this level or any above it.
