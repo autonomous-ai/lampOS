@@ -11073,7 +11073,7 @@ fn nod_with_silence(silent: Option<(Duration, Duration)>) -> (Fates, Duration, D
     );
     let mut played = run.2.iter().filter(|s| s.2 == Some("nod")).map(|s| s.0);
     let first = played.next().unwrap();
-    let last = played.last().unwrap();
+    let last = played.next_back().unwrap();
     (run, first, last)
 }
 
