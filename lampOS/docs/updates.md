@@ -2576,7 +2576,8 @@ new updater's first round finds the lamp up to date, so the files go
 within one `--every-s` of the update. The round's sandbox cannot write
 `/var/log`, so it asks systemd for the same transient unit the boot run
 does (`Systemd::systemd_run`, which runs only `systemd-run`). Each file is
-said by name and size as it goes; once none is left the round finds
+said by name and size once removed. A removal that fails is said once per
+updater run for each distinct error, never again each round. Once none is left the round finds
 nothing and runs nothing, so a round, install and the boot run never
 repeat one another. With `/etc/lampOS/sysstat-on`, nothing is removed.
 journald is never restarted or signalled. The tests use the round's fake

@@ -1164,8 +1164,11 @@ As root, on a lamp with the base image (`crates/update/src/install.rs`):
    `install::sysstat_kept_removed`) goes at the same boot run, at install, and
    at every round that applies (#7254's third part, [updates.md](updates.md),
    "sysstat's kept files at a round"): every plain file named `sa` or `sar` and digits directly in
-   `/var/log/sysstat` (`sa18`, `sar17`), each said first by name and size
-   (`sysstat's kept file removed: /var/log/sysstat/sa18 (146028 bytes)`).
+   `/var/log/sysstat` (`sa18`, `sar17`), each said by name and size once
+   removed (`sysstat's kept file removed: /var/log/sysstat/sa18 (146028 bytes)`).
+   A removal that fails is said (`sysstat's kept files were not removed: …`)
+   once per process for each distinct error, so a round that fails the same
+   way every `--every-s` doesn't fill the log disk it is meant to free.
    A link, a folder or any other name is never followed or touched. With
    `/etc/lampOS/sysstat-on` there, nothing is removed. `lamp-region.service`
    may write only `/etc`, and no round changes that unit in a home
