@@ -22,7 +22,8 @@ folder: `lamp-turn-end`, always, and `lamp-same-voice` when the build
 carries it ([same-voice.md](../../docs/same-voice.md)). The latter runs
 only when `LAMP_SAME_VOICE_MODEL` is set, which `lamp-voice.service` sets
 since 4 November with `LAMP_SAME_VOICE_FOR=services`: the prints are for
-the linked services alone, and no conversation rule reads them.
+the linked services alone, and no conversation rule reads them but the join
+of cut words, which `LAMP_JOIN_SAME_VOICE=on` lets read them (#8003).
 
 | File | What |
 |---|---|
