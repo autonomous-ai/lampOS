@@ -211,6 +211,13 @@ const ARRIVED_STEPS: u8 = 15;
 /// reply on the wire, the next three exchanges tripped over it, and the lamp
 /// had no body until someone started it again.
 const WIRE_STEPS: u8 = 25;
+/// Steps in a row of a failing read or write (`WIRE_STEPS`' count) that end
+/// a gesture playing, said as [`GESTURE_BLIND_FATE`]: a tenth of a second,
+/// a frame held long enough to be seen as a stall. Fewer hold the frame and
+/// the gesture goes on: one missed read cut a level 5 waltz from 8.40 s to
+/// 4.78 s on lamp-52e6 (#8266).
+const GESTURE_BLIND_STEPS: u8 = 5;
+const GESTURE_BLIND_FATE: &str = "ended: 5 servo reads in a row were missed";
 
 /// The joints this body commands, in the order of every array of three here.
 /// The glance a look away begins with, in counts of the base's turn: a
@@ -7928,8 +7935,7 @@ fn run_on_dyn<P: PortIo, R: Runtime>(
             relaxed = false;
         }
         // A gesture is for a lamp standing still at its full height.
-        let upright = leaving.is_none()
-            && !blind
+        let stood_still = leaving.is_none()
             && standing.is_some_and(|up| {
                 asked_now
                     .stand_share
@@ -7938,6 +7944,13 @@ fn run_on_dyn<P: PortIo, R: Runtime>(
                     && stand >= 1.0
                     && stand_velocity == 0.0
             });
+        let upright = stood_still && !blind;
+        // One playing goes on through a read or write that failed for a
+        // moment: the joints hold the frame they have (nothing new is
+        // asked while blind), its clock goes on. A miss that lasts
+        // `GESTURE_BLIND_STEPS` ends it, said (#8266).
+        let blind_steps = misses.max(unsent);
+        let plays_on = stood_still && blind_steps < GESTURE_BLIND_STEPS;
         // Anything alive that stands with nothing to do shifts a little
         // now and then, not on a clock: after a wait drawn at random, and each
         // time a different small move (`crate::idle`). It stops the moment there is something to do:
@@ -8317,13 +8330,13 @@ fn run_on_dyn<P: PortIo, R: Runtime>(
             ) {
                 // Paused (#2602): eased to a hold where it is; its own clock
                 // stands still meanwhile.
-                (Some((at, _, from, speed)), _) if upright => {
+                (Some((at, _, from, speed)), _) if plays_on => {
                     gesture_wanted = held_at(now.saturating_sub(at), from, speed).0;
                 }
                 // Gone on again: from the held pose into the clip, eased in
                 // from still over `EASE_OUT` (a smoothstep), the clip
                 // already taken up from where the hold carried it.
-                (None, Some(offsets)) if upright => {
+                (None, Some(offsets)) if plays_on => {
                     gesture_wanted = offsets;
                     // Under `Limits::presence` (#7301) a shift's arm only
                     // sags toward its fold, by the level's size, and stays
@@ -8354,8 +8367,36 @@ fn run_on_dyn<P: PortIo, R: Runtime>(
                         }
                     }
                 }
+                // Not one that came to its end as the miss lasted: that one is over.
+                (Some(_), _) | (None, Some(_))
+                    if stood_still && blind_steps >= GESTURE_BLIND_STEPS =>
+                {
+                    playing = None;
+                    report.gestures_dropped += 1;
+                    // One from outside is journaled from its fate; the
+                    // body's own (an idle shift, a call's glance) has none.
+                    if from_outside(clip) {
+                        gesture_fates.push_told(
+                            (clip.name, GESTURE_BLIND_FATE),
+                            Told {
+                                source: playing_by.1,
+                                by: None,
+                            },
+                        );
+                    } else {
+                        eprintln!(
+                            "lamp-body: step {} gesture {} {GESTURE_BLIND_FATE}",
+                            report.steps, clip.name
+                        );
+                    }
+                }
                 _ => playing = None,
             }
+        }
+        // Played on blind, it holds the frame it has: the arm's offsets as
+        // the head's goals (below), nothing new asked until the wire answers.
+        if blind && playing.is_some() {
+            gesture_wanted = gesture_now;
         }
         // A holder's pose (`Asked::pose`): the head's roll and the arm where
         // it asks, laid on the stand as a gesture's offsets are, while held
