@@ -264,6 +264,13 @@ pub fn said_no_told(subject: Option<&str>) -> String {
     kept_told("they said no", subject)
 }
 
+/// What the lamp says itself, with no model round, to a no that is only a
+/// no to the one-face forget question (#8185,
+/// `known_faces::only_refuses`): nothing is forgotten. In the owner's
+/// language only from its clip rendered ahead; until then the model is
+/// told [`said_no_told`] and answers.
+pub const KEPT_IT_LINE: &str = "Okay, I'll keep it.";
+
 /// [`said_no_told`] for an answer asked about once more
 /// ([`FORGET_ASKED_AGAIN`]) and still not clear: nothing was forgotten.
 pub fn still_unclear_told(subject: Option<&str>) -> String {
@@ -290,7 +297,8 @@ fn kept_told(why: &str, subject: Option<&str>) -> String {
 pub const FORGET_ASKED_AGAIN: &str = "(For you to know: their answer was not clear, so nothing was forgotten and it is still kept. Ask them once more, in a few words, \"Should I forget it?\", and then stop. Do not say what was asked about, do not say it is forgotten, and do not call forget now. If they then say yes, call forget then, naming nothing else.)";
 
 /// Phrases an answer to the one-face forget question may forget by, beside
-/// [`PHRASES`] (#8165): "No, I don't need it.", "No, drop it."
+/// [`PHRASES`] (#8165): "No, I don't need it.", "No, drop it.", and "No, I
+/// don't want it." (#8185).
 const ANSWER_PHRASES: &[&[&str]] = &[
     &["drop", "it"],
     &["drop", "that"],
@@ -298,6 +306,9 @@ const ANSWER_PHRASES: &[&[&str]] = &[
     &["don't", "need"],
     &["dont", "need"],
     &["do", "not", "need"],
+    &["don't", "want"],
+    &["dont", "want"],
+    &["do", "not", "want"],
 ];
 
 /// Whether a forget word or phrase of `said` is negated in its clause
@@ -2180,6 +2191,33 @@ pub fn asks_about_forgetting(answer: &str, name: &str) -> bool {
         }
     }
     false
+}
+
+/// Whether `answer` asks about the forget `name` ([`asks_about_forgetting`])
+/// in its last question, and that question offers nothing else: no "or",
+/// "hay" or "hoặc" in it (the second read's P2 on #8215). "Shall I forget
+/// what you kept about the umbrella?" does; "…, or keep it?" and "Shall I
+/// forget it? Or shall I set a reminder instead?" don't, so a plain yes to
+/// them is the model's to judge. Only then does a plain yes run the held
+/// one-face forget in code (`second_provider::OneFaceAnswer::PlainYes`).
+pub fn offers_only_forgetting(answer: &str, name: &str) -> bool {
+    const OR: &[&str] = &["or", "hay", "ho\u{1eb7}c"];
+    let mut sentence = String::new();
+    let mut last = None;
+    for c in answer.chars() {
+        sentence.push(c);
+        match c {
+            '?' | '\u{ff1f}' => last = Some(std::mem::take(&mut sentence)),
+            '.' | '!' | '\u{2026}' | '\u{3002}' => sentence.clear(),
+            _ => {}
+        }
+    }
+    last.is_some_and(|question| {
+        asks_about_forgetting(&question, name)
+            && !crate::known_faces::lower_words(&question)
+                .iter()
+                .any(|word| OR.contains(&word.as_str()))
+    })
 }
 
 /// Whether `question` has the lamp offer to forget: a forget word after
@@ -4090,6 +4128,16 @@ pub const HEARD_NAMED: &str = "heard_named";
 /// when more than one thing could be meant ([`FORGET_WHICH`]).
 pub const HEARD_BARE: &str = "heard_bare";
 
+/// The argument the lamp adds, never the model, to a `forget` by
+/// `source_id` whose heard line names a subject ("forget what I said about
+/// the bicycle"; [`heard_about_by_id`], #8259), carrying that subject in
+/// the person's words, as [`forget_want`] reads it for an id: once the
+/// memory confirms the kept thing gone by its id, the person's own
+/// exchanges about the subject go too, as a forget about takes them
+/// (`DaysClient::forget_exchanges_about`), in their scope alone. Never sent
+/// to the memory.
+pub const HEARD_ABOUT: &str = "heard_about";
+
 /// The argument the lamp adds, never the model, to a bare `forget` whose
 /// own `about` it dropped as not heard where the line asks to forget
 /// ([`named_forget_with`], C35), carrying that `about`: the memory forgets
@@ -4575,7 +4623,17 @@ pub fn named_forget(
         Some(lease) => lease.scope()?.person().map(str::to_owned),
         None => person_now(),
     };
-    named_forget_with(call, said, person.as_deref(), carry())
+    let named = named_forget_with(call, said, person.as_deref(), carry());
+    // The second route taking back its own new keep runs by that id alone
+    // (`ScopeLease::undoes_own_keep`): no subject is added to it.
+    if named
+        .as_ref()
+        .is_some_and(|named| named.args.get(HEARD_ABOUT).is_some())
+        && lease.is_some_and(|lease| lease.undoes_own_keep(&call.args))
+    {
+        return None;
+    }
+    named
 }
 
 /// [`named_forget_with`] for a typed text from the app, whose memory is the
@@ -5179,6 +5237,9 @@ fn named_forget_on(
                 args: json!({ HEARD_KEPT: true }),
             });
         }
+        // By the id recall gave: the subject the line names goes with it,
+        // so the turns about it go too (#8259).
+        ForgetPick::AsCalled => return said.and_then(|said| heard_about_by_id(call, said)),
         _ => return None,
     };
     *last = Some((person.map(str::to_owned), subject.clone(), Instant::now()));
@@ -5186,6 +5247,28 @@ fn named_forget_on(
         id: call.id.clone(),
         name: call.name.clone(),
         args: json!({"about": subject, HEARD_NAMED: true}),
+    })
+}
+
+/// #8259: a `forget` by `source_id` (not bare) on a heard line `said` that
+/// names a subject, marked with that subject ([`HEARD_ABOUT`]): the subject
+/// [`forget_want`] reads for an id ([`named_subject`]), no other words.
+/// `None` for any other call, or a line that names nothing ("forget that")
+/// or only keeps: the forget runs by its id alone, as before.
+pub fn heard_about_by_id(call: &ToolCall, said: &str) -> Option<ToolCall> {
+    if call.name != FORGET
+        || call.args.get("source_id").is_none_or(Value::is_null)
+        || call.args.get(HEARD_BARE).is_some()
+        || line_only_keeps(said)
+    {
+        return None;
+    }
+    let mut args = call.args.clone();
+    args[HEARD_ABOUT] = json!(named_subject(said)?);
+    Some(ToolCall {
+        id: call.id.clone(),
+        name: call.name.clone(),
+        args,
     })
 }
 
@@ -6285,7 +6368,11 @@ mod one_kept_tests {
             held.contains("If they say yes within 30 seconds, call forget then"),
             "{held}"
         );
-        assert!(held.contains("only that call runs it"), "{held}");
+        // #8215's P3: a plain yes may have run it already, before the call.
+        assert!(
+            held.contains("unless you are told it has already run"),
+            "{held}"
+        );
         assert!(!held.contains("Do not call forget"), "{held}");
         assert!(!held.contains("couldn't see"), "{held}");
     }
@@ -6305,7 +6392,7 @@ pub fn one_face_forget_asks(subject: &str) -> Value {
     json!({
         "forgotten": false,
         "held": format!(
-            "Not done yet: this waits for their yes. Ask them once, in a few words and in the language they spoke, whether you should forget what you kept about {} (for example \"Shall I forget what you kept about your bike lock code?\" or \"Mình có nên quên điều đã giữ về mã khóa xe của bạn không?\"), and then stop. Do not say what was kept, its details, or anything you know about it. If they say yes within 30 seconds, call forget then, naming nothing else: only that call runs it. A no or nothing keeps it. Do not say it is forgotten until that forget has run.",
+            "Not done yet: this waits for their yes. Ask them once, in a few words and in the language they spoke, whether you should forget what you kept about {} (for example \"Shall I forget what you kept about your bike lock code?\" or \"Mình có nên quên điều đã giữ về mã khóa xe của bạn không?\"), and then stop. Do not say what was kept, its details, or anything you know about it. If they say yes within 30 seconds, call forget then, naming nothing else, unless you are told it has already run: it runs only on their yes. A no or nothing keeps it. Do not say it is forgotten until that forget has run.",
             cut_at_a_word(subject, WHAT_WENT_BYTES)
         )
     })
@@ -11705,6 +11792,20 @@ impl DaysClient {
             request["speaker"] = json!(speaker);
         }
         let request_text = request["text"].as_str().map(str::to_owned);
+        // #8259: a forget by the id recall gave, on a line that named what
+        // it is about ([`HEARD_ABOUT`]): a known person's own exchanges
+        // about it go too once the id is confirmed gone, as a forget about
+        // takes them. Never for the room's scope, nor a bare forget.
+        let heard_about = (call.name == FORGET
+            && self.forget_all.load(Ordering::Acquire)
+            && just_kept_id.is_none()
+            && request["op"] == "forget"
+            && call.args.get(HEARD_BARE).is_none()
+            && call.args.get("source_id").is_some_and(Value::is_u64))
+        .then(|| call.args.get(HEARD_ABOUT))
+        .flatten()
+        .filter(|about| exchanges_forget_words(about, person).is_some())
+        .cloned();
         // A remember or recall sent gives "that" only when it is answered
         // (#3504, Friday's N1): one that fails or is lost leaves none.
         if matches!(
@@ -11814,7 +11915,9 @@ impl DaysClient {
                     })
                 },
             );
-            if forgetting {
+            // With the turns about it still to ask, the account's history
+            // waits for both, as a forget about's does.
+            if forgetting && heard_about.is_none() {
                 crate::history_send::forget_answered(
                     person,
                     call.name == FORGET_EVERYTHING,
@@ -11822,8 +11925,34 @@ impl DaysClient {
                 );
             }
             let Some(answer) = answer else {
+                if heard_about.is_some() {
+                    crate::history_send::forget_answered(person, false, None);
+                }
                 return lost((gone(), false));
             };
+            // The id confirmed gone: the person's exchanges about what the
+            // line named, in what is left of the call's time, after the
+            // kept thing (as a forget about orders them, so its forget by
+            // id still finds the exchanges it came from).
+            let asks_turns = heard_about.is_some();
+            let heard_about = heard_about.filter(|_| {
+                answer["ok"] == true
+                    && answer.get("removed").is_some()
+                    && !answered_nothing_there(&answer)
+            });
+            let (exchanges, turns_not_reached) = match &heard_about {
+                Some(about) => {
+                    self.forget_exchanges_about(about, person, started + deadline, lease)
+                }
+                None => (None, false),
+            };
+            if asks_turns {
+                // Their turns asked and not answered: what went is not
+                // known, and the person's and the room's turns wait for the
+                // next start, as after a forget about's.
+                let known = heard_about.is_none() || exchanges.is_some();
+                crate::history_send::forget_answered(person, false, known.then_some(&answer));
+            }
             // Forget everything answered ok: the service records the voice
             // holds of theirs go, whatever the answer says next.
             if call.name == FORGET_EVERYTHING
@@ -11861,6 +11990,17 @@ impl DaysClient {
                     self.context.try_lock().ok().as_deref(),
                     person,
                 );
+            }
+            // #8259: the person hears one count, the kept thing and the
+            // turns about it that went with it, or that those were not
+            // reached, as a forget about tells them.
+            if heard_about.is_some() {
+                let (with_turns, _) = exchanges_forgotten((told, true), exchanges);
+                told = if turns_not_reached {
+                    exchanges_not_reached((with_turns, true)).0
+                } else {
+                    with_turns
+                };
             }
             // Their memory is emptied, or held nothing: the room's lines
             // about a person are theirs no more today (#2849), even if what
@@ -16144,6 +16284,28 @@ fn owner_forgets_rows_of(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// The second read's P2 on #8215: a plain yes runs the one-face forget
+    /// in code only when the lamp's last question offered it alone.
+    #[test]
+    fn offers_only_forgetting_reads_the_last_question_with_no_or() {
+        for alone in [
+            "Shall I forget what you kept about the umbrella?",
+            "Got it. Shall I forget what you kept about the umbrella?",
+            "Shall I forget what you kept about the umbrella? Just say yes.",
+        ] {
+            assert!(offers_only_forgetting(alone, FORGET), "{alone}");
+        }
+        for not in [
+            "Shall I forget what you kept about the umbrella, or keep it?",
+            "Shall I forget what you kept about the umbrella? Or shall I set a reminder instead?",
+            "Shall I forget what you kept about the umbrella? And shall I dim the light?",
+            "Okay, I'll keep it.",
+            "",
+        ] {
+            assert!(!offers_only_forgetting(not, FORGET), "{not}");
+        }
+    }
     use std::{
         io::{BufRead, BufReader, Write},
         os::unix::net::UnixListener,
@@ -22380,6 +22542,164 @@ mod tests {
         std::fs::remove_file(&socket).unwrap();
     }
 
+    /// #8259 (lamp-06c1, 22 Nov, #8125's leg 15, round 1): "forget what I
+    /// said about the bicycle" called by the id recall gave is marked with
+    /// the subject its line names, the one [`forget_want`] reads for an id,
+    /// and the one-face pick holds the same subject for its yes. "Forget
+    /// that", a line that only keeps, a bare forget, a forget about and a
+    /// keep are not marked: they run as before.
+    #[test]
+    fn a_forget_by_id_carries_the_subject_its_line_names() {
+        const LINE: &str = "Lamp, forget what I said about the bicycle.";
+        let by_id = call(FORGET, json!({"source_id": 9}));
+        let marked = heard_about_by_id(&by_id, LINE).unwrap();
+        assert_eq!(marked.args["source_id"], 9, "{marked:?}");
+        assert_eq!(
+            marked.args[HEARD_ABOUT],
+            json!(named_subject(LINE).unwrap()),
+            "{marked:?}"
+        );
+        assert!(
+            marked.args[HEARD_ABOUT]
+                .as_str()
+                .is_some_and(|about| about.contains("bicycle")),
+            "{marked:?}"
+        );
+        for said in ["Lamp, forget that.", "Don't forget my bicycle."] {
+            assert!(heard_about_by_id(&by_id, said).is_none(), "{said}");
+        }
+        for other in [
+            call(FORGET, json!({"source_id": 9, HEARD_BARE: true})),
+            call(FORGET, json!({"source_id": null})),
+            call(FORGET, json!({"about": "bicycle"})),
+            call(REMEMBER, json!({"text": "My bicycle is red."})),
+        ] {
+            assert!(heard_about_by_id(&other, LINE).is_none(), "{other:?}");
+        }
+        // The one-face pick's held forget carries the same subject as its
+        // `about`, which their yes runs by `agreed_forget_exchanges`.
+        let kept = vec![(9, "My bicycle is red.".to_owned())];
+        let (id, subject) =
+            one_face_pick(&call(FORGET, json!({"source_id": null})), LINE, &kept).unwrap();
+        assert_eq!((id, json!(subject)), (9, marked.args[HEARD_ABOUT].clone()));
+    }
+
+    /// The first builder's question on #8260 (06:25, 22 Nov): a by-id forget
+    /// matches turns on the subject its line names alone, never the kept
+    /// thing's words, and never on "said": "forget what I said about the
+    /// bicycle" asks for turns with "bicycle" (every key word), and "forget
+    /// what I said" or "forget that" asks for none.
+    #[test]
+    fn a_forget_by_id_never_matches_turns_on_said() {
+        const MINH: &str = "p-be9688998f085098";
+        let by_id = call(FORGET, json!({"source_id": 4531}));
+        let marked = heard_about_by_id(&by_id, "Lamp, forget what I said about the bicycle.")
+            .expect("the line names the bicycle");
+        assert_eq!(
+            exchanges_forget_words(&marked.args[HEARD_ABOUT], Some(MINH)),
+            Some((MINH, vec![vec!["bicycle".to_owned()]])),
+            "{marked:?}"
+        );
+        for said in [
+            "Lamp, forget what I said.",
+            "Lamp, forget what I just said.",
+            "Lamp, forget that.",
+        ] {
+            assert!(heard_about_by_id(&by_id, said).is_none(), "{said}");
+        }
+    }
+
+    /// #8259: a forget by id marked with its line's subject ([`HEARD_ABOUT`])
+    /// takes the kept thing, then, confirmed gone, the person's own
+    /// exchanges about the subject, in their scope alone, told as one
+    /// count. With no subject ("forget that"), in the room's scope, or an
+    /// id that was not there, only the id is asked, as before. A forget
+    /// about asks for the exchanges once.
+    #[test]
+    fn a_forget_by_id_whose_line_named_a_subject_takes_their_turns_about_it() {
+        const MINH: &str = "p-be9688998f085098";
+        fn answers(request: &Value) -> Value {
+            match request["op"].as_str() {
+                Some("forget") if request["id"] == 9 => json!({"ok":true,"removed":1}),
+                Some("forget") => json!({"ok":true,"removed":0}),
+                Some("exchanges_forget") => json!({"ok":true,"removed":100,"exchanges":{}}),
+                Some("kept") => json!({"ok":true,"entries":[
+                    {"id":9,"at_unix_ms":NOW,"text":"My bicycle is red."}
+                ]}),
+                Some("forget_mark") => json!({"ok":true}),
+                _ => json!({"ok":false}),
+            }
+        }
+        let marked = |id: u64| json!({"source_id": id, HEARD_ABOUT: "bicycle"});
+        for (at, args, person, turns) in [
+            // A by-id forget with the subject in the line takes the turns.
+            (0, marked(9), Some(MINH), true),
+            // With no subject in the line, only that thing.
+            (1, json!({"source_id": 9}), Some(MINH), false),
+            // Never the room's turns.
+            (2, marked(9), None, false),
+            // An id not there takes nothing more.
+            (3, marked(8), Some(MINH), false),
+        ] {
+            let (socket, served) = memory_within(
+                &format!("by-id-turns-{at}"),
+                1 + usize::from(turns),
+                answers,
+            );
+            let client = DaysClient::new(socket.clone()).unwrap();
+            client.forget_all.store(true, Ordering::Release);
+            let _ = client.context.lock().unwrap().include(person, &[8, 9]);
+            let (told, answered) =
+                client.run_at(&call(FORGET, args), FIRST_READ, NOW, Some(&EAST), person);
+            assert!(answered, "{at}: {told}");
+            let asked = served.join().unwrap();
+            assert_eq!(asked[0]["op"], "forget", "{at}: {asked:?}");
+            assert!(asked[0].get(HEARD_ABOUT).is_none(), "never sent: {asked:?}");
+            assert_eq!(asked[0]["person"], json!(person), "{at}: {asked:?}");
+            if turns {
+                assert_eq!(told["forgotten"], true, "{told}");
+                assert_eq!(asked.len(), 2, "no exchanges_forget seen: {asked:?} {told}");
+                assert_eq!(
+                    asked[1],
+                    json!({"op":"exchanges_forget","person":MINH,"about":[["bicycle"]]}),
+                    "theirs only: {asked:?}"
+                );
+                assert_eq!(told["exchanges"], 100, "one count: {told}");
+            } else {
+                assert_eq!(asked.len(), 1, "{at}: {asked:?}");
+                assert!(told.get("exchanges").is_none(), "{at}: {told}");
+                // Nothing more was asked and lost either.
+                assert!(told.get("history").is_none(), "{at}: {told}");
+            }
+            drop(client);
+            std::fs::remove_file(&socket).unwrap();
+        }
+        // A forget about is unchanged: its exchanges are asked once.
+        let (socket, served) = memory_within("by-id-turns-about", 4, answers);
+        let client = DaysClient::new(socket.clone()).unwrap();
+        client.forget_all.store(true, Ordering::Release);
+        client.forget_about.store(true, Ordering::Release);
+        let (told, _) = client.run_at(
+            &call(FORGET, json!({"about":"bicycle", HEARD_NAMED: true})),
+            FIRST_READ,
+            NOW,
+            Some(&EAST),
+            Some(MINH),
+        );
+        assert_eq!(told["forgotten"], true, "{told}");
+        let asked = served.join().unwrap();
+        assert_eq!(
+            asked
+                .iter()
+                .filter(|asked| asked["op"] == "exchanges_forget")
+                .count(),
+            1,
+            "{asked:?}"
+        );
+        drop(client);
+        std::fs::remove_file(&socket).unwrap();
+    }
+
     /// Thirteen's P2 on #5022: store ids are counted per person, so A's 3
     /// and the room's 3 are two kept things. Shown from the room's listing
     /// only, a one-face `forget {source_id: 3}` forgets the room's 3, never
@@ -27930,6 +28250,67 @@ mod tests {
     }
 
     /// [`memory`], giving back the request lines exactly as they came.
+    /// [`memory`] that gives up waiting [`MEMORY_WITHIN`] after it starts
+    /// and gives back what it read by then: a request a test waits for and
+    /// that never comes fails its assert, never hangs the run (#8260).
+    pub(super) fn memory_within(
+        name: &str,
+        requests: usize,
+        answer: fn(&Value) -> Value,
+    ) -> (PathBuf, std::thread::JoinHandle<Vec<Value>>) {
+        let socket =
+            std::env::temp_dir().join(format!("lamp-remember-{name}-{}.sock", std::process::id()));
+        let _ = std::fs::remove_file(&socket);
+        let listener = UnixListener::bind(&socket).unwrap();
+        listener.set_nonblocking(true).unwrap();
+        let records_on = crate::service_records::on();
+        let contacts_on = crate::service_contacts::on();
+        let served = std::thread::spawn(move || {
+            let until = Instant::now() + MEMORY_WITHIN;
+            let mut read = Vec::new();
+            while read.len() < requests && Instant::now() < until {
+                let stream = match listener.accept() {
+                    Ok((stream, _)) => stream,
+                    Err(error) if error.kind() == io::ErrorKind::WouldBlock => {
+                        std::thread::sleep(Duration::from_millis(5));
+                        continue;
+                    }
+                    Err(error) => panic!("{error}"),
+                };
+                stream.set_nonblocking(false).unwrap();
+                stream
+                    .set_read_timeout(Some(
+                        until
+                            .saturating_duration_since(Instant::now())
+                            .max(Duration::from_millis(1)),
+                    ))
+                    .unwrap();
+                let mut line = String::new();
+                if BufReader::new(stream.try_clone().unwrap())
+                    .read_line(&mut line)
+                    .is_err()
+                {
+                    break;
+                }
+                let request: Value = serde_json::from_str(&line).unwrap();
+                let wrote = (&stream).write_all(format!("{}\n", answer(&request)).as_bytes());
+                if (!records_on && request["op"] == "service_records_forget")
+                    || (!contacts_on && request["op"] == "service_contacts_forget")
+                {
+                    continue;
+                }
+                wrote.unwrap();
+                read.push(request);
+            }
+            read
+        });
+        (socket, served)
+    }
+
+    /// How long [`memory_within`] waits for the requests a test expects:
+    /// the room-speaker tests' fake memory's bound.
+    const MEMORY_WITHIN: Duration = Duration::from_secs(5);
+
     fn memory_lines(
         name: &str,
         requests: usize,

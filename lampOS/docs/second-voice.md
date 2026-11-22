@@ -236,7 +236,8 @@ each line plays exactly as before.
 | The second route's lines when a wordless cut-in is picked up again | `cut_in_wordless::BRIDGE` ("Anyway,"), `AGAIN` ("Oops, cut off again. Anyway,"), `PAUSE` ("It's a bit noisy here, so I'll pause. Just say 'Lamp' when you want me to go on.") | rendered ahead as the stop line; the first two then the cut answer's rest (`LAMP_CUT_IN_WORDLESS_RESUMES`, the memory owner's call, 5 Nov; on in the product, #7413) | the owner's words, rendered ahead (`language::fixed_in`); the rest in the answer's own words |
 | The second route's line when a line by name gets no words twice | `second_provider::NO_WORDS_LINE` ("Sorry, I lost my words there. Could you ask me again?") | said as the turn's text (`LAMP_NO_WORDS_AGAIN`, off in the product) | the owner's words (`language::fixed_in`) |
 | The second route's line when a reply claims again an action no call made | `action_claim::NOT_DONE_LINE` ("Sorry, I didn't do that. Could you ask me again?") | said as the turn's text (`LAMP_ACTION_CLAIM_CHECKED`, on in the product, #5215) | the owner's words (`language::fixed_in`) |
-| The second route's line when a live figure could not be looked up | `live_fact::COULD_NOT_LINE` ("Sorry, I couldn't look that up just now.") | said as the turn's text (`LAMP_LIVE_FACT_CHECKED`, off, #7605) | the owner's words (`language::fixed_in`) |
+| The second route's line when a live figure could not be looked up | `live_fact::COULD_NOT_LINE` ("Sorry, I couldn't look that up just now.") | said as the turn's text (`LAMP_LIVE_FACT_CHECKED`, on in the product, #7605) | the owner's words (`language::fixed_in`) |
+| The second route's bridge when words said before a live figure's hold are not gone on from | `live_fact::BRIDGE` ("… let me check.") | said before the reply asked again, or before the could-not line, once a turn (`LAMP_LIVE_FACT_CHECKED`, on in the product, #8224) | English only, the lamp's own fixed words |
 | The second route's line when an answer to the lamp's own question gets no words | `second_provider::ANSWER_AGAIN_LINE` ("Sorry, could you say that again?") | said as the turn's text (`LAMP_ANSWER_ASK_AGAIN`, off in the product) | the owner's words (`language::fixed_in`) |
 | The second route's word when each sentence of a reply was an offer to keep left out | `keep_quietly::GOT_IT` ("Got it.") | said as the turn's text (`LAMP_KEEP_QUIETLY`, on in the product, a known person's own scope) | the owner's words (`language::fixed_in`) |
 | The second route's answer to a plain keep (`LAMP_KEEP_ANSWERS_AT_ONCE`, C59) | `keep_at_once::KEPT` ("Okay, I'll remember that.") | said as the turn's text, at once, with no second chat round | rendered ahead by this route's voice as the wordless cut-in lines are, played from that clip as the turn's piece; not rendered yet, the turn asks round 2 as without the switch |
@@ -4519,7 +4520,7 @@ after a take-over, but now for every turn:
   outside the ask costs one more chat round. Not judged: "It's safe to
   unplug me." (a reply opening "It's" is decided at its first word), claims
   in a later sentence, other languages.
-- **With `LAMP_LIVE_FACT_CHECKED=on` (off; #7605), a live figure is never
+- **With `LAMP_LIVE_FACT_CHECKED=on` (on in the product; #7605), a live figure is never
   said with no lookup behind it.** On lamp-9adf (18 Nov, build 13929) "what
   is the gold price today?" got "around $4,050 an ounce" with `calls=none`,
   and Da Nang's weather "right now" and "tomorrow" was answered from Ho Chi
@@ -4539,8 +4540,12 @@ after a take-over, but now for every turn:
   lookup in the turn found (`live_fact::found`: a `web_search` or
   `fetch_page` answer with results, a page's words or a price backs any
   figure, a `weather` answer with the weather backs only the weather's
-  figures; an error or an empty search, `{"results": []}`, backs nothing;
-  the chat's own search backs any; a cut answer's carried lookup counts
+  figures; an error or an empty search, `{"results": []}`, backs nothing,
+  nor results whose every item has a blank title and text, nor a page
+  read with a status of 400 or more (`fetch_page` passes the page's
+  status on when it is one) or an error page's title such as "404 Not
+  Found"; one search or page that found backs every figure in the turn,
+  on any topic; the chat's own search (`ChatEvent::Searched`) backs any; a cut answer's carried lookup counts
   only when its answer found something; another turn's never) is held with
   the rest of its round, and the round's words are not kept. A quoted line
   and a reminder's ring are not judged. With no call, the model is asked
@@ -4558,7 +4563,47 @@ after a take-over, but now for every turn:
   `MAX_ROUNDS`. A doubted keep's take-back is said before the live block,
   so its ask again never skips it. Until a search has found something,
   the first words wait for their sentence's end (no clause or first-words
-  split), on every turn with the switch on. The journal says `N
+  split) only on a line that asks for a live fact (`live_fact::asks_live`:
+  a live marker such as today, now or tomorrow, a price, rate or score
+  word, or a weather word, never a place or a name alone, so "Hey, Lamp.
+  Set a timer for 5 minutes." and "Play Spotify." never wait; the first
+  builder on #8224, rule 7 and c7063146174, strict first). Only that wait
+  reads the person's line, a word list named as an allowed exception to
+  the rule against word lists, as `action_claim::WORDED` is: it decides
+  only when the first words are cut and fails safe. Every sentence is
+  still judged by its own words, and while a figure is judged a
+  first piece (a clause or the first words) is cut before its first bare
+  number or number word (`live_fact::is_number`), never with it, and the
+  rest waits for its sentence's end and is judged whole, so "How much is
+  an ounce of silver?", which the list misses, hears "Silver's around"
+  and never "52 to" (the 06c1 S1 leg on #8224). Any other line is cut as
+  with the switch off but before a number: "Your timer is set for 5
+  minutes" is cut as "Your timer is set", as off, and "That's 3 sessions
+  this week" at "That's", sooner than off, so its first sound is never
+  later; a reply that opens with a number ("Three hours is 180 minutes.")
+  waits for its sentence's end. A piece cut off before its
+  sentence's end leads the rest when that is judged ("The temperature in
+  Hanoi" said, "is 30 degrees." is still the weather's figure). The
+  reply asked again is told the words its held round already said
+  (`live_fact::note_after`; only words said past every hold count), and
+  when it begins with all of them from any said piece on (so an opening
+  it doesn't repeat, "Sure!", drops nothing else; case and marks folded,
+  whole words only) they are taken off; when it doesn't go on from them and they end
+  mid-sentence, the lamp ends them first with its own fixed
+  `live_fact::BRIDGE`, "… let me check.", once a turn and never naming a
+  tool, then says the reply asked again (or the could-not line; the said
+  piece keeps dangling across rounds until words are said after it, and
+  the bridge is spent only once said, so a second held round still ends
+  with it, Thirteen's HOLD on #8224): "Silver's
+  around … let me check. Silver was around $45 an ounce." (the first
+  builder's c7066116904, after the 06c1 S1 leg said "Silver's around 52
+  to Silver was around $45"); none when nothing was said before the hold
+  or what was said ended a sentence. The journal says `said the bridge`.
+  Words already said are taken off so they are
+  never said twice (#8224's row: "In Hanoi right now In Hanoi right now
+  it's 20°C"); another start, or a word only begun ("nowadays"), keeps
+  every word. The journal says `the reply asked again began with the N
+  word(s) already said: not said again`. The journal says `N
   sentence(s) gave a live figure no lookup backs …: not said, asked again
   with T required (LAMP_LIVE_FACT_CHECKED)` and, once the ask again
   speaks, `the live figure's ask again said its first words N ms after it
@@ -5772,7 +5817,21 @@ after a take-over, but now for every turn:
     nothing` (`said_to_me::Said::AnswerNoLook`): its answer goes on the
     chain, so it keeps no conversation going and renews no call
     (`LAMP_BUSY_FOLLOW_UP_RENEWS`). After that the next line needs a look or
-    the name, until a line with one is played.
+    the name, until a line with one is played. A line that cut in over the
+    lamp's own answer shares that one use (#8205): on lamp-52e6's core row
+    w3 (builds 15259 to 15338, 21 Nov), "Hey Lamp, …" said over the story
+    the lamp was asked for by name, with its name not heard and nobody in
+    view, was held `held: no look in a conversation` and got no answer,
+    although it had cut the story (`request 2: 9 of its answer's 99 words
+    were played, 3720 ms of it, before it was cut; request 3 is asked with
+    only those`). A line begun over the lamp's answer as it was heard (its
+    Start's `over_the_lamps_voice`, `said_to_me::Line::cut_in`) is admitted
+    only by stopping that answer, so it is the person cutting the lamp
+    short; with no look and the one use free it is let out as `a cut-in
+    over the lamp's own answer, no look: it renews nothing`
+    (`said_to_me::Said::CutInNoLook`) and chained as the answer above is. A
+    line begun over only the lamp's wait sound is not one; the same words
+    said with the lamp silent are held as before.
   - **Under a sure hearing, a face or the name in the words**
     (`LAMP_NAME_FACE_OR_WORDS=on`, on in the product's lamp-voice.service,
     #8136, from #8114's shapes 5-7). On lamp-74ff on 20 Nov (build 15146,
@@ -6793,7 +6852,14 @@ stands), and eyes that can't be reached at all name nobody, as before. Without a
   it.", `known_faces::refuses`), keeps it whatever the model calls, its
   `forget` answered with `remember::said_no_told`, and a line with a
   negated and an un-negated forget word is asked once more
-  (`one_face_answer`, #8165). So are a correction
+  (`one_face_answer`, #8165). A plain yes (`agent_tasks::plain_yes_with`)
+  to a last question that offered the forget alone, with no "or"
+  (`remember::offers_only_forgetting`), runs it before round 1 though the model calls no forget, round 1 told
+  it ran, and a no that is only a no (`known_faces::only_refuses`) is
+  answered "Okay, I'll keep it." (`remember::KEPT_IT_LINE`) with no model
+  round, in the owner's language only from its clip rendered ahead
+  (`kept_line_clip`), else the model is told it is kept (#8185). A
+  privacy switch change drops the held question (`Engine::privacy`). So are a correction
   (`remember` with `replaces`), `keep_rule`, `list_rules`, `set_role` and
   `end_role` (the privacy read on #5385, also in
   `remember::role_for_guarded`), and
@@ -7292,7 +7358,11 @@ stands), and eyes that can't be reached at all name nobody, as before. Without a
   - **The words.** With no sitting known (no fresh value, away, nobody
     sitting, or not exactly one face in view) it is told to say warmly "I
     didn't catch when you sat down", never that it doesn't keep track of
-    them; the function's description says the same.
+    them; the function's description says the same. The description also
+    tells it to call again on every such ask, since the time moves on and an
+    earlier answer in the conversation is out of date (row-7694q on
+    lamp-52e6: asked again 9 minutes later in the same thread, it called 0
+    times and repeated "about six minutes").
 
   Privacy, squared with `doing_told`'s "never volunteers" (its header says
   both): only the current sitting, which the eyes begin again when someone
@@ -8242,7 +8312,7 @@ only after calling this in that turn", in it the probe refuses to run).
 Six lines ask about a reminder ("what did I ask you to remind me about?",
 "when is my reminder?", "when did I set that reminder?", "do I have any
 reminders for tomorrow?", "Hey Lamp, what reminders do I?", a question heard
-a word short that is none of `LAMP_REMINDERS_ASKED`'s phrases, and "Mình có
+a word short, which `LAMP_REMINDERS_ASKED` forces too since #7987, and "Mình có
 những lời nhắc nào?", the same question in Vietnamese; #7987) and are right
 with `list_reminders` first; four
 are right with anything else (a memory question, a new reminder, yesterday's

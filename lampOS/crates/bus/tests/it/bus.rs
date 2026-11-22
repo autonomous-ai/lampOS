@@ -1173,7 +1173,9 @@ fn a_publisher_serves_sixty_four_subscribers_and_says_once_that_there_are_more()
     };
     let error = publisher.publish_json(1, &1).unwrap_err();
     assert!(
-        error.to_string().contains("more than 64 subscribers"),
+        error
+            .to_string()
+            .contains("more than 64 subscribers (65 found)"),
         "{error}"
     );
     // Said once, and the sixty-four were served both times.
@@ -2085,4 +2087,75 @@ fn a_subscriber_keeps_statistics_of_what_came_and_what_did_not() {
     );
     assert_eq!((follow.expired(), follow.wrong_type()), (1, 1));
     assert_eq!((follow.malformed(), follow.repeated()), (0, 0));
+}
+
+/// A socket file nobody is bound to, as a subscriber leaves it when it is
+/// killed or exec's before its Drop (`<name>.<pid>.<n>.sock`, #7439).
+fn dead_socket(path: &Path) {
+    drop(UnixDatagram::bind(path).unwrap());
+    assert!(path.exists());
+}
+
+/// #8272: 70 dead subscribers' sockets ahead of one live one, as after many
+/// restarts of a voice without a reboot. The dead never count toward the
+/// cap: the live one hears the first publish, nothing is said to be wrong,
+/// and only the live socket is left.
+#[test]
+fn seventy_dead_sockets_never_keep_a_live_subscriber_out_or_stay() {
+    let root = Root::new();
+    let bus = root.bus();
+    let subs = root.0.join("apps/remember/subs");
+    fs::create_dir_all(&subs).unwrap();
+    for pid in 0..70 {
+        dead_socket(&subs.join(format!("a.{pid}.0.sock")));
+    }
+    let mut live = bus.subscribe("apps/remember", "voice").unwrap();
+    let mut publisher = bus
+        .publisher("apps/remember", Kind::Event, "control")
+        .unwrap();
+    let outcome = publisher.publish_json(1, &1).expect("no trouble");
+    assert_eq!(
+        outcome,
+        Published {
+            delivered: 1,
+            dropped: 0,
+            removed: 70
+        }
+    );
+    assert_eq!(live.recv(WAIT).unwrap().expect("heard").header.seq, 1);
+    let left = sockets(&subs);
+    assert_eq!(left.len(), 1, "{left:?}");
+    assert!(
+        left[0]
+            .file_name()
+            .unwrap()
+            .to_str()
+            .unwrap()
+            .starts_with("voice.")
+    );
+}
+
+/// The same for a publisher that has run for long: the 64 it sends to all
+/// die without Drop, and a live newcomer still hears the next publish.
+#[test]
+fn a_publisher_whose_sixty_four_died_takes_the_live_newcomer() {
+    let root = Root::new();
+    let bus = root.bus().rescan_every(Duration::ZERO);
+    let subs = root.0.join("apps/took/subs");
+    fs::create_dir_all(&subs).unwrap();
+    let bound: Vec<_> = (0..lamp_bus::MOST_SUBSCRIBERS)
+        .map(|pid| UnixDatagram::bind(subs.join(format!("a.{pid}.0.sock"))).unwrap())
+        .collect();
+    let mut publisher = bus.publisher("apps/took", Kind::Event, "control").unwrap();
+    assert_eq!(publisher.publish_json(1, &1).unwrap().delivered, 64);
+    drop(bound);
+    let mut live = bus.subscribe("apps/took", "voice").unwrap();
+    let outcome = publisher.publish_json(2, &2).expect("no trouble");
+    assert_eq!(
+        (outcome.delivered, outcome.dropped, outcome.removed),
+        (1, 0, 64)
+    );
+    assert_eq!(live.recv(WAIT).unwrap().expect("heard").header.seq, 2);
+    assert_eq!(sockets(&subs).len(), 1);
+    assert_eq!(publisher.subscribers().len(), 1);
 }

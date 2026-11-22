@@ -63,9 +63,11 @@ pub fn tool() -> Tool {
         description: "Call this when the person at the desk asks how long they have been sitting \
                       there, or when they last took a break (\"how long have I been at my desk?\", \
                       \"when did I last get up?\"). It reads the current sitting as your eyes \
-                      measure it. Then say what it gives you as \"say\", in a few words, in their \
-                      language, rounded the way a person would say it. Never say you don't keep \
-                      track of them: when it has no time, say warmly that you didn't catch when \
+                      measure it. Call it again on every such ask, even when you answered it \
+                      earlier in the conversation: the time moves on, so an earlier answer is out \
+                      of date; never answer from it. Then say what it gives you as \"say\", in a \
+                      few words, in their language, rounded the way a person would say it. Never \
+                      say you don't keep track of them: when it has no time, say warmly that you didn't catch when \
                       they sat down. Never bring it up unless you were asked, and never about \
                       anyone else."
             .into(),
@@ -227,6 +229,19 @@ mod tests {
         assert_eq!(rounded(65 * 60), "about an hour");
         assert_eq!(rounded(95 * 60), "about an hour and a half");
         assert_eq!(rounded(130 * 60), "about 2 hours");
+    }
+
+    /// #7694 (row-7694q): asked again 9 minutes later in the same thread,
+    /// the model said a1's "about six minutes" without calling; the
+    /// description tells it to call again on every such ask.
+    #[test]
+    fn every_ask_calls_again_never_answering_from_an_earlier_answer() {
+        let description = tool().description;
+        assert!(description.contains(
+            "Call it again on every such ask, even when you answered it earlier in the \
+             conversation: the time moves on, so an earlier answer is out of date; never \
+             answer from it."
+        ));
     }
 
     #[test]

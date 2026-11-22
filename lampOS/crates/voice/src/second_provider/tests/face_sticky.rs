@@ -166,6 +166,24 @@ fn with_the_carried_journal_a_carried_line_read_as_theirs_is_journalled() {
     assert!(crate::remember::kept_out(7_814_003));
 }
 
+/// #7814: a carried line journalled as its person's is logged once per
+/// request, not once per output event: one answer's many events count 1, a
+/// second request counts 2.
+#[test]
+fn a_carried_line_journalled_as_theirs_is_logged_once_per_request() {
+    use std::sync::atomic::AtomicU64;
+    let last = AtomicU64::new(u64::MAX);
+    let count = AtomicU64::new(0);
+    let logged: Vec<u64> = (0..49)
+        .filter_map(|_| worker::carried_journalled_once(&last, &count, 7))
+        .collect();
+    assert_eq!(logged, [1]);
+    assert_eq!(worker::carried_journalled_once(&last, &count, 8), Some(2));
+    assert_eq!(worker::carried_journalled_once(&last, &count, 8), None);
+    assert!(!worker::first_for_request(&last, 8));
+    assert!(worker::first_for_request(&last, 9));
+}
+
 /// Friday's P1 on #7933 (20 Nov 03:16): the eyes write a T7 rematch (0.31
 /// within ten minutes of a match) with the held mark, as a held check. On
 /// the voice, its line runs no forget, and the owner's private read-back

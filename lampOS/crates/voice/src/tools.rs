@@ -978,6 +978,9 @@ fn core_tools_within(settings: &Settings, bound: usize) -> Vec<Tool> {
         tools.push(crate::make_skill_local::tool());
         // A make is make_skill's, never a task's (#8022 case 2).
         crate::agent_tasks::tell_make(&mut tools);
+        // A change to a skill the person made, its own function beside it
+        // (#8008, [`crate::made_change::FUNCTION`]).
+        tools.push(crate::made_change::tool());
     }
     if settings.who.is_some() {
         tools.extend(crate::known_faces::tools_for(face_switches(settings)));
@@ -1364,7 +1367,9 @@ pub fn route(settings: &Settings, name: &str) -> Route {
             settings.tasks.as_ref().map(|place| place.directory.clone()),
         );
     }
-    if settings.make_skill && name == crate::made_skill::MAKE {
+    if settings.make_skill
+        && (name == crate::made_skill::MAKE || name == crate::made_change::FUNCTION)
+    {
         return Route::MakeLocal(settings.skills.clone());
     }
     if crate::agent_tasks::is_tool(name) {
@@ -2153,6 +2158,8 @@ pub(crate) fn forget_confirmation_voice(
         return;
     }
     if name == crate::remember::FORGET_EVERYTHING {
+        // An app's live context lines go too (`LAMP_APP_MEMORY`, #7415).
+        crate::app_context::forget_with_everything(name, told);
         if let Some(lease) = lease
             && lease.everything_marked()
             && (told["forgotten"] == true || told["note"] == "I was keeping nothing of them.")
@@ -2328,6 +2335,13 @@ fn run_call_with_scope(
             // word of its sentence was heard: a quiet keep is never said
             // back, so it is never the model's own words (#5053).
             if let Some(told) = crate::keep_quietly::unheard(call, request, heard, lease) {
+                return ("the memory", (told, true));
+            }
+            // With `LAMP_APP_MEMORY`, a `remember` carrying an app's live
+            // context line keeps nothing: "remember that" keeps the
+            // person's own words, never the app's line (#7415).
+            if let Some(told) = crate::app_context::keeps_a_line(call, crate::app_context::now_ms())
+            {
                 return ("the memory", (told, true));
             }
             // The words also give a day the model left out (#3987).
@@ -2727,6 +2741,10 @@ fn run_call_with_scope(
             {
                 crate::made_skill::forget_all_notes_soon();
             }
+            // And every app's live context line (`LAMP_APP_MEMORY`, #7415).
+            if heard {
+                crate::app_context::forget_with_everything(&model.name, &told);
+            }
             ("the memory", (told, answered))
         }
         Route::Executive(directory) => (
@@ -2750,6 +2768,16 @@ fn run_call_with_scope(
             ),
         ),
         Route::MakeLocal(skills) => {
+            // `change_skill` is run as `make_skill`'s call with `change`
+            // (#8008, [`crate::made_change::as_make`]); the second route's
+            // stream has already read it so.
+            let as_make =
+                crate::made_change::as_make(&call.name, &call.args).map(|args| ToolCall {
+                    id: call.id.clone(),
+                    name: crate::made_skill::MAKE.into(),
+                    args,
+                });
+            let call = as_make.as_ref().unwrap_or(call);
             let mut told =
                 crate::make_skill_local::answer(call, request, heard, lease, skills.as_deref());
             // A question about their skills that came to the made ones
@@ -4433,6 +4461,28 @@ mod tests {
             assert_eq!(served.join().unwrap()["args"], sent, "heard {heard}");
             std::fs::remove_dir_all(dir).unwrap();
         }
+    }
+
+    /// #8008: `change_skill` through its route is run as `make_skill`'s
+    /// call with `change`, its answer the same.
+    #[test]
+    fn a_change_skill_call_runs_as_make_skills_change() {
+        let route = Route::MakeLocal(None);
+        let asked = ToolCall {
+            id: "1".into(),
+            name: crate::made_change::FUNCTION.into(),
+            args: json!({"name": "rain check", "request": "at seven thirty"}),
+        };
+        let made = ToolCall {
+            id: "1".into(),
+            name: crate::made_skill::MAKE.into(),
+            args: json!({crate::made_change::CHANGE: "rain check", "request": "at seven thirty"}),
+        };
+        let (whom, (changed, answered)) = run_call_with_scope(&route, &asked, 1, true, None);
+        let (_, (as_made, _)) = run_call_with_scope(&route, &made, 2, true, None);
+        assert_eq!(whom, "the lamp's own model");
+        assert!(answered);
+        assert_eq!(changed, as_made);
     }
 
     /// #7335's row: with `LAMP_SKILL_STATE_TOLD`, `make_skill`'s list of

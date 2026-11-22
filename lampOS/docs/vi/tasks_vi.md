@@ -3373,7 +3373,8 @@ lamp-c0a4) thì không đổi gì: OpenClaw vẫn là engine của đèn, và ph
   engine kia đã cài, dùng engine kia.
 - **Đèn còn đang chuẩn bị.** Một lần giao việc kết thúc `not_sent` với
   `openclaw_gateway_not_ready` (Gateway của OpenClaw không trả lời trong
-  60 s) hoặc `harness_not_running` (#7282) được Task news kể bằng lời
+  60 s; khi bật `LAMP_OPENCLAW_GATEWAY_BY_DEFAULT`, không phục vụ trong
+  480 s mà lần giao việc được giữ trong hàng đợi, #8105) hoặc `harness_not_running` (#7282) được Task news kể bằng lời
   `failed_not_ready`, "I'm still getting ready. Give me a minute and ask me
   again.", không phải là việc "did not reach" agent. Chỉ trong 180 s sau khi
   đèn khởi động (`skill_words::NOT_READY_WITHIN_MS`, bằng `STARTING_AT_MOST`

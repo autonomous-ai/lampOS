@@ -10,7 +10,10 @@
 //! retries nor says so (lamp-c0a4), so before `harness new openclaw`
 //! lamp-tasks waits until the Gateway takes a connection and answers, at
 //! most [`READY_WITHIN`]; else the hand-over is not sent, with
-//! [`NOT_READY`], and the person is told it failed.
+//! [`NOT_READY`], and the person is told it failed. With
+//! `LAMP_OPENCLAW_GATEWAY_BY_DEFAULT` on, a launch is first held in the
+//! queue until the Gateway serves ([`cold_answers`]), at most
+//! [`COLD_WITHIN`].
 use std::io::{Read, Write};
 use std::net::{Ipv4Addr, SocketAddr, TcpStream};
 use std::path::{Path, PathBuf};
@@ -28,8 +31,8 @@ pub const PORT: u16 = 18789;
 /// How long a launch waits for a Gateway not answering yet before it is
 /// given up: its own start after a boot or a restart (27-50 s on lamp-c0a4
 /// with two plugins). A Gateway stopped by `LAMP_OPENCLAW_GATEWAY_BY_DEFAULT`
-/// starts colder (port 107-112 s, RPCs 220-241 s on lamp-e82d, #8105): a
-/// launch's wait for that comes before the switch is on.
+/// starts colder (port 107-112 s, RPCs 220-241 s on lamp-e82d, #8105): the
+/// launch is held in the queue for that ([`COLD_WITHIN`]) before this wait.
 pub const READY_WITHIN: Duration = Duration::from_secs(60);
 /// Between two looks at the port while it is waited for.
 const READY_EVERY: Duration = Duration::from_millis(250);
@@ -128,9 +131,210 @@ fn panes_fresh(read_at: u64, now_ms: u64) -> bool {
     read_at != 0 && (now_ms + 1).saturating_sub(read_at) <= 2 * PANES_EVERY.as_millis() as u64
 }
 
+/// The most a launch on OpenClaw is held in the queue for a Gateway that
+/// isn't answering, while lamp-update may have stopped it (#8105): about
+/// twice the slowest of three cold starts on lamp-e82d (RPCs at 220-241 s,
+/// the first builder's 14:49).
+pub const COLD_WITHIN: Duration = Duration::from_secs(480);
+
+/// Between two looks at the port while a launch is held for it.
+const COLD_EVERY: Duration = Duration::from_secs(1);
+
+/// Whether lamp-update has asked since this process started: it asks only
+/// with `LAMP_OPENCLAW_GATEWAY_BY_DEFAULT` on, every 10 s, so a launch is held
+/// for a cold Gateway only then, and off is as before. Kept for the
+/// process's life once set (Twelve on #8234: a round that pauses the asks
+/// is just when the Gateway may be cold).
+static UPDATE_EVER_ASKED: AtomicBool = AtomicBool::new(false);
+
+/// lamp-update's switch file every build carries, and the switch in it
+/// (`lamp_update::switches::update_switch`): read here too, so a launch is
+/// held for a cold Gateway from a lamp-tasks start on, not only once
+/// lamp-update has asked (Twelve on #8234).
+pub const UPDATE_ENV: &str = "/etc/lampOS/update.env";
+pub const BY_DEFAULT_SWITCH: &str = "LAMP_OPENCLAW_GATEWAY_BY_DEFAULT";
+/// The most of the switch file read, as lamp-update reads it.
+const MOST_SWITCH_BYTES: usize = 4096;
+/// Between two reads of the switch file.
+const SWITCH_EVERY: Duration = Duration::from_secs(30);
+
+/// Whether `bytes`, a switch file, says `switch` is `on`, by lamp-update's
+/// rule (`lamp_update::models::file_says_on`): comments and blank lines
+/// skipped, the last value wins, any line that isn't `NAME=value` makes the
+/// whole file off, and so does a file over 4 KiB or not UTF-8.
+pub fn switch_file_says_on(bytes: &[u8], switch: &str) -> bool {
+    if bytes.len() > MOST_SWITCH_BYTES {
+        return false;
+    }
+    let Ok(text) = std::str::from_utf8(bytes) else {
+        return false;
+    };
+    let mut value = None;
+    for line in text.lines().map(str::trim) {
+        if line.is_empty() || line.starts_with('#') {
+            continue;
+        }
+        let Some((name, rest)) = line.split_once('=') else {
+            return false;
+        };
+        if name.is_empty()
+            || !name
+                .bytes()
+                .all(|byte| byte.is_ascii_alphanumeric() || byte == b'_')
+        {
+            return false;
+        }
+        if name == switch {
+            value = Some(rest);
+        }
+    }
+    value == Some("on")
+}
+
+/// [`BY_DEFAULT_SWITCH`] as [`UPDATE_ENV`] says it, read at most every
+/// [`SWITCH_EVERY`]: missing, not a regular file or unreadable is off.
+fn switch_on() -> bool {
+    use std::io::Read;
+    static READ: std::sync::Mutex<Option<(Instant, bool)>> = std::sync::Mutex::new(None);
+    let mut read = READ
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner);
+    if let Some((at, on)) = *read
+        && at.elapsed() < SWITCH_EVERY
+    {
+        return on;
+    }
+    let path = Path::new(UPDATE_ENV);
+    let mut bytes = Vec::new();
+    let on = std::fs::symlink_metadata(path).is_ok_and(|metadata| metadata.is_file())
+        && std::fs::File::open(path)
+            .and_then(|file| {
+                file.take(MOST_SWITCH_BYTES as u64 + 1)
+                    .read_to_end(&mut bytes)
+            })
+            .is_ok()
+        && switch_file_says_on(&bytes, BY_DEFAULT_SWITCH);
+    *read = Some((Instant::now(), on));
+    on
+}
+
+/// Whether a launch on OpenClaw may be held for a cold Gateway (#8105).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Asking {
+    /// The switch is on: its file says so, or lamp-update has asked.
+    Yes,
+    /// Neither: off, as before.
+    No,
+}
+
+/// Sets whether lamp-update has asked, alone (no fresh ask, so no pane
+/// read): for tests only, which share this process.
+#[doc(hidden)]
+pub fn asked_for_tests(asked: bool) {
+    UPDATE_EVER_ASKED.store(asked, std::sync::atomic::Ordering::Release);
+}
+
+/// [`Asking`] now.
+pub fn update_asking() -> Asking {
+    asking_of(
+        UPDATE_EVER_ASKED.load(std::sync::atomic::Ordering::Acquire),
+        switch_on,
+    )
+}
+
+/// [`Asking`] with lamp-update having asked or not, else the switch file.
+fn asking_of(ever_asked: bool, file_on: impl FnOnce() -> bool) -> Asking {
+    if ever_asked || file_on() {
+        Asking::Yes
+    } else {
+        Asking::No
+    }
+}
+
+/// How a held launch's Gateway is looked at: [`Serving::lamp`]'s read,
+/// port then the approvals RPC once per Gateway start, so a launch is sent
+/// only once the Gateway serves (#7170's 17:43, Twelve on #8234). Run on a
+/// thread of its own; replaced in tests ([`look_cold_with`]).
+type ColdLook = Box<dyn FnMut() -> bool + Send>;
+static COLD_LOOK: std::sync::OnceLock<std::sync::Mutex<ColdLook>> = std::sync::OnceLock::new();
+
+fn cold_look() -> &'static std::sync::Mutex<ColdLook> {
+    COLD_LOOK.get_or_init(|| std::sync::Mutex::new(serving_look(Serving::lamp())))
+}
+
+/// A held launch's look through `serving`: true only once it serves, its
+/// port then its approvals read, never at the port alone.
+fn serving_look(mut serving: Serving) -> ColdLook {
+    Box::new(move || serving.ready_until(Instant::now() + SERVING_LOOK_WITHIN, &|| false))
+}
+
+/// The last look's answer for a held launch, looked at most every
+/// [`COLD_EVERY`] by a thread of its own, so the store's loop never waits on
+/// a look: `true` once the Gateway served.
+static COLD_ANSWERS: AtomicBool = AtomicBool::new(false);
+/// Until when (as [`WANTED_AT_MS`]) the Gateway is looked at for a held
+/// launch.
+static COLD_LOOK_UNTIL_MS: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+
+/// One look's bound: the port, then a read of at most [`READ_WITHIN`].
+const SERVING_LOOK_WITHIN: Duration = Duration::from_secs(25);
+
+/// Puts `look` in place of [`Serving::lamp`]'s read for held launches: for
+/// tests only.
+#[doc(hidden)]
+pub fn look_cold_with(look: ColdLook) {
+    *cold_look()
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner) = look;
+}
+
+/// Whether the Gateway served at the last look for a held launch; looks
+/// go on while held launches ask, and stop 5 s after the last ask. A
+/// Gateway that served this start (the kept listener's inode, as skill
+/// runs keep it) is taken as serving at once, so a warm launch is never
+/// held a tick (Twelve on #8234).
+pub fn cold_answers() -> bool {
+    static LOOKER: std::sync::OnceLock<()> = std::sync::OnceLock::new();
+    COLD_LOOK_UNTIL_MS.store(
+        mono_ms() + 1 + 5 * COLD_EVERY.as_millis() as u64,
+        std::sync::atomic::Ordering::Release,
+    );
+    LOOKER.get_or_init(|| {
+        let _ = thread::Builder::new()
+            .name("tasks-gateway-look".into())
+            .spawn(|| {
+                loop {
+                    let until = COLD_LOOK_UNTIL_MS.load(std::sync::atomic::Ordering::Acquire);
+                    let served = mono_ms() < until
+                        && (cold_look()
+                            .lock()
+                            .unwrap_or_else(std::sync::PoisonError::into_inner))(
+                        );
+                    COLD_ANSWERS.store(served, std::sync::atomic::Ordering::Release);
+                    thread::sleep(COLD_EVERY);
+                }
+            });
+    });
+    COLD_ANSWERS.load(std::sync::atomic::Ordering::Acquire) || served_this_start()
+}
+
+/// Whether the Gateway listening now is the one whose approvals read last
+/// succeeded ([`SERVED`]): served this start, so warm.
+fn served_this_start() -> bool {
+    SERVED
+        .get()
+        .and_then(|served| {
+            *served
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner)
+        })
+        .is_some_and(|inode| listener_here() == Some(inode))
+}
+
 /// lamp-update asked whether OpenClaw is in use (`Route::UpdateRead`).
 pub fn update_asked() {
     UPDATE_ASKED_AT_MS.store(mono_ms() + 1, std::sync::atomic::Ordering::Release);
+    UPDATE_EVER_ASKED.store(true, std::sync::atomic::Ordering::Release);
 }
 
 /// Whether the lamp's panes are to be read now, the last read at `last`:
@@ -1400,6 +1604,67 @@ mod tests {
         assert!(panes_fresh(now + 1, now + 2 * 60_000));
         assert!(!panes_fresh(now + 1, now + 2 * 60_000 + 1));
         assert!(!panes_fresh(0, now));
+    }
+
+    /// #8105 (Twelve on #8234): a held launch's default look is the serving
+    /// read: the port answering with the approvals read failing is not
+    /// served; the read succeeding then is.
+    #[test]
+    fn a_held_launchs_look_waits_for_the_serving_read_not_the_port() {
+        let port = Fake {
+            ready_from: Some(1),
+            ..Fake::default()
+        };
+        let read = Fake {
+            ready_from: Some(3),
+            ..Fake::default()
+        };
+        let mut look = serving_look(Serving::new(Box::new(port), Box::new(read.clone())));
+        assert!(!look(), "the port answers, the read fails: held");
+        assert!(*read.looks.lock().unwrap() >= 1, "the read was made");
+        let mut served = false;
+        for _ in 0..10 {
+            if look() {
+                served = true;
+                break;
+            }
+            thread::sleep(READ_EVERY);
+        }
+        assert!(served, "the read succeeds: released");
+    }
+
+    /// #8105 (Twelve on #8234): once lamp-update has asked, it stays asked
+    /// with no new ask; never asked, the switch file decides.
+    #[test]
+    fn lamp_updates_ask_is_kept_for_the_process() {
+        update_asked();
+        assert!(UPDATE_EVER_ASKED.load(std::sync::atomic::Ordering::Acquire));
+        assert_eq!(
+            asking_of(
+                UPDATE_EVER_ASKED.load(std::sync::atomic::Ordering::Acquire),
+                || false
+            ),
+            Asking::Yes
+        );
+        assert_eq!(asking_of(false, || true), Asking::Yes);
+        assert_eq!(asking_of(false, || false), Asking::No);
+    }
+
+    /// #8105: the switch file is read by lamp-update's rule.
+    #[test]
+    fn the_switch_file_is_read_as_lamp_update_reads_it() {
+        let on = |text: &str| switch_file_says_on(text.as_bytes(), BY_DEFAULT_SWITCH);
+        assert!(on("LAMP_OPENCLAW_GATEWAY_BY_DEFAULT=on\n"));
+        assert!(on(
+            "# note\n\nLAMP_UPDATE_NOW=on\nLAMP_OPENCLAW_GATEWAY_BY_DEFAULT=on\n"
+        ));
+        assert!(!on(
+            "LAMP_OPENCLAW_GATEWAY_BY_DEFAULT=on\nLAMP_OPENCLAW_GATEWAY_BY_DEFAULT=off\n"
+        ));
+        assert!(!on("LAMP_OPENCLAW_GATEWAY_BY_DEFAULT=On\n"));
+        assert!(!on("LAMP_OPENCLAW_GATEWAY_BY_DEFAULT=on\ngarbled line\n"));
+        assert!(!on(""));
+        assert!(!on(&"#".repeat(5000)));
     }
 
     /// #8105 (Twelve's P1 on #8223): the panes are read only while

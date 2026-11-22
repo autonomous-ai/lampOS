@@ -937,7 +937,7 @@ impl Subscriber {
 /// may remove it after this one has taken the name, and the new subscriber
 /// hears nothing until it subscribes again. Closing that needs publishers
 /// to compare the file they remove with the one they probed (by inode).
-fn cleared(path: &std::path::Path) -> bool {
+pub(crate) fn cleared(path: &std::path::Path) -> bool {
     use std::os::unix::fs::FileTypeExt;
     let socket = fs::symlink_metadata(path).is_ok_and(|meta| meta.file_type().is_socket());
     let refused = socket
