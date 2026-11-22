@@ -9625,6 +9625,53 @@ fn with_sysstat_on_nothing_kept_is_removed() {
     assert!(folder.join("sa18").exists());
 }
 
+/// The reviewer-lead's P3 on #8314: a `systemd-run` that keeps failing is
+/// said once for each distinct error, never again each round, and no file
+/// is said removed; a removal that works is said, and the next failure is
+/// said again.
+#[test]
+fn a_removal_that_keeps_failing_is_said_once_for_each_error() {
+    let lamp = Lamp::new(188, &[]);
+    let folder = lamp.on(install::SYSSTAT_KEPT);
+    fs::create_dir_all(&folder).unwrap();
+    fs::write(folder.join("sa18"), "kept").unwrap();
+    let mut said = Vec::new();
+    let mut remove = |error: Option<&str>, said: &mut Vec<String>| {
+        install::sysstat_kept_removed(
+            &lamp.root,
+            &mut |_: &[&str]| error.map_or(Ok(()), |why| Err(why.to_owned())),
+            &mut |line: &str| said.push(line.to_owned()),
+        )
+        .unwrap()
+    };
+    // The memory is the process's, kept with this lamp's root, so another
+    // test's removal never clears it.
+    let refused = "P3 test: Failed to start transient service unit: Access denied";
+    for _ in 0..3 {
+        assert_eq!(remove(Some(refused), &mut said), ["/var/log/sysstat/sa18"]);
+    }
+    let other = "P3 test: Connection timed out";
+    remove(Some(other), &mut said);
+    remove(Some(other), &mut said);
+    assert_eq!(
+        said,
+        [
+            format!("sysstat's kept files were not removed: {refused}"),
+            format!("sysstat's kept files were not removed: {other}"),
+        ]
+    );
+    said.clear();
+    remove(None, &mut said);
+    remove(Some(other), &mut said);
+    assert_eq!(
+        said,
+        [
+            "sysstat's kept file removed: /var/log/sysstat/sa18 (4 bytes)".to_owned(),
+            format!("sysstat's kept files were not removed: {other}"),
+        ]
+    );
+}
+
 /// #7254: install removes sysstat's kept files as the boot run does, so a
 /// lamp gets the journal's room at the update itself; a second install
 /// finds none, runs nothing and changes nothing.

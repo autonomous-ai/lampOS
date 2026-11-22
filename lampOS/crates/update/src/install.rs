@@ -1129,7 +1129,8 @@ pub fn sysstat_kept_name(name: &str) -> bool {
 /// take room the journal needs (`/var/log` is 47 MB; past 75 % the base
 /// cuts the journal to 5 MB). Only plain files named as
 /// [`sysstat_kept_name`] directly in [`SYSSTAT_KEPT`] are removed, each said
-/// by name and size first; a link, a folder or anything else is never
+/// by name and size once removed; a removal that fails is said once per
+/// process for each distinct error; a link, a folder or anything else is never
 /// followed or touched. With [`SYSSTAT_ON_PATH`] there (its owner wants
 /// sysstat), nothing is removed. `lamp-region.service` may write only
 /// `/etc`, and no round changes that unit in a home, so the removal is one
@@ -1182,12 +1183,7 @@ pub fn sysstat_kept_removed(
         return Ok(Vec::new());
     }
     kept.sort();
-    for (path, bytes) in &kept {
-        say(&format!(
-            "sysstat's kept file removed: {path} ({bytes} bytes)"
-        ));
-    }
-    let paths: Vec<String> = kept.into_iter().map(|(path, _)| path).collect();
+    let paths: Vec<String> = kept.iter().map(|(path, _)| path.clone()).collect();
     let mut argv = vec![
         "systemd-run",
         "--wait",
@@ -1201,11 +1197,41 @@ pub fn sysstat_kept_removed(
         "--",
     ];
     argv.extend(paths.iter().map(String::as_str));
-    if let Err(why) = systemd_run(&argv) {
-        say(&format!("sysstat's kept files were not removed: {why}"));
+    let result = systemd_run(&argv);
+    // A failure is said once per process for each distinct error: a round
+    // that fails the same way every `--every-s` stays quiet on the RAM log
+    // disk this frees (the reviewer-lead's P3 on #8314).
+    let mut failed = SYSSTAT_FAILED
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner);
+    match result {
+        Ok(()) => {
+            if failed.as_ref().is_some_and(|(at, _)| at == root) {
+                *failed = None;
+            }
+            for (path, bytes) in &kept {
+                say(&format!(
+                    "sysstat's kept file removed: {path} ({bytes} bytes)"
+                ));
+            }
+        }
+        Err(why) => {
+            let line = format!("sysstat's kept files were not removed: {why}");
+            if failed
+                .as_ref()
+                .is_none_or(|(at, said)| at != root || *said != line)
+            {
+                say(&line);
+                *failed = Some((root.to_path_buf(), line));
+            }
+        }
     }
     Ok(paths)
 }
+
+/// The last failure [`sysstat_kept_removed`] said, and under which root, so
+/// a repeat is not said.
+static SYSSTAT_FAILED: std::sync::Mutex<Option<(PathBuf, String)>> = std::sync::Mutex::new(None);
 
 /// `/etc/tmpfiles.d/lampos.conf`: the bus root and the locks.
 pub const TMPFILES: &str = include_str!("../../../deploy/product/lampos.conf");
