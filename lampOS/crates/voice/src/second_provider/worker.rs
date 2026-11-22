@@ -3326,6 +3326,12 @@ pub fn serve(
         crate::known_faces::keep_owner_fresh(owner_file.clone(), owner_faces.clone());
         crate::app_remember::start(root, memory, crate::app_remember::owners_face_first);
     }
+    // An installed app's live context line (`apps/context`, #7415): set or
+    // cleared in this process's RAM as lamp-control tells it; nothing reads
+    // the bus unless `LAMP_APP_MEMORY` is on.
+    if let Some(root) = files.bus_root.as_deref() {
+        crate::app_context::start_telling(root);
+    }
     let another_voice = Arc::new(std::sync::atomic::AtomicBool::new(false));
     let another_voice_told = another_voice.clone();
     // Whether anything tracks it: set where the one-face rule takes the flag.

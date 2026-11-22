@@ -565,6 +565,7 @@ topic catalogue. Neither carries any sound.
 | `AppTook` | `apps/took` | event | none / none | The app took that line (`turn`, `app`): the voice ends the request in code and says nothing; lamp-control to the voice (#7415 piece 6) |
 | `AppRemember` | `apps/remember` | event | none / none | An installed app's fact for the lamp's known person, checked and tidied at the door (`ask`, `app`, `name`, `text`, `at_unix_ms`); lamp-control to the voice, which keeps it with memory's `remember_app_fact` (`lamp_msgs::app_fact`, #7415 C166, [apps.md](apps.md)) |
 | `AppRemembered` | `apps/remembered` | event | none / none | How an `AppRemember` went (`ask`, `app`, `outcome`: `kept` or one code); the voice to lamp-control, which answers the app |
+| `AppContext` | `apps/context` | event | none / none | An installed app's live context line, checked and tidied at the door (`app`, `name`, `line` at most 120 characters, `for_ms` 1 to 600000); a clear is `line` `""`, `name` `""`, `for_ms` 0, sent too when the app's last connection closes; lamp-control to the voice, which holds it in RAM only (`app_context::set` / `clear`, #7415, [apps.md](apps.md)) |
 
 Levels are dBFS from -120 (digital silence) to 0; `check()` refuses
 anything else, and a peak under its quiet.

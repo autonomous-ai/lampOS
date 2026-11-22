@@ -371,10 +371,90 @@ impl AppRemembered {
     }
 }
 
+/// An installed app's live context line, checked and tidied at the door,
+/// for the voice to tell during the app's session (`apps/context`,
+/// lamp-control to the voice; `apps.context`, #7415). `app` is the app's
+/// checked name (its source is `app:<app>`), `name` its manifest's title as
+/// [`name`], `line` already [`tidy`] to at most [`CONTEXT_MOST_CHARS`],
+/// told for `for_ms` (1 to [`CONTEXT_MOST_MS`]). An empty `line` with
+/// `for_ms` 0 clears the app's line: the app said so, or its session ended
+/// (its last connection closed, it stopped or it was removed). Never kept:
+/// the voice holds it in RAM only.
+#[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct AppContext {
+    pub app: String,
+    pub name: String,
+    pub line: String,
+    pub for_ms: u64,
+}
+
+impl AppContext {
+    pub const TYPE: &str = "lamp_msgs/AppContext";
+    pub const VERSION: u32 = 1;
+    pub const TOPIC: &str = "apps/context";
+
+    pub fn declaration() -> lamp_bus::Declaration {
+        lamp_bus::Declaration::new(Self::TYPE, Self::VERSION, lamp_bus::Kind::Event)
+    }
+
+    /// The clear of app `app`'s line.
+    pub fn clear(app: &str) -> Self {
+        Self {
+            app: app.to_owned(),
+            name: String::new(),
+            line: String::new(),
+            for_ms: 0,
+        }
+    }
+
+    /// Whether it clears the app's line.
+    pub fn clears(&self) -> bool {
+        self.line.is_empty()
+    }
+
+    /// The source its line is told under: `app:<app>`.
+    pub fn source(&self) -> Option<Source> {
+        Source::parse(&format!("app:{}", self.app))
+    }
+
+    pub fn check(&self) -> Result<(), crate::Invalid> {
+        if !crate::app_triggers::name_ok(&self.app) || self.source().is_none() {
+            return Err(crate::Invalid("an app's context line names an app".into()));
+        }
+        if self.clears() {
+            return if self.for_ms == 0 && self.name.is_empty() {
+                Ok(())
+            } else {
+                Err(crate::Invalid(
+                    "an app's context clear has no name and no time".into(),
+                ))
+            };
+        }
+        if self.name.len() > NAME_BYTES || name(&self.name) != self.name {
+            return Err(crate::Invalid(
+                "an app's context line has a fitting name".into(),
+            ));
+        }
+        if tidy(&self.line, CONTEXT_MOST_CHARS).as_deref() != Ok(self.line.as_str()) {
+            return Err(crate::Invalid(
+                "an app's context line is tidied words".into(),
+            ));
+        }
+        if !(1..=CONTEXT_MOST_MS).contains(&self.for_ms) {
+            return Err(crate::Invalid(
+                "an app's context line is told 1 ms to 10 minutes".into(),
+            ));
+        }
+        Ok(())
+    }
+}
+
 pub fn app_fact_topics() -> Vec<(&'static str, lamp_bus::Declaration)> {
     vec![
         (AppRemember::TOPIC, AppRemember::declaration()),
         (AppRemembered::TOPIC, AppRemembered::declaration()),
+        (AppContext::TOPIC, AppContext::declaration()),
     ]
 }
 
@@ -568,6 +648,39 @@ mod tests {
         };
         assert!(went(KEPT).check().is_ok() && went("not_known").check().is_ok());
         assert!(went("").check().is_err() && went("Not known").check().is_err());
-        assert_eq!(app_fact_topics().len(), 2);
+        assert_eq!(app_fact_topics().len(), 3);
+    }
+
+    /// A context line on the bus: tidied, at most 120, told 1 ms to 10
+    /// minutes; a clear has no name, no words and no time.
+    #[test]
+    fn a_context_line_on_the_bus_holds_only_checked_words() {
+        let line = |line: &str, for_ms: u64| AppContext {
+            app: "gym-coach".into(),
+            name: "Gym Coach".into(),
+            line: line.into(),
+            for_ms,
+        };
+        let ok = line("set 2 of 3, 7 squats", 60_000);
+        assert!(ok.check().is_ok() && !ok.clears());
+        assert_eq!(ok.source().unwrap().as_str(), "app:gym-coach");
+        assert!(line("set \"2\"", 60_000).check().is_err());
+        assert!(line(&"a".repeat(CONTEXT_MOST_CHARS), 1).check().is_ok());
+        assert!(
+            line(&"a".repeat(CONTEXT_MOST_CHARS + 1), 1)
+                .check()
+                .is_err()
+        );
+        assert!(line("set 2", 0).check().is_err());
+        assert!(line("set 2", CONTEXT_MOST_MS).check().is_ok());
+        assert!(line("set 2", CONTEXT_MOST_MS + 1).check().is_err());
+        let clear = AppContext::clear("gym-coach");
+        assert!(clear.clears() && clear.check().is_ok());
+        assert!(line("", 0).check().is_err(), "a clear names no title");
+        assert!(AppContext::clear("Gym").check().is_err());
+        assert_eq!(
+            serde_json::to_value(&ok).unwrap(),
+            serde_json::json!({"app": "gym-coach", "name": "Gym Coach", "line": "set 2 of 3, 7 squats", "for_ms": 60_000})
+        );
     }
 }
