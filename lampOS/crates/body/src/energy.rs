@@ -171,7 +171,13 @@ pub fn livelier(clip: &'static Clip, level: u8) -> &'static Clip {
             return under_five(clip, level);
         }
         let frames = longer_frames(clip, 5);
-        let gain = gain(&frames, cut_frames(clip, 5), clip, clip_size(clip.name, 5), true);
+        let gain = gain(
+            &frames,
+            cut_frames(clip, 5),
+            clip,
+            clip_size(clip.name, 5),
+            true,
+        );
         played(&longer(clip, 5), gain, of(5).clip_pace)
     })
 }
