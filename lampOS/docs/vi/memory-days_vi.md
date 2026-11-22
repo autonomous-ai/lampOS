@@ -938,12 +938,17 @@ phần của kho nằm ở `crates/memory/src/app_facts.rs`.
   - **Không được giữ bởi "remember that".** Một `remember` mà lời có chứa
     dòng còn hạn bị từ chối (`remembered: false`, nhật ký chỉ ghi
     `LAMP_APP_MEMORY`), nên điều người giữ chỉ là lời của chính họ.
-  - **Mọi lượt nói.** Khi `LAMP_PRIVATE_ROOM` bật, ai nói với lamp cũng là
-    chủ của nó, nên dòng còn hạn được kể ở mọi lượt nói, không kiểm khuôn
-    mặt (first builder, 11:14 trên #8072). App chỉ ghi qua người lamp biết
-    (`app_fact::whose`, phần của cửa).
+  - **Chỉ ở lượt của chủ** (`app_context::notes_for`, P3 của Reviewer-lead
+    trên #8313). Dòng còn hạn chỉ được kể khi phạm vi của lượt là một người
+    quen đang trong tầm nhìn (cổng mà các ghi chú bên cạnh dùng, không bao giờ
+    là của phòng hay của khoảng hở) và là một trong các id trí nhớ của chủ
+    (`app_remember::owners_face_first`). Lượt của khách hay của phòng không
+    bao giờ nghe dòng app của chủ, kể cả khi `LAMP_PRIVATE_ROOM` bật.
   - **Quên hết sẽ xoá chúng** (`app_context::forget_with_everything`, nơi
-    `forget_everything` chạy trong `tools.rs`).
+    `forget_everything` chạy trong `tools.rs`), và một `forget` nghe được
+    mà `about` nêu tên một app đang có dòng ("forget what Gym Coach said",
+    theo tên hiển thị hoặc id, nguyên từ) sẽ xoá dòng của app đó
+    (`app_context::forget_about`), trừ khi nó lỗi hoặc không quên gì.
   - **Không kể gì khi Lamp ở chế độ riêng tư.** "Riêng tư" là **công tắc
     riêng tư vật lý** đóng (hoặc micro bị tắt), không phải phòng riêng. Khi
     đó không kể và không đặt dòng nào, và mọi dòng bị xoá khi công tắc đóng.

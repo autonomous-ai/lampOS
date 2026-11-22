@@ -211,15 +211,85 @@ pub fn forget_with_everything(name: &str, told: &serde_json::Value) {
     }
 }
 
+/// After a tool `name` with `args` answered `told`: a heard `forget` whose
+/// `about` names an app holding a live line ("forget what Gym Coach said",
+/// its display name or its id, word for word) clears that app's line too,
+/// so its next line is new (the first builder's P3 on #8313). A forget that
+/// erred or forgot nothing (`forgotten: false`, as when Lamp couldn't see who
+/// asked) leaves the lines.
+pub fn forget_about(name: &str, args: &serde_json::Value, told: &serde_json::Value) {
+    if !on()
+        || name != crate::remember::FORGET
+        || told.get("error").is_some()
+        || told.get("forgotten") == Some(&serde_json::Value::Bool(false))
+    {
+        return;
+    }
+    let Some(about) = args.get("about").and_then(serde_json::Value::as_str) else {
+        return;
+    };
+    let about = format!(" {} ", folded(about));
+    let named: Vec<Source> = with_lines(|lines| lines.names())
+        .unwrap_or_default()
+        .into_iter()
+        .filter(|(source, shown)| {
+            let id = source.as_str().split_once(':').map_or("", |(_, id)| id);
+            [folded(shown), folded(id)]
+                .iter()
+                .any(|words| !words.is_empty() && about.contains(&format!(" {words} ")))
+        })
+        .map(|(source, _)| source)
+        .collect();
+    for source in &named {
+        clear(source);
+    }
+}
+
 /// The notes told beside this turn's line at `now`: each live line quoted
-/// with its source, on any spoken turn (`LAMP_PRIVATE_ROOM`: whoever speaks
-/// to the lamp is its owner, the first builder's 11:14 on #8072). Nothing
-/// with the switch off or while Lamp is private.
+/// with its source. The engine tells them through [`notes_for`], on the
+/// owner's turn only. Nothing with the switch off or while Lamp is private.
 pub fn notes(now: u64, private: bool) -> Vec<String> {
     if !on() || private {
         return Vec::new();
     }
     with_lines(|lines| lines.live(now)).unwrap_or_default()
+}
+
+#[cfg(test)]
+thread_local! {
+    static OWNERS_FOR_TEST: std::cell::RefCell<Option<Vec<String>>> =
+        const { std::cell::RefCell::new(None) };
+}
+
+/// The owner's memory ids for the calling test's thread alone (`None`: the
+/// lamp's own reading).
+#[cfg(test)]
+pub(crate) fn set_owners_for_test(owners: Option<Vec<String>>) {
+    OWNERS_FOR_TEST.with(|cell| *cell.borrow_mut() = owners);
+}
+
+/// The owner's memory ids, the face's first (`app_remember::owners_face_first`).
+fn owners() -> Vec<String> {
+    #[cfg(test)]
+    if let Some(owners) = OWNERS_FOR_TEST.with(|cell| cell.borrow().clone()) {
+        return owners;
+    }
+    crate::app_remember::owners_face_first()
+}
+
+/// [`notes`] on the owner's turn only: `person` is the turn's known person
+/// in view (its scope's, none when the room's or held only by a gap), told
+/// only when they are one of the owner's memory ids. An app writes for the
+/// lamp's known person alone, so a guest's or the room's turn never hears
+/// the owner's app line (the Reviewer-lead's P3 on #8313).
+pub fn notes_for(now: u64, private: bool, person: Option<&str>) -> Vec<String> {
+    if !on() || private {
+        return Vec::new();
+    }
+    match person {
+        Some(person) if owners().iter().any(|id| id == person) => notes(now, private),
+        _ => Vec::new(),
+    }
 }
 
 /// The words of the live lines, for [`keeps_a_line`].
@@ -404,6 +474,73 @@ mod tests {
             assert!(apply(&told("set \"1\"", 60_000), 9_000, false).is_err());
             assert!(apply(&told("set 1", 600_001), 9_000, false).is_err());
             assert!(notes(9_001, false).is_empty());
+        });
+    }
+
+    /// Told on the owner's turn only: a guest's (a known person not the
+    /// owner), the room's (no known person) and a gap's are told nothing.
+    #[test]
+    fn told_on_the_owners_turn_only() {
+        alone(|| {
+            const OWNER: &str = "p-0123456789abcdef";
+            set_owners_for_test(Some(vec![OWNER.to_owned()]));
+            coach_says("set 2 of 3", 60_000, 1_000);
+            assert_eq!(notes_for(1_001, false, Some(OWNER)).len(), 1);
+            assert!(notes_for(1_001, false, Some("p-fedcba9876543210")).is_empty());
+            assert!(notes_for(1_001, false, None).is_empty(), "the room's");
+            assert!(notes_for(1_001, true, Some(OWNER)).is_empty(), "private");
+            set_owners_for_test(Some(Vec::new()));
+            assert!(notes_for(1_001, false, Some(OWNER)).is_empty(), "no owner");
+            set_owners_for_test(None);
+        });
+    }
+
+    /// "Forget what Gym Coach said" clears the coach's line, by its name or
+    /// its id, and no other app's; a forget that erred, forgot nothing, or
+    /// names no app holding a line leaves them.
+    #[test]
+    fn forget_what_an_app_said_clears_its_line() {
+        alone(|| {
+            let other = Source::parse("app:yoga-flow").unwrap();
+            let both = || {
+                coach_says("set 2 of 3", 60_000, 1_000);
+                set(other.clone(), "Yoga Flow", "pose 4", 60_000, 1_000, false).unwrap();
+            };
+            let forget = |about: &str, told: serde_json::Value| {
+                forget_about(crate::remember::FORGET, &json!({"about": about}), &told);
+            };
+            both();
+            forget("what Gym Coach said", json!({"forgotten": true}));
+            let left = notes(1_001, false);
+            assert_eq!(left.len(), 1, "{left:?}");
+            assert!(left[0].contains("Yoga Flow"));
+            both();
+            forget("the gym-coach app's notes", json!({"forgotten": true}));
+            assert_eq!(notes(1_001, false).len(), 1, "by its id");
+            both();
+            for (about, told) in [
+                ("what Gym Coach said", json!({"error": "unavailable"})),
+                (
+                    "what Gym Coach said",
+                    json!({"forgotten": false, "note": "n"}),
+                ),
+                ("my gym coaching plan", json!({"forgotten": true})),
+            ] {
+                forget(about, told);
+                assert_eq!(notes(1_001, false).len(), 2, "{about}");
+            }
+            // Another tool, or no words: nothing.
+            forget_about(
+                crate::remember::REMEMBER,
+                &json!({"about": "Gym Coach"}),
+                &json!({"remembered": true}),
+            );
+            forget_about(
+                crate::remember::FORGET,
+                &json!({}),
+                &json!({"forgotten": true}),
+            );
+            assert_eq!(notes(1_001, false).len(), 2);
         });
     }
 
