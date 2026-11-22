@@ -9636,7 +9636,7 @@ fn a_removal_that_keeps_failing_is_said_once_for_each_error() {
     fs::create_dir_all(&folder).unwrap();
     fs::write(folder.join("sa18"), "kept").unwrap();
     let mut said = Vec::new();
-    let mut remove = |error: Option<&str>, said: &mut Vec<String>| {
+    let remove = |error: Option<&str>, said: &mut Vec<String>| {
         install::sysstat_kept_removed(
             &lamp.root,
             &mut |_: &[&str]| error.map_or(Ok(()), |why| Err(why.to_owned())),
