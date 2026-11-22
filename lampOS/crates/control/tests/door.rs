@@ -3030,6 +3030,123 @@ async fn a_tried_run_is_minted_the_drafts_grants_and_its_end_tells_its_says() {
     }
 }
 
+/// #8180: a make's tried run's `say` is answered `finished` at once while
+/// the voice holds its turn (the make's own, which waits on this try): it
+/// never reaches the voice, and the run's end tells it said and its exact
+/// words, which lamp-tasks gives the make as the try's first words.
+#[tokio::test]
+async fn a_tried_runs_say_is_answered_at_once_while_the_voice_holds_its_turn() {
+    let dir = std::env::temp_dir().join(format!("lamp-control-tried-say-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&dir);
+    std::fs::create_dir_all(&dir).unwrap();
+    let say = dir.join("say.sock");
+    // A voice that takes a line and never answers: its turn held open.
+    let voice = std::os::unix::net::UnixListener::bind(&say).unwrap();
+    voice.set_nonblocking(true).unwrap();
+    let lamp = lamp_made(
+        "run-try-say",
+        move |events| {
+            Box::new(lamp_control::parts::Lamp::new(
+                None,
+                None,
+                Some(say),
+                "boot".into(),
+                events,
+            ))
+        },
+        |door, _| door,
+    )
+    .await;
+    let path = run_socket(&lamp, my_uid(&lamp)).await;
+    let minted = admin(&lamp, json!({"mint": {"try": ["speak"], "run": "try-1"}})).await;
+    let token = minted["token"].as_str().unwrap().to_owned();
+    let mut socket = agent_connect(&path).await.unwrap();
+    assert_eq!(run_hello(&mut socket, Some(&token)).await["ok"], true);
+    let words = "Low tide at six.";
+    socket
+        .send(Message::text(
+            json!({"id": 2, "op": "say", "text": words}).to_string(),
+        ))
+        .await
+        .unwrap();
+    // Its answer and its `done`, in either order, both well inside the
+    // try's 30 s.
+    let (mut answered, mut done) = (None, None);
+    while answered.is_none() || done.is_none() {
+        let next = agent_next(&mut socket).await.expect("its answer and done");
+        if next["ev"] == "done" {
+            done = Some(next);
+        } else {
+            answered = Some(next);
+        }
+    }
+    assert_eq!(answered.unwrap()["ok"], true);
+    let done = done.unwrap();
+    assert_eq!((&done["re"], &done["how"]), (&json!(2), &json!("finished")));
+    assert!(
+        matches!(voice.accept(), Err(ref error) if error.kind() == std::io::ErrorKind::WouldBlock),
+        "the voice was never asked"
+    );
+    let ended = admin(&lamp, json!({"end": {"run": "try-1"}})).await;
+    assert_eq!(
+        ended,
+        json!({"ended": true, "said": 1, "said_first": words}),
+        "{ended}"
+    );
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
+/// #8180 (First's condition): a tried run's `say` is checked as the voice
+/// checks an exact line: one the voice would refuse (empty, blank, over
+/// its bound, a control character) is refused, never counted, so the try
+/// fails (lamp-tasks' `SAID_NOTHING`). The bound is the voice's own.
+#[tokio::test]
+async fn a_tried_runs_say_the_voice_would_refuse_fails_the_try() {
+    let most = lamp_voice::say::MOST_WORDS_BYTES;
+    assert_eq!(lamp_control::protocol::SAY_MAX_BYTES, most);
+    // The line lamp-control sends the voice for a computer's exact say.
+    let line = |text: &str| {
+        json!({"skill": "control", "text": text, "expires_in_ms": 30000, "exact": true, "by": "c_1"})
+            .to_string()
+    };
+    let refused = ["", "   ", &"a".repeat(most + 1), "one\ntwo"];
+    for text in refused {
+        assert!(lamp_voice::say::parse(&line(text)).is_err(), "{text:?}");
+    }
+    assert!(lamp_voice::say::parse(&line(&"a".repeat(most))).is_ok());
+    let lamp = lamp_made(
+        "run-try-say-refused",
+        |events| {
+            Box::new(lamp_control::parts::Lamp::new(
+                None,
+                None,
+                None,
+                "boot".into(),
+                events,
+            ))
+        },
+        |door, _| door,
+    )
+    .await;
+    let path = run_socket(&lamp, my_uid(&lamp)).await;
+    let minted = admin(&lamp, json!({"mint": {"try": ["speak"], "run": "try-1"}})).await;
+    let token = minted["token"].as_str().unwrap().to_owned();
+    let mut socket = agent_connect(&path).await.unwrap();
+    assert_eq!(run_hello(&mut socket, Some(&token)).await["ok"], true);
+    for (id, text) in refused.into_iter().enumerate() {
+        socket
+            .send(Message::text(
+                json!({"id": id + 2, "op": "say", "text": text}).to_string(),
+            ))
+            .await
+            .unwrap();
+        let answer = agent_next(&mut socket).await.expect("an answer");
+        assert_eq!(answer["ok"], false, "{text:?} {answer}");
+    }
+    let ended = admin(&lamp, json!({"end": {"run": "try-1"}})).await;
+    assert_eq!(ended, json!({"ended": true, "said": 0}), "{ended}");
+}
+
 #[tokio::test]
 async fn a_token_is_minted_only_from_the_owners_yes() {
     let lamp = lamp("run-yes").await;
