@@ -577,9 +577,29 @@ whose words came at +3.15 s, after the kit's window; row-8159d run 1 try
 `Interruption` (`lamp-audio`, `tests/it/cut_in_7413`), yield inside the
 person's words with the switch and not without it. Nothing changes at a
 reply's start or after a resume, nor for `Over` before the lamp's own sound
-is matched (`MATCHED_BLOCKS`), which reaches the yield as `Under`: run 1
-try 15's real cut-in came so, 1.1-1.4 s after a resume, and is not
-rescued. In those trails the lamp's story going on after its pauses, at the
+is matched (`MATCHED_BLOCKS`), which reaches the yield as `Under`.
+
+**With the switch, too, a reply going on after a pause in which its sound
+fell still (`Still`, the render quiet 30 blocks) has begun again for the
+onset**, as one going on after a resume has: 10 in a row
+(`early_onset_blocks`), not 7, for 120 blocks (`early_blocks`) after the
+last still block; `Unknown` still counts there once the reply itself is
+past its first 120 blocks. On lamp-52e6 on 21 Nov (row-8159d run 1 try 15)
+the story paused 9 blocks, went on, and 63 blocks later its own voice was
+heard `Over` plainly for 7 blocks (the render explaining none of it, the
+alignment under 20 blocks old): a yield 0.39 s before the clip, resumed on
+stillness; that resume restarted the reply's first blocks, so the
+"Wait, hold on." that followed was never yielded to. Its trail before the
+clip yields to nothing with the switch. Two of the three rescued cut-ins
+(q-cutin-h try 8, run 1 try 10) came 11 and 16 blocks after a still block
+and yield 3 blocks later than `Unknown` alone made them. The cost: a person
+right after a pause in the story needs 3 more blocks (30 ms) over the lamp. Of the
+42 yields to real cut-ins in the saved trails (row-8159d runs 1 and 2,
+row-7413i), 7 came within 120 blocks of a still block; 6 had 10 or more
+`Over` in a row counting the 20 blocks kept after the yield, and one
+(row-8159d run 1 try 13) had 8, so it may have been yielded to later or
+not at all. Nor does it reach run 1 try 17's own-voice yield, 123 blocks
+after its pause. In those trails the lamp's story going on after its pauses, at the
 same stale alignment, was heard `Under` (the canceller took it); its own
 voice let through and heard `Unknown` for 7 blocks mid-reply is not
 measured, and a lamp check with the switch on (the lamp's long story with
@@ -1502,7 +1522,7 @@ functions:
 | `over_a_busy_room_a_sound_that_never_yields_waits_for_the_name_then_is_let_go` (`coordinator/tests/duplex.rs`) | With the switch, the room busy: six blocks in the clear over a sounding answer make no yield and the mask passes them; held for the name 600 ms, then let go (`over_bed`); the name or a stop word in it, the switch off, or a room not busy: as before |
 | `the_turn_a_request_displaces_counts_toward_the_room_its_answer_began_in` (`coordinator/tests/turn_taking.rs`) | Two unanswered turns and a third displaced by the request: the answer's room is busy |
 | `a_yield_late_in_a_question_commits_on_stillness_with_the_switch`, `a_yield_not_late_in_speech_resumes_with_the_switch`, `a_late_yield_resumes_at_its_deadline_and_for_the_room_behind_the_asker` (`lamp-audio`) | `LAMP_CUT_IN_LATE_YIELD=on`: lamp-c0a4's dropped question (17 scattered plain `Over`, then the onset, 2 `Own`, 18 `Under`, 44 `Still`) commits, and resumes without the switch; the onset alone, 11 `Over`, the deadline and talk under the asker resume |
-| `cut_ins_heard_unknown_past_the_replys_start_yield_only_with_the_switch`, `the_lamps_own_voice_yields_to_nothing_more_with_the_switch` (`lamp-audio`, `tests/it/cut_in_7413`) | `LAMP_CUT_IN_STALE_ONSET=on`: lamp-52e6's recorded trails of three missed cut-ins yield at blocks 554, 423 and 319, and none without the switch; the story before each clip yields to nothing with it, and run 1 try 15 (a yield on the lamp's own sound, its cut-in heard before the match) is unchanged |
+| `cut_ins_heard_unknown_past_the_replys_start_yield_only_with_the_switch`, `the_lamps_own_voice_yields_to_nothing_more_with_the_switch` (`lamp-audio`, `tests/it/cut_in_7413`) | `LAMP_CUT_IN_STALE_ONSET=on`: lamp-52e6's recorded trails of three missed cut-ins yield at blocks 557, 426 and 319, and none without the switch; the story before each clip yields to nothing with it, run 1 try 15's included (its yield on the lamp's own sound after a pause, at block 184, needs 10 in a row there with the switch), and that yield is unchanged without the switch |
 | `a_question_yielded_to_late_commits_with_the_switch` (`turn_taking.rs`) | `LAMP_CUT_IN_LATE_YIELD=on`: the same question through the mask commits; the switch off resumes; the same blocks not plain (40% explained) resume with the switch |
 | `the_lamps_own_voice_over_a_held_render_is_not_a_late_yield`, `the_lamps_own_voice_at_its_word_tails_is_not_a_late_yield` (`lamp-audio`) | `LAMP_CUT_IN_LATE_YIELD=on`: the lamp's own voice misjudged as `Over` (50% explained) in 10 single blocks and the onset: with the render holding it is no late yield and resumes on stillness, as with the switch off; with the render fallen 7 dB it is the lamp's own voice and makes no yield at all (32a00aa48e) (lamp-4ace, 1 Nov) |
 | `with_counts_real_two_plain_asides_leave_a_third_line_heard` | `LAMP_CUT_IN_COUNTS_REAL=on`: two asides heard plainly, then a third line 5 s after, which commits and ends the story; off, not heard |

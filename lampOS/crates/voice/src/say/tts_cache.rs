@@ -103,6 +103,8 @@ pub struct TtsCache {
     /// is warmed ([`Self::wake_line`]). Off, it is neither warmed nor kept
     /// from going.
     hears_name: bool,
+    /// [`Self::keeping_outage_lines`].
+    outage_lines: bool,
     /// One render at a time, so a line asked while it warms is rendered once.
     /// Held while rendering, so a line asked while it warms is rendered
     /// once. It holds the lines that rendered empty or past [`MOST_FRAMES`]:
@@ -132,6 +134,7 @@ impl TtsCache {
             render_in: None,
             owners: None,
             hears_name: false,
+            outage_lines: false,
             rendering: Mutex::new(std::collections::HashSet::new()),
         }
     }
@@ -157,6 +160,15 @@ impl TtsCache {
         self
     }
 
+    /// `LAMP_OUTAGE_LINE_AGAIN=on` (#8235): an English lamp warms the
+    /// failed turn's line (`language::TURN_LOST`), which its release has no
+    /// file for, and the second route's down line, said by a turn of the
+    /// service's outage; another language warms both as fixed lines.
+    pub fn keeping_outage_lines(mut self, on: bool) -> Self {
+        self.outage_lines = on;
+        self
+    }
+
     /// The lines warmed at start: the owner's fixed lines first, when the
     /// owner's language is not English, then [`WARM`], the English fallback,
     /// and with [`Self::hearing_its_name`] the wake's English on an English
@@ -167,6 +179,15 @@ impl TtsCache {
             .flat_map(Language::fixed_lines)
             .chain(WARM.iter().copied())
             .chain(self.hears_name.then(|| self.wake_words()))
+            .chain(
+                (self.outage_lines && self.owners.is_none())
+                    .then_some([
+                        crate::language::TURN_LOST,
+                        crate::second_provider::DOWN_LINE,
+                    ])
+                    .into_iter()
+                    .flatten(),
+            )
             .collect()
     }
 
@@ -699,6 +720,12 @@ fn made_from_environment() -> Option<Arc<TtsCache>> {
             .speaking(crate::language::at_start())
             .hearing_its_name(
                 crate::sleep_capture::Mode::from_environment() == crate::sleep_capture::Mode::On,
+            )
+            .keeping_outage_lines(
+                std::env::var(crate::coordinator::OUTAGE_LINE_AGAIN_ENVIRONMENT)
+                    .ok()
+                    .as_deref()
+                    == Some("on"),
             ),
     );
     let warming = Arc::clone(&cache);
