@@ -145,11 +145,13 @@ pub fn stand_seconds(base: f32, level: u8) -> f32 {
 
 /// A built-in clip (`crate::clips::ALL`) as `level` plays it (#8153):
 /// each joint `clip_size` times as far, held to the gesture's reach
-/// (`crate::body::GESTURE_REACH`) and to V1's own swing of it
-/// (`crate::clips::V1_SWING`, the lead: level 5 is almost V1; [`sized`]),
-/// never more than a level above takes it, and its frames `clip_pace` times as
-/// quick, the step rounded up to a whole millisecond. The body plays it
-/// only under `LAMP_BODY_ENERGY`, so each step is stretched under the
+/// (`crate::body::GESTURE_REACH`), and its frames `clip_pace` times as
+/// quick, the step rounded up to a whole millisecond: at level 5 for all of
+/// its V1 recording where it was cut from one, held to V1's own swing of it
+/// (`crate::clips::V1_SWING`, the lead: level 5 is almost V1; [`sized`]);
+/// at 2 to 4 the clip itself as before #8201, a joint lowered only where it
+/// would move farther or faster than the level above (`under_five`). The
+/// body plays it only under `LAMP_BODY_ENERGY`, so each step is stretched under the
 /// servo's speed (`Limits::clip_ceiling`), and checks it against V1's
 /// anti-tip rule as played. Level 1, and any other clip (a move from a
 /// file, a shift at rest, the call's glance), is the clip itself. Each is
@@ -165,23 +167,59 @@ pub fn livelier(clip: &'static Clip, level: u8) -> &'static Clip {
         return clip;
     };
     MADE[index][usize::from(level) - 2].get_or_init(|| {
-        // No more than any level above takes it, so a level's swing over
-        // the cut is never under the level below's (#8153): each level's
-        // V1 cap and base hold are its own stretch's, the stretches nested.
-        let gain = (level..=5)
-            .map(|at| {
-                let frames = longer_frames(clip, at);
-                gain(
-                    &frames,
-                    cut_frames(clip, at),
-                    clip,
-                    clip_size(clip.name, at),
-                )
-            })
-            .reduce(|low, high| std::array::from_fn(|joint| low[joint].min(high[joint])))
-            .unwrap();
-        played(&longer(clip, level), gain, of(level).clip_pace)
+        if level < 5 {
+            return under_five(clip, level);
+        }
+        let frames = longer_frames(clip, 5);
+        let gain = gain(&frames, cut_frames(clip, 5), clip, clip_size(clip.name, 5), true);
+        played(&longer(clip, 5), gain, of(5).clip_pace)
     })
+}
+
+/// A built-in clip at level 2, 3 or 4 (#8153, the lead's call, 22 Nov): as
+/// before #8201, the clip itself at the level's size and pace, but no joint
+/// moving farther (peak to peak) or faster (its largest step) than the level
+/// above moves it over the stretch of the cut that level plays: there that
+/// joint alone is lowered to it, the step kept.
+fn under_five(clip: &'static Clip, level: u8) -> Clip {
+    let all = 0..=clip.frames.len() - 1;
+    let mut gain = gain(clip.frames, all, clip, clip_size(clip.name, level), false);
+    let step_ms = step_at(clip, &made(clip.frames, gain), of(level).clip_pace);
+    let above = livelier(clip, level + 1);
+    let stretch = &above.frames[cut_frames(clip, level + 1)];
+    for joint in 0..5 {
+        let (most, fastest) = how_far_and_fast(stretch, above.step_ms, joint);
+        let over = |gain: [f32; 5]| {
+            let (swing, speed) = how_far_and_fast(&made(clip.frames, gain), step_ms, joint);
+            (swing > most || speed > fastest).then_some((swing, speed))
+        };
+        let Some((swing, speed)) = over(gain) else {
+            continue;
+        };
+        gain[joint] *= (most as f32 / swing as f32).min(fastest / speed);
+        // ponytail: rounding may leave it a count over; step down until not.
+        while over(gain).is_some() {
+            gain[joint] *= 0.999;
+        }
+    }
+    Clip {
+        name: clip.name,
+        step_ms,
+        frames: made(clip.frames, gain).leak(),
+    }
+}
+
+/// How far and how fast `frames`, `step_ms` apart, take `joint`: peak to
+/// peak, counts, and its largest step, counts a second.
+fn how_far_and_fast(frames: &[[i16; 5]], step_ms: u16, joint: usize) -> (i32, f32) {
+    let at = frames.iter().map(|frame| i32::from(frame[joint]));
+    let swing = at.clone().max().unwrap_or(0) - at.min().unwrap_or(0);
+    let step = frames
+        .windows(2)
+        .map(|two| (i32::from(two[1][joint]) - i32::from(two[0][joint])).abs())
+        .max()
+        .unwrap_or(0);
+    (swing, step as f32 * 1_000.0 / f32::from(step_ms))
 }
 
 /// The hardest the base (base yaw) of a built-in clip is asked to change
@@ -205,20 +243,20 @@ pub fn longest_us(clip: &'static Clip) -> u64 {
 }
 
 /// A built-in clip's size at `level`: the level's `clip_size`, less where
-/// [`CLIP_SIZE_CAP`] holds it.
+/// [`CLIP_SIZE_CAP`] holds it, or below level 5 [`UNDER_FIVE_CAP`].
 pub fn clip_size(name: &str, level: u8) -> f32 {
-    let size = of(level).clip_size;
+    let under_five = UNDER_FIVE_CAP.iter().filter(|_| taken(level) < 5);
     CLIP_SIZE_CAP
         .iter()
-        .find(|(cap, _)| *cap == name)
-        .map_or(size, |(_, cap)| size.min(*cap))
+        .chain(under_five)
+        .filter(|(cap, _)| *cap == name)
+        .fold(of(level).clip_size, |size, (_, cap)| size.min(*cap))
 }
 
 /// A built-in clip as long as `level` plays it, before its size and pace
-/// (#8153): one cut from its recording (`crate::clips::WHOLE`) is lengthened
-/// toward all of it, evenly from the cut at level 1 to the whole at level 5
-/// (or as much of it as [`WHOLE_TRIM`] keeps), never shorter than the
-/// clip itself; any other clip is itself.
+/// (#8153): at level 5 one cut from its recording (`crate::clips::WHOLE`)
+/// is all of it (or as much of it as [`WHOLE_TRIM`] keeps), never shorter
+/// than the clip itself; below 5, and any other clip, the clip itself.
 pub fn longer(clip: &'static Clip, level: u8) -> Clip {
     match window(clip, level) {
         Some((whole, first, last)) => span(whole, first, last),
@@ -240,18 +278,12 @@ fn window(clip: &'static Clip, level: u8) -> Option<(&'static crate::clips::Whol
     let whole = crate::clips::WHOLE
         .iter()
         .find(|whole| whole.cut.name == clip.name && whole.cut.frames == clip.frames)?;
-    if taken(level) == 1 {
+    if taken(level) < 5 {
         return None;
     }
     let (first, last) = whole_kept(whole);
-    let share = f32::from(taken(level) - 1) / 4.0;
-    let toward = |cut: usize, end: usize| {
-        let reach = (end as f32 - cut as f32) * share;
-        (cut as f32 + reach).round() as usize
-    };
-    let (first, last) = (toward(whole.from, first), toward(whole.to, last));
-    // Never shorter than level 1: a stretch no longer than the clip
-    // (excited's, its bounce played twice, below level 5) keeps the clip.
+    // Never shorter than level 1: a stretch no longer than the clip keeps
+    // the clip.
     (last - first >= clip.frames.len()).then_some((whole, first, last))
 }
 
@@ -317,7 +349,7 @@ fn span_frames(whole: &crate::clips::Whole, first: usize, last: usize) -> Vec<[i
 /// clip's own; where even the clip's own pace would ask more, the base
 /// keeps the clip's own size (the head and the arm still grow).
 pub fn sized(clip: &Clip, size: f32, pace: f32) -> Clip {
-    let gain = gain(clip.frames, 0..=clip.frames.len() - 1, clip, size);
+    let gain = gain(clip.frames, 0..=clip.frames.len() - 1, clip, size, true);
     played(clip, gain, pace)
 }
 
@@ -328,17 +360,19 @@ pub fn sized(clip: &Clip, size: f32, pace: f32) -> Clip {
 /// recording held at the reach; at most what swings it, peak to peak, as
 /// far as V1 swung it over all of its recording (the lead, #8153: level 5
 /// is almost V1), never under 1 for that (a joint the generator's gains
-/// took past V1 keeps level 1's size); and the base 1 where its bend at
-/// the clip's own step would pass [`BASE_BEND`].
+/// took past V1 keeps level 1's size; only with `to_v1`, level 5's); and
+/// the base 1 where its bend at the clip's own step would pass [`BASE_BEND`].
 fn gain(
     frames: &[[i16; 5]],
     cut: std::ops::RangeInclusive<usize>,
     clip: &Clip,
     size: f32,
+    to_v1: bool,
 ) -> [f32; 5] {
     let reach = crate::body::GESTURE_REACH;
     let v1 = crate::clips::V1_SWING
         .iter()
+        .filter(|_| to_v1)
         .find(|(name, _)| *name == clip.name)
         .map(|(_, swing)| *swing);
     let mut gain: [f32; 5] = std::array::from_fn(|joint| {
@@ -397,14 +431,19 @@ fn quickest(frames: &[[i16; 5]]) -> u16 {
 /// base bends past [`BASE_BEND`], never slower than its own. Kept for good.
 fn played(clip: &Clip, gain: [f32; 5], pace: f32) -> Clip {
     let frames = made(clip.frames, gain);
-    let step_ms = ((f32::from(clip.step_ms) / pace).ceil() as u16)
-        .max(quickest(&frames))
-        .min(clip.step_ms);
     Clip {
         name: clip.name,
-        step_ms,
+        step_ms: step_at(clip, &frames, pace),
         frames: frames.leak(),
     }
+}
+
+/// `clip`'s step played as `frames`, `pace` times as quick, never so quick
+/// the base bends past [`BASE_BEND`], never slower than its own.
+fn step_at(clip: &Clip, frames: &[[i16; 5]], pace: f32) -> u16 {
+    ((f32::from(clip.step_ms) / pace).ceil() as u16)
+        .max(quickest(frames))
+        .min(clip.step_ms)
 }
 
 /// The built-in clips held under a level's `clip_size` (#8153), each at
@@ -422,6 +461,11 @@ pub const CLIP_SIZE_CAP: [(&str, f32); 3] = [
     ("surprised", 1.27),
     ("dance_groove", 1.59),
 ];
+
+/// Levels 2 to 4's own caps, as they were before #8201 (the lead's call,
+/// 22 Nov: levels 2 to 4 play as before): sleepy and excited held at 1.44
+/// and 1.27 of the clip itself.
+pub const UNDER_FIVE_CAP: [(&str, f32); 2] = [("sleepy", 1.44), ("excited", 1.27)];
 
 /// The cut clips level 5 does not play for all of their recording (#8153),
 /// each as long as V1's anti-tip rule lets it be at its level-5 size on the
@@ -1019,8 +1063,8 @@ mod tests {
     /// of its V1 recording, not only the stretch V2 cut (2 to 9 s): its
     /// frames are the recording's rows, every one, unless `WHOLE_TRIM` names
     /// the bound that trims it, and then exactly the rows it keeps. Levels
-    /// 2 to 4 step from the cut toward it, each longer than the level under
-    /// it; level 1 is the clip itself (`level_one_plays_every_clip_as_recorded`).
+    /// 1 to 4 play the clip itself, as long (the lead's call, 22 Nov:
+    /// levels 2 to 4 as before #8201; `level_one_plays_every_clip_as_recorded`).
     /// Its time is the rows at the clip's frame time over the level's 1.5
     /// pace, each step stretched under the servo's 1,000 counts a second.
     /// Prints a line a clip (`cargo test -- --nocapture`).

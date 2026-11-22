@@ -296,7 +296,7 @@ mod tests {
 
     /// #8153: every built-in clip as each level plays it (`energy::livelier`:
     /// up to 1.6 times its size at level 5, `energy::CLIP_SIZE_CAP` where
-    /// held, and lengthened toward all of its V1 recording,
+    /// held, and at 5 all of its V1 recording,
     /// `energy::WHOLE_TRIM` where held), on each deployed lamp's standing
     /// pose, keeps [`L5_MM`] under V1's rule on every frame: no frame past
     /// 21.5 mm off the axis, half a millimetre inside the 22 mm at which

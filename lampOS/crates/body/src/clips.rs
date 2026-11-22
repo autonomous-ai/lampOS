@@ -26,8 +26,8 @@ pub struct Clip {
 }
 
 /// A clip cut from its V1 recording (`hal/recordings/`), with all of that
-/// recording at the cut's size and frame time (#8153): an energy level above
-/// 1 plays the clip lengthened toward it (`crate::energy::livelier`). The
+/// recording at the cut's size and frame time (#8153): energy level 5 plays
+/// all of it in place of the clip (`crate::energy::livelier`). The
 /// whole is never played as it is: it begins at the recording's first frame,
 /// ends at nothing and is not held to the generator's speeds, since only
 /// `LAMP_BODY_ENERGY` plays it, with every step stretched under the servo's.

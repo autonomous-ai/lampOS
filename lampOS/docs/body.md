@@ -1522,14 +1522,15 @@ the voice, Expression and lamp-skills (each with `energy_in::EnergyIn`, the body
   the lamp back past 16 mm (`energy::CLIP_SIZE_CAP`,
   `cog::every_built_in_clip_at_every_level_passes_v1s_rule`; no bound moved): greeting 1.54,
   surprised 1.27 and dance_groove 1.59 (its lean back), found on the clips as cut; sleepy (1.44)
-  and excited (1.27) were held too until V1's swing held them under it. On the host at level 5,
+  and excited (1.27) were held too until V1's swing held them under it at level 5, and still are at
+  levels 2 to 4, which play as before #8201 (`energy::UNDER_FIVE_CAP`, "Clip length" below). On the host at level 5,
   at the length played ("Clip length" below), the clips' worst frame is 3.9 to 21.46 mm off the
   axis (greeting 21.46, scanning 21.40, excited 20.13; level 1: 3.1 to 17.99), so seven clips
   come within 85% of 22 mm and are said in the journal as V1 said them (`tipping.close`), and the
   farthest back is 13.40 mm (laugh). The fastest joint of 13 of the 21 clips as cut reaches the
   servo's 1,000 counts a second (#8183's count; level 1: headshake alone). The eight clips not cut
   from a longer recording take 0.68 to 0.76 of their level-1 time (headshake 1.02, below); the
-  others are lengthened ("Clip length" below).
+  others play all of their recording at level 5 ("Clip length" below).
 
   The base (base yaw) carries the lamp's weight, so a level never asks it to change speed from one
   step to the next harder than level 1 already asks of it in some clip: `energy::BASE_BEND`, 7,690
@@ -1570,11 +1571,10 @@ the voice, Expression and lamp-skills (each with `energy_in::EnergyIn`, the body
   raised, which #8153 does not do.
 - **Clip length (#8153).** Thirteen built-in clips are a stretch V2 cut from a V1 recording (2 to
   9 s, "Gestures" below); the generator also writes all of each recording at the cut's size and
-  frame time (`clips::WHOLE`, `NAME_WHOLE`, never played as it is). Above level 1 such a clip is
-  lengthened toward it (`energy::longer`): evenly from the cut at level 1 to all of the recording
-  at level 5, taken from the first frame kept so it begins at nothing and, ended before the
-  recording does, brought back to nothing over its last ten frames, never shorter than the clip
-  itself, then sized and paced as above. The size, the reach, the servo's 1,000 counts a second
+  frame time (`clips::WHOLE`, `NAME_WHOLE`, never played as it is). At level 5 such a clip plays
+  all of it (`energy::longer`), taken from the first frame kept so it begins at nothing and, ended
+  before the recording does, brought back to nothing over its last ten frames, never shorter than
+  the clip itself, then sized and paced as above. The size, the reach, the servo's 1,000 counts a second
   and V1's tip rule are as above, none raised: a recording that would cross the tip rule (21.5 mm)
   or the lean back (16 mm) at its level-5 size is trimmed to as much as stays inside
   (`energy::WHOLE_TRIM`, found on the host by
@@ -1582,7 +1582,18 @@ the voice, Expression and lamp-skills (each with `energy_in::EnergyIn`, the body
   clip at levels 2 to 5 is checked against both
   (`cog::every_built_in_clip_at_every_level_passes_v1s_rule`; at level 5 the worst is 21.46 mm off
   the axis, greeting, and 13.40 mm back, laugh). The other eight clips are already all of
-  their recording. Level 1 plays the clip itself. Level 5 on the host
+  their recording. Level 1 plays the clip itself.
+
+  **Levels 2 to 4 play as before #8201** (the lead's call, V2 on #8153, 22 Nov 16:3x, the first
+  builder's (b)): the clip itself, as long as level 1, at the level's size and pace in the table
+  above, sleepy and excited held at 1.44 and 1.27 (`energy::UNDER_FIVE_CAP`), byte for byte what
+  they were, except that no level moves a joint more than the level above it: where a joint would
+  swing farther (peak to peak) or step faster (its largest step, counts a second) than the level
+  above moves it over the stretch of the cut that level plays, that joint alone is lowered to it,
+  the step kept (`energy::under_five`; `energy::tests::levels_two_to_four_play_as_before_8201_never_more_than_the_level_above`,
+  which keeps the pre-#8201 builder as its reference and pins where the cap holds).
+
+  Level 5 on the host
   (`energy::level_five_plays_each_clip_for_all_of_its_v1_recording`; played seconds at the 1.5
   pace, each step stretched under the servo's speed):
 
@@ -2211,8 +2222,8 @@ each is the most active stretch of its recording of the length given, begun at i
 into the reach the test below allows (at most 80% of the recording), ended at nothing over its last half second and
 slowed under the same speeds. They are what skills and expressions ask for by name. Filmed from the iMac on
 lamp-4ace at 10:4x: `acknowledge`, `curious`, `happy`, `excited` and `caring` read from the front; `surprised`,
-`confused` and `sleepy` are small there. Above energy level 1 those cut from a longer recording are
-lengthened toward all of it ("Clip length (#8153)" above, `clips::WHOLE`).
+`confused` and `sleepy` are small there. At energy level 5 those cut from a longer recording play
+all of it ("Clip length (#8153)" above, `clips::WHOLE`).
 
 | Clip | From | Lasts | Mostly |
 | --- | --- | --- | --- |
