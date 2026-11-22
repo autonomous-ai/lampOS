@@ -1272,9 +1272,12 @@ mod tests {
                         played.frames.iter().map(|frame| frame[joint]).collect()
                     };
                     // Nor may a joint where level 2 sits below level 1
-                    // (V2's (A) on #8307, pinned as `pinned_below_one`).
+                    // (V2's (A) on #8307, `BELOW_ONE`).
                     if (level == 5 && column(under) == column(clip))
-                        || (level == 2 && BELOW_ONE.contains(&(clip.name, joint)))
+                        || (level == 2
+                            && BELOW_ONE
+                                .iter()
+                                .any(|(name, at, ..)| (*name, *at) == (clip.name, joint)))
                     {
                         continue;
                     }
@@ -1296,15 +1299,16 @@ mod tests {
         }
     }
 
-    /// Clip and joint where the capped level 2 sits below level 1, under the
-    /// floor's 10% (V2's (A) on #8307).
-    const BELOW_ONE: [(&str, usize); 6] = [
-        ("curious", 2),
-        ("happy", 3),
-        ("surprised", 0),
-        ("confused", 0),
-        ("confused", 2),
-        ("dance_hype", 3),
+    /// Clip, joint, level 1's swing and level 2's where the capped level 2
+    /// sits below level 1, under the floor's 10% (V2's (A) on #8307; pinned,
+    /// so a change is said).
+    const BELOW_ONE: [(&str, usize, i32, i32); 6] = [
+        ("curious", 2, 142, 133),
+        ("happy", 3, 171, 160),
+        ("surprised", 0, 190, 186),
+        ("confused", 0, 190, 178),
+        ("confused", 2, 142, 129),
+        ("dance_hype", 3, 155, 143),
     ];
 
     /// `clip` at `level` 2 to 4 capped as [`under_five`] caps it, but with
@@ -1498,11 +1502,11 @@ mod tests {
                         continue;
                     }
                     if level == 1 && (swing > top_swing + 1 || speed > top_speed) {
-                        let pair = format!("{} {joint}: L1 {swing}, L2 {top_swing}", clip.name);
+                        let pair = (clip.name, joint, swing, top_swing);
                         let capped = format!("{} 2 {joint}:", clip.name);
                         assert!(
                             held.iter().any(|entry| entry.starts_with(&capped)),
-                            "{pair} is below level 1 but not capped at level 2"
+                            "{pair:?} is below level 1 but not capped at level 2"
                         );
                         below_one.push(pair);
                         continue;
@@ -1588,16 +1592,8 @@ mod tests {
             "dance_jazz 4 2: L1 87, now 86",
             "dance_jazz 4 4: L1 88, now 108",
         ];
-        let pinned_below_one: [&str; 6] = [
-            "curious 2: L1 142, L2 133",
-            "happy 3: L1 171, L2 160",
-            "surprised 0: L1 190, L2 186",
-            "confused 0: L1 190, L2 178",
-            "confused 2: L1 142, L2 129",
-            "dance_hype 3: L1 155, L2 143",
-        ];
         assert_eq!(floored, floored_at_one);
         assert_eq!(held, pinned);
-        assert_eq!(below_one, pinned_below_one);
+        assert_eq!(below_one, BELOW_ONE);
     }
 }
