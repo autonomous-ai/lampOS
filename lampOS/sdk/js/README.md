@@ -372,12 +372,15 @@ it.
 
 ```js
 await lamp.remember('squats 3x10, the 6th too shallow');
-for (let rep = 1; rep <= 10; rep++) {
-  await lamp.context(`set 2 of 3, ${rep} squats`, { forMs: 30_000 }); // renewed each rep
+for (let set = 1; set <= 3; set++) {
+  // Once a set, not each rep: Lamp takes one line a second (`rate` with `retryMs` past it).
+  await lamp.context(`set ${set} of 3, 10 squats`, { forMs: 120_000 });
   // ...
 }
-await lamp.clearContext(); // the set is over
-``` The fake lamp serves all of it with `FakeLamp.start({ app: true, appName, appGrants, appSettings })` and `fake.appPath`, and `fake.hearPhrase(phrase)`, `fake.trigger(name, phrase, turn)`, `fake.setAppSetting(changed)` and `fake.stopApp(why)`; `fake.appFacts` and `fake.appContext` are what the app told memory, and `fake.refuseNext('apps.remember', code)` refuses the next one with any code.
+await lamp.clearContext(); // the workout is over
+```
+
+The fake lamp serves all of it with `FakeLamp.start({ app: true, appName, appGrants, appSettings })` and `fake.appPath`, and `fake.hearPhrase(phrase)`, `fake.trigger(name, phrase, turn)`, `fake.setAppSetting(changed)` and `fake.stopApp(why)`; `fake.appFacts` and `fake.appContext` are what the app told the lamp, and `fake.refuseNext('apps.remember', code)` refuses the next one with any code.
 
 **Seeing every frame:** with `LAMPOS_LOG=debug`, every frame to and from the
 lamp is printed to stderr, one line each (`lampos -> {...}` sent, `lampos <-

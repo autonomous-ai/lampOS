@@ -276,11 +276,14 @@ else:          # a paired computer (Lamp.connect / Lamp.local)
 
 ```python
 await lamp.remember("squats 3x10, the 6th too shallow")
-for rep in range(1, 11):
-    await lamp.context(f"set 2 of 3, {rep} squats", for_ms=30_000)  # renewed each rep
+for set_no in range(1, 4):
+    # Once a set, not each rep: Lamp takes one line a second (`rate` with `retry_ms` past it).
+    await lamp.context(f"set {set_no} of 3, 10 squats", for_ms=120_000)
     ...
-await lamp.clear_context()  # the set is over
-``` The fake lamp serves all of it with `FakeLamp(app=True, app_name=..., app_grants=..., app_settings=...)` and `fake.app_path`, and `fake.hear_phrase(phrase)`, `fake.trigger(name, phrase, turn)`, `fake.set_app_setting(**changed)` and `fake.stop_app(why)`; `fake.app_facts` and `fake.app_context` are what the app told memory, and `fake.refuse_next("apps.remember", code)` refuses the next one with any code.
+await lamp.clear_context()  # the workout is over
+```
+
+The fake lamp serves all of it with `FakeLamp(app=True, app_name=..., app_grants=..., app_settings=...)` and `fake.app_path`, and `fake.hear_phrase(phrase)`, `fake.trigger(name, phrase, turn)`, `fake.set_app_setting(**changed)` and `fake.stop_app(why)`; `fake.app_facts` and `fake.app_context` are what the app told the lamp, and `fake.refuse_next("apps.remember", code)` refuses the next one with any code.
 
 **Dependencies** (`websockets`, `cryptography`; `zeroconf` to find lamps)
 have lower bounds only, as a library's should: the application that uses
