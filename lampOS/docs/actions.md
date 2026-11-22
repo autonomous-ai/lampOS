@@ -115,7 +115,7 @@ catalog regression checks this guidance; live model selection still needs
 the [lamp follow-up](schedule.md#relative-time-follow-up-on-the-lamp).
 
 With `LAMP_TIMER_ASKS_HOW_LONG=on` in lamp-actions' unit (#8182, off unless
-set), `set_timer`'s description also says that when the person's words give
+set; on in the product unit), `set_timer`'s description also says that when the person's words give
 no length it sets nothing and asks only "For how long?", and `set_reminder`'s
 the same with "What time?" (`schedule::asking_how_long`), and that a question
 about what it is for is asked only as "What's the timer for?" or "What should
