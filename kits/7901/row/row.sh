@@ -67,8 +67,8 @@ EGJ="egress ready in its fence|granted net: its egress socket|\[lamp-tasks\] egr
 BEGIN(){ LEG=$1; J=$LG/leg-$1.journal.txt; echo "== leg $1 $(date +%T)"; RENEW || return 1; : > $J; JP=$(JF $J); sleep 3; }
 END(){ sleep ${TAIL:-8}; kill $JP 2>/dev/null; JP=; }
 STATE(){ LAMP "STAGE=$1" $D/state.lamp.sh > $LG/state-$1.txt 2>&1; sed 's/^/  /' $LG/state-$1.txt | grep -v '^  STAGE' | cut -c1-400; }
-WATCH(){ $SSH -n $H "rm -f /tmp/t7901-stop.$1"; LAMP "SECS=$(( RUNWAIT + ENDWAIT + 120 )) STOPF=/tmp/t7901-stop.$1" $D/fence.lamp.sh > $LG/fence-$1.txt 2>&1 & FP=$!; }
-UNWATCH(){ $SSH -n $H "touch /tmp/t7901-stop.$1"; sleep 2; kill $FP 2>/dev/null; FP=; grep -E '^(RUNPID|ADMIN|NET|CG|EGRESS)' $LG/fence-$1.txt | cut -c1-220 | sed 's/^/  fence /'; }
+WATCH(){ SSHR -n $H "rm -f /tmp/t7901-stop.$1"; LAMP "SECS=$(( RUNWAIT + ENDWAIT + 120 )) STOPF=/tmp/t7901-stop.$1" $D/fence.lamp.sh > $LG/fence-$1.txt 2>&1 & FP=$!; }
+UNWATCH(){ SSHR -n $H "touch /tmp/t7901-stop.$1"; sleep 2; kill $FP 2>/dev/null; FP=; grep -E '^(RUNPID|ADMIN|NET|CG|EGRESS)' $LG/fence-$1.txt | cut -c1-220 | sed 's/^/  fence /'; }
 # MAKE <clip>: the voice make, its read-back, the yes, on. Sets MSTAT (unheard|noend|notkept|kept), MW, Y, O.
 MAKE(){ local n0 rb; MSTAT=; MW=; Y=; O=; n0=$(lines); PLAY $1
   waitfor "$HEARD" $n0 ${HEARWAIT:-60} >/dev/null || { MSTAT=unheard; return 1; }

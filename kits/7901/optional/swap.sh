@@ -15,7 +15,7 @@ for b in $BINS; do
   echo "ART $b $got"; SHAS="${SHAS:-} $b=$got"
 done
 GATE lamp-voice lamp-skills lamp-control lamp-tasks || exit 1
-$SSH -n $H 'mkdir -p /tmp/t7901' || exit 1
+SSHR -n $H 'mkdir -p /tmp/t7901' || exit 1
 for b in $BINS; do $SCP -q $ART/$b $H:/tmp/t7901/$b || { echo "copy $b failed"; exit 1; }; done
 LAMP "SHAS='${SHAS# }'" $O/swap-common.lamp.sh $O/swap.lamp.sh 2>&1 | tee $D/logs/swap.txt
 grep -q '^SWAPPED OK' $D/logs/swap.txt && echo "next: ../run.sh check (with PR_*_SHA from art/SHA256SUMS)" || echo "SWAP NOT OK: ./restore.sh now"

@@ -128,4 +128,8 @@ case("RUN.fail-legfail-unrowed", "A B C D", "FAIL", {"j/C.MAKEC": j([(1, asked(1
 case("RUN.void-noyes", "A B C D", "VOID", env={"RUNSH": "1"})
 case("RUN.void-checksha", "A B C D", "VOID", {"out/check.lamp.sh": "BIN lamp-voice running=2222 file=2222\nVERIFY FAIL: lamp-voice-not-the-given-PR-sha\nREADY\n"}, env={"MIC_YES": "yes", "RUNSH": "1"})
 case("RUN.void-budget", "A B C D", "VOID", env={"MIC_YES": "yes", "RUNSH": "1", "MOCK_STARTS": "9"})
+# ---- kit helpers alone (unit.sh), the fixes ported from the #8180 e82d kit: engine(), the mute check, SSHR; Mac volume
+for u in ("engine-env", "engine-voice", "engine-app", "engine-none", "mute-oldstamp", "mute-timed", "mute-recoff", "mute-live",
+          "mute-liveoff", "ssh-retry", "ssh-sshpass", "ssh-giveup", "ssh-other", "macvol"):
+    case("U." + u, "-", "PASS", env={"UNIT": u})
 print("gen: %d cases in %s" % (n, FX))
