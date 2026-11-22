@@ -1165,7 +1165,8 @@ In gate 1126 (lamp-52e6, 21 Nov, #8182) the core timer line asked for one
 minute; speech to text kept its words but lost the number and the unit, the
 model set a ten-minute timer on its own, and the lamp said when it would
 ring. With `LAMP_TIMER_ASKS_HOW_LONG=on` (`lamp_actions::schedule::ASKS_HOW_LONG_SWITCH`,
-off unless set; it must be set in lamp-actions' unit and lamp-voice's):
+off unless set; it must be set in lamp-actions' unit and lamp-voice's, as the
+product's both are):
 
 - **The descriptions say so.** `set_timer` says that when the person's words
   give no length it sets nothing and asks only "For how long?", then sets it
