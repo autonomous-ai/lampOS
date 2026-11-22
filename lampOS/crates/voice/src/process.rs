@@ -3313,6 +3313,7 @@ fn second_route_worker_environment(
         crate::opens_further::ENVIRONMENT,
         crate::second_provider::TURNED_SPEAKING_ENVIRONMENT,
         crate::second_provider::JOIN_CUT_WORDS_ENVIRONMENT,
+        crate::second_provider::JOIN_SAME_VOICE_ENVIRONMENT,
         crate::second_provider::CARRY_LONG_ENVIRONMENT,
         // Read by the second worker, which tells the coordinator (#3026).
         crate::unfinished_words::ENVIRONMENT,
@@ -3673,6 +3674,7 @@ mod tests {
             crate::opens_further::ENVIRONMENT,
             crate::second_provider::TURNED_SPEAKING_ENVIRONMENT,
             crate::second_provider::JOIN_CUT_WORDS_ENVIRONMENT,
+            crate::second_provider::JOIN_SAME_VOICE_ENVIRONMENT,
             crate::second_provider::CARRY_LONG_ENVIRONMENT,
             crate::unfinished_words::ENVIRONMENT,
             crate::same_voice::CALLER_ONLY_ENVIRONMENT,
@@ -4879,6 +4881,7 @@ mod tests {
                     || name == crate::opens_further::ENVIRONMENT
                     || name == crate::second_provider::TURNED_SPEAKING_ENVIRONMENT
                     || name == crate::second_provider::JOIN_CUT_WORDS_ENVIRONMENT
+                    || name == crate::second_provider::JOIN_SAME_VOICE_ENVIRONMENT
                     || name == crate::second_provider::CARRY_LONG_ENVIRONMENT
                     || name == crate::unfinished_words::ENVIRONMENT
                     || name == crate::same_voice::CALLER_ONLY_ENVIRONMENT
@@ -5087,6 +5090,7 @@ mod tests {
                     "LAMP_HISTORY_SAID_ONCE=on",
                     "LAMP_HISTORY_SEND=on",
                     "LAMP_JOIN_CUT_WORDS=on",
+                    "LAMP_JOIN_SAME_VOICE=on",
                     "LAMP_KEEP_ANSWERS_AT_ONCE=on",
                     "LAMP_KEEP_CLAIM_WHOLE=on",
                     "LAMP_KEEP_QUIETLY=on",
