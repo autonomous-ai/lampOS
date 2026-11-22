@@ -112,6 +112,11 @@ pub const OFFLINE_VOICE_ENVIRONMENT: &str = "LAMP_OFFLINE_VOICE";
 /// first builder's (C)). Silent until its recording is provisioned. Off
 /// unless set.
 pub const SERVICE_DOWN_LINE_ENVIRONMENT: &str = "LAMP_SERVICE_DOWN_LINE";
+/// `on`, with `LAMP_OFFLINE_VOICE` (#8235): every speech turn of an
+/// outage says the outage's line, not only the first; and an English lamp's
+/// lost turn says `turn_lost` from the speech cache, which warms it. Off
+/// unless set: every turn as #830 left it.
+pub const OUTAGE_LINE_AGAIN_ENVIRONMENT: &str = "LAMP_OUTAGE_LINE_AGAIN";
 const DIAGNOSTIC_SHUTDOWN_GRACE: Duration = Duration::from_millis(750);
 /// The workers' shared grace on a stop without audio diagnostics, as `serve`
 /// always runs. A worker not gone by then is killed and reaped.
@@ -7457,13 +7462,17 @@ fn conversation_with_gate_inner(
     // A person heard Unknown past a reply's start counts toward the yield's
     // onset run (`LAMP_CUT_IN_STALE_ONSET=on`, #7413): a cut-in in a pause
     // of the lamp's story, its alignment stale or its render silent, was
-    // never 7 Over in a row (lamp-52e6, 20-21 Nov). Off unless set.
+    // never 7 Over in a row (lamp-52e6, 20-21 Nov). And an answer going on
+    // after a pause has begun again for the onset, as after a resume: its
+    // own voice after a pause made a yield on 7 plain Over. Off unless set.
     let stale_onset = duplex && crate::turn_taking::cut_in_stale_onset();
     if stale_onset {
         eprintln!(
-            "lamp-voice: stale onsets: a block heard unknown past an answer's first {} blocks counts toward the {} that make the lamp stop for a person",
+            "lamp-voice: stale onsets: a block heard unknown past an answer's first {} blocks counts toward the {} that make the lamp stop for a person; {} for {} blocks after a pause in the answer",
             lamp_audio::duplex::Confirmation::EVALUATED.early_blocks,
             lamp_audio::duplex::Confirmation::EVALUATED.onset_blocks,
+            lamp_audio::duplex::Confirmation::EVALUATED.early_onset_blocks,
+            lamp_audio::duplex::Confirmation::EVALUATED.early_blocks,
         );
     }
     detector.keep_first_words(first_words);

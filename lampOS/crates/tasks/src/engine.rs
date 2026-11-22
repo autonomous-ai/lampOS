@@ -1867,9 +1867,13 @@ impl<P: Persistence> Engine<P> {
             ),
             // In alias order, as loaded. The machine and project stay here.
             // A name only where it has one (#1676).
-            // `installed: false` only where its engine wasn't found on that
-            // computer (#5199, `installed` null with `installable` true),
-            // so the voice names only agents some computer has.
+            // `installed: false` only where its engine is said not
+            // installed on that computer (#5199: an explicit `installed:
+            // false`), so the voice names only agents some computer has.
+            // Never for an unknown (#8283): Harness's CLI says `installed`
+            // only as `true` or `null`, "`null` is unknown, never 'not
+            // there'" (openharness `machineEngines.ts`), and a slow login
+            // shell reads `installable: true` too.
             // `"lamp":"installing"` only with `LAMP_HERMES_ON_LAMP` on and
             // no lamp Hermes target yet (#5978): the voice then says the
             // lamp's own helper is still being installed.
