@@ -112,6 +112,11 @@ pub const OFFLINE_VOICE_ENVIRONMENT: &str = "LAMP_OFFLINE_VOICE";
 /// first builder's (C)). Silent until its recording is provisioned. Off
 /// unless set.
 pub const SERVICE_DOWN_LINE_ENVIRONMENT: &str = "LAMP_SERVICE_DOWN_LINE";
+/// `on`, with `LAMP_OFFLINE_VOICE` (#8235): every speech turn of an
+/// outage says the outage's line, not only the first; and an English lamp's
+/// lost turn says `turn_lost` from the speech cache, which warms it. Off
+/// unless set: every turn as #830 left it.
+pub const OUTAGE_LINE_AGAIN_ENVIRONMENT: &str = "LAMP_OUTAGE_LINE_AGAIN";
 const DIAGNOSTIC_SHUTDOWN_GRACE: Duration = Duration::from_millis(750);
 /// The workers' shared grace on a stop without audio diagnostics, as `serve`
 /// always runs. A worker not gone by then is killed and reaped.
