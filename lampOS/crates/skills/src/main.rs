@@ -5751,7 +5751,21 @@ fn say(
     skill: &str,
     asking: serde_json::Value,
     rest_permits: &[Permit],
+    begun: impl FnMut(),
+) -> String {
+    say_with(path, what, skill, asking, rest_permits, begun, None)
+}
+
+/// [`say`], its ask written through `handle` when given, so its asker may
+/// take it back while it waits ([`SayHandle`]).
+fn say_with(
+    path: &Path,
+    what: &str,
+    skill: &str,
+    asking: serde_json::Value,
+    rest_permits: &[Permit],
     mut begun: impl FnMut(),
+    handle: Option<&SayHandle>,
 ) -> String {
     let start_before_us = rest_permits.iter().map(Permit::expires_us).min();
     let mut attempt = || -> io::Result<String> {
@@ -5792,7 +5806,14 @@ fn say(
             .iter()
             .try_for_each(Permit::check)
             .map_err(io::Error::other)?;
-        writeln!(stream, "{ask}")?;
+        match handle {
+            Some(handle) => {
+                if !handle.write(&stream, &ask)? {
+                    return Ok("dropped (taken back by its asker before it was asked)".into());
+                }
+            }
+            None => writeln!(stream, "{ask}")?,
+        }
         let mut lines = BufReader::new(stream.take(64 * 1_024));
         loop {
             let mut line = String::new();
@@ -5802,6 +5823,9 @@ fn say(
             let answer: serde_json::Value = serde_json::from_str(&line)
                 .map_err(|error| io::Error::new(io::ErrorKind::InvalidData, error))?;
             if answer["event"] == "begun" {
+                if let Some(handle) = handle {
+                    handle.begun();
+                }
                 begun();
             } else if let Some(outcome) = answer["outcome"].as_str() {
                 return Ok(match answer["why"].as_str() {
@@ -6088,20 +6112,7 @@ fn hand_task(
             // starting (#7354), on a thread of its own, so the answer is
             // read as it comes.
             let line = lamp_skills::task::asking_getting_ready(line, asked_at.is_some());
-            let sent = hand_over_telling(socket, &line, &mut || {
-                let (say_socket, skill) = (say_socket.clone(), skill.clone());
-                std::thread::spawn(move || {
-                    let asking = json!({
-                        "text": lamp_skills::task::GETTING_READY_LINE,
-                        "exact": true,
-                        "priority": lamp_skills::SAY_PRIORITY,
-                    });
-                    let outcome = say(&say_socket, "say", &skill, asking, &[], || {});
-                    eprintln!(
-                        "lamp-skills: skill:{skill}: do.task: told the lamp is getting ready: {outcome}"
-                    );
-                });
-            });
+            let sent = hand_over_saying_getting_ready(socket, &line, &say_socket, &skill);
             if metered {
                 let after = lamp_skills::relay_share::read_here();
                 eprintln!(
@@ -6440,6 +6451,124 @@ impl Drop for Handing {
 /// run may have begun.
 fn hand_over(socket: &Path, line: &str) -> Result<String, lamp_skills::service_write::Unrun> {
     hand_over_telling(socket, line, &mut || {})
+}
+
+/// [`hand_over_asking`], with lamp-tasks' getting-ready notice said as
+/// [`lamp_skills::task::GETTING_READY_LINE`] on a thread of its own, so the
+/// answer is read as it comes (#7354). Asked as the answer to the
+/// conversation that asked for the run (`"answers": true`, Jarvis's HOLD on
+/// #8237): the call's own answer already told the voice this skill's run is
+/// the person's (`task_run`, raised as `MadeRunNow` before the hand-over
+/// starts), so the line passes the conversation and the owed reply, never
+/// speech playing or a line being heard. Taken back once the hand-over's
+/// answer is read before the voice began it, so it is never said after the
+/// answer; [`lamp_skills::task::GETTING_READY_EXPIRES_MS`] is only the
+/// backstop.
+fn hand_over_saying_getting_ready(
+    socket: &Path,
+    line: &str,
+    say_socket: &Path,
+    skill: &str,
+) -> Result<String, lamp_skills::service_write::Unrun> {
+    let taken_back = Arc::new(SayHandle::default());
+    let sent = hand_over_asking(socket, line, &mut || {
+        let (say_socket, skill) = (say_socket.to_owned(), skill.to_owned());
+        let handle = Arc::clone(&taken_back);
+        std::thread::spawn(move || {
+            let asking = json!({
+                "text": lamp_skills::task::GETTING_READY_LINE,
+                "exact": true,
+                "answers": true,
+                "priority": lamp_skills::SAY_PRIORITY,
+                "expires_in_ms": lamp_skills::task::GETTING_READY_EXPIRES_MS,
+            });
+            let outcome = say_with(
+                &say_socket,
+                "say",
+                &skill,
+                asking,
+                &[],
+                || {},
+                Some(&handle),
+            );
+            eprintln!(
+                "lamp-skills: skill:{skill}: do.task: told the lamp is getting ready: {outcome}"
+            );
+        });
+    });
+    taken_back.take_back_unless_begun();
+    sent
+}
+
+/// One say ask its asker may take back while it waits (the say service's
+/// [`lamp_voice::say::CANCEL_LINE`] on the ask's own connection): never once
+/// the voice told it begun, so a line is never cut off mid-word; and an ask
+/// taken back before it was written is never written.
+#[derive(Default)]
+struct SayHandle(Mutex<SayAsk>);
+
+#[derive(Default)]
+struct SayAsk {
+    /// The ask's connection, once written.
+    stream: Option<UnixStream>,
+    begun: bool,
+    taken_back: bool,
+}
+
+impl SayHandle {
+    /// Writes the ask on `stream`, unless it was taken back first.
+    fn write(&self, stream: &UnixStream, ask: &serde_json::Value) -> io::Result<bool> {
+        let mut held = self.0.lock().unwrap_or_else(|poison| poison.into_inner());
+        if held.taken_back {
+            return Ok(false);
+        }
+        writeln!(&*stream, "{ask}")?;
+        held.stream = stream.try_clone().ok();
+        Ok(true)
+    }
+
+    fn begun(&self) {
+        self.0
+            .lock()
+            .unwrap_or_else(|poison| poison.into_inner())
+            .begun = true;
+    }
+
+    /// Takes the ask back if the voice hasn't begun it: cancelled on its
+    /// connection when written, never written when not yet.
+    fn take_back_unless_begun(&self) {
+        let mut held = self.0.lock().unwrap_or_else(|poison| poison.into_inner());
+        if held.begun {
+            return;
+        }
+        held.taken_back = true;
+        if let Some(stream) = held.stream.as_ref() {
+            let _ = writeln!(&*stream, "{}", lamp_voice::say::CANCEL_LINE);
+        }
+    }
+}
+
+/// [`hand_over_telling`], and once more without the getting-ready ask when
+/// an earlier lamp-tasks refused the line for it (Twelve's HOLD on #8237):
+/// a round restarts the two in no fixed order, so for a while a new
+/// lamp-skills may hand over to an old lamp-tasks. That refusal came before
+/// anything was minted or run ([`lamp_skills::task::without_getting_ready_if_refused`]),
+/// so the task runs once; only the getting-ready line isn't said.
+fn hand_over_asking(
+    socket: &Path,
+    line: &str,
+    getting_ready: &mut dyn FnMut(),
+) -> Result<String, lamp_skills::service_write::Unrun> {
+    let answer = hand_over_telling(socket, line, getting_ready)?;
+    match lamp_skills::task::without_getting_ready_if_refused(line, &answer) {
+        Some(plain) => {
+            eprintln!(
+                "lamp-skills: do.task: lamp-tasks is from before the getting-ready notice: handed over again without it"
+            );
+            hand_over(socket, &plain)
+        }
+        None => Ok(answer),
+    }
 }
 
 /// [`hand_over`], the getting-ready notice lamp-tasks may write before the
@@ -9556,5 +9685,249 @@ mod tests {
         let did = refused;
         assert_eq!(did.why, "its trigger held");
         assert!(!did.why.contains("Walter"));
+    }
+
+    /// A lamp-tasks at `socket` that answers each line as `answer` says,
+    /// one connection per line, and keeps every line it was handed.
+    fn fake_tasks(
+        socket: &Path,
+        lines: usize,
+        answer: fn(&serde_json::Value) -> serde_json::Value,
+    ) -> std::thread::JoinHandle<Vec<serde_json::Value>> {
+        let listener = UnixListener::bind(socket).unwrap();
+        std::thread::spawn(move || {
+            let mut handed = Vec::new();
+            for _ in 0..lines {
+                let (stream, _) = listener.accept().unwrap();
+                let mut line = String::new();
+                BufReader::new(&stream).read_line(&mut line).unwrap();
+                let line: serde_json::Value = serde_json::from_str(&line).unwrap();
+                (&stream)
+                    .write_all(format!("{}\n", answer(&line)).as_bytes())
+                    .unwrap();
+                handed.push(line);
+            }
+            handed
+        })
+    }
+
+    /// Twelve's HOLD on #8237: a voice-asked run handed to a lamp-tasks
+    /// from before the getting-ready notice (a round restarts the two in no
+    /// fixed order) is refused for the ask, as that lamp-tasks' parse
+    /// refuses a field it doesn't know, and is handed over once more
+    /// without it, so the run goes once; a lamp-tasks that takes the ask
+    /// gets the line once.
+    #[test]
+    fn a_voice_run_handed_to_an_earlier_lamp_tasks_goes_once_without_the_ask() {
+        let dir = tempfile::Builder::new()
+            .prefix("gr")
+            .tempdir_in("/tmp")
+            .unwrap();
+        let line = lamp_skills::task::asking_getting_ready(
+            &json!({"op": "skill_task", "skill": "melon", "task": "a poem"}).to_string(),
+            true,
+        );
+        // An earlier lamp-tasks: `deny_unknown_fields`, refused before
+        // anything runs.
+        let socket = dir.path().join("old.sock");
+        let old = fake_tasks(&socket, 2, |line| {
+            if line.get("tell_getting_ready").is_some() {
+                json!({"ok": false, "error": "bad_request", "message": "not a skill's task line"})
+            } else {
+                json!({"ok": true, "answer": "a poem"})
+            }
+        });
+        let mut told = 0;
+        let answer = hand_over_asking(&socket, &line, &mut || told += 1).unwrap();
+        assert_eq!(
+            serde_json::from_str::<serde_json::Value>(&answer).unwrap()["ok"],
+            true,
+            "{answer}"
+        );
+        let handed = old.join().unwrap();
+        assert_eq!(handed.len(), 2);
+        assert_eq!(handed[0]["tell_getting_ready"], true);
+        assert_eq!(
+            handed[1],
+            json!({"op": "skill_task", "skill": "melon", "task": "a poem"})
+        );
+        assert_eq!(told, 0);
+        // A lamp-tasks that takes the ask: one line, never sent again.
+        let socket = dir.path().join("new.sock");
+        let new = fake_tasks(&socket, 1, |_| json!({"ok": true, "answer": "a poem"}));
+        let answer = hand_over_asking(&socket, &line, &mut || {}).unwrap();
+        assert!(answer.contains("\"ok\":true"), "{answer}");
+        assert_eq!(new.join().unwrap().len(), 1);
+    }
+
+    /// A lamp-tasks that writes the getting-ready notice when `notice`,
+    /// then its answer once `answer_now` is told (or at once).
+    fn slow_tasks(
+        socket: &Path,
+        notice: bool,
+        answer_now: Option<mpsc::Receiver<()>>,
+    ) -> std::thread::JoinHandle<()> {
+        let listener = UnixListener::bind(socket).unwrap();
+        std::thread::spawn(move || {
+            let (stream, _) = listener.accept().unwrap();
+            let mut line = String::new();
+            BufReader::new(&stream).read_line(&mut line).unwrap();
+            if notice {
+                (&stream)
+                    .write_all(b"{\"event\":\"getting_ready\"}\n")
+                    .unwrap();
+            }
+            if let Some(now) = answer_now {
+                now.recv_timeout(Duration::from_secs(10)).unwrap();
+            }
+            (&stream)
+                .write_all(b"{\"ok\":true,\"answer\":\"a poem\"}\n")
+                .unwrap();
+        })
+    }
+
+    /// A say service that takes one ask, tells `asked` it has it, says it
+    /// begun when `begins`, then keeps every later line its asker writes
+    /// for a while, and answers `dropped` on a cancel or `spoken` at the end.
+    fn held_voice(
+        listener: UnixListener,
+        begins: bool,
+        asked: mpsc::Sender<serde_json::Value>,
+    ) -> std::thread::JoinHandle<Vec<String>> {
+        std::thread::spawn(move || {
+            let (stream, _) = listener.accept().unwrap();
+            stream
+                .set_read_timeout(Some(Duration::from_millis(600)))
+                .unwrap();
+            let mut lines = BufReader::new(&stream);
+            let mut ask = String::new();
+            lines.read_line(&mut ask).unwrap();
+            if begins {
+                (&stream)
+                    .write_all(b"{\"event\":\"begun\",\"at_us\":1}\n")
+                    .unwrap();
+            }
+            asked.send(serde_json::from_str(&ask).unwrap()).unwrap();
+            let mut later = Vec::new();
+            let mut line = String::new();
+            while lines.read_line(&mut line).is_ok_and(|read| read > 0) {
+                later.push(line.trim().to_owned());
+                line.clear();
+            }
+            let outcome = if later
+                .iter()
+                .any(|line| line == lamp_voice::say::CANCEL_LINE)
+            {
+                "{\"outcome\":\"dropped\",\"why\":\"stopped by its asker\"}\n"
+            } else {
+                "{\"outcome\":\"spoken\"}\n"
+            };
+            let _ = (&stream).write_all(outcome.as_bytes());
+            later
+        })
+    }
+
+    /// Jarvis's HOLD on #8237, the first builder's yes at 12:32: the
+    /// getting-ready line is asked as the answer to the asking
+    /// conversation, with its 20 s backstop, and taken back when the run's
+    /// answer comes before the voice began it, so it's never said after the
+    /// answer; once begun it is left whole, never cut; a fast start, with
+    /// no notice, asks no line at all.
+    #[test]
+    fn the_getting_ready_line_answers_its_conversation_and_never_comes_after_the_answer() {
+        let dir = tempfile::Builder::new()
+            .prefix("gl")
+            .tempdir_in("/tmp")
+            .unwrap();
+        let line = lamp_skills::task::asking_getting_ready(
+            &json!({"op": "skill_task", "skill": "melon", "task": "a poem"}).to_string(),
+            true,
+        );
+        // The answer before the voice began it: taken back.
+        let (tasks_socket, say_socket) = (dir.path().join("t1.sock"), dir.path().join("s1.sock"));
+        let (answer_now, now) = mpsc::channel();
+        let tasks = slow_tasks(&tasks_socket, true, Some(now));
+        let (asked, ask) = mpsc::channel();
+        let voice = held_voice(UnixListener::bind(&say_socket).unwrap(), false, asked);
+        let relay = std::thread::spawn(move || {
+            let ask = ask.recv_timeout(Duration::from_secs(10)).unwrap();
+            answer_now.send(()).unwrap();
+            ask
+        });
+        let answer =
+            hand_over_saying_getting_ready(&tasks_socket, &line, &say_socket, "melon").unwrap();
+        assert!(answer.contains("\"ok\":true"), "{answer}");
+        tasks.join().unwrap();
+        let ask = relay.join().unwrap();
+        assert_eq!(ask["text"], lamp_skills::task::GETTING_READY_LINE);
+        assert_eq!(
+            (&ask["exact"], &ask["answers"]),
+            (&json!(true), &json!(true))
+        );
+        assert_eq!(ask["expires_in_ms"], 20_000);
+        assert_eq!(ask["skill"], "melon");
+        assert_eq!(
+            voice.join().unwrap(),
+            vec![lamp_voice::say::CANCEL_LINE.to_owned()]
+        );
+        // Begun before the answer: left whole.
+        let (tasks_socket, say_socket) = (dir.path().join("t2.sock"), dir.path().join("s2.sock"));
+        let (answer_now, now) = mpsc::channel();
+        let tasks = slow_tasks(&tasks_socket, true, Some(now));
+        let (asked, ask) = mpsc::channel();
+        let voice = held_voice(UnixListener::bind(&say_socket).unwrap(), true, asked);
+        let relay = std::thread::spawn(move || {
+            ask.recv_timeout(Duration::from_secs(10)).unwrap();
+            // The begun line is read by the asker before the answer comes.
+            std::thread::sleep(Duration::from_millis(200));
+            answer_now.send(()).unwrap();
+        });
+        hand_over_saying_getting_ready(&tasks_socket, &line, &say_socket, "melon").unwrap();
+        tasks.join().unwrap();
+        relay.join().unwrap();
+        assert_eq!(
+            voice.join().unwrap(),
+            Vec::<String>::new(),
+            "a begun line is never cut"
+        );
+        // A fast start: no notice, no line asked.
+        let (tasks_socket, say_socket) = (dir.path().join("t3.sock"), dir.path().join("s3.sock"));
+        let tasks = slow_tasks(&tasks_socket, false, None);
+        let listener = UnixListener::bind(&say_socket).unwrap();
+        listener.set_nonblocking(true).unwrap();
+        hand_over_saying_getting_ready(&tasks_socket, &line, &say_socket, "melon").unwrap();
+        tasks.join().unwrap();
+        std::thread::sleep(Duration::from_millis(300));
+        assert!(listener.accept().is_err(), "a fast start asks no line");
+    }
+
+    /// An ask taken back before its thread wrote it is never written.
+    #[test]
+    fn a_say_ask_taken_back_before_it_was_written_is_never_written() {
+        let dir = tempfile::Builder::new()
+            .prefix("gw")
+            .tempdir_in("/tmp")
+            .unwrap();
+        let socket = dir.path().join("say.sock");
+        let listener = UnixListener::bind(&socket).unwrap();
+        let handle = SayHandle::default();
+        handle.take_back_unless_begun();
+        let heard = std::thread::spawn(move || {
+            let (stream, _) = listener.accept().unwrap();
+            let mut line = String::new();
+            BufReader::new(&stream).read_line(&mut line).unwrap();
+            line
+        });
+        let outcome = say_with(
+            &socket,
+            "say",
+            "melon",
+            json!({"text": "hi", "exact": true}),
+            &[],
+            || {},
+            Some(&handle),
+        );
+        assert!(outcome.starts_with("say: dropped (taken back"), "{outcome}");
+        assert_eq!(heard.join().unwrap(), "", "nothing was written");
     }
 }
