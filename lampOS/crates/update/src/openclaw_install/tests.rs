@@ -654,13 +654,15 @@ fn the_namespace_script_is_hermess_for_openclaw() {
     for skills in [false, true] {
         let with_mode = ns_text(sk(skills));
         assert_eq!(with_mode.matches(NPM_CI_MODE).count(), 1);
-        assert!(with_mode.ends_with(&format!("{NPM_CI_MODE}{RUN_LINE}")));
+        assert!(with_mode.ends_with(&format!("{NPM_CI_MODE}{GATEWAY_RUN}{RUN_LINE}")));
         let checked = std::process::Command::new("/bin/sh")
             .args(["-n", "-c", &with_mode])
             .output()
             .unwrap();
         assert!(checked.status.success(), "{checked:?}");
-        let ours = with_mode.replacen(NPM_CI_MODE, "", 1);
+        let ours = with_mode
+            .replacen(NPM_CI_MODE, "", 1)
+            .replacen(GATEWAY_RUN, "", 1);
         let hermes = hermes_install::ns_text(skills, false);
         assert!(!ours.to_ascii_lowercase().contains("hermes"), "{ours}");
         assert!(!ours.contains("#5978") && !ours.contains("#6128"));
@@ -686,6 +688,107 @@ fn the_namespace_script_is_hermess_for_openclaw() {
     }
     assert!(ns_text(sk(true)).contains("# LAMP_OPENCLAW_SKILLS=on (#6226)"));
     assert_eq!(ALLOWED, [PLACE, WORK, SKILLS]);
+}
+
+/// (#8289) Every namespace script runs the unit's `gateway run` through
+/// [`GATEWAY_RUN`], once, right before [`RUN_LINE`], and starts there the
+/// same OpenClaw [`RUN_LINE`] execs; the unit still starts `gateway run`
+/// and its `MainPID` is still the `unshare` with [`NS_FLAGS`].
+#[test]
+fn the_gateway_runs_as_a_child_of_the_namespaces_shell() {
+    for skills in [false, true] {
+        for tasks in [false, true] {
+            for one_path in [false, true] {
+                let text = ns_text(Shown {
+                    skills,
+                    tasks,
+                    one_path,
+                });
+                assert_eq!(text.matches(GATEWAY_RUN).count(), 1);
+                assert!(text.ends_with(&format!("{GATEWAY_RUN}{RUN_LINE}")));
+            }
+        }
+    }
+    let run = RUN_LINE
+        .strip_prefix("exec ")
+        .unwrap()
+        .trim_end_matches('\n');
+    assert!(GATEWAY_RUN.contains(&format!("  {run} &\n")));
+    assert!(GATEWAY_RUN.contains("if [ \"${1-}\" = gateway ] && [ \"${2-}\" = run ]; then\n"));
+    assert!(UNIT_TEXT.contains("ExecStart=/usr/local/bin/openclaw gateway run\n"));
+    assert!(WRAPPER_TEXT.contains(&format!(
+        "exec /usr/bin/unshare {} {NS} \"$@\"\n",
+        NS_FLAGS.join(" ")
+    )));
+}
+
+/// (#8289) [`GATEWAY_RUN`] run by `sh` (dash where there is one, as on a
+/// lamp) with a stand-in OpenClaw: a SIGTERM to the shell ends a gateway
+/// with no handler of its own and one that stops on it, the shell exiting
+/// 0 (a clean stop) within a few seconds; a gateway that fails its stop or
+/// exits by itself gives its own status; any other call falls through to
+/// [`RUN_LINE`]. The kernel's PID 1 rule itself needs a PID namespace (a
+/// lamp's row).
+#[test]
+fn the_gateway_mode_passes_a_stop_on_and_exits_as_the_gateway_does() {
+    use std::time::{Duration, Instant};
+    let dir = tempfile::tempdir().unwrap();
+    let sh = ["/bin/dash", "/bin/sh"]
+        .into_iter()
+        .find(|sh| Path::new(sh).exists())
+        .unwrap();
+    let run = RUN_LINE.strip_prefix("exec ").unwrap();
+    let run = run.strip_suffix(" \"$@\"\n").unwrap();
+    let cases = [
+        ("no-handler", "exec sleep 30", true, 0),
+        (
+            "stops",
+            "trap 'exit 0' TERM\nwhile :; do sleep 0.1; done",
+            true,
+            0,
+        ),
+        (
+            "fails-its-stop",
+            "trap 'exit 1' TERM\nwhile :; do sleep 0.1; done",
+            true,
+            1,
+        ),
+        ("exits-by-itself", "sleep 0.3\nexit 3", false, 3),
+    ];
+    for (name, body, stop, want) in cases {
+        let child = dir.path().join(name);
+        std::fs::write(&child, format!("#!/bin/sh\n{body}\n")).unwrap();
+        std::fs::set_permissions(&child, std::fs::Permissions::from_mode(0o755)).unwrap();
+        let script = GATEWAY_RUN.replacen(run, &child.to_string_lossy(), 1) + "exit 99\n";
+        let started = Instant::now();
+        let mut shell = std::process::Command::new(sh)
+            .args(["-c", &script, "openclaw-ns", "gateway", "run"])
+            .spawn()
+            .unwrap();
+        // Past the stand-in's own start, as a lamp's stop after a start is.
+        std::thread::sleep(Duration::from_millis(700));
+        if stop {
+            let pid = shell.id().to_string();
+            let sent = std::process::Command::new("kill")
+                .args(["-TERM", &pid])
+                .status()
+                .unwrap();
+            assert!(sent.success());
+        }
+        let status = shell.wait().unwrap();
+        assert_eq!(status.code(), Some(want), "{name}");
+        assert!(started.elapsed() < Duration::from_secs(10), "{name}");
+    }
+    let other = std::process::Command::new(sh)
+        .args([
+            "-c",
+            &format!("{GATEWAY_RUN}exit 99\n"),
+            "openclaw-ns",
+            "--version",
+        ])
+        .status()
+        .unwrap();
+    assert_eq!(other.code(), Some(99));
 }
 
 /// The pins: Node 24 at or past 24.16 (OpenClaw's floor), nodejs.org's
@@ -1637,7 +1740,11 @@ fn the_one_path_shows_the_pushed_skills_without_ns_net_and_off_changes_nothing()
             for (from, to) in ENGINE_EDITS {
                 before = before.replace(from, to);
             }
-            let before = before.replacen(RUN_LINE, &format!("{NPM_CI_MODE}{RUN_LINE}"), 1);
+            let before = before.replacen(
+                RUN_LINE,
+                &format!("{NPM_CI_MODE}{GATEWAY_RUN}{RUN_LINE}"),
+                1,
+            );
             let off = Shown {
                 skills,
                 tasks,
