@@ -17981,7 +17981,7 @@ fn agree_held_forget(
     });
     match (agreed, scope, held.args["source_id"].as_u64()) {
         (Some(call), Some(scope), Some(id)) => {
-            scope.mark_forget_agreed(&OneFaceForgetYes(()), id);
+            scope.mark_forget_agreed(&OneFaceForgetYes(()), id, held.args["about"].as_str());
             call.args = held.args;
             eprintln!(
                 "lamp-voice second: request {request} chat round {round}: the model's forget is their yes: the one-face forget held runs as held (LAMP_PERSON_SCOPE_ONE_FACE_READS)"
@@ -19729,7 +19729,11 @@ async fn answer(
                     && let Some(scope) = scope.as_ref()
                     && let Some(id) = call.args["source_id"].as_u64()
                 {
-                    scope.mark_forget_agreed(&OneFaceForgetYes(()), id);
+                    scope.mark_forget_agreed(
+                        &OneFaceForgetYes(()),
+                        id,
+                        call.args["about"].as_str(),
+                    );
                 }
                 let result = run_tool(shared, request, heard, &call, scope.as_ref()).await;
                 if scope.as_ref().is_some_and(|scope| !scope.is_current()) {

@@ -5984,7 +5984,12 @@ impl DaysClient {
             Err(Listed::Cut) => return Err(ForgetNotAsked::ListingMayBeCut),
             Err(_) => return Err(ForgetNotAsked::ListingFailed("app facts: no answer")),
         };
-        entries.extend(facts.iter().map(|(id, text, _)| (*id, text.clone())));
+        // Matched by the app's title and quoted words alone (P2-b on #8300).
+        entries.extend(
+            facts
+                .iter()
+                .map(|(id, text, _)| (*id, app_fact_words(text))),
+        );
         Ok((entries, facts))
     }
 }
@@ -6145,10 +6150,25 @@ fn app_facts_listed(
 /// The app's title in an app fact's kept form, `Noted by the app <title>,
 /// <day>: "<words>"` (`lamp_msgs::app_fact`).
 fn app_title(text: &str) -> Option<&str> {
-    let rest = text.strip_prefix("Noted by the app ")?;
+    let rest = text.strip_prefix(lamp_msgs::app_fact::PREFIX)?;
     let (head, _) = rest.split_once(": \"")?;
     let (title, _) = head.rsplit_once(", ")?;
     Some(title).filter(|title| !title.trim().is_empty())
+}
+
+/// What a forget's words are matched against in an app fact's kept form
+/// (`lamp_msgs::app_fact::text`): the app's title and its quoted words,
+/// never the `Noted by the app` prefix ([`lamp_msgs::app_fact::PREFIX`]) or
+/// the day (the Reviewer-lead's P2-b on #8300: "forget what the app said"
+/// matched every app fact). Nothing for a text not in that form.
+fn app_fact_words(text: &str) -> String {
+    let Some(title) = app_title(text) else {
+        return String::new();
+    };
+    let Some((_, said)) = text.split_once(": \"") else {
+        return String::new();
+    };
+    format!("{title} {}", said.strip_suffix('"').unwrap_or(said))
 }
 
 /// Whether `words` (a forget's, as [`about_words`] folds them) name the app
@@ -6189,40 +6209,49 @@ fn one_app_group<'a>(
     any && one.is_some_and(|(_, title)| subjects.iter().any(|words| names_app(words, title)))
 }
 
-/// After the one-face forget their yes agreed to (#5627) forgot app fact
-/// `told`'s id, the other facts of the same app that their words `about`
-/// name the app of and match ([`one_app_group`], #8228) go with it, each by
+/// After the one-face forget their yes agreed to (#5627) forgot its kept
+/// thing by id (`told`), the facts of one app that their words `about` (the
+/// words the lamp held when it asked, never the model's on the yes) name
+/// the app of and match ([`agreed_app_group`], #8228) go with it, each by
 /// its id: "forget what Gym Coach said" takes all of that app's facts for
-/// them. Only after a by-id forget the memory confirmed, in `person`'s scope
-/// alone; `group` is what was listed before it, the asked fact among them.
-/// The answer counts them.
+/// them. Listed only after a by-id forget the memory confirmed, so a slow
+/// listing never leaves that forget without time (the Reviewer-lead's P2-c
+/// on #8300), in `person`'s scope alone. The answer counts them; one the
+/// memory did not say it removed leaves `all` false and a note that some
+/// may be left.
 pub fn agreed_forget_app_facts(
     socket: &Path,
     told: (Value, bool),
-    group: &[u64],
+    about: &Value,
     person: &str,
     deadline: Duration,
     lease: &crate::memory_scope::ScopeLease,
 ) -> (Value, bool) {
-    if group.is_empty() || !told.1 || told.0["forgotten"] != true || !lease.is_current() {
+    if !told.1 || told.0["forgotten"] != true || !lease.is_current() {
         return told;
     }
     let until = Instant::now() + deadline;
-    let mut removed = 0u64;
-    for id in group {
-        let Some(budget) = until
+    let left = || {
+        until
             .checked_duration_since(Instant::now())
             .filter(|left| !left.is_zero())
-        else {
+    };
+    let group = agreed_app_group(socket, about, person, &left, lease);
+    if group.is_empty() {
+        return told;
+    }
+    let mut removed = 0u64;
+    for id in &group {
+        let Some(budget) = left() else {
             break;
         };
         let forget = for_person(
             json!({"op":"forget","id":id,"selective":true}),
             Some(person),
         );
-        if bounded_exchange_scoped(socket, &forget, budget, Some(lease))
-            .is_some_and(|answer| answer["ok"] == true && answer["removed"].as_u64() != Some(0))
-        {
+        if bounded_exchange_scoped(socket, &forget, budget, Some(lease)).is_some_and(|answer| {
+            answer["ok"] == true && answer["removed"].as_u64().is_some_and(|n| n > 0)
+        }) {
             removed += 1;
         }
     }
@@ -6233,20 +6262,27 @@ pub fn agreed_forget_app_facts(
     told["count"] = json!(1 + removed);
     if removed < group.len() as u64 {
         told["all"] = json!(false);
+        if told.get("note").is_none() {
+            told["note"] = json!(APP_FACTS_LEFT);
+        }
     }
     (told, answered)
 }
 
-/// The other facts of the app whose fact `id` is, for the yes to a one-face
-/// forget of it ([`agreed_forget_app_facts`]): those `about` matches, when
-/// it names that app ([`one_app_group`]); none when `id` is no app fact of
-/// `person`'s, or their words don't name its app.
-pub fn agreed_app_group(
+/// The note on an agreed forget that took fewer of the app's facts than
+/// its words named ([`agreed_forget_app_facts`]).
+pub const APP_FACTS_LEFT: &str =
+    "Some of what that app said may be left: not all of it was forgotten.";
+
+/// The facts of one app, `person`'s own, that `about` matches, when it names
+/// that app ([`one_app_group`]), for the yes to a one-face forget
+/// ([`agreed_forget_app_facts`]); none when `person` is no known one, their
+/// words don't name one app alone, or the listing fails.
+fn agreed_app_group(
     socket: &Path,
-    id: u64,
     about: &Value,
     person: &str,
-    deadline: Duration,
+    left: &impl Fn() -> Option<Duration>,
     lease: &crate::memory_scope::ScopeLease,
 ) -> Vec<u64> {
     let Some(about) = about
@@ -6259,38 +6295,24 @@ pub fn agreed_app_group(
     if !lamp_msgs::known::is_person_id(person) {
         return vec![];
     }
-    let until = Instant::now() + deadline;
-    let left = || {
-        until
-            .checked_duration_since(Instant::now())
-            .filter(|left| !left.is_zero())
-    };
-    let Ok(facts) = app_facts_listed(socket, person, &left, Some(lease)) else {
-        return vec![];
-    };
-    let Some((_, text, source)) = facts.iter().find(|(fact, _, _)| *fact == id) else {
+    let Ok(facts) = app_facts_listed(socket, person, left, Some(lease)) else {
+        eprintln!("lamp-voice provider: an agreed forget's app facts were not listed");
         return vec![];
     };
     let subjects: Vec<Vec<String>> = about_subjects(about).into_iter().map(|(_, w)| w).collect();
     let group: Vec<&(u64, String, String)> = facts
         .iter()
-        .filter(|(_, other, from)| from == source && names_about(other, about))
+        .filter(|(_, text, _)| names_about(&app_fact_words(text), about))
         .collect();
     if !one_app_group(
         group
             .iter()
             .map(|(_, text, from)| Some((text.as_str(), from.as_str()))),
         &subjects,
-    ) || !group.iter().any(|(fact, _, _)| *fact == id)
-        || app_title(text).is_none()
-    {
+    ) {
         return vec![];
     }
-    group
-        .into_iter()
-        .map(|(fact, _, _)| *fact)
-        .filter(|fact| *fact != id)
-        .collect()
+    group.into_iter().map(|(fact, _, _)| *fact).collect()
 }
 
 /// The entries (id, text) of a kept listing's `answer`, for
@@ -13206,7 +13228,8 @@ impl DaysClient {
     ) -> Result<AppFacts, Listed> {
         let mut matched = vec![];
         for (id, text, source) in self.app_facts_listed(person, left, lease)? {
-            if about_hits(&text, subjects, found) && !matching.contains(&id) {
+            // By the app's title and quoted words alone (P2-b on #8300).
+            if about_hits(&app_fact_words(&text), subjects, found) && !matching.contains(&id) {
                 matching.push(id);
                 matched.push((id, text, source));
             }
@@ -21837,14 +21860,6 @@ mod tests {
         // The one-face yes: the forget by the asked id, then the rest of
         // the app's group, as tools.rs runs them.
         let yes = |id: u64, subject: &str| {
-            let group = agreed_app_group(
-                &socket,
-                id,
-                &json!(subject),
-                &owner,
-                Duration::from_secs(2),
-                &owner_lease,
-            );
             let told = client.run_at(
                 &call(FORGET, json!({"source_id": id})),
                 FIRST_READ,
@@ -21852,16 +21867,13 @@ mod tests {
                 Some(&EAST),
                 Some(&owner),
             );
-            (
-                group.clone(),
-                agreed_forget_app_facts(
-                    &socket,
-                    told,
-                    &group,
-                    &owner,
-                    Duration::from_secs(2),
-                    &owner_lease,
-                ),
+            agreed_forget_app_facts(
+                &socket,
+                told,
+                &json!(subject),
+                &owner,
+                Duration::from_secs(2),
+                &owner_lease,
             )
         };
 
@@ -21880,8 +21892,7 @@ mod tests {
             one_face_target_of(&client, &named, said, &owner, &owner_lease).unwrap();
         assert_eq!(id, three[0]);
         assert!(!subject.contains("zorblax"), "{subject}");
-        let (group, (told, answered)) = yes(id, &subject);
-        assert_eq!(group, three[1..]);
+        let (told, answered) = yes(id, &subject);
         assert!(answered, "{told}");
         assert_eq!(told["count"], 3, "{told}");
         assert!(listed().is_empty());
@@ -21891,8 +21902,7 @@ mod tests {
         let (id, subject) =
             one_face_target_of(&client, &named, said, &owner, &owner_lease).unwrap();
         assert_eq!(id, one);
-        let (group, (told, _)) = yes(id, &subject);
-        assert!(group.is_empty(), "{group:?}");
+        let (told, _) = yes(id, &subject);
         assert_eq!(told["forgotten"], true, "{told}");
         assert!(listed().is_empty());
 
@@ -21912,16 +21922,10 @@ mod tests {
                 2
             ))
         );
-        let group = agreed_app_group(
-            &socket,
-            fact,
-            &json!("gym coach"),
-            &owner,
-            Duration::from_secs(2),
-            &owner_lease,
-        );
+        let until = Instant::now() + Duration::from_secs(2);
+        let left = || until.checked_duration_since(Instant::now());
+        let group = agreed_app_group(&socket, &json!("gym coach"), &owner, &left, &owner_lease);
         assert!(!group.contains(&plain), "{group:?}");
-        assert!(group.is_empty(), "{group:?}");
         ask(json!({"op":"forget","person":&owner,"id":plain}));
         ask(json!({"op":"forget","person":&owner,"id":fact}));
 
@@ -21940,6 +21944,106 @@ mod tests {
         assert!(answered, "{told}");
         assert_eq!(told["count"], 9, "{told}");
         assert!(listed().is_empty());
+        drop(client);
+        stop.stop();
+        worker.join().unwrap();
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    /// The Reviewer-lead's P2-b on #8300, on the real memory: a forget's
+    /// words match an app fact's quoted words and its app's title, never the
+    /// `Noted by the app <title>, <day>:` it is kept with. "Forget what the
+    /// app said" names no fact that doesn't say "app": one face in view, it
+    /// asks about none; several faces, it takes only the one whose words say
+    /// it, never the other app facts of either app.
+    #[test]
+    fn forget_what_the_app_said_takes_nothing_it_does_not_name() {
+        use lamp_memory::{
+            Server,
+            days::Days,
+            store::{LocalTime as StoreTime, Options},
+        };
+        let owner_request = scoped_request(Some("Owner"), 9_301);
+        let owner_lease = owner_request.lease();
+        let owner = owner_lease.scope().unwrap().person().unwrap().to_owned();
+        let root = std::env::temp_dir().join(format!("lamp-app-prefix-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&root);
+        std::fs::create_dir_all(&root).unwrap();
+        let days = Days::open(
+            Options {
+                dir: root.join("store"),
+                keep_days: 30,
+                local: StoreTime::Offset(420),
+            },
+            NOW,
+        )
+        .unwrap();
+        let socket = root.join("m.sock");
+        let server = Server::bind(&socket).unwrap();
+        let stop = server.stopper();
+        let worker = std::thread::spawn(move || {
+            let mut days = days;
+            server.run(&mut days, &mut || NOW, &mut |_| {}).unwrap();
+        });
+        let ask = |line: Value| {
+            let answer = bounded_exchange(&socket, &line, Duration::from_secs(2))
+                .expect("the memory answers");
+            assert_eq!(answer["ok"], true, "{line}: {answer}");
+            answer
+        };
+        ask(
+            json!({"op":"append","person":&owner,"at_unix_ms":NOW - 600_000,"heard":"hello","said":"Hi"}),
+        );
+        let at = std::cell::Cell::new(NOW - 500_000);
+        let fact = |source: &str, name: &str, text: &str| {
+            at.set(at.get() + 1_000);
+            ask(
+                json!({"op": lamp_msgs::app_fact::REMEMBER_OP, "person": &owner,
+                "source": source, "name": name, "at_unix_ms": at.get(), "text": text}),
+            )["id"]
+                .as_u64()
+                .unwrap()
+        };
+        let listed = || {
+            ask(json!({"op":"kept","person":&owner,"app_facts":true}))["entries"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .map(|entry| entry["id"].as_u64().unwrap())
+                .collect::<Vec<_>>()
+        };
+        let client = DaysClient::new(socket.clone()).unwrap();
+        client.forget_all.store(true, Ordering::Release);
+        client.forget_about.store(true, Ordering::Release);
+        let said = "Lamp, forget what the app said.";
+
+        // One face, one fact that never says "app": nothing asked about.
+        let squats = fact("app:gym-coach", "Gym Coach", "squats 3x10 zorblax");
+        assert!(matches!(
+            one_face_target_of(
+                &client,
+                &call(FORGET, json!({})),
+                said,
+                &owner,
+                &owner_lease
+            ),
+            Err(ForgetNotAsked::NoMatch(_))
+        ));
+        assert_eq!(listed(), [squats]);
+
+        // Several faces: only the fact whose words say "app" goes.
+        let bed = fact("app:sleep-diary", "Sleep Diary", "bed at 23:00 zorblax");
+        let phone = fact("app:sleep-diary", "Sleep Diary", "phone app off at 22:00");
+        let (told, answered) = client.run_at(
+            &call(FORGET, json!({"about": "what the app said"})),
+            FIRST_READ,
+            NOW,
+            Some(&EAST),
+            Some(&owner),
+        );
+        assert!(answered, "{told}");
+        assert_eq!(told["count"], 1, "{told}");
+        assert_eq!(listed(), [squats, bed], "{phone} alone goes: {told}");
         drop(client);
         stop.stop();
         worker.join().unwrap();

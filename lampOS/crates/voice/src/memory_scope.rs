@@ -736,6 +736,10 @@ struct RequestContext {
     /// line, the lamp having asked them once (#5627), 0 for none
     /// ([`ScopeLease::mark_forget_agreed`]).
     forget_agreed: AtomicU64,
+    /// The words that held forget was about when the lamp asked
+    /// ([`ScopeLease::agreed_about`]), from the heard line, never the
+    /// model's on the yes.
+    forget_agreed_about: Mutex<Option<String>>,
     /// Narrowed to the room, its reply still told the admitted person's
     /// name ([`ScopeLease::name_for_reply`]).
     named: AtomicBool,
@@ -995,6 +999,7 @@ impl RequestScope {
                 everything: AtomicBool::new(false),
                 own_keep_undone: AtomicU64::new(0),
                 forget_agreed: AtomicU64::new(0),
+                forget_agreed_about: Mutex::new(None),
                 named: AtomicBool::new(false),
                 named_by_one_face: AtomicBool::new(false),
                 named_conversation: AtomicBool::new(false),
@@ -1053,6 +1058,7 @@ impl RequestScope {
                 everything: AtomicBool::new(false),
                 own_keep_undone: AtomicU64::new(0),
                 forget_agreed: AtomicU64::new(0),
+                forget_agreed_about: Mutex::new(None),
                 named: AtomicBool::new(false),
                 named_by_one_face: AtomicBool::new(false),
                 named_conversation: AtomicBool::new(false),
@@ -1714,13 +1720,30 @@ impl ScopeLease {
     /// face too ([`Self::forgets_need_mouth`]), where the yes was the
     /// private room's. Only the second route makes the
     /// [`crate::second_provider::OneFaceForgetYes`] it needs, and only for
-    /// the held call's own id. It lives with the request.
+    /// the held call's own id and the words it was about (`about`, as the
+    /// lamp held them when it asked). It lives with the request.
     pub(crate) fn mark_forget_agreed(
         &self,
         _agreed: &crate::second_provider::OneFaceForgetYes,
         id: u64,
+        about: Option<&str>,
     ) {
+        if let Ok(mut held) = self.context.forget_agreed_about.lock() {
+            *held = about.map(str::to_owned);
+        }
         self.context.forget_agreed.store(id, Ordering::Release);
+    }
+
+    /// The words the forget marked by [`Self::mark_forget_agreed`] was about
+    /// when the lamp asked: all its yes widens by (their exchanges, the
+    /// observations and the app's facts naming it), never the `about` the
+    /// model's call carries on the yes (the Reviewer-lead's P2-a on #8300).
+    pub(crate) fn agreed_about(&self) -> Option<String> {
+        self.context
+            .forget_agreed_about
+            .lock()
+            .ok()
+            .and_then(|held| held.clone())
     }
 
     /// Whether `args`, a `forget`'s, is exactly the forget marked by

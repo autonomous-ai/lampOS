@@ -29,7 +29,7 @@ fn call(name: &str, args: Value) -> net::ToolCall {
 fn a_held_name_runs_no_forget_correction_or_rule() {
     let held = RequestScope::new(key(1), ScopeSnapshot::sticky_of("A"));
     let lease = held.lease();
-    lease.mark_forget_agreed(&OneFaceForgetYes(()), 9);
+    lease.mark_forget_agreed(&OneFaceForgetYes(()), 9, None);
     for (name, args) in [
         (crate::remember::FORGET, json!({"source_id": 9})),
         (crate::remember::FORGET, json!({"about": "the coffee"})),

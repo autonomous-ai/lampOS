@@ -891,7 +891,10 @@ phần của kho nằm ở `crates/memory/src/app_facts.rs`.
     chuyện: `forget {about}` của voice đọc các điều app của chính người đó
     theo cách này, từng trang (tối đa 24, quá thì "quá nhiều để xem hết"),
     và khớp chúng theo cùng các từ như các điều họ đã giữ, nên «quên điều
-    gym coach đã nói» lấy được chúng. Lệnh quên một khuôn mặt (#5627),
+    gym coach đã nói» lấy được chúng. Các từ của một điều app chỉ là tiêu
+    đề app và lời được trích của nó, không bao giờ là `Noted by the app`
+    phía trước hay ngày: «quên điều app đã nói» chỉ lấy điều nào có nói
+    "app" (#8300). Lệnh quên một khuôn mặt (#5627),
     khi chỉ người đó trong tầm nhìn, liệt kê chúng cùng cách bên cạnh các
     điều họ đã giữ, trong cùng 1,5 s (`tools::ASK_DEADLINE`) với danh sách
     điều đã giữ, nên việc tìm trước câu hỏi chờ tối đa 3 s cùng danh sách id:
@@ -901,10 +904,14 @@ phần của kho nằm ở `crates/memory/src/app_facts.rs`.
     tên app đó (tiêu đề trong "Noted by the app <tiêu đề>", không kể hoa
     thường), lệnh quên một khuôn mặt hỏi một lần bằng lời của họ và lời đồng
     ý quên từng điều theo id, còn lệnh quên về một chuyện lấy hết, kể cả quá
-    8 điều. Lẫn điều đã giữ với điều app, hoặc điều của hai app, vẫn hỏi
+    8 điều. Lời đồng ý quên điều được hỏi theo id trước, rồi mới liệt kê các
+    điều của app trong phần còn lại của cùng 1,5 s, nên một danh sách chậm
+    không bao giờ để lệnh quên đó hết thời gian; nó chỉ mở rộng theo các từ
+    lamp đã hỏi, không bao giờ theo từ của model lúc đồng ý. Điều mà trí nhớ
+    không nói đã xoá thì không được đếm, và câu trả lời nói có thể còn sót. Lẫn điều đã giữ với điều app, hoặc điều của hai app, vẫn hỏi
     điều nào. Không bao giờ của căn phòng, không
-    bao giờ của người khác; trí nhớ cũ từ chối trường này và lệnh quên tìm
-    ở phần còn lại.
+    bao giờ của người khác; trí nhớ cũ, và kho legacy, từ chối trường này và
+    lệnh quên tìm ở phần còn lại.
   - **Lượt ban đêm không bao giờ đọc nó**, nên không đoạn, mẫu hay chương
     nào được làm từ nó mà mất dấu hoặc sống quá 90 ngày của nó. Những gì
     làm từ nó qua bất kỳ liên kết nào khác đi cùng nó (lượt đi của lệnh
