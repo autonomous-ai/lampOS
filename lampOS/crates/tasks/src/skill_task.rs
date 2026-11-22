@@ -2648,7 +2648,23 @@ pub struct HarnessRunner {
     /// same door OpenClaw's gateway has ([`HarnessRunner::start_door`]).
     /// None, or not there: such a run keeps its own pane.
     pub start_door: Option<PathBuf>,
+    /// The exact exec allow-list that holds a default agent with no
+    /// gateway's kept session to the launcher, read as
+    /// [`Self::skill_start_allowed`] reads agent `main`'s (the #8213 HOLD,
+    /// `crate::skill_start`'s residual). Only such an allow-list keeps other
+    /// code at the agent's own uid out of a door run's launcher and fenced
+    /// script, which hold the run's token. `None`: there is none, and every
+    /// run of such an agent keeps its own pane, its token file read once by
+    /// its own wrapper. The lamp's Hermes runs its kept session with
+    /// approvals off (`HERMES_YOLO_MODE`) and has no such list today, so a
+    /// lamp's runner has `None`.
+    pub kept_allow_list: Option<crate::gateway::SkillStartAllowed>,
 }
+
+/// Why a default agent with no gateway keeps a skill's run in its own pane
+/// while its kept session is held to no exact exec allow-list
+/// ([`HarnessRunner::kept_allow_list`], the #8213 HOLD).
+pub const NO_EXEC_ALLOW_LIST: &str = "its kept session is held to no exact exec allow-list with the launcher, so a run's token never goes through it";
 
 /// lamp-tasks' Harness project in `home`, `~/harnesses/lamp-tasks`
 /// (`runtime::MACHINES_PROJECT`), where each run's folder is made.
@@ -2803,7 +2819,11 @@ impl HarnessRunner {
     /// ([`Self::start_door`]), the run's own script (a fixed write has
     /// none), no keys file (its pane's wrapper reads those), and for a run
     /// granted `net` a launcher whose fence relays it ([`fence_takes_net`],
-    /// as a gateway agent's). Each `Err` says why it keeps its own pane.
+    /// as a gateway agent's). First of all, the kept session held to an
+    /// exact exec allow-list with the launcher ([`Self::kept_allow_list`],
+    /// as OpenClaw's gateway is): with none, any code at the agent's uid
+    /// could take a door run's token (the #8213 HOLD). Each `Err` says why
+    /// it keeps its own pane.
     fn through_door(
         &self,
         run: &SkillRun,
@@ -2818,6 +2838,10 @@ impl HarnessRunner {
         }
         if !kept {
             return Err("no kept session is typed into here".into());
+        }
+        match &self.kept_allow_list {
+            None => return Err(NO_EXEC_ALLOW_LIST.into()),
+            Some(allowed) => allowed.check().map_err(str::to_owned)?,
         }
         let script = self
             .agent_ns
@@ -2986,6 +3010,9 @@ impl HarnessRunner {
             egress: None,
             gateway_net: None,
             start_door: Some(PathBuf::from(crate::skill_start::LAUNCHER)),
+            // No agent with no gateway has an exact exec allow-list today
+            // (the lamp's Hermes runs its kept session with approvals off).
+            kept_allow_list: None,
         }
     }
 
@@ -7412,6 +7439,7 @@ mod tests {
             egress: None,
             gateway_net: None,
             start_door: None,
+            kept_allow_list: None,
         }
     }
 

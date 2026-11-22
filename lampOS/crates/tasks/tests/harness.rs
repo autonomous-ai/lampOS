@@ -7633,6 +7633,7 @@ fn skill_runner_with(
         egress: None,
         gateway_net: None,
         start_door: None,
+        kept_allow_list: None,
     }
 }
 
@@ -10319,6 +10320,37 @@ fn with_one_session_on_as_an_agent_each_run_keeps_its_own_pane() {
 /// ([`skill_task::AGENT_NS_START_LINE`]), a launcher file when `launcher`,
 /// and lamp-tasks' one session.
 fn hermes_door_runner(rig: &Rig, start_line: bool, launcher: bool) -> HarnessRunner {
+    hermes_door_runner_listed(rig, start_line, launcher, Some(true))
+}
+
+/// The kept session's exact exec allow-list (#8213's HOLD), as
+/// `SkillStartAllowed` reads agent `main`'s: `Some(true)` with the
+/// launcher, `Some(false)` without it, `None` no list at all (the lamp's
+/// Hermes today).
+fn kept_allow_list(listed: Option<bool>) -> Option<lamp_tasks::gateway::SkillStartAllowed> {
+    let entry = match listed? {
+        true => lamp_tasks::skill_start::LAUNCHER,
+        false => "/usr/bin/true",
+    };
+    let read = json!({
+        "path": "/x", "exists": true, "hash": "h",
+        "file": {"version": 1, "agents": {"main": {"allowlist": [{"pattern": entry}]}}},
+    })
+    .to_string();
+    Some(lamp_tasks::gateway::SkillStartAllowed::new(
+        Box::new(move || Ok(read.clone())),
+        Box::new(|| None),
+    ))
+}
+
+/// [`hermes_door_runner`] with its kept session's allow-list as given
+/// ([`kept_allow_list`]).
+fn hermes_door_runner_listed(
+    rig: &Rig,
+    start_line: bool,
+    launcher: bool,
+    listed: Option<bool>,
+) -> HarnessRunner {
     let mut ns = ns_with_runs();
     if start_line {
         ns.push_str(skill_task::AGENT_NS_START_LINE);
@@ -10334,6 +10366,7 @@ fn hermes_door_runner(rig: &Rig, start_line: bool, launcher: bool) -> HarnessRun
         fs::write(&door, "launcher").unwrap();
     }
     runner.start_door = Some(door);
+    runner.kept_allow_list = kept_allow_list(listed);
     runner.one_session = Some(Arc::new(
         lamp_tasks::one_session::OneSession::new(
             Duration::from_secs(5),
@@ -10363,8 +10396,10 @@ fn watch_token_file(
     })
 }
 
-/// #8151's parity (the manager's condition: the door is the normal case):
-/// with the lamp's Hermes the default, its kept session up and the door
+/// #8151's parity, once the kept session is held to an exact exec
+/// allow-list with the launcher (#8213's HOLD; the lamp's Hermes has none
+/// today, `a_hermes_run_the_door_cant_take_keeps_its_own_pane_with_its_token_file`):
+/// with a default agent with no gateway, its kept session up and the door
 /// installed (the agent namespace showing the launcher's folder, the
 /// launcher there), each skill run is typed into the one Hermes pane as
 /// `skill-start <run-id>`, exactly as OpenClaw's: one `new hermes` (the
@@ -10372,7 +10407,7 @@ fn watch_token_file(
 /// `close`, no `skill-task-1` pane, and no token file ever written: the
 /// token reaches only the launcher's claim, once per run.
 #[test]
-fn with_one_session_on_a_hermes_defaults_skill_runs_go_through_the_door_in_its_kept_session() {
+fn with_an_exec_allow_list_a_hermes_defaults_skill_runs_go_through_the_door_in_its_kept_session() {
     let mut rig = Rig::new();
     rig.config.as_person = true;
     one_session_plan(&rig);
@@ -10434,19 +10469,33 @@ fn with_one_session_on_a_hermes_defaults_skill_runs_go_through_the_door_in_its_k
 /// written before it, nothing typed into the kept session. The door's
 /// pieces each missing in turn: the agent namespace's line for the
 /// launcher's folder, the launcher, a kept session (Harness called as an
-/// agent), and a fixed write with no script.
+/// agent), and a fixed write with no script. And #8213's HOLD, the lamp's
+/// own case today: every piece installed but the kept session held to no
+/// exact exec allow-list (Hermes's kept pane runs with approvals off), or
+/// to one without the launcher. Any code at the agent's uid could
+/// otherwise take a door run's token from the launcher or its fenced
+/// script.
 #[test]
 fn a_hermes_run_the_door_cant_take_keeps_its_own_pane_with_its_token_file() {
-    for (case, start_line, launcher, as_person, fixed) in [
-        ("no start line", false, true, true, false),
-        ("no launcher", true, false, true, false),
-        ("no kept session", true, true, false, false),
-        ("a fixed write", true, true, true, true),
+    for (case, start_line, launcher, as_person, fixed, listed) in [
+        ("no exec allow-list", true, true, true, false, None),
+        (
+            "an allow-list without the launcher",
+            true,
+            true,
+            true,
+            false,
+            Some(false),
+        ),
+        ("no start line", false, true, true, false, Some(true)),
+        ("no launcher", true, false, true, false, Some(true)),
+        ("no kept session", true, true, false, false, Some(true)),
+        ("a fixed write", true, true, true, true, Some(true)),
     ] {
         let mut rig = Rig::new();
         rig.config.as_person = as_person;
         one_session_plan(&rig);
-        let runner = hermes_door_runner(&rig, start_line, launcher);
+        let runner = hermes_door_runner_listed(&rig, start_line, launcher, listed);
         let done = Arc::new(std::sync::atomic::AtomicBool::new(false));
         let watched = watch_token_file(&rig, done.clone());
         let mut run = if fixed {
