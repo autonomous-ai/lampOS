@@ -493,6 +493,9 @@ mod tests {
             .lines()
             .find_map(|line| line.strip_prefix("description: "))
             .expect("no description");
-        assert!(description.contains("\"how do reminders work?\""), "{description}");
+        assert!(
+            description.contains("\"how do reminders work?\""),
+            "{description}"
+        );
     }
 }
