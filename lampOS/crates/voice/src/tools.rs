@@ -4662,6 +4662,24 @@ mod tests {
         let label = "What should I remind you about?";
         let anything_else = "It rings at 4:09. Anything else?";
         let sum = "Ten. Anything else?";
+        // The label questions below are the ones the catalog fixes with the
+        // switch on (the Reviewer-lead's P2 on #8274), so the lamp asks them
+        // in these words.
+        let on = lamp_actions::schedule::asking_how_long(
+            lamp_actions::schedule::catalog_with(false),
+            true,
+        );
+        let said = |name: &str| on.iter().find(|f| f.name == name).unwrap().description;
+        assert!(
+            said("set_reminder").contains(label),
+            "{}",
+            said("set_reminder")
+        );
+        assert!(
+            said("set_timer").contains("What's the timer for?"),
+            "{}",
+            said("set_timer")
+        );
         for (heard, asked, call, sets) in [
             (
                 "Take my pills.",

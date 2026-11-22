@@ -1504,6 +1504,19 @@ mod tests {
             "{}",
             said("set_reminder")
         );
+        // The label questions are fixed too, each naming the schedule, so a
+        // reply to one lends the asked line's time (the Reviewer-lead's P2
+        // on #8274: "What's it for?" lent nothing).
+        assert!(
+            said("set_reminder").contains("'What should I remind you about?'"),
+            "{}",
+            said("set_reminder")
+        );
+        assert!(
+            said("set_timer").contains("'What's the timer for?'"),
+            "{}",
+            said("set_timer")
+        );
         for (was, now) in catalog_with(false).iter().zip(&on) {
             if !matches!(was.name, "set_timer" | "set_reminder") {
                 assert_eq!(was.description, now.description);
