@@ -1998,24 +1998,21 @@ fn exec_allowlist(run: &mut Runner, shown: Shown, say: &mut dyn FnMut(&str)) -> 
         return None;
     }
     let mut added = false;
+    let mut unknown = false;
     for args in exec_allowlist_args(shown) {
-        let mut ran = run(&allowlist_argv(args));
-        // A gateway just (re)started is not ready for the add at first: its
-        // namespace does not show Node yet, then it answers "Config
-        // unavailable" until its config is read (#7135, c0a4: the first
-        // run's exec was denied). The add is tried again, ADD_TRIES times
-        // at most, ADD_AGAIN apart.
-        for _ in 1..ADD_TRIES {
-            match &ran {
-                Err(why) if args[2] == "add" && gateway_not_ready(why) => {
-                    std::thread::sleep(ADD_AGAIN);
-                    ran = run(&allowlist_argv(args));
-                }
-                _ => break,
-            }
-        }
+        // An add goes through [`add_settled`]: one refused by a gateway not
+        // ready or (re)starting under it is tried again, and still so it is
+        // not known, never a refusal (#7135, #8246).
+        let ran = if args[2] == "add" {
+            add_settled(run, args, say).map_err(|(why, settled)| {
+                unknown |= !settled;
+                why
+            })
+        } else {
+            run(&allowlist_argv(args)).map(drop)
+        };
         match ran {
-            Ok(_) => added |= args[2] == "add",
+            Ok(()) => added |= args[2] == "add",
             Err(why) if args[2] == "add" => say(&format!(
                 "OpenClaw's exec allow-list does not let agent {} run {} yet: {why}; the next round tries again",
                 args[5], args[6]
@@ -2028,6 +2025,9 @@ fn exec_allowlist(run: &mut Runner, shown: Shown, say: &mut dyn FnMut(&str)) -> 
                 args[5], args[6]
             )),
         }
+    }
+    if unknown {
+        return None;
     }
     if added {
         say(&format!(
@@ -2086,8 +2086,9 @@ fn allowlist_argv(args: [&str; 7]) -> Vec<String> {
 /// (nothing run, nothing said: the round started it); else whether the
 /// add was taken, a refusal said in one line. The old globs' removes are
 /// the one-shot's alone. A gateway active but not ready yet (at a boot,
-/// [`gateway_not_ready`]) is asked again as the one-shot's add is; still
-/// not ready, it is None: unknown, not refused, so the entry is never
+/// [`gateway_not_ready`]) or stopping or restarting under the add
+/// (#8246) is asked again as the one-shot's add is ([`add_settled`]);
+/// still not settled, it is None: unknown, not refused, so the entry is never
 /// marked gone and OpenClaw never reinstalled for it (#7135, c0a4's
 /// reboot at 22:59:00), and the next round checks again.
 fn keep_run_entry(run: &mut Runner, say: &mut dyn FnMut(&str)) -> Option<bool> {
@@ -2098,31 +2099,115 @@ fn keep_run_entry(run: &mut Runner, say: &mut dyn FnMut(&str)) -> Option<bool> {
         one_path: true,
         ..Shown::default()
     })[0];
-    let mut ran = run(&allowlist_argv(add));
-    for _ in 1..ADD_TRIES {
-        match &ran {
-            Err(why) if gateway_not_ready(why) => {
-                std::thread::sleep(ADD_AGAIN);
-                ran = run(&allowlist_argv(add));
-            }
-            _ => break,
-        }
-    }
-    match ran {
-        Ok(_) => Some(true),
-        Err(why) if gateway_not_ready(&why) => {
+    match add_settled(run, add, say) {
+        Ok(()) => Some(true),
+        Err((why, false)) => {
             say(&format!(
                 "OpenClaw's gateway is not ready yet, so agent {RUN_AGENT}'s allow-list entry is not known: {why}; the next round checks again"
             ));
             None
         }
-        Err(why) => {
+        Err((why, true)) => {
             say(&format!(
                 "OpenClaw's exec allow-list does not let agent {RUN_AGENT} run {SKILL_START}: {why}; the one-shot is asked to add it"
             ));
             Some(false)
         }
     }
+}
+
+/// An allow-list add ([`allowlist_argv`]) run until a settled gateway
+/// answers it. A gateway just (re)started is not ready for it at first
+/// ([`gateway_not_ready`], #7135, c0a4: the first run's exec was denied),
+/// and one that stops or restarts under the add refuses it with whatever
+/// its going down printed (#8246, 52e6 at 22:25:06: a put-back's restart,
+/// the entry then marked gone for an hour), and the wrapper finds no
+/// OpenClaw in the namespace of one started less than [`JUST_STARTED`]
+/// ago. Either way the add is tried again, [`ADD_TRIES`] times at most,
+/// [`ADD_AGAIN`] apart, each retry said in one line with its cause. Err
+/// holds the last refusal and whether a settled gateway gave it: false
+/// means it was never checked, so the entry is not known, never gone.
+fn add_settled(
+    run: &mut Runner,
+    args: [&str; 7],
+    say: &mut dyn FnMut(&str),
+) -> Result<(), (String, bool)> {
+    let mut pid = main_pid(run);
+    let mut tries = 1;
+    loop {
+        let why = match run(&allowlist_argv(args)) {
+            Ok(_) => return Ok(()),
+            Err(why) => why,
+        };
+        let was = std::mem::replace(&mut pid, main_pid(run));
+        let cause = if gateway_not_ready(&why) {
+            "not ready yet"
+        } else if !gateway_active(run) {
+            "not active"
+        } else if pid != was {
+            "another MainPID"
+        } else if why.contains(&format!("{OPENCLAW}: No such file or directory"))
+            && gateway_age(run).is_some_and(|age| age < JUST_STARTED)
+        {
+            "OpenClaw not in its namespace yet"
+        } else {
+            return Err((why, true));
+        };
+        if tries == ADD_TRIES {
+            return Err((why, false));
+        }
+        tries += 1;
+        say(&format!(
+            "OpenClaw's allow-list add met a gateway restart ({cause}), tried again (try {tries} of {ADD_TRIES})"
+        ));
+        std::thread::sleep(ADD_AGAIN);
+    }
+}
+
+/// How long after its start a gateway's namespace may not show OpenClaw
+/// yet: the wrapper then says `unshare: failed to execute` [`OPENCLAW`]`:
+/// No such file or directory`. Read as not ready only that long, so a
+/// broken install still shows as a refusal, in the same run too (it is
+/// less than [`ADD_TRIES`] × [`ADD_AGAIN`]). kit-7872i on 52e6 (22 Nov):
+/// the install's restart started MainPID 3909051 at 05:53:01.9 and the
+/// add right after it was refused so; its journal line carries no time,
+/// so the gap is bounded only by the leg's read at 05:53:45: at most
+/// 43 s (by the code path, the add follows the restart in well under
+/// 1 s). 60 s leaves at least 17 s over that bound.
+pub const JUST_STARTED: Duration = Duration::from_secs(60);
+
+/// How long ago the gateway's main process started: systemd's
+/// `ExecMainStartTimestampMonotonic` against `/proc/uptime` (which runs
+/// on at least as fast, so the age is never short). None when either is
+/// not read or none started.
+fn gateway_age(run: &mut Runner) -> Option<Duration> {
+    let show = [
+        "systemctl",
+        "show",
+        "-p",
+        "ExecMainStartTimestampMonotonic",
+        "--value",
+        UNIT,
+    ];
+    let started = run(&show.map(str::to_owned))
+        .ok()?
+        .trim()
+        .parse::<u64>()
+        .ok()
+        .filter(|&us| us > 0)?;
+    let up = run(&["cat", "/proc/uptime"].map(str::to_owned)).ok()?;
+    let up = up.split_whitespace().next()?.parse::<f64>().ok()?;
+    Duration::try_from_secs_f64(up)
+        .ok()?
+        .checked_sub(Duration::from_micros(started))
+}
+
+/// The gateway unit's `MainPID` as systemd shows it (empty when not read):
+/// another one after an add means the gateway restarted under it.
+fn main_pid(run: &mut Runner) -> String {
+    run(&["systemctl", "show", "-p", "MainPID", "--value", UNIT].map(str::to_owned))
+        .map(|pid| pid.trim().to_owned())
+        .unwrap_or_default()
 }
 
 /// [`SKILL_START`] there as `shown` wants it: with the one run path on, a

@@ -2257,6 +2257,182 @@ fn a_round_reads_a_gateway_not_ready_as_unknown_never_as_the_entry_gone() {
     assert!(lamp.asked().unwrap().one_path, "the one-shot is asked");
 }
 
+/// #8246 (lamp-52e6, 21 Nov 22:25:06): a put-back restarted the gateway,
+/// and the round's add, refused by the gateway going down under it, was
+/// read as the entry gone: `exec_allowlist` false and skills on OpenClaw
+/// refused until the next round. An add refused while the gateway stops
+/// or comes back as another process is not checked: tried again as a not
+/// ready one is, and never settled it is unknown, the record kept and
+/// nothing asked. The one-shot's add follows the same rule. A refusal from
+/// a settled gateway still marks the entry gone.
+#[test]
+fn an_add_refused_while_the_gateway_restarts_under_it_never_marks_the_entry_gone() {
+    let lamp = Lamp::new();
+    lamp.harness_there();
+    tasks_there(&lamp, TASKS_BYTES);
+    let mut systemd = Fake::default();
+    round_shown(&lamp, &mut systemd, one_path());
+    install(&lamp, &Runs::new(&lamp), 20).unwrap();
+    assert!(lamp.said().unwrap().exec_allowlist && lamp.asked().is_none());
+
+    // The first `refused` adds fail with what a gateway going down prints,
+    // each followed by a new MainPID ("restarts") or the unit not active
+    // ("stops"); the rest of the commands as `Runs` answers them.
+    let runs = Runs::new(&lamp);
+    let gateway = |stops: bool, refused: u32, adds: Rc<RefCell<u32>>| {
+        let mut inner = runs.runner();
+        move |argv: &[String]| -> Result<String, String> {
+            let line = argv.join(" ");
+            let n = *adds.borrow();
+            let down = n >= 1 && n <= refused;
+            if line.contains(" approvals allowlist add ") {
+                *adds.borrow_mut() += 1;
+                if n < refused {
+                    return Err("gateway closed (1012): service restart".into());
+                }
+            } else if line.contains(" -p MainPID ") {
+                return Ok(if stops {
+                    "100".into()
+                } else {
+                    format!("{}\n", 100 + n)
+                });
+            } else if line.contains(" is-active ") && stops && down {
+                return Err("inactive".into());
+            }
+            inner(argv)
+        }
+    };
+    let round = |systemd: &mut Fake, run: &mut Runner| {
+        after_round(
+            lamp.root(),
+            &lamp.records(),
+            one_path(),
+            systemd,
+            run,
+            30,
+            Ok(crate::hermes_schedule::Window::Reached),
+            &mut quiet(),
+        )
+    };
+    for stops in [false, true] {
+        // Refused twice under a restart, then taken: one round, kept.
+        let adds = Rc::new(RefCell::new(0));
+        round(&mut systemd, &mut gateway(stops, 2, adds.clone()));
+        assert_eq!(*adds.borrow(), 3, "stops {stops}");
+        assert!(lamp.said().unwrap().exec_allowlist, "stops {stops}");
+        assert_eq!(lamp.asked(), None, "stops {stops}");
+
+        // Never settled in the round: unknown, nothing marked or asked.
+        let adds = Rc::new(RefCell::new(0));
+        round(&mut systemd, &mut gateway(stops, ADD_TRIES, adds.clone()));
+        assert_eq!(*adds.borrow(), ADD_TRIES, "stops {stops}");
+        assert!(lamp.said().unwrap().exec_allowlist, "stops {stops}");
+        assert_eq!(lamp.asked(), None, "no one-shot: stops {stops}");
+    }
+
+    // The one-shot's add, never settled: the record's entry as it was.
+    let said = lamp.said().unwrap();
+    write(
+        &lamp.records(),
+        OpenclawInstall {
+            exec_allowlist: true,
+            ..OpenclawInstall::new("installing", None, 40)
+        },
+    );
+    ask_install(&lamp.records(), one_path()).unwrap();
+    let adds = Rc::new(RefCell::new(0));
+    let mut run = gateway(false, ADD_TRIES, adds.clone());
+    let after = install_with(
+        lamp.root(),
+        &lamp.records(),
+        &mut run,
+        &mut || 50,
+        &mut quiet(),
+        &Kit::BUILT,
+    )
+    .unwrap()
+    .unwrap();
+    assert_eq!(*adds.borrow(), ADD_TRIES);
+    assert!(after.exec_allowlist, "{after:#?} (was {said:#?})");
+
+    // A settled gateway's refusal (active, MainPID the same): gone, asked.
+    let mut adds = 0;
+    let mut inner = runs.runner();
+    let mut run = |argv: &[String]| -> Result<String, String> {
+        let line = argv.join(" ");
+        if line.contains(" approvals allowlist add ") {
+            adds += 1;
+            return Err("unknown agent".into());
+        }
+        if line.contains(" -p MainPID ") {
+            return Ok("100\n".into());
+        }
+        inner(argv)
+    };
+    round(&mut systemd, &mut run);
+    assert_eq!(adds, 1);
+    assert!(!lamp.said().unwrap().exec_allowlist);
+    assert!(lamp.asked().unwrap().one_path, "the one-shot is asked");
+}
+
+/// #8246, V2's rulings: kit-7872i (52e6, 22 Nov 05:53) saw the add right
+/// after the install's restart refused by the wrapper, `unshare: failed
+/// to execute` OpenClaw `: No such file or directory`, the gateway active
+/// with the same MainPID. Within 60 s (`JUST_STARTED`) of the MainPID's
+/// start that text is not ready: tried again, the retry said in one line
+/// with its cause and try number. Past it the same text is a refusal, so
+/// a broken install still shows: the entry gone.
+#[test]
+fn the_wrappers_no_openclaw_is_not_ready_only_just_after_the_gateway_started() {
+    for (age, taken) in [(5, Some(true)), (61, Some(false))] {
+        let mut adds = 0;
+        let mut run = |argv: &[String]| -> Result<String, String> {
+            let line = argv.join(" ");
+            if line.contains(" approvals allowlist add ") {
+                adds += 1;
+                if adds == 1 || age > 60 {
+                    return Err(format!(
+                        "unshare: failed to execute {OPENCLAW}: No such file or directory"
+                    ));
+                }
+            } else if line.contains(" -p MainPID ") {
+                return Ok("3909051\n".into());
+            } else if line.contains(" -p ExecMainStartTimestampMonotonic ") {
+                return Ok("1000000000\n".into());
+            } else if line == "cat /proc/uptime" {
+                return Ok(format!("{}.25 2000.00\n", 1000 + age));
+            }
+            Ok(String::new())
+        };
+        let mut lines = Vec::new();
+        let kept = keep_run_entry(&mut run, &mut |line: &str| lines.push(line.to_owned()));
+        assert_eq!(kept, taken, "{age} s: {lines:#?}");
+        let tried: Vec<_> = lines
+            .iter()
+            .filter(|line| line.contains("allow-list add met a gateway restart"))
+            .collect();
+        if age < 60 {
+            assert_eq!(adds, 2);
+            assert_eq!(
+                tried,
+                [&format!(
+                    "OpenClaw's allow-list add met a gateway restart (OpenClaw not in its namespace yet), tried again (try 2 of {ADD_TRIES})"
+                )],
+                "{lines:#?}"
+            );
+        } else {
+            assert_eq!(adds, 1);
+            assert!(tried.is_empty(), "{lines:#?}");
+            assert!(
+                lines
+                    .iter()
+                    .any(|line| line.contains("the one-shot is asked to add it")),
+                "{lines:#?}"
+            );
+        }
+    }
+}
+
 /// The one run path switched off with the gateway down: nothing is run,
 /// and the record keeps the entry, so the next round asks again; with
 /// the gateway up, the removes run and the record drops it.

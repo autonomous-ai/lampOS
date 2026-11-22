@@ -2638,8 +2638,19 @@ As root, on a lamp with the base image (`crates/update/src/install.rs`):
      the next round asks again). An add refused only because the
      gateway just (re)started is not ready yet (its namespace does not
      show Node, `'node': No such file or directory`, then `Config
-     unavailable`) is tried again in the same run, 40 times 3 s apart (two
-     minutes) at most (#7135). A remove that fails is journaled and
+     unavailable`), or by a gateway that stops or comes back as another
+     process (another `MainPID`) under the add, or by the wrapper finding
+     no OpenClaw in the namespace (`unshare: failed to execute
+     .../.bin/openclaw: No such file or directory`) of a gateway whose
+     `MainPID` started less than 60 s before (`ExecMainStartTimestampMonotonic`
+     against `/proc/uptime`; kit-7872i on lamp-52e6, 22 Nov 05:53: the add
+     right after the install's restart, at most 43 s after it), is tried
+     again in the same run, 40 times 3 s apart (two minutes) at most
+     (#7135, #8246), each retry journaled as `OpenClaw's allow-list add
+     met a gateway restart (<cause>), tried again (try K of 40)`; still
+     not settled, the entry is not known and the record keeps what it
+     said. That text from a gateway started 60 s or more before stays a
+     refusal, so a broken install still shows. A remove that fails is journaled and
      passed over; an add that fails is journaled and not done: the
      install is still `installed`, nothing is taken down, and the record's
      `exec_allowlist` stays false, so the next round asks the one-shot
@@ -2652,8 +2663,12 @@ As root, on a lamp with the base image (`crates/update/src/install.rs`):
      round; an add refused sets `exec_allowlist` false and asks the
      one-shot, and the removes stay the one-shot's. A gateway active but
      not ready yet (Node not there yet, or `Config unavailable`, as after
-     a boot) is asked again the same way, 40 times 3 s apart; still not
-     ready, the entry is unknown, not refused: nothing is marked or asked,
+     a boot), or one that stops or restarts under the add (#8246,
+     lamp-52e6 21 Nov 22:25: a restart's refusal had marked the entry gone
+     for an hour), or the wrapper's no-OpenClaw text within 60 s of the
+     gateway's start, is asked again the same way, 40 times 3 s apart,
+     each retry journaled; still
+     not settled, the entry is unknown, not refused: nothing is marked or asked,
      and the next round checks again (#7135, lamp-c0a4's reboot at
      22:59:00, where it had started a reinstall). Between rounds,
      lamp-tasks runs the same add once per gateway start, before that
