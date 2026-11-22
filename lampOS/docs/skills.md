@@ -2384,7 +2384,7 @@ and version and held to the add-on limits, for a judge. Without
 | Smoky air, Dusty air (#1684) | core | **Held until measured.** The air at the desk suddenly smoky (PM2.5 up 100 µg/m³ within 3 minutes, to 150 or more, held 30 s): one exact line, a small lift and an amber breath, once a spell, at any hour; and very dusty for an hour (125 or more): one exact line, at most once a day, in the daytime, with someone at the desk. Neither is a smoke alarm, which only the docs say (here and [air.md](air.md)): their lines, their `SKILL.md` descriptions and what the model is told to answer never say fire, alarm or smoke alarm; Smoky air's line begins "The air reads like smoke". Neither declares a `[stop]`, so a passing "stop" cannot snooze the smoke line (#1837's P3). Installed disabled (`install::PRODUCT_SKILLS_OFF`) until the four real traces (kettle steam, toast, a candle blown out, a match) are recorded on a lamp with an air sensor and their numbers are decided from the replays; their cases are written by a script, and those four are placeholders, to be replaced by the real recording (#1684). Their thresholds are provisional until then. For a trial, see [air.md](air.md), "Smoky air and Dusty air on a trial lamp" |
 | Feelings (#3691) | core | What the lamp felt, shown as a creature would: Mood's `felt` on `mood/state` (glad, lively, low; [mood.md](mood.md)) as a small head move of its own and a step of light from the person's, never brighter. Installed disabled (`install::PRODUCT_SKILLS_OFF`) until its lamp check, and it does nothing without Mood (`LAMP_MOOD=on`), which stays trial-only with Tone |
 | Light scenes, Point the light (`point-light`), Light show | core | Asked for by a person, never on their own (#1679): a scene's light, kept, with the head over the desk for reading and focus; the head over the desk and turned toward what the model's look saw there ("light my book"); a show of slow-changing colours under a minute. Light show comes with the product since #5745, Light scenes and Point the light since #5744 (`light_show`, `light_scene`, `point_light`, reached through `use_skill`, `LAMP_USE_SKILL=on`) |
-| How to use the lamp (`faq`, #5790) | core | Asked by a person, never on its own: "how do I...", "what can you do?", "where do I link my calendar?", "help"; not for their own reminders or timers, which are `list_reminders`' (#8181). Its tool `lamp_help`, reached through `use_skill`, with `topic` (`abilities`, the default, `connectors`, `controls`, `light`, `reminders`, `nudges`, `guard_mode`, `skills`, `updates`, `unplug`, `memory`, `setup`, `about`: who made the lamp and that it's sold at autonomous.ai/lamp, no price), is told one section of its product knowledge (`knowledge.md`, the `knowledge` key above) and answers from it in one to three sentences. It only tells: it reads no topic and asks nothing of the light or the body. In the product's install since #5790 (below, "Core skill: how to use the lamp") |
+| How to use the lamp (`faq`, #5790) | core | Asked by a person, never on its own: "how do I...", "what can you do?", "where do I link my calendar?", "help", "how do reminders work?"; not for their own reminders or timers, which are `list_reminders`' (#8181). Its tool `lamp_help`, reached through `use_skill`, with `topic` (`abilities`, the default, `connectors`, `controls`, `light`, `reminders`, `nudges`, `guard_mode`, `skills`, `updates`, `unplug`, `memory`, `setup`, `about`: who made the lamp and that it's sold at autonomous.ai/lamp, no price), is told one section of its product knowledge (`knowledge.md`, the `knowledge` key above) and answers from it in one to three sentences. It only tells: it reads no topic and asks nothing of the light or the body. In the product's install since #5790 (below, "Core skill: how to use the lamp") |
 | Pose (#4135) | core | Asked for by a person, never on its own: "get lower", "sit down", "back to normal". Its tool `set_pose` (`normal`, `lower`, `sit`) asks the body's stand at 100, 60 or 30 percent of its own through a `stand` step, kept until the next ask or power-up; asked taller than its usual height, the model says so ("This is as tall as I stand.") and calls nothing. Comes with the product since #4135, its stand moving the body only with `LAMP_BODY_POSE_ASK=on` in lamp-skills and lamp-body, which the product's units set since lamp-52e6's run of 29 Oct |
 | Onboarding | core | Every lamp's first meeting: the walk's steps and their order are this skill's own file (`skills/onboarding/skill.toml`), which the voice reads once when it starts, checked by the same validator Skills loads and packages a core skill with ([onboarding.md](onboarding.md)) |
 | Startle (#2822) | core | A creature glances at a sudden sound, a bang or something dropped, then lets it go. Its move is this skill's own file (`[startle]`), which `lamp-expression serve` reads once when it starts ([expression.md](expression.md), "The startle: a glance at a sudden sound") |
@@ -9125,19 +9125,21 @@ and tells a person how to use it, by voice, as V1's `skills/faq` did for
 its web pages. `skills/faq/` is a core skill in the product's install
 (`install::PRODUCT_SKILLS`), reached through `use_skill` (`lamp_help`,
 with a `topic`); its description names the asks it is for ("how do I...?",
-"what can you do?", "where do I link Gmail or my calendar?", "what does
+"how do reminders work?", "what can you do?", "where do I link Gmail or my calendar?", "what does
 the button do?", "who made you?", "where can I buy you?", "what's your
 website?", "help"), so a request for help is a call and not the
 model's own guess. Its description and its `when` also say it is "not for
 their own reminders or timers", which are `list_reminders`' (#8181: on
 lamp-52e6 in gate 1126 the core reminders line, the 2nd line of a
 conversation, went to `lamp_help` with `topic` `reminders`;
-[schedule.md](schedule.md)). Its description and its choice's `about` are kept short:
+[schedule.md](schedule.md)); "how do reminders work?" is named among its
+asks, since in kit-8206c (#8206's ROW, 22 Nov) that line got no call in 2
+of 4 while the description named reminders only as not its own. Its description and its choice's `about` are kept short:
 `use_skill`'s section of every skill's line is bounded at 4,096 bytes
 (`use_skill::SECTION_MOST_BYTES`), and with the FAQ's line a product lamp's
-is about 2,364 while #5804 keeps the three light skills installed off (2,234
-before the `about` asks' 65 bytes, 2,299 before #8181's 65); with them on
-again about 4,094. Past
+is about 2,390 while #5804 keeps the three light skills installed off (2,234
+before the `about` asks' 65 bytes, 2,299 before #8181's 91); with them on
+again about 4,120, past the bound. Past
 the bound a core skill's line is kept whole first and the other skills'
 are shortened ([tools.md](tools.md), "Many skills"), so a Store skill's
 line no longer cuts `wellbeing_nudges` or `set_pose` to its name alone.

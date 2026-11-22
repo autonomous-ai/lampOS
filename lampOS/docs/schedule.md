@@ -814,8 +814,11 @@ lamp_help" (to fit a function's 1,024 bytes, its "(what is set, when due
 or set)" is gone: the description is 1,021 bytes). Faq's description and
 its `when` say it is "not for their own reminders or timers", which are
 `list_reminders`' ([skills.md](skills.md), "Core skill: how to use the
-lamp"). Test:
-`list_reminders_and_lamp_help_say_which_is_for_their_own_reminders`
+lamp"), and its description names "how do reminders work?" among its
+asks (in kit-8206c, #8206's ROW on 22 Nov, that line got no call in 2 of
+4 while faq named reminders only as not its own). Tests:
+`list_reminders_and_lamp_help_say_which_is_for_their_own_reminders` and
+`faq_says_how_reminders_work_is_its_own`
 (`crates/voice/src/tools/reminders_asked.rs`). Whether the model calls
 `list_reminders` mid-conversation is a played row's. That line was 7 of
 7 words heard and still not forced, and the journal could not say which
