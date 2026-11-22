@@ -164,7 +164,7 @@ for name, (rec, scale, seconds) in list(KEPT.items()) + list(NEW.items()):
                                      f'/// {n * step_ms / 1000:.1f} s. Offsets from {lo} to {hi}.'])
     print(f'{name:12} from {rec:13} scale {scale:.2f} {n * step_ms / 1000:5.1f} s  lo {lo} hi {hi}  slowed x{slow:.2f}', file=sys.stderr)
     # A clip cut from its recording also gets the whole recording (#8153), at the cut's gains (or scale) and
-    # frame time, once (no repeat): what the energy level lengthens it toward (`energy::livelier`). Never played
+    # frame time, once (no repeat): what level 5 plays (`energy::livelier`; levels 2 to 4 play the cut). Never played
     # as is, and only under LAMP_BODY_ENERGY, whose servo ceiling stretches any step past the servo's speed.
     if (a, b) != (0, len(frames_all)):
         whole, _, _ = offsets(name, t_all, frames_all, gains=gains if name in REWORKED else None,
