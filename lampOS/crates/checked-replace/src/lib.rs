@@ -293,7 +293,8 @@ pub fn validate(argv: &[String], env: &[(&str, &str)], within: Duration) -> Resu
 /// value after a name holding `token`, `key`, `secret` or `password`
 /// (`"token":"…"`, `apiKey: '…'`), any value after such a name and `=`
 /// (`secret=…`), and any run of 24 or more letters, digits, `-` or `_` (a
-/// token's shape). What it says of the config's shape stays.
+/// token's shape), but [`GATEWAY_CAME_UP`], which writers' retries read.
+/// What it says of the config's shape stays.
 pub fn redact(said: &str) -> String {
     const SECRET: [&str; 4] = ["token", "key", "secret", "password"];
     let word = |c: char| c.is_alphanumeric() || c == '_' || c == '-';
@@ -311,7 +312,9 @@ pub fn redact(said: &str) -> String {
         while i < len && word(chars[i]) {
             i += 1;
         }
-        if i - start >= 24 {
+        // GATEWAY_CAME_UP is OpenClaw's word, not a value: masked, it keeps
+        // the retry that reads it from firing (Seventh's P1 on #8064).
+        if i - start >= 24 && chars[start..i].iter().copied().ne(GATEWAY_CAME_UP.chars()) {
             out.push_str("***");
             continue;
         }
@@ -455,5 +458,29 @@ mod tests {
         );
         assert!(error.contains("status 1"), "{error}");
         assert!(error.contains("***"), "{error}");
+    }
+
+    /// Seventh's P1 on #8064: [`GATEWAY_CAME_UP`] is 25 word characters, a
+    /// token's shape, and was masked, so a gateway that came up under a
+    /// check run without it was taken as a refusal of the text. It is kept
+    /// whole through [`validate`]; a token of the same length still is not.
+    #[test]
+    fn a_gateway_that_came_up_is_known_through_the_redaction() {
+        let token = "abcdefghijklmnopqrstuvwxy";
+        assert_eq!(token.len(), GATEWAY_CAME_UP.len());
+        let dir = tempfile_dir("came-up");
+        let program = dir.join("openclaw");
+        std::fs::write(
+            &program,
+            format!("#!/bin/sh\necho '{GATEWAY_CAME_UP}: gateway already running, token {token}'\nexit 1\n"),
+        )
+        .unwrap();
+        std::fs::set_permissions(&program, std::fs::Permissions::from_mode(0o755)).unwrap();
+        let argv = [program.to_string_lossy().into_owned()];
+        let error = validate(&argv, &[], Duration::from_secs(10)).unwrap_err();
+        std::fs::remove_dir_all(&dir).unwrap();
+        assert!(gateway_not_there(&error), "{error}");
+        assert!(!error.contains(token), "{error}");
+        assert_eq!(redact(&format!("x{GATEWAY_CAME_UP}")), "***");
     }
 }
