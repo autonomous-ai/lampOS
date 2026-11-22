@@ -190,6 +190,14 @@ impl Host for FakeHost {
 
     fn refresh(&mut self, argv: &[&str]) -> Result<(), String> {
         self.calls.push(format!("refresh {}", argv.join(" ")));
+        // The transient unit's `rm -f --`, done under the root (#7254).
+        if argv.first() == Some(&"systemd-run")
+            && let Some(at) = argv.iter().position(|word| *word == "--")
+        {
+            for path in &argv[at + 1..] {
+                let _ = fs::remove_file(self.root.join(path.trim_start_matches('/')));
+            }
+        }
         Ok(())
     }
 
@@ -9498,9 +9506,11 @@ fn only_sysstats_own_kept_files_are_removed() {
         fs::write(folder.join(name), vec![0u8; bytes]).unwrap();
     }
     let mut said = Vec::new();
-    let removed = install::sysstat_kept_removed(&lamp.root, &mut lamp.host, &mut |line: &str| {
-        said.push(line.to_owned())
-    })
+    let removed = install::sysstat_kept_removed(
+        &lamp.root,
+        &mut |argv: &[&str]| lamp.host.refresh(argv),
+        &mut |line: &str| said.push(line.to_owned()),
+    )
     .unwrap();
     assert_eq!(
         removed,
@@ -9544,15 +9554,24 @@ fn a_link_a_folder_or_a_file_elsewhere_is_never_removed() {
     fs::write(&elsewhere, "elsewhere").unwrap();
     std::os::unix::fs::symlink(&elsewhere, folder.join("sa01")).unwrap();
     fs::write(lamp.on("/var/log/sa05"), "beside the folder").unwrap();
-    let removed = install::sysstat_kept_removed(&lamp.root, &mut lamp.host, &mut |_| {}).unwrap();
+    let removed = install::sysstat_kept_removed(
+        &lamp.root,
+        &mut |argv: &[&str]| lamp.host.refresh(argv),
+        &mut |_| {},
+    )
+    .unwrap();
     assert!(removed.is_empty(), "{removed:?}");
     assert!(sysstat_removal(&lamp).is_empty());
     // No folder at all: nothing either.
     let mut bare = Lamp::new(188, &[]);
     assert!(
-        install::sysstat_kept_removed(&bare.root, &mut bare.host, &mut |_| {})
-            .unwrap()
-            .is_empty()
+        install::sysstat_kept_removed(
+            &bare.root,
+            &mut |argv: &[&str]| bare.host.refresh(argv),
+            &mut |_| {}
+        )
+        .unwrap()
+        .is_empty()
     );
     assert!(sysstat_removal(&bare).is_empty());
 }
@@ -9567,9 +9586,11 @@ fn a_kept_folder_it_cant_list_is_said_and_never_fails_the_boot_run() {
     // A plain file where the folder should be: listing it fails.
     fs::write(&folder, "not a folder").unwrap();
     let mut said = Vec::new();
-    let removed = install::sysstat_kept_removed(&lamp.root, &mut lamp.host, &mut |line: &str| {
-        said.push(line.to_owned())
-    })
+    let removed = install::sysstat_kept_removed(
+        &lamp.root,
+        &mut |argv: &[&str]| lamp.host.refresh(argv),
+        &mut |line: &str| said.push(line.to_owned()),
+    )
     .unwrap();
     assert!(removed.is_empty());
     assert_eq!(said.len(), 1, "{said:?}");
@@ -9592,14 +9613,45 @@ fn with_sysstat_on_nothing_kept_is_removed() {
     fs::create_dir_all(on.parent().unwrap()).unwrap();
     fs::write(&on, "").unwrap();
     let mut said = Vec::new();
-    let removed = install::sysstat_kept_removed(&lamp.root, &mut lamp.host, &mut |line: &str| {
-        said.push(line.to_owned())
-    })
+    let removed = install::sysstat_kept_removed(
+        &lamp.root,
+        &mut |argv: &[&str]| lamp.host.refresh(argv),
+        &mut |line: &str| said.push(line.to_owned()),
+    )
     .unwrap();
     assert!(removed.is_empty());
     assert!(said.is_empty(), "{said:?}");
     assert!(sysstat_removal(&lamp).is_empty());
     assert!(folder.join("sa18").exists());
+}
+
+/// #7254: install removes sysstat's kept files as the boot run does, so a
+/// lamp gets the journal's room at the update itself; a second install
+/// finds none, runs nothing and changes nothing.
+#[test]
+fn an_install_removes_sysstats_kept_files_and_a_second_changes_nothing() {
+    let mut lamp = Lamp::new(188, &[]);
+    let folder = lamp.on(install::SYSSTAT_KEPT);
+    fs::create_dir_all(&folder).unwrap();
+    fs::write(folder.join("sa18"), vec![0u8; 146_028]).unwrap();
+    fs::write(folder.join("sar17"), "kept").unwrap();
+    fs::write(folder.join("notes"), "not sysstat's").unwrap();
+    lamp.install().unwrap();
+    assert!(!folder.join("sa18").exists(), "{:?}", lamp.said);
+    assert!(!folder.join("sar17").exists());
+    assert!(folder.join("notes").exists());
+    assert_eq!(sysstat_removal(&lamp).len(), 1, "{:?}", lamp.host.calls);
+    let said = "sysstat's kept file removed: /var/log/sysstat/sa18 (146028 bytes)";
+    assert!(lamp.said.iter().any(|line| line == said), "{:?}", lamp.said);
+    lamp.said.clear();
+    assert!(lamp.install().unwrap().changed.is_empty());
+    assert_eq!(sysstat_removal(&lamp).len(), 1);
+    assert!(
+        !lamp.said.iter().any(|line| line.contains("sysstat")),
+        "{:?}",
+        lamp.said
+    );
+    assert!(folder.join("notes").exists());
 }
 
 /// Cloud perception is on in the product (#6543's switch-on): lamp-seen

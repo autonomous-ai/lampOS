@@ -564,6 +564,20 @@ pub fn round(config: &Config, world: &mut World) -> Outcome {
     if let Outcome::UpToDate(sequence) = outcome {
         run.start_added(&[], sequence);
     }
+    // sysstat's kept files (#7254), as the boot run removes them: a lamp
+    // that takes a build by a round and never reboots gets the journal's
+    // room at its new updater's first round, up to date as above. None
+    // left runs nothing; journald is never touched.
+    let mut said = Vec::new();
+    let systemd = &mut *run.world.systemd;
+    let _ = crate::install::sysstat_kept_removed(
+        &config.root,
+        &mut |argv| systemd.systemd_run(argv),
+        &mut |line| said.push(line.to_owned()),
+    );
+    for line in &said {
+        run.say(line);
+    }
     if config.self_switch
         && let Outcome::Switched(sequence)
         | Outcome::Held { sequence, .. }
