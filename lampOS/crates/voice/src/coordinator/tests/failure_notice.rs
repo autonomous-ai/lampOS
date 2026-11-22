@@ -1501,3 +1501,200 @@ fn a_failed_turn_with_nothing_played_still_says_turn_lost() {
     .unwrap();
     assert!(selected(&silent, lamp_audio::notice::NoticeKind::TurnLost));
 }
+
+/// What one local-only turn of a long outage got: a line, by its kind and
+/// words, a sound, or nothing.
+#[derive(Debug, PartialEq, Eq, Clone)]
+enum Heard {
+    Line(lamp_audio::notice::NoticeKind, String),
+    Sigh,
+    Nothing,
+}
+
+/// A 10-minute outage with speech every 30 s (#8235), the internet's or, with
+/// `service`, the voice service's alone, each turn's notice taken by the
+/// speaker as it plays: what each of the 20 turns got.
+fn long_outage(catalog: &FailureNotices, service: bool) -> Vec<Heard> {
+    let mut outage = Outage::default();
+    let mut trace = SessionState::default();
+    (0..20)
+        .map(|_| {
+            let (mut owner, mut reply) = offline_reply(true);
+            reply.as_mut().unwrap().local_only = Some(notices::LocalOnly {
+                speech: true,
+                back: false,
+                service,
+                signed_out: false,
+            });
+            select_failure_notice_in(catalog, &mut reply, &None, &mut outage, &mut trace).unwrap();
+            let heard = match &reply.as_ref().unwrap().notice {
+                NoticeDelivery::Selected { recording, .. } => match recording.kind() {
+                    Some(kind) => Heard::Line(kind, recording.transcript().unwrap().to_owned()),
+                    None => Heard::Sigh,
+                },
+                _ => Heard::Nothing,
+            };
+            if heard != Heard::Nothing {
+                speaker_took(&mut owner, &mut reply);
+            }
+            outage.note_delivery(&reply);
+            heard
+        })
+        .collect()
+}
+
+/// An English lamp's speech cache with the outage's lines, kept when `warm`.
+fn outage_cache(dir: &std::path::Path, warm: bool) -> crate::say::tts_cache::TtsCache {
+    let cache = crate::say::tts_cache::TtsCache::new(
+        dir,
+        "Rachel",
+        crate::language::SPEECH_MODEL,
+        "en",
+        Box::new(|_: &str| Ok(vec![4_321_i16; 2_400])),
+    )
+    .keeping_outage_lines(true);
+    if warm {
+        cache.warm(&cache.warm_lines()).unwrap();
+    }
+    cache
+}
+
+/// #8235, `LAMP_OUTAGE_LINE_AGAIN=on` (the owner's call, 22 Nov 03:21:
+/// "reponse user everytime"): every speech turn of a long outage says the
+/// existing line of its cause, one run per cause: no internet, the
+/// release's "can't reach the internet"; the service alone, the second
+/// route's "thoughts are slow" from the speech cache.
+#[test]
+fn a_long_outage_says_the_line_of_its_cause_on_every_turn() {
+    use lamp_audio::notice::NoticeKind;
+    let dir = std::env::temp_dir().join(format!("lamp-notice-8235-out-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&dir);
+    let catalog = FailureNotices::synthetic_offline()
+        .line_again(true)
+        .with_english(outage_cache(&dir, true));
+    let internet = long_outage(&catalog, false);
+    let clip = "Synthetic PCM for tests; not a voice asset".to_owned();
+    assert_eq!(
+        internet,
+        vec![Heard::Line(NoticeKind::ProviderUnavailable, clip.clone()); 20]
+    );
+    let service = long_outage(&catalog, true);
+    assert_eq!(
+        service,
+        vec![
+            Heard::Line(
+                NoticeKind::VoiceServiceUnreachable,
+                crate::second_provider::DOWN_LINE.to_owned()
+            );
+            20
+        ]
+    );
+    // The down line not kept yet (a lamp started offline): the release's
+    // service line, every turn, rather than silence.
+    let unkept_dir = dir.join("unkept");
+    let unkept = FailureNotices::synthetic_offline()
+        .line_again(true)
+        .with_english(outage_cache(&unkept_dir, false));
+    assert_eq!(
+        long_outage(&unkept, true),
+        vec![Heard::Line(NoticeKind::VoiceServiceUnreachable, clip); 20]
+    );
+    // A sound let through (a cough) still gets nothing: no apology for it.
+    let (_owner, mut cough) = offline_reply(false);
+    select_failure_notice_in(
+        &catalog,
+        &mut cough,
+        &None,
+        &mut Outage::default(),
+        &mut SessionState::default(),
+    )
+    .unwrap();
+    assert!(matches!(
+        cough.as_ref().unwrap().notice,
+        NoticeDelivery::Unselected
+    ));
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
+/// The switch off (#8235): as #830 left it, the release's line of the cause
+/// once an outage and nothing after, the cache's lines unread.
+#[test]
+fn without_the_switch_a_long_outage_says_its_line_once_as_before() {
+    use lamp_audio::notice::NoticeKind;
+    let dir = std::env::temp_dir().join(format!("lamp-notice-8235-off-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&dir);
+    let catalog = FailureNotices::synthetic_offline().with_english(outage_cache(&dir, true));
+    let clip = "Synthetic PCM for tests; not a voice asset".to_owned();
+    for (service, kind) in [
+        (false, NoticeKind::ProviderUnavailable),
+        (true, NoticeKind::VoiceServiceUnreachable),
+    ] {
+        let heard = long_outage(&catalog, service);
+        assert_eq!(heard[0], Heard::Line(kind, clip.clone()));
+        assert!(heard[1..].iter().all(|h| *h == Heard::Nothing), "{heard:?}");
+    }
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
+/// #8235: a provider turn lost on an English lamp, whose release has no
+/// `turn_lost` file, says the line from the speech cache, rendered at start
+/// in the lamp's voice, once it is kept and with the switch; the sigh
+/// otherwise, as before.
+#[test]
+fn a_lost_provider_turn_says_turn_lost_from_the_speech_cache_with_the_switch() {
+    use crate::language;
+    use lamp_audio::notice::NoticeKind;
+    let dir = std::env::temp_dir().join(format!("lamp-notice-8235-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&dir);
+    let cache = || {
+        crate::say::tts_cache::TtsCache::new(
+            &dir,
+            "Rachel",
+            language::SPEECH_MODEL,
+            "en",
+            Box::new(|_: &str| Ok(vec![4_321_i16; 2_400])),
+        )
+        .keeping_outage_lines(true)
+    };
+    let lost = |catalog: &FailureNotices| {
+        let mut reply = failed_after(false, false);
+        let mut trace = SessionState::default();
+        select_failure_notice(catalog, &mut reply, &None, &mut trace).unwrap();
+        (reply, trace)
+    };
+    let first_sample = |reply: &Option<Reply>| match &reply.as_ref().unwrap().notice {
+        NoticeDelivery::Selected { recording, .. } => recording.first_sample(),
+        _ => panic!("a sound is chosen"),
+    };
+    // Not kept yet: the sigh stands in.
+    let unkept = FailureNotices::missing_with_sigh()
+        .line_again(true)
+        .with_english(cache());
+    let (reply, trace) = lost(&unkept);
+    assert!(!selected(&reply, NoticeKind::TurnLost));
+    assert!(trace.iter().any(|e| e["fallback_for"] == "no_directory"));
+    // Kept: its words, under its kind, named as the cache's.
+    let warmed = cache();
+    assert!(warmed.warm_lines().contains(&language::TURN_LOST));
+    warmed.warm(&warmed.warm_lines()).unwrap();
+    let kept = FailureNotices::missing_with_sigh()
+        .line_again(true)
+        .with_english(warmed);
+    let (reply, _) = lost(&kept);
+    assert!(selected(&reply, NoticeKind::TurnLost));
+    assert_eq!(first_sample(&reply), 4_321);
+    let evidence = reply.as_ref().unwrap().notice.evidence();
+    assert!(
+        evidence["wav_sha256"]
+            .as_str()
+            .unwrap()
+            .starts_with("speech-cache:"),
+        "{evidence}"
+    );
+    // The switch off: the sigh, the kept line unread.
+    let off = FailureNotices::missing_with_sigh().with_english(cache());
+    let (reply, trace) = lost(&off);
+    assert!(!selected(&reply, NoticeKind::TurnLost));
+    assert!(trace.iter().any(|e| e["fallback_for"] == "no_directory"));
+    let _ = std::fs::remove_dir_all(&dir);
+}

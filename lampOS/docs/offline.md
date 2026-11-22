@@ -297,6 +297,13 @@ internet, not the relay, and nothing in #830 depends on the relay.
   my voice service right now", never the internet's words and never "back
   online" after ([failure-notices.md](failure-notices.md), "Service down").
   Off unless set; silent until its recording is given.
+- **A long outage (`LAMP_OUTAGE_LINE_AGAIN=on`, #8235, off in the
+  product):** every speech turn of the outage says the existing line of its
+  cause, not only the first: no internet, "can't reach the internet"; the
+  service alone, the second route's "my thoughts are slow just now", so no
+  turn let through ends in nothing
+  ([failure-notices.md](failure-notices.md), "In a long outage, the line
+  every time").
 - **When the second route is the only voice** (`LAMP_VOICE_ROUTE=second`,
   #1844): it has no relay link of its own to watch, so its worker says its
   link down when a turn fails on the network and none of its services'
