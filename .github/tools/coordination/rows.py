@@ -77,9 +77,18 @@ def named_sha(body, pr):
 
 
 def failed(body):
-    """A row whose first 300 characters say FAIL or VOID and not PASS."""
+    """A row whose first 300 characters say FAIL or VOID, and whose row line doesn't say PASS.
+
+    22 Nov (#8180, train 1162): the PASS that clears a FAIL is read from the row's own line only (the line naming ROW or
+    "lamp row"), never from the rest of the first 300 characters. "ROW #8180 … build 15510: FAIL" followed by a
+    check's "`VERIFY PASS`" in the next paragraph was counted as a row and cut into a train. A row line that says
+    "PASS, the earlier FAIL was the kit" or "FAILED then PASS on a rerun" still counts."""
     head = body[:300]
-    return bool(FAILED.search(head)) and not PASSED.search(head)
+    if not FAILED.search(head):
+        return False
+    lines = head.split("\n")
+    line = next((l for l in lines if re.search(r"(?i)\b(?:lamp )?row\b", l)), lines[0])
+    return not PASSED.search(line)
 
 
 def unquoted(rx, body, end=None):
