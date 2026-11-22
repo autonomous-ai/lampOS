@@ -1133,12 +1133,15 @@ pub fn sysstat_kept_name(name: &str) -> bool {
 /// sysstat), nothing is removed. `lamp-region.service` may write only
 /// `/etc`, and no round changes that unit in a home, so the removal is one
 /// transient unit of its own (`systemd-run --wait --collect`), writing only
-/// that folder, naming the exact paths. Run at every boot by `lamp-update
-/// region`; once they are gone it finds nothing and runs nothing. Returns
-/// the paths it asked to remove.
+/// that folder, naming the exact paths, through `systemd_run`. Run at every
+/// boot by `lamp-update region`, by install, and by every round that
+/// applies (crate::round, #7254), so a lamp that updates with no reboot
+/// gets the room too; once they are gone it finds nothing and runs
+/// nothing. journald is never restarted or signalled. Returns the paths it
+/// asked to remove.
 pub fn sysstat_kept_removed(
     root: &Path,
-    host: &mut dyn Host,
+    systemd_run: &mut dyn FnMut(&[&str]) -> Result<(), String>,
     say: &mut dyn FnMut(&str),
 ) -> Result<Vec<String>, String> {
     if fs::symlink_metadata(on(root, SYSSTAT_ON_PATH)).is_ok() {
@@ -1197,7 +1200,7 @@ pub fn sysstat_kept_removed(
         "--",
     ];
     argv.extend(paths.iter().map(String::as_str));
-    if let Err(why) = host.refresh(&argv) {
+    if let Err(why) = systemd_run(&argv) {
         say(&format!("sysstat's kept files were not removed: {why}"));
     }
     Ok(paths)
@@ -2269,6 +2272,9 @@ pub fn install(
     if let Err(why) = sysstat_quiet(&config.root, host, &mut changed, say) {
         say(&format!("sysstat's drop-ins: {why}"));
     }
+    // What sysstat already kept (#7254), as the boot run and a round
+    // remove it; each file is said as it goes, and none left runs nothing.
+    let _ = sysstat_kept_removed(&config.root, &mut |argv| host.refresh(argv), say);
 
     let before = state.clone();
     let build = Build {

@@ -1161,8 +1161,9 @@ As root, on a lamp with the base image (`crates/update/src/install.rs`):
    `lamp-region.service` runs `update/current`'s `lamp-update region` at every
    boot, which writes them too. They reach it at its first boot after a
    round. **What sysstat already kept** (#7254's second part, the lead's yes on #7570;
-   `install::sysstat_kept_removed`, from `lamp-update region` only) goes at the
-   same boot run: every plain file named `sa` or `sar` and digits directly in
+   `install::sysstat_kept_removed`) goes at the same boot run, at install, and
+   at every round that applies (#7254's third part, [updates.md](updates.md),
+   "sysstat's kept files at a round"): every plain file named `sa` or `sar` and digits directly in
    `/var/log/sysstat` (`sa18`, `sar17`), each said first by name and size
    (`sysstat's kept file removed: /var/log/sysstat/sa18 (146028 bytes)`).
    A link, a folder or any other name is never followed or touched. With
@@ -1171,8 +1172,11 @@ As root, on a lamp with the base image (`crates/update/src/install.rs`):
    (`round::installed_units` passes over it), so the removal is one transient
    unit of its own: `systemd-run --wait --collect` with `ProtectSystem=strict`,
    `ReadWritePaths=/var/log/sysstat` and `NoNewPrivileges=yes`, running
-   `/bin/rm -f --` on exactly those paths. Once they are gone it finds nothing
-   and runs nothing.
+   `/bin/rm -f --` on exactly those paths. Install and a round run the same
+   function and the same unit (a round's sandbox cannot write `/var/log`
+   either). Once they are gone it finds nothing and runs nothing, so the
+   three runs never undo or repeat one another. The journal is never
+   restarted or signalled: freeing the room is all it does.
 7. Records the build and the folders it made in
    `/var/lib/lampos-update/state.json`, as a round does, under the same
    lock, before systemd is asked anything. It reads them as a round does

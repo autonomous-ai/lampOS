@@ -5,7 +5,7 @@
 use lamp_update::{
     Config, Outcome, World,
     fetch::Web,
-    install::{self, Install, System},
+    install::{self, Host, Install, System},
     judge::UnitState,
     manifest, own, publish, round,
     world::{BusEars, Deaf, Ears, Monotonic, Statvfs, Systemctl, Systemd},
@@ -439,9 +439,11 @@ fn region(options: &BTreeMap<String, String>) -> Result<(), String> {
     // home runs from `update/current` at every boot.
     let sysstat = install::sysstat_quiet(Path::new("/"), &mut System, &mut changed, &mut say);
     // What sysstat already kept (#7254 part 2), at every boot, as the
-    // drop-ins are: a lamp in a home gets this through this unit only.
-    // Each file is said by name and size as it goes, so nothing more here.
-    let kept = install::sysstat_kept_removed(Path::new("/"), &mut System, &mut say).map(|_| ());
+    // drop-ins are; a round runs the same removal too (crate::round), for a
+    // lamp that updates with no reboot. Each file is said by name and size as it goes, so nothing more here.
+    let kept =
+        install::sysstat_kept_removed(Path::new("/"), &mut |argv| System.refresh(argv), &mut say)
+            .map(|_| ());
     for line in &changed {
         println!("{line}");
     }

@@ -2473,7 +2473,8 @@ and no unit of this lamp starts through it`), so a lamp that took the
 region's build through a round refused every later build. That unit's `lamp-update region`, from `update/current` at every boot, is
 also how install's sysstat drop-ins (#7254, [install.md](install.md),
 "sysstat's collection off") reach a lamp in a home: a round never writes
-install's side files itself. A part new to the
+install's side files itself. sysstat's kept files are the exception: a
+round removes them too ("sysstat's kept files at a round", below). A part new to the
 lamp is installed afresh in the folder of its
 binary's SHA-256, as a switch installs a build, and its `current` link is
 made to name it. A part's template, socket or timer is added when its part
@@ -2561,6 +2562,25 @@ managed updater lacks some (the waking face, the Wi-Fi restore and
 recovery among them), and gets them enabled for its next start. A stop of
 an added unit systemd never loaded (the switch cut before its reload) is
 taken as done. The tests use the round's fake systemd.
+
+### sysstat's kept files at a round (#7254)
+
+Most lamps in homes take a build by a round and never reboot for it, so
+the boot run of `lamp-update region` that removes sysstat's kept files
+([install.md](install.md), "sysstat's collection off") left them on the
+RAM log disk until the next power cut, and the journal stayed short. Every
+round that applies (not a dry round, and not one waiting for lamp-update's
+own switch) now runs the same `install::sysstat_kept_removed` after its
+build work, on an up-to-date round too: as with lamp-control above, the
+new updater's first round finds the lamp up to date, so the files go
+within one `--every-s` of the update. The round's sandbox cannot write
+`/var/log`, so it asks systemd for the same transient unit the boot run
+does (`Systemd::systemd_run`, which runs only `systemd-run`). Each file is
+said by name and size as it goes; once none is left the round finds
+nothing and runs nothing, so a round, install and the boot run never
+repeat one another. With `/etc/lampOS/sysstat-on`, nothing is removed.
+journald is never restarted or signalled. The tests use the round's fake
+systemd; not shown yet on a lamp.
 
 ### Settings and tmpfiles (`LAMP_UPDATE_APPLY`)
 
