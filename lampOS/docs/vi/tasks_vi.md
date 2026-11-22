@@ -1790,9 +1790,11 @@ sang runner chung của #6510 bước 2 mà không cần luật mới.
     chối khi nạp (`grants_of` của lamp-skills), khi tải lên
     (`upload_agent::files`, `capped`), trong lời đồng ý của lamp-control
     (`grants_ok`), trong lần giao của lamp-tasks (`HandOver::check`) hay lúc
-    tạo (`made_skill::code_held`, `make_no_cannot::covered`). Khi `air` đi
-    cùng `net`, lời đồng ý vẫn nói rõ ("…, so its air readings can go to the
-    internet", `skill_task_yes::AIR_BESIDE_NET`).
+    tạo (`made_skill::code_held`, `make_no_cannot::covered`). Khi đi cùng
+    `net`, lời đồng ý nói rõ điều gì có thể đi ra internet, mỗi quyền một vế
+    ("…, so what the camera sees and its notes can go to the internet",
+    `skill_task_yes::BESIDE_NET`; P2 của Reviewer-lead trên #7901), kể cả
+    `air` ("…, so its air readings can go to the internet").
   - Lần chạy có `net` chỉ thấy thư mục kỹ năng của chính nó, không bao giờ
     thấy thư mục của kỹ năng khác: lamp-tasks ghi tên thư mục đó cạnh socket
     lối ra của lần chạy, trong thư mục riêng 0700 của nó,
