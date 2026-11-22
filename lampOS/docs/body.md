@@ -1597,6 +1597,12 @@ the voice, Expression and lamp-skills (each with `energy_in::EnergyIn`, the body
   | dance_waltz | shoulder: 2, 3, 4; elbow: 2, 3, 4; base yaw: 4 |
   | dance_jazz | head pitch: 2, 3, 4; base yaw: 2, 3, 4; elbow: 3, 4 |
 
+  On ten of those joints levels 2 to 4 sit just below level 1 (V2's (A) on #8307): V1 at level 5
+  moves the joint less than the clip itself does, and the cap carries that down while level 1
+  stays the clip. They are curious's base yaw, happy's shoulder, caring's elbow, surprised's head
+  pitch, confused's head pitch and base yaw, scanning's head roll, dance_hype's shoulder and
+  dance_waltz's shoulder and elbow (pinned in the same test; only a joint capped at level 2 may).
+
   Level 5 on the host
   (`energy::level_five_plays_each_clip_for_all_of_its_v1_recording`; played seconds at the 1.5
   pace, each step stretched under the servo's speed):
