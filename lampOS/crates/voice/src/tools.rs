@@ -4665,6 +4665,23 @@ mod tests {
                 true,
             ),
             ("Pasta.", Some("Set a timer for ten minutes."), &timer, true),
+            ("Ten minutes.", Some("Set a timer."), &timer, true),
+            // A fresh ask carries its own length (Fifth's HOLD on #8274):
+            // "It rings at 4:09. Anything else?" lends the old one nothing.
+            (
+                "Set another timer.",
+                Some("Set a timer for ten minutes."),
+                &timer,
+                false,
+            ),
+            (
+                "Set a timer for.",
+                Some("What's five plus five?"),
+                &timer,
+                false,
+            ),
+            // An unrelated question's number lends nothing either.
+            ("Pasta.", Some("What's five plus five?"), &timer, false),
             (
                 "Take my pills.",
                 Some("Remind me tomorrow."),
