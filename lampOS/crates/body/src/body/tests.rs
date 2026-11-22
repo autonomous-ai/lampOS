@@ -4225,6 +4225,7 @@ fn gesture_run_full(
                 pose: None,
                 unplug: false,
                 held_by_test: false,
+                missed_by_test: 0,
                 held: looking.is_some_and(|(from, _)| time.get() >= from),
                 aim: looking.map(|(_, yaw)| [yaw, 0.0]),
                 limp: false,
@@ -4359,6 +4360,7 @@ fn expression_run_with(
             pose: None,
             unplug: false,
             held_by_test: false,
+            missed_by_test: 0,
             held: false,
             aim: None,
             limp: false,
@@ -4534,6 +4536,7 @@ fn speaking_run_with(
             pose: None,
             unplug: false,
             held_by_test: false,
+            missed_by_test: 0,
             held: false,
             aim: None,
             limp: false,
@@ -5252,6 +5255,7 @@ fn rest_glances_watched(
             pose: None,
             unplug: false,
             held_by_test: false,
+            missed_by_test: 0,
             held: false,
             aim: None,
             limp: false,
@@ -6333,6 +6337,7 @@ fn a_lamp_is_not_stood_up_farther_back_than_v1s_line() {
             pose: None,
             unplug: false,
             held_by_test: false,
+            missed_by_test: 0,
             held: false,
             aim: None,
             limp: false,
@@ -6409,6 +6414,7 @@ fn a_gesture_waits_for_a_lamp_that_is_rising_and_is_forgotten_by_one_that_is_not
             pose: None,
             unplug: false,
             held_by_test: false,
+            missed_by_test: 0,
             held: false,
             aim: None,
             limp: false,
@@ -6503,6 +6509,7 @@ fn the_heads_pitch_is_never_asked_under_its_floor_whatever_adds_up() {
                 pose: None,
                 unplug: false,
                 held_by_test: false,
+                missed_by_test: 0,
                 held: false,
                 aim: None,
                 limp: false,
@@ -7283,6 +7290,7 @@ fn it_stands_up_for_somebody_in_front_of_it_and_stays_up_while_they_are_there() 
                     pose: None,
                     unplug: false,
                     held_by_test: false,
+                    missed_by_test: 0,
                     held: false,
                     aim: None,
                     limp: false,
@@ -7372,6 +7380,7 @@ fn paused_with_somebody_still_in_front_of_it_a_standing_lamp_folds() {
                 pose: None,
                 unplug: false,
                 held_by_test: false,
+                missed_by_test: 0,
                 held: false,
                 aim: None,
                 limp: false,
@@ -7468,6 +7477,7 @@ fn put_to_sleep_by_the_head_with_somebody_in_front_of_it_a_standing_lamp_folds_n
                 woken: false,
                 unplug: false,
                 held_by_test: false,
+                missed_by_test: 0,
                 held: false,
                 aim: None,
                 limp: false,
@@ -10472,6 +10482,7 @@ fn called_run(
                 pose: None,
                 unplug: false,
                 held_by_test: false,
+                missed_by_test: 0,
                 held: false,
                 aim: None,
                 limp: false,
@@ -11118,6 +11129,93 @@ fn a_lasting_miss_ends_a_playing_gesture_and_says_so() {
             ("nod", "ended: 5 servo reads in a row were missed"),
         ]
     );
+}
+
+/// A nod asked at 1 s of a folded lamp at rest, with `count` servo reads
+/// missed on purpose (`Asked::missed_by_test`, what `lamp-body --miss-from`
+/// asks) asked once, at `at`; and when the nod played, first and last.
+fn nod_with_test_misses(count: u8, at: Duration) -> (Fates, Duration, Duration) {
+    let mut nod = once(Duration::from_secs(1), false);
+    let mut asked = false;
+    let run = skill_run(
+        14,
+        standing(100, 5),
+        gesture_limits(),
+        |_| {},
+        || Some((Mood::Resting, 0)),
+        move |now| {
+            let due = !asked && now >= at;
+            asked |= due;
+            Asked {
+                missed_by_test: if due { count } else { 0 },
+                ..nod(now)
+            }
+        },
+    );
+    let mut played = run.2.iter().filter(|s| s.2 == Some("nod")).map(|s| s.0);
+    let first = played.next().unwrap();
+    let last = played.next_back().unwrap();
+    (run, first, last)
+}
+
+/// #8266: one or three reads missed on purpose in the middle of a gesture
+/// (`--miss-from`, so that a lamp's row need not wait for the wire) run the
+/// wire's own miss path, and the gesture plays to its length and is over
+/// with no fate but its taking.
+#[test]
+fn one_or_three_reads_missed_on_purpose_leave_a_gesture_playing_to_its_end() {
+    let (_, began, ended) = nod_with_silence(None);
+    let middle = began + (ended - began) / 2;
+    for count in [1, 3] {
+        let ((report, fates, _), first, last) = nod_with_test_misses(count, middle);
+        assert_eq!(report.stop, Stop::Cancelled, "{count}: {report:?}");
+        assert_eq!(report.missed_reads, u64::from(count), "{report:?}");
+        assert_eq!(first, began, "{count}");
+        assert!(
+            last + Duration::from_millis(60) >= ended,
+            "{count}: cut at {:?} of {:?}",
+            last - first,
+            ended - began
+        );
+        assert_eq!(
+            (report.gestures, report.gestures_dropped),
+            (1, 0),
+            "{count}"
+        );
+        assert_eq!(fates, [("nod", "taken: it was folded and stood up for it")]);
+    }
+}
+
+/// #8266: five reads missed on purpose in a row end the gesture playing,
+/// and say so, as five missed on the wire do.
+#[test]
+fn five_reads_missed_on_purpose_end_a_playing_gesture_and_say_so() {
+    let (_, began, ended) = nod_with_silence(None);
+    let middle = began + (ended - began) / 2;
+    let ((report, fates, _), _, last) = nod_with_test_misses(5, middle);
+    assert_eq!(report.stop, Stop::Cancelled, "{report:?}");
+    assert_eq!(report.missed_reads, 5, "{report:?}");
+    assert!(last < ended, "{last:?} of {ended:?}");
+    assert_eq!((report.gestures, report.gestures_dropped), (1, 1));
+    assert_eq!(
+        fates,
+        [
+            ("nod", "taken: it was folded and stood up for it"),
+            ("nod", GESTURE_BLIND_FATE),
+        ]
+    );
+}
+
+/// Asked nothing (every product unit: no `--miss-from`), a run is the same
+/// step for step as one whose test input never asks a miss.
+#[test]
+fn no_reads_missed_on_purpose_unless_asked() {
+    let (baseline, began, ended) = nod_with_silence(None);
+    let (asked_none, first, last) = nod_with_test_misses(0, began);
+    assert_eq!((first, last), (began, ended));
+    assert_eq!(asked_none.0.missed_reads, 0);
+    assert_eq!(asked_none.1, baseline.1);
+    assert_eq!(asked_none.2, baseline.2);
 }
 
 /// A skill's gesture asked of a folded lamp at rest (lamp-4ace, 15:16 on
@@ -15605,6 +15703,7 @@ fn held_from_test_input_run(
             let asked = Asked {
                 gesture: due.then_some(&crate::clips::STRETCHING),
                 held_by_test: held,
+                missed_by_test: 0,
                 held: false,
                 aim: None,
                 limp: false,
@@ -16551,6 +16650,7 @@ fn unplug_never_attests_an_arm_stuck_away_from_its_fold() {
         || Asked {
             unplug: true,
             held_by_test: false,
+            missed_by_test: 0,
             held: false,
             aim: None,
             limp: false,
@@ -16584,6 +16684,7 @@ fn unplug_attests_a_fold_whose_elbow_rests_a_few_counts_off() {
         || Asked {
             unplug: true,
             held_by_test: false,
+            missed_by_test: 0,
             held: false,
             aim: None,
             limp: false,
@@ -16625,6 +16726,7 @@ fn unplug_brings_a_base_looking_aside_home_before_it_attests() {
                 Asked {
                     unplug: true,
                     held_by_test: false,
+                    missed_by_test: 0,
                     held: false,
                     aim: None,
                     limp: false,
@@ -16688,6 +16790,7 @@ fn unplug_ready_stays_ready_through_a_second_turn() {
             Asked {
                 unplug: true,
                 held_by_test: false,
+                missed_by_test: 0,
                 held: false,
                 aim: None,
                 limp: false,
@@ -16745,6 +16848,7 @@ fn unplug_ready_survives_a_bad_read() {
         || Asked {
             unplug: true,
             held_by_test: false,
+            missed_by_test: 0,
             held: false,
             aim: None,
             limp: false,
@@ -16886,6 +16990,7 @@ fn unplug_never_attests_a_shifted_runtime_home_as_the_configured_fold() {
         || Asked {
             unplug: true,
             held_by_test: false,
+            missed_by_test: 0,
             held: false,
             aim: None,
             limp: false,
@@ -16945,6 +17050,7 @@ fn unplug_released_stands_through_the_ordinary_rise_unless_paused() {
                 Asked {
                     unplug: latched,
                     held_by_test: false,
+                    missed_by_test: 0,
                     held: false,
                     aim: None,
                     limp: false,

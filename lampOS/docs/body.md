@@ -2326,7 +2326,9 @@ What the body does with the request:
   stops on a wire failing for half a second (25 steps, above). Until 22
   November one missed read ended it at once as a plain `over`: on
   lamp-52e6 a level 5 waltz played 4.78 s of its 8.40 s with
-  `missed_reads=3` (row-8201b).
+  `missed_reads=3` (row-8201b). A lamp's row need not wait for the wire
+  to miss: `--miss-from` (a test input, under "Test input: --miss-from")
+  misses reads on purpose at this same point.
 
   The same line is said at most once in five seconds, and the next time
   with how many like it were held back (`(N more like it before this)`), so
@@ -2940,6 +2942,7 @@ four rows, "Without it" is what `off` leaves.
 | `--lease-socket ABSOLUTE_PATH` | lamp-control may hold the body for up to 30 s at a time, renewed, while the lamp's own life stands back (see "Held by lamp-control") | no lease: nobody can ask the lamp's own life to stand back | a short absolute path |
 | `--lease-holder-uid N` | with `--lease-socket`: a caller running as user id N (above 0) may hold the body too, whatever its unit; for the virtual lamp only | only `lamp-control.service` as `lampos`, or root | a user id above 0, given once, and only with `--lease-socket` |
 | `--hold-from ABSOLUTE_FILE` | a test input, for tests on a lamp only: while the file's first word is `held`, the head's pitch is taken as held by a hand (see "Test input: --hold-from" under "Giving way to a hand") | off: only a joint that gave way is a hand. No product unit passes it | an absolute file; `held`, or anything else for no hand |
+| `--miss-from ABSOLUTE_FILE` | a test input, for tests on a lamp only: each write of the file whose first words are `miss N` (N from 1 to 25) makes the next N reads of the servos fail where a read with no reply fails (see "Test input: --miss-from" under "Giving way to a hand") | off: only the wire misses a read. No product unit passes it | an absolute file; `miss N`, or anything else for no miss |
 | `--head-stall-load LOAD` | the head pitch's stall bound, this lamp's own (see "Giving way to a hand": a head that holds more than 100 to stand) | 100 | 100 to 230 |
 | `--stand-roll N` | the head's tilt reach once the lamp has stood up, where that is more than the roll of `--reach` | no more than folded | 200 |
 | `--pitch-window LOW,HIGH` | the window the head's pitch goal is kept in while the head is beside the base, this lamp's own; checked at start against the head pitch servo's own limits (registers 9 and 11), and the run refused with nothing written if it is not inside them | lamp-4ace's, 1,740 to 2,030, and the servo's limits are not read | LOW at least 1,670 (the head's floor) and under HIGH, and around `--home`'s pitch |
@@ -3808,7 +3811,7 @@ been made.
 `--hold-from ABSOLUTE_FILE` is for tests on a lamp only, so a row a hand
 on the head has shown once can run again with no person there. No product
 unit passes it, and a test checks every file under `deploy/`
-(`nothing_deployed_passes_hold_from`). The file's first word is read at
+(`nothing_deployed_passes_a_test_flag`). The file's first word is read at
 most every 100 ms (`hold_in::LOOK_EVERY`, a small read, never waited on):
 `held` is the head's pitch held by a hand; `free`, any other word, an
 empty file or none is no hand, and a file removed is a hand let go.
@@ -3838,6 +3841,36 @@ search and the voice's, can be run from it. Tests:
 `a_skill_gesture_playing_ends_by_a_hand_from_the_test_input_eased_out`,
 `a_skill_gesture_still_waiting_is_dropped_by_a_hand_from_the_test_input`,
 and `hold_in`'s own for the file.
+
+### Test input: --miss-from (#8266)
+
+`--miss-from ABSOLUTE_FILE` is for tests on a lamp only, so a row about a
+gesture that meets a missed servo read need not wait for the wire to miss
+one (0 in a night's run on lamp-52e6, 3 in 17,124 steps in another). No
+product unit passes it, and a test checks every file under `deploy/` and
+every lamp unit anywhere else in lampOS (`nothing_deployed_passes_a_test_flag`).
+The file is read at most every 100 ms (`hold_in::LOOK_EVERY`, a small
+read, never waited on). Each write of it whose first words are `miss N`,
+N from 1 to 25, asks once: the body's next N reads of the servos in its
+run fail at the point a read with no reply fails (`Asked::missed_by_test`),
+so what follows is the wire's own miss path and nothing else changes: no
+goal, torque or motion of its own. A write is told from the last by its
+time or its text, so the same text written again within the clock's tick
+is not seen; write another, or remove the file first. Any other text, an
+empty file or none asks nothing, and a file already there at start asks
+nothing, so a body started again does not miss for an old test. An ask
+while some are still to miss keeps the larger count. Per the rules above,
+1 to 4 hold a playing gesture's frame and it plays on to its `over`; 5 or
+more end it as `ended: 5 servo reads in a row were missed`; 25 end the
+run as a wire silent for half a second does.
+
+The journal says at start `lamp-body: missed reads from a test input:
+FILE (--miss-from, a test flag no product unit passes)`, then `lamp-body:
+N servo reads to miss, from a test input (--miss-from)` for each write it
+takes. Tests:
+`one_or_three_reads_missed_on_purpose_leave_a_gesture_playing_to_its_end`,
+`five_reads_missed_on_purpose_end_a_playing_gesture_and_say_so`,
+`no_reads_missed_on_purpose_unless_asked`, and `miss_in`'s own for the file.
 
 ## Letting go under overload
 
