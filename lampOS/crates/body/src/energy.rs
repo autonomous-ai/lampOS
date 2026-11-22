@@ -1498,7 +1498,18 @@ mod tests {
             }
         }
         // Clip and joint where level 2 sits below level 1 (pinned, so a change is said).
-        let pinned_below_one: [&str; 0] = [];
+        let pinned_below_one: [&str; 10] = [
+            "curious 2",
+            "happy 3",
+            "caring 4",
+            "surprised 0",
+            "confused 0",
+            "confused 2",
+            "scanning 1",
+            "dance_hype 3",
+            "dance_waltz 3",
+            "dance_waltz 4",
+        ];
         assert_eq!(below_one, pinned_below_one);
     }
 }
