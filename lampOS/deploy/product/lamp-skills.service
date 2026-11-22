@@ -141,6 +141,8 @@ Environment=LAMP_SKILLS_DEV_DIR=/var/lib/lampOS/skills-dev
 Environment=LAMP_REQUESTED_AUDIO=on
 # LAMP_YAWN_SOONER: its why and rules are its row in docs/switches.md (#3709, #6543).
 Environment=LAMP_YAWN_SOONER=on
+# LAMP_DESK_TIME: its why and rules are its row in docs/switches.md (#7694). The same line in lamp-voice.
+Environment=LAMP_DESK_TIME=on
 ExecStart=/opt/lampOS/skills/current/lamp-skills --dir /var/lib/lampOS/skills --bus-root /run/lampos-bus --gaze-socket /run/lampos-body/gaze.sock --mood-socket /run/lampos-body/mood.sock --actions-socket /run/lampos-actions/call.sock --say-socket /run/lampos-say/say.sock --tools-dir /run/lampos-skills --state-dir /var/lib/lampos-skills-state --zone system
 Restart=on-failure
 RestartSec=5s
