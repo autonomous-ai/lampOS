@@ -7170,9 +7170,6 @@ fn run_on_dyn<P: PortIo, R: Runtime>(
     let mut pinned = [false; 3];
     let mut misses = 0u8;
     let mut unsent = 0u8;
-    // Reads still to miss on purpose, asked by a test input
-    // (`Asked::missed_by_test`, `lamp-body --miss-from`).
-    let mut test_misses = 0u8;
     let mut leaving: Option<Duration> = None;
     // What the run ends on once a lamp leaving for it is down: an arm too
     // warm, or unreadable, is folded first and let go folded.
@@ -7266,7 +7263,6 @@ fn run_on_dyn<P: PortIo, R: Runtime>(
         }
         // What its eyes saw and a gesture asked of it, since the last step.
         let (mut asked_now, asked_by, asked_source) = asked();
-        test_misses = test_misses.max(asked_now.missed_by_test);
         // A new energy level only once settled, so that a cap never drops
         // under a joint still moving: no gesture playing or waiting, the
         // pose's filter still and the arm up or down.
@@ -9167,15 +9163,7 @@ fn run_on_dyn<P: PortIo, R: Runtime>(
             }
         }
         let bad_before = (bus.bad_reads, bus.bad_temperatures);
-        // A read missed on purpose (`--miss-from`) fails here, as one with no
-        // reply would, so that what follows is the wire's own miss path.
-        let read = if test_misses > 0 {
-            test_misses -= 1;
-            Err("a read missed on purpose (--miss-from, a test input)".to_string())
-        } else {
-            bus.samples()
-        };
-        let samples = match read {
+        let samples = match bus.samples() {
             Ok(samples) => {
                 misses = 0;
                 samples
