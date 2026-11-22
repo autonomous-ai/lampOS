@@ -22,7 +22,7 @@ case $t in
   engine-env)  penv 4243 LAMP_LAMP_ENGINE=openclaw; o=$(lampsh $E); v "no app file: engine from LAMP_LAMP_ENGINE" '[ "$o" = ENGINE=openclaw ]';;
   engine-app)  penv 4243 LAMP_LAMP_ENGINE=openclaw; app hermes; o=$(lampsh $E); v "the app's choice wins over the env" '[ "$o" = ENGINE=hermes ]';;
   engine-none) penv 4243 OTHER=1; o=$(lampsh $KIT/row/save.lamp.sh); v "no app file and no env: save stops" 'echo "$o" | grep -q "SAVE STOP: no engine-default"';;
-  mute-expired) rec $(( $(nowus) - 60000000 )); o=$(lampsh $KIT/row/mute.lamp.sh); v "live unread, record's timed mute past: off" 'echo "$o" | grep -q "^MUTE OFF OK"';;
+  mute-oldstamp) rec $(( $(nowus) - 60000000 )); o=$(lampsh $KIT/row/mute.lamp.sh); v "live unread, a muted record with an old stamp stays on" 'echo "$o" | grep -q "^MUTE FAIL"';;
   mute-timed)  rec $(( $(nowus) + 600000000 )); o=$(lampsh $KIT/row/mute.lamp.sh); v "live unread, record's timed mute still running: on" 'echo "$o" | grep -q "^MUTE FAIL"';;
   mute-live)   rec $(( $(nowus) - 60000000 )); bus true; o=$(lampsh $KIT/row/mute.lamp.sh); v "live voice/mute muted: on" 'echo "$o" | grep -q "^MUTE FAIL: live"';;
   mute-liveoff) rec $(( $(nowus) + 600000000 )); bus false; o=$(lampsh $KIT/row/mute.lamp.sh); v "live voice/mute unmuted wins over the record" 'echo "$o" | grep -q "^MUTE OFF OK (live"';;

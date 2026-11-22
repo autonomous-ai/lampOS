@@ -3,7 +3,7 @@
 This kit runs the legs half of #8180's ROW from the runner's Mac. It does not install, round or put back a build. You
 put #8180's build on the lamp before you start, and you put the lamp back to stable after the kit ends.
 
-Nothing here has run on a lamp yet. It has only been mocked: `mock/row/run-all.sh` runs 61 cases: every leg's PASS, FAIL and
+Nothing here has run on a lamp yet. It has only been mocked: `mock/row/run-all.sh` runs 73 cases: every leg's PASS, FAIL and
 VOID cases, plus run.sh itself, with stub ssh, scp, afplay and lock.
 
 ## Prerequisites
