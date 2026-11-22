@@ -200,6 +200,11 @@ Environment=LAMP_CUT_IN_WORDLESS_ASKS=on
 # LAMP_CUT_IN_WORDLESS_RESUMES: #7413; a busy room's wordless cut goes on from the sentence it cut, a second says
 # "Oops, cut off again", a third pauses. Needs LAMP_CUT_IN_WORDLESS_ASKS above. Its rules are its row in docs/switches.md.
 Environment=LAMP_CUT_IN_WORDLESS_RESUMES=on
+# LAMP_CUT_IN_LATE_YIELD and LAMP_CUT_IN_STALE_ONSET: #7413; a question over the lamp's story heard late, or over
+# a pause in it, stops the story. Need --turn-taking duplex above. Their rules are their rows in docs/switches.md.
+# On after row-7413q on lamp-52e6, the first builder's DEFAULT-ON given on #7413.
+Environment=LAMP_CUT_IN_LATE_YIELD=on
+Environment=LAMP_CUT_IN_STALE_ONSET=on
 Environment=LAMP_SECOND_SAID_ONCE=on
 # A light, volume or timer turn answered at once with the acting part's own result, a single ask ending there, in
 # English only (#2135, #4700): on lamp-4ace on 31 Oct (d06603109f) off and on alternating, timers and reminders 2.06-2.20 s
