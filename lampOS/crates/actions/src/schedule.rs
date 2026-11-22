@@ -151,12 +151,15 @@ pub fn asking_how_long(mut catalog: Vec<Function>, on: bool) -> Vec<Function> {
 }
 
 /// `set_timer`'s description with [`ASKS_HOW_LONG_SWITCH`] on: off's, and
-/// to ask for a length the words did not give.
-const SET_TIMER_ASKS: &str = "Set a timer or a relative reminder only when asked. For a duration from now, such as 'in two minutes', 'in ten minutes', or 'in an hour', use this tool with the requested label and whole seconds (120, 600, or 3600 respectively); never round to a clock time. If the person's words give no length, never choose one: set nothing and ask only, in a few words, 'For how long?', then set it from their answer. Confirm the returned time only after durable success. If the outcome is unknown, list current reminders before asking again. If they change the time of one already set, cancel that one before setting the new one; never leave both.";
+/// to ask for a length the words did not give. When it asks what a timer is
+/// for, its words are fixed and name the timer, so the voice's reply lends
+/// the asked line's length (`reminders::asked_gave_when` in lamp-voice; the
+/// Reviewer-lead's P2 on #8274).
+const SET_TIMER_ASKS: &str = "Set a timer or a relative reminder only when asked. For a duration from now, such as 'in two minutes', 'in ten minutes', or 'in an hour', use this tool with the requested label and whole seconds (120, 600, or 3600 respectively); never round to a clock time. If the person's words give no length, never choose one: set nothing and ask only, in a few words, 'For how long?', then set it from their answer. If you ask what it is for, ask only 'What's the timer for?'. Confirm the returned time only after durable success. If the outcome is unknown, list current reminders before asking again. If they change the time of one already set, cancel that one before setting the new one; never leave both.";
 
 /// `set_reminder`'s with the switch on: off's, and to ask for a time the
-/// words did not give.
-const SET_REMINDER_ASKS: &str = "Set one reminder at a requested local clock time, such as 'at nine tomorrow morning'. For relative times from now, use set_timer with the requested label and whole seconds instead; do not round to HH:MM. If the person's words give no time, never choose one: set nothing and ask only, in a few words, 'What time?', then set it from their answer. Ask for missing or ambiguous intent; never calculate a Unix timestamp.";
+/// words did not give, and what it is for in fixed words, as `set_timer`'s.
+const SET_REMINDER_ASKS: &str = "Set one reminder at a requested local clock time, such as 'at nine tomorrow morning'. For relative times from now, use set_timer with the requested label and whole seconds instead; do not round to HH:MM. If the person's words give no time, never choose one: set nothing and ask only, in a few words, 'What time?', then set it from their answer. Ask for missing or ambiguous intent; to ask what it is for, ask only 'What should I remind you about?'. Never calculate a Unix timestamp.";
 
 /// [`catalog`] with [`EVERY_SWITCH`] on (`every`) or off: off, it is the
 /// catalog as it was, byte for byte.

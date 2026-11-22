@@ -117,7 +117,9 @@ the [lamp follow-up](schedule.md#relative-time-follow-up-on-the-lamp).
 With `LAMP_TIMER_ASKS_HOW_LONG=on` in lamp-actions' unit (#8182, off unless
 set), `set_timer`'s description also says that when the person's words give
 no length it sets nothing and asks only "For how long?", and `set_reminder`'s
-the same with "What time?" (`schedule::asking_how_long`); the voice's second
+the same with "What time?" (`schedule::asking_how_long`), and that a question
+about what it is for is asked only as "What's the timer for?" or "What should
+I remind you about?"; the voice's second
 route refuses such a call by the heard line ([schedule.md](schedule.md#a-length-or-time-not-heard-is-asked-lamp_timer_asks_how_long)).
 
 Labels contain 1–300 UTF-8 bytes, nonblank, with no control characters.
