@@ -29,6 +29,21 @@ updbusy(){ w=; [ -e $UF/journal.json ] && w="$w journal.json"; [ -e $UF/self.jso
 # (lamp-tasks', then lamp-voice's). Empty only when both are missing.
 engine(){ local e u; e=$(grep -oE '"engine" *: *"[a-z]+"' $EF 2>/dev/null | grep -oE '"[a-z]+"$' | tr -d '"')
   for u in lamp-tasks lamp-voice; do [ -n "$e" ] && break; e=$(envval "$(pid $u)" LAMP_LAMP_ENGINE); done; echo "$e"; }
+# The Google mail links lamp-services holds (leg D's mail make needs one): its store, /var/lib/lampos-services/<code>.json
+# (crates/services/src/store.rs:20 DIR, :292 path, :319 load: the file's connector is its code), for gmail and
+# gmail-app (catalog.rs:70, :92); one is linked unless store.rs:358 list() would call it expired (refused, or past its
+# expires_at with no refresh token). Prints "google <code ...>" for the usable ones, or "google none"; never a secret.
+SVC=/var/lib/lampos-services
+linked(){ python3 -I -c 'import json,sys,time,os
+ok=[]; seen=[]
+for c in ("gmail","gmail-app"):
+    p=os.path.join(sys.argv[1],c+".json")
+    try: e=json.load(open(p))
+    except Exception: continue
+    if e.get("connector")!=c: continue
+    x=int(e.get("expires_at") or 0); gone=bool(e.get("refused")) or (x!=0 and x<time.time() and not e.get("refresh_token"))
+    seen.append(c+("=expired" if gone else "")); ok+=[] if gone else [c]
+print("google %s (files: %s)" % (" ".join(ok) or "none", " ".join(seen) or "none"))' $SVC; }
 skillnames(){ ls -1 $SK 2>/dev/null | LC_ALL=C sort; }
 madenames(){ python3 -I -c 'import json,sys
 try: print("\n".join(e.get("name","") for e in json.load(open(sys.argv[1]))))

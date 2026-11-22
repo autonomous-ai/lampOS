@@ -5,10 +5,11 @@ set -u; M=$(cd "$(dirname "$0")" && pwd); KIT=$(cd $M/../.. && pwd); c=$1; FXD=$
 W=$M/work/$c; rm -rf $W; mkdir -p $W/state $W/clips
 cp -R $KIT/row $W/row; rm -rf $W/row/logs; mkdir -p $W/row/logs
 printf 'J [lamp-tasks] each run gets its own cgroup under /sys/fs/cgroup/system.slice/lamp-tasks.service: memory.max 512M, cpu.max 100000 100000, pids.max 72\nCGROUP OK serve in its own leaf %s\nVERIFY PASS\n' "'serve'" > $W/row/logs/verify.txt
-echo READY > $W/row/logs/ready.txt; echo "SAVED OK" > $W/row/logs/save.txt; echo "MUTE LIFTED OK after 4s" > $W/row/logs/micon.txt
+echo READY > $W/row/logs/ready.txt; echo "MUTE LIFTED OK after 4s" > $W/row/logs/micon.txt
 for x in DAYS DAYSASK PRICE PRICEASK PROBE MAIL MAILASK LONGMAKE READY YES2 LOOK LOOKASK SLOW FORK NAMED; do : > $W/clips/$x-el.wav; done
 : > $W/clips/clips.txt; printf 'LAMP=lamp-mock\nLAMP_HOST=mock-lamp\nLAMP_SUDO_PASS=not-a-password\n' > $W/kit.env
-BOOT=0; MIC_YES=; TAILS2=; RUNSH=0; UNIT=; . $FXD/case.env
+BOOT=0; MIC_YES=; TAILS2=; RUNSH=0; UNIT=; LINKED=; . $FXD/case.env
+printf 'LINKED %s\nSAVED OK\n' "${LINKED:-google gmail-app (files: gmail-app)}" > $W/row/logs/save.txt   # save's link read (D)
 if [ -n "$UNIT" ]; then   # a kit helper alone (unit.sh), no row: PASS when it does what the test asks
   out=$(bash $M/unit.sh $UNIT $W $KIT); got=$(echo "$out" | grep -q '^UNIT PASS' && echo PASS || echo FAIL)
   exp=$(cat $FXD/expect); [ "$got" = "$exp" ] && ok=OK || ok=MISMATCH

@@ -3,7 +3,7 @@
 This kit runs the legs half of #8180's ROW from the runner's Mac. It does not install, round or put back a build. You
 put #8180's build on the lamp before you start, and you put the lamp back to stable after the kit ends.
 
-Nothing here has run on a lamp yet. It has only been mocked: `mock/row/run-all.sh` runs 83 cases: every leg's PASS, FAIL and
+Nothing here has run on a lamp yet. It has only been mocked: `mock/row/run-all.sh` runs 87 cases: every leg's PASS, FAIL and
 VOID cases, plus run.sh itself, with stub ssh, scp, afplay and lock.
 
 ## Prerequisites
@@ -37,7 +37,7 @@ one step, then goes on at `<then>`. `UNTIL=<step>` stops before that step, and t
 | render | `row/render.sh` (skips clips already rendered) | 3 | `RENDER OK` or `RENDER nothing to do` |
 | check | `row/check.lamp.sh`: the build, #8180's cgroup, ready | 1 | `VERIFY PASS`, `READY` |
 | micon | `row/micon.lamp.sh`: the mute is recorded and lifted, only with MIC_YES=yes (the lamp's person's yes for this ROW) | 1 | `MUTE LIFTED OK` or `MUTE NOT MUTED` |
-| save | `row/mute.lamp.sh`, then `row/save.lamp.sh` (baselines; the test ledgers are cleared) | 1 | `MUTE OFF OK`, `SAVED OK` |
+| save | `row/mute.lamp.sh`, then `row/save.lamp.sh` (baselines; the test ledgers are cleared; `LINKED` Google mail) | 1 | `MUTE OFF OK`, `SAVED OK` |
 | legs | `row/row.sh A B C D E K H P N` | 55 | `VERDICT PASS` |
 | tails | `row/row.sh F G` (reads the verdicts of A, B and D from logs/verdicts.env) | 1 | `VERDICT PASS` |
 | boot | `row/boot7170.sh`: one reboot | 4-9 | `LEG 7170 PASS` |
@@ -60,8 +60,9 @@ in 10 min: a start is refused at 9 or more. A make leg (A, B, D, K) can take up 
   signed-out lamp): the card has 3 of 3 sections, no stub, made_with = the engine, the try passed having said at least
   one line, the skill is kept, and DAYSASK starts its own run, which ends exit 0 having said, with a say after it. B: `hand-over to script start N ms`, no agent session, and the first say <= 6 s after the clip.
   C: lamp-control `refused: no_grant`. D: the prompt names SKILL.md first, no lamp files are read, and the answer
-  comes <= 45 s after the clip. D needs a linked Google account; VOID without one (a mail make not kept is VOID,
-  and its LEG line says so). E: the make runs on, READY is answered while it makes, and the switch is off again.
+  comes <= 45 s after the clip. D needs a linked Google account; VOID without one. `save` prints `LINKED google <codes>` from
+  lamp-services' store (`/var/lib/lampos-services/gmail.json` or `gmail-app.json`, not expired and unrenewable): a mail
+  make not kept is VOID only on `LINKED google none`; with a usable link it is a FAIL. The LEG line says which. E: the make runs on, READY is answered while it makes, and the switch is off again.
 - **K**: CHECK (K1) made and kept, (K2) the try's token is exactly `[camera, speak]` (lamp-control: `a make's tried run,
   a token for [speak, camera], its writes stubbed`), (K3) the run's token is exactly `[camera, speak]`, any order,
   nothing more, (K4) the say was spoken, (K5) no yes asked. The camera's grant is `camera` and the mic's `microphone`;

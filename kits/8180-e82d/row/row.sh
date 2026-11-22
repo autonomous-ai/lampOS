@@ -189,7 +189,11 @@ legC(){ local n0 e x
 # ---- D: the mail task step: SKILL.md first, no lamp files, ~30 s. An optional Google leg: its verdict says so.
 DNOTE="needs a linked Google account; VOID without one"
 legD(){ local n0 st e s t
-  BEGIN D || return 1; quiet; MAKE MAIL || { END; WHY="$WHY ($DNOTE: a mail make not kept is VOID)"; VD=VOID; return 0; }
+  BEGIN D || return 1; quiet
+  # an unkept mail make is VOID only when save read no usable Google mail link (LINKED google none); linked, it FAILs
+  local lk; lk=$(sed -n 's/^LINKED //p' $LG/save.txt 2>/dev/null | head -1)
+  MAKE MAIL || { END; case "$lk" in "google none"*) WHY="$WHY (no linked Google mail account: $lk)"; VD=VOID;;
+    "") WHY="$WHY (no LINKED line in logs/save.txt: the link not read, so a FAIL)";; *) WHY="$WHY (linked: $lk)";; esac; return 0; }
   [ "$(echo "$ML" | field kind)" = task ] || echo "  NOTE $MN is kind=$(echo "$ML" | field kind), not a task step"
   sleep 10; quiet; SSHR -n $H 'touch /tmp/t8180-markD'; n0=$(lines); PLAY MAILASK
   st=$(waitfor "skill task [^ ]+: started on the lamp's default agent|skill task [^ ]+: granted net" $n0 60) && echo "  $(show $st)"

@@ -46,6 +46,16 @@ S
       ssh-other) export DENY=9 ERR="ssh: connect to host mock-lamp port 22: Connection refused" RC=255; o=$(run)
         v "another error: 1 try only" '[ "$(cat $W/sshn)" = 1 ] && echo "$o" | grep -q "rc=255" && echo "$o" | grep -q "Connection refused"';;
     esac;;
+  # save's Google mail link read (linked, common.lamp.sh) against a fake /var/lib/lampos-services
+  linked-*) S=$RT/var/lib/lampos-services; mkdir -p $S; L=$W/linked.sh; echo 'echo "LINKED $(linked)"' > $L
+    case $t in
+      linked-none) o=$(lampsh $L); v "no store file: google none" '[ "$o" = "LINKED google none (files: none)" ]';;
+      linked-expired) printf '{"connector":"gmail-app","access_token":"x","expires_at":1000,"refresh_token":""}' > $S/gmail-app.json
+        printf '{"connector":"gmail","refused":true}' > $S/gmail.json; o=$(lampsh $L)
+        v "a refused gmail and an ended gmail-app with no refresh: google none" '[ "$o" = "LINKED google none (files: gmail=expired gmail-app=expired)" ]';;
+      linked-ok) printf '{"connector":"gmail-app","access_token":"x","expires_at":1000,"refresh_token":"r"}' > $S/gmail-app.json; o=$(lampsh $L)
+        v "an ended gmail-app that can be renewed is linked" '[ "$o" = "LINKED google gmail-app (files: gmail-app)" ]';;
+    esac;;
   # the row's probe fixtures (C, H, P) load by the product's skill.toml rules (fixcheck.py cites them)
   fixtures) o=$(python3 -I $KIT/mock/row/fixcheck.py $KIT/row/probe); rc=$?
     v "grant-probe, slow-probe and fork-probe load: a tool and a [[do]] each" '[ $rc = 0 ] && [ "$(echo "$o" | grep -c " OK$")" = 3 ]';;
