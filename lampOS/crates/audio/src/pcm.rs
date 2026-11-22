@@ -145,6 +145,8 @@ pub struct Speaker {
     last_discard: Option<QueuedRange>,
     underruns: UnderrunBudget,
     underran: Option<UnderranSpeech>,
+    /// Speech dropped because the device went mid-run (#8269), until reported.
+    gone: Option<UnderranSpeech>,
     /// See [`Speaker::write_ahead_frames`].
     write_ahead: usize,
     #[cfg(test)]
@@ -286,6 +288,7 @@ impl Speaker {
             last_discard: None,
             underruns: UnderrunBudget::default(),
             underran: None,
+            gone: None,
             write_ahead,
             #[cfg(test)]
             post_write_check_at: None,
@@ -504,6 +507,13 @@ impl Speaker {
 
     pub fn clock_started(&self) -> bool {
         self.clock_started
+    }
+
+    /// Whether any authority has been installed in this speaker's guard: a
+    /// fresh speaker after a gone one has none until the coordinator's next
+    /// snapshot (#8269), and primes nothing before it.
+    pub fn has_authority(&self) -> bool {
+        self.guard.state().is_some()
     }
 
     /// Whether the authority installed here has lapsed now: the worker was
@@ -835,10 +845,87 @@ impl Speaker {
                 Err(stop) => stop,
             };
         }
+        // #8269: a device gone mid-run. The speech it held is kept as the
+        // receipt before the stop below drops it, for a worker that waits
+        // for the device and goes on.
+        if matches!(
+            error.errno(),
+            crate::device::errno::NODEV
+                | crate::device::errno::BADFD
+                | crate::device::errno::STRPIPE
+        ) {
+            self.gone = self.speech_receipt();
+        }
         match self.fault() {
             Ok(()) => error.into(),
             Err(fault) => fault,
         }
+    }
+
+    /// The speech queued, as a dropped-speech receipt names it.
+    fn speech_receipt(&self) -> Option<UnderranSpeech> {
+        self.pending
+            .speech_owner()
+            .map(|(owner, other_owners)| UnderranSpeech {
+                owner,
+                queued_frames: self.pending.pending_frames(),
+                other_owners,
+            })
+    }
+
+    /// #8269: the device went mid-run (ENODEV, EBADFD, ESTRPIPE) and
+    /// `discontinuity` latched the guard. Nothing more is asked of the
+    /// device: what was queued is dropped here, never played, and the
+    /// ledger moves to the next epoch as a discard moves it (unless the
+    /// fault's own stop already did), so the reset is reported as any
+    /// other. The speech it held is kept as [`Speaker::take_gone`]'s
+    /// receipt. The guard stays latched for good.
+    pub fn drop_gone(&mut self) -> Result<()> {
+        self.guard.invalidate();
+        self.last_poll = None;
+        self.finish_deadline = None;
+        self.clock_started = false;
+        if self.gone.is_none() {
+            self.gone = self.speech_receipt();
+        }
+        // The fault's own stop may have dropped it already, its discard
+        // answered before the device went: then the epoch is fresh and empty.
+        if self.pending.has_pending() || self.pending.queued_range().accepted_through > 0 {
+            self.last_discard = Some(self.pending.clear()?);
+            self.flush_count = self.flush_count.saturating_add(1);
+        }
+        Ok(())
+    }
+
+    /// #8269: this is a fresh speaker, opened on the device `old` played
+    /// into before it went, and it takes `old`'s place. Its guard is its
+    /// own, new, with no authority until the coordinator's next snapshot is
+    /// installed: `old`'s, latched, is never carried over. `old`'s queue was
+    /// dropped by [`Speaker::drop_gone`]; this one goes on from the epoch
+    /// after it, so nothing of it is written again and the capture side's
+    /// reference is primed again for a new epoch.
+    pub fn follow(&mut self, old: &mut Speaker) -> Result<()> {
+        if !old.guard.is_faulted()
+            || old.pending.has_pending()
+            || old.gone.is_some()
+            || self.flush_count != 0
+            || self.pending.queued_range().epoch != 1
+            || self.pending.queued_range().accepted_through != 0
+        {
+            return Err(io::Error::other(
+                "a fresh speaker follows only a gone one, its queue dropped and reported",
+            )
+            .into());
+        }
+        self.pending = std::mem::take(&mut old.pending);
+        self.flush_count = old.flush_count;
+        self.last_discard = old.last_discard;
+        Ok(())
+    }
+
+    /// Speech dropped because the device went (#8269), until reported.
+    pub fn take_gone(&mut self) -> Option<UnderranSpeech> {
+        self.gone.take()
     }
 
     /// Control transport loss or malformed control input latches the guard closed.
@@ -1324,6 +1411,60 @@ mod underrun_tests {
         // The guard is kept: the same authority starts the clock again.
         speaker.start_clock(token).unwrap();
         assert!(speaker.clock_started());
+    }
+
+    /// #8269: an answer under way when the device goes (ENODEV): the guard
+    /// is latched, the speech queued is dropped and kept as the receipt, and
+    /// a fresh speaker follows from the next epoch with its own guard, which
+    /// has no authority until a snapshot is installed in it. Nothing of the
+    /// old queue is left in the new one to be written again.
+    #[test]
+    fn a_speaker_gone_mid_answer_drops_its_speech_and_a_fresh_one_follows_with_its_own_guard() {
+        let (mut speaker, mut controller, owner) = speaking();
+        let queued = speaker.pending.pending_frames();
+        let epoch = speaker.queued_range().epoch;
+        let flushes = speaker.flush_count();
+        let error = underrun(&mut speaker, rustix::io::Errno::NODEV);
+        assert!(error.downcast_ref::<Underrun>().is_none(), "{error}");
+        assert!(speaker.zero_authority().is_err(), "the guard is latched");
+        speaker.drop_gone().unwrap();
+        // Dropped once, by the fault's stop or here: one discard to report.
+        assert_eq!(speaker.flush_count(), flushes + 1, "a discard to report");
+        assert_eq!(
+            speaker.take_gone(),
+            Some(UnderranSpeech {
+                owner,
+                queued_frames: queued,
+                other_owners: false,
+            })
+        );
+        assert_eq!(speaker.last_discard().map(|range| range.epoch), Some(epoch));
+        let boot = BootId::new([121; 16]).unwrap();
+        let mut fresh = Speaker::open_clock("null", boot).unwrap();
+        // Only a gone speaker is followed.
+        let mut running = Speaker::open_clock("null", boot).unwrap();
+        assert!(fresh.follow(&mut running).is_err());
+        fresh.follow(&mut speaker).unwrap();
+        assert_eq!(fresh.queued_range().epoch, epoch + 1);
+        assert_eq!(fresh.queued_range().accepted_through, 0);
+        assert_eq!(
+            fresh.pending.pending_speech_frames(),
+            0,
+            "nothing to replay"
+        );
+        assert_eq!(fresh.flush_count(), flushes + 1);
+        assert_eq!(fresh.last_discard(), speaker.last_discard());
+        assert!(
+            fresh.zero_authority().is_err(),
+            "no authority before a snapshot"
+        );
+        assert!(
+            speaker.zero_authority().is_err(),
+            "the old guard stays latched"
+        );
+        fresh.install(controller.snapshot(now()).unwrap()).unwrap();
+        prime(&mut fresh);
+        assert!(fresh.clock_started());
     }
 
     #[test]

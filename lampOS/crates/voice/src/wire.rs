@@ -235,6 +235,17 @@ pub enum WorkerEvent {
         reason: String,
         closed_at_us: u64,
     },
+    /// The gap a stall already opened is now a device gone mid-run
+    /// (#8269): the device went while the microphone was closed for the
+    /// stall. The worker waits for it up to `GONE_AT_START` from
+    /// `gone_at_us`, not the stall's 1.5 s, and the coordinator's own bound
+    /// becomes the gone device's. `reason` is as a `CaptureGap`'s
+    /// (`Disconnected`, `Suspended`, `SpeakerGone`).
+    CaptureGapGone {
+        epoch: u64,
+        reason: String,
+        gone_at_us: u64,
+    },
     /// The capture worker's echo reference changed trust. Not a fault:
     /// capture goes on, and each frame says whether it was cancelled.
     ReferenceStatus {
@@ -386,6 +397,10 @@ pub enum PlaybackDiscardReason {
     /// The speaker underran mid-answer (#3697): what it had queued is gone,
     /// as after a lapse (#1178). The answer is cut, never the voice.
     Underran,
+    /// The speaker's device went mid-run (#8269): what it had queued is
+    /// dropped, never played by the fresh speaker. The answer is cut, never
+    /// the voice.
+    DeviceGone,
 }
 
 impl From<InteractionError> for PlaybackDiscardReason {
@@ -560,6 +575,15 @@ pub enum ReferenceControl {
         started_at_us: u64,
     },
     Stopped {
+        playback_epoch: u64,
+        observed_at_us: u64,
+    },
+    /// The speaker's device went mid-run (ENODEV, EBADFD, ESTRPIPE, #8269):
+    /// `playback_epoch` is dropped and nothing more of it is sent. The
+    /// speaker waits for its device and primes a new epoch when it is back;
+    /// until that clock starts, capture keeps its microphone closed as a
+    /// gap, never a fault.
+    SpeakerGone {
         playback_epoch: u64,
         observed_at_us: u64,
     },

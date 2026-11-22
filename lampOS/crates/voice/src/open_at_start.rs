@@ -38,8 +38,86 @@ const BUSY_RETRY: Duration = Duration::from_millis(50);
 /// 2026-10-17 (12:29:20 and 12:49:06) the voice mic fell off for 4-5 s, the
 /// open failed with `ENODEV`, and the run ended and muted the lamp (#1178).
 /// Its open is tried again for this long, every [`GONE_RETRY`].
-const GONE_AT_START: Duration = Duration::from_secs(10);
-const GONE_RETRY: Duration = Duration::from_millis(250);
+///
+/// The same bound and cadence serve a microphone or speaker gone mid-run
+/// ([`GoneMidRun`], #8269): no limit of its own.
+pub(crate) const GONE_AT_START: Duration = Duration::from_secs(10);
+pub(crate) const GONE_RETRY: Duration = Duration::from_millis(250);
+
+/// A device gone mid-run (#8269): on 06c1 at 07:32:26 on 22 November its USB
+/// card reset, the microphone's read and the speaker's write failed `ENODEV`,
+/// and the voice ended with exit 1 and came back muted by the restart guard.
+/// The worker waits for it instead, trying it again every [`GONE_RETRY`] for
+/// up to [`GONE_AT_START`], as at start, and says so in three lines: when it
+/// went, when it came back, or that it did not. Nothing is spoken and
+/// nothing is muted; past the bound the run ends as it did.
+pub(crate) struct GoneMidRun {
+    /// The worker, as its journal lines begin: `capture` or `speaker`.
+    worker: &'static str,
+    /// What went: `the microphone` or `the speaker`.
+    what: &'static str,
+    since: Instant,
+    next: Instant,
+}
+
+impl GoneMidRun {
+    /// `what` went at `now`, the first try again [`GONE_RETRY`] after it.
+    pub(crate) fn began(worker: &'static str, what: &'static str, now: Instant) -> Self {
+        Self {
+            worker,
+            what,
+            since: now,
+            next: now + GONE_RETRY,
+        }
+    }
+
+    /// The journal's line for it going, with the errno the device gave, if
+    /// one did.
+    pub(crate) fn went(&self, errno: Option<i32>) -> String {
+        let errno = errno.map_or_else(String::new, |errno| format!(" (errno {errno})"));
+        format!(
+            "lamp-voice: {}: {} went mid-run{errno}: waiting up to {} s for it",
+            self.worker,
+            self.what,
+            GONE_AT_START.as_secs()
+        )
+    }
+
+    /// Whether to try it again on this tick.
+    pub(crate) fn due(&self, now: Instant) -> bool {
+        now >= self.next
+    }
+
+    /// It was tried at `now`: the next try is [`GONE_RETRY`] later.
+    pub(crate) fn tried(&mut self, now: Instant) {
+        self.next = now + GONE_RETRY;
+    }
+
+    /// Whether the wait has run its bound.
+    pub(crate) fn over(&self, now: Instant) -> bool {
+        now.duration_since(self.since) >= GONE_AT_START
+    }
+
+    /// The journal's line for it coming back at `now`.
+    pub(crate) fn back(&self, now: Instant) -> String {
+        format!(
+            "lamp-voice: {}: {} came back after {} ms: the voice goes on",
+            self.worker,
+            self.what,
+            now.duration_since(self.since).as_millis()
+        )
+    }
+
+    /// The journal's line, and the worker's error, for it not coming back.
+    pub(crate) fn not_back(&self) -> String {
+        format!(
+            "lamp-voice: {}: {} is not back after {} s: the run ends",
+            self.worker,
+            self.what,
+            GONE_AT_START.as_secs()
+        )
+    }
+}
 
 /// Why a microphone that failed to open at start is waited for.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -175,6 +253,39 @@ pub(crate) fn open_waiting_out_busy<S>(
 #[cfg(test)]
 mod open_at_start_tests {
     use super::*;
+
+    /// A device gone mid-run is tried every 250 ms for 10 s, GONE_AT_START's
+    /// own bound and cadence, and its three lines say what went and when.
+    #[test]
+    fn a_device_gone_mid_run_is_tried_every_250_ms_for_10_s_and_said() {
+        let start = Instant::now();
+        let at = |ms: u64| start + Duration::from_millis(ms);
+        let mut wait = GoneMidRun::began("capture", "the microphone", at(0));
+        assert_eq!(
+            wait.went(Some(19)),
+            "lamp-voice: capture: the microphone went mid-run (errno 19): waiting up to 10 s for it"
+        );
+        assert!(!wait.due(at(249)));
+        assert!(wait.due(at(250)));
+        wait.tried(at(250));
+        assert!(!wait.due(at(499)));
+        assert!(wait.due(at(500)));
+        assert!(!wait.over(at(9_999)));
+        assert!(wait.over(at(10_000)));
+        assert_eq!(
+            wait.back(at(1_250)),
+            "lamp-voice: capture: the microphone came back after 1250 ms: the voice goes on"
+        );
+        assert_eq!(
+            wait.not_back(),
+            "lamp-voice: capture: the microphone is not back after 10 s: the run ends"
+        );
+        let speaker = GoneMidRun::began("speaker", "the speaker", at(0));
+        assert_eq!(
+            speaker.went(None),
+            "lamp-voice: speaker: the speaker went mid-run: waiting up to 10 s for it"
+        );
+    }
     use lamp_audio::capture::ErrorKind as CaptureErrorKind;
 
     fn failed(call: &'static str, errno: i32) -> CaptureError {

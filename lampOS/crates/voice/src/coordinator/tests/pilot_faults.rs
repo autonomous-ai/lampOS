@@ -98,6 +98,12 @@ enum Act {
     CaptureReopen,
     /// The same with a 50 ms close, as an XRun the worker reopens at once.
     CaptureXRun,
+    /// #8269: a stall closes the microphone and its device goes while it is
+    /// closed (a USB card reset often reads as a stall first): the worker
+    /// says the stall's gap is now a device gone, which went this many ms
+    /// ago (the second field), and opens it again this many ms later (the
+    /// first; `None`: never).
+    CaptureGoneAfterStall(Option<u64>, u64),
     /// `CaptureReopen` racing the speaker's re-prime on the same fresh
     /// authority (#7224): the reopened epoch counts from 1 again, and its
     /// first frames were cancelled against a clock not yet started.
@@ -796,6 +802,37 @@ impl Peers {
                             epoch,
                             reason: "AuthorityExpired".to_owned(),
                             closed_at_us: monotonic_us(),
+                        })
+                        .unwrap();
+                }
+            }
+            Act::CaptureGoneAfterStall(back_ms, ago_ms) => {
+                let ms = back_ms.unwrap_or(60_000);
+                self.capture_stalled_until =
+                    Some(crate::scenario_clock::instant() + Duration::from_millis(ms));
+                if let Some(schedule) = self.capture.as_mut() {
+                    schedule.skip_to(monotonic_us() + ms * 1_000);
+                }
+                self.capture_reopen = back_ms.is_some();
+                let epoch = self.capture_epoch;
+                let at = monotonic_us();
+                if let Some(capture) = self.peers.iter_mut().find(|p| p.role == "capture") {
+                    capture
+                        .channels
+                        .control
+                        .send(WorkerEvent::CaptureGap {
+                            epoch,
+                            reason: "AuthorityExpired".to_owned(),
+                            closed_at_us: at,
+                        })
+                        .unwrap();
+                    capture
+                        .channels
+                        .control
+                        .send(WorkerEvent::CaptureGapGone {
+                            epoch,
+                            reason: "Disconnected".to_owned(),
+                            gone_at_us: at.saturating_sub(ago_ms * 1_000),
                         })
                         .unwrap();
                 }
@@ -2115,6 +2152,56 @@ fn a_microphone_closed_by_a_stall_reopens_under_a_new_epoch_and_the_voice_goes_o
     assert_eq!(run.seen.starts.len(), 1);
     let turn = run.seen.starts[0];
     assert_eq!(run.outcomes()[&turn], ["audio_written_unscored"]);
+}
+
+/// #8269, the first builder's P2 on #8288: a stall closed the microphone
+/// and its device went while it was closed, as a USB card reset often reads.
+/// The worker told the coordinator the stall's gap is now a device gone, so
+/// the coordinator holds the run past the stall's 1.5 s, and the microphone,
+/// back 3 s later, is heard again: the voice goes on.
+#[test]
+fn a_stall_then_a_device_gone_and_back_within_10_s_and_the_voice_goes_on() {
+    let _one = one_session();
+    let run = run(Script {
+        // Frames count on through the gap (a device's own schedule): the
+        // question is asked after the reopen, near block 330.
+        speech: 360..420,
+        ..Script::question(Answer::Complete(12))
+    }
+    .then(When::Block(30), Act::CaptureGoneAfterStall(Some(3_000), 0)));
+    run.assert_invariants();
+    assert!(is_mute(&run.result), "{:?}", run.result);
+    assert_eq!(run.events("capture_gap_closed").len(), 1);
+    assert_eq!(run.events("capture_gap_gone").len(), 1);
+    let started: Vec<_> = run
+        .events("capture_started")
+        .iter()
+        .map(|event| event["details"]["epoch"].as_u64().unwrap())
+        .collect();
+    assert_eq!(started, [1, 2]);
+    let gaps = run.events("capture_gap");
+    assert_eq!(gaps.len(), 1, "{gaps:?}");
+    assert!(
+        gaps[0]["stalled_us"].as_u64().unwrap() >= 2_900_000,
+        "{gaps:?}"
+    );
+    assert_eq!(run.seen.starts.len(), 1);
+}
+
+/// The same, with the device not back: the coordinator's bound counts from
+/// when the device went, the worker's 10 s and a stall's 1.5 s, and the run
+/// ends there. The device went 9 s before the act, so the run ends about
+/// 2.5 s after it, past the stall's own 1.5 s.
+#[test]
+fn a_stall_then_a_device_gone_and_not_back_ends_the_run_at_the_gone_bound() {
+    let _one = one_session();
+    let run = run(Script::question(Answer::Complete(12))
+        .then(When::Block(30), Act::CaptureGoneAfterStall(None, 9_000)));
+    let error = run.result.as_ref().unwrap_err().to_string();
+    assert!(error.contains("went mid-run and is not back"), "{error}");
+    let fired = run.fired_at(Act::CaptureGoneAfterStall(None, 9_000));
+    let after_ms = run.teardown_began_us.saturating_sub(fired) / 1_000;
+    assert!((2_300..=4_000).contains(&after_ms), "{after_ms} ms");
 }
 
 /// A stall inside someone's question: what was heard is abandoned as a hand

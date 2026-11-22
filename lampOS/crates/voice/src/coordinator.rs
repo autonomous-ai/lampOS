@@ -6567,6 +6567,9 @@ fn conversation_with_gate_inner(
     )
     .riding_stalls(rides_stall_on && rig.privacy_controls && lifetime.continuous());
     let mut frames_from_us = 0u64;
+    // The retention heartbeat's own start while capture waits for a device
+    // gone mid-run, and from its reopen (#8269). No frame is dropped by it.
+    let mut device_gone_heartbeat_us = 0u64;
     // A privacy observation read stale before the microphone was first
     // allowed: said once (lamp-4ace, 19 Oct 01:19).
     let mut said_stale_at_start = false;
@@ -12049,7 +12052,27 @@ fn conversation_with_gate_inner(
         {
             frames_from_us = frames_from_us.max(at);
         }
-        if retention_expired(last_capture, frames_from_us, monotonic_us()) {
+        // A device gone mid-run (#8269): while capture waits for it the
+        // heartbeat waits too, and counts again from the reopen; past the
+        // worker's own bound the run ends.
+        if let Some(since) = trace.device_gone_since_us {
+            let now_us = monotonic_us();
+            if now_us.saturating_sub(since) >= DEVICE_GONE_MOST_US {
+                return Err(io::Error::other(
+                    "an audio device went mid-run and is not back: the run ends",
+                )
+                .into());
+            }
+            device_gone_heartbeat_us = now_us;
+        }
+        if let Some(bus) = bus_out.as_mut() {
+            bus.set_device_gone(trace.device_gone_since_us);
+        }
+        if retention_expired(
+            last_capture,
+            frames_from_us.max(device_gone_heartbeat_us),
+            monotonic_us(),
+        ) {
             return Err(io::Error::other("microphone retention heartbeat expired").into());
         }
         let monitor = rig.endpoint.as_ref().and_then(|e| e.monitor.as_ref());
@@ -17808,6 +17831,8 @@ fn drain_capture_control(
                     .into());
                 }
                 *epoch = Some(started);
+                // Back from a device gone mid-run (#8269).
+                trace.device_gone_since_us = None;
                 record(
                     trace,
                     json!({"kind":"capture_started","at_us":monotonic_us(),"details":event}),
@@ -17830,12 +17855,35 @@ fn drain_capture_control(
                 {
                     trace.clock_recovery_at_us = Some(*closed_at_us);
                 }
+                if let WorkerEvent::CaptureGap {
+                    reason,
+                    closed_at_us,
+                    ..
+                } = &event
+                    && device_gone_reason(reason)
+                {
+                    trace.device_gone_since_us = Some(*closed_at_us);
+                }
                 record(
                     trace,
                     json!({"kind":"capture_gap_closed","at_us":monotonic_us(),"details":event}),
                 )?;
                 *epoch = None;
                 closed = Some(gone);
+            }
+            // A stall's gap taken over by a device gone mid-run (#8269):
+            // the gap is already open, and from now its bound is the gone
+            // device's, counted from when it went, not the stall's 1.5 s.
+            WorkerEvent::CaptureGapGone {
+                ref reason,
+                gone_at_us,
+                ..
+            } if epoch.is_none() && device_gone_reason(reason) => {
+                trace.device_gone_since_us = Some(gone_at_us);
+                record(
+                    trace,
+                    json!({"kind":"capture_gap_gone","at_us":monotonic_us(),"details":event}),
+                )?;
             }
             WorkerEvent::ReferenceStatus { status } => {
                 record(trace, reference_status_trace(&status))?
@@ -17870,6 +17918,22 @@ fn held_turn_lease_ending(snapshot: Snapshot) -> bool {
                 .as_micros()
                 .saturating_add(HELD_TURN_LEASE_MARGIN_US)
 }
+
+/// Whether a capture gap's reason is a device gone mid-run (#8269): the
+/// microphone disconnected or suspended, or the speaker gone, as capture
+/// names them. The worker waits up to `GONE_AT_START` for it, not a stall's
+/// 1.5 s.
+fn device_gone_reason(reason: &str) -> bool {
+    matches!(reason, "Disconnected" | "Suspended" | "SpeakerGone")
+}
+
+/// The coordinator's own bound on a device gone mid-run (#8269): the
+/// worker's wait (`GONE_AT_START`) and a stall's gap after it
+/// ([`CAPTURE_GAP_US`]), so the worker's own end, said in its journal line,
+/// comes first, and a worker that never says either does not hold the
+/// voice for good.
+const DEVICE_GONE_MOST_US: u64 =
+    crate::open_at_start::GONE_AT_START.as_micros() as u64 + CAPTURE_GAP_US;
 
 /// Frames dropped since the capture last delivered one on time.
 #[derive(Default)]
@@ -18331,11 +18395,14 @@ fn handle_playback_discard(
 }
 
 /// A speaker discard that costs the answer, never the voice: its authority
-/// lapsed while it was held up (#1178), or it underran (#3697).
+/// lapsed while it was held up (#1178), it underran (#3697), or its device
+/// went mid-run and a fresh one follows (#8269).
 fn cuts_only_the_answer(reason: PlaybackDiscardReason) -> bool {
     matches!(
         reason,
-        PlaybackDiscardReason::ExpiredState | PlaybackDiscardReason::Underran
+        PlaybackDiscardReason::ExpiredState
+            | PlaybackDiscardReason::Underran
+            | PlaybackDiscardReason::DeviceGone
     )
 }
 

@@ -105,6 +105,10 @@ pub(crate) struct SessionState {
     /// that had not started (#7224, `ClockNotStarted`), as read; taken by
     /// the loop with `LAMP_VOICE_UNSTARTED_FRAME_DROP=on`.
     pub(crate) clock_recovery_at_us: Option<u64>,
+    /// Since when capture has waited for a device gone mid-run (#8269), the
+    /// microphone or the speaker, as its gap said (`closed_at_us`); until
+    /// its next start. The retention heartbeat waits with it.
+    pub(crate) device_gone_since_us: Option<u64>,
 }
 impl SessionState {
     pub(crate) fn finite() -> Self {
