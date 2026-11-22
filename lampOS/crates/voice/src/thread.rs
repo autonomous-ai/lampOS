@@ -1426,6 +1426,13 @@ impl Thread {
             .map(|exchange| now.saturating_duration_since(exchange.at))
     }
 
+    /// The words of [`Self::lamp_question`]: what a reply to it answers
+    /// (#8182, the Reviewer-lead's P2 on #8274).
+    pub fn lamp_question_said(&self, request: u64) -> Option<&str> {
+        self.lamp_question(request)
+            .map(|exchange| exchange.lamp.as_str())
+    }
+
     /// The lamp's newest line before `request`, when it ended in a question.
     fn lamp_question(&self, request: u64) -> Option<&Exchange> {
         self.exchanges

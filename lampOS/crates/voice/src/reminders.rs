@@ -123,30 +123,37 @@ pub(crate) fn set_asks_here(on: Option<bool>) {
 #[cfg(test)]
 thread_local! {
     /// [`asked_before`]'s words as a test of this thread sets them.
-    static ASKED_HERE: std::cell::RefCell<Option<Option<String>>> =
+    static ASKED_HERE: std::cell::RefCell<Option<Option<(String, String)>>> =
         const { std::cell::RefCell::new(None) };
 }
 
-/// [`asked_before`]'s words for this test's thread alone; `None` reads the
-/// thread's.
+/// [`asked_before`]'s words for this test's thread alone, the person's lines
+/// and the lamp's question; `None` reads the thread's.
 #[cfg(test)]
-pub(crate) fn set_asked_here(asked: Option<Option<&str>>) {
-    ASKED_HERE.with(|here| *here.borrow_mut() = asked.map(|asked| asked.map(str::to_owned)));
+pub(crate) fn set_asked_here(asked: Option<Option<(&str, &str)>>) {
+    ASKED_HERE.with(|here| {
+        *here.borrow_mut() = asked
+            .map(|asked| asked.map(|(lines, question)| (lines.to_owned(), question.to_owned())))
+    });
 }
 
 /// The person's lines the lamp's questions just before `request` answered
-/// ([`crate::thread::Thread::asked_before`]): a reply to "What should I
-/// remind you about?" is set from the line that gave the time.
-fn asked_before(request: u64) -> Option<String> {
+/// ([`crate::thread::Thread::asked_before`]), with the lamp's newest
+/// question, the one the reply answers
+/// ([`crate::thread::Thread::lamp_question_said`]): a reply to "What should
+/// I remind you about?" is set from the line that gave the time.
+fn asked_before(request: u64) -> Option<(String, String)> {
     #[cfg(test)]
     if let Some(asked) = ASKED_HERE.with(|here| here.borrow().clone()) {
         return asked;
     }
-    crate::thread::THREAD.lock().ok()?.asked_before(
+    let thread = crate::thread::THREAD.lock().ok()?;
+    let lines = thread.asked_before(
         request,
         std::time::Instant::now(),
         crate::said_to_me::QUESTION_WAITS,
-    )
+    )?;
+    Some((lines, thread.lamp_question_said(request)?.to_owned()))
 }
 
 /// Whether [`lamp_actions::schedule::ASKS_HOW_LONG_SWITCH`] is on here.
@@ -226,9 +233,11 @@ fn gives_when(heard: &str) -> bool {
 /// gives one, sets it. Nor a reply to the lamp's own question whose asked
 /// line gave one ([`asked_before`]: "Remind me at seven." → "What should I
 /// remind you about?" → "Take my pills."), when the asked line was itself a
-/// timer or reminder ask and the reply names none: a fresh ask ("Set
-/// another timer." after "It rings at 4:09. Anything else?") carries its
-/// own length (Fifth's HOLD on #8274). With
+/// timer or reminder ask and the lamp's question asked about it: a fresh
+/// ask ("Set another timer." after "It rings at 4:09. Anything else?")
+/// carries its own length (Fifth's HOLD on #8274), and a reply that names
+/// the schedule itself ("Remind me to take my pills.") still lends (the
+/// Reviewer-lead's P2 on #8274). With
 /// [`lamp_actions::schedule::ASKS_HOW_LONG_SWITCH`]
 /// on, in English only (the words are English), and only for a line a
 /// person said: a typed text, or a line not known, checks nothing.
@@ -245,7 +254,7 @@ pub(crate) fn when_not_heard(name: &str, request: u64, heard: bool) -> Option<se
         return None;
     }
     let words = crate::stop_scope::heard_words(request, heard)?;
-    if gives_when(&words) || !names_the_schedule(&words) && asked_gave_when(request) {
+    if gives_when(&words) || asked_gave_when(request) {
         return None;
     }
     eprintln!(
@@ -259,13 +268,21 @@ pub(crate) fn when_not_heard(name: &str, request: u64, heard: bool) -> Option<se
 /// Whether a line the lamp's questions just before `request` answered
 /// ([`asked_before`]) was itself a timer or reminder ask that gave its
 /// length or time ([`crate::going_on_asks::names_the_schedule`] and
-/// [`gives_when`]). Fifth's HOLD on #8274: "What's five plus five?" →
-/// "Ten. Anything else?" lends "five" to nothing.
+/// [`gives_when`]), and the lamp's question, its last sentence, asked about
+/// the timer or reminder too (the same word set): "What should I remind you
+/// about?" asks for the asked one's label, while "Anything else?" invites a
+/// new ask. Fifth's HOLD on #8274: "What's five plus five?" → "Ten.
+/// Anything else?" lends "five" to nothing, and "Set a timer for ten
+/// minutes." → "It rings at 4:09. Anything else?" lends "ten minutes" to
+/// nothing.
 fn asked_gave_when(request: u64) -> bool {
-    asked_before(request).is_some_and(|asked| {
-        asked
-            .lines()
-            .any(|line| names_the_schedule(line) && gives_when(line))
+    asked_before(request).is_some_and(|(asked, question)| {
+        let question = question.trim_end().trim_end_matches('?');
+        let question = question.rsplit(['.', '!', '?']).next().unwrap_or(question);
+        names_the_schedule(question)
+            && asked
+                .lines()
+                .any(|line| names_the_schedule(line) && gives_when(line))
     })
 }
 
