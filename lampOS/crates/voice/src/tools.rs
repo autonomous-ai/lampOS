@@ -4578,7 +4578,10 @@ mod tests {
             ),
             (
                 "Remind me tomorrow to call the bank.",
-                set("set_reminder", json!({"text":"Call the bank","time":"09:00"})),
+                set(
+                    "set_reminder",
+                    json!({"text":"Call the bank","time":"09:00"}),
+                ),
                 "What time?",
             ),
         ] {

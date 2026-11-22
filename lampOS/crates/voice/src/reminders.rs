@@ -134,11 +134,50 @@ fn asks_how_long() -> bool {
 /// minutes", "at nine", "at noon"); "o'clock" is read as "clock". "am"
 /// and "pm" are left out: "I am" is no time, and "4 pm" has its digit.
 const WHEN_WORDS: [&str; 44] = [
-    "one", "two", "three", "four", "five", "six", "seven", "eight", "nine", "ten", "eleven",
-    "twelve", "thirteen", "fourteen", "fifteen", "sixteen", "seventeen", "eighteen", "nineteen",
-    "twenty", "thirty", "forty", "fifty", "sixty", "ninety", "hundred", "half", "quarter",
-    "second", "seconds", "sec", "secs", "minute", "minutes", "min", "mins", "hour", "hours",
-    "hr", "hrs", "noon", "midnight", "clock", "oclock",
+    "one",
+    "two",
+    "three",
+    "four",
+    "five",
+    "six",
+    "seven",
+    "eight",
+    "nine",
+    "ten",
+    "eleven",
+    "twelve",
+    "thirteen",
+    "fourteen",
+    "fifteen",
+    "sixteen",
+    "seventeen",
+    "eighteen",
+    "nineteen",
+    "twenty",
+    "thirty",
+    "forty",
+    "fifty",
+    "sixty",
+    "ninety",
+    "hundred",
+    "half",
+    "quarter",
+    "second",
+    "seconds",
+    "sec",
+    "secs",
+    "minute",
+    "minutes",
+    "min",
+    "mins",
+    "hour",
+    "hours",
+    "hr",
+    "hrs",
+    "noon",
+    "midnight",
+    "clock",
+    "oclock",
 ];
 
 /// Whether `heard` gives a length or a time: a digit, or a word of
@@ -163,14 +202,19 @@ pub(crate) fn when_not_heard(name: &str, request: u64, heard: bool) -> Option<se
         "set_reminder" => "What time?",
         _ => return None,
     };
-    if !asks_how_long() || crate::messages::is_text(request) || crate::language::from_environment().is_some() {
+    if !asks_how_long()
+        || crate::messages::is_text(request)
+        || crate::language::from_environment().is_some()
+    {
         return None;
     }
     let words = crate::stop_scope::heard_words(request, heard)?;
     if gives_when(&words) {
         return None;
     }
-    eprintln!("lamp-voice: request {request}: {name} refused, its line gave no length or time; the model is told to ask");
+    eprintln!(
+        "lamp-voice: request {request}: {name} refused, its line gave no length or time; the model is told to ask"
+    );
     Some(serde_json::json!({
         "error": format!("Nothing was set: the person's words gave no length or time for it, so it may have been lost in hearing. Never choose one. Ask only this, in a few words: \"{ask}\", and set it from their answer.")
     }))
