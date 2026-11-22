@@ -1137,7 +1137,10 @@ off unless set; it must be set in lamp-actions' unit and lamp-voice's):
   from the answer; `set_reminder` the same with "What time?"
   (`schedule::asking_how_long`). Off, the catalog is as it was, byte for byte.
 - **The second route refuses the call.** A `set_timer` or `set_reminder`
-  whose request's own heard line (`thread::heard_in_own_line`) has no digit
+  whose request's own heard line (`thread::heard_in_own_line`), and the
+  person's lines the lamp's questions just before it answered
+  (`thread::asked_before`: the run of exchanges whose lamp line ended in a
+  question, each within `said_to_me::QUESTION_WAITS`, 120 s), have no digit
   and no word of `reminders::WHEN_WORDS` (the numbers one to twenty and the
   tens, "hundred", "half", "quarter", the units second, minute and hour with
   their short forms, "noon", "midnight", "o'clock") is never sent
@@ -1149,7 +1152,10 @@ off unless set; it must be set in lamp-actions' unit and lamp-voice's):
   The person's answer ("One minute.", "Ten.") is a line of its own that gives
   one, so its call is set as the model makes it. A second call in the same
   request is refused the same way, so the model's rounds end in the ask; each
-  new line is judged by its own words. A typed text, a line whose words are
+  new line is judged by its own words and the lines its question asked for:
+  "Remind me at seven." → "What should I remind you about?" → "Take my
+  pills." is set (Sixth's HOLD on #8274), and "Remind me tomorrow." → "What
+  about?" → "Take my pills." still asks "What time?". A typed text, a line whose words are
   not known, and an owner's language other than English check nothing.
   Because the refusal is an error, `LAMP_SECOND_SAY_WITH_CALL`'s at-once line
   never says "Timer set." for it (`second_provider::timer_line` needs a
@@ -1158,10 +1164,15 @@ off unless set; it must be set in lamp-actions' unit and lamp-voice's):
 
 Test: `a_timer_whose_length_was_not_heard_asks_and_sets_nothing`
 (lamp-voice `tools.rs`: no length asks and sets nothing, "one minute" sets
-60 s, "ten minutes" 600 s) and
+60 s, "ten minutes" 600 s),
+`a_reply_to_the_lamps_question_is_set_from_the_line_that_gave_the_time`
+(lamp-voice `tools.rs`),
+`the_lines_the_lamps_questions_answered_are_the_run_back_within_its_bound`
+(lamp-voice `thread.rs`) and
 `set_timer_and_set_reminder_say_to_ask_only_with_the_switch` (lamp-actions).
 Lamp check owed: 10 timer lines with the length cut from the clip all ask,
-and 10 whole ones set what was said, from the journal.
+10 whole ones set what was said, and a reply to the lamp's own question
+(its label, or morning or evening) is set, from the journal.
 
 ## First's Voice integration contract
 
