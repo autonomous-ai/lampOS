@@ -248,6 +248,12 @@ Environment=LAMP_SECOND_CHAT_KEPT=on
 # The model service refusing every turn (#4265; lamp-52e6 30 Oct, the lead's call on #1711): said once and held,
 # a line sent each minute to find it back; a skill's fixed words are said meanwhile, a note the model words waits.
 Environment=LAMP_SECOND_REFUSED_HOLD=on
+# LAMP_VOICE_DAY_TALLY: its why and rules are its row in docs/switches.md (#7347, #7664). The day's thinking,
+# hearing and speaking counted, numbers only, in /var/lib/lampOS/voice/day-tally, wiped by a reset.
+Environment=LAMP_VOICE_DAY_TALLY=on
+# LAMP_VOICE_DAY_SHED: its why and rules are its row in docs/switches.md (#7664). From 0.8 of the relay's
+# X-Usage-Day-Used, what nobody asked for is shed; the owner's own talk never is.
+Environment=LAMP_VOICE_DAY_SHED=on
 Environment=LAMP_VOICE_LINK=on
 # LAMP_CAMERA_FOLLOWS_EYES: its why and rules are its row in docs/switches.md (#2233, #2402).
 Environment=LAMP_CAMERA_FOLLOWS_EYES=on

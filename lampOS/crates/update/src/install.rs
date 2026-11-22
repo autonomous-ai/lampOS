@@ -784,6 +784,7 @@ pub const RESET_PLAN: &str = include_str!("../../setup/fixtures/reset-plan-produ
 /// build's is written over it. Add the new one first whenever the fixture
 /// changes; never remove one.
 pub const RESET_PLAN_SHIPPED: &[&str] = &[
+    "1617cf05ff337ea6f5f0b7ddfd55a48e2ef97588259b20f3af3d366db1906a80", // #7664: the voice's day tally, day-tally
     "f36f4b63210494cc8848061509c7b085996bfbf3154f2059c58111e0ad623d3c", // #7415: lamp-npu's state folder, its fetched models
     "0192f1ca63da3391fcb14e072afef96244691c35edef6388c8cd91abc05a7b55", // #6543: the app's desk noticing mark, seen-activity-mark.json
     "bc7558fcea2999b583f79dce9d28ee981db49471c186fea883baa03e2c4c51c9", // #6774 F8: setup's Wi-Fi join counts

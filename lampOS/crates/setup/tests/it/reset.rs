@@ -994,6 +994,10 @@ const PERSON_STORES: [&str; 48] = [
     // names and words come from the person's requests (the reviewer's P2-2
     // on #2011), `made_skill::DIRECTORY` in crates/voice/src/made_skill.rs.
     "/var/lib/lampOS/voice/made-skills",
+    // The day's thinking, hearing and speaking counted, numbers only
+    // (`LAMP_VOICE_DAY_TALLY`, #7347, #7664): `day_tally::DIRECTORY` in
+    // crates/voice/src/day_tally.rs.
+    "/var/lib/lampOS/voice/day-tally",
     // The person's light the ring keeps with `LAMP_LIGHT_KEEP=on` (#1468):
     // the folder, so a `person.json.new` a power cut left goes too.
     "/var/lib/lampOS/light",

@@ -953,7 +953,7 @@ order is kept. A written turn is the same from the chat on.
   request was 31 KB with 31 tools, and its first event came in 976 to
   1296 ms).
 - **With `LAMP_VOICE_DAY_TALLY=on` those counts are added up for the day**
-  (off unless set; #7347, `day_tally.rs`). On 16 November a lamp at home
+  (on in the product, #7664; #7347, `day_tally.rs`). On 16 November a lamp at home
   used up its day's allowance before six in the evening and answered
   nothing for over an hour; the journal's lines above were gone within
   minutes (#7254), and nothing on the lamp said what the day had cost.
@@ -1040,7 +1040,7 @@ order is kept. A written turn is the same from the chat on.
     the voice or its worker stops are lost.
   - **Not yet:** the lamp does not read how much of its day the relay says
     is used, warn, or shed anything near the limit. Those are #7347's
-    next parts. A reset does not wipe the file yet.
+    next parts. A reset wipes the folder (#7664).
   - Tests: `day_tally::tests` (an answer's usage is read in both services'
     forms, nothing is counted until counting begins, two writers add up
     by model, a new UTC day keeps the day before and begins again, a clock
@@ -2960,8 +2960,8 @@ order is kept. A written turn is the same from the chat on.
 
 A lamp's day allowance should last its owner's day, so near its end the
 lamp stops spending it on what nobody asked for. Off unless
-`LAMP_VOICE_DAY_SHED=on` (the coordinator's unit; it hands the worker
-`--day-shed`); off, the header is not even read.
+`LAMP_VOICE_DAY_SHED=on` (the coordinator's unit, on in the product; it
+hands the worker `--day-shed`); off, the header is not even read.
 
 - **The reading.** The relay sends `X-Usage-Day-Used`, the share of the
   lamp's day used (three decimals, 0 to 1; exactly 1 on a day-limit
