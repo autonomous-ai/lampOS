@@ -440,7 +440,8 @@ fn region(options: &BTreeMap<String, String>) -> Result<(), String> {
     let sysstat = install::sysstat_quiet(Path::new("/"), &mut System, &mut changed, &mut say);
     // What sysstat already kept (#7254 part 2), at every boot, as the
     // drop-ins are; a round runs the same removal too (crate::round), for a
-    // lamp that updates with no reboot. Each file is said by name and size as it goes, so nothing more here.
+    // lamp that updates with no reboot. Each file is said by name and size
+    // as it goes, so nothing more here.
     let kept =
         install::sysstat_kept_removed(Path::new("/"), &mut |argv| System.refresh(argv), &mut say)
             .map(|_| ());
