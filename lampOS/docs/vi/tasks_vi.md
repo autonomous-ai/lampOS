@@ -1794,7 +1794,8 @@ sang runner chung của #6510 bước 2 mà không cần luật mới.
     `net`, lời đồng ý nói rõ điều gì có thể đi ra internet, mỗi quyền một vế
     ("…, so what the camera sees and its notes can go to the internet",
     `skill_task_yes::BESIDE_NET`; P2 của Reviewer-lead trên #7901), kể cả
-    `air` ("…, so its air readings can go to the internet").
+    `air` ("…, so its air readings can go to the internet"), `sound` và
+    `hear` ("what kinds of sound it hears", "when its phrases are heard").
   - Lần chạy có `net` chỉ thấy thư mục kỹ năng của chính nó, không bao giờ
     thấy thư mục của kỹ năng khác: lamp-tasks ghi tên thư mục đó cạnh socket
     lối ra của lần chạy, trong thư mục riêng 0700 của nó,

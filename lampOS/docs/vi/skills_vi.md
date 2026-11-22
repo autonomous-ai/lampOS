@@ -5548,13 +5548,13 @@ kết `http(s)://`, một webhook, hoặc bảo gọi, lấy hay gửi tới m�
 chỉ nhắc "API" hay "URL" thì chưa đủ (cần `LAMP_TASK_NET=on`, bật trong sản phẩm, #7200). `net` được đi cùng
 mọi quyền: camera, micro, những gì đèn nói, ghi chú, `look` hay quyền của dịch vụ liên kết (#7901, thiết kế đã chốt: mọi quyền khai báo
 của kỹ năng đều bật, không chặn gì), trong tệp cũng như trong `skill.toml` đã giữ. Khi `net` đi cùng camera, micro, những gì đèn nói, `look`, ghi chú,
-`air` hay quyền đọc của dịch vụ, lời nói lại thêm điều có thể đi ra internet,
+`air`, `sound`, `hear` hay quyền đọc của dịch vụ, lời nói lại thêm điều có thể đi ra internet,
 mỗi quyền một vế theo thứ tự các quyền (P2 của Reviewer-lead trên #7901,
 `skill_task_yes::BESIDE_NET`): "so what the camera sees can go to the
 internet"; "so what the camera sees and its notes can go to the internet".
 Các vế là "what the camera sees", "what the microphone hears", "everything
 the lamp says out loud", "whether someone is there", "its notes", "its air
-readings" và "your <dịch vụ>" (quyền đọc của dịch vụ; quyền ghi chỉ gửi khi
+readings", "what kinds of sound it hears", "when its phrases are heard" và "your <dịch vụ>" (quyền đọc của dịch vụ; quyền ghi chỉ gửi khi
 có lời đồng ý). Đèn nói lại các quyền khi bật.
 Chỉ đèn, giọng (kể cả âm thanh nó phát) và thân thì bật ngay (giọng nói ghi lời đồng ý với
 lamp-control); `sound` (nghe các loại âm thanh), micro, camera, gửi đi hoặc `net` thì hỏi lời đồng ý bằng
