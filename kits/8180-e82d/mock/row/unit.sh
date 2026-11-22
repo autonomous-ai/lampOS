@@ -1,0 +1,50 @@
+#!/bin/bash
+# unit.sh <test> <work dir> <kit>: one kit helper run on the Mac against a fake lamp tree (lamp paths rewritten under
+# <work>/root; systemctl stubbed). Prints "UNIT PASS <what>" when the helper does what the test asks, else "UNIT FAIL".
+set -u; t=$1; W=$2; KIT=$3; RT=$W/root; mkdir -p $RT/bin $RT/var/lib/lampos-tasks/store $RT/var/lib/lampOS/voice/mute $RT/home $RT/run $RT/proc
+# systemctl: lamp-tasks is pid 4243, lamp-voice 4244 (fake /proc/<pid>/environ); no ExecStart
+cat > $RT/bin/systemctl <<'S'
+#!/bin/sh
+case "$*" in *MainPID*lamp-tasks*) echo 4243;; *MainPID*lamp-voice*) echo 4244;; *MainPID*) echo 0;; esac
+S
+chmod +x $RT/bin/systemctl; export PATH=$RT/bin:$PATH
+# a lamp body, its absolute lamp paths moved under $RT
+lampsh(){ { printf 'LAMP_USER=orangepi; LOCK_WHO=unit\n'; cat $KIT/row/common.lamp.sh; cat "$@"; } |
+  sed -e "s#/var/lib/#$RT/var/lib/#g" -e "s#/run/#$RT/run/#g" -e "s#/proc/#$RT/proc/#g" -e "s#/home/#$RT/home/#g" -e "s#/opt/#$RT/opt/#g" | sh 2>&1; }
+penv(){ mkdir -p $RT/proc/$1; printf 'PATH=/usr/bin\0%s\0' "$2" > $RT/proc/$1/environ; }
+app(){ printf '{"engine": "%s", "at": 1}\n' "$1" > $RT/var/lib/lampos-tasks/store/engine-default.json; }
+bus(){ mkdir -p $RT/run/lampos-bus/voice/mute; printf '{"at_unix_ms": %s, "seq": 3}\n{"muted": %s, "reason": "user"}' "$(python3 -c 'import time;print(int(time.time()*1000))')" "$1" > $RT/run/lampos-bus/voice/mute/latest; }
+rec(){ printf '{"version":1,"clock_id":"wall","muted":true,"through_us":%s,"reason":"timed"}\n' "$1" > $RT/var/lib/lampOS/voice/mute/record.json; }
+nowus(){ python3 -c 'import time;print(int(time.time()*1e6))'; }
+v(){ if eval "$2"; then echo "UNIT PASS $1"; else echo "UNIT FAIL $1: $(echo "$o" | tr '\n' ' ' | cut -c1-150)"; fi; }
+E=$W/engine.sh; echo 'echo "ENGINE=$(engine)"' > $E
+case $t in
+  engine-env)  penv 4243 LAMP_LAMP_ENGINE=openclaw; o=$(lampsh $E); v "no app file: engine from LAMP_LAMP_ENGINE" '[ "$o" = ENGINE=openclaw ]';;
+  engine-app)  penv 4243 LAMP_LAMP_ENGINE=openclaw; app hermes; o=$(lampsh $E); v "the app's choice wins over the env" '[ "$o" = ENGINE=hermes ]';;
+  engine-none) penv 4243 OTHER=1; o=$(lampsh $KIT/row/save.lamp.sh); v "no app file and no env: save stops" 'echo "$o" | grep -q "SAVE STOP: no engine-default"';;
+  mute-expired) rec $(( $(nowus) - 60000000 )); o=$(lampsh $KIT/row/mute.lamp.sh); v "live unread, record's timed mute past: off" 'echo "$o" | grep -q "^MUTE OFF OK"';;
+  mute-timed)  rec $(( $(nowus) + 600000000 )); o=$(lampsh $KIT/row/mute.lamp.sh); v "live unread, record's timed mute still running: on" 'echo "$o" | grep -q "^MUTE FAIL"';;
+  mute-live)   rec $(( $(nowus) - 60000000 )); bus true; o=$(lampsh $KIT/row/mute.lamp.sh); v "live voice/mute muted: on" 'echo "$o" | grep -q "^MUTE FAIL: live"';;
+  mute-liveoff) rec $(( $(nowus) + 600000000 )); bus false; o=$(lampsh $KIT/row/mute.lamp.sh); v "live voice/mute unmuted wins over the record" 'echo "$o" | grep -q "^MUTE OFF OK (live"';;
+  ssh-*)
+    # fake ssh: the first $DENY tries print $ERR and exit $RC; then it prints the stdin it got. Calls in $W/sshn.
+    cat > $W/fakessh <<'S'
+#!/bin/bash
+n=$(( $(cat $FW/sshn 2>/dev/null || echo 0) + 1 )); echo $n > $FW/sshn
+for a in "$@"; do [ "$a" = -n ] && exec </dev/null; done
+in=$(cat); echo "$in" > $FW/stdin.$n
+[ $n -le $DENY ] && { echo "$ERR" >&2; exit $RC; }; echo "OK $(echo "$in" | tail -1)"
+S
+    chmod +x $W/fakessh; export FW=$W
+    run(){ ( export SSH=$W/fakessh LAMP_HOST=mock-lamp KIT_ENV= D=$W/kitrow; mkdir -p $W/kitrow; cp $KIT/row/kit.sh $KIT/row/common.lamp.sh $W/kitrow/
+      . $W/kitrow/kit.sh; echo "the body" > $W/body; LAMP "" $W/body; echo "rc=$?" ) 2>&1; }
+    case $t in
+      ssh-retry) export DENY=2 ERR="orangepi@mock-lamp: Permission denied (publickey,password)." RC=255; o=$(run)
+        v "refused twice, then in: 3 tries, same body each" '[ "$(cat $W/sshn)" = 3 ] && echo "$o" | grep -q "^OK the body" && echo "$o" | grep -q "rc=0" && cmp -s $W/stdin.1 $W/stdin.3';;
+      ssh-giveup) export DENY=9 ERR="orangepi@mock-lamp: Permission denied (publickey,password)." RC=255; o=$(run)
+        v "refused every time: 3 tries, then its exit" '[ "$(cat $W/sshn)" = 3 ] && echo "$o" | grep -q "rc=255"';;
+      ssh-other) export DENY=9 ERR="ssh: connect to host mock-lamp port 22: Connection refused" RC=255; o=$(run)
+        v "another error: 1 try only" '[ "$(cat $W/sshn)" = 1 ] && echo "$o" | grep -q "rc=255" && echo "$o" | grep -q "Connection refused"';;
+    esac;;
+  *) echo "UNIT FAIL no such test $t";;
+esac

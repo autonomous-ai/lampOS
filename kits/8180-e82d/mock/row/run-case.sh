@@ -8,7 +8,11 @@ printf 'J [lamp-tasks] each run gets its own cgroup under /sys/fs/cgroup/system.
 echo READY > $W/row/logs/ready.txt; echo "SAVED OK" > $W/row/logs/save.txt; echo "MUTE LIFTED OK after 4s" > $W/row/logs/micon.txt
 for x in WEEK WEEKASK PRICE PRICEASK PROBE MAIL MAILASK LONGMAKE READY YES2 LOOK LOOKASK SLOW FORK NAMED; do : > $W/clips/$x-el.wav; done
 : > $W/clips/clips.txt; printf 'LAMP=lamp-mock\nLAMP_HOST=mock-lamp\nLAMP_SUDO_PASS=not-a-password\n' > $W/kit.env
-BOOT=0; MIC_YES=; TAILS2=; RUNSH=0; . $FXD/case.env
+BOOT=0; MIC_YES=; TAILS2=; RUNSH=0; UNIT=; . $FXD/case.env
+if [ -n "$UNIT" ]; then   # a kit helper alone (unit.sh), no row: PASS when it does what the test asks
+  out=$(bash $M/unit.sh $UNIT $W $KIT); got=$(echo "$out" | grep -q '^UNIT PASS' && echo PASS || echo FAIL)
+  exp=$(cat $FXD/expect); [ "$got" = "$exp" ] && ok=OK || ok=MISMATCH
+  printf '%-24s expect %-4s got %-4s %-8s %s\n' "$c" "$exp" "$got" "$ok" "$(echo "$out" | tail -1 | cut -c1-170)"; exit 0; fi
 export MOCK_FX=$FXD MOCK_ROW=$W/row MOCK_LOG=$W/calls.log MOCK_STATE=$W/state MIC_YES
 [ -n "${MOCK_LAMPOS_TASKS:-}" ] && export MOCK_LAMPOS_TASKS
 export PATH=$M/bin:$PATH BASH_ENV=$M/shim.bash SLEEPDIV=${SLEEPDIV:-25}

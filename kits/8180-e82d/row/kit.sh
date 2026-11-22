@@ -31,10 +31,22 @@ if [ -z "${SSH:-}" ]; then
   else SSH="ssh -o StrictHostKeyChecking=accept-new"; SCP="scp -o StrictHostKeyChecking=accept-new"; fi
 fi
 SCP=${SCP:-scp}
+# SSHR: $SSH, run again (at most 3 tries, 2 s apart) only when the lamp refused the login: exit 255 (ssh) or 5
+# (sshpass) with "Permission denied" in its stderr; any other failure is returned at once. Without -n, stdin (a LAMP
+# body) is kept in memory, never in a file, and fed again to each try. Its stderr is passed on once the try ends.
+SSHR(){ local i=1 rc e a n=0 in=; e=$(mktemp "${TMPDIR:-/tmp}/kit8180-ssh.XXXXXX")
+  for a in "$@"; do [ "$a" = -n ] && n=1; done
+  [ $n = 1 ] || { in=$(cat; echo x); in=${in%x}; }
+  while :; do
+    if [ $n = 1 ]; then $SSH "$@" 2>"$e"; else printf '%s' "$in" | $SSH "$@" 2>"$e"; fi; rc=$?
+    if [ $i -lt 3 ] && { [ $rc = 255 ] || [ $rc = 5 ]; } && grep -q 'Permission denied' "$e"; then
+      echo "ssh: the lamp refused the login (try $i of 3): again in 2 s" >&2; i=$((i + 1)); sleep 2; continue; fi
+    cat "$e" >&2; rm -f "$e"; return $rc
+  done; }
 # Run a lamp body as root: password (only to sudo's stdin), the lamp settings, the row prelude, an optional
 # "VAR=val" line, the files.
 LAMP(){ local pre=$1; shift; { pw; printf 'LAMP_USER=%s; LOCK_WHO=%s\n' "$LAMP_USER" "$LOCK_WHO"; cat $D/common.lamp.sh; [ -n "$pre" ] && printf '%s\n' "$pre"; cat "$@"; } |
-  $SSH -o ServerAliveInterval=10 -o ServerAliveCountMax=3 -o ConnectTimeout=15 $H 'if sudo -n true 2>/dev/null; then read -r _x; sudo sh -s; else sudo -S -p "" sh -s; fi'; }
+  SSHR -o ServerAliveInterval=10 -o ServerAliveCountMax=3 -o ConnectTimeout=15 $H 'if sudo -n true 2>/dev/null; then read -r _x; sudo sh -s; else sudo -S -p "" sh -s; fi'; }
 # Our lock only, when there is one (KIT_LL): every Mac script starts with RENEW; a failed renew stops it before any ssh.
 RENEW(){ [ -n "$LL" ] || return 0
   $LL $LOCK_LAMP renew $LOCK_WHO $LOCK_SESSION >/dev/null 2>&1 || { echo "LOCK: not ours ($LOCK_LAMP $LOCK_WHO $LOCK_SESSION): stop, no ssh"; return 1; }; }
@@ -49,10 +61,10 @@ PLAY(){ local id=$1 f=$A/$1-el.wav g; VOLOK || return 2; [ -f "$f" ] || { echo "
   echo "$(date '+%T') PLAY $id gain=$g leg=${LEG:-?} (Mac vol $(MACVOL))" | tee -a $D/logs/plays.log
   ${AFPLAY:-afplay} -v "$g" "$f"; PEND=$(NOW); echo "$(date '+%T') PLAYED $id end=$PEND" >> $D/logs/plays.log; }
 JF(){ $SSH -n $H "journalctl -f -n0 -o short-unix -u lamp-voice -u lamp-tasks -u lamp-skills -u 'lamp-skills-manage@*' -u lamp-control -u lamp-openclaw-gateway -u lamp-update" >> $1 2>&1 & echo $!; }
-SKEW(){ local a l b; a=$(NOW); l=$($SSH -n $H 'date +%s.%N'); b=$(NOW)
+SKEW(){ local a l b; a=$(NOW); l=$(SSHR -n $H 'date +%s.%N'); b=$(NOW)
   python3 -c "import sys;a,l,b=map(float,sys.argv[1:]);print('%.3f %.3f'%(l-(a+b)/2,b-a))" $a $l $b; }
 # Start budget: at most 10 starts in any 10 min per unit (the lamp's own journal counts). A start is allowed at <= 8.
-STARTS(){ $SSH -n $H "journalctl -u $1 --since -10min -o cat --no-pager" 2>/dev/null | grep -c "^Started " ; }
+STARTS(){ SSHR -n $H "journalctl -u $1 --since -10min -o cat --no-pager" 2>/dev/null | grep -c "^Started " ; }
 GATE(){ local u c; for u in ${@:-lamp-voice}; do c=$(STARTS $u); [ "${c:-0}" -le 8 ] || { echo "GATE: $u started $c times in the last 10 min: wait"; return 1; }; done; }
 # Mac-mic recording of a leg (MAC_REC=1 only): ffmpeg avfoundation, the Mac's built-in microphone, 16 kHz mono, at most
 # 15 min, to <logs>/leg-<L>.mac.wav. The volume settings are read before and after (logs/macvol.txt); no volume,

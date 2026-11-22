@@ -25,7 +25,10 @@ UF=/var/lib/lampos-update; UST=$UF/state.json
 build(){ python3 -I -c 'import json,sys; i=json.load(open(sys.argv[1])).get("installed") or {}; print(i.get("sequence", ""))' $UST 2>/dev/null; }
 updbusy(){ w=; [ -e $UF/journal.json ] && w="$w journal.json"; [ -e $UF/self.json ] && w="$w self.json"
   a=$(systemctl is-active lamp-update-apply 2>/dev/null || true); case "$a" in active|activating|reloading) w="$w lamp-update-apply=$a";; esac; echo "${w# }"; }
-engine(){ grep -oE '"engine" *: *"[a-z]+"' $EF 2>/dev/null | grep -oE '"[a-z]+"$' | tr -d '"'; }
+# The lamp's engine: the app's choice (engine-default.json) when there is one, else the units' LAMP_LAMP_ENGINE
+# (lamp-tasks', then lamp-voice's). Empty only when both are missing.
+engine(){ local e u; e=$(grep -oE '"engine" *: *"[a-z]+"' $EF 2>/dev/null | grep -oE '"[a-z]+"$' | tr -d '"')
+  for u in lamp-tasks lamp-voice; do [ -n "$e" ] && break; e=$(envval "$(pid $u)" LAMP_LAMP_ENGINE); done; echo "$e"; }
 skillnames(){ ls -1 $SK 2>/dev/null | LC_ALL=C sort; }
 madenames(){ python3 -I -c 'import json,sys
 try: print("\n".join(e.get("name","") for e in json.load(open(sys.argv[1]))))

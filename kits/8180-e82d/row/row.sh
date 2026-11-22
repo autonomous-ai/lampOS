@@ -97,10 +97,10 @@ BEGIN(){ LEG=$1; J=$LG/leg-$1.journal.txt; echo "== leg $1 $(date +%T)"; RENEW |
 END(){ sleep ${TAIL:-8}; kill $JP 2>/dev/null; JP=; RECSTOP; }
 # Leg G's cgroup watch (cgwatch.lamp.sh) around B's run: logs/cg-<L>.txt
 CGP=
-CGW(){ $SSH -n $H "rm -f /tmp/t8180-stop.cg$1"; LAMP "SECS=${CGSECS:-240} STOPF=/tmp/t8180-stop.cg$1" $D/cgwatch.lamp.sh > $LG/cg-$1.txt 2>&1 & CGP=$!; sleep 2; }
-UNCGW(){ $SSH -n $H "touch /tmp/t8180-stop.cg$1"; sleep 4; kill $CGP 2>/dev/null; CGP=; grep -E '^(SERVELEAF|RUNLEAF|CGEND|CGROOT)' $LG/cg-$1.txt | cut -c1-220 | sed 's/^/  cg /'; }
-WATCH(){ $SSH -n $H "rm -f /tmp/t8180-stop.$1"; LAMP "SECS=$(( MAKEWAIT + 120 )) STOPF=/tmp/t8180-stop.$1" $D/fence.lamp.sh > $LG/fence-$1.txt 2>&1 & FP=$!; }
-UNWATCH(){ $SSH -n $H "touch /tmp/t8180-stop.$1"; sleep 2; kill $FP 2>/dev/null; FP=; grep -E '^(TRYPID|ADMIN|NET|EGRESS)' $LG/fence-$1.txt | cut -c1-220 | sed 's/^/  fence /'; }
+CGW(){ SSHR -n $H "rm -f /tmp/t8180-stop.cg$1"; LAMP "SECS=${CGSECS:-240} STOPF=/tmp/t8180-stop.cg$1" $D/cgwatch.lamp.sh > $LG/cg-$1.txt 2>&1 & CGP=$!; sleep 2; }
+UNCGW(){ SSHR -n $H "touch /tmp/t8180-stop.cg$1"; sleep 4; kill $CGP 2>/dev/null; CGP=; grep -E '^(SERVELEAF|RUNLEAF|CGEND|CGROOT)' $LG/cg-$1.txt | cut -c1-220 | sed 's/^/  cg /'; }
+WATCH(){ SSHR -n $H "rm -f /tmp/t8180-stop.$1"; LAMP "SECS=$(( MAKEWAIT + 120 )) STOPF=/tmp/t8180-stop.$1" $D/fence.lamp.sh > $LG/fence-$1.txt 2>&1 & FP=$!; }
+UNWATCH(){ SSHR -n $H "touch /tmp/t8180-stop.$1"; sleep 2; kill $FP 2>/dev/null; FP=; grep -E '^(TRYPID|ADMIN|NET|EGRESS)' $LG/fence-$1.txt | cut -c1-220 | sed 's/^/  fence /'; }
 field(){ sed -n "s/.* $1=\([^ ]*\).*/\1/p"; }
 # MAKE <clip>: the voice make, its read-back and yes when asked; sets MK (kept line no.), MN (new skill), ML (MADE line)
 MAKE(){ local n0 w r y; MK=; MN=; ML=; RB=0; MADELINE=; n0=$(lines); MK0=$n0; WATCH $LEG; PLAY $1
@@ -166,7 +166,7 @@ legB(){ local n0 h e s a lat
 # ---- C: the grant-probe fixture asks the camera
 legC(){ local n0 e x
   BEGIN C || return 1; quiet
-  $SSH -n $H 'rm -rf /tmp/t8180-probe; mkdir -p /tmp/t8180-probe' && $SCP -qr $D/probe/grant-probe $H:/tmp/t8180-probe/ || { WHY="probe copy failed (VOID: kit, not the build)"; VC=VOID; END; return 0; }
+  SSHR -n $H 'rm -rf /tmp/t8180-probe; mkdir -p /tmp/t8180-probe' && $SCP -qr $D/probe/grant-probe $H:/tmp/t8180-probe/ || { WHY="probe copy failed (VOID: kit, not the build)"; VC=VOID; END; return 0; }
   LAMP "" $D/probe.lamp.sh 2>&1 | tee $LG/probe.txt | sed 's/^/  /'; grep -q '^PROBE INSTALLED' $LG/probe.txt || { WHY="probe not installed (VOID: kit, not the build)"; VC=VOID; END; return 0; }
   sleep 5; for i in 1 2; do n0=$(lines); PLAY PROBE
     e=$(waitfor "refused: no_grant|of skill grant-probe: (no token made|its time is up)|skill run [^ ]+: ended in|$READBACK" $n0 ${RUNWAIT:-90})
@@ -180,7 +180,7 @@ legC(){ local n0 e x
 legD(){ local n0 st e s t
   BEGIN D || return 1; quiet; MAKE MAIL || { END; return 0; }
   [ "$(echo "$ML" | field kind)" = task ] || echo "  NOTE $MN is kind=$(echo "$ML" | field kind), not a task step"
-  sleep 10; quiet; $SSH -n $H 'touch /tmp/t8180-markD'; n0=$(lines); PLAY MAILASK
+  sleep 10; quiet; SSHR -n $H 'touch /tmp/t8180-markD'; n0=$(lines); PLAY MAILASK
   st=$(waitfor "skill task [^ ]+: started on the lamp's default agent|skill task [^ ]+: granted net" $n0 60) && echo "  $(show $st)"
   e=$(waitfor "skill task [^ ]+: (ended|its agent's answer)" $n0 ${TASKWAIT:-240}) && echo "  $(show $e | cut -c1-200)"
   s=$(waitfor "$SAY" ${e:-$n0} 60)
@@ -232,7 +232,7 @@ legF(){ local ad hid vis eg ec ej f5
   echo "CHECK (F2) B's net try reaches out by its egress socket: $({ [ "${eg:-0}" != 0 ] || [ "${ec:-0}" != 0 ] || [ -n "$ej" ] || [ -n "$f5" ]; } && echo PASS || echo FAIL)"; }
 # ---- G (Reviewer-lead 04:23): the run's process cap counts the run's own tasks only (read-only ssh)
 legG(){ local k pl n cg sv up bad gone left nc
-  k=$($SSH -n $H 'uname -r'); pl=$($SSH -n $H 'command -v prlimit'); n=$($SSH -n $H "ps -eLo user= | grep -c '^lampos'")
+  k=$(SSHR -n $H 'uname -r'); pl=$(SSHR -n $H 'command -v prlimit'); n=$(SSHR -n $H "ps -eLo user= | grep -c '^lampos'")
   echo "  kernel $k; prlimit '${pl:-none}'; lampos tasks now $n; A $VA, B $VB"
   # #8180 cgroup, from logs/cg-B.txt (B's run) and every leg's journal
   cg=$LG/cg-B.txt
@@ -296,7 +296,7 @@ legW(){ local b a
   [ -n "$b" ] && [ "$b" = "$a" ] && echo "CHECK (W3) a make plus a run leave workshop-skills/ unchanged: PASS" || echo "CHECK (W3) a make plus a run leave workshop-skills/ unchanged: FAIL ('$b' -> '$a')"
   grep -c ': PASS' $LG/wshop-config.txt | grep -qx 2 && [ -n "$b" ] && [ "$b" = "$a" ] && { VW=PASS; WHY="skill_workshop denied, gateway accepts it, workshop-skills unchanged ($a)"; } || WHY="$(grep -h '^CHECK (W[12])' $LG/wshop-config.txt | grep -v ': PASS' | cut -c1-90 | tr '\n' ';')$([ -n "$b" ] && [ "$b" = "$a" ] || echo " W3 workshop-skills '$b' -> '$a'")"; }
 # a row fixture copied and installed (NAME), for H and P
-FIXTURE(){ $SSH -n $H "mkdir -p /tmp/t8180-probe" && $SCP -qr $D/probe/$1 $H:/tmp/t8180-probe/ || return 1
+FIXTURE(){ SSHR -n $H "mkdir -p /tmp/t8180-probe" && $SCP -qr $D/probe/$1 $H:/tmp/t8180-probe/ || return 1
   LAMP "NAME=$1" $D/probe.lamp.sh 2>&1 | tee $LG/probe-$1.txt | sed 's/^/  /'; grep -q '^PROBE INSTALLED' $LG/probe-$1.txt; }
 # NOCG n0: the refusal for want of an own cgroup after line n0, if any (run_cgroup.rs NO_CGROUP / for_run_on)
 NOCG(){ local x; x=$(tail -n +$(( $1 + 1 )) $J | grep -oE "run [^ ]+: refused, no own cgroup: .*|the run's own memory and CPU bounds could not be set, so it was not run|runs have no own cgroup: [^;]*" | head -1 | cut -c1-160); [ -n "$x" ] && echo ": REFUSED, $x"; }
