@@ -33,6 +33,9 @@ if "sudo sh -s" in cmd:
     m = re.search(r"MODE=(\S+)", pre); key = key or (m.group(1) if m else "")
     m = re.search(r"NAME=(\S+)", pre); key = key or (m.group(1) if m else "")
     if nm == "made.lamp.sh": key = lastleg()
+    if nm == "putback.lamp.sh":                          # the k-th read: out/putback.lamp.sh.read.<k>, else .read
+        st = os.path.join(os.environ["MOCK_STATE"], "putback.n"); k = int(open(st).read()) + 1 if os.path.exists(st) else 1
+        open(st, "w").write(str(k)); key = "read.%d" % k if fx("out/putback.lamp.sh.read.%d" % k) else "read"
     if nm == "wshop.lamp.sh" and key == "hash":
         st = os.path.join(os.environ["MOCK_STATE"], "wshop.n"); k = int(open(st).read()) + 1 if os.path.exists(st) else 1
         open(st, "w").write(str(k)); key = "hash.%d" % k
@@ -62,5 +65,9 @@ if cmd.startswith("date +%s.%N"): print("%.6f" % time.time()); sys.exit(0)
 if cmd.startswith("uname -r"): print(os.environ.get("MOCK_UNAME", "6.1.43-rockchip-rk3588")); sys.exit(0)
 if "command -v prlimit" in cmd: print(os.environ.get("MOCK_PRLIMIT", "/usr/bin/prlimit")); sys.exit(0)
 if "ps -eLo user=" in cmd: print(os.environ.get("MOCK_LAMPOS_TASKS", "88")); sys.exit(0)
+if "--since -20min -o short-unix" in cmd:             # MAKEIDLE: the k-th read gives cmd/makes.<k>, else cmd/makes
+    st = os.path.join(os.environ["MOCK_STATE"], "makes.n"); k = int(open(st).read()) + 1 if os.path.exists(st) else 1
+    open(st, "w").write(str(k)); out = fx("cmd/makes.%d" % k, "cmd/makes") or ""
+    sys.stdout.write(out.replace("@NOW@", "%.6f" % time.time())); sys.exit(0)
 if cmd.startswith("journalctl -u"): sys.exit(0)        # STARTS: no starts in the last 10 min
 sys.exit(0)                                            # rm/touch/mkdir: nothing

@@ -2,7 +2,11 @@
 # Mac. #8180 legs ROW on one lamp (settings: row/kit.sh; the runner's env file: KIT_ENV). The runner installs #8180's
 # CI ARM64 artifact by their own /run drop-in before, and puts the lamp back to stable themselves after: this kit
 # never installs, rounds or puts back a build.
-#   ./run.sh [from-step [then-step]]   steps: lock render check micon save legs tails boot unrow micoff release
+#   ./run.sh [from-step [then-step]]   steps: lock render check micon save legs tails boot unrow micoff putback release
+#   LEGS="A B C D K H G P" picks the legs step's legs (default A B C D K H P N E); SKIP="tails boot" leaves steps out.
+#   putback is optional (PUTBACK_CMD unset: skipped): the runner's own command re-signs stable's bytes at PUTBACK_SEQ,
+#   which must be above the lamp's installed sequence (lamp-update refuses a lower or equal one), then the step waits
+#   (PUTBACK_WAIT, 1200 s) for lamp-update to have installed PUTBACK_SEQ. The kit holds no key and signs nothing.
 #   With then-step, the first step runs and the run goes on at then-step (e.g. `./run.sh micon boot` after the trap put
 #   the mute back during the boot leg). UNTIL=<step> stops before that step (the EXIT trap still runs).
 # One run goes from the step named (default: lock) to the end. On ANY exit (a STOP, a FAIL, Ctrl-C) the EXIT trap
@@ -11,7 +15,7 @@
 # lamp-cloud is never stopped; GATE keeps each unit at 10 or fewer starts in any 10 min.
 set -u; K=$(cd "$(dirname "$0")" && pwd); D=$K/row; . $D/kit.sh
 L=$D/logs; mkdir -p $L
-STEPS="lock render check micon save legs tails boot unrow micoff release"
+STEPS="lock render check micon save legs tails boot unrow micoff putback release"
 FROM=${1:-lock}; THEN=${2:-}
 for x in $FROM $THEN; do case " $STEPS " in *" $x "*) ;; *) echo "no step '$x' (steps: $STEPS)"; exit 2;; esac; done
 T(){ echo "$(date '+%T') $*" | tee -a $L/times.log; }
@@ -32,6 +36,7 @@ go=0
 for st in $STEPS; do
   [ $st = $FROM ] && go=1; [ -n "$THEN" ] && [ $st = $THEN ] && go=1; [ $go = 1 ] || continue
   [ -n "${UNTIL:-}" ] && [ $st = "$UNTIL" ] && { T "UNTIL $st: stop before it"; exit 0; }
+  case " ${SKIP:-} " in *" $st "*) T "SKIP $st"; continue;; esac
   [ $st = lock ] || RENEW || exit 1
   T "step $st"
   case $st in
@@ -57,7 +62,7 @@ for st in $STEPS; do
            LAMP "" $D/mute.lamp.sh > $L/mute.txt 2>&1; cat $L/mute.txt; need mute '^MUTE OFF OK'
            rm -f $L/verdicts.env $L/named-on.txt $L/named-off.txt
            LAMP "" $D/save.lamp.sh > $L/save.txt 2>&1; cat $L/save.txt; need save '^SAVED OK';;
-  legs)    HEARD legs; bash $D/row.sh ${LEGS:-A B C D E K H P N}; T "legs: $(grep '^VERDICT' $L/row-$(echo ${LEGS:-A B C D E K H P N} | tr -d ' ').txt | cut -c1-90)";;
+  legs)    HEARD legs; bash $D/row.sh ${LEGS:-A B C D K H P N E}; T "legs: $(grep '^VERDICT' $L/row-$(echo ${LEGS:-A B C D K H P N E} | tr -d ' ').txt | cut -c1-90)";;
   tails)   HEARD tails; bash $D/row.sh ${TAILS:-F G}; T "tails: $(grep '^VERDICT' $L/row-$(echo ${TAILS:-F G} | tr -d ' ').txt | cut -c1-90)";;
   boot)    HEARD boot; bash $D/boot7170.sh 2>&1 | tee $L/boot7170.txt; T "boot: $(grep '^LEG 7170' $L/boot7170.txt)"
            grep -q '^LEG 7170 FAIL (ssh not back' $L/boot7170.txt && { T "STOP: the lamp is not back after the reboot: look at it; the trap tries to put the mute back, and once the lamp is back: ./run.sh unrow"; exit 3; };;
@@ -69,8 +74,23 @@ for st in $STEPS; do
              LAMP "" $D/micoff.lamp.sh > $L/micoff.txt 2>&1; cat $L/micoff.txt; cat $L/micoff.txt | sed "s/^/$(date +%T) micoff /" >> $L/mic.txt
              need micoff '^MUTE BACK OK'
            else T "micoff: nothing lifted by the kit"; echo "MUTE BACK OK (nothing lifted)" > $L/micoff.txt; fi;;
+  putback) # Optional: stable's bytes re-signed at PUTBACK_SEQ by the runner's own PUTBACK_CMD (on this Mac; the kit
+           # holds no key), needed when the ROW's sequence is at or above stable's: lamp-update refuses a lower or equal
+           # sequence (lampOS docs/updates.md, "A corrective build needs a higher sequence").
+           if [ -z "${PUTBACK_CMD:-}" ]; then echo "PUTBACK skipped (PUTBACK_CMD unset: the runner's own put-back)" | tee $L/putback.txt
+           else [ -n "${PUTBACK_SEQ:-}" ] || { T "STOP at putback: PUTBACK_CMD needs PUTBACK_SEQ"; exit 3; }
+             LAMP "MODE=read" $D/putback.lamp.sh > $L/putback.txt 2>&1; cat $L/putback.txt
+             cur=$(sed -n 's/^SEQ installed=\([0-9]*\).*/\1/p' $L/putback.txt | tail -1)
+             [ -n "$cur" ] && [ "$PUTBACK_SEQ" -gt "$cur" ] 2>/dev/null || { T "STOP at putback: PUTBACK_SEQ $PUTBACK_SEQ is not above the lamp's installed sequence '${cur:-unread}': re-sign stable's bytes at a higher sequence"; exit 3; }
+             PUTBACK_SEQ=$PUTBACK_SEQ LAMP_HOST=$LAMP_HOST bash -c "$PUTBACK_CMD" >> $L/putback.txt 2>&1 || { T "STOP at putback: PUTBACK_CMD failed (row/logs/putback.txt)"; exit 3; }
+             s0=$(date +%s); ok=0; while [ $(( $(date +%s) - s0 )) -lt ${PUTBACK_WAIT:-1200} ]; do RENEW || exit 1
+               LAMP "MODE=read" $D/putback.lamp.sh > $L/putback-read.txt 2>&1
+               grep -q "^SEQ installed=$PUTBACK_SEQ busy=''" $L/putback-read.txt && { ok=1; break; }; sleep ${PUTBACK_POLL:-30}; done
+             cat $L/putback-read.txt >> $L/putback.txt
+             [ $ok = 1 ] && echo "PUTBACK OK installed $PUTBACK_SEQ (was $cur)" | tee -a $L/putback.txt || { T "STOP at putback: $PUTBACK_SEQ not installed in ${PUTBACK_WAIT:-1200} s ($(cat $L/putback-read.txt))"; exit 3; }
+           fi;;
   release) if [ -z "$LL" ]; then echo "LOCK none to release"
-           else grep -q '^UNROW OK' $L/unrow.txt 2>/dev/null && grep -q '^MUTE BACK OK' $L/micoff.txt 2>/dev/null || { T "no UNROW OK + MUTE BACK OK: keep the lock (FORCE=1 releases anyway)"; [ "${FORCE:-0}" = 1 ] || exit 1; }
+           else grep -q '^UNROW OK' $L/unrow.txt 2>/dev/null && grep -q '^MUTE BACK OK' $L/micoff.txt 2>/dev/null && { [ -z "${PUTBACK_CMD:-}" ] || grep -q '^PUTBACK OK' $L/putback.txt 2>/dev/null; } || { T "no UNROW OK + MUTE BACK OK: keep the lock (FORCE=1 releases anyway)"; [ "${FORCE:-0}" = 1 ] || exit 1; }
              touch $L/RELEASED; [ -f $L/renew.pid ] && { kill $(cat $L/renew.pid) 2>/dev/null; rm -f $L/renew.pid; }
              $LL $LOCK_LAMP release $LOCK_WHO $LOCK_SESSION && echo "LOCK RELEASED $(date +%T)"; fi;;
   esac

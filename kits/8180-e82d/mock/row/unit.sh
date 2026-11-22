@@ -59,5 +59,13 @@ S
   # the row's probe fixtures (C, H, P) load by the product's skill.toml rules (fixcheck.py cites them)
   fixtures) o=$(python3 -I $KIT/mock/row/fixcheck.py $KIT/row/probe); rc=$?
     v "grant-probe, slow-probe and fork-probe load: a tool and a [[do]] each" '[ $rc = 0 ] && [ "$(echo "$o" | grep -c " OK$")" = 3 ]';;
+  # every fresh-turn clip opens with the lamp's name said as a call: each clip row.sh ASKs or MAKEs, and every clip in
+  # clips.txt but the answers to the lamp's own question (ANSWERS: YES)
+  clips-call) ANSWERS=" YES "; CL=$KIT/row/clips/clips.txt
+    ids=$( { grep -oE '(ASK|MAKE) [A-Z][A-Z0-9]+' $KIT/row/row.sh | awk '{print $2}'; cut -f1 $CL; } | sort -u)
+    bad=; for id in $ids; do case "$ANSWERS" in *" $id "*) continue;; esac
+      tx=$(awk -F'\t' -v c=$id '$1 == c {print $2}' $CL); case "$tx" in "Hey Lamp, "*) ;; *) bad="$bad $id='${tx:-no text}'";; esac; done
+    o="checked $(echo $ids | wc -w | tr -d ' ') clips; not a call:${bad:- none}"
+    v "every fresh-turn clip opens with 'Hey Lamp,'" '[ -z "$bad" ] && [ -n "$ids" ]';;
   *) echo "UNIT FAIL no such test $t";;
 esac

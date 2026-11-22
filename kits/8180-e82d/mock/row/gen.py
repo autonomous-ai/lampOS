@@ -129,6 +129,21 @@ case("A.fail-runsaid0", "A", over={"j/A.DAYSASK": PASS["j/A.DAYSASK"].replace("e
 case("A.fail-otherskill", "A", over={"j/A.DAYSASK": PASS["j/A.DAYSASK"].replace("days-left", "week-day")})
 case("A.fail-nosay", "A", over={"j/A.DAYSASK": j([(1, started("run-a2", "days-left")), (1.1, token("run-a2", "days-left", "speak")), (1.7, handover("run-a2", 412)), (1.8, ended("run-a2", "its script exited 0", 1))])})
 case("A.fail-trysaid0", "A", over={"j/A.DAYS": PASS["j/A.DAYS"].replace("exit 0, 30 s limit, said 1", "exit 0, 30 s limit, said 0")})
+# the voice held an ask back as said to nobody (attention.rs NOT_SPOKEN_TO, provider_worker.rs / second_provider.rs's line)
+HELD = lambda r: V + "provider: request %d: its answer is held back: nobody spoke to the lamp: no name, nobody turned to it, no conversation with it going on" % r
+case("A.void-held", "A", over={"j/A.DAYSASK": j([(2, HELD(103))])})
+case("B.void-held", "B", over={"j/B.PRICEASK": j([(2, HELD(113))])})
+# a make still in flight: lamp-tasks refused the make busy; a long make running on past the bound; one that ends
+BUSY = T + "skill make: refused busy, one is being made"
+RUNON = "@NOW@ mock-lamp lamp-voice[812]: lamp-voice second: request 131: the make has no answer 60 s after its waiting line: it runs on, its one line is said, and the turn ends\n"
+case("A.void-busy", "A", over={"j/A.DAYS": j([(1, BUSY), (2, V + "a skill wasn't made: one is being made")])})
+case("K.void-inflight", "K", over={"cmd/makes": RUNON})
+case("K.pass-inflight-ends", "K", over={"cmd/makes.1": RUNON, "cmd/makes": RUNON + "@NOW@ mock-lamp lamp-voice[812]: lamp-voice: a long make was made: kept off until its person hears it\n"}, env={"GREP": "'MAKEIDLE no make in flight after'"})
+case("E.void-inflight", "E", over={"cmd/makes": RUNON})
+# the kept session's cold start is an INFO line, no verdict (#8237)
+case("D.pass-coldinfo", "D", over={"j/D.MAILASK": PASS["j/D.MAILASK"] + "@+22.5 lamp-tasks[905]: tasks: one session: kept session new agent:main (openclaw, ready) in 84883 ms\n"}, env={"GREP": "'^INFO leg D cold start \\(#8237, no verdict\\): .*kept session new .* in 84883 ms'"})
+# an ask waits for the lamp's own say to end (its made line, 86 chars at +31 s)
+case("A.pass-hush", "A", env={"GREP": "'HUSH the lamp.s say ends in'"})
 case("A.fail-notkept", "A", over={"j/A.DAYS": j([(1, V + "request 101: a skill to make: asked"), (30, V + "a skill made here wasn't kept in 30100 ms: its try failed")])})
 case("B.pass", "B")
 case("B.fail-latency", "B", over={"j/B.PRICEASK": PASS["j/B.PRICEASK"].replace("@+1.8 ", "@+9.0 ")})
@@ -164,6 +179,8 @@ case("H.void", "H", over={"out/probe.lamp.sh": "PROBE NOT INSTALLED\n"})
 case("P.pass", "B P")
 case("P.fail", "B P", over={"out/cgwatch.lamp.sh.P": cg(["run-p1", "run-p2"], pe="0"), "j/P.PRICEASK": PASS["j/P.PRICEASK"].replace("refused=56", "refused=0")})
 case("P.void", "P")
+# P needs B's kept price skill, not B's PASS (e82d 14:38: B failed, so P went VOID)
+case("P.pass-bfail", "B P", over={"j/B.PRICEASK": PASS["j/B.PRICEASK"].replace("@+1.8 ", "@+9.0 ")})
 case("F.pass", "A B D", "F")
 case("F.fail", "A B D", "F", over={"out/fence.lamp.sh.A": fence(4101, admin="visible")})
 case("F.fail-noegress", "A B D", "F", over={"out/fence.lamp.sh.B": fence(4202), "j/B.PRICE": PASS["j/B.PRICE"]})
@@ -172,6 +189,8 @@ case("G.pass", "A B", "G")
 case("G.fail-uncapped", "A B", "G", over={"out/cgwatch.lamp.sh.B": cg(["run-b2"], pm="max")})
 case("G.fail-serveroot", "A B", "G", over={"out/cgwatch.lamp.sh.B": cg(["run-b2"], serve="").replace("leaf=", "leaf=unit-root")})
 case("G.void", "A B", "G", env={"MOCK_LAMPOS_TASKS": "40"})
+# A or B not shown (VOID) and neither failed: G VOID, not FAIL
+case("G.void-bvoid", "A B", "G", over={"j/B.PRICEASK": j([(2, HELD(113))])})
 case("W.pass", " ", "W")
 case("W.fail", " ", "W", over={"out/wshop.lamp.sh.hash.2": "WSHOP 99aa00bb11cc22dd files=5\n"})
 case("W.fail-deny", " ", "W", over={"out/wshop.lamp.sh.config": PASS["out/wshop.lamp.sh.config"].replace("W1) tools.deny holds skill_workshop: PASS", "W1) tools.deny holds skill_workshop: FAIL")})
@@ -180,6 +199,15 @@ case("RUN.pass", "A B D N", "F G", boot=True, env={"MIC_YES": "yes", "RUNSH": "1
 case("RUN.fail-noboot-muteback", "A B D N", "F G", boot=True, env={"MIC_YES": "yes", "RUNSH": "1"}, over={"cmd/bootid": "boot-1\n"})
 case("RUN.void-noyes", "A B D N", "F G", boot=True, env={"RUNSH": "1"})
 case("ALL.pass", "A B C D E K H P N", "F G")
+case("ALL.pass-elast", "A B C D K H P N E", "F G")
+# the rerun of 22 Nov (First 14:39): the failed legs only, G among them, on the same build
+case("RERUN.pass", "A B C D K H G P", "")
+case("RUN.pass-rerun", "A B C D K H G P", "", env={"MIC_YES": "yes", "RUNSH": "1", "SKIP": "'tails boot'"})
+# the optional put-back: stable re-signed above the lamp's sequence (15510 -> 15600), installed; a sequence not above it stops
+PB = {"out/putback.lamp.sh.read.1": "SEQ installed=15510 busy=''\n", "out/putback.lamp.sh.read": "SEQ installed=15600 busy=''\n"}
+case("RUN.pass-putback", "A B D N", "F G", boot=True, over=PB, env={"MIC_YES": "yes", "RUNSH": "1", "PUTBACK_CMD": "'putback-cmd'", "PUTBACK_SEQ": "15600", "GREP": "'^PUTBACK OK installed 15600 \\(was 15510\\)'"})
+case("RUN.fail-putback-low", "A B D N", "F G", boot=True, over=PB, env={"MIC_YES": "yes", "RUNSH": "1", "PUTBACK_CMD": "'putback-cmd'", "PUTBACK_SEQ": "15500", "GREP": "'STOP at putback: PUTBACK_SEQ 15500 is not above'"})
+case("RUN.pass-noputback", "A B D N", "F G", boot=True, env={"MIC_YES": "yes", "RUNSH": "1", "GREP": "'PUTBACK skipped'"})
 # run.sh's order: legs, then the tails in a second invocation
 case("ALL.pass-split", "A B C D E K H P N", "", env={"TAILS2": "'F G'"})
 case("G.pass-split", "A B", "", env={"TAILS2": "'F G'"})
@@ -201,5 +229,5 @@ case("7170.void-muted", "D", boot=True, over={"out/boot.lamp.sh.after": PASS["ou
 case("7170.pass-muted-yes", "D", boot=True, env={"MIC_YES": "yes"}, over={"out/boot.lamp.sh.after": PASS["out/boot.lamp.sh.after"].replace("MUTEBOOT muted=False", "MUTEBOOT muted=True"), "out/micon.lamp.sh": "RECORD_KEPT the person's record from this ROW's first micon stays\nMUTE LIFTED OK after 4s\n"})
 # U: one kit helper alone (unit.sh), against a fake lamp tree: the engine without an app choice, an old-stamped
 # mute, a refused ssh login
-for u in ("engine-env", "engine-app", "engine-none", "mute-oldstamp", "mute-timed", "mute-live", "mute-liveoff", "ssh-retry", "ssh-giveup", "ssh-other", "fixtures", "linked-none", "linked-expired", "linked-ok"):
+for u in ("engine-env", "engine-app", "engine-none", "mute-oldstamp", "mute-timed", "mute-live", "mute-liveoff", "ssh-retry", "ssh-giveup", "ssh-other", "fixtures", "clips-call", "linked-none", "linked-expired", "linked-ok"):
     case("U.pass-" + u, " ", env={"UNIT": u})

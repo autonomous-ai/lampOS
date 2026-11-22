@@ -8,28 +8,32 @@ printf 'J [lamp-tasks] each run gets its own cgroup under /sys/fs/cgroup/system.
 echo READY > $W/row/logs/ready.txt; echo "MUTE LIFTED OK after 4s" > $W/row/logs/micon.txt
 for x in DAYS DAYSASK PRICE PRICEASK PROBE MAIL MAILASK LONGMAKE READY YES2 LOOK LOOKASK SLOW FORK NAMED; do : > $W/clips/$x-el.wav; done
 : > $W/clips/clips.txt; printf 'LAMP=lamp-mock\nLAMP_HOST=mock-lamp\nLAMP_SUDO_PASS=not-a-password\n' > $W/kit.env
-BOOT=0; MIC_YES=; TAILS2=; RUNSH=0; UNIT=; LINKED=; . $FXD/case.env
+BOOT=0; MIC_YES=; TAILS2=; RUNSH=0; UNIT=; LINKED=; SKIP=; GREP=; PUTBACK_CMD=; PUTBACK_SEQ=; . $FXD/case.env
+# GREP: a line (ERE) the run's output must also hold, else the case is BAD
 printf 'LINKED %s\nSAVED OK\n' "${LINKED:-google gmail-app (files: gmail-app)}" > $W/row/logs/save.txt   # save's link read (D)
 if [ -n "$UNIT" ]; then   # a kit helper alone (unit.sh), no row: PASS when it does what the test asks
   out=$(bash $M/unit.sh $UNIT $W $KIT); got=$(echo "$out" | grep -q '^UNIT PASS' && echo PASS || echo FAIL)
   exp=$(cat $FXD/expect); [ "$got" = "$exp" ] && ok=OK || ok=MISMATCH
   printf '%-24s expect %-4s got %-4s %-8s %s\n' "$c" "$exp" "$got" "$ok" "$(echo "$out" | tail -1 | cut -c1-170)"; exit 0; fi
-export MOCK_FX=$FXD MOCK_ROW=$W/row MOCK_LOG=$W/calls.log MOCK_STATE=$W/state MIC_YES
+export MOCK_FX=$FXD MOCK_ROW=$W/row MOCK_LOG=$W/calls.log MOCK_STATE=$W/state MIC_YES SKIP PUTBACK_CMD PUTBACK_SEQ PUTBACK_WAIT=4 PUTBACK_POLL=1
 [ -n "${MOCK_LAMPOS_TASKS:-}" ] && export MOCK_LAMPOS_TASKS
 export PATH=$M/bin:$PATH BASH_ENV=$M/shim.bash SLEEPDIV=${SLEEPDIV:-25}
 export KIT_ENV=$W/kit.env KIT_LL=$M/bin/lamplock SSH=$M/bin/ssh SCP=$M/bin/scp AFPLAY=$M/bin/afplay OSASCRIPT=$M/bin/osascript A=$W/clips
-export POLL=0.1 QUIETS=0.1 WAITMAX=${WAITMAX:-4} MAKEWAIT=4 RUNWAIT=4 TASKWAIT=4 SAYWAIT=1 RBWAIT=2 BETWEEN=0 TAIL=0 NWAIT=4
+export POLL=0.1 QUIETS=0.1 WAITMAX=${WAITMAX:-4} MAKEWAIT=4 RUNWAIT=4 TASKWAIT=4 SAYWAIT=1 RBWAIT=2 BETWEEN=0 TAIL=0 NWAIT=4 IDLEPOLL=1
 TO=; command -v timeout >/dev/null && TO="timeout 600"
 export BOOTWAIT=30 PORTWAIT=4 RUNWAIT7170=4 ENDWAIT=2
 if [ "${RUNSH:-0}" = 1 ]; then
   # run.sh from lock to release; verdict: PASS = exit 0, both VERDICT PASS, LEG 7170 PASS, UNROW OK, MUTE BACK OK;
-  # FAIL = stopped AND the trap put the mute back; VOID = stopped before any lift (no micon call made)
+  # FAIL = stopped AND the trap put the mute back; VOID = stopped before any lift (no micon call made). With SKIP
+  # (a rerun of chosen legs): PASS = exit 0, the legs' VERDICT PASS, no tails or boot run, UNROW OK, MUTE BACK OK.
   cp $KIT/run.sh $W/run.sh; rm -f $W/row/logs/micon.txt
   LEGS="$LEGS" TAILS="$TAILS" $TO bash $W/run.sh > $W/out.txt 2>&1; rc=$?; echo "exit $rc" >> $W/out.txt; L=$W/row/logs
   touch $L/RELEASED; [ -f $L/renew.pid ] && kill $(cat $L/renew.pid) 2>/dev/null    # a stopped run keeps its lock loop
-  if [ $rc = 0 ] && [ "$(cat $L/row-*.txt | grep -c '^VERDICT PASS')" = 2 ] && grep -q '^LEG 7170 PASS' $L/boot7170.txt && grep -q '^UNROW OK' $L/unrow.txt && grep -q '^MUTE BACK OK' $L/micoff.txt; then got=PASS
+  if [ -n "$SKIP" ]; then [ $rc = 0 ] && [ "$(cat $L/row-*.txt | grep -c '^VERDICT PASS')" = 1 ] && [ ! -f $L/boot7170.txt ] && grep -q '^UNROW OK' $L/unrow.txt && grep -q '^MUTE BACK OK' $L/micoff.txt && got=PASS || got=BAD
+  elif [ $rc = 0 ] && [ "$(cat $L/row-*.txt | grep -c '^VERDICT PASS')" = 2 ] && grep -q '^LEG 7170 PASS' $L/boot7170.txt && grep -q '^UNROW OK' $L/unrow.txt && grep -q '^MUTE BACK OK' $L/micoff.txt; then got=PASS
   elif [ $rc != 0 ] && grep -q '^MUTE LIFTED OK' $L/micon.txt 2>/dev/null && grep -q '^MUTE BACK OK' $L/micoff.txt 2>/dev/null; then got=FAIL
   elif [ $rc != 0 ] && ! grep -q 'LAMP micon.lamp.sh' $W/calls.log 2>/dev/null; then got=VOID; else got=BAD; fi
+  [ -n "$GREP" ] && ! grep -qE -- "$GREP" $W/out.txt && got=BAD
   exp=$(cat $FXD/expect); [ "$got" = "$exp" ] && ok=OK || ok=MISMATCH
   printf '%-24s expect %-4s got %-4s %-8s %s\n' "$c" "$exp" "$got" "$ok" "$(grep -E 'STOP|run.sh done|exit with' $W/out.txt | tail -2 | cut -c1-170 | tr '\n' ' ')"
   exit 0; fi
@@ -40,5 +44,6 @@ last=$(echo $LEGS $TAILS | awk '{print $NF}')
 [ "$BOOT" = 1 ] && { $TO bash $W/row/boot7170.sh >> $W/out.txt 2>&1; echo "exit $?" >> $W/out.txt; last=7170; }
 exp=$(cat $FXD/expect)
 got=$(grep "^LEG $last " $W/out.txt | tail -1 | awk '{print $3}')
+[ -n "$GREP" ] && ! grep -qE -- "$GREP" $W/out.txt && got=BAD
 [ "$got" = "$exp" ] && ok=OK || ok=MISMATCH
 printf '%-24s expect %-4s got %-4s %-8s %s\n' "$c" "$exp" "${got:-none}" "$ok" "$(grep "^LEG $last " $W/out.txt | tail -1 | cut -d' ' -f4- | cut -c1-170)"

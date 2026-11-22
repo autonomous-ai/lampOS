@@ -1,0 +1,3 @@
+#!/bin/bash
+# Mock PUTBACK_CMD: the runner's own re-sign and round (here nothing): logs its sequence for the case.
+echo "$(date +%s) putback-cmd seq=$PUTBACK_SEQ host=$LAMP_HOST" >> "$MOCK_LOG"; echo "re-signed stable at $PUTBACK_SEQ (mock)"

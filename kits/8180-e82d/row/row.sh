@@ -30,8 +30,17 @@
 #      journals "request R: the heard words named <agent> for the work: round 1 hands them over in code
 #      (LAMP_NAMED_AGENT_TAKES_LINE)"; then off again (NAMED OFF). CHECK N1/N2/N3. The switch is taken off on ANY exit.
 #   Every make prints its "Made it, and I tried it" line (MADELINE) when the journal has it.
-#   ./row.sh A B C D E K H P N, then ./row.sh F G (F and G read A, B and D's logs and verdicts from logs/verdicts.env).
-#   With no arguments: LEGS="A B C D E K H P N" TAILS="F G". Exit 0 on VERDICT PASS (this invocation's legs).
+#   ./row.sh A B C D K H P N E, then ./row.sh F G (F and G read A, B and D's logs and verdicts from logs/verdicts.env).
+#   With no arguments: LEGS="A B C D K H P N E" TAILS="F G" (E last: its long make runs on past its leg). Exit 0 on
+#   VERDICT PASS (this invocation's legs). A rerun of chosen legs: ./row.sh A B C D K H G P (G reads A and B of the same
+#   invocation).
+#   Every fresh-turn ask (ASK; its clip opens with "Hey Lamp,") is played only once the lamp's own say has ended (HUSH),
+#   as a person would. A leg that would FAIL is VOID instead (POST) when (a) the voice held one of its asks back as said
+#   to nobody ("its answer is held back: nobody spoke to the lamp", voice attention.rs NOT_SPOKEN_TO and
+#   TURNED_NOT_SPOKEN_TO): "ask not heard as a call"; or (b) a make was still in flight: before each make MAKEIDLE waits
+#   (IDLEWAIT, 600 s) until no long make runs on, and lamp-tasks' "skill make: refused busy, one is being made"
+#   (tasks skill_make.rs:2140) is "a make still running". The kept session's cold start (#8237: "kept session new ... in
+#   N ms", "slow chat send ... stage=startup") is printed as INFO, never a verdict.
 
 set -u; D=$(cd "$(dirname "$0")" && pwd); . $D/kit.sh
 LG=${ROWLOGS:-$D/logs}; mkdir -p $LG
@@ -49,6 +58,9 @@ NGUARD(){ [ -f $LG/named-on.txt ] || return 0; grep -q '^NAMED OFF' $LG/named-of
   NOFF && echo "  NAMED OFF" || echo "  WARN named switch NOT off (logs/named-off.txt): ../run.sh unrow"; }
 JP=; FP=; trap '[ -n "$JP" ] && kill $JP 2>/dev/null; [ -n "$FP" ] && kill $FP 2>/dev/null; [ -n "${CGP:-}" ] && kill $CGP 2>/dev/null; RECSTOP; trap - INT TERM HUP; NGUARD' EXIT; trap 'exit 130' INT TERM HUP
 POLL=${POLL:-1}; LIMIT_B=${LIMIT_B:-6}; LIMIT_D=${LIMIT_D:-45}; MAKEWAIT=${MAKEWAIT:-660}
+# Each ask's wait for its run or answer: at least 180 s, since the first make or task after a round may wait on a cold
+# kept OpenClaw session (e82d, 22 Nov 14:38: "kept session new ... in 84883 ms"). A make has MAKEWAIT (660 s).
+RUNWAIT=$RUNWAIT; TASKWAIT=$TASKWAIT; IDLEWAIT=${IDLEWAIT:-600}; IDLEPOLL=${IDLEPOLL:-15}
 lines(){ wc -l < $J | tr -d ' '; }
 # first line number after line $2 matching ERE $1, waiting at most $3 s (lock renewed every 120 s)
 waitfor(){ local s=$(date +%s) r=$(date +%s) n lim=$3
@@ -93,9 +105,40 @@ MADECHK(){ local g k; MADEWHY=; MADEN=; MADEU=; g=$(echo "$ML" | field grants); 
 SAY="lamp-control: .*: say \(|[0-9]+ of [0-9]+ pieces began"
 AGENT="\[lamp-tasks\] skill task [^ ]+: (started on the lamp's default agent|ended, Harness says|granted net: its egress socket .* default agent)|Harness .*(new|session)"
 EGJ="egress ready in its fence|granted net: its egress socket|\[lamp-tasks\] egress: "
-BEGIN(){ LEG=$1; J=$LG/leg-$1.journal.txt; echo "== leg $1 $(date +%T)"; RENEW || return 1; : > $J; JP=$(JF $J); RECSTART $1 $LG/leg-$1.mac.wav
+BEGIN(){ LEG=$1; J=$LG/leg-$1.journal.txt; ASKN=; echo "== leg $1 $(date +%T)"; RENEW || return 1; : > $J; JP=$(JF $J); RECSTART $1 $LG/leg-$1.mac.wav
   SK_=$(SKEW | awk '{print $1}'); echo "  skew lamp-Mac ${SK_} s"; sleep 3; }
-END(){ sleep ${TAIL:-8}; kill $JP 2>/dev/null; JP=; RECSTOP; }
+END(){ sleep ${TAIL:-8}; kill $JP 2>/dev/null; JP=; RECSTOP; COLD; }
+# The kept session's cold start (#8237; tasks/src/one_session.rs:3197 and :3242, the Gateway's "slow chat send Nms
+# stage=startup"): INFO only, never a verdict.
+COLDRE="one session: kept session new .* in [0-9]+ ms|slow chat send [0-9]+ms.*stage=startup|kept session's first words not taken"
+COLD(){ grep -E "$COLDRE" $J 2>/dev/null | cut -c1-220 | sed "s/^/INFO leg $LEG cold start (#8237, no verdict): /"; return 0; }
+# HUSH: wait for the lamp's last say in this leg's journal to end (its pieces line + chars/12 + 3 s, at most 45 s) before
+# a fresh-turn ask: a person does not talk over the lamp, and an ask played over its say is heard faintly.
+HUSH(){ local t w; t=$(grep -nE "[0-9]+ of [0-9]+ pieces began" $J 2>/dev/null | tail -1 | cut -d: -f1); [ -n "$t" ] || return 0
+  w=$(python3 -c "import sys,time;e=float(sys.argv[1])+int(sys.argv[2] or 0)/12+3;w=e-(time.time()+float(sys.argv[3]));print(int(min(max(w,0),45)+0.999))" "$(ep $t)" "$(sed -n "${t}p" $J | grep -oE '[0-9]+ chars' | tail -1 | grep -oE '[0-9]+')" "${SK_:-0}")
+  [ "${w:-0}" -gt 0 ] && { echo "  HUSH the lamp's say ends in ~$w s: waiting"; sleep $w; }; return 0; }
+# ASK <clip>: a fresh turn, noted (its first journal line) for HELDOF, then played
+ASK(){ ASKN="$ASKN $(lines):$1"; PLAY $1; }
+# HELDOF: the first of this leg's asks the voice held back as said to nobody, with its line; else nothing (exit 1)
+HELDRE="its answer is held back: nobody spoke to the lamp"
+HELDOF(){ local x n c nx h; set -- $ASKN; while [ $# -gt 0 ]; do x=$1; shift; n=${x%%:*}; c=${x#*:}; nx=${1:-}; nx=${nx%%:*}
+    h=$(tail -n +$(( n + 1 )) $J 2>/dev/null | head -n $(( ${nx:-999999} - n )) | grep -E "$HELDRE" | head -1 | cut -c1-200)
+    [ -n "$h" ] && { echo "$c: $h"; return 0; }; done; return 1; }
+# POST <leg>: a FAIL is VOID when an ask was not heard as a call, or a make was still running (MKBUSY)
+POST(){ local v h; eval "v=\$V$1"; [ "$v" = FAIL ] || return 0
+  if h=$(HELDOF); then eval "V$1=VOID"; WHY="ask not heard as a call ($h); was: $WHY"
+  elif [ -n "$MKBUSY" ]; then eval "V$1=VOID"; WHY="a make still running ($WHY)"; fi; return 0; }
+# MAKEIDLE: no make in flight on the lamp: a long make that ran on (second_provider.rs, long_make.rs) with no end after
+# it ("a long make was made", "a long make made nothing", lamp-tasks' "skill make: the run ended with an answer" or
+# "refused <code>: "), read every IDLEPOLL s for at most IDLEWAIT s
+RUNONRE="the make has no answer [0-9]+ s after its waiting line: it runs on|a long make's turn was cut before its minute: it runs on"
+MENDRE="a long make was made|a long make made nothing|\[lamp-tasks\] skill make: (the run ended with an answer|refused [a-z_]+: )"
+BUSYRE="\[lamp-tasks\] skill make: refused busy, one is being made"
+MAKEIDLE(){ local s=$(date +%s) l said=0 lim=$IDLEWAIT; [ -n "${WAITMAX:-}" ] && [ "$lim" -gt "$WAITMAX" ] && lim=$WAITMAX
+  while :; do l=$(SSHR -n $H "journalctl -u lamp-voice -u lamp-tasks --since -20min -o short-unix --no-pager" 2>/dev/null | grep -E "$RUNONRE|$MENDRE" | tail -1)
+    echo "$l" | grep -qE "$RUNONRE" || { [ $said = 1 ] && echo "  MAKEIDLE no make in flight after $(( $(date +%s) - s )) s"; return 0; }
+    [ $said = 0 ] && { echo "  MAKEIDLE a make is in flight: $(echo "$l" | cut -c1-160): waiting (at most $IDLEWAIT s)"; said=1; }
+    [ $(( $(date +%s) - s )) -ge $lim ] && return 1; RENEW || return 1; sleep $IDLEPOLL; done; }
 # Leg G's cgroup watch (cgwatch.lamp.sh) around B's run: logs/cg-<L>.txt
 CGP=
 CGW(){ SSHR -n $H "rm -f /tmp/t8180-stop.cg$1"; LAMP "SECS=${CGSECS:-240} STOPF=/tmp/t8180-stop.cg$1" $D/cgwatch.lamp.sh > $LG/cg-$1.txt 2>&1 & CGP=$!; sleep 2; }
@@ -104,9 +147,12 @@ WATCH(){ SSHR -n $H "rm -f /tmp/t8180-stop.$1"; LAMP "SECS=$(( MAKEWAIT + 120 ))
 UNWATCH(){ SSHR -n $H "touch /tmp/t8180-stop.$1"; sleep 2; kill $FP 2>/dev/null; FP=; grep -E '^(TRYPID|ADMIN|NET|EGRESS)' $LG/fence-$1.txt | cut -c1-220 | sed 's/^/  fence /'; }
 field(){ sed -n "s/.* $1=\([^ ]*\).*/\1/p"; }
 # MAKE <clip>: the voice make, its read-back and yes when asked; sets MK (kept line no.), MN (new skill), ML (MADE line)
-MAKE(){ local n0 w r y; MK=; MN=; ML=; RB=0; MADELINE=; n0=$(lines); MK0=$n0; WATCH $LEG; PLAY $1
-  w=$(waitfor "$KEPT|$NOTKEPT" $n0 $MAKEWAIT) || { UNWATCH $LEG; WHY="no make end in $MAKEWAIT s"; return 1; }
+MAKE(){ local n0 w r y; MK=; MN=; ML=; RB=0; MADELINE=
+  MAKEIDLE || { WHY="still in flight after $IDLEWAIT s, $1 not asked"; MKBUSY=1; return 1; }
+  HUSH; n0=$(lines); MK0=$n0; WATCH $LEG; ASK $1
+  w=$(waitfor "$KEPT|$NOTKEPT|$BUSYRE" $n0 $MAKEWAIT) || { UNWATCH $LEG; WHY="no make end in $MAKEWAIT s"; tail -n +$(( n0 + 1 )) $J | grep -qE "$BUSYRE" && MKBUSY=1; return 1; }
   UNWATCH $LEG; echo "  make end: $(show $w)"
+  sed -n "${w}p" $J | grep -qE "$BUSYRE" && { WHY="lamp-tasks refused $1: busy, one is being made"; MKBUSY=1; return 1; }
   sed -n "${w}p" $J | grep -qE "$KEPT" || { WHY="not kept: $(show $w | cut -c1-160)"; return 1; }; MK=$w
   echo "  make time: $(sed -n "${w}p" $J | grep -oE 'kept in [0-9]+ ms')"
   sed -n "$(( n0 + 1 )),${w}p" $J | grep -E "$TRY" | cut -c1-220 | sed 's/^/  try: /'
@@ -140,13 +186,13 @@ legA(){ local n0 e s st rid
   eng=$(echo "$ML" | field engine); [ "$(echo "$ML" | field fm_with)" = "$eng" ] && [ "$(echo "$ML" | field idx_with)" = "$eng" ] || why="$why made_with card=$(echo "$ML" | field fm_with) index=$(echo "$ML" | field idx_with), engine $eng;"
   TRYOK || why="$why no passed tried run (exit 0, said >= 1) before kept;"
   why="$why$MADEWHY"
-  sleep 10; quiet; n0=$(lines); PLAY DAYSASK
-  st=$(waitfor "skill run [^ ]+: $MN handed over|skill task [^ ]+: started" $n0 ${RUNWAIT:-180})
+  sleep 10; quiet; HUSH; n0=$(lines); ASK DAYSASK
+  st=$(waitfor "skill run [^ ]+: $MN handed over|skill task [^ ]+: started" $n0 $RUNWAIT)
   rid=$(sed -n "${st:-1}p" $J | sed -n "s/.*skill run \([^ :]*\): $MN handed over.*/\1/p")
   # a run step: its own end, whose "said N" counts its own says (a run's client is c_<hex>, runs.rs:118, so a say line
   # does not name the run), and a say after its start; a task step: the task's end, a say after it
-  if [ -n "$rid" ]; then e=$(waitfor "skill run $rid: ended in" $st ${RUNWAIT:-180}); s=$(waitfor "$SAY" $st ${RUNWAIT:-180})
-  else e=$(waitfor "skill task [^ ]+: (ended|its agent's answer)" $n0 ${RUNWAIT:-180}); s=$(waitfor "$SAY" ${e:-$n0} ${RUNWAIT:-180}); fi
+  if [ -n "$rid" ]; then e=$(waitfor "skill run $rid: ended in" $st $RUNWAIT); s=$(waitfor "$SAY" $st $RUNWAIT)
+  else e=$(waitfor "skill task [^ ]+: (ended|its agent's answer)" $n0 $RUNWAIT); s=$(waitfor "$SAY" ${e:-$n0} $RUNWAIT); fi
   [ -n "$e" ] && echo "  run end: $(show $e) ($(since $(ep $e) $PEND) s after the clip)"
   [ -n "$s" ] && echo "  first say $(since $(ep $s) $PEND) s after the clip: $(show $s | cut -c1-160)"
   quiet; END
@@ -161,8 +207,8 @@ legB(){ local n0 h e s a lat
   BEGIN B || return 1; quiet; MAKE PRICE || { END; return 0; }
   [ "$(echo "$ML" | field kind)" = run ] || { WHY="$MN is kind=$(echo "$ML" | field kind), not a run step"; END; return 0; }
   TRYOK || echo "  NOTE no passed try line before kept"
-  sleep 10; quiet; CGW B; n0=$(lines); PLAY PRICEASK
-  h=$(waitfor "skill run [^ ]+: hand-over to script start [0-9]+ ms" $n0 ${RUNWAIT:-120}) || { WHY="no hand-over line in ${RUNWAIT:-120} s$(NOCG $n0)"; UNCGW B; END; return 0; }
+  sleep 10; quiet; CGW B; HUSH; n0=$(lines); ASK PRICEASK
+  h=$(waitfor "skill run [^ ]+: hand-over to script start [0-9]+ ms" $n0 $RUNWAIT) || { WHY="no hand-over line in $RUNWAIT s$(NOCG $n0)"; UNCGW B; END; return 0; }
   echo "  $(show $h)"; rid=$(sed -n "${h}p" $J | sed -n 's/.*skill run \([^ :]*\): hand-over.*/\1/p')
   e=$(waitfor "skill run $rid: ended in" $h 60); [ -n "$e" ] && echo "  $(show $e)"
   s=$(waitfor "$SAY" $n0 30); [ -n "$s" ] && { lat=$(since $(ep $s) $PEND); echo "  first say $lat s after the clip's end: $(show $s | cut -c1-160)"; }
@@ -178,8 +224,8 @@ legC(){ local n0 e x
   BEGIN C || return 1; quiet
   SSHR -n $H 'rm -rf /tmp/t8180-probe; mkdir -p /tmp/t8180-probe' && $SCP -qr $D/probe/grant-probe $H:/tmp/t8180-probe/ || { WHY="probe copy failed (VOID: kit, not the build)"; VC=VOID; END; return 0; }
   LAMP "" $D/probe.lamp.sh 2>&1 | tee $LG/probe.txt | sed 's/^/  /'; grep -q '^PROBE INSTALLED' $LG/probe.txt || { WHY="probe not installed (VOID: kit, not the build)"; VC=VOID; END; return 0; }
-  sleep 5; for i in 1 2; do n0=$(lines); PLAY PROBE
-    e=$(waitfor "refused: no_grant|of skill grant-probe: (no token made|its time is up)|skill run [^ ]+: ended in|$READBACK" $n0 ${RUNWAIT:-90})
+  sleep 5; for i in 1 2; do HUSH; n0=$(lines); ASK PROBE
+    e=$(waitfor "refused: no_grant|of skill grant-probe: (no token made|its time is up)|skill run [^ ]+: ended in|$READBACK" $n0 $RUNWAIT)
     [ -n "$e" ] && echo "  $(show $e)"
     sed -n "${e:-1}p" $J | grep -qE "$READBACK" && { saydone $e; PLAY YES2; sleep 15; continue; }
     break; done
@@ -195,16 +241,16 @@ legD(){ local n0 st e s t
   MAKE MAIL || { END; case "$lk" in "google none"*) WHY="$WHY (no linked Google mail account: $lk)"; VD=VOID;;
     "") WHY="$WHY (no LINKED line in logs/save.txt: the link not read, so a FAIL)";; *) WHY="$WHY (linked: $lk)";; esac; return 0; }
   [ "$(echo "$ML" | field kind)" = task ] || echo "  NOTE $MN is kind=$(echo "$ML" | field kind), not a task step"
-  sleep 10; quiet; SSHR -n $H 'touch /tmp/t8180-markD'; n0=$(lines); PLAY MAILASK
-  st=$(waitfor "skill task [^ ]+: started on the lamp's default agent|skill task [^ ]+: granted net" $n0 60) && echo "  $(show $st)"
-  e=$(waitfor "skill task [^ ]+: (ended|its agent's answer)" $n0 ${TASKWAIT:-240}) && echo "  $(show $e | cut -c1-200)"
+  sleep 10; quiet; SSHR -n $H 'touch /tmp/t8180-markD'; HUSH; n0=$(lines); ASK MAILASK
+  st=$(waitfor "skill task [^ ]+: started on the lamp's default agent|skill task [^ ]+: granted net" $n0 $RUNWAIT) && echo "  $(show $st)"
+  e=$(waitfor "skill task [^ ]+: (ended|its agent's answer)" $n0 $TASKWAIT) && echo "  $(show $e | cut -c1-200)"
   s=$(waitfor "$SAY" ${e:-$n0} 60)
   [ -n "$e" ] && t=$(since $(ep $e) $PEND) && echo "  answer $t s after the clip; first say after it $( [ -n "$s" ] && since $(ep $s) $PEND ) s"
   quiet; END
   LAMP "SKILL=$MN MARK=/tmp/t8180-markD" $D/task.lamp.sh > $LG/task-D.txt 2>&1; grep -E '^(PROMPT |SESSION|  LAMPPATH)' $LG/task-D.txt | cut -c1-240 | sed 's/^/  /'
   local P; P=$(grep '^PROMPT ' $LG/task-D.txt)
   local lp; lp=$(grep '^SESSION ' $LG/task-D.txt | sed -n 's/.*lamp_paths=\([0-9]*\).*/\1/p' | awk '{s+=$1} END {print s+0}')
-  if [ -z "$e" ]; then WHY="no task end/answer line in ${TASKWAIT:-240} s"
+  if [ -z "$e" ]; then WHY="no task end/answer line in $TASKWAIT s"
   elif [ -n "$MADEWHY" ]; then WHY="$MN:$MADEWHY"
   elif [ "$(echo "$P" | field card)" != yes ] || [ "$(echo "$P" | field first)" != yes ]; then WHY="the prompt doesn't send its agent to its SKILL.md first: $P"
   elif [ "${lp:-0}" != 0 ]; then WHY="its session names $lp lamp path(s) beyond its prompt's (logs/task-D.txt)"
@@ -213,12 +259,14 @@ legD(){ local n0 st e s t
   grep -q '^SESSIONS none' $LG/task-D.txt && WHY="$WHY; NOTE no session file found to read"; }
 # ---- E: LAMP_MAKE_MAY_RUN_ON by a /run drop-in, reversibly
 legE(){ local n0 ro q m
-  RENEW || return 1; GATE lamp-voice || { WHY="start budget (VOID: not run)"; VE=VOID; return 0; }
+  RENEW || return 1
+  MAKEIDLE || { MKBUSY=1; WHY="a make in flight after $IDLEWAIT s: the switch not turned on, LONGMAKE not asked"; return 0; }
+  GATE lamp-voice || { WHY="start budget (VOID: not run)"; VE=VOID; return 0; }
   LAMP "MODE=on PR_VOICE_SHA=${PR_VOICE_SHA:-}" $D/runon.lamp.sh 2>&1 | tee $LG/runon-on.txt | sed 's/^/  /'; grep -q '^RUNON ON' $LG/runon-on.txt || { WHY="switch not on (VOID: not run; logs/runon-on.txt)"; VE=VOID; return 0; }
-  BEGIN E || return 1; quiet; n0=$(lines); PLAY LONGMAKE
+  BEGIN E || return 1; quiet; HUSH; n0=$(lines); ASK LONGMAKE
   ro=$(waitfor "the make has no answer [0-9]+ s after its waiting line: it runs on|a long make's turn was cut before its minute: it runs on|$KEPT|$NOTKEPT" $n0 150)
   [ -n "$ro" ] && echo "  $(show $ro)"
-  if [ -n "$ro" ] && sed -n "${ro}p" $J | grep -qE "runs on"; then saydone $ro; sleep 8; PLAY READY
+  if [ -n "$ro" ] && sed -n "${ro}p" $J | grep -qE "runs on"; then saydone $ro; sleep 8; ASK READY
     q=$(waitfor "made skills listed|a make asked while a long make runs on|long make" $ro 60) && echo "  $(show $q)"
     m=$(sed -n "${ro},${q:-$(lines)}p" $J | grep -E "a long make was made|a long make made nothing")
     saydone ${q:-$ro}; echo "  LISTEN: the READY answer must say it is still making (ear check, note it in the ROW)"
@@ -268,7 +316,8 @@ legG(){ local k pl n cg sv up bad gone left nc
   left=$(sed -n 's/^CGEND left=\([^ ]*\).*/\1/p' $cg 2>/dev/null)
   nc=$(cat $LG/leg-*.journal.txt 2>/dev/null | grep -cE 'refused, no own cgroup|not handed down|not written: ')
   echo "  cgroup: serve leaf '${sv:-?}', run leaves seen $up, all gone $gone, left '${left:-}', no-cgroup refusals $nc"
-  if [ ! -s "$cg" ]; then WHY="no cgroup watch of B's run (logs/cg-B.txt): B did not reach its ask"
+  if [ ! -s "$cg" ] && [ "$VB" = VOID ]; then WHY="no cgroup watch of B's run: B VOID, not reached (VOID)"; VG=VOID
+  elif [ ! -s "$cg" ]; then WHY="no cgroup watch of B's run (logs/cg-B.txt): B did not reach its ask"
   elif ! echo " $sv" | grep -qE '^ (serve|main) $'; then WHY="serve's pid not in its own leaf (leaf '${sv:-none}')"
   elif [ "$up" = 0 ]; then WHY="no run-* leaf seen under lamp-tasks' cgroup during B's run ($(grep -c '^RUNLEAF ~' $cg) made with no process)"
   elif [ -n "$bad" ]; then WHY="a run leaf without its caps: $(echo "$bad" | cut -c1-200)"
@@ -277,7 +326,8 @@ legG(){ local k pl n cg sv up bad gone left nc
   elif [ -z "$pl" ]; then WHY="no prlimit in the image"
   elif [ "$(printf '5.14\n%s\n' "${k%%-*}" | sort -V | head -1)" != 5.14 ]; then WHY="kernel $k is older than 5.14"
   elif [ "${n:-0}" -le 64 ]; then WHY="only $n lampos tasks (VOID: cap not shown per run)"; VG=VOID
-  elif [ "$VA" != PASS ] || [ "$VB" != PASS ]; then WHY="a try or the run step failed (A $VA, B $VB) with $n lampos tasks"
+  elif [ "$VA" = FAIL ] || [ "$VB" = FAIL ]; then WHY="a try or the run step failed (A $VA, B $VB) with $n lampos tasks"
+  elif [ "$VA" != PASS ] || [ "$VB" != PASS ]; then WHY="A $VA, B $VB: not shown, so not (4) (VOID)"; VG=VOID
   else VG=PASS; WHY="serve in leaf $sv; $up run leaf/leaves in B's run with $(grep -m1 '^RUNLEAF +run-' $cg | grep -oE 'memory\.max=[^ ]+ .*pids\.max=[^ ]+' | cut -c1-140), gone after; kernel $k, prlimit at $pl, $n lampos tasks > 64, A and B passed"; fi; }
 
 # ---- K (21 Nov): a skill that uses the camera (or the mic) and the speaker: made, tried and run, no yes asked
@@ -289,10 +339,10 @@ GSET(){ grep -oE 'a token for \[[^]]*\]' | head -1 | sed 's/^a token for \[//; s
 legK(){ local n0 w tt rt s rb2 e k1 k2 k3 k4 k5
   BEGIN K || return 1; quiet; MAKE LOOK || { END; echo "CHECK (K1) made and kept: FAIL ($WHY)"; return 0; }
   tt=$(sed -n "$(( MK0 + 1 )),${MK}p" $J | grep -E "a make's tried run, a token for \[" | head -1)
-  sleep 10; quiet; n0=$(lines); PLAY LOOKASK
-  rt=$(waitfor "run [^ ]+ of skill $MN: a token for \[" $n0 ${RUNWAIT:-90})
-  e=$(waitfor "skill run [^ ]+: ended in|skill task [^ ]+: (ended|its agent's answer)" $n0 ${RUNWAIT:-90})
-  s=$(waitfor "$SAY" $n0 ${RUNWAIT:-90}); rb2=$(tail -n +$(( n0 + 1 )) $J | grep -E "$READBACK|$YESOK" | head -1)
+  sleep 10; quiet; HUSH; n0=$(lines); ASK LOOKASK
+  rt=$(waitfor "run [^ ]+ of skill $MN: a token for \[" $n0 $RUNWAIT)
+  e=$(waitfor "skill run [^ ]+: ended in|skill task [^ ]+: (ended|its agent's answer)" $n0 $RUNWAIT)
+  s=$(waitfor "$SAY" $n0 $RUNWAIT); rb2=$(tail -n +$(( n0 + 1 )) $J | grep -E "$READBACK|$YESOK" | head -1)
   [ -n "$rt" ] && echo "  $(show $rt)"; [ -n "$e" ] && echo "  $(show $e)"; [ -n "$s" ] && echo "  first say $(since $(ep $s) $PEND) s after the clip: $(show $s | cut -c1-140)"
   quiet; END
   k1=PASS; k2=FAIL; k3=FAIL; k4=FAIL; k5=FAIL
@@ -328,8 +378,8 @@ legH(){ local n0 h rid e2 h2 rid2 x h1 h2c h3 h4 old
   BEGIN H || return 1; quiet
   FIXTURE slow-probe || { WHY="slow-probe fixture not installed (VOID: kit)"; VH=VOID; END; return 0; }
   GATE lamp-tasks || { WHY="start budget (lamp-tasks) (VOID: not run)"; VH=VOID; END; return 0; }
-  CGSECS=150 CGW H; n0=$(lines); PLAY SLOW
-  h=$(waitfor "$STARTED" $n0 ${RUNWAIT:-60}) || { UNCGW H; WHY="no run start (handed over) for slow-probe$(NOCG $n0)"; END; return 0; }
+  CGSECS=150 CGW H; HUSH; n0=$(lines); ASK SLOW
+  h=$(waitfor "$STARTED" $n0 $RUNWAIT) || { UNCGW H; WHY="no run start (handed over) for slow-probe$(NOCG $n0)"; END; return 0; }
   rid=$(sed -n "${h}p" $J | sed -n 's/.*skill run \([^ :]*\): .*/\1/p'); echo "  $(show $h)"
   for x in $(seq 1 20); do grep -q '^RUNLEAF +run-' $LG/cg-H.txt && break; sleep 0.5; done
   old=$(grep -m1 '^RUNLEAF +run-' $LG/cg-H.txt | awk '{print substr($2,2)}'); echo "  run leaf before the restart: ${old:-none seen}"
@@ -341,7 +391,7 @@ legH(){ local n0 h rid e2 h2 rid2 x h1 h2c h3 h4 old
      && grep -q 'mainpid_in_serve=yes' $LG/restart-H.txt && grep -q 'root_procs=\[\]' $LG/restart-H.txt && h2c=PASS
   h3=FAIL; grep -q '^J .*each run gets its own cgroup under' $LG/restart-H.txt && ! grep -qE '^J .*(runs have no own cgroup|refused, no own cgroup|could not be set)' $LG/restart-H.txt && h3=PASS
   # a fresh run step after it: slow-probe again (its own skill, so H needs no other leg)
-  quiet; n0=$(lines); PLAY SLOW
+  quiet; HUSH; n0=$(lines); ASK SLOW
   h2=$(waitfor "skill run [^ ]+: hand-over to script start [0-9]+ ms" $n0 60); rid2=$(sed -n "${h2:-1}p" $J | sed -n 's/.*skill run \([^ :]*\): hand-over.*/\1/p')
   e2=; [ -n "$rid2" ] && e2=$(waitfor "skill run $rid2: ended in" $h2 60); [ -n "$e2" ] && echo "  fresh run: $(show $e2)"
   h4=FAIL; [ -n "$e2" ] && RUNOK $e2 && h4=PASS
@@ -355,12 +405,12 @@ legH(){ local n0 h rid e2 h2 rid2 x h1 h2c h3 h4 old
 legP(){ local n0 h rid e n1 h2 rid2 e2 pe fp p1 p2 ov
   BEGIN P || return 1; quiet
   FIXTURE fork-probe || { WHY="fork-probe fixture not installed (VOID: kit)"; VP=VOID; END; return 0; }
-  [ -n "$MNB" ] || { WHY="no price skill from leg B for the second task (run B first)"; VP=VOID; END; return 0; }
-  CGSECS=150 CGW P; n0=$(lines); PLAY FORK
-  h=$(waitfor "$STARTED" $n0 ${RUNWAIT:-60}) || { UNCGW P; WHY="no run start (handed over) for fork-probe$(NOCG $n0)"; END; return 0; }
+  [ -n "$MNB" ] || { WHY="no price skill kept by leg B for the second task (run B first)"; VP=VOID; END; return 0; }
+  CGSECS=150 CGW P; HUSH; n0=$(lines); ASK FORK
+  h=$(waitfor "$STARTED" $n0 $RUNWAIT) || { UNCGW P; WHY="no run start (handed over) for fork-probe$(NOCG $n0)"; END; return 0; }
   rid=$(sed -n "${h}p" $J | sed -n 's/.*skill run \([^ :]*\): .*/\1/p'); echo "  fork run $rid: $(show $h)"
-  sleep 2; n1=$(lines); PLAY PRICEASK
-  h2=$(waitfor "$STARTED" $n1 60); rid2=$(sed -n "${h2:-1}p" $J | sed -n 's/.*skill run \([^ :]*\): .*/\1/p')
+  sleep 2; n1=$(lines); ASK PRICEASK
+  h2=$(waitfor "$STARTED" $n1 $RUNWAIT); rid2=$(sed -n "${h2:-1}p" $J | sed -n 's/.*skill run \([^ :]*\): .*/\1/p')
   [ "$rid2" = "$rid" ] && rid2=
   e=$(waitfor "skill run $rid: ended in" $h 60); e2=; [ -n "$rid2" ] && e2=$(waitfor "skill run $rid2: ended in" ${h2:-$n1} 60)
   sleep 5; UNCGW P; quiet; END
@@ -388,7 +438,7 @@ legN(){ local n0 n1 h1 h2 s1 t0 t1 n1c=FAIL n2c=FAIL n3c=FAIL
     rm -f $LG/named-on.txt $LG/named-off.txt; fi
   BEGIN N || return 1; quiet
   # N1: off, as on stable: no hand-over in code; the voice's own tool answers
-  t0=$(TASKMAX); n0=$(lines); PLAY NAMED
+  t0=$(TASKMAX); HUSH; n0=$(lines); ASK NAMED
   h1=$(waitfor "$HANDED" $n0 ${NWAIT:-40}); s1=$(waitfor "$SAY" $n0 5)
   [ -n "$h1" ] && echo "  OFF but handed: $(show $h1)"; [ -n "$s1" ] && echo "  off: answered: $(show $s1 | cut -c1-160)" || echo "  NOTE off: no say/pieces line for the ask"
   quiet; NTASKS ${t0:-0} NAMED-off
@@ -397,7 +447,7 @@ legN(){ local n0 n1 h1 h2 s1 t0 t1 n1c=FAIL n2c=FAIL n3c=FAIL
   GATE lamp-voice || { END; WHY="start budget before the switch on (VOID: N1 $n1c)"; VN=VOID; return 0; }
   : > $LG/named-on.txt; LAMP "MODE=on" $D/named.lamp.sh 2>&1 | tee $LG/named-on.txt | grep -E '^(NAMED|NOTE|ENGINE)' | cut -c1-200 | sed 's/^/  /'
   if ! grep -q '^NAMED ON' $LG/named-on.txt; then END; GATE lamp-voice || sleep 60; NOFF; WHY="switch not on (VOID: logs/named-on.txt; N1 $n1c)"; VN=VOID; return 0; fi
-  sleep 5; quiet; t1=$(TASKMAX); n1=$(lines); PLAY NAMED
+  sleep 5; quiet; t1=$(TASKMAX); HUSH; n1=$(lines); ASK NAMED
   h2=$(waitfor "$HANDED" $n1 ${NWAIT:-40}); [ -n "$h2" ] && { echo "  on: $(show $h2)"; n2c=PASS; }
   saydone ${h2:-$n1}; quiet; NTASKS ${t1:-0} NAMED-on
   # N3: off again
@@ -408,15 +458,15 @@ legN(){ local n0 n1 h1 h2 s1 t0 t1 n1c=FAIL n2c=FAIL n3c=FAIL
   echo "CHECK (N2) on: the voice's hand-over line ('round 1 hands them over in code'): $n2c"
   echo "CHECK (N3) the switch off again (NAMED OFF, drop-in gone): $n3c"
   [ "$n1c$n2c$n3c" = PASSPASSPASS ] && { VN=PASS; WHY="off: not handed; on: $(show $h2 | grep -oE 'request [0-9]+: the heard words named [^ ]+'); off again"; } || WHY="N1 $n1c N2 $n2c N3 $n3c"; }
-LEGS=${LEGS-A B C D E K H P N}; TAILS=${TAILS-F G}
+LEGS=${LEGS-A B C D K H P N E}; TAILS=${TAILS-F G}
 RT=$LG/row-$(echo $LEGS $TAILS | tr -d ' ').txt     # this invocation's lines; row.txt keeps every invocation's
 echo "== row.sh $LEGS $TAILS on $LAMP $(date '+%F %T')" | tee $RT >> $LG/row.txt
 case " $LEGS $TAILS " in *" W "*) { RENEW || exit 1; wpre; } 2>&1 | tee -a $RT;; esac
-for g in $LEGS $TAILS; do RENEW || { echo "LOCK lost before leg $g: stop"; exit 1; }; WHY=
-  case $g in A) legA; echo "LEG A $VA ($WHY)";; B) legB; MKB=$MK; [ "$VB" = PASS ] && MNB=$MN; echo "LEG B $VB ($WHY)"; printf 'MNB=%s\nMKB=%s\n' "$MNB" "$MKB" >> $LG/verdicts.env;; C) legC; echo "LEG C $VC ($WHY)";;
-    D) legD; echo "LEG D $VD ($WHY) [$DNOTE]";; E) legE; echo "LEG E $VE ($WHY)";; F) legF; echo "LEG F $VF ($WHY)";; G) legG; echo "LEG G $VG ($WHY)";;
-    K) legK; echo "LEG K $VK ($WHY)";; H) legH; echo "LEG H $VH ($WHY)";; P) legP; echo "LEG P $VP ($WHY)";; W) legW; echo "LEG W $VW ($WHY)";;
-    N) legN; echo "LEG N $VN ($WHY)";; *) echo "no leg $g"; continue;; esac
+for g in $LEGS $TAILS; do RENEW || { echo "LOCK lost before leg $g: stop"; exit 1; }; WHY=; ASKN=; MKBUSY=; J=/dev/null
+  case $g in A) legA; POST A; echo "LEG A $VA ($WHY)";; B) legB; POST B; MKB=$MK; [ -n "$MK" ] && [ -n "$MN" ] && MNB=$MN; echo "LEG B $VB ($WHY)"; printf 'MNB=%s\nMKB=%s\n' "$MNB" "$MKB" >> $LG/verdicts.env;; C) legC; POST C; echo "LEG C $VC ($WHY)";;
+    D) legD; POST D; echo "LEG D $VD ($WHY) [$DNOTE]";; E) legE; POST E; echo "LEG E $VE ($WHY)";; F) legF; POST F; echo "LEG F $VF ($WHY)";; G) legG; POST G; echo "LEG G $VG ($WHY)";;
+    K) legK; POST K; echo "LEG K $VK ($WHY)";; H) legH; POST H; echo "LEG H $VH ($WHY)";; P) legP; POST P; echo "LEG P $VP ($WHY)";; W) legW; POST W; echo "LEG W $VW ($WHY)";;
+    N) legN; POST N; echo "LEG N $VN ($WHY)";; *) echo "no leg $g"; continue;; esac
   eval "echo V$g=\$V$g" >> $LG/verdicts.env
   sleep ${BETWEEN:-8}; done 2>&1 | tee -a $RT
 cat $RT | tail -n +2 >> $LG/row.txt
