@@ -3,7 +3,7 @@
 // `app.trigger`, `app.settings` and `phrase.heard` its events. The fake lamp serves the same.
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { Lamp } from '../src/index.js';
+import { Lamp, byCode } from '../src/index.js';
 import { FakeLamp } from '../src/testing.js';
 
 const settle = () => new Promise((resolve) => setTimeout(resolve, 60));
@@ -159,5 +159,75 @@ test('an empty panel line is refused by the SDK and the fake alike, and panel(t,
     await assert.rejects(lamp.panel('ok', ['a', '', 'b']), (error) => error.code === 'bad_request');
     await assert.rejects(lamp.request('app.panel.set', { title: 'ok', lines: ['a', '', 'b'] }), (error) => error.code === 'bad_request');
     assert.equal(await lamp.panel('ok', null), 1);
+  });
+});
+
+// What an app tells Lamp's memory: `remember` (apps.remember) and `context` (apps.context), with the `remember` grant.
+const MEMORY_GRANTS = ['speak', 'hear', 'remember'];
+const MEMORY_REFUSALS = ['off', 'no_grant', 'bad_request', 'private', 'unavailable', 'rate', 'refused'];
+
+test('remember keeps a fact and says kept', async () => {
+  await withApp({ appGrants: MEMORY_GRANTS }, async (fake, lamp) => {
+    assert.equal(await lamp.remember('squats 3x10, the 6th too shallow'), true);
+    assert.deepEqual(fake.asked('apps.remember'), [{ text: 'squats 3x10, the 6th too shallow' }]);
+    assert.deepEqual(fake.appFacts, ['squats 3x10, the 6th too shallow']);
+  });
+});
+
+test('remember and context need the remember grant', async () => {
+  await withApp({}, async (fake, lamp) => {
+    await assert.rejects(lamp.remember('squats'), byCode.no_grant);
+    await assert.rejects(lamp.context('set 1 of 3'), byCode.no_grant);
+  });
+});
+
+test('each memory refusal is its own error', async () => {
+  await withApp({ appGrants: MEMORY_GRANTS }, async (fake, lamp) => {
+    for (const [op, call] of [['apps.remember', () => lamp.remember('squats')], ['apps.context', () => lamp.context('set 1 of 3')]]) {
+      for (const code of MEMORY_REFUSALS) {
+        fake.refuseNext(op, code, `the lamp says ${code}`, code === 'rate' ? 1234 : undefined);
+        await assert.rejects(call(), (error) => error instanceof byCode[code] && error.code === code
+          && error.why === `the lamp says ${code}` && error.retryMs === (code === 'rate' ? 1234 : undefined), `${op} ${code}`);
+      }
+    }
+    assert.deepEqual(fake.appFacts, []);
+    assert.equal(fake.appContext, null);
+  });
+});
+
+test('remember is three a minute with retryMs', async () => {
+  await withApp({ appGrants: MEMORY_GRANTS }, async (fake, lamp) => {
+    for (let n = 0; n < 3; n++) assert.equal(await lamp.remember(`fact ${n}`), true);
+    await assert.rejects(lamp.remember('fact 3'), (error) => error instanceof byCode.rate && error.retryMs > 0 && error.retryMs <= 60_000);
+    assert.deepEqual(fake.appFacts, ['fact 0', 'fact 1', 'fact 2']);
+  });
+});
+
+test('remember is refused while private and over 280', async () => {
+  await withApp({ appGrants: MEMORY_GRANTS }, async (fake, lamp) => {
+    await assert.rejects(lamp.remember('x'.repeat(281)), byCode.bad_request);
+    fake.setPrivate(true);
+    await assert.rejects(lamp.remember('squats'), byCode.private);
+    await assert.rejects(lamp.context('set 1 of 3'), byCode.private);
+    assert.deepEqual(fake.appFacts, []);
+  });
+});
+
+test('context is renewed each rep and cleared at the end', async () => {
+  await withApp({ appGrants: MEMORY_GRANTS }, async (fake, lamp) => {
+    await lamp.context('set 2 of 3, 6 squats', { forMs: 30_000 });
+    await lamp.context('set 2 of 3, 7 squats', { forMs: 30_000 });
+    assert.deepEqual(fake.appContext, { line: 'set 2 of 3, 7 squats', forMs: 30_000 });
+    await lamp.context('set 3 of 3, 1 squat');
+    assert.deepEqual(fake.appContext, { line: 'set 3 of 3, 1 squat', forMs: 60_000 });
+    await lamp.clearContext();
+    assert.equal(fake.appContext, null);
+    await lamp.context('again');
+    await lamp.context('');
+    assert.equal(fake.appContext, null);
+    assert.deepEqual(fake.asked('apps.context').at(-1), { line: '' });
+    for (const [line, forMs] of [['x'.repeat(121), 1000], ['ok', 0], ['ok', 600_001]]) {
+      await assert.rejects(lamp.context(line, { forMs }), byCode.bad_request, JSON.stringify([line, forMs]));
+    }
   });
 });

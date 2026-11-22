@@ -24,6 +24,8 @@ naming every public call, tool, event and error code they have.
 | an installed app's manifest trigger and taking its turn | `lamp.on("app.trigger", handler)`, then `await lamp.took(event["turn"])` | `lamp.on('app.trigger', handler)`, then `await lamp.took(event.turn)` | — | — |
 | an installed app's settings, and the owner changing one | `await lamp.settings()`; `lamp.on("app.settings", handler)` | `await lamp.settings()`; `lamp.on('app.settings', handler)` | — | — |
 | an installed app's panel in the owner's app (title, at most 6 lines, one a minute) | `await lamp.panel("Title", ["line"])` | `await lamp.panel('Title', ['line'])` | — | — |
+| an installed app's fact for Lamp's memory (280 characters once tidied, three a minute) | `await lamp.remember("squats 3x10")` | `await lamp.remember('squats 3x10')` | — | `remember` (the manifest's) |
+| an installed app's live context line for the voice, never kept (120 characters, `for_ms` up to 10 minutes, renewed; needs a lamp with `apps.context`) | `await lamp.context("set 2 of 3, 7 squats", for_ms=30_000)`; `await lamp.clear_context()` | `await lamp.context('set 2 of 3, 7 squats', { forMs: 30_000 })`; `await lamp.clearContext()` | — | `remember` (the manifest's) |
 | find lamps on this network | `await find()` (`lampos.discovery`, the `[find]` extra) | `await find()` | — |
 | any op of the schema | `await lamp.request(op, **fields)` (`on_id=` is told its id before it is sent) | `lamp.request(op, fields)` | — |
 
