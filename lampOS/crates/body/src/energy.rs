@@ -1468,6 +1468,10 @@ mod tests {
             "dance_jazz 4 4",
         ];
         assert_eq!(held, pinned);
+        // V2's (A) on #8307: where the clip itself (level 1) moves a joint
+        // more than V1 does at level 5, the capped level 2 sits below level
+        // 1 there; only a joint the cap holds at level 2 may (pinned).
+        let mut below_one = Vec::new();
         for clip in crate::clips::ALL {
             for level in 1..=4u8 {
                 let (here, above) = (livelier(clip, level), livelier(clip, level + 1));
@@ -1475,6 +1479,15 @@ mod tests {
                 for joint in 0..5 {
                     let (swing, speed) = how_far_and_fast(here.frames, here.step_ms, joint);
                     let (top_swing, top_speed) = how_far_and_fast(stretch, above.step_ms, joint);
+                    if level == 1 && (swing > top_swing + 1 || speed > top_speed) {
+                        let pair = format!("{} {joint}", clip.name);
+                        assert!(
+                            held.contains(&format!("{} 2 {joint}", clip.name)),
+                            "{pair} is below level 1 but not capped at level 2"
+                        );
+                        below_one.push(pair);
+                        continue;
+                    }
                     assert!(
                         swing <= top_swing + 1 && speed <= top_speed,
                         "{} joint {joint}: level {level} {swing}, {speed:.0}/s; level {} {top_swing}, {top_speed:.0}/s",
@@ -1484,5 +1497,8 @@ mod tests {
                 }
             }
         }
+        // Clip and joint where level 2 sits below level 1 (pinned, so a change is said).
+        let pinned_below_one: [&str; 0] = [];
+        assert_eq!(below_one, pinned_below_one);
     }
 }
