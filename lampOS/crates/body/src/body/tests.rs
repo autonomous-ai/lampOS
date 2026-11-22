@@ -21860,6 +21860,247 @@ fn a_built_in_clip_at_level_five_plays_larger_than_at_level_one() {
     assert!(lively >= today * 3 / 2, "{today} {lively}");
 }
 
+/// One step of [`returned_after`]: when, the mood, the gesture playing,
+/// the head's and the base's goals, and the gestures' fates said.
+type Returned = (
+    Duration,
+    Mood,
+    Option<&'static str>,
+    [u16; 3],
+    Vec<(&'static str, &'static str)>,
+);
+
+/// `clip` asked at 8 s while the lamp speaks, at `level` with
+/// `LAMP_BODY_ENERGY=on` (#8153): it speaks until 16 s and listens after,
+/// but speaks again from 20 s to 22 s if `speaks_again`; a second nod is
+/// asked at `nod_again`. Each step for 30 s.
+fn returned_after(
+    level: u8,
+    clip: Option<&'static Clip>,
+    speaks_again: bool,
+    nod_again: Option<Duration>,
+) -> Vec<Returned> {
+    let (mut lamp, mut clock) = folded(Duration::from_secs(30));
+    lamp.arm_moves = true;
+    lamp.overload_clears = 1;
+    let limits = Limits {
+        energy: true,
+        ..Limits::folded_with(Tuning {
+            reach: [150, 15, 1, 250],
+            speed: 120,
+            servo_speed: 1_000,
+            servo_acceleration: 60,
+        })
+        .unwrap()
+    };
+    let time = clock.time.clone();
+    let heard = clock.time.clone();
+    let seen = clock.time.clone();
+    let (mut asked, mut asked_again) = (false, false);
+    let mut steps = Vec::new();
+    let report = run_alive(
+        &mut lamp,
+        &mut clock,
+        limits,
+        Some(HOME),
+        Some(standing(100, 60)),
+        None,
+        move || {
+            let at = heard.get();
+            let speaking = at < Duration::from_secs(16)
+                || (speaks_again && at >= Duration::from_secs(20) && at < Duration::from_secs(22));
+            Some(if speaking {
+                (Mood::Speaking, 60)
+            } else {
+                (Mood::Listening, 60)
+            })
+        },
+        move || {
+            let now = time.get();
+            let due = !asked && now >= Duration::from_secs(8);
+            asked |= due;
+            let again = !asked_again && nod_again.is_some_and(|at| now >= at);
+            asked_again |= again;
+            Asked {
+                gesture: if due {
+                    clip
+                } else {
+                    again.then_some(&crate::clips::NOD)
+                },
+                energy: level,
+                ..Asked::default()
+            }
+        },
+        |glimpse| {
+            steps.push((
+                seen.get(),
+                glimpse.mood,
+                glimpse.gesture,
+                glimpse.goals,
+                glimpse.gesture_fates.iter().collect(),
+            ))
+        },
+    );
+    assert_eq!(report.stop, Stop::Cancelled, "{report:?}");
+    assert_eq!(report.tipping.refused, 0, "{report:?}");
+    steps
+}
+
+/// The gestures played over `steps`, each once in a row, with when it began.
+fn played_in(steps: &[Returned]) -> Vec<(&'static str, Duration)> {
+    let mut played: Vec<(&'static str, Duration)> = Vec::new();
+    let mut was = None;
+    for step in steps {
+        if step.2 != was
+            && let Some(name) = step.2
+        {
+            played.push((name, step.0));
+        }
+        was = step.2;
+    }
+    played
+}
+
+/// #8153 (V2's ruling, 22 Nov): at level 5 a gesture over is followed by
+/// V1's return, `idle.csv`, as V1 plays it after every clip but idle,
+/// sleepy and music (`animation_service.py`). It never plays while the lamp
+/// speaks: it waits for the answer's end, so a fill on an answer is
+/// followed by a settle in the pause after it, never over the words, and
+/// the lean toward the person is never taken away for it. It reads as a
+/// settle, not a second gesture: no head or base joint swings past V1's own
+/// swing of `idle.csv` (`clips::V1_SWING`), and it ends where it began.
+/// The journal says it once, as the gesture's fate (`gesture nod over; the
+/// return plays`), so a kit counts it apart from a shift at rest. Level 1
+/// is today: no return.
+#[test]
+fn at_level_five_a_gesture_over_is_followed_by_v1s_return_once_the_lamp_stops_speaking() {
+    let today = returned_after(1, Some(&crate::clips::NOD), false, None);
+    let names: Vec<_> = played_in(&today)
+        .into_iter()
+        .map(|(name, _)| name)
+        .collect();
+    assert_eq!(names, ["nod"]);
+    let lively = returned_after(5, Some(&crate::clips::NOD), false, None);
+    let played = played_in(&lively);
+    let names: Vec<_> = played.iter().map(|(name, _)| *name).collect();
+    assert_eq!(names, ["nod", "idle"], "{played:?}");
+    // The nod ended while it spoke; the return waited for the answer's end.
+    let nod_over = lively.iter().rfind(|step| step.2 == Some("nod")).unwrap().0;
+    assert!(nod_over < Duration::from_secs(16), "{nod_over:?}");
+    let began = played[1].1;
+    assert!(
+        began >= Duration::from_secs(16) && began <= Duration::from_millis(16_100),
+        "{began:?}"
+    );
+    assert!(
+        lively
+            .iter()
+            .all(|step| !(step.2 == Some("idle") && step.1 == Mood::Speaking))
+    );
+    let said: Vec<_> = lively.iter().flat_map(|step| step.4.clone()).collect();
+    assert_eq!(
+        said.iter()
+            .filter(|fate| **fate == ("nod", "over; the return plays"))
+            .count(),
+        1,
+        "{said:?}"
+    );
+    assert!(
+        said.iter().all(|(_, why)| !why.starts_with("dropped")),
+        "{said:?}"
+    );
+    // A settle: what it adds to the same talk with nothing asked (the mood
+    // moving the head as it listens) stays inside V1's own swing of
+    // idle.csv, and is nothing again once it is over.
+    let plain = returned_after(5, None, false, None);
+    assert_eq!(plain.len(), lively.len());
+    let added = |at: usize, joint: usize| {
+        // The same step: the simulated wire's time differs by microseconds.
+        assert!(plain[at].0.abs_diff(lively[at].0) < Duration::from_millis(5));
+        i32::from(lively[at].3[joint]) - i32::from(plain[at].3[joint])
+    };
+    let returning: Vec<usize> = (0..lively.len())
+        .filter(|at| lively[*at].2 == Some("idle"))
+        .collect();
+    assert!(returning.len() >= 400, "{}", returning.len());
+    let v1 = crate::clips::V1_SWING
+        .iter()
+        .find(|(name, _)| *name == "idle")
+        .unwrap()
+        .1;
+    // The goals are head pitch, head roll and base yaw, as V1_SWING's first three.
+    for (joint, &v1_joint) in v1.iter().enumerate().take(3) {
+        let moved = returning.iter().map(|at| added(*at, joint));
+        let swing = moved.clone().max().unwrap() - moved.min().unwrap();
+        assert!(
+            swing > 0 && swing <= i32::from(v1_joint),
+            "joint {joint}: {swing}"
+        );
+    }
+    let first = returning[0];
+    let after = *returning.last().unwrap() + 25;
+    for joint in 0..3 {
+        assert!(added(first - 1, joint).abs() <= 2, "joint {joint}");
+        assert!(added(after, joint).abs() <= 2, "joint {joint}");
+    }
+}
+
+/// #8153: the return never plays while the lamp speaks: one playing as an
+/// answer begins ends there and is not taken up again; and after sleepy,
+/// which V1 holds, none plays.
+#[test]
+fn the_return_ends_as_the_lamp_speaks_and_none_follows_sleepy() {
+    let steps = returned_after(5, Some(&crate::clips::NOD), true, None);
+    let played = played_in(&steps);
+    assert_eq!(
+        played.iter().map(|(name, _)| *name).collect::<Vec<_>>(),
+        ["nod", "idle"],
+        "{played:?}"
+    );
+    assert!(
+        steps
+            .iter()
+            .all(|step| !(step.2 == Some("idle") && step.1 == Mood::Speaking))
+    );
+    let last = steps.iter().rfind(|step| step.2 == Some("idle")).unwrap().0;
+    assert!(last < Duration::from_secs(20), "{last:?}");
+    let sleepy = returned_after(5, Some(&crate::clips::SLEEPY), false, None);
+    let played = played_in(&sleepy);
+    assert_eq!(
+        played.iter().map(|(name, _)| *name).collect::<Vec<_>>(),
+        ["sleepy"],
+        "{played:?}"
+    );
+}
+
+/// #8153: a gesture asked while the return plays cuts it at once and is
+/// never dropped for it, as over a shift at rest; it has its own return.
+#[test]
+fn a_gesture_asked_while_the_return_plays_cuts_it_at_once() {
+    let steps = returned_after(
+        5,
+        Some(&crate::clips::NOD),
+        false,
+        Some(Duration::from_secs(18)),
+    );
+    let played = played_in(&steps);
+    let names: Vec<_> = played.iter().map(|(name, _)| *name).collect();
+    assert_eq!(names, ["nod", "idle", "nod", "idle"], "{played:?}");
+    assert!(played[2].1 <= Duration::from_millis(18_060), "{played:?}");
+    let said: Vec<_> = steps.iter().flat_map(|step| step.4.clone()).collect();
+    assert!(
+        said.iter().all(|(_, why)| !why.starts_with("dropped")),
+        "{said:?}"
+    );
+    assert_eq!(
+        said.iter()
+            .filter(|fate| fate.1 == "taken: it plays")
+            .count(),
+        2,
+        "{said:?}"
+    );
+}
+
 /// A gesture only an energy level above 1 starts of itself (`lively`, the
 /// voice's fill, a lively skill's run, #6893) is dropped while lamp-control
 /// holds the body; the same nod not marked plays under the lease, as today.
