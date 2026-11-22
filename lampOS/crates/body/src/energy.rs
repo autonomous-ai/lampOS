@@ -1260,6 +1260,7 @@ mod tests {
                 .map(|frame| i32::from(frame[joint]));
             at.clone().max().unwrap() - at.min().unwrap()
         };
+        let mut under_gain = Vec::new();
         for clip in crate::clips::ALL {
             for level in 2..=5 {
                 let (here, there) = (cut_frames(clip, level), cut_frames(clip, level - 1));
@@ -1288,16 +1289,30 @@ mod tests {
                         swing(&raw_there, there.clone(), joint),
                     );
                     let wanted = under as f32 * raw_here as f32 / raw_there.max(1) as f32;
-                    assert!(
-                        now as f32 + 1.0 >= wanted.round(),
-                        "{} joint {joint}: {now} at level {level}, {under} at {} ({wanted:.0} on this stretch)",
-                        clip.name,
-                        level - 1
-                    );
+                    if now as f32 + 1.0 < wanted.round() {
+                        under_gain.push((
+                            clip.name,
+                            level,
+                            joint,
+                            now,
+                            under,
+                            wanted.round() as i32,
+                        ));
+                    }
                 }
             }
         }
+        assert_eq!(under_gain, UNDER_GAIN);
     }
+
+    /// Clip, level, joint, its swing there, the level under's, and the
+    /// level under's at its gain on this stretch, where a level swings the
+    /// cut less than the level under's gain would (pinned, so a change is
+    /// said): excited's head pitch at 5, whose level 4 is the clip itself,
+    /// the bounce twice at 1.27 as before #8201, and level 5 the bounce once
+    /// in its recording held to V1's swing (#8307). Level 5 still swings it
+    /// farther than level 4 does (196 against 133 counts).
+    const UNDER_GAIN: [(&str, u8, usize, i32, i32, i32); 1] = [("excited", 5, 0, 196, 133, 248)];
 
     /// Clip, joint, level 1's swing and level 2's where the capped level 2
     /// sits below level 1, under the floor's 10% (V2's (A) on #8307; pinned,
