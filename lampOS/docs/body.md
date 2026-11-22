@@ -1578,6 +1578,25 @@ the voice, Expression and lamp-skills (each with `energy_in::EnergyIn`, the body
   the step kept (`energy::under_five`; `energy::tests::levels_two_to_four_play_as_before_8201_never_more_than_the_level_above`,
   which keeps the pre-#8201 builder as its reference and pins where the cap holds).
 
+  Where the cap holds, 64 joint-levels in all (pinned in that test): there that joint moves
+  no more than the level above it, so less than before #8201; every other joint of every clip
+  at 2 to 4 is byte for byte as before.
+
+  | clip | joint: levels capped |
+  |---|---|
+  | curious | base yaw: 2, 3, 4 |
+  | happy | shoulder: 2, 3, 4 |
+  | caring | elbow: 2, 3, 4; head pitch: 4 |
+  | surprised | head pitch: 2, 3, 4; shoulder: 2, 3, 4 |
+  | confused | head pitch: 2, 3, 4; base yaw: 2, 3, 4 |
+  | sleepy | base yaw: 2, 3, 4; head pitch, head roll, shoulder, elbow: 3, 4 |
+  | excited | shoulder: 2, 3, 4 |
+  | scanning | head roll: 2, 3, 4 |
+  | dance_chill | base yaw: 2 |
+  | dance_hype | head pitch: 2, 3, 4; shoulder: 2, 3, 4; base yaw: 3, 4; elbow: 4 |
+  | dance_waltz | shoulder: 2, 3, 4; elbow: 2, 3, 4; base yaw: 4 |
+  | dance_jazz | head pitch: 2, 3, 4; base yaw: 2, 3, 4; elbow: 3, 4 |
+
   Level 5 on the host
   (`energy::level_five_plays_each_clip_for_all_of_its_v1_recording`; played seconds at the 1.5
   pace, each step stretched under the servo's speed):
