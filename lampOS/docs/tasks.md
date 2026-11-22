@@ -1676,6 +1676,9 @@ The product unit's test is `the_tasks_part_starts_with_no_targets_and_learns_the
     `installed` null with `installable` true; read as missing, the office
     left the voice's staff and every hand-over to it was refused. Test:
     `an_engine_harness_does_not_say_is_installed_is_unknown_never_missing`.
+    The lamp's own machine is judged the other way round: it is kept as a
+    target only on an explicit `installed: true` (below), so a slow look
+    there leaves it out until a fresh `true`, and #8283 doesn't change that.
     Devin Cloud, which works in
     Devin's cloud, is never refused. A refusal has the machines and their
     engines looked at again at once (at most once in 30 s), so a computer
