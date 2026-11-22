@@ -294,8 +294,10 @@ behind the same two switches and, at the voice, `LAMP_APP_MEMORY`.
   set's counter changes a few times a minute and a line is told only at the
   person's next turn, so nothing an app means is lost while a loop can't flood
   the bus. A clear is never refused for privacy or the rate, and is not
-  counted; a refused line or one not published is not counted either. A
-  pending forget of the app's facts does not hold a live line.
+  counted; a refused line or one not published is not counted either. The
+  door's pending forget of a removed app's facts does not hold a new live
+  line (the remove already cleared the old one); a person's own "forget what
+  <app> said" clears it at the voice, below.
   - **To the voice in one hop.** The door publishes `AppContext` on
     `apps/context` (`{"app", "name", "line", "for_ms"}`: the app's checked
     name, its manifest title as `app_fact::name`, the tidied line; a clear is
@@ -303,14 +305,19 @@ behind the same two switches and, at the voice, `LAMP_APP_MEMORY`.
     (subscriber `voice`, started once a process with `LAMP_APP_MEMORY` on)
     calls `app_context::set` or `clear` with its own privacy reading (none yet
     counts as private) and the journal says the app and what was done, never a
-    word. App send to the voice holding the line is one bus hop: about 0.3 ms
+    word. The line is told only on the owner's turn (a known person in view
+    who is the owner), never a guest's or the room's. App send to the voice holding the line is one bus hop: about 0.3 ms
     in the door's bus test, under 100 ms asserted in the voice's.
   - **Gone with the session.** When the app's last connection closes (it
     stopped, was updated, crashed or was removed), lamp-control publishes the
     clear for it, once; `app_forget` publishes it before closing the
     connections. If that publish fails, or lamp-control restarts, the voice
     drops the line at its own `for_ms`, 10 minutes at most. The voice also
-    clears every line when Lamp goes private and on a forget everything.
+    clears every line when Lamp goes private and on a forget everything, and
+    one app's line on a heard `forget` whose `about` names that app holding
+    a line ("forget what Gym Coach said", by its title or id as whole words;
+    `app_context::forget_about`), unless the forget erred or forgot nothing
+    (`forgotten: false`). The app's next line is then a new one.
 - **A remove forgets, and the forget holds.** `app_forget` (the helper's
   remove) first marks the app in `--state-dir`'s `app-facts-forget.json` (0600;
   a mark that can't be written refuses the op, so the helper asks again), then

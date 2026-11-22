@@ -267,6 +267,15 @@ impl ContextLines {
         self.lines.clear();
     }
 
+    /// Each source holding a line, with its display name: for a person's
+    /// "forget what <app> said", which clears that app's line.
+    pub fn names(&self) -> Vec<(Source, String)> {
+        self.lines
+            .iter()
+            .map(|(source, (name, _, _))| (source.clone(), name.clone()))
+            .collect()
+    }
+
     /// The notes to tell beside the turn's lines at `now`, by source; a
     /// line past its time goes.
     pub fn live(&mut self, now: u64) -> Vec<String> {

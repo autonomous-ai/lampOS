@@ -12519,9 +12519,16 @@ async fn spoken(
         // An app's live context lines (`LAMP_APP_MEMORY`, #7415), each a
         // quoted note with its source, by #7900's short-lived note: told
         // for this turn only, never kept; nothing while Lamp is private.
-        .chain(crate::app_context::notes(
+        // Only on the owner's turn, by the known-person gate above: never a
+        // guest's or the room's (the Reviewer-lead's P3 on #8313).
+        .chain(crate::app_context::notes_for(
             crate::app_context::now_ms(),
             shared.private_now.load(Ordering::SeqCst),
+            scope
+                .as_ref()
+                .and_then(crate::memory_scope::ScopeLease::scope)
+                .filter(|_| known_in_view)
+                .and_then(|scope| scope.person()),
         ))
         .chain(records)
         .chain(read_ids)
