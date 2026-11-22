@@ -2602,6 +2602,29 @@ pub const MEMORY_FACE_KEPT: &str = "What they told you is forgotten, but their f
 pub fn switch_forget_all(on: bool) -> bool {
     *FORGET_ALL.get_or_init(|| on)
 }
+
+/// The Days memory on `socket` with `LAMP_MEMORY_FORGET_ALL` on, as in the
+/// product: a forget by `source_id` runs as `forget {id}`, never the old
+/// memory's `forget_last`; `shown`, of `person`'s memory, as recall showed
+/// them this session. Process-wide and set once, so only for a test run in
+/// a process of its own.
+#[cfg(test)]
+pub(crate) fn days_forget_all_for_test(socket: PathBuf, person: &str, shown: &[u64]) {
+    assert!(DAYS_MODE.set(true).is_ok(), "the Days mode was set already");
+    assert!(FORGET_ALL.set(true).is_ok(), "forget all was set already");
+    let client = DaysClient::new(socket).unwrap();
+    let stopped = client
+        .context
+        .lock()
+        .unwrap()
+        .include(Some(&person_id(person)), shown);
+    assert!(stopped.is_none(), "{stopped:?}");
+    assert!(
+        DAYS.set(Some(client)).is_ok(),
+        "the Days client was set already"
+    );
+}
+
 /// Only the exact value `on`, with the Days client: recall's second version
 /// (#2176). A question's common words ("what", "my", "của", "tôi") match
 /// nothing, recall takes a span of days (`days_ago_from`, `days_ago_to`),

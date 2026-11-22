@@ -8255,6 +8255,38 @@ mod tests {
         owner
     }
 
+    /// Set by [`agreed_days_child`] for the test its child process runs.
+    const AGREED_DAYS_CHILD: &str = "LAMP_VOICE_TEST_AGREED_DAYS_CHILD";
+
+    /// The agreed forget by id runs as `forget {id}` only with the Days
+    /// memory and `LAMP_MEMORY_FORGET_ALL` on, as in the product; without
+    /// them a `source_id` forget is the old memory's `forget_last`. Both are
+    /// set once per process, so the test `name` runs again in a child
+    /// process of its own with them on, its memory on the socket this gives
+    /// it there (`None` here, where the child's result was checked). Recall
+    /// showed Nell her kept thing 3 there, as before the lamp asked her.
+    fn agreed_days_child(name: &str) -> Option<std::path::PathBuf> {
+        if std::env::var(AGREED_DAYS_CHILD).ok().as_deref() != Some(name) {
+            let output = std::process::Command::new(std::env::current_exe().unwrap())
+                .args(["--exact", &format!("tools::tests::{name}"), "--nocapture"])
+                .env(AGREED_DAYS_CHILD, name)
+                .output()
+                .unwrap();
+            let said = format!(
+                "{}\n{}",
+                String::from_utf8_lossy(&output.stdout),
+                String::from_utf8_lossy(&output.stderr)
+            );
+            assert!(output.status.success(), "{said}");
+            assert!(said.contains("1 passed"), "the child ran no test: {said}");
+            return None;
+        }
+        let socket =
+            std::env::temp_dir().join(format!("one-face-agreed-{}.sock", std::process::id()));
+        crate::remember::days_forget_all_for_test(socket.clone(), "Nell", &[3]);
+        Some(socket)
+    }
+
     /// The Reviewer-lead's P2-a on #8300: the yes widens the forget only by
     /// the words the lamp held when it asked, never the model's `about` on
     /// the yes. Asked about "squats", a yes whose call says "gym coach"
@@ -8262,11 +8294,12 @@ mod tests {
     /// both.
     #[test]
     fn an_agreed_forget_widens_only_by_the_words_it_asked_with() {
+        let Some(socket) =
+            agreed_days_child("an_agreed_forget_widens_only_by_the_words_it_asked_with")
+        else {
+            return;
+        };
         for (at, held, others) in [(0u64, "squats", false), (1, "gym coach", true)] {
-            let socket = std::env::temp_dir().join(format!(
-                "one-face-agreed-held-{at}-{}.sock",
-                std::process::id()
-            ));
             let served = agreed_memory(
                 &socket,
                 Duration::ZERO,
@@ -8298,7 +8331,7 @@ mod tests {
             } else {
                 assert_eq!(forgot, [&json!(3)], "{asked:?}");
             }
-            std::fs::remove_file(socket).unwrap();
+            std::fs::remove_file(&socket).unwrap();
         }
     }
 
@@ -8307,10 +8340,9 @@ mod tests {
     /// may be left.
     #[test]
     fn an_app_fact_not_said_removed_is_not_counted() {
-        let socket = std::env::temp_dir().join(format!(
-            "one-face-agreed-unremoved-{}.sock",
-            std::process::id()
-        ));
+        let Some(socket) = agreed_days_child("an_app_fact_not_said_removed_is_not_counted") else {
+            return;
+        };
         let served = agreed_memory(&socket, Duration::ZERO, |id| match id.as_u64() {
             Some(3) => json!({"ok": true, "removed": 1}),
             Some(8) => json!({"ok": true}),
@@ -8341,8 +8373,11 @@ mod tests {
     /// leaves it its time: the kept thing goes, and nothing else.
     #[test]
     fn a_slow_app_facts_listing_never_starves_the_agreed_forget() {
-        let socket =
-            std::env::temp_dir().join(format!("one-face-agreed-slow-{}.sock", std::process::id()));
+        let Some(socket) =
+            agreed_days_child("a_slow_app_facts_listing_never_starves_the_agreed_forget")
+        else {
+            return;
+        };
         let served = agreed_memory(
             &socket,
             ASK_DEADLINE + Duration::from_millis(200),
