@@ -4640,6 +4640,57 @@ mod tests {
         crate::reminders::set_asks_here(None);
     }
 
+    /// Sixth's HOLD on #8274: a reply to the lamp's own question ("What
+    /// should I remind you about?" → "Take my pills.") is set from the line
+    /// it answers, which gave the time; a reply whose asked line gave none
+    /// is still refused, and so is a fresh ask with no length.
+    #[test]
+    fn a_reply_to_the_lamps_question_is_set_from_the_line_that_gave_the_time() {
+        let set = |name: &str, args: Value| ToolCall {
+            id: "1".into(),
+            name: name.into(),
+            args,
+        };
+        crate::reminders::set_asks_here(Some(true));
+        let reminder = set(
+            "set_reminder",
+            json!({"text":"Take my pills","time":"19:00"}),
+        );
+        let timer = set("set_timer", json!({"text":"Pasta","seconds":600}));
+        for (heard, asked, call, sets) in [
+            ("Take my pills.", Some("Remind me at seven."), &reminder, true),
+            ("Pasta.", Some("Set a timer for ten minutes."), &timer, true),
+            ("Take my pills.", Some("Remind me tomorrow."), &reminder, false),
+            ("Set a timer for please.", None, &timer, false),
+        ] {
+            let dir = schedule_directory("how-long-asked");
+            let served = sets.then(|| {
+                executive(
+                    &dir,
+                    b"{\"ok\":true,\"result\":{\"status\":\"committed\",\"clock\":\"19:00\"}}\n",
+                    Duration::ZERO,
+                )
+            });
+            crate::stop_scope::set_heard_here(Some(Some(heard)));
+            crate::reminders::set_asked_here(Some(asked));
+            let (_, (told, answered)) =
+                run_call_with_scope(&Route::Schedule(dir.clone()), call, 1, true, None);
+            crate::stop_scope::set_heard_here(None);
+            crate::reminders::set_asked_here(None);
+            if let Some(served) = served {
+                assert!(answered, "{heard} after {asked:?}: {told}");
+                assert_eq!(told["status"], "committed");
+                assert_eq!(served.join().unwrap()["name"], call.name.as_str());
+            } else {
+                let error = told["error"].as_str().unwrap_or_default();
+                assert!(error.starts_with("Nothing was set"), "{heard}: {told}");
+                assert!(!answered);
+            }
+            std::fs::remove_dir_all(dir).unwrap();
+        }
+        crate::reminders::set_asks_here(None);
+    }
+
     #[test]
     fn lost_or_unsendable_schedule_results_are_unknown_and_are_never_retried() {
         for (name, reply) in [

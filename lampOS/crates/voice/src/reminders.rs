@@ -119,6 +119,32 @@ pub(crate) fn set_asks_here(on: Option<bool>) {
     ASKS_HERE.with(|here| here.set(on));
 }
 
+#[cfg(test)]
+thread_local! {
+    /// [`asked_before`]'s words as a test of this thread sets them.
+    static ASKED_HERE: std::cell::RefCell<Option<Option<String>>> =
+        const { std::cell::RefCell::new(None) };
+}
+
+/// [`asked_before`]'s words for this test's thread alone; `None` reads the
+/// thread's.
+#[cfg(test)]
+pub(crate) fn set_asked_here(asked: Option<Option<&str>>) {
+    ASKED_HERE.with(|here| *here.borrow_mut() = asked.map(|asked| asked.map(str::to_owned)));
+}
+
+/// The person's lines the lamp's questions just before `request` answered
+/// ([`crate::thread::Thread::asked_before`]): a reply to "What should I
+/// remind you about?" is set from the line that gave the time.
+fn asked_before(request: u64) -> Option<String> {
+    #[cfg(test)]
+    if let Some(asked) = ASKED_HERE.with(|here| here.borrow().clone()) {
+        return asked;
+    }
+    let _ = request;
+    None
+}
+
 /// Whether [`lamp_actions::schedule::ASKS_HOW_LONG_SWITCH`] is on here.
 fn asks_how_long() -> bool {
     #[cfg(test)]
