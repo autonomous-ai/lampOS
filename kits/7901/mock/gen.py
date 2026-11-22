@@ -128,6 +128,32 @@ case("RUN.fail-legfail-unrowed", "A B C D", "FAIL", {"j/C.MAKEC": j([(1, asked(1
 case("RUN.void-noyes", "A B C D", "VOID", env={"RUNSH": "1"})
 case("RUN.void-checksha", "A B C D", "VOID", {"out/check.lamp.sh": "BIN lamp-voice running=2222 file=2222\nVERIFY FAIL: lamp-voice-not-the-given-PR-sha\nREADY\n"}, env={"MIC_YES": "yes", "RUNSH": "1"})
 case("RUN.void-budget", "A B C D", "VOID", env={"MIC_YES": "yes", "RUNSH": "1", "MOCK_STARTS": "9"})
+# ---- #8180's on-at-once make (LAMP_MADE_CODE_ON_AT_ONCE on in the product): no read-back, no yes; the try's say is
+# answered at once (said 1) and said in the tried line, journaled by its length only (make_try.rs, made_skill.rs).
+# Playing YES there is wrong: these cases' YES chunk holds the old refusal, so a YES played FAILs the leg.
+def tryline(code=0, said=1): return T + "make try: scripts/main.py: exit %s, 30 s limit, said %s" % (code, said)
+def atonce(task="kept"): return V + "a made skill with code of its own is on at once (LAMP_MADE_CODE_ON_AT_ONCE); its task %s" % task
+def saidon(n=118, uses=True): return V + "a made skill is said on with its try (%d chars, %s)" % (n, "uses named" if uses else "no uses named")
+YESBAD = j([(1, V + "request 199: a yes played in an at-once make: " + NBP)])
+def made_at_once(req, ms, nm, task="kept", tl=None, so=None, on_=True):
+    tl = tryline() if tl is None else tl; so = saidon() if so is None else so
+    ls = [(1, asked(req))] + ([(20, tl)] if tl else []) + [(30, atonce(task))] + ([(30.2, on(nm))] if on_ else []) + ([(30.4, so)] if so else [])
+    return j(ls + [(31, kept(ms)), (31.5, pieces(req + 1, 140))])
+AA = {"j/A.MAKEA": made_at_once(101, 30500, "coffee-price"), "j/A.YES": YESBAD}
+CA = {"j/C.MAKEC": made_at_once(121, 30500, "desk-search"), "j/C.YES": YESBAD}
+def over(base, **kw): d = dict(base); d.update(kw); return d
+case("A.pass-atonce", "A", "PASS", AA)
+case("A.fail-atonce-tasknotkept", "A", "FAIL", over(AA, **{"j/A.MAKEA": made_at_once(101, 30500, "coffee-price", task="not kept")}))
+case("A.fail-atonce-nosaidon", "A", "FAIL", over(AA, **{"j/A.MAKEA": made_at_once(101, 30500, "coffee-price", so="")}))
+case("A.fail-atonce-nouses", "A", "FAIL", over(AA, **{"j/A.MAKEA": made_at_once(101, 30500, "coffee-price", so=saidon(90, False))}))
+case("A.fail-atonce-trysaid0", "A", "FAIL", over(AA, **{"j/A.MAKEA": made_at_once(101, 30500, "coffee-price", tl=tryline(0, 0))}))
+case("A.fail-atonce-noon", "A", "FAIL", over(AA, **{"j/A.MAKEA": made_at_once(101, 30500, "coffee-price", on_=False)}))
+case("A.pass-yes-try", "A", "PASS", {"j/A.MAKEA": BASE["j/A.MAKEA"].replace("@+40.0 ", "@+20.0 " + tryline() + "\n@+40.0 ", 1)})
+case("A.fail-yes-tryexit1", "A", "FAIL", {"j/A.MAKEA": BASE["j/A.MAKEA"].replace("@+40.0 ", "@+20.0 " + tryline(1, 0) + "\n@+40.0 ", 1)})
+case("C.pass-atonce", "C", "PASS", CA)
+case("C.fail-atonce-nosaidon", "C", "FAIL", over(CA, **{"j/C.MAKEC": made_at_once(121, 30500, "desk-search", so="")}))
+case("D.pass-atonce", "C D", "PASS", CA)
+case("RUN.pass-atonce", "A B C D", "PASS", dict(AA, **CA), env={"MIC_YES": "yes", "RUNSH": "1"})
 # ---- kit helpers alone (unit.sh), the fixes ported from the #8180 e82d kit: engine(), the mute check, SSHR; Mac volume
 for u in ("engine-env", "engine-voice", "engine-app", "engine-none", "mute-oldstamp", "mute-timed", "mute-recoff", "mute-live",
           "mute-liveoff", "ssh-retry", "ssh-sshpass", "ssh-giveup", "ssh-other", "macvol"):

@@ -69,22 +69,52 @@ END(){ sleep ${TAIL:-8}; kill $JP 2>/dev/null; JP=; }
 STATE(){ LAMP "STAGE=$1" $D/state.lamp.sh > $LG/state-$1.txt 2>&1; sed 's/^/  /' $LG/state-$1.txt | grep -v '^  STAGE' | cut -c1-400; }
 WATCH(){ SSHR -n $H "rm -f /tmp/t7901-stop.$1"; LAMP "SECS=$(( RUNWAIT + ENDWAIT + 120 )) STOPF=/tmp/t7901-stop.$1" $D/fence.lamp.sh > $LG/fence-$1.txt 2>&1 & FP=$!; }
 UNWATCH(){ SSHR -n $H "touch /tmp/t7901-stop.$1"; sleep 2; kill $FP 2>/dev/null; FP=; grep -E '^(RUNPID|ADMIN|NET|CG|EGRESS)' $LG/fence-$1.txt | cut -c1-220 | sed 's/^/  fence /'; }
-# MAKE <clip>: the voice make, its read-back, the yes, on. Sets MSTAT (unheard|noend|notkept|kept), MW, Y, O.
-MAKE(){ local n0 rb; MSTAT=; MW=; Y=; O=; n0=$(lines); PLAY $1
+# #8180 (LAMP_MADE_CODE_ON_AT_ONCE, on in deploy/product's lamp-voice and lamp-control): a made skill with code of its
+# own that is not a task for the lamp's agent goes on at once, with no read-back and no yes (make_skill_local.rs
+# code_on_at_once). Its lines come before the kept line: "is on at once (...); its task kept|not kept", "a made skill
+# is on the lamp: <name>", and, when a try ran, the tried line "Made it..., and I tried it: <the try's first words>",
+# journaled by its length only, never its words (made_skill.rs tried_journal). Otherwise (the switch off, or an agent
+# task) the read-back waits for the yes, as before. The try ([lamp-tasks] make try, make_try.rs) ends exit 0 having
+# said >= 1: its say is answered at once by lamp-control (f45ad0f9ec) and said after the make in the tried line.
+ATONCE="is on at once \(LAMP_MADE_CODE_ON_AT_ONCE\); its task (kept|not kept)"
+TRY="\[lamp-tasks\] make try: "
+SAIDON="lamp-voice: a made skill is said on with its try \([0-9]+ chars, (no )?uses named\)"
+# MAKE <clip>: the voice make, then its path: at-once (no yes played) or read-back + yes. Sets MSTAT
+# (unheard|noend|notkept|kept), MW, Y, O, MPATH (at-once|yes|none), AT (at-once line), TRYL (try lines), SO (tried line).
+MAKE(){ local n0 rb; MSTAT=; MW=; Y=; O=; MPATH=none; AT=; TRYL=; SO=; n0=$(lines); PLAY $1
   waitfor "$HEARD" $n0 ${HEARWAIT:-60} >/dev/null || { MSTAT=unheard; return 1; }
   MW=$(waitfor "$KEPT|$NOTKEPT" $n0 $MAKEWAIT) || { MSTAT=noend; return 1; }
   echo "  make end: $(show $MW)"
+  TRYL=$(sed -n "$(( n0 + 1 )),${MW}p" $J | grep -E "$TRY"); [ -n "$TRYL" ] && echo "$TRYL" | cut -c1-220 | sed 's/^/  try: /'
   sed -n "${MW}p" $J | grep -qE "$KEPT" || { MSTAT=notkept; return 1; }; MSTAT=kept
-  rb=$(waitfor "$READBACK" $n0 ${RBWAIT:-60}) && echo "  read back: $(show $rb)" || { echo "  no read-back line in ${RBWAIT:-60} s"; rb=$MW; }
-  saydone $rb; PLAY YES
-  Y=$(waitfor "$YESOK|$YESNOT" $rb ${YESWAIT:-60})
-  if [ -n "$Y" ] && sed -n "${Y}p" $J | grep -qE "$YESNOT"; then echo "  $(show $Y): one more yes"; sleep ${YES_AGAIN:-10}; PLAY YES; Y=$(waitfor "$YESOK" $Y ${YESWAIT:-60}); fi
-  [ -n "$Y" ] && echo "  yes: $(show $Y)" || echo "  no yes-taken line"
-  O=$(waitfor "$ON" $rb ${ONWAIT:-90}) && echo "  on: $(show $O)"; quiet; return 0; }
+  AT=$(tail -n +$(( n0 + 1 )) $J | grep -E "$ATONCE" | head -1)
+  if [ -n "$AT" ]; then MPATH=at-once; echo "  PATH at-once (no read-back, no yes played): $(echo "$AT" | cut -c1-200)"
+    O=$(waitfor "$ON" $n0 ${ONWAIT:-90}) && echo "  on: $(show $O)"
+    SO=$(tail -n +$(( n0 + 1 )) $J | grep -oE "$SAIDON" | head -1); echo "  tried line: ${SO:-none in the journal}"
+    saydone $MW
+  else
+    rb=$(waitfor "$READBACK" $n0 ${RBWAIT:-60}) && { MPATH=yes; echo "  PATH yes (read back): $(show $rb)"; } || { echo "  PATH none: no at-once and no read-back line in ${RBWAIT:-60} s: the yes is played as before"; rb=$MW; }
+    saydone $rb; PLAY YES
+    Y=$(waitfor "$YESOK|$YESNOT" $rb ${YESWAIT:-60})
+    if [ -n "$Y" ] && sed -n "${Y}p" $J | grep -qE "$YESNOT"; then echo "  $(show $Y): one more yes"; sleep ${YES_AGAIN:-10}; PLAY YES; Y=$(waitfor "$YESOK" $Y ${YESWAIT:-60}); fi
+    [ -n "$Y" ] && echo "  yes: $(show $Y)" || echo "  no yes-taken line"
+    O=$(waitfor "$ON" $rb ${ONWAIT:-90}) && echo "  on: $(show $O)"; fi
+  echo "PATH $LEG $MPATH" >> $LG/paths.txt; quiet; return 0; }
+# MKCHK: TW empty when the make's path and try are right: at-once needs "its task kept"; a try that ran ends exit 0
+# having said >= 1; at once, a try that ran is said on in the tried line, naming what the skill uses (it holds net).
+MKCHK(){ TW=
+  [ "$MPATH" = at-once ] && ! echo "$AT" | grep -q 'its task kept' && TW="$TW put on at once but its task not kept (its code runs nowhere);"
+  if [ -n "$TRYL" ]; then
+    echo "$TRYL" | grep -qE 'was not run|exit [^0]|limit passed|said (0|unknown)' && TW="$TW its try failed: $(echo "$TRYL" | head -1 | cut -c1-120);"
+    echo "$TRYL" | grep -qE 'exit 0, .*said [1-9]' || TW="$TW its try did not end exit 0 having said;"
+    if [ "$MPATH" = at-once ]; then [ -n "$SO" ] || TW="$TW no tried line ('Made it..., and I tried it') after its try;"
+      [ -n "$SO" ] && echo "$SO" | grep -q 'no uses named' && TW="$TW the tried line names no uses;"; fi
+  fi; return 0; }
+tck(){ [ -n "$TW" ] && echo "FAIL ($TW)" || echo "PASS (path $MPATH, $( [ -n "$TRYL" ] && echo "try $(echo "$TRYL" | grep -oE 'exit [0-9a-z]+|said [0-9a-z]+' | tr '\n' ' ')${SO:+, tried line said}" || echo "no try ran"))"; }
 mwhy(){ case $MSTAT in unheard) echo "the clip was not heard (no request line in ${HEARWAIT:-60} s: mute, Mac volume, speaker placement)";;
   noend) echo "no make end in $MAKEWAIT s";; notkept) echo "not kept: $(show $MW | cut -c1-170)";; *) echo "$MSTAT";; esac; }
 oldref(){ grep -E "$OLDREF" $J | head -1 | cut -c1-200; }
-VA=FAIL VB=FAIL VC=FAIL VD=FAIL
+VA=FAIL VB=FAIL VC=FAIL VD=FAIL; TW=; MPATH=none
 # ---- A: the coffee make: kept with net AND notes, no refusal
 legA(){ local L g ref c1=0 c2=0 c3=0 c4=0
   BEGIN A || return 1; quiet; MAKE MAKEA; END; STATE A
@@ -96,9 +126,11 @@ legA(){ local L g ref c1=0 c2=0 c3=0 c4=0
   echo "CHECK (A2) its grants hold net AND notes: $(ck A $c2) (${SKILL:-no new skill} grants=${g:--})"
   echo "CHECK (A3) no net-beside-private refusal in the journal: $(ck A $c3)${ref:+ ($ref)}"
   echo "CHECK (A4) on the lamp: $(ck A $c4)${Y:+ (yes taken)}"
+  MKCHK; [ "$MSTAT" = kept ] && echo "CHECK (A5) its path and try: $(tck)"
   if [ -n "$ref" ]; then WHY="the old net-beside-private refusal: $ref"
   elif [ "$MSTAT" = unheard ] || [ "$MSTAT" = noend ]; then VA=VOID; WHY=$(mwhy)
-  elif [ "$c1$c2$c4" = 111 ]; then VA=PASS; WHY="$SKILL kept, grants=$g, on, no refusal"
+  elif [ -n "$TW" ]; then WHY="$SKILL:$TW"
+  elif [ "$c1$c2$c4" = 111 ]; then VA=PASS; WHY="$SKILL kept, grants=$g, on ($MPATH), no refusal"
   elif [ $c1 = 0 ]; then WHY=$(mwhy)
   elif [ $c2 = 0 ]; then WHY="${SKILL:-no new skill}: grants=${g:--}, not net+notes"
   else WHY="no 'is on the lamp' line (yes: $([ -n "$Y" ] && echo taken || echo not seen))"; fi; }
@@ -152,12 +184,14 @@ legC(){ local L g ref sp newc nnew c1=0 c2=0 c3=0 c4=0
   echo "CHECK (C2) one skill holds net AND camera: $(ck C $c2) (${L:-no new skill} grants=${g:--})"
   echo "CHECK (C3) no net-beside-private refusal and no split in the journal: $(ck C $c3)${ref:+ (refusal: $ref)}${sp:+ (split: $sp)} (new skills: $nnew)"
   echo "CHECK (C4) on the lamp: $(ck C $c4)${Y:+ (yes taken)}"
+  MKCHK; [ "$MSTAT" = kept ] && echo "CHECK (C5) its path and try: $(tck)"
   grep -E "$OLDREF|$SPLIT|$NOTKEPT" $J | cut -c1-220 | head -4 | sed 's/^/  /'
   if [ -n "$ref" ]; then WHY="the old net-beside-private refusal: $ref"
   elif [ -n "$sp" ] || [ "$nnew" -gt 1 ]; then [ -n "$sp" ] && WHY="a split in the journal: $sp" || WHY="split into $nnew skills: $(echo $newc)"
   elif [ "$MSTAT" = unheard ] || [ "$MSTAT" = noend ]; then VC=VOID; WHY=$(mwhy)
   elif [ "$MSTAT" = notkept ] && grep -qE "cannot was not made a task for the lamp's agent: sensing" $J; then VC=VOID; WHY="not kept as a trigger that watches (class sensing), not #7901's refusal: rerun leg C once"
-  elif [ "$c1$c2$c4" = 111 ]; then VC=PASS; WHY="$L kept with grants=$g, on, no refusal, no split"
+  elif [ -n "$TW" ]; then WHY="$L:$TW"
+  elif [ "$c1$c2$c4" = 111 ]; then VC=PASS; WHY="$L kept with grants=$g, on ($MPATH), no refusal, no split"
   elif [ $c1 = 0 ]; then WHY=$(mwhy)
   elif [ $c2 = 0 ]; then WHY="${L:-no new skill}: grants=${g:--}, not net+camera"
   else WHY="no 'is on the lamp' line (yes: $([ -n "$Y" ] && echo taken || echo not seen))"; fi; }
