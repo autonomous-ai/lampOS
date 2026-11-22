@@ -3167,10 +3167,13 @@ fn the_gateway_restarts_with_lamp_control_when_it_shows_its_socket() {
 #[test]
 fn lamp_control_gives_the_gateway_its_start_count_back() {
     let control = include_str!("../../../../deploy/product/lamp-control.service");
-    let line = format!(
-        "ExecStartPost=-+/bin/sh -c '/usr/bin/systemctl reset-failed {UNIT} 2>/dev/null'"
+    let line =
+        format!("ExecStartPost=-+/bin/sh -c '/usr/bin/systemctl reset-failed {UNIT} 2>/dev/null'");
+    assert_eq!(
+        control.lines().filter(|l| *l == line).count(),
+        1,
+        "{control}"
     );
-    assert_eq!(control.lines().filter(|l| *l == line).count(), 1, "{control}");
     let service = control.find("[Service]").unwrap();
     let install = control.find("[Install]").unwrap();
     let at = control.find(&line).unwrap();
@@ -3301,6 +3304,61 @@ fn a_gateway_unit_loaded_as_written_is_left_alone() {
     assert_eq!(systemd.shown, 1, "checked once");
     assert!(systemd.asked.is_empty(), "{:?}", systemd.asked);
     assert!(not_loaded(&said).is_empty(), "{said:?}");
+}
+
+/// #8320 (the first builder's and the Reviewer-lead's HOLD): the round
+/// that ships `PartOf=` restarts lamp-control before it writes the
+/// gateway's unit, so a running gateway showing lamp-control's socket is
+/// try-restarted once when its unit is written anew; the next round, the
+/// same bytes, restarts nothing.
+#[test]
+fn a_gateway_unit_written_anew_with_the_control_socket_restarts_it_once() {
+    let lamp = Lamp::new();
+    let shown = one_path();
+    assert!(shown.tasks && shown.one_path);
+    let before = unit_text_for(shown).replacen("PartOf=lamp-control.service\n", "", 1);
+    fs::write(lamp.unit(), before).unwrap();
+    let running = "DropInPaths=\nNeedDaemonReload=no\nCPUQuotaPerSecUSec=1s\nActiveState=active\n";
+    let round = |systemd: &mut Fake| {
+        let runs = Runs::new(&lamp);
+        let mut said = Vec::new();
+        after_round(
+            lamp.root(),
+            &lamp.records(),
+            shown,
+            systemd,
+            &mut runs.runner(),
+            1,
+            Ok(crate::hermes_schedule::Window::Reached),
+            &mut |line: &str| said.push(line.to_owned()),
+        );
+        said
+    };
+    let mut systemd = Fake {
+        loaded: Some(running),
+        ..Fake::default()
+    };
+    let said = round(&mut systemd);
+    assert_eq!(
+        fs::read_to_string(lamp.unit()).unwrap(),
+        unit_text_for(shown)
+    );
+    let restarts = |systemd: &Fake| {
+        systemd
+            .asked
+            .iter()
+            .filter(|a| **a == "try-restart")
+            .count()
+    };
+    assert_eq!(restarts(&systemd), 1, "{:?}", systemd.asked);
+    assert!(said.iter().any(|line| line.contains("#8320")), "{said:?}");
+
+    let mut systemd = Fake {
+        loaded: Some(running),
+        ..Fake::default()
+    };
+    round(&mut systemd);
+    assert_eq!(restarts(&systemd), 0, "{:?}", systemd.asked);
 }
 
 /// #8105: lamp-tasks' answer read, and the rule: the switch off is always
