@@ -516,6 +516,17 @@ impl Systemd for FakeSystemd {
         Ok(())
     }
 
+    fn systemd_run(&mut self, argv: &[&str]) -> Result<(), String> {
+        self.calls.borrow_mut().push(argv.join(" "));
+        // The transient unit's `rm -f --`, done under the root (#7254).
+        if let Some(at) = argv.iter().position(|word| *word == "--") {
+            for path in &argv[at + 1..] {
+                let _ = fs::remove_file(self.root.join(path.trim_start_matches('/')));
+            }
+        }
+        Ok(())
+    }
+
     fn stop(&mut self, unit: &str) -> Result<(), String> {
         self.calls.borrow_mut().push(format!("stop {unit}"));
         self.units.remove(unit);
@@ -1073,6 +1084,43 @@ fn a_round_with_nothing_to_change_only_checks() {
     lamp.round();
     assert!(lamp.phases.is_empty(), "{:?}", lamp.phases);
     assert!(lamp.targets.is_empty(), "{:?}", lamp.targets);
+}
+
+/// #7254: a lamp that takes a build by a round, with no reboot, has
+/// sysstat's kept files removed at its new updater's first round, as the
+/// boot run removes them; a second round finds none and runs nothing. A dry
+/// round never removes them.
+#[test]
+fn a_round_removes_sysstats_kept_files_and_a_second_runs_nothing() {
+    let mut lamp = Lamp::new();
+    build_two(&mut lamp);
+    assert_eq!(lamp.round(), Outcome::Switched(2));
+    let folder = lamp
+        .root
+        .join(lamp_update::install::SYSSTAT_KEPT.trim_start_matches('/'));
+    fs::create_dir_all(&folder).unwrap();
+    fs::write(folder.join("sa18"), vec![0u8; 146_028]).unwrap();
+    fs::write(folder.join("notes"), "not sysstat's").unwrap();
+    let runs = |lamp: &Lamp| {
+        lamp.calls()
+            .into_iter()
+            .filter(|call| call.starts_with("systemd-run"))
+            .count()
+    };
+    lamp.config.apply = false;
+    lamp.round();
+    assert!(lamp.exists("/var/log/sysstat/sa18"));
+    assert_eq!(runs(&lamp), 0);
+    lamp.config.apply = true;
+    lamp.said.clear();
+    assert_eq!(lamp.round(), Outcome::UpToDate(2), "{:?}", lamp.said);
+    assert!(!lamp.exists("/var/log/sysstat/sa18"), "{:?}", lamp.said);
+    assert!(lamp.exists("/var/log/sysstat/notes"));
+    assert_eq!(runs(&lamp), 1, "{:?}", lamp.calls());
+    let said = "sysstat's kept file removed: /var/log/sysstat/sa18 (146028 bytes)";
+    assert!(lamp.said.iter().any(|line| line == said), "{:?}", lamp.said);
+    assert_eq!(lamp.round(), Outcome::UpToDate(2));
+    assert_eq!(runs(&lamp), 1);
 }
 
 #[test]

@@ -111,6 +111,13 @@ pub trait Systemd {
     fn back_began_unix_ms(&mut self) -> Option<u64> {
         None
     }
+    /// `argv`, a `systemd-run --wait` of one transient unit and only that,
+    /// run to its end: sysstat's kept files removed outside this program's
+    /// sandbox (crate::install::sysstat_kept_removed, #7254). Refused
+    /// unless a world can.
+    fn systemd_run(&mut self, argv: &[&str]) -> Result<(), String> {
+        Err(format!("{} cannot be run here", argv.join(" ")))
+    }
     /// The last line the unit's own program wrote to the journal since this
     /// program last restarted it, cleaned ([`clean_line`]); none before a
     /// restart, or when it said nothing since (#1505). Only ever asked of a
@@ -319,6 +326,13 @@ impl Systemd for Systemctl {
 
     fn start_added(&mut self, unit: &str) -> Result<(), String> {
         run(&["start", "--no-block", "--", unit], JOURNAL_WITHIN)
+    }
+
+    fn systemd_run(&mut self, argv: &[&str]) -> Result<(), String> {
+        match argv.split_first() {
+            Some((&"systemd-run", words)) => run_program("systemd-run", words, self.restart_within),
+            _ => Err(format!("{} is not a systemd-run", argv.join(" "))),
+        }
     }
 
     fn stop(&mut self, unit: &str) -> Result<(), String> {
@@ -589,13 +603,17 @@ fn cgroup_freeze_file(group: &str) -> Option<PathBuf> {
 }
 
 fn run(words: &[&str], within: Duration) -> Result<(), String> {
-    let mut child = Command::new("systemctl")
+    run_program("systemctl", words, within)
+}
+
+fn run_program(program: &str, words: &[&str], within: Duration) -> Result<(), String> {
+    let mut child = Command::new(program)
         .args(words)
         .stdin(Stdio::null())
         .stdout(Stdio::null())
         .stderr(Stdio::piped())
         .spawn()
-        .map_err(|error| format!("systemctl: {error}"))?;
+        .map_err(|error| format!("{program}: {error}"))?;
     let until = Instant::now() + within;
     loop {
         match child.try_wait() {
@@ -606,7 +624,7 @@ fn run(words: &[&str], within: Duration) -> Result<(), String> {
                     let _ = io::Read::read_to_string(&mut stderr, &mut why);
                 }
                 return Err(format!(
-                    "systemctl {}: {status}: {}",
+                    "{program} {}: {status}: {}",
                     words.join(" "),
                     why.trim()
                 ));
@@ -617,12 +635,12 @@ fn run(words: &[&str], within: Duration) -> Result<(), String> {
                 let _ = child.kill();
                 let _ = child.wait();
                 return Err(format!(
-                    "systemctl {} did not finish within {} s",
+                    "{program} {} did not finish within {} s",
                     words.join(" "),
                     within.as_secs()
                 ));
             }
-            Err(error) => return Err(format!("systemctl: {error}")),
+            Err(error) => return Err(format!("{program}: {error}")),
         }
     }
 }
