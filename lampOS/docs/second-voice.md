@@ -5292,7 +5292,12 @@ after a take-over, but now for every turn:
     the gap, the cosine, which line has no print, or no one face seen. One person
     is the two lines' prints at 0.70 or over (`same_voice::SAME_FROM`, over
     every pair of two voices on 18 Oct's labelled set), when the same-voice
-    check runs for another rule; or else one face, the same passing id,
+    check runs for another rule, or, with `LAMP_JOIN_SAME_VOICE=on`, from
+    the linked services' prints (the product's `LAMP_SAME_VOICE_FOR=services`),
+    or prints of its own where those are not made (the private room, no
+    services), every heard line then printed, in RAM only (#8003: on lamp-9adf on 19 Nov one
+    person's 21 s request said in the dark was heard as five lines and only
+    the last was asked); or else one face, the same passing id,
     seen speaking each line and no other face speaking either. **The eyes
     come first:** more than one face seen speaking either line, or each
     line's face another, is two people, whatever the voices say (the

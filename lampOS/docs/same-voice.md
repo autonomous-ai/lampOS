@@ -700,7 +700,15 @@ prints for the services alone:
   (`Voices::asking_only_while`), so the line said right after a link, the
   one a write is prepared in, is printed, with no restart; after the last
   unlink, the next line is not. The journal says each change once. The
-  owner's enrolled print and its forgetting are as before.
+  owner's enrolled print and its forgetting are as before. With
+  `LAMP_SAME_VOICE_CONFIRMS` or `LAMP_JOIN_SAME_VOICE` (#8003), which read
+  these prints, every heard line is printed, linked or not. In the private
+  room (`LAMP_PRIVATE_ROOM=on`) or with no services the child is not
+  started, as no line is held to a voice there; with `LAMP_JOIN_SAME_VOICE`
+  one starts for the join of cut words alone (`Printing::ForTheJoin`): its
+  prints are in RAM only, never written, and the services' judge, the
+  owner's enrolled print, the confirm and a write's wait see none of them
+  (`Heeding::join_prints_only`).
 - **What is fed.** The prints are kept apart from the rules'
   (`Heeding::for_services`, beside `Heeding::voices`, which stays empty).
   Each line's sound and each verdict feed them as before
@@ -716,7 +724,9 @@ prints for the services alone:
   `Heeding::voices`, and so sees no print, exactly as without a model:
   #829's check and the rules on `voice_going_on_in` (`LAMP_SPOKEN_TO`,
   `LAMP_GOING_ON_NOT_OWN`, `LAMP_QUIET_GOING_ON_SAME_ONE`, someone else's
-  sign), joining a cut line (`same_speaker`, `LAMP_JOIN_CUT_WORDS`), the
+  sign), joining a cut line (`same_speaker`, `LAMP_JOIN_CUT_WORDS`; with
+  `LAMP_JOIN_SAME_VOICE=on` the join alone reads the services' prints, every
+  heard line then printed, #8003), the
   same speaker's carry and its held colleagues
   (`LAMP_SAME_SPEAKER_CARRIES`), a line kept unjudged, the turned face's
   sign (`LAMP_TURNED_FACE_SPEAKS`), the asked person's answer

@@ -1174,6 +1174,16 @@ pub const TWO_FACES_HELD_ENVIRONMENT: &str = "LAMP_TWO_FACES_HELD";
 /// half the same way (Eighth's long request).
 pub const JOIN_CUT_WORDS_ENVIRONMENT: &str = "LAMP_JOIN_CUT_WORDS";
 
+/// Where the worker reads whether the join of cut words reads the voice
+/// prints made for the linked services (`LAMP_SAME_VOICE_FOR=services`), or,
+/// where none are made (the private room, no services), prints of its own:
+/// `on`, and nothing else (#8003: on lamp-9adf on 19 Nov one person's 21 s
+/// request said in the dark was heard as five lines, and only the last was
+/// asked). Only with [`JOIN_CUT_WORDS_ENVIRONMENT`] or
+/// [`NAME_CARRIES_ENVIRONMENT`], and never with
+/// `same_voice::CONFIRMS_ENVIRONMENT`, where the voice only confirms.
+pub const JOIN_SAME_VOICE_ENVIRONMENT: &str = "LAMP_JOIN_SAME_VOICE";
+
 /// Where the worker reads whether a busy room ends sooner (the first
 /// builder on Queue #1722, 04:00): `on`, and nothing else. A minute after
 /// the last talk when the lamp has not answered since, and a minute after
