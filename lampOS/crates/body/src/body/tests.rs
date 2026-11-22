@@ -11055,6 +11055,71 @@ fn gesture_limits() -> Limits {
     .unwrap()
 }
 
+/// A nod asked at 1 s of a folded lamp at rest, with the wire silent over
+/// `silent` (from, until) when given; and when the nod played, first and last.
+fn nod_with_silence(silent: Option<(Duration, Duration)>) -> (Fates, Duration, Duration) {
+    let run = skill_run(
+        14,
+        standing(100, 5),
+        gesture_limits(),
+        |lamp| {
+            if let Some((from, until)) = silent {
+                lamp.silent_from = Some(from);
+                lamp.silent_until = Some(until);
+            }
+        },
+        || Some((Mood::Resting, 0)),
+        once(Duration::from_secs(1), false),
+    );
+    let mut played = run.2.iter().filter(|s| s.2 == Some("nod")).map(|s| s.0);
+    let first = played.next().unwrap();
+    let last = played.last().unwrap();
+    (run, first, last)
+}
+
+/// #8266, lamp-52e6 at 04:11 on 22 Nov: a level 5 waltz with one servo read
+/// missed in the middle ended as a plain `over` at 4.78 s of its 8.40 s. One
+/// missed read holds the frame for that step and the gesture plays to its end.
+#[test]
+fn one_missed_read_in_the_middle_of_a_gesture_leaves_it_playing_to_its_end() {
+    let (_, began, ended) = nod_with_silence(None);
+    let middle = began + (ended - began) / 2;
+    let ((report, fates, _), first, last) =
+        nod_with_silence(Some((middle, middle + Duration::from_millis(20))));
+    assert_eq!(report.stop, Stop::Cancelled, "{report:?}");
+    assert!(report.missed_reads > 0, "the fixture must miss a read");
+    assert!(report.missed_reads < 3, "{report:?}");
+    assert_eq!(first, began);
+    assert!(
+        last + Duration::from_millis(60) >= ended,
+        "cut at {:?} of {:?}",
+        last - first,
+        ended - began
+    );
+    assert_eq!((report.gestures, report.gestures_dropped), (1, 0));
+    assert_eq!(fates, [("nod", "taken: it was folded and stood up for it")]);
+}
+
+/// A miss that lasts (a third of a second, short of the run's own half
+/// second on a silent wire) still ends the gesture, and says why.
+#[test]
+fn a_lasting_miss_ends_a_playing_gesture_and_says_so() {
+    let (_, began, ended) = nod_with_silence(None);
+    let middle = began + (ended - began) / 2;
+    let ((report, fates, _), _, last) =
+        nod_with_silence(Some((middle, middle + Duration::from_millis(300))));
+    assert_eq!(report.stop, Stop::Cancelled, "{report:?}");
+    assert!(last < middle + Duration::from_millis(300), "{last:?}");
+    assert_eq!((report.gestures, report.gestures_dropped), (1, 1));
+    assert_eq!(
+        fates,
+        [
+            ("nod", "taken: it was folded and stood up for it"),
+            ("nod", "ended: 5 servo reads in a row were missed"),
+        ]
+    );
+}
+
 /// A skill's gesture asked of a folded lamp at rest (lamp-4ace, 15:16 on
 /// 2026-10-16: `stretching` asked at `stand 0.00`, and nothing): it stands
 /// up for it as for any mood but rest, then plays it, and says so once.
