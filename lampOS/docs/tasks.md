@@ -4591,9 +4591,11 @@ one runner (a fresh home per run, the token as a file) with no new rules:
     is refused at load (lamp-skills' `grants_of`), at an upload
     (`upload_agent::files`, `capped`), in lamp-control's yes (`grants_ok`),
     in lamp-tasks' hand-over (`HandOver::check`) or at the make
-    (`made_skill::code_held`, `make_no_cannot::covered`). With `air`
-    beside `net` the yes still says so ("…, so its air readings can go to
-    the internet", `skill_task_yes::AIR_BESIDE_NET`).
+    (`made_skill::code_held`, `make_no_cannot::covered`). Beside `net`
+    the yes says what can go to the internet, one clause per grant ("…, so
+    what the camera sees and its notes can go to the internet",
+    `skill_task_yes::BESIDE_NET`; the Reviewer-lead's P2 on #7901), `air`
+    among them ("…, so its air readings can go to the internet").
   - A `net` run sees only its own skill's folder, never another skill's:
     lamp-tasks names it beside the run's egress socket in its private 0700
     folder, `/run/lampos-tasks/egress/<egress name>.folder` (0600, made new
