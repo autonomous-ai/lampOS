@@ -91,6 +91,15 @@ pub trait Parts {
     fn said_take_first(&mut self, client: &str) -> (u32, Option<String>) {
         (self.said_take(client), None)
     }
+    /// A make's tried run's `say` (#8180), its words already checked as
+    /// the voice checks them (`protocol::words`): answered at once as said
+    /// whole and counted with its words for [`Parts::said_take_first`],
+    /// never sent to the voice, whose turn waits on the very make that runs
+    /// the try. Its words are not dropped: the person hears them after the
+    /// make, in its tried line. Answered, uncounted, by default.
+    fn say_tried(&mut self, _client: &str, _re: u64, _text: &str) -> Result<Value, Error> {
+        Ok(json!({"to": "make"}))
+    }
 }
 
 /// A part's answer: now, or what to run off the door's lock for it.
@@ -1181,7 +1190,8 @@ impl Door {
         };
         // A skill run's linked services: off, nothing else is looked at.
         // A make's tried run's ops are done live within its grants, as its
-        // real run's (#8180).
+        // real run's (#8180), but for its `say`: answered at once, below,
+        // and said after the make (`Parts::say_tried`).
         if matches!(op, Op::ServiceRead { .. } | Op::ServiceWrite { .. }) && self.services.is_none()
         {
             return refuse(ErrorCode::Off, crate::services::OFF.to_owned());
@@ -1619,7 +1629,28 @@ impl Door {
             op => op,
         };
         parts.asking(session.connection);
-        match parts.reply(&client, re, &op, now_us) {
+        // A make's tried run's `say` is the one op of a try not done live
+        // (#8180): the voice holds the make's turn open until the make
+        // answers, and the make waits on its try, so a line sent to the
+        // voice would wait on itself. It is answered at once and said after
+        // the make, in its tried line.
+        let tried_say = match &op {
+            Op::Say { text, .. }
+                if session.run_socket
+                    && self
+                        .runs
+                        .of_client(&client, now_us)
+                        .is_some_and(|run| run.tried) =>
+            {
+                Some(text.clone())
+            }
+            _ => None,
+        };
+        let answered = match &tried_say {
+            Some(text) => parts.say_tried(&client, re, text).map(Reply::Now),
+            None => parts.reply(&client, re, &op, now_us),
+        };
+        match answered {
             Ok(reply) => {
                 // Counted only once the part took it.
                 if let Some(class) = class {
@@ -2214,6 +2245,10 @@ mod tests {
         }
         fn media_end(&mut self, client: &str, media: Media) {
             self.media_ended.push((client.to_owned(), media));
+        }
+        fn say_tried(&mut self, client: &str, _: u64, text: &str) -> Result<Value, Error> {
+            self.did.push(format!("{client} say_tried {text}"));
+            Ok(json!({"to": "make"}))
         }
     }
 
@@ -4731,9 +4766,11 @@ mod tests {
     }
 
     /// #8180 (the dev's ruling): a make's tried run's ops are done live
-    /// within its grants, as its real run's: it speaks, plays a sound,
-    /// moves, lights, and captures from the camera, the microphone and
-    /// the speaker stream; none is stubbed or refused for being a try.
+    /// within its grants, as its real run's: it plays a sound, moves,
+    /// lights, and captures from the camera, the microphone and the
+    /// speaker stream; none is stubbed or refused for being a try. Its
+    /// `say` alone is answered at once
+    /// (`a_tried_runs_say_alone_is_answered_at_once_not_sent_to_the_voice`).
     #[test]
     fn a_tried_runs_ops_are_live_within_its_grants() {
         let grants = [
@@ -4745,7 +4782,6 @@ mod tests {
             Grant::Speaker,
         ];
         let frames = [
-            json!({"op": "say", "text": "hello"}),
             json!({"op": "sound", "name": "hum"}),
             json!({"op": "gesture", "name": "nod"}),
             json!({"op": "light", "colour": "warm", "level": 2, "for_ms": 1000}),
@@ -4768,6 +4804,35 @@ mod tests {
                 "{frame}: done by the lamp's parts {:?}",
                 fake.did
             );
+        }
+    }
+
+    /// #8180: a make's tried run's `say` (exact or rephrased) is answered
+    /// at once by `Parts::say_tried`, never sent to the voice, whose turn
+    /// waits on the make that runs the try; an untried run's goes to the
+    /// voice, as before.
+    #[test]
+    fn a_tried_runs_say_alone_is_answered_at_once_not_sent_to_the_voice() {
+        let says = [
+            json!({"id": 7, "op": "say", "text": "Low tide at six."}),
+            json!({"id": 7, "op": "say", "text": "Low tide at six.", "rephrase": true}),
+        ];
+        for say in says {
+            for tried in [true, false] {
+                let (mut door, mut session, mut fake) = run_door(&[Grant::Speak], None);
+                if tried {
+                    door.mark_tried("r1");
+                }
+                let outcome = door.handle(&mut session, &say.to_string(), &mut fake, S, 1);
+                assert_eq!(reply(&outcome)["ok"], true, "{say} {outcome:?}");
+                let client = crate::runs::run_client("r1");
+                let expected = if tried {
+                    format!("{client} say_tried Low tide at six.")
+                } else {
+                    format!("{client} say")
+                };
+                assert_eq!(fake.did, [expected], "tried {tried}: {say}");
+            }
         }
     }
 
