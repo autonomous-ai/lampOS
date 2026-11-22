@@ -4732,6 +4732,15 @@ mod tests {
                 &timer,
                 false,
             ),
+            // A reply that is itself a fresh ask, naming a timer, reminder,
+            // alarm or countdown, carries its own length even when the
+            // question named the timer (Sixth's P3 on #8321).
+            (
+                "Set another timer.",
+                Some(("Set a timer for ten minutes.", "Want another timer?")),
+                &timer,
+                false,
+            ),
             (
                 "Pasta.",
                 Some(("Set a timer for ten minutes.", anything_else)),
