@@ -1210,4 +1210,164 @@ mod tests {
             }
         }
     }
+
+    /// `livelier` for levels 2 to 4 before #8201 (94672e3b7b's, the body's
+    /// `sized` and that day's `CLIP_SIZE_CAP`, kept verbatim here as the
+    /// reference): the clip itself, each joint the level's size, held to
+    /// the gesture's reach and the base at its own size where its bend at
+    /// the clip's own step would pass [`BASE_BEND`], its frames the level's
+    /// pace quicker.
+    fn before_8201(clip: &Clip, level: u8) -> Clip {
+        const CAP: [(&str, f32); 5] = [
+            ("greeting", 1.54),
+            ("surprised", 1.27),
+            ("sleepy", 1.44),
+            ("excited", 1.27),
+            ("dance_groove", 1.59),
+        ];
+        let row = of(level);
+        let size = CAP
+            .iter()
+            .find(|(name, _)| *name == clip.name)
+            .map_or(row.clip_size, |(_, cap)| row.clip_size.min(*cap));
+        let pace = row.clip_pace;
+        let reach = crate::body::GESTURE_REACH;
+        let mut gain: [f32; 5] = std::array::from_fn(|joint| {
+            let most = clip
+                .frames
+                .iter()
+                .map(|frame| frame[joint].unsigned_abs())
+                .max()
+                .unwrap_or(0);
+            if most == 0 {
+                1.0
+            } else {
+                size.min(reach[joint] / f32::from(most))
+            }
+        });
+        let made = |gain: [f32; 5]| -> Vec<[i16; 5]> {
+            clip.frames
+                .iter()
+                .map(|frame| {
+                    std::array::from_fn(|joint| {
+                        (f32::from(frame[joint]) * gain[joint])
+                            .round()
+                            .clamp(-reach[joint], reach[joint]) as i16
+                    })
+                })
+                .collect()
+        };
+        let quickest = |frames: &[[i16; 5]]| -> u16 {
+            let bend = frames
+                .windows(3)
+                .map(|three| {
+                    (i32::from(three[2][2]) - 2 * i32::from(three[1][2]) + i32::from(three[0][2]))
+                        .unsigned_abs()
+                })
+                .max()
+                .unwrap_or(0);
+            (1_000.0 * (bend as f32 / BASE_BEND).sqrt()).ceil() as u16
+        };
+        let mut frames = made(gain);
+        if quickest(&frames) > clip.step_ms && gain[2] > 1.0 {
+            gain[2] = 1.0;
+            frames = made(gain);
+        }
+        let step_ms = ((f32::from(clip.step_ms) / pace).ceil() as u16)
+            .max(quickest(&frames))
+            .min(clip.step_ms);
+        Clip {
+            name: clip.name,
+            step_ms,
+            frames: frames.leak(),
+        }
+    }
+
+    /// How far and how fast `frames`, `step_ms` apart, take `joint`: peak
+    /// to peak, counts, and its largest step, counts a second.
+    fn how_far_and_fast(frames: &[[i16; 5]], step_ms: u16, joint: usize) -> (i32, f32) {
+        let at = frames.iter().map(|frame| i32::from(frame[joint]));
+        let swing = at.clone().max().unwrap_or(0) - at.min().unwrap_or(0);
+        let step = frames
+            .windows(2)
+            .map(|two| (i32::from(two[1][joint]) - i32::from(two[0][joint])).abs())
+            .max()
+            .unwrap_or(0);
+        (swing, step as f32 * 1_000.0 / f32::from(step_ms))
+    }
+
+    /// The lead's call on #8153 (V2, 22 Nov 16:3x, the first builder's (b)):
+    /// levels 2 to 4 stay as they were before #8201, except where one would
+    /// move a joint more than the level above it, and there it is capped at
+    /// that level. So at 2 to 4 every built-in clip has the frames and the
+    /// step [`before_8201`] gives it, but for a joint that swings farther
+    /// (peak to peak) or steps faster than the level above does over the
+    /// stretch that level plays of the cut (`cut_frames`), which is lowered
+    /// to no more than it; and no level 1 to 4 moves any joint more than
+    /// the level above. Prints each joint the cap holds
+    /// (`cargo test -- --nocapture`).
+    #[test]
+    fn levels_two_to_four_play_as_before_8201_never_more_than_the_level_above() {
+        let mut held = Vec::new();
+        for clip in crate::clips::ALL {
+            for level in 2..=4u8 {
+                let (old, now) = (before_8201(clip, level), livelier(clip, level));
+                let above = livelier(clip, level + 1);
+                let stretch = &above.frames[cut_frames(clip, level + 1)];
+                assert_eq!(
+                    (now.step_ms, now.frames.len()),
+                    (old.step_ms, old.frames.len()),
+                    "{} at level {level}",
+                    clip.name
+                );
+                for joint in 0..5 {
+                    let column = |clip: &Clip| -> Vec<i16> {
+                        clip.frames.iter().map(|frame| frame[joint]).collect()
+                    };
+                    let (swing, speed) = how_far_and_fast(old.frames, old.step_ms, joint);
+                    let (top_swing, top_speed) = how_far_and_fast(stretch, above.step_ms, joint);
+                    if swing <= top_swing && speed <= top_speed {
+                        assert_eq!(
+                            column(now),
+                            column(&old),
+                            "{} at level {level}, joint {joint}",
+                            clip.name
+                        );
+                        continue;
+                    }
+                    let (now_swing, now_speed) = how_far_and_fast(now.frames, now.step_ms, joint);
+                    eprintln!(
+                        "cap {:<13} level {level} joint {joint}: before #8201 {swing} counts, {speed:.0}/s; level {} {top_swing}, {top_speed:.0}/s; now {now_swing}, {now_speed:.0}/s",
+                        clip.name,
+                        level + 1
+                    );
+                    assert!(
+                        now_swing <= top_swing.min(swing) && now_speed <= top_speed.min(speed),
+                        "{} at level {level}, joint {joint}",
+                        clip.name
+                    );
+                    held.push(format!("{} {level} {joint}", clip.name));
+                }
+            }
+        }
+        // Where the cap holds: clip, level, joint (pinned, so a change is said).
+        let pinned: [&str; 0] = [];
+        assert_eq!(held, pinned);
+        for clip in crate::clips::ALL {
+            for level in 1..=4u8 {
+                let (here, above) = (livelier(clip, level), livelier(clip, level + 1));
+                let stretch = &above.frames[cut_frames(clip, level + 1)];
+                for joint in 0..5 {
+                    let (swing, speed) = how_far_and_fast(here.frames, here.step_ms, joint);
+                    let (top_swing, top_speed) = how_far_and_fast(stretch, above.step_ms, joint);
+                    assert!(
+                        swing <= top_swing && speed <= top_speed,
+                        "{} joint {joint}: level {level} {swing}, {speed:.0}/s; level {} {top_swing}, {top_speed:.0}/s",
+                        clip.name,
+                        level + 1
+                    );
+                }
+            }
+        }
+    }
 }
