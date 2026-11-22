@@ -1,7 +1,7 @@
 //! Optional Schedule consumer. All path access, storage and Schedule calls are
 //! isolated in one child. The coordinator polls only bounded local datagrams.
 //! A prepared delivery is not permission to speak; a final Voice owner decides.
-use crate::going_on_asks::names_the_schedule;
+use crate::going_on_asks::{names_a_schedule_item, names_the_schedule};
 use lamp_schedule::delivery::{PreparedToken, QualifiedCompletion, QualifiedRetirement};
 use lamp_turn_owner::TurnOwner;
 use serde::{Deserialize, Serialize};
@@ -235,9 +235,12 @@ fn gives_when(heard: &str) -> bool {
 /// remind you about?" → "Take my pills."), when the asked line was itself a
 /// timer or reminder ask and the lamp's question asked about it: a fresh
 /// ask ("Set another timer." after "It rings at 4:09. Anything else?")
-/// carries its own length (Fifth's HOLD on #8274), and a reply that names
-/// the schedule itself ("Remind me to take my pills.") still lends (the
-/// Reviewer-lead's P2 on #8274). With
+/// carries its own length (Fifth's HOLD on #8274), and so does a reply
+/// that names a timer, reminder, alarm or countdown itself ("Set another
+/// timer." after "Want another timer?";
+/// [`crate::going_on_asks::names_a_schedule_item`], Sixth's P3 on #8321),
+/// while one that only says "remind" or the lamp ("Remind me to take my
+/// pills.") still lends (the Reviewer-lead's P2 on #8274). With
 /// [`lamp_actions::schedule::ASKS_HOW_LONG_SWITCH`]
 /// on, in English only (the words are English), and only for a line a
 /// person said: a typed text, or a line not known, checks nothing.
@@ -254,7 +257,7 @@ pub(crate) fn when_not_heard(name: &str, request: u64, heard: bool) -> Option<se
         return None;
     }
     let words = crate::stop_scope::heard_words(request, heard)?;
-    if gives_when(&words) || asked_gave_when(request) {
+    if gives_when(&words) || (!names_a_schedule_item(&words) && asked_gave_when(request)) {
         return None;
     }
     eprintln!(
