@@ -277,18 +277,24 @@ fn owners() -> Vec<String> {
     crate::app_remember::owners_face_first()
 }
 
-/// [`notes`] on the owner's turn only: `person` is the turn's known person
-/// in view (its scope's, none when the room's or held only by a gap), told
-/// only when they are one of the owner's memory ids. An app writes for the
-/// lamp's known person alone, so a guest's or the room's turn never hears
+/// [`notes`] on the owner's turn only, as `services::owner_hears` judges
+/// it: in the private room (`LAMP_PRIVATE_ROOM`) always, since whoever
+/// speaks there is the owner, with a face in view or not (the first
+/// builder's 11:14 on #8072, the Reviewer-lead's P2 on #8315); outside it,
+/// only when `person`, the turn's known person in view (its scope's, none
+/// when the room's or held only by a gap), is one of the owner's memory
+/// ids. A guest's or the room's turn outside the private room never hears
 /// the owner's app line (the Reviewer-lead's P3 on #8313).
 pub fn notes_for(now: u64, private: bool, person: Option<&str>) -> Vec<String> {
     if !on() || private {
         return Vec::new();
     }
-    match person {
-        Some(person) if owners().iter().any(|id| id == person) => notes(now, private),
-        _ => Vec::new(),
+    let owners_turn = crate::person::private_room()
+        || person.is_some_and(|person| owners().iter().any(|id| id == person));
+    if owners_turn {
+        notes(now, private)
+    } else {
+        Vec::new()
     }
 }
 
@@ -477,12 +483,15 @@ mod tests {
         });
     }
 
-    /// Told on the owner's turn only: a guest's (a known person not the
-    /// owner), the room's (no known person) and a gap's are told nothing.
+    /// Told on the owner's turn only: outside the private room a guest's (a
+    /// known person not the owner), the room's (no known person) and a gap's
+    /// are told nothing; in the private room every spoken turn is the
+    /// owner's.
     #[test]
     fn told_on_the_owners_turn_only() {
         alone(|| {
             const OWNER: &str = "p-0123456789abcdef";
+            crate::person::set_private_room_for_test(Some(false));
             set_owners_for_test(Some(vec![OWNER.to_owned()]));
             coach_says("set 2 of 3", 60_000, 1_000);
             assert_eq!(notes_for(1_001, false, Some(OWNER)).len(), 1);
@@ -491,6 +500,12 @@ mod tests {
             assert!(notes_for(1_001, true, Some(OWNER)).is_empty(), "private");
             set_owners_for_test(Some(Vec::new()));
             assert!(notes_for(1_001, false, Some(OWNER)).is_empty(), "no owner");
+            // The private room: whoever speaks is the owner, face or none;
+            // still nothing while private.
+            crate::person::set_private_room_for_test(Some(true));
+            assert_eq!(notes_for(1_001, false, None).len(), 1, "no face in view");
+            assert!(notes_for(1_001, true, None).is_empty());
+            crate::person::set_private_room_for_test(None);
             set_owners_for_test(None);
         });
     }
