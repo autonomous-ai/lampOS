@@ -1363,6 +1363,49 @@ mod tests {
         assert_eq!(fs::read_to_string(&path).unwrap(), INSTALLED);
     }
 
+    /// Seventh's P1 on #8064: a gateway that came up between `MainPID` 0
+    /// and the check in OpenClaw's own namespace makes OpenClaw say
+    /// `GatewayLockNamespaceError`. That is not a refusal of the text: it
+    /// is tried again, and the text lands after one wait.
+    #[test]
+    fn a_gateway_that_came_up_under_the_check_is_tried_again() {
+        let dir = tempfile::tempdir().unwrap();
+        let state = dir.path().join("state");
+        fs::create_dir_all(&state).unwrap();
+        let path = state.join(CONFIG_FILE);
+        let came = dir.path().join("came");
+        let wrapper = dir.path().join("openclaw");
+        fs::write(
+            &wrapper,
+            format!(
+                "#!/bin/sh\n[ -e {came} ] && {{ rm {came}; echo 'GatewayLockNamespaceError: gateway already running'; exit 1; }}\nexit 0\n",
+                came = came.display()
+            ),
+        )
+        .unwrap();
+        fs::set_permissions(&wrapper, fs::Permissions::from_mode(0o755)).unwrap();
+        fs::write(&path, INSTALLED).unwrap();
+        fs::write(&came, "").unwrap();
+        let mut said = Vec::new();
+        let written = write_waiting(
+            &state,
+            7741,
+            Path::new(WORKSPACE),
+            true,
+            true,
+            &joined(&wrapper),
+            &[Duration::from_millis(1); 3],
+            &mut |line| {
+                assert_eq!(fs::read_to_string(&path).unwrap(), INSTALLED);
+                said.push(line.to_owned());
+            },
+        );
+        assert!(written.unwrap());
+        assert_eq!(said.len(), 1, "{said:?}");
+        assert!(said[0].contains("wait for its gateway"), "{said:?}");
+        assert_ne!(fs::read_to_string(&path).unwrap(), INSTALLED);
+    }
+
     /// #7268's FINDING on b958d31455 (lamp-52e6, lamp-tasks and the gateway
     /// restarted together): the check raced the gateway's own start and was
     /// killed, "status killed", with no verdict from OpenClaw. A killed check
