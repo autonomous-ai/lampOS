@@ -4104,9 +4104,14 @@ made once and whole"); `lamp_tasks::make_try`.
   voice's repair); a try that couldn't start (no token, no fence) is
   refused `not_tried`.
 - **Live, as the run**: lamp-control marks the token tried, and each of its
-  ops is done live within its grants, as a skill run's: it speaks, plays,
-  moves, lights, captures, and its `service.write` is sent to lamp-services;
-  the notes it keeps stay ([control.md](control.md), "A make's tried run").
+  ops is done live within its grants, as a skill run's: it plays, moves,
+  lights, captures, and its `service.write` is sent to lamp-services; the
+  notes it keeps stay ([control.md](control.md), "A make's tried run"). Its
+  `say` alone is answered at once, `finished` and counted with its words,
+  never sent to the voice, whose turn waits on this very make
+  (`Parts::say_tried`); the person hears those words after the make, in
+  its tried line. A line the voice would refuse is refused and not
+  counted, so the try fails.
 - **The say count** (for #8158's `run` step too): lamp-control counts each
   of a run client's `say`s the voice said whole (`done` with
   `how: finished`; one dropped for privacy or expiry, or a `sound`, is not

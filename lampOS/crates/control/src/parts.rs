@@ -1705,6 +1705,26 @@ impl Parts for Lamp {
         self.said_take_first(client).0
     }
 
+    fn say_tried(&mut self, client: &str, re: u64, text: &str) -> Result<Value, Error> {
+        // Counted with its words as a say the voice said whole is, before
+        // its `done` is sent, so a try that waited for the `done` ends with
+        // it counted; its words go to the make's tried line.
+        {
+            let mut said = self.said.lock().expect("said");
+            let kept = said.entry(client.to_owned()).or_default();
+            kept.count += 1;
+            if kept.first.is_none() {
+                kept.first = Some(said_first(text));
+            }
+        }
+        // Off the door's lock, as a voice's `done` is.
+        let (events, client) = (self.events.clone(), client.to_owned());
+        std::thread::spawn(move || {
+            events(&client, json!({"ev": "done", "re": re, "how": "finished"}));
+        });
+        Ok(json!({"to": "make"}))
+    }
+
     fn said_take_first(&mut self, client: &str) -> (u32, Option<String>) {
         self.said
             .lock()

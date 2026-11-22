@@ -1421,9 +1421,14 @@ tạo một lần và trọn vẹn"); `lamp_tasks::make_try`.
   chối `not_tried`.
 - **Chạy thật, như lần chạy**: lamp-control đánh dấu token là chạy thử, và
   mỗi thao tác của nó được làm thật trong phạm vi quyền, như lần chạy của
-  một skill: nói, phát âm thanh, cử động, bật đèn, thu hình và tiếng, và
+  một skill: phát âm thanh, cử động, bật đèn, thu hình và tiếng, và
   `service.write` được gửi tới lamp-services; ghi chú nó giữ vẫn còn
-  ([control_vi.md](control_vi.md), "Lần chạy thử của một lần tạo").
+  ([control_vi.md](control_vi.md), "Lần chạy thử của một lần tạo"). Riêng
+  `say` của nó được trả lời ngay, `finished` và được đếm kèm lời, không
+  bao giờ gửi tới giọng, vì lượt của giọng đang chờ chính lần tạo này
+  (`Parts::say_tried`); người dùng nghe lời đó sau lần tạo, trong câu báo
+  đã thử. Câu giọng sẽ từ chối thì bị từ chối và không được đếm, nên lượt
+  thử thất bại.
 - **Số câu đã nói** (cũng cho bước `run` của #8158): lamp-control đếm mỗi
   `say` của client một lần chạy mà giọng đã nói trọn (`done` với
   `how: finished`; câu bị bỏ vì riêng tư hay hết hạn, hoặc một `sound`,
