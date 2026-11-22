@@ -544,7 +544,8 @@ limit: "busy" is unanswered turns (three, then 180 s; `Attention::busy` in
 `body_link.rs`), not sound, so a television that forms no turns is never
 busy, and a quiet room within 180 s of three ignored remarks is.
 
-**With `LAMP_CUT_IN_LATE_YIELD=on` (off unless set), a yield made late in
+**With `LAMP_CUT_IN_LATE_YIELD=on` (off unless set; on in the
+product's `lamp-voice.service`, #7413), a yield made late in
 a person's speech over the lamp commits on stillness.** Over the lamp's
 voice most of a plain question can be heard as `Under` (the detector's
 score on the cancelled signal under 0.5), so the 7 consecutive `Over`
@@ -564,7 +565,8 @@ then 26 `Under` and an onset run with 4 plain; the yield resumed 750 ms on.
 At a reply's start an `Unknown` block is the lamp's own first word heard
 against the last reply's alignment (`fresh_blocks`), and is not counted.
 
-**With `LAMP_CUT_IN_STALE_ONSET=on` (off unless set), a block heard
+**With `LAMP_CUT_IN_STALE_ONSET=on` (off unless set; on in the
+product's `lamp-voice.service`, #7413), a block heard
 `Unknown` past a reply's first 120 blocks counts toward the onset run** of
 7 that makes the lamp yield, as `Over` does, never as plain
 (`Interruption::count_unknown_onsets`). On lamp-52e6 on 20-21 Nov (#7413)
