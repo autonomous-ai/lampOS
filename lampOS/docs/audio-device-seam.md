@@ -198,7 +198,11 @@ primes the clock again through the barrier.
 Still faults, as before:
 - a retiring tail, or an underrun before the last one's receipt is reported;
 - `ENODEV`, `EBADFD` and `ESTRPIPE`: a disconnect, a bad state or a
-  suspend;
+  suspend. The guard stays latched; since #8269 the worker no longer ends
+  on it but waits up to 10 s for the device and goes on with a fresh
+  speaker (`Speaker::drop_gone`, `Speaker::follow`), as
+  [pilot-faults.md](pilot-faults.md) says under "A microphone or speaker
+  gone mid-run";
 - more than `MAX_UNDERRUNS` (3) within `UNDERRUN_WINDOW_US` (10 s), in
   `crates/audio/src/underrun.rs`: a speaker that keeps underrunning is
   failing, not held up, and the restart guard should see it.
@@ -213,6 +217,9 @@ Tests:
     and primes and starts again;
   - the fourth within the window closes the guard;
   - `ENODEV`, `EBADFD` and `ESTRPIPE` close it;
+  - with speech queued, `ENODEV` keeps it as the gone receipt, and a fresh
+    speaker follows from the next epoch with its own guard and nothing to
+    replay (#8269);
   - an EPIPE with speech queued drops it into the underrun receipt, keeps
     the guard, and the clock starts again only once the receipt is taken;
   - an EPIPE before the last receipt is taken closes the guard.
@@ -222,8 +229,10 @@ Tests:
   answer leaves the voice up, and `cut_after_speaker_lapse` cuts that answer
   and drops what the provider had queued for it.
 
-The worker's own branch has no test: `null` never underruns, and the worker
-loop's one test (`tests/speaker_lapse_worker.rs`) cannot inject an errno.
+The worker's own underrun branch has no test: `null` never underruns. A
+software queue can now fail a call with an errno a test asks for
+(`SoftPcm::faults`, #8269), and the worker loop's test over one
+(`tests/speaker_lapse_worker.rs`) covers a device gone mid-run.
 
 **A speaker held up, with recovery off** (#1178, lamp-cb94 at 04:53:53 UTC
 on 17 October, 4 h 34 min into Thirteen's soak). The journal had a bare

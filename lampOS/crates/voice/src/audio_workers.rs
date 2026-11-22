@@ -6,7 +6,7 @@ use crate::{
     activity::SpeechProbability,
     diagnostic_control::{DiagnosticFinished, DiagnosticStarted},
     diagnostics::{self, EndReason, Recorder, ResetMeta, ResetReason, StreamKind},
-    open_at_start::{BUSY_AT_START, OpenAtStart},
+    open_at_start::{BUSY_AT_START, GoneMidRun, OpenAtStart},
     options::{
         AudioWorkerOptions, NoiseSuppression, ReferenceClock, ReferenceRecovery, SoftwareProcessing,
     },
@@ -184,6 +184,134 @@ fn into_gap<T>(
         *gap = Some(begin_gap(channels, epoch, error, hold)?);
     }
     Ok(())
+}
+
+/// Whether `errno` is a device gone mid-run (#8269): unplugged or reset
+/// (ENODEV, EBADFD) or suspended (ESTRPIPE).
+fn gone_errno(errno: i32) -> bool {
+    use lamp_audio::device::errno;
+    matches!(errno, errno::NODEV | errno::BADFD | errno::STRPIPE)
+}
+
+/// A microphone gone mid-run (#8269): the read or status found it
+/// disconnected or suspended. The discard of a gone device fails as the
+/// device did (06c1's `snd_pcm_drop failed with errno 19`); any other close
+/// error is still the fault it was.
+fn gone(error: &CaptureError) -> Option<Discontinuity> {
+    let reason = match error.kind {
+        CaptureErrorKind::Discontinuity(
+            reason @ (Discontinuity::Disconnected | Discontinuity::Suspended),
+        ) => reason,
+        _ => return None,
+    };
+    match error.close_error {
+        None => Some(reason),
+        Some(fault) if gone_errno(fault.errno) => Some(reason),
+        Some(_) => None,
+    }
+}
+
+/// A try to open a gone microphone again that found it not back yet: still
+/// gone or suspended, not yet named again (ENOENT) or taken for a moment as
+/// it comes back (EBUSY), its authority lapsed meanwhile (the next snapshot
+/// opens it), or a stall. Anything else ends the wait and the worker.
+fn not_back(error: &CaptureError) -> bool {
+    use lamp_audio::device::{OPEN_CALL, errno};
+    gone(error).is_some()
+        || stall(error).is_some()
+        || matches!(error.kind, CaptureErrorKind::NotPermitted)
+        || error.device_error.is_some_and(|fault| {
+            fault.call == OPEN_CALL
+                && (gone_errno(fault.errno) || matches!(fault.errno, errno::NOENT | errno::BUSY))
+        })
+}
+
+/// A stall's gap reopen that found the microphone gone (#8269): the device
+/// went while the stall had it closed. Its open failed as a gone device's
+/// does (`ENODEV`, `EBADFD`, `ESTRPIPE`, or `ENOENT` while the card is not
+/// yet named again), or it opened and was found disconnected or suspended.
+/// The gap's own reason for the coordinator, as a read's would be.
+fn gone_on_reopen(error: &CaptureError) -> Option<&'static str> {
+    use lamp_audio::device::{OPEN_CALL, errno};
+    if let Some(reason) = gone(error) {
+        return Some(match reason {
+            Discontinuity::Suspended => "Suspended",
+            _ => "Disconnected",
+        });
+    }
+    let fault = error.device_error.filter(|fault| fault.call == OPEN_CALL)?;
+    match fault.errno {
+        errno::STRPIPE => Some("Suspended"),
+        errno::NODEV | errno::BADFD | errno::NOENT => Some("Disconnected"),
+        _ => None,
+    }
+}
+
+/// A device gone mid-run (#8269), the microphone or the speaker: open a gone
+/// wait, said in the journal, with the coordinator told the microphone
+/// closed. Once a wait: a second device going joins the one open, and a
+/// speaker gone starts its bound again. A stall's gap already open is taken
+/// over by the wait, and the coordinator, told of it as a stall, is told it
+/// is now a device gone (`CaptureGapGone`), so its bound is the wait's.
+#[allow(clippy::too_many_arguments)]
+fn into_gone<T>(
+    waiting: &mut Option<GoneMidRun>,
+    gap: &mut Option<u64>,
+    channels: &mut WorkerChannels,
+    epoch: u64,
+    what: &'static str,
+    reason: &str,
+    errno: Option<i32>,
+    hold: &mut CaptureHold<T>,
+) -> Result<()> {
+    if waiting.is_some() {
+        // A speaker gone while the microphone's wait is open: the wait
+        // starts again from now, so a speaker back within its own 10 s is
+        // not cut at the microphone's bound, and the coordinator's bound
+        // moves with it, so the worker's own line still comes first.
+        if reason != "SpeakerGone" {
+            return Ok(());
+        }
+        let wait = GoneMidRun::began("capture", what, Instant::now());
+        eprintln!("{}", wait.went(errno));
+        channels.control.send(WorkerEvent::CaptureGapGone {
+            epoch,
+            reason: reason.to_owned(),
+            gone_at_us: monotonic_us(),
+        })?;
+        *waiting = Some(wait);
+        return Ok(());
+    }
+    let wait = GoneMidRun::began("capture", what, Instant::now());
+    eprintln!("{}", wait.went(errno));
+    if gap.take().is_none() {
+        channels.control.send(WorkerEvent::CaptureGap {
+            epoch,
+            reason: reason.to_owned(),
+            closed_at_us: monotonic_us(),
+        })?;
+        *hold = CaptureHold::new(hold.blocks())
+            .ok_or_else(|| io::Error::other("capture hold beyond its bound"))?;
+    } else {
+        // The stall's gap is taken over: the coordinator was told of it as
+        // a stall, with a stall's 1.5 s bound. It is told the gap is now a
+        // device gone, so its bound becomes this wait's.
+        channels.control.send(WorkerEvent::CaptureGapGone {
+            epoch,
+            reason: reason.to_owned(),
+            gone_at_us: monotonic_us(),
+        })?;
+    }
+    *waiting = Some(wait);
+    Ok(())
+}
+
+/// The errno a capture error names, the device's or its discard's.
+fn capture_errno(error: &CaptureError) -> Option<i32> {
+    error
+        .device_error
+        .or(error.close_error)
+        .map(|fault| fault.errno)
 }
 
 fn capture_started(
@@ -631,6 +759,12 @@ fn capture_loop<D: CaptureDevice>(
     // that has started is reopened: before that, the start is the
     // reference's barrier to keep, and a stall in it still ends the worker.
     let mut gap: Option<u64> = None;
+    // A device gone mid-run (#8269): the microphone, or the speaker as it
+    // said on the reference link, waited for up to `GONE_AT_START`.
+    let mut waiting_gone: Option<GoneMidRun> = None;
+    // The speaker said it went; until its new clock starts the microphone
+    // stays closed.
+    let mut speaker_gone = false;
     let mut started = false;
     // With LAMP_VOICE_UNSTARTED_FRAME_DROP=on (#7224), a reopened
     // microphone sends nothing until the speaker's clock has started again,
@@ -681,6 +815,19 @@ fn capture_loop<D: CaptureDevice>(
                             channels.control.send(WorkerEvent::CaptureStopped)?;
                             return Ok(EndReason::PrivacyClosed);
                         }
+                        // #8269: a mute or the switch while a gone device is
+                        // waited for ends the wait as it ends a running
+                        // capture, and nothing is opened.
+                        if waiting_gone.is_some()
+                            && (snapshot.microphone_permission() != Permission::Allowed
+                                || snapshot.microphone_generation() != privacy)
+                        {
+                            eprintln!(
+                                "lamp-voice: capture: the microphones closed while a gone device was waited for: nothing is opened"
+                            );
+                            channels.control.send(WorkerEvent::CaptureStopped)?;
+                            return Ok(EndReason::PrivacyClosed);
+                        }
                     }
                     Err(error) if matches!(error.kind, CaptureErrorKind::Authority(reason) if rejected_old_state(reason)) =>
                         {}
@@ -722,6 +869,56 @@ fn capture_loop<D: CaptureDevice>(
             }
             Err(error) => return Err(error.into()),
         }
+        // #8269: a gone device is tried again every 250 ms for up to 10 s,
+        // through `prepare`, so each try checks a fresh authority, the
+        // privacy switch and the mute before the device is touched, and the
+        // privacy generation is the one capture started under. While the
+        // speaker is gone the microphone waits for its new clock.
+        let mut back = None;
+        if let Some(wait) = waiting_gone.as_mut() {
+            let now = Instant::now();
+            if wait.over(now) {
+                let said = wait.not_back();
+                eprintln!("{said}");
+                return Err(io::Error::other(said).into());
+            }
+            if !speaker_gone && wait.due(now) {
+                wait.tried(now);
+                if microphone.reset_required().is_some() {
+                    microphone.reset()?;
+                }
+                match microphone.prepare() {
+                    Ok(report) if report.microphone_generation == privacy => {
+                        match microphone.start_prepared() {
+                            Ok(report) => back = Some(report),
+                            Err(error) if not_back(&error) => {}
+                            Err(error) => return Err(error.into()),
+                        }
+                    }
+                    Ok(_) => {
+                        return Err(io::Error::other(
+                            "privacy changed while a gone device was waited for",
+                        )
+                        .into());
+                    }
+                    Err(error) if not_back(&error) => {}
+                    Err(error) => return Err(error.into()),
+                }
+            }
+        }
+        if let Some(report) = back
+            && let Some(wait) = waiting_gone.take()
+        {
+            channels.control.send(capture_started(
+                &report,
+                dsp_epoch,
+                noise_suppression,
+                privacy,
+            ))?;
+            eprintln!("{}", wait.back(Instant::now()));
+            reference.capture_reopened(monotonic_us());
+            reopen_hold.reopened(monotonic_us());
+        }
         // A stall closed the microphone: it opens again only under a fresh
         // authority. `prepare` checks it, the privacy switch and the mute
         // before the device is touched; until the coordinator's next
@@ -749,6 +946,20 @@ fn capture_loop<D: CaptureDevice>(
                         // The fresh authority lapsed between open and start:
                         // the microphone closed again; the next one reopens it.
                         Err(error) if stall(&error).is_some() => {}
+                        // The device went during the stall (#8269): the gap
+                        // is taken over by a gone wait.
+                        Err(error) if gone_on_reopen(&error).is_some() => {
+                            into_gone(
+                                &mut waiting_gone,
+                                &mut gap,
+                                channels,
+                                microphone.epoch(),
+                                "the microphone",
+                                gone_on_reopen(&error).unwrap_or("Disconnected"),
+                                capture_errno(&error),
+                                &mut hold,
+                            )?;
+                        }
                         Err(error) => return Err(error.into()),
                     }
                 }
@@ -759,6 +970,20 @@ fn capture_loop<D: CaptureDevice>(
                 Err(error)
                     if matches!(error.kind, CaptureErrorKind::NotPermitted)
                         || stall(&error).is_some() => {}
+                // The device went during the stall (#8269): the gap is taken
+                // over by a gone wait, whose retries open it once it is back.
+                Err(error) if gone_on_reopen(&error).is_some() => {
+                    into_gone(
+                        &mut waiting_gone,
+                        &mut gap,
+                        channels,
+                        microphone.epoch(),
+                        "the microphone",
+                        gone_on_reopen(&error).unwrap_or("Disconnected"),
+                        capture_errno(&error),
+                        &mut hold,
+                    )?;
+                }
                 Err(error) => return Err(error.into()),
             }
         }
@@ -881,7 +1106,10 @@ fn capture_loop<D: CaptureDevice>(
                                 monotonic_us(),
                             )?;
                             primed_at = None;
-                            if !microphone.is_running() && gap.is_none() {
+                            // The speaker that went is back with a new clock
+                            // (#8269): the microphone may open again.
+                            speaker_gone = false;
+                            if !microphone.is_running() && gap.is_none() && waiting_gone.is_none() {
                                 let report = microphone.start_prepared()?;
                                 started = true;
                                 channels.control.send(capture_started(
@@ -896,6 +1124,42 @@ fn capture_loop<D: CaptureDevice>(
                             microphone.revoke()?;
                             channels.control.send(WorkerEvent::CaptureStopped)?;
                             return Ok(EndReason::Stopped);
+                        }
+                        // #8269: the speaker's device went (one USB card
+                        // carries both). A gap, not a fault: the microphone
+                        // closes, its discard excused if the card took it too,
+                        // and opens again once the speaker's new clock starts.
+                        ReferenceControl::SpeakerGone { .. } if started => {
+                            speaker_gone = true;
+                            if microphone.is_open() {
+                                match microphone.revoke() {
+                                    Ok(()) => {}
+                                    Err(error)
+                                        if error
+                                            .close_error
+                                            .is_some_and(|fault| gone_errno(fault.errno)) => {}
+                                    Err(error) => return Err(error.into()),
+                                }
+                            }
+                            into_gone(
+                                &mut waiting_gone,
+                                &mut gap,
+                                channels,
+                                microphone.epoch(),
+                                "the speaker",
+                                "SpeakerGone",
+                                None,
+                                &mut hold,
+                            )?;
+                        }
+                        // Before capture's first start the speaker's own open
+                        // at start bounds it; a speaker gone then ends the
+                        // run as it did, said as what it is.
+                        ReferenceControl::SpeakerGone { .. } => {
+                            return Err(io::Error::other(
+                                "the speaker went before capture first started: the run ends",
+                            )
+                            .into());
                         }
                         _ => {
                             return Err(io::Error::other(
@@ -917,7 +1181,7 @@ fn capture_loop<D: CaptureDevice>(
                 // closed it: the speaker's reference goes on through the gap
                 // (#784, the third stall on lamp-52e6 ended on this), and the
                 // privacy generation is still checked on every packet.
-                if !microphone.is_open() && gap.is_none() {
+                if !microphone.is_open() && gap.is_none() && waiting_gone.is_none() {
                     return Err(reference
                         .fault(ReferenceFaultKind::PrivacyMismatch, monotonic_us())
                         .into());
@@ -939,7 +1203,7 @@ fn capture_loop<D: CaptureDevice>(
         // A clock a reopen waits for that has not come (#7224): first a
         // fresh reopen, as after a stall, then the old exit. Never silent
         // for good.
-        if gap.is_none() {
+        if gap.is_none() && waiting_gone.is_none() {
             match reopen_hold.due(&reference.timing(), monotonic_us()) {
                 None => {}
                 Some(crate::unstarted_frames::Recovery::Reopen(line)) => {
@@ -967,6 +1231,20 @@ fn capture_loop<D: CaptureDevice>(
             cost.stage(Stage::Read, from);
             match read {
                 Ok(frame) => frame,
+                Err(error) if started && gone(&error).is_some() => {
+                    let reason = gone(&error).map_or_else(String::new, |r| format!("{r:?}"));
+                    into_gone(
+                        &mut waiting_gone,
+                        &mut gap,
+                        channels,
+                        microphone.epoch(),
+                        "the microphone",
+                        &reason,
+                        capture_errno(&error),
+                        &mut hold,
+                    )?;
+                    None
+                }
                 Err(error) if started && stall(&error).is_some() => {
                     into_gap(&mut gap, channels, microphone.epoch(), &error, &mut hold)?;
                     None
@@ -1282,7 +1560,7 @@ fn report_reference(
 }
 
 pub fn speaker(
-    mut channels: WorkerChannels,
+    channels: WorkerChannels,
     controller: BootId,
     worker: BootId,
     directory: &Path,
@@ -1299,6 +1577,30 @@ pub fn speaker(
         )
         .into());
     }
+    speaker_on(
+        channels,
+        controller,
+        worker,
+        directory,
+        diagnostic_directory,
+        |channels| open_speaker(channels, device, controller),
+        || reopen_speaker(device, controller),
+    )
+}
+
+/// The speaker worker over the speaker `open` gives it. The entry point
+/// above is the board's; a process-level test hands it a software queue
+/// instead and runs this same loop. `reopen` opens the same device again,
+/// once, with a new guard (#8269).
+pub fn speaker_on(
+    mut channels: WorkerChannels,
+    controller: BootId,
+    worker: BootId,
+    directory: &Path,
+    diagnostic_directory: Option<&Path>,
+    open: impl FnOnce(&mut WorkerChannels) -> Result<Speaker>,
+    mut reopen: impl FnMut() -> Result<Speaker>,
+) -> Result<()> {
     let mut recording = Recording::start(
         diagnostic_directory,
         controller,
@@ -1306,7 +1608,7 @@ pub fn speaker(
         None,
         &mut channels,
     )?;
-    let mut speaker = open_speaker(&mut channels, device, controller)?;
+    let mut speaker = open(&mut channels)?;
     let mut speech = SpeechPlayback::default();
     let mut output = ReferenceOutput::default();
     let result = speaker_loop(
@@ -1317,6 +1619,7 @@ pub fn speaker(
         &mut recording,
         &mut speech,
         &mut output,
+        &mut reopen,
     );
     let result = ended_at_peer_stop(
         &mut channels,
@@ -1406,6 +1709,30 @@ fn open_speaker(
         return crate::bus_speaker::open(controller);
     }
     open_alsa_speaker(channels, device, controller)
+}
+
+/// The same device opened again, once, nothing waited out: what a speaker
+/// gone mid-run tries every 250 ms (#8269). A fresh `Speaker`, so a new
+/// guard with no authority until the coordinator's next snapshot.
+fn reopen_speaker(device: &str, controller: BootId) -> Result<Speaker> {
+    if crate::bus_speaker::is_bus_device(device) {
+        return crate::bus_speaker::open(controller);
+    }
+    reopen_alsa_speaker(device, controller)
+}
+
+#[cfg(target_os = "linux")]
+fn reopen_alsa_speaker(device: &str, controller: BootId) -> Result<Speaker> {
+    Speaker::open_clock(device, controller)
+}
+
+#[cfg(not(target_os = "linux"))]
+fn reopen_alsa_speaker(device: &str, controller: BootId) -> Result<Speaker> {
+    let _ = controller;
+    Err(io::Error::other(format!(
+        "this build has no sound card: the speaker device {device} is not available, only bus:speaker1 is"
+    ))
+    .into())
 }
 
 #[cfg(not(target_os = "linux"))]
@@ -1711,6 +2038,8 @@ fn receive_chunk(
     pending: &mut Option<PendingChunk>,
     last_sequence: &mut u64,
     flush_count: &mut u64,
+    // The revision floor after a gone speaker (#8269), and the newest seen.
+    (floor, seen_revision): (u64, &mut u64),
 ) -> Result<()> {
     if pending.is_none()
         && let Some(chunk) = channels.data.receive::<SpeakerChunk>()?
@@ -1723,6 +2052,18 @@ fn receive_chunk(
             return Err(io::Error::other("invalid speaker chunk size/sequence/final block").into());
         }
         *last_sequence = chunk.chunk_sequence;
+        *seen_revision = (*seen_revision).max(chunk.snapshot.revision());
+        // Speech sent under the authority a gone speaker had (#8269) is
+        // refused, never written by the fresh one.
+        if chunk.snapshot.revision() <= floor {
+            channels.control.send(WorkerEvent::PlaybackRejected {
+                turn: chunk.permit.owner().turn(),
+                sequence: chunk.chunk_sequence,
+                reason: SPEAKER_WENT.to_owned(),
+                lapsed: true,
+            })?;
+            return Ok(());
+        }
         match speaker.install(chunk.snapshot) {
             Ok(()) => supersede_speech(
                 channels,
@@ -1757,6 +2098,7 @@ fn receive_chunk(
 // `speech` and `output` are the caller's, so that an end at the voice's
 // Stop found through a refused reference link (#4332) reports and records
 // its reset as the loop's own Stop does.
+#[allow(clippy::too_many_arguments)]
 fn speaker_loop(
     channels: &mut WorkerChannels,
     speaker: &mut Speaker,
@@ -1765,17 +2107,286 @@ fn speaker_loop(
     recording: &mut Option<Recording>,
     speech: &mut SpeechPlayback,
     output: &mut ReferenceOutput,
+    reopen: &mut dyn FnMut() -> Result<Speaker>,
 ) -> Result<EndReason> {
-    let mut link: Option<ReferenceChannels> = None;
-    let mut pending: Option<PendingChunk> = None;
-    let mut last_sequence = 0;
-    let mut flush_count = speaker.flush_count();
-    // Since when the authority has been lapsed, the speaker silent (#1178).
-    let mut lapsed_since: Option<u64> = None;
+    let mut state = SpeakerState {
+        link: None,
+        pending: None,
+        last_sequence: 0,
+        flush_count: speaker.flush_count(),
+        lapsed_since: None,
+        seen_revision: 0,
+        floor_revision: 0,
+        ending: false,
+    };
     channels.control.send(WorkerEvent::Ready)?;
     // With LAMP_STALLS=on, a pass or an overrun wait of 50 ms or more is
     // recorded with what held it (#1178).
     let mut stalls = crate::stalls::Stalls::from_environment("speaker");
+    loop {
+        let result = speaker_passes(
+            channels,
+            speaker,
+            worker,
+            directory,
+            recording,
+            speech,
+            output,
+            &mut state,
+            &mut stalls,
+        );
+        // #8269: the device went mid-run. Not the end of the voice: the
+        // speaker waits for it and goes on with a fresh one, unless the
+        // error came in a Stop or a privacy close, which end the run as
+        // they did.
+        let gone = match &result {
+            Err(error) if !state.ending => speaker_gone(error.as_ref()),
+            _ => None,
+        };
+        let Some(errno) = gone else {
+            return result;
+        };
+        if let Some(end) = wait_for_speaker(
+            channels,
+            speaker,
+            worker,
+            directory,
+            recording,
+            speech,
+            output,
+            &mut state,
+            &mut stalls,
+            reopen,
+            errno,
+        )? {
+            return Ok(end);
+        }
+    }
+}
+
+/// What the speaker's passes keep across a device gone mid-run (#8269): the
+/// reference link, the chunk waiting, the chunk sequence, the discards
+/// reported, a lapse, and the authority revisions.
+struct SpeakerState {
+    link: Option<ReferenceChannels>,
+    pending: Option<PendingChunk>,
+    last_sequence: u64,
+    flush_count: u64,
+    // Since when the authority has been lapsed, the speaker silent (#1178).
+    lapsed_since: Option<u64>,
+    /// The newest authority revision the worker has been sent.
+    seen_revision: u64,
+    /// A fresh speaker after a gone one takes only a snapshot newer than
+    /// every one the gone speaker was sent: its guard is new, never the
+    /// old one's authority (#8269).
+    floor_revision: u64,
+    /// A Stop or a privacy close is being carried out: a device error then
+    /// ends the run as it did.
+    ending: bool,
+}
+
+/// The errno of a speaker error that is its device gone mid-run (#8269):
+/// ALSA's ENODEV, EBADFD or ESTRPIPE, from the call that found it or from
+/// the discard of the gone device.
+fn speaker_gone(error: &(dyn std::error::Error + Send + Sync + 'static)) -> Option<i32> {
+    error
+        .downcast_ref::<lamp_audio::pcm::PcmError>()
+        .map(|error| error.errno())
+        .filter(|errno| gone_errno(*errno))
+}
+
+/// A try to open a gone speaker again that found it not back yet: still
+/// gone, not yet named again (ENOENT) or taken for a moment as it comes
+/// back (EBUSY). Anything else ends the wait and the run.
+fn speaker_not_back(error: &(dyn std::error::Error + Send + Sync + 'static)) -> bool {
+    use lamp_audio::device::errno;
+    error
+        .downcast_ref::<lamp_audio::pcm::PcmError>()
+        .is_some_and(|error| {
+            gone_errno(error.errno()) || matches!(error.errno(), errno::NOENT | errno::BUSY)
+        })
+}
+
+/// #8269: the speaker's device went mid-run. Its guard is latched and stays
+/// so; what it had queued is dropped and reported as a discard is, and the
+/// chunk waiting is refused, so the answer it was saying is cut and nothing
+/// of it is written again. The capture side is told the speaker went, and
+/// keeps its microphone closed until the new clock starts. The device is
+/// tried again every 250 ms for up to 10 s (`GONE_AT_START`); when it opens,
+/// a fresh speaker with a new guard takes the old one's place, and takes
+/// only a snapshot newer than any the old one was sent: the coordinator's
+/// next. Meanwhile the coordinator's control is read: a Stop or a mute ends
+/// the wait, and chunks that come are refused. Nothing is spoken. Past the
+/// bound the run ends as before. Returns how the run ended, or `None` to go
+/// on.
+#[allow(clippy::too_many_arguments)]
+fn wait_for_speaker(
+    channels: &mut WorkerChannels,
+    speaker: &mut Speaker,
+    worker: BootId,
+    directory: &Path,
+    recording: &mut Option<Recording>,
+    speech: &mut SpeechPlayback,
+    output: &mut ReferenceOutput,
+    state: &mut SpeakerState,
+    stalls: &mut crate::stalls::Stalls,
+    reopen: &mut dyn FnMut() -> Result<Speaker>,
+    errno: i32,
+) -> Result<Option<EndReason>> {
+    let mut wait = GoneMidRun::began("speaker", "the speaker", Instant::now());
+    eprintln!("{}", wait.went(Some(errno)));
+    let epoch = speaker.queued_range().epoch;
+    speaker.drop_gone()?;
+    if report_discard(channels, speaker, output, &mut state.flush_count, recording)? {
+        report_speech_reset(channels, speech)?;
+    }
+    if let Some(partial) = state.pending.take() {
+        channels.control.send(WorkerEvent::PlaybackRejected {
+            turn: partial.chunk.permit.owner().turn(),
+            sequence: partial.chunk.chunk_sequence,
+            reason: SPEAKER_WENT.to_owned(),
+            lapsed: true,
+        })?;
+    }
+    state.floor_revision = state.seen_revision;
+    state.lapsed_since = None;
+    if let Some(link) = state.link.as_mut() {
+        link.control.send(ReferenceControl::SpeakerGone {
+            playback_epoch: epoch,
+            observed_at_us: monotonic_us(),
+        })?;
+    }
+    loop {
+        let tick = Instant::now();
+        let stall_pass = stalls.begin();
+        for index in 0..=HELD_UP_CONTROL {
+            let Some(control) = channels.control.receive_renewed(Control::is_renewal)? else {
+                break;
+            };
+            if index == HELD_UP_CONTROL {
+                return Err(io::Error::other("speaker control tick bound").into());
+            }
+            match control {
+                Control::Authority { snapshot } => {
+                    // Issued after the device went: the fresh speaker may
+                    // take the next one, never one the gone speaker had.
+                    state.seen_revision = state.seen_revision.max(snapshot.revision());
+                    if let Some(recording) = recording {
+                        recording.observe_privacy(snapshot);
+                    }
+                    if output.privacy.is_some()
+                        && snapshot.microphone_permission() != Permission::Allowed
+                    {
+                        eprintln!(
+                            "lamp-voice: speaker: the microphones closed while the speaker was waited for; the speaker ends closed"
+                        );
+                        report_speech_reset(channels, speech)?;
+                        if let Some(link) = state.link.as_mut() {
+                            link.notify_stopped_after_local_close(speaker.queued_range().epoch);
+                        }
+                        return Ok(Some(EndReason::PrivacyClosed));
+                    }
+                }
+                Control::ConnectReference { peer } => {
+                    if state.link.is_some() {
+                        return Err(io::Error::other("reference peer already bound").into());
+                    }
+                    state.link = Some(ReferenceChannels::bind(directory, "speaker", worker, peer)?);
+                }
+                Control::Stop => {
+                    report_speech_reset(channels, speech)?;
+                    diagnostic_reset(
+                        recording,
+                        ResetReason::Stop,
+                        0,
+                        0,
+                        speaker.queued_range().epoch,
+                        output.privacy.unwrap_or(0),
+                        speaker.last_discard(),
+                    );
+                    if let Some(link) = state.link.as_mut() {
+                        link.notify_stopped_after_local_close(speaker.queued_range().epoch);
+                    }
+                    return Ok(Some(EndReason::Stopped));
+                }
+                Control::StartCapture
+                | Control::ProviderOutputCapacity { .. }
+                | Control::NameGrant { .. } => {
+                    return Err(io::Error::other("invalid speaker command").into());
+                }
+            }
+        }
+        // Speech sent meanwhile is refused, never kept for the new speaker.
+        for _ in 0..MAX_CONTROL {
+            let Some(chunk) = channels.data.receive::<SpeakerChunk>()? else {
+                break;
+            };
+            if chunk.chunk_sequence <= state.last_sequence {
+                return Err(
+                    io::Error::other("invalid speaker chunk size/sequence/final block").into(),
+                );
+            }
+            state.last_sequence = chunk.chunk_sequence;
+            channels.control.send(WorkerEvent::PlaybackRejected {
+                turn: chunk.permit.owner().turn(),
+                sequence: chunk.chunk_sequence,
+                reason: SPEAKER_WENT.to_owned(),
+                lapsed: true,
+            })?;
+        }
+        let now = Instant::now();
+        if wait.over(now) {
+            let said = wait.not_back();
+            eprintln!("{said}");
+            return Err(io::Error::other(said).into());
+        }
+        if wait.due(now) {
+            wait.tried(now);
+            match reopen() {
+                Ok(mut fresh) => {
+                    fresh.follow(speaker)?;
+                    // The gone speaker goes here; its guard went with it.
+                    *speaker = fresh;
+                    output.reset();
+                    eprintln!("{}", wait.back(Instant::now()));
+                    return Ok(None);
+                }
+                Err(error) if speaker_not_back(error.as_ref()) => {}
+                Err(error) => return Err(error),
+            }
+        }
+        stall_pass.done();
+        finish_tick(tick);
+    }
+}
+
+/// Why speech is refused while the speaker's device is gone (#8269).
+const SPEAKER_WENT: &str = "the speaker went mid-run";
+
+/// The speaker's passes, until one ends the loop or fails.
+#[allow(clippy::too_many_arguments)]
+fn speaker_passes(
+    channels: &mut WorkerChannels,
+    speaker: &mut Speaker,
+    worker: BootId,
+    directory: &Path,
+    recording: &mut Option<Recording>,
+    speech: &mut SpeechPlayback,
+    output: &mut ReferenceOutput,
+    state: &mut SpeakerState,
+    stalls: &mut crate::stalls::Stalls,
+) -> Result<EndReason> {
+    let SpeakerState {
+        link,
+        pending,
+        last_sequence,
+        flush_count,
+        lapsed_since,
+        seen_revision,
+        floor_revision,
+        ending,
+    } = state;
+    let floor = *floor_revision;
     let mut last_tick = Instant::now();
     'tick: loop {
         let tick = Instant::now();
@@ -1791,6 +2402,13 @@ fn speaker_loop(
             }
             match control {
                 Control::Authority { snapshot } => {
+                    *seen_revision = (*seen_revision).max(snapshot.revision());
+                    // A fresh speaker after a gone one (#8269) takes only
+                    // the coordinator's next snapshot, never one the gone
+                    // speaker was sent.
+                    if snapshot.revision() <= floor {
+                        continue;
+                    }
                     if let Err(error) = speaker.install(snapshot) {
                         if underran(error.as_ref()) {
                             // Installed before the check underran (#3697).
@@ -1798,10 +2416,10 @@ fn speaker_loop(
                                 channels,
                                 speaker,
                                 output,
-                                &mut flush_count,
+                                flush_count,
                                 speech.unfinished_owner(),
                                 speech,
-                                &mut pending,
+                                pending,
                                 recording,
                             )?;
                         } else if error
@@ -1825,7 +2443,8 @@ fn speaker_loop(
                         // install may already have dropped queued PCM. Preserve
                         // that original discarded range instead of replacing it
                         // with a second empty drop before its diagnostic receipt.
-                        if speaker.flush_count() == flush_count {
+                        *ending = true;
+                        if speaker.flush_count() == *flush_count {
                             speaker.stop()?;
                         }
                         report_speech_reset(channels, speech)?;
@@ -1849,16 +2468,17 @@ fn speaker_loop(
                         speech,
                         snapshot,
                         output.privacy,
-                        flush_count,
+                        *flush_count,
                     )?;
                 }
                 Control::ConnectReference { peer } => {
                     if link.is_some() {
                         return Err(io::Error::other("reference peer already bound").into());
                     }
-                    link = Some(ReferenceChannels::bind(directory, "speaker", worker, peer)?);
+                    *link = Some(ReferenceChannels::bind(directory, "speaker", worker, peer)?);
                 }
                 Control::Stop => {
+                    *ending = true;
                     speaker.stop()?;
                     report_speech_reset(channels, speech)?;
                     diagnostic_reset(
@@ -1894,11 +2514,11 @@ fn speaker_loop(
                 channels,
                 speaker,
                 output,
-                &mut flush_count,
+                flush_count,
                 speech,
-                &mut pending,
+                pending,
                 recording,
-                &mut lapsed_since,
+                lapsed_since,
             )?;
             stall_pass.done();
             finish_tick(tick);
@@ -1918,10 +2538,10 @@ fn speaker_loop(
                     channels,
                     speaker,
                     output,
-                    &mut flush_count,
+                    flush_count,
                     speech.unfinished_owner(),
                     speech,
-                    &mut pending,
+                    pending,
                     recording,
                 )?;
                 stall_pass.done();
@@ -1933,11 +2553,11 @@ fn speaker_loop(
                     channels,
                     speaker,
                     output,
-                    &mut flush_count,
+                    flush_count,
                     speech,
-                    &mut pending,
+                    pending,
                     recording,
-                    &mut lapsed_since,
+                    lapsed_since,
                 )?;
                 stall_pass.done();
                 finish_tick(tick);
@@ -1945,7 +2565,7 @@ fn speaker_loop(
             }
             Err(error) => return Err(error),
         }
-        if report_discard(channels, speaker, output, &mut flush_count, recording)? {
+        if report_discard(channels, speaker, output, flush_count, recording)? {
             report_speech_reset(channels, speech)?;
         }
         if let Some(tail) = speaker.take_retired_tail()? {
@@ -1966,7 +2586,7 @@ fn speaker_loop(
             })?;
         }
         // A hard deadline can expire while collecting the retirement receipt.
-        if report_discard(channels, speaker, output, &mut flush_count, recording)? {
+        if report_discard(channels, speaker, output, flush_count, recording)? {
             report_speech_reset(channels, speech)?;
         }
         let Some(link) = link.as_mut() else {
@@ -2011,11 +2631,11 @@ fn speaker_loop(
                                 channels,
                                 speaker,
                                 output,
-                                &mut flush_count,
+                                flush_count,
                                 speech,
-                                &mut pending,
+                                pending,
                                 recording,
-                                &mut lapsed_since,
+                                lapsed_since,
                             )?;
                             stall_pass.done();
                             finish_tick(tick);
@@ -2042,11 +2662,11 @@ fn speaker_loop(
                                 channels,
                                 speaker,
                                 output,
-                                &mut flush_count,
+                                flush_count,
                                 speech,
-                                &mut pending,
+                                pending,
                                 recording,
-                                &mut lapsed_since,
+                                lapsed_since,
                             )?;
                             stall_pass.done();
                             finish_tick(tick);
@@ -2076,7 +2696,9 @@ fn speaker_loop(
                 .fault(speaker, ReferenceFaultKind::BarrierTimeout)
                 .into());
         }
-        if output.privacy.is_some() && !speaker.clock_started() {
+        // A fresh speaker after a gone one (#8269) primes once the
+        // coordinator's next snapshot is installed in its new guard.
+        if output.privacy.is_some() && !speaker.clock_started() && speaker.has_authority() {
             match output.prime(speaker, link, recording) {
                 Ok(()) => {}
                 Err(error) if underran(error.as_ref()) => {
@@ -2084,10 +2706,10 @@ fn speaker_loop(
                         channels,
                         speaker,
                         output,
-                        &mut flush_count,
+                        flush_count,
                         speech.unfinished_owner(),
                         speech,
-                        &mut pending,
+                        pending,
                         recording,
                     )?;
                     stall_pass.done();
@@ -2099,11 +2721,11 @@ fn speaker_loop(
                         channels,
                         speaker,
                         output,
-                        &mut flush_count,
+                        flush_count,
                         speech,
-                        &mut pending,
+                        pending,
                         recording,
-                        &mut lapsed_since,
+                        lapsed_since,
                     )?;
                     stall_pass.done();
                     finish_tick(tick);
@@ -2134,9 +2756,10 @@ fn speaker_loop(
             output,
             speech,
             recording,
-            &mut pending,
-            &mut last_sequence,
-            &mut flush_count,
+            pending,
+            last_sequence,
+            flush_count,
+            (floor, &mut *seen_revision),
         )?;
         // Aim for 10..20 ms (a software queue: 20..30 ms, `write_ahead_frames`). Provider pacing must not stop the physical clock:
         // accept real zero-only PCM if speech is unavailable, and report that
@@ -2153,9 +2776,10 @@ fn speaker_loop(
                     output,
                     speech,
                     recording,
-                    &mut pending,
-                    &mut last_sequence,
-                    &mut flush_count,
+                    pending,
+                    last_sequence,
+                    flush_count,
+                    (floor, &mut *seen_revision),
                 )?;
             }
             let writable_block = speaker.last_poll().is_some_and(|status| {
@@ -2200,7 +2824,7 @@ fn speaker_loop(
                             .recorder
                             .try_render(meta, &partial.chunk.samples[partial.offset..end]);
                     }
-                    if report_discard(channels, speaker, output, &mut flush_count, recording)? {
+                    if report_discard(channels, speaker, output, flush_count, recording)? {
                         report_speech_reset(channels, speech)?;
                     }
                     match result {
@@ -2212,7 +2836,7 @@ fn speaker_loop(
                                 written.frames,
                             )? {
                                 // Receipt first; the dropped tail is never new-epoch render.
-                                pending = None;
+                                *pending = None;
                                 stall_pass.done();
                                 finish_tick(tick);
                                 continue 'tick;
@@ -2262,7 +2886,7 @@ fn speaker_loop(
                                     observed_at_us: written.completed_at_us,
                                 })?;
                                 if partial.offset == partial.chunk.samples.len() {
-                                    pending = None;
+                                    *pending = None;
                                 }
                             }
                         }
@@ -2273,17 +2897,17 @@ fn speaker_loop(
                                 reason: error.to_string(),
                                 lapsed: lapsed(error.as_ref()),
                             })?;
-                            pending = None;
+                            *pending = None;
                         }
                         Err(error) if underran(error.as_ref()) => {
                             underrun(
                                 channels,
                                 speaker,
                                 output,
-                                &mut flush_count,
+                                flush_count,
                                 speaking,
                                 speech,
-                                &mut pending,
+                                pending,
                                 recording,
                             )?;
                             stall_pass.done();
@@ -2312,10 +2936,10 @@ fn speaker_loop(
                                 channels,
                                 speaker,
                                 output,
-                                &mut flush_count,
+                                flush_count,
                                 speech.unfinished_owner(),
                                 speech,
-                                &mut pending,
+                                pending,
                                 recording,
                             )?;
                             stall_pass.done();
@@ -2327,11 +2951,11 @@ fn speaker_loop(
                                 channels,
                                 speaker,
                                 output,
-                                &mut flush_count,
+                                flush_count,
                                 speech,
-                                &mut pending,
+                                pending,
                                 recording,
-                                &mut lapsed_since,
+                                lapsed_since,
                             )?;
                             stall_pass.done();
                             finish_tick(tick);
@@ -2487,6 +3111,16 @@ fn report_discard(
             reason: PlaybackDiscardReason::Underran,
             queued_frames: underran.queued_frames,
             other_owners: underran.other_owners,
+            observed_at_us: monotonic_us(),
+        })?;
+    }
+    // Speech a device gone mid-run dropped (#8269), named the same way.
+    if let Some(gone) = speaker.take_gone() {
+        channels.control.send(WorkerEvent::PlaybackDiscarded {
+            owner: gone.owner,
+            reason: PlaybackDiscardReason::DeviceGone,
+            queued_frames: gone.queued_frames,
+            other_owners: gone.other_owners,
             observed_at_us: monotonic_us(),
         })?;
     }
@@ -3273,6 +3907,7 @@ mod speaker_chunk_tests {
                     &mut None,
                     &mut SpeechPlayback::default(),
                     &mut ReferenceOutput::default(),
+                    &mut || Err(io::Error::other("no speaker to open again").into()),
                 )
                 .map(|_| ())
                 .map_err(|error| error.to_string())
