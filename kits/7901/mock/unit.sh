@@ -58,5 +58,8 @@ S
       . $W/kitrow/kit.sh; OSASCRIPT=$MB/osascript MOCK_MACVOL=70 VOLOK; echo "v70=$?"; OSASCRIPT=$MB/osascript MOCK_MACVOL=71 VOLOK; echo "v71=$?" ) 2>&1 )
     sets=$(grep -rlE 'set volume|output volume [0-9]|osascript .*-e .*set ' $KIT/run.sh $KIT/row $KIT/optional 2>/dev/null)
     v "Mac volume 70 plays, 71 stops, no script sets it" 'echo "$o" | grep -q "v70=0" && echo "$o" | grep -q "v71=2" && [ -z "$sets" ]';;
+  # legs S and K's pushed fixtures load by the product's skill.toml rules (fixcheck.py cites them)
+  fixtures) o=$(python3 -I $KIT/mock/fixcheck.py $KIT/row/fixtures); rc=$?; echo "$o" | sed 's/^/  /'
+    v "every pushed fixture loads by the loader's rules: $(echo "$o" | tr '\n' ' ')" '[ $rc = 0 ] && [ "$(echo "$o" | grep -c " OK$")" = 2 ]';;
   *) echo "UNIT FAIL no such test $t";;
 esac

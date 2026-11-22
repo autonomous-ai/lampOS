@@ -52,12 +52,16 @@ for st in $STEPS; do
            need micon '^MUTE (LIFTED OK|NOT MUTED)';;
   save)    VOLOK || exit 2; HEARD save
            LAMP "" $D/mute.lamp.sh > $L/mute.txt 2>&1; cat $L/mute.txt; need mute '^MUTE OFF OK'
-           rm -f $L/verdicts.env $L/skill-a.name $L/skill-c.name
+           rm -f $L/verdicts.env $L/skill-a.name $L/skill-c.name $L/push-*.txt $L/unpush.txt
            LAMP "" $D/save.lamp.sh > $L/save.txt 2>&1; cat $L/save.txt; need save '^SAVED OK';;
-  legs)    HEARD legs; bash $D/row.sh ${LEGS:-A B C D}; T "legs: $(grep '^VERDICT' $L/row-$(echo ${LEGS:-A B C D} | tr -d ' ').txt | cut -c1-90)";;
+  legs)    HEARD legs; bash $D/row.sh ${LEGS:-A B C D S K}; T "legs: $(grep '^VERDICT' $L/row-$(echo ${LEGS:-A B C D S K} | tr -d ' ').txt | cut -c1-90)";;
   unrow)   # The row's put-back: the notes drop-ins (1 lamp-voice and 1 lamp-control start if there), the row's skills
            # (removed by the lamp's own lamp-skills), made.json, the legs' notes files, the row's /tmp files.
            GATE lamp-voice lamp-control || { T "STOP at unrow: start budget"; exit 3; }
+           # The pushed fixtures of legs S and K, taken off by the computer that pushed them (the door's skill.remove)
+           : > $L/unpush.txt; for f in $L/push-*.txt; do [ -f $f ] && grep -q '^PUSHED ' $f || continue; s=${f##*/push-}; s=${s%.txt}
+             ${PUSHCMD:-python3 $D/push.py} remove $s ${LAMP_PAIRED:-} 2>&1 | tail -1 | tee -a $L/unpush.txt; done
+           grep -q 'REMOVE REFUSED' $L/unpush.txt 2>/dev/null && { T "STOP at unrow: a pushed fixture was not removed (row/logs/unpush.txt)"; exit 3; }
            LAMP "" $D/unrow.lamp.sh > $L/unrow.txt 2>&1; cat $L/unrow.txt; need unrow '^UNROW OK';;
   micoff)  if grep -q '^MUTE LIFTED OK' $L/micon.txt 2>/dev/null; then GATE lamp-voice || { T "STOP at micoff: start budget: wait, then ./run.sh micoff"; exit 3; }
              LAMP "" $D/micoff.lamp.sh > $L/micoff.txt 2>&1; cat $L/micoff.txt; sed "s/^/$(date +%T) micoff /" $L/micoff.txt >> $L/mic.txt

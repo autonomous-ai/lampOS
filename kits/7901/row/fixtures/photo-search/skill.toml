@@ -1,0 +1,10 @@
+# #7901 ROW leg S test fixture, pushed from the runner's paired Mac (lamp skill push) and removed at unrow. Not made
+# on the lamp: its grants wait for the owner's kept yes. It holds the camera and the internet in one skill.
+asks = ["photo search"]
+kind = "installable"
+version = "1.0.0"
+tool = "photo_search"
+grants = ["camera", "net"]
+
+[[do]]
+task = { task = "Take one camera picture and look up online what it shows.", run = "scripts/main.py" }

@@ -31,6 +31,15 @@ def coffee(g="net,speak,notes", rd="yes", nf="none", keys=0, sha="-"):
 def desk(nm="desk-search", g="camera,net,speak"):
     return "NEW %s on=True grants=%s reads_notes=no sets_notes=no notes=none keys=0 sha=-\n" % (nm, g)
 FCU = "/system.slice/lamp-tasks.service"
+# The voice's kept task ask (skill_task_yes.rs ASKED_FILE, serde_json to_string: no spaces). SAYBACK_OLD is f162be0fcb's
+# words for camera + net (no line on what can go out); SAYBACK_NEW adds the line (#7901's head generalises AIR_BESIDE_NET).
+SAYBACK_OLD = ("Photo search hands one task to the lamp's agent: \u201cTake one camera picture and look up online what it shows.\u201d. "
+               "Its script comes from your computer Mac, and it uses the camera and reaches the public internet. It runs only once you agree.")
+SAYBACK_NEW = SAYBACK_OLD.replace("public internet.", "public internet, so what the camera sees can go to the internet.")
+def asked_file(sb, skill="photo-search"):
+    import json as _j
+    return _j.dumps({"at_unix_ms": 1795000000000, "grants": ["camera", "net"], "note": "(Nobody has spoken. A skill on this lamp waits for the owner's yes before its task runs. Call nothing now.) " + sb,
+                     "say_back": sb, "sha256": "ab" * 32, "skill": skill}, separators=(",", ":"), ensure_ascii=False)
 def fence(pid=4501, admin="hidden", eg=True, cg="run-d1", seen=True):
     s = "EGRESS-AT-START \n"
     if seen:
@@ -61,6 +70,23 @@ BASE = {
  "j/D.RUNC": j([(1, heard(131)), (1.2, egress("task-d1")), (1.3, token("task-d1", "desk-search", "speak, camera")),
                 (5, ended("task-d1", "desk-search")), (5.2, pieces(132, 80))]),
  "out/fence.lamp.sh.D": fence(),
+ # S: the pushed photo-search (camera + net): asked aloud with the can-go-out line, NO, asked again, YES, its run
+ "out/push.photo-search": 'PUSHED {"asks": ["camera", "net"], "name": "photo-search", "on": true, "version": "1.0.0"}\n',
+ "out/asked.lamp.sh.askS": "ASKED " + asked_file(SAYBACK_NEW) + "\nASK-WATCH END 09:10:00\n",
+ "j/S.RUNS.1": j([(1, heard(141)), (1.5, S + "skill:photo-search: do.task: not handed over: waiting for the owner's yes (the lamp says it back and asks); asked aloud: say: spoken"),
+                  (2, V + "a skill's task with no yes is said back unasked (2 grant(s))"), (3, V + "request 142: a skill's task said back unasked waits for the owner's yes"), (3.2, pieces(142, 230))]),
+ "j/S.NO": j([(1, V + "request 143: the answer to photo-search's say-back was no: nothing kept, it stays off"), (1.5, pieces(143, 40))]),
+ "j/S.USES": j([(1, heard(144)), (2, V + "request 144: a skill's task read back: it waits for the person's yes (2 grant(s))"), (2.2, pieces(144, 230))]),
+ "j/S.YES": j([(1, C + "the owner's yes to photo-search's task kept (2 grant(s))"), (1.2, V + "request 145: a skill's task approved on the person's yes (#6305)"), (1.5, pieces(145, 50))]),
+ "j/S.RUNS.2": j([(1, heard(146)), (1.2, S + "skill:photo-search: do.task: handed to lamp-tasks: run task-s1"),
+                  (1.3, T + "skill task task-s1: granted net: its egress socket task-s1.sock made for the lamp's default agent (openclaw)"),
+                  (1.4, token("task-s1", "photo-search", "camera")), (3, C + "c_9a1b2c3d (photo-search): notes.get: refused: no_grant, 0.1 ms"),
+                  (5, ended("task-s1", "photo-search")), (5.2, pieces(147, 70))]),
+ # K: the pushed key-probe: its yes, then its run refused for a key never added (tasks skill_task.rs run_keys)
+ "out/push.key-probe": 'PUSHED {"asks": ["speak"], "name": "key-probe", "on": true, "version": "1.0.0"}\n',
+ "j/K.KEYUSES": j([(1, heard(151)), (2, V + "request 151: a skill's task read back: it waits for the person's yes (1 grant(s))"), (2.2, pieces(151, 200))]),
+ "j/K.YES": j([(1, C + "the owner's yes to key-probe's task kept (1 grant(s))"), (1.5, pieces(152, 40))]),
+ "j/K.KEYRUN": j([(1, heard(153)), (1.5, T + "skill task: key-probe not run: 1 key(s) not added in the app"), (2, pieces(154, 90))]),
  # run.sh's other steps
  "out/check.lamp.sh": "BIN lamp-voice running=1111 file=1111 (/opt/lampOS/voice/releases/x/lamp-voice) dropins=\nVERIFY PASS (all four parts = the given PR shas)\nREADY\n",
  "out/notes.lamp.sh.on": "NOTES lamp-voice LAMP_MADE_NOTES='on' active=active\nNOTES lamp-control LAMP_MADE_NOTES='on' active=active\nNOTES ON OK (restarted: lamp-voice lamp-control)\n",
@@ -99,7 +125,7 @@ case("B.fail-nonotesfile", "A B", "FAIL", {"out/state.lamp.sh.B1": "STAGE B1\n" 
 case("B.void-noskill", "B", "VOID")
 case("B.void-unheard", "A B", "VOID", drop=["j/B.RUN.1", "j/B.RUN.2"])
 # ---- C (flipped)
-case("C.pass", "C", "PASS")
+case("C.fail-asked", "C", "FAIL")   # kept with net+camera, but on the yes path: First's 16:06 line 2 wants nothing asked
 case("C.fail-oldrefusal", "C", "FAIL", {"j/C.MAKEC": j([(1, asked(121)), (30, notkept(30000, OLD_CAMERA)), (31, pieces(122, 90))]),
      "out/state.lamp.sh.C": BASE["out/state.lamp.sh.C0"].replace("C0", "C")})
 case("C.fail-oldclass", "C", "FAIL", {"j/C.MAKEC": j([(1, asked(121)), (20, OLD_CLASS), (21, notkept(20100, "the lamp's model said no made skill can do it")), (22, pieces(122, 120))]),
@@ -122,12 +148,11 @@ case("D.void-otherskill", "C D", "VOID", {"j/D.RUNC": BASE["j/D.RUNC"].replace("
 case("D.void-noskill", "C D", "VOID", drop=["j/C.MAKEC", "j/C.YES", "out/state.lamp.sh.C"])
 case("D.void-private", "C D", "VOID", {"j/D.RUNC": BASE["j/D.RUNC"].replace("@+5.0 ", "@+3.0 " + C + "task-d1: camera.snapshot: refused: private\n@+5.0 ", 1)})
 # ---- run.sh end to end (lock .. release)
-case("RUN.pass", "A B C D", "PASS", env={"MIC_YES": "yes", "RUNSH": "1"})
-case("RUN.fail-stop-muteback", "A B C D", "FAIL", {"out/save.lamp.sh": "SAVE STOP: lamp-update round under way (journal.json): wait\n"}, env={"MIC_YES": "yes", "RUNSH": "1"})
-case("RUN.fail-legfail-unrowed", "A B C D", "FAIL", {"j/C.MAKEC": j([(1, asked(121)), (30, notkept(30000, OLD_CAMERA)), (31, pieces(122, 90))])}, env={"MIC_YES": "yes", "RUNSH": "1"})
-case("RUN.void-noyes", "A B C D", "VOID", env={"RUNSH": "1"})
-case("RUN.void-checksha", "A B C D", "VOID", {"out/check.lamp.sh": "BIN lamp-voice running=2222 file=2222\nVERIFY FAIL: lamp-voice-not-the-given-PR-sha\nREADY\n"}, env={"MIC_YES": "yes", "RUNSH": "1"})
-case("RUN.void-budget", "A B C D", "VOID", env={"MIC_YES": "yes", "RUNSH": "1", "MOCK_STARTS": "9"})
+case("RUN.fail-stop-muteback", "A B C D S K", "FAIL", {"out/save.lamp.sh": "SAVE STOP: lamp-update round under way (journal.json): wait\n"}, env={"MIC_YES": "yes", "RUNSH": "1"})
+case("RUN.fail-legfail-unrowed", "A B C D S K", "FAIL", {"j/C.MAKEC": j([(1, asked(121)), (30, notkept(30000, OLD_CAMERA)), (31, pieces(122, 90))])}, env={"MIC_YES": "yes", "RUNSH": "1"})
+case("RUN.void-noyes", "A B C D S K", "VOID", env={"RUNSH": "1"})
+case("RUN.void-checksha", "A B C D S K", "VOID", {"out/check.lamp.sh": "BIN lamp-voice running=2222 file=2222\nVERIFY FAIL: lamp-voice-not-the-given-PR-sha\nREADY\n"}, env={"MIC_YES": "yes", "RUNSH": "1"})
+case("RUN.void-budget", "A B C D S K", "VOID", env={"MIC_YES": "yes", "RUNSH": "1", "MOCK_STARTS": "9"})
 # ---- #8180's on-at-once make (LAMP_MADE_CODE_ON_AT_ONCE on in the product): no read-back, no yes; the try's say is
 # answered at once (said 1) and said in the tried line, journaled by its length only (make_try.rs, made_skill.rs).
 # Playing YES there is wrong: these cases' YES chunk holds the old refusal, so a YES played FAILs the leg.
@@ -153,9 +178,25 @@ case("A.fail-yes-tryexit1", "A", "FAIL", {"j/A.MAKEA": BASE["j/A.MAKEA"].replace
 case("C.pass-atonce", "C", "PASS", CA)
 case("C.fail-atonce-nosaidon", "C", "FAIL", over(CA, **{"j/C.MAKEC": made_at_once(121, 30500, "desk-search", so="")}))
 case("D.pass-atonce", "C D", "PASS", CA)
-case("RUN.pass-atonce", "A B C D", "PASS", dict(AA, **CA), env={"MIC_YES": "yes", "RUNSH": "1"})
+# RUN.pass: A on the yes path, C at once (C6: nothing asked), S and K pushed
+case("RUN.pass", "A B C D S K", "PASS", dict(CA), env={"MIC_YES": "yes", "RUNSH": "1"})
+case("RUN.pass-atonce", "A B C D S K", "PASS", dict(AA, **CA), env={"MIC_YES": "yes", "RUNSH": "1"})
+# ---- S: a pushed camera+net skill (First's 16:06 line 3; the Reviewer-lead's ask on #7901, 16:04)
+SNO_KEPT = j([(1, V + "request 143: the answer to photo-search's say-back was no: nothing kept, it stays off"), (1.2, C + "the owner's yes to photo-search's task kept (2 grant(s))"), (1.5, pieces(143, 40))])
+case("S.pass", "S", "PASS")
+case("S.fail-keptonno", "S", "FAIL", {"j/S.NO": SNO_KEPT})
+case("S.fail-noline", "S", "FAIL", {"out/asked.lamp.sh.askS": "ASKED " + asked_file(SAYBACK_OLD) + "\n"})
+case("S.fail-token", "S", "FAIL", {"j/S.RUNS.2": BASE["j/S.RUNS.2"].replace("a token for [camera]", "a token for [speak, camera]")})
+case("S.fail-noegress", "S", "FAIL", {"j/S.RUNS.2": "".join(l + "\n" for l in BASE["j/S.RUNS.2"].splitlines() if "egress" not in l)})
+case("S.void-held", "S", "VOID", {"j/S.YES": j([(1, V2 + "request 145: its answer is held back: nobody spoke to the lamp: no name, nobody turned to it, no conversation with it going on")])})
+case("S.void-nopush", "S", "VOID", drop=["out/push.photo-search"])
+case("S.void-later", "S", "VOID", {"j/S.RUNS.1": j([(1, heard(141)), (1.5, S + "skill:photo-search: do.task: not handed over: waiting for the owner's yes (the lamp says it back and asks); asked aloud: say: refused (its read-back can't be said whole here (the owner isn't seen alone): kept for later)")])})
+# ---- K: a pushed skill whose key was never added (First's 16:06 line 4: keys refused)
+case("K.pass", "K", "PASS")
+case("K.fail-token", "K", "FAIL", {"j/K.KEYRUN": j([(1, heard(153)), (1.4, token("task-k1", "key-probe", "speak")), (3, ended("task-k1", "key-probe")), (3.2, pieces(154, 30))])})
+case("K.void-nopush", "K", "VOID", drop=["out/push.key-probe"])
 # ---- kit helpers alone (unit.sh), the fixes ported from the #8180 e82d kit: engine(), the mute check, SSHR; Mac volume
 for u in ("engine-env", "engine-voice", "engine-app", "engine-none", "mute-oldstamp", "mute-timed", "mute-recoff", "mute-live",
-          "mute-liveoff", "ssh-retry", "ssh-sshpass", "ssh-giveup", "ssh-other", "macvol"):
+          "mute-liveoff", "ssh-retry", "ssh-sshpass", "ssh-giveup", "ssh-other", "macvol", "fixtures"):
     case("U." + u, "-", "PASS", env={"UNIT": u})
 print("gen: %d cases in %s" % (n, FX))

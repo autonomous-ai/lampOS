@@ -1,0 +1,11 @@
+# #7901 ROW leg K test fixture, pushed from the runner's paired Mac (lamp skill push) and removed at unrow. Its task
+# needs a key (secrets) that no app ever added, so lamp-tasks refuses its run before any token: keys stay refused.
+asks = ["key probe"]
+kind = "installable"
+version = "1.0.0"
+tool = "key_probe"
+grants = ["speak"]
+secrets = ["ROW_PROBE_API_KEY"]
+
+[[do]]
+task = { task = "Say whether the row probe key reached this run.", run = "scripts/main.py" }

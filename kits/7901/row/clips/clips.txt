@@ -3,3 +3,8 @@ RUN	Hey Lamp, run the coffee price skill.	1.0
 MAKEC	Hey Lamp, make a skill that looks at my desk with the camera and searches online for what it sees.	1.0
 RUNC	Hey Lamp, run the desk skill.	1.0
 YES	Yes, go ahead.	1.0
+RUNS	Hey Lamp, photo search.	1.0
+USES	Hey Lamp, what does the photo search skill use?	1.0
+NO	No, leave it off.	1.0
+KEYUSES	Hey Lamp, what does the key probe skill use?	1.0
+KEYRUN	Hey Lamp, key probe.	1.0
