@@ -165,13 +165,15 @@ pub const AIR_BESIDE_NET: &str = "so its air readings can go to the internet";
 /// What can leave the lamp when a grant sits beside [`NET`], in the words
 /// [`GRANTS`] uses for it: the Reviewer-lead's P2 on #7901, as `net` may
 /// now sit beside any grant, so a yes says what can go to the internet.
-pub const BESIDE_NET: [(&str, &str); 6] = [
+pub const BESIDE_NET: [(&str, &str); 8] = [
     ("camera", "what the camera sees"),
     ("microphone", "what the microphone hears"),
     ("speech", "everything the lamp says out loud"),
     ("look", "whether someone is there"),
     ("notes", "its notes"),
     ("air", "its air readings"),
+    ("sound", "what kinds of sound it hears"),
+    ("hear", "when its phrases are heard"),
 ];
 
 /// What of `grant` can go to the internet beside [`NET`]: [`BESIDE_NET`]'s
@@ -1406,6 +1408,24 @@ mod tests {
             beside_net(&["look", "net"]),
             "it knows when someone is there, never who and reaches the public internet, so \
              whether someone is there can go to the internet"
+        );
+    }
+
+    #[test]
+    fn sound_beside_net_says_what_kinds_of_sound_can_go_out() {
+        assert_eq!(
+            beside_net(&["sound", "net"]),
+            "it hears kinds of sound, never words and reaches the public internet, so what \
+             kinds of sound it hears can go to the internet"
+        );
+    }
+
+    #[test]
+    fn hear_beside_net_says_when_its_phrases_are_heard_can_go_out() {
+        assert_eq!(
+            beside_net(&["hear", "net"]),
+            "it hears its own phrases, never the words around them and reaches the public \
+             internet, so when its phrases are heard can go to the internet"
         );
     }
 
