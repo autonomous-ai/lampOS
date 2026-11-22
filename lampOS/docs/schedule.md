@@ -1155,7 +1155,14 @@ off unless set; it must be set in lamp-actions' unit and lamp-voice's):
   new line is judged by its own words and the lines its question asked for:
   "Remind me at seven." → "What should I remind you about?" → "Take my
   pills." is set (Sixth's HOLD on #8274), and "Remind me tomorrow." → "What
-  about?" → "Take my pills." still asks "What time?". A typed text, a line whose words are
+  about?" → "Take my pills." still asks "What time?". An asked line lends
+  its length only when it was itself a timer or reminder ask
+  (`going_on_asks::names_the_schedule`: timer, reminder, remind, alarm,
+  countdown or the lamp) and the new line names none: a fresh ask carries
+  its own, so "Set a timer for ten minutes." → "It rings at 4:09. Anything
+  else?" → "Set another timer." asks "For how long?", and "What's five plus
+  five?" → "Ten. Anything else?" lends "five" to nothing (Fifth's HOLD on
+  #8274). A typed text, a line whose words are
   not known, and an owner's language other than English check nothing.
   Because the refusal is an error, `LAMP_SECOND_SAY_WITH_CALL`'s at-once line
   never says "Timer set." for it (`second_provider::timer_line` needs a

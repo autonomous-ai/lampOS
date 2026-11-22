@@ -1,6 +1,7 @@
 //! Optional Schedule consumer. All path access, storage and Schedule calls are
 //! isolated in one child. The coordinator polls only bounded local datagrams.
 //! A prepared delivery is not permission to speak; a final Voice owner decides.
+use crate::going_on_asks::names_the_schedule;
 use lamp_schedule::delivery::{PreparedToken, QualifiedCompletion, QualifiedRetirement};
 use lamp_turn_owner::TurnOwner;
 use serde::{Deserialize, Serialize};
@@ -224,7 +225,10 @@ fn gives_when(heard: &str) -> bool {
 /// model is told to ask once, in a few words, and the answer's line, which
 /// gives one, sets it. Nor a reply to the lamp's own question whose asked
 /// line gave one ([`asked_before`]: "Remind me at seven." → "What should I
-/// remind you about?" → "Take my pills."). With
+/// remind you about?" → "Take my pills."), when the asked line was itself a
+/// timer or reminder ask and the reply names none: a fresh ask ("Set
+/// another timer." after "It rings at 4:09. Anything else?") carries its
+/// own length (Fifth's HOLD on #8274). With
 /// [`lamp_actions::schedule::ASKS_HOW_LONG_SWITCH`]
 /// on, in English only (the words are English), and only for a line a
 /// person said: a typed text, or a line not known, checks nothing.
@@ -241,7 +245,7 @@ pub(crate) fn when_not_heard(name: &str, request: u64, heard: bool) -> Option<se
         return None;
     }
     let words = crate::stop_scope::heard_words(request, heard)?;
-    if gives_when(&words) || asked_before(request).is_some_and(|asked| gives_when(&asked)) {
+    if gives_when(&words) || !names_the_schedule(&words) && asked_gave_when(request) {
         return None;
     }
     eprintln!(
@@ -250,6 +254,19 @@ pub(crate) fn when_not_heard(name: &str, request: u64, heard: bool) -> Option<se
     Some(serde_json::json!({
         "error": format!("Nothing was set: the person's words gave no length or time for it, so it may have been lost in hearing. Never choose one. Ask only this, in a few words: \"{ask}\", and set it from their answer.")
     }))
+}
+
+/// Whether a line the lamp's questions just before `request` answered
+/// ([`asked_before`]) was itself a timer or reminder ask that gave its
+/// length or time ([`crate::going_on_asks::names_the_schedule`] and
+/// [`gives_when`]). Fifth's HOLD on #8274: "What's five plus five?" →
+/// "Ten. Anything else?" lends "five" to nothing.
+fn asked_gave_when(request: u64) -> bool {
+    asked_before(request).is_some_and(|asked| {
+        asked
+            .lines()
+            .any(|line| names_the_schedule(line) && gives_when(line))
+    })
 }
 
 /// Whether a call was told [`cannot_ring`]'s refusal: nothing was set.
