@@ -15,11 +15,15 @@
 //!
 //! `discard` empties the queue and stops it, as `snd_pcm_drop` does; what the sink was already
 //! given is out and is not recalled, which is at most the queue's depth, 40 ms.
+//!
+//! A test can make the next call of a name fail once with an `errno` ([`SoftPcm::faults`],
+//! [`SoftFaults::fail_next`]), as a USB card that goes mid-run answers `ENODEV` (#8269). Nothing
+//! fails unless a test asks.
 use crate::{
     RENDER_RATE, RENDER_SAMPLES,
     pcm::{PcmError, PcmFormat, PcmResult, PcmState, PlaybackPcm},
 };
-use std::sync::Mutex;
+use std::sync::{Arc, Mutex};
 
 /// The queue's depth in frames: what the speaker asks of ALSA.
 pub const DEPTH_FRAMES: i64 = (RENDER_SAMPLES * 4) as i64;
@@ -53,6 +57,36 @@ pub struct SoftPcm {
     clock: Box<dyn Fn() -> u64 + Send>,
     /// Where taken sound goes: called with each write's accepted frames.
     sink: Mutex<Sink>,
+    /// One-shot failures a test asked for, by ALSA's name for the call.
+    faults: SoftFaults,
+}
+
+/// A test's hold on a [`SoftPcm`]'s failures: the next call of a name (ALSA's own:
+/// `snd_pcm_writei`, `snd_pcm_drop`, `snd_pcm_avail_delay`, `snd_pcm_start`, `snd_pcm_drain`,
+/// `snd_pcm_prepare`) fails once with `errno`, as a sound card gone mid-run answers (#8269).
+#[derive(Clone, Default)]
+pub struct SoftFaults(Arc<Mutex<Vec<(&'static str, i32)>>>);
+
+impl SoftFaults {
+    /// The next call named `func` fails once with `errno` (positive, as `rustix::io::Errno`'s
+    /// `raw_os_error`).
+    pub fn fail_next(&self, func: &'static str, errno: i32) {
+        self.0
+            .lock()
+            .unwrap_or_else(|p| p.into_inner())
+            .push((func, errno));
+    }
+
+    fn failing(&self, func: &'static str) -> PcmResult<()> {
+        let mut faults = self.0.lock().unwrap_or_else(|p| p.into_inner());
+        match faults.iter().position(|(name, _)| *name == func) {
+            Some(index) => {
+                let (_, errno) = faults.remove(index);
+                Err(PcmError::new(func, errno))
+            }
+            None => Ok(()),
+        }
+    }
 }
 
 fn error(func: &'static str, errno: rustix::io::Errno) -> PcmError {
@@ -80,7 +114,13 @@ impl SoftPcm {
             }),
             clock: Box::new(clock),
             sink: Mutex::new(Box::new(sink)),
+            faults: SoftFaults::default(),
         }
+    }
+
+    /// The hold a test keeps on this queue's failures, before the queue is handed to a speaker.
+    pub fn faults(&self) -> SoftFaults {
+        self.faults.clone()
     }
 
     /// The queue as of now: what the clock has drained is gone.
@@ -107,16 +147,19 @@ impl SoftPcm {
 
 impl PlaybackPcm for SoftPcm {
     fn avail_delay(&self) -> PcmResult<(i64, i64)> {
+        self.faults.failing("snd_pcm_avail_delay")?;
         let inner = self.settled();
         Ok((DEPTH_FRAMES - inner.queued, inner.queued))
     }
 
     fn start(&self) -> PcmResult<()> {
+        self.faults.failing("snd_pcm_start")?;
         self.settled().started = true;
         Ok(())
     }
 
     fn writei(&self, samples: &[i16]) -> PcmResult<usize> {
+        self.faults.failing("snd_pcm_writei")?;
         let taken = {
             let mut inner = self.settled();
             let room = (DEPTH_FRAMES - inner.queued).max(0) as usize;
@@ -134,6 +177,7 @@ impl PlaybackPcm for SoftPcm {
     }
 
     fn drain(&self) -> PcmResult<()> {
+        self.faults.failing("snd_pcm_drain")?;
         if self.settled().queued > 0 {
             return Err(error("snd_pcm_drain", rustix::io::Errno::AGAIN));
         }
@@ -141,6 +185,7 @@ impl PlaybackPcm for SoftPcm {
     }
 
     fn prepare(&self) -> PcmResult<()> {
+        self.faults.failing("snd_pcm_prepare")?;
         let mut inner = self.settled();
         inner.queued = 0;
         inner.started = false;
@@ -156,10 +201,12 @@ impl PlaybackPcm for SoftPcm {
     }
 
     fn discard(&self) -> PcmResult<()> {
+        // The queue is emptied whatever the answer, as a gone card's is.
+        let failed = self.faults.failing("snd_pcm_drop");
         let mut inner = self.settled();
         inner.queued = 0;
         inner.started = false;
-        Ok(())
+        failed
     }
 }
 
@@ -246,6 +293,24 @@ mod tests {
         pcm.writei(&[1; 240]).unwrap();
         pcm.prepare().unwrap();
         assert_eq!(pcm.avail_delay().unwrap(), (DEPTH_FRAMES, 0));
+    }
+
+    #[test]
+    fn a_failure_asked_for_fails_its_call_once() {
+        let (pcm, _now, blocks) = queue();
+        let faults = pcm.faults();
+        let nodev = rustix::io::Errno::NODEV.raw_os_error();
+        faults.fail_next("snd_pcm_writei", nodev);
+        faults.fail_next("snd_pcm_drop", nodev);
+        assert_eq!(pcm.writei(&[1; 240]).unwrap_err().errno(), nodev);
+        assert!(
+            blocks.lock().unwrap().is_empty(),
+            "a failed write gives the sink nothing"
+        );
+        assert_eq!(pcm.writei(&[1; 240]).unwrap(), 240);
+        assert_eq!(pcm.discard().unwrap_err().errno(), nodev);
+        assert_eq!(pcm.avail_delay().unwrap(), (DEPTH_FRAMES, 0));
+        pcm.discard().unwrap();
     }
 
     #[test]

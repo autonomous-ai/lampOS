@@ -676,6 +676,20 @@ impl ReferenceAssembly {
         Ok(true)
     }
 
+    /// The microphone, gone mid-run, was opened again at `now` (#8269).
+    /// While it was gone no capture block came, so nothing could reseed the
+    /// reference: an untrusted reference counts its bound from the reopen,
+    /// not from before the device went. The bound itself is unchanged, and
+    /// a trusted one is left as it is.
+    pub fn capture_reopened(&mut self, now: u64) {
+        if let Some(state) = self.recovery.as_mut()
+            && state.trust == Trust::Untrusted
+        {
+            state.untrusted_since_us = now;
+            state.run = false;
+        }
+    }
+
     /// The speaker restarted its clock and primed a new epoch. Its canceller
     /// is as cold as after any reseed.
     pub(super) fn primed_recovering(&mut self, previous_epoch: u64, now: u64) -> Result<()> {

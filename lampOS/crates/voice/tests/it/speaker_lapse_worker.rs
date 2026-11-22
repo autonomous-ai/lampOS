@@ -21,13 +21,16 @@ use lamp_turn_owner::{
     AdmissionState, AdmittedInput, BootId, CaptureState, Controller, MonoTime, Permission,
 };
 use lamp_voice::{
-    audio_workers::speaker,
+    audio_workers::{speaker, speaker_on},
     process::{SessionDirectory, new_boot},
     reference::PRIME_FRAMES,
     transport::{ReferenceChannels, WorkerChannels},
-    wire::{Control, PreparedPrime, PrimeDisposition, ReferenceControl, WorkerEvent},
+    wire::{
+        Control, PreparedPrime, PrimeDisposition, ReferenceControl, RenderReference, WorkerEvent,
+    },
 };
 use std::{
+    path::PathBuf,
     thread::{JoinHandle, sleep},
     time::{Duration, Instant},
 };
@@ -60,6 +63,10 @@ struct Rig {
     prepare: bool,
     prepared_sent: bool,
     faults: Vec<String>,
+    /// What the worker told the capture side on the reference link, in order.
+    told: Vec<ReferenceControl>,
+    /// The playback epochs the worker's clock resets moved to.
+    clock_resets: Vec<u64>,
 }
 
 /// A control message the parent had sent before the worker first looked,
@@ -79,6 +86,19 @@ impl Rig {
     /// With `queued`, those are sent before the worker starts, in their
     /// order, and stand for the start's own authority and reference link.
     fn start_queued(queued: &[Queued]) -> Self {
+        Self::start_spawning(queued, |channels, parent_boot, worker_boot, path| {
+            std::thread::spawn(move || {
+                speaker(channels, parent_boot, worker_boot, &path, "null", None)
+                    .map_err(|error| error.to_string())
+            })
+        })
+    }
+
+    /// With `spawn`, which runs the worker on its channels.
+    fn start_spawning(
+        queued: &[Queued],
+        spawn: impl FnOnce(WorkerChannels, BootId, BootId, PathBuf) -> JoinHandle<Result<(), String>>,
+    ) -> Self {
         let directory = SessionDirectory::create().unwrap();
         let (parent_boot, worker_boot, capture_boot) = (
             new_boot().unwrap(),
@@ -114,6 +134,8 @@ impl Rig {
             prepare: false,
             prepared_sent: false,
             faults: Vec::new(),
+            told: Vec::new(),
+            clock_resets: Vec::new(),
         };
         // A turn owns the lamp, its leases a turn's.
         rig.renew_leases();
@@ -139,10 +161,7 @@ impl Rig {
                 .send_with(control, || at_us - age_us)
                 .unwrap();
         }
-        rig.worker = Some(std::thread::spawn(move || {
-            speaker(channels, parent_boot, worker_boot, &path, "null", None)
-                .map_err(|error| error.to_string())
-        }));
+        rig.worker = Some(spawn(channels, parent_boot, worker_boot, path));
         if queued.is_empty() {
             rig.service();
             rig.parent
@@ -203,6 +222,10 @@ impl Rig {
             return;
         }
         self.linked = true;
+        while let Ok(Some(told)) = self.capture.control.receive::<ReferenceControl>() {
+            self.told.push(told);
+        }
+        while let Ok(Some(_)) = self.capture.data.receive::<RenderReference>() {}
         if self.prepare && !self.prepared_sent {
             let sent = self
                 .capture
@@ -236,8 +259,12 @@ impl Rig {
 
     fn take_events(&mut self) {
         while let Ok(Some(event)) = self.parent.control.receive::<WorkerEvent>() {
-            if let WorkerEvent::Fault { code } = event {
-                self.faults.push(code);
+            match event {
+                WorkerEvent::Fault { code } => self.faults.push(code),
+                WorkerEvent::PlaybackClockReset { next_epoch, .. } => {
+                    self.clock_resets.push(next_epoch);
+                }
+                _ => {}
             }
         }
     }
@@ -484,4 +511,155 @@ fn an_aged_first_reference_prepare_reaches_the_real_speakers_validation() {
             std::panic::resume_unwind(failure);
         }
     }
+}
+
+/// A speaker over a software queue whose accepted sound is kept in `sound`,
+/// in the clock mode the worker uses, and the queue's failures.
+fn soft_speaker(
+    boot: BootId,
+    sound: std::sync::Arc<std::sync::Mutex<Vec<i16>>>,
+) -> (lamp_audio::pcm::Speaker, lamp_audio::soft_pcm::SoftFaults) {
+    let queue = lamp_audio::soft_pcm::SoftPcm::real_time(move |frames| {
+        sound.lock().unwrap().extend_from_slice(frames);
+    });
+    let faults = queue.faults();
+    let speaker = lamp_audio::pcm::Speaker::with_pcm(
+        Box::new(queue),
+        lamp_audio::soft_pcm::FORMAT,
+        boot,
+        true,
+    )
+    .unwrap();
+    (speaker, faults)
+}
+
+impl Rig {
+    /// Service until the worker has told the capture side something `wanted`
+    /// picks, up to two seconds; its index in `told`.
+    fn until_told(&mut self, what: &str, wanted: impl Fn(&ReferenceControl) -> bool) -> usize {
+        let from = Instant::now();
+        loop {
+            if let Some(index) = self.told.iter().position(&wanted) {
+                return index;
+            }
+            assert!(
+                from.elapsed() < Duration::from_secs(2),
+                "never told {what}: {:?}, faults {:?}",
+                self.told,
+                self.faults
+            );
+            self.service();
+            self.alive(what);
+            sleep(Duration::from_millis(2));
+        }
+    }
+
+    /// The worker primed `epoch`; the capture side answers it, and the
+    /// worker starts its clock.
+    fn prime_and_start(&mut self, epoch: u64) {
+        self.until_told("the prime", |told| {
+            matches!(told, ReferenceControl::ClockPrimed { prime } if prime.playback_epoch == epoch)
+        });
+        self.answer_prime(epoch);
+        self.until_told("the clock's start", |told| {
+            matches!(told, ReferenceControl::ClockStarted { playback_epoch, .. } if *playback_epoch == epoch)
+        });
+    }
+}
+
+/// #8269 (d): the speaker's device goes mid-run (a write `ENODEV`, and its
+/// discard too, as one USB card going). The old speaker's guard stays
+/// latched and it is dropped; the worker tells the capture side the speaker
+/// went, tries the device again every 250 ms, and opens a fresh speaker with
+/// a new guard. That one waits for the coordinator's next snapshot, primes a
+/// new epoch, and plays on. What was queued is dropped and reported, never
+/// written again: the old queue takes nothing after the fault, and the new
+/// one only silence. Before, the worker ended and the voice with it.
+#[test]
+fn a_speaker_gone_mid_run_is_opened_again_with_nothing_replayed() {
+    use std::sync::{
+        Arc, Mutex,
+        atomic::{AtomicU32, Ordering},
+    };
+    let old_sound = Arc::new(Mutex::new(Vec::new()));
+    let new_sound = Arc::new(Mutex::new(Vec::new()));
+    let tries = Arc::new(AtomicU32::new(0));
+    let faults = Arc::new(Mutex::new(None));
+    let (old, new, counted, kept) = (
+        old_sound.clone(),
+        new_sound.clone(),
+        tries.clone(),
+        faults.clone(),
+    );
+    let mut rig = Rig::start_spawning(&[], move |channels, parent_boot, worker_boot, path| {
+        std::thread::spawn(move || {
+            speaker_on(
+                channels,
+                parent_boot,
+                worker_boot,
+                &path,
+                None,
+                |_| {
+                    let (speaker, faults) = soft_speaker(parent_boot, old);
+                    *kept.lock().unwrap() = Some(faults);
+                    Ok(speaker)
+                },
+                move || {
+                    // Off USB for two tries, then back.
+                    if counted.fetch_add(1, Ordering::SeqCst) < 2 {
+                        return Err(lamp_audio::pcm::PcmError::new(
+                            "snd_pcm_open",
+                            rustix::io::Errno::NODEV.raw_os_error(),
+                        )
+                        .into());
+                    }
+                    Ok(soft_speaker(parent_boot, new.clone()).0)
+                },
+            )
+            .map_err(|error| error.to_string())
+        })
+    });
+    rig.connect();
+    rig.prepare = true;
+    rig.prime_and_start(1);
+    rig.run_for(Duration::from_millis(200), "playing");
+    let nodev = rustix::io::Errno::NODEV.raw_os_error();
+    {
+        let faults = faults.lock().unwrap();
+        let faults = faults.as_ref().expect("the first speaker's queue");
+        faults.fail_next("snd_pcm_writei", nodev);
+        faults.fail_next("snd_pcm_drop", nodev);
+    }
+    let gone = rig.until_told("the speaker went", |told| {
+        matches!(
+            told,
+            ReferenceControl::SpeakerGone {
+                playback_epoch: 1,
+                ..
+            }
+        )
+    });
+    let old_taken = old_sound.lock().unwrap().len();
+    assert!(old_taken > 0, "the first speaker played nothing");
+    // The new epoch's prime comes only after the speaker went.
+    rig.prime_and_start(2);
+    assert!(
+        rig.told
+            .iter()
+            .position(|told| matches!(told, ReferenceControl::ClockPrimed { prime } if prime.playback_epoch == 2))
+            > Some(gone)
+    );
+    rig.run_for(Duration::from_millis(200), "playing again");
+    assert_eq!(tries.load(Ordering::SeqCst), 3, "opened on the third try");
+    assert_eq!(
+        old_sound.lock().unwrap().len(),
+        old_taken,
+        "the gone speaker was written after it went"
+    );
+    let played = new_sound.lock().unwrap().clone();
+    assert!(!played.is_empty(), "the fresh speaker played nothing");
+    assert!(played.iter().all(|&s| s == 0), "something was replayed");
+    assert_eq!(rig.clock_resets, [2], "the reset to the new epoch");
+    assert!(rig.faults.is_empty(), "{:?}", rig.faults);
+    assert_eq!(rig.stop(), Ok(()));
 }

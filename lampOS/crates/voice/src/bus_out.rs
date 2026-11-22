@@ -897,6 +897,9 @@ pub enum Waiting {
     /// The switch is not read yet: the wait's first looks, before its
     /// worker's first reading.
     Reading,
+    /// An audio device went mid-run (#8269): a session waits up to 10 s
+    /// for it to come back (`GONE_AT_START`), the microphone closed.
+    DeviceGone,
 }
 
 /// A switch unread for this long while the voice waits is said to be
@@ -921,9 +924,12 @@ impl Waiting {
     /// case is named, so a new one must be placed here (Fifth on #1565).
     pub fn closed(self) -> bool {
         match self {
-            Self::Switch | Self::Muted | Self::Asleep | Self::RestartGuard | Self::Unreadable => {
-                true
-            }
+            Self::Switch
+            | Self::Muted
+            | Self::Asleep
+            | Self::RestartGuard
+            | Self::Unreadable
+            | Self::DeviceGone => true,
             Self::Reading | Self::Opening => false,
         }
     }
@@ -972,6 +978,7 @@ pub fn waiting_health(waiting: Waiting, owed: bool) -> lamp_msgs::Diagnostic {
         ),
         Waiting::Unreadable => (Level::Warn, "until the privacy switch can be read"),
         Waiting::Reading => (Level::Ok, "(reading the privacy switch)"),
+        Waiting::DeviceGone => (Level::Warn, DEVICE_GONE_WAITING),
         Waiting::Opening => {
             let opening = Diagnostic::ok(SOURCE).with("link", "connecting");
             return if owed {
@@ -989,6 +996,13 @@ pub fn waiting_health(waiting: Waiting, owed: bool) -> lamp_msgs::Diagnostic {
     };
     report.with("link", "closed")
 }
+
+/// What the voice's health says while it waits for a device gone mid-run
+/// (#8269), and once it is not back in time.
+pub const DEVICE_GONE_WAITING: &str =
+    "(an audio device went mid-run; waiting up to 10 s for it to come back)";
+pub const DEVICE_GONE_NOT_BACK: &str =
+    "an audio device went mid-run and is not back after 10 s: the voice ended";
 
 /// What the waiting voice's report adds while a due reminder waits.
 pub const OWED: &str = "a reminder is owed, to be said when they open";
@@ -1217,6 +1231,26 @@ pub struct BusOut {
     /// The model service refusing turns: its kinds and for how long (#4265).
     model_refusing: Option<(String, u64)>,
     signed_out: bool,
+    /// Since when a session has waited for a device gone mid-run (#8269).
+    device_gone_since_us: Option<u64>,
+}
+
+/// A session that ends while it still waits for a device gone mid-run, past
+/// its bound (#8269), says why before it goes: the run ends as before (exit
+/// 1, the restart guard's mute), and its last report names the device, not
+/// a fault nobody can read. Every way out of the session drops this.
+impl Drop for BusOut {
+    fn drop(&mut self) {
+        let now_us = lamp_ipc::monotonic_us();
+        if self.device_gone_since_us.is_some_and(|since| {
+            now_us.saturating_sub(since) >= crate::open_at_start::GONE_AT_START.as_micros() as u64
+        }) {
+            let report =
+                lamp_msgs::Diagnostic::new(lamp_msgs::Level::Error, SOURCE, DEVICE_GONE_NOT_BACK)
+                    .with("link", "closed");
+            let _ = self.health.publish_json(now_us, &report);
+        }
+    }
 }
 
 impl BusOut {
@@ -1277,6 +1311,7 @@ impl BusOut {
             chat_key_refused: false,
             model_refusing: None,
             signed_out: false,
+            device_gone_since_us: None,
         })
     }
 
@@ -1412,10 +1447,26 @@ impl BusOut {
         );
         let report = signed_out(report, self.signed_out);
         let report = linked_dropped(report, crate::service_records::linked::dropped());
+        // A device gone mid-run is the report while it is waited for (#8269).
+        let report = if self.device_gone_since_us.is_some() {
+            waiting_health(Waiting::DeviceGone, false)
+        } else {
+            report
+        };
         let _ = self.health.publish_json(now_us, &report);
         if let Some(link) = &mut self.link {
             let _ = link.publish_json(now_us, &link_state(link_up, down_for, refusal));
         }
+    }
+
+    /// Since when the session has waited for an audio device gone mid-run,
+    /// if it does (#8269): while it does the report says so, a warning, at
+    /// once when it begins and when it ends.
+    pub fn set_device_gone(&mut self, since_us: Option<u64>) {
+        if self.device_gone_since_us.is_some() != since_us.is_some() {
+            self.reported_at_us = None;
+        }
+        self.device_gone_since_us = since_us;
     }
 
     /// Whether the light ring stays off this session (#1620): said with
@@ -1902,6 +1953,13 @@ mod tests {
             lamp_msgs::Level::Warn
         );
         assert!(waiting_health(Waiting::Opening, false).message.is_empty());
+        // #8269: a device gone mid-run is a warning, said with the wait.
+        let gone = waiting_health(Waiting::DeviceGone, false);
+        assert_eq!(gone.level, lamp_msgs::Level::Warn);
+        assert_eq!(
+            gone.message,
+            "the microphones are off (an audio device went mid-run; waiting up to 10 s for it to come back)"
+        );
         // #1545: a due reminder waiting is said beside why, at the same
         // level, and marked; the opening report carries the mark only.
         let owed = waiting_health(Waiting::Muted, true);

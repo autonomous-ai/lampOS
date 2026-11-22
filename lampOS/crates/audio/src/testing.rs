@@ -118,6 +118,11 @@ impl CaptureControl {
     pub fn fail_next(&self, call: &'static str, errno: i32) {
         self.script().faults.push((call, errno));
     }
+    /// Every failure still asked for is dropped: a microphone that was gone
+    /// is back, and its next open succeeds (#8269).
+    pub fn clear_faults(&self) {
+        self.script().faults.clear();
+    }
     /// The stream state reported by `status` from now on.
     pub fn set_state(&self, state: DeviceState) {
         self.script().state = state;

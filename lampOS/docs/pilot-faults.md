@@ -321,8 +321,8 @@ Two of the voice's start-up failures, found on lamp-52e6 and lamp-4ace on
   says once how long it waited. Longer, it ends the worker as before. Each
   reason's bound runs from its own first answer, so a microphone that comes
   back from off USB and answers busy for a moment still gets its 8 s. A mute
-  during the wait opens nothing and ends the worker. Only the start is
-  covered: a microphone lost mid-run still ends it. A wait that ended with
+  during the wait opens nothing and ends the worker. A microphone lost
+  mid-run is the next item. A wait that ended with
   the microphone open is said in one plain line, the same in three places:
   the journal (`lamp-voice: capture: the voice mic was off USB for 4.3 s at
   start; opened on try 18`, or `was busy`), the session's events
@@ -331,6 +331,89 @@ Two of the voice's start-up failures, found on lamp-52e6 and lamp-4ace on
   warning, if the link is down) until the next capture start: the voice's
   own, or the one after a mute or a sleep, which clears it if the microphone
   opened at once.
+- **A microphone or speaker gone mid-run.** On lamp-06c1 on 2026-11-22 at
+  07:32:26 its USB card, which carries both, reset mid-run: capture's
+  `snd_pcm_readi` failed with errno 19 and its discard failed the same way,
+  the speaker's reference link was refused as capture ended, the speaker
+  worker exited, and the voice exited 1 and came back 4 s later muted by the
+  restart guard (#8269). A device gone mid-run (`ENODEV`, `EBADFD`,
+  `ESTRPIPE`) is now waited for, every 250 ms for up to 10 s
+  (`GONE_AT_START`'s own bound and cadence, `GoneMidRun` in
+  `open_at_start.rs`), and opened again. Nothing is spoken and nothing is
+  muted.
+  - Capture: the read that finds the microphone gone (its discard's same
+    error excused, any other close error still a fault) closes it as a gap
+    (`CaptureGap`, reason `Disconnected` or `Suspended`) and tries
+    `prepare()` again on each 250 ms: every try checks a fresh authority,
+    the switch and the mute before the device is touched, and the privacy
+    generation must be the one capture started under. A mute or the switch
+    during the wait ends capture as a running capture's mute does
+    (`CaptureStopped`), and nothing is opened. An untrusted echo reference
+    counts its 1 s bound from the reopen (`capture_reopened`), since no
+    capture block could reseed it while the microphone was gone.
+  - Speaker: a write, poll or start that finds the device gone latches the
+    old speaker's guard for good (`pcm::Speaker::discontinuity`). The
+    worker drops that speaker's queue (`Speaker::drop_gone`: reported as a
+    discard, `PlaybackClockReset` to the next epoch and, with speech
+    queued, `PlaybackDiscarded` reason `device_gone`, which cuts the answer
+    and never the voice), refuses the chunk waiting and any sent meanwhile
+    (`PlaybackRejected`, lapsed), and tells capture on the reference link
+    (`ReferenceControl::SpeakerGone`). It tries the device again every
+    250 ms; a fresh `Speaker` follows the gone one (`Speaker::follow`: the
+    next epoch, its own new guard), installs only a snapshot newer than any
+    the gone one was sent, and primes a new epoch. Nothing queued before is
+    written again. A Stop or a mute during the wait ends the worker as it
+    would have.
+  - The reference link: both workers keep their sockets through a wait, so
+    the link is never refused by one. Capture takes `SpeakerGone` as a gap:
+    it closes its microphone (a discard failing with the card is excused)
+    and opens it again only once the speaker's new clock has started.
+  - The coordinator: while a gap's reason is a device gone it holds the
+    microphone's retention heartbeat, and counts it again from the reopen;
+    past 11.5 s (`DEVICE_GONE_MOST_US`: the worker's 10 s and a stall's
+    1.5 s) it ends the run itself.
+  - The journal says three lines: `lamp-voice: capture: the microphone went
+    mid-run (errno 19): waiting up to 10 s for it` (`speaker: the speaker
+    went …` for the speaker), then `… came back after N ms: the voice goes
+    on`, or `… is not back after 10 s: the run ends`.
+  - The health: `voice` is a warning while it waits (`Waiting::DeviceGone`,
+    "the microphones are off (an audio device went mid-run; waiting up to
+    10 s for it to come back)"). Past the bound the run ends as before (exit
+    1, the restart guard's mute), and its last report, an error, says "an
+    audio device went mid-run and is not back after 10 s: the voice ended".
+  - No switch: past the bound the run ends as it did, so the worst case is
+    the old behaviour.
+  - A stall first: a USB card going often reads as a stall before its
+    `ENODEV`. The stall's gap is already open and the coordinator was told
+    of it as a stall, with the stall's 1.5 s bound. When the gap's reopen
+    finds the device gone (its open fails `ENODEV`, `EBADFD`, `ESTRPIPE` or
+    `ENOENT`, or it is found disconnected or suspended), or the speaker
+    says it went, the worker takes the gap over as a gone wait and says so
+    (`WorkerEvent::CaptureGapGone`, the gone reason and when the device
+    went). The gap's reopen checks the authority, the switch, the mute and
+    the privacy generation as before. From then the coordinator's bound is
+    the gone device's, counted from when it went, and past it the run ends
+    as above.
+  - Both devices: a speaker that goes while the microphone's wait is open
+    starts the wait's 10 s again, and the coordinator's bound moves with it
+    (a second `CaptureGapGone`), so a speaker back within its own 10 s is
+    not cut at the microphone's bound and the worker's line still comes
+    first.
+  - A speaker gone before capture's first start ends the run as before (the
+    speaker's own open at start bounds that), said as "the speaker went
+    before capture first started".
+  - Tests: `coordinator/tests/pilot_faults.rs` (a stall then a device gone
+    and back within 10 s, and the voice goes on; not back, and the run ends
+    at the gone device's bound), `capture_hold_worker.rs` (a microphone gone
+    during a stall's gap is waited for and heard again, or not back in 10 s
+    ends the run; a microphone back within the bound is
+    heard again; a mute in the wait opens nothing; not back in 10 s ends the
+    run; a speaker gone is a gap for capture until its new clock), the
+    speaker worker over a software queue with `SoftPcm::faults`
+    (`speaker_lapse_worker.rs`: a write `ENODEV`, a fresh speaker, nothing
+    replayed), `pcm` (the receipt, `follow`'s own guard) and
+    `open_at_start` (the bound, cadence and lines). The lamp's own row, a
+    USB unbind and bind of the card mid-run, waits for its person.
 - **The speaker busy at start.** On lamp-06c1 on 2026-10-30 (boot
   `b8c51349`) PulseAudio held the C-Media speaker after a restart: busy from
   10:17:01, free again at about 10:17:10, some 9 s (`module-suspend-on-idle`

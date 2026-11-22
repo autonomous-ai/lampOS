@@ -186,6 +186,9 @@ struct Rig {
     /// The epoch of each start the worker reported, and its gaps.
     epochs: Vec<u64>,
     gaps: usize,
+    /// The worker's starts, gaps and gaps taken over by a device gone
+    /// (#8269), in the order it sent them.
+    order: Vec<&'static str>,
     /// A reference fault and a refused send are recorded, and a refused
     /// receive ends the drain, not the test (#1178, #1351): the worker is
     /// expected to end.
@@ -414,6 +417,7 @@ impl Rig {
             stopped: false,
             epochs: Vec::new(),
             gaps: 0,
+            order: Vec::new(),
             tolerate_fault: false,
             worker_fault: None,
             fault: None,
@@ -538,8 +542,13 @@ impl Rig {
                 WorkerEvent::CaptureStarted { epoch, .. } => {
                     self.started = true;
                     self.epochs.push(epoch);
+                    self.order.push("started");
                 }
-                WorkerEvent::CaptureGap { .. } => self.gaps += 1,
+                WorkerEvent::CaptureGap { .. } => {
+                    self.gaps += 1;
+                    self.order.push("gap");
+                }
+                WorkerEvent::CaptureGapGone { .. } => self.order.push("gap_gone"),
                 WorkerEvent::CaptureStopped => self.stopped = true,
                 WorkerEvent::ReferenceFault { fault } if self.tolerate_fault => {
                     self.fault.get_or_insert(fault.reason);
@@ -1914,4 +1923,282 @@ fn with_the_switch_a_clock_that_never_starts_is_recovered_then_ends_capture() {
         "ended {} ms after the re-prime",
         primed.elapsed().as_millis()
     );
+}
+
+/// How long a microphone gone mid-run is waited for (#8269): `GONE_AT_START`
+/// in `crates/voice/src/open_at_start.rs`, private to the crate, so stated here.
+const GONE_FOR_AT_MOST: Duration = Duration::from_secs(10);
+
+impl Rig {
+    /// The microphone goes mid-run, as 06c1's USB card did at 07:32:26 on 22
+    /// November (#8269): its next read fails `ENODEV`, the discard of the
+    /// gone device fails the same way, and its next `opens` opens do too.
+    fn microphone_gone(&self, opens: usize) {
+        use lamp_audio::device::{OPEN_CALL, errno::NODEV};
+        self.device.fail_next("read", NODEV);
+        self.device.fail_next("discard", NODEV);
+        for _ in 0..opens {
+            self.device.fail_next(OPEN_CALL, NODEV);
+        }
+    }
+
+    /// For `ms` the speaker goes on accepting a block every tick and the
+    /// microphone holds nothing: the speaker is fine while the microphone is
+    /// gone. The schedule moves on by the time spent.
+    fn speaker_only(&mut self, ms: u64) {
+        let until = Instant::now() + Duration::from_millis(ms);
+        while Instant::now() < until && self.worker_running() {
+            self.accept(vec![0; RENDER_SAMPLES]);
+            let next = Instant::now() + TICK;
+            while Instant::now() < next {
+                self.service();
+                sleep(Duration::from_micros(300));
+            }
+        }
+        self.origin += Duration::from_millis(ms);
+    }
+
+    /// For `ms` the speaker sends nothing and the microphone holds nothing,
+    /// the worker given authority all along: both gone.
+    fn quiet(&mut self, ms: u64) {
+        let until = Instant::now() + Duration::from_millis(ms);
+        while Instant::now() < until && self.worker_running() {
+            self.service();
+            sleep(Duration::from_millis(1));
+        }
+        self.origin += Duration::from_millis(ms);
+    }
+
+    /// The schedule of [`Rig::stream`] goes on from now.
+    fn resume(&mut self) {
+        self.origin = Instant::now() - TICK * self.pushed_at.len() as u32;
+    }
+}
+
+/// #8269 (a): 06c1 at 07:32:26 on 22 November, its USB card reset mid-run.
+/// The microphone's read fails `ENODEV` and its discard fails too. That is a
+/// gone gap, not the end of the voice: the worker tells the coordinator the
+/// microphone closed, tries it again every 250 ms, and when it is back (a
+/// second here) opens it under a fresh authority in a new epoch, and what
+/// it hears after is handed on. Before, the run ended with exit 1 and the
+/// restart guard brought it back muted.
+#[test]
+fn a_microphone_gone_mid_run_is_waited_for_and_heard_again_once_it_is_back() {
+    warm_up();
+    let signal = Signal::new(200);
+    let mut rig = Rig::start_with("scripted gone mid-run", 0, ReferenceRecovery::Bounded);
+    rig.stream(&signal, 50);
+    rig.settle(0);
+    let before = rig.frames.len();
+    rig.microphone_gone(4);
+    // The speaker goes on meanwhile; the gap must open and the microphone
+    // stay closed through the four failed opens.
+    rig.speaker_only(600);
+    assert_eq!(rig.gaps, 1, "no gap for the gone microphone");
+    assert_eq!(rig.epochs, [1], "opened again while it was gone");
+    rig.speaker_only(1_000);
+    rig.wait_for_start(2);
+    assert_eq!(rig.epochs, [1, 2]);
+    assert_eq!(rig.device.counts().0, 2, "opened once, when it was back");
+    rig.resume();
+    rig.stream(&signal, 50);
+    rig.settle(0);
+    assert_eq!(
+        rig.frames.len(),
+        before + 50,
+        "the blocks after it are heard"
+    );
+    rig.end_with(Control::Stop);
+    rig.finish();
+}
+
+/// #8269 (b): a mute while the gone microphone is waited for opens nothing.
+/// The mute ends the wait as a mute ends a running capture: the worker says
+/// it stopped and ends cleanly, and the microphone, back a moment later, is
+/// never opened again.
+#[test]
+fn a_mute_while_a_microphone_gone_mid_run_is_waited_for_opens_nothing() {
+    warm_up();
+    let signal = Signal::new(100);
+    let mut rig = Rig::start_with(
+        "scripted gone mid-run, muted",
+        0,
+        ReferenceRecovery::Bounded,
+    );
+    rig.stream(&signal, 50);
+    rig.settle(0);
+    rig.microphone_gone(40);
+    rig.speaker_only(600);
+    assert_eq!(rig.gaps, 1, "no gap for the gone microphone");
+    assert_eq!(rig.device.counts().0, 1);
+    rig.controller
+        .set_microphone_permission(now(), Permission::Denied)
+        .unwrap();
+    let snapshot = rig.controller.snapshot(now()).unwrap();
+    rig.end_with(Control::Authority { snapshot });
+    // Read within a tick (2 ms); only then is the microphone back, so an
+    // open after it would be one the mute let through.
+    sleep(Duration::from_millis(30));
+    rig.device.clear_faults();
+    sleep(Duration::from_millis(600));
+    let ended = rig.ended();
+    assert_eq!(ended, Ok(()), "fault: {:?}", rig.worker_fault);
+    assert!(rig.stopped, "no CaptureStopped");
+    assert_eq!(rig.device.counts().0, 1, "the microphone was opened again");
+    assert_eq!(rig.epochs, [1]);
+}
+
+/// #8269 (c): a microphone not back within 10 s ends the run as before: the
+/// worker ends with an error that says so, no sooner than the bound.
+#[test]
+fn a_microphone_gone_mid_run_and_not_back_in_10_s_ends_the_run() {
+    warm_up();
+    let signal = Signal::new(100);
+    let mut rig = Rig::start_with("scripted gone for good", 0, ReferenceRecovery::Bounded);
+    rig.stream(&signal, 50);
+    rig.settle(0);
+    rig.tolerate_fault = true;
+    let gone_at = Instant::now();
+    // More failed opens than 10 s of tries at 250 ms.
+    rig.microphone_gone(60);
+    let deadline = gone_at + GONE_FOR_AT_MOST + Duration::from_secs(3);
+    while rig.worker_running() {
+        assert!(Instant::now() < deadline, "the worker went on waiting");
+        rig.speaker_only(100);
+    }
+    let ended_after = gone_at.elapsed();
+    let reason = rig.ended().expect_err("the run ends");
+    assert!(
+        ended_after >= GONE_FOR_AT_MOST,
+        "ended {} ms after the microphone went: {reason}",
+        ended_after.as_millis()
+    );
+    assert!(reason.contains("not back after 10 s"), "{reason}");
+    assert_eq!(rig.device.counts().0, 1, "never opened again");
+}
+
+/// #8269, the Reviewer-lead's P2 on #8288: the worker is held up, its
+/// authority lapses and a stall closes the microphone, and its USB card
+/// resets in that gap, as a card going often reads as a stall first. The
+/// gap's reopen finds the device gone (`ENODEV` on its open): the worker
+/// takes the stall's gap over as a gone wait and tells the coordinator so
+/// (`CaptureGapGone`), and its retries open it once it is back, past the
+/// stall's own 1.5 s. What it hears after is handed on.
+#[test]
+fn a_microphone_gone_during_a_stalls_gap_is_waited_for_and_heard_again() {
+    use lamp_audio::device::{OPEN_CALL, errno::NODEV};
+    warm_up();
+    let signal = Signal::new(200);
+    let mut rig = Rig::start_with("scripted gone in a stall", 0, ReferenceRecovery::Bounded);
+    rig.stream(&signal, 50);
+    rig.settle(0);
+    let before = rig.frames.len();
+    // The gap's reopen and seven of the wait's tries at 250 ms: about 2 s.
+    for _ in 0..8 {
+        rig.device.fail_next(OPEN_CALL, NODEV);
+    }
+    rig.hold_up(400);
+    rig.speaker_only(2_500);
+    rig.wait_for_start(2);
+    assert_eq!(rig.order, ["started", "gap", "gap_gone", "started"]);
+    assert_eq!(rig.epochs, [1, 2]);
+    rig.resume();
+    rig.stream(&signal, 50);
+    rig.settle(0);
+    assert_eq!(
+        rig.frames.len(),
+        before + 50,
+        "the blocks after it are heard"
+    );
+    rig.end_with(Control::Stop);
+    rig.finish();
+}
+
+/// The same with the microphone not back: the gone wait, not the stall's
+/// 1.5 s, bounds it, and 10 s after the gap's reopen found it gone the run
+/// ends, said as a device not back.
+#[test]
+fn a_microphone_gone_during_a_stalls_gap_and_not_back_in_10_s_ends_the_run() {
+    use lamp_audio::device::{OPEN_CALL, errno::NODEV};
+    warm_up();
+    let signal = Signal::new(100);
+    let mut rig = Rig::start_with(
+        "scripted gone in a stall for good",
+        0,
+        ReferenceRecovery::Bounded,
+    );
+    rig.stream(&signal, 50);
+    rig.settle(0);
+    rig.tolerate_fault = true;
+    // More failed opens than 10 s of tries at 250 ms.
+    for _ in 0..60 {
+        rig.device.fail_next(OPEN_CALL, NODEV);
+    }
+    let held_at = Instant::now();
+    rig.hold_up(400);
+    let deadline = held_at + GONE_FOR_AT_MOST + Duration::from_secs(3);
+    while rig.worker_running() {
+        assert!(Instant::now() < deadline, "the worker went on waiting");
+        rig.speaker_only(100);
+    }
+    let ended_after = held_at.elapsed();
+    let reason = rig.ended().expect_err("the run ends");
+    assert!(
+        ended_after >= GONE_FOR_AT_MOST,
+        "ended {} ms after the stall: {reason}",
+        ended_after.as_millis()
+    );
+    assert!(reason.contains("not back after 10 s"), "{reason}");
+    assert_eq!(rig.order, ["started", "gap", "gap_gone"]);
+}
+
+/// #8269 (e): the speaker's device went (one USB card carries both) and it
+/// says so on the reference link. Capture takes it as a gap, not a fault:
+/// it closes its microphone, takes the speaker's new prime while it waits,
+/// and opens the microphone again once the new clock has started. Before,
+/// the message was a wrong command and capture ended.
+#[test]
+fn a_speaker_gone_mid_run_is_a_gap_for_capture_until_its_clock_starts_again() {
+    warm_up();
+    let signal = Signal::new(200);
+    let mut rig = Rig::start_with(
+        "scripted speaker gone mid-run",
+        0,
+        ReferenceRecovery::Bounded,
+    );
+    rig.stream(&signal, 50);
+    rig.settle(0);
+    let before = rig.frames.len();
+    rig.speaker
+        .control
+        .send(ReferenceControl::SpeakerGone {
+            playback_epoch: rig.playback_epoch,
+            observed_at_us: monotonic_us(),
+        })
+        .unwrap();
+    rig.quiet(500);
+    assert!(
+        rig.worker_running(),
+        "capture ended: {:?}",
+        rig.worker_fault
+    );
+    assert_eq!(rig.gaps, 1, "no gap while the speaker is gone");
+    assert_eq!(
+        rig.epochs,
+        [1],
+        "the microphone reopened before the speaker"
+    );
+    rig.reprime();
+    rig.start_clock();
+    rig.wait_for_start(2);
+    rig.resume();
+    rig.stream(&signal, 50);
+    rig.settle(0);
+    assert_eq!(
+        rig.frames.len(),
+        before + 50,
+        "the blocks after it are heard"
+    );
+    rig.end_with(Control::Stop);
+    rig.finish();
 }
