@@ -605,6 +605,7 @@ class FakeLamp:
         self.app_facts: list[str] = []
         self.app_context: dict[str, Any] | None = None
         self._remembered_at: list[float] = []
+        self._context_at: float | None = None
         self.app_path: str | None = None
         self._app_server = None
         self._app_dir: tempfile.TemporaryDirectory | None = None
@@ -1621,21 +1622,33 @@ class FakeLamp:
     async def _app_memory(self, ws, request: dict) -> None:
         """`apps.remember` and `apps.context`, as lamp-control answers them: nothing while the lamp is private, a
         fact's words at most 280 characters (the lamp tidies them first; this fake only strips them) and three facts
-        a minute; a context line at most 120 characters for 1 ms to 10 minutes, an empty line with no time its clear."""
+        a minute; a context line at most 120 characters for 1 ms to 10 minutes and one a second, an empty line with no
+        time its clear."""
         op, id_ = request["op"], request["id"]
-        if self.state["lamp"]["private"]:
-            await self._refuse(ws, id_, "private", "Lamp is private")
-            return
         if op == "apps.context":
             line, for_ms = request.get("line"), request.get("for_ms")
+            # A clear (an empty line, no time) is never rated and never refused while private.
             if line == "" and for_ms is None:
                 self.app_context = None
-            elif not isinstance(line, str) or not line or len(line) > 120 or not (_whole(for_ms) and 1 <= for_ms <= 600_000):
-                await self._refuse(ws, id_, "bad_request", "a line of 1 to 120 characters for 1 to 600000 ms")
+                await self._ok(ws, id_)
                 return
-            else:
-                self.app_context = {"line": line, "for_ms": for_ms}
+            if not isinstance(line, str) or not line or len(line) > 120 or not (_whole(for_ms) and 1 <= for_ms <= 600_000):
+                await self._refuse(ws, id_, "bad_request", "a line of 1 to 120 characters for 1 to 600000 ms; a clear has no for_ms")
+                return
+            if self.state["lamp"]["private"]:
+                await self._refuse(ws, id_, "private", "Lamp is private")
+                return
+            # One line a second an app; only a line that was set counts.
+            now = self.clock()
+            if self._context_at is not None and now - self._context_at < 1:
+                await self._refuse(ws, id_, "rate", "one line a second", retry_ms=max(1, round((1 - (now - self._context_at)) * 1000)))
+                return
+            self._context_at = now
+            self.app_context = {"line": line, "for_ms": for_ms}
             await self._ok(ws, id_)
+            return
+        if self.state["lamp"]["private"]:
+            await self._refuse(ws, id_, "private", "Lamp is private")
             return
         text = " ".join(str(request.get("text", "")).split())
         if not text or len(text) > 280:
