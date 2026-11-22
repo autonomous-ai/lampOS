@@ -57,6 +57,16 @@ class Row(unittest.TestCase):
                      "ROW 7016 on lamp-52e6 build 12701 " + "x" * 300 + " FAIL" + J):
             self.assertEqual(rows([c("writer-a", body)], HEAD, W, "7016"), "row", body)
 
+    def test_a_fail_row_line_is_no_row_whatever_the_lines_below_say(self):
+        # 22 Nov (#8180, train 1162): the row line said FAIL, and a check's "`VERIFY PASS`" in the next paragraph was
+        # read as its verdict, so the PR was cut into a train.
+        body = ("ROW #8180 %s on lamp-e82d build 15510: FAIL\n\nMigrate, 14:38 GMT+7, to **Twelve**: the re-run. "
+                "`VERIFY PASS` (all five), `READY`, `MUTE OFF OK`. E, N and F pass." % HEAD) + J
+        self.assertEqual(rows([c("writer-a", body)], HEAD, W, "8180"), "none")
+        # The same row line saying PASS still counts, whatever FAILs the lines below name.
+        body = ("ROW #8180 %s on lamp-e82d build 15510: PASS\n\nLeg A was a FAIL on the kit; its rerun passed." % HEAD) + J
+        self.assertEqual(rows([c("writer-a", body)], HEAD, W, "8180"), "row")
+
     def test_failed_voided_and_fails_are_no_row(self):
         # 14 Nov (the second reader's P2 on #7041).
         for body in ("ROW #7041 abc FAILED on build 5", "ROW #7041 abc VOIDED", "ROW #7041 abc: FAILS the timer line",
