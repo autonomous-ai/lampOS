@@ -200,6 +200,7 @@ its grants allow, each refused `no_grant` without its grant, plus:
 | `app.settings.get` | none; ten a second at most | `{"ok":true,"settings":{key: value,…}}`, every key with its current value; over the rate `{"ok":false,"error":{"code":"rate","why":"ten reads a second","retry_ms":N}}` |
 | `app.panel.set` | `title` 1 to 40, `lines` at most 6 of at most 80, no control characters; one a minute | `{"ok":true,"rev":N}`; over the rate `{"ok":false,"error":{"code":"rate","why":"one panel a minute","retry_ms":N}}`, and the minute holds across the app's reconnects |
 | `apps.remember` | `text`: one fact for the lamp's known person, at most 280 characters once tidied, no other field; needs `remember` and `LAMP_APP_REMEMBER`; never while private; three a minute | `{"ok":true,"kept":true}` once memory kept it; refusals and the voice's side below, "What an app tells Lamp's memory" |
+| `apps.context` | `line`: one live line for this session, at most 120 characters once tidied, with `for_ms` 1 to 600000 (10 minutes; the app renews it); `line` `""` alone (no `for_ms`) clears it; no other field; needs `remember` and `LAMP_APP_REMEMBER`; a line never while private; one a second (a clear always goes) | `{"ok":true}` once told to the voice; refusals below, "What an app tells Lamp's memory" |
 
 Events (`{"ev":…}`): `phrase.heard` `{phrase}` (never what was said),
 `app.trigger` `{trigger, phrase, turn}` (a manifest trigger; the words around
@@ -222,7 +223,7 @@ offered while 16 are already waiting is not sent. When the owner stops, updates 
 comes first. Errors are the door's codes; with `LAMP_STORE_APPS` off every op
 is refused `off`.
 
-### What an app tells Lamp's memory (`apps.remember` built, `apps.context` designed)
+### What an app tells Lamp's memory (`apps.remember` and `apps.context` built)
 
 Agreed on #7415 (the first builder's yes of 19 Nov 16:45): an app with the
 `remember` grant keeps a fact for the lamp's known person, marked with the app
@@ -231,8 +232,9 @@ side is built ([memory-days.md](memory-days.md), "An app's facts and context
 lines"; `lamp_msgs::app_fact`). **`apps.remember` is built** (C166:
 lamp-control's `app_remember.rs`, the voice's `app_remember.rs`), behind its
 own switch `LAMP_APP_REMEMBER` (lamp-control; off, in no unit, until the first
-builder's privacy read and the ROW) inside `LAMP_STORE_APPS`. `apps.context`
-is designed and not built.
+builder's privacy read and the ROW) inside `LAMP_STORE_APPS`. **`apps.context`
+is built** too (lamp-control's `app_context.rs`, the voice's `app_context.rs`),
+behind the same two switches and, at the voice, `LAMP_APP_MEMORY`.
 
 - **The grant.** `remember` is an app's own grant, beside the door's 14 and
   never a computer's: a manifest may ask it (`lamp_skills::app_package::GRANTS`,
@@ -272,6 +274,43 @@ is designed and not built.
   memory's `remember_app_fact` with source `app:<name>` and says how it went on
   `apps/remembered`, which is the app's answer. The journals say the
   app and the outcome, never a word of the fact.
+- **A live context line (`apps.context`).** On the app socket only, after
+  `hello`: `{"id", "op": "apps.context", "line", "for_ms"}`, no other field.
+  `line` is one live line for the app's session ("set 2 of 3, 7 squats"),
+  told to the model beside the person's line until `for_ms` has passed (1 to
+  600000 ms; the app renews it by sending it again) and never kept. `{"id",
+  "op": "apps.context", "line": ""}` with no `for_ms` clears it. Answered
+  `{"ok":true}` once lamp-control published it to the voice (no memory round
+  trip: the line lives in the voice's RAM only), or `unavailable` ("Lamp's
+  voice can't be told now") when it could not. Refused, in `apps.remember`'s
+  order: `off` (`LAMP_STORE_APPS`, then `LAMP_APP_REMEMBER`); `no_grant`
+  ("apps.context needs the remember grant"); `bad_request` for another field,
+  no `line`, a `for_ms` missing, not a whole number or outside 1 to 600000, a
+  `for_ms` with a clear, or words `app_fact::tidy` refuses (nothing left, or
+  over 120 characters: refused, never cut); `private` ("the lamp is private:
+  nothing is told now") while the privacy switch is on (or unread); `rate`
+  ("one line a second", `retry_ms`) within 1 s of the app's last line told,
+  held across reconnects, forgotten by a remove. One a second because a
+  set's counter changes a few times a minute and a line is told only at the
+  person's next turn, so nothing an app means is lost while a loop can't flood
+  the bus. A clear is never refused for privacy or the rate, and is not
+  counted; a refused line or one not published is not counted either. A
+  pending forget of the app's facts does not hold a live line.
+  - **To the voice in one hop.** The door publishes `AppContext` on
+    `apps/context` (`{"app", "name", "line", "for_ms"}`: the app's checked
+    name, its manifest title as `app_fact::name`, the tidied line; a clear is
+    `{"app", "name": "", "line": "", "for_ms": 0}`). The voice's writer
+    (subscriber `voice`, started once a process with `LAMP_APP_MEMORY` on)
+    calls `app_context::set` or `clear` with its own privacy reading (none yet
+    counts as private) and the journal says the app and what was done, never a
+    word. App send to the voice holding the line is one bus hop: about 0.3 ms
+    in the door's bus test, under 100 ms asserted in the voice's.
+  - **Gone with the session.** When the app's last connection closes (it
+    stopped, was updated, crashed or was removed), lamp-control publishes the
+    clear for it, once; `app_forget` publishes it before closing the
+    connections. If that publish fails, or lamp-control restarts, the voice
+    drops the line at its own `for_ms`, 10 minutes at most. The voice also
+    clears every line when Lamp goes private and on a forget everything.
 - **A remove forgets, and the forget holds.** `app_forget` (the helper's
   remove) first marks the app in `--state-dir`'s `app-facts-forget.json` (0600;
   a mark that can't be written refuses the op, so the helper asks again), then

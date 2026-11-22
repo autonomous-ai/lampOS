@@ -724,6 +724,9 @@ fn serve(arguments: &[String], admin: PathBuf) -> Result<(), String> {
             // while the lamp is private, read as the speaker reads it.
             shared.set_private(lamp_control::speaker::gates(Some(watch.clone())).0);
             lamp_control::app_remember::start(bus, shared.clone());
+            // An app's live context line (`apps.context`) to the voice, by
+            // the same gates.
+            lamp_control::app_context::start(bus, shared.clone());
             eprintln!(
                 "lamp-control: apps.remember is {}",
                 if lamp_control::app_remember::on() {

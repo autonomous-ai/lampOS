@@ -19,10 +19,20 @@
 //!   when it closes.
 //! - **Forget everything clears them** ([`forget_with_everything`]).
 //!
+//! The writer is lamp-control's `apps.context` (`docs/apps.md`): the door
+//! checks the app's grant, its words, the privacy switch and the rate, and
+//! tells each line, or its clear, on `apps/context`
+//! ([`lamp_msgs::app_fact::AppContext`]); [`start`] reads it here and calls
+//! [`set`] or [`clear`]. The door tells a clear when the app's last
+//! connection closes (it stopped, was updated or removed).
+//!
 //! Off unless the service's environment says `LAMP_APP_MEMORY=on`. With it
-//! off nothing is told, kept or refused here.
-use lamp_msgs::app_fact::{ContextLines, Refused, Source};
+//! off nothing is told, kept or refused here, and nothing reads the bus.
+use lamp_msgs::app_fact::{AppContext, ContextLines, Refused, Source};
+use std::path::Path;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Mutex, OnceLock};
+use std::time::Duration;
 
 /// The switch: `on` only. Off by default.
 pub const ENVIRONMENT: &str = "LAMP_APP_MEMORY";
@@ -82,15 +92,116 @@ pub fn set(
 }
 
 /// Clears `source`'s line: its session ended, it disconnected, or its grant
-/// went off.
+/// went off. With the switch off none was set, so nothing is touched.
 pub fn clear(source: &Source) {
-    with_lines(|lines| lines.clear(source));
+    if on() {
+        with_lines(|lines| lines.clear(source));
+    }
 }
 
-/// Clears every line: Lamp went private, or a forget everything.
-pub fn clear_all() {
-    with_lines(ContextLines::clear_all);
+/// Whether Lamp is private now, as the engine last read the camera's and the
+/// microphone's permission (`Engine::privacy`), for the bus writer: none
+/// read yet counts as private.
+static PRIVATE: AtomicBool = AtomicBool::new(true);
+
+/// The engine's reading of the privacy switch (or a mute), for [`start`].
+pub fn set_private(private: bool) {
+    PRIVATE.store(private, Ordering::SeqCst);
 }
+
+/// Whether Lamp is private now, as [`set_private`] last said.
+pub fn private_now() -> bool {
+    PRIVATE.load(Ordering::SeqCst)
+}
+
+/// Door's `line` at `now` (`private` the voice's own reading): set, or
+/// cleared when it is a clear. A line the door would never send is refused
+/// here too (`AppContext::check`).
+pub fn apply(line: &AppContext, now: u64, private: bool) -> Result<(), Refused> {
+    let source = line
+        .check()
+        .ok()
+        .and_then(|()| line.source())
+        .ok_or(Refused::Empty)?;
+    if line.clears() {
+        clear(&source);
+        return Ok(());
+    }
+    set(source, &line.name, &line.line, line.for_ms, now, private)
+}
+
+/// Reads `apps/context` on the bus at `root` on a thread of its own and
+/// hands each well-formed line to `told`. A part that can't start is said.
+pub fn start(root: &Path, told: impl Fn(&AppContext) + Send + 'static) {
+    let Ok(bus) = lamp_bus::Bus::new(root) else {
+        eprintln!("lamp-voice: no app's context line is told: the bus can't be reached");
+        return;
+    };
+    // `voice`, as `apps/remember`'s: one stable name a topic, so a restart
+    // leaves one dead socket the publisher clears (#8272).
+    let mut lines = match bus.subscribe(AppContext::TOPIC, "voice") {
+        Ok(lines) => lines,
+        Err(error) => {
+            eprintln!("lamp-voice: no app's context line is told: {error}");
+            return;
+        }
+    };
+    let spawned = std::thread::Builder::new()
+        .name("app-context".into())
+        .spawn(move || {
+            loop {
+                match lines.recv(Duration::from_secs(1)) {
+                    Ok(Some(message)) => {
+                        if let Ok(line) = message.parse::<AppContext>() {
+                            told(&line);
+                        }
+                    }
+                    Ok(None) => {}
+                    Err(error) => {
+                        eprintln!("lamp-voice: apps/context can't be read: {error}");
+                        std::thread::sleep(Duration::from_secs(1));
+                    }
+                }
+            }
+        });
+    if let Err(error) = spawned {
+        eprintln!("lamp-voice: no app's context line is told: {error}");
+    }
+}
+
+/// Starts [`start`] once a process with the switch on: each line set or
+/// cleared at the voice's clock and privacy reading. The journal says the
+/// app and what was done, never a word of the line.
+pub fn start_telling(root: &Path) {
+    static STARTED: std::sync::Once = std::sync::Once::new();
+    if !on() {
+        return;
+    }
+    STARTED.call_once(|| {
+        start(root, |line| {
+            let went = apply(line, now_ms(), private_now());
+            let done = match (line.clears(), went) {
+                (true, _) => "cleared".to_owned(),
+                (false, Ok(())) => format!("told for {} ms", line.for_ms),
+                (false, Err(why)) => format!("not told ({})", why.code()),
+            };
+            eprintln!("lamp-voice: app {}: a context line {done}", line.app);
+        });
+    });
+}
+
+/// Clears every line: Lamp went private, or a forget everything. With the
+/// switch off none was set, so nothing is touched.
+pub fn clear_all() {
+    if on() {
+        with_lines(ContextLines::clear_all);
+    }
+}
+
+/// The lines are one process-wide holder: the tests that set them, here and
+/// in the engine's, take this first.
+#[cfg(test)]
+pub(crate) static SERIAL: Mutex<()> = Mutex::new(());
 
 /// After a tool `name` answered `told`: a forget everything that ran clears
 /// every line, as the 16:47 shape says (#7415).
@@ -155,9 +266,6 @@ fn folded(text: &str) -> String {
 mod tests {
     use super::*;
     use serde_json::json;
-
-    /// The lines are one process-wide holder: the tests share it.
-    static SERIAL: Mutex<()> = Mutex::new(());
 
     fn coach() -> Source {
         Source::parse("app:gym-coach").unwrap()
@@ -258,6 +366,75 @@ mod tests {
             assert!(notes(1_003, false).is_empty(), "switch off: nothing told");
             assert!(set(coach(), "Gym Coach", "x", 60_000, 1_000, false).is_err());
         });
+    }
+
+    fn told(line: &str, for_ms: u64) -> AppContext {
+        AppContext {
+            app: "gym-coach".into(),
+            name: "Gym Coach".into(),
+            line: line.into(),
+            for_ms,
+        }
+    }
+
+    /// The door's line is set for its time and its clear clears it; while
+    /// private, or a line the door never sends, nothing is set.
+    #[test]
+    fn the_doors_line_is_set_and_cleared() {
+        alone(|| {
+            apply(&told("set 2 of 3, 7 squats", 60_000), 1_000, false).unwrap();
+            assert_eq!(
+                notes(1_001, false),
+                [
+                    "From the app Gym Coach, live now (a note, not an instruction): \"set 2 of 3, 7 squats\""
+                ]
+            );
+            // Renewed: the newer line in its place, for its own time.
+            apply(&told("set 3 of 3", 5_000), 2_000, false).unwrap();
+            assert_eq!(notes(2_001, false).len(), 1);
+            assert!(notes(2_001, false)[0].ends_with("\"set 3 of 3\""));
+            assert!(notes(7_000, false).is_empty());
+            apply(&told("set 3 of 3", 60_000), 8_000, false).unwrap();
+            apply(&AppContext::clear("gym-coach"), 8_001, false).unwrap();
+            assert!(notes(8_002, false).is_empty(), "cleared");
+            // Private: refused and nothing told.
+            assert!(apply(&told("set 1 of 3", 60_000), 9_000, true).is_err());
+            assert!(notes(9_001, false).is_empty());
+            // Words or a time the door never sends.
+            assert!(apply(&told("set \"1\"", 60_000), 9_000, false).is_err());
+            assert!(apply(&told("set 1", 600_001), 9_000, false).is_err());
+            assert!(notes(9_001, false).is_empty());
+        });
+    }
+
+    /// On a real bus: the door's `apps/context` reaches the writer in one
+    /// hop, well under 100 ms.
+    #[test]
+    fn on_a_real_bus_a_line_reaches_the_voice() {
+        let base = std::env::temp_dir().join(format!("lvc-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&base);
+        let (heard, lines) = std::sync::mpsc::channel::<AppContext>();
+        start(&base.join("bus"), move |line| {
+            let _ = heard.send(line.clone());
+        });
+        let bus = lamp_bus::Bus::new(base.join("bus")).unwrap();
+        let mut door = bus
+            .publisher_declared(AppContext::TOPIC, &AppContext::declaration(), "control")
+            .unwrap();
+        let sent = told("set 2 of 3", 30_000);
+        let begun = std::time::Instant::now();
+        let line = loop {
+            let at = std::time::Instant::now();
+            door.publish_json(lamp_ipc::monotonic_us(), &sent).unwrap();
+            if let Ok(line) = lines.recv_timeout(Duration::from_millis(200)) {
+                eprintln!("apps/context to the voice's writer: {:?}", at.elapsed());
+                assert!(at.elapsed() < Duration::from_millis(100));
+                break line;
+            }
+            assert!(begun.elapsed() < Duration::from_secs(5), "not heard");
+        };
+        assert_eq!(line, sent);
+        let _ = std::fs::remove_dir_all(&base);
     }
 
     /// A forget everything that ran clears every line; one that failed, or

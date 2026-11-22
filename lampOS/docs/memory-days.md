@@ -1155,8 +1155,11 @@ is `lamp_msgs::app_fact`; the store's side is `crates/memory/src/app_facts.rs`.
   and sends `remember_app_fact` with source `app:<name>`. An app's remove
   sends `forget_app_facts` for its source from lamp-control on the forget
   socket (`--forget-socket`, which takes it beside `forget_person`), kept as a
-  pending mark and tried every 30 s until memory answers `ok`. `apps.context`
-  is not built yet.
+  pending mark and tried every 30 s until memory answers `ok`. The door's
+  `apps.context` (built, [apps.md](apps.md)) checks the same grant and
+  switches, the words (`tidy`, at most 120), `for_ms` (1 ms to 10 minutes),
+  the privacy switch and one line a second, and tells the voice on
+  `apps/context`; the app's last connection closing tells its clear.
   An older memory answers `unknown_op`, told to the app as `unavailable`.
 - **The voice's side (`LAMP_APP_MEMORY`, off by default; App Only's part of
   the 16:45 split, `crates/voice/src/app_context.rs`).** Built on #7900's
@@ -1188,9 +1191,12 @@ is `lamp_msgs::app_fact`; the store's side is `crates/memory/src/app_facts.rs`.
     are kept things worded `Noted by the app <name>, <day>: "<text>"`, so
     they are told quoted with their source wherever recall is told. The
     voice adds nothing for them.
-  - **Not yet (follow-ups):** the door's `apps.context` op and its writer
-    that calls `app_context::set` across processes; a voice turn test of the
-    note in the chat request; the ROW on 06c1, owed at switch-on after the
+  - **The writer** (`app_context::start_telling`, once a process with the
+    switch on): reads lamp-control's `apps/context` and calls `set` or
+    `clear` with the engine's last privacy reading (`set_private`, none yet
+    counting as private). A voice turn test holds the note in the chat
+    request (`second_provider/tests/app_context_note.rs`).
+  - **Not yet (follow-up):** the ROW on 06c1, owed at switch-on after the
     first builder's privacy read.
 
 The bounds are the thread's, none this store's own:
@@ -1203,6 +1209,7 @@ The bounds are the thread's, none this store's own:
 | Kept for | 90 local days, the day it was kept the first | App Only 16:4x, first builder 16:45 point 3 |
 | A context line | at most 120 characters, one a source | App Only 16:4x, first builder 16:45 point 3 |
 | A context line's time | `for_ms` 1 ms to 10 minutes, renewed by the app | App Only 16:4x, first builder 16:45 point 3 |
+| A context line's rate | one a second an app at the door, a clear not counted | this PR, for the owner's review |
 | A source's name | at most 64 bytes in the kept words | this PR, for the owner's review |
 | A fact's time ahead | at most 5 s ahead of memory's clock (as `linked_record`) | this PR, for the owner's review |
 
