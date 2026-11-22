@@ -846,6 +846,12 @@ pub const QUIET_STAND: Duration = Duration::from_secs(15 * 60);
 /// for this long again at one above, then at the owner's own.
 pub const LIVELY_FOR: Duration = Duration::from_secs(2 * 60);
 
+/// Under `LAMP_BODY_ENERGY` at level 5 (#8153): how long V1's return after
+/// a gesture (`energy::return_after`) waits for the lamp to stop speaking
+/// before it is let go. Later it would read as a shift of its own, not the
+/// gesture settling.
+pub const RETURN_WAIT: Duration = Duration::from_secs(15);
+
 /// A gesture asked on the mood socket, not one the body makes of itself:
 /// a shift at rest (`crate::idle`, `IDLE` among them) or the turn to a call.
 fn from_outside(clip: &Clip) -> bool {
@@ -6971,6 +6977,9 @@ fn run_on_dyn<P: PortIo, R: Runtime>(
     // gesture is given.
     let mut playing: Option<(&'static Clip, Duration)> = None;
     let mut pending: Option<(&'static Clip, Duration)> = None;
+    // At level 5 (#8153): the return owed after a gesture played out, the
+    // gesture's name, and until when it may still begin (`RETURN_WAIT`).
+    let mut return_owed: Option<(&'static str, &'static Clip, Duration)> = None;
     // Who asked for the gesture playing and the one waiting (weighed
     // against each other only under `Limits::arbitration`), each priority with the name its asker gave (the
     // body's own turn to a call is the conversation's, and names nobody),
@@ -7987,6 +7996,19 @@ fn run_on_dyn<P: PortIo, R: Runtime>(
             idle_size = lively.idle_size;
         }
         let idling = playing.is_some_and(|(clip, _)| idle::is_move(clip));
+        // V1's return after a gesture (#8153) is a shift's kind of move and
+        // gives way as one does, but it may play while the lamp listens or
+        // thinks, as V1's did; never while it speaks or reads aloud.
+        let returning =
+            playing.is_some_and(|(clip, _)| std::ptr::eq(clip, crate::energy::idle_return()));
+        let settling = upright
+            && !matches!(mood, Mood::Speaking | Mood::Reading)
+            && pending.is_none()
+            && !asked_now.still
+            && easing == [0; 3]
+            && in_hand == [0; 3]
+            && !test_held
+            && !asked_now.held;
         let quiet = upright
             && mood == Mood::Resting
             && pending.is_none()
@@ -7998,7 +8020,7 @@ fn run_on_dyn<P: PortIo, R: Runtime>(
             && !(limits.presence && asked_now.held);
         if !quiet {
             idle_due = None;
-            if idling {
+            if idling && !(returning && settling) {
                 playing = None;
             }
         } else if playing.is_none() {
@@ -8212,6 +8234,21 @@ fn run_on_dyn<P: PortIo, R: Runtime>(
                 }
             }
         }
+        // #8153: the return owed after a gesture begins once nothing else
+        // plays or waits and the lamp is not speaking; any other gesture,
+        // a fold or `RETURN_WAIT` gone by lets it go. Begun here, the reach
+        // and the anti-tip check below take it as any clip.
+        if playing.is_some() || pending.is_some() || !upright {
+            return_owed = None;
+        } else if let Some((after, back, until)) = return_owed {
+            if now >= until {
+                return_owed = None;
+            } else if settling && easing_out.is_none() && !level_waits {
+                playing = Some((back, now));
+                return_owed = None;
+                gesture_fates.push((after, crate::moves::RETURN_PLAYS));
+            }
+        }
         // With the app's reach, a gesture asked past what the lamp's hardware
         // gives each side is dropped whole, said, never played cut short
         // (banana's P2 on ten/move-reach). With the switch on but the servos'
@@ -8353,6 +8390,14 @@ fn run_on_dyn<P: PortIo, R: Runtime>(
                             resumed = None;
                         }
                     }
+                }
+                // Played out: at level 5, under the switch, V1's return is
+                // owed (#8153); a gesture ended or let go owes none.
+                (None, None) => {
+                    playing = None;
+                    return_owed = crate::energy::return_after(clip, energy)
+                        .filter(|_| stretch.is_some())
+                        .map(|back| (clip.name, back, now + RETURN_WAIT));
                 }
                 _ => playing = None,
             }

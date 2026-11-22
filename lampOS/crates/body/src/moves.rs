@@ -231,6 +231,12 @@ pub fn ended(by: Priority) -> &'static str {
 /// on the lamp as it played: an unprompted gesture gives way to a hand.
 pub const ENDED_BY_HAND: &str = "ended: by a hand";
 
+/// A built-in gesture that played out at energy level 5 is followed by V1's
+/// return (#8153, `crate::energy::return_after`): said in the journal as the
+/// return begins, under the gesture's name. Not on `body/gesture`, which says
+/// the return as it says a shift at rest, `idle`.
+pub const RETURN_PLAYS: &str = "over; the return plays";
+
 /// An asker's name as its datagram gave it (`skill:dance`), kept in place
 /// so the motor loop never allocates for it, to say who lost the body and
 /// to whom on `body/gesture` (#940). At most [`Source::MOST`] bytes and

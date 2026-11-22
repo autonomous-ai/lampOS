@@ -9,7 +9,7 @@
 //! idle waits (`Limits::at`, `crate::idle`), the head's roll standing
 //! (`Limits::at`), the listening lean (`crate::body::mood_lean`) and a spoken
 //! nod's size (`crate::body`), a built-in clip's size and pace ([`livelier`],
-//! #8153); under `LAMP_BODY_PRESENCE` (#7301) also the
+//! #8153) and at level 5 V1's return after it ([`return_after`]); under `LAMP_BODY_PRESENCE` (#7301) also the
 //! size of a shift's arm sag (`idle_size`), and for a few minutes after an
 //! arrival or talk the shifts' waits and size are a level or two livelier
 //! than the owner's (`crate::body::LIVELY_FOR`), that switch's own, so with
@@ -202,6 +202,42 @@ pub fn longest_us(clip: &'static Clip) -> u64 {
     (1..=5)
         .map(|level| livelier(clip, level).duration_within_us(ceiling))
         .fold(clip.duration_us(), u64::max)
+}
+
+/// The built-in clips V1 plays no return after (#8153): `idle.csv` itself,
+/// sleepy, which it holds (`NO_IDLE_RECORDINGS`), and music, which loops
+/// (`hal/drivers/motors/animation_service.py`, 604-622).
+pub const NO_RETURN: [&str; 7] = [
+    "idle",
+    "sleepy",
+    "dance_chill",
+    "dance_groove",
+    "dance_hype",
+    "dance_waltz",
+    "dance_jazz",
+];
+
+/// What the body plays after `clip` played out at `level` (#8153, V2's
+/// ruling for the lead's "level 5 is almost V1"): at level 5, after a
+/// built-in clip but [`NO_RETURN`], V1's return to rest, [`idle_return`];
+/// else none, so levels 1 to 4 are as they were. A move from a file, a
+/// shift at rest and the call's glance have none.
+pub fn return_after(clip: &Clip, level: u8) -> Option<&'static Clip> {
+    (taken(level) == 5
+        && crate::clips::named(clip.name).is_some()
+        && !NO_RETURN.contains(&clip.name))
+    .then(idle_return)
+}
+
+/// V1's return to rest (`idle.csv`, `clips::IDLE`) inside level 5's bounds:
+/// [`sized`] at level 5's size, so held to the gesture's reach, V1's own
+/// swing of it and [`BASE_BEND`], the frames level 5 plays `idle` with,
+/// but at idle.csv's own 20 frames a second, never quicker: a settle, not
+/// a second gesture. Checked against V1's anti-tip rule as it begins.
+/// Made once.
+pub fn idle_return() -> &'static Clip {
+    static MADE: OnceLock<Clip> = OnceLock::new();
+    MADE.get_or_init(|| sized(&crate::clips::IDLE, clip_size("idle", 5), 1.0))
 }
 
 /// A built-in clip's size at `level`: the level's `clip_size`, less where
@@ -1166,6 +1202,51 @@ mod tests {
                     );
                 }
             }
+        }
+    }
+
+    /// #8153: V1's return after a gesture is a settle, not a second gesture:
+    /// level 5's own frames of `idle` (so every level-5 bound, and the
+    /// anti-tip check of every built-in clip at level 5, holds for it),
+    /// begun and ended at nothing, no joint past V1's swing of idle.csv,
+    /// at idle.csv's own 50 ms a frame, never quicker. Only at level 5,
+    /// after a built-in clip but idle, sleepy and music.
+    #[test]
+    fn the_return_is_v1s_idle_at_its_own_pace_inside_level_fives_bounds() {
+        use crate::clips::{self, IDLE};
+        let back = idle_return();
+        assert_eq!(back.name, "idle");
+        assert_eq!(back.step_ms, IDLE.step_ms);
+        assert_eq!(back.frames, livelier(&IDLE, 5).frames);
+        assert_eq!(back.frames[0], [0; 5]);
+        assert_eq!(back.frames[back.frames.len() - 1], [0; 5]);
+        let v1 = clips::V1_SWING
+            .iter()
+            .find(|(name, _)| *name == "idle")
+            .unwrap()
+            .1;
+        for (joint, &v1_joint) in v1.iter().enumerate() {
+            let swing = spread(back, joint);
+            assert!(swing >= spread(&IDLE, joint), "joint {joint}");
+            assert!(swing <= i32::from(v1_joint), "joint {joint}: {swing}");
+        }
+        for level in 0..=4 {
+            assert!(return_after(&clips::NOD, level).is_none(), "{level}");
+        }
+        for clip in clips::ALL {
+            let after = return_after(clip, 5);
+            if NO_RETURN.contains(&clip.name) {
+                assert!(after.is_none(), "{}", clip.name);
+            } else {
+                assert!(
+                    after.is_some_and(|after| std::ptr::eq(after, back)),
+                    "{}",
+                    clip.name
+                );
+            }
+        }
+        for clip in [&clips::TILT_LEFT, &clips::SETTLE, &clips::CALLED] {
+            assert!(return_after(clip, 5).is_none(), "{}", clip.name);
         }
     }
 

@@ -1466,9 +1466,43 @@ the voice, Expression and lamp-skills (each with `energy_in::EnergyIn`, the body
   last fill and never the last fill again. A matched cue is sent as before at every level. At level
   5 (#8153) every answer gets a clip, its own cue's or a fill, at least 8 s after the last fill:
   with an answer every 25 to 45 s about 1.3 to 2.4 a minute, plus matched cues, against V1's 2.7 to
-  5.8 starts a minute by its code (an emotion clip per answer and `idle.csv` after each). At rest
-  nothing is added at any level: the shifts at rest as in the first table, no clip of its own, and
-  no V1-style return clip after a gesture (a lamp that fidgets alone reads as a machine).
+  5.8 starts a minute by its code (an emotion clip per answer and `idle.csv` after each). At level 5
+  each such clip is followed by V1's return ("Return" below), so a clip on an answer counts as two
+  starts, as V1's did. At rest nothing is added at any level: the shifts at rest as in the first
+  table and no clip of its own (a lamp that fidgets alone reads as a machine); a return follows only
+  a gesture.
+- **Return (#8153, V2's ruling 22 Nov).** row-8153s on lamp-52e6 (22 Nov) measured 129 clip starts
+  an hour in talk at level 5, 0.96 an answer, under V1's 162 to 348, a band that counts V1's
+  `idle.csv` after every clip but idle, sleepy and music (`hal/drivers/motors/animation_service.py`
+  604-622). So at level 5 only (levels 1 to 4 as they were), a built-in clip (`clips::ALL`: a fill,
+  a cue, a skill's or the lamp's own) that plays out is followed by V1's return,
+  `energy::idle_return`: `clips::IDLE` (`idle.csv`) sized as level 5 sizes it (`energy::sized`, so
+  the gesture's reach, V1's own swing of it, `BASE_BEND` and the frames level 5 plays `idle` with),
+  but at idle.csv's own 50 ms a frame, never quicker, about 10 s, begun and ended at nothing. None
+  after idle, sleepy or a dance (`energy::NO_RETURN`), nor after a move from a file, a shift at rest,
+  the call's glance, or a gesture ended or let go before its end; none without `LAMP_BODY_ENERGY`.
+  - **A settle, never a second gesture** (rule 8): no head or base joint swings past V1's own swing
+    of `idle.csv` (`clips::V1_SWING`: pitch 105, roll 210, yaw 19 counts), and it ends where it
+    began (`energy::tests::the_return_is_v1s_idle_at_its_own_pace_inside_level_fives_bounds`,
+    and on the loop
+    `at_level_five_a_gesture_over_is_followed_by_v1s_return_once_the_lamp_stops_speaking`). Our
+    clips already end at nothing, so the joints are at rest when it begins; it is V1's sway there.
+  - **Never while it speaks or reads aloud.** It waits for the answer's end, not skipped: a fill
+    plays on an answer, so it nearly always ends while the lamp speaks, and a return skipped then
+    would rarely play at all; played over the words it would take the speaking lean away from the
+    person (a gesture does). It begins once nothing plays or waits, the lamp stands, no hand, hold,
+    stillness or lamp-control lease is on it and no new energy level waits, while the lamp listens,
+    thinks or rests, as V1's did. Not begun within `RETURN_WAIT` (15 s) of the gesture's end, it is
+    let go, since later it would read as a shift of its own. One playing as the lamp speaks again
+    ends there and is not taken up again
+    (`the_return_ends_as_the_lamp_speaks_and_none_follows_sleepy`).
+  - **Any gesture cuts it at once.** It is said and given way as a shift at rest (`idle` on
+    `body/gesture`), so a fill or a cue asked while it plays begins at once, never dropped for it
+    (`a_gesture_asked_while_the_return_plays_cuts_it_at_once`). A fold, a hand or a new level ends
+    it as it ends a shift.
+  - **Journal.** As it begins, once: `gesture NAME over; the return plays` (`moves::RETURN_PLAYS`,
+    NAME the gesture's), a step after its `gesture over`, so a kit counts it as a start apart from a
+    shift at rest (both are also said `gesture idle`). It is checked against V1's anti-tip rule as it begins, as any clip.
 - **Clip size and pace (#8153).** A built-in clip (`clips::ALL`) asked of the body under the switch
   is played at the level's `clip_size` and `clip_pace` (`energy::livelier`, from the level taken when
   it is asked): each joint that many times as far, held to the gesture's reach (`GESTURE_REACH`,
@@ -1592,6 +1626,8 @@ the voice, Expression and lamp-skills (each with `energy_in::EnergyIn`, the body
   gesture's end as long as the longest level plays it (`energy::longest_us`). A longer clip holds
   a new energy level until it ends; a fill or a matched cue asked while it plays is dropped
   ("dropped: another gesture plays", as for any gesture: `--arbitration` is off in the product).
+  At level 5 V1's return follows it ("Return" above), about 10 s more of a settle that any gesture
+  asked cuts at once, so the return never drops a fill or a cue.
 - **Pause nod.** Expression's pause clip waits `pause_cooldown_us`: the catalogue's cooldown at level 1,
   else the level's gap, never longer than the catalogue's and never under 3 s.
 - **Music.** A skill trigger with `lively = true` (Music sway, [skills.md](skills.md)): its cooldown at
