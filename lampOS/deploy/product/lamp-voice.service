@@ -248,6 +248,10 @@ Environment=LAMP_SECOND_CHAT_KEPT=on
 # The model service refusing every turn (#4265; lamp-52e6 30 Oct, the lead's call on #1711): said once and held,
 # a line sent each minute to find it back; a skill's fixed words are said meanwhile, a note the model words waits.
 Environment=LAMP_SECOND_REFUSED_HOLD=on
+# LAMP_LIMIT_LOCAL_ASKS: its why and rules are its row in docs/switches.md (#7346, #7642). At the relay's usage
+# limit, a plain light or volume ask, the time and a due timer are done without the model. Needs
+# LAMP_SECOND_DOWN_LINE and LAMP_SECOND_REFUSED_HOLD above.
+Environment=LAMP_LIMIT_LOCAL_ASKS=on
 Environment=LAMP_VOICE_LINK=on
 # LAMP_CAMERA_FOLLOWS_EYES: its why and rules are its row in docs/switches.md (#2233, #2402).
 Environment=LAMP_CAMERA_FOLLOWS_EYES=on

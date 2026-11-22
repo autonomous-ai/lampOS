@@ -638,7 +638,7 @@ A base URL on `campaign-api.autonomous.ai` ending in `/ai` is given `/v1`
   when it comes back` when timed, and `heard nothing: its usage limit was
   said earlier in this run (not named)` or `(named within 5 min of it)` for
   the quiet asks. With `LAMP_LIMIT_LOCAL_ASKS=on` (#7346's condition 4,
-  off by default, an English owner only), what needs no model is still
+  on in the product, #7642; an English owner only), what needs no model is still
   done at the limit: a heard line that is plainly a light or volume ask
   (`limit_local::matched`: on, off, a colour, brighter, dimmer, warmer,
   cooler, louder, quieter; once the name, a greeting and politeness are set
