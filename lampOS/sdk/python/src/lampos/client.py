@@ -168,6 +168,9 @@ APP_SOCKET_ENV = "LAMP_APP_SOCKET"
 APP_SOCKET = "/run/lampos-apps/apps.sock"
 # What an app's panel takes (lamp-control checks them again).
 PANEL_TITLE_MAX, PANEL_LINES_MAX, PANEL_LINE_MAX = 40, 6, 80
+# How long an app's context line lasts unless it says (`context`): a minute. The lamp judges the line and its time
+# (at most 120 characters, 1 ms to 10 minutes), as it judges a fact's words (`remember`, 280 once tidied).
+CONTEXT_FOR_MS = 60_000
 
 
 def _agent_socket() -> str | None:
@@ -1211,6 +1214,26 @@ class Lamp:
         if any(line == "" for line in lines):
             raise LampError("panel: a line is text, never empty (leave it out)", code="bad_request")
         return (await self.request("app.panel.set", title=title, lines=lines))["rev"]
+
+    async def remember(self, text: str) -> bool:
+        """Keep one fact for the lamp's known person, marked with this app as its source (the manifest's `remember`
+        grant). The lamp tidies the words first (links, markup and double quotes left out) and refuses, never cuts,
+        what is left over 280 characters (`BadRequestError`). True once memory kept it. Refused `off`, `no_grant`,
+        `private`, `unavailable`, `rate` (three a minute an app; `retry_ms`) or `refused` (memory did not keep it)."""
+        return bool((await self.request("apps.remember", text=text)).get("kept"))
+
+    async def context(self, line: str, *, for_ms: int = CONTEXT_FOR_MS) -> None:
+        """Tell the voice a live line beside what the person says, for `for_ms` (1 ms to 10 minutes), never kept:
+        renew it while it holds ("set 2 of 3, 7 squats"). An empty line clears it (`clear_context`). The `remember`
+        grant, as `remember`'s refusals, and `bad_request` for a line over 120 characters. Needs a lamp build with
+        `apps.context`; an older one refuses it."""
+        if line == "":
+            return await self.clear_context()
+        await self.request("apps.context", line=line, for_ms=for_ms)
+
+    async def clear_context(self) -> None:
+        """Take this app's context line back at once (it goes by itself after its `for_ms`)."""
+        await self.request("apps.context", line="")
 
     async def get(self, *states: str) -> dict:
         """The states asked for (`presence`, `light`, `mood`, `lamp`, `body`),
