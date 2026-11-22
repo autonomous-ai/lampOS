@@ -705,7 +705,7 @@ prints for the services alone:
   these prints, every heard line is printed, linked or not. In the private
   room (`LAMP_PRIVATE_ROOM=on`) or with no services the child is not
   started, as no line is held to a voice there; with `LAMP_JOIN_SAME_VOICE`
-  one starts for the join of cut words alone (`Printing::ForTheJoin`): its
+  (on in the product unit) one starts for the join of cut words alone (`Printing::ForTheJoin`): its
   prints are in RAM only, never written, and the services' judge, the
   owner's enrolled print, the confirm and a write's wait see none of them
   (`Heeding::join_prints_only`).
