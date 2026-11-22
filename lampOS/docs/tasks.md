@@ -1678,7 +1678,15 @@ The product unit's test is `the_tasks_part_starts_with_no_targets_and_learns_the
     `an_engine_harness_does_not_say_is_installed_is_unknown_never_missing`.
     The lamp's own machine is judged the other way round: it is kept as a
     target only on an explicit `installed: true` (below), so a slow look
-    there leaves it out until a fresh `true`, and #8283 doesn't change that.
+    there leaves it out until a fresh `true`; #8283 doesn't change that
+    list. The lamp's two picks on that target do change: work naming no
+    engine runs on the lamp's default unless the lamp's machine is said not
+    to have it (`Engine::lamp_engine`), and an engine named runs only if it
+    isn't said missing there, else `engine_not_here`. Both read
+    `missing`, an explicit `installed: false` only, so since #8284 a
+    default the look leaves unknown is kept rather than falling back to the
+    targets file's engine, and an engine named that's unknown is tried, with
+    Harness's own start deciding.
     Devin Cloud, which works in
     Devin's cloud, is never refused. A refusal has the machines and their
     engines looked at again at once (at most once in 30 s), so a computer
