@@ -150,7 +150,8 @@ pub fn stand_seconds(base: f32, level: u8) -> f32 {
 /// its V1 recording where it was cut from one, held to V1's own swing of it
 /// (`crate::clips::V1_SWING`, the lead: level 5 is almost V1; [`sized`]);
 /// at 2 to 4 the clip itself as before #8201, a joint lowered only where it
-/// would move farther or faster than the level above (`under_five`). The
+/// would move farther or faster than the level above, or played as level 1
+/// where that would take it more than 10% under level 1 (`under_five`). The
 /// body plays it only under `LAMP_BODY_ENERGY`, so each step is stretched under the
 /// servo's speed (`Limits::clip_ceiling`), and checks it against V1's
 /// anti-tip rule as played. Level 1, and any other clip (a move from a
@@ -182,11 +183,18 @@ pub fn livelier(clip: &'static Clip, level: u8) -> &'static Clip {
     })
 }
 
+/// How far below level 1's swing [`under_five`]'s cap may take a joint
+/// before the joint plays level 1's own: 10% (V2, #8307).
+const FLOOR: f32 = 0.10;
+
 /// A built-in clip at level 2, 3 or 4 (#8153, the lead's call, 22 Nov): as
 /// before #8201, the clip itself at the level's size and pace, but no joint
 /// moving farther (peak to peak) or faster (its largest step) than the level
 /// above moves it over the stretch of the cut that level plays: there that
-/// joint alone is lowered to it, the step kept.
+/// joint alone is lowered to it, the step kept. A joint so lowered more than
+/// [`FLOOR`] below level 1's swing (the clip itself) plays level 1's own
+/// instead (V2 and the first builder on #8307, 22 Nov 20:2x): level 5 then
+/// moves it less than 2 to 4, the accepted cost.
 fn under_five(clip: &'static Clip, level: u8) -> Clip {
     let all = 0..=clip.frames.len() - 1;
     let mut gain = gain(clip.frames, all, clip, clip_size(clip.name, level), false);
@@ -206,6 +214,11 @@ fn under_five(clip: &'static Clip, level: u8) -> Clip {
         // ponytail: rounding may leave it a count over; step down until not.
         while over(gain).is_some() {
             gain[joint] *= 0.999;
+        }
+        let (own, _) = how_far_and_fast(clip.frames, clip.step_ms, joint);
+        let (capped, _) = how_far_and_fast(&made(clip.frames, gain), step_ms, joint);
+        if (capped as f32) < own as f32 * (1.0 - FLOOR) {
+            gain[joint] = 1.0;
         }
     }
     Clip {
@@ -1243,6 +1256,14 @@ mod tests {
                 let (now, under) = (livelier(clip, level), livelier(clip, level - 1));
                 let (raw_here, raw_there) = (longer(clip, level), longer(clip, level - 1));
                 for joint in 0..5 {
+                    // A joint floored at level 1 at level 4 (`under_five`)
+                    // may move more than level 5: the accepted cost (#8307).
+                    let column = |played: &Clip| -> Vec<i16> {
+                        played.frames.iter().map(|frame| frame[joint]).collect()
+                    };
+                    if level == 5 && column(under) == column(clip) {
+                        continue;
+                    }
                     let now = swing(now, here.clone(), joint);
                     let under = swing(under, there.clone(), joint);
                     let (raw_here, raw_there) = (
@@ -1353,12 +1374,15 @@ mod tests {
     /// step [`before_8201`] gives it, but for a joint that swings farther
     /// (peak to peak) or steps faster than the level above does over the
     /// stretch that level plays of the cut (`cut_frames`), which is lowered
-    /// to no more than it; and no level 1 to 4 moves any joint more than
-    /// the level above (a count of rounding). Prints each joint the cap holds
-    /// (`cargo test -- --nocapture`).
+    /// to no more than it, or, lowered more than 10% under level 1's swing,
+    /// plays level 1's own (`floored`, V2 and the first builder on #8307);
+    /// and no level 1 to 4 moves any joint more than the level above (a
+    /// count of rounding), but a floored joint. Prints each joint the cap
+    /// holds (`cargo test -- --nocapture`).
     #[test]
     fn levels_two_to_four_play_as_before_8201_never_more_than_the_level_above() {
         let mut held = Vec::new();
+        let (mut floored, mut floored_at) = (Vec::new(), Vec::new());
         for clip in crate::clips::ALL {
             for level in 2..=4u8 {
                 let (old, now) = (before_8201(clip, level), livelier(clip, level));
@@ -1386,6 +1410,12 @@ mod tests {
                         continue;
                     }
                     let (now_swing, now_speed) = how_far_and_fast(now.frames, now.step_ms, joint);
+                    let (one, _) = how_far_and_fast(clip.frames, clip.step_ms, joint);
+                    if column(now) == column(clip) {
+                        floored.push(format!("{} {level} {joint}: L1 {one}", clip.name));
+                        floored_at.push((clip.name, level, joint));
+                        continue;
+                    }
                     eprintln!(
                         "cap {:<13} level {level} joint {joint}: before #8201 {swing} counts, {speed:.0}/s; level {} {top_swing}, {top_speed:.0}/s; now {now_swing}, {now_speed:.0}/s",
                         clip.name,
@@ -1396,78 +1426,15 @@ mod tests {
                         "{} at level {level}, joint {joint}",
                         clip.name
                     );
-                    held.push(format!("{} {level} {joint}", clip.name));
+                    held.push(format!(
+                        "{} {level} {joint}: L1 {one}, now {now_swing}",
+                        clip.name
+                    ));
                 }
             }
         }
-        // Where the cap holds: clip, level, joint (pinned, so a change is said).
-        let pinned: [&str; 64] = [
-            "curious 2 2",
-            "curious 3 2",
-            "curious 4 2",
-            "happy 2 3",
-            "happy 3 3",
-            "happy 4 3",
-            "caring 2 4",
-            "caring 3 4",
-            "caring 4 0",
-            "caring 4 4",
-            "surprised 2 0",
-            "surprised 2 3",
-            "surprised 3 0",
-            "surprised 3 3",
-            "surprised 4 0",
-            "surprised 4 3",
-            "confused 2 0",
-            "confused 2 2",
-            "confused 3 0",
-            "confused 3 2",
-            "confused 4 0",
-            "confused 4 2",
-            "sleepy 2 2",
-            "sleepy 3 0",
-            "sleepy 3 1",
-            "sleepy 3 2",
-            "sleepy 3 3",
-            "sleepy 3 4",
-            "sleepy 4 0",
-            "sleepy 4 1",
-            "sleepy 4 2",
-            "sleepy 4 3",
-            "sleepy 4 4",
-            "excited 2 3",
-            "excited 3 3",
-            "excited 4 3",
-            "scanning 2 1",
-            "scanning 3 1",
-            "scanning 4 1",
-            "dance_chill 2 2",
-            "dance_hype 2 0",
-            "dance_hype 2 3",
-            "dance_hype 3 0",
-            "dance_hype 3 2",
-            "dance_hype 3 3",
-            "dance_hype 4 0",
-            "dance_hype 4 2",
-            "dance_hype 4 3",
-            "dance_hype 4 4",
-            "dance_waltz 2 3",
-            "dance_waltz 2 4",
-            "dance_waltz 3 3",
-            "dance_waltz 3 4",
-            "dance_waltz 4 2",
-            "dance_waltz 4 3",
-            "dance_waltz 4 4",
-            "dance_jazz 2 0",
-            "dance_jazz 2 2",
-            "dance_jazz 3 0",
-            "dance_jazz 3 2",
-            "dance_jazz 3 4",
-            "dance_jazz 4 0",
-            "dance_jazz 4 2",
-            "dance_jazz 4 4",
-        ];
-        assert_eq!(held, pinned);
+        eprintln!("pin floored {floored:?}");
+        eprintln!("pin held {held:?}");
         // V2's (A) on #8307: where the clip itself (level 1) moves a joint
         // more than V1 does at level 5, the capped level 2 sits below level
         // 1 there; only a joint the cap holds at level 2 may (pinned).
@@ -1479,10 +1446,14 @@ mod tests {
                 for joint in 0..5 {
                     let (swing, speed) = how_far_and_fast(here.frames, here.step_ms, joint);
                     let (top_swing, top_speed) = how_far_and_fast(stretch, above.step_ms, joint);
+                    if floored_at.contains(&(clip.name, level, joint)) {
+                        continue;
+                    }
                     if level == 1 && (swing > top_swing + 1 || speed > top_speed) {
-                        let pair = format!("{} {joint}", clip.name);
+                        let pair = format!("{} {joint}: L1 {swing}, L2 {top_swing}", clip.name);
+                        let capped = format!("{} 2 {joint}:", clip.name);
                         assert!(
-                            held.contains(&format!("{} 2 {joint}", clip.name)),
+                            held.iter().any(|entry| entry.starts_with(&capped)),
                             "{pair} is below level 1 but not capped at level 2"
                         );
                         below_one.push(pair);
@@ -1497,19 +1468,15 @@ mod tests {
                 }
             }
         }
-        // Clip and joint where level 2 sits below level 1 (pinned, so a change is said).
-        let pinned_below_one: [&str; 10] = [
-            "curious 2",
-            "happy 3",
-            "caring 4",
-            "surprised 0",
-            "confused 0",
-            "confused 2",
-            "scanning 1",
-            "dance_hype 3",
-            "dance_waltz 3",
-            "dance_waltz 4",
-        ];
+        // Pinned, so a change is said: where levels 2 to 4 play level 1's own
+        // (clip level joint), where the cap holds (clip level joint), and
+        // where level 2 sits below level 1 (clip joint), with their swings.
+        eprintln!("pin below_one {below_one:?}");
+        let floored_at_one: [&str; 0] = [];
+        let pinned: [&str; 0] = [];
+        let pinned_below_one: [&str; 0] = [];
+        assert_eq!(floored, floored_at_one);
+        assert_eq!(held, pinned);
         assert_eq!(below_one, pinned_below_one);
     }
 }
