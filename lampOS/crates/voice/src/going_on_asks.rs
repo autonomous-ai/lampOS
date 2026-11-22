@@ -135,9 +135,23 @@ const SCHEDULE_WORDS: [&str; 10] = [
 /// lamp-4ace at 18:4x Daniel's "Yes, give me five minutes.", to Samantha,
 /// set a five-minute timer that rang mid-day.
 pub fn names_the_schedule(heard: &str) -> bool {
+    schedule_words(heard).next().is_some()
+}
+
+/// Whether `heard` names a timer, a reminder, an alarm or a countdown
+/// itself, a word of [`SCHEDULE_WORDS`] other than "remind" or the lamp:
+/// a fresh ask ("Set another timer."), not a reply that gives the asked
+/// one's label ("Remind me to take my pills."; Sixth's P3 on #8321).
+pub fn names_a_schedule_item(heard: &str) -> bool {
+    schedule_words(heard).any(|word| !matches!(word.as_str(), "remind" | "lamp" | "lamp's"))
+}
+
+/// The words of `heard` in [`SCHEDULE_WORDS`], lowercased.
+fn schedule_words(heard: &str) -> impl Iterator<Item = String> + '_ {
     heard
         .split(|c: char| !(c.is_alphanumeric() || c == '\''))
-        .any(|word| SCHEDULE_WORDS.contains(&word.to_lowercase().as_str()))
+        .map(str::to_lowercase)
+        .filter(|word| SCHEDULE_WORDS.contains(&word.as_str()))
 }
 
 /// The verdict for such a line from what the Policy said, or `None` if
