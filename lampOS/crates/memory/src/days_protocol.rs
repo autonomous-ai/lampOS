@@ -1737,6 +1737,120 @@ mod tests {
 
     const NOW_MS: u64 = NOW;
 
+    /// A forget about a thing after a long talk (lamp-06c1, 21 Nov: ~101
+    /// matching turns): every matching turn goes, none other, and each is
+    /// told, in the answer and its pages and in the account's history
+    /// queue, once.
+    #[test]
+    fn a_forget_about_a_thing_takes_every_matching_turn_of_a_long_talk() {
+        let (_scratch, mut store) = Scratch::new("forget-long-talk");
+        let minh = "p-0123456789abcdef";
+        let send = |store: &mut Days, request: Value| -> Value {
+            serde_json::from_str(&answer(store, request.to_string().as_bytes(), NOW).line).unwrap()
+        };
+        let mut coffee = Vec::new();
+        for n in 0..101 {
+            let added = send(
+                &mut store,
+                json!({"op":"append_linked","person":minh,"at_unix_ms":NOW,"heard":format!("coffee {n}"),"said":"ok","source_ids":[]}),
+            );
+            coffee.push(added["id"].as_u64().unwrap());
+            if n % 10 == 0 {
+                send(
+                    &mut store,
+                    json!({"op":"append_linked","person":minh,"at_unix_ms":NOW,"heard":format!("tea {n}"),"said":"ok","source_ids":[]}),
+                );
+            }
+        }
+        let about = send(
+            &mut store,
+            json!({"op":"exchanges_forget","person":minh,"about":[["coffee"]],"history_unsent":true}),
+        );
+        assert_eq!(about["removed"], 101, "{about}");
+        let ids = |answer: &Value| -> Vec<String> {
+            answer["exchanges"][minh]
+                .as_array()
+                .into_iter()
+                .flatten()
+                .map(|id| id.as_str().unwrap().to_owned())
+                .collect()
+        };
+        let mut told = ids(&about);
+        let mut token = about["exchanges_token"].as_str().map(str::to_owned);
+        while let Some(t) = token {
+            let page = send(&mut store, json!({"op":"forgot_exchanges","token":t}));
+            told.extend(ids(&page));
+            token = (page["more"] == true).then_some(t);
+        }
+        let turns: Vec<String> = coffee
+            .iter()
+            .map(|id| lamp_msgs::history_turn_id(store.history_epoch(), minh, *id))
+            .collect();
+        let mut sorted = told.clone();
+        sorted.sort_unstable();
+        let mut expected = turns.clone();
+        expected.sort_unstable();
+        assert_eq!(sorted, expected);
+        let range = about["unsent"].as_array().unwrap();
+        let (from, to) = (range[0].as_u64().unwrap(), range[1].as_u64().unwrap());
+        assert_eq!(to - from + 1, 101, "{about}");
+        let unsent = store.history_unsent(0).unwrap();
+        let queued: Vec<String> = unsent["exchanges"][minh]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|turn| turn.as_str().unwrap().to_owned())
+            .collect();
+        assert_eq!(queued, turns, "{unsent}");
+        let left: u64 = store
+            .db
+            .query_row(
+                "SELECT count(*) FROM entries WHERE person=?1 AND kind='exchange'",
+                [minh],
+                |r| r.get(0),
+            )
+            .unwrap();
+        assert_eq!(left, 11, "the tea turns stay");
+    }
+
+    /// A forget about a thing is one transaction: a failure part way, here
+    /// at the 61st of 101 turns, removes none of them and tells nothing.
+    #[test]
+    fn a_forget_about_a_thing_that_fails_part_way_removes_none() {
+        let (_scratch, mut store) = Scratch::new("forget-atomic");
+        let minh = "p-0123456789abcdef";
+        for n in 0..101 {
+            let line = json!({"op":"append_linked","person":minh,"at_unix_ms":NOW,"heard":format!("coffee {n}"),"said":"ok","source_ids":[]});
+            answer(&mut store, line.to_string().as_bytes(), NOW);
+        }
+        store.unsent_asked = true;
+        store
+            .db
+            .execute_batch(
+                "CREATE TEMP TRIGGER fail_part_way BEFORE DELETE ON entries WHEN old.heard='coffee 60' BEGIN SELECT RAISE(ABORT,'part way'); END;",
+            )
+            .unwrap();
+        let person = Person::new(minh).unwrap();
+        let failed = store.exchanges_forget(&person, &[vec!["coffee".to_owned()]]);
+        assert!(failed.is_err(), "{failed:?}");
+        let left: u64 = store
+            .db
+            .query_row(
+                "SELECT count(*) FROM entries WHERE person=?1 AND kind='exchange'",
+                [minh],
+                |r| r.get(0),
+            )
+            .unwrap();
+        assert_eq!(left, 101, "none removed");
+        let queued: u64 = store
+            .db
+            .query_row("SELECT count(*) FROM history_unsent", [], |r| r.get(0))
+            .unwrap();
+        assert_eq!(queued, 0, "nothing queued for the account");
+        assert!(store.take_forgot().is_empty());
+        assert_eq!(store.take_unsent(), None);
+    }
+
     /// #7771: a forget's answer names the exchanges it removed, by scope
     /// and id, for the voice to delete the same turns on the account; a
     /// forget of everything of a person's leaves their own out (the voice
@@ -2477,6 +2591,50 @@ mod tests {
                 selective
             );
         }
+    }
+
+    /// The first builder's question on #8260 (06:25, 22 Nov): a kept thing
+    /// with "said" in it, forgotten by id with the selective rule, leaves an
+    /// unrelated turn of theirs that only shares "said" with it (unlinked,
+    /// not a copy: it lacks the kept thing's other words), and a forget of
+    /// their exchanges about the line's subject leaves it too.
+    #[test]
+    fn a_forget_by_id_of_a_kept_said_leaves_an_unrelated_said_turn() {
+        let (_scratch, mut store) = Scratch::new("forget-said-unrelated");
+        let person = "p-0123456789abcdef";
+        let send = |store: &mut Days, request: Value| -> Value {
+            serde_json::from_str(&answer(store, request.to_string().as_bytes(), NOW).line).unwrap()
+        };
+        let kept = send(
+            &mut store,
+            json!({"op":"remember","person":person,"at_unix_ms":NOW,"text":"Ossa said the bicycle lock code is 4512"}),
+        );
+        let unrelated = send(
+            &mut store,
+            json!({"op":"append","person":person,"at_unix_ms":NOW+1,"heard":"I said hello to the neighbour this morning","said":"That's kind of you."}),
+        );
+        let forgotten = send(
+            &mut store,
+            json!({"op":"forget","person":person,"id":kept["id"],"selective":true}),
+        );
+        assert_eq!(forgotten["ok"], true, "{forgotten}");
+        assert_eq!(forgotten["removed"], 1, "{forgotten}");
+        let turns = send(
+            &mut store,
+            json!({"op":"exchanges_forget","person":person,"about":[["bicycle"]]}),
+        );
+        assert_eq!(turns["ok"], true, "{turns}");
+        assert_eq!(turns["removed"], 0, "{turns}");
+        assert!(
+            store
+                .record(
+                    &Person::new(person).unwrap(),
+                    unrelated["id"].as_u64().unwrap()
+                )
+                .unwrap()
+                .is_some(),
+            "the unrelated turn with \"said\" stays"
+        );
     }
 
     #[test]

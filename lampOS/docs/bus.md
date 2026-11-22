@@ -44,6 +44,12 @@ again (`lamp-update` does, onto each new build). So a subscriber that finds
 its name taken (`.new` or `.sock`) connects to it: refused, nobody is bound
 there, and it removes the file and takes the name; answered, it takes the
 next count, and after 8 it fails with `no free socket name` (#7439).
+A publisher does the same when it reads `subs/`: it connects to each
+newcomer before it links it, and to those it links when the newcomers would
+not fit, and removes every file nobody is bound to. So a dead subscriber
+never takes a place under the cap of 64, and the sockets a voice leaves at
+each restart go at the next publish, however seldom the topic is published
+(#8272).
 
 A publisher's entry in `pubs/` is a file whose time says when the
 publisher last showed that it was alive. It is empty unless the publisher
@@ -162,7 +168,9 @@ that subscriber's queue is full; or refused because nobody holds the socket,
 whose file is then removed. `publish` answers `{delivered, dropped, removed}`
 and keeps totals, for each subscriber too. It is an error only for a message
 too large or badly labelled, and once, not with every message, for a root it
-cannot use or more than 64 subscribers. `subs/` is read at most every 200 ms
+cannot use or more than 64 live subscribers, with how many were found.
+Past the cap a read tries at most 64 more, so a flood of live sockets costs
+it a bounded number of connects. `subs/` is read at most every 200 ms
 and when a subscriber is found dead; between reads, an event with nobody
 subscribed costs no system call but the publisher's own entry, once a second.
 A publisher that declares its topic is the one case that fails at the start:

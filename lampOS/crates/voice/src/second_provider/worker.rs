@@ -500,9 +500,33 @@ pub fn carried_journal_on() -> bool {
     *ON.get_or_init(|| std::env::var(CARRIED_JOURNAL_ENVIRONMENT).ok().as_deref() == Some("on"))
 }
 
-/// Carried lines journalled as their person's since the worker started
-/// ([`keep_out_scoped`]), for the journal's count.
+/// Requests whose carried line was journalled as their person's since the
+/// worker started ([`keep_out_scoped`]), for the journal's count.
 static CARRIED_JOURNALLED: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+
+/// The last request whose carried line was journalled as its person's
+/// ([`keep_out_scoped`]), so its journal line prints once per request, not
+/// once per output event (#7814: one carried answer printed it 49 times in
+/// 0.75 s). `u64::MAX` before the first.
+static CARRIED_JOURNALLED_LAST: std::sync::atomic::AtomicU64 =
+    std::sync::atomic::AtomicU64::new(u64::MAX);
+
+/// Whether `request` is a new one for `last`, the last request seen, which
+/// it then becomes: a request's events after its first give false.
+pub(crate) fn first_for_request(last: &std::sync::atomic::AtomicU64, request: u64) -> bool {
+    last.swap(request, std::sync::atomic::Ordering::Relaxed) != request
+}
+
+/// The journal's count for `request`'s carried line, bumped in `count`, on
+/// its first event only ([`first_for_request`] on `last`); `None` after.
+pub(crate) fn carried_journalled_once(
+    last: &std::sync::atomic::AtomicU64,
+    count: &std::sync::atomic::AtomicU64,
+    request: u64,
+) -> Option<u64> {
+    first_for_request(last, request)
+        .then(|| count.fetch_add(1, std::sync::atomic::Ordering::Relaxed) + 1)
+}
 
 /// The journal's line for a carried line journalled as its person's: the
 /// request and the count so far, no words and no name.
@@ -8311,7 +8335,8 @@ pub(crate) struct Heeding {
     no_face_renews: bool,
     /// `LAMP_NAME_SIGN_TIED` (#8092): the request `LAMP_SAID_TO_ME` let out
     /// as the one answer with no look to the lamp's waiting question
-    /// ([`crate::said_to_me::Said::AnswerNoLook`]): its answer renews
+    /// ([`crate::said_to_me::Said::AnswerNoLook`]), or as the one cut-in
+    /// over its own answer (`Said::CutInNoLook`, #8205): its answer renews
     /// nothing. And whether that answer was played since the last line
     /// played with a look or the name.
     no_look_answer: Option<u64>,
@@ -11746,6 +11771,8 @@ impl Heeding {
             // `LAMP_NAME_SIGN_TIED` (#8092): only with eyes to give a look.
             looks_needed: self.attention.second_sign_tied() && self.eyes.is_some(),
             look_free_answered: self.look_free_used,
+            // Begun over the lamp's own answer, which it cut (#8205).
+            cut_in: self.began_over == Some(request),
             ..Default::default()
         };
         // The eyes' signs as the replay of saved journals reads them
@@ -11765,8 +11792,11 @@ impl Heeding {
         }
         let going_on = signs.going_on;
         let decision = crate::said_to_me::judge(line);
-        self.no_look_answer =
-            (decision == crate::said_to_me::Said::AnswerNoLook).then_some(request);
+        self.no_look_answer = matches!(
+            decision,
+            crate::said_to_me::Said::AnswerNoLook | crate::said_to_me::Said::CutInNoLook
+        )
+        .then_some(request);
         let mut pose = crate::said_to_me::pose(line.pitch, line.looking, looks);
         if skipped {
             pose.push_str(", the lone face's pose skipped: another voice");
@@ -15183,8 +15213,13 @@ pub(crate) fn keep_out_scoped(lease: &crate::memory_scope::ScopeLease, journal: 
         crate::remember::held_by_gap(lease.key().request);
         return true;
     }
-    if carried {
-        let count = CARRIED_JOURNALLED.fetch_add(1, std::sync::atomic::Ordering::Relaxed) + 1;
+    if carried
+        && let Some(count) = carried_journalled_once(
+            &CARRIED_JOURNALLED_LAST,
+            &CARRIED_JOURNALLED,
+            lease.key().request,
+        )
+    {
         eprintln!("{}", carried_journalled_line(lease.key().request, count));
     }
     false
@@ -35367,3 +35402,7 @@ mod busy_follow_up;
 #[cfg(test)]
 #[path = "worker/near_lamp_name_tests.rs"]
 mod near_lamp_name;
+
+#[cfg(test)]
+#[path = "worker/cut_in_said_to_me_tests.rs"]
+mod cut_in_said_to_me;

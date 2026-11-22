@@ -25,6 +25,21 @@ pub struct Clip {
     pub frames: &'static [[i16; 5]],
 }
 
+/// A clip cut from its V1 recording (`hal/recordings/`), with all of that
+/// recording at the cut's size and frame time (#8153): an energy level above
+/// 1 plays the clip lengthened toward it (`crate::energy::livelier`). The
+/// whole is never played as it is: it begins at the recording's first frame,
+/// ends at nothing and is not held to the generator's speeds, since only
+/// `LAMP_BODY_ENERGY` plays it, with every step stretched under the servo's.
+#[derive(Clone, Copy, Debug)]
+pub struct Whole {
+    pub cut: &'static Clip,
+    pub whole: &'static Clip,
+    /// The whole's frames the cut was taken from, first and last.
+    pub from: usize,
+    pub to: usize,
+}
+
 impl Clip {
     /// The most each joint moves in `tick`, at the clip's own pace: its
     /// largest step from one frame to the next, spread over its frame
@@ -68,7 +83,7 @@ impl Clip {
     /// The time from frame `frame` to the next, stretched where any joint
     /// would go faster than `ceiling` counts a second, so that none does;
     /// a step under it keeps its time (V1's stretch, #6893).
-    fn step_within_us(&self, frame: usize, ceiling: f32) -> u64 {
+    pub(crate) fn step_within_us(&self, frame: usize, ceiling: f32) -> u64 {
         let (from, to) = (self.frames[frame], self.frames[frame + 1]);
         let farthest = (0..5)
             .map(|joint| (i32::from(to[joint]) - i32::from(from[joint])).unsigned_abs())

@@ -849,6 +849,67 @@ enum PlaceWait {
     GiveUp,
 }
 
+/// Whether the next launch waits for OpenClaw's Gateway (#8105, the first
+/// builder's (b)): with `LAMP_OPENCLAW_GATEWAY_BY_DEFAULT` on (lamp-update
+/// asking, [`crate::gateway::update_asking`]) a launch on OpenClaw while
+/// its Gateway doesn't answer is held in the queue, marking it wanted so
+/// lamp-update starts it, at most `cap`, then given up; the store's loop
+/// and the Harness thread go on meanwhile. Off, or another engine: on as
+/// usual, the launch's own 60 s wait as before. `answers` is the port's
+/// last look; `held` the task held and since when.
+fn gateway_wait(
+    next: Option<&Launch>,
+    asking: crate::gateway::Asking,
+    answers: impl FnOnce() -> bool,
+    held: &mut Option<(String, Instant)>,
+    now: Instant,
+    cap: Duration,
+) -> PlaceWait {
+    use crate::gateway::Asking;
+    let Some(next) =
+        next.filter(|next| asking != Asking::No && next.target.engine == EngineKind::Openclaw)
+    else {
+        if let Some((name, _)) = held.take() {
+            eprintln!("tasks: {name}: held for OpenClaw's gateway no longer");
+        }
+        return PlaceWait::Go;
+    };
+    crate::gateway::mark_wanted();
+    if answers() {
+        match held.take() {
+            Some((name, since)) if name == next.name => eprintln!(
+                "tasks: {name}: OpenClaw's gateway serves after {} s; sent",
+                now.saturating_duration_since(since).as_secs()
+            ),
+            Some((name, _)) => eprintln!("tasks: {name}: held for OpenClaw's gateway no longer"),
+            None => {}
+        }
+        return PlaceWait::Go;
+    }
+    match held {
+        Some((name, since)) if *name == next.name => {
+            if now.saturating_duration_since(*since) < cap {
+                return PlaceWait::Hold;
+            }
+            // `held` is cleared by the caller once the give-up is written,
+            // so a tick with a launch in flight gives up on the next one.
+            PlaceWait::GiveUp
+        }
+        _ => {
+            if let Some((name, _)) = held.take() {
+                eprintln!("tasks: {name}: held for OpenClaw's gateway no longer");
+            }
+            eprintln!(
+                "tasks: {}: held until OpenClaw's gateway answers (at most {} s)",
+                next.name,
+                cap.as_secs()
+            );
+            *held = Some((next.name.clone(), now));
+            PlaceWait::Hold
+        }
+    }
+}
+
 /// Whether the next launch waits for the lamp's place (H5 on #7258):
 /// one that may be for the lamp's pane while its place is not known yet
 /// (just after start, or Harness's daemon down; signed in or out alike,
@@ -2152,6 +2213,7 @@ fn owner<C: Clock>(
     // The hand-over held for the lamp's place (H5 on #7258): its name and
     // since when, bounded by the queue's wait.
     let mut place_held: Option<(String, Instant)> = None;
+    let mut gateway_held: Option<(String, Instant)> = None;
     // Declared before `waits`, so dropped after it, but still before the
     // engine: every `watch` child is killed and reaped when the owner ends,
     // however it ends.
@@ -3074,6 +3136,40 @@ fn owner<C: Clock>(
                     crate::one_session::QUEUE_WAIT,
                 )
             });
+            // A launch on OpenClaw waits for its Gateway in the queue (#8105).
+            let gateway_hold = if place_wait == PlaceWait::Go {
+                gateway_wait(
+                    engine.queued_launches().first().copied(),
+                    crate::gateway::update_asking(),
+                    crate::gateway::cold_answers,
+                    &mut gateway_held,
+                    Instant::now(),
+                    crate::gateway::COLD_WITHIN,
+                )
+            } else {
+                PlaceWait::Go
+            };
+            if daemon.is_none()
+                && start_daemon_due.is_none()
+                && gateway_hold == PlaceWait::GiveUp
+                && let Some(job) = engine.begin_launch(&now).map_err(io::Error::other)?
+            {
+                if let Some((name, _)) = gateway_held.take() {
+                    eprintln!(
+                        "tasks: {name}: OpenClaw's gateway didn't serve in {} s; not sent",
+                        crate::gateway::COLD_WITHIN.as_secs()
+                    );
+                }
+                engine
+                    .finish_launch(
+                        job.task_id,
+                        LaunchOutcome::NotSent {
+                            code: crate::gateway::NOT_READY.into(),
+                        },
+                        &now,
+                    )
+                    .map_err(io::Error::other)?;
+            }
             if daemon.is_none()
                 && start_daemon_due.is_none()
                 && place_wait == PlaceWait::GiveUp
@@ -3092,7 +3188,7 @@ fn owner<C: Clock>(
             let launch = match daemon {
                 Some(job) => Some(job),
                 None if start_daemon_due.is_some() => None,
-                None if place_wait != PlaceWait::Go => None,
+                None if place_wait != PlaceWait::Go || gateway_hold != PlaceWait::Go => None,
                 // `LAMP_TASKS_ONE_SESSION` on (#7246): a spoken task for
                 // the lamp's pane waits queued while the pane is held, and
                 // the spoken task holding it lets go once its answer is read.
@@ -8322,6 +8418,123 @@ mod tests {
             Some(LaunchOutcome::Joined { .. })
         ));
         assert_eq!(pane.opens.load(Ordering::Acquire), 1);
+    }
+
+    /// #8105 (the first builder's (b)): with lamp-update asking, a launch
+    /// on OpenClaw is held while its Gateway doesn't answer, at most the
+    /// cap, then given up; it goes at once when it answers; another engine,
+    /// or lamp-update not asking (the switch off), goes as before.
+    #[test]
+    fn a_launch_on_openclaw_waits_for_a_cold_gateway_in_the_queue() {
+        let launch = |engine: EngineKind| Launch {
+            name: "lamp-cold".into(),
+            prompt: "p".into(),
+            target: Target {
+                machine_id: "a".repeat(32),
+                project: "~/harnesses/lamp-tasks/lamp".into(),
+                engine,
+            },
+            session: None,
+        };
+        let openclaw = launch(EngineKind::Openclaw);
+        let hermes = launch(EngineKind::Hermes);
+        let cap = crate::gateway::COLD_WITHIN;
+        let start = Instant::now();
+        let mut held = None;
+        // The switch off, or another engine: on as before, never held.
+        assert_eq!(
+            gateway_wait(
+                Some(&openclaw),
+                crate::gateway::Asking::No,
+                || false,
+                &mut held,
+                start,
+                cap
+            ),
+            PlaceWait::Go
+        );
+        assert_eq!(
+            gateway_wait(
+                Some(&hermes),
+                crate::gateway::Asking::Yes,
+                || false,
+                &mut held,
+                start,
+                cap
+            ),
+            PlaceWait::Go
+        );
+        assert!(held.is_none());
+        // Cold: held, and still held within the cap.
+        assert_eq!(
+            gateway_wait(
+                Some(&openclaw),
+                crate::gateway::Asking::Yes,
+                || false,
+                &mut held,
+                start,
+                cap
+            ),
+            PlaceWait::Hold
+        );
+        assert_eq!(
+            gateway_wait(
+                Some(&openclaw),
+                crate::gateway::Asking::Yes,
+                || false,
+                &mut held,
+                start + cap / 2,
+                cap
+            ),
+            PlaceWait::Hold
+        );
+        // It answers: sent at once.
+        assert_eq!(
+            gateway_wait(
+                Some(&openclaw),
+                crate::gateway::Asking::Yes,
+                || true,
+                &mut held,
+                start + cap / 2,
+                cap
+            ),
+            PlaceWait::Go
+        );
+        assert!(held.is_none());
+        // Past the cap: given up, and given up again on the next tick until
+        // the caller clears `held` (a launch in flight that tick).
+        let mut late = None;
+        gateway_wait(
+            Some(&openclaw),
+            crate::gateway::Asking::Yes,
+            || false,
+            &mut late,
+            start,
+            cap,
+        );
+        assert_eq!(
+            gateway_wait(
+                Some(&openclaw),
+                crate::gateway::Asking::Yes,
+                || false,
+                &mut late,
+                start + cap,
+                cap
+            ),
+            PlaceWait::GiveUp
+        );
+        assert_eq!(
+            gateway_wait(
+                Some(&openclaw),
+                crate::gateway::Asking::Yes,
+                || false,
+                &mut late,
+                start + cap,
+                cap
+            ),
+            PlaceWait::GiveUp
+        );
+        assert_eq!(cap, Duration::from_secs(480));
     }
 
     /// #7275: the owner's mark on the daemon gate follows its start due or

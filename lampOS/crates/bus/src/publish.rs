@@ -255,6 +255,9 @@ pub struct Publisher {
     rescan_every: Duration,
     scanned: Option<Instant>,
     links: Vec<Link>,
+    /// Files nobody was bound to that looks removed since the last publish
+    /// said them, as `Published::removed`.
+    cleared: usize,
     datagram: Vec<u8>,
     totals: Totals,
     /// The first thing that went wrong with the root during this publish.
@@ -350,6 +353,7 @@ impl Publisher {
             rescan_every: bus.rescan_every,
             scanned: None,
             links: Vec::new(),
+            cleared: 0,
             datagram: Vec::new(),
             totals: Totals::default(),
             trouble: None,
@@ -616,6 +620,8 @@ impl Publisher {
         {
             self.scan(now);
         }
+        // A guarded send says only what it sent itself.
+        self.cleared = 0;
         if self.due(now) || self.unlisted {
             self.show(now)?;
         }
@@ -780,6 +786,7 @@ impl Publisher {
             let found = self.scan(now);
             self.send(datagram, self.links.len() - found, &mut outcome)?;
         }
+        outcome.removed += std::mem::take(&mut self.cleared);
         self.seq += 1;
         self.totals.published += 1;
         self.totals.delivered += outcome.delivered as u64;
@@ -812,9 +819,10 @@ impl Publisher {
         }
     }
 
-    /// Read `subs/` again: forget whoever's socket file has gone and give
-    /// each newcomer a socket to be sent on. Says how many are new; they
-    /// are the last ones in `links`.
+    /// Read `subs/` again: forget whoever's socket file has gone, remove
+    /// the files nobody is bound to, and give each live newcomer a socket
+    /// to be sent on. Says how many are new; they are the last ones in
+    /// `links`.
     fn scan(&mut self, now: Instant) -> usize {
         self.scanned = Some(now);
         let mut present = Vec::new();
@@ -847,16 +855,43 @@ impl Publisher {
         present.sort_unstable();
         self.links
             .retain(|link| present.binary_search(&link.name).is_ok());
+        let newcomers: Vec<String> = present
+            .into_iter()
+            .filter(|name| !self.links.iter().any(|link| &link.name == name))
+            .collect();
+        // A subscriber killed or exec'd before its Drop leaves its socket,
+        // one more under a new pid with every restart (#7439), and a topic
+        // published seldom finds them only here. Nobody is bound to such a
+        // file, so it is removed and takes no place under the cap (#8272):
+        // each newcomer is tried before it is linked, and the linked ones
+        // too once the newcomers would not fit.
+        if self.links.len() + newcomers.len() > MOST_SUBSCRIBERS {
+            let linked = self.links.len();
+            self.links
+                .retain(|link| !crate::subscribe::cleared(&link.path));
+            self.cleared += linked - self.links.len();
+        }
         let mut found = 0;
-        for name in present {
-            if self.links.iter().any(|link| link.name == name) {
+        let mut left_out = 0;
+        let mut tried_past = 0;
+        for name in newcomers {
+            let path = self.subs.join(&name);
+            if self.links.len() == MOST_SUBSCRIBERS {
+                // Past the cap a look tries at most as many again, so a
+                // flood of live sockets costs it a bounded number of tries.
+                if tried_past < MOST_SUBSCRIBERS {
+                    tried_past += 1;
+                    if crate::subscribe::cleared(&path) {
+                        self.cleared += 1;
+                        continue;
+                    }
+                }
+                left_out += 1;
                 continue;
             }
-            if self.links.len() == MOST_SUBSCRIBERS {
-                self.trouble.get_or_insert(io::Error::other(format!(
-                    "more than {MOST_SUBSCRIBERS} subscribers: the rest get nothing"
-                )));
-                break;
+            if crate::subscribe::cleared(&path) {
+                self.cleared += 1;
+                continue;
             }
             let socket = UnixDatagram::unbound().and_then(|socket| {
                 socket.set_nonblocking(true)?;
@@ -866,7 +901,7 @@ impl Publisher {
             match socket {
                 Ok(socket) => {
                     self.links.push(Link {
-                        path: self.subs.join(&name),
+                        path,
                         name,
                         socket,
                         delivered: 0,
@@ -882,6 +917,12 @@ impl Publisher {
                     break;
                 }
             }
+        }
+        if left_out > 0 {
+            self.trouble.get_or_insert(io::Error::other(format!(
+                "more than {MOST_SUBSCRIBERS} subscribers ({} found): the rest get nothing",
+                self.links.len() + left_out
+            )));
         }
         found
     }

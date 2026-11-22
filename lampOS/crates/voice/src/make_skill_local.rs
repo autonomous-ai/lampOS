@@ -1114,9 +1114,17 @@ fn parameters_with(writes: bool, tasks: bool, code: bool) -> Value {
         "type": "string",
         "description": "Only when the person asks to delete or remove a skill: its name as they said it, given alone with no request."
     });
+    // A spoken change to a skill the person made ([`crate::made_change`],
+    // #7975, #8008) is its own function, `change_skill`, run as this one's
+    // call with `change` ([`crate::made_change::as_make`]): never a
+    // parameter here, so these stay within
+    // [`PRODUCT_MOST_PARAMETERS_BYTES`].
     // A skill the person made or added turned off and back on by voice
     // (#7445, #7594, [`crate::made_turn`], `LAMP_MADE_SKILL_OFF_SAID`):
-    // never a remove, which is then told as for good alone.
+    // never a remove, which is then told as for good alone. Nor is a
+    // change (#7975, lamp-9adf, 19 Nov: "change rain check to seven
+    // thirty" removed it): that is `change_skill`, whose words say it is
+    // never a remove.
     if made_skill::off_said_on() {
         parameters["properties"][crate::made_remove::REMOVE]["description"] = json!(
             "Only when they ask to delete or remove a skill for good, never to turn one off, pause or stop it: its name as they said it, alone."
@@ -1805,7 +1813,14 @@ fn made_no_asks(
     if !crate::make_no_asks::on() || !crate::make_no_asks::keeps_no_yes(made) {
         return None;
     }
-    let replaces = made_in != 0 && !made.uses.code && !made.uses.agent_task;
+    // A change replaces only the skill it changes, in place, never another
+    // (`crate::made_change`, Twelve's P2 2 on #8008: its near twins were
+    // turned off with no word): its words that would start another are
+    // refused with why, as anyone else's make's are.
+    let replaces = made_in != 0
+        && !made.uses.code
+        && !made.uses.agent_task
+        && made_skill::change_as().is_none();
     // Its words would start skills the person made, kept for this
     // (`made_skill::asks_taken_sparing`, #7828's fix 3): replaced below on
     // the owner's ask, as a trigger clash is; anyone else's make, or one
@@ -3239,6 +3254,12 @@ pub fn take_said_line() -> Option<String> {
 /// [`take_said_line`], with what the make came to ([`Outcome`]).
 pub fn take_said_outcome() -> Option<(String, Outcome)> {
     MADE_LINE.with(|kept| kept.take())
+}
+
+/// The line [`take_said_line`] gives next on this thread, said in place of
+/// the make's own (`crate::made_change`: a change is told as one).
+pub(crate) fn said_line_now(line: String, outcome: Outcome) {
+    MADE_LINE.with(|kept| kept.replace(Some((line, outcome))));
 }
 
 /// Tests: the line [`take_said_line`] gives next on this thread, as a make
@@ -4889,6 +4910,11 @@ pub fn answer(
     if crate::make_no_asks::on()
         && let Some(asked) = call.args[crate::make_no_asks::UNDO].as_str()
     {
+        // "Put it back" after a change, the latest thing done: its old
+        // version back in place ([`crate::made_change::put_back`]).
+        if let Some(name) = crate::made_change::put_back_for_undo_here(asked) {
+            return crate::made_change::put_back_here(&name, request, heard, lease);
+        }
         return crate::make_no_asks::undo_here(asked, request, heard, lease);
     }
     // A skill the person made, removed by voice (#6960): matched in code
@@ -5004,10 +5030,18 @@ pub fn answer(
     let Some(keeping) = Keeping::when(true) else {
         return crate::tools::unavailable();
     };
+    // A change to a skill the person made ([`crate::made_change`]): that
+    // one re-made in place. Never after an undo.
+    let changing = call.args[crate::made_change::CHANGE]
+        .as_str()
+        .map(str::trim)
+        .filter(|asked| undone.is_none() && !asked.is_empty());
     // What a turned-off skill on the lamp already does turns it on, with
     // one line and its undo, never an offer (#7747, `LAMP_MAKE_CORE_OFFER`;
-    // the first builder, 18 Nov 18:41). Never after an undo.
+    // the first builder, 18 Nov 18:41). Never after an undo, nor for a
+    // change, which changes the skill named.
     if undone.is_none()
+        && changing.is_none()
         && let Some(turned) = crate::make_core_offer::before_make_here(&call.args, request, skills)
     {
         return turned;
@@ -5038,9 +5072,20 @@ pub fn answer(
             "with no given_name"
         }
     );
-    let told = named_make(given, || {
-        make_in(request, request_words, &keeping, own_chat, now_unix_ms)
-    });
+    let told = match changing {
+        Some(asked) => crate::made_change::changed(
+            &keeping,
+            asked,
+            request_words,
+            || crate::services::owners_yes_of(request, heard, owner_for_make(lease)),
+            crate::make_no_asks::turned_off_here().as_ref(),
+            |words| make_in(request, words, &keeping, own_chat, now_unix_ms),
+            now_unix_ms,
+        ),
+        None => named_make(given, || {
+            make_in(request, request_words, &keeping, own_chat, now_unix_ms)
+        }),
+    };
     MAKE_OWNER.with(|asked| asked.borrow_mut().take());
     // The skill made, kept as made in this conversation (#7660).
     keep_just_made(&told, request, lease);
@@ -5829,13 +5874,71 @@ light = { dim = 1 }
         assert!(served.join().is_err(), "authenticated timeout was ignored");
     }
 
+    /// How long a test helper waits for the call it stands in for.
+    pub(crate) const ACCEPT_WITHIN: std::time::Duration = std::time::Duration::from_secs(60);
+
+    /// A test helper's accept, bounded by [`ACCEPT_WITHIN`]: a make that
+    /// never calls the helper (its chat ran out under a loaded host) fails
+    /// its test plainly, never hangs its join with the helper still in
+    /// `accept` (Heron's hour at 0% CPU on #8180, sampled: two joins, seven
+    /// helpers in `accept`).
+    pub(crate) fn accept_within(
+        listener: &std::os::unix::net::UnixListener,
+    ) -> std::os::unix::net::UnixStream {
+        listener.set_nonblocking(true).unwrap();
+        let deadline = std::time::Instant::now() + ACCEPT_WITHIN;
+        loop {
+            match listener.accept() {
+                Ok((stream, _)) => {
+                    // An accepted socket keeps the listener's non-blocking
+                    // mode on macOS: the helper reads it blocking.
+                    stream.set_nonblocking(false).unwrap();
+                    return stream;
+                }
+                Err(error) if error.kind() == std::io::ErrorKind::WouldBlock => {
+                    assert!(
+                        std::time::Instant::now() < deadline,
+                        "no call to the test helper's socket within {} s",
+                        ACCEPT_WITHIN.as_secs()
+                    );
+                    std::thread::sleep(std::time::Duration::from_millis(5));
+                }
+                Err(error) => panic!("test helper accept: {error}"),
+            }
+        }
+    }
+
+    /// [`accept_within`] for a stub chat on TCP: the same bound, so a make
+    /// that never calls it fails plainly instead of hanging its join.
+    pub(crate) fn accept_within_tcp(listener: &std::net::TcpListener) -> std::net::TcpStream {
+        listener.set_nonblocking(true).unwrap();
+        let deadline = std::time::Instant::now() + ACCEPT_WITHIN;
+        loop {
+            match listener.accept() {
+                Ok((stream, _)) => {
+                    stream.set_nonblocking(false).unwrap();
+                    return stream;
+                }
+                Err(error) if error.kind() == std::io::ErrorKind::WouldBlock => {
+                    assert!(
+                        std::time::Instant::now() < deadline,
+                        "no call to the test chat's socket within {} s",
+                        ACCEPT_WITHIN.as_secs()
+                    );
+                    std::thread::sleep(std::time::Duration::from_millis(5));
+                }
+                Err(error) => panic!("test chat accept: {error}"),
+            }
+        }
+    }
+
     /// A manage helper at `socket` that puts on whatever made skill it is
     /// asked for, once: the line it was asked.
     pub(crate) fn manage_helper(socket: &Path) -> std::thread::JoinHandle<Value> {
         use std::io::BufRead;
         let listener = std::os::unix::net::UnixListener::bind(socket).unwrap();
         std::thread::spawn(move || {
-            let (stream, _) = listener.accept().unwrap();
+            let stream = accept_within(&listener);
             let mut line = String::new();
             std::io::BufReader::new(&stream)
                 .read_line(&mut line)
@@ -5934,7 +6037,7 @@ light = { dim = 1 }
         let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
         let url = format!("http://{}/v1/", listener.local_addr().unwrap());
         let held = std::thread::spawn(move || {
-            let (socket, _) = listener.accept().unwrap();
+            let socket = accept_within_tcp(&listener);
             std::thread::sleep(JUDGE_WITHIN + Duration::from_secs(1));
             drop(socket);
         });
@@ -6576,7 +6679,7 @@ light = { dim = 1 }
         // The manage helper, gated: the person's no comes while it puts the
         // skill on, before it answers.
         let helper = std::thread::spawn(move || {
-            let (stream, _) = listener.accept().unwrap();
+            let stream = crate::make_skill_local::tests::accept_within(&listener);
             let mut line = String::new();
             std::io::BufReader::new(&stream)
                 .read_line(&mut line)
@@ -9592,7 +9695,11 @@ printf 'tar of %s' \"$name\" > \"$3/$name-1.0.0.tar\"\n",
                 tasks: tasks.clone(),
                 ..Settings::default()
             };
-            for name in [made_skill::MAKE, "put_on_made_skill"] {
+            for name in [
+                made_skill::MAKE,
+                crate::made_change::FUNCTION,
+                "put_on_made_skill",
+            ] {
                 assert_eq!(route(&off, name), Route::Nobody, "{name}");
                 assert!(declared(&off).iter().all(|tool| tool.name != name));
             }
@@ -9601,14 +9708,19 @@ printf 'tar of %s' \"$name\" > \"$3/$name-1.0.0.tar\"\n",
                 tasks,
                 ..Settings::default()
             };
-            assert_eq!(route(&on, made_skill::MAKE), Route::MakeLocal(None));
-            assert_eq!(
-                declared(&on)
-                    .iter()
-                    .filter(|tool| tool.name == made_skill::MAKE)
-                    .count(),
-                1
-            );
+            // A change's own function, offered and routed exactly where
+            // `make_skill` is (#8008).
+            for name in [made_skill::MAKE, crate::made_change::FUNCTION] {
+                assert_eq!(route(&on, name), Route::MakeLocal(None), "{name}");
+                assert_eq!(
+                    declared(&on)
+                        .iter()
+                        .filter(|tool| tool.name == name)
+                        .count(),
+                    1,
+                    "{name}"
+                );
+            }
             assert_eq!(route(&on, "put_on_made_skill"), Route::Nobody);
             assert!(
                 declared(&on)

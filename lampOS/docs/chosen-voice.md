@@ -82,8 +82,11 @@ cleared, wiped by the reset. A change of the energy alone restarts nothing.
 (`lamp_msgs/Energy {level, chosen}`, [msgs.md](msgs.md)) at once when it
 changes and every 5 s otherwise, so a level the app sets is said within
 half a second and the body, reading once a second, has it within about
-1.5 s (#7438); inert data, so no switch of its own: the body reads it only
-with its own switch (#6893's later pieces).
+1.5 s (#7438); inert data, so no switch of its own: the body, Expression,
+lamp-skills and the voice read it under `LAMP_BODY_ENERGY=on`, on in the
+product ([body.md](body.md), "How lively it moves"); at level 5 the body
+plays each cut clip for all of its V1 recording, its swing at most V1's
+(#8153).
 
 ## The character words' rules
 
