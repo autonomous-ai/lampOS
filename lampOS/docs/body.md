@@ -1593,30 +1593,41 @@ the voice, Expression and lamp-skills (each with `energy_in::EnergyIn`, the body
   the step kept (`energy::under_five`; `energy::tests::levels_two_to_four_play_as_before_8201_never_more_than_the_level_above`,
   which keeps the pre-#8201 builder as its reference and pins where the cap holds).
 
-  Where the cap holds, 64 joint-levels in all (pinned in that test): there that joint moves
+  Where the cap holds, 52 joint-levels in all (pinned in that test): there that joint moves
   no more than the level above it, so less than before #8201; every other joint of every clip
-  at 2 to 4 is byte for byte as before.
+  at 2 to 4 is byte for byte as before, but the four floored below.
 
   | clip | joint: levels capped |
   |---|---|
   | curious | base yaw: 2, 3, 4 |
   | happy | shoulder: 2, 3, 4 |
-  | caring | elbow: 2, 3, 4; head pitch: 4 |
+  | caring | head pitch: 4 |
   | surprised | head pitch: 2, 3, 4; shoulder: 2, 3, 4 |
   | confused | head pitch: 2, 3, 4; base yaw: 2, 3, 4 |
   | sleepy | base yaw: 2, 3, 4; head pitch, head roll, shoulder, elbow: 3, 4 |
   | excited | shoulder: 2, 3, 4 |
-  | scanning | head roll: 2, 3, 4 |
   | dance_chill | base yaw: 2 |
   | dance_hype | head pitch: 2, 3, 4; shoulder: 2, 3, 4; base yaw: 3, 4; elbow: 4 |
-  | dance_waltz | shoulder: 2, 3, 4; elbow: 2, 3, 4; base yaw: 4 |
+  | dance_waltz | base yaw: 4 |
   | dance_jazz | head pitch: 2, 3, 4; base yaw: 2, 3, 4; elbow: 3, 4 |
 
-  On ten of those joints levels 2 to 4 sit just below level 1 (V2's (A) on #8307): V1 at level 5
-  moves the joint less than the clip itself does, and the cap carries that down while level 1
-  stays the clip. They are curious's base yaw, happy's shoulder, caring's elbow, surprised's head
-  pitch, confused's head pitch and base yaw, scanning's head roll, dance_hype's shoulder and
-  dance_waltz's shoulder and elbow (pinned in the same test; only a joint capped at level 2 may).
+  Four more joints are capped to exactly level 1's own, so nothing changes there: confused's
+  head pitch at 4, sleepy's base yaw at 2 to 4, dance_chill's base yaw at 2 and dance_jazz's head
+  pitch at 2 to 4.
+
+  **The floor** (V2 and the first builder on #8307, 22 Nov 20:2x; `energy::FLOOR`): where the cap
+  alone would take a joint more than 10% under level 1's swing, levels 2 to 4 play level 1's own
+  on that joint (the clip as it is, at the level's step). Four joints, at 2, 3 and 4: caring's
+  elbow (level 1 338 counts; the cap alone 231), scanning's head roll (309; 199, 200, 209),
+  dance_waltz's shoulder (48; 42, 43, 43) and dance_waltz's elbow (307; 257). The accepted cost:
+  level 5 (V1) moves those four joints a little less than 2 to 4 do.
+
+  On six capped joints levels 2 to 4 sit just below level 1 (V2's (A) on #8307), under the
+  floor's 10%: V1 at level 5 moves the joint less than the clip itself does, and the cap carries
+  that down while level 1 stays the clip. They are curious's base yaw (level 1 142, level 2 133),
+  happy's shoulder (171, 160), surprised's head pitch (190, 186), confused's head pitch (190, 178)
+  and base yaw (142, 129) and dance_hype's shoulder (155, 143) (pinned in the same test; only a
+  joint capped at level 2 may).
 
   Level 5 on the host
   (`energy::level_five_plays_each_clip_for_all_of_its_v1_recording`; played seconds at the 1.5
