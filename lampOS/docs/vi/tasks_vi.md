@@ -2920,7 +2920,7 @@ nay.
   | Đã mở, đã xác nhận, và rảnh | `ready` | — |
   | Đang một lượt (lời đã được nhận; watch của Harness đọc `working`) | `working` | — |
 
-  "Được biết là không có" chỉ là một `installed: false` rõ ràng. Harness để `installed` trống (`null`) nghĩa là chưa biết, không bao giờ là không có (#8283): một máy tính khác có engine `null` kèm `installable: true` vẫn nhận việc, và việc khởi động thất bại của Harness (`ENGINE_NOT_INSTALLED`) mới quyết. Riêng máy của đèn thì ngược lại: chỉ được giữ làm nơi nhận việc khi có `installed: true` mới.
+  "Được biết là không có" chỉ là một `installed: false` rõ ràng. Harness để `installed` trống (`null`) nghĩa là chưa biết, không bao giờ là không có (#8283): một máy tính khác có engine `null` kèm `installable: true` vẫn nhận việc, và việc khởi động thất bại của Harness (`ENGINE_NOT_INSTALLED`) mới quyết. Riêng máy của đèn thì ngược lại: chỉ được giữ làm nơi nhận việc khi có `installed: true` mới. Còn hai cách chọn engine trên chính đèn thì đổi theo #8284: việc không nói engine chạy trên engine mặc định của đèn, trừ khi máy của đèn được báo là không có nó (`Engine::lamp_engine`); engine được gọi tên chỉ chạy khi không bị báo là không có, nếu không thì `engine_not_here`. Cả hai đều dựa vào `missing`, chỉ là một `installed: false` rõ ràng, nên engine mặc định chưa biết vẫn được giữ, không đổi sang engine trong file targets, và engine được gọi tên mà chưa biết thì vẫn được thử, để lần khởi động của Harness quyết.
 
   Việc Harness tự đăng xuất không phải `error`: đèn đăng xuất vẫn chạy
   agent của nó (#6407). Mã lỗi (`one_session::fault_code`):
