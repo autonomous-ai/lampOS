@@ -4832,6 +4832,7 @@ mod tests {
                     || name == crate::second_provider::worker::WHILE_THEY_APPLY_ENVIRONMENT
                     || name == crate::second_provider::SAID_ONCE_ENVIRONMENT
                     || name == crate::second_provider::SAY_WITH_CALL_ENVIRONMENT
+                    || name == lamp_actions::schedule::ASKS_HOW_LONG_SWITCH
                     || name == crate::keep_at_once::ENVIRONMENT
                     || name == crate::action_claim::ENVIRONMENT
                     || name == crate::action_claim::WORDED_ENVIRONMENT
@@ -5258,6 +5259,7 @@ mod tests {
                     "LAMP_STOP_WORDS_KEYTERM=on",
                     "LAMP_TASKS_NAMED_ASK=on",
                     "LAMP_TASKS_TOLD=/var/lib/lampOS/voice/tasks-told",
+                    "LAMP_TIMER_ASKS_HOW_LONG=on",
                     "LAMP_TOLD_WHEN_ASKED=on",
                     "LAMP_TURNED_FACE_SPEAKS=on",
                     "LAMP_TURNED_SPEAKING=on",
