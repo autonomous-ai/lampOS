@@ -387,7 +387,10 @@ and, at the voice, `LAMP_APP_MEMORY`.
   app learns nothing of the person's own forgets (the journals keep the exact
   code), "at most 20 facts an app a day (too_many)", or `bad_time`;
   `unavailable` when the voice or memory gave no word within 2.5 s (it may not
-  be kept).
+  be kept). A publish that the bus reports trouble with (more than 64
+  subscribers, #8272) may still have reached the voice, so the door waits for
+  its word all the same; only a fact the bus refused before any send is
+  answered `unavailable` at once.
 - **Whose and how.** The door tells the voice on `apps/remember`
   (`AppRemember`: the door's ask number, the app's checked name, its manifest's
   title as `app_fact::name`, the tidied words, the wall time). The voice picks
