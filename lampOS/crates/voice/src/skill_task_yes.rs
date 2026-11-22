@@ -157,10 +157,46 @@ pub const NET_ENVIRONMENT: &str = "LAMP_TASK_NET";
 /// in a one-run token; lamp-tasks reads it from the hand-over.
 pub const NET: (&str, &str) = ("net", "reaches the public internet");
 
-/// Said after the grants when `air` sits beside [`NET`] ([`uses_said`]):
-/// its readings can leave the lamp, so the yes says so (the first
-/// builder's ruling on #7590, 18 Nov 02:01).
+/// Said after the grants when `air` alone sits beside [`NET`]
+/// ([`uses_said`]): its readings can leave the lamp, so the yes says so
+/// (the first builder's ruling on #7590, 18 Nov 02:01).
 pub const AIR_BESIDE_NET: &str = "so its air readings can go to the internet";
+
+/// What can leave the lamp when a grant sits beside [`NET`], in the words
+/// [`GRANTS`] uses for it: the Reviewer-lead's P2 on #7901, as `net` may
+/// now sit beside any grant, so a yes says what can go to the internet.
+pub const BESIDE_NET: [(&str, &str); 6] = [
+    ("camera", "what the camera sees"),
+    ("microphone", "what the microphone hears"),
+    ("speech", "everything the lamp says out loud"),
+    ("look", "whether someone is there"),
+    ("notes", "its notes"),
+    ("air", "its air readings"),
+];
+
+/// What of `grant` can go to the internet beside [`NET`]: [`BESIDE_NET`]'s
+/// words, or "your Gmail" for a service's read ([`service_grant`]); none
+/// for any other grant.
+fn beside_net_words(grant: &str) -> Option<String> {
+    if let Some((_, words)) = BESIDE_NET.iter().find(|(name, _)| *name == grant) {
+        return Some((*words).to_owned());
+    }
+    let (code, write) = service_grant(grant)?;
+    (!write).then(|| {
+        let service = lamp_services::catalog::service(code)
+            .map_or_else(|| code.replace('_', " "), |service| service.name.to_owned());
+        format!("your {service}")
+    })
+}
+
+/// `words` joined as said: "a", "a and b", "a, b and c".
+fn joined(words: &[String]) -> String {
+    match words {
+        [] => String::new(),
+        [one] => one.clone(),
+        [rest @ .., last] => format!("{} and {last}", rest.join(", ")),
+    }
+}
 
 thread_local! {
     /// The network grant's switch as a test of this thread sets it (other
@@ -231,8 +267,10 @@ pub fn grant_named(name: &str) -> Option<&'static str> {
 
 /// What the script uses, every grant in plain words: "it uses the camera
 /// and changes the light". A grant not in [`GRANTS`] is said by its name,
-/// never left out (the manage helper gives only known ones). With `air`
-/// beside [`NET`], it ends with [`AIR_BESIDE_NET`].
+/// never left out (the manage helper gives only known ones). With [`NET`]
+/// beside a grant of [`BESIDE_NET`] or a service's read, it ends with what
+/// can go to the internet, each in its grant's order: "so what the camera
+/// sees can go to the internet" ([`AIR_BESIDE_NET`] for `air` alone).
 pub fn uses_said(grants: &[String]) -> String {
     let words: Vec<String> = grants
         .iter()
@@ -243,16 +281,22 @@ pub fn uses_said(grants: &[String]) -> String {
                 .unwrap_or_else(|| format!("uses {grant}"))
         })
         .collect();
-    let said = match words.as_slice() {
-        [] => "it uses none of the lamp's parts".to_owned(),
-        [one] => format!("it {one}"),
-        [rest @ .., last] => format!("it {} and {last}", rest.join(", ")),
-    };
-    let names = |name: &str| grants.iter().any(|grant| grant == name);
-    if names("air") && names(NET.0) {
-        format!("{said}, {AIR_BESIDE_NET}")
+    let said = if words.is_empty() {
+        "it uses none of the lamp's parts".to_owned()
     } else {
+        format!("it {}", joined(&words))
+    };
+    if !grants.iter().any(|grant| grant == NET.0) {
+        return said;
+    }
+    let out: Vec<String> = grants
+        .iter()
+        .filter_map(|grant| beside_net_words(grant))
+        .collect();
+    if out.is_empty() {
         said
+    } else {
+        format!("{said}, so {} can go to the internet", joined(&out))
     }
 }
 
@@ -1217,6 +1261,97 @@ mod tests {
         assert_eq!(uses_said(&of(&["air"])), "it reads the air sensor");
         assert!(!uses_said(&of(&["speak", "net"])).contains(AIR_BESIDE_NET));
         set_net_here(None);
+    }
+
+    /// The Reviewer-lead's P2 on #7901: `net` beside the camera, the
+    /// microphone, what the lamp says, `look`, the skill's notes or a
+    /// service's read says what of it can go to the internet; alone, or
+    /// beside a grant that sends nothing out, it says nothing of it.
+    fn beside_net(grants: &[&str]) -> String {
+        set_net_here(Some(true));
+        let said = uses_said(&grants.iter().map(|g| (*g).to_owned()).collect::<Vec<_>>());
+        set_net_here(None);
+        said
+    }
+
+    #[test]
+    fn camera_beside_net_says_what_it_sees_can_go_out() {
+        assert_eq!(
+            beside_net(&["camera", "net"]),
+            "it uses the camera and reaches the public internet, so what the camera sees can \
+             go to the internet"
+        );
+        assert_eq!(beside_net(&["camera"]), "it uses the camera");
+    }
+
+    #[test]
+    fn microphone_beside_net_says_what_it_hears_can_go_out() {
+        assert_eq!(
+            beside_net(&["net", "microphone"]),
+            "it reaches the public internet and uses the microphone, so what the microphone \
+             hears can go to the internet"
+        );
+    }
+
+    #[test]
+    fn speech_beside_net_says_what_the_lamp_says_can_go_out() {
+        assert_eq!(
+            beside_net(&["speech", "net"]),
+            "it reads everything the lamp says out loud and reaches the public internet, so \
+             everything the lamp says out loud can go to the internet"
+        );
+    }
+
+    #[test]
+    fn look_beside_net_says_whether_someone_is_there_can_go_out() {
+        assert_eq!(
+            beside_net(&["look", "net"]),
+            "it knows when someone is there, never who and reaches the public internet, so \
+             whether someone is there can go to the internet"
+        );
+    }
+
+    #[test]
+    fn notes_beside_net_says_its_notes_can_go_out() {
+        assert_eq!(
+            beside_net(&["notes", "net"]),
+            "it keeps small notes of its own on the lamp and reaches the public internet, so \
+             its notes can go to the internet"
+        );
+    }
+
+    #[test]
+    fn a_service_read_beside_net_says_the_service_can_go_out() {
+        crate::made_skill::set_agent_services_here(Some(true));
+        let read = beside_net(&["gmail-read", "net"]);
+        let write = beside_net(&["gmail-write", "net"]);
+        crate::made_skill::set_agent_services_here(None);
+        assert_eq!(
+            read,
+            "it reads your Gmail and reaches the public internet, so your Gmail can go to the \
+             internet"
+        );
+        assert!(!write.contains("can go to the internet"), "{write}");
+    }
+
+    #[test]
+    fn two_grants_beside_net_say_both_can_go_out_in_order() {
+        assert_eq!(
+            beside_net(&["net", "camera", "speak", "notes"]),
+            "it reaches the public internet, uses the camera, speaks and plays sounds and keeps \
+             small notes of its own on the lamp, so what the camera sees and its notes can go to \
+             the internet"
+        );
+        assert_eq!(
+            beside_net(&["camera", "microphone", "air", "net"]),
+            "it uses the camera, uses the microphone, reads the air sensor and reaches the public \
+             internet, so what the camera sees, what the microphone hears and its air readings \
+             can go to the internet"
+        );
+        assert_eq!(
+            beside_net(&["net", "speak", "light"]),
+            "it reaches the public internet, speaks and plays sounds and changes the light"
+        );
     }
 
     /// LAMP_AGENT_SERVICES: a connector skill's service grants are said

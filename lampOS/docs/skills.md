@@ -8174,8 +8174,15 @@ bytes, as above):
   service's grant (#7901, the settled design: all of a skill's declared
   grants are on, nothing blocked), in a file and in a kept `skill.toml`
   alike; docs/tasks.md, "What a `net` run may hold, and its bounds".
-  With `air` beside `net`, the say-back adds "so its air readings can go
-  to the internet".
+  With `net` beside the camera, the microphone, what the lamp says,
+  `look`, its notes, `air` or a service's read, the say-back adds what can
+  go to the internet, one clause per grant in the grant's order, joined as
+  said (the Reviewer-lead's P2 on #7901, `skill_task_yes::BESIDE_NET`):
+  "so what the camera sees can go to the internet"; "so what the camera
+  sees and its notes can go to the internet". The clauses are "what the
+  camera sees", "what the microphone hears", "everything the lamp says out
+  loud", "whether someone is there", "its notes", "its air readings" and
+  "your <service>" (a service's read; its write sends only on a yes).
 - **A linked service it uses gets that service's grants** (the owner's
   ruling, 13 Nov: anything that touches the connectors goes to the lamp's
   agent end to end), as a voice-made service skill's `do.task` carries
