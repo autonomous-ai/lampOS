@@ -1128,7 +1128,10 @@ is `lamp_msgs::app_fact`; the store's side is `crates/memory/src/app_facts.rs`.
     a thing only: the voice's `forget {about}` reads the person's own app
     facts that way, page by page (at most 24, else "too much to look
     through"), and matches them by the same words as their kept things, so
-    "forget what the gym coach said" takes them. The one-face forget (#5627),
+    "forget what the gym coach said" takes them. A fact's words are its
+    app's title and its quoted words only, never the `Noted by the app`
+    before them or the day: "forget what the app said" takes only a fact
+    that says "app" (#8300). The one-face forget (#5627),
     with the person alone in view, lists them the same way beside their kept
     things, within the same 1.5 s (`tools::ASK_DEADLINE`) as the kept
     listing, so the lookup before the question waits at most 3 s with the
@@ -1137,11 +1140,16 @@ is `lamp_msgs::app_fact`; the store's side is `crates/memory/src/app_facts.rs`.
     (#8228): when every match is an app fact of the same source and the
     words name that app (its title in "Noted by the app <title>", case
     aside), the one-face forget asks once in their words and the yes forgets
-    each by its id, and the forget about takes them all, past its 8 too. A
+    each by its id, and the forget about takes them all, past its 8 too. The
+    yes forgets the one asked about by its id first, then lists the app's
+    facts within what is left of the same 1.5 s, so a slow listing never
+    leaves that forget without time; it widens only by the words the lamp
+    asked with, never the model's on the yes. A fact memory does not say it
+    removed is not counted, and the answer says some may be left. A
     mix of kept things and app facts, or two apps' facts, still asks which.
     Never the room's, never
-    another person's; an older memory refuses the field and the forget looks
-    in the rest.
+    another person's; an older memory, and the legacy store, refuse the field
+    and the forget looks in the rest.
   - **Never read by the nightly pass**, so no episode, pattern or chapter
     is made from one without its mark or outlives its 90 days. What was
     made from one by any other link goes with it (the forget walk).

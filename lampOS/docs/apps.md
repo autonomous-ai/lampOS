@@ -287,5 +287,10 @@ is designed and not built.
   memory with no Days store (`unknown_op`) keeps no app facts and counts as
   done. Every fact of the app goes, with what was made from them, whatever
   `LAMP_APP_REMEMBER` says now. The person's own forgets take them as any
-  kept thing. An update whose manifest drops `remember` forgets nothing: the
+  kept thing. Words naming every word of an app's title take that app's
+  facts together, so an app titled with one word ("Coach", "Notes") has all
+  its facts taken by "forget my coach" or "forget my notes", by design: the
+  person named the app. A forget's words are matched against the title and
+  the fact's quoted words only, never the `Noted by the app` and day it is
+  kept with ([memory-days.md](memory-days.md)). An update whose manifest drops `remember` forgets nothing: the
   app's facts stay until its remove, the person's forget or their 90 days.

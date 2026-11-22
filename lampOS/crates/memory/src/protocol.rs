@@ -146,7 +146,8 @@ pub enum Request {
         /// The Days store's (#7415): only the person's own app facts, for
         /// a forget about a thing, never the hits note's list; with
         /// `before_id`, those below it, a page of them. Not with
-        /// `observations`. The legacy store, which keeps none, ignores it.
+        /// `observations`. The legacy store, which keeps none, refuses it
+        /// (`bad_request`).
         #[serde(default)]
         app_facts: bool,
         #[serde(default)]
@@ -445,8 +446,21 @@ fn done(store: &mut Store, request: Request, now_unix_ms: u64) -> Result<Respons
             Response::Added { id }
         }
         Request::Kept {
-            person, max_bytes, ..
+            person,
+            max_bytes,
+            app_facts,
+            before_id,
+            ..
         } => {
+            // It keeps no app facts: refused, never its kept things listed as
+            // them (the Reviewer-lead's P3 on #8300), as the voice reads an
+            // older memory's refusal as none.
+            if app_facts || before_id.is_some() {
+                return Err(refuse(
+                    "bad_request",
+                    "this memory keeps no app facts (app_facts, before_id)",
+                ));
+            }
             let room = usize::try_from(max_bytes.unwrap_or(KEPT_BYTES)).unwrap_or(usize::MAX);
             Response::Kept {
                 entries: store.kept(&one(person)?, room).map_err(disk)?,
@@ -1002,6 +1016,29 @@ mod tests {
             .iter()
             .map(|entry| entry["id"].as_u64().unwrap())
             .collect()
+    }
+
+    /// The Reviewer-lead's P3 on #8300: this store keeps no app facts, so a
+    /// listing of them (`app_facts`, or a page of them by `before_id`) is
+    /// refused, never answered with its kept things as if they were.
+    #[test]
+    fn the_legacy_store_refuses_an_app_facts_listing() {
+        let (_scratch, mut store) = Scratch::new("app-facts-refused");
+        let kept = ask(
+            &mut store,
+            json!({"op":"remember","at_unix_ms":NOON,"text":"coffee"}),
+        );
+        assert_eq!(kept["ok"], true, "{kept}");
+        for request in [
+            json!({"op":"kept","app_facts":true}),
+            json!({"op":"kept","app_facts":true,"before_id":9}),
+            json!({"op":"kept","before_id":9}),
+        ] {
+            let answer = ask(&mut store, request.clone());
+            assert_eq!(answer["ok"], false, "{request}: {answer}");
+            assert_eq!(answer["error"], "bad_request", "{request}: {answer}");
+        }
+        assert_eq!(ids(&ask(&mut store, json!({"op":"kept"}))).len(), 1);
     }
 
     #[test]
