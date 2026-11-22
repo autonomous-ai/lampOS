@@ -725,8 +725,11 @@ prints for the services alone:
   #829's check and the rules on `voice_going_on_in` (`LAMP_SPOKEN_TO`,
   `LAMP_GOING_ON_NOT_OWN`, `LAMP_QUIET_GOING_ON_SAME_ONE`, someone else's
   sign), joining a cut line (`same_speaker`, `LAMP_JOIN_CUT_WORDS`; with
-  `LAMP_JOIN_SAME_VOICE=on` the join alone reads the services' prints, every
-  heard line then printed, #8003), the
+  `LAMP_JOIN_SAME_VOICE=on` the join reads the services' prints, the one
+  conversation decision that does, every heard line then printed, linked or
+  not, so those prints also reach the services' judge and the owner's
+  enrolled print (`owner_voice::offer`) as the confirm's do; in the private
+  room the join's own prints reach neither, #8003), the
   same speaker's carry and its held colleagues
   (`LAMP_SAME_SPEAKER_CARRIES`), a line kept unjudged, the turned face's
   sign (`LAMP_TURNED_FACE_SPEAKS`), the asked person's answer

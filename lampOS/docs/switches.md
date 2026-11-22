@@ -978,6 +978,7 @@ What a person would notice with each switch on, one plain line per switch counte
 | `LAMP_SPEAKING_READ_LOOKS` | A line you said while the eyes briefly lost your mouth is still taken as yours. |
 | `LAMP_TWO_FACES_HELD` | A second face seen just once, like a passer-by or a photo, no longer makes the lamp treat the room as busy. |
 | `LAMP_ENDPOINT_PAUSE_JOIN` | When you pause mid-sentence to think, the lamp waits a moment and answers what you said as one request. |
+| `LAMP_JOIN_SAME_VOICE` | A long request you make in the dark, with pauses, is answered whole; two people's words stay apart. |
 | `LAMP_WORKER_SCHEDULING` | Nothing you'd notice: shares the lamp's processor more fairly between its voice and its other parts. |
 | `LAMP_UNCLEAR_HUM` | When the lamp can't make out what you said, it gives a quick "hm?" and a listening look instead of silence. |
 | `LAMP_VAD_INPUT` | The lamp listens differently for your voice while it talks, to catch a "Stop" said over it. |
