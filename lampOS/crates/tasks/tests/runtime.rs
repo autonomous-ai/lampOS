@@ -3039,9 +3039,9 @@ fn with_hermes_on_lamp_off_work_naming_no_machine_goes_to_the_computer() {
     assert!(lamp_side(Some("on"), None, None, None).is_none());
 }
 
-/// #5199: an engine not found on that computer (`installed` null with
-/// `installable` true) is refused early, and the targets say so; unknown
-/// proceeds.
+/// #5199, as #8283 left it: an engine said not installed on that computer
+/// (an explicit `installed: false`, from an older Harness or the raw probe)
+/// is refused early, and the targets say so; unknown proceeds.
 #[test]
 fn an_engine_known_not_there_is_refused_and_told_and_unknown_proceeds() {
     let (mut s, path) = engines_running(true);
@@ -3060,10 +3060,10 @@ fn an_engine_known_not_there_is_refused_and_told_and_unknown_proceeds() {
         &s,
         Ok(vec![
             row("claude", Some(true), Some(true)),
-            // Harness's row for an engine not on the computer.
+            // Said not installed there, in so many words.
             EngineRow {
                 installable: Some(true),
-                ..row("codex", None, None)
+                ..row("codex", Some(false), None)
             },
         ]),
     );
@@ -3077,6 +3077,68 @@ fn an_engine_known_not_there_is_refused_and_told_and_unknown_proceeds() {
     // The computer can't say any more: unknown, so it goes as before.
     office_engines(&s, Ok(vec![row("codex", None, None)]));
     prepared_until(&s, None);
+}
+
+/// #8283: the office computer as the real Harness CLI read it on lamp-06c1
+/// (#8240, 22 Nov 12:14): a login shell slower than the probe's 5 s, so
+/// every engine there, Claude Code among them, came out `installed: null`
+/// with `installable: true` (openharness `machineEngines.ts`: "`null` is
+/// unknown, never 'not there'"; the computer's `installable` is
+/// `!installed && command && recipe`). Unknown: the office target is told
+/// without `installed: false`, so the voice keeps it in its staff, and a
+/// hand-over to it is prepared, never refused `engine_missing`.
+#[test]
+fn an_engine_harness_does_not_say_is_installed_is_unknown_never_missing() {
+    let (mut s, path) = engines_running(true);
+    let machine = "b".repeat(32);
+    let cli: String = ["claude", "codex", "opencode", "pi", "hermes", "openclaw"]
+        .iter()
+        .map(|engine| {
+            format!(
+                "{}\n",
+                json!({"machineId":machine,"engine":engine,"installed":null,"signedIn":null,"installable":true,"firstPrompt":null})
+            )
+        })
+        .collect();
+    let rows = lamp_tasks::harness::parse_engines(cli.as_bytes(), &machine).unwrap();
+    assert!(
+        rows.iter()
+            .all(|row| row.installed.is_none() && row.installable == Some(true)),
+        "{rows:?}"
+    );
+    office_engines(&s, Ok(rows));
+    s.start();
+    let office = json!([{"alias":"office","engine":"claude","name":"Office iMac"}]);
+    targets_until(&s, office.clone());
+    // The engines file as Friday's capture had it: `claude:
+    // {installable: true}`, no `installed`.
+    let start = Instant::now();
+    let known = loop {
+        if let Ok(known) = read_engines(&engines_path(&path))
+            && known.get("office").is_some_and(|c| c.engines.len() == 6)
+        {
+            break known;
+        }
+        assert!(start.elapsed() < Duration::from_secs(5), "no engines file");
+        thread::sleep(Duration::from_millis(10));
+    };
+    for (name, engine) in &known["office"].engines {
+        assert_eq!(engine.installed, None, "{name}");
+        assert!(engine.installable.as_ref().unwrap().value, "{name}");
+    }
+    // Read again, and again: still told as unknown, never `installed: false`.
+    let looks = s.counts.engine_looks.load(Ordering::SeqCst);
+    while s.counts.engine_looks.load(Ordering::SeqCst) < looks + 3 {
+        assert!(start.elapsed() < LOOKED_AGAIN_WITHIN, "not looked again");
+        thread::sleep(Duration::from_millis(10));
+    }
+    let told = s.ask(json!({"op":"targets"}));
+    assert_eq!(told["targets"], office, "{told}");
+    assert_eq!(told["targets"][0].get("installed"), None, "{told}");
+    // Handed over: prepared, not refused `engine_missing`.
+    let prepared = prepare_office(&s);
+    assert_eq!(prepared["ok"], true, "{prepared}");
+    assert_ne!(prepared["error"], "engine_missing", "{prepared}");
 }
 
 /// #5199: without `--engines-from-machines` nothing is asked or refused:

@@ -1660,14 +1660,23 @@ The product unit's test is `the_tasks_part_starts_with_no_targets_and_learns_the
     and refuses nothing. A file there that isn't this part's is left as it
     is. Nothing known: the file is removed.
   - **Refused at `prepare`,** at once, with nothing made: the computer known
-    `offline` is `computer_offline`; the engine not found there
-    (`installed` null with `installable` true, as Harness prints an engine
-    a computer lacks) is `engine_missing`; known `signedIn: false` (Claude
-    Code and Codex only) is `engine_not_signed_in`, in that order. Unknown
-    always proceeds, as today: `installed` null with `installable` false
-    goes, and Harness's own `ENGINE_NOT_INSTALLED` decides. A computer
-    whose shell took over 5 s reads as not found too, so it is said as
-    "not found", never as "not installed". Devin Cloud, which works in
+    `offline` is `computer_offline`; the engine said not installed there
+    (an explicit `installed: false`, from an older Harness or the raw
+    probe) is `engine_missing`; known `signedIn: false` (Claude Code and
+    Codex only) is `engine_not_signed_in`, in that order. Unknown always
+    proceeds: `installed` null goes whatever `installable` says, and
+    Harness's own refusal of a failed start (`ENGINE_NOT_INSTALLED`)
+    decides (#8283). Harness's CLI says `installed` only as `true` or
+    `null`, and its contract (openharness `machineEngines.ts`) is that
+    `null` "is unknown, never 'not there'": the computer's probe reads a
+    missing command, a login shell that timed out (5 s an engine) and a
+    failed spawn all as not installed, so `installable: true` comes with
+    a slow shell too. On lamp-06c1 on 22 Nov (#8240) the office computer's
+    look took 27 s and every engine there, Claude Code among them, read
+    `installed` null with `installable` true; read as missing, the office
+    left the voice's staff and every hand-over to it was refused. Test:
+    `an_engine_harness_does_not_say_is_installed_is_unknown_never_missing`.
+    Devin Cloud, which works in
     Devin's cloud, is never refused. A refusal has the machines and their
     engines looked at again at once (at most once in 30 s), so a computer
     woken or an agent signed in since is known by the next ask.
@@ -1678,8 +1687,9 @@ The product unit's test is `the_tasks_part_starts_with_no_targets_and_learns_the
     "Claude Code isn't signed in on your MacBook.", each with "Nothing was
     handed over." and what would let it go, never "just now".
   - **The staff:** `{"op":"targets"}` gives `installed: false` beside a
-    target whose engine wasn't found on that computer, and the voice leaves
-    it out of the staff, so the descriptions and the staff's note name only
+    target whose engine is said not installed on that computer (the
+    explicit `installed: false` above; never an unknown, #8283), and the
+    voice leaves it out of the staff, so the descriptions and the staff's note name only
     agents some computer has. With the engine chosen above, a target
     written from the machines names one its computer has.
   - **Without the switch** nothing is asked, kept, read or refused: an

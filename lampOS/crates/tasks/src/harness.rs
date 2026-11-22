@@ -5130,7 +5130,9 @@ pub struct EngineRow {
     /// out as `null` (openharness `machineEngines.ts`).
     pub installed: Option<bool>,
     /// The computer's own `!installed && command && recipe`, passed
-    /// through: with `installed` null, `true` is an engine not found there.
+    /// through. With `installed` null, `true` is still unknown, never an
+    /// engine not found there: a login shell that timed out reads so too
+    /// (#8283).
     pub installable: Option<bool>,
     pub signed_in: Option<bool>,
 }
