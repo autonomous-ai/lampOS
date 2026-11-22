@@ -1493,9 +1493,17 @@ mod tests {
         );
         let on = asking_how_long(catalog_with(false), true);
         let said = |name| on.iter().find(|f| f.name == name).unwrap().description;
-        assert!(said("set_timer").contains("For how long?"), "{}", said("set_timer"));
+        assert!(
+            said("set_timer").contains("For how long?"),
+            "{}",
+            said("set_timer")
+        );
         assert!(said("set_timer").contains("never choose one"));
-        assert!(said("set_reminder").contains("What time?"), "{}", said("set_reminder"));
+        assert!(
+            said("set_reminder").contains("What time?"),
+            "{}",
+            said("set_reminder")
+        );
         for (was, now) in catalog_with(false).iter().zip(&on) {
             if !matches!(was.name, "set_timer" | "set_reminder") {
                 assert_eq!(was.description, now.description);
