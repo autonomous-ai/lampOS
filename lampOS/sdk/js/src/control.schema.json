@@ -3803,7 +3803,7 @@
       "additionalProperties": false
     },
     "apps.context": {
-      "description": "An app's live context line, told to the voice beside the person's line for for_ms and never kept (the remember grant). An empty line with no for_ms clears it. Designed, not built: a lamp without it refuses the op. Refused as apps.remember is, and bad_request for a line over 120 characters or for_ms outside 1 to 600000.",
+      "description": "An app's live context line, told to the voice beside the person's line for for_ms and never kept (the remember grant). An empty line with no for_ms clears it; a clear is never rated nor refused while private. Built: told to the voice on the owner's turn, or on any turn in the private room; a lamp built before it refuses the op. Refused as apps.remember is, rate past one set line a second an app (retry_ms), and bad_request for a line over 120 characters, for_ms outside 1 to 600000, or a clear with for_ms.",
       "type": "object",
       "properties": {
         "id": {
