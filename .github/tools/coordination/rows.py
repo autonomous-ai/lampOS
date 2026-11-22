@@ -76,19 +76,33 @@ def named_sha(body, pr):
     return s.group(1) if s else None
 
 
-def failed(body):
-    """A row whose first 300 characters say FAIL or VOID, and whose row line doesn't say PASS.
+def row_line(body, pr=None):
+    """The line of body that makes it a row of pr, as has_row matched it: line 1 when it opens with this PR's ROW
+    line, else the first line where "lamp row for #N" is said unquoted. Line 1 when neither, or without pr."""
+    lines = body.split("\n")
+    if pr and not row_line_re(pr).match(body):
+        rx, offset = lamp_row_re(pr), 0
+        for line in lines:
+            m = rx.search(line)
+            if m and not quoted(body, offset + m.start()):
+                return line
+            offset += len(line) + 1
+    return lines[0]
 
-    22 Nov (#8180, train 1162): the PASS that clears a FAIL is read from the row's own line only (the line naming ROW or
-    "lamp row"), never from the rest of the first 300 characters. "ROW #8180 … build 15510: FAIL" followed by a
-    check's "`VERIFY PASS`" in the next paragraph was counted as a row and cut into a train. A row line that says
-    "PASS, the earlier FAIL was the kit" or "FAILED then PASS on a rerun" still counts."""
+
+def failed(body, pr=None):
+    """A row whose first 300 characters say FAIL or VOID, and whose own row line doesn't say PASS.
+
+    22 Nov (#8180, train 1162): the PASS that clears a FAIL is read from the row's own line only, the line has_row
+    matched (row_line), never from the rest of the first 300 characters. "ROW #8180 … build 15510: FAIL" followed by
+    a check's "`VERIFY PASS`" in the next paragraph was counted as a row and cut into a train. A row line that says
+    "PASS, the earlier FAIL was the kit" or "FAILED then PASS on a rerun" still counts. The Reviewer-lead's P2 on
+    #8293: the line is the one has_row matched, so an earlier line naming a kit like "row-8053r DRY PASS" can't
+    clear a mid-post "lamp row for #N: FAIL"."""
     head = body[:300]
     if not FAILED.search(head):
         return False
-    lines = head.split("\n")
-    line = next((l for l in lines if re.search(r"(?i)\b(?:lamp )?row\b", l)), lines[0])
-    return not PASSED.search(line)
+    return not PASSED.search(row_line(head, pr))
 
 
 def unquoted(rx, body, end=None):
@@ -128,7 +142,7 @@ def has_row(c, pr):
         return None
     if not ((row_line_re(pr).match(body) and not quoted(body, 0)) or unquoted(lamp_row_re(pr), body, 300)):
         return None
-    return None if failed(body) else missing(body)
+    return None if failed(body, pr) else missing(body)
 
 
 def says_no_row(c, heads):
