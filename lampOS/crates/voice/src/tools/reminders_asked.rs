@@ -480,4 +480,19 @@ mod tests {
         }
         assert!(field("when: ").len() <= 200);
     }
+
+    /// Faq's description names how reminders work as its own ask, not only
+    /// their own reminders as not its: on lamp-52e6 in kit-8206c (#8206's
+    /// ROW, 22 Nov) "how do reminders work?" got `calls=none` in 2 of 4,
+    /// round 1 `forced=none`, with faq's description naming reminders only
+    /// in its "not for" clause.
+    #[test]
+    fn faq_says_how_reminders_work_is_its_own() {
+        let faq = include_str!("../../../../skills/faq/SKILL.md");
+        let description = faq
+            .lines()
+            .find_map(|line| line.strip_prefix("description: "))
+            .expect("no description");
+        assert!(description.contains("\"how do reminders work?\""), "{description}");
+    }
 }
