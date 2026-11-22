@@ -187,18 +187,25 @@ pub fn livelier(clip: &'static Clip, level: u8) -> &'static Clip {
 /// before the joint plays level 1's own: 10% (V2, #8307).
 const FLOOR: f32 = 0.10;
 
+/// A clip frame's head roll (`Clip::frames`' second joint), left out of
+/// [`FLOOR`] (V2 on #8307, 23 Nov, after row-8307a): the product unit's
+/// `--reach 150,15,1,250` gives the roll 1 count and `stand_roll` is 0 at
+/// levels 1 and 2, so level 1 plays about 2 counts of it, not the clip's.
+const UNFLOORED_ROLL: usize = 1;
+
 /// A built-in clip at level 2, 3 or 4 (#8153, the lead's call, 22 Nov): as
 /// before #8201, the clip itself at the level's size and pace, but no joint
 /// moving farther (peak to peak) or faster (its largest step) than the level
 /// above moves it over the stretch of the cut that level plays: there that
 /// joint alone is lowered to it, the step kept. A joint so lowered more than
 /// [`FLOOR`] below level 1's swing (the clip itself) plays level 1's own
-/// instead (V2 and the first builder on #8307, 22 Nov 20:2x): level 5 then
-/// moves it less than 2 to 4, the accepted cost. Capped to a floored level
+/// instead (V2 and the first builder on #8307, 22 Nov 20:2x), but the head
+/// roll ([`UNFLOORED_ROLL`]): level 5 then moves it less than 2 to 4, the
+/// accepted cost. Capped to a floored level
 /// above, a joint at 2 or 3 then plays level 1's own as well.
 fn under_five(clip: &'static Clip, level: u8) -> Clip {
     let (mut gain, step_ms) = capped(clip, level, livelier(clip, level + 1));
-    for joint in 0..5 {
+    for joint in (0..5).filter(|joint| *joint != UNFLOORED_ROLL) {
         let (own, _) = how_far_and_fast(clip.frames, clip.step_ms, joint);
         let (swing, _) = how_far_and_fast(&made(clip.frames, gain), step_ms, joint);
         if (swing as f32) < own as f32 * (1.0 - FLOOR) {
@@ -1315,14 +1322,16 @@ mod tests {
     const UNDER_GAIN: [(&str, u8, usize, i32, i32, i32); 1] = [("excited", 5, 0, 196, 133, 248)];
 
     /// Clip, joint, level 1's swing and level 2's where the capped level 2
-    /// sits below level 1, under the floor's 10% (V2's (A) on #8307; pinned,
-    /// so a change is said).
-    const BELOW_ONE: [(&str, usize, i32, i32); 6] = [
+    /// sits below level 1, under the floor's 10% (V2's (A) on #8307) or on
+    /// the head roll the floor leaves out (`UNFLOORED_ROLL`; pinned, so a
+    /// change is said).
+    const BELOW_ONE: [(&str, usize, i32, i32); 7] = [
         ("curious", 2, 142, 133),
         ("happy", 3, 171, 160),
         ("surprised", 0, 190, 186),
         ("confused", 0, 190, 178),
         ("confused", 2, 142, 129),
+        ("scanning", 1, 309, 199),
         ("dance_hype", 3, 155, 143),
     ];
 
@@ -1539,13 +1548,10 @@ mod tests {
         // (clip level joint), where the cap holds (clip level joint), and
         // where level 2 sits below level 1 (clip joint), with their swings.
         eprintln!("pin below_one {below_one:?}");
-        let floored_at_one: [&str; 12] = [
+        let floored_at_one: [&str; 9] = [
             "caring 2 4: L1 338, cap 231",
             "caring 3 4: L1 338, cap 231",
             "caring 4 4: L1 338, cap 231",
-            "scanning 2 1: L1 309, cap 199",
-            "scanning 3 1: L1 309, cap 200",
-            "scanning 4 1: L1 309, cap 209",
             "dance_waltz 2 3: L1 48, cap 42",
             "dance_waltz 2 4: L1 307, cap 257",
             "dance_waltz 3 3: L1 48, cap 43",
@@ -1553,7 +1559,7 @@ mod tests {
             "dance_waltz 4 3: L1 48, cap 43",
             "dance_waltz 4 4: L1 307, cap 257",
         ];
-        let pinned: [&str; 52] = [
+        let pinned: [&str; 55] = [
             "curious 2 2: L1 142, now 133",
             "curious 3 2: L1 142, now 133",
             "curious 4 2: L1 142, now 137",
@@ -1587,6 +1593,9 @@ mod tests {
             "excited 2 3: L1 284, now 295",
             "excited 3 3: L1 284, now 295",
             "excited 4 3: L1 284, now 296",
+            "scanning 2 1: L1 309, now 199",
+            "scanning 3 1: L1 309, now 200",
+            "scanning 4 1: L1 309, now 209",
             "dance_chill 2 2: L1 284, now 284",
             "dance_hype 2 0: L1 198, now 212",
             "dance_hype 2 3: L1 155, now 143",
