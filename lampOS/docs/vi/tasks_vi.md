@@ -2920,6 +2920,8 @@ nay.
   | Đã mở, đã xác nhận, và rảnh | `ready` | — |
   | Đang một lượt (lời đã được nhận; watch của Harness đọc `working`) | `working` | — |
 
+  "Được biết là không có" chỉ là một `installed: false` rõ ràng. Harness để `installed` trống (`null`) nghĩa là chưa biết, không bao giờ là không có (#8283): một máy tính khác có engine `null` kèm `installable: true` vẫn nhận việc, và việc khởi động thất bại của Harness (`ENGINE_NOT_INSTALLED`) mới quyết. Riêng máy của đèn thì ngược lại: chỉ được giữ làm nơi nhận việc khi có `installed: true` mới.
+
   Việc Harness tự đăng xuất không phải `error`: đèn đăng xuất vẫn chạy
   agent của nó (#6407). Mã lỗi (`one_session::fault_code`):
   `engine_not_ready`, `not_running`, `held`, `held_no_gateway`, `launch_failed`,
