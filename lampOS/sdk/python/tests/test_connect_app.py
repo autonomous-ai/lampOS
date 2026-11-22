@@ -333,14 +333,19 @@ def test_remember_is_refused_while_private_and_over_280():
 def test_context_is_renewed_each_rep_and_cleared_at_the_end():
     async def go():
         async with FakeLamp(app=True, app_grants=MEMORY_GRANTS) as fake:
+            now = [100.0]
+            fake.clock = lambda: now[0]
             async with await Lamp.connect_app(path=fake.app_path) as lamp:
                 await lamp.context("set 2 of 3, 6 squats", for_ms=30_000)
+                now[0] += 1
                 await lamp.context("set 2 of 3, 7 squats", for_ms=30_000)
                 assert fake.app_context == {"line": "set 2 of 3, 7 squats", "for_ms": 30_000}
+                now[0] += 1
                 await lamp.context("set 3 of 3, 1 squat")
                 assert fake.app_context == {"line": "set 3 of 3, 1 squat", "for_ms": 60_000}
                 await lamp.clear_context()
                 assert fake.app_context is None
+                now[0] += 1
                 await lamp.context("again")
                 await lamp.context("")
                 assert fake.app_context is None
@@ -348,5 +353,69 @@ def test_context_is_renewed_each_rep_and_cleared_at_the_end():
                 for line, for_ms in (("x" * 121, 1000), ("ok", 0), ("ok", 600_001)):
                     with pytest.raises(BY_CODE["bad_request"]):
                         await lamp.context(line, for_ms=for_ms)
+
+    run(go())
+
+
+def test_context_answers_ok_alone():
+    async def go():
+        async with FakeLamp(app=True, app_grants=MEMORY_GRANTS) as fake:
+            async with await Lamp.connect_app(path=fake.app_path) as lamp:
+                for fields in ({"line": "set 1 of 3", "for_ms": 1000}, {"line": ""}):
+                    reply = await lamp.request("apps.context", **fields)
+                    assert reply == {"re": reply["re"], "ok": True}
+
+    run(go())
+
+
+def test_context_is_one_line_a_second_and_only_set_lines_count():
+    async def go():
+        async with FakeLamp(app=True, app_grants=MEMORY_GRANTS) as fake:
+            now = [100.0]
+            fake.clock = lambda: now[0]
+            async with await Lamp.connect_app(path=fake.app_path) as lamp:
+                # Refused lines (too long, private) are not counted: the first set line goes.
+                with pytest.raises(BY_CODE["bad_request"]):
+                    await lamp.context("x" * 121)
+                await fake.set_private(True)
+                with pytest.raises(BY_CODE["private"]):
+                    await lamp.context("rep 1")
+                await fake.set_private(False)
+                await lamp.context("rep 1")
+                now[0] += 0.4
+                with pytest.raises(BY_CODE["rate"]) as over:
+                    await lamp.context("rep 2")
+                assert (over.value.why, over.value.retry_ms) == ("one line a second", 600)
+                # The rated line did not count: a second after the set one, the next goes.
+                now[0] += 0.6
+                await lamp.context("rep 2")
+                assert fake.app_context["line"] == "rep 2"
+
+    run(go())
+
+
+def test_a_clear_is_never_rated_nor_refused_while_private():
+    async def go():
+        async with FakeLamp(app=True, app_grants=MEMORY_GRANTS) as fake:
+            now = [100.0]
+            fake.clock = lambda: now[0]
+            async with await Lamp.connect_app(path=fake.app_path) as lamp:
+                await lamp.context("rep 1")
+                await lamp.clear_context()
+                await lamp.clear_context()
+                assert fake.app_context is None
+                await fake.set_private(True)
+                await lamp.clear_context()
+                await lamp.context("")
+
+    run(go())
+
+
+def test_a_clear_with_for_ms_is_a_bad_request():
+    async def go():
+        async with FakeLamp(app=True, app_grants=MEMORY_GRANTS) as fake:
+            async with await Lamp.connect_app(path=fake.app_path) as lamp:
+                with pytest.raises(BY_CODE["bad_request"]):
+                    await lamp.request("apps.context", line="", for_ms=1000)
 
     run(go())

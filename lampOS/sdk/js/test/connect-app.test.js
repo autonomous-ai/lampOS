@@ -215,13 +215,18 @@ test('remember is refused while private and over 280', async () => {
 
 test('context is renewed each rep and cleared at the end', async () => {
   await withApp({ appGrants: MEMORY_GRANTS }, async (fake, lamp) => {
+    let now = 100_000;
+    fake.clock = () => now;
     await lamp.context('set 2 of 3, 6 squats', { forMs: 30_000 });
+    now += 1000;
     await lamp.context('set 2 of 3, 7 squats', { forMs: 30_000 });
     assert.deepEqual(fake.appContext, { line: 'set 2 of 3, 7 squats', forMs: 30_000 });
+    now += 1000;
     await lamp.context('set 3 of 3, 1 squat');
     assert.deepEqual(fake.appContext, { line: 'set 3 of 3, 1 squat', forMs: 60_000 });
     await lamp.clearContext();
     assert.equal(fake.appContext, null);
+    now += 1000;
     await lamp.context('again');
     await lamp.context('');
     assert.equal(fake.appContext, null);
@@ -229,5 +234,53 @@ test('context is renewed each rep and cleared at the end', async () => {
     for (const [line, forMs] of [['x'.repeat(121), 1000], ['ok', 0], ['ok', 600_001]]) {
       await assert.rejects(lamp.context(line, { forMs }), byCode.bad_request, JSON.stringify([line, forMs]));
     }
+  });
+});
+
+test('context answers ok alone', async () => {
+  await withApp({ appGrants: MEMORY_GRANTS }, async (fake, lamp) => {
+    for (const fields of [{ line: 'set 1 of 3', for_ms: 1000 }, { line: '' }]) {
+      const reply = await lamp.request('apps.context', fields);
+      assert.deepEqual(reply, { re: reply.re, ok: true });
+    }
+  });
+});
+
+test('context is one line a second and only set lines count', async () => {
+  await withApp({ appGrants: MEMORY_GRANTS }, async (fake, lamp) => {
+    let now = 100_000;
+    fake.clock = () => now;
+    // Refused lines (too long, private) are not counted: the first set line goes.
+    await assert.rejects(lamp.context('x'.repeat(121)), byCode.bad_request);
+    fake.setPrivate(true);
+    await assert.rejects(lamp.context('rep 1'), byCode.private);
+    fake.setPrivate(false);
+    await lamp.context('rep 1');
+    now += 400;
+    await assert.rejects(lamp.context('rep 2'), (error) => error instanceof byCode.rate && error.why === 'one line a second' && error.retryMs === 600);
+    // The rated line did not count: a second after the set one, the next goes.
+    now += 600;
+    await lamp.context('rep 2');
+    assert.equal(fake.appContext.line, 'rep 2');
+  });
+});
+
+test('a clear is never rated nor refused while private', async () => {
+  await withApp({ appGrants: MEMORY_GRANTS }, async (fake, lamp) => {
+    let now = 100_000;
+    fake.clock = () => now;
+    await lamp.context('rep 1');
+    await lamp.clearContext();
+    await lamp.clearContext();
+    assert.equal(fake.appContext, null);
+    fake.setPrivate(true);
+    await lamp.clearContext();
+    await lamp.context('');
+  });
+});
+
+test('a clear with for_ms is a bad request', async () => {
+  await withApp({ appGrants: MEMORY_GRANTS }, async (fake, lamp) => {
+    await assert.rejects(lamp.request('apps.context', { line: '', for_ms: 1000 }), byCode.bad_request);
   });
 });

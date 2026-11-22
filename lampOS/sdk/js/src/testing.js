@@ -474,6 +474,7 @@ export class FakeLamp {
     this.appFacts = [];
     this.appContext = null;
     this.rememberedAt = [];
+    this.contextAt = null;
     this.localPath = null;
     this.localWs = new Set();
     this.tokens = new Map();
@@ -1292,24 +1293,30 @@ export class FakeLamp {
 
   // `apps.remember` and `apps.context`, as lamp-control answers them: nothing while the lamp is private, a fact's words
   // at most 280 characters (the lamp tidies them first; this fake only strips them) and three facts a minute; a
-  // context line at most 120 characters for 1 ms to 10 minutes, an empty line with no time its clear.
+  // context line at most 120 characters for 1 ms to 10 minutes and one a second, an empty line with no time its clear.
   appMemory(ws, request) {
     const { op, id } = request;
     const fields = Object.keys(request).filter((k) => !['id', 'op'].includes(k));
-    if (this.state.lamp.private) return this.refuse(ws, id, 'private', 'Lamp is private');
     if (op === 'apps.context') {
       const { line, for_ms: forMs } = request;
       if (fields.some((k) => !['line', 'for_ms'].includes(k))) return this.refuse(ws, id, 'bad_request', 'line and for_ms only');
+      // A clear (an empty line, no time) is never rated and never refused while private.
       if (line === '' && forMs === undefined) {
         this.appContext = null;
         return this.ok(ws, id);
       }
       if (typeof line !== 'string' || !line || [...line].length > 120 || !Number.isInteger(forMs) || forMs < 1 || forMs > 600_000) {
-        return this.refuse(ws, id, 'bad_request', 'a line of 1 to 120 characters for 1 to 600000 ms');
+        return this.refuse(ws, id, 'bad_request', 'a line of 1 to 120 characters for 1 to 600000 ms; a clear has no for_ms');
       }
+      if (this.state.lamp.private) return this.refuse(ws, id, 'private', 'Lamp is private');
+      // One line a second an app; only a line that was set counts.
+      const at = this.clock();
+      if (this.contextAt !== null && at - this.contextAt < 1000) return this.refuse(ws, id, 'rate', 'one line a second', Math.max(1, Math.round(1000 - (at - this.contextAt))));
+      this.contextAt = at;
       this.appContext = { line, forMs };
       return this.ok(ws, id);
     }
+    if (this.state.lamp.private) return this.refuse(ws, id, 'private', 'Lamp is private');
     if (fields.some((k) => k !== 'text')) return this.refuse(ws, id, 'bad_request', 'text only');
     const text = typeof request.text === 'string' ? request.text.split(/\s+/u).filter(Boolean).join(' ') : '';
     if (!text || [...text].length > 280) return this.refuse(ws, id, 'bad_request', 'text: 1 to 280 characters once tidied');
