@@ -2741,9 +2741,11 @@ fn run_call_with_scope(
             {
                 crate::made_skill::forget_all_notes_soon();
             }
-            // And every app's live context line (`LAMP_APP_MEMORY`, #7415).
+            // And every app's live context line (`LAMP_APP_MEMORY`, #7415),
+            // or the one app's a "forget what <app> said" names.
             if heard {
                 crate::app_context::forget_with_everything(&model.name, &told);
+                crate::app_context::forget_about(&model.name, &model.args, &told);
             }
             ("the memory", (told, answered))
         }

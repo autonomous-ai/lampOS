@@ -1177,12 +1177,17 @@ is `lamp_msgs::app_fact`; the store's side is `crates/memory/src/app_facts.rs`.
   - **Not kept by "remember that".** A `remember` whose words carry a live
     line is refused (`remembered: false`, the journal saying only
     `LAMP_APP_MEMORY`), so the person's keep holds their own words only.
-  - **Any spoken turn.** With `LAMP_PRIVATE_ROOM` on, whoever speaks to the
-    lamp is its owner, so a live line is told on any spoken turn, with no
-    face check (the first builder's 11:14 on #8072). The app writes only
-    through the lamp's known person (`app_fact::whose`, the door's).
+  - **The owner's turn only** (`app_context::notes_for`, the Reviewer-lead's
+    P3 on #8313). A live line is told only when the turn's scope is a known
+    person in view (the gate the neighbouring notes use, never the room's or
+    a gap's) who is one of the owner's memory ids
+    (`app_remember::owners_face_first`). A guest's or the room's turn never
+    hears the owner's app line, even with `LAMP_PRIVATE_ROOM` on.
   - **Forget everything clears them** (`app_context::forget_with_everything`,
-    where `forget_everything` runs in `tools.rs`).
+    where `forget_everything` runs in `tools.rs`), and a heard `forget`
+    whose `about` names an app holding a line ("forget what Gym Coach
+    said", its title or id as whole words) clears that app's line
+    (`app_context::forget_about`), unless it erred or forgot nothing.
   - **Nothing while Lamp is private.** "Private" means the **physical
     privacy switch** closed (or the microphone muted), not the private
     room. Nothing is told or set then, and every line is cleared when it
