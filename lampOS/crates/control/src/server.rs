@@ -264,6 +264,9 @@ pub struct Shared {
     /// How an app's fact reaches the voice (`apps/remember`,
     /// [`crate::app_remember::start`]): none until the bus side is started.
     remember_sink: Mutex<Option<crate::app_remember::Sink>>,
+    /// How an app's live context line reaches the voice (`apps/context`,
+    /// [`crate::app_context::start`]): none until the bus side is started.
+    context_sink: Mutex<Option<crate::app_context::Sink>>,
     /// Memory's forget socket, for a removed app's facts
     /// ([`crate::app_facts_forget::SOCKET`] unless a test says another).
     forget_socket: Mutex<PathBuf>,
@@ -479,6 +482,7 @@ impl Shared {
             apps_on: Mutex::new(crate::app_yes::on),
             remember_on: Mutex::new(crate::app_remember::on),
             remember_sink: Mutex::new(None),
+            context_sink: Mutex::new(None),
             forget_socket: Mutex::new(PathBuf::from(crate::app_facts_forget::SOCKET)),
             facts_forget: Mutex::new(None),
             remember_waiting: Mutex::new(HashMap::new()),
@@ -747,6 +751,7 @@ impl Shared {
                 apps_on: Mutex::new(crate::app_yes::on),
                 remember_on: Mutex::new(crate::app_remember::on),
                 remember_sink: Mutex::new(None),
+                context_sink: Mutex::new(None),
                 forget_socket: Mutex::new(PathBuf::from(crate::app_facts_forget::SOCKET)),
                 facts_forget: Mutex::new(None),
                 remember_waiting: Mutex::new(HashMap::new()),
@@ -1116,6 +1121,94 @@ impl Shared {
     /// How an app's fact is told to the voice (`apps/remember`).
     pub fn set_remember_sink(&self, sink: crate::app_remember::Sink) {
         *self.remember_sink.lock().expect("remember_sink") = Some(sink);
+    }
+
+    /// How an app's context line is told to the voice (`apps/context`).
+    pub fn set_context_sink(&self, sink: crate::app_context::Sink) {
+        *self.context_sink.lock().expect("context_sink") = Some(sink);
+    }
+
+    /// App `app`'s checked context line (or its clear) told to the voice:
+    /// whether it was published. The journal says the app, never a word.
+    fn tell_context(
+        &self,
+        line: &lamp_msgs::app_fact::AppContext,
+        now: std::time::Instant,
+    ) -> bool {
+        let Some(sink) = self.context_sink.lock().expect("context_sink").clone() else {
+            eprintln!(
+                "lamp-control: app {}: a context line not told: no voice to tell",
+                line.app
+            );
+            return false;
+        };
+        let sent = sink(line);
+        if sent {
+            self.apps
+                .lock()
+                .expect("apps")
+                .1
+                .context_told(&line.app, (!line.clears()).then_some(now));
+        }
+        sent
+    }
+
+    /// App `name`'s session ended (its last connection closed, or it was
+    /// removed): a context line the voice may hold is cleared there.
+    fn end_context(&self, name: &str) {
+        let ends = self.apps.lock().expect("apps").1.context_ends(name);
+        if ends
+            && !self.tell_context(
+                &lamp_msgs::app_fact::AppContext::clear(name),
+                std::time::Instant::now(),
+            )
+        {
+            // The voice drops it at its own `for_ms` (10 minutes at most).
+            eprintln!("lamp-control: app {name}: its context line's clear was not told");
+        }
+    }
+
+    /// App `app`'s `apps.context` `frame` judged and, when checked, told:
+    /// the answer to send.
+    fn app_context(
+        &self,
+        app: &crate::app_socket::AppPeer,
+        frame: &serde_json::Map<String, Value>,
+    ) -> Value {
+        let gates = self.remember_gates(app);
+        let now = std::time::Instant::now();
+        let asked = crate::app_context::ask(
+            &self.apps.lock().expect("apps").1,
+            &app.name,
+            frame,
+            gates,
+            now,
+        );
+        let (re, line) = match asked {
+            None => {
+                return crate::protocol::refused(
+                    None,
+                    &crate::protocol::Error::new(
+                        crate::protocol::ErrorCode::BadRequest,
+                        "an op has an id and a name",
+                    ),
+                );
+            }
+            Some(crate::app_context::Ask::Refused(reply)) => return reply,
+            Some(crate::app_context::Ask::Clear { re }) => {
+                (re, lamp_msgs::app_fact::AppContext::clear(&app.name))
+            }
+            Some(crate::app_context::Ask::Tell { re, line, for_ms }) => (
+                re,
+                lamp_msgs::app_fact::AppContext {
+                    app: app.name.clone(),
+                    name: lamp_msgs::app_fact::name(&app.title),
+                    line,
+                    for_ms,
+                },
+            ),
+        };
+        crate::app_context::answer_of(re, self.tell_context(&line, now))
     }
 
     /// Whether `apps.remember` is on, for a test that can't set
@@ -1812,8 +1905,10 @@ pub async fn serve_app_as(
             if let Ok(Ok(socket)) = opened {
                 shared.apps.lock().expect("apps").1.connection(&name, true);
                 connection(socket, shared.clone(), false, None, false, Some(peer)).await;
-                let mut apps = shared.apps.lock().expect("apps");
-                apps.1.connection(&name, false);
+                shared.apps.lock().expect("apps").1.connection(&name, false);
+                // The app's session ended with its last connection: its live
+                // context line goes at the voice (`apps.context`).
+                shared.end_context(&name);
             }
             if let Some(count) = held.lock().expect("held").get_mut(&name) {
                 *count = count.saturating_sub(1);
@@ -1991,6 +2086,29 @@ async fn connection<S>(
                         if let Some(reply) = reply
                             && socket.send(Message::text(reply.to_string())).await.is_err()
                         {
+                            break;
+                        }
+                        quiet_until = tokio::time::Instant::now() + quiet;
+                        continue;
+                    }
+                    // An app's live context line (`apps.context`): judged
+                    // here, told to the voice on the bus, answered once told.
+                    if let Some(app) = session.app_peer().cloned()
+                        && let Ok(Value::Object(frame)) = serde_json::from_str::<Value>(text.as_str())
+                        && crate::app_context::is_ours(&frame)
+                    {
+                        let reply = if session.client().is_none() {
+                            crate::protocol::refused(
+                                frame.get("id").and_then(Value::as_u64),
+                                &crate::protocol::Error::new(
+                                    crate::protocol::ErrorCode::NoHello,
+                                    "say hello first",
+                                ),
+                            )
+                        } else {
+                            shared.app_context(&app, &frame)
+                        };
+                        if socket.send(Message::text(reply.to_string())).await.is_err() {
                             break;
                         }
                         quiet_until = tokio::time::Instant::now() + quiet;
@@ -2415,6 +2533,9 @@ fn forget_app_op(
     }
     let client = crate::app_socket::app_client(name);
     shared.apps.lock().expect("apps").1.forget_app(name);
+    // Its live context line goes at the voice now, before its connections
+    // are closed below.
+    shared.end_context(name);
     shared.door.lock().expect("door").forget_data(&client);
     shared.close_client(&client, CLOSED_REMOVED);
     // Its facts in Lamp's memory go too: marked first, then asked of
@@ -3563,6 +3684,169 @@ mod tests {
         assert!(!shared.remember_gates(&coach).granted);
         shared.set_remember_on(|| false);
         assert!(!shared.remember_gates(&coach).on);
+    }
+
+    fn gym_coach() -> crate::app_socket::AppPeer {
+        crate::app_socket::AppPeer {
+            name: "gym-coach".into(),
+            title: "Gym Coach".into(),
+            version: "1.0.4".into(),
+            client: crate::app_socket::app_client("gym-coach"),
+            grants: Default::default(),
+            remember: true,
+        }
+    }
+
+    /// `apps.context` at the door: refused by `apps.remember`'s gates, a
+    /// checked line told the voice as `AppContext` and answered
+    /// `{"ok":true}`; an empty line clears it; with no voice to tell,
+    /// `unavailable`. The app's last connection closing tells the clear,
+    /// once, and so does its remove.
+    #[test]
+    fn an_apps_context_line_is_told_and_cleared_with_its_session() {
+        use lamp_msgs::app_fact::AppContext;
+        let state = std::env::temp_dir().join(format!("lc-context-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&state);
+        std::fs::create_dir_all(&state).unwrap();
+        let (shared, _lines, _inbox, _newest) = stalled_keeping(Some(&state));
+        *shared.apps_on.lock().unwrap() = || true;
+        shared.set_remember_on(|| true);
+        let private = Arc::new(std::sync::atomic::AtomicBool::new(false));
+        let reads = private.clone();
+        shared.set_private(Arc::new(move || reads.load(Ordering::SeqCst)));
+        let coach = gym_coach();
+        let frame = |value: Value| value.as_object().cloned().unwrap();
+        let set = |id: u64, line: &str| {
+            frame(json!({"id": id, "op": "apps.context", "line": line, "for_ms": 60_000}))
+        };
+        // No voice to tell yet.
+        let untold = shared.app_context(&coach, &set(1, "set 1 of 3"));
+        assert_eq!(untold["error"]["code"], "unavailable", "{untold}");
+        let told = Arc::new(Mutex::new(Vec::<AppContext>::new()));
+        let into = told.clone();
+        shared.set_context_sink(Arc::new(move |line: &AppContext| {
+            into.lock().unwrap().push(line.clone());
+            true
+        }));
+        let taken = || std::mem::take(&mut *told.lock().unwrap());
+        // Private, or without the grant: refused, nothing told.
+        private.store(true, Ordering::SeqCst);
+        assert_eq!(
+            shared.app_context(&coach, &set(2, "set 1 of 3"))["error"]["code"],
+            "private"
+        );
+        private.store(false, Ordering::SeqCst);
+        let ungranted = crate::app_socket::AppPeer {
+            remember: false,
+            ..gym_coach()
+        };
+        assert_eq!(
+            shared.app_context(&ungranted, &set(3, "set 1 of 3"))["error"]["code"],
+            "no_grant"
+        );
+        assert!(taken().is_empty());
+        // Told: the checked name, the manifest's title, the tidied line.
+        let ok = shared.app_context(&coach, &set(4, "set 2 of 3, \"7\" squats"));
+        assert_eq!(ok, json!({"re": 4, "ok": true}));
+        let line = AppContext {
+            app: "gym-coach".into(),
+            name: "Gym Coach".into(),
+            line: "set 2 of 3, 7 squats".into(),
+            for_ms: 60_000,
+        };
+        assert_eq!(taken(), std::slice::from_ref(&line));
+        assert!(line.check().is_ok());
+        // Within the second: rate, nothing told.
+        let over = shared.app_context(&coach, &set(5, "set 2 of 3, 8 squats"));
+        assert_eq!(over["error"]["code"], "rate");
+        assert!(over["error"]["retry_ms"].as_u64().unwrap() <= 1_000);
+        // An empty line clears it, rate or not.
+        let cleared = shared.app_context(
+            &coach,
+            &frame(json!({"id": 6, "op": "apps.context", "line": ""})),
+        );
+        assert_eq!(cleared, json!({"re": 6, "ok": true}));
+        assert_eq!(taken(), [AppContext::clear("gym-coach")]);
+        // Cleared by the app: its disconnect tells nothing more.
+        shared.apps.lock().unwrap().1.connection("gym-coach", true);
+        shared.apps.lock().unwrap().1.connection("gym-coach", false);
+        shared.end_context("gym-coach");
+        assert!(taken().is_empty());
+        // A line told, then two connections: only the last one's close
+        // clears it, once.
+        shared.apps.lock().unwrap().1.connection("gym-coach", true);
+        shared.apps.lock().unwrap().1.connection("gym-coach", true);
+        shared
+            .apps
+            .lock()
+            .unwrap()
+            .1
+            .context_told("gym-coach", Some(std::time::Instant::now()));
+        shared.apps.lock().unwrap().1.connection("gym-coach", false);
+        shared.end_context("gym-coach");
+        assert!(taken().is_empty(), "one connection still up");
+        shared.apps.lock().unwrap().1.connection("gym-coach", false);
+        shared.end_context("gym-coach");
+        assert_eq!(taken(), [AppContext::clear("gym-coach")]);
+        shared.end_context("gym-coach");
+        assert!(taken().is_empty(), "once");
+        // A remove clears a line the voice may hold, before its connections
+        // close.
+        shared.apps.lock().unwrap().1.connection("gym-coach", true);
+        shared
+            .apps
+            .lock()
+            .unwrap()
+            .1
+            .context_told("gym-coach", Some(std::time::Instant::now()));
+        let done = forget_app_op(
+            &shared,
+            "gym-coach",
+            crate::app_yes::Peer::Helper,
+            true,
+            Some(&state),
+        );
+        assert_eq!(done, json!({"ok": true}));
+        assert_eq!(taken(), [AppContext::clear("gym-coach")]);
+        shared.apps.lock().unwrap().1.connection("gym-coach", false);
+        shared.end_context("gym-coach");
+        assert!(taken().is_empty());
+        let _ = std::fs::remove_dir_all(&state);
+    }
+
+    /// On a real bus: a line is said on `apps/context` in one hop.
+    #[test]
+    fn the_bus_side_tells_a_context_line() {
+        use lamp_msgs::app_fact::AppContext;
+        let base = std::env::temp_dir().join(format!("lcb-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&base);
+        let bus = lamp_bus::Bus::new(base.join("bus")).unwrap();
+        let (shared, _lines, _inbox, _newest) = stalled_keeping(None);
+        *shared.apps_on.lock().unwrap() = || true;
+        shared.set_remember_on(|| true);
+        shared.set_private(Arc::new(|| false));
+        let mut lines = bus.subscribe(AppContext::TOPIC, "test").unwrap();
+        crate::app_context::start(&bus, shared.clone());
+        let sent = std::time::Instant::now();
+        let ok = shared.app_context(
+            &gym_coach(),
+            json!({"id": 1, "op": "apps.context", "line": "set 2 of 3", "for_ms": 30_000})
+                .as_object()
+                .unwrap(),
+        );
+        assert_eq!(ok, json!({"re": 1, "ok": true}));
+        let line: AppContext = lines
+            .recv(Duration::from_secs(5))
+            .unwrap()
+            .expect("apps/context said")
+            .parse()
+            .unwrap();
+        eprintln!("apps.context to apps/context heard: {:?}", sent.elapsed());
+        assert_eq!(
+            (line.app.as_str(), line.line.as_str(), line.for_ms),
+            ("gym-coach", "set 2 of 3", 30_000)
+        );
+        let _ = std::fs::remove_dir_all(&base);
     }
 
     /// A removed app's facts are forgotten: `app_forget` marks the app

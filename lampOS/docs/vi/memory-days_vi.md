@@ -916,7 +916,11 @@ phần của kho nằm ở `crates/memory/src/app_facts.rs`.
   `not_known`, và gửi `remember_app_fact` với nguồn `app:<name>`. Khi gỡ một
   app, lamp-control gửi `forget_app_facts` cho nguồn của nó trên forget socket
   (`--forget-socket`, nhận nó cạnh `forget_person`), giữ một dấu chờ và thử lại
-  mỗi 30 giây cho đến khi trí nhớ trả lời `ok`. `apps.context` chưa được xây. Trí nhớ
+  mỗi 30 giây cho đến khi trí nhớ trả lời `ok`. `apps.context` ở cửa đã được
+  xây ([apps.md](../apps.md)): kiểm cùng quyền và công tắc, lời (`tidy`, tối đa
+  120), `for_ms` (1 ms đến 10 phút), công tắc riêng tư và một dòng mỗi giây, rồi
+  báo giọng nói trên `apps/context`; kết nối cuối của app đóng thì báo lệnh xoá
+  dòng. Trí nhớ
   cũ trả lời `unknown_op`, báo cho app là `unavailable`.
 - **Phía giọng nói (`LAMP_APP_MEMORY`, mặc định tắt; phần của App Only theo
   cách chia 16:45, `crates/voice/src/app_context.rs`).** Dựa trên ghi chú
@@ -947,9 +951,13 @@ phần của kho nằm ở `crates/memory/src/app_facts.rs`.
     là điều được giữ với lời `Noted by the app <tên>, <ngày>: "<text>"`, nên
     được kể trong dấu nháy kèm nguồn ở mọi nơi phần nhớ lại được kể. Giọng
     nói không thêm gì cho chúng.
-  - **Chưa làm (việc tiếp theo):** thao tác `apps.context` ở cửa và bên ghi
-    gọi `app_context::set` qua tiến trình; một bài test lượt nói kiểm ghi
-    chú trong yêu cầu chat; ROW trên 06c1.
+  - **Bên ghi** (`app_context::start_telling`, một lần mỗi tiến trình khi
+    công tắc bật): đọc `apps/context` của lamp-control và gọi `set` hoặc
+    `clear` với lần đọc riêng tư gần nhất của engine (`set_private`, chưa đọc
+    thì coi là riêng tư). Một bài test lượt nói kiểm ghi chú trong yêu cầu
+    chat (`second_provider/tests/app_context_note.rs`).
+  - **Chưa làm (việc tiếp theo):** ROW trên 06c1, khi bật công tắc sau khi
+    first builder đọc phần riêng tư.
 
 Các giới hạn là của luồng thảo luận, không cái nào do kho này tự đặt:
 
@@ -961,6 +969,7 @@ Các giới hạn là của luồng thảo luận, không cái nào do kho này 
 | Thời gian giữ | 90 ngày địa phương, ngày giữ là ngày đầu | App Only 16:4x, first builder 16:45 điểm 3 |
 | Một dòng ngữ cảnh | tối đa 120 ký tự, một dòng mỗi nguồn | App Only 16:4x, first builder 16:45 điểm 3 |
 | Thời gian một dòng ngữ cảnh | `for_ms` từ 1 ms đến 10 phút, app gia hạn | App Only 16:4x, first builder 16:45 điểm 3 |
+| Tần suất một dòng ngữ cảnh | một dòng mỗi giây mỗi app ở cửa, lệnh xoá không tính | PR này, chờ chủ xem |
 | Tên nguồn | tối đa 64 byte trong lời đã giữ | PR này, chờ chủ xem |
 | Thời điểm muộn hơn | tối đa 5 s sau đồng hồ trí nhớ (như `linked_record`) | PR này, chờ chủ xem |
 

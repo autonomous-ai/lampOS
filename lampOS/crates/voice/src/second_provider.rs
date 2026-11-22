@@ -5590,7 +5590,9 @@ impl Engine {
         self.shared
             .private_now
             .store(!(now.0 && now.2), Ordering::SeqCst);
-        // Lamp private: no app's live line outlasts it (`LAMP_APP_MEMORY`).
+        // Lamp private: no app's live line outlasts it (`LAMP_APP_MEMORY`),
+        // and the bus writer sets none while it is.
+        crate::app_context::set_private(!(now.0 && now.2));
         if !(now.0 && now.2) {
             crate::app_context::clear_all();
         }

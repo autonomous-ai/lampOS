@@ -314,6 +314,13 @@ pub struct Live {
     /// [`crate::app_remember::MOST_A_MINUTE`] in a minute: kept across its
     /// runs, as the panel's minute is. Only a remove forgets it.
     remembered: BTreeMap<String, std::collections::VecDeque<Instant>>,
+    /// When each app last told a context line (`apps.context`), one a
+    /// [`crate::app_context::EVERY`]: kept across its runs. Only a remove
+    /// forgets it.
+    context_last: BTreeMap<String, Instant>,
+    /// The apps whose context line the voice may hold now: told one and not
+    /// cleared it. Its last connection closing clears it at the voice.
+    context_told: std::collections::BTreeSet<String>,
 }
 
 impl Live {
@@ -379,6 +386,40 @@ impl Live {
         }
         sent.push_back(now);
         Ok(())
+    }
+
+    /// Whether app `name` may tell a context line at `now`, or how long
+    /// until it may ([`crate::app_context::EVERY`] after its last one told).
+    pub fn may_tell_context(&self, name: &str, now: Instant) -> Result<(), Duration> {
+        let every = crate::app_context::EVERY;
+        match self.context_last.get(name) {
+            Some(last) if now.saturating_duration_since(*last) < every => {
+                Err(every - now.saturating_duration_since(*last))
+            }
+            _ => Ok(()),
+        }
+    }
+
+    /// The voice was told `name`'s context line at `Some(now)`, counted
+    /// toward its rate, or its clear (`None`). Only a line told counts: one
+    /// refused or never published costs nothing.
+    pub fn context_told(&mut self, name: &str, at: Option<Instant>) {
+        match at {
+            Some(now) => {
+                self.context_last.insert(name.to_owned(), now);
+                self.context_told.insert(name.to_owned());
+            }
+            None => {
+                self.context_told.remove(name);
+            }
+        }
+    }
+
+    /// Whether `name`'s session has ended with a context line the voice may
+    /// still hold: no connection of it is up and it told one not cleared.
+    /// True once; the caller tells the voice the clear.
+    pub fn context_ends(&mut self, name: &str) -> bool {
+        !self.socket(name) && self.context_told.remove(name)
     }
 
     /// A connection of `name` opened (`+1`) or closed (`-1`).
@@ -491,6 +532,9 @@ impl Live {
         self.panel_last.remove(name);
         self.revs.remove(name);
         self.remembered.remove(name);
+        // `context_told` stays for the remove's own `context_ends`, which
+        // tells the voice the clear.
+        self.context_last.remove(name);
     }
 
     /// An app's panel is gone with its run (it stopped).
