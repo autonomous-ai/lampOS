@@ -1306,17 +1306,16 @@ fn told_bounded(lines: Vec<String>) -> Vec<String> {
 /// P2 on #7351).
 pub const NOT_READY_SAID: [&str; 2] = ["openclaw_gateway_not_ready", "harness_not_running"];
 
-/// The words the person hears, once, when a run they asked for by voice is
-/// refused as the lamp is still getting ready ([`NOT_READY_SAID`]) in
-/// lamp-tasks' `answer`; none for any other answer or a run not asked by
-/// voice (a trigger's run says nothing unprompted), or one refused past
-/// [`lamp_voice::skill_words::NOT_READY_WITHIN_MS`] after the lamp started
-/// (`since_boot_ms`): its Gateway or Harness is broken, not starting, and
-/// the run's failure is told as before (El's P2 on #7351).
 /// What the person who just asked for a run by voice hears, once, when its
 /// agent's start-up wait passes about 5 s (#7354, the first builder's
 /// words): never the agent's name, and nothing says ready.
 pub const GETTING_READY_LINE: &str = "One moment, I'm getting ready.";
+
+/// How long [`GETTING_READY_LINE`] may wait to begin (the first builder's
+/// yes on #8237, 12:32): a backstop only. It is asked about 5 s into the
+/// start, so it is dropped if it can't begin by about 25 s; the run's
+/// answer read first takes it back sooner.
+pub const GETTING_READY_EXPIRES_MS: u64 = 20_000;
 
 /// The hand-over `line` asking lamp-tasks for its getting-ready notice
 /// (`tell_getting_ready`, #7354): only for a run the person just asked for
@@ -1332,6 +1331,34 @@ pub fn asking_getting_ready(line: &str, asked_by_voice: bool) -> String {
     }
 }
 
+/// The words an earlier lamp-tasks refuses a hand-over line with when it
+/// can't parse it (`HandOver::parse_with`, `deny_unknown_fields`): what a
+/// lamp-tasks from before #7354 answers a line that asks for its
+/// getting-ready notice.
+pub const NOT_A_TASK_LINE: &str = "not a skill's task line";
+
+/// The hand-over `line` again without its getting-ready ask, when `answer`
+/// is the refusal an earlier lamp-tasks gives a line it can't parse
+/// ([`NOT_A_TASK_LINE`], Twelve's HOLD on #8237): an update round restarts
+/// lamp-skills and lamp-tasks in no fixed order, and a lamp-tasks put back
+/// alone is earlier too. That refusal comes before anything is minted or
+/// run, so the line sent again once can never run the task twice. `None`
+/// for any other answer, or a line that never asked.
+pub fn without_getting_ready_if_refused(line: &str, answer: &str) -> Option<String> {
+    let refused = serde_json::from_str::<serde_json::Value>(answer.trim()).is_ok_and(|said| {
+        said["ok"] == false && said["error"] == "bad_request" && said["message"] == NOT_A_TASK_LINE
+    });
+    if !refused {
+        return None;
+    }
+    let Ok(serde_json::Value::Object(mut fields)) = serde_json::from_str(line) else {
+        return None;
+    };
+    fields
+        .remove("tell_getting_ready")
+        .map(|_| serde_json::Value::Object(fields).to_string())
+}
+
 /// Whether one line from lamp-tasks is its getting-ready notice
 /// (`{"event":"getting_ready"}`), not the run's answer.
 pub fn is_getting_ready(line: &str) -> bool {
@@ -1340,6 +1367,13 @@ pub fn is_getting_ready(line: &str) -> bool {
     })
 }
 
+/// The words the person hears, once, when a run they asked for by voice is
+/// refused as the lamp is still getting ready ([`NOT_READY_SAID`]) in
+/// lamp-tasks' `answer`; none for any other answer or a run not asked by
+/// voice (a trigger's run says nothing unprompted), or one refused past
+/// [`lamp_voice::skill_words::NOT_READY_WITHIN_MS`] after the lamp started
+/// (`since_boot_ms`): its Gateway or Harness is broken, not starting, and
+/// the run's failure is told as before (El's P2 on #7351).
 pub fn not_ready_line(
     answer: &str,
     asked_by_voice: bool,
@@ -1375,6 +1409,51 @@ mod tests {
         ));
         assert!(!is_getting_ready("{\"ok\":false,\"error\":\"not_ready\"}"));
         assert!(!GETTING_READY_LINE.to_lowercase().contains("openclaw"));
+    }
+
+    /// Twelve's HOLD on #8237: an earlier lamp-tasks refuses a line it
+    /// can't parse with [`NOT_A_TASK_LINE`] before anything runs, so only
+    /// that refusal of a line that asked for the notice is sent again, once,
+    /// without the ask; any other answer, or a line that never asked, is
+    /// left as it is.
+    #[test]
+    fn only_an_earlier_lamp_tasks_refusal_of_the_ask_is_sent_again_without_it() {
+        let asked = asking_getting_ready(
+            &json!({"op": "skill_task", "skill": "melon"}).to_string(),
+            true,
+        );
+        let refused =
+            json!({"ok": false, "error": "bad_request", "message": NOT_A_TASK_LINE}).to_string();
+        let again: serde_json::Value =
+            serde_json::from_str(&without_getting_ready_if_refused(&asked, &refused).unwrap())
+                .unwrap();
+        assert_eq!(again, json!({"op": "skill_task", "skill": "melon"}));
+        let plain = json!({"op": "skill_task", "skill": "melon"}).to_string();
+        assert_eq!(without_getting_ready_if_refused(&plain, &refused), None);
+        for answer in [
+            json!({"ok": true, "answer": "done"}).to_string(),
+            json!({"ok": false, "error": "bad_request", "message": "the task's words are empty or too long"}).to_string(),
+            json!({"ok": false, "error": "busy", "message": NOT_A_TASK_LINE}).to_string(),
+            "not json".to_owned(),
+        ] {
+            assert_eq!(without_getting_ready_if_refused(&asked, &answer), None, "{answer}");
+        }
+    }
+
+    /// The words [`NOT_A_TASK_LINE`] are lamp-tasks' own for a line it
+    /// can't parse, as an earlier one does with this field: a field it
+    /// doesn't know is refused with them.
+    #[test]
+    fn the_refusal_looked_for_is_lamp_tasks_own_for_a_field_it_does_not_know() {
+        let line =
+            json!({"op": "skill_task", "skill": "melon", "task": "a poem", "not_known": true})
+                .to_string();
+        let Err(refused) =
+            lamp_tasks::skill_task::HandOver::parse(line.as_bytes(), std::path::Path::new("/"))
+        else {
+            panic!("a field it doesn't know is refused");
+        };
+        assert_eq!(refused, ("bad_request", NOT_A_TASK_LINE.to_owned()));
     }
 
     use super::*;
