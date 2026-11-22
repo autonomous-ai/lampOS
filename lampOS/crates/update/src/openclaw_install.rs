@@ -371,6 +371,38 @@ if [ \"$M\" = on ]; then
 fi
 ";
 
+/// (#8289) [`NS`]'s gateway mode, after [`NPM_CI_MODE`] and before
+/// [`RUN_LINE`]: for the unit's `gateway run` only, OpenClaw is started as
+/// a child, and this shell stays the PID namespace's PID 1. The kernel
+/// drops a signal from outside a PID namespace to its PID 1 when PID 1 has
+/// no handler for it; with the gateway exec'd as PID 1, Node had none for
+/// SIGTERM until the gateway had loaded (tens of seconds on a lamp), so
+/// systemd's one SIGTERM of a stop soon after a start was lost and the
+/// stop waited its whole `TimeoutStopUSec` (90 s) and ended `failed`
+/// (lamp-52e6, 22 Nov, twice). The shell traps SIGTERM before OpenClaw
+/// starts and passes it on (a child that has no handler yet just ends),
+/// waits for OpenClaw and exits with its status, 0 when it ended on the
+/// SIGTERM passed on (143), as systemd takes a SIGTERM for a clean stop.
+/// The unit's `MainPID` is still the `unshare` outside, so a pane's way in
+/// (`pid_for_children`) is the same namespace. Every other call runs
+/// OpenClaw by [`RUN_LINE`], as before.
+pub const GATEWAY_RUN: &str = "# (#8289) The gateway runs as this shell's child, not as the PID namespace's PID 1, which drops a signal from
+# outside that it has no handler for (Node has none for SIGTERM until the gateway has loaded): this shell passes a
+# stop's SIGTERM on and exits as the gateway does, 0 when it ended on that SIGTERM.
+if [ \"${1-}\" = gateway ] && [ \"${2-}\" = run ]; then
+  t=
+  trap 't=TERM' TERM
+  /usr/bin/unshare --user --map-user=\"$U\" --map-group=\"$G\" /var/lib/lampos-openclaw/npm/node_modules/.bin/openclaw \"$@\" &
+  c=$!
+  trap 't=TERM; kill -TERM \"$c\" 2>/dev/null' TERM
+  [ -z \"$t\" ] || kill -TERM \"$c\" 2>/dev/null
+  while wait \"$c\"; s=$?; [ \"$s\" -gt 128 ] && kill -0 \"$c\" 2>/dev/null; do :; done
+  if [ \"$s\" -gt 128 ]; then wait \"$c\"; r=$?; [ \"$r\" = 127 ] || s=$r; fi
+  if [ \"$s\" = 143 ] && [ -n \"$t\" ]; then s=0; fi
+  exit \"$s\"
+fi
+";
+
 /// What [`ns_text`] changes with [`Shown::one_path`] and [`Shown::tasks`]
 /// on (the gateway mark's, [`wrapper_text_for`]), after [`ENGINE_EDITS`],
 /// each found exactly once (a test holds it): the pushed skills' folder
@@ -463,7 +495,8 @@ fi
 
 /// [`NS`]'s text: Hermes's ([`hermes_install::ns_text`]`(skills, false)`,
 /// the same allow-list, the same steps) for OpenClaw ([`ENGINE_EDITS`]),
-/// with its install mode ([`NPM_CI_MODE`]) before OpenClaw runs. With
+/// with its install mode ([`NPM_CI_MODE`]) and its gateway mode
+/// ([`GATEWAY_RUN`], #8289) before OpenClaw runs. With
 /// `shown.skills`, lamp-skills' socket folder is shown read-only too; with
 /// `shown.tasks`, lamp-control's socket alone, read-only (a round asks for
 /// it with the one run path on only: a skill's run on the gateway reaches
@@ -487,7 +520,11 @@ pub fn ns_text(shown: Shown) -> String {
         let bind = "if [ -S \"$L\" ]; then";
         text = text.replacen(bind, &format!("{WAIT_FOR_CONTROL}{bind}"), 1);
     }
-    text.replacen(RUN_LINE, &format!("{NPM_CI_MODE}{RUN_LINE}"), 1)
+    text.replacen(
+        RUN_LINE,
+        &format!("{NPM_CI_MODE}{GATEWAY_RUN}{RUN_LINE}"),
+        1,
+    )
 }
 
 /// [`WRAPPER`]'s text: [`WRAPPER_TEXT`] with the shared namespace piece's

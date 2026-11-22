@@ -2490,6 +2490,19 @@ As root, on a lamp with the base image (`crates/update/src/install.rs`):
        --kill-child --mount-proc --propagation private
        /usr/local/lib/lampos/openclaw-ns`: a user, mount and PID namespace
        of its own with its own `/proc`, as Hermes's.
+     - (#8289) For the unit's `gateway run`, `openclaw-ns` starts OpenClaw
+       as its child and stays the namespace's PID 1, never execs it: the
+       kernel drops a signal from outside a PID namespace to its PID 1 when
+       PID 1 has no handler for it, and Node has none for SIGTERM until the
+       gateway has loaded (tens of seconds on a lamp), so with the gateway
+       as PID 1 a `systemctl stop` soon after a start lost its one SIGTERM,
+       waited the whole `TimeoutStopUSec` (90 s) and left the unit `failed`
+       (`Result=timeout`; lamp-52e6, 22 Nov). The shell traps SIGTERM before
+       OpenClaw starts, passes it on, waits for OpenClaw and exits with its
+       status, 0 when it ended on that SIGTERM (143), so a stop ends
+       `inactive` in seconds. The unit's `MainPID` is still the `unshare`
+       outside, so a pane's way in below joins the same namespace. Every
+       other call (`--version`, the install's steps) still execs OpenClaw.
      - Any other call (a Harness pane) takes the gateway's main process
        from systemd (`systemctl show -p MainPID`, never a file OpenClaw
        could write), checks it is `lampos`'s, in another user namespace and
@@ -2515,7 +2528,8 @@ As root, on a lamp with the base image (`crates/update/src/install.rs`):
      `lampos` as every lamp service does, can signal none of them. Checked
      on lamp-c0a4 (11 Nov, 18:2x) from inside a pane's namespaces: `/proc`
      listed 7 processes (the Gateway as pid 1, its workers and the check
-     itself), and `kill -0` on lamp-tasks, lamp-voice, lamp-cloud and
+     itself; since #8289 pid 1 is `openclaw-ns`'s shell and the Gateway its
+     child), and `kill -0` on lamp-tasks, lamp-voice, lamp-cloud and
      Harness's daemon each said `No such process`. The install's own
      steps (`npm ci`, `openclaw --version`) run with the gateway's flags,
      in a PID namespace of their own. `openclaw-ns` itself reads only
