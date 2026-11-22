@@ -60,7 +60,7 @@ JP=; FP=; trap '[ -n "$JP" ] && kill $JP 2>/dev/null; [ -n "$FP" ] && kill $FP 2
 POLL=${POLL:-1}; LIMIT_B=${LIMIT_B:-6}; LIMIT_D=${LIMIT_D:-45}; MAKEWAIT=${MAKEWAIT:-660}
 # Each ask's wait for its run or answer: at least 180 s, since the first make or task after a round may wait on a cold
 # kept OpenClaw session (e82d, 22 Nov 14:38: "kept session new ... in 84883 ms"). A make has MAKEWAIT (660 s).
-RUNWAIT=$RUNWAIT; TASKWAIT=$TASKWAIT; IDLEWAIT=${IDLEWAIT:-600}; IDLEPOLL=${IDLEPOLL:-15}
+RUNWAIT=${RUNWAIT:-180}; TASKWAIT=${TASKWAIT:-240}; IDLEWAIT=${IDLEWAIT:-600}; IDLEPOLL=${IDLEPOLL:-15}
 lines(){ wc -l < $J | tr -d ' '; }
 # first line number after line $2 matching ERE $1, waiting at most $3 s (lock renewed every 120 s)
 waitfor(){ local s=$(date +%s) r=$(date +%s) n lim=$3

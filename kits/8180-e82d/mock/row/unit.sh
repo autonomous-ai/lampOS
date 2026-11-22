@@ -57,6 +57,13 @@ S
         v "an ended gmail-app that can be renewed is linked" '[ "$o" = "LINKED google gmail-app (files: gmail-app)" ]';;
     esac;;
   # the row's probe fixtures (C, H, P) load by the product's skill.toml rules (fixcheck.py cites them)
+  vars-default)
+    # Under set -u a bare self-assignment (NAME=$NAME) stops the kit when the runner left NAME unset (e82d, 22 Nov 15:49).
+    o=$(python3 -I -c 'import re,sys
+for f in sys.argv[1:]:
+  for n,l in enumerate(open(f),1):
+    if re.search(r"(^|[; ])([A-Z][A-Z0-9_]*)=\$\2(;|$)",l.rstrip("\n")): print("%s:%d:%s"%(f,n,l.strip()))' $KIT/row/*.sh $KIT/run.sh)
+    v "every kit variable has a default (no bare NAME=\$NAME)" '[ -z "$o" ]';;
   fixtures) o=$(python3 -I $KIT/mock/row/fixcheck.py $KIT/row/probe); rc=$?
     v "grant-probe, slow-probe and fork-probe load: a tool and a [[do]] each" '[ $rc = 0 ] && [ "$(echo "$o" | grep -c " OK$")" = 3 ]';;
   # every fresh-turn clip opens with the lamp's name said as a call: each clip row.sh ASKs or MAKEs, and every clip in
