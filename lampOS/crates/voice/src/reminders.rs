@@ -141,8 +141,11 @@ fn asked_before(request: u64) -> Option<String> {
     if let Some(asked) = ASKED_HERE.with(|here| here.borrow().clone()) {
         return asked;
     }
-    let _ = request;
-    None
+    crate::thread::THREAD.lock().ok()?.asked_before(
+        request,
+        std::time::Instant::now(),
+        crate::said_to_me::QUESTION_WAITS,
+    )
 }
 
 /// Whether [`lamp_actions::schedule::ASKS_HOW_LONG_SWITCH`] is on here.
@@ -219,7 +222,10 @@ fn gives_when(heard: &str) -> bool {
 /// heard line gives no length or time (#8182, gate 1126: speech to text
 /// kept "set a timer" and lost "one minute", and the model set ten): the
 /// model is told to ask once, in a few words, and the answer's line, which
-/// gives one, sets it. With [`lamp_actions::schedule::ASKS_HOW_LONG_SWITCH`]
+/// gives one, sets it. Nor a reply to the lamp's own question whose asked
+/// line gave one ([`asked_before`]: "Remind me at seven." → "What should I
+/// remind you about?" → "Take my pills."). With
+/// [`lamp_actions::schedule::ASKS_HOW_LONG_SWITCH`]
 /// on, in English only (the words are English), and only for a line a
 /// person said: a typed text, or a line not known, checks nothing.
 pub(crate) fn when_not_heard(name: &str, request: u64, heard: bool) -> Option<serde_json::Value> {
@@ -230,12 +236,12 @@ pub(crate) fn when_not_heard(name: &str, request: u64, heard: bool) -> Option<se
     };
     if !asks_how_long()
         || crate::messages::is_text(request)
-        || crate::language::from_environment().is_some()
+        || crate::language::at_start().is_some()
     {
         return None;
     }
     let words = crate::stop_scope::heard_words(request, heard)?;
-    if gives_when(&words) {
+    if gives_when(&words) || asked_before(request).is_some_and(|asked| gives_when(&asked)) {
         return None;
     }
     eprintln!(

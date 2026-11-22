@@ -1436,6 +1436,30 @@ impl Thread {
             .filter(|exchange| exchange.lamp.trim_end().ends_with('?'))
     }
 
+    /// The person's lines that the lamp's questions just before `request`
+    /// answered, newest first, one line each, joined: the run of exchanges
+    /// before `request` whose lamp line ended in a question, each begun
+    /// no more than `within` before `now`. An exchange with no words of the
+    /// lamp is passed over; one that asked nothing, or is older, ends the
+    /// run. `None` with no such exchange. For #8182: "Remind me at seven."
+    /// → "What should I remind you about?" → "Take my pills." gave the
+    /// time in the line the reply answers (Sixth's HOLD on #8274).
+    pub fn asked_before(&self, request: u64, now: Instant, within: Duration) -> Option<String> {
+        let mut said = Vec::new();
+        for exchange in self.exchanges.iter().rev() {
+            if exchange.request >= request || !exchange.lamp.chars().any(char::is_alphanumeric) {
+                continue;
+            }
+            if !exchange.lamp.trim_end().ends_with('?')
+                || now.saturating_duration_since(exchange.at) > within
+            {
+                break;
+            }
+            said.push(exchange.person.trim());
+        }
+        (!said.is_empty()).then(|| said.join("\n"))
+    }
+
     /// [`Self::lamp_asked`], or with `by_its_end` (`LAMP_REMARKS`)
     /// [`Self::lamp_asked_by_its_end`] too. This also reaches the rule's
     /// other uses of `lamp_asked`: a short sound that answers the lamp
@@ -3420,6 +3444,34 @@ mod tests {
         kept.person("How many dong is one US dollar?", true, at(3));
         kept.lamp(2, "Let me search that.", at(4));
         assert_eq!(kept.recent(at(7), within, 6).len(), 1);
+    }
+
+    #[test]
+    fn the_lines_the_lamps_questions_answered_are_the_run_back_within_its_bound() {
+        // #8182, Sixth's HOLD on #8274: a reply is read with the lines the
+        // lamp's questions just before it answered.
+        let mut thread = Thread::new();
+        let start = Instant::now();
+        let at = |seconds: u64| start + Duration::from_secs(seconds);
+        let within = Duration::from_secs(120);
+        thread.person("What time is it?", true, at(0));
+        thread.lamp(1, "It's six.", at(1));
+        thread.person("Remind me at seven.", true, at(2));
+        thread.lamp(2, "What should I remind you about?", at(3));
+        thread.person("Take my pills.", true, at(4));
+        thread.lamp(3, "Morning or evening?", at(5));
+        assert_eq!(
+            thread.asked_before(4, at(6), within).as_deref(),
+            Some("Take my pills.\nRemind me at seven."),
+            "the run of questions, and not the line before it"
+        );
+        assert_eq!(
+            thread.asked_before(4, at(124), within).as_deref(),
+            Some("Take my pills."),
+            "an older question ends the run"
+        );
+        assert_eq!(thread.asked_before(4, at(126), within), None, "stale");
+        assert_eq!(thread.asked_before(2, at(6), within), None, "no question");
     }
 
     #[test]
