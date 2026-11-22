@@ -459,7 +459,12 @@ A plain question about the person's reminders must read them
 line that is only "what reminders do I have", "do I have any reminders",
 "what are my reminders", "list my reminders" and the like, beside a
 greeting, the lamp's name, "please", "can you", "tell me" or a day
-(`tools::reminders_asked::asks_for_reminders`), has its first chat round
+(`tools::reminders_asked::asks_for_reminders`), or such a question of 4
+words or more heard one word short (one word lost or heard as another,
+never "reminders" or "my", once a line, and never beside a word that
+changes the ask: "set", "cancel", "timer", "need", "should", "not",
+"and"; #7987: on lamp-52e6 at the gate's Mac volume 45 "Hey Lamp, what
+reminders do I have?" was heard whole in about 17 of 60 plays), has its first chat round
 sent with `tool_choice` naming `list_reminders`, when it is declared. Any
 other word (a set, a cancel, a delete, a move, a timer, "do you like
 reminders?"), `list_reminders` not declared and a round after a call are
@@ -472,7 +477,9 @@ telling nothing; the journal tagged those lines with
 `attention::about_its_work`, which takes any line with "reminder" in it and
 so is too wide to force a call on. Host tests:
 `a_plain_question_about_reminders_is_told_apart`,
-`a_plain_question_forces_list_reminders_only_when_offered`.
+`a_plain_question_forces_list_reminders_only_when_offered`,
+`a_plain_question_one_word_short_is_still_forced`,
+`one_word_short_never_forces_another_ask`.
 
 Actions validates arguments before IPC, owns Schedule's CAS guards, and calls
 the socket selected by `LAMP_SCHEDULE_SOCKET` (enabled default
@@ -729,9 +736,10 @@ a skill cut for it is named on the setup line (#1706).
 
 The switch declares two functions, `reports_stop` and `reports_state`
 (below), so a session is told two more than without it. The product's
-unit sets it: a product lamp's chat request offers 50 of the lamp's own
+unit sets it: a product lamp's chat request offers 51 of the lamp's own
 functions (`PRODUCT_FUNCTIONS`, `crates/update/tests/functions.rs`), the
-voice's own 32 with these two among them (and lamp-services' three since
+voice's own 33 with these two among them (and `change_skill` beside
+`make_skill` since #8008, and lamp-services' three since
 `LAMP_SERVICES` is on in the product, `set_role` and `end_role`
 since `LAMP_MEMORY_ROLE` is on in the product, 9 Nov, and `go_to_sleep`
 since `LAMP_SLEEP_ASKED` is on in the product, #6853, and seen activity's

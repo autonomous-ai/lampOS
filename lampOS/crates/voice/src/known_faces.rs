@@ -318,6 +318,77 @@ pub(crate) fn refuses(turn: &str) -> bool {
         && !crate::remember::forgets_unnegated(turn)
 }
 
+/// The words a refusal that is only a refusal is made of ([`only_refuses`],
+/// #8185): no words, keep words, the forget words a no negates, and words
+/// that stand beside them. Never "just", "mind", "wait", "now" or
+/// "scratch": with the comma dropped, "Never mind just delete it" or "No,
+/// scratch it." asks for the forget (the second read on #8215).
+const ONLY_REFUSING: &[&str] = &[
+    "no",
+    "nope",
+    "nah",
+    "not",
+    "don't",
+    "dont",
+    "never",
+    "kh\u{f4}ng",
+    "\u{111}\u{1eeb}ng",
+    "ch\u{1edb}",
+    "th\u{f4}i",
+    "keep",
+    "leave",
+    "hold",
+    "gi\u{1eef}",
+    "l\u{1ea1}i",
+    "forget",
+    "delete",
+    "erase",
+    "remove",
+    "wipe",
+    "clear",
+    "drop",
+    "get",
+    "rid",
+    "of",
+    "qu\u{ea}n",
+    "x\u{f3}a",
+    "xo\u{e1}",
+    "please",
+    "lamp",
+    "hey",
+    "it",
+    "that",
+    "thanks",
+    "thank",
+    "you",
+    "i",
+    "want",
+    "need",
+    "to",
+    "course",
+    "\u{111}i",
+    "nh\u{e9}",
+];
+
+/// Whether the turn is a refusal and nothing else (#8185): [`refuses`],
+/// no question, at most six words (as `services::plain_no`), each of them
+/// a no, a keep word, a negated forget word or a word beside them
+/// ([`ONLY_REFUSING`]), "do" only in "do not". "No.", "Lamp, no.", "No,
+/// keep it.", "Don't.", "No, don't forget it.", "Không, giữ lại." are;
+/// "No, turn the lights on.", "Yes, but don't forget it." and "No, do it."
+/// are not: what else they say is the model's to answer.
+pub(crate) fn only_refuses(turn: &str) -> bool {
+    if turn.trim_end().ends_with('?') || !refuses(turn) {
+        return false;
+    }
+    let words = lower_words(turn);
+    words.len() <= 6
+        && words.iter().enumerate().all(|(at, word)| {
+            ONLY_REFUSING.contains(&word.as_str())
+                || word == "do" && words.get(at + 1).is_some_and(|next| next == "not")
+        })
+}
+
 /// How many letters the person said a name has: "three letters", "it's 4
 /// letters". The last count said, if any.
 fn letters_counted(said: &str) -> Option<usize> {
@@ -2283,6 +2354,20 @@ pub const DEADLINE: Duration = Duration::from_secs(6);
 pub(crate) const FRESH: Duration = lamp_msgs::known::FRESH;
 const MOST_NAME_BYTES: usize = 120;
 
+/// With [`FaceSwitches::face_question`] and names checked, before
+/// [`QUESTION_NOT_ASK`] (unchecked, the description asks for a told name,
+/// so this would contradict it): a
+/// clear ask is a call in any turn, also after their face was kept earlier
+/// in the conversation, or before they said their name (#8053, row-8053q on
+/// lamp-52e6, 21 Nov: such asks called it 17 of 30 after a save, and an ask
+/// with no name 0 of 3 to 3 of 3 by line after a greeting). Both are
+/// answered here before any look: a face known by that name is told so
+/// ([`face_question_first`]), and no name is told [`NO_NAME`]
+/// ([`run_switched`]). Never judged by words here.
+const ASK_IS_A_CALL: &str = " Call it for every clear ask to remember them, in any turn: also when you kept \
+     their face earlier in this conversation (it tells you if you already know them), and before they have \
+     said their name (call it with an empty name: it says there was no name, so then ask for it).";
+
 /// With [`FaceSwitches::face_question`], at the end of [`REMEMBER`]'s
 /// description, checked or not: a question whether the lamp knows them is
 /// no ask. The model's call is never judged by its words here.
@@ -2334,6 +2419,11 @@ pub fn tools_for(switches: FaceSwitches) -> Vec<Tool> {
                  given for somebody else."
             }
             .to_owned()
+                + if switches.face_question && checked {
+                    ASK_IS_A_CALL
+                } else {
+                    ""
+                }
                 + if switches.face_question {
                     QUESTION_NOT_ASK
                 } else {
@@ -5852,6 +5942,53 @@ mod tests {
         }
     }
 
+    /// #8185: a refusal that is only a refusal is answered by the lamp at
+    /// once; one that says anything else, or no refusal, is not.
+    #[test]
+    fn only_refuses_reads_a_no_and_nothing_else() {
+        for no in [
+            "No.",
+            "Lamp, no.",
+            "No, keep it.",
+            "No, no, keep it.",
+            "Don't.",
+            "Nope.",
+            "Nah, leave it.",
+            "No thanks.",
+            "Of course not.",
+            "No, don't forget it.",
+            "No, do not delete it.",
+            "No, don't get rid of it.",
+            "Don't drop it.",
+            "No, I want to keep it.",
+            "Kh\u{f4}ng, gi\u{1eef} l\u{1ea1}i.",
+            "\u{110}\u{1eeb}ng qu\u{ea}n.",
+        ] {
+            assert!(only_refuses(no), "{no}");
+        }
+        for not in [
+            "No, turn the lights on.",
+            "Yes, but don't forget it.",
+            "No. What time is it?",
+            "No?",
+            "No, do it.",
+            "No, no, no, please don't forget that, lamp.",
+            "I don't want to keep it.",
+            "No, I don't want it.",
+            "Never mind just delete it",
+            "Don't wait just delete it",
+            "No not now delete it now",
+            "No, scratch it.",
+            "No, just forget it.",
+            "No problem, go ahead.",
+            "Yes.",
+            "Keep it.",
+            "",
+        ] {
+            assert!(!only_refuses(not), "{not}");
+        }
+    }
+
     /// The reviewer on #1208 at 04:40: a yes to the lamp's read-back holds
     /// nothing but yeses, the name and words that stand beside a yes. A
     /// correction with no "no" in it is asked about again.
@@ -8118,7 +8255,56 @@ mod tests {
             assert!(on.ends_with(QUESTION_NOT_ASK), "{on}");
             assert!(on.contains("\"Do you remember me?\""), "{on}");
             assert!(!off.contains("Do you remember me"), "{off}");
-            assert_eq!(on, format!("{off}{QUESTION_NOT_ASK}"));
+            // Unchecked, the description asks for a told name, so the
+            // nameless call is not offered (Seventh's read on #8218).
+            let call = if checked { ASK_IS_A_CALL } else { "" };
+            assert_eq!(on, format!("{off}{call}{QUESTION_NOT_ASK}"));
+            assert_eq!(on.contains(ASK_IS_A_CALL), checked, "{on}");
+            // #8053: an ask is a call in any turn, after a save or before
+            // a name, and a question still never is (it comes last).
+            assert!(ASK_IS_A_CALL.contains("every clear ask"), "{on}");
+            assert!(ASK_IS_A_CALL.contains("kept their face earlier"), "{on}");
+            assert!(ASK_IS_A_CALL.contains("empty name"), "{on}");
+            assert!(!off.contains("every clear ask"), "{off}");
+            assert!(on.find(ASK_IS_A_CALL) < on.find(QUESTION_NOT_ASK), "{on}");
+        }
+    }
+
+    /// #8053: the description says a call before their name is told there
+    /// was no name, so the model asks for it ([`ASK_IS_A_CALL`]). An empty or blank name, with the
+    /// switch on, is told [`NO_NAME`] here and nothing reaches the eyes:
+    /// no look, nothing kept, as with it off.
+    #[test]
+    fn with_face_question_a_call_with_no_name_is_told_to_ask_and_sends_nothing() {
+        let switches = |face_question: bool| FaceSwitches {
+            checked: true,
+            rename_yes: true,
+            name_learn_fix: true,
+            face_question,
+            ..FaceSwitches::default()
+        };
+        for args in [json!({"name": ""}), json!({"name": "  "}), json!({})] {
+            for on in [true, false] {
+                let (socket, sent) = eyes(vec![]);
+                let call = ToolCall {
+                    id: "1".into(),
+                    name: REMEMBER.into(),
+                    args: args.clone(),
+                };
+                let (told, _) = run_switched(
+                    &socket,
+                    &call,
+                    switches(on),
+                    &Said::now("Please remember my face."),
+                    None,
+                    &mut None,
+                );
+                let sent = sent.join().unwrap();
+                let _ = std::fs::remove_dir_all(socket.parent().unwrap());
+                assert_eq!(told["error"], NO_NAME, "{args} {told}");
+                assert!(refused_here(&told), "{told}");
+                assert!(sent.is_empty(), "{sent:?}");
+            }
         }
     }
 

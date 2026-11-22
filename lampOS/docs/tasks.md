@@ -749,7 +749,8 @@ of 5 s at most there). Only a known no refuses:
 
 A hand-over that ends `not_sent` as the lamp is still getting ready,
 `openclaw_gateway_not_ready` (its OpenClaw Gateway didn't answer within
-60 s) or `harness_not_running` (#7282), is told with Task news'
+60 s; with `LAMP_OPENCLAW_GATEWAY_BY_DEFAULT` on, didn't serve within the
+480 s its launch is held in the queue, #8105) or `harness_not_running` (#7282), is told with Task news'
 `failed_not_ready` words, "I'm still getting ready. Give me a minute and ask
 me again.", not as work that "did not reach" its agent. Only within 180 s
 of the lamp's start (`skill_words::NOT_READY_WITHIN_MS`, lamp-tasks' own
