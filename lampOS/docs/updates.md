@@ -312,7 +312,9 @@ until repository variable `LAMPOS_CDN_MIRROR` is exactly `on`, and a failure
 in it never fails the promotion. A lamp installed or imaged with the product
 unit since #6256 (F2) reads this feed, so when the mirror fails such a lamp
 keeps the build it has until a later promotion is mirrored; a lamp installed
-before reads the GitHub stable feed above.
+before reads the GitHub stable feed above until `LAMP_UPDATE_CDN_FEED=on`, which
+the carried `/etc/lampOS/update.env` sets in the product, moves it to this feed
+("Moving a lamp to the CDN feed", below).
 
 The job builds `lamp-update` from its own commit and never runs an updater
 it downloads. It reads the stable envelope, refuses it unless its files
