@@ -2359,7 +2359,7 @@ fn the_gateway_unit_keeps_the_start_socket_folder_with_the_one_path() {
     let on = unit_text_for(one_path());
     assert_eq!(
         on.replacen(START_DIR_LINES, "", 1).replace(
-            "After=network-online.target lamp-cloud.service lamp-control.service\nWants=lamp-control.service\n",
+            CONTROL_LINES,
             "After=network-online.target lamp-cloud.service\n"
         ),
         UNIT_TEXT
@@ -2798,6 +2798,35 @@ fn gateway_waits_for_control_only_with_the_one_run_path() {
                     );
                     assert!(!ns.contains("disappeared before bind"));
                     assert!(!WAIT_FOR_CONTROL.contains("fail"));
+                }
+            }
+        }
+    }
+}
+
+/// #8320: the gateway's namespace binds lamp-control's socket file once,
+/// at its start, and each lamp-control start makes a new one, so with that
+/// socket shown the gateway is `PartOf=` lamp-control (restarted and
+/// stopped with it), in its `[Unit]` section; without it, not.
+#[test]
+fn the_gateway_restarts_with_lamp_control_when_it_shows_its_socket() {
+    for skills in [false, true] {
+        for tasks in [false, true] {
+            for one_path in [false, true] {
+                let unit = unit_text_for(Shown {
+                    skills,
+                    tasks,
+                    one_path,
+                });
+                let part_of = unit
+                    .lines()
+                    .position(|line| line == "PartOf=lamp-control.service");
+                assert_eq!(part_of.is_some(), tasks && one_path, "{unit}");
+                if let Some(at) = part_of {
+                    let unit_section = unit.lines().position(|line| line == "[Unit]").unwrap();
+                    let service = unit.lines().position(|line| line == "[Service]").unwrap();
+                    assert!(unit_section < at && at < service, "{unit}");
+                    assert_eq!(unit.matches("PartOf=").count(), 1, "{unit}");
                 }
             }
         }

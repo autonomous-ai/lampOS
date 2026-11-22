@@ -602,9 +602,23 @@ RuntimeDirectoryMode=0755
 RuntimeDirectoryPreserve=yes
 ";
 
+/// The lines [`unit_text_for`] puts for [`UNIT_TEXT`]'s `After=` with
+/// [`Shown::tasks`] and [`Shown::one_path`] on (#7135, #8320).
+pub const CONTROL_LINES: &str = "After=network-online.target lamp-cloud.service lamp-control.service\n\
+    Wants=lamp-control.service\n\
+    PartOf=lamp-control.service\n";
+
 /// [`UNIT`]'s text for `shown`: with [`Shown::one_path`], [`UNIT_TEXT`]
 /// with [`START_DIR_LINES`] after its `WorkingDirectory=`; else
-/// [`UNIT_TEXT`], byte for byte.
+/// [`UNIT_TEXT`], byte for byte. With [`Shown::tasks`] too, it starts
+/// after and wants lamp-control, and is `PartOf=` it (#8320): its
+/// namespace binds lamp-control's socket file once, at its start, and
+/// lamp-control's `RuntimeDirectory` is made anew (a new socket inode) at
+/// each lamp-control start, so a lamp-control restart (a round's switch,
+/// `lamp-setup restart`, the keeper, its own `Restart=on-failure`) restarts
+/// the gateway too, and a stop stops it (a round's `gateway_on` starts it
+/// again). The cost: the gateway's start, about 60 s, after each
+/// lamp-control restart.
 pub fn unit_text_for(shown: Shown) -> String {
     let anchor = "WorkingDirectory=/var/lib/lampos-openclaw/state\n";
     if !shown.one_path {
@@ -614,7 +628,7 @@ pub fn unit_text_for(shown: Shown) -> String {
     if shown.tasks {
         text.replacen(
             "After=network-online.target lamp-cloud.service\n",
-            "After=network-online.target lamp-cloud.service lamp-control.service\nWants=lamp-control.service\n",
+            CONTROL_LINES,
             1,
         )
     } else {
