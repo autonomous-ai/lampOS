@@ -4638,9 +4638,15 @@ file:
   actual socket before capturing its mount view (up to 60 one-second waits).
   Still missing, it logs one line and starts without it (a lamp before setup
   has no lamp-control); the off path and install/version calls do not wait.
-  A later socket replacement still needs a gateway restart. The first round
-  after this update rewrites the namespace script and the unit and restarts
-  the gateway once.
+  The namespace binds the socket file once, at the gateway's start, and each
+  lamp-control start makes a new one (its `RuntimeDirectory`), so the unit is
+  also `PartOf=lamp-control.service` (#8320): a lamp-control restart (a
+  round's switch, `lamp-setup restart`, the keeper, its own
+  `Restart=on-failure`) restarts the gateway, and a stop stops it until it is
+  started again (a round's `gateway_on`). The cost is the gateway's start,
+  about 60 s, after each lamp-control restart. The first round after this
+  update rewrites the namespace script and the unit and restarts the gateway
+  once.
 - **The socket.** The launcher sends the run id to
   `/run/lampos-skill-start/start.sock` (0600). lamp-update owns the folder
   `/run/lampos-skill-start` (0755, `lampos`'s): the OpenClaw gateway's

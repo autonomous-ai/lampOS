@@ -2613,9 +2613,14 @@ As root, on a lamp with the base image (`crates/update/src/install.rs`):
      lamp-control: its unit has `ConditionPathExists=/var/lib/lampos-setup/done`;
      a failed start would also hit the unit's start limit and keep the gateway
      down after setup), so the socket is not shown, as before. Install/version
-     calls and the switch-off path do not wait. This only handles initial
-     startup: a later control socket replacement still needs a gateway restart
-     to replace its bind. The first round after this update rewrites the
+     calls and the switch-off path do not wait. The bind is of the socket
+     file, made once at the gateway's start, and each lamp-control start
+     makes a new one (its `RuntimeDirectory`), so the unit is also
+     `PartOf=lamp-control.service` (#8320): a lamp-control restart (a round's
+     switch, `lamp-setup restart`, the keeper, its own `Restart=on-failure`)
+     restarts the gateway, and a stop stops it until it is started again (a
+     round's `gateway_on`). The cost is the gateway's start, about 60 s, after
+     each lamp-control restart. The first round after this update rewrites the
      namespace script and the unit and restarts the gateway once. It also shows the start socket folder
      `/run/lampos-skill-start` read-only (lamp-tasks makes its
      `start.sock` there; a socket still connects on a read-only mount;
