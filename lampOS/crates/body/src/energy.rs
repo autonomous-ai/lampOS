@@ -194,12 +194,31 @@ const FLOOR: f32 = 0.10;
 /// joint alone is lowered to it, the step kept. A joint so lowered more than
 /// [`FLOOR`] below level 1's swing (the clip itself) plays level 1's own
 /// instead (V2 and the first builder on #8307, 22 Nov 20:2x): level 5 then
-/// moves it less than 2 to 4, the accepted cost.
+/// moves it less than 2 to 4, the accepted cost. Capped to a floored level
+/// above, a joint at 2 or 3 then plays level 1's own as well.
 fn under_five(clip: &'static Clip, level: u8) -> Clip {
+    let (mut gain, step_ms) = capped(clip, level, livelier(clip, level + 1));
+    for joint in 0..5 {
+        let (own, _) = how_far_and_fast(clip.frames, clip.step_ms, joint);
+        let (swing, _) = how_far_and_fast(&made(clip.frames, gain), step_ms, joint);
+        if (swing as f32) < own as f32 * (1.0 - FLOOR) {
+            gain[joint] = 1.0;
+        }
+    }
+    Clip {
+        name: clip.name,
+        step_ms,
+        frames: made(clip.frames, gain).leak(),
+    }
+}
+
+/// [`under_five`]'s gain and step before the floor: `clip` at `level`'s
+/// size and pace, each joint lowered to no more than `above` moves it over
+/// the stretch of the cut `above` plays.
+fn capped(clip: &'static Clip, level: u8, above: &Clip) -> ([f32; 5], u16) {
     let all = 0..=clip.frames.len() - 1;
     let mut gain = gain(clip.frames, all, clip, clip_size(clip.name, level), false);
     let step_ms = step_at(clip, &made(clip.frames, gain), of(level).clip_pace);
-    let above = livelier(clip, level + 1);
     let stretch = &above.frames[cut_frames(clip, level + 1)];
     for joint in 0..5 {
         let (most, fastest) = how_far_and_fast(stretch, above.step_ms, joint);
@@ -215,17 +234,8 @@ fn under_five(clip: &'static Clip, level: u8) -> Clip {
         while over(gain).is_some() {
             gain[joint] *= 0.999;
         }
-        let (own, _) = how_far_and_fast(clip.frames, clip.step_ms, joint);
-        let (capped, _) = how_far_and_fast(&made(clip.frames, gain), step_ms, joint);
-        if (capped as f32) < own as f32 * (1.0 - FLOOR) {
-            gain[joint] = 1.0;
-        }
     }
-    Clip {
-        name: clip.name,
-        step_ms,
-        frames: made(clip.frames, gain).leak(),
-    }
+    (gain, step_ms)
 }
 
 /// How far and how fast `frames`, `step_ms` apart, take `joint`: peak to
@@ -1282,6 +1292,22 @@ mod tests {
         }
     }
 
+    /// `clip` at `level` 2 to 4 capped as [`under_five`] caps it, but with
+    /// no floor at this level or any above it.
+    fn cap_alone(clip: &'static Clip, level: u8) -> Clip {
+        let above = if level == 4 {
+            *livelier(clip, 5)
+        } else {
+            cap_alone(clip, level + 1)
+        };
+        let (gain, step_ms) = capped(clip, level, &above);
+        Clip {
+            name: clip.name,
+            step_ms,
+            frames: made(clip.frames, gain).leak(),
+        }
+    }
+
     /// `livelier` for levels 2 to 4 before #8201 (94672e3b7b's, the body's
     /// `sized` and that day's `CLIP_SIZE_CAP`, kept verbatim here as the
     /// reference): the clip itself, each joint the level's size, held to
@@ -1411,8 +1437,15 @@ mod tests {
                     }
                     let (now_swing, now_speed) = how_far_and_fast(now.frames, now.step_ms, joint);
                     let (one, _) = how_far_and_fast(clip.frames, clip.step_ms, joint);
-                    if column(now) == column(clip) {
-                        floored.push(format!("{} {level} {joint}: L1 {one}", clip.name));
+                    // Floored: level 1's own where the cap alone (no floor
+                    // at any level) would take it more than 10% under.
+                    let alone = cap_alone(clip, level);
+                    let (cap, _) = how_far_and_fast(alone.frames, alone.step_ms, joint);
+                    if column(now) == column(clip) && (cap as f32) < one as f32 * (1.0 - FLOOR) {
+                        floored.push(format!(
+                            "{} {level} {joint}: L1 {one}, cap {cap}",
+                            clip.name
+                        ));
                         floored_at.push((clip.name, level, joint));
                         continue;
                     }
@@ -1472,9 +1505,82 @@ mod tests {
         // (clip level joint), where the cap holds (clip level joint), and
         // where level 2 sits below level 1 (clip joint), with their swings.
         eprintln!("pin below_one {below_one:?}");
-        let floored_at_one: [&str; 0] = [];
-        let pinned: [&str; 0] = [];
-        let pinned_below_one: [&str; 0] = [];
+        let floored_at_one: [&str; 12] = [
+            "caring 2 4: L1 338, cap 231",
+            "caring 3 4: L1 338, cap 231",
+            "caring 4 4: L1 338, cap 231",
+            "scanning 2 1: L1 309, cap 199",
+            "scanning 3 1: L1 309, cap 200",
+            "scanning 4 1: L1 309, cap 209",
+            "dance_waltz 2 3: L1 48, cap 42",
+            "dance_waltz 2 4: L1 307, cap 257",
+            "dance_waltz 3 3: L1 48, cap 43",
+            "dance_waltz 3 4: L1 307, cap 257",
+            "dance_waltz 4 3: L1 48, cap 43",
+            "dance_waltz 4 4: L1 307, cap 257",
+        ];
+        let pinned: [&str; 52] = [
+            "curious 2 2: L1 142, now 133",
+            "curious 3 2: L1 142, now 133",
+            "curious 4 2: L1 142, now 137",
+            "happy 2 3: L1 171, now 160",
+            "happy 3 3: L1 171, now 160",
+            "happy 4 3: L1 171, now 160",
+            "caring 4 0: L1 193, now 267",
+            "surprised 2 0: L1 190, now 186",
+            "surprised 2 3: L1 195, now 216",
+            "surprised 3 0: L1 190, now 186",
+            "surprised 3 3: L1 195, now 216",
+            "surprised 4 0: L1 190, now 186",
+            "surprised 4 3: L1 195, now 216",
+            "confused 2 0: L1 190, now 178",
+            "confused 2 2: L1 142, now 129",
+            "confused 3 0: L1 190, now 178",
+            "confused 3 2: L1 142, now 129",
+            "confused 4 0: L1 190, now 190",
+            "confused 4 2: L1 142, now 143",
+            "sleepy 2 2: L1 5, now 5",
+            "sleepy 3 0: L1 115, now 144",
+            "sleepy 3 1: L1 14, now 17",
+            "sleepy 3 2: L1 5, now 5",
+            "sleepy 3 3: L1 153, now 191",
+            "sleepy 3 4: L1 340, now 425",
+            "sleepy 4 0: L1 115, now 144",
+            "sleepy 4 1: L1 14, now 17",
+            "sleepy 4 2: L1 5, now 5",
+            "sleepy 4 3: L1 153, now 191",
+            "sleepy 4 4: L1 340, now 425",
+            "excited 2 3: L1 284, now 295",
+            "excited 3 3: L1 284, now 295",
+            "excited 4 3: L1 284, now 296",
+            "dance_chill 2 2: L1 284, now 284",
+            "dance_hype 2 0: L1 198, now 212",
+            "dance_hype 2 3: L1 155, now 143",
+            "dance_hype 3 0: L1 198, now 214",
+            "dance_hype 3 2: L1 154, now 180",
+            "dance_hype 3 3: L1 155, now 146",
+            "dance_hype 4 0: L1 198, now 216",
+            "dance_hype 4 2: L1 154, now 185",
+            "dance_hype 4 3: L1 155, now 149",
+            "dance_hype 4 4: L1 188, now 256",
+            "dance_waltz 4 2: L1 186, now 263",
+            "dance_jazz 2 0: L1 268, now 268",
+            "dance_jazz 2 2: L1 87, now 86",
+            "dance_jazz 3 0: L1 268, now 268",
+            "dance_jazz 3 2: L1 87, now 86",
+            "dance_jazz 3 4: L1 88, now 108",
+            "dance_jazz 4 0: L1 268, now 268",
+            "dance_jazz 4 2: L1 87, now 86",
+            "dance_jazz 4 4: L1 88, now 108",
+        ];
+        let pinned_below_one: [&str; 6] = [
+            "curious 2: L1 142, L2 133",
+            "happy 3: L1 171, L2 160",
+            "surprised 0: L1 190, L2 186",
+            "confused 0: L1 190, L2 178",
+            "confused 2: L1 142, L2 129",
+            "dance_hype 3: L1 155, L2 143",
+        ];
         assert_eq!(floored, floored_at_one);
         assert_eq!(held, pinned);
         assert_eq!(below_one, pinned_below_one);
