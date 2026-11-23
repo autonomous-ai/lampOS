@@ -1861,6 +1861,12 @@ impl Says {
                 .as_deref()
                 == Some("on"),
         );
+        crate::speaker_stream::set_gain(
+            std::env::var(crate::speaker_stream::GAIN_ENVIRONMENT)
+                .ok()
+                .as_deref()
+                == Some("on"),
+        );
         let every_sound = std::env::var(EVERY_SOUND_ENVIRONMENT).ok().as_deref() == Some("on");
         if every_sound {
             eprintln!(
