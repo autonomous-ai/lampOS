@@ -219,6 +219,9 @@ struct Runs {
     main_pid: &'static str,
     /// How many of the next `ss` looks find the gateway not listening.
     not_listening: RefCell<u32>,
+    /// The gateway's start as `systemctl show --timestamp=unix` says it;
+    /// empty: not said.
+    began: RefCell<String>,
 }
 
 impl Runs {
@@ -232,6 +235,7 @@ impl Runs {
             error: "refused",
             main_pid: "",
             not_listening: RefCell::new(0),
+            began: RefCell::default(),
         }
     }
     fn runner(&self) -> impl FnMut(&[String]) -> Result<String, String> + '_ {
@@ -254,6 +258,8 @@ impl Runs {
                     /dev/mmcblk0p2 60000000 1000 20000000 3% /\n"
                         .to_owned(),
                 )
+            } else if line.contains("--property=ExecMainStartTimestamp") {
+                Ok(self.began.borrow().clone())
             } else if argv[0] == "ss" {
                 // The gateway listening, unless a test says otherwise.
                 let mut quiet = self.not_listening.borrow_mut();
@@ -3777,56 +3783,81 @@ fn a_gateway_unit_loaded_as_written_is_left_alone() {
     assert!(not_loaded(&said).is_empty(), "{said:?}");
 }
 
-/// #8324 (lamp-52e6, gate G): the install's restart of a gateway still in
-/// its first start (running, not listening on its port yet, as just
-/// restarted by lamp-control's restart through `PartOf=` or a round's
-/// try-restart) waits until it listens, so its stop is not the ~80 s drain
-/// that was SIGKILLed; a listening one is restarted at once.
-#[test]
-fn the_install_restarts_a_gateway_in_its_first_start_only_once_it_listens() {
-    let lamp = Lamp::new();
-    lamp.harness_there();
-    let mut systemd = Fake::default();
-    round(&lamp, &mut systemd, true, 10);
-    let runs = Runs::new(&lamp);
-    *runs.not_listening.borrow_mut() = 3;
-    assert_eq!(install(&lamp, &runs, 20).unwrap().install, "installed");
+/// The `ss` looks the install made, and whether all came before its one
+/// gateway restart.
+fn settle_looks(runs: &Runs) -> usize {
     let lines = runs.lines();
-    let looks: Vec<usize> = lines
-        .iter()
-        .enumerate()
-        .filter(|(_, line)| line.starts_with("ss -Hltn"))
-        .map(|(at, _)| at)
-        .collect();
     let restart = runs.position(&format!("systemctl restart {UNIT}"));
-    assert_eq!(
-        looks.len(),
-        4,
-        "3 not listening, then listening: {lines:#?}"
-    );
-    assert!(looks.iter().all(|&at| at < restart), "{lines:#?}");
     assert_eq!(
         lines
             .iter()
             .filter(|line| line.starts_with("systemctl restart"))
             .count(),
-        1
+        1,
+        "{lines:#?}"
     );
+    let looks: Vec<usize> = (0..lines.len())
+        .filter(|&at| lines[at].starts_with("ss -Hltn"))
+        .collect();
+    assert!(looks.iter().all(|&at| at < restart), "{lines:#?}");
+    looks.len()
+}
 
-    // Listening already: one look, the restart at once.
+/// The install run at `at_unix_ms` on a lamp the round asked it of, its
+/// gateway started at `began` (`@SECONDS`, or empty: not said) and not
+/// listening for `quiet` looks.
+fn install_settling(began: &str, quiet: u32, at_unix_ms: u64) -> usize {
     let lamp = Lamp::new();
     lamp.harness_there();
-    round(&lamp, &mut systemd, true, 10);
+    round(&lamp, &mut Fake::default(), true, 10);
     let runs = Runs::new(&lamp);
-    install(&lamp, &runs, 20).unwrap();
-    let lines = runs.lines();
+    *runs.not_listening.borrow_mut() = quiet;
+    *runs.began.borrow_mut() = began.to_owned();
+    let mut run = runs.runner();
+    let said = install_with(
+        lamp.root(),
+        &lamp.records(),
+        &mut run,
+        &mut || at_unix_ms,
+        &mut quiet(),
+        &kit(),
+    )
+    .unwrap()
+    .unwrap();
+    drop(run);
+    assert_eq!(said.install, "installed");
+    settle_looks(&runs)
+}
+
+/// #8324 (the Reviewer-lead's HOLD on 2f22d4200b): a stop at the moment
+/// :18789 first listens is the 79.9 s drain (kit-8306b on lamp-52e6), so
+/// the install's restart of a gateway started 10 s ago, which listens on
+/// the 4th look, waits past the listen until 150 s from its start (and 90 s
+/// past that listen): 71 looks 2 s apart, all before its one restart.
+#[test]
+fn the_install_never_restarts_a_gateway_at_its_first_listen() {
+    let now = 1_000_000_000_000;
+    let ten_s_ago = format!("@{}\n", now / 1000 - 10);
+    assert_eq!(install_settling(&ten_s_ago, 3, now), 71);
+    // Listening already, 10 s into its start (the stop right at first
+    // listen): still waited out to 150 s from the start.
+    assert_eq!(install_settling(&ten_s_ago, 0, now), 71);
+}
+
+/// #8324: a gateway started long ago and listening is restarted at once;
+/// one whose start systemd can't say, seen to begin listening on the 4th
+/// look, is restarted 90 s past that listen; one never listening is
+/// restarted anyway after 300 s.
+#[test]
+fn the_install_restarts_a_settled_gateway_at_once_and_waits_past_a_new_listen() {
+    let now = 1_000_000_000_000;
     assert_eq!(
-        lines
-            .iter()
-            .filter(|line| line.starts_with("ss -Hltn"))
-            .count(),
+        install_settling(&format!("@{}", now / 1000 - 600), 0, now),
         1
     );
+    assert_eq!(install_settling("", 0, now), 1);
+    assert_eq!(install_settling("", 3, now), 3 + 45 + 1);
+    assert_eq!(install_settling("", u32::MAX, now), 151);
 }
 
 /// #8105: lamp-tasks' answer read, and the rule: the switch off is always

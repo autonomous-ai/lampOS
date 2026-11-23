@@ -2636,14 +2636,17 @@ As root, on a lamp with the base image (`crates/update/src/install.rs`):
      ten minutes end it `failed`; a round that wants it starts a gateway
      it finds `inactive` or `failed` (a `failed` one after its
      `reset-failed`, said once), which brings it back. The install's own
-     restart of the gateway (to run the new OpenClaw) waits while the
-     gateway is running but not yet listening on 18789, in its first start
-     (just restarted by a lamp-control restart, a round's try-restart or
-     `Restart=always`), until it listens, 75 looks 2 s apart (150 s) at
-     most (#8324): a stop in that window drained for about 80 s, ran into
-     the 90 s stop timeout, was SIGKILLed and left OpenClaw's state
-     unreadable (gate G on lamp-52e6); a stop of a listening gateway takes
-     about 3 s. With `LAMP_OPENCLAW_GATEWAY_BY_DEFAULT=on` (#8105, off until
+     restart of the gateway (to run the new OpenClaw) waits while a running
+     gateway is still in its startup (#8324): until it listens on 18789,
+     150 s have passed since systemd started it (`ExecMainStartTimestamp`),
+     and 90 s past a listen the install saw begin, looking every 2 s, 300 s
+     at most, then restarted anyway. A stop at the moment it first listens
+     drained 79.9 s against the 90 s stop timeout (kit-8306b on lamp-52e6,
+     listen 46 s after the start; OpenClaw logs `drain=75000ms` at
+     startup), and a second stop seconds after a start was SIGKILLed and
+     left OpenClaw's state unreadable (gate G); a stop 60 s or more after
+     the listen took under 10 s. A gateway started long ago and listening,
+     or not running, is restarted at once. With `LAMP_OPENCLAW_GATEWAY_BY_DEFAULT=on` (#8105, off until
      its row) it runs only while OpenClaw is the lamp's default agent, as
      lamp-tasks says it on its app socket: `serve` asks every 10 s and
      each round once, enables and starts it for `openclaw`, disables and
