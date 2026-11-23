@@ -17,4 +17,9 @@ gwrestart(){ systemctl is-active -q $GW || { echo "GATEWAY $GW not active: not r
   systemctl restart $GW; n "restarted $GW after lamp-control (#8320)"; i=0
   while [ $i -lt 90 ]; do cat /proc/net/tcp /proc/net/tcp6 2>/dev/null | awk -v p=":$GWPORT" '$2 ~ p"$" && $4 == "0A" {f=1} END {exit !f}' && { echo "GATEWAY restarted, listening after ${i}s"; return 0; }; sleep 2; i=$((i+2)); done
   echo "GATEWAY restarted, not listening after 90s"; return 1; }
+# #8180's unit lines a binary bind can't bring (deploy/product/lamp-tasks.service, lamp-control.service), laid as
+# /run drop-ins by swap and removed by restore: each run's own cgroup needs lamp-tasks' Delegate (without it every run
+# step and try is refused on Linux), and lamp-control mints a made skill's grants with no yes.
+UD_TASKS=/run/systemd/system/lamp-tasks.service.d/zz-row-8180-delegate.conf
+UD_CONTROL=/run/systemd/system/lamp-control.service.d/zz-row-8180-madecode.conf
 HD=/run/systemd/system/lamp-update.service.d/zz-row-8180-hold.conf

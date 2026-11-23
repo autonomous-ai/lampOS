@@ -13,9 +13,10 @@ if [ $W = 1 ]; then
   done
 fi
 [ -f $HD ] && { rm -f $HD; rmdir ${HD%/*} 2>/dev/null; n "removed $HD"; }
+for f in $UD_TASKS $UD_CONTROL; do [ -f $f ] && { rm -f $f; rmdir ${f%/*} 2>/dev/null; n "removed $f"; W=1; }; done
 for p in $PARTS; do part=${p%%:*}; [ -d $(tdir $part) ] && { rm -rf $(tdir $part); n "removed $(tdir $part)"; }; done
 rm -rf /tmp/t8180; systemctl daemon-reload
-[ $W = 1 ] && { systemctl start $UNITS; n "started $UNITS on the installed build"; sleep 25; gwrestart || ok=0; }
+[ $W = 1 ] && { systemctl restart $UNITS; n "restarted $UNITS on the installed build"; sleep 25; gwrestart || ok=0; }
 systemctl restart lamp-update 2>/dev/null; sleep 20
 for p in $PARTS; do part=${p%%:*}; r=${p#*:}; unit=${r%%:*}; bin=${r#*:}; f=$(inst $part $bin); pp=$(pid $unit)
   want=$(cat $R/$bin.installed 2>/dev/null); fs=$(sha256sum "$f" | cut -d' ' -f1); rs=$(sha256sum /proc/$pp/exe 2>/dev/null | cut -d' ' -f1)
@@ -25,4 +26,5 @@ for p in $PARTS; do part=${p%%:*}; r=${p#*:}; unit=${r%%:*}; bin=${r#*:}; f=$(in
   [ "$(mounted "$f")" = 0 ] || { echo "FAIL mount left over $f"; ok=0; }
 done
 [ -f $HD ] && { echo "FAIL hold left: $HD"; ok=0; }
+for f in $UD_TASKS $UD_CONTROL; do [ -f $f ] && { echo "FAIL drop-in left: $f"; ok=0; }; done
 [ $ok = 1 ] && { rm -f $R/*.installed; echo "RESTORED OK"; } || echo "RESTORE NOT OK"

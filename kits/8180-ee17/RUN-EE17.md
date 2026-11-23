@@ -59,6 +59,7 @@ ee17's stable (15543) has no #8323. OpenClaw's gateway binds lamp-control's sock
 starts, and a skill run's fence inherits that namespace. The swap restarts lamp-control, so the old gateway would keep
 a dead socket, and every skill-run leg would fail for a reason that isn't #8180. So:
 - `swap` and `restore` restart lamp-openclaw-gateway after the four units start, and wait for its port (at most 90 s).
+- `swap` also lays #8180's two unit lines as `/run` drop-ins, which a binary bind can't bring: lamp-tasks' `Delegate=memory cpu pids` (each run's own cgroup) and lamp-control's `LAMP_MADE_CODE_ON_AT_ONCE=on`. `restore` removes them and restarts the units.
 - `check` compares the socket's inode on the host with the one in the gateway's namespace (`nsenter -m`). If they
   differ, it prints `VERIFY FAIL: control-sock-stale-in-gateway(#8320)`, and the run stops before any lift.
 

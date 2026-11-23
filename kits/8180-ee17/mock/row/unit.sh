@@ -79,8 +79,10 @@ for f in sys.argv[1:]:
     # fails when the gateway's namespace holds an older lamp-control socket than the host's.
     sw=$(grep -c '^gwrestart || ok=0$' $KIT/swap/swap.lamp.sh); rs=$(grep -c 'gwrestart || ok=0; }$' $KIT/swap/restore.lamp.sh)
     gt=$(grep -c 'lamp-openclaw-gateway"$' $KIT/swap/swap.sh); ck=$(grep -c 'why="$why control-sock-stale-in-gateway(#8320)"' $KIT/row/check.lamp.sh)
-    o="swap restarts $sw, restore restarts $rs, swap gates $gt, check fails stale $ck"
-    v "gateway restarted after lamp-control, stale socket fails VERIFY" '[ "$o" = "swap restarts 1, restore restarts 1, swap gates 1, check fails stale 1" ]';;
+    dl=$(grep -c 'Delegate=memory cpu pids.*> \$UD_TASKS' $KIT/swap/swap.lamp.sh); dm=$(grep -c 'LAMP_MADE_CODE_ON_AT_ONCE=on.*> \$UD_CONTROL' $KIT/swap/swap.lamp.sh)
+    dr=$(grep -c 'for f in \$UD_TASKS \$UD_CONTROL; do \[ -f \$f \] && { rm -f' $KIT/swap/restore.lamp.sh)
+    o="swap restarts $sw, restore restarts $rs, swap gates $gt, check fails stale $ck, drop-ins $dl $dm removed $dr"
+    v "gateway restarted after lamp-control, stale socket fails VERIFY, #8180's unit lines laid and removed" '[ "$o" = "swap restarts 1, restore restarts 1, swap gates 1, check fails stale 1, drop-ins 1 1 removed 1" ]';;
   namenear)
     # The Mac voice's "Hey Lamp" (#8318, e82d 22 Nov): save lays LAMP_NAME_NEAR=off as the row's /run drop-in and checks
     # it took; unrow removes that drop-in and checks lamp-voice is back to the product's value.
