@@ -17,6 +17,7 @@ SDKs generate from.
 - **piece 4**: the routing (`parts.rs`). `gesture` and `move` go to the body's mood socket, `light` is a `light/request` on the bus, `say` goes to the voice's say socket with its outcome as a `done` event (a computer's `stop` cancels its own say there, waiting or playing), `sound` is the voice's built-in short hum through the same socket and gates, or a clip of the computer's own (`sounds.rs`, "Sounds" below), played as an exact `say` is, and `express` is the `feelings` skill's own move and light (`feelings.rs`). Each is at `skill` priority as `lamp-control`, held to the part's own checks. `look` at `ahead` or `{yaw, pitch}` goes on the body's lease socket under the lease the door holds (`body_lease.rs`), its end a `done` with the angles reached; `look` at `hand` has the body follow the hand in view, said with the body's lease (below). `look` at `face` or `name` is refused as out of this release ("not in this release: look at a face or a name"); `joints` is refused with what it waits for; `play` is the door's own lookup of a pushed skill's recorded move, sent as a `move` (below). A computer's last connection closing, or a revoke, stops what it asked for, and actions a part refuses are bounded at 20 a second.
 - **piece 5**: the bus as events, lease signals and state (`watch.rs`, with `--bus-root`). Events go out by edge, never per message: someone arrived or left, turned to or from the lamp, or stood up; the lamp's name heard; a sound class past its bar (never `speech`); a touch or the button; the lamp talking, paused, private or asleep. Each goes only to a connection subscribed to it that holds its grant. Words heard are matched on the lamp against each connection's own phrases, and only the phrase leaves it. Talking suspends every lease and resting holds them again; a hand on the body, a stop, a pause, privacy or sleep loses them. `get` answers presence (counts, never who), the light, the inner state and the lamp's own.
 - **piece 6**: the body's lease (`body_lease.rs`): with `--lease-socket`, a computer's `body` lease holds lamp-body's own, so the lamp's own life stands back, and the body's end of it is the computer's (`slumped` added to the whys).
+- **app push** (#8351, `app_push.rs`, with `--apps-manage-socket` and `LAMP_STORE_APPS`): `app.push`, `app.list` and `app.remove`, a paired computer's own unsigned app installed through the apps' helper with no yes asked ([apps.md](apps.md), "An app from your own computer").
 - **piece 7**: skills pushed from a computer (`push.rs`, with `--manage-socket`): the `skills` grant, `skill.push` in parts, `skill.list` and `skill.remove`, each asked of root's manage helper off the door's lock, and a revoke turning the computer's pushed skills off. The helper's side is lamp-skills' (Eighth's piece B); until it is in, the helper refuses what it doesn't know.
 
 **The product unit `deploy/product/lamp-control.service` carries it**, as `lampos`, installed and enabled on every lamp
@@ -67,7 +68,7 @@ owner ticked. An unpaired caller gets `unpaired` and the connection closes.
 | `hear` | `phrase.heard` for the client's own phrases (never the words around them), `name.heard`, `listen.set` (its own mute); with `speak`, `turn.start` |
 | `sound` | `sound.heard`, by class |
 | `speech` | `lamp.said`: every line the lamp says out loud that the rules below allow, which can be personal; never what a person says to it ("What the lamp says") |
-| `skills` | `skill.push`, `skill.list`, `skill.remove`: its own skills put on the lamp, which run on their own after it goes, never beyond its other grants ("Skills pushed from a computer") |
+| `skills` | `skill.push`, `skill.list`, `skill.remove`: its own skills put on the lamp, which run on their own after it goes, never beyond its other grants ("Skills pushed from a computer"); `app.push`, `app.list`, `app.remove`: its own unsigned apps, the same, with `LAMP_STORE_APPS` ([apps.md](apps.md), "An app from your own computer") |
 | `air` | `air.changed` and `get` `air`: the air sensor's readings (particles, carbon dioxide, humidity, temperature at the sensor). Carbon dioxide and humidity rise when someone comes in and stays, so they can show when someone is in the room, even to a computer without `look`: the pairing screen says so |
 | `device` | `get` `device`: the lamp's own computer (processor load, memory, disk, its temperatures) |
 | `camera` | `camera.snapshot`, `camera.stream`: the camera's pictures, the eyes' own newest frame, never while the lamp is private ("The camera"); `pose`: one person's pose in a JPEG of the computer's own, from the lamp's NPU ("Poses") |
@@ -796,6 +797,9 @@ folded, may wait up to that long for its first motion to begin.
 | `microphone.stream` | `on` (true or false) | `microphone` | — |
 | `pose` | `jpeg`: one JPEG in base64, 1–204,800 chars (150 KiB), local only | `camera` | — |
 | `skill.remove` | `name` | `skills` | — |
+| `app.push` | `name` (an app's, `^[a-z][a-z0-9-]{0,23}$`), `sha256` (64 hex), `size` 1–4,194,304, `part` from 0, `parts` 1–128, `data` (base64, ≤ 49,152 chars); the app's grants within the pairing's, never `remember`; unsigned ([apps.md](apps.md), "An app from your own computer") | `skills` | — |
+| `app.list` | — | `skills` | — |
+| `app.remove` | `name` | `skills` | — |
 
 `move`'s shape is checked here, and the body's move check
 (`crates/body/src/moves.rs`) judges the rest. The door doesn't know the lamp's
@@ -983,6 +987,8 @@ Rates a client is held to with `--rates default`. By default the rates are off, 
 | `express` | 20 a minute |
 | `skill.push` | 1 every 10 s and 20 an hour, counted once at part 0 |
 | `skill.list`, `skill.remove` | 6 a minute; one at a time for a computer, and 4 with the helper at once on the lamp (`busy` past either) |
+| `app.push` | 1 every 10 s and 20 an hour, counted once at part 0; one push in flight on the lamp |
+| `app.list`, `app.remove` | 6 a minute; one at a time for a computer, shared with the skill helper's asks |
 | actions a part refused | 20 a second, then the connection closes |
 | registered phrases | 16 a computer, across all its connections; each of 64 characters at most and 8 letters at least, so no short word or pair ("is a"; "ok lamp" too, at 6 letters: "okay lamp" passes). The floor is friction, not a guard: what keeps `hear` narrow is the owner's grant, this cap, the rate on changing them, and that only the registered phrase leaves the lamp |
 | changing the phrases | 6 a minute; the same phrases again cost nothing |
