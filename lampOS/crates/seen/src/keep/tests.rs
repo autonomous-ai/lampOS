@@ -33,6 +33,15 @@ fn plan(scene: &mut Scene, keep: &mut Keep, at: u64, stood_up: bool, forgot: boo
     )
 }
 
+/// A face `id` whose box is 0.2 across, its left edge at `x`, as
+/// [`Scene::faces`] makes it.
+fn track(id: &str, x: f32) -> Track {
+    Track {
+        id: id.into(),
+        edges: [x, 0.3, x + 0.2, 0.6],
+    }
+}
+
 fn owner(scene: &mut Scene, keep: &mut Keep, at: u64) -> Plan {
     owner_as(scene, keep, "f1", at)
 }
@@ -116,27 +125,51 @@ fn a_second_remembered_person_within_120_s_starts_afresh() {
 #[test]
 fn a_keep_begun_with_no_face_known_never_goes_on() {
     let mut away = Away::default();
+    let (f1, f2) = (track("f1", 0.4), track("f2", 0.4));
     // Held from its first step with no face in view: whose it is not known.
-    assert_eq!(away.step(S, true, None, true, None), Step::Began);
+    assert_eq!(away.step(S, true, None, true, None, Some(0)), Step::Began);
     assert_eq!(
-        away.step(2 * S, false, None, true, Some("f1")),
+        away.step(2 * S, false, None, true, Some(&f1), Some(1)),
         Step::Wiped(Why::OtherFace)
     );
     // Open with f1, kept, reopened with no face in view: not known either.
-    assert_eq!(away.step(3 * S, false, None, true, Some("f1")), Step::Open);
-    assert_eq!(away.step(4 * S, true, None, true, None), Step::Began);
     assert_eq!(
-        away.step(5 * S, false, None, true, None),
+        away.step(3 * S, false, None, true, Some(&f1), Some(1)),
+        Step::Open
+    );
+    assert_eq!(
+        away.step(4 * S, true, None, true, None, Some(0)),
+        Step::Began
+    );
+    assert_eq!(
+        away.step(5 * S, false, None, true, None, Some(0)),
         Step::Wiped(Why::OtherFace)
     );
     // A face lost for a step while open keeps whose it is.
-    assert_eq!(away.step(6 * S, false, None, true, Some("f2")), Step::Open);
-    assert_eq!(away.step(7 * S, false, None, true, None), Step::Open);
-    assert_eq!(away.step(8 * S, true, None, true, None), Step::Began);
     assert_eq!(
-        away.step(9 * S, false, None, true, Some("f2")),
+        away.step(6 * S, false, None, true, Some(&f2), Some(1)),
+        Step::Open
+    );
+    assert_eq!(
+        away.step(7 * S, false, None, true, None, Some(0)),
+        Step::Open
+    );
+    assert_eq!(
+        away.step(8 * S, true, None, true, None, Some(0)),
+        Step::Began
+    );
+    assert_eq!(
+        away.step(9 * S, false, None, true, Some(&f2), Some(1)),
         Step::Resumed
     );
+    // A timer's keep begun with no face known never carries either.
+    let mut timer = Away::timer();
+    assert_eq!(timer.step(S, true, None, true, None, Some(0)), Step::Began);
+    assert_eq!(
+        timer.step(2 * S, false, None, true, Some(&f1), Some(1)),
+        Step::Wiped(Why::OtherFace)
+    );
+    assert_eq!(timer.detail(), Some("no face known when it was kept"));
 }
 
 #[test]
@@ -254,21 +287,24 @@ fn standing_up_or_a_forget_wipes_at_once() {
 #[test]
 fn nothing_to_keep_is_as_before() {
     let mut away = Away::default();
-    assert_eq!(away.step(0, true, None, false, None), Step::Open);
+    assert_eq!(away.step(0, true, None, false, None, None), Step::Open);
     assert_eq!(
-        away.step(0, true, Some(Hard::Asleep), false, None),
+        away.step(0, true, Some(Hard::Asleep), false, None, None),
         Step::Open
     );
-    assert_eq!(away.step(S, true, None, true, None), Step::Began);
+    assert_eq!(away.step(S, true, None, true, None, None), Step::Began);
     assert_eq!(
-        away.step(S + KEEP_US - 1, true, None, true, None),
+        away.step(S + KEEP_US - 1, true, None, true, None, None),
         Step::Kept
     );
     assert_eq!(
-        away.step(S + KEEP_US, true, None, true, None),
+        away.step(S + KEEP_US, true, None, true, None, None),
         Step::Wiped(Why::Expired)
     );
-    assert_eq!(away.step(S + KEEP_US, true, None, false, None), Step::Open);
+    assert_eq!(
+        away.step(S + KEEP_US, true, None, false, None, None),
+        Step::Open
+    );
 }
 
 #[test]
@@ -436,4 +472,199 @@ fn seat_a_plain_new_id_without_the_hold_begins_from_the_arrival_as_before() {
     let plan = seat_step(&mut scene, &mut seat, 2_100 * S, None, &[]);
     assert_eq!(plan.sitting, Step::Wiped(Why::OtherFace));
     assert_eq!(timers(&seat, 2_160 * S), (2_160, 2_160, 2_160));
+}
+
+#[test]
+fn the_06c1_slump_a_new_id_2_s_later_in_the_same_place_goes_on() {
+    // lamp-06c1, 23 Nov 15:51 (#6543): the owner slumped, the face list
+    // went stale ("gate nobody" at 15:51:06), and the same face came back
+    // 2 s later under a new passing id in the same place. Posture's window
+    // and the sitting's timers were wiped as "another face"; they go on.
+    let mut scene = Scene::owner_at(0);
+    let mut keep = Keep::default();
+    assert_eq!(owner(&mut scene, &mut keep, S).posture, Step::Open);
+    // The eyes' list goes empty: the gate reads nobody.
+    scene.faces(&[], 3 * S + 1);
+    let lost = plan_at(&mut scene, &mut keep, 3 * S + 1);
+    assert_eq!(scene.gate(3 * S + 1), Err(crate::gate::Closed::Nobody));
+    assert_eq!((lost.posture, lost.sitting), (Step::Began, Step::Began));
+    scene.faces(&[("f3", 0.41)], 5 * S + 1);
+    let back = plan_at(&mut scene, &mut keep, 5 * S + 1);
+    assert_eq!(scene.gate(5 * S + 1), Ok(()));
+    assert!(!back.posture.wipes() && !back.sitting.wipes(), "{back:?}");
+    assert!(!back.posture.holds() && !back.sitting.holds(), "{back:?}");
+    assert_eq!((back.posture, back.sitting), (Step::Carried, Step::Carried));
+    assert_eq!(
+        back.posture_line("open").unwrap(),
+        "posture's window goes on: the gate opened again within 4 s on a new passing id in the same place (f1 to f3 after 2000 ms: centres 0.010 apart, within the new box's width 0.200)"
+    );
+    assert!(back.sitting_line("open").unwrap().starts_with(
+        "the sitting's timers goes on: the gate opened again within 4 s on a new passing id"
+    ));
+    // Carried onto f3: f3 lost and back goes on as f3's.
+    assert_eq!(
+        owner_as(&mut scene, &mut keep, "f3", 6 * S).posture,
+        Step::Open
+    );
+    scene.faces(&[], 7 * S);
+    assert!(plan_at(&mut scene, &mut keep, 7 * S).posture.holds());
+    let again = owner_as(&mut scene, &mut keep, "f3", 30 * S);
+    assert_eq!(
+        (again.posture, again.sitting),
+        (Step::Resumed, Step::Resumed)
+    );
+}
+
+/// The owner (`f1` at 0.4) open at 1 s, the gate closed (nobody) at 2 s,
+/// and `faces` back at `at`: the plan then.
+fn back_after_nobody(faces: &[(&str, f32)], at: u64) -> Plan {
+    let mut scene = Scene::owner_at(0);
+    let mut keep = Keep::default();
+    owner(&mut scene, &mut keep, S);
+    scene.faces(&[], 2 * S);
+    let lost = plan_at(&mut scene, &mut keep, 2 * S);
+    assert_eq!((lost.posture, lost.sitting), (Step::Began, Step::Began));
+    scene.faces(faces, at);
+    let back = plan_at(&mut scene, &mut keep, at);
+    assert_eq!(scene.gate(at), Ok(()));
+    back
+}
+
+#[test]
+fn a_new_id_in_the_same_place_up_to_4_s_goes_on_and_5_s_wipes() {
+    let at_4_s = back_after_nobody(&[("f3", 0.4)], 2 * S + CARRY_GAP_US);
+    assert_eq!(
+        (at_4_s.posture, at_4_s.sitting),
+        (Step::Carried, Step::Carried)
+    );
+    let late = back_after_nobody(&[("f3", 0.4)], 7 * S);
+    assert_eq!(
+        (late.posture, late.sitting),
+        (Step::Wiped(Why::OtherFace), Step::Wiped(Why::OtherFace))
+    );
+    assert_eq!(
+        late.posture_line("open").unwrap(),
+        "posture's window wiped: the gate opened again on another face than the one it was kept for (f1 to f3 after 5000 ms, over 4000 ms)"
+    );
+}
+
+#[test]
+fn a_new_id_far_from_the_kept_box_wipes() {
+    // Centres 0.21 apart, over the new box's 0.2: another place.
+    let far = back_after_nobody(&[("f3", 0.61)], 4 * S);
+    assert_eq!(
+        (far.posture, far.sitting),
+        (Step::Wiped(Why::OtherFace), Step::Wiped(Why::OtherFace))
+    );
+    assert_eq!(
+        far.sitting_line("open").unwrap(),
+        "the sitting's timers wiped: the gate opened again on another face than the one it was kept for (f1 to f3 after 2000 ms: centres 0.210 apart, over the new box's width 0.200)"
+    );
+    // Just within the width still goes on.
+    let near = back_after_nobody(&[("f3", 0.59)], 4 * S);
+    assert_eq!((near.posture, near.sitting), (Step::Carried, Step::Carried));
+}
+
+#[test]
+fn two_faces_back_wipes() {
+    let two = back_after_nobody(&[("f3", 0.4), ("f4", 0.1)], 4 * S);
+    assert_eq!(
+        (two.posture, two.sitting),
+        (Step::Wiped(Why::OtherFace), Step::Wiped(Why::OtherFace))
+    );
+    assert_eq!(
+        two.posture_line("open").unwrap(),
+        "posture's window wiped: the gate opened again on another face than the one it was kept for (2 faces in view)"
+    );
+}
+
+#[test]
+fn a_keep_about_a_person_never_carries_onto_a_new_id() {
+    // The first builder's condition on #6543: the carry is for timers only.
+    // The keep holds no kind about a person (posture's window and the
+    // sitting's timers are both timers); anything kept about a person
+    // keeps `Away::default`'s rule, the same id only, and is wiped by the
+    // very step that carries a timer.
+    let (f1, f3) = (track("f1", 0.4), track("f3", 0.41));
+    let mut person = Away::default();
+    let mut timer = Away::timer();
+    for away in [&mut person, &mut timer] {
+        assert_eq!(
+            away.step(S, false, None, true, Some(&f1), Some(1)),
+            Step::Open
+        );
+        assert_eq!(
+            away.step(2 * S, true, None, true, None, Some(0)),
+            Step::Began
+        );
+    }
+    assert_eq!(
+        person.step(4 * S, false, None, true, Some(&f3), Some(1)),
+        Step::Wiped(Why::OtherFace)
+    );
+    assert_eq!(person.detail(), None);
+    assert_eq!(
+        timer.step(4 * S, false, None, true, Some(&f3), Some(1)),
+        Step::Carried
+    );
+    // Both of the keep's kinds are timers.
+    let keep = Keep::default();
+    assert!(keep.posture.carries && keep.sitting.carries);
+}
+
+#[test]
+fn seat_desk_time_goes_on_across_a_carry() {
+    // Desk time is the sitting's own (`desk_s`, on in the product): a
+    // carry keeps the sitting, so its desk time goes on; a wipe would
+    // begin a new one at 0.
+    use crate::sitting::More;
+    use lamp_msgs::DeskWork;
+    let desk = More {
+        desk_work: Some(DeskWork::Computer),
+        ..More::default()
+    };
+    let mut scene = Scene::owner_at(0);
+    let mut seat = Seat::default();
+    let step = |scene: &mut Scene, seat: &mut Seat, at: u64| {
+        scene.renew(at);
+        let inputs = scene.readings.inputs(scene.opted_in, true, at);
+        let seen = scene.readings.on_track(at);
+        let gate = crate::gate::may_request(&inputs);
+        seat.step(
+            &Now {
+                now_us: at,
+                inputs: &inputs,
+                seen: &seen,
+                stood_up: false,
+                forgot: false,
+                posture_gate: gate,
+                desk: gate,
+                watching: true,
+            },
+            &[],
+            &Begin {
+                arrived_us: 0,
+                more: true,
+                break_is_standing: false,
+                stood_up_us: None,
+            },
+        )
+    };
+    let desk_s = |seat: &Seat, at: u64| seat.sitting().unwrap().doing_more(at).unwrap().desk_s;
+    scene.faces(&[("f1", 0.4)], S);
+    step(&mut scene, &mut seat, S);
+    seat.sitting_mut().unwrap().saw_more(&desk, S);
+    scene.faces(&[("f1", 0.4)], 61 * S);
+    step(&mut scene, &mut seat, 61 * S);
+    seat.sitting_mut().unwrap().saw_more(&desk, 61 * S);
+    assert_eq!(desk_s(&seat, 61 * S), 60);
+    // The slump: nobody at 64 s, a new id in the same place at 66 s.
+    scene.faces(&[], 64 * S);
+    assert_eq!(step(&mut scene, &mut seat, 64 * S).sitting, Step::Began);
+    scene.faces(&[("f3", 0.41)], 66 * S);
+    let back = step(&mut scene, &mut seat, 66 * S);
+    assert_eq!(back.sitting, Step::Carried);
+    assert_eq!(desk_s(&seat, 66 * S), 60, "kept across the carry");
+    seat.sitting_mut().unwrap().saw_more(&desk, 121 * S);
+    assert_eq!(desk_s(&seat, 121 * S), 120, "and it runs on");
 }

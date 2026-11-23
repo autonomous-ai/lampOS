@@ -702,10 +702,10 @@ fn serve(config: Config, stop: &AtomicBool) -> io::Result<()> {
         );
         let word =
             |closed: Result<(), gate::Closed>| closed.map_or_else(|c| c.as_str(), |()| "open");
-        if let Some(line) = plan.posture.line("posture's window", word(posture_gate)) {
+        if let Some(line) = plan.posture_line(word(posture_gate)) {
             eprintln!("lamp-seen: {line}");
         }
-        if let Some(line) = plan.sitting.line("the sitting's timers", word(desk)) {
+        if let Some(line) = plan.sitting_line(word(desk)) {
             eprintln!("lamp-seen: {line}");
         }
         if plan.sitting.wipes() {
