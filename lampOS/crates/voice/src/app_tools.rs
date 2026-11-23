@@ -228,7 +228,21 @@ struct State {
     subsets: HashMap<String, (u64, Vec<String>)>,
     narrowed: Option<Narrowed>,
     calls: u64,
+    /// The app functions given the model in this process, the newest last,
+    /// at most [`CALLED_KEPT`]: what the thread keeps by name and outcome
+    /// is decided by them, never by what is offered later.
+    called: std::collections::VecDeque<String>,
+    /// The app functions [`declared`] last gave the model, after its clash
+    /// and bound checks: only these are routed to an app, so a name a lamp
+    /// function has always reaches the lamp's own.
+    declared: Vec<String>,
 }
+
+/// How many called app functions are kept by name.
+const CALLED_KEPT: usize = 64;
+
+/// This process's start, in ms: the first part of each call's id.
+static BOOT_MS: std::sync::LazyLock<u64> = std::sync::LazyLock::new(now_ms);
 
 static STATE: std::sync::LazyLock<Mutex<State>> = std::sync::LazyLock::new(Mutex::default);
 
@@ -311,6 +325,15 @@ pub fn offered(
             left_out.push(app.app.clone());
             continue;
         }
+        // Two apps can spell one function (`a-b` and `c`, `a` and `b_c`):
+        // a name an earlier app gave leaves this app out whole.
+        if tools.iter().any(|tool| {
+            let function = lamp_msgs::function_name(&app.app, &tool.name);
+            kept.iter().any(|one: &Offered| one.function == function)
+        }) {
+            left_out.push(app.app.clone());
+            continue;
+        }
         room -= cost;
         let title = title(app);
         kept.extend(tools.into_iter().map(|tool| Offered {
@@ -374,7 +397,30 @@ pub fn functions(offered: &[Offered]) -> Vec<lamp_gemini::Tool> {
 /// Whether `name` is an app tool's function: one offered from the apps
 /// running now.
 pub fn is_app_function(name: &str) -> bool {
-    on() && current().0.iter().any(|one| one.function == name)
+    on() && with_state(|state| state.declared.iter().any(|declared| declared == name))
+        .unwrap_or(false)
+        && current().0.iter().any(|one| one.function == name)
+}
+
+/// Whether `name` was given the model as an app tool's function in this
+/// process (never a lamp function's name, which [`declared`] leaves to the
+/// lamp): the thread keeps such a call by its name and outcome only,
+/// whatever is offered now (an app's `tools` or its stop may take it out
+/// of the offer after its call).
+pub fn was_called(name: &str) -> bool {
+    on() && with_state(|state| state.called.iter().any(|called| called == name)).unwrap_or(false)
+}
+
+/// Marks `name` as given the model as an app's function ([`was_called`]).
+fn mark_called(name: &str) {
+    with_state(|state| {
+        if !state.called.iter().any(|called| called == name) {
+            if state.called.len() == CALLED_KEPT {
+                state.called.pop_front();
+            }
+            state.called.push_back(name.to_owned());
+        }
+    });
 }
 
 /// The tools offered now from the running apps, and the apps left out.
@@ -406,13 +452,21 @@ pub fn declared(
     most: usize,
     now_ms: u64,
 ) -> Vec<lamp_gemini::Tool> {
-    if !on() || with_state(|state| state.offered_for).flatten().is_none() {
+    if !on() {
+        return declared;
+    }
+    // None routed until this request's functions are declared.
+    with_state(|state| state.declared.clear());
+    if with_state(|state| state.offered_for).flatten().is_none() {
         return declared;
     }
     let (offered, _) = current();
     if offered.is_empty() {
         return declared;
     }
+    // The lamp's own names, before a narrowed turn clears them: an app's
+    // function by one of them is never declared or routed, narrowed or not.
+    let lamps: Vec<String> = declared.iter().map(|tool| tool.name.clone()).collect();
     let narrowed = narrowed_now(now_ms);
     let offered: Vec<Offered> = match &narrowed {
         Some(app) => {
@@ -421,8 +475,10 @@ pub fn declared(
         }
         None => offered,
     };
+    let mut apps = Vec::new();
     for function in functions(&offered) {
-        if declared.iter().any(|tool| tool.name == function.name) {
+        if lamps.contains(&function.name) || declared.iter().any(|tool| tool.name == function.name)
+        {
             eprintln!(
                 "lamp-voice second: app tool {} not offered: the name is taken ({ENVIRONMENT})",
                 function.name
@@ -436,8 +492,13 @@ pub fn declared(
             );
             continue;
         }
+        // Given the model as an app's: a call of it is kept by name and
+        // outcome only, offered later or not ([`was_called`]).
+        mark_called(&function.name);
+        apps.push(function.name.clone());
         declared.push(function);
     }
+    with_state(|state| state.declared = apps);
     declared
 }
 
@@ -576,7 +637,10 @@ pub fn answer(request: u64, function: &str, args: &Value, blocked: bool, now_ms:
         return json!({"error": "no app runs with that tool now; nothing was done", "not_done": true});
     };
     let narrowed_away = narrowed_now(now_ms).is_some_and(|app| app != one.app);
-    if blocked || !offered_here || narrowed_away {
+    // Only a function given the model as an app's ([`declared`]).
+    let declared_here =
+        with_state(|state| state.declared.iter().any(|name| name == function)).unwrap_or(false);
+    if blocked || !offered_here || narrowed_away || !declared_here {
         eprintln!(
             "lamp-voice second: request {request}: app tool {function} refused: not the owner's turn, private, the care hold, an answer awaited, or narrowed to another app ({ENVIRONMENT})"
         );
@@ -594,7 +658,7 @@ pub fn answer(request: u64, function: &str, args: &Value, blocked: bool, now_ms:
     })
     .unwrap_or(0);
     let call = AppCall {
-        call: format!("app-{request}-{n}"),
+        call: format!("app-{}-{request}-{n}", *BOOT_MS),
         app: one.app.clone(),
         name: one.tool.name.clone(),
         args: if args.is_object() {
