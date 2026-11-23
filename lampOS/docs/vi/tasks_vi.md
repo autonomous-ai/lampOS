@@ -3399,8 +3399,10 @@ grant skill-start của nó, giống hệt kỹ năng của OpenClaw. Phần ri�
   nó cho phiên trực tiếp (`direct::takes_runs`). Wrapper theo lượt, file token
   và namespace theo lượt của Hermes không được dùng nên không được kiểm tra.
   Grant của lượt được mở cho launcher (`gateway::open_start`), và lời giao nêu
-  launcher dưới dạng `skill-start <run id>` (nó đứng đầu `PATH` của gateway),
-  thêm một dòng cho Hermes (`direct::skill_words`):
+  launcher bằng đường dẫn đầy đủ, như lời giao của OpenClaw (công cụ
+  `terminal` của Hermes lấy `PATH` từ ảnh chụp của login shell, không phải
+  của gateway, nên `skill-start` trần không được tìm thấy ở đó), thêm một
+  dòng cho Hermes (`direct::skill_words`):
   chạy nó bằng công cụ `terminal`, ở tiền cảnh (`background` false), với
   `timeout` bằng hạn của lượt (tối đa 600 s, giới hạn tiền cảnh của Hermes),
   và chờ nó kết thúc. Trên đường này không có file token theo lượt, không có
@@ -3421,10 +3423,12 @@ grant skill-start của nó, giống hệt kỹ năng của OpenClaw. Phần ri�
   (`direct::HERMES_CONTEXT_TOKENS`, 128k: ngữ cảnh thật của model không được
   đọc, nên lấy mức nhỏ hơn), dựa trên kích thước phiên do chính gateway đếm
   (các tin nhắn còn sống, chưa nén, và token của chúng). Vì Hermes tự nén và
-  kích thước của nó là sau khi nén, ngưỡng dự phòng của V1 cũng áp dụng: 40
-  lượt hoặc 250k token (`one_session::rotation_due`), do phiên đếm từ khi bắt
-  đầu (số lượt đã giao, và tổng `usage.input_tokens` của chúng) và giữ cùng id
-  qua các lần khởi động lại.
+  kích thước của nó là sau khi nén, ngưỡng dự phòng theo số lượt của V1 cũng áp
+  dụng: 40 lượt (`one_session::rotation_due`), số lượt đã giao từ khi phiên bắt
+  đầu, giữ cùng id qua các lần khởi động lại. Số token của một lượt không phải
+  là ngưỡng ở đây: `usage.input_tokens` đếm prompt của mọi lần gọi model trong
+  lượt chạy, nên một lượt tìm kiếm web đã vượt 250k trên lamp-ee17; kích thước
+  ở trên mới là thước đo ngữ cảnh, như với OpenClaw.
 - **Rớt.** Gateway khởi động lại hoặc mất giữa chừng (luồng sự kiện đứt và
   không đọc được trạng thái trong 30 s) làm lượt đang chạy, và mọi lượt xếp
   hàng sau nó, kết thúc với cùng câu `lamp_agent_gateway::DROPPED`. Không gì

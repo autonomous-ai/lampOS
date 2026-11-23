@@ -71,8 +71,8 @@
 //!    The context rotation is `reset()` too, at the engine's bounds
 //!    ([`near_limit`]: 85% of the engine's context ([`context_tokens`]) or
 //!    150 messages for a task, 60% or 100 for a make; for Hermes also V1's
-//!    40 turns or 250k tokens, `one_session::rotation_due`, since Hermes
-//!    compacts on its own and counts after it) on the gateway's own size
+//!    40 turns, `one_session::rotation_due`, since Hermes compacts on its
+//!    own and counts after it) on the gateway's own size
 //!    of the session ([`DirectSession::session_size`], read before the send
 //!    when not read since the last run), else on the words handed over and
 //!    read. A gateway down is reconnected to for ever;
@@ -354,9 +354,8 @@ pub fn context_tokens(engine: EngineKind) -> u64 {
 /// estimate `tokens` of the words handed over and read alone) near the
 /// engine's context (`one_session::near_context_limit_in` at
 /// [`context_tokens`]), or, for an engine that compacts on its own and
-/// reports after it (Hermes), V1's backstop (`one_session::rotation_due`,
-/// 40 turns or 250k tokens) on `counts`, the session's turns and tokens
-/// since it began. OpenClaw's bounds are exactly those of the one session.
+/// reports after it (Hermes), V1's turn backstop (`one_session::rotation_due`,
+/// 40 turns) on `counts`' turns; its tokens are not a bound here. OpenClaw's bounds are exactly those of the one session.
 pub fn near_limit(
     engine: EngineKind,
     size: Option<crate::harness::SessionSize>,
@@ -364,9 +363,13 @@ pub fn near_limit(
     counts: (u64, u64),
     make: bool,
 ) -> bool {
-    let (turns, counted) = counts;
+    // Only the turn count of V1's backstop: a turn's tokens count every
+    // model call's prompt in it (a web search turn passed 250k alone on
+    // ee17, 24 Nov), so the context itself is judged by `size`, as
+    // OpenClaw's is (owner: Hermes behaves as OpenClaw).
+    let (turns, _counted) = counts;
     crate::one_session::near_context_limit_in(context_tokens(engine), size, tokens, make)
-        || crate::one_session::rotation_due(engine, turns, counted)
+        || crate::one_session::rotation_due(engine, turns, 0)
 }
 
 /// The most a Hermes foreground command may run (Hermes's own
@@ -374,23 +377,21 @@ pub fn near_limit(
 /// it, and the run would end before its script.
 pub const HERMES_FOREGROUND_MOST_S: u64 = 600;
 
-/// The skill-start launcher as Hermes's gateway has it: first on its
-/// `PATH` (a link to [`crate::skill_start::LAUNCHER`], lamp-update's
-/// `hermes_gateway`). Its approval policy allows it by this bare name too.
-pub const HERMES_LAUNCHER: &str = "skill-start";
-
 /// A skill run's words for `engine` (`prompt`, the run's
-/// `gateway::open_start` prompt, which names the skill-start launcher and
-/// the run's id): Hermes is told to run `skill-start <run id>`
-/// ([`HERMES_LAUNCHER`]) with its `terminal` tool in the foreground with a
-/// timeout as long as the run's `deadline` (at most
+/// `gateway::open_start` prompt, which names the skill-start launcher by
+/// its full path, [`crate::skill_start::LAUNCHER`], and the run's id):
+/// Hermes is told to run it with its `terminal` tool in the foreground with
+/// a timeout as long as the run's `deadline` (at most
 /// [`HERMES_FOREGROUND_MOST_S`]), so the launcher's end is the run's.
+/// The launcher keeps its full path, as for OpenClaw: Hermes's `terminal`
+/// takes its `PATH` from a login shell's snapshot (`/etc/profile`), not
+/// from the gateway's, so a bare `skill-start` is not found there (ee17,
+/// 24 Nov 02:51: `skill-start: command not found`, exit 127).
 /// OpenClaw's are `prompt` as it is.
 pub fn skill_words(engine: EngineKind, prompt: &str, deadline: Duration) -> String {
     if engine != EngineKind::Hermes {
         return prompt.to_owned();
     }
-    let prompt = prompt.replace(crate::skill_start::LAUNCHER, HERMES_LAUNCHER);
     let timeout = deadline.as_secs().clamp(1, HERMES_FOREGROUND_MOST_S);
     format!(
         "{prompt}\nRun it with your `terminal` tool, in the foreground (`background` false), with `timeout` {timeout}, and wait for it to end."

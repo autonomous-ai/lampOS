@@ -166,10 +166,7 @@ fn open(base: &str, req: &Req<'_>, deadline: Instant) -> Result<TcpStream, HttpE
 type Head = (u16, Vec<(String, String)>, Vec<u8>);
 
 /// The response head, and the bytes read past it.
-fn read_head(
-    stream: &mut TcpStream,
-    deadline: Instant,
-) -> Result<Head, HttpError> {
+fn read_head(stream: &mut TcpStream, deadline: Instant) -> Result<Head, HttpError> {
     let mut buf = Vec::new();
     let mut chunk = [0u8; 4096];
     loop {

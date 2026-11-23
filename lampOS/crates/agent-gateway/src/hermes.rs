@@ -219,8 +219,11 @@ pub struct Kept {
     pub created: u64,
     /// Runs handed over into it.
     pub turns: u64,
-    /// The sum of its ended runs' `usage.input_tokens` (every model call's
-    /// prompt, so far above the context: V1's 250k backstop counts this).
+    /// The last ended run's `usage.input_tokens` (the prompts of that one
+    /// turn's model calls), as V1 compared one turn's usage with its 250k
+    /// backstop. Never summed across turns: a sum passes 250k after a few
+    /// web searches and would rotate the kept session at nearly every turn
+    /// (ee17, 24 Nov 02:55 and 03:00).
     pub tokens: u64,
 }
 
@@ -375,7 +378,8 @@ impl Session {
         self.kept.turns
     }
 
-    /// The kept session's summed `usage.input_tokens` (V1's 250k backstop).
+    /// The last ended run's `usage.input_tokens` ([`Kept::tokens`], V1's
+    /// 250k backstop, per turn).
     pub fn run_tokens(&self) -> u64 {
         self.kept.tokens
     }
@@ -635,7 +639,8 @@ impl Session {
         });
     }
 
-    /// Counts an ended run's usage once into the kept session.
+    /// Keeps an ended run's usage once as the kept session's last turn's
+    /// ([`Kept::tokens`]).
     fn count(&mut self, run: &RunId) {
         if !self.counted.insert(run.clone()) {
             return;
@@ -646,7 +651,7 @@ impl Session {
         }
         let usage = self.shared.lock().runs.get(run).and_then(|r| r.usage);
         if let Some(u) = usage {
-            self.kept.tokens = self.kept.tokens.saturating_add(u.input_tokens);
+            self.kept.tokens = u.input_tokens;
             self.save();
         }
         self.size_fresh = false;
