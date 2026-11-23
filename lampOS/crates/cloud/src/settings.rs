@@ -1521,7 +1521,7 @@ mod tests {
         let reply = changes.take()[0].reply(&identity, "t");
         assert_eq!(
             reply["error"],
-            "service must be deepseek, deepgram, elevenlabs, openai_compatible, openrouter or gemini"
+            "service must be deepseek, deepgram, elevenlabs, openai_compatible, openrouter, gemini or anthropic"
         );
         assert_eq!(
             reply["data"],
@@ -1615,6 +1615,28 @@ mod tests {
                 .unwrap()
                 .0,
             r#"{"remove":"openrouter"}"#
+        );
+    }
+
+    /// #8420: an Anthropic key goes to the helper with its model, as
+    /// Gemini's does; the helper alone decides what Anthropic takes.
+    #[test]
+    fn an_anthropic_key_goes_to_the_helper_with_its_model() {
+        let (line, id) = keys_line(
+            "keys.set",
+            &json!({"service": "anthropic", "key": "sk-ant-planted-8420", "model": "claude-sonnet-4-5", "request_id": "a1"}),
+        )
+        .unwrap();
+        assert_eq!(
+            serde_json::from_str::<Value>(&line).unwrap(),
+            json!({"set": "anthropic", "key": "sk-ant-planted-8420", "model": "claude-sonnet-4-5"})
+        );
+        assert_eq!(id.as_deref(), Some("a1"));
+        assert_eq!(
+            keys_line("keys.remove", &json!({"service": "anthropic"}))
+                .unwrap()
+                .0,
+            r#"{"remove":"anthropic"}"#
         );
     }
 
