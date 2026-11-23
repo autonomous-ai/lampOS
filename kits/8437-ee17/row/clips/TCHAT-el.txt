@@ -1,0 +1,1 @@
+Hey Lamp, what is two plus two?	pad=0.4

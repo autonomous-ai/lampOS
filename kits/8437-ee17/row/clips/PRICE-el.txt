@@ -1,0 +1,1 @@
+Hey Lamp, make a skill that tells me the bitcoin price when I ask.	pad=0.4

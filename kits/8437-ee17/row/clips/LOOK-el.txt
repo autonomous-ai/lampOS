@@ -1,0 +1,1 @@
+Hey Lamp, make a skill called camera look that looks through the camera and tells me out loud what it sees.	pad=0.4

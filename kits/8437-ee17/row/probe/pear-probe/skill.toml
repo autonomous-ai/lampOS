@@ -1,0 +1,15 @@
+asks = ["pear probe"]
+kind = "installable"
+version = "1.0.0"
+grants = ["speak"]
+# Its tool's name is not its own (as sit-back's wellbeing_nudges is not "sit-back"): the voice keeps the spoken ask
+# under the function the call named, the tool, and #8415 must find it by the tool (voice skill_task_yes.rs
+# asked_aloud_in; told_when_asked.rs key() only folds "_" into "-", so slow_probe was already slow-probe).
+tool = "fruit_check"
+
+[permissions]
+speak = true
+
+# #8437 ROW leg S test fixture, removed by unrow: a run step that says one line. Pushed, so its run asks the yes.
+[[do]]
+run = "scripts/main.py"

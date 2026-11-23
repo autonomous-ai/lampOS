@@ -1,0 +1,1 @@
+Hey Lamp, camera look.	pad=0.4

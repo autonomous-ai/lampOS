@@ -1,0 +1,14 @@
+asks = ["quick probe"]
+kind = "installable"
+version = "1.0.0"
+grants = ["speak"]
+# A tool loads it: an installed skill's asks call its tool (crates/skills/src/lib.rs; the 8180 kit's fixtures).
+tool = "quick_probe"
+
+[permissions]
+speak = true
+
+# #8437 ROW leg L test fixture, removed by unrow: a run step that says one line at once. Pushed, so its run asks
+# the person's yes first; L times that yes-ask from the end of the ask's clip.
+[[do]]
+run = "scripts/main.py"

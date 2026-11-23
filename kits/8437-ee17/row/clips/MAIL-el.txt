@@ -1,0 +1,1 @@
+Hey Lamp, make a skill that sums up my unread mail when I ask.	pad=0.4

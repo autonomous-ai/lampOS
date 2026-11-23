@@ -1,0 +1,6 @@
+#!/usr/bin/env python3
+import os, sys, time
+with open(os.environ["MOCK_LOG"], "a") as f: f.write("%.3f osascript %s\n" % (time.time(), sys.argv[1:]))
+s = " ".join(sys.argv[1:])
+if "set volume" in s: sys.exit(0)
+print(os.environ.get("MOCK_MACVOL", "50") if "output volume" in s else "output volume:50, input volume:60, alert volume:100, output muted:false")

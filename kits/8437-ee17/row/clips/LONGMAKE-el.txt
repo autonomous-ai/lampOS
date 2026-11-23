@@ -1,0 +1,1 @@
+Hey Lamp, make a skill that every morning tells me the weather, my first meeting and the top news headline, then dims the light slowly.	pad=0.4

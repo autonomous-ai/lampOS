@@ -1,0 +1,1 @@
+Hey Lamp, how many days are left in the year?	pad=0.4

@@ -1,0 +1,1 @@
+Hey Lamp, run the quick probe skill now.	pad=0.4

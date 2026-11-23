@@ -1,0 +1,27 @@
+kind = "installable"
+version = "1.0.0"
+grants = ["speak"]
+
+# voice/state is among the topics a pushed skill may read (crates/skills/src/lib.rs PUSHED_TOPICS).
+[permissions]
+speak = true
+topics = ["voice/state"]
+
+# #8437 ROW leg T test fixture, removed by unrow: no tool and no asks, so nobody's words start it. Its trigger
+# fires when the voice comes to rest after a turn (`appears`, after at least 3 s of not resting, so not at its load:
+# docs/skills.md trigger.absent_for, "at the program's start nothing has been away"), once in 30 minutes. Its run
+# needs the yes (pushed), asked at the usual priority 5, which waits the 15 s quiet after the last turn.
+[[trigger]]
+topic = "voice/state"
+field = "state"
+equals = "resting"
+when = "appears"
+absent_for = "3s"
+cooldown = "30m"
+
+# The product skips the Policy (deploy/product/lamp-skills.service LAMP_SKILLS_ASK=skip); a trigger still names it.
+[ask]
+policy = "nudge"
+
+[[do]]
+run = "scripts/main.py"

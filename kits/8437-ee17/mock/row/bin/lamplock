@@ -1,0 +1,2 @@
+#!/bin/sh
+echo "$(date +%s) lock $*" >> "$MOCK_LOG"; [ "$2" = renew ] && exit ${MOCK_RENEW_RC:-0}; exit ${MOCK_LOCK_RC:-0}

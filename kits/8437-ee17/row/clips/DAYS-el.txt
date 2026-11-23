@@ -1,0 +1,1 @@
+Hey Lamp, make a skill that tells me how many days are left in the year when I ask.	pad=0.4

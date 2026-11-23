@@ -1,0 +1,1 @@
+Hey Lamp, what's the bitcoin price?	pad=0.4
