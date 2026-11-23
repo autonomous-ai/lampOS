@@ -14,6 +14,11 @@ op=${1:-}; what=${2:-}
 case "$op" in
   push)
     S=$D/logs/stage; rm -rf $S; mkdir -p $S
+    # A copy of the fixture with this run's mark in SKILL.md: each run is another folder SHA-256, which the lamp asks
+    # aloud again (skills task.rs ask_refuses: an ask is said once a day per skill folder, "a folder changed since is
+    # another SHA-256"). No lamp state is touched for it.
+    F=$S/fixture/$(basename "$what"); mkdir -p $S/fixture && cp -R "$what" $F && printf '\n<!-- row run %s -->\n' "${ROW_NONCE:-$(date +%s)}" >> $F/SKILL.md
+    what=$F
     m=$(python3 -I - "$SDK" "$what" "$S/package.tar" <<'PY'
 import sys, os
 # lampos's push and errors modules only: the package's __init__ (its client, websockets) is never run.

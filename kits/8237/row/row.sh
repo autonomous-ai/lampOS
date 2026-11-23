@@ -4,14 +4,15 @@
 # product's own (see ../RUN-8237.md "Journal lines"). Each leg: CHECK lines, then LEG <x> PASS|FAIL|VOID.
 #   row.sh [legs]   default: P G A W  -> logs/row.txt, last line VERDICT PASS|FAIL|VOID
 set -u; D=$(cd "$(dirname "$0")" && pwd); . $D/kit.sh; L=$D/logs; O=$L/row.txt; : > $O
-POLL=${POLL:-1}; GWAIT=${GWAIT:-300}; WWAIT=${WWAIT:-120}; YESAFTER=${YESAFTER:-2}; YESWAIT=${YESWAIT:-180}; SETTLE=${SETTLE:-15}
+POLL=${POLL:-1}; GWAIT=${GWAIT:-300}; WWAIT=${WWAIT:-120}; YESAFTER=${YESAFTER:-2}; YESWAIT=${YESWAIT:-180}; SETTLE=${SETTLE:-15}; RUNAFTER=${RUNAFTER:-12}
 o(){ echo "$*" | tee -a $O; }
 S=$SKILL
 # patterns (lampOS/crates/tasks/src/skill_task.rs, lampOS/crates/skills/src/main.rs at #8237's head)
 TOLD_T="skill task: the agent's start-up wait passed 5 s: told getting ready"
 TOLD_S="skill:$S: do.task: told the lamp is getting ready: "
 ANS="skill:$S: do.task: lamp-tasks' answer carries "
-ASKED="skill:$S: do.task: not handed over: waiting for the owner's yes"
+ASKED="skill:$S: do.task: not handed over: waiting for the owner's yes (the lamp says it back and asks); asked aloud: say: spoken"
+KEPT="lamp-control: the owner's yes to $S's task kept"   # lampOS/crates/control/src/task_yes.rs
 RESEND="do.task: lamp-tasks is from before the getting-ready notice: handed over again without it"
 NOTSENT="the hand-over is not sent"
 c(){ grep -cF -- "$1" "$2" 2>/dev/null | tr -d ' '; }
@@ -30,8 +31,13 @@ P) o "== P: the fixture's yes, asked once with a warm gateway"
    if ! waitfor "$ASKED" $L/p.journal $YESWAIT; then jstop; o "CHECK (P0) the lamp never asked for the yes within ${YESWAIT} s (logs/p.journal)"; leg P VOID "no ask for the yes: G and W can't run"; continue; fi
    o "CHECK (P0) the lamp asked for the yes: $(grep -F -- "$ASKED" $L/p.journal | tail -1 | cut -d: -f4- | cut -c1-90)"
    sleep $YESAFTER; PLAY YES
-   if waitfor "$ANS" $L/p.journal $WWAIT; then sleep $SETTLE; jstop; o "CHECK (P1) a run handed over and answered: $(grep -F -- "$ANS" $L/p.journal | tail -1 | cut -d: -f4- | cut -c1-90)"; leg P PASS
-   else jstop; o "CHECK (P1) no answer from lamp-tasks within ${WWAIT} s (logs/p.journal)"; leg P VOID "the yes was not kept: G and W can't run"; fi;;
+   # A yes kept runs the task at its next trigger, never this one (skills task.rs "On the yes, the task runs at its
+   # next trigger"; voice skill_task_yes.rs APPROVED_NEXT): RUN is asked again once lamp-control kept the yes.
+   if ! waitfor "$KEPT" $L/p.journal $WWAIT; then jstop; o "CHECK (P1) lamp-control kept no yes within ${WWAIT} s (logs/p.journal)"; leg P VOID "the yes was not kept: G and W can't run"; continue; fi
+   o "CHECK (P1) lamp-control kept the owner's yes"
+   sleep $RUNAFTER; PLAY RUN
+   if waitfor "$ANS" $L/p.journal $GWAIT; then sleep $SETTLE; jstop; o "CHECK (P2) a run handed over and answered: $(grep -F -- "$ANS" $L/p.journal | tail -1 | cut -d: -f4- | cut -c1-90)"; leg P PASS
+   else jstop; o "CHECK (P2) no answer from lamp-tasks within ${GWAIT} s (logs/p.journal)"; leg P VOID "no answer after the yes: G and W can't run"; fi;;
 G) o "== G: cold gateway: the line once, before the answer"
    grep -q '^P=PASS' $L/verdicts.env || { leg G VOID "no P PASS"; continue; }
    GATE lamp-openclaw-gateway || { leg G VOID "start budget"; continue; }

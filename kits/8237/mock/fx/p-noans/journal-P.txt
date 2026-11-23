@@ -1,1 +1,2 @@
 1763850000.500000 lamp lamp-skills[1]: lamp-skills: skill:desk-hello: do.task: not handed over: waiting for the owner's yes (the lamp says it back and asks); asked aloud: say: spoken
+1763850000.800000 lamp lamp-control[2]: lamp-control: the owner's yes to desk-hello's task kept (1 grant(s))
