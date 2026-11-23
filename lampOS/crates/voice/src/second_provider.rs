@@ -10100,7 +10100,7 @@ pub fn fault(error: &net::Error) -> Fault {
         net::Error::Transport(_) => Fault::Transport,
         net::Error::Timeout(step) if step.contains("connect") => Fault::ConnectTimeout,
         net::Error::Timeout(_) => Fault::ResponseTimeout,
-        net::Error::Status(401 | 403) => Fault::Authentication,
+        net::Error::Status(401 | 403) | net::Error::KeyInvalid => Fault::Authentication,
         net::Error::Status(402) => Fault::QuotaExceeded,
         net::Error::Status(429) | net::Error::UsageLimit(_) => Fault::RateLimited,
         net::Error::Status(500..) => Fault::ServerUnavailable,
