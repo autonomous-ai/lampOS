@@ -17,7 +17,7 @@ export MOCK_FX=$FXD MOCK_LOG=$W/calls.log MOCK_STATE=$W/state MOCK_STARTS MOCK_V
 export PATH=$M/bin:$PATH BASH_ENV=$M/shim.bash SLEEPDIV=${SLEEPDIV:-25}
 export STAGE_SDK=$(cd $KIT/../.. && pwd)/lampOS/sdk/python/src
 export PUSHCMD="${MOCK_PUSHCMD:-$M/bin/push}" KIT_ENV=$W/kit.env KIT_LL=$M/bin/lamplock SSH=$M/bin/ssh SCP=$M/bin/scp AFPLAY=$M/bin/afplay OSASCRIPT=$M/bin/osascript
-export POLL=1 GWAIT=8 WWAIT=6 YESAFTER=1 SETTLE=1 ASKAFTER=1
+export POLL=1 GWAIT=8 WWAIT=6 YESWAIT=6 YESAFTER=1 SETTLE=1 ASKAFTER=1
 bash $W/run.sh > $W/out.txt 2>&1; rc=$?; echo "exit $rc" >> $W/out.txt; L=$W/row/logs
 touch $L/RELEASED; [ -f $L/renew.pid ] && kill $(cat $L/renew.pid) 2>/dev/null
 v=$(grep -h '^VERDICT' $L/row.txt 2>/dev/null | awk '{print $2}'); pb=$(grep -c '^PUTBACK OK' $L/putback.txt 2>/dev/null); rel=$(grep -c 'release' $W/calls.log)

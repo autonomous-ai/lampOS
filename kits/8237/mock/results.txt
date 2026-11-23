@@ -1,26 +1,27 @@
-a-none         expect VOID     got VOID     OK       VERDICT VOID P=PASS G=PASS A=VOID W=PASS  10:37:12 legs: VERDICT VOID P=PASS G=PASS A=VOID W=PASS  10:37:12 run.sh done: VERDICT VOID P=PASS G=PASS A=VOID W=PASS  
-a-one          expect PASS     got PASS     OK       VERDICT PASS P=PASS G=PASS A=PASS W=PASS  10:37:12 legs: VERDICT PASS P=PASS G=PASS A=PASS W=PASS  10:37:12 run.sh done: VERDICT PASS P=PASS G=PASS A=PASS W=PASS  
-a-short        expect FAIL     got FAIL     OK       VERDICT FAIL P=PASS G=PASS A=FAIL W=PASS  10:37:12 legs: VERDICT FAIL P=PASS G=PASS A=FAIL W=PASS  10:37:12 run.sh done: VERDICT FAIL P=PASS G=PASS A=FAIL W=PASS  
-a-two          expect FAIL     got FAIL     OK       VERDICT FAIL P=PASS G=PASS A=FAIL W=PASS  10:37:12 legs: VERDICT FAIL P=PASS G=PASS A=FAIL W=PASS  10:37:12 run.sh done: VERDICT FAIL P=PASS G=PASS A=FAIL W=PASS  
-bin-sha        expect NOSSH    got NOSSH    OK       10:37:09 STOP at put: bins/lamp-skills is not 0000 
-check-muted    expect STOPBACK got STOPBACK OK       10:37:09 STOP at check: no '^READY$' (read row/logs/check.txt) 
-g-dropped      expect FAIL     got FAIL     OK       VERDICT FAIL P=PASS G=FAIL A=PASS W=PASS  10:37:13 legs: VERDICT FAIL P=PASS G=FAIL A=PASS W=PASS  10:37:13 run.sh done: VERDICT FAIL P=PASS G=FAIL A=PASS W=PASS  
-g-expired      expect FAIL     got FAIL     OK       VERDICT FAIL P=PASS G=FAIL A=PASS W=PASS  10:37:14 legs: VERDICT FAIL P=PASS G=FAIL A=PASS W=PASS  10:37:15 run.sh done: VERDICT FAIL P=PASS G=FAIL A=PASS W=PASS  
-g-noanswer     expect FAIL     got FAIL     OK       VERDICT FAIL P=PASS G=FAIL A=PASS W=PASS  10:37:18 legs: VERDICT FAIL P=PASS G=FAIL A=PASS W=PASS  10:37:18 run.sh done: VERDICT FAIL P=PASS G=FAIL A=PASS W=PASS  
-g-notold       expect FAIL     got FAIL     OK       VERDICT FAIL P=PASS G=FAIL A=PASS W=PASS  10:37:17 legs: VERDICT FAIL P=PASS G=FAIL A=PASS W=PASS  10:37:18 run.sh done: VERDICT FAIL P=PASS G=FAIL A=PASS W=PASS  
-g-notsent      expect VOID     got VOID     OK       VERDICT VOID P=PASS G=VOID A=PASS W=PASS  10:37:17 legs: VERDICT VOID P=PASS G=VOID A=PASS W=PASS  10:37:18 run.sh done: VERDICT VOID P=PASS G=VOID A=PASS W=PASS  
-g-resend       expect FAIL     got FAIL     OK       VERDICT FAIL P=PASS G=FAIL A=PASS W=PASS  10:37:17 legs: VERDICT FAIL P=PASS G=FAIL A=PASS W=PASS  10:37:18 run.sh done: VERDICT FAIL P=PASS G=FAIL A=PASS W=PASS  
-g-twice        expect FAIL     got FAIL     OK       VERDICT FAIL P=PASS G=FAIL A=PASS W=PASS  10:37:18 legs: VERDICT FAIL P=PASS G=FAIL A=PASS W=PASS  10:37:19 run.sh done: VERDICT FAIL P=PASS G=FAIL A=PASS W=PASS  
-g-warm         expect VOID     got VOID     OK       VERDICT VOID P=PASS G=VOID A=PASS W=PASS  10:37:19 legs: VERDICT VOID P=PASS G=VOID A=PASS W=PASS  10:37:20 run.sh done: VERDICT VOID P=PASS G=VOID A=PASS W=PASS  
+a-none         expect VOID     got VOID     OK       VERDICT VOID P=PASS G=PASS A=VOID W=PASS  11:10:02 legs: VERDICT VOID P=PASS G=PASS A=VOID W=PASS  11:10:03 run.sh done: VERDICT VOID P=PASS G=PASS A=VOID W=PASS  
+a-one          expect PASS     got PASS     OK       VERDICT PASS P=PASS G=PASS A=PASS W=PASS  11:10:02 legs: VERDICT PASS P=PASS G=PASS A=PASS W=PASS  11:10:03 run.sh done: VERDICT PASS P=PASS G=PASS A=PASS W=PASS  
+a-short        expect FAIL     got FAIL     OK       VERDICT FAIL P=PASS G=PASS A=FAIL W=PASS  11:10:02 legs: VERDICT FAIL P=PASS G=PASS A=FAIL W=PASS  11:10:03 run.sh done: VERDICT FAIL P=PASS G=PASS A=FAIL W=PASS  
+a-two          expect FAIL     got FAIL     OK       VERDICT FAIL P=PASS G=PASS A=FAIL W=PASS  11:10:02 legs: VERDICT FAIL P=PASS G=PASS A=FAIL W=PASS  11:10:03 run.sh done: VERDICT FAIL P=PASS G=PASS A=FAIL W=PASS  
+bin-sha        expect NOSSH    got NOSSH    OK       11:09:59 STOP at put: bins/lamp-skills is not 0000 
+check-muted    expect STOPBACK got STOPBACK OK       11:10:00 STOP at check: no '^READY$' (read row/logs/check.txt) 
+g-dropped      expect FAIL     got FAIL     OK       VERDICT FAIL P=PASS G=FAIL A=PASS W=PASS  11:10:04 legs: VERDICT FAIL P=PASS G=FAIL A=PASS W=PASS  11:10:04 run.sh done: VERDICT FAIL P=PASS G=FAIL A=PASS W=PASS  
+g-expired      expect FAIL     got FAIL     OK       VERDICT FAIL P=PASS G=FAIL A=PASS W=PASS  11:10:04 legs: VERDICT FAIL P=PASS G=FAIL A=PASS W=PASS  11:10:05 run.sh done: VERDICT FAIL P=PASS G=FAIL A=PASS W=PASS  
+g-noanswer     expect FAIL     got FAIL     OK       VERDICT FAIL P=PASS G=FAIL A=PASS W=PASS  11:10:08 legs: VERDICT FAIL P=PASS G=FAIL A=PASS W=PASS  11:10:08 run.sh done: VERDICT FAIL P=PASS G=FAIL A=PASS W=PASS  
+g-notold       expect FAIL     got FAIL     OK       VERDICT FAIL P=PASS G=FAIL A=PASS W=PASS  11:10:07 legs: VERDICT FAIL P=PASS G=FAIL A=PASS W=PASS  11:10:08 run.sh done: VERDICT FAIL P=PASS G=FAIL A=PASS W=PASS  
+g-notsent      expect VOID     got VOID     OK       VERDICT VOID P=PASS G=VOID A=PASS W=PASS  11:10:07 legs: VERDICT VOID P=PASS G=VOID A=PASS W=PASS  11:10:08 run.sh done: VERDICT VOID P=PASS G=VOID A=PASS W=PASS  
+g-resend       expect FAIL     got FAIL     OK       VERDICT FAIL P=PASS G=FAIL A=PASS W=PASS  11:10:07 legs: VERDICT FAIL P=PASS G=FAIL A=PASS W=PASS  11:10:08 run.sh done: VERDICT FAIL P=PASS G=FAIL A=PASS W=PASS  
+g-twice        expect FAIL     got FAIL     OK       VERDICT FAIL P=PASS G=FAIL A=PASS W=PASS  11:10:08 legs: VERDICT FAIL P=PASS G=FAIL A=PASS W=PASS  11:10:09 run.sh done: VERDICT FAIL P=PASS G=FAIL A=PASS W=PASS  
+g-warm         expect VOID     got VOID     OK       VERDICT VOID P=PASS G=VOID A=PASS W=PASS  11:10:09 legs: VERDICT VOID P=PASS G=VOID A=PASS W=PASS  11:10:10 run.sh done: VERDICT VOID P=PASS G=VOID A=PASS W=PASS  
 lock-held      expect NOSSH    got NOSSH    OK       
-p-noans        expect VOID     got VOID     OK       VERDICT VOID P=VOID G=VOID A=VOID W=VOID  10:37:21 legs: VERDICT VOID P=VOID G=VOID A=VOID W=VOID  10:37:22 run.sh done: VERDICT VOID P=VOID G=VOID A=VOID W=VOID  
-pass           expect PASS     got PASS     OK       VERDICT PASS P=PASS G=PASS A=PASS W=PASS  10:37:22 legs: VERDICT PASS P=PASS G=PASS A=PASS W=PASS  10:37:23 run.sh done: VERDICT PASS P=PASS G=PASS A=PASS W=PASS  
-put-notok      expect STOPBACK got STOPBACK OK       10:37:20 STOP at put: no '^PUT OK' (read row/logs/put.txt) 
-putback-bad    expect KEPT     got KEPT     OK       10:37:23 legs: VERDICT PASS P=PASS G=PASS A=PASS W=PASS  10:37:23 STOP at putback: PUTBACK NOT OK (row/logs/putback.txt) 10:37:23 WARN: PUTBACK NOT OK: ./run.sh putback 
-stage-pass     expect PASS     got PASS     OK       VERDICT PASS P=PASS G=PASS A=PASS W=PASS  10:37:24 legs: VERDICT PASS P=PASS G=PASS A=PASS W=PASS  10:37:24 run.sh done: VERDICT PASS P=PASS G=PASS A=PASS W=PASS  
-stage-refused  expect STOPBACK got STOPBACK OK       10:37:22 STOP at push: no '^PUSHED ' (read row/logs/push.txt) 
-starts-out     expect NOSSH    got NOSSH    OK       10:37:22 STOP at put: start budget 
+p-noans        expect VOID     got VOID     OK       VERDICT VOID P=VOID G=VOID A=VOID W=VOID  11:10:14 legs: VERDICT VOID P=VOID G=VOID A=VOID W=VOID  11:10:14 run.sh done: VERDICT VOID P=VOID G=VOID A=VOID W=VOID  
+p-noask        expect VOID     got VOID     OK       VERDICT VOID P=VOID G=VOID A=VOID W=VOID  11:10:13 legs: VERDICT VOID P=VOID G=VOID A=VOID W=VOID  11:10:14 run.sh done: VERDICT VOID P=VOID G=VOID A=VOID W=VOID  
+pass           expect PASS     got PASS     OK       VERDICT PASS P=PASS G=PASS A=PASS W=PASS  11:10:16 legs: VERDICT PASS P=PASS G=PASS A=PASS W=PASS  11:10:19 run.sh done: VERDICT PASS P=PASS G=PASS A=PASS W=PASS  
+put-notok      expect STOPBACK got STOPBACK OK       11:10:11 STOP at put: no '^PUT OK' (read row/logs/put.txt) 
+putback-bad    expect KEPT     got KEPT     OK       11:10:19 legs: VERDICT PASS P=PASS G=PASS A=PASS W=PASS  11:10:20 STOP at putback: PUTBACK NOT OK (row/logs/putback.txt) 11:10:21 WARN: PUTBACK NOT OK: ./run.sh putback 
+stage-pass     expect PASS     got PASS     OK       VERDICT PASS P=PASS G=PASS A=PASS W=PASS  11:10:23 legs: VERDICT PASS P=PASS G=PASS A=PASS W=PASS  11:10:26 run.sh done: VERDICT PASS P=PASS G=PASS A=PASS W=PASS  
+stage-refused  expect STOPBACK got STOPBACK OK       11:10:19 STOP at push: no '^PUSHED ' (read row/logs/push.txt) 
+starts-out     expect NOSSH    got NOSSH    OK       11:10:19 STOP at put: start budget 
 vol-high       expect STOPBACK got STOPBACK OK       
-w-noans        expect VOID     got VOID     OK       VERDICT VOID P=PASS G=PASS A=PASS W=VOID  10:37:26 legs: VERDICT VOID P=PASS G=PASS A=PASS W=VOID  10:37:26 run.sh done: VERDICT VOID P=PASS G=PASS A=PASS W=VOID  
-w-told         expect FAIL     got FAIL     OK       VERDICT FAIL P=PASS G=PASS A=PASS W=FAIL  10:37:26 legs: VERDICT FAIL P=PASS G=PASS A=PASS W=FAIL  10:37:27 run.sh done: VERDICT FAIL P=PASS G=PASS A=PASS W=FAIL  
-TOTAL 25 cases: OK 25 MISMATCH 0
+w-noans        expect VOID     got VOID     OK       VERDICT VOID P=PASS G=PASS A=PASS W=VOID  11:10:28 legs: VERDICT VOID P=PASS G=PASS A=PASS W=VOID  11:10:29 run.sh done: VERDICT VOID P=PASS G=PASS A=PASS W=VOID  
+w-told         expect FAIL     got FAIL     OK       VERDICT FAIL P=PASS G=PASS A=PASS W=FAIL  11:10:28 legs: VERDICT FAIL P=PASS G=PASS A=PASS W=FAIL  11:10:29 run.sh done: VERDICT FAIL P=PASS G=PASS A=PASS W=FAIL  
+TOTAL 26 cases: OK 26 MISMATCH 0

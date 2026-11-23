@@ -4,13 +4,14 @@
 # product's own (see ../RUN-8237.md "Journal lines"). Each leg: CHECK lines, then LEG <x> PASS|FAIL|VOID.
 #   row.sh [legs]   default: P G A W  -> logs/row.txt, last line VERDICT PASS|FAIL|VOID
 set -u; D=$(cd "$(dirname "$0")" && pwd); . $D/kit.sh; L=$D/logs; O=$L/row.txt; : > $O
-POLL=${POLL:-1}; GWAIT=${GWAIT:-300}; WWAIT=${WWAIT:-120}; YESAFTER=${YESAFTER:-12}; SETTLE=${SETTLE:-15}
+POLL=${POLL:-1}; GWAIT=${GWAIT:-300}; WWAIT=${WWAIT:-120}; YESAFTER=${YESAFTER:-2}; YESWAIT=${YESWAIT:-180}; SETTLE=${SETTLE:-15}
 o(){ echo "$*" | tee -a $O; }
 S=$SKILL
 # patterns (lampOS/crates/tasks/src/skill_task.rs, lampOS/crates/skills/src/main.rs at #8237's head)
 TOLD_T="skill task: the agent's start-up wait passed 5 s: told getting ready"
 TOLD_S="skill:$S: do.task: told the lamp is getting ready: "
 ANS="skill:$S: do.task: lamp-tasks' answer carries "
+ASKED="skill:$S: do.task: not handed over: waiting for the owner's yes"
 RESEND="do.task: lamp-tasks is from before the getting-ready notice: handed over again without it"
 NOTSENT="the hand-over is not sent"
 c(){ grep -cF -- "$1" "$2" 2>/dev/null | tr -d ' '; }
@@ -23,7 +24,12 @@ leg(){ o "LEG $1 $2${3:+ ($3)}"; echo "$1=$2" >> $L/verdicts.env; }
 for x in ${@:-P G A W}; do RENEW || { o "VERDICT VOID (lock lost before leg $x)"; exit 1; }; LEG=$x; export LEG
 case $x in
 P) o "== P: the fixture's yes, asked once with a warm gateway"
-   jstart p; PLAY RUN; sleep $YESAFTER; PLAY YES
+   # The yes is played only once the lamp has asked for it (said the task back): on a lamp whose kept session
+   # opens cold after put, that ask comes a minute or more after RUN, and a yes played before it is not kept.
+   jstart p; PLAY RUN
+   if ! waitfor "$ASKED" $L/p.journal $YESWAIT; then jstop; o "CHECK (P0) the lamp never asked for the yes within ${YESWAIT} s (logs/p.journal)"; leg P VOID "no ask for the yes: G and W can't run"; continue; fi
+   o "CHECK (P0) the lamp asked for the yes: $(grep -F -- "$ASKED" $L/p.journal | tail -1 | cut -d: -f4- | cut -c1-90)"
+   sleep $YESAFTER; PLAY YES
    if waitfor "$ANS" $L/p.journal $WWAIT; then sleep $SETTLE; jstop; o "CHECK (P1) a run handed over and answered: $(grep -F -- "$ANS" $L/p.journal | tail -1 | cut -d: -f4- | cut -c1-90)"; leg P PASS
    else jstop; o "CHECK (P1) no answer from lamp-tasks within ${WWAIT} s (logs/p.journal)"; leg P VOID "the yes was not kept: G and W can't run"; fi;;
 G) o "== G: cold gateway: the line once, before the answer"
