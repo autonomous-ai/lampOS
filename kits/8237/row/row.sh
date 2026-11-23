@@ -98,7 +98,7 @@ W) o "== W: warm gateway: nothing said"
    nt=$(c "$TOLD_T" $L/w.journal); ns=$(c "$TOLD_S" $L/w.journal)
    o "CHECK (W1) lamp-tasks told nothing: $nt line(s)"; o "CHECK (W2) lamp-skills asked no line: $ns ask(s)"
    o "CHECK (W3) the run's answer was read: $([ $got = 1 ] && echo yes || echo no)"
-   if [ $got = 0 ]; then leg W VOID "no answer within ${WWAIT} s"; elif [ "$nt" = 0 ] && [ "$ns" = 0 ]; then leg W PASS; else leg W FAIL; fi;;
+   if [ $got = 0 ]; then leg W FAIL "the gateway was ready but no answer came within ${WWAIT} s (the person hears nothing); the run's last lamp-tasks line: $(grep -F "[lamp-tasks]" $L/w.journal | tail -1 | sed 's/^.*\[lamp-tasks\] //' | cut -c1-140)"; elif [ "$nt" = 0 ] && [ "$ns" = 0 ]; then leg W PASS; else leg W FAIL; fi;;
 *) o "no leg $x"; exit 2;;
 esac; done
 if grep -q '=FAIL' $L/verdicts.env; then o "VERDICT FAIL $(tr '\n' ' ' < $L/verdicts.env)"
