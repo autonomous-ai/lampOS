@@ -47,7 +47,8 @@ reported accepted cursor 480 and analysed cursor zero, but the speaker required
 analysis cursor 480. Earlier virtual reference tests bypassed that speaker
 handshake. The corrected internal protocol distinguishes prime preparation from
 analysis. `ReferenceAssembly::prime` mints the typed acknowledgement only after
-its existing epoch/discard/privacy/freshness checks and successful DSP/ring
+its existing epoch/discard/privacy/freshness checks (the prime's age at
+receipt is bounded by the same deadline as below) and successful DSP/ring
 preparation. `PrimeBarrier` is the same portable validation path called by the
 Linux speaker immediately before its guarded start. It is one-shot and retains
 the original deadline: 1 s for epoch 1, the first start after the voice

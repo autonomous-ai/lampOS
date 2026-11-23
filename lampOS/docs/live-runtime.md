@@ -113,7 +113,8 @@ wrong-epoch/privacy or expired acknowledgements fail. Only then does the speaker
 explicitly start, after another live privacy check; capture then starts its
 prepared microphone and retains sequence 1. The prime/ack barrier has a checked
 bound (1 s on epoch 1, 100 ms after; speaker and capture both use
-`reference::barrier_us`) and reference connection has
+`reference::barrier_us`, and capture refuses a prime older than it at
+receipt) and reference connection has
 a 3 s startup bound. Neither is a guarantee that arbitrary driver calls finish
 within that time. There is no blind warmup mute or discarded opening audio.
 

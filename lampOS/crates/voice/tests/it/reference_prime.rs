@@ -396,6 +396,36 @@ fn first_start_has_one_second_and_later_starts_keep_100_ms() {
     assert_eq!(later(309_000), Err(ReferenceFaultKind::BarrierTimeout));
 }
 
+/// Capture's own check of the prime's age at receipt follows the same bound
+/// (#8391): a first prime received 500 ms late is prepared, a later epoch's
+/// prime 500 ms or 100 ms late is still refused.
+#[test]
+fn a_late_first_prime_is_prepared_and_a_late_later_one_is_refused() {
+    let prime = |playback_epoch, at, discarded| ClockPrimed {
+        playback_epoch,
+        privacy_generation: 2,
+        accepted_zero_frames: PRIME_FRAMES,
+        accepted_at_us: at,
+        queue_observed_at_us: at,
+        queued_frames: PRIME_FRAMES,
+        discarded,
+    };
+    let mut echo = EchoProcessor::new(false);
+    let mut assembly = ReferenceAssembly::default();
+    assert!(
+        assembly
+            .prime(prime(1, 10_000, None), 510_000, 2, &mut echo)
+            .is_ok()
+    );
+    let later = prime(2, 600_000, Some(queued(1)));
+    for now in [1_100_000, 700_000] {
+        assert!(assembly.prime(later, now, 2, &mut echo).is_err());
+        assert_eq!(assembly.timing().playback_epoch, 1);
+    }
+    assert!(assembly.prime(later, 699_999, 2, &mut echo).is_ok());
+    assert_eq!(assembly.timing().playback_epoch, 2);
+}
+
 #[test]
 fn malformed_and_legacy_wire_ack_are_not_implicitly_upgraded() {
     for raw in [
