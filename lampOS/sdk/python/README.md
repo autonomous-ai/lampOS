@@ -315,7 +315,7 @@ it plays:
 
 ```python
 async with lamp.speaker_stream() as out:        # 16 kHz mono S16LE; sample_rate=24000 for 24 kHz
-    await out.play_wav("hello.wav")             # in real time; returns when played
+    await out.play_wav("hello.wav")             # in real time (each frame 200 ms ahead); returns when played
     await out.speaker_write(pcm_bytes)          # your own PCM, framed in 100 ms binary messages
     await out.drain()                           # wait until what was written has played
     print(out.ended, out.stats)                 # the lamp's why if it ended the stream; newest speaker.stats
