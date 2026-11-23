@@ -247,7 +247,7 @@ fn went_starting_an_app(
     awaiting_a_yes: bool,
 ) -> (Vec<Vec<Message>>, Vec<String>, Told3) {
     let (asked, outputs, told, _) =
-        went_starting_an_app_with(heard, takes, note, awaiting_a_yes, Vec::new());
+        went_starting_an_app_with(heard, takes, note, awaiting_a_yes, Vec::new(), None);
     (asked, outputs, told)
 }
 
@@ -259,6 +259,7 @@ fn went_starting_an_app_with(
     note: Option<&'static str>,
     awaiting_a_yes: bool,
     more: Vec<ToolCall>,
+    care: Option<Arc<crate::care_line::Care>>,
 ) -> (Vec<Vec<Message>>, Vec<String>, Told3, Vec<String>) {
     struct Apps {
         takes: bool,
@@ -328,7 +329,8 @@ fn went_starting_an_app_with(
         runner,
         Arc::new(Instant::now),
     )
-    .announcing(false);
+    .announcing(false)
+    .caring(care);
     if let Some(note) = note {
         engine = engine.noting_the_conversation_alone(Arc::new(move |_| Some(note)));
     }
@@ -448,6 +450,7 @@ fn a_start_app_the_app_takes_still_runs_the_rounds_other_calls() {
         None,
         false,
         vec![call("c2", "set_volume", json!({"level": 30}))],
+        None,
     );
     assert_eq!(told.len(), 1, "the app was told once: {told:?}");
     assert_eq!(ran, ["set_volume"], "the volume call was dropped");
@@ -492,6 +495,7 @@ fn a_call_that_cannot_run_once_an_app_took_the_turn_is_not_run() {
             ),
             call("c4", "set_volume", json!({"level": 30})),
         ],
+        None,
     );
     assert_eq!(
         told.len(),
@@ -504,4 +508,44 @@ fn a_call_that_cannot_run_once_an_app_took_the_turn_is_not_run() {
         outputs.iter().any(|label| label == "complete"),
         "the turn ends: {outputs:?}"
     );
+}
+
+/// #7689 part 2: on a care turn (words of self-harm, `LAMP_CARE_LINE`), a
+/// `start_app` the model calls starts nothing: the app is never told, and
+/// the model is told so and answers; the care line follows its answer.
+#[test]
+fn a_start_app_on_a_care_turn_starts_nothing() {
+    let care = Arc::new(crate::care_line::Care::new(
+        crate::care_line::CareLines::shipped(),
+        Some("US".into()),
+        "en",
+    ));
+    let (asked, outputs, told, _) = went_starting_an_app_with(
+        "I want to kill myself, start english practice",
+        true,
+        None,
+        false,
+        Vec::new(),
+        Some(care.clone()),
+    );
+    assert!(told.is_empty(), "a care turn started the app: {told:?}");
+    assert_eq!(asked.len(), 2, "the model was told and answers: {asked:?}");
+    assert!(care.is_turn(2), "kept as a care turn");
+    let line = crate::care_line::CareLines::shipped()
+        .line(Some("US"), "en")
+        .to_owned();
+    assert!(
+        outputs.iter().any(|said| said == &format!("said:{line}")),
+        "the care line follows: {outputs:?}"
+    );
+    // The same line on a route with no care starts it, as before.
+    let (_, _, told, _) = went_starting_an_app_with(
+        "I want to kill myself, start english practice",
+        true,
+        None,
+        false,
+        Vec::new(),
+        None,
+    );
+    assert_eq!(told.len(), 1, "{told:?}");
 }
