@@ -145,6 +145,10 @@ pub mod owner_place;
 /// `docs/chosen-voice.md`).
 pub mod chosen_voice;
 
+/// Where a person's own ElevenLabs key and voice go: ElevenLabs' own API, or
+/// a test lamp's `LAMP_OWN_ELEVENLABS_URL` (#8367, `docs/own-keys.md`).
+pub mod own_voice;
+
 /// The local agent's user, group, socket folder and drop-in text (the owner's
 /// switch, `docs/control.md`).
 pub mod local_agent;

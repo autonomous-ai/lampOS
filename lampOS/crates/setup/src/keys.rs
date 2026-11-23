@@ -483,6 +483,9 @@ pub struct HttpCheck {
     pub deepgram: String,
     /// ElevenLabs' API root, a test's local server in place of it.
     pub elevenlabs: String,
+    /// A test lamp's `LAMP_OWN_ELEVENLABS_URL` (`lamp_msgs::own_voice`):
+    /// the check goes there, as the voice's speech will.
+    pub switched: Option<String>,
     https_only: bool,
 }
 
@@ -491,6 +494,7 @@ impl Default for HttpCheck {
         Self {
             deepgram: DEEPGRAM_CHECK_URL.to_owned(),
             elevenlabs: ELEVENLABS_API.to_owned(),
+            switched: lamp_msgs::own_voice::switched_from_environment(),
             https_only: true,
         }
     }
@@ -503,6 +507,7 @@ impl HttpCheck {
         Self {
             elevenlabs: deepgram.clone(),
             deepgram,
+            switched: None,
             https_only: false,
         }
     }
@@ -977,6 +982,28 @@ mod tests {
     /// #8367: ElevenLabs' check is one request for the voice, the key in
     /// `xi-api-key` alone: 2xx works, 401 or 403 refuses the key, 400 or
     /// 404 the voice ID, anything else is not reached.
+    #[test]
+    fn a_switched_check_asks_the_given_address_for_one_word_with_the_key() {
+        for (status, verdict) in [(200, Verdict::Works), (401, Verdict::Refused), (404, Verdict::VoiceRefused)] {
+            let (base, served) = answering(status);
+            let voice = Given {
+                voice_id: Some("Voice8367".into()),
+                ..given(Service::ElevenLabs, "sk-planted-8367", None).unwrap()
+            };
+            let mut check = HttpCheck::local(format!("{base}/v1"));
+            check.switched = Some(format!("{base}/relay"));
+            assert_eq!(check.check(&voice), verdict, "{status}");
+            let asked = served.join().unwrap();
+            assert!(
+                asked.starts_with(
+                    "post /relay/elevenlabs/text-to-speech/voice8367/stream?output_format=pcm_24000 http/1.1"
+                ),
+                "{asked}"
+            );
+            assert!(asked.contains("xi-api-key: sk-planted-8367"), "{asked}");
+        }
+    }
+
     #[test]
     fn the_elevenlabs_check_asks_for_the_voice_with_the_key_in_its_header() {
         for (status, verdict) in [
