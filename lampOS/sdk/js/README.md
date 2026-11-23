@@ -448,6 +448,48 @@ asking only `speak`. What a push needs:
   piece 7). Without it the lamp answers `refused`, "skill push is not on this
   lamp". The product unit passes it from stable 11091 on; 11048 and older don't.
 
+## Publish your app
+
+**Staged:** built against the Store's developer API as Backend3 specified it on
+20 Nov ([#7415](https://github.com/autonomous-ai/lampOS/issues/7415#issuecomment-7035102128)),
+live on production; this SDK has been run only against a fake Store so far.
+An app (format 2, [docs/apps.md](../../docs/apps.md)) goes to the Skills
+Store; a skill goes on through the lamp. Check and pack the app with the
+Python SDK (`lamp app check DIR`, `lamp app pack DIR`); sign in with
+`lamp login` there or here, then:
+
+```js
+import { readFileSync } from 'node:fs';
+import { sendLoginCode, signIn, submitApp, submissions, requestPublic } from 'lampos';
+
+await sendLoginCode('you@example.com');           // the account emails a code
+await signIn('you@example.com', '123456');         // the code; never a password. Kept, 0600
+const app = await submitApp(readFileSync('gym-coach-1.0.0.tar'), {
+  title: 'Gym coach', category: 'health',
+  icon: readFileSync('icon.png'), cover: readFileSync('cover.png'),
+});
+console.log(app.id, app.review_status);            // pending: hidden until approved
+const { data, total } = await submissions();       // your apps; submissions(id) for one
+await requestPublic(app.id);                       // only once approved; the reviewers decide
+```
+
+- The token is kept in `~/.config/lampos/store.json` (`$LAMPOS_HOME`), the
+  file `lamp login` writes, one per account host; `LAMP_STORE_TOKEN` or
+  `{ token }` gives one instead. Production by default; `{ staging: true }`,
+  or `{ store, account }` URLs (`LAMP_STORE_URL`, `LAMP_ACCOUNT_URL`), for
+  another. Every host, path and error code is in `src/store.js`.
+- `submitApp` refuses here, before anything is sent: no sign-in, bytes that
+  are not a format-2 package (a gzip, a skill), art that is not a PNG of
+  exactly 1024x1024 (icon) or 1600x900 (cover) or is over 2 MB, a title over
+  100 or a description over 1000 characters. The Store checks the rest.
+- A refusal is a `StoreError` with the Store's `error_code` as `code` and
+  what to do in `why`: `lampos_package_invalid` with the Store's own reason,
+  `skill_name_exists`, `developer_app_only`, `authentication_error` and
+  `device_key_refused` (sign in again), `app_not_found`, `app_not_approved`,
+  `app_already_public`, and the day's limits `developer_daily_limit` (10
+  accepted uploads), `developer_attempt_limit` (30 attempts) and
+  `developer_public_limit` (3 public asks).
+
 ## Everything you can read
 
 What the lamp tells a paired computer, read from lamp-control's `watch.rs`,
@@ -679,6 +721,19 @@ and send it again. Without `retryMs`, it is a held part, as above.
 | `lamp.pushSkill(folder)` | on customer lamps from stable 11091 on (11048 and older refuse it). A skill folder (`SKILL.md`, `skill.toml` with a `version`): packed and sent in parts. The fuller check is the Python SDK's `lamp skill check` | `skills` |
 | `lamp.skills()` | | `skills` |
 | `lamp.removeSkill(name)` | one of this computer's own pushed skills | `skills` |
+
+### The Store
+
+| call | parameters |
+|---|---|
+| `sendLoginCode(email, opts)` | the account emails a sign-in code |
+| `signIn(email, code, opts)` | the account's token; kept for `lamp` unless `{ keep: false }` |
+| `submitApp(tarBytes, { icon, cover, title, description, category, filename, ...opts })` | an unsigned format-2 tar; the app, `review_status` `pending`, hidden |
+| `submissions(id, { page, limit, ...opts })` | one app of yours, or `{ data, total }` |
+| `requestPublic(id, opts)` | an approved app's ask to go public |
+| `saveToken`, `keptToken`, `forgetToken`, `endpoints` | the kept sign-in, and where the Store is |
+
+`opts` is `{ token, where }` or `{ token, staging, store, account }`.
 
 ### The `lamp` command
 

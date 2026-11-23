@@ -380,6 +380,15 @@ pairing's current grants.
 | `lamp.skills()`; CLI `lamp skill list` | `lamp.skills()` | `lamp_skills()` | Op `skill.list`: this computer's pushed skills | `skills` | one at a time for a computer; 6 a minute with the rates on | `[{name, version, sha256, on, held, pushed_at}, ...]` | `refused` "skill push is not on this lamp"; `busy` "this computer's last skill request is still with the lamp's skill helper"; `busy` "the lamp's skill helper is busy: try again" | works today (10 Nov 2026, 11091) |
 | `lamp.remove_skill(name)`; CLI `lamp skill remove NAME` | `lamp.removeSkill(name)` | `lamp_skill_remove(name)` | Op `skill.remove`: takes one of this computer's skills off the lamp | `skills` | as `skill.list` | ok | as `skill.list` | works today (10 Nov 2026, 11091) |
 
+### Publishing an app to the Store
+
+An app (format 2, [docs/apps.md](../docs/apps.md)) goes to the Skills Store, not through the lamp. No lamp and no grant: the
+developer's Autonomous account, signed in with an emailed code.
+
+| Python | JavaScript | MCP tool | What it does | Grant | Limits | Answer | Refusals | Status |
+|---|---|---|---|---|---|---|---|---|
+| `lampos.app.check(path)`, `lampos.app.pack(folder)`; CLI `lamp app check DIR\|TAR`, `lamp app pack DIR`; `lampos.store.Store`: `send_code`, `sign_in`, `submit`, `apps`, `app`, `request_public`; CLI `lamp login`, `lamp app submit DIR\|TAR`, `lamp app status [ID]`, `lamp app request-public ID`, `lamp app studio` (a page on 127.0.0.1) | `sendLoginCode`, `signIn`, `submitApp(tar, {...})`, `submissions(id?)`, `requestPublic(id)` (check and pack with the Python CLI) | — | Checks the app as the Store's reader does (less the signature) and packs the unsigned tar; signs in (`POST apiv2 …/customers/send-login-verification`, then `…/sign-in` with `grant_type: "otp"`); uploads (`POST campaign-api …/skills-store/developer/apps`, multipart `file`, `icon`, `cover`, `title`, `description`, `category`); reads `GET /apps`, `GET /apps/:id`; `POST /apps/:id/request-public` | none (the account's bearer token, kept 0600) | tar ≤ 18 MiB; icon PNG exactly 1024x1024, cover PNG 1600x900, each ≤ 2 MB; title ≤ 100, description ≤ 1000; a day per account: 10 accepted uploads, 30 attempts, 3 public asks | the app: `id`, `name`, `version`, `review_status` (`pending`, `approved`, `rejected`), `review_note`, `visibility`, `public_requested` | refused here before any upload: a check error, wrong art, no sign-in. The Store's: `lampos_package_invalid` (its reason), `skill_name_exists`, `developer_app_only`, `authentication_error`, `device_key_refused`, `app_not_found`, `app_not_approved`, `app_already_public`, `developer_daily_limit`, `developer_attempt_limit`, `developer_public_limit` | staged (23 Nov 2026): the Store's API is Backend3's, live on production since 20 Nov (#7415); the SDK is tested against a fake Store only, and has not yet uploaded to the real one |
+
 ### A skill run's linked services (control socket only)
 
 A skill's task run on the lamp's own Hermes (#6432) holds a one-run token on the control

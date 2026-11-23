@@ -214,6 +214,15 @@ Every refusal is a `LampError` with `code` and `why`, the lamp's own words;
   [references/api.md](references/api.md#the-speaker). `body.state` and
   routed `joints` come next; this skill gains them as they land.
 
+## Publishing an app to the Store
+
+An app (format 2) goes to the Skills Store, not through the lamp:
+`lamp app check DIR`, `lamp app pack DIR`, `lamp login` (the account's
+emailed code; never ask for or handle a password), `lamp app submit DIR`,
+`lamp app status [ID]`, `lamp app request-public ID`, or the page
+`lamp app studio`. `lamp logout` forgets the sign-in. The SDK README's
+"Publish your app" has the folder's shape and every refusal.
+
 ## Patterns
 
 Ready to adapt, each in Python and JS: react to presence, a CI light, a
