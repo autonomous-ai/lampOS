@@ -50,10 +50,10 @@ fn a_key_absent_present_and_removed() {
     let (reply, _) = keys::answer(r#"{"which":true}"#, &store, &mut works, true);
     // With #8367's and #8362's fields beside today's (`offers` is pinned
     // below).
-    let none = json!({"deepseek": null, "deepgram": null, "elevenlabs": null, "openai_compatible": null, "openrouter": null, "gemini": null});
+    let none = json!({"deepseek": null, "deepgram": null, "elevenlabs": null, "openai_compatible": null, "openrouter": null, "gemini": null, "anthropic": null});
     assert_eq!(
         reply,
-        json!({"done": {"deepseek": "lamp", "deepgram": "lamp", "elevenlabs": "lamp", "openai_compatible": "lamp", "openrouter": "lamp", "gemini": "lamp", "since": none, "deepseek_host": null, "voice_id": {"elevenlabs": null}, "openai_compatible_host": null, "model": none, "checked": none, "in_use": {"model": null}, "offers": reply["done"]["offers"]}})
+        json!({"done": {"deepseek": "lamp", "deepgram": "lamp", "elevenlabs": "lamp", "openai_compatible": "lamp", "openrouter": "lamp", "gemini": "lamp", "anthropic": "lamp", "since": none, "deepseek_host": null, "voice_id": {"elevenlabs": null}, "openai_compatible_host": null, "model": none, "checked": none, "in_use": {"model": null}, "offers": reply["done"]["offers"]}})
     );
     for service in ["deepseek", "deepgram"] {
         let (reply, done) = keys::answer(&set(service, ""), &store, &mut works, true);
@@ -470,6 +470,7 @@ fn elevenlabs_is_offered_beside_the_model_services() {
             {"service": "openai_compatible", "name": "OpenAI-compatible", "kind": "model", "models": [], "base_url": true, "fields": ["model"]},
             {"service": "openrouter", "name": "OpenRouter", "kind": "model", "models": [], "base_url": false, "fields": ["model"], "endpoint": "https://openrouter.ai/api/v1"},
             {"service": "gemini", "name": "Gemini", "kind": "model", "models": [], "base_url": false, "fields": ["model"], "endpoint": "https://generativelanguage.googleapis.com/v1beta/openai"},
+            {"service": "anthropic", "name": "Anthropic", "kind": "model", "models": [], "base_url": false, "fields": ["model"], "endpoint": "https://api.anthropic.com/v1"},
         ])
     );
     assert_eq!(which["elevenlabs"], "lamp");
@@ -969,6 +970,117 @@ fn a_gemini_model_is_kept_with_its_model_at_geminis_own_endpoint() {
     );
     assert!(done.unwrap().restart_voice);
     for file in ["gemini.key", "gemini.model", "gemini.checked"] {
+        assert!(!store.0.join(file).exists(), "{file}");
+    }
+}
+
+/// #8420: a person's own Anthropic key and model, by name. `offers` gives
+/// Anthropic's fixed API for the app to show (`base_url: false`); an
+/// endpoint sent with it is refused before any check. Its key and model are
+/// kept as private files, `keys.get` names the model and `in_use.model`,
+/// and keeping it takes the other own models away, Gemini's among them.
+#[test]
+fn an_anthropic_model_is_kept_with_its_model_at_anthropics_own_endpoint() {
+    let store = Store(folder("anthropic"));
+    let mut works = Told(Verdict::Works, vec![]);
+    let (reply, _) = keys::answer(r#"{"which":true}"#, &store, &mut works, true);
+    let which = &reply["done"];
+    let offer = which["offers"]
+        .as_array()
+        .expect("offers")
+        .iter()
+        .find(|offer| offer["service"] == "anthropic")
+        .expect("anthropic offered")
+        .clone();
+    assert_eq!(
+        offer,
+        json!({"service": "anthropic", "name": "Anthropic", "kind": "model", "models": [], "base_url": false, "fields": ["model"], "endpoint": "https://api.anthropic.com/v1"})
+    );
+    assert_eq!(which["anthropic"], "lamp");
+    assert_eq!(which["model"]["anthropic"], Value::Null);
+
+    // An endpoint of the person's, or no model: refused before any check,
+    // nothing of either said back.
+    for (line, words) in [
+        (
+            json!({"set": "anthropic", "key": PLANTED, "base_url": "https://elsewhere.invalid/v1", "model": "claude-sonnet-4-5"}),
+            "Anthropic takes no endpoint",
+        ),
+        (
+            json!({"set": "anthropic", "key": PLANTED}),
+            "an Anthropic key needs its model",
+        ),
+    ] {
+        let line = line.to_string();
+        let mut check = Told(Verdict::Works, vec![]);
+        let (reply, done) = keys::answer(&line, &store, &mut check, true);
+        assert_eq!(
+            reply,
+            json!({"refused": words, "code": "bad_field"}),
+            "{line}"
+        );
+        never_said(&reply, &done);
+        assert!(!reply.to_string().contains("elsewhere"), "{line}");
+        assert!(check.1.is_empty(), "{line}");
+    }
+    assert!(!store.0.exists());
+
+    // Gemini's first, then Anthropic's.
+    let gemini = json!({"set": "gemini", "key": PLANTED, "model": "gemini-2.5-flash"}).to_string();
+    keys::answer(&gemini, &store, &mut works, true);
+    let line =
+        json!({"set": "anthropic", "key": PLANTED, "model": "claude-sonnet-4-5"}).to_string();
+    let (reply, done) = keys::answer(&line, &store, &mut works, true);
+    never_said(&reply, &done);
+    assert_eq!(reply["done"]["service"], "anthropic");
+    assert_eq!(reply["done"]["code"], "works");
+    let answer = reply["done"]["answer"].as_str().unwrap();
+    assert!(
+        answer.starts_with(
+            "that key works: your conversations now go to api.anthropic.com with your key"
+        ),
+        "{answer}"
+    );
+    assert!(done.unwrap().restart_voice);
+    let asked = works.1.last().unwrap();
+    assert_eq!(
+        asked.base_url.as_deref(),
+        Some("https://api.anthropic.com/v1")
+    );
+    assert_eq!(asked.model.as_deref(), Some("claude-sonnet-4-5"));
+    for file in ["anthropic.key", "anthropic.model", "anthropic.checked"] {
+        let mode = fs::metadata(store.0.join(file))
+            .unwrap_or_else(|error| panic!("{file}: {error}"))
+            .permissions()
+            .mode();
+        assert_eq!(mode & 0o777, 0o600, "{file}");
+    }
+    assert!(!store.0.join("anthropic.url").exists());
+    for file in ["gemini.key", "gemini.model", "gemini.checked"] {
+        assert!(!store.0.join(file).exists(), "{file}");
+    }
+    let (reply, _) = keys::answer(r#"{"which":true}"#, &store, &mut works, true);
+    let which = &reply["done"];
+    never_said(&reply, &None);
+    assert_eq!(which["anthropic"], "own");
+    assert_eq!(which["gemini"], "lamp");
+    assert_eq!(which["model"]["anthropic"], "claude-sonnet-4-5");
+    assert_eq!(which["checked"]["anthropic"], "works");
+    assert_eq!(which["in_use"], json!({"model": "anthropic"}));
+    // Gemini's over it takes Anthropic's away in turn.
+    keys::answer(&gemini, &store, &mut works, true);
+    for file in ["anthropic.key", "anthropic.model", "anthropic.checked"] {
+        assert!(!store.0.join(file).exists(), "{file}");
+    }
+    // Removed: nothing of it left.
+    keys::answer(&line, &store, &mut works, true);
+    let (reply, done) = keys::answer(r#"{"remove":"anthropic"}"#, &store, &mut works, true);
+    assert_eq!(
+        reply,
+        json!({"done": {"service": "anthropic", "uses": "lamp"}})
+    );
+    assert!(done.unwrap().restart_voice);
+    for file in ["anthropic.key", "anthropic.model", "anthropic.checked"] {
         assert!(!store.0.join(file).exists(), "{file}");
     }
 }
