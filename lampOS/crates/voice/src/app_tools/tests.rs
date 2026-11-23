@@ -92,7 +92,10 @@ fn alone<T>(apps: Vec<AppsTools>, f: impl FnOnce(&Fake) -> T) -> T {
 
 /// The owner's turn, nothing held.
 fn owners_turn(request: u64, now_ms: u64) -> Vec<String> {
-    notes_for(request, now_ms, false, false, false, Some("owner-1"))
+    let notes = notes_for(request, now_ms, false, false, false, Some("owner-1"));
+    // The turn's functions declared, as each chat request does.
+    declared(lamps(), 64, now_ms);
+    notes
 }
 
 fn names(tools: &[lamp_gemini::Tool]) -> Vec<String> {
@@ -220,7 +223,7 @@ fn arguments_that_dont_fit_the_schema_send_nothing() {
         );
         assert_eq!(
             told,
-            json!({"error": "days is not a value this tool takes; nothing was sent to the app", "not_done": true})
+            json!({"error": "days takes a whole number from 1 to 7; nothing was sent to the app", "not_done": true})
         );
         let told = answer(
             1,
@@ -272,7 +275,7 @@ fn a_call_goes_to_the_app_and_its_result_is_data_in_the_apps_frame() {
         assert_eq!(
             calls,
             [AppCall {
-                call: "app-4-1".into(),
+                call: format!("app-{}-4-1", *BOOT_MS),
                 app: "gym-coach".into(),
                 name: "set_plan".into(),
                 args: json!({"days": 3, "minutes": 30}),
@@ -506,6 +509,7 @@ fn the_section_holds_eight_tools_at_the_caps_and_leaves_out_what_wont_fit() {
 #[test]
 fn the_thread_keeps_a_call_by_name_and_outcome_only() {
     alone(vec![coach()], |_| {
+        owners_turn(1, 1_000);
         let args = json!({"days": 3, "minutes": 30, "note": "a bad knee"});
         assert_eq!(
             crate::second_provider::kept_args("gym_coach_set_plan", &args),
@@ -524,4 +528,121 @@ fn the_thread_keeps_a_call_by_name_and_outcome_only() {
             Some("not done")
         );
     });
+}
+
+/// A call's id carries this process's start, so one made after a restart
+/// never repeats an id from before it (the app's idempotency key).
+#[test]
+fn a_calls_id_is_new_after_a_restart() {
+    alone(vec![coach()], |fake| {
+        owners_turn(4, 1_000);
+        answer(4, "gym_coach_get_progress", &json!({}), false, 1_000);
+        let id = fake.calls.lock().unwrap()[0].call.clone();
+        assert_eq!(id, format!("app-{}-4-1", *BOOT_MS));
+        assert!(*BOOT_MS > 1_600_000_000_000, "milliseconds since 1970");
+        assert!(lamp_msgs::call_id_ok(&id));
+    });
+}
+
+/// A call whose own result takes it out of the offer (its `tools`), or
+/// whose app then stops, is still kept by name and outcome only: the
+/// thread's keeping is decided by what was called, not by what is
+/// offered later.
+#[test]
+fn a_call_out_of_the_offer_later_is_still_kept_bare() {
+    alone(vec![coach()], |fake| {
+        owners_turn(1, 1_000);
+        *fake.answer.lock().unwrap() = Ok(json!({"ok": true, "tools": ["get_progress"]}));
+        let args = json!({"days": 3, "minutes": 30, "note": "a bad knee"});
+        let told = answer(1, "gym_coach_set_plan", &args, false, 1_000);
+        assert!(
+            !is_app_function("gym_coach_set_plan"),
+            "out of the offer now"
+        );
+        assert_eq!(
+            crate::second_provider::kept_args("gym_coach_set_plan", &args),
+            Some(json!({}))
+        );
+        assert_eq!(
+            crate::second_provider::kept_result("gym_coach_set_plan", &told),
+            Some("ok")
+        );
+        fake.running.lock().unwrap().clear();
+        assert_eq!(
+            crate::second_provider::kept_args("gym_coach_set_plan", &args),
+            Some(json!({}))
+        );
+        // A function never called as an app's is not taken for one.
+        assert_eq!(
+            crate::second_provider::kept_args("gym_coach_other", &args),
+            None
+        );
+    });
+}
+
+/// An app whose name and tool spell a lamp function (`set` and `volume`
+/// make `set_volume`) never takes it: it is not declared, on a narrowed
+/// turn either, and the model's call of it is the lamp's own, kept as the
+/// lamp's. Two apps spelling one function: the later is left out whole.
+#[test]
+fn an_apps_function_never_takes_a_lamp_functions_name() {
+    let set = AppsTools {
+        app: "set".into(),
+        title: "Set".into(),
+        since_ms: 1,
+        tools: vec![
+            tool("volume", "Change the app's own sound level.", None),
+            tool("mode", "Choose the app's mode.", None),
+        ],
+    };
+    alone(vec![set.clone()], |fake| {
+        owners_turn(1, 1_000);
+        assert_eq!(
+            names(&declared(lamps(), 64, 1_000)),
+            ["set_volume", "use_skill", "set_mode"],
+            "the lamp's set_volume, once"
+        );
+        assert!(!is_app_function("set_volume"));
+        assert!(is_app_function("set_mode"));
+        // Called anyway as the app's: refused, nothing sent.
+        assert_eq!(
+            answer(1, "set_volume", &json!({}), false, 1_000)["error"],
+            NOT_NOW
+        );
+        assert!(fake.calls.lock().unwrap().is_empty());
+        // Kept exactly as the lamp keeps its own, with the switch off.
+        let args = json!({"level": 3});
+        ON_FOR_TEST.with(|cell| cell.set(Some(false)));
+        let lamps_own = crate::second_provider::kept_args("set_volume", &args);
+        ON_FOR_TEST.with(|cell| cell.set(Some(true)));
+        assert_eq!(
+            crate::second_provider::kept_args("set_volume", &args),
+            lamps_own,
+            "kept as the lamp's own"
+        );
+        assert!(!was_called("set_volume"));
+        // A narrowed turn after the app's result: still not the app's.
+        answer(1, "set_mode", &json!({}), false, 1_000);
+        owners_turn(2, 2_000);
+        assert_eq!(names(&declared(lamps(), 64, 2_000)), ["set_mode"]);
+        assert!(!is_app_function("set_volume"));
+    });
+    let a_b = AppsTools {
+        app: "a-b".into(),
+        title: "A B".into(),
+        since_ms: 1,
+        tools: vec![tool("c", "One thing.", None)],
+    };
+    let a = AppsTools {
+        app: "a".into(),
+        title: "A".into(),
+        since_ms: 2,
+        tools: vec![tool("b_c", "Another thing.", None)],
+    };
+    let (kept, left_out) = offered(&[a_b, a], &HashMap::new());
+    assert_eq!(
+        kept.iter().map(|one| one.app.as_str()).collect::<Vec<_>>(),
+        ["a-b"]
+    );
+    assert_eq!(left_out, ["a"]);
 }

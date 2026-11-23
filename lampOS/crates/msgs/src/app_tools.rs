@@ -261,7 +261,34 @@ pub fn check_args(schema: Option<&Value>, args: &Value) -> Result<(), String> {
             _ => false,
         };
         if !fits {
-            return Err(format!("{name} is not a value this tool takes"));
+            return Err(match field.get("type").and_then(Value::as_str) {
+                Some(kind @ ("integer" | "number")) => format!(
+                    "{name} takes {} from {} to {}",
+                    if kind == "integer" {
+                        "a whole number"
+                    } else {
+                        "a number"
+                    },
+                    field["minimum"],
+                    field["maximum"]
+                ),
+                Some("string") => match field.get("enum").and_then(Value::as_array) {
+                    Some(values) => format!(
+                        "{name} takes one of: {}",
+                        values
+                            .iter()
+                            .filter_map(Value::as_str)
+                            .collect::<Vec<_>>()
+                            .join(", ")
+                    ),
+                    None => format!(
+                        "{name} takes words of at most {} characters",
+                        field["maxLength"]
+                    ),
+                },
+                Some("boolean") => format!("{name} takes true or false"),
+                _ => format!("{name} is not a value this tool takes"),
+            });
         }
     }
     Ok(())
@@ -382,18 +409,17 @@ pub struct AppCall {
     pub args: Value,
 }
 
-/// A call's id: `app-<request>-<n>`.
+/// A call's id: `app-<boot>-<request>-<n>`, each a number: `boot` is the
+/// voice process's own start (its milliseconds), so a call made after a
+/// restart never repeats an id from before it (the app's idempotency key).
 pub fn call_id_ok(call: &str) -> bool {
+    let parts: Vec<&str> = call.split('-').collect();
     call.len() <= 64
-        && call
-            .strip_prefix("app-")
-            .and_then(|rest| rest.split_once('-'))
-            .is_some_and(|(request, n)| {
-                !request.is_empty()
-                    && !n.is_empty()
-                    && request.bytes().all(|b| b.is_ascii_digit())
-                    && n.bytes().all(|b| b.is_ascii_digit())
-            })
+        && parts.len() == 4
+        && parts[0] == "app"
+        && parts[1..]
+            .iter()
+            .all(|part| !part.is_empty() && part.bytes().all(|b| b.is_ascii_digit()))
 }
 
 impl AppCall {
@@ -581,15 +607,15 @@ mod tests {
         assert_eq!(check(json!({"days": 3})), Err("minutes is needed".into()));
         assert_eq!(
             check(json!({"days": 9, "minutes": 30})),
-            Err("days is not a value this tool takes".into())
+            Err("days takes a whole number from 1 to 7".into())
         );
         assert_eq!(
             check(json!({"days": 3, "minutes": 30, "goal": "fun"})),
-            Err("goal is not a value this tool takes".into())
+            Err("goal takes one of: move, strength, stamina, flexibility".into())
         );
         assert_eq!(
             check(json!({"days": 3, "minutes": 30, "note": "x".repeat(201)})),
-            Err("note is not a value this tool takes".into())
+            Err("note takes words of at most 200 characters".into())
         );
         assert_eq!(
             check(json!({"days": 3, "minutes": 30, "other": 1})),
@@ -597,7 +623,7 @@ mod tests {
         );
         assert_eq!(
             check(json!({"days": "3", "minutes": 30})),
-            Err("days is not a value this tool takes".into())
+            Err("days takes a whole number from 1 to 7".into())
         );
         assert_eq!(
             check(json!([1])),
@@ -611,13 +637,19 @@ mod tests {
     #[test]
     fn a_call_and_its_answer_name_a_call_an_app_and_nothing_else() {
         let call = AppCall {
-            call: "app-12-1".into(),
+            call: "app-1700000000000-12-1".into(),
             app: "gym-coach".into(),
             name: "set_plan".into(),
             args: json!({"days": 3}),
         };
         assert_eq!(call.check(), Ok(()));
-        for id in ["app-12", "kept-12-1", "app--1", "app-1-x"] {
+        for id in [
+            "app-12-1",
+            "kept-1-12-1",
+            "app-1--1",
+            "app-1-1-x",
+            "app-1-2-3-4",
+        ] {
             let bad = AppCall {
                 call: id.into(),
                 ..call.clone()
@@ -625,7 +657,7 @@ mod tests {
             assert!(bad.check().is_err(), "{id}");
         }
         let done = AppCalled {
-            call: "app-12-1".into(),
+            call: "app-1700000000000-12-1".into(),
             app: "gym-coach".into(),
             result: Some(json!({"ok": true})),
             error: None,
@@ -654,7 +686,7 @@ mod tests {
         assert_eq!(failed.check(), Ok(()));
         assert!(
             serde_json::from_str::<AppCalled>(
-                r#"{"call":"app-1-1","app":"a","error":"x","extra":1}"#
+                r#"{"call":"app-1-1-1","app":"a","error":"x","extra":1}"#
             )
             .is_err()
         );
