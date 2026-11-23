@@ -1551,7 +1551,6 @@ mod tests {
         assert_eq!(refused, ("bad_request", NOT_A_TASK_LINE.to_owned()));
     }
 
-
     /// #8158: a `run` step's outcome. Succeeded (exit 0 within its bound
     /// and something said), nothing more is said. Failed in any way, the
     /// one fixed line is said only when the person's words started it, and
