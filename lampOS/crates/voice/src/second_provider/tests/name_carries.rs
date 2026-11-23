@@ -1302,3 +1302,53 @@ async fn a_calls_words_past_the_name_are_judged_by_their_words() {
         );
     }
 }
+
+/// #8114, the Reviewer-lead's P2 on #8398: with `LAMP_NAME_FACE_OR_WORDS`
+/// a wordless call's put-in "Lamp." never reaches the rule through the
+/// name's carry. A room line begun 2 s after it, one person shown to have
+/// said both, is judged by its own words and held; without the switch it
+/// is judged as "Lamp. <its words>", as before. A name the person said
+/// ("Hey lamp") still goes before the line it carries, with the switch.
+#[tokio::test(start_paused = true)]
+async fn a_wordless_calls_put_in_name_never_carries_to_the_rule() {
+    let line = "I need a gift for my sister.";
+    for (name, called, own, judged_as, answered) in [
+        ("", true, true, line, false),
+        ("", true, false, "Lamp. I need a gift for my sister.", true),
+        (
+            "Hey lamp",
+            false,
+            true,
+            "Hey lamp I need a gift for my sister.",
+            true,
+        ),
+    ] {
+        let played = script(&[name, line]);
+        let judged = Judged::default();
+        let (engine, now) = lamp(&played, true, &judged);
+        let mut engine = if own {
+            engine.judging_a_wordless_call_by_its_words()
+        } else {
+            engine
+        };
+        say_the_name(&mut engine, called, true);
+        say_after(&mut engine, &now, Duration::from_millis(2_000)).await;
+        assert_eq!(turn(&mut engine).await.last().unwrap(), "complete");
+        let judged = judged.lock().unwrap().clone();
+        assert_eq!(
+            judged
+                .last()
+                .map(|(request, _, words)| (*request, words.as_str())),
+            Some((2, judged_as)),
+            "{name:?} {own}"
+        );
+        let asked = asked(&played);
+        assert_eq!(
+            asked
+                .iter()
+                .any(|asked| format!("{asked:?}").contains("gift for my sister")),
+            answered,
+            "{name:?} {own}: {asked:?}"
+        );
+    }
+}
