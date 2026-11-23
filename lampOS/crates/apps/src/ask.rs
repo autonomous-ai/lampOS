@@ -75,8 +75,28 @@ fn listed_json(app: &Listed) -> Value {
         said["title"] = json!(app.title);
         said["logs"] = json!(app.logs);
         said["pushed"] = json!(pushed);
+        said["pushed_by"] = pushed_by(pushed);
     }
     said
+}
+
+/// The computer an app was pushed from, as a pushed skill's row says it
+/// (lamp-cloud's `skills::PushedBy`): `computer`, its name at pairing (at
+/// most 64 bytes, no control characters), and `client`, its pairing id. From
+/// the record, so the phone's row and the door's answers agree.
+pub fn pushed_by(pushed: &Pushed) -> Value {
+    let computer: String = pushed
+        .client_name
+        .as_deref()
+        .unwrap_or_default()
+        .chars()
+        .filter(|c| !c.is_control())
+        .scan(0, |bytes, c| {
+            *bytes += c.len_utf8();
+            (*bytes <= MOST_CLIENT).then_some(c)
+        })
+        .collect();
+    json!({"computer": computer, "client": pushed.client})
 }
 
 /// lamp-control's answer line, as [`answer`]'s: `{"ok":...}` or
@@ -114,6 +134,10 @@ pub fn answer_door(on: bool, line: &str, parts: &mut Parts) -> Value {
             })
             .and_then(|()| read_staged(&parts.layout.staging, &path, parts.staged_owner))
             .and_then(|bytes| {
+                let pushed = Pushed {
+                    client,
+                    client_name,
+                };
                 install_pushed(
                     parts.layout,
                     parts.fx,
@@ -121,14 +145,12 @@ pub fn answer_door(on: bool, line: &str, parts: &mut Parts) -> Value {
                     parts.reader,
                     &bytes,
                     parts.build,
-                    &Pushed {
-                        client,
-                        client_name,
-                    },
+                    &pushed,
                 )
                 .map(|done| {
                     json!({"name": done.name, "version": done.version,
-                           "updated": done.updated, "started": done.started})
+                           "updated": done.updated, "started": done.started,
+                           "pushed_by": pushed_by(&pushed)})
                 })
             }),
     };
