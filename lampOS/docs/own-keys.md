@@ -225,8 +225,10 @@ against ElevenLabs' own service.
   own key and voice (LAMP_OWN_KEYS)", never the key or the ID. The helper
   restarts the voice only once the lamp is quiet ("The route at its next
   start"), so the change is heard from the next thing the lamp says, and a
-  sentence being spoken is never cut. The lamp's fixed lines are cached by
-  voice, so they're rendered again in the person's.
+  sentence being spoken is never cut. Not the lamp's cached fixed lines:
+  the speech cache (`say/tts_cache.rs`) is made from the configuration
+  without the person's keys, so those lines stay in the lamp's own voice
+  (a follow-up, #8367).
 - **The fallback:** the relay's address, key and voice are kept beside the
   person's. A piece ElevenLabs refuses for the person's key or voice (401,
   402, 403 or 404, a bad key, a voice gone, credits run out) is said in the
