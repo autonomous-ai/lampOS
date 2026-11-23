@@ -827,7 +827,7 @@ impl Reminders {
         let by_skill = value.as_deref() == Ok("skill");
         // Config is validated in the child. A slow/missing directory cannot
         // delay audio startup; parent startup only creates/spawns its IPC peer.
-        let transport = transport::Transport::spawn(&std::env::current_exe()?)?;
+        let transport = transport::Transport::spawn(&crate::process::own_binary()?)?;
         Ok(Some(Self {
             transport,
             offer: None,

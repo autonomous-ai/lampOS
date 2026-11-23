@@ -145,15 +145,16 @@ impl OwnMemory {
         let dir = std::env::temp_dir().join(format!("lamp-nightly-probe-{}", std::process::id()));
         private_folder(&dir)?;
         let socket = dir.join("memory.sock");
-        let child = std::process::Command::new(binary)
+        let mut command = std::process::Command::new(binary);
+        command
             .args(["--dir"])
             .arg(dir.join("store"))
             .arg("--socket")
             .arg(&socket)
             .args(["--memory-days", "--utc-offset-minutes", "0"])
             .stdout(std::process::Stdio::null())
-            .stderr(std::process::Stdio::null())
-            .spawn()?;
+            .stderr(std::process::Stdio::null());
+        let child = crate::process::spawn_named(&mut command)?;
         let own = Self { child, dir };
         for _ in 0..100 {
             if crate::tools::exchange(&socket, &json!({"op":"status"}), Duration::from_secs(1))
@@ -347,6 +348,25 @@ mod tests {
             assert_eq!(mode, 0o700, "{}", folder.display());
         }
         std::fs::remove_dir_all(&dir).unwrap();
+    }
+
+    /// #7402: the probe's own lamp-memory, its program missing, is named in
+    /// the failure, the kind kept, and nothing else is started.
+    #[test]
+    fn the_probes_own_memory_start_of_a_missing_program_names_it() {
+        let error = OwnMemory::start(Path::new("/nonexistent/lamp-memory-7402"))
+            .err()
+            .expect("a missing program is not started");
+        let _ = std::fs::remove_dir_all(
+            std::env::temp_dir().join(format!("lamp-nightly-probe-{}", std::process::id())),
+        );
+        assert_eq!(error.kind(), io::ErrorKind::NotFound);
+        assert!(
+            error
+                .to_string()
+                .starts_with("spawn /nonexistent/lamp-memory-7402: "),
+            "{error}"
+        );
     }
 
     #[test]

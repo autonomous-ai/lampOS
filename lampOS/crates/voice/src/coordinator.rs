@@ -3468,8 +3468,10 @@ fn run_source(
     // only withdraws reminder authority; healthy capture and conversation stay.
     let reminders = RefCell::new(match crate::reminders::Reminders::from_environment() {
         Ok(reminders) => reminders,
-        Err(_) => {
-            eprintln!("lamp-voice: Schedule consumer unavailable; reminders remain pending");
+        Err(error) => {
+            eprintln!(
+                "lamp-voice: Schedule consumer unavailable ({error}); reminders remain pending"
+            );
             None
         }
     });
