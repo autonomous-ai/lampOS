@@ -1483,4 +1483,106 @@ mod tests {
             let _ = fs::remove_dir_all(&folder);
         }
     }
+
+    /// #8420: Gemini's check is one request to its fixed OpenAI-compatible
+    /// endpoint, `GET /models/<model>` with the key as the bearer. Its id
+    /// comes back as `models/<id>` or `<id>`; 404 is no such model. A bad
+    /// key is a 400 there, not a 401: refused only by its own error body,
+    /// as seen live on 24 Nov with a made-up key ("Please pass a valid API
+    /// key", `INVALID_ARGUMENT`; the native API's `API_KEY_INVALID`); any
+    /// other 400 is not the key's. The key is never said back.
+    #[test]
+    fn a_gemini_check_reads_the_one_model_and_refuses_a_bad_key_by_its_400() {
+        fn reply(status: u16, body: &str) -> String {
+            format!(
+                "HTTP/1.1 {status} X\r\ncontent-type: application/json\r\ncontent-length: {}\r\nconnection: close\r\n\r\n{body}",
+                body.len()
+            )
+        }
+        /// The real check, sent to the local server in place of Gemini.
+        struct Local(String);
+        impl Check for Local {
+            fn check(&mut self, given: &Given) -> Verdict {
+                assert_eq!(
+                    given.base_url.as_deref(),
+                    Some("https://generativelanguage.googleapis.com/v1beta/openai")
+                );
+                let local = Given {
+                    base_url: Some(self.0.clone()),
+                    ..given.clone()
+                };
+                HttpCheck::local(String::new()).check(&local)
+            }
+        }
+        let live_400 = r#"{"error":{"code":400,"message":"Please pass a valid API key","status":"INVALID_ARGUMENT"}}"#;
+        let native_400 = r#"{"error":{"code":400,"message":"API key not valid. Please pass a valid API key.","status":"INVALID_ARGUMENT","details":[{"@type":"type.googleapis.com/google.rpc.ErrorInfo","reason":"API_KEY_INVALID","domain":"googleapis.com"}]}}"#;
+        let plain_400 = r#"{"error":{"code":400,"message":"Invalid JSON payload received.","status":"INVALID_ARGUMENT"}}"#;
+        let line =
+            json!({"set": "gemini", "key": "AIza-made-up-8420", "model": "gemini-2.5-flash"})
+                .to_string();
+        for (served, code) in [
+            (
+                reply(
+                    200,
+                    r#"{"id":"models/gemini-2.5-flash","object":"model","owned_by":"google"}"#,
+                ),
+                "works",
+            ),
+            (
+                reply(
+                    200,
+                    r#"{"id":"gemini-2.5-flash","object":"model","owned_by":"google"}"#,
+                ),
+                "works",
+            ),
+            (
+                reply(404, r#"{"error":{"code":404,"status":"NOT_FOUND"}}"#),
+                "bad_field",
+            ),
+            (reply(400, live_400), "refused"),
+            (reply(400, native_400), "refused"),
+            (reply(401, ""), "refused"),
+            (reply(403, ""), "refused"),
+            (reply(400, plain_400), "unreached"),
+            (reply(500, ""), "unreached"),
+        ] {
+            let (base, served) = answering_with(&served);
+            let folder = std::env::temp_dir().join(format!(
+                "lamp-setup-keys-gemini-{code}-{}",
+                std::process::id()
+            ));
+            let _ = fs::remove_dir_all(&folder);
+            let store = Store(folder.join("own"));
+            let (reply, done) = answer(
+                &line,
+                &store,
+                &mut Local(format!("{base}/v1beta/openai")),
+                true,
+            );
+            assert!(done.is_some(), "the check never ran: {reply}");
+            let asked = served.join().unwrap();
+            assert!(
+                asked.starts_with("get /v1beta/openai/models/gemini-2.5-flash http/1.1"),
+                "{asked}"
+            );
+            assert!(
+                asked.contains("authorization: bearer aiza-made-up-8420"),
+                "{asked}"
+            );
+            let said = done.unwrap().said;
+            assert!(!reply.to_string().contains("made-up"), "{reply}");
+            assert!(!said.contains("made-up"), "{said}");
+            if code == "works" {
+                assert_eq!(reply["done"]["code"], "works", "{reply}");
+                assert!(store.0.join("gemini.key").is_file());
+            } else {
+                assert_eq!(reply["code"], code, "{reply}");
+                assert!(!store.0.join("gemini.key").exists());
+            }
+            if code == "bad_field" {
+                assert_eq!(reply["refused"], "Gemini has no model by that name");
+            }
+            let _ = fs::remove_dir_all(&folder);
+        }
+    }
 }
