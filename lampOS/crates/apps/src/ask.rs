@@ -3,9 +3,9 @@
 //! the verbs themselves, and the only path in it is an install's staged file, which [`crate::staging`] holds to a plain name directly in the staging folder.
 use crate::{
     effects::Effects,
-    install::install,
+    install::{Pushed, install, install_pushed},
     layout::Layout,
-    manage::{list, remove_with_yes, start, stop},
+    manage::{Listed, list, list_pushed_by, remove_pushed, remove_with_yes, start, stop},
     package::PackageReader,
     remove::Companions,
     staging::read_staged,
@@ -27,6 +27,115 @@ pub enum Request {
     Stop(String),
     Remove(String),
     Install { path: String },
+}
+
+/// What lamp-control alone may ask, for a paired computer's own pushed apps
+/// (docs/apps.md, "An app from your own computer"): it holds the pairing and
+/// its grants, and names the computer. No verb here takes a Store package,
+/// and none of [`Request`]'s is taken from lamp-control.
+#[derive(Debug, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case", deny_unknown_fields)]
+pub enum DoorRequest {
+    InstallPushed {
+        path: String,
+        client: String,
+        #[serde(default)]
+        client_name: Option<String>,
+    },
+    ListPushedBy(String),
+    RemovePushed {
+        client: String,
+        name: String,
+    },
+}
+
+pub fn parse_door(line: &str) -> Result<DoorRequest, String> {
+    serde_json::from_str(line.trim()).map_err(|_| {
+        "lamp-control's request is one line: {\"install_pushed\":{\"path\",\"client\",\"client_name\"}}, \
+         {\"list_pushed_by\":CLIENT} or {\"remove_pushed\":{\"client\",\"name\"}}"
+            .to_owned()
+    })
+}
+
+/// The most bytes of a pairing's id or name, as lamp-control keeps them.
+const MOST_CLIENT: usize = 64;
+
+fn client_ok(client: &str) -> Result<(), String> {
+    if client.is_empty() || client.len() > MOST_CLIENT || client.chars().any(char::is_control) {
+        return Err("not a computer's pairing id".to_owned());
+    }
+    Ok(())
+}
+
+fn listed_json(app: &Listed) -> Value {
+    let mut said = json!({"name": app.name, "version": app.version, "grants": app.grants,
+                          "net": app.net, "stopped": app.stopped});
+    if let Some(pushed) = &app.pushed {
+        said["sha256"] = json!(app.sha256);
+        said["title"] = json!(app.title);
+        said["logs"] = json!(app.logs);
+        said["pushed"] = json!(pushed);
+    }
+    said
+}
+
+/// lamp-control's answer line, as [`answer`]'s: `{"ok":...}` or
+/// `{"refused":WHY}`; with the switch off everything is refused.
+pub fn answer_door(on: bool, line: &str, parts: &mut Parts) -> Value {
+    let request = match parse_door(line) {
+        Ok(request) => request,
+        Err(why) => return json!({"refused": why}),
+    };
+    if !on {
+        return json!({"refused": OFF});
+    }
+    let done = match request {
+        DoorRequest::ListPushedBy(client) => {
+            if let Err(why) = client_ok(&client) {
+                return json!({"refused": why});
+            }
+            let apps: Vec<Value> = list_pushed_by(parts.layout, &client)
+                .iter()
+                .map(listed_json)
+                .collect();
+            return json!({"ok": {"apps": apps}});
+        }
+        DoorRequest::RemovePushed { client, name } => client_ok(&client)
+            .and_then(|()| remove_pushed(parts.layout, parts.fx, parts.skills, &client, &name))
+            .map(|_| json!("removed")),
+        DoorRequest::InstallPushed {
+            path,
+            client,
+            client_name,
+        } => client_ok(&client)
+            .and_then(|()| match &client_name {
+                Some(name) => client_ok(name),
+                None => Ok(()),
+            })
+            .and_then(|()| read_staged(&parts.layout.staging, &path, parts.staged_owner))
+            .and_then(|bytes| {
+                install_pushed(
+                    parts.layout,
+                    parts.fx,
+                    parts.skills,
+                    parts.reader,
+                    &bytes,
+                    parts.build,
+                    &Pushed {
+                        client,
+                        client_name,
+                    },
+                )
+                .map(|done| {
+                    json!({"name": done.name, "version": done.version,
+                           "updated": done.updated, "started": done.started})
+                })
+            }),
+    };
+    match done {
+        Ok(said) => json!({"ok": said}),
+        Err(why) => json!({"refused": why}),
+    }
 }
 
 pub fn parse(line: &str) -> Result<Request, String> {
@@ -62,13 +171,7 @@ pub fn answer(on: bool, line: &str, parts: &mut Parts) -> Value {
     }
     let done = match request {
         Request::List {} => {
-            let apps: Vec<Value> = list(parts.layout)
-                .into_iter()
-                .map(|a| {
-                    json!({"name": a.name, "version": a.version, "grants": a.grants,
-                           "net": a.net, "stopped": a.stopped})
-                })
-                .collect();
+            let apps: Vec<Value> = list(parts.layout).iter().map(listed_json).collect();
             return json!({"ok": {"apps": apps}});
         }
         Request::Start(name) => start(parts.layout, parts.fx, &name).map(|()| "started"),

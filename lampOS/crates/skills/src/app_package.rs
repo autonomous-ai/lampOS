@@ -468,6 +468,25 @@ pub fn check_manifest(manifest: &AppManifest) -> Result<(), String> {
 /// size and SHA-256 and no file but the listed, the entry's module, the
 /// companion skills and the assets. Nothing is written anywhere.
 pub fn read_app_package_bytes(bytes: &[u8], keys: &[[u8; 32]]) -> Result<AppPackage, String> {
+    read_app_package(bytes, Some(keys))
+}
+
+/// What a pushed app's `signed_by` says: it carries no signature.
+pub const UNSIGNED: &str = "unsigned";
+
+/// What a pushed package that carries a signature is told.
+pub const PUSHED_IS_UNSIGNED: &str = "it carries lamp-skill.sig: an app pushed from a computer is unsigned (a signed one is the Store's)";
+
+/// A package pushed from the owner's own paired computer (docs/apps.md, "An
+/// app from your own computer"): every check [`read_app_package_bytes`]
+/// makes but the signature, and it must carry none, so a Store package is
+/// never taken by this path. Only the apps helper's `install_dev`, which
+/// lamp-control alone may ask, reads with it.
+pub fn read_pushed_app_package_bytes(bytes: &[u8]) -> Result<AppPackage, String> {
+    read_app_package(bytes, None)
+}
+
+fn read_app_package(bytes: &[u8], keys: Option<&[[u8; 32]]>) -> Result<AppPackage, String> {
     if bytes.len() as u64 > MOST_PACKAGE_BYTES {
         return Err(format!(
             "more than {MOST_PACKAGE_BYTES} bytes: too big for an app"
@@ -480,7 +499,11 @@ pub fn read_app_package_bytes(bytes: &[u8], keys: &[[u8; 32]]) -> Result<AppPack
         folder,
     } = read_tar(bytes, MOST_DEPTH)?;
     let manifest_bytes = manifest.ok_or(format!("no {MANIFEST}: not an app's package"))?;
-    let signed_by = check_signature(&manifest_bytes, signature.as_deref(), keys)?;
+    let signed_by = match keys {
+        Some(keys) => check_signature(&manifest_bytes, signature.as_deref(), keys)?,
+        None if signature.is_some() => return Err(PUSHED_IS_UNSIGNED.to_owned()),
+        None => UNSIGNED.to_owned(),
+    };
     let manifest: AppManifest =
         serde_json::from_slice(&manifest_bytes).map_err(|error| format!("{MANIFEST}: {error}"))?;
     check_manifest(&manifest)?;

@@ -3,7 +3,7 @@
 //! lock, and none runs on an app that is being installed or removed.
 use crate::{
     effects::{Effects, Verb},
-    install::{Record, installed_record},
+    install::{Pushed, Record, installed_record},
     layout::Layout,
     lock::AppsLock,
     name::{app_name_ok, net_unit, plain_unit},
@@ -23,6 +23,13 @@ pub struct Listed {
     pub net: bool,
     /// The owner stopped it.
     pub stopped: bool,
+    /// The package's SHA-256.
+    pub sha256: String,
+    /// The manifest's title, as installed (none if it can't be read).
+    pub title: Option<String>,
+    pub logs: bool,
+    /// The computer it was pushed from; none for a Store app.
+    pub pushed: Option<Pushed>,
 }
 
 fn unit_for(record: &Record, name: &str) -> String {
@@ -140,9 +147,68 @@ pub fn list(layout: &Layout) -> Vec<Listed> {
                 version: record.version,
                 grants: record.grants,
                 net: record.net,
+                sha256: record.sha256,
+                title: title_of(layout, &name),
+                logs: record.logs,
+                pushed: record.pushed,
             })
         })
         .collect()
+}
+
+/// The installed manifest's title.
+fn title_of(layout: &Layout, name: &str) -> Option<String> {
+    let text =
+        fs::read_to_string(layout.code.join(name).join("current").join("lamp-skill.json")).ok()?;
+    let manifest: serde_json::Value = serde_json::from_str(&text).ok()?;
+    manifest.get("title")?.as_str().map(str::to_owned)
+}
+
+/// The apps `client` pushed, by name. Read-only, as [`list`].
+pub fn list_pushed_by(layout: &Layout, client: &str) -> Vec<Listed> {
+    list(layout)
+        .into_iter()
+        .filter(|listed| {
+            listed
+                .pushed
+                .as_ref()
+                .is_some_and(|pushed| pushed.client == client)
+        })
+        .collect()
+}
+
+/// What a remove of another's app or a Store app by a computer says.
+pub const NOT_PUSHED_BY: &str = "this computer did not push an app of that name";
+
+/// A computer's remove of an app it pushed: no owner's yes (the pairing is
+/// the consent, as for its push), only its own push, never a Store app nor
+/// another computer's. Then the remove runs as the owner's does.
+pub fn remove_pushed(
+    layout: &Layout,
+    fx: &mut dyn Effects,
+    skills: &mut dyn Companions,
+    client: &str,
+    name: &str,
+) -> Result<Removed, String> {
+    if !app_name_ok(name) {
+        return Err(format!("not an app name: {name:?}"));
+    }
+    {
+        let _held = AppsLock::take(&layout.state, layout.lock_wait)?;
+        if has(&layout.state, name, Mark::Removing) || has(&layout.state, name, Mark::Installing) {
+            return Err(BUSY_APP.to_owned());
+        }
+        let record = installed_record(layout, name).ok_or_else(|| NOT_INSTALLED.to_owned())?;
+        if record
+            .pushed
+            .as_ref()
+            .is_none_or(|pushed| pushed.client != client)
+        {
+            return Err(NOT_PUSHED_BY.to_owned());
+        }
+        set(&layout.state, name, Mark::Removing).map_err(|e| format!("a mark: {e}"))?;
+    }
+    remove(layout, fx, skills, name)
 }
 
 /// The owner's remove: the yes is for the installed version and package
