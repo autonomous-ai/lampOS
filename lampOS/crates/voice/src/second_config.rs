@@ -607,10 +607,25 @@ impl SecondConfig {
     /// key, never a key or a URL. A key that can't be read is passed over
     /// for the relay, said by its error's kind. Off: as it was, no line.
     pub fn with_own_keys(
-        mut self,
+        self,
         on: bool,
         credentials: Option<&std::ffi::OsStr>,
     ) -> (Self, Vec<String>) {
+        let switched = lamp_msgs::own_voice::switched_from_environment();
+        self.with_own_keys_at(on, credentials, switched.as_deref())
+    }
+
+    /// [`Self::with_own_keys`] with a test lamp's `LAMP_OWN_ELEVENLABS_URL`
+    /// given (`switched`, `lamp_msgs::own_voice::switched`): the person's
+    /// ElevenLabs voice goes there in place of [`ELEVENLABS_API`], and one
+    /// more journal line names its host.
+    pub fn with_own_keys_at(
+        mut self,
+        on: bool,
+        credentials: Option<&std::ffi::OsStr>,
+        switched: Option<&str>,
+    ) -> (Self, Vec<String>) {
+        let _ = switched;
         if !on {
             return (self, Vec::new());
         }
@@ -1559,6 +1574,33 @@ mod tests {
     /// live speech straight at ElevenLabs' own API in their voice, with one
     /// journal line that names neither the key nor the voice ID. Off, the
     /// same files change nothing.
+    #[test]
+    fn a_test_lamps_switch_sends_the_persons_voice_to_its_address() {
+        let (_, config) = written("own-voice-switched", r#","tts_provider":"elevenlabs""#);
+        let relay = load_from_path(&config).unwrap();
+        let units = directory("own-voice-switched-units");
+        let dir = Some(units.as_os_str());
+        private(&units.join("own_elevenlabs.key"), "sk-planted-8394\n");
+        private(&units.join("own_elevenlabs.voice"), "PersonVoice8394\n");
+        let at = "https://campaign-api.autonomous.ai/api/v1/ai";
+        let (own, lines) = relay.clone().with_own_keys_at(true, dir, Some(at));
+        assert_eq!(own.tts_base_url, at);
+        assert_eq!(own.tts_key.expose(), "sk-planted-8394");
+        assert!(
+            lines.contains(&"ElevenLabs: the person's own voice goes to campaign-api.autonomous.ai, not ElevenLabs' own API (LAMP_OWN_ELEVENLABS_URL, test lamps only)".to_owned()),
+            "{lines:?}"
+        );
+        // Unset: ElevenLabs' own API, and no such line.
+        let (own, lines) = relay.clone().with_own_keys_at(true, dir, None);
+        assert_eq!(own.tts_base_url, ELEVENLABS_API);
+        assert!(!lines.iter().any(|line| line.contains("LAMP_OWN_ELEVENLABS_URL")), "{lines:?}");
+        // No key of the person's: the switch changes nothing.
+        fs::remove_file(units.join("own_elevenlabs.key")).unwrap();
+        let (alone, lines) = relay.clone().with_own_keys_at(true, dir, Some(at));
+        assert_eq!(alone.tts_base_url, relay.tts_base_url);
+        assert!(!lines.iter().any(|line| line.contains("LAMP_OWN_ELEVENLABS_URL")), "{lines:?}");
+    }
+
     #[test]
     fn the_persons_elevenlabs_key_and_voice_speak_in_place_of_the_lamps() {
         let planted = "sk-planted-8367-elevenlabs-fake";
