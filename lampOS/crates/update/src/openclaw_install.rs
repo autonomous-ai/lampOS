@@ -2004,6 +2004,7 @@ fn steps(
     if let Err(why) = run(&["systemctl", "reset-failed", UNIT].map(str::to_owned)) {
         say(&format!("{UNIT} not reset-failed: {why}"));
     }
+    settled(run, say);
     if let Err(why) = run(&["systemctl", "restart", UNIT].map(str::to_owned)) {
         return fail("gateway", format!("systemctl restart {UNIT}: {why}"), say);
     }
@@ -2166,6 +2167,56 @@ const GATEWAY_WAITS: [Duration; 8] = if cfg!(test) {
 /// Whether the gateway's unit is active (`systemctl is-active`).
 fn gateway_active(run: &mut Runner) -> bool {
     run(&["systemctl", "is-active", "--quiet", UNIT].map(str::to_owned)).is_ok()
+}
+
+/// How many times [`settled`] looks for the gateway listening, at most.
+pub const SETTLE_TRIES: u32 = 75;
+/// The wait between those looks: 75 × 2 s, 150 s at most (the gateway's
+/// first start is about 60 s; its stop budget at startup 85 s).
+pub const SETTLE_AGAIN: Duration = if cfg!(test) {
+    Duration::from_millis(1)
+} else {
+    Duration::from_secs(2)
+};
+
+/// #8324: before the install's restart, a gateway running but not yet
+/// listening on [`PORT`] (in its first start, as just restarted by a
+/// lamp-control restart through `PartOf=`, a round's try-restart, or
+/// `Restart=always`) is waited for until it listens, [`SETTLE_TRIES`] ×
+/// [`SETTLE_AGAIN`] at most. A stop in that window drained for about 80 s,
+/// ran into the 90 s `TimeoutStopSec`, was SIGKILLed and left OpenClaw's
+/// state unreadable (gate G on lamp-52e6); a stop of one listening takes
+/// about 3 s. A gateway not running, or a listen not readable, waits for
+/// nothing.
+fn settled(run: &mut Runner, say: &mut dyn FnMut(&str)) {
+    if !gateway_active(run) {
+        return;
+    }
+    let sport = format!("sport = :{PORT}");
+    for tries in 0..SETTLE_TRIES {
+        match run(&["ss", "-Hltn", &sport].map(str::to_owned)) {
+            Err(why) => {
+                say(&format!(
+                    "{UNIT}: its listen on {PORT} not read: {why}; restarted now"
+                ));
+                return;
+            }
+            Ok(out) if !out.trim().is_empty() => {
+                if tries > 0 {
+                    say(&format!("{UNIT} listens on {PORT} now: restarted (#8324)"));
+                }
+                return;
+            }
+            Ok(_) if tries == 0 => say(&format!(
+                "{UNIT} is starting, not listening on {PORT} yet: the restart waits for it (#8324)"
+            )),
+            Ok(_) => {}
+        }
+        std::thread::sleep(SETTLE_AGAIN);
+    }
+    say(&format!(
+        "{UNIT} still not listening on {PORT}: restarted anyway (#8324)"
+    ));
 }
 
 /// An [`exec_allowlist_args`] edit as it is run: as `lampos`, through
