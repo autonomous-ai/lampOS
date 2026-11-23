@@ -5250,6 +5250,66 @@ fn the_product_keeps_the_one_session_as_the_kept_session() {
     assert_eq!(on("Environment=LAMP_OPENCLAW_V1_TOOLS=on"), 1);
 }
 
+/// M8: the product's lamp-tasks speaks to OpenClaw's gateway directly
+/// (`LAMP_TASKS_OPENCLAW_DIRECT`, `on` exactly), once, in lamp-tasks alone:
+/// no other product unit names it. Its way to the gateway stays open: no
+/// network sandbox (the gateway's loopback port is the lamp's own, its
+/// namespaces never a network one) and OpenClaw's folder, with the token,
+/// not hidden from it.
+#[test]
+fn the_product_speaks_to_openclaws_gateway_directly() {
+    // lamp_tasks::direct::SWITCH (lamp-update does not depend on lamp-tasks).
+    let name = "LAMP_TASKS_OPENCLAW_DIRECT";
+    let line = format!("Environment={name}=on");
+    for (unit, text) in install::PRODUCT {
+        let on = section(text, "Service")
+            .iter()
+            .filter(|set| **set == line)
+            .count();
+        let mentioned = text
+            .lines()
+            .filter(|set| !set.starts_with('#') && set.contains(name))
+            .count();
+        let owner = *unit == "lamp-tasks.service";
+        assert_eq!(on, usize::from(owner), "{unit}: {line}");
+        assert_eq!(mentioned, on, "{unit}: {name}");
+    }
+    let tasks = install::PRODUCT
+        .iter()
+        .find(|(name, _)| *name == "lamp-tasks.service")
+        .unwrap()
+        .1;
+    for set in section(tasks, "Service") {
+        for closed in [
+            "PrivateNetwork=",
+            "IPAddressDeny=",
+            "IPAddressAllow=",
+            "RestrictAddressFamilies=",
+            "NetworkNamespacePath=",
+            "ProtectHome=",
+            "ProtectSystem=",
+            "TemporaryFileSystem=",
+        ] {
+            assert!(!set.starts_with(closed), "lamp-tasks: {set}");
+        }
+        if set.starts_with("InaccessiblePaths=") || set.starts_with("ReadOnlyPaths=") {
+            assert!(
+                !set.contains("/var/lib/lampos-openclaw"),
+                "lamp-tasks: {set}"
+            );
+        }
+    }
+    use lamp_update::openclaw_install::{NS_FLAGS, shown, wrapper_text_for};
+    assert!(
+        !NS_FLAGS.contains(&"--net"),
+        "the gateway's namespaces must leave it on the lamp's loopback"
+    );
+    for (skills, one_path) in [(false, false), (true, false), (true, true)] {
+        let wrapper = wrapper_text_for(shown(skills, one_path));
+        assert!(!wrapper.contains("--net"), "{wrapper}");
+    }
+}
+
 /// #7245: the product's lamp-voice makes a skill on the lamp's agent with
 /// the guide, on the one run path (named on #7737, El's P2).
 #[test]

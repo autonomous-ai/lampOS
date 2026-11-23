@@ -1345,6 +1345,9 @@ pub struct CloseJob {
     pub task_id: u64,
     pub machine_id: String,
     pub agent_id: String,
+    /// The task's engine ([`engine_of`]): a direct OpenClaw task is never
+    /// read or closed through Harness (`crate::direct::lamp_path`).
+    pub engine: EngineKind,
     pub answer: String,
     pub asked: Option<String>,
     /// Which try this is, from 1 to [`CLOSE_TRIES`], for the journal.
@@ -1359,6 +1362,10 @@ pub struct ObservationJob {
     /// machine's agent only when told which (`--machine`, since 0.4.2).
     pub machine_id: String,
     pub agent_id: String,
+    /// The task's engine ([`engine_of`]): a direct OpenClaw task is read
+    /// from its gateway run, never by Harness's `show`
+    /// (`crate::direct::lamp_observe`).
+    pub engine: EngineKind,
 }
 
 pub struct Engine<P: Persistence> {
@@ -2754,6 +2761,37 @@ impl<P: Persistence> Engine<P> {
         Ok(true)
     }
 
+    /// `LAMP_TASKS_OPENCLAW_DIRECT` on: each watched task whose direct run
+    /// has ended is read at once ([`Engine::push`]), as Harness's `watch`
+    /// and `wait` push theirs, not at the watch's next read up to
+    /// [`WATCH_EARLY_MS`] later (ee17: 23 s from the run's end to its
+    /// observation). `pushed` holds the tasks already asked, so each is
+    /// pushed once; one the engine can't take now is tried at the next turn.
+    pub fn push_direct_ended(
+        &mut self,
+        now: &Clock,
+        pushed: &mut std::collections::BTreeSet<u64>,
+    ) -> Result<(), Error> {
+        let Some(direct) = crate::direct::lamp() else {
+            return Ok(());
+        };
+        let watched = self.watched(now);
+        pushed.retain(|id| watched.iter().any(|task| task.task_id == *id));
+        let ended = direct.ended_agents();
+        if ended.is_empty() {
+            return Ok(());
+        }
+        for task in watched {
+            if pushed.contains(&task.task_id) || !ended.contains(&task.agent_id) {
+                continue;
+            }
+            if self.push(task.task_id, now)? {
+                pushed.insert(task.task_id);
+            }
+        }
+        Ok(())
+    }
+
     /// The tasks whose latest read was asked for by a push ([`Engine::push`]),
     /// whatever it found: one still watched after it was not settled by it,
     /// and is left out of `wait` until the watch's own next read replaces
@@ -3025,6 +3063,7 @@ impl<P: Persistence> Engine<P> {
             task_id: task.id,
             machine_id: machine_of(task).to_owned(),
             agent_id: task.dispatch.agent_id.clone().expect("accepted task"),
+            engine: engine_of(task),
             answer: told.answer.clone(),
             asked: told.ask.clone(),
             tries,
@@ -3111,6 +3150,7 @@ impl<P: Persistence> Engine<P> {
             request_id: read.request_id,
             machine_id: machine_of(task).to_owned(),
             agent_id: task.dispatch.agent_id.clone().expect("accepted task"),
+            engine: engine_of(task),
         };
         self.save(next)?;
         Ok(Some(job))
@@ -3150,7 +3190,10 @@ impl<P: Persistence> Engine<P> {
                 .any(|o| o.digest == observed_digest);
             let confirmed = task.read.as_ref().is_some_and(|read| read.confirmed);
             let idle = observation.state == "idle" && settled(&observation) && !kept && !confirmed;
-            if !settled(&observation) || (idle && seen != Some(&observed_digest)) {
+            // A direct turn's answer comes whole from the run's final event
+            // (`crate::direct`): settled at once, no second look.
+            let whole = crate::direct::lamp_owns(&observation.agent_id).is_some();
+            if !settled(&observation) || (idle && !whole && seen != Some(&observed_digest)) {
                 let watch_idle = idle.then(|| observed_digest.clone());
                 let failure = if idle { "idle_once" } else { "working" };
                 return self.watch_looked(job, watch_idle, background_since, failure, now);
@@ -7349,6 +7392,105 @@ mod tests {
         assert!(task.watch_idle.is_none());
         assert!(!engine.push(id, &clock(50)).unwrap());
         assert!(!engine.push(999, &clock(50)).unwrap());
+    }
+
+    /// ee17 task 13: a direct run's end is read at once (a push), not at
+    /// the watch's next read 30 s on; pushed once; with no direct session,
+    /// nothing is pushed.
+    #[test]
+    fn a_direct_runs_end_is_read_at_once() {
+        let (mut engine, _memory) = opened();
+        let id = accepted(&mut engine, 10);
+        let mut pushed = std::collections::BTreeSet::new();
+        // No direct session: nothing pushed, the watch's schedule holds.
+        engine.push_direct_ended(&clock(20), &mut pushed).unwrap();
+        assert!(engine.begin_observation(&clock(20)).unwrap().is_none());
+        crate::direct::set_test_lamp(Some(crate::direct::tests::lamp_owning(
+            AGENT,
+            "Lumi, Sunny and Archie.",
+        )));
+        engine.push_direct_ended(&clock(20), &mut pushed).unwrap();
+        let job = engine.begin_observation(&clock(20));
+        crate::direct::set_test_lamp(None);
+        let job = job.unwrap().expect("read at once, 10 ms after the end");
+        assert_eq!((job.task_id, job.agent_id.as_str()), (id, AGENT));
+        assert_eq!(pushed.into_iter().collect::<Vec<_>>(), vec![id]);
+    }
+
+    /// ee17 2026-11-23 18:1x: a direct run failed by a gateway drop. Its
+    /// observation, read from the direct session, carries the
+    /// drop's "try again" words as `data.answer`, the field the voice's
+    /// stopped-task news reads (`GetObservation`), state `failed`.
+    #[test]
+    fn a_dropped_direct_runs_observation_answer_is_the_try_again_words() {
+        let (mut engine, _memory) = opened();
+        let id = accepted(&mut engine, 10);
+        let mut pushed = std::collections::BTreeSet::new();
+        crate::direct::set_test_lamp(Some(crate::direct::tests::lamp_dropped(AGENT)));
+        engine.push_direct_ended(&clock(20), &mut pushed).unwrap();
+        let job = engine.begin_observation(&clock(20)).unwrap().unwrap();
+        let observed = crate::direct::lamp_owns(AGENT).and_then(|direct| direct.observe(AGENT));
+        crate::direct::set_test_lamp(None);
+        let observed = observed.expect("the direct session's");
+        engine
+            .finish_observation(&job, observed, &clock(25))
+            .unwrap();
+        let task = &engine.state.tasks[find(&engine.state, id).unwrap()];
+        let observation_id = task.observations[0].id;
+        let got = engine
+            .handle(
+                &Request::GetObservation { id, observation_id },
+                &clock(26),
+                false,
+            )
+            .unwrap();
+        assert_eq!(got["data"]["state"], "failed");
+        assert_eq!(got["data"]["answer"], lamp_agent_gateway::openclaw::DROPPED);
+    }
+
+    /// U4 on the direct path: a direct turn's idle answer is the run's
+    /// final event, whole, so the watch keeps it at its first look (no
+    /// second identical read), stamped with this boot's clock, and it is in
+    /// `settled[]` at once; the same read of a Harness agent is only seen
+    /// once (`idle_once`).
+    #[test]
+    fn a_direct_turns_first_idle_answer_is_kept_and_settled_at_once() {
+        for direct in [false, true] {
+            let (mut engine, _memory) = opened();
+            let id = accepted(&mut engine, 10);
+            if direct {
+                crate::direct::set_test_lamp(Some(crate::direct::tests::lamp_owning(
+                    AGENT,
+                    "Lumi, Sunny and Archie.",
+                )));
+            }
+            let at = 10 + WATCH_EARLY_MS;
+            assert!(engine.watch(&clock(at)).unwrap());
+            let job = engine.begin_observation(&clock(at)).unwrap().unwrap();
+            engine
+                .finish_observation(&job, data("Lumi, Sunny and Archie."), &clock(at + 5))
+                .unwrap();
+            crate::direct::set_test_lamp(None);
+            let task = &engine.state.tasks[find(&engine.state, id).unwrap()];
+            if direct {
+                assert_eq!(task.observations.len(), 1);
+                assert_eq!(task.observations[0].observed.boot_id, "test-boot");
+                assert_eq!(task.observations[0].observed.monotonic_ms, at + 5);
+                let settled = engine.settled_within(&clock(at + 6), u64::MAX);
+                assert_eq!(settled.len(), 1);
+                assert_eq!(
+                    (settled[0].task_id, settled[0].state.as_str()),
+                    (id, "idle")
+                );
+            } else {
+                assert!(task.observations.is_empty());
+                assert_eq!(
+                    task.read.as_ref().unwrap().code.as_deref(),
+                    Some("idle_once")
+                );
+                assert!(engine.settled_within(&clock(at + 6), u64::MAX).is_empty());
+            }
+        }
     }
 
     #[test]

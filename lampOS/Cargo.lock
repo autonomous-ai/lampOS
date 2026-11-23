@@ -1980,6 +1980,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "lamp-agent-gateway"
+version = "0.1.0"
+dependencies = [
+ "serde",
+ "serde_json",
+ "sha2",
+ "tempfile",
+ "tungstenite",
+]
+
+[[package]]
 name = "lamp-air"
 version = "0.1.0"
 dependencies = [
@@ -2740,6 +2751,7 @@ name = "lamp-tasks"
 version = "0.1.0"
 dependencies = [
  "getrandom 0.4.3",
+ "lamp-agent-gateway",
  "lamp-bus",
  "lamp-checked-replace",
  "lamp-ipc",

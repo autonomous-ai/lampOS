@@ -652,8 +652,8 @@ lần chạy, và được trả lời khi lần chạy kết thúc
       target riêng của đèn trong Harness, như khi đã đăng nhập; target này
       chạy được khi không có tài khoản (#6407: không xem machines, không
       `--machine`, việc chạy dưới id riêng của máy). Ghi một dòng nhật ký:
-      "skill task <run>: direct execution is unavailable; Harness is signed
-      out, so trying Harness's own lamp target". Dòng này mô tả một lần thử,
+      "skill task <run>: a run without Harness is unavailable; Harness is
+      signed out, so trying Harness's own lamp target". Dòng này mô tả một lần thử,
       không phải từ chối cuối cùng hay khẳng định thành công.
       Vì vậy một đèn đã reset với OpenClaw là
       mặc định vẫn chạy skill qua gateway của OpenClaw và launcher
@@ -2883,6 +2883,204 @@ khi đăng xuất, và với 0.6.60 khi đăng nhập (ROW của #7507).
   gì. Việc nói không có câu này: nó chỉ được báo lỗi
   `one_session_not_started` của #7919 qua Task news, không bao giờ cả hai.
   Câu này được nghe cùng câu trả lời, không phải ngay lúc thay phiên.
+
+### Nói thẳng với OpenClaw (`LAMP_TASKS_OPENCLAW_DIRECT=on` trong unit lamp-tasks của sản phẩm)
+
+Khi môi trường riêng của lamp-tasks có `LAMP_TASKS_OPENCLAW_DIRECT=on` (đúng
+`on`; giá trị khác, hoặc không đặt, là tắt), lamp-tasks giao mọi lượt OpenClaw
+thẳng cho gateway của OpenClaw qua `lamp_agent_gateway::AgentSession`
+(`crates/agent-gateway`): một kết nối và một phiên sống lâu. Cách này thay
+Harness CLI cho OpenClaw (`harness new/reply/ensure/wait/show/close/ps`,
+`openclaw tui` trong tmux, nguồn của các phiên bị kẹt #7906, #8001, #6226) và
+các lệnh CLI `openclaw … --gateway` (`approvals get`, `approvals allowlist
+add`, `gateway call sessions.delete`). Hermes vẫn đi đường cũ. Mã nằm ở
+`crates/tasks/src/direct.rs`.
+
+Phiên là `lamp_agent_gateway::openclaw::Session` (`direct::lamp_session`):
+`Config` mặc định, với URL lấy từ `gateway::PORT` và hàng rào lấy từ
+`skill_start::LAUNCHER`. Tức là `ws://127.0.0.1:18789`, token trong
+`/var/lib/lampos-openclaw/gateway-token`, phiên được giữ `agent:main:lamp`, mỗi
+việc được giao như một lượt chạy riêng (`queueMode` `followup`), và các yêu cầu
+phê duyệt được trả lời theo chính sách của hàng rào skill-start. `lamp-tasks.service` của sản
+phẩm bật nó (M8; [switches.md](../switches.md)).
+
+Khi công tắc bật và đã có phiên:
+
+- **Lúc khởi động.** Một luồng bơm (`openclaw-direct`) kết nối ngay và mở hoặc
+  nhận lại phiên được giữ, không cần ai hỏi. Một lần nhìn thất bại được thử lại
+  sau 0,5 s, mỗi lần gấp đôi, tối đa 30 s (2 s khi có việc đang chờ). Khi đã
+  sẵn sàng và rảnh, nó nhìn lại mỗi 30 s. Pane của một phiên
+  (`LAMP_TASKS_ONE_SESSION`) không được mở, vì nó chỉ nhận lượt của OpenClaw.
+- **Việc nói ra.** Một việc OpenClaw cho chính máy của đèn, không nêu tên phiên,
+  được xếp hàng trong phiên trực tiếp và trả lời `joined` với agent id riêng:
+  một UUID mới cho mỗi lượt. Kho theo dõi nó như mọi việc `joined`, qua
+  `observe` và `status`, trả lời những id đó từ chính lượt chạy. Nó không bao
+  giờ được đưa vào `wait` hay `watch` của Harness (`direct::harness_watched`),
+  vốn chưa từng có nó (`UNKNOWN_HARNESS`): việc kết thúc của nó được đọc từ
+  chính lượt chạy. Việc định
+  tuyến là một biến thể của backend production (`runtime::Production::Direct`):
+  lượt OpenClaw của đèn đi vào phiên trực tiếp, mọi lời gọi khác đi vào backend
+  Harness bên trong. Bước chờ của worker tasks-harness (`gateway::launch_with`)
+  vẫn như cũ, nhưng probe của nó là trạng thái sẵn sàng của phiên
+  (`OpenclawDirect::gateway`, một `gateway::Probe`), không phải cổng. Việc giao
+  chờ phiên sẵn sàng, tối đa 60 s
+  (`gateway::READY_WITHIN`). Quá hạn mà chưa sẵn sàng, việc là `not_sent`
+  `openclaw_gateway_not_ready`, và Task news nói "I'm still getting ready".
+- **`do.task` của kỹ năng và make.** `HarnessRunner::run` giao lượt chạy cho
+  phiên trực tiếp thay cho bước chờ gateway và pane. Việc lượt chạy có đi
+  thẳng hay không (agent mặc định của đèn là gateway agent của OpenClaw) được
+  kiểm tra trước bước kiểm tra không-Harness, nên lượt chạy trực tiếp không bao
+  giờ đọc trạng thái đăng nhập của Harness. Thư mục, grant skill-start
+  (`gateway::open_start`, hàng rào) và token của nó vẫn như cũ. Chỉ việc giao
+  và việc chờ kết thúc là thay đổi. Việc chờ phiên sẵn sàng tối đa 240 s
+  (`gateway::SERVING_WITHIN`) hoặc đến hạn của lượt chạy, bằng cùng bước chờ
+  `Gateway::before_launch_until`. Lượt chạy kết thúc tốt ghi `skill task <run>:
+  ended, OpenClaw's gateway says idle, after <N> s; its agent: started (the
+  lamp's default agent)`. Câu trả lời của kỹ
+  năng chỉ được giữ khi launcher đã nhận lần khởi động và hàng rào báo script
+  đã chạy (`Live::ran`); nếu không, lượt chạy thất bại đóng, như trước. Câu trả
+  lời của make là `answer.md` trong thư mục của nó, nếu không có thì lấy từ
+  chat (`make_answer`). Lượt bị hủy hoặc quá hạn được dừng trên gateway
+  (`chat.abort`).
+- **Mỗi lần một lượt.** Các lượt vào lần lượt từng cái: việc nói ra trước lượt
+  kỹ năng và make, rồi cũ nhất trước. Văn bản của mỗi lượt giống của một phiên:
+  `New task <id>:`, rồi dòng ngôn ngữ trả lời, rồi lời. Một lượt đang chờ lượt
+  trước nó đọc là `starting`, với dòng `waiting for the task before it to end`.
+- **Bị kẹt.** Nếu một lượt chạy không có sự kiện nào từ gateway trong 5 phút
+  (busyTTL của V1, `STUCK_AFTER`), nó bị coi là kẹt. Nếu sự kiện cuối
+  của lượt là một công cụ đã bắt đầu mà chưa có kết quả (`last_tool.running`:
+  một lần build hay một lệnh `sleep` không gửi gì cho đến khi xong), giới hạn
+  im lặng là 6 lần mức đó, 30 phút, để một công cụ chạy lâu hợp lệ không bị
+  dừng. Lượt bị kẹt được dừng (cố hết mức) và kết thúc `failed` với "the agent
+  stopped responding, so the task was stopped". Sau đó lượt tiếp theo được
+  giao. Để thử trên đèn, `LAMP_TASKS_DIRECT_STUCK_S` (số giây nguyên, từ 10 trở
+  lên; giá trị khác bị bỏ qua) đặt giới hạn gốc khi lamp-tasks khởi động, ghi
+  vào journal là `tasks: direct: a quiet run is checked for stuck after <s> s
+  (LAMP_TASKS_DIRECT_STUCK_S), a running tool after <6×s> s`. Sản phẩm không
+  đặt biến này.
+- **Phiên hỏng.** Một lần gửi bị từ chối, hoặc hai lần gửi thất bại liên tiếp
+  (gateway chưa lên thì không tính), làm phiên hỏng. Phiên được đặt lại (một
+  cuộc trò chuyện mới) và lượt đang chờ được thử thêm một lần. Hỏng lại sau đó,
+  hoặc quá 4 lần gửi, lượt kết thúc `failed`. Trước khi gửi lại một lượt đã
+  thử, các lượt đang chạy của gateway được xem, và lượt gateway đã có cho việc
+  đó được nhận lại chứ không gửi hai lần.
+- **Gateway sập.** Luồng bơm tiếp tục kết nối lại. Một lượt đang xếp hàng chờ
+  tối đa 2 phút gateway chưa sẵn sàng (`QUEUED_MOST`), tính từ lúc gateway
+  thôi sẵn sàng, rồi kết thúc `failed` với "the agent's gateway was not ready
+  in time (openclaw_gateway_not_ready)".
+- **Đang chuẩn bị.** Nếu phiên chưa sẵn sàng 5 s trong lúc có việc chờ, một hook
+  được báo một lần cho mỗi đợt chưa sẵn sàng. `tell_getting_ready` của #8237
+  chưa có ở head này, nên hiện tại hook chỉ ghi `tasks: direct: still getting
+  ready: <why>` (một TODO trong `direct.rs`).
+- **Danh sách cho phép của skill-start.** Trước mỗi lượt kỹ năng, danh sách
+  cho phép exec của agent `main` được đọc qua phiên. Nếu thiếu mục của
+  launcher, nó được thêm lại. Một lần đọc mà engine không làm được không bao
+  giờ chặn lượt chạy. Một lần thêm lại thất bại kết thúc lượt chạy với
+  `skill-start is not on agent main's exec allow-list yet`. Các lệnh này nằm
+  trên `direct::DirectSession`, bên cạnh `AgentSession` trung lập với engine.
+- **Tiến độ.** `Progress` của mỗi lượt từ gateway được đưa ra theo đúng dạng
+  `harness ps` và `harness show` từng đưa, nên tracker (`tasks/status`,
+  `get_progress`), bản ghi việc (`work`, `work_list`) và "tasks now" đọc mà
+  không đổi gì, mỗi lượt là một việc (không còn lưu ý về pane dùng chung).
+  - Trạng thái là `starting` khi đang xếp hàng trong lamp-tasks, `working` từ
+    lúc gateway nhận lượt (kể cả trước sự kiện đầu tiên) cho đến khi kết thúc
+    (không bao giờ `idle`), `idle` với cả câu trả lời khi đã trả lời, `failed`
+    khi thất bại hoặc câu trả lời rỗng, và `stopped` khi bị dừng.
+  - `tasks/status` trên bus nhận dòng của một việc trực tiếp mỗi khi nó đổi
+    (trạng thái, dòng hoặc lần hoạt động cuối), ở vòng lặp kế tiếp của
+    lamp-tasks.
+  - **Không gọi Harness cho việc trực tiếp.** Một việc OpenClaw trên chính máy
+    của đèn (`direct::lamp_path`) không làm `ps` nào của Harness đến hạn
+    (`progress::Tracker::due`), lần nhìn của nó lấy từ lượt chạy thay cho
+    `harness show` (`direct::lamp_observe`; lượt đã mất ở đây, bị dọn hoặc từ
+    trước khi khởi động lại, là `observe_failed` và được đọc là `missing`), và
+    việc đóng của nó không hỏi Harness (`close_told`, gone). Mỗi lần gọi như
+    vậy mất ~2 s trên đèn, trên đúng worker `tasks-harness` mà các lần launch
+    cũng chạy, nên một lần giao việc có thể phải chờ sau nó (`turn accepted in
+    6346 ms` trên đèn). Việc Hermes, OpenClaw trên máy khác và khi tắt công tắc
+    vẫn giữ bộ đọc Harness như trước; một lần đọc Hermes đang chạy vẫn có thể
+    giữ chân một lần launch.
+  - Lượt của một lần chạy skill hay một make được đặt tên theo run id; make
+    không có run id (tên thư mục không chứa run id) được `<skill>-<8 hex>`, nên
+    dòng journal `tasks: <id>: turn accepted …` luôn có tên.
+  - Dòng (`about`, tối đa 160 ký tự) là `on step k of n: <bước>` của kế hoạch
+    khi agent có kế hoạch, rồi công cụ đang chạy hoặc vừa chạy với tóm tắt
+    của nó. Không có cả hai thì là phần cuối của những gì nó đã viết. Dòng được
+    làm sạch (`now::step`), không có đường dẫn tệp và không có từ nào mà bộ
+    đọc dấu hiệu coi là `done` (`progress::signs_in`: `done`, `finished`,
+    `completed`, `implemented`) giữa lượt, để không dấu hiệu `done` nào khởi
+    động một lượt không ai hỏi.
+  - `tools` là số công cụ đã xong. `step` của bản ghi việc là `{n, tool}`, với
+    `n` là số công cụ đã xong cộng cái đang chạy, và `tool` chỉ là tên công cụ,
+    được ghi lên bản ghi mỗi lần các bản ghi việc được làm mới.
+  - Câu trả lời được cắt còn 16 KiB, kèm `truncated`.
+  - Một yêu cầu `get_progress`, `tasks_now`, `work` hoặc `work_list` trước hết
+    đọc ngay tiến độ của các việc trực tiếp, nên câu "việc đến đâu rồi?" đúng
+    cả giữa lượt.
+  - Kho giữ câu trả lời `idle` của lượt trực tiếp ngay ở lần nhìn đầu (đó là sự
+    kiện cuối của lượt chạy, trọn vẹn), không chờ lần nhìn thứ hai giống hệt,
+    nên tin không ai hỏi được báo ngay.
+  - Lần nhìn đó đến ngay khi lượt chạy kết thúc. Vòng lặp chủ đẩy một lần đọc
+    cho mỗi việc trực tiếp đang theo dõi có lượt chạy đã kết thúc
+    (`Engine::push_direct_ended`), một lần, như `watch`/`wait` của Harness đẩy
+    việc của chúng. Nó không chờ lần đọc kế tiếp của watch, có thể đến 30 s
+    sau (ee17 việc 13: 23 s từ `session.ended` đến lúc có quan sát).
+- **Mất kết nối.** Khi kết nối đứt, phiên tự kết nối lại với cùng backoff, và
+  lượt mà gateway vẫn còn giữ thì chạy tiếp. Lượt bị mất khi khởi động lại
+  (`UnknownRun`) kết thúc `failed` với "the agent's gateway lost the run in a
+  restart", và việc tiếp theo được giao khi sẵn sàng.
+- **Gateway khởi động lại hoặc rớt kết nối.** Đây là quyết định của chủ sở
+  hữu (2026-11-23). Với mọi lần rớt (đóng 1012 khi khởi động lại, crash, 1006,
+  mất socket), mọi lượt đang chạy kết thúc `failed` ngay với
+  `openclaw::DROPPED`: "A small system error stopped this task. Please try
+  again in a few minutes." Các lượt xếp hàng sau nó cũng kết thúc như vậy,
+  không bao giờ được giao. Lượt mà gateway không còn biết sau khi kết nối lại
+  (`UnknownRun`) cũng vậy. Câu đó là `data.answer` của quan sát thất bại, do
+  `get_observation` trả về và tin của giọng nói về một việc bị dừng đọc, nên
+  giọng nói nói nó bằng ngôn ngữ của người dùng. `get_task` chỉ liệt kê siêu dữ
+  liệu của quan sát, không bao giờ có câu trả lời. Không
+  chờ cơ chế khôi phục sau khởi động lại của OpenClaw. Lượt có final đến trước
+  khi rớt vẫn giữ câu trả lời. Gateway bị crash được unit của nó khởi động lại
+  (`Restart=always`, #8238, `openclaw_install.rs`). lamp-tasks không có đường
+  khởi động lại riêng.
+  - **Lượt khôi phục lạc.** Sau khi kết nối lại,
+    `main-session-restart-recovery` của OpenClaw tự chạy lại việc đã thất bại
+    (ee17 17:0x: 76 s sau khi sẵn sàng, dài 4 phút 22 s, với một run id mới
+    của gateway). Một việc ngắn tiếp theo đã phải chờ 4 phút sau nó. Trong 15
+    phút sau một lần rớt có làm lượt thất bại (`STRAYS_FOR`), mọi lượt của
+    phiên giữ lại không phải của ta mà đang chạy đều bị hủy một lần
+    (`chat.abort {sessionKey, runId}`): lượt đang chạy lúc kết nối lại (một
+    `chat.history`, `activeRunIds` / `inFlightRun`), hoặc lượt đó ở sự kiện
+    đầu tiên của nó. Sự kiện của nó không làm thay đổi gì.
+  - **Kết nối lại.** Mỗi lần kết nối (quay số, challenge, hello, một
+    `sessions.list` đầu tiên) có giới hạn riêng, bất kể khoảng thời gian của
+    bên gọi: 30 s (`connect_timeout`), hoặc 60 s sau một lần đóng 1012 hay khi
+    gateway báo đang khởi động (`restart_connect_timeout`). Bắt tay chậm được
+    thử lại sau 1 s mà không làm backoff tăng. ee17 2026-11-23 15:59-16:07 cho
+    thấy lý do: gateway bão hòa vì khởi động cần lâu hơn mức cũ 2 s (lần nhìn
+    sẵn sàng) và 10 s (giới hạn lời gọi), và lamp-tasks bỏ từng kết nối dở.
+- **Xoay vòng.** Xoay vòng ngữ cảnh là `reset()`, một cuộc trò chuyện mới,
+  trước một lượt, theo ngưỡng của một phiên (`one_session::near_context_limit`:
+  85 % của ngữ cảnh 128k hoặc hơn 150 tin nhắn cho một việc, 60 % hoặc hơn 100
+  cho một make). Nó cân kích thước phiên do chính gateway đếm
+  (`DirectSession::session_size`): giá trị lớn hơn giữa `sessionInfo.totalTokens`
+  và `contextBudgetStatus.estimatedPromptTokens`, cùng `totalMessages`, từ một
+  `chat.history` một tin nhắn. Lần đọc này diễn ra ở mỗi lần (kết nối lại),
+  sau mỗi lượt và trước một lần gửi khi chưa đọc kể từ đó. Khi không đọc
+  được, dùng lời đã giao và đã đọc, 4 ký tự một token (ee17 đã lên 224 tin
+  nhắn và 127k token mà không xoay vòng với ngưỡng cũ 150k token). Không có
+  đồng bộ lại hay nhận lại nào sau một lần đặt lại hoặc lamp-tasks khởi động
+  lại.
+- **Đóng.** Khi kho đóng một lượt trực tiếp còn đang chạy, lượt đó được hủy trên
+  gateway (`chat.abort`); lượt đã kết thúc thì không còn gì.
+- **`ps` của Harness thất bại.** Các dòng trực tiếp vẫn được đưa ra, nên tracker
+  vẫn đọc được.
+
+Journal: `tasks: direct: OpenClaw's gateway is ready, the kept session open`,
+`tasks: <id>: turn accepted in <ms> ms (<nth>)`, `tasks: direct: <why>` khi
+chưa sẵn sàng, `tasks: direct: run <run> had no event in <s> s and is stuck;
+ended, the next turn goes on`, và `tasks: direct: a fresh conversation for <id>
+(a full conversation | a broken session), about <n> tokens in the last`.
 
 ### Giới hạn được chấp nhận cho thứ Hai: grant của kỹ năng đang chạy trong gateway
 

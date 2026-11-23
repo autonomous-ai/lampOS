@@ -426,7 +426,14 @@ impl Tracker {
         // For each machine: any task in its first ten minutes, any task
         // not yet asked for.
         let mut machines: BTreeMap<&str, (bool, bool)> = BTreeMap::new();
-        for task in watched {
+        // A direct OpenClaw task (`LAMP_TASKS_OPENCLAW_DIRECT` on) is read
+        // from its gateway run (`direct::OpenclawDirect::refresh`), never
+        // by Harness's `ps`: it makes no machine due. Hermes and the
+        // switch off: as before.
+        for task in watched
+            .iter()
+            .filter(|task| !crate::direct::lamp_path(&task.engine, &task.machine_id))
+        {
             let entry = machines
                 .entry(task.machine_id.as_str())
                 .or_insert((false, false));
@@ -762,6 +769,44 @@ mod tests {
     const B: &str = "22222222-2222-4222-8222-222222222222";
     const OFFICE: &str = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
     const HOME: &str = "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb";
+
+    /// `LAMP_TASKS_OPENCLAW_DIRECT` on: a direct OpenClaw task on the
+    /// lamp's machine makes no Harness `ps` due, and its look is the run's
+    /// (or `observe_failed` once gone), never Harness's `show`. A Hermes
+    /// task beside it, and the switch off, keep the Harness poller.
+    #[test]
+    fn a_direct_openclaw_task_is_never_asked_of_harness_and_hermes_still_is() {
+        let mut openclaw = watched(1, OFFICE, A, Some(1_000));
+        openclaw.engine = "openclaw".into();
+        let mut hermes = watched(2, OFFICE, B, Some(1_000));
+        hermes.engine = "hermes".into();
+        // The switch off: Harness's `ps` of the lamp, as today.
+        let mut tracker = Tracker::started(RUN);
+        assert_eq!(
+            tracker.due(std::slice::from_ref(&openclaw), 10),
+            Some(OFFICE.to_owned())
+        );
+        assert_eq!(crate::direct::lamp_observe("openclaw", OFFICE, A), None);
+        // On: none for the OpenClaw task alone.
+        let direct = crate::direct::tests::lamp_owning(A, "done");
+        direct.set_lamp_machine(Box::new(|| Some(OFFICE.to_owned())));
+        crate::direct::set_test_lamp(Some(direct));
+        let mut tracker = Tracker::started(RUN);
+        let alone = tracker.due(std::slice::from_ref(&openclaw), 10);
+        let owned = crate::direct::lamp_observe("openclaw", OFFICE, A).map(|seen| seen.is_ok());
+        let gone = crate::direct::lamp_observe("openclaw", OFFICE, B);
+        let hermes_seen = crate::direct::lamp_observe("hermes", OFFICE, B);
+        let other_machine = crate::direct::lamp_observe("openclaw", HOME, B);
+        let both = tracker.due(&[openclaw.clone(), hermes.clone()], 10);
+        crate::direct::set_test_lamp(None);
+        assert_eq!(alone, None);
+        assert_eq!(owned, Some(true));
+        assert_eq!(gone, Some(Err("observe_failed".to_owned())));
+        // Hermes, and OpenClaw on another machine: Harness as before.
+        assert_eq!(hermes_seen, None);
+        assert_eq!(other_machine, None);
+        assert_eq!(both, Some(OFFICE.to_owned()));
+    }
 
     /// c0a4-17 HW: on a kept session `ps` is per agent, so before the new
     /// task's first activity it shows the earlier task's line and its last

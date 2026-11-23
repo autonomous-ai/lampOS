@@ -1,0 +1,1552 @@
+//! OpenClaw spoken to directly (`LAMP_TASKS_OPENCLAW_DIRECT`): every
+//! OpenClaw turn handed straight to OpenClaw's gateway through
+//! [`lamp_agent_gateway::AgentSession`], one connection and one kept
+//! session, in place of the Harness CLI (`harness new/reply/ensure/wait/
+//! show/close/ps`, `openclaw tui` in tmux: the stuck sessions of #7906,
+//! #8001 and #6226) and the `openclaw … --gateway` CLI calls (`approvals
+//! get`, `allowlist add`, `gateway call sessions.delete`). Hermes keeps
+//! today's path.
+//!
+//! # The plan
+//!
+//! The seams, each one `if` on [`LAMP`] (set only with the switch on and a
+//! session built); with the switch off [`LAMP`] is never set and every
+//! line below is skipped, so the Harness path runs as before:
+//!
+//! 1. **Spoken task.** `runtime::Production::Direct` (the production
+//!    backend with this session beside Harness) asks
+//!    [`OpenclawDirect::spoken_launch`] before the one session's pane: an
+//!    OpenClaw task for the lamp's own machine with no session named is
+//!    queued here and answered `Joined` with an agent id of its own (a
+//!    UUID per turn, so the store's checks hold and each task is followed
+//!    by itself: no shared-pane caveat). The store then follows it as any
+//!    joined task, through `Production::observe` and `Production::status`,
+//!    which answer such ids from here ([`OpenclawDirect::observe`],
+//!    [`OpenclawDirect::listed`]). An idle observation with the answer is
+//!    what settles the task and fires the unasked news, as before.
+//!    The tasks-harness worker's gateway wait (`gateway::launch_with`) is
+//!    the same as Harness's, its probe this session's readiness in place of
+//!    the port's (the `gateway::Probe` impl below).
+//! 2. **Skill `do.task` and make.** `skill_task::HarnessRunner::run` (both
+//!    a skill's run on the one run path and a make, which reaches it through
+//!    `skill_make::MakeTurn`, THE SEAM) calls [`skill_turn`] in place of its
+//!    gateway wait and one-session pane: the run's folder, its skill-start
+//!    grant (`gateway::open_start`, the fence) and its token stay exactly as
+//!    they are; only the hand-over and the wait for the end are here. A
+//!    skill's answer is kept only when its launcher claimed the start and
+//!    the fence said it started the script (`skill_start::Live::ran`).
+//! 3. **Readiness.** One pump thread ([`OpenclawDirect::start`]) connects
+//!    at lamp-tasks' start, opens or adopts the kept session and keeps it
+//!    ready, with backoff (U1). A launch waits on that state through
+//!    `gateway::Gateway`'s own wait (`before_launch_until`), never on a
+//!    port probe or a CLI read. Past [`GETTING_READY_AFTER`] not ready the
+//!    getting-ready hook is told once (#8237's hook: not at this head, so
+//!    the production hook only journals; TODO(#8237) below).
+//! 4. **Allow-list.** Before each skill run is handed over, agent `main`'s
+//!    allow-list is read over the session and the skill-start entry put back
+//!    when missing ([`DirectSession`]).
+//! 5. **Progress.** Each run's [`lamp_agent_gateway::Progress`] is kept here
+//!    and given as `harness ps`'s and `harness show`'s rows were
+//!    ([`listed_of`], [`observation_of`]), so `progress::Tracker`,
+//!    `works::Board` and `now` are fed with the same state enum and fields;
+//!    the board's step comes from the run's tools ([`OpenclawDirect::record_steps`],
+//!    once per refresh of the work records).
+//!    Before a "how far along" read is answered, the tracker is read from
+//!    here at once ([`OpenclawDirect::refresh`]): no `ps` and no wait.
+//! 6. **Hygiene, V1's way.** One kept session, one turn at a time. A run
+//!    with no event for [`STUCK_AFTER`] (V1's busyTTL) is stuck: aborted and
+//!    ended failed, and the next turn goes on. A refused send, or [`BROKEN_SENDS`] failed in a row, is a
+//!    broken session: [`AgentSession::reset`] and the turn tried once more.
+//!    The context rotation is `reset()` too, at the one session's bounds
+//!    (`one_session::near_context_limit`: 85% of the context or 150
+//!    messages for a task, 60% or 100 for a make) on the gateway's own size
+//!    of the session ([`DirectSession::session_size`], read before the send
+//!    when not read since the last run), else on the words handed over and
+//!    read. A gateway down is reconnected to for ever;
+//!    a queued turn waits [`QUEUED_MOST`] of it, then ends not ready. No
+//!    resync or re-adopt after a reset or a lamp-tasks restart (later).
+use crate::engine::{MAX_ANSWER_BYTES, MAX_ASK_BYTES, Watched};
+use crate::harness::{EngineKind, Launch, LaunchOutcome, Listed, Observation};
+use lamp_agent_gateway::{AgentSession, Error, Outcome, Phase, Progress, RunId, Turn, TurnKind};
+use std::path::Path;
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::{Arc, Condvar, Mutex, MutexGuard, OnceLock, PoisonError};
+use std::time::{Duration, Instant, SystemTime};
+
+/// The switch, in lamp-tasks' own environment: `on` exactly ([`on`]).
+pub const SWITCH: &str = "LAMP_TASKS_OPENCLAW_DIRECT";
+
+/// [`SWITCH`]'s value: `on` exactly; anything else (unset too) is off.
+pub fn on(value: Option<&str>) -> bool {
+    value == Some("on")
+}
+
+/// The lamp's direct session: set once at `serve`'s start, only with
+/// [`SWITCH`] on and a session built ([`lamp_session`]). Never set in the
+/// crate's tests, which make their own.
+pub static LAMP: OnceLock<Arc<OpenclawDirect>> = OnceLock::new();
+
+/// A session lamp-tasks can hand turns to, with what the engine-neutral
+/// [`AgentSession`] lacks: agent `main`'s exec allow-list over the
+/// session's own socket (`exec.approvals.get` / `set`, in place of the
+/// CLI's `approvals get` and `approvals allowlist add`), and the kept
+/// conversation's size.
+pub trait DirectSession: AgentSession {
+    /// Whether agent `main` (or `*`) may exec the skill-start launcher.
+    fn skill_start_allowed(&mut self) -> Result<bool, Error>;
+    /// Puts the skill-start launcher's entry on agent `main`'s allow-list.
+    fn allow_skill_start(&mut self) -> Result<(), Error>;
+    /// The kept conversation's size as the gateway counts it: its tokens
+    /// (as `bytes`, 4 a token, for `one_session::near_context_limit`) and
+    /// messages, read now when not read since the last run; `None` when it
+    /// can't be read, and lamp-tasks judges from the words handed over.
+    fn session_size(&mut self) -> Option<crate::harness::SessionSize>;
+}
+
+/// One approvals call's bound over the session.
+const APPROVALS_WITHIN: Duration = Duration::from_secs(10);
+
+impl DirectSession for lamp_agent_gateway::openclaw::Session {
+    fn skill_start_allowed(&mut self) -> Result<bool, Error> {
+        let read = self.approvals_get(APPROVALS_WITHIN)?;
+        // Not such a read: never blocks the run, as the CLI read's was.
+        Ok(crate::gateway::allows_skill_start(&read.to_string()).unwrap_or(true))
+    }
+    fn allow_skill_start(&mut self) -> Result<(), Error> {
+        self.allowlist_add(crate::skill_start::LAUNCHER, APPROVALS_WITHIN)
+            .map(|_| ())
+    }
+    fn session_size(&mut self) -> Option<crate::harness::SessionSize> {
+        // The larger of `totalTokens` and `estimatedPromptTokens`, and
+        // `totalMessages`, from `chat.history`.
+        let (tokens, messages) = self.size_now()?;
+        Some(crate::harness::SessionSize {
+            messages,
+            bytes: tokens.saturating_mul(4),
+        })
+    }
+}
+
+/// The lamp's real session: OpenClaw's gateway on loopback
+/// ([`crate::gateway::PORT`]), its token from the product's file, the one
+/// kept session `agent:main:lamp`, each task its own run (`followup`),
+/// approvals answered by the skill-start fence's policy
+/// ([`crate::skill_start::LAUNCHER`]).
+pub fn lamp_session() -> Option<Box<dyn DirectSession>> {
+    let cfg = lamp_agent_gateway::openclaw::Config {
+        url: format!("ws://127.0.0.1:{}", crate::gateway::PORT),
+        fence: crate::skill_start::LAUNCHER.into(),
+        ..lamp_agent_gateway::openclaw::Config::default()
+    };
+    Some(Box::new(lamp_agent_gateway::openclaw::Session::new(cfg)))
+}
+
+/// Not ready this long while something waits, the getting-ready hook is
+/// told once (#8237's 5 s).
+pub const GETTING_READY_AFTER: Duration = Duration::from_secs(5);
+/// One readiness look's bound on the pump.
+pub const READY_LOOK: Duration = Duration::from_secs(2);
+/// One wait for a run's end on the pump, between progress reads.
+pub const WAIT_SLICE: Duration = Duration::from_millis(250);
+/// The first pause after a readiness look failed, doubled at each failure.
+pub const RETRY_FIRST: Duration = Duration::from_millis(500);
+/// The longest pause between readiness looks with nothing waiting...
+pub const RETRY_MOST: Duration = Duration::from_secs(30);
+/// ...and with a turn waiting.
+pub const RETRY_WAITING_MOST: Duration = Duration::from_secs(2);
+/// While ready and idle, readiness is looked at again this often, so a
+/// gateway gone between tasks is known before the next ask.
+pub const IDLE_READY_EVERY: Duration = Duration::from_secs(30);
+/// The most characters of a progress line (`about`), as `now`'s step.
+pub const ABOUT_MOST: usize = crate::now::MOST_STEP_CHARS;
+/// Ended runs kept for the store's reads, the oldest dropped past it.
+const ENDED_KEPT: usize = 64;
+/// A run with no event from the gateway this long is checked for stuck
+/// (V1's busyTTL, 5 min).
+pub const STUCK_AFTER: Duration = Duration::from_secs(5 * 60);
+/// How many times [`STUCK_AFTER`] a run waits when its last event is a
+/// tool's start with no result yet: a build or a `sleep` sends nothing
+/// between the two, so a legit long tool is not ended at the base limit.
+pub const TOOL_QUIET_TIMES: u32 = 6;
+/// Sets the stuck limit in seconds (10 or more) at lamp-tasks' start,
+/// for tests on a lamp; unset or otherwise, [`STUCK_AFTER`].
+pub const STUCK_SWITCH: &str = "LAMP_TASKS_DIRECT_STUCK_S";
+/// The least [`STUCK_SWITCH`] takes.
+pub const STUCK_LEAST_S: u64 = 10;
+
+/// The stuck limit [`STUCK_SWITCH`] sets: whole seconds, at least
+/// [`STUCK_LEAST_S`]; anything else, none.
+pub fn stuck_after_of(value: Option<&str>) -> Option<Duration> {
+    let seconds: u64 = value?.trim().parse().ok()?;
+    (seconds >= STUCK_LEAST_S).then(|| Duration::from_secs(seconds))
+}
+
+/// How long `progress`'s run may be quiet before it is checked for stuck:
+/// [`TOOL_QUIET_TIMES`] × `stuck_after` while its last event is a tool's
+/// start with no result, else `stuck_after`.
+pub fn quiet_limit(stuck_after: Duration, progress: &Progress) -> Duration {
+    if progress.last_tool.as_ref().is_some_and(|tool| tool.running) {
+        stuck_after.saturating_mul(TOOL_QUIET_TIMES)
+    } else {
+        stuck_after
+    }
+}
+
+/// Whether `progress`'s run, at `now`, has been quiet past its
+/// [`quiet_limit`].
+pub fn quiet_past(stuck_after: Duration, progress: &Progress, now: SystemTime) -> bool {
+    now.duration_since(progress.updated_at)
+        .is_ok_and(|quiet| quiet >= quiet_limit(stuck_after, progress))
+}
+
+/// What a stuck run ends with, said to the person as its failure.
+pub const STUCK_WHY: &str = "the agent stopped responding, so the task was stopped";
+/// The longest a queued turn waits for a gateway that is not ready.
+pub const QUEUED_MOST: Duration = Duration::from_secs(2 * 60);
+/// A queued turn that waited [`QUEUED_MOST`] ends with this.
+pub const QUEUED_NOT_READY: &str =
+    "the agent's gateway was not ready in time (openclaw_gateway_not_ready)";
+/// Sends failed in a row that make the session broken: reset, then the
+/// waiting turn tried once more.
+pub const BROKEN_SENDS: u32 = 2;
+/// Sends of one turn before it ends failed.
+pub const SEND_TRIES_MOST: u32 = 4;
+
+/// How a run ended, as lamp-tasks keeps it.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum End {
+    Answered(String),
+    Failed(String),
+    Aborted,
+}
+
+#[derive(Clone, Debug)]
+struct Run {
+    /// The store's launch name, or the skill run's id: the turn's id.
+    name: String,
+    /// Its own agent id (a UUID), as the store follows it.
+    agent: String,
+    kind: TurnKind,
+    message: String,
+    /// The task's own words, for the observation's `ask`.
+    asked: String,
+    queued_at: SystemTime,
+    queued_since: Instant,
+    /// Sends tried, and whether a reset was spent on it.
+    tries: u32,
+    reset_spent: bool,
+    run: Option<RunId>,
+    progress: Option<Progress>,
+    end: Option<End>,
+}
+
+impl Run {
+    fn in_flight(&self) -> bool {
+        self.run.is_some() && self.end.is_none()
+    }
+    fn queued(&self) -> bool {
+        self.run.is_none() && self.end.is_none()
+    }
+}
+
+#[derive(Default)]
+struct Inner {
+    runs: Vec<Run>,
+    ready: bool,
+    not_ready_since: Option<Instant>,
+    not_ready_why: String,
+    told_getting_ready: bool,
+    /// Waiters on readiness now (`OpenclawDirect::wait_ready`).
+    waiting_ready: u32,
+    /// Estimated tokens in the kept conversation (4 characters a token).
+    tokens: u64,
+    turns: u64,
+    resets: u64,
+    /// Sends failed in a row ([`BROKEN_SENDS`]).
+    failed_sends: u32,
+}
+
+impl Inner {
+    fn find(&self, agent: &str) -> Option<&Run> {
+        self.runs.iter().find(|run| run.agent == agent)
+    }
+    fn find_mut(&mut self, agent: &str) -> Option<&mut Run> {
+        self.runs.iter_mut().find(|run| run.agent == agent)
+    }
+    fn waiting(&self) -> bool {
+        self.waiting_ready > 0 || self.runs.iter().any(Run::queued)
+    }
+    fn prune(&mut self) {
+        while self.runs.iter().filter(|run| run.end.is_some()).count() > ENDED_KEPT {
+            let Some(at) = self.runs.iter().position(|run| run.end.is_some()) else {
+                break;
+            };
+            self.runs.remove(at);
+        }
+    }
+}
+
+/// Told once a not-ready stretch passes [`GETTING_READY_AFTER`] while
+/// something waits, with why in plain words.
+pub type GettingReady = Box<dyn Fn(&str) + Send + Sync>;
+
+/// Reads the lamp's own machine id.
+type MachineOf = Box<dyn Fn() -> Option<String> + Send + Sync>;
+
+/// The lamp's one direct session and its turns.
+pub struct OpenclawDirect {
+    session: Mutex<Box<dyn DirectSession>>,
+    inner: Mutex<Inner>,
+    changed: Condvar,
+    /// The watched rows last given the tracker ([`Self::refresh_if_changed`]).
+    last_rows: Mutex<String>,
+    getting_ready: GettingReady,
+    getting_ready_after: Duration,
+    ready_look: Duration,
+    wait_slice: Duration,
+    retry_first: Duration,
+    stuck_after: Duration,
+    queued_most: Duration,
+    /// The lamp's own machine id, read at each spoken launch.
+    lamp_machine: Mutex<Option<MachineOf>>,
+    stop: Arc<AtomicBool>,
+}
+
+impl OpenclawDirect {
+    pub fn new(session: Box<dyn DirectSession>, stop: Arc<AtomicBool>) -> Self {
+        Self {
+            session: Mutex::new(session),
+            inner: Mutex::new(Inner::default()),
+            changed: Condvar::new(),
+            last_rows: Mutex::new(String::new()),
+            getting_ready: Box::new(|why| {
+                // TODO(#8237): its `tell_getting_ready` is not at this
+                // head; once it is, call it here.
+                eprintln!("tasks: direct: still getting ready: {why}");
+            }),
+            getting_ready_after: GETTING_READY_AFTER,
+            ready_look: READY_LOOK,
+            wait_slice: WAIT_SLICE,
+            retry_first: RETRY_FIRST,
+            stuck_after: STUCK_AFTER,
+            queued_most: QUEUED_MOST,
+            lamp_machine: Mutex::new(None),
+            stop,
+        }
+    }
+
+    /// With `hook` told once a not-ready stretch passes `after`.
+    pub fn with_getting_ready(mut self, after: Duration, hook: GettingReady) -> Self {
+        self.getting_ready_after = after;
+        self.getting_ready = hook;
+        self
+    }
+
+    /// With the pump's readiness look, wait slice and first retry bounds.
+    pub fn with_bounds(
+        mut self,
+        ready_look: Duration,
+        wait_slice: Duration,
+        retry_first: Duration,
+    ) -> Self {
+        self.ready_look = ready_look;
+        self.wait_slice = wait_slice;
+        self.retry_first = retry_first;
+        self
+    }
+
+    /// With a run quiet `stuck_after` checked for stuck, and a queued turn
+    /// failed after `queued_most` of a gateway not ready.
+    pub fn with_limits(mut self, stuck_after: Duration, queued_most: Duration) -> Self {
+        self.stuck_after = stuck_after;
+        self.queued_most = queued_most;
+        self
+    }
+
+    /// With a run checked for stuck after `stuck_after` quiet (a running
+    /// tool, [`TOOL_QUIET_TIMES`] that).
+    pub fn with_stuck_after(mut self, stuck_after: Duration) -> Self {
+        self.stuck_after = stuck_after;
+        self
+    }
+
+    /// The lamp's own machine, read by `machine` at each spoken launch.
+    pub fn set_lamp_machine(&self, machine: Box<dyn Fn() -> Option<String> + Send + Sync>) {
+        *self
+            .lamp_machine
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner) = Some(machine);
+    }
+
+    fn lamp_machine(&self) -> Option<String> {
+        self.lamp_machine
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+            .as_ref()
+            .and_then(|machine| machine())
+    }
+
+    fn lock(&self) -> MutexGuard<'_, Inner> {
+        self.inner.lock().unwrap_or_else(PoisonError::into_inner)
+    }
+
+    fn session(&self) -> MutexGuard<'_, Box<dyn DirectSession>> {
+        self.session.lock().unwrap_or_else(PoisonError::into_inner)
+    }
+
+    /// The pump started on its own thread (U1): it connects at once.
+    pub fn start(self: &Arc<Self>) -> std::io::Result<std::thread::JoinHandle<()>> {
+        let me = self.clone();
+        std::thread::Builder::new()
+            .name("openclaw-direct".into())
+            .spawn(move || me.pump())
+    }
+
+    /// Whether the session is ready now, as the pump last found it.
+    pub fn is_ready(&self) -> bool {
+        self.lock().ready
+    }
+
+    /// How many fresh conversations the session was given ([`AgentSession::reset`]).
+    pub fn resets(&self) -> u64 {
+        self.lock().resets
+    }
+
+    /// [`lamp_path`] for this session.
+    fn path(&self, engine: &str, machine: &str) -> bool {
+        engine == EngineKind::Openclaw.bus_name() && self.lamp_machine().as_deref() == Some(machine)
+    }
+
+    /// The agents of this session's turns whose run has ended (answered,
+    /// failed or stopped), for the store's read at once
+    /// (`Engine::push_direct_ended`).
+    pub fn ended_agents(&self) -> Vec<String> {
+        self.lock()
+            .runs
+            .iter()
+            .filter(|run| run.end.is_some())
+            .map(|run| run.agent.clone())
+            .collect()
+    }
+
+    /// Whether `agent` is one of this session's turns.
+    pub fn owns(&self, agent: &str) -> bool {
+        self.lock().find(agent).is_some()
+    }
+
+    /// A turn with agent id `agent`, answered `answer`, for the crate's
+    /// tests of the store.
+    #[cfg(test)]
+    pub(crate) fn answered_for_tests(&self, agent: &str, answer: &str) {
+        self.ended_for_tests(agent, End::Answered(answer.to_owned()));
+    }
+
+    /// A turn of `agent` ended `end`, for tests of the store.
+    #[cfg(test)]
+    pub(crate) fn ended_for_tests(&self, agent: &str, end: End) {
+        self.lock().runs.push(Run {
+            name: "lamp-test".into(),
+            agent: agent.to_owned(),
+            kind: TurnKind::Spoken,
+            message: String::new(),
+            asked: String::new(),
+            queued_at: SystemTime::now(),
+            queued_since: Instant::now(),
+            tries: 0,
+            reset_spent: false,
+            run: Some(RunId("run-test".into())),
+            progress: None,
+            end: Some(end),
+        });
+    }
+
+    fn pump(&self) {
+        let mut backoff = self.retry_first;
+        let mut ready_at = Instant::now();
+        while !self.stop.load(Ordering::Acquire) {
+            let ready = self.lock().ready;
+            let idle_look_due = ready && ready_at.elapsed() >= IDLE_READY_EVERY;
+            let busy = self.lock().runs.iter().any(|run| run.end.is_none());
+            if !ready || (idle_look_due && !busy) {
+                let result = self.session().ready(self.ready_look);
+                ready_at = Instant::now();
+                match result {
+                    Ok(()) => {
+                        self.became_ready();
+                        backoff = self.retry_first;
+                    }
+                    Err(error) => {
+                        let waiting = self.not_ready(&error);
+                        self.expire_queued();
+                        // A run in flight waits too: never a long retry
+                        // while its end is owed.
+                        let most = if waiting || busy {
+                            RETRY_WAITING_MOST
+                        } else {
+                            RETRY_MOST
+                        };
+                        self.rest(backoff.min(most));
+                        backoff = backoff.saturating_mul(2).min(most);
+                        continue;
+                    }
+                }
+            }
+            let in_flight = self
+                .lock()
+                .runs
+                .iter()
+                .find(|run| run.in_flight())
+                .map(|run| {
+                    (
+                        run.agent.clone(),
+                        run.run.clone().unwrap_or_else(|| RunId(String::new())),
+                    )
+                });
+            if let Some((agent, run)) = in_flight {
+                let (waited, progress, stuck) = {
+                    let mut session = self.session();
+                    let waited = session.wait(&run, self.wait_slice);
+                    let progress = session.progress(&run);
+                    let stuck =
+                        matches!(waited, Err(Error::TimedOut)) && self.is_stuck(progress.as_ref());
+                    if stuck {
+                        // Best effort: the run ends here whatever the abort.
+                        if let Err(error) = session.abort(&run) {
+                            eprintln!("tasks: direct: stuck run {} not aborted: {error}", run.0);
+                        }
+                    }
+                    (waited, progress, stuck)
+                };
+                if stuck {
+                    let limit = progress.as_ref().map_or(self.stuck_after, |progress| {
+                        quiet_limit(self.stuck_after, progress)
+                    });
+                    eprintln!(
+                        "tasks: direct: run {} had no event in {} s and is stuck; ended, the next turn goes on",
+                        run.0,
+                        limit.as_secs()
+                    );
+                    let mut inner = self.lock();
+                    if let Some(entry) = inner.find_mut(&agent) {
+                        if progress.is_some() {
+                            entry.progress = progress;
+                        }
+                        entry.end.get_or_insert(End::Failed(STUCK_WHY.into()));
+                    }
+                    drop(inner);
+                    self.changed.notify_all();
+                } else {
+                    self.after_wait(&agent, waited, progress);
+                }
+                continue;
+            }
+            let next = {
+                let inner = self.lock();
+                // Spoken tasks go ahead of skill runs and makes, as in the
+                // one session's queue; else the oldest first.
+                inner
+                    .runs
+                    .iter()
+                    .find(|run| run.queued() && run.kind == TurnKind::Spoken)
+                    .or_else(|| inner.runs.iter().find(|run| run.queued()))
+                    .map(|run| run.agent.clone())
+            };
+            if let Some(agent) = next {
+                self.hand_over(&agent);
+                continue;
+            }
+            self.rest(Duration::from_secs(1));
+        }
+    }
+
+    /// Waits up to `pause` for a change (a turn queued, a stop).
+    fn rest(&self, pause: Duration) {
+        let inner = self.lock();
+        let _ = self
+            .changed
+            .wait_timeout(inner, pause)
+            .unwrap_or_else(PoisonError::into_inner);
+    }
+
+    fn became_ready(&self) {
+        let mut inner = self.lock();
+        if !inner.ready {
+            eprintln!("tasks: direct: OpenClaw's gateway is ready, the kept session open");
+        }
+        inner.ready = true;
+        inner.not_ready_since = None;
+        inner.told_getting_ready = false;
+        drop(inner);
+        self.changed.notify_all();
+    }
+
+    /// The session not ready (`error`): whether something waits for it.
+    fn not_ready(&self, error: &Error) -> bool {
+        let mut inner = self.lock();
+        if inner.ready || inner.not_ready_since.is_none() {
+            eprintln!("tasks: direct: {error}");
+        }
+        inner.ready = false;
+        inner.not_ready_since.get_or_insert_with(Instant::now);
+        inner.not_ready_why = error.to_string();
+        let waiting = inner.waiting();
+        let tell = self.tell_due(&mut inner);
+        drop(inner);
+        self.tell(tell);
+        self.changed.notify_all();
+        waiting
+    }
+
+    /// Whether the getting-ready hook is due: once a not-ready stretch,
+    /// past its bound while waited on. Told by [`Self::tell`], unlocked.
+    fn tell_due(&self, inner: &mut Inner) -> Option<String> {
+        if !inner.ready
+            && !inner.told_getting_ready
+            && inner.waiting()
+            && inner
+                .not_ready_since
+                .is_some_and(|since| since.elapsed() >= self.getting_ready_after)
+        {
+            inner.told_getting_ready = true;
+            return Some(inner.not_ready_why.clone());
+        }
+        None
+    }
+
+    fn tell(&self, why: Option<String>) {
+        if let Some(why) = why {
+            (self.getting_ready)(&why);
+        }
+    }
+
+    /// Queued turns that waited [`QUEUED_MOST`] for a gateway not ready,
+    /// counted from when it stopped being ready, end failed.
+    fn expire_queued(&self) {
+        let mut inner = self.lock();
+        let Some(since) = inner.not_ready_since else {
+            return;
+        };
+        let most = self.queued_most;
+        let mut ended = Vec::new();
+        for run in inner.runs.iter_mut().filter(|run| run.queued()) {
+            let from = if run.queued_since > since {
+                run.queued_since
+            } else {
+                since
+            };
+            if from.elapsed() >= most {
+                run.end = Some(End::Failed(QUEUED_NOT_READY.into()));
+                ended.push(run.name.clone());
+            }
+        }
+        drop(inner);
+        for name in ended {
+            eprintln!(
+                "tasks: {name}: the gateway was not ready in {} s; ended",
+                most.as_secs()
+            );
+        }
+        self.changed.notify_all();
+    }
+
+    /// Ready, or waited for until `until` or `cancelled`
+    /// ([`crate::gateway::Probe::ready_until`]).
+    fn wait_ready(&self, until: Instant, cancelled: &dyn Fn() -> bool) -> bool {
+        let mut inner = self.lock();
+        inner.waiting_ready += 1;
+        let result = loop {
+            if inner.ready {
+                break true;
+            }
+            inner.not_ready_since.get_or_insert_with(Instant::now);
+            if let Some(why) = self.tell_due(&mut inner) {
+                drop(inner);
+                self.tell(Some(why));
+                inner = self.lock();
+                continue;
+            }
+            let now = Instant::now();
+            if cancelled() || now >= until || self.stop.load(Ordering::Acquire) {
+                break false;
+            }
+            let left = until
+                .saturating_duration_since(now)
+                .min(Duration::from_millis(50));
+            inner = self
+                .changed
+                .wait_timeout(inner, left)
+                .unwrap_or_else(PoisonError::into_inner)
+                .0;
+        };
+        inner.waiting_ready -= 1;
+        result
+    }
+
+    /// Queues one turn; its agent id. The pump hands it over in order.
+    pub fn enqueue(&self, name: &str, kind: TurnKind, words: &str) -> Result<String, String> {
+        let agent = new_agent_id()?;
+        let mut inner = self.lock();
+        inner.runs.push(Run {
+            name: name.to_owned(),
+            agent: agent.clone(),
+            kind,
+            message: crate::one_session::hand_over(name, words),
+            asked: words.to_owned(),
+            queued_at: SystemTime::now(),
+            queued_since: Instant::now(),
+            tries: 0,
+            reset_spent: false,
+            run: None,
+            progress: None,
+            end: None,
+        });
+        inner.prune();
+        drop(inner);
+        self.changed.notify_all();
+        Ok(agent)
+    }
+
+    fn end(&self, agent: &str, end: End) {
+        let mut inner = self.lock();
+        if let Some(run) = inner.find_mut(agent)
+            && run.end.is_none()
+        {
+            run.end = Some(end);
+        }
+        drop(inner);
+        self.changed.notify_all();
+    }
+
+    fn hand_over(&self, agent: &str) {
+        let Some((turn, make)) = self.lock().find(agent).map(|run| {
+            (
+                Turn {
+                    task_id: run.name.clone(),
+                    message: run.message.clone(),
+                    kind: run.kind,
+                },
+                run.kind == TurnKind::Make,
+            )
+        }) else {
+            return;
+        };
+        let mut session = self.session();
+        // The skill-start fence's allow-list, read over the session before
+        // each skill run (a restarted gateway may have lost it, #7280) and
+        // put back when missing; a read the engine can't do never blocks.
+        if turn.kind == TurnKind::SkillTask {
+            let allowed = match session.skill_start_allowed() {
+                Ok(true) => Ok(()),
+                Ok(false) => session.allow_skill_start().map(|()| {
+                    eprintln!(
+                        "tasks: direct: {} put back on agent main's exec allow-list",
+                        crate::skill_start::LAUNCHER
+                    );
+                }),
+                Err(error) => {
+                    eprintln!(
+                        "tasks: direct: agent main's exec allow-list not read ({error}); the run is handed over"
+                    );
+                    Ok(())
+                }
+            };
+            if let Err(error) = allowed {
+                drop(session);
+                eprintln!(
+                    "tasks: direct: {}: not handed over: {} ({error})",
+                    turn.task_id,
+                    crate::gateway::SKILL_START_NOT_ALLOWED
+                );
+                self.end(
+                    agent,
+                    End::Failed(crate::gateway::SKILL_START_NOT_ALLOWED.into()),
+                );
+                return;
+            }
+        }
+        // The context rotation as `reset()`, at the one session's bounds
+        // on the gateway's own size (tokens and messages; 128k context);
+        // where it can't be read, on the words handed over and read.
+        let estimate = self.lock().tokens;
+        let size = session.session_size();
+        let full = crate::one_session::near_context_limit(size, estimate, make);
+        if full {
+            self.reset_session(
+                &mut **session,
+                &format!("{} (a full conversation)", turn.task_id),
+            );
+        }
+        // Tried before and maybe taken (a send that timed out or broke):
+        // the run the gateway already has for this turn, never a second.
+        let tried = self.lock().find(agent).is_some_and(|run| run.tries > 0);
+        let adopted = if tried {
+            session
+                .running()
+                .into_iter()
+                .find(|progress| progress.task_id == turn.task_id)
+                .map(|progress| progress.run)
+        } else {
+            None
+        };
+        let began = Instant::now();
+        let sent = match adopted {
+            Some(run) => {
+                eprintln!(
+                    "tasks: direct: {}: the gateway already has it as {}; not sent again",
+                    turn.task_id, run.0
+                );
+                Ok(run)
+            }
+            None => session.send(&turn),
+        };
+        let progress = sent.as_ref().ok().and_then(|run| session.progress(run));
+        drop(session);
+        match sent {
+            Ok(run) => {
+                let mut inner = self.lock();
+                inner.tokens = inner.tokens.saturating_add(tokens_in(&turn.message));
+                inner.turns += 1;
+                inner.failed_sends = 0;
+                let turns = inner.turns;
+                // Cancelled while it was being handed over: aborted at once.
+                let mut cancelled = None;
+                if let Some(entry) = inner.find_mut(agent) {
+                    if entry.end.is_some() {
+                        cancelled = Some(run.clone());
+                    }
+                    entry.run = Some(run);
+                    entry.progress = progress;
+                }
+                drop(inner);
+                if let Some(run) = cancelled
+                    && let Err(error) = self.session().abort(&run)
+                {
+                    eprintln!("tasks: direct: run {} not aborted: {error}", run.0);
+                }
+                eprintln!(
+                    "tasks: {}: turn accepted in {} ms ({})",
+                    turn.task_id,
+                    began.elapsed().as_millis(),
+                    crate::one_session::nth(turns)
+                );
+            }
+            Err(error) => self.send_failed(agent, &turn.task_id, error),
+        }
+        self.changed.notify_all();
+    }
+
+    /// A send of `agent`'s turn failed with `error`. The gateway not ready:
+    /// kept queued, sent once it is (its expiry, [`QUEUED_MOST`]). The
+    /// session broken (refused, or [`BROKEN_SENDS`] failed in a row): a
+    /// fresh session, and the turn tried once more. Past
+    /// [`SEND_TRIES_MOST`], or broken again after its reset: failed.
+    fn send_failed(&self, agent: &str, task: &str, error: Error) {
+        eprintln!("tasks: direct: {task}: not handed over: {error}");
+        let (broken, reset_spent, tries) = {
+            let mut inner = self.lock();
+            // A gateway not up is not a broken session.
+            if !matches!(error, Error::NotReady(_)) {
+                inner.failed_sends += 1;
+            }
+            let broken = matches!(error, Error::Refused(_)) || inner.failed_sends >= BROKEN_SENDS;
+            match inner.find_mut(agent) {
+                Some(run) => {
+                    run.tries += 1;
+                    (broken, run.reset_spent, run.tries)
+                }
+                None => return,
+            }
+        };
+        if broken && !reset_spent {
+            {
+                let mut session = self.session();
+                self.reset_session(&mut **session, &format!("{task} (a broken session)"));
+            }
+            let mut inner = self.lock();
+            inner.failed_sends = 0;
+            if let Some(run) = inner.find_mut(agent) {
+                run.reset_spent = true;
+            }
+            return;
+        }
+        let again = matches!(error, Error::NotReady(_) | Error::Lost(_) | Error::TimedOut)
+            && !broken
+            && tries < SEND_TRIES_MOST;
+        if again {
+            if matches!(error, Error::NotReady(_) | Error::Lost(_)) {
+                self.not_ready(&error);
+            }
+            return;
+        }
+        self.end(agent, End::Failed(error.to_string()));
+    }
+
+    /// A fresh conversation in place of the kept one, said why.
+    fn reset_session(&self, session: &mut dyn DirectSession, why: &str) {
+        match session.reset() {
+            Ok(()) => {
+                let mut inner = self.lock();
+                eprintln!(
+                    "tasks: direct: a fresh conversation for {why}, about {} tokens in the last",
+                    inner.tokens
+                );
+                inner.tokens = 0;
+                inner.resets += 1;
+            }
+            Err(error) => eprintln!("tasks: direct: the kept session not reset: {error}"),
+        }
+    }
+
+    /// Whether a run, its last event `progress`, is stuck: quiet past its
+    /// [`quiet_limit`] (V1's busyTTL).
+    fn is_stuck(&self, progress: Option<&Progress>) -> bool {
+        progress.is_some_and(|progress| quiet_past(self.stuck_after, progress, SystemTime::now()))
+    }
+
+    fn after_wait(&self, agent: &str, waited: Result<Outcome, Error>, progress: Option<Progress>) {
+        let mut inner = self.lock();
+        let ended = match waited {
+            Ok(Outcome::Answered { text, progress }) => {
+                inner.tokens = inner.tokens.saturating_add(tokens_in(&text));
+                Some((End::Answered(text), Some(progress)))
+            }
+            Ok(Outcome::Failed { why, progress }) => {
+                // The gateway dropped under the run (a restart, a crash):
+                // the turns queued behind it end too, with the same "try
+                // again" words, not left waiting for a recovery.
+                if why == lamp_agent_gateway::openclaw::DROPPED {
+                    for queued in inner.runs.iter_mut().filter(|run| run.queued()) {
+                        queued.end = Some(End::Failed(why.clone()));
+                    }
+                }
+                Some((End::Failed(why), Some(progress)))
+            }
+            Ok(Outcome::Aborted { progress }) => Some((End::Aborted, Some(progress))),
+            Err(Error::TimedOut) => None,
+            Err(error @ (Error::Lost(_) | Error::NotReady(_))) => {
+                drop(inner);
+                // The session resyncs its open runs once connected again.
+                self.not_ready(&error);
+                inner = self.lock();
+                None
+            }
+            // The gateway's link no longer knows the run (lost in a
+            // restart): the person hears the drop's "try again" words.
+            Err(Error::UnknownRun(_)) => Some((
+                End::Failed(lamp_agent_gateway::openclaw::DROPPED.into()),
+                None,
+            )),
+            Err(error) => Some((End::Failed(error.to_string()), None)),
+        };
+        if let Some(run) = inner.find_mut(agent) {
+            match ended {
+                Some((end, last)) => {
+                    run.progress = last.or(progress).or(run.progress.take());
+                    // A cancel's end stays the one told.
+                    run.end.get_or_insert(end);
+                }
+                None => {
+                    if progress.is_some() {
+                        run.progress = progress;
+                    }
+                }
+            }
+        }
+        drop(inner);
+        self.changed.notify_all();
+    }
+
+    /// Ends `agent`'s turn: dropped from the queue, or aborted on the
+    /// gateway when handed over.
+    pub fn cancel(&self, agent: &str) {
+        let run = {
+            let mut inner = self.lock();
+            match inner.find_mut(agent) {
+                Some(run) if run.queued() => {
+                    run.end = Some(End::Aborted);
+                    None
+                }
+                Some(run) if run.in_flight() => run.run.clone(),
+                _ => None,
+            }
+        };
+        if let Some(run) = run
+            && let Err(error) = self.session().abort(&run)
+        {
+            eprintln!(
+                "tasks: direct: cancelled run {} not aborted on the gateway: {error}",
+                run.0
+            );
+        }
+        self.end(agent, End::Aborted);
+    }
+
+    /// Waits for `agent`'s end until `until` or `cancelled` (then aborted,
+    /// and `None`).
+    pub fn wait_end(
+        &self,
+        agent: &str,
+        until: Instant,
+        cancelled: &dyn Fn() -> bool,
+    ) -> Option<End> {
+        let mut inner = self.lock();
+        loop {
+            match inner.find(agent) {
+                None => return None,
+                Some(run) => {
+                    if let Some(end) = &run.end {
+                        return Some(end.clone());
+                    }
+                }
+            }
+            if cancelled() || Instant::now() >= until || self.stop.load(Ordering::Acquire) {
+                drop(inner);
+                self.cancel(agent);
+                return None;
+            }
+            inner = self
+                .changed
+                .wait_timeout(inner, Duration::from_millis(50))
+                .unwrap_or_else(PoisonError::into_inner)
+                .0;
+        }
+    }
+
+    /// Whether `launch` is the direct path's: OpenClaw on the lamp's own
+    /// machine, no session named. Hermes and anything else: `false`.
+    pub fn takes(&self, launch: &Launch) -> bool {
+        launch.target.engine == EngineKind::Openclaw
+            && launch.session.is_none()
+            && self
+                .lamp_machine()
+                .is_some_and(|machine| machine == launch.target.machine_id)
+    }
+
+    /// A spoken task (seam 1), queued: `None` when not the direct path's.
+    /// Its readiness is waited for before, by the worker's
+    /// `gateway::launch_with` with [`Self::gateway`].
+    pub fn spoken_launch(&self, launch: &Launch) -> Option<LaunchOutcome> {
+        if !self.takes(launch) {
+            return None;
+        }
+        Some(
+            match self.enqueue(&launch.name, TurnKind::Spoken, &launch.prompt) {
+                Ok(agent_id) => LaunchOutcome::Joined {
+                    agent_id,
+                    session: None,
+                },
+                Err(why) => {
+                    eprintln!("tasks: {}: not queued: {why}", launch.name);
+                    LaunchOutcome::NotSent {
+                        code: "direct_not_queued".into(),
+                    }
+                }
+            },
+        )
+    }
+
+    /// `agent`'s turn as `harness show` gave it; `None` for one not here.
+    pub fn observe(&self, agent: &str) -> Option<Observation> {
+        self.lock().find(agent).map(observation_of_run)
+    }
+
+    /// Every turn here as `harness ps` rows.
+    pub fn listed(&self) -> Vec<Listed> {
+        self.lock().runs.iter().map(listed_of_run).collect()
+    }
+
+    /// The rows for `machine`'s `ps`: this session's when it is the lamp's.
+    pub fn listed_on(&self, machine: &str) -> Vec<Listed> {
+        if self.lamp_machine().as_deref() == Some(machine) {
+            self.listed()
+        } else {
+            Vec::new()
+        }
+    }
+
+    /// Each watched direct task's latest tool on the work records
+    /// (`works::Board::step`), as the transcript's steps were.
+    pub fn record_steps(&self, watched: &[Watched]) {
+        let steps: Vec<(u64, u64, String)> = {
+            let inner = self.lock();
+            watched
+                .iter()
+                .filter_map(|task| {
+                    let progress = inner.find(&task.agent_id)?.progress.as_ref()?;
+                    let (n, tool) = step_of(progress)?;
+                    Some((task.task_id, n, tool))
+                })
+                .collect()
+        };
+        let at = crate::works::unix_ms();
+        crate::works::with(|board| {
+            for (task, n, tool) in &steps {
+                board.step(*task, *n, tool, at);
+            }
+        });
+    }
+
+    /// [`Self::refresh`] when a watched direct task's row changed since the
+    /// last time (its state, line or last activity), so the bus's
+    /// `tasks/status` follows the run within a turn of the loop rather than
+    /// Harness's `ps` reads.
+    pub fn refresh_if_changed(
+        &self,
+        tracker: Option<&mut crate::progress::Tracker>,
+        watched: &[Watched],
+    ) {
+        let rows: Vec<(String, String, Option<String>, Option<u64>)> = self
+            .listed()
+            .into_iter()
+            .filter(|row| watched.iter().any(|task| task.agent_id == row.agent_id))
+            .map(|row| (row.agent_id, row.state, row.about, row.last_active_unix_ms))
+            .collect();
+        let sign = format!("{rows:?}");
+        {
+            let mut last = self.last_rows.lock().unwrap_or_else(|e| e.into_inner());
+            if *last == sign {
+                return;
+            }
+            *last = sign;
+        }
+        self.refresh(tracker, watched);
+    }
+
+    /// The tracker brought up to date from here for the watched direct
+    /// tasks, at once, before a progress read is answered. Their steps go
+    /// on the work records with the records' own refresh
+    /// ([`Self::record_steps`]), not here.
+    pub fn refresh(&self, tracker: Option<&mut crate::progress::Tracker>, watched: &[Watched]) {
+        // A direct-path task whose run is gone here (pruned, or from
+        // before a restart) is read too, as missing, as Harness's `ps`
+        // would have: it is never asked of Harness ([`lamp_path`]).
+        let ours: Vec<Watched> = watched
+            .iter()
+            .filter(|task| self.owns(&task.agent_id) || self.path(&task.engine, &task.machine_id))
+            .cloned()
+            .collect();
+        if ours.is_empty() {
+            return;
+        }
+        let Some(tracker) = tracker else {
+            return;
+        };
+        let mut machines: Vec<&str> = ours.iter().map(|task| task.machine_id.as_str()).collect();
+        machines.sort_unstable();
+        machines.dedup();
+        for machine in machines {
+            tracker.read(
+                machine,
+                Ok(self.listed()),
+                &ours,
+                crate::works::unix_ms(),
+                0,
+            );
+        }
+    }
+}
+
+/// The kept session's readiness as the Gateway's probe: a hand-over waits
+/// on it through [`crate::gateway::Gateway`]'s own wait, as Harness's does
+/// on the port.
+impl crate::gateway::Probe for Arc<OpenclawDirect> {
+    fn ready(&mut self) -> bool {
+        self.is_ready()
+    }
+    fn ready_until(&mut self, until: Instant, cancelled: &dyn Fn() -> bool) -> bool {
+        self.wait_ready(until, cancelled)
+    }
+    fn not_ready(&self) -> String {
+        let why = self.lock().not_ready_why.clone();
+        if why.is_empty() {
+            "OpenClaw's gateway is not ready yet".to_owned()
+        } else {
+            why
+        }
+    }
+}
+
+impl OpenclawDirect {
+    /// The wait before a hand-over, ready at most `within`.
+    pub fn gateway(self: &Arc<Self>, within: Duration) -> crate::gateway::Gateway {
+        crate::gateway::Gateway::with_bounds(
+            Box::new(self.clone()),
+            within,
+            crate::gateway::READY_EVERY,
+        )
+    }
+}
+
+/// A skill's `do.task` or a make (seam 2), in place of the gateway wait and
+/// the one session's pane: `words` (the run's prompt, the skill-start line
+/// in it for a skill) handed into the kept session, its end waited for to
+/// `until` or `stopped`. `live` is the run's skill-start grant (none for a
+/// make), `folder` the make's own folder.
+#[allow(clippy::too_many_arguments)]
+pub fn skill_turn(
+    direct: &Arc<OpenclawDirect>,
+    run: &crate::skill_task::SkillRun,
+    live: Option<&crate::skill_start::Live>,
+    folder: &Path,
+    words: &str,
+    makes: bool,
+    began: Instant,
+    until: Instant,
+    stopped: &dyn Fn() -> bool,
+) -> Result<u64, String> {
+    let mut gateway = direct.gateway(crate::gateway::SERVING_WITHIN);
+    if let Err(why) = gateway.before_launch_until(until, stopped) {
+        eprintln!("tasks: {}: {why}; the hand-over is not sent", run.run);
+        return Err(format!(
+            "the agent's gateway didn't take the run ({})",
+            crate::gateway::NOT_READY
+        ));
+    }
+    if stopped() || Instant::now() >= until {
+        return Err("the skill run ended before hand-over".into());
+    }
+    let kind = if makes {
+        TurnKind::Make
+    } else {
+        TurnKind::SkillTask
+    };
+    let name = turn_name(run)?;
+    let agent = direct.enqueue(&name, kind, words)?;
+    run.started.store(true, Ordering::Release);
+    let ended = direct.wait_end(&agent, until, stopped);
+    let took = began.elapsed().as_secs();
+    let line = format!(
+        "[lamp-tasks] skill task {}: ended, OpenClaw's gateway says idle, after {took} s; its agent: started (the lamp's default agent)",
+        run.run
+    );
+    match ended {
+        Some(End::Answered(answer)) if makes => {
+            eprintln!("{line}");
+            if let Some((text, _)) =
+                crate::skill_make::make_answer(folder, Some((answer.as_str(), false)))
+            {
+                let _ = run.answer.set(text);
+            }
+            Ok(0)
+        }
+        Some(End::Answered(answer)) => {
+            eprintln!("{line}");
+            // Failing closed, as the Harness path: the launcher claimed the
+            // start and the fence said it started the script, or no answer.
+            let ran = live.map_or_else(
+                || crate::gateway::start_ran(false, false),
+                crate::skill_start::Live::ran,
+            );
+            let answer = Some(answer).filter(|answer| !answer.trim().is_empty());
+            if ran.is_ok()
+                && let Some(answer) = answer
+            {
+                let _ = run.answer.set(answer);
+            }
+            ran.map(|()| 0)
+        }
+        Some(End::Failed(why)) => Err(why),
+        Some(End::Aborted) | None => {
+            if began.elapsed() >= run.deadline || Instant::now() >= until {
+                Err(format!(
+                    "the run was ended at its deadline, {} s",
+                    run.deadline.as_secs()
+                ))
+            } else {
+                Err("the run was ended as lamp-tasks stops".into())
+            }
+        }
+    }
+}
+
+#[cfg(test)]
+thread_local! {
+    /// A test's own lamp session, seen on its thread only ([`lamp`]).
+    static TEST_LAMP: std::cell::RefCell<Option<Arc<OpenclawDirect>>> =
+        const { std::cell::RefCell::new(None) };
+}
+
+/// The lamp's direct session: [`LAMP`]; in the crate's tests, the one the
+/// test set on its own thread ([`set_test_lamp`]), if any.
+pub fn lamp() -> Option<Arc<OpenclawDirect>> {
+    #[cfg(test)]
+    if let Some(direct) = TEST_LAMP.with(|lamp| lamp.borrow().clone()) {
+        return Some(direct);
+    }
+    LAMP.get().cloned()
+}
+
+/// A test's lamp session on its own thread.
+#[cfg(test)]
+pub(crate) fn set_test_lamp(direct: Option<Arc<OpenclawDirect>>) {
+    TEST_LAMP.with(|lamp| *lamp.borrow_mut() = direct);
+}
+
+/// Whether a task of `engine` (its bus name, `openclaw`) on `machine` is
+/// the direct path's: the switch on, OpenClaw, the lamp's own machine. Its
+/// progress and looks come from the gateway only, never from Harness's
+/// `ps` or `show` (each ~2 s on the lamp, on the one worker a hand-over
+/// waits behind). Hermes, other machines and the switch off: `false`.
+pub fn lamp_path(engine: &str, machine: &str) -> bool {
+    lamp().is_some_and(|direct| direct.path(engine, machine))
+}
+
+/// A direct-path task's look ([`lamp_path`]) in place of Harness's `show`:
+/// its run's, or `observe_failed` (what `show` of an agent Harness never
+/// had says) once the run is gone here (pruned, or from before a restart).
+/// `None`: not the direct path's, so Harness is asked as before.
+pub fn lamp_observe(
+    engine: &str,
+    machine: &str,
+    agent: &str,
+) -> Option<Result<Observation, String>> {
+    let direct = lamp().filter(|direct| direct.path(engine, machine))?;
+    Some(
+        direct
+            .observe(agent)
+            .ok_or_else(|| "observe_failed".to_owned()),
+    )
+}
+
+/// `watched` without the direct-path tasks ([`lamp_path`]): what Harness's
+/// `wait` and `watch` may follow. A direct task's end is read from its run
+/// (`Engine::push_direct_ended`); Harness never had it (`UNKNOWN_HARNESS`).
+pub fn harness_watched(watched: &[Watched]) -> Vec<Watched> {
+    watched
+        .iter()
+        .filter(|task| !lamp_path(&task.engine, &task.machine_id))
+        .cloned()
+        .collect()
+}
+
+/// The lamp's direct session, when `agent` is one of its turns.
+pub fn lamp_owns(agent: &str) -> Option<Arc<OpenclawDirect>> {
+    lamp().filter(|direct| direct.owns(agent))
+}
+
+fn tokens_in(text: &str) -> u64 {
+    u64::try_from(text.len() / 4).unwrap_or(u64::MAX)
+}
+
+fn unix_ms(at: SystemTime) -> Option<u64> {
+    at.duration_since(SystemTime::UNIX_EPOCH)
+        .ok()
+        .and_then(|since| u64::try_from(since.as_millis()).ok())
+}
+
+/// A fresh agent id, a lowercase UUID (v4), as Harness's are.
+fn new_agent_id() -> Result<String, String> {
+    let mut bytes = [0u8; 16];
+    getrandom::fill(&mut bytes).map_err(|_| "no random bytes".to_string())?;
+    bytes[6] = (bytes[6] & 0x0f) | 0x40;
+    bytes[8] = (bytes[8] & 0x3f) | 0x80;
+    let hex: String = bytes.iter().map(|byte| format!("{byte:02x}")).collect();
+    Ok(format!(
+        "{}-{}-{}-{}-{}",
+        &hex[..8],
+        &hex[8..12],
+        &hex[12..16],
+        &hex[16..20],
+        &hex[20..]
+    ))
+}
+
+/// `text` at most `most` bytes, cut at a whole character; and whether cut.
+fn cut_bytes(text: &str, most: usize) -> (String, bool) {
+    let end = text.floor_char_boundary(most);
+    (text[..end].to_owned(), end < text.len())
+}
+
+/// The state `harness ps`/`show` would say for a turn: queued here or on
+/// the gateway `starting`, at work `working`, answered `idle`, failed
+/// `failed`, aborted `stopped`. Never `idle` before the run ended.
+pub fn state_of(queued: bool, phase: Option<&Phase>, end: Option<&End>) -> &'static str {
+    match (end, phase) {
+        (Some(End::Answered(text)), _) if !text.trim().is_empty() => "idle",
+        // An end with no answer is no answer to tell: failed, never an idle
+        // agent the store would wait on for ever.
+        (Some(End::Answered(_) | End::Failed(_)), _) => "failed",
+        (Some(End::Aborted), _) => "stopped",
+        // Not yet handed over: starting. Handed over, the gateway has it:
+        // working from then on, its first event or not (ee17, 13:58:48: the
+        // bus read `starting` while `get_progress` read `working`).
+        (None, _) if queued => "starting",
+        (None, None | Some(Phase::Queued)) => "working",
+        (None, Some(Phase::Thinking | Phase::Tool | Phase::Writing)) => "working",
+        (None, Some(Phase::Done)) => "working",
+        (None, Some(Phase::Failed { .. })) => "failed",
+        (None, Some(Phase::Aborted)) => "stopped",
+    }
+}
+
+/// A skill run's or make's task id on the gateway and in the journal: its
+/// run id, or, with none (a make whose folder has no run id in its name,
+/// ee17 14:04:35), the skill's name and a fresh short id.
+fn turn_name(run: &crate::skill_task::SkillRun) -> Result<String, String> {
+    if !run.run.trim().is_empty() {
+        return Ok(run.run.clone());
+    }
+    let id = new_agent_id()?;
+    let short: String = id.chars().take(8).collect();
+    let skill = if run.skill.trim().is_empty() {
+        "skill"
+    } else {
+        run.skill.as_str()
+    };
+    Ok(format!("{skill}-{short}"))
+}
+
+/// The line of a turn waiting for the one before it.
+pub const QUEUED_ABOUT: &str = "waiting for the task before it to end";
+
+/// An untrusted progress line made safe to say: file paths (any word with
+/// a `/` or `\\`, or starting `~`) and every word the sign matcher reads
+/// as the work done (`progress::signs_in`'s `Sign::Done`) left out, so no
+/// unasked turn is started mid-run.
+fn scrub(line: &str) -> String {
+    line.split_whitespace()
+        .filter(|word| {
+            !(word.contains('/')
+                || word.contains('\\')
+                || word.starts_with('~')
+                || crate::progress::signs_in(word).contains(&lamp_msgs::Sign::Done))
+        })
+        .collect::<Vec<_>>()
+        .join(" ")
+}
+
+/// The progress line (`about`), from the run's own events: its plan's
+/// "on step k of n" with the step at hand when it keeps one, the tool it
+/// runs (or ran last) with its brief, else the tail of what it has
+/// written; at most [`ABOUT_MOST`] characters, scrubbed ([`scrub`]) and
+/// made plain (`now::step`): it is the agent's, so untrusted.
+pub fn about(progress: &Progress) -> Option<String> {
+    let mut parts = Vec::new();
+    if !progress.plan.is_empty() {
+        let done = progress.plan.iter().filter(|item| item.done).count();
+        let n = progress.plan.len();
+        match progress.plan.iter().find(|item| !item.done) {
+            Some(item) => parts.push(format!(
+                "on step {} of {n}: {}",
+                (done + 1).min(n),
+                scrub(&item.text)
+            )),
+            None => parts.push(format!("past step {n} of {n}")),
+        }
+    }
+    if let Some(tool) = &progress.last_tool {
+        let brief = scrub(&tool.brief);
+        let doing = if tool.running { "running" } else { "ran" };
+        parts.push(if brief.is_empty() {
+            format!("{doing} {}", tool.name)
+        } else {
+            format!("{doing} {}: {brief}", tool.name)
+        });
+    }
+    let line = if parts.is_empty() {
+        // The tail of what it wrote: its newest words.
+        let text = scrub(progress.last_text.as_deref()?);
+        let skip = text.chars().count().saturating_sub(ABOUT_MOST);
+        text.chars().skip(skip).collect()
+    } else {
+        parts.join("; ")
+    };
+    crate::now::step(&line, ABOUT_MOST)
+}
+
+/// The board's step for a run: the tool at hand (or last), numbered by the
+/// tools done so far plus the one running.
+pub fn step_of(progress: &Progress) -> Option<(u64, String)> {
+    let tool = progress.last_tool.as_ref()?;
+    let n = u64::from(progress.tools_done) + u64::from(tool.running);
+    Some((n, crate::now::step(&tool.name, 64)?)).filter(|_| n > 0)
+}
+
+fn listed_of_run(run: &Run) -> Listed {
+    Listed {
+        agent_id: run.agent.clone(),
+        state: state_of(
+            run.queued(),
+            run.progress.as_ref().map(|p| &p.phase),
+            run.end.as_ref(),
+        )
+        .to_owned(),
+        last_active_unix_ms: run
+            .progress
+            .as_ref()
+            .map_or(unix_ms(run.queued_at), |p| unix_ms(p.updated_at)),
+        // Waiting for the turn before it (one at a time): said so.
+        about: if run.queued() {
+            Some(QUEUED_ABOUT.to_owned())
+        } else {
+            run.progress.as_ref().and_then(about)
+        },
+        agent: Some(EngineKind::Openclaw.argument().to_owned()),
+    }
+}
+
+/// A run's row as `harness ps` gave it ([`listed_of_run`]), for tests and
+/// the docs: `progress` the gateway's, `end` lamp-tasks'.
+pub fn listed_of(agent: &str, progress: Option<&Progress>, end: Option<&End>) -> Listed {
+    listed_of_run(&Run {
+        name: String::new(),
+        agent: agent.to_owned(),
+        kind: TurnKind::Spoken,
+        message: String::new(),
+        asked: String::new(),
+        queued_at: SystemTime::now(),
+        queued_since: Instant::now(),
+        tries: 0,
+        reset_spent: false,
+        run: progress.map(|p| p.run.clone()),
+        progress: progress.cloned(),
+        end: end.cloned(),
+    })
+}
+
+fn observation_of_run(run: &Run) -> Observation {
+    let (answer, truncated) = match &run.end {
+        Some(End::Answered(text)) => cut_bytes(text, MAX_ANSWER_BYTES),
+        // A drop's failure carries the person's "try again" words as its
+        // last words: the voice's news of a stopped task says them, in the
+        // person's language.
+        Some(End::Failed(why)) if why == lamp_agent_gateway::openclaw::DROPPED => {
+            (why.clone(), false)
+        }
+        _ => (String::new(), false),
+    };
+    Observation {
+        agent_id: run.agent.clone(),
+        state: state_of(
+            run.queued(),
+            run.progress.as_ref().map(|p| &p.phase),
+            run.end.as_ref(),
+        )
+        .to_owned(),
+        ask: Some(cut_bytes(&run.asked, MAX_ASK_BYTES).0).filter(|ask| !ask.is_empty()),
+        answer,
+        truncated,
+        tools: run.progress.as_ref().map_or(0, |p| u64::from(p.tools_done)),
+    }
+}
+
+/// A run's observation as `harness show` gave it ([`observation_of_run`]).
+pub fn observation_of(agent: &str, progress: Option<&Progress>, end: Option<&End>) -> Observation {
+    observation_of_run(&Run {
+        name: String::new(),
+        agent: agent.to_owned(),
+        kind: TurnKind::Spoken,
+        message: String::new(),
+        asked: String::new(),
+        queued_at: SystemTime::now(),
+        queued_since: Instant::now(),
+        tries: 0,
+        reset_spent: false,
+        run: progress.map(|p| p.run.clone()),
+        progress: progress.cloned(),
+        end: end.cloned(),
+    })
+}
+
+#[cfg(test)]
+pub(crate) mod tests;
