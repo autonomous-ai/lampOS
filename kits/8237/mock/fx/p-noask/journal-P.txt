@@ -1,2 +1,4 @@
+1763849990.000000 lamp lamp-skills[1]: lamp-skills: desk-hello Triggered: the model called desk_hello with {}
+1763849990.000000 lamp lamp-skills[1]: lamp-skills: desk-hello Triggered: the model called desk_hello with {}
 1763850000.500000 lamp lamp-skills[1]: lamp-skills: skill:desk-hello: do.task: not handed over: waiting for the owner's yes (the lamp says it back and asks); not asked aloud: asked aloud already today
 1763850001.000000 lamp lamp-skills[1]: lamp-skills: skill:desk-hello: do.task: lamp-tasks' answer carries 20 bytes of its agent's answer

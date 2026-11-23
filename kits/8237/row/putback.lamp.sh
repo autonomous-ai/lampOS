@@ -28,4 +28,9 @@ for p in $PUTP; do part=${p%%:*}; r=${p#*:}; unit=${r%%:*}; bin=${r#*:}; f=$(ins
   [ "$(mounted "$f")" = 0 ] || { echo "FAIL a mount left over $f"; ok=0; }; done
 [ -f $HD ] && { echo "FAIL hold left: $HD"; ok=0; }; [ -f $AD ] && { echo "FAIL drop-in left: $AD"; ok=0; }; [ -f $ND ] && { echo "FAIL drop-in left: $ND"; ok=0; }
 [ -n "$(envval "$(pid lamp-voice)" LAMP_NAME_NEAR | grep -x off)" ] && [ ! -f $ND ] && echo "NOTE lamp-voice still has LAMP_NAME_NEAR=off from elsewhere"
+AK=/var/lib/lampos-skills-state/task-asks.json
+if [ -e $R/task-asks.found ]; then cp -p $R/task-asks.found $AK; n "put $AK back as found"
+  [ "$(sha $AK)" = "$(sha $R/task-asks.found)" ] && { echo "ASKS LEDGER put back as found $(sha $AK)"; rm -f $R/task-asks.found; } || { echo "FAIL asks ledger not as found"; ok=0; }
+elif [ -e $R/task-asks.none ]; then rm -f $AK; n "removed the row's $AK (none before)"; echo "ASKS LEDGER none, as found"; rm -f $R/task-asks.none
+else echo "ASKS LEDGER not recorded by put: left as is"; fi
 [ $ok = 1 ] && { rm -f $R/*.stable; echo "PUTBACK OK"; } || echo "PUTBACK NOT OK"

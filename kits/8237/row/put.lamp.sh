@@ -23,6 +23,12 @@ for p in $PUTP; do part=${p%%:*}; bin=${p##*:}; install -d $(tdir $part); instal
 rm -rf /tmp/t8237; systemctl daemon-reload
 [ -f $HD ] && { systemctl restart lamp-update; n "lamp-update restarted, apply off"; }
 systemctl stop lamp-skills lamp-tasks; n "stopped lamp-skills lamp-tasks for the binds"
+# The asks-aloud ledger (skills task.rs ASKS_FILE: once a day a folder, 3 a day in all) is test state for this row,
+# not the product's: kept as found and cleared while lamp-skills is stopped, put back by putback.lamp.sh.
+AK=/var/lib/lampos-skills-state/task-asks.json
+if [ ! -e $R/task-asks.found ] && [ ! -e $R/task-asks.none ]; then
+  if [ -f $AK ]; then cp -p $AK $R/task-asks.found; n "kept $AK as found ($(sha $AK))"; else : > $R/task-asks.none; n "no $AK before the row"; fi; fi
+rm -f $AK; n "cleared $AK for the row"; echo "ASKS LEDGER cleared (kept: $([ -e $R/task-asks.found ] && sha $R/task-asks.found || echo none))"
 for u in lamp-skills lamp-tasks; do [ "$(pid $u)" = 0 ] || { echo "PUT NOT OK: $u still has a pid: nothing bound"; exit 4; }; done
 for p in $PUTP; do part=${p%%:*}; bin=${p##*:}; mount --bind -o ro $(tdir $part)/$bin "$(inst $part $bin)"; n "bind $(tdir $part)/$bin over $(inst $part $bin)"; done
 systemctl start lamp-tasks lamp-skills; systemctl restart lamp-voice; n "started lamp-tasks lamp-skills on #8237, lamp-voice with LAMP_NAME_NEAR=off"
