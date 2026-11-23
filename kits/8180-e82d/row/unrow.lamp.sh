@@ -6,12 +6,13 @@
 # Never touches volume, lamp-cloud or a reset. Prints UNROW OK or UNROW NOT OK.
 set -u; ok=1
 gone=
-for f in $ND_RUNON $ND_NAMED; do [ -f $f ] && { rm -f $f; n "removed $f"; gone="$gone ${f##*/}"; }; done
+for f in $ND_RUNON $ND_NAMED $ND_NAMENEAR; do [ -f $f ] && { rm -f $f; n "removed $f"; gone="$gone ${f##*/}"; }; done
 if [ -n "$gone" ]; then rmdir ${ND_RUNON%/*} 2>/dev/null; systemctl daemon-reload
   systemctl restart lamp-voice; n "restarted lamp-voice (drop-ins gone:$gone)"; sleep 15; echo "DROPINS removed:$gone; lamp-voice restarted"; fi
 v=$(pid lamp-voice)
 for sw in LAMP_MAKE_MAY_RUN_ON LAMP_NAMED_AGENT_TAKES_LINE; do
   [ -z "$(envval $v $sw)" ] && echo "PASS $sw not set" || { echo "FAIL $sw still '$(envval $v $sw)'"; ok=0; }; done
+[ "$(envval $v LAMP_NAME_NEAR)" != off ] && echo "PASS LAMP_NAME_NEAR back to the product's ('$(envval $v LAMP_NAME_NEAR)')" || { echo "FAIL LAMP_NAME_NEAR still off"; ok=0; }
 if [ "${KEEP_SKILLS:-0}" != 1 ] && [ -f $R/skills.before ]; then
   for s in $(skillnames | LC_ALL=C comm -13 $R/skills.before -); do
     out=$($SKBIN remove --dir $SK --state-dir $SKST "$s" 2>&1); rc=$?

@@ -13,6 +13,10 @@ ND_RUNON=/run/systemd/system/lamp-voice.service.d/zz-row-8180-runon.conf
 # leg N only (#7269): LAMP_NAMED_AGENT_TAKES_LINE=on, a /run drop-in (gone at reboot), removed by named off, by unrow,
 # by row.sh's EXIT trap and by run.sh's EXIT guard (NAMEDGUARD)
 ND_NAMED=/run/systemd/system/lamp-voice.service.d/zz-row-8180-named.conf
+# every leg (23 Nov): LAMP_NAME_NEAR=off, a /run drop-in laid by save and removed by unrow. The clips are the Mac's
+# ElevenLabs voice, which lamp-name may not take for the lamp's name, so an ask was held as "nobody spoke to the
+# lamp" (#8318; e82d 22 Nov: A, B, K, H). The first builder's fix for Mac-voice kits (#6449, 23 Nov 07:59).
+ND_NAMENEAR=/run/systemd/system/lamp-voice.service.d/zz-row-8180-namenear.conf
 # product switches the rows rest on (lamp-voice's environment must have them =on)
 NEED="LAMP_MAKE_SKILL LAMP_MAKE_SKILL_AGENT LAMP_SKILL_TASKS LAMP_MADE_SCRIPTS LAMP_TASK_NET LAMP_TASK_NET_GATEWAY"
 MS=/var/lib/lampOS/voice/made-skills

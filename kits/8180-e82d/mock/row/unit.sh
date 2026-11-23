@@ -64,6 +64,14 @@ for f in sys.argv[1:]:
   for n,l in enumerate(open(f),1):
     if re.search(r"(^|[; ])([A-Z][A-Z0-9_]*)=\$\2(;|$)",l.rstrip("\n")): print("%s:%d:%s"%(f,n,l.strip()))' $KIT/row/*.sh $KIT/run.sh)
     v "every kit variable has a default (no bare NAME=\$NAME)" '[ -z "$o" ]';;
+  namenear)
+    # The Mac voice's "Hey Lamp" (#8318, e82d 22 Nov): save lays LAMP_NAME_NEAR=off as the row's /run drop-in and checks
+    # it took; unrow removes that drop-in and checks lamp-voice is back to the product's value.
+    sv=$(grep -c 'Environment=LAMP_NAME_NEAR=off.* > \$ND_NAMENEAR' $KIT/row/save.lamp.sh); ck=$(grep -c '\[ "\$nn" = off \] ||' $KIT/row/save.lamp.sh)
+    ur=$(grep -c 'for f in \$ND_RUNON \$ND_NAMED \$ND_NAMENEAR; do' $KIT/row/unrow.lamp.sh); uc=$(grep -c 'FAIL LAMP_NAME_NEAR still off' $KIT/row/unrow.lamp.sh)
+    nd=$(grep -c '^ND_NAMENEAR=/run/systemd/system/lamp-voice.service.d/' $KIT/row/common.lamp.sh)
+    o="save lays $sv, checks $ck; unrow removes $ur, checks $uc; common defines $nd"
+    v "LAMP_NAME_NEAR=off is laid by save and taken away by unrow" '[ "$sv$ck$ur$uc$nd" = 11111 ]';;
   keep-verdicts)
     # A split rerun (rows of 20 min or less, 23 Nov) keeps the earlier runs' verdicts: save clears verdicts.env only
     # without KEEP_VERDICTS=1, so a later G still reads A, B and D.

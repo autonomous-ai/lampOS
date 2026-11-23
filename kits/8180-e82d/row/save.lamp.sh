@@ -22,4 +22,9 @@ for f in task-asks.json task-runs.json; do [ -f $SKST/$f ] || { n "no $SKST/$f: 
   cp -p $SKST/$f $SKST/$f.bak-row-8180-$(date +%H%M%S); printf '[]' > $SKST/$f.t && chown --reference=$SKST/$f $SKST/$f.t && chmod --reference=$SKST/$f $SKST/$f.t && mv -f $SKST/$f.t $SKST/$f; n "backed up and cleared $SKST/$f"; echo "LEDGER $f cleared"; done
 n "row baselines saved in $R (made.json, long-make, skills tar)"
 echo "LINKED $(linked)"
+# LAMP_NAME_NEAR=off for the row (ND_NAMENEAR): 1 lamp-voice start; unrow removes it
+mkdir -p ${ND_NAMENEAR%/*}; printf '[Service]\n# #8180 row: Hey Lamp in the Mac voice, gone at reboot\nEnvironment=LAMP_NAME_NEAR=off\n' > $ND_NAMENEAR
+systemctl daemon-reload; systemctl restart lamp-voice; n "added $ND_NAMENEAR (LAMP_NAME_NEAR=off); lamp-voice restarted"; sleep 15
+nn=$(envval $(pid lamp-voice) LAMP_NAME_NEAR); [ "$nn" = off ] || { echo "SAVE STOP: LAMP_NAME_NEAR is '$nn' after the drop-in"; exit 3; }
+echo "NAMENEAR off (row drop-in)"
 echo "SAVED OK"
