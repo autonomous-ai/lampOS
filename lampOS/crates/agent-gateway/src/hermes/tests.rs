@@ -433,6 +433,77 @@ fn run_interrupted_by_a_shutdown_ends_with_the_drop_words() {
     );
 }
 
+/// The killed gateway still holds the kept session's turn lease (Hermes'
+/// state.db, 300 s TTL): the next turn must go into a fresh session, never
+/// wait that out (ee17, 24 Nov 04:23).
+#[test]
+fn after_a_drop_the_next_turn_goes_into_a_fresh_session() {
+    let f = Fake::start();
+    let mut s = ready(&f);
+    let old = s.session_id().to_owned();
+    let run = s.send(&turn("t1", "New task t1: long")).unwrap();
+    following(&f, &run, 1);
+    f.kill();
+    assert!(
+        matches!(s.wait(&run, 5 * SECOND).unwrap(), Outcome::Failed { why, .. } if why == DROPPED)
+    );
+    f.revive();
+    s.ready(5 * SECOND).expect("ready again");
+    let new = s.session_id().to_owned();
+    assert_ne!(new, old);
+    assert!(f.has_session(&new));
+    assert_eq!(f.reqs("DELETE", &format!("/api/sessions/{old}")).len(), 1);
+    assert_eq!(kept(&f).session_id, new);
+    let next = s
+        .send(&turn("t2", "New task t2: capital of Spain"))
+        .unwrap();
+    assert_eq!(runs_posted(&f)[1].body["session_id"], json!(new));
+    following(&f, &next, 1);
+    f.push(&next.0, "run.completed", json!({"output": "Madrid"}));
+    assert_eq!(answered(s.wait(&next, 5 * SECOND).unwrap()).0, "Madrid");
+    // Once per drop: the turn after keeps the new session.
+    s.send(&turn("t3", "z")).unwrap();
+    assert_eq!(runs_posted(&f)[2].body["session_id"], json!(new));
+}
+
+#[test]
+fn a_restart_that_interrupted_the_run_replaces_the_session_at_the_next_send() {
+    let f = Fake::start();
+    let mut s = ready(&f);
+    let old = s.session_id().to_owned();
+    let run = s.send(&turn("t1", "x")).unwrap();
+    following(&f, &run, 1);
+    f.restart();
+    assert!(
+        matches!(s.wait(&run, 5 * SECOND).unwrap(), Outcome::Failed { why, .. } if why == DROPPED)
+    );
+    // No ready() between: the send itself replaces the session first.
+    assert!(eventually(5 * SECOND, || s.send(&turn("t2", "y")).is_ok()));
+    let new = s.session_id().to_owned();
+    assert_ne!(new, old);
+    assert_eq!(runs_posted(&f)[1].body["session_id"], json!(new));
+    assert_eq!(f.reqs("DELETE", &format!("/api/sessions/{old}")).len(), 1);
+}
+
+/// A graceful restart (Hermes drains, the run completes) keeps the session.
+#[test]
+fn a_run_that_completed_keeps_the_session_across_a_restart() {
+    let f = Fake::start();
+    let mut s = ready(&f);
+    let old = s.session_id().to_owned();
+    let run = s.send(&turn("t1", "x")).unwrap();
+    following(&f, &run, 1);
+    f.push(&run.0, "run.completed", json!({"output": "done"}));
+    assert_eq!(answered(s.wait(&run, 5 * SECOND).unwrap()).0, "done");
+    f.restart();
+    s.ready(5 * SECOND).expect("ready again");
+    assert!(eventually(5 * SECOND, || s.send(&turn("t2", "y")).is_ok()));
+    assert_eq!(s.session_id(), old);
+    assert_eq!(runs_posted(&f)[1].body["session_id"], json!(old));
+    assert_eq!(kept(&f).session_id, old);
+    assert!(f.reqs("DELETE", &format!("/api/sessions/{old}")).is_empty());
+}
+
 #[test]
 fn an_unconfirmed_hand_over_is_sent_again_with_its_key_and_replayed() {
     let f = Fake::start();

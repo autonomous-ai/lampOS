@@ -476,11 +476,31 @@ fn another_default_stops_the_gateway_and_hermes_again_starts_it() {
             format!("start {UNIT}")
         ]
     );
-    // A failed gateway is left to the next round between rounds.
+    // A failed gateway, already wanted, is left to the next round.
     systemd.gateway = Some("failed");
     systemd.asked.clear();
     keep_between_rounds(lamp.root(), &mut systemd, Gateway::Wanted, &mut said());
     assert_eq!(systemd.asked, ["gateway-state"]);
+    // Not wanted again, then Hermes chosen once more with the gateway left
+    // failed by the stop before (lamp-ee17, 24 Nov): reset and started at
+    // once, not left for a round hours away.
+    systemd.gateway = Some("inactive");
+    keep_between_rounds(lamp.root(), &mut systemd, Gateway::NotWanted, &mut said());
+    assert!(!lamp.enabled());
+    systemd.gateway = Some("failed");
+    systemd.asked.clear();
+    keep_between_rounds(lamp.root(), &mut systemd, Gateway::Wanted, &mut said());
+    assert!(lamp.enabled());
+    assert_eq!(
+        systemd.asked,
+        [
+            "gateway-state".to_owned(),
+            "reload".to_owned(),
+            "gateway-state".to_owned(),
+            format!("reset-failed {UNIT}"),
+            format!("start {UNIT}")
+        ]
+    );
 }
 
 /// Between rounds, nothing is touched before the unit and the script are
