@@ -76,6 +76,9 @@ pub enum Error {
     /// (seconds since 1970 UTC: its `reset_at`, else `retry-after` from
     /// now), if it said.
     UsageLimit(Option<i64>),
+    /// Gemini answered HTTP 400 for the key itself, by its body (#8420):
+    /// said only for a chat that reads it so, the person's own Gemini.
+    KeyInvalid,
     /// The service said something this client does not read.
     Protocol(&'static str),
 }
@@ -88,6 +91,7 @@ impl fmt::Display for Error {
             Error::Timeout(step) => write!(f, "{step} timed out"),
             Error::Status(code) => write!(f, "service answered HTTP {code}"),
             Error::UsageLimit(_) => f.write_str("service answered HTTP 429 (usage limit)"),
+            Error::KeyInvalid => f.write_str("service answered HTTP 400 (the key invalid)"),
             Error::Protocol(what) => write!(f, "unexpected {what}"),
         }
     }
@@ -226,6 +230,18 @@ async fn post(
     auth: (&'static str, &str),
     body: &serde_json::Value,
 ) -> Result<reqwest::Response> {
+    post_reading_the_key(client, url, auth, body, false).await
+}
+
+/// [`post`], with Gemini's 400 for a bad key as [`Error::KeyInvalid`] when
+/// `key_400` (#8420).
+pub(crate) async fn post_reading_the_key(
+    client: &reqwest::Client,
+    url: &str,
+    auth: (&'static str, &str),
+    body: &serde_json::Value,
+    key_400: bool,
+) -> Result<reqwest::Response> {
     let request = client
         .post(url)
         .header(auth.0, auth.1)
@@ -285,6 +301,9 @@ async fn post(
             }
             return Err(Error::UsageLimit(reset));
         }
+        if key_400 && status == 400 && gemini_key_invalid(&head) {
+            return Err(Error::KeyInvalid);
+        }
         return Err(Error::Status(status));
     }
     Ok(response)
@@ -337,6 +356,30 @@ pub(crate) fn unix_of(text: &str) -> Option<i64> {
         }
     };
     Some(days * 86_400 + hour * 3_600 + minute * 60 + second - east)
+}
+
+/// Whether Gemini's 400 refuses the key (#8420): its OpenAI-compatible
+/// endpoint says "Please pass a valid API key" (seen live on 24 Nov, as an
+/// object or a one-item array), its native API `API_KEY_INVALID`. Any other
+/// 400 is the request's own.
+fn gemini_key_invalid(head: &[u8]) -> bool {
+    let Ok(value) = serde_json::from_slice::<serde_json::Value>(head) else {
+        return false;
+    };
+    let error = match &value {
+        serde_json::Value::Array(items) => {
+            &items.first().unwrap_or(&serde_json::Value::Null)["error"]
+        }
+        _ => &value["error"],
+    };
+    error["message"]
+        .as_str()
+        .is_some_and(|message| message.contains("valid API key"))
+        || error["details"]
+            .as_array()
+            .into_iter()
+            .flatten()
+            .any(|detail| detail["reason"] == "API_KEY_INVALID")
 }
 
 /// The longest `retry-after` taken as a reset: past it, no time is said.

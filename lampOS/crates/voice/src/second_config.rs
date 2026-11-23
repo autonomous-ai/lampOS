@@ -160,6 +160,19 @@ pub enum OwnChat {
     OpenAiCompatible,
     /// OpenRouter's, at [`OPENROUTER_BASE_URL`], never searching.
     OpenRouter,
+    /// Gemini's, at [`GEMINI_BASE_URL`] (#8420).
+    Gemini,
+}
+
+impl OwnChat {
+    /// Its name in the journal.
+    pub fn name(self) -> &'static str {
+        match self {
+            Self::OpenAiCompatible => "OpenAI-compatible",
+            Self::OpenRouter => "OpenRouter",
+            Self::Gemini => "Gemini",
+        }
+    }
 }
 
 /// The lamp's own speech, as the route had it before the person's voice.
@@ -619,6 +632,10 @@ pub const OWN_COMPATIBLE_MODEL: &str = "own_openai_compatible.model";
 /// OpenRouter's own, [`OPENROUTER_BASE_URL`].
 pub const OWN_OPENROUTER_KEY: &str = "own_openrouter.key";
 pub const OWN_OPENROUTER_MODEL: &str = "own_openrouter.model";
+/// The person's own Gemini key and model (#8420); its endpoint is Google's
+/// own, [`GEMINI_BASE_URL`].
+pub const OWN_GEMINI_KEY: &str = "own_gemini.key";
+pub const OWN_GEMINI_MODEL: &str = "own_gemini.model";
 
 /// A model's name as it goes in a request's body: 1 to 128 letters,
 /// digits, `-`, `.`, `_`, `/` and `:`.
@@ -714,18 +731,25 @@ impl SecondConfig {
                 checked_url(read(OWN_COMPATIBLE_URL)?).map_err(|_| io::ErrorKind::InvalidData)?;
             Ok(Some((key, url, model(OWN_COMPATIBLE_MODEL)?)))
         });
-        let openrouter = || {
-            own(OWN_OPENROUTER_KEY).and_then(|key| {
+        // A named provider's key and model, at its own fixed endpoint.
+        let named = |key: &str, url: &str, model_file: &str| {
+            own(key).and_then(|key| {
                 let Some(key) = key else { return Ok(None) };
-                Ok(Some((
-                    key,
-                    OPENROUTER_BASE_URL.to_owned(),
-                    model(OWN_OPENROUTER_MODEL)?,
-                )))
+                Ok(Some((key, url.to_owned(), model(model_file)?)))
             })
         };
         let (chat, found) = match compatible {
-            Ok(None) => (OwnChat::OpenRouter, openrouter()),
+            Ok(None) => match named(
+                OWN_OPENROUTER_KEY,
+                OPENROUTER_BASE_URL,
+                OWN_OPENROUTER_MODEL,
+            ) {
+                Ok(None) => (
+                    OwnChat::Gemini,
+                    named(OWN_GEMINI_KEY, GEMINI_BASE_URL, OWN_GEMINI_MODEL),
+                ),
+                found => (OwnChat::OpenRouter, found),
+            },
             found => (OwnChat::OpenAiCompatible, found),
         };
         let compatible_line = match found {
@@ -735,9 +759,10 @@ impl SecondConfig {
                         "OpenAI-compatible: the person's own key, at {}, model {model} (LAMP_OWN_KEYS)",
                         host(&url)
                     ),
-                    OwnChat::OpenRouter => {
-                        format!("OpenRouter: the person's own key, model {model} (LAMP_OWN_KEYS)")
-                    }
+                    OwnChat::OpenRouter | OwnChat::Gemini => format!(
+                        "{}: the person's own key, model {model} (LAMP_OWN_KEYS)",
+                        chat.name()
+                    ),
                 };
                 let lamps_own = self.hosted.clone();
                 self.hosted.relay_deepseek_base_url = self.hosted.deepseek_base_url.replace(url);
@@ -750,10 +775,7 @@ impl SecondConfig {
             Ok(None) => None,
             Err(kind) => Some(format!(
                 "{}: the relay, the person's key could not be read ({kind}) (LAMP_OWN_KEYS)",
-                match chat {
-                    OwnChat::OpenAiCompatible => "OpenAI-compatible",
-                    OwnChat::OpenRouter => "OpenRouter",
-                }
+                chat.name()
             )),
         };
         let deepseek = own(OWN_DEEPSEEK_KEY).and_then(|key| {
