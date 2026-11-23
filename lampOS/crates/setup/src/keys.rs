@@ -864,7 +864,7 @@ impl Store {
             "openai_compatible_host".into(),
             json!(
                 read(compatible, compatible.url_file())
-                    .map(|url| host(&url).to_owned())
+                    .map(|url| self::host(&url).to_owned())
                     .filter(|host| !host.is_empty())
             ),
         );
